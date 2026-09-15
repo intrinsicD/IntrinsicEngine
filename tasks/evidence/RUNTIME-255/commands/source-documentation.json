@@ -1,0 +1,25 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py",
+    "--root",
+    ".",
+    "--path",
+    "src/graphics/renderer/Graphics.RenderingContract.cppm",
+    "--summary"
+  ],
+  "command_display": "python3 tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py --root . --path src/graphics/renderer/Graphics.RenderingContract.cppm --summary",
+  "cwd": ".",
+  "duration_ms": 33,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T01:41:53Z",
+  "label": "source-documentation",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T01:41:53Z",
+  "stderr_path": "tasks/evidence/RUNTIME-255/commands/source-documentation.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-255/commands/source-documentation.stdout.log",
+  "stdout_sha256": "ae830e89adb0e59a07e4ce3a399ef2a5150a40d6d6339cf4d655961ff1ebe2f2",
+  "task_id": "RUNTIME-255"
+}

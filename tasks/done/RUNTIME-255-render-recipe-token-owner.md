@@ -5,10 +5,10 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: high-risk
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "codex-overnight"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-09-15T01:13:12Z"
 contract_schema: 1
 contracts: [repo.source-documentation]
 ---
@@ -76,24 +76,24 @@ Claude approved this corrected plan. Source comparison and review files are unde
    with high-risk handoff/review/report/seal evidence.
 
 ## Required changes
-- [ ] Five token implementations live with their enums and serve both existing consumers.
-- [ ] All 31 spellings, parser candidate lists/order, Unknown handling and safety diagnostics preserved.
-- [ ] Remove superseded editor helpers directly; no new abstraction/module/file or compatibility path.
+- [x] Five token implementations live with their enums and serve both existing consumers.
+- [x] All 49 spellings, parser candidate lists/order, Unknown handling and safety diagnostics preserved.
+- [x] Remove superseded editor helpers directly; no new abstraction/module/file or compatibility path.
 
 ## Tests
-- [ ] Literal-driven expected spellings for all five enums and invalid-enum fallbacks.
-- [ ] Per-enum accepted/unknown tokens and parseable-but-unsafe domain behavior remain unchanged.
-- [ ] Existing recipe editor model and full CPU/focused sanitizer gates pass.
+- [x] Literal-driven expected spellings for all seven enums and invalid-enum fallbacks.
+- [x] Per-enum accepted/unknown tokens and parseable-but-unsafe domain behavior remain unchanged.
+- [x] Existing recipe editor model and full CPU/focused sanitizer gates pass.
 
 ## Docs
-- [ ] Document the shared token owner briefly in existing renderer docs and refresh module inventory.
-- [ ] Record exact net production counts without calling code movement deletion or speedup.
-- [ ] Complete high-risk independent review, handoff/report, retirement and exact source seal.
+- [x] Document the shared token owner briefly in existing renderer docs and refresh module inventory.
+- [x] Record exact net production counts without calling code movement deletion or speedup.
+- [x] Complete high-risk independent review, handoff/report, retirement and exact source seal.
 
 ## Acceptance criteria
-- [ ] Canonical token ownership reused without changing any accepted config or displayed label.
-- [ ] Literal expectations and existing UI/config behavior verified with independent review.
-- [ ] Final source locally committed, retired and sealed with no new production file or performance claim.
+- [x] Canonical token ownership reused without changing any accepted config or displayed label.
+- [x] Literal expectations and existing UI/config behavior verified with independent review.
+- [x] Final source locally committed, retired and sealed with no new production file or performance claim.
 
 ## Verification
 ```bash
@@ -119,3 +119,49 @@ focused sanitizers cover this string/config contract. BUILD-007/C92 remain open.
 - Replacing explicit candidate lists with numeric ranges or broad schema rewrites.
 - Adding exported parsers, generic token infrastructure, new files or unrelated prepared-frame helpers.
 - Claiming runtime/compile speedup or reduced code size without exact matched evidence.
+
+## In-scope planning refinement — existing token owners
+Before parser/test edits or builds, source inspection found the same duplicated
+spelling in adjacent ParseRendererCapability and ParseRenderOutputKind. Their
+existing RenderingContract ToString overloads already provide all 11+7 identical
+tokens. Reuse them in this same parser file, with unchanged candidate lists/order;
+no additional declaration, file or mechanism. This completes the same token-owner
+consolidation for all seven parsers with current ToString owners while avoiding a
+second compiler rebuild for the identical two small follow-ups. The user-approved
+cleanup scope is unchanged; the earlier five-overload API limit still applies.
+Record 49 matched pairs total (31 moved-owner, 18 existing-owner); literal-driven
+tests cover all seven. Other parser families, aliases and fallback policies stay
+unchanged. The compiled owner/editor edits were already made by Claude before its
+24-turn tool cap; resume only remaining parser/tests work, not those completed edits.
+
+## Completion — 2026-09-15
+- Endpoint: **Retired**, shared enum-token ownership with unchanged config/UI behavior.
+- Commit: implementation and retirement are in the enclosing local commit;
+  `tasks/evidence/RUNTIME-255/seal.yaml` names the exact sealed revision.
+- Five compiled ToString overloads replace five runtime-local spelling switches.
+  Seven parsers reuse 49 exact owner tokens, including two pre-existing overloads.
+  Their candidate lists, order, Unknown handling and rejection diagnostics are
+  preserved. Exact baseline substitution reproduces the entire config source.
+- Four existing production files total 3,441 to 3,435 physical lines: six fewer,
+  with zero new production files or modules. This is primarily consolidation,
+  not large code deletion. No compile-time or runtime-speed claim.
+- Four new tests pin literal spellings, invalid values and parser/ownership
+  discrimination; existing config and editor-model tests cover the reused outputs.
+  Full CPU: 4,636 passed and one expected unsanitized GLFW/LSan control skip.
+  Focused tests: 27/27 on native, ASan and UBSan, with variants run sequentially.
+  Full sanitizer and GPU execution suites were not repeated for this string-only
+  change; no backend capability or method-parity claim is made.
+- Claude approved the fixed source diff. Root checked every optional review note:
+  fixed enum underlying types, direct algorithm include, intentional parse-versus-
+  ownership assertions and untouched parser contracts. The source-documentation
+  review flag is the existing mandatory slot-borrow lifetime comment; retained.
+  Two earlier Claude implementation calls reached tool limits; root completed
+  the remaining tests and removed duplicate fixtures. No failing C++ gate.
+- Architecture/clean-workshop: rows 1–3 pass (existing allowed graphics owner,
+  no new dependency, five additive declarations); 4–7 not applicable (no frame
+  pass, recipe behavior, rendering protocol or maturity promotion); row 8 passes
+  with no new exception. Lifetime, concurrency and failure paths are unchanged.
+  Config/UI/agent spelling now shares the same owner; no generic enum machinery.
+- Existing frame-graph and reuse-owner docs are synchronized; module inventory
+  was regenerated and still contains 417 modules. Fixed-digest independent final
+  review and command receipts bind the retirement. BUILD-007/C92 remain open.

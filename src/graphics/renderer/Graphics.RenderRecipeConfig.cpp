@@ -123,30 +123,30 @@ namespace Extrinsic::Graphics
         [[nodiscard]] std::optional<RendererCapability> ParseRendererCapability(
             const std::string_view value) noexcept
         {
-            if (value == "Surface") return RendererCapability::Surface;
-            if (value == "Lines") return RendererCapability::Lines;
-            if (value == "Points") return RendererCapability::Points;
-            if (value == "Shadows") return RendererCapability::Shadows;
-            if (value == "Picking") return RendererCapability::Picking;
-            if (value == "Readback") return RendererCapability::Readback;
-            if (value == "Headless") return RendererCapability::Headless;
-            if (value == "Interactive") return RendererCapability::Interactive;
-            if (value == "DebugView") return RendererCapability::DebugView;
-            if (value == "VisibilityRecipe") return RendererCapability::VisibilityRecipe;
-            if (value == "LightingRecipe") return RendererCapability::LightingRecipe;
+            if (value == ToString(RendererCapability::Surface)) return RendererCapability::Surface;
+            if (value == ToString(RendererCapability::Lines)) return RendererCapability::Lines;
+            if (value == ToString(RendererCapability::Points)) return RendererCapability::Points;
+            if (value == ToString(RendererCapability::Shadows)) return RendererCapability::Shadows;
+            if (value == ToString(RendererCapability::Picking)) return RendererCapability::Picking;
+            if (value == ToString(RendererCapability::Readback)) return RendererCapability::Readback;
+            if (value == ToString(RendererCapability::Headless)) return RendererCapability::Headless;
+            if (value == ToString(RendererCapability::Interactive)) return RendererCapability::Interactive;
+            if (value == ToString(RendererCapability::DebugView)) return RendererCapability::DebugView;
+            if (value == ToString(RendererCapability::VisibilityRecipe)) return RendererCapability::VisibilityRecipe;
+            if (value == ToString(RendererCapability::LightingRecipe)) return RendererCapability::LightingRecipe;
             return std::nullopt;
         }
 
         [[nodiscard]] std::optional<RenderOutputKind> ParseRenderOutputKind(
             const std::string_view value) noexcept
         {
-            if (value == "Color") return RenderOutputKind::Color;
-            if (value == "Depth") return RenderOutputKind::Depth;
-            if (value == "EntityId") return RenderOutputKind::EntityId;
-            if (value == "PrimitiveId") return RenderOutputKind::PrimitiveId;
-            if (value == "Metrics") return RenderOutputKind::Metrics;
-            if (value == "ReadbackBuffer") return RenderOutputKind::ReadbackBuffer;
-            if (value == "Artifact") return RenderOutputKind::Artifact;
+            if (value == ToString(RenderOutputKind::Color)) return RenderOutputKind::Color;
+            if (value == ToString(RenderOutputKind::Depth)) return RenderOutputKind::Depth;
+            if (value == ToString(RenderOutputKind::EntityId)) return RenderOutputKind::EntityId;
+            if (value == ToString(RenderOutputKind::PrimitiveId)) return RenderOutputKind::PrimitiveId;
+            if (value == ToString(RenderOutputKind::Metrics)) return RenderOutputKind::Metrics;
+            if (value == ToString(RenderOutputKind::ReadbackBuffer)) return RenderOutputKind::ReadbackBuffer;
+            if (value == ToString(RenderOutputKind::Artifact)) return RenderOutputKind::Artifact;
             return std::nullopt;
         }
 
@@ -163,31 +163,31 @@ namespace Extrinsic::Graphics
         [[nodiscard]] std::optional<BindingSourceDomain> ParseBindingSourceDomain(
             const std::string_view value) noexcept
         {
-            if (value == "MeshVertex") return BindingSourceDomain::MeshVertex;
-            if (value == "MeshFace") return BindingSourceDomain::MeshFace;
-            if (value == "GraphNode") return BindingSourceDomain::GraphNode;
-            if (value == "GraphEdge") return BindingSourceDomain::GraphEdge;
-            if (value == "PointCloudPoint") return BindingSourceDomain::PointCloudPoint;
-            if (value == "Scene") return BindingSourceDomain::Scene;
-            if (value == "Generated") return BindingSourceDomain::Generated;
-            if (value == "Runtime") return BindingSourceDomain::Runtime;
-            if (value == "Unknown") return BindingSourceDomain::Unknown;
+            if (value == ToString(BindingSourceDomain::MeshVertex)) return BindingSourceDomain::MeshVertex;
+            if (value == ToString(BindingSourceDomain::MeshFace)) return BindingSourceDomain::MeshFace;
+            if (value == ToString(BindingSourceDomain::GraphNode)) return BindingSourceDomain::GraphNode;
+            if (value == ToString(BindingSourceDomain::GraphEdge)) return BindingSourceDomain::GraphEdge;
+            if (value == ToString(BindingSourceDomain::PointCloudPoint)) return BindingSourceDomain::PointCloudPoint;
+            if (value == ToString(BindingSourceDomain::Scene)) return BindingSourceDomain::Scene;
+            if (value == ToString(BindingSourceDomain::Generated)) return BindingSourceDomain::Generated;
+            if (value == ToString(BindingSourceDomain::Runtime)) return BindingSourceDomain::Runtime;
+            if (value == ToString(BindingSourceDomain::Unknown)) return BindingSourceDomain::Unknown;
             return std::nullopt;
         }
 
         [[nodiscard]] std::optional<BindingValueType> ParseBindingValueType(
             const std::string_view value) noexcept
         {
-            if (value == "Float") return BindingValueType::Float;
-            if (value == "UInt") return BindingValueType::UInt;
-            if (value == "Vec2") return BindingValueType::Vec2;
-            if (value == "Vec3") return BindingValueType::Vec3;
-            if (value == "Vec4") return BindingValueType::Vec4;
-            if (value == "Mat4") return BindingValueType::Mat4;
-            if (value == "Texture2D") return BindingValueType::Texture2D;
-            if (value == "Buffer") return BindingValueType::Buffer;
-            if (value == "AccelerationStructure") return BindingValueType::AccelerationStructure;
-            if (value == "Unknown") return BindingValueType::Unknown;
+            if (value == ToString(BindingValueType::Float)) return BindingValueType::Float;
+            if (value == ToString(BindingValueType::UInt)) return BindingValueType::UInt;
+            if (value == ToString(BindingValueType::Vec2)) return BindingValueType::Vec2;
+            if (value == ToString(BindingValueType::Vec3)) return BindingValueType::Vec3;
+            if (value == ToString(BindingValueType::Vec4)) return BindingValueType::Vec4;
+            if (value == ToString(BindingValueType::Mat4)) return BindingValueType::Mat4;
+            if (value == ToString(BindingValueType::Texture2D)) return BindingValueType::Texture2D;
+            if (value == ToString(BindingValueType::Buffer)) return BindingValueType::Buffer;
+            if (value == ToString(BindingValueType::AccelerationStructure)) return BindingValueType::AccelerationStructure;
+            if (value == ToString(BindingValueType::Unknown)) return BindingValueType::Unknown;
             return std::nullopt;
         }
 
@@ -203,30 +203,30 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] std::optional<ViewKind> ParseViewKind(const std::string_view value) noexcept
         {
-            if (value == "Camera") return ViewKind::Camera;
-            if (value == "NonCamera") return ViewKind::NonCamera;
-            if (value == "Picking") return ViewKind::Picking;
-            if (value == "Metrics") return ViewKind::Metrics;
-            if (value == "Preview") return ViewKind::Preview;
+            if (value == ToString(ViewKind::Camera)) return ViewKind::Camera;
+            if (value == ToString(ViewKind::NonCamera)) return ViewKind::NonCamera;
+            if (value == ToString(ViewKind::Picking)) return ViewKind::Picking;
+            if (value == ToString(ViewKind::Metrics)) return ViewKind::Metrics;
+            if (value == ToString(ViewKind::Preview)) return ViewKind::Preview;
             return std::nullopt;
         }
 
         [[nodiscard]] std::optional<OutputTargetKind> ParseOutputTargetKind(
             const std::string_view value) noexcept
         {
-            if (value == "Window") return OutputTargetKind::Window;
-            if (value == "OffscreenTexture") return OutputTargetKind::OffscreenTexture;
-            if (value == "File") return OutputTargetKind::File;
-            if (value == "ReadbackBuffer") return OutputTargetKind::ReadbackBuffer;
-            if (value == "PublishedArtifact") return OutputTargetKind::PublishedArtifact;
+            if (value == ToString(OutputTargetKind::Window)) return OutputTargetKind::Window;
+            if (value == ToString(OutputTargetKind::OffscreenTexture)) return OutputTargetKind::OffscreenTexture;
+            if (value == ToString(OutputTargetKind::File)) return OutputTargetKind::File;
+            if (value == ToString(OutputTargetKind::ReadbackBuffer)) return OutputTargetKind::ReadbackBuffer;
+            if (value == ToString(OutputTargetKind::PublishedArtifact)) return OutputTargetKind::PublishedArtifact;
             return std::nullopt;
         }
 
         [[nodiscard]] std::optional<InteractionMode> ParseInteractionMode(
             const std::string_view value) noexcept
         {
-            if (value == "Interactive") return InteractionMode::Interactive;
-            if (value == "Headless") return InteractionMode::Headless;
+            if (value == ToString(InteractionMode::Interactive)) return InteractionMode::Interactive;
+            if (value == ToString(InteractionMode::Headless)) return InteractionMode::Headless;
             return std::nullopt;
         }
 

@@ -1,0 +1,151 @@
+{
+  "baseline": {
+    "base_revision": "ab5aa44c7cd1d499bf515bade7cd99cfbfc93669",
+    "files": {
+      "src/graphics/renderer/Graphics.RenderingContract.cppm": {
+        "sha256": "3cfdcdf6b9615b9366f86dba2a66c07160f40e2f921b6cd4fd8a898f053d644b",
+        "lines": 470
+      },
+      "src/graphics/renderer/Graphics.RenderingContract.cpp": {
+        "sha256": "53797acb431bbf1ff7658f132db2291d482630d06e962d1e965fa84d5facb930",
+        "lines": 661
+      },
+      "src/graphics/renderer/Graphics.RenderRecipeConfig.cpp": {
+        "sha256": "ac3c71d7dcafd9bfd3026174230bca780fa2e80eac3ce050418cc4f430d69a1d",
+        "lines": 1703
+      },
+      "src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.cpp": {
+        "sha256": "a194a43f1a271e3040fe1cd47caff5ff5ae829dcce717749c43323edb7884429",
+        "lines": 607
+      }
+    },
+    "total_production_lines": 3441,
+    "token_pairs": [
+      {
+        "enum": "BindingSourceDomain",
+        "tokens": {
+          "Unknown": "Unknown",
+          "MeshVertex": "MeshVertex",
+          "MeshFace": "MeshFace",
+          "GraphNode": "GraphNode",
+          "GraphEdge": "GraphEdge",
+          "PointCloudPoint": "PointCloudPoint",
+          "Scene": "Scene",
+          "Generated": "Generated",
+          "Runtime": "Runtime"
+        },
+        "exact_match": true,
+        "accepts_unknown": true
+      },
+      {
+        "enum": "BindingValueType",
+        "tokens": {
+          "Unknown": "Unknown",
+          "Float": "Float",
+          "UInt": "UInt",
+          "Vec2": "Vec2",
+          "Vec3": "Vec3",
+          "Vec4": "Vec4",
+          "Mat4": "Mat4",
+          "Texture2D": "Texture2D",
+          "Buffer": "Buffer",
+          "AccelerationStructure": "AccelerationStructure"
+        },
+        "exact_match": true,
+        "accepts_unknown": true
+      },
+      {
+        "enum": "ViewKind",
+        "tokens": {
+          "Camera": "Camera",
+          "NonCamera": "NonCamera",
+          "Picking": "Picking",
+          "Metrics": "Metrics",
+          "Preview": "Preview"
+        },
+        "exact_match": true,
+        "accepts_unknown": false
+      },
+      {
+        "enum": "OutputTargetKind",
+        "tokens": {
+          "Window": "Window",
+          "OffscreenTexture": "OffscreenTexture",
+          "File": "File",
+          "ReadbackBuffer": "ReadbackBuffer",
+          "PublishedArtifact": "PublishedArtifact"
+        },
+        "exact_match": true,
+        "accepts_unknown": false
+      },
+      {
+        "enum": "InteractionMode",
+        "tokens": {
+          "Interactive": "Interactive",
+          "Headless": "Headless"
+        },
+        "exact_match": true,
+        "accepts_unknown": false
+      }
+    ],
+    "existing_owner_extra_pairs": [
+      {
+        "enum": "RendererCapability",
+        "tokens": {
+          "Surface": "Surface",
+          "Lines": "Lines",
+          "Points": "Points",
+          "Shadows": "Shadows",
+          "Picking": "Picking",
+          "Readback": "Readback",
+          "Headless": "Headless",
+          "Interactive": "Interactive",
+          "DebugView": "DebugView",
+          "VisibilityRecipe": "VisibilityRecipe",
+          "LightingRecipe": "LightingRecipe"
+        },
+        "exact_match": true,
+        "accepts_unknown": false
+      },
+      {
+        "enum": "RenderOutputKind",
+        "tokens": {
+          "Color": "Color",
+          "Depth": "Depth",
+          "EntityId": "EntityId",
+          "PrimitiveId": "PrimitiveId",
+          "Metrics": "Metrics",
+          "ReadbackBuffer": "ReadbackBuffer",
+          "Artifact": "Artifact"
+        },
+        "exact_match": true,
+        "accepts_unknown": false
+      }
+    ]
+  },
+  "current": {
+    "src/graphics/renderer/Graphics.RenderingContract.cppm": {
+      "sha256": "59209eaaca99dfe3caa0d6f12e7e3334eef040170ad53c49b1510f4ab83b05a8",
+      "lines": 475
+    },
+    "src/graphics/renderer/Graphics.RenderingContract.cpp": {
+      "sha256": "baad878e7ec92f36b1ec19f55b5e23fa8d784a4337b97c69c338b6203b0bf13d",
+      "lines": 732
+    },
+    "src/graphics/renderer/Graphics.RenderRecipeConfig.cpp": {
+      "sha256": "794040673c6d87756647bfb2326f02716db993ec49e498235f6fe7d83d1f27b0",
+      "lines": 1703
+    },
+    "src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.cpp": {
+      "sha256": "7346b4a6d39365804e06e499a167b067b5b4583a860f928e66d9b1820ffae112",
+      "lines": 525
+    }
+  },
+  "matched_token_pairs": 49,
+  "config_source_equals_exact_literal_substitution": true,
+  "new_production_files": 0,
+  "new_public_overloads": 5,
+  "removed_runtime_local_helpers": 5,
+  "timing_claim": false,
+  "current_total_production_lines": 3435
+}

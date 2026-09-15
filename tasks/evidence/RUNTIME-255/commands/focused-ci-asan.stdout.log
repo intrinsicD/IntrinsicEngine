@@ -1,0 +1,65 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-asan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-asan
+      Start 1085: SandboxEditorUi.RenderRecipeEditorModelListsDeclaredRecipeControls
+ 1/27 Test #1085: SandboxEditorUi.RenderRecipeEditorModelListsDeclaredRecipeControls ........................   Passed    0.06 sec
+      Start 1113: SandboxEditorUi.RenderRecipeEditorDraftValidationPreviewActivationAndCancel
+ 2/27 Test #1113: SandboxEditorUi.RenderRecipeEditorDraftValidationPreviewActivationAndCancel ...............   Passed    0.06 sec
+      Start 1114: SandboxEditorUi.RenderRecipeEditorUnchangedDraftIsNoOp
+ 3/27 Test #1114: SandboxEditorUi.RenderRecipeEditorUnchangedDraftIsNoOp ....................................   Passed    0.06 sec
+      Start 1115: SandboxEditorUi.RenderRecipeEditorArtifactPublishAndApplyUseRegistry
+ 4/27 Test #1115: SandboxEditorUi.RenderRecipeEditorArtifactPublishAndApplyUseRegistry ......................   Passed    0.06 sec
+      Start 2681: RenderingContract.ValidDescriptorSnapshotBindingsRecipeAndViewAreCompatible
+ 5/27 Test #2681: RenderingContract.ValidDescriptorSnapshotBindingsRecipeAndViewAreCompatible ...............   Passed    0.03 sec
+      Start 2682: RenderingContract.RendererDescriptorRequiresStableContractFields
+ 6/27 Test #2682: RenderingContract.RendererDescriptorRequiresStableContractFields ..........................   Passed    0.03 sec
+      Start 2683: RenderingContract.SnapshotCompatibilityRejectsWrongScopeAndStaleDegradedState
+ 7/27 Test #2683: RenderingContract.SnapshotCompatibilityRejectsWrongScopeAndStaleDegradedState .............   Passed    0.03 sec
+      Start 2684: RenderingContract.BindingSetRequiresDeclaredDataAndSupportedCapabilities
+ 8/27 Test #2684: RenderingContract.BindingSetRequiresDeclaredDataAndSupportedCapabilities ..................   Passed    0.03 sec
+      Start 2685: RenderingContract.RecipeRejectsUnknownSlotsUnsupportedCapabilitiesAndDisallowedBindings
+ 9/27 Test #2685: RenderingContract.RecipeRejectsUnknownSlotsUnsupportedCapabilitiesAndDisallowedBindings ...   Passed    0.03 sec
+      Start 2686: RenderingContract.ViewOutputRecipeRejectsInvalidViewportScaleReadbackAndOutputs
+10/27 Test #2686: RenderingContract.ViewOutputRecipeRejectsInvalidViewportScaleReadbackAndOutputs ...........   Passed    0.03 sec
+      Start 2687: RenderingContract.RenderArtifactMetadataValidatesDeclaredOutputAndClassifiesLifecycle
+11/27 Test #2687: RenderingContract.RenderArtifactMetadataValidatesDeclaredOutputAndClassifiesLifecycle .....   Passed    0.03 sec
+      Start 2688: RenderingContract.TokenSpellingsAreStableForConfigAndUiConsumers
+12/27 Test #2688: RenderingContract.TokenSpellingsAreStableForConfigAndUiConsumers ..........................   Passed    0.03 sec
+      Start 2689: RenderingContract.TokenSpellingsFallBackToUnknownForInvalidEnumValues
+13/27 Test #2689: RenderingContract.TokenSpellingsFallBackToUnknownForInvalidEnumValues .....................   Passed    0.03 sec
+      Start 2690: RenderRecipeConfig.ValidRecipeConfigLoadsIntoContractValues
+14/27 Test #2690: RenderRecipeConfig.ValidRecipeConfigLoadsIntoContractValues ...............................   Passed    0.03 sec
+      Start 2691: RenderRecipeConfig.DisabledExtensionSlotsLoadIntoPreview
+15/27 Test #2691: RenderRecipeConfig.DisabledExtensionSlotsLoadIntoPreview ..................................   Passed    0.03 sec
+      Start 2692: RenderRecipeConfig.DisabledUnknownSlotsFailClosed
+16/27 Test #2692: RenderRecipeConfig.DisabledUnknownSlotsFailClosed .........................................   Passed    0.03 sec
+      Start 2693: RenderRecipeConfig.FileLoaderUsesSameDryRunValidation
+17/27 Test #2693: RenderRecipeConfig.FileLoaderUsesSameDryRunValidation .....................................   Passed    0.03 sec
+      Start 2694: RenderRecipeConfig.UnknownSlotsFailClosed
+18/27 Test #2694: RenderRecipeConfig.UnknownSlotsFailClosed .................................................   Passed    0.03 sec
+      Start 2695: RenderRecipeConfig.UnsupportedCapabilityRequirementsAreRejected
+19/27 Test #2695: RenderRecipeConfig.UnsupportedCapabilityRequirementsAreRejected ...........................   Passed    0.03 sec
+      Start 2696: RenderRecipeConfig.RuntimeOwnedBindingDomainsAreRejected
+20/27 Test #2696: RenderRecipeConfig.RuntimeOwnedBindingDomainsAreRejected ..................................   Passed    0.03 sec
+      Start 2697: RenderRecipeConfig.VersionMismatchIsUnsupported
+21/27 Test #2697: RenderRecipeConfig.VersionMismatchIsUnsupported ...........................................   Passed    0.03 sec
+      Start 2698: RenderRecipeConfig.FallbackAndDegradedStatesRemainDistinct
+22/27 Test #2698: RenderRecipeConfig.FallbackAndDegradedStatesRemainDistinct ................................   Passed    0.03 sec
+      Start 2699: RenderRecipeConfig.FixedRendererCoreCannotBeReplacedByConfig
+23/27 Test #2699: RenderRecipeConfig.FixedRendererCoreCannotBeReplacedByConfig ..............................   Passed    0.03 sec
+      Start 2700: RenderRecipeConfig.PreviewValidationIsSideEffectFreeAndInteractiveFast
+24/27 Test #2700: RenderRecipeConfig.PreviewValidationIsSideEffectFreeAndInteractiveFast ....................   Passed    0.17 sec
+      Start 2701: RenderRecipeConfig.DuplicateSlotNamesEditOnlyTheFirstMatch
+25/27 Test #2701: RenderRecipeConfig.DuplicateSlotNamesEditOnlyTheFirstMatch ................................   Passed    0.03 sec
+      Start 2702: RenderRecipeConfig.EnumTokensRejectUnknownAndMisspelledTokens
+26/27 Test #2702: RenderRecipeConfig.EnumTokensRejectUnknownAndMisspelledTokens .............................   Passed    0.05 sec
+      Start 2703: RenderRecipeConfig.BindingEnumTokensAcceptUnknownWhileOwnershipStillRejectsIt
+27/27 Test #2703: RenderRecipeConfig.BindingEnumTokensAcceptUnknownWhileOwnershipStillRejectsIt .............   Passed    0.04 sec
+
+100% tests passed, 0 tests failed out of 27
+
+Label Time Summary:
+contract    =   1.11 sec*proc (27 tests)
+graphics    =   0.87 sec*proc (23 tests)
+runtime     =   0.24 sec*proc (4 tests)
+
+Total Test time (real) =   1.48 sec

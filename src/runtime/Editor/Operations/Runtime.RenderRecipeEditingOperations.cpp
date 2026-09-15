@@ -36,88 +36,6 @@ namespace Extrinsic::Runtime
                              stableName) != renderer.DeclaredRecipeSlots.end();
         }
 
-        [[nodiscard]] const char* DebugNameForBindingSourceDomain(
-            const Graphics::BindingSourceDomain domain) noexcept
-        {
-            using Domain = Graphics::BindingSourceDomain;
-            switch (domain)
-            {
-            case Domain::Unknown: return "Unknown";
-            case Domain::MeshVertex: return "MeshVertex";
-            case Domain::MeshFace: return "MeshFace";
-            case Domain::GraphNode: return "GraphNode";
-            case Domain::GraphEdge: return "GraphEdge";
-            case Domain::PointCloudPoint: return "PointCloudPoint";
-            case Domain::Scene: return "Scene";
-            case Domain::Generated: return "Generated";
-            case Domain::Runtime: return "Runtime";
-            }
-            return "Unknown";
-        }
-
-        [[nodiscard]] const char* DebugNameForBindingValueType(
-            const Graphics::BindingValueType type) noexcept
-        {
-            using Type = Graphics::BindingValueType;
-            switch (type)
-            {
-            case Type::Unknown: return "Unknown";
-            case Type::Float: return "Float";
-            case Type::UInt: return "UInt";
-            case Type::Vec2: return "Vec2";
-            case Type::Vec3: return "Vec3";
-            case Type::Vec4: return "Vec4";
-            case Type::Mat4: return "Mat4";
-            case Type::Texture2D: return "Texture2D";
-            case Type::Buffer: return "Buffer";
-            case Type::AccelerationStructure: return "AccelerationStructure";
-            }
-            return "Unknown";
-        }
-
-        [[nodiscard]] const char* DebugNameForViewKind(
-            const Graphics::ViewKind view) noexcept
-        {
-            using View = Graphics::ViewKind;
-            switch (view)
-            {
-            case View::Camera: return "Camera";
-            case View::NonCamera: return "NonCamera";
-            case View::Picking: return "Picking";
-            case View::Metrics: return "Metrics";
-            case View::Preview: return "Preview";
-            }
-            return "Unknown";
-        }
-
-        [[nodiscard]] const char* DebugNameForOutputTargetKind(
-            const Graphics::OutputTargetKind target) noexcept
-        {
-            using Target = Graphics::OutputTargetKind;
-            switch (target)
-            {
-            case Target::Window: return "Window";
-            case Target::OffscreenTexture: return "OffscreenTexture";
-            case Target::File: return "File";
-            case Target::ReadbackBuffer: return "ReadbackBuffer";
-            case Target::PublishedArtifact: return "PublishedArtifact";
-            }
-            return "Unknown";
-        }
-
-        [[nodiscard]] const char* DebugNameForInteractionMode(
-            const Graphics::InteractionMode mode) noexcept
-        {
-            switch (mode)
-            {
-            case Graphics::InteractionMode::Interactive:
-                return "Interactive";
-            case Graphics::InteractionMode::Headless:
-                return "Headless";
-            }
-            return "Unknown";
-        }
-
         [[nodiscard]] std::vector<std::string> CapabilityNames(
             const std::vector<Graphics::RendererCapability>& capabilities)
         {
@@ -165,10 +83,10 @@ namespace Extrinsic::Runtime
             return EditorRenderRecipeBindingOverrideModel{
                 .SemanticName = intent.SemanticName,
                 .Slot = intent.ConsumerRole,
-                .SourceDomain = DebugNameForBindingSourceDomain(intent.SourceDomain),
+                .SourceDomain = std::string{Graphics::ToString(intent.SourceDomain)},
                 .SourceIdentity = intent.SourceIdentity,
                 .SourceRevision = intent.SourceRevision,
-                .ValueType = DebugNameForBindingValueType(intent.ValueType),
+                .ValueType = std::string{Graphics::ToString(intent.ValueType)},
                 .ValueFormat = intent.ValueFormat,
                 .Required = required,
                 .Editable = !required,
@@ -297,9 +215,9 @@ namespace Extrinsic::Runtime
         model.RendererId = recipeContext.Renderer.Id;
         model.ActiveRecipeId = recipe.RecipeId;
         model.ActiveViewOutputRecipeId = viewOutput.RecipeId;
-        model.ViewKind = DebugNameForViewKind(viewOutput.View);
-        model.OutputTarget = DebugNameForOutputTargetKind(viewOutput.Target);
-        model.InteractionMode = DebugNameForInteractionMode(viewOutput.Mode);
+        model.ViewKind = std::string{Graphics::ToString(viewOutput.View)};
+        model.OutputTarget = std::string{Graphics::ToString(viewOutput.Target)};
+        model.InteractionMode = std::string{Graphics::ToString(viewOutput.Mode)};
         model.ViewportWidth = viewOutput.ViewportWidth;
         model.ViewportHeight = viewOutput.ViewportHeight;
         model.RenderScale = viewOutput.RenderScale;

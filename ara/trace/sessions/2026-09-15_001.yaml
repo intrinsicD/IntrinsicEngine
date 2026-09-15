@@ -103,7 +103,7 @@ ai_actions:
   - docs/architecture/runtime.md
   - tasks/done/RUNTIME-254-render-extraction-private-dependencies.md
   - tasks/evidence/RUNTIME-254/report.yaml
-  - tasks/backlog/runtime/RUNTIME-255-render-recipe-token-owner.md
+  - tasks/done/RUNTIME-255-render-recipe-token-owner.md
 claims_touched: []
 key_context:
 - turn: 1

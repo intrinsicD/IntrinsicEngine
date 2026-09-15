@@ -418,6 +418,11 @@ namespace Extrinsic::Graphics
     export [[nodiscard]] std::string_view ToString(RenderDataCategory value) noexcept;
     export [[nodiscard]] std::string_view ToString(RendererCapability value) noexcept;
     export [[nodiscard]] std::string_view ToString(RenderOutputKind value) noexcept;
+    export [[nodiscard]] std::string_view ToString(BindingSourceDomain value) noexcept;
+    export [[nodiscard]] std::string_view ToString(BindingValueType value) noexcept;
+    export [[nodiscard]] std::string_view ToString(ViewKind value) noexcept;
+    export [[nodiscard]] std::string_view ToString(OutputTargetKind value) noexcept;
+    export [[nodiscard]] std::string_view ToString(InteractionMode value) noexcept;
     export [[nodiscard]] std::string_view ToString(RenderingContractDiagnosticCode value) noexcept;
     export [[nodiscard]] std::string_view ToString(RenderingContractDiagnosticSeverity value) noexcept;
 

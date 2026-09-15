@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -315,4 +316,76 @@ TEST(RenderingContract, RenderArtifactMetadataValidatesDeclaredOutputAndClassifi
     EXPECT_TRUE(HasDiagnostic(result, RenderingContractDiagnosticCode::ArtifactRendererMismatch));
     EXPECT_TRUE(HasDiagnostic(result, RenderingContractDiagnosticCode::UndeclaredArtifactOutput));
     EXPECT_EQ(ClassifyRenderArtifactLifecycle(artifact), RenderArtifactLifecycleClass::Published);
+}
+
+TEST(RenderingContract, TokenSpellingsAreStableForConfigAndUiConsumers)
+{
+    EXPECT_EQ(ToString(RendererCapability::Surface), "Surface");
+    EXPECT_EQ(ToString(RendererCapability::Lines), "Lines");
+    EXPECT_EQ(ToString(RendererCapability::Points), "Points");
+    EXPECT_EQ(ToString(RendererCapability::Shadows), "Shadows");
+    EXPECT_EQ(ToString(RendererCapability::Picking), "Picking");
+    EXPECT_EQ(ToString(RendererCapability::Readback), "Readback");
+    EXPECT_EQ(ToString(RendererCapability::Headless), "Headless");
+    EXPECT_EQ(ToString(RendererCapability::Interactive), "Interactive");
+    EXPECT_EQ(ToString(RendererCapability::DebugView), "DebugView");
+    EXPECT_EQ(ToString(RendererCapability::VisibilityRecipe), "VisibilityRecipe");
+    EXPECT_EQ(ToString(RendererCapability::LightingRecipe), "LightingRecipe");
+
+    EXPECT_EQ(ToString(RenderOutputKind::Color), "Color");
+    EXPECT_EQ(ToString(RenderOutputKind::Depth), "Depth");
+    EXPECT_EQ(ToString(RenderOutputKind::EntityId), "EntityId");
+    EXPECT_EQ(ToString(RenderOutputKind::PrimitiveId), "PrimitiveId");
+    EXPECT_EQ(ToString(RenderOutputKind::Metrics), "Metrics");
+    EXPECT_EQ(ToString(RenderOutputKind::ReadbackBuffer), "ReadbackBuffer");
+    EXPECT_EQ(ToString(RenderOutputKind::Artifact), "Artifact");
+
+    EXPECT_EQ(ToString(BindingSourceDomain::MeshVertex), "MeshVertex");
+    EXPECT_EQ(ToString(BindingSourceDomain::MeshFace), "MeshFace");
+    EXPECT_EQ(ToString(BindingSourceDomain::GraphNode), "GraphNode");
+    EXPECT_EQ(ToString(BindingSourceDomain::GraphEdge), "GraphEdge");
+    EXPECT_EQ(ToString(BindingSourceDomain::PointCloudPoint), "PointCloudPoint");
+    EXPECT_EQ(ToString(BindingSourceDomain::Scene), "Scene");
+    EXPECT_EQ(ToString(BindingSourceDomain::Generated), "Generated");
+    EXPECT_EQ(ToString(BindingSourceDomain::Runtime), "Runtime");
+    EXPECT_EQ(ToString(BindingSourceDomain::Unknown), "Unknown");
+
+    EXPECT_EQ(ToString(BindingValueType::Float), "Float");
+    EXPECT_EQ(ToString(BindingValueType::UInt), "UInt");
+    EXPECT_EQ(ToString(BindingValueType::Vec2), "Vec2");
+    EXPECT_EQ(ToString(BindingValueType::Vec3), "Vec3");
+    EXPECT_EQ(ToString(BindingValueType::Vec4), "Vec4");
+    EXPECT_EQ(ToString(BindingValueType::Mat4), "Mat4");
+    EXPECT_EQ(ToString(BindingValueType::Texture2D), "Texture2D");
+    EXPECT_EQ(ToString(BindingValueType::Buffer), "Buffer");
+    EXPECT_EQ(ToString(BindingValueType::AccelerationStructure), "AccelerationStructure");
+    EXPECT_EQ(ToString(BindingValueType::Unknown), "Unknown");
+
+    EXPECT_EQ(ToString(ViewKind::Camera), "Camera");
+    EXPECT_EQ(ToString(ViewKind::NonCamera), "NonCamera");
+    EXPECT_EQ(ToString(ViewKind::Picking), "Picking");
+    EXPECT_EQ(ToString(ViewKind::Metrics), "Metrics");
+    EXPECT_EQ(ToString(ViewKind::Preview), "Preview");
+
+    EXPECT_EQ(ToString(OutputTargetKind::Window), "Window");
+    EXPECT_EQ(ToString(OutputTargetKind::OffscreenTexture), "OffscreenTexture");
+    EXPECT_EQ(ToString(OutputTargetKind::File), "File");
+    EXPECT_EQ(ToString(OutputTargetKind::ReadbackBuffer), "ReadbackBuffer");
+    EXPECT_EQ(ToString(OutputTargetKind::PublishedArtifact), "PublishedArtifact");
+
+    EXPECT_EQ(ToString(InteractionMode::Interactive), "Interactive");
+    EXPECT_EQ(ToString(InteractionMode::Headless), "Headless");
+}
+
+TEST(RenderingContract, TokenSpellingsFallBackToUnknownForInvalidEnumValues)
+{
+    constexpr std::uint8_t invalid = 200;
+
+    EXPECT_EQ(ToString(static_cast<RendererCapability>(invalid)), "Unknown");
+    EXPECT_EQ(ToString(static_cast<RenderOutputKind>(invalid)), "Unknown");
+    EXPECT_EQ(ToString(static_cast<BindingSourceDomain>(invalid)), "Unknown");
+    EXPECT_EQ(ToString(static_cast<BindingValueType>(invalid)), "Unknown");
+    EXPECT_EQ(ToString(static_cast<ViewKind>(invalid)), "Unknown");
+    EXPECT_EQ(ToString(static_cast<OutputTargetKind>(invalid)), "Unknown");
+    EXPECT_EQ(ToString(static_cast<InteractionMode>(invalid)), "Unknown");
 }

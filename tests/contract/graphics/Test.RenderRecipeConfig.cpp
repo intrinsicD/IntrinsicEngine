@@ -96,6 +96,35 @@ namespace
         return it == recipe.Slots.end() ? nullptr : &*it;
     }
 
+    [[nodiscard]] std::string ConfigWithToken(const std::string_view previous,
+                                               const std::string_view replacement)
+    {
+        std::string document = ValidRecipeConfig();
+        const std::string token = "\"" + std::string{previous} + "\"";
+        const std::size_t position = document.find(token);
+        EXPECT_NE(position, std::string::npos);
+        if (position != std::string::npos)
+        {
+            EXPECT_EQ(document.find(token, position + token.size()), std::string::npos);
+            document.replace(position, token.size(), "\"" + std::string{replacement} + "\"");
+        }
+        return document;
+    }
+
+    // Parse rejection and ownership rejection share diagnostic codes; only the
+    // recorded state separates "token not in the accepted set" (Unsupported)
+    // from "token parsed but config may not claim it" (Invalid).
+    [[nodiscard]] bool HasDiagnosticInState(const RenderRecipeConfigLoadResult& result,
+                                            const RenderRecipeConfigDiagnosticCode code,
+                                            const RenderRecipeConfigState state)
+    {
+        return std::any_of(result.Diagnostics.begin(),
+                           result.Diagnostics.end(),
+                           [code, state](const RenderRecipeConfigDiagnostic& diagnostic) {
+                               return diagnostic.Code == code && diagnostic.State == state;
+                           });
+    }
+
     [[nodiscard]] const BindingIntent* FindBinding(const BindingSet& bindings,
                                                    const std::string_view name)
     {
@@ -126,6 +155,10 @@ TEST(RenderRecipeConfig, ValidRecipeConfigLoadsIntoContractValues)
     EXPECT_EQ(result.Preview.ViewOutput.RecipeId, "current-renderer.preview-output");
     EXPECT_EQ(result.Preview.ViewOutput.View, ViewKind::Preview);
     EXPECT_EQ(result.Preview.ViewOutput.Target, OutputTargetKind::OffscreenTexture);
+    EXPECT_EQ(result.Preview.ViewOutput.Mode, InteractionMode::Headless);
+    ASSERT_EQ(result.Preview.ViewOutput.Outputs.size(), 2u);
+    EXPECT_EQ(result.Preview.ViewOutput.Outputs[0].Kind, RenderOutputKind::Color);
+    EXPECT_EQ(result.Preview.ViewOutput.Outputs[1].Kind, RenderOutputKind::ReadbackBuffer);
     EXPECT_TRUE(result.Preview.ViewOutput.ReadbackRequested);
     EXPECT_EQ(result.Preview.ViewOutput.ViewportWidth, 640u);
     EXPECT_EQ(result.Preview.ViewOutput.ViewportHeight, 360u);
@@ -138,11 +171,14 @@ TEST(RenderRecipeConfig, ValidRecipeConfigLoadsIntoContractValues)
     EXPECT_EQ(lighting->SchemaId, "intrinsic.graphics.lighting/user-preview/v1");
     EXPECT_EQ(lighting->UsedBindingRoles.size(), 1u);
     EXPECT_EQ(lighting->UsedBindingRoles.front(), "light-snapshots");
+    EXPECT_EQ(lighting->RequiredCapabilities,
+              std::vector<RendererCapability>{RendererCapability::LightingRecipe});
 
     const BindingIntent* lights = FindBinding(result.Preview.Bindings, "light-snapshots");
     ASSERT_NE(lights, nullptr);
     EXPECT_EQ(lights->SourceDomain, BindingSourceDomain::Scene);
     EXPECT_EQ(lights->SourceIdentity, "RenderWorld.Lights.UserPreview");
+    EXPECT_EQ(lights->ValueType, BindingValueType::Buffer);
 }
 
 TEST(RenderRecipeConfig, DisabledExtensionSlotsLoadIntoPreview)
@@ -422,4 +458,83 @@ TEST(RenderRecipeConfig, DuplicateSlotNamesEditOnlyTheFirstMatch)
     EXPECT_EQ(result.ContractDiagnostics.Diagnostics.size(),
               unique.ContractDiagnostics.Diagnostics.size());
     EXPECT_TRUE(IsCompatible(result.ContractDiagnostics));
+}
+
+TEST(RenderRecipeConfig, EnumTokensRejectUnknownAndMisspelledTokens)
+{
+    struct Case
+    {
+        std::string_view Previous;
+        std::string_view Replacement;
+        RenderRecipeConfigDiagnosticCode Code;
+    };
+    const Case cases[] = {
+        {"Preview", "Unknown", RenderRecipeConfigDiagnosticCode::InvalidViewOutput},
+        {"Preview", "preview", RenderRecipeConfigDiagnosticCode::InvalidViewOutput},
+        {"OffscreenTexture", "Unknown", RenderRecipeConfigDiagnosticCode::InvalidViewOutput},
+        {"Headless", "Unknown", RenderRecipeConfigDiagnosticCode::InvalidViewOutput},
+        {"Color", "Unknown", RenderRecipeConfigDiagnosticCode::UnsupportedOutput},
+        {"Color", "color", RenderRecipeConfigDiagnosticCode::UnsupportedOutput},
+        {"LightingRecipe", "Unknown", RenderRecipeConfigDiagnosticCode::UnsupportedCapability},
+        {"LightingRecipe", "lightingRecipe", RenderRecipeConfigDiagnosticCode::UnsupportedCapability},
+    };
+    const RenderRecipeConfigContext context = MakeContext();
+    for (const Case& test : cases)
+    {
+        SCOPED_TRACE(std::string{test.Previous} + " -> " + std::string{test.Replacement});
+        const auto result = PreviewRenderRecipeConfig(
+            ConfigWithToken(test.Previous, test.Replacement), context);
+        EXPECT_FALSE(IsConfigUsable(result));
+        EXPECT_TRUE(HasDiagnosticInState(result, test.Code, RenderRecipeConfigState::Unsupported));
+    }
+}
+
+TEST(RenderRecipeConfig, BindingEnumTokensAcceptUnknownWhileOwnershipStillRejectsIt)
+{
+    const RenderRecipeConfigContext context = MakeContext();
+
+    // `Unknown` and `Generated` are accepted spellings; the ownership check, not
+    // the parser, is what keeps them out of a loadable config.
+    for (const std::string_view domain : {std::string_view{"Unknown"}, std::string_view{"Generated"}})
+    {
+        const RenderRecipeConfigLoadResult result =
+            PreviewRenderRecipeConfig(ConfigWithToken("Scene", domain), context);
+        EXPECT_FALSE(IsConfigUsable(result)) << domain;
+        EXPECT_TRUE(HasDiagnosticInState(result,
+                                         RenderRecipeConfigDiagnosticCode::UnsafeBindingDomain,
+                                         RenderRecipeConfigState::Invalid))
+            << domain;
+        EXPECT_FALSE(HasDiagnosticInState(result,
+                                          RenderRecipeConfigDiagnosticCode::UnsafeBindingDomain,
+                                          RenderRecipeConfigState::Unsupported))
+            << domain;
+    }
+
+    const RenderRecipeConfigLoadResult lowercaseDomain =
+        PreviewRenderRecipeConfig(ConfigWithToken("Scene", "scene"), context);
+    EXPECT_FALSE(IsConfigUsable(lowercaseDomain));
+    EXPECT_TRUE(HasDiagnosticInState(lowercaseDomain,
+                                     RenderRecipeConfigDiagnosticCode::UnsafeBindingDomain,
+                                     RenderRecipeConfigState::Unsupported));
+
+    const RenderRecipeConfigLoadResult unknownValueType =
+        PreviewRenderRecipeConfig(ConfigWithToken("Buffer", "Unknown"), context);
+    EXPECT_FALSE(HasDiagnosticInState(unknownValueType,
+                                      RenderRecipeConfigDiagnosticCode::InvalidSchema,
+                                      RenderRecipeConfigState::Unsupported));
+    const BindingIntent* parsedUnknown =
+        FindBinding(unknownValueType.Preview.Bindings, "light-snapshots");
+    ASSERT_NE(parsedUnknown, nullptr);
+    EXPECT_EQ(parsedUnknown->ValueType, BindingValueType::Unknown);
+
+    const RenderRecipeConfigLoadResult lowercaseValueType =
+        PreviewRenderRecipeConfig(ConfigWithToken("Buffer", "buffer"), context);
+    EXPECT_FALSE(IsConfigUsable(lowercaseValueType));
+    EXPECT_TRUE(HasDiagnosticInState(lowercaseValueType,
+                                     RenderRecipeConfigDiagnosticCode::InvalidSchema,
+                                     RenderRecipeConfigState::Unsupported));
+    const BindingIntent* unchanged =
+        FindBinding(lowercaseValueType.Preview.Bindings, "light-snapshots");
+    ASSERT_NE(unchanged, nullptr);
+    EXPECT_EQ(unchanged->ValueType, BindingValueType::Buffer);
 }

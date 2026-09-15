@@ -1,0 +1,29 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-asan",
+    "--output-on-failure",
+    "-R",
+    "^(RenderingContract|RenderRecipeConfig|SandboxEditorUi.RenderRecipe|EngineConfigControl|RenderRecipeActivation)",
+    "--no-tests=error",
+    "--timeout",
+    "60",
+    "--parallel",
+    "1"
+  ],
+  "command_display": "ctest --test-dir build/ci-asan --output-on-failure -R '^(RenderingContract|RenderRecipeConfig|SandboxEditorUi.RenderRecipe|EngineConfigControl|RenderRecipeActivation)' --no-tests=error --timeout 60 --parallel 1",
+  "cwd": ".",
+  "duration_ms": 1489,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T01:47:53Z",
+  "label": "focused-ci-asan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T01:47:51Z",
+  "stderr_path": "tasks/evidence/RUNTIME-255/commands/focused-ci-asan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-255/commands/focused-ci-asan.stdout.log",
+  "stdout_sha256": "d58cdc3a37e2514da24a70abf42586a5e9ffe14dfcc6c11af332757341c7ac59",
+  "task_id": "RUNTIME-255"
+}

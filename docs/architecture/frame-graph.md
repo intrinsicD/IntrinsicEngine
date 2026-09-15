@@ -53,6 +53,12 @@ recipe-config document schema. Its schema id is
 document against a `RenderRecipeConfigContext` containing the current renderer
 descriptor, base render recipe, view/output recipe, and binding set.
 
+`Extrinsic.Graphics.RenderingContract` owns the `ToString` spellings shared by
+recipe editor labels and config parsing for renderer capabilities, output kinds,
+view/target/interaction kinds and binding domain/value types. Parsers keep explicit,
+case-sensitive accepted-enumerator lists. `Unknown` is a recognized domain/value
+type token; ownership validation still rejects unknown domains in loadable configs.
+
 Preview is side-effect-free: it returns a `RenderRecipeConfigLoadResult`
 containing validation state, diagnostics, the parsed preview, disabled extension
 slots, binding overrides, and contract diagnostics. Invalid, stale,

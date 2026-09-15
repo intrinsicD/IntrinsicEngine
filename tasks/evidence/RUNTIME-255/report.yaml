@@ -1,0 +1,145 @@
+schema_version: 1
+task_id: RUNTIME-255
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-15T01:58:27Z'
+claim_eligible: false
+source:
+  base_ref: ab5aa44c7
+  base_revision: ab5aa44c7cd1d499bf515bade7cd99cfbfc93669
+  head_revision: ab5aa44c7cd1d499bf515bade7cd99cfbfc93669
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 01e362408d4e5b96752cc92b45b1a60ee7722f89c696c57dffdf4405f98b6a9e
+  - path: ara/trace/sessions/2026-09-15_001.yaml
+    sha256: 184baa6c497ebe03339a4f6289ea71ee9848818ad84d3cad19d5449fde00cd66
+  - path: docs/architecture/frame-graph.md
+    sha256: af8ba4427fed4447b0285b9b72b56b597a0ef6cd3a8d8ec5e3ba8d57e49527ca
+  - path: src/graphics/renderer/Graphics.RenderRecipeConfig.cpp
+    sha256: 794040673c6d87756647bfb2326f02716db993ec49e498235f6fe7d83d1f27b0
+  - path: src/graphics/renderer/Graphics.RenderingContract.cpp
+    sha256: baad878e7ec92f36b1ec19f55b5e23fa8d784a4337b97c69c338b6203b0bf13d
+  - path: src/graphics/renderer/Graphics.RenderingContract.cppm
+    sha256: 59209eaaca99dfe3caa0d6f12e7e3334eef040170ad53c49b1510f4ab83b05a8
+  - path: src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.cpp
+    sha256: 7346b4a6d39365804e06e499a167b067b5b4583a860f928e66d9b1820ffae112
+  - path: tasks/SESSION-BRIEF.md
+    sha256: b7cc46325243e8621015404f2d9e714d0b389254f0db320992d286a00da1bb92
+  - path: tasks/backlog/runtime/RUNTIME-255-render-recipe-token-owner.md
+    sha256: null
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 889bf7902f7897f51b9381d4042929bdf3d9c7bb297a414b1fb2aed9aa1b5877
+  - path: tasks/done/RUNTIME-255-render-recipe-token-owner.md
+    sha256: f5363a2236c40256ec16f985f5b59ef31527344c934df8d012a156b1e1661299
+  - path: tests/contract/graphics/Test.RenderRecipeConfig.cpp
+    sha256: 083cd225c4fbe5aa60711e08dbe5a3a311f85341e25322fa3c8ed754659c3692
+  - path: tests/contract/graphics/Test.RenderingContract.cpp
+    sha256: 5e5e34095c1e6562ad70218f559582979aa31e4fbef0c9b3ee25dbe17328517d
+  - path: tests/contract/runtime/Test.SandboxEditorModels.cpp
+    sha256: bcf1185705ef6b792eb6eba6f6e1dcb26de7f5c9ce834be4bcb405e0ada957b7
+  - path: tools/agents/skills/intrinsicengine-reuse/references/owner-routes.md
+    sha256: a42b55ce336111654a9a325bb01e2917190df3d3d1f05ff3d3f8f534e5bdc9c7
+  content_digest: dc0644e4bf7330f38a12015d49c55e4b7992e6bffac9eade3fc1531330549f52
+touched:
+  paths:
+  - ara/trace/exploration_tree.yaml
+  - ara/trace/sessions/2026-09-15_001.yaml
+  - docs/architecture/frame-graph.md
+  - src/graphics/renderer/Graphics.RenderRecipeConfig.cpp
+  - src/graphics/renderer/Graphics.RenderingContract.cpp
+  - src/graphics/renderer/Graphics.RenderingContract.cppm
+  - src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.cpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/runtime/RUNTIME-255-render-recipe-token-owner.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-255-render-recipe-token-owner.md
+  - tests/contract/graphics/Test.RenderRecipeConfig.cpp
+  - tests/contract/graphics/Test.RenderingContract.cpp
+  - tests/contract/runtime/Test.SandboxEditorModels.cpp
+  - tools/agents/skills/intrinsicengine-reuse/references/owner-routes.md
+  layers:
+  - graphics
+  - runtime
+  modules:
+  - Extrinsic.Graphics.RenderRecipeConfig
+  - Extrinsic.Graphics.RenderingContract
+  - Extrinsic.Runtime.RenderRecipeEditingOperations
+extension_seam: null
+future_change_plan: null
+acceptance:
+- criterion: Canonical token ownership reused without changing any accepted config or displayed label.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/RUNTIME-255/structural-counts.json
+  - src/graphics/renderer/Graphics.RenderingContract.cpp
+  reason: null
+- criterion: Literal expectations and existing UI/config behavior verified with independent review.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/RUNTIME-255/reviews.jsonl
+  - tasks/evidence/RUNTIME-255/commands/full-cpu.stdout.log
+  - tasks/evidence/RUNTIME-255/commands/focused-ci-asan.stdout.log
+  - tasks/evidence/RUNTIME-255/commands/focused-ci-ubsan.stdout.log
+  reason: null
+- criterion: Final source locally committed, retired and sealed with no new production file or performance
+    claim.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/done/RUNTIME-255-render-recipe-token-owner.md
+  - tasks/evidence/RUNTIME-255/seal.yaml
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-255/commands/build-ci-asan.json
+- receipt: tasks/evidence/RUNTIME-255/commands/build-ci-ubsan.json
+- receipt: tasks/evidence/RUNTIME-255/commands/clean-workshop.json
+- receipt: tasks/evidence/RUNTIME-255/commands/configure-ci.json
+- receipt: tasks/evidence/RUNTIME-255/commands/focused-build.json
+- receipt: tasks/evidence/RUNTIME-255/commands/focused-ci-asan.json
+- receipt: tasks/evidence/RUNTIME-255/commands/focused-ci-ubsan.json
+- receipt: tasks/evidence/RUNTIME-255/commands/focused-ci.json
+- receipt: tasks/evidence/RUNTIME-255/commands/full-build.json
+- receipt: tasks/evidence/RUNTIME-255/commands/full-cpu.json
+- receipt: tasks/evidence/RUNTIME-255/commands/retirement-structural.json
+- receipt: tasks/evidence/RUNTIME-255/commands/source-documentation.json
+changed_public_contracts:
+- Five additive compiled ToString overloads; exact existing tokens, parser candidate sets and UI labels
+  retained
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/RUNTIME-255-render-recipe-token-owner.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- No measured compile-time improvement; full sanitizer/GPU suites not repeated for this string-only change.
+  BUILD-007/C92 remain open.
+skipped_checks: []
+artifacts:
+- path: tasks/evidence/RUNTIME-255/structural-counts.json
+  sha256: 2cf9784988fd165de9a03fe9d05603adfdbfdb15ccdf25a30f85755a897227d4
+  kind: file
+- path: tasks/evidence/RUNTIME-255/source-review.txt
+  sha256: 8f79baa6f30de3df17a4b4ece487e1239408f9789fe1a86100547ead5e6a1f94
+  kind: file
+- path: tasks/evidence/RUNTIME-255/review-disposition.txt
+  sha256: 98cdf5b87efe51dbdfdc9a13b5990f9e3e39c20736e0697663f94e120cee92b2
+  kind: file
+- path: tasks/evidence/RUNTIME-255/final-review.txt
+  sha256: 2705ec1d5861380c5dfd307da3588f645b7c1bc260eb46c5fbc479a9f2632b1e
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/RUNTIME-255/handoff.jsonl
+review: tasks/evidence/RUNTIME-255/reviews.jsonl

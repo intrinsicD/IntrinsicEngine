@@ -1,0 +1,218 @@
+[0/2] Re-checking globbed directories...
+[1/26] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.RenderRecipeConfig.cpp for CXX dependencies
+[2/26] Scanning /home/alex/Documents/IntrinsicEngine/build/ci/generated/deps/tinygltf_impl.cpp for CXX dependencies
+[3/26] Generating CXX dyndep file CMakeFiles/tinygltf.dir/CXX.dd
+[4/26] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.RenderingContract.cpp for CXX dependencies
+[5/26] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.RenderingContract.cppm for CXX dependencies
+[6/26] Generating CXX dyndep file src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/CXX.dd
+[7/44] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderingContract.cppm.o
+[8/44] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderingContract.cpp.o
+[9/44] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.CurrentRendererContractAdapter.cppm.o
+[10/44] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.CurrentRendererContractAdapter.cpp.o
+[11/44] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderRecipeConfig.cppm.o
+[12/44] Building CXX object CMakeFiles/tinygltf.dir/generated/deps/tinygltf_impl.cpp.o
+[13/44] Linking CXX static library lib/libtinygltf.a
+[14/44] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.FrameRecipe.cppm.o
+[15/44] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderRecipeConfig.cpp.o
+[16/44] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderDiagnostics.cppm.o
+[17/44] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.FrameRecipe.cpp.o
+[18/44] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.SharedRenderRecipeExecution.cppm.o
+[19/44] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.SharedRenderRecipeExecution.cpp.o
+[20/44] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.DebugViewSystem.cppm.o
+[21/44] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.TransientDebug.Surface.cppm.o
+[22/44] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.TransientDebug.Surface.cpp.o
+[23/44] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.DebugViewSystem.cpp.o
+[24/44] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.DebugView.cppm.o
+[25/44] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.DebugView.cpp.o
+[26/44] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.cpp for CXX dependencies
+[27/44] Generating CXX dyndep file src/runtime/CMakeFiles/ExtrinsicRuntime.dir/CXX.dd
+[28/132] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.VisualizationOverlay.cppm.o
+[29/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderArtifactPublication.cppm.o
+[30/132] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.VisualizationOverlay.cpp.o
+[31/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderArtifactPublication.cpp.o
+[32/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Kernel/Runtime.FramePacingDiagnostics.cppm.o
+[33/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Kernel/Runtime.FramePacingDiagnostics.cpp.o
+[34/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Config/Runtime.RenderRecipeActivation.cppm.o
+[35/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Config/Runtime.RenderRecipeActivation.cpp.o
+[36/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Kernel/Runtime.Engine.cppm.o
+[37/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Config/Runtime.EngineConfigControl.cppm.o
+[38/132] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.Renderer.cppm.o
+[39/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorProcessing.cppm.o
+[40/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp.o
+[41/132] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.Renderer.cpp.o
+[42/132] Linking CXX static library lib/libExtrinsicGraphics.a
+[43/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp.o
+[44/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorProcessing.cpp.o
+[45/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.cpp.o
+[46/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderExtraction.Recipes.cpp.o
+[47/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderExtraction.Geometry.cpp.o
+[48/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderExtraction.cpp.o
+[49/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.PointFieldOperations.cppm.o
+[50/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Density.cpp.o
+[51/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.PointAnalysisOperations.cppm.o
+[52/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Spacing.cpp.o
+[53/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp.o
+[54/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp.o
+[55/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.DensityWeights.cpp.o
+[56/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Descriptors.cpp.o
+[57/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.PointFieldOperations.cpp.o
+[58/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.PointAnalysisOperations.cpp.o
+[59/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.PointFieldOperations.Frame.cpp.o
+[60/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.PointAnalysisOperations.Frame.cpp.o
+[61/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.PointSetOperations.cppm.o
+[62/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.PointConstructionOperations.cppm.o
+[63/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Bilateral.cpp.o
+[64/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Construction.cpp.o
+[65/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.cpp.o
+[66/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.PointSetOperations.Frame.cpp.o
+[67/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.PointConstructionOperations.Frame.cpp.o
+[68/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.PointCloudServiceOperations.cppm.o
+[69/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.NormalOperations.cppm.o
+[70/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.PointCloudServiceOperations.cpp.o
+[71/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.NormalOperations.cpp.o
+[72/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.PointCloudServiceOperations.Frame.cpp.o
+[73/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.NormalOperations.Frame.cpp.o
+[74/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp.o
+[75/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.RegistrationOperations.cppm.o
+[76/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.RegistrationOperations.cpp.o
+[77/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.RegistrationOperations.Frame.cpp.o
+[78/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.MeshFieldOperations.cppm.o
+[79/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.MeshFieldOperations.cpp.o
+[80/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.MeshFieldOperations.Frame.cpp.o
+[81/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Registration.cpp.o
+[82/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.MeshFieldOperations.Curvature.cpp.o
+[83/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.MeshFieldOperations.Geodesics.cpp.o
+[84/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.MeshTopologyOperations.cppm.o
+[85/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.MeshTopologyOperations.cpp.o
+[86/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.ParameterizationOperations.cppm.o
+[87/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.MeshTopologyOperations.Frame.cpp.o
+[88/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.ParameterizationOperations.Frame.cpp.o
+[89/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.MeshTopologyOperations.Topology.cpp.o
+[90/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Uv.cpp.o
+[91/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.ParameterizationOperations.cpp.o
+[92/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.cppm.o
+[93/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Frame.cpp.o
+[94/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp.o
+[95/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.RenderRecipeEditingOperations.cppm.o
+[96/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.RenderRecipeEditingOperations.Public.cpp.o
+[97/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Kernel/Runtime.Module.cppm.o
+[98/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Kernel/Runtime.AsyncWorkModule.cpp.o
+[99/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.RenderRecipeEditingOperations.cpp.o
+[100/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Clustering/Runtime.ClusteringModule.cpp.o
+[101/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/AssetWorkflow/Runtime.AssetWorkflowModule.cpp.o
+[102/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.RenderRecipeEditingOperations.Debug.cpp.o
+[103/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp.o
+[104/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Kernel/Runtime.Engine.cpp.o
+[105/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Config/Runtime.EngineConfigControl.cpp.o
+[106/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/GeometryIntegration/Runtime.SpatialIndexCache.cpp.o
+[107/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/PhysicsIntegration/Runtime.PhysicsModule.cpp.o
+[108/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Scene/Runtime.SceneDocumentModule.cpp.o
+[109/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Scene/Runtime.SceneInteractionModule.cpp.o
+[110/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/TextureBake/Runtime.TextureBakeModule.cpp.o
+[111/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorUiModule.cppm.o
+[112/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Cameras/Runtime.CameraModule.cppm.o
+[113/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Cameras/Runtime.CameraModule.cpp.o
+[114/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.cppm.o
+[115/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/ImGui/Runtime.ImGuiAdapter.cppm.o
+[116/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp.o
+[117/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp.o
+[118/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp.o
+[119/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorUiModule.cpp.o
+[120/132] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/ImGui/Runtime.ImGuiAdapter.cpp.o
+[121/132] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.SandboxEditorModels.cpp for CXX dependencies
+[122/132] Generating CXX dyndep file tests/CMakeFiles/RuntimeContractTestObjs.dir/CXX.dd
+[123/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.GpuAssetCacheFallbackBootstrap.cpp.o
+[124/184] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorWorkspaceSession.cpp.o
+[125/184] Linking CXX static library lib/libExtrinsicRuntime.a
+[126/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.AssetWorkflowModule.cpp.o
+[127/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.AssetImportFormatCoverage.cpp.o
+[128/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.AsyncWorkModule.cpp.o
+[129/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.ImGuiAdapter.cpp.o
+[130/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.EditorUiHost.cpp.o
+[131/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.ImGuiAdapterEngineWiring.cpp.o
+[132/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.MeshGeometryExtraction.cpp.o
+[133/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RenderArtifactPublication.cpp.o
+[134/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.MeshPrimitiveViewExtraction.cpp.o
+[135/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.GizmoInteractionEngineWiring.cpp.o
+[136/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RenderExtractionContract.cpp.o
+[137/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.PointCloudGeometryExtraction.cpp.o
+[138/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.GraphGeometryExtraction.cpp.o
+[139/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.GeodesicsOperations.cpp.o
+[140/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.ParameterizationOperations.cpp.o
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.ParameterizationOperations.cpp:926:5: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+  926 |     harness.Halfedges()
+      |     ^~~~~~~~~~~~~~~~~~~
+  927 |         .Properties.GetOrAdd<glm::vec2>("h:texcoord", glm::vec2{0.25f, 0.5f});
+      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 warning generated.
+[141/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.CurvatureSegmentationOperations.cpp.o
+[142/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.PrimitiveSelection.cpp.o
+[143/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RegistrationDomains.cpp.o
+[144/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.NormalEstimation.cpp.o
+[145/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.OutlierAnalysis.cpp.o
+[146/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.KernelDensityOperations.cpp.o
+[147/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.BilateralFilterOperations.cpp.o
+[148/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.KeypointAnalysisOperations.cpp.o
+[149/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.DescriptorAnalysisOperations.cpp.o
+[150/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.DensityWeightOperations.cpp.o
+[151/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.PointConstructionOperations.cpp.o
+[152/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.ProceduralGeometryExtraction.cpp.o
+[153/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.CameraModule.cpp.o
+[154/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.PointSpacingOperations.cpp.o
+[155/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RuntimeInputActions.cpp.o
+[156/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RuntimeConfigControl.cpp.o
+[157/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.ClusteringModule.cpp.o
+[158/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RuntimeRenderRecipeActivation.cpp.o
+[159/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RuntimeJobService.cpp.o
+[160/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.PointCloudConsolidationModule.cpp.o
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.PointCloudConsolidationModule.cpp:477:15: warning: field 'Domain' will be initialized after field 'Backend' [-Wreorder-ctor]
+  477 |             : Domain(domain), Backend(backend)
+      |               ^~~~~~~~~~~~~~  ~~~~~~~~~~~~~~~~
+      |               Backend(backend)Domain(domain)
+1 warning generated.
+[161/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RuntimeKernelEvents.cpp.o
+[162/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RuntimeModule.cpp.o
+[163/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RuntimeWorldRegistry.cpp.o
+[164/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RuntimeSceneLifecycle.cpp.o
+[165/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RuntimeReferenceScene.cpp.o
+[166/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SceneDocumentModule.cpp.o
+[167/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RuntimeVulkanBreadcrumb.cpp.o
+[168/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SceneInteractionModule.cpp.o
+[169/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorModels.cpp.o
+[170/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorSceneCommands.cpp.o
+[171/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorClusteringMethods.cpp.o
+[172/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorMeshMethods.cpp.o
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp:286:9: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+  286 |         mesh.AddTriangle(a, b, c);
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~
+1 warning generated.
+[173/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp.o
+[174/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorVisualization.cpp.o
+[175/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.TextureBakeModule.cpp.o
+[176/184] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SelectionSnapshotExtraction.cpp.o
+[177/184] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.RenderingContract.cpp for CXX dependencies
+[178/184] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.RenderRecipeConfig.cpp for CXX dependencies
+[179/184] Generating CXX dyndep file tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/CXX.dd
+[180/202] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SelectionStableLookupComposition.cpp.o
+[181/202] Building CXX object tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/contract/graphics/Test.CurrentRendererContractAdapter.cpp.o
+[182/202] Building CXX object tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/contract/graphics/Test.DebugViewContract.cpp.o
+[183/202] Building CXX object tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/contract/graphics/Test.DefaultRecipeBackbufferReadback.cpp.o
+[184/202] Building CXX object tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/contract/graphics/Test.FrameRecipeContract.cpp.o
+[185/202] Building CXX object tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/contract/graphics/Test.DebugViewPass.cpp.o
+[186/202] Building CXX object tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/contract/graphics/Test.ImGuiPresentContract.cpp.o
+[187/202] Building CXX object tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/contract/graphics/Test.ImGuiPass.cpp.o
+[188/202] Building CXX object tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/contract/graphics/Test.MaterialSubstitutionContract.cpp.o
+[189/202] Building CXX object tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/contract/graphics/Test.PostProcessChainContract.cpp.o
+[190/202] Building CXX object tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/contract/graphics/Test.RenderCommandRouter.cpp.o
+[191/202] Building CXX object tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/contract/graphics/Test.RenderingContract.cpp.o
+[192/202] Building CXX object tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/contract/graphics/Test.PresentPass.cpp.o
+[193/202] Building CXX object tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/contract/graphics/Test.RenderRecipeConfig.cpp.o
+[194/202] Building CXX object tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/contract/graphics/Test.RenderWorldContract.cpp.o
+[195/202] Building CXX object tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/contract/graphics/Test.SharedRenderRecipeExecution.cpp.o
+[196/202] Building CXX object tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/contract/graphics/Test.RendererFrameLifecycle.cpp.o
+[197/202] Building CXX object tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/contract/graphics/Test.TransformSyncSystem.cpp.o
+[198/202] Building CXX object tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/contract/graphics/Test.TransientDebugSurfacePass.cpp.o
+[199/202] Building CXX object tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/contract/graphics/Test.VisualizationOverlayPass.cpp.o
+[200/202] Building CXX object tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/contract/graphics/Test.VisualizationPropertyBufferResidency.cpp.o
+[201/202] Linking CXX executable bin/IntrinsicGraphicsContractCpuTests
+[202/202] Linking CXX executable bin/IntrinsicRuntimeContractTests

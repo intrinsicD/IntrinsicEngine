@@ -3547,6 +3547,9 @@ TEST(SandboxEditorUi, RenderRecipeEditorModelListsDeclaredRecipeControls)
 {
     Graphics::RenderRecipeConfigContext recipeContext =
         MakeRenderRecipeConfigContext();
+    recipeContext.BaseViewOutput.View = Graphics::ViewKind::Preview;
+    recipeContext.BaseViewOutput.Target = Graphics::OutputTargetKind::OffscreenTexture;
+    recipeContext.BaseViewOutput.Mode = Graphics::InteractionMode::Headless;
     Runtime::EditorRenderRecipeEditorState editorState{};
     Runtime::RenderArtifactRegistry artifacts;
     ASSERT_TRUE(artifacts.RegisterArtifact(
@@ -3563,6 +3566,9 @@ TEST(SandboxEditorUi, RenderRecipeEditorModelListsDeclaredRecipeControls)
         frame.RenderRecipe;
 
     ASSERT_TRUE(model.Available);
+    EXPECT_EQ(model.ViewKind, "Preview");
+    EXPECT_EQ(model.OutputTarget, "OffscreenTexture");
+    EXPECT_EQ(model.InteractionMode, "Headless");
     EXPECT_EQ(model.RendererId, Graphics::kCurrentRendererContractId);
     EXPECT_EQ(model.ActiveRecipeId, Graphics::kCurrentRendererDefaultRecipeId);
     EXPECT_FALSE(model.CanValidate);
@@ -3595,6 +3601,8 @@ TEST(SandboxEditorUi, RenderRecipeEditorModelListsDeclaredRecipeControls)
     EXPECT_FALSE(lights->Required);
     EXPECT_TRUE(lights->Editable);
     EXPECT_EQ(lights->Slot, "lighting");
+    EXPECT_EQ(lights->SourceDomain, "Scene");
+    EXPECT_EQ(lights->ValueType, "Buffer");
 
     ASSERT_NE(FindRecipeOutputRow(model, "color"), nullptr);
 

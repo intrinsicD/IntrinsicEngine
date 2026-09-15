@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-c",
+    "tools/ci/run_clean_workshop_review.sh . --strict && python3 tools/agents/check_task_state_links.py --root . --strict && python3 tools/repo/check_root_hygiene.py --root . && python3 tools/repo/check_test_layout.py --root . --strict && python3 tools/agents/sync_skills.py --check && python3 tools/agents/check_ara_claims.py --root . --strict && git diff --check"
+  ],
+  "command_display": "bash -c 'tools/ci/run_clean_workshop_review.sh . --strict && python3 tools/agents/check_task_state_links.py --root . --strict && python3 tools/repo/check_root_hygiene.py --root . && python3 tools/repo/check_test_layout.py --root . --strict && python3 tools/agents/sync_skills.py --check && python3 tools/agents/check_ara_claims.py --root . --strict && git diff --check'",
+  "cwd": ".",
+  "duration_ms": 3073,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T01:57:59Z",
+  "label": "retirement-structural",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T01:57:56Z",
+  "stderr_path": "tasks/evidence/RUNTIME-255/commands/retirement-structural.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-255/commands/retirement-structural.stdout.log",
+  "stdout_sha256": "79d724f473a1d3964f7a73815ea7be5e9dabacd0494d791e694f2f7577b47dc0",
+  "task_id": "RUNTIME-255"
+}

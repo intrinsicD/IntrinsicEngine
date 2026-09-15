@@ -191,6 +191,77 @@ namespace Extrinsic::Graphics
         return "Unknown";
     }
 
+    [[nodiscard]] std::string_view ToString(const BindingSourceDomain value) noexcept
+    {
+        switch (value)
+        {
+        case BindingSourceDomain::MeshVertex: return "MeshVertex";
+        case BindingSourceDomain::MeshFace: return "MeshFace";
+        case BindingSourceDomain::GraphNode: return "GraphNode";
+        case BindingSourceDomain::GraphEdge: return "GraphEdge";
+        case BindingSourceDomain::PointCloudPoint: return "PointCloudPoint";
+        case BindingSourceDomain::Scene: return "Scene";
+        case BindingSourceDomain::Generated: return "Generated";
+        case BindingSourceDomain::Runtime: return "Runtime";
+        case BindingSourceDomain::Unknown: return "Unknown";
+        }
+        return "Unknown";
+    }
+
+    [[nodiscard]] std::string_view ToString(const BindingValueType value) noexcept
+    {
+        switch (value)
+        {
+        case BindingValueType::Float: return "Float";
+        case BindingValueType::UInt: return "UInt";
+        case BindingValueType::Vec2: return "Vec2";
+        case BindingValueType::Vec3: return "Vec3";
+        case BindingValueType::Vec4: return "Vec4";
+        case BindingValueType::Mat4: return "Mat4";
+        case BindingValueType::Texture2D: return "Texture2D";
+        case BindingValueType::Buffer: return "Buffer";
+        case BindingValueType::AccelerationStructure: return "AccelerationStructure";
+        case BindingValueType::Unknown: return "Unknown";
+        }
+        return "Unknown";
+    }
+
+    [[nodiscard]] std::string_view ToString(const ViewKind value) noexcept
+    {
+        switch (value)
+        {
+        case ViewKind::Camera: return "Camera";
+        case ViewKind::NonCamera: return "NonCamera";
+        case ViewKind::Picking: return "Picking";
+        case ViewKind::Metrics: return "Metrics";
+        case ViewKind::Preview: return "Preview";
+        }
+        return "Unknown";
+    }
+
+    [[nodiscard]] std::string_view ToString(const OutputTargetKind value) noexcept
+    {
+        switch (value)
+        {
+        case OutputTargetKind::Window: return "Window";
+        case OutputTargetKind::OffscreenTexture: return "OffscreenTexture";
+        case OutputTargetKind::File: return "File";
+        case OutputTargetKind::ReadbackBuffer: return "ReadbackBuffer";
+        case OutputTargetKind::PublishedArtifact: return "PublishedArtifact";
+        }
+        return "Unknown";
+    }
+
+    [[nodiscard]] std::string_view ToString(const InteractionMode value) noexcept
+    {
+        switch (value)
+        {
+        case InteractionMode::Interactive: return "Interactive";
+        case InteractionMode::Headless: return "Headless";
+        }
+        return "Unknown";
+    }
+
     [[nodiscard]] std::string_view ToString(const RenderingContractDiagnosticCode value) noexcept
     {
         switch (value)

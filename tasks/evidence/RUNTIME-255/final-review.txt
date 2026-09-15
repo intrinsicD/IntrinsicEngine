@@ -1,0 +1,20 @@
+## APPROVE
+
+Final fixed-digest review of the supplied diff, report, handoff and receipts. No tools used; findings rest on internal consistency of the supplied material.
+
+### Verified
+
+**Line accounting closes exactly.** `.cppm` +5 (hunk `+418,11`, five declarations), `.cpp` +71 (`@@ -191,6 +191,77 @@`; five bodies at N+8 lines over 31 cases = 71), runtime −82 (`@@ -36,88 +36,6 @@`, five helpers plus separator; the two call-site hunks are line-neutral), config ±0. 3441 → 3435 = −6, matching `structural-counts.json`, the report, and the retirement-log entry. `new_production_files: 0`, `new_public_overloads: 5`, `removed_runtime_local_helpers: 5` all corroborated by the diff.
+
+**Behavior preservation.** Every one of the 49 token pairs in the baseline map appears verbatim in the new switches and in the pinning test. Config hunks touch only the RHS of `==`; candidate order, `noexcept`, `[[nodiscard]]` and the `std::nullopt` fallthrough are untouched. Critically, the `ToString` invalid-value fallback `"Unknown"` cannot leak acceptance into the five parsers that reject it, because each compares only against valid enumerators — `ParseViewKind`/`ParseOutputTargetKind`/`ParseInteractionMode`/`ParseRendererCapability`/`ParseRenderOutputKind` have no `Unknown` arm, while the two binding parsers keep theirs. Per-enum `Unknown` acceptance is preserved as required. No `default:` in the new switches keeps `-Wswitch` coverage.
+
+**Layering and scope.** Five additive declarations at the existing owner; runtime keeps its pre-existing `Graphics::` edge and gains no new one; `std::string{...}` is the correct materialization at the model boundary. No new file, module, parser API, generic helper or alias. Adjacent untouched parsers (`RenderingFallbackPolicy`, `BindingColorSpace`) have no owner `ToString`, so the file is not left inconsistent.
+
+**Gates.** Twelve receipts, all `exit_code: 0`, matching the twelve entries in `report.commands` one-for-one and covering the task's Verification block: configure, full build + full CPU, focused native/ASan/UBSan builds and runs, clean-workshop strict, retirement-structural chain, source-documentation audit. My six earlier nits are dispositioned against the actual source (fixed `std::uint8_t` underlying types make the `200` cast UBSan-clean; `<algorithm>` already included); none were blocking and none require a source change. Source is unchanged since the initial review, so that approval carries.
+
+**Docs/retirement.** Frame-graph and owner-routes text match the code, including the "ownership still rejects unknown domains" claim, which the config test pins with the Invalid/Unsupported state discriminator. Backlog→done move is reflected in the session trace, exploration tree and SESSION-BRIEF. `module_inventory.md` correctly shows no diff, since no module was added.
+
+### Non-blocking notes
+
+1. Acceptance criterion 3 ("locally committed, retired and sealed") is marked satisfied while the commit and seal are still pending; this is expected pre-commit state (`dirty: true`, head == base) but the criterion is only genuinely satisfied once `seal.yaml` names the commit. Confirm the seal pins this same `content_digest` `dc0644e4…`.
+2. Receipts record exit codes only; the "4636 passed + 1 expected GLFW/LSan skip" figure is not independently visible in the supplied JSON.

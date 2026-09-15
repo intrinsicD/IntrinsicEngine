@@ -12483,5 +12483,5 @@ tree:
     - tasks/evidence/RUNTIME-254/report.yaml
     - tasks/evidence/RUNTIME-254/seal.yaml
     - tasks/evidence/RUNTIME-254/structural-counts.json
-    - tasks/backlog/runtime/RUNTIME-255-render-recipe-token-owner.md
+    - tasks/done/RUNTIME-255-render-recipe-token-owner.md
     status: resolved

@@ -1,0 +1,25 @@
+## APPROVE
+
+Source-only review of the fixed diff; no tools used. Approval is conditional on the running build and the pending test suite passing — I verified consistency, not execution.
+
+### What I verified
+
+**Line/hash accounting is self-consistent.** `.cppm` +5 (five declarations), `.cpp` +71, runtime −82, config ±0. Per-function shape of the five new `ToString` bodies is `N + 8` lines (no blank between the switch's closing brace and the `return "Unknown";`), giving 31 cases + 40 = 71 exactly. Net 3441 → 3435 = +71 +5 −82. The claim of a pure literal-RHS substitution in the config file is corroborated by its unchanged line count and by every hunk showing only `"Literal"` → `ToString(Enum::Value)` on the RHS of `==`, with predicate order, `noexcept`, `[[nodiscard]]`, `std::nullopt` fallthrough and surrounding bodies untouched.
+
+**Token map is faithful.** All 49 pairs in the baseline map appear verbatim in the new switches and in the pinning test; the two pre-existing owner enums (`RendererCapability`, `RenderOutputKind`) keep their spellings and now feed their parsers too. `Unknown` is accepted for `BindingSourceDomain`/`BindingValueType` only; the other five parsers have no `Unknown` arm, consistent with `accepts_unknown` in the map. New switches carry no `default:`, matching the existing owner style, so `-Wswitch` still guards new enumerators.
+
+**Layering and surface.** Five overloads added at an existing owner rather than a new module/helper; runtime keeps its pre-existing `Graphics::` dependency and loses five local switches; no new file, parser API, or generic enum machinery. `std::string{Graphics::ToString(...)}` at the model boundary is the correct conversion for the `std::string` fields. Both doc updates are accurate to the code, including the "ownership validation still rejects unknown domains" claim, and the owner-route row points at the two tests that actually pin the behavior.
+
+**Parse-vs-ownership discrimination is genuinely tested.** `HasDiagnosticInState` matching on code *and* state is the right discriminator given the shared codes. `Unknown`/`Generated` → `UnsafeBindingDomain`/**Invalid** with an explicit negative assertion on the Unsupported variant; lowercase `scene` → `UnsafeBindingDomain`/**Unsupported**. The value-type case additionally pins that a failed parse leaves the preview binding at the context value (`Buffer`) while an accepted `Unknown` propagates — that is the sharpest assertion in the set. Drift protection is sound in both directions: parsers derive from `ToString`, and the 49 literal expectations plus 7 invalid-sentinel checks fail loudly if a spelling moves.
+
+`ConfigWithToken` wrapping the needle in quotes is what makes single-token replacement safe (`"Preview"` cannot hit `current-renderer.preview-output`, `"Buffer"` cannot hit `"ReadbackBuffer"`, `"Color"` cannot hit a lowercase `"color"` name), and the uniqueness `EXPECT_EQ(..., npos)` turns any wrong assumption about the fixture into a visible failure rather than a silent mis-target.
+
+### Optional nits (none blocking)
+
+1. `TokenSpellingsFallBackToUnknownForInvalidEnumValues` casts `200` into all seven enums. This is well-defined and UBSan-clean only if each enum has a fixed underlying type; the `std::uint8_t` literal suggests the author confirmed that. If any of them (e.g. two-enumerator `InteractionMode`) lacks a fixed underlying type, its value range is 0–1 and `-fsanitize=enum` would flag the cast. Worth a glance at the declarations if sanitizer builds are in CI.
+2. `Test.RenderRecipeConfig.cpp` gains `std::any_of` and `std::size_t` but no include change, unlike `Test.RenderingContract.cpp` which added `<cstdint>`. Almost certainly already transitively present; the build will say so either way.
+3. The `unknownValueType` case asserts the parsed value and the absence of a schema diagnostic but never pins `IsConfigUsable`. Pinning it would complete the "accepted spelling, ownership decides" story for value types the way the domain cases do.
+4. Domain parse failure surfaces as `UnsafeBindingDomain`/Unsupported while value-type parse failure surfaces as `InvalidSchema`/Unsupported. Pre-existing and now documented by the test — a one-line comment on the asymmetry would help the next reader.
+5. `ConfigWithToken`'s second parameter is indented one column past the opening paren.
+6. `RenderRecipeEditorModelListsDeclaredRecipeControls` now mutates `BaseViewOutput` to non-default values inside a test whose stated subject is declared recipe controls. The five field checks are the right checks; a separate case would keep the subject narrow.
+7. Unverified from the diff alone: two parser bodies in the config file remain untouched (around the gaps at ~155 and ~195). If either parses `RenderDataCategory` — which already has an owner `ToString` — that is the one remaining literal list eligible for the same reuse, and leaving it out makes the file internally inconsistent. If they parse non-enum or unowned values, ignore this.

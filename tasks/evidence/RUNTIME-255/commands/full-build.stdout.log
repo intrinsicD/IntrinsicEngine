@@ -1,0 +1,78 @@
+[0/2] Re-checking globbed directories...
+[1/37] Generating CXX dyndep file benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/CXX.dd
+[2/38] Generating CXX dyndep file benchmarks/CMakeFiles/IntrinsicKMeansGpuBenchmarkSmoke.dir/CXX.dd
+[3/39] Generating CXX dyndep file benchmarks/CMakeFiles/IntrinsicLopFamilyGpuBenchmarkSmoke.dir/CXX.dd
+[4/40] Generating CXX dyndep file src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/CXX.dd
+[5/48] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/rendering/Bench_FrameRecipeCompileCacheSmoke.cpp.o
+[6/48] Building CXX object benchmarks/CMakeFiles/IntrinsicLopFamilyGpuBenchmarkSmoke.dir/geometry/Bench_LopFamilyGpuVulkanSmoke.cpp.o
+[7/48] Building CXX object benchmarks/CMakeFiles/IntrinsicKMeansGpuBenchmarkSmoke.dir/geometry/Bench_KMeansGpuVulkanSmoke.cpp.o
+[8/48] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.PanelSupport.cpp.o
+[9/48] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.EditorShell.cpp.o
+[10/48] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Sandbox.ConfigSections.cppm.o
+[11/48] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Sandbox.ConfigSections.cpp.o
+[12/48] Linking CXX executable bin/IntrinsicBenchmarkSmoke
+[13/48] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.MethodPanels.cpp.o
+[14/48] Linking CXX executable bin/IntrinsicKMeansGpuBenchmarkSmoke
+[15/48] Generating CXX dyndep file tests/CMakeFiles/RuntimeContractSlowTestObjs.dir/CXX.dd
+[16/49] Linking CXX executable bin/IntrinsicLopFamilyGpuBenchmarkSmoke
+[17/49] Generating CXX dyndep file tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/CXX.dd
+[18/58] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.DomainPanels.cpp.o
+[19/58] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.MeshProcessingPanels.cpp.o
+[20/58] Linking CXX static library lib/libExtrinsicSandboxEditor.a
+[21/58] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxConfigSections.cpp.o
+[22/58] Building CXX object tests/CMakeFiles/RuntimeContractSlowTestObjs.dir/contract/runtime/Test.AssetImportFormatCoverageSlow.cpp.o
+[23/58] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxAppComposition.cpp.o
+[24/58] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxDomainPanels.cpp.o
+[25/58] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxCurvatureSegmentationPanel.cpp.o
+[26/58] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxDescriptorAnalysisPanel.cpp.o
+[27/58] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxParameterizationPanel.cpp.o
+[28/58] Generating CXX dyndep file tests/CMakeFiles/RuntimePhysicsModuleTestObjs.dir/CXX.dd
+[29/59] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxEditorPresentation.cpp.o
+[30/59] Generating CXX dyndep file tests/CMakeFiles/PointLBVHGpuTestObjs.dir/CXX.dd
+[31/61] Building CXX object tests/CMakeFiles/RuntimePhysicsModuleTestObjs.dir/integration/runtime/Test.PhysicsModule.cpp.o
+[32/61] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxProcessingPanels.cpp.o
+[33/61] Generating CXX dyndep file tests/CMakeFiles/GraphicsVulkanSmokeTestObjs.dir/CXX.dd
+[34/68] Building CXX object tests/CMakeFiles/GraphicsVulkanSmokeTestObjs.dir/integration/graphics/Test.ComputeParallelPrimitivesGpuSmoke.cpp.o
+[35/68] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp.o
+[36/68] Building CXX object tests/CMakeFiles/GraphicsVulkanSmokeTestObjs.dir/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp.o
+[37/68] Building CXX object tests/CMakeFiles/PointLBVHGpuTestObjs.dir/integration/graphics/Test.PointConstructionGpuSmoke.cpp.o
+[38/68] Building CXX object tests/CMakeFiles/GraphicsVulkanSmokeTestObjs.dir/integration/graphics/Test.HzbOcclusionConservatismGpuSmoke.cpp.o
+[39/68] Building CXX object tests/CMakeFiles/GraphicsVulkanSmokeTestObjs.dir/integration/graphics/Test.ImGuiSurfaceGpuSmoke.cpp.o
+[40/68] Building CXX object tests/CMakeFiles/PointLBVHGpuTestObjs.dir/integration/graphics/Test.PointLBVHGpuSmoke.cpp.o
+[41/68] Building CXX object tests/CMakeFiles/GraphicsVulkanSmokeTestObjs.dir/integration/graphics/Test.TransientDebugSurfaceGpuSmoke.cpp.o
+[42/68] Generating CXX dyndep file tests/CMakeFiles/RuntimeSandboxAcceptanceGpuSmokeTestObjs.dir/CXX.dd
+[43/69] Linking CXX executable bin/IntrinsicPointLBVHGpuTests
+[44/69] Generating CXX dyndep file tests/CMakeFiles/RuntimeClusteringServiceGpuSmokeTestObjs.dir/CXX.dd
+[45/70] Building CXX object tests/CMakeFiles/GraphicsVulkanSmokeTestObjs.dir/integration/graphics/Test.UvViewGpuSmoke.cpp.o
+[46/70] Generating CXX dyndep file tests/CMakeFiles/RuntimePointCloudConsolidationGpuParityTestObjs.dir/CXX.dd
+[47/71] Building CXX object tests/CMakeFiles/GraphicsVulkanSmokeTestObjs.dir/integration/graphics/Test.VisualizationOverlaySurfaceGpuSmoke.cpp.o
+[48/71] Generating CXX dyndep file tests/CMakeFiles/RuntimeProgressivePoissonResultGpuSmokeTestObjs.dir/CXX.dd
+[49/71] Generating CXX dyndep file tests/CMakeFiles/GraphicsRendererCpuUnitTestObjs.dir/CXX.dd
+[50/72] Building CXX object tests/CMakeFiles/GraphicsRendererCpuUnitTestObjs.dir/unit/graphics/Test.Graphics.DebugViewSystem.cpp.o
+[51/72] Generating CXX dyndep file tests/CMakeFiles/GraphicsContractTestObjs.dir/CXX.dd
+[52/73] Building CXX object tests/CMakeFiles/RuntimeClusteringServiceGpuSmokeTestObjs.dir/integration/runtime/Test.ClusteringServiceGpuSmoke.cpp.o
+[53/73] Generating CXX dyndep file tests/CMakeFiles/RuntimeGraphicsCpuTestObjs.dir/CXX.dd
+[54/76] Building CXX object tests/CMakeFiles/GraphicsContractTestObjs.dir/contract/graphics/Test.RendererRhiBoundary.cpp.o
+[55/76] Building CXX object tests/CMakeFiles/RuntimePointCloudConsolidationGpuParityTestObjs.dir/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp.o
+[56/76] Building CXX object tests/CMakeFiles/RuntimeGraphicsCpuTestObjs.dir/integration/runtime/Test.RenderWorldPoolPipelined.cpp.o
+[57/76] Generating CXX dyndep file tests/CMakeFiles/RuntimeIntegrationCpuTestObjs.dir/CXX.dd
+[58/76] Generating CXX dyndep file tests/CMakeFiles/GraphicsIntegrationCpuTestObjs.dir/CXX.dd
+[59/77] Building CXX object tests/CMakeFiles/GraphicsIntegrationCpuTestObjs.dir/integration/graphics/Test.RendererLegacy.cpp.o
+[60/77] Generating CXX dyndep file tests/CMakeFiles/RuntimeGpuResultReadbackSmokeTestObjs.dir/CXX.dd
+[61/77] Linking CXX executable bin/IntrinsicRuntimeIntegrationTests
+[62/77] Linking CXX executable bin/IntrinsicGraphicsIntegrationCpuTests
+[63/77] Linking CXX executable bin/IntrinsicRuntimeContractSlowTests
+[64/77] Linking CXX executable bin/IntrinsicSandboxEditorIntegrationTests
+[65/77] Linking CXX executable bin/IntrinsicRuntimePhysicsModuleTests
+[66/77] Building CXX object tests/CMakeFiles/RuntimeGraphicsCpuTestObjs.dir/integration/runtime/Test.RuntimeSandboxAcceptance.cpp.o
+[67/77] Linking CXX executable bin/IntrinsicGraphicsVulkanSmokeTests
+[68/77] Linking CXX executable bin/IntrinsicRuntimeClusteringServiceGpuSmokeTests
+[69/77] Linking CXX executable bin/IntrinsicRuntimeProgressivePoissonResultGpuSmokeTests
+[70/77] Linking CXX executable bin/IntrinsicRuntimeGpuResultReadbackSmokeTests
+[71/77] Linking CXX executable bin/IntrinsicGraphicsRendererCpuUnitTests
+[72/77] Linking CXX executable bin/IntrinsicRuntimePointCloudConsolidationGpuParityTests
+[73/77] Linking CXX executable bin/IntrinsicGraphicsContractTests
+[74/77] Building CXX object tests/CMakeFiles/RuntimeGraphicsCpuTestObjs.dir/integration/runtime/Test.RuntimeRenderExtraction.cpp.o
+[75/77] Linking CXX executable bin/IntrinsicRuntimeGraphicsCpuTests
+[76/77] Building CXX object tests/CMakeFiles/RuntimeSandboxAcceptanceGpuSmokeTestObjs.dir/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp.o
+[77/77] Linking CXX executable bin/IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests

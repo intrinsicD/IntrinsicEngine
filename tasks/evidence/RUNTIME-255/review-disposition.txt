@@ -1,0 +1,12 @@
+Root disposition of Claude's fixed-source review (source-review.txt)
+
+No blocking source findings. Confirmed in full source:
+- All seven tested enums explicitly use std::uint8_t; invalid value 200 is representable.
+- Test.RenderRecipeConfig.cpp already directly includes <algorithm>, <string> and <string_view>; the used algorithms and string size types are available.
+- Unknown value-type coverage deliberately asserts successful parsing and retained preview value; overall config usability has separate contract validation and is not inferred from token recognition.
+- The parse-versus-ownership distinction already has a local comment and exact diagnostic-state assertions.
+- Keep the existing editor-model case: its subject is the declared recipe controls, including these five displayed fields. No additional duplicated setup is needed.
+- The untouched adjacent parsers are RenderingFallbackPolicy and BindingColorSpace, neither with an existing ToString overload. RenderRecipeConfigState additionally accepts lowercase aliases. No missed RenderDataCategory parser exists. Do not broaden the API or remove aliases.
+- One helper continuation indentation nit is cosmetic; no correctness/source change warranted after the frozen source review.
+
+The review is source-only. Command receipts independently record build/test outcomes; final retirement requires a fresh fixed-digest review with those outcomes.
