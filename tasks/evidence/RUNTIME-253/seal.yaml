@@ -1,0 +1,8 @@
+schema_version: 1
+task_id: RUNTIME-253
+sealed_revision: b20c68f921cf36f5df49c4458903a9ff61522183
+source_content_digest: 95faea498f834762c6f15913fdcc67ef356f1a7475d1db36ec4c12d2bcbfcc68
+report_sha256: cc04ccbc80400fff2cbd1adf04ad470a22c051f3d2e558439a944fb9cce58f03
+records: []
+reason: Bind completed config reuse evidence to the reviewed local retirement commit.
+generated_by: tools/agents/workflow_evidence.py
