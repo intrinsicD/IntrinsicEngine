@@ -59,7 +59,8 @@ See the [shared spatial-index consumer inventory](../../../docs/architecture/spa
       overloads needed by current graph and mesh callers; one implementation is
       not a reason for an abstract interface.
 - [ ] Return generic property/span outputs unless handle-indexed access is
-      genuinely required, and retain `Graph` adapters for compatibility.
+      genuinely required. Retain `Graph` conveniences only for actual callers,
+      update in-tree consumers together, and remove superseded APIs directly.
 - [ ] Prove mesh primal adjacency enters without copied topology or fabricated
       faces; publication changes only named same-cardinality properties.
 

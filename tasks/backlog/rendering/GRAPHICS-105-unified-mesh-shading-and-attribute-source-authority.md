@@ -219,9 +219,9 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' --time
 
 ## Slice plan
 - **Slice A (CPUContracted).** Add material `ShadingModel` as the single lit/unlit authority; route the unified shader to honor it; assign a default **lit** material uniformly across both import routes via one helper (subsuming RUNTIME-128 + `3485151`); demote `VisualizationConfig` lit/unlit role for imports. Defers attribute-source and UI to later slices.
-  - **A1 — landed (this slice).** `Graphics::ShadingModel{Lit,Unlit}` added to `MaterialParams` (default `Lit`) and `GpuMaterialSlot.ShadingModel` (former `_pad0`, layout-preserving) + GLSL mirror/constants; `PackSlot` writes it; the forward surface shader's lit/unlit gate now keys on `ShadingModel` (legacy `MaterialFlags::Unlit` kept as a transitional alias) and the `DefaultDebugSurface` type-branch is removed from the gate; slot-0 default and RUNTIME-128's default-lit material set `ShadingModel` explicitly. Tests: material-system round-trip + default-slot `Unlit`, shader-source contract. **Build/CPU gate not run here (vcpkg egress block).**
+  - **A1 — landed (this slice).** `Graphics::ShadingModel{Lit,Unlit}` added to `MaterialParams` (default `Lit`) and `GpuMaterialSlot.ShadingModel` (former `_pad0`, layout-preserving) + GLSL mirror/constants; `PackSlot` writes it; the forward surface shader's lit/unlit gate now keys on `ShadingModel` (legacy `MaterialFlags::Unlit` kept as a transitional alias) and the `DefaultDebugSurface` type-branch is removed from the gate; slot-0 default and RUNTIME-128's default-lit material set `ShadingModel` explicitly. Tests: material-system round-trip + default-slot `Unlit`, shader-source contract. **Historical slice-time verification: build/CPU gate was blocked by vcpkg egress.**
   - **A2 — remaining.** Map glTF `KHR_materials_unlit` → `ShadingModel::Unlit` at import; one shared `ResolveImportedMeshMaterial` helper across both routes; migrate the remaining `MaterialFlags::Unlit` writers off the flag. Folded into the scivis-collapse slice below since they share the `VisualizationSyncSystem` surface.
-- **Slice B (CPUContracted) — landed.** Added `Graphics::AttributeSource{VertexAttribute,Texture}` + `MaterialChannel` + `Set/GetChannelSource`, and `MaterialParams::ChannelSourceBits` → `GpuMaterialSlot.ChannelSourceBits` (former `_pad1`, layout-preserving) + GLSL mirror, constants, and the `GpuMaterialChannelSource` accessor. Both promoted `ResolveSurfaceNormal` paths (forward `default_debug_surface.frag`, deferred `gbuffer.frag`) now gate the Normal texture lane on the per-channel source (legacy `ObjectSpaceNormalMap` flag kept as transitional alias; default `VertexAttribute` preserves behavior). The producer (`ResolveTextureAssetBindings`) sets the Normal channel source = Texture wherever it sets the object-space flag. Tests: channel-source round-trip, producer mirrors flag↔source, shader-source contract in both promoted paths. **Build/CPU gate not run here (vcpkg egress block).** Keeps non-Normal source semantics out of the UI/acceptance scope and defers the normal controls to Slice E.
+- **Slice B (CPUContracted) — landed.** Added `Graphics::AttributeSource{VertexAttribute,Texture}` + `MaterialChannel` + `Set/GetChannelSource`, and `MaterialParams::ChannelSourceBits` → `GpuMaterialSlot.ChannelSourceBits` (former `_pad1`, layout-preserving) + GLSL mirror, constants, and the `GpuMaterialChannelSource` accessor. Both promoted `ResolveSurfaceNormal` paths (forward `default_debug_surface.frag`, deferred `gbuffer.frag`) now gate the Normal texture lane on the per-channel source (legacy `ObjectSpaceNormalMap` flag kept as transitional alias; default `VertexAttribute` preserves behavior). The producer (`ResolveTextureAssetBindings`) sets the Normal channel source = Texture wherever it sets the object-space flag. Tests: channel-source round-trip, producer mirrors flag↔source, shader-source contract in both promoted paths. **Historical slice-time verification: build/CPU gate was blocked by vcpkg egress.** Keeps non-Normal source semantics out of the UI/acceptance scope and defers the normal controls to Slice E.
 - **Slice C (CPUContracted).** Finish the single-authority cleanup: shared imported-material policy, `KHR_materials_unlit`, retirement of transitional lit/unlit writers/branches, and collapse of visualization override-material synthesis after retained visualization-mode contracts pass.
 - **Slice D (CPUContracted).** Make the normal binding explicitly per-renderable; preserve unrelated slots, prove shared-authored-material isolation, exact-generation fallback, standing readiness invalidation, stale rejection, and mesh/domain/UV gating.
 - **Slice E (CPUContracted).** Extend the stable-id
@@ -328,23 +328,24 @@ The unified surface frag (forward `default_debug_surface.frag` + deferred
 Delete/collapse, with the single data path replacing each:
 
 - [ ] **Import-as-UniformColor default** — `ImportedGeometryVisualization()` /
-  `ImportedMeshVisualization()` (`Runtime.Engine.cpp:292-310`, callers at
-  1088/1156/1208). Replace with `ResolveImportedMeshMaterial`. This removes the
+  `ImportedMeshVisualization()` in
+  `src/runtime/AssetWorkflow/Runtime.AssetWorkflowRecipePolicies.cpp`. Replace with `ResolveImportedMeshMaterial`. This removes the
   `3485151` workaround by subsumption.
 - [ ] **Override-material synthesis** in `VisualizationSyncSystem` for
   `UniformColor` (`BuildUniformColorParams`,
-  `Graphics.VisualizationSyncSystem.cpp:229-239`) and the per-entity
+  `src/graphics/renderer/Graphics.VisualizationSyncSystem.cpp`) and the per-entity
   `EnsureOverrideLease`/`OverrideLeases`/`EffectiveSlot`-per-frame machinery
-  (lines 56-86, 553-589). The scivis data path (`GpuEntityConfig`) already
+  in that same implementation. The scivis data path (`GpuEntityConfig`) already
   exists; the synthesized SciVis material is redundant.
 - [ ] **Scivis override materials** — `BuildScalarFieldParams`/`BuildPerElementParams`
-  (`:189-227`, `:242-250`). KEEP the visualization *capability* via
+  in `Graphics.VisualizationSyncSystem.cpp`. KEEP the visualization *capability* via
   `GpuEntityConfig` data; remove the material synthesis. (Design decision below.)
-- [ ] **Dual lit/unlit shader branch** — drop `MaterialTypeID == DefaultDebugSurface`
-  from the unlit test (`default_debug_surface.frag:137-138`); lit/unlit = `ShadingModel`.
-- [ ] **`MaterialFlags::Unlit` as the authority** — migrate its 4 writers
-  (`MaterialSystem.cpp:327`; `VisualizationSyncSystem.cpp:195,234,245`) to
-  `ShadingModel`; retire the flag bit (or keep as a deprecated alias for one slice).
+- [ ] **Obsolete `MaterialFlags::Unlit` bit** — remove the redundant flag
+  write in `Graphics.MaterialSystem.cpp` and the bit declaration. The slot-0
+  material already sets `ShadingModel::Unlit`; preserve that genuine invalid-
+  handle indicator. Visualization synthesis has no remaining Unlit writes.
+  The shader authority switch already landed in A1; no compatibility alias
+  or transition period is required.
 
 ### Keep (intentional, not part of the bug)
 - **Slot 0 `DefaultDebugSurface`** (`MaterialSystem.cpp:313-338`) as the genuine

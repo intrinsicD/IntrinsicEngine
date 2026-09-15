@@ -41,8 +41,9 @@ contract_review: Existing import-control integration coverage; no geometry bindi
   `BUG-098` restores production hover timing; `BUG-099` closes the binary PLY
   PointCloud route; `BUG-100` makes every File / Import payload queued and
   responsive. Through `ASSETIO-010`, every successful row must exercise the
-  post-`RUNTIME-200` staged import recipe and canonical `JobService`, not a
-  compatibility `AssetImportPipeline`/IO-bridge route.
+  existing `AssetWorkflowModule` staged `AssetImportRecipe` and canonical
+  `JobService`. Reuse the single-source format capability table delivered by
+  ASSETIO-012 for route expectations; do not build a second routing table.
 - The current integration suite opens the real window and can observe a
   disabled hover only after forcing `DelayNone`; it never types the real path,
   selects a real combo row, clicks Import, or covers the checked-in model
@@ -113,8 +114,8 @@ contract_review: Existing import-control integration coverage; no geometry bindi
       and cannot dispatch; prerequisites become enabled in linear order.
 - [ ] Supported imports traverse the actual Path/combo/Import controls and
       finish through the same queued runtime path used by the application.
-- [ ] That queued runtime path is the sole staged `AssetImportRecipe`; the
-      matrix cannot pass through a retained compatibility import pipeline.
+- [ ] Each successful matrix row identifies the existing staged
+      `AssetImportRecipe` / `JobService` route used to complete it.
 - [ ] Generated route-class substitutes cover local XYZ/OBJ without committing
       or assuming provenance for user datasets; every tracked fixture,
       including `child.obj`, remains explicitly covered.

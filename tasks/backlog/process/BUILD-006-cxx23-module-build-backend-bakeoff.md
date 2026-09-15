@@ -30,6 +30,12 @@ contracts:
 - No permanent dual-backend maintenance and no engine source optimization.
 
 ## Context
+- BUILD-007 already measured engine source compile-locality changes. Reuse
+  its measurement tooling and baseline provenance where applicable; those
+  results do not compare build/cache backends or satisfy this task. Measure
+  backend candidates on the same current source rather than repeating the
+  completed engine refactors.
+
 
 - Owner: build backend and action-cache integration; no engine layer change.
 - The control is the current preset-driven CMake/Ninja/Clang path with the

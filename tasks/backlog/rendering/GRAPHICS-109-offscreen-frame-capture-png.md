@@ -2,6 +2,15 @@
 id: GRAPHICS-109
 theme: none
 depends_on: []
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: [repo.source-documentation]
 ---
 # GRAPHICS-109 — Offscreen frame capture to PNG (headless figure renders)
 
@@ -19,10 +28,10 @@ depends_on: []
 - Pairs with RUNTIME-131 (agent/CLI config facade) so captures can be driven without ImGui, and with RUNTIME-134 for an in-editor "export frame" action.
 
 ## Required changes
-- [ ] Wire the existing offscreen color-target readback to a PNG encoder (via an approved `vcpkg.json` image-write dependency or a repository-owned encoder) and write to a caller-specified path.
+- [ ] Wire the existing offscreen color-target readback to a PNG encoder using the already-manifested `stb` image-write facility; reconcile its implementation ownership with the existing TinyGLTF integration and write to a caller-specified path.
 - [ ] Honor a requested capture resolution and color format from the render-recipe/headless config; document the supported formats.
 - [ ] Publish the saved file through `Runtime.RenderArtifactPublication` (`SavedToFile`) with metadata (path, resolution, format) and fail closed with diagnostics when the device is non-operational or the path is unwritable.
-- [ ] Provide a minimal headless entry (driven by config / the RUNTIME-131 facade) that renders a scene to an offscreen target and saves a PNG, usable from CI/agent contexts.
+- [ ] Provide a minimal headless entry (driven by the existing validated render-output config and artifact publication path) that renders a scene to an offscreen target and saves a PNG, usable from CI/agent contexts.
 
 ## Tests
 - [ ] Add a `gpu;vulkan` (offscreen) test under `ci-vulkan` that renders a known scene headless and asserts a non-empty, correctly-sized PNG is written and re-decodes to the expected dimensions.
@@ -31,7 +40,9 @@ depends_on: []
 
 ## Docs
 - [ ] Document the capture/export flow and supported formats under `docs/architecture/` (rendering) and the headless usage recipe; update `docs/benchmarking` or method docs if used for figure capture.
-- [ ] Record any new dependency in `vcpkg.json`/`vcpkg-configuration.json` and the dependency docs; regenerate `docs/api/generated/module_inventory.md` if surfaces change.
+- [ ] Document the existing dependency/encoder ownership and regenerate
+      `docs/api/generated/module_inventory.md` if surfaces change. A second
+      image library needs a demonstrated contract mismatch, not this task alone.
 
 ## Acceptance criteria
 - [ ] A headless render produces a PNG at the requested resolution, published as a `SavedToFile` artifact with metadata.

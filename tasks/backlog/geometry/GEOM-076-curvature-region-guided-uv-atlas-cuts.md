@@ -25,6 +25,15 @@ contract_review: "This follow-up consumes only a future accepted METHOD-040 glob
 - No reimplementation of shared parameterization optimization numerics. If a later solver needs those changes, declare `geometry.parameterization-optimization` in a separately reviewed slice.
 
 ## Context
+- Current research gate: METHOD-040 has not supplied an accepted production
+  partition. Active METHOD-043/044/045 own adjacent offline candidate/evidence
+  work; METHOD-044 explicitly reserves GEOM-076 for a reviewed adoption
+  rescope after candidate selection. This task remains gated on its stated
+  METHOD-040 input, not permission to adopt a different experiment. Reconcile
+  their frozen evidence and reuse accepted fixtures before opening another
+  cohort. Change the input contract and dependencies explicitly if a different
+  candidate wins; offline success alone does not enable production adoption.
+
 - Owner/layer: comparative fixtures, hint interpretation, chart construction, and UV diagnostics live in `src/geometry`; runtime binds only a future accepted selected-mesh METHOD-040 output contract and owns undoable UV publication; app owns only validated controls and comparison presentation.
 - METHOD-038 retired with bounded fixtures/oracles and no accepted v2 boundary producer. METHOD-039 preserved a useful feature stage but refuted its seed-sensitive local patch solver without publication or adoption. METHOD-040 must first produce an accepted global partition; those boundaries remain a hypothesis until this task evaluates atlas behavior.
 - `Geometry.UvAtlas` already owns source-face cross-references, chart/seam-cut records, FastStaged/XAtlas selection, per-chart parameterization attempts, quality diagnostics, packing, and corner-domain UV publication. Integration should be an optional input to that surface, not a parallel atlas path.

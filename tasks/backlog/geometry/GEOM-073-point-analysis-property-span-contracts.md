@@ -19,7 +19,7 @@ maturity_target: CPUContracted
 
 - Add generic typed property/span entry points for the existing point-set
   analyses in `Geometry.PointCloud.Utils` and `Geometry.PointCloud.Features`,
-  keeping `Cloud` overloads as convenience adapters.
+  retaining `Cloud` adapters only for actual callers or deleted-slot semantics.
 
 ## Non-goals
 
@@ -29,10 +29,20 @@ maturity_target: CPUContracted
 
 ## Context
 
-- Several read-only or same-cardinality algorithms still require `Cloud` even
-  though their implementation consumes positions, optional normals, indices,
-  and output arrays. This prevents face-center/edge/halfedge properties from
-  being used directly and makes a container wrapper look semantic.
+- Span and supplied-neighborhood kernels now cover statistics/radii, outliers,
+  density, bilateral filtering, ISS keypoints and FPFH. Descriptor matching
+  already consumes `DescriptorSet`; coarse alignment already takes position
+  spans. Those are canonical implementations, not remaining porting work.
+- The remaining audit starts with `ComputeBoundingBox(const Cloud&)` and
+  `ApplyGaussianNoise(Cloud&, ...)` in `Geometry.PointCloud.Utils`. Determine
+  whether existing bounds/property helpers already satisfy their contracts;
+  add only the missing borrowed-input seam, preserving deleted-slot behavior.
+  Count-changing `VoxelDownsample`/`RandomSubsample` remain explicit owning
+  operations; their existence alone does not require new span wrappers.
+- Framework24 covariance probability and scalar Gaussian saliency are distinct
+  feature gaps in the product inventory, not unimplemented overloads of the
+  delivered local-distance-ratio or ISS kernels. They are outside this task's
+  no-new-estimator scope and remain tracked by REVIEW-004.
 - Re-read each implemented formulation before changing its seam: Rusu et al.'s
   statistical filtering lineage, Zhong's 2009 ISS detector, and Rusu et al.'s
   FPFH (DOI `10.1109/ROBOT.2009.5152473`), plus later robustness/scalability
@@ -44,7 +54,9 @@ Preserve the generic property/span boundary so future callers can supply or reus
 a geometry-owned neighborhood index. Radius outliers/ISS/FPFH are candidates;
 spacing, splat radii, bilateral/statistical analysis and automatic feature scales
 need kNN/self exclusion. The shared point LBVH now supplies these queries
-(GPU k=1..64); consumer adapters remain to be integrated. Retain
+(GPU k=1..64); outlier, density, spacing, bilateral, keypoint, FPFH,
+projection and point-construction adapters are integrated. Reuse them;
+do not reopen their implementation here. Retain
 numerical behavior here; do not import Runtime.SpatialIndexCache or add a
 universal query interface just for a future backend.
 
@@ -79,7 +91,8 @@ See the [shared spatial-index consumer inventory](../../../docs/architecture/spa
 
 - [ ] Point-set analyses depend on their typed values, not `Cloud` provenance or
       vertex handles.
-- [ ] Existing `Cloud` callers remain source-compatible and behavior-identical.
+- [ ] Update in-tree callers together and preserve behavior. No compatibility
+      wrappers or aliases are required for superseded public APIs.
 
 ## Verification
 
@@ -96,42 +109,10 @@ python3 tools/agents/validate_tasks.py --root tasks --strict
 - No ECS/runtime import, unreviewed algorithm substitution, implicit
   topology/cardinality edit, or handle-specific generic API.
 
-## Outlier slice progress (2026-09-09)
+## Delivered slices
 
-RUNTIME-209/UI-041 add span statistical/radius analysis plus cached CPU/Vulkan
-query execution and canonical-domain publication. Keep this task open for the
-remaining statistics/radii, bilateral, density, simplified probability and
-feature utilities. Reuse SpatialIndexCache where the estimator semantics fit;
-do not conflate LOF-like probability with the statistical/radius masks.
-
-## Density slice progress (2026-09-09)
-
-RUNTIME-220 adds span/supplied-candidate density kernels and canonical-domain
-CPU/Vulkan runtime/config/UI publication. The inherited local Gaussian average
-and spacing bandwidth remain distinct from full-sample KDE. This task remains
-open for statistics/radii, bilateral, simplified probability and features.
-
-## Spacing/radii slice progress
-
-RUNTIME-221 adds span/supplied-candidate statistics and radius estimation, plus
-canonical-domain CPU/Vulkan runtime/config/UI radius publication with full
-nearest-other spacing diagnostics. Sampled statistics retain deterministic stride;
-invalid/nonfinite or unrepresentable float results now fail closed. Keep this
-task open for bilateral filtering, simplified probability and feature utilities.
-RUNTIME-222 owns model-space radius rendering; do not reinterpret radii as pixels.
-
-## Local-distance-ratio slice
-RUNTIME-223 adds typed-span and supplied-neighbor overloads for the existing
-ratio heuristic and integrates it into the shared outlier workflow. Bilateral
-filtering and point features remain separate slices; Framework24 covariance
-probability must not be confused with this existing distance-ratio formula.
-
-## Bilateral slice
-RUNTIME-224 adds owned span results and a supplied-neighbor single-pass reducer for the fixed-normal point filter, preserving the Cloud wrapper with atomic publication. Runtime uses all canonical domains and private cache workspaces for moving iterations. Feature utilities and the distinct Framework24 covariance probability remain separate work; older progress paragraphs above record their slice-time remainder.
-
-## Keypoint slice
-RUNTIME-225 adds span scale/keypoint analysis and complete supplied radius rows through the common Geometry.SpatialQueries neighborhood view. Runtime composes cached CPU/Vulkan queries with CPU centroid-PCA and suppression on all canonical domains. The corrected nearest-live Cloud spacing also affects descriptor automatic radii. FPFH span/neighborhood/runtime integration and descriptor matching remain open; reuse the common row view and property helpers, while preserving descriptor-space matching semantics. Framework24 scalar Gaussian saliency and covariance probability remain distinct ports.
-
-RUNTIME-226 adds FPFH position/normal span and supplied-neighborhood kernels, with the Cloud wrapper delegating through live compaction. Its canonical runtime/config/UI and 33-column publication slice has separate verification ownership; descriptor-space matching and remaining utility audit stay in this task.
-
-RUNTIME-227 adds compact density weights with a supplied complete-neighborhood reducer, conservative broad-phase support and canonical CPU/Vulkan runtime/config/UI. Remaining projection adapters should reuse this reducer and shared radius pagination while keeping immutable source indices separate from moving-sample workspaces. Preserve exact kernel support and compare against the existing grid driver. Framework24 scalar Gaussian saliency and covariance probability remain distinct ports; audit general GPU LBVH subnormal-coordinate handling before relaxing the density adapter restriction.
+RUNTIME-209/UI-041 and RUNTIME-220 through RUNTIME-227 delivered the analysis,
+span/neighborhood and runtime publication slices above. RUNTIME-228 through
+RUNTIME-230 delivered projection and point-construction adapters. Their task
+records and current kernels own those details; this task does not repeat their
+former remaining-work lists. RUNTIME-222 still owns model-space radius rendering.

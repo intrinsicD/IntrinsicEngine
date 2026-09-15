@@ -24,10 +24,14 @@ contracts: [repo.source-documentation, geometry.element-domain-sources]
 - No behavior change to the corrected centroid semantics delivered by `BUG-109` or to existing callers.
 
 ## Context
+- BUG-109 is delivered: quantization validates invalid/out-of-range values
+  and occupied cells are ordered deterministically. Its dependency is
+  satisfied; build the new index-returning strategies on that contract.
+
 - Owner/layer: `src/geometry`; `geometry -> core` only.
 - Port source: framework24 `lib_bcg_framework/include/bcg_point_cloud_vertex_sampler_grid_*.h` plus `bcg_geometry_processing/include/GridSampler.h`. The old `medioids` spelling is not a conventional medoid: it selects the input point nearest the arithmetic cell mean. Port that behavior as `ClosestToCellCentroid`; the `union` sampler variants are composition sugar and are not ported.
 - Retired `GEOM-016` hardened centroid voxel downsampling with deterministic ordering and stable tie-breaking; this task adds index-returning strategies under the same determinism and invalid-input contract.
-- `BUG-109` first makes that intended baseline true in the current implementation by validating non-finite/out-of-range quantization and sorting occupied cells. This task must build on that fix rather than duplicate or bypass it.
+
 - Index-returning selection is what makes downstream property transfer exact (select rows from every property), which the centroid path cannot do.
 
 ## Spatial acceleration consideration

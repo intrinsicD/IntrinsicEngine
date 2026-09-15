@@ -24,6 +24,11 @@ contracts: [repo.source-documentation, geometry.element-domain-sources]
 - No speedup claim without a benchmark manifest and baseline comparison (benchmark policy).
 
 ## Context
+- RUNTIME-224 already integrates the bilateral supplied-neighbor reducer and
+  CPU/Vulkan spatial choices. A justified lattice filter would extend that
+  existing operation, preserving its neighborhood/kernel semantics, rather
+  than create a second bilateral processing workflow.
+
 - Owner/layer: `src/geometry`; `geometry -> core` only.
 - Paper: Adams, Baek, Davis — "Fast High-Dimensional Filtering Using the Permutohedral Lattice", Computer Graphics Forum (Eurographics) 2010.
 - Port source: framework24 `lib_bcg_framework/include/bcg_permutohedral_lattice.h` (untested in bcg; this port adds a brute-force oracle test).

@@ -31,6 +31,11 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, method.e
 - No speedup claim without validated benchmark output and baseline comparison.
 
 ## Context
+- RUNTIME-202 already removed the Sandbox facade/duplicate result types.
+  Extend `EditorProgressivePoissonCommand` / `EditorProgressivePoissonResult`
+  in `Runtime.PointSetOperations`, preserving its shared snapshot, validation,
+  cancellation, stale-result and publication semantics for GPU completion.
+
 - Owning subsystem/layer: runtime owns the GPU execution seam; METHOD-012 remains
   the method-pure CPU reference and correctness oracle.
 - METHOD-013 retired at `CPUContracted`: planning, shader assets, recording,
@@ -43,7 +48,7 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, method.e
 - Config: registered app section
   `sandbox.progressive_poisson` field `backend`.
 - Command/API: the post-`RUNTIME-202` typed
-  `ProgressivePoissonRequest::Backend`; UI/config/agent callers use that same
+  `EditorProgressivePoissonCommand` backend request; UI/config/agent callers use that same
   operation.
 - UI: retired `RUNTIME-136` already exposes requested backend and fallback
   readout.
@@ -97,9 +102,6 @@ build/rebuild plus complete sampling cost before adopting another structure.
 See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
 
 ## Required changes
-- [ ] Complete one typed Progressive Poisson runtime operation so CPU and GPU
-      requests share snapshot, validation, cancellation, stale-result,
-      result, and writeback semantics.
 - [ ] Record GPU work through `JobService` and flow the existing multi-buffer
       Vulkan output through the `RUNTIME-195` readback operation into the
       parser/parity diagnostics; remove direct blocking `IDevice::ReadBuffer`
@@ -120,10 +122,6 @@ See the [shared spatial-index consumer inventory](../../../docs/architecture/spa
       parity, readback/fallback, device, and timing-source details in
       diagnostics; a skipped/fallback run cannot support a GPU performance
       claim.
-- [ ] After CPU/fallback and actual Vulkan parity pass through the typed
-      operation, delete duplicate Sandbox backend/result records, direct
-      CPU/GPU command routes, and any public backend wrapper/queue that has no
-      independent consumer.
 
 ## Tests
 - [ ] Default CPU/null fallback test asserting a Vulkan request returns the CPU
@@ -184,5 +182,3 @@ python3 tools/agents/validate_tasks.py --root tasks --strict
 ## Maturity
 - Target: `ParityProven` on Vulkan-capable hosts; CPU fallback remains the
   intended endpoint on Null/non-operational hosts.
-- Closure also requires migration of UI/config/agent workflows to the typed
-  operation and deletion of the parallel Sandbox/backend paths after parity.

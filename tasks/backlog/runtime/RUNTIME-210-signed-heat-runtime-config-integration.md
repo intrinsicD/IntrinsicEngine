@@ -10,7 +10,7 @@ branch:
 worktree:
 claimed_at:
 contract_schema: 1
-contracts: [geometry.element-domain-sources, method.engine-integration]
+contracts: [geometry.element-domain-sources, method.engine-integration, runtime.editor-prepared-frame-locality]
 maturity_target: Operational
 ---
 # RUNTIME-210 — Signed Heat runtime and config integration
@@ -29,6 +29,12 @@ maturity_target: Operational
   contract merely to advertise more domains.
 
 ## Context
+- Extend the existing `Runtime.MeshFieldOperations` family and its prepared
+  frame for this mesh field. Reuse canonical property preflight, JobService,
+  config control and history/publication; add no per-method facade or module
+  service, and keep Signed Heat implementation imports out of shared editor
+  workspace interfaces.
+
 
 - `methods/geometry/signed_heat` and `Geometry.SignedHeatMethod` are complete
   CPU-reference assets but have no runtime/config/Sandbox binding. Unlike the

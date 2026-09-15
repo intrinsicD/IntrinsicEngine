@@ -9,6 +9,15 @@ depends_on:
   - RUNTIME-195
   - RUNTIME-202
 maturity_target: ParityProven
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: [repo.source-documentation, geometry.element-domain-sources, method.engine-integration, runtime.editor-prepared-frame-locality]
 ---
 # METHOD-026 — Parameterization family GPU (Vulkan compute) backend and parity
 
@@ -47,9 +56,10 @@ maturity_target: ParityProven
   falls back to `cpu_reference` with honest telemetry.
 - Config/UI: this task extends the config/result model delivered by retired
   `RUNTIME-176` and the panel delivered by retired `UI-036` with
-  `gpu_vulkan_compute` after the implementation exists. `RUNTIME-202` first
-  migrates the old CPU facade into a typed parameterization operation; this
-  task extends that operation and does not wire a feature-specific queue.
+  `gpu_vulkan_compute` after the implementation exists. The existing
+  `Runtime.ParameterizationOperations`, including
+  `EditorParameterizationPreparedFrame`, owns the typed operation. Extend it
+  and keep implementation dependencies private to this family.
 
 ## Control surfaces
 - Config/UI/Agent: add the runtime-owned `gpu_vulkan_compute` request for the
@@ -57,9 +67,23 @@ maturity_target: ParityProven
   config apply path; unavailable execution falls back honestly.
 
 ## Backends
+
+
 - Backend axis: adds `gpu_vulkan_compute` with `gpu;vulkan` parity.
   `cpu_reference` is always the oracle and fallback; an adopted SLIM
   `cpu_optimized` path is an additional comparison, never the ARAP oracle.
+
+## Engine integration
+
+| Field | Disposition |
+| --- | --- |
+| Least-structured input | Triangle mesh topology, float positions, and strategy-specific pins/boundary constraints; faces are semantic inputs. |
+| Compatible entity sources | Existing editable mesh contract; validate canonical property references without widening to unsupported topology. |
+| RuntimeModule | Extend `Runtime.ParameterizationOperations`; keep implementation and backend dependencies private to the family. |
+| Config/agent | Existing parameterization preview/apply path gains only adopted strategy/backend choices and honest requested/actual/fallback results. |
+| UI | Extend the existing parameterization panel and `EditorParameterizationPreparedFrame`, using shared panel support. |
+| Publication | Existing validated UV publication/history path preserves unrelated properties and rejects stale work. |
+| End-to-end tests | This task owns backend selection, config source parity, fallback, and result publication coverage; the tests below own numerical/backend evidence. |
 
 ## Slice plan
 - **Slice A — private backend/fallback.** Extend the typed operation's
@@ -82,8 +106,9 @@ maturity_target: ParityProven
 ## Required changes
 - [ ] Implement local-step/global-solve GPU recording as private state of the
       typed parameterization operation. Upload mesh topology/positions once,
-      iterate on the GPU, and drain UVs through `RUNTIME-195`; the old
-      K-Means public wrapper/private queue is explicitly not a precedent.
+      iterate on the GPU, and drain UVs through `RUNTIME-195`. Follow the
+      current clustering pattern: a private module-owned backend and one
+      `GpuQueueParticipantHandle`, without an exported queue or backend DTO.
 - [ ] Register one private parameterization participant with `JobService` so
       work records inside the renderer frame context with no extra present; do
       not expose a parameterization job queue or queue DTO.
@@ -96,9 +121,6 @@ maturity_target: ParityProven
       `cpu_reference` when unavailable. Reject a strategy/GPU pair that missed
       parity during config preview rather than substituting a strategy.
 - [ ] Preserve determinism within the documented GPU parity tolerance; preserve SLIM injectivity on the GPU path.
-- [ ] After CPU/fallback and actual Vulkan parity pass, remove duplicate
-      Sandbox backend/result DTOs and any direct CPU/GPU apply route that
-      bypasses the typed parameterization operation.
 
 ## Tests
 - [ ] Opt-in
@@ -145,8 +167,8 @@ maturity_target: ParityProven
       RHI-free and the private backend implementation lives in runtime).
 - [ ] The emitted actual-GPU result validates; skipped/fallback execution
       cannot satisfy the operational/parity acceptance row.
-- [ ] UI, config, and agent requests use the same typed operation and no
-      backend wrapper/queue/facade compatibility route remains.
+- [ ] UI, config, and agent GPU requests extend the same existing typed
+      operation and prepared frame; do not introduce a parallel apply route.
 
 ## Verification
 ```bash

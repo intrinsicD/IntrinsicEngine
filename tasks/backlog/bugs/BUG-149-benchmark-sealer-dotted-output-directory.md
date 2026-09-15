@@ -28,12 +28,21 @@ contract_review: "Reviewed the full catalog; this is a benchmark-tool path class
 - Impact: dotted temporary/result directories can trigger broad unintended reads/writes, enormous diagnostics, false-green automation, and failure to seal the intended isolated result set. The METHOD-037 files themselves validated when the validator was pointed directly at the exact directory.
 
 ## Required changes
+Current source already propagates producer/sealer failures and exits via
+`SystemExit(main())`. Preserve and regression-test that delivered behavior;
+the remaining defect is suffix-based output-root classification. The earlier
+zero-exit observation above is historical, not the current implementation.
+
 - [ ] Resolve the producer output root without using a directory name's suffix as a file/directory discriminator; validate the exact target before invoking the sealer.
-- [ ] Ensure producer and sealer exit statuses are both retained and any failure returns nonzero, with a concise diagnostic naming the failed stage.
+- [ ] Preserve the existing nonzero producer/sealer exit propagation while
+      fixing root resolution; add explicit regression coverage for both stages.
 - [ ] Keep sealing confined to the exact requested root and refuse ambiguous/missing outputs without walking a parent such as `/tmp`.
 
 ## Tests
-- [ ] Add regression coverage for dotted and non-dotted output directories, an explicit JSON output file if supported, producer failure, sealer failure, and proof that sibling JSON is untouched.
+- [ ] Add `tests/regression/tooling/Test.BenchmarkRunAndSeal.py` (not yet
+      present) covering dotted and non-dotted output directories, an explicit
+      JSON output file if supported, producer failure, sealer failure, and
+      proof that sibling JSON is untouched.
 
 ## Docs
 - [ ] Clarify accepted `--output` path forms in the benchmark workflow/help if both directory and explicit file forms remain supported.
@@ -44,8 +53,11 @@ contract_review: "Reviewed the full catalog; this is a benchmark-tool path class
 - [ ] Benchmark tooling regressions and strict manifest/result validation pass.
 
 ## Verification
+
+After implementing the regression file named above:
+
 ```bash
-python3 -m unittest tests.regression.tooling.Test.BenchmarkRunAndSeal
+python3 tests/regression/tooling/Test.BenchmarkRunAndSeal.py
 python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
 python3 tools/benchmark/validate_benchmark_results.py --root <isolated-result-dir> --manifests-root benchmarks --strict
 python3 tools/agents/check_task_policy.py --root . --strict

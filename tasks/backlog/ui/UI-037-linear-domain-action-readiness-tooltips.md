@@ -11,7 +11,7 @@ worktree:
 claimed_at:
 maturity_target: Operational
 contract_schema: 1
-contracts: [geometry.element-domain-sources, geometry.property-coherence]
+contracts: [geometry.element-domain-sources, geometry.property-coherence, runtime.editor-prepared-frame-locality]
 ---
 # UI-037 — Linear domain-action readiness and disabled-reason tooltips
 
@@ -34,9 +34,14 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence]
 ## Context
 - Owner/layers: runtime feature owners own selection/domain/config/capability
   validation and expose copied readiness with their operation snapshots;
-  `src/app/Sandbox/Editor/` aggregates those values into its view model and
-  owns only ImGui presentation. The dependency remains `app -> runtime`.
-- Today the domain panels mix boolean availability, early returns, inline `TextDisabled`, and buttons that remain enabled until their command fails. That makes the next step in the linear workflow difficult to discover and risks app validation drifting from the command contract.
+  family-owned runtime prepared frames carry those values to
+  `src/app/Sandbox/Editor/`, which owns only ImGui presentation. The dependency remains `app -> runtime`.
+- Existing operations already expose ad-hoc availability/reason pairs, such
+  as `UvRegenerationAvailable` / `UvRegenerationDisabledReason`.
+  `Sandbox.PanelSupport.hpp` already supplies `DrawDisabledReasonTooltip`.
+  Unify the remaining readiness representation and cover the full action
+  inventory; do not recreate that helper or move family logic into a shared
+  editor workspace interface.
 - The readiness inventory covers mesh processing actions (denoise, curvature, remesh, subdivide, simplify, and recompute normals), selected-mesh UV regeneration, texture bake, point/graph/mesh normal generation where offered, point-cloud outlier removal, K-Means, Progressive Poisson, ICP, and parameterization.
 - ICP readiness requires two distinct compatible entities/property sources,
   not point-cloud provenance. Reuse the canonical property/topology preflight
@@ -73,8 +78,8 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence]
   model tests while reusing canonical metadata/current caches and adding only
   concrete feature-owned derived results that the readiness matrix proves it
   needs.
-- **Slice B — App presentation.** Add the private disabled-reason item helper,
-  reusing the exact app-internal free-function/hover-flag convention from
+- **Slice B — App presentation.** Reuse `DrawDisabledReasonTooltip` and
+  the exact app-internal free-function/hover-flag convention from
   `BUG-093`; keep controls visible in linear order, remove duplicated app
   validation, and pin command/no-command behavior without changing algorithms.
 - **Slice C — Inventory and operational proof.** Cover every named workflow and
@@ -85,8 +90,9 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence]
 - [ ] Export one right-sized runtime value record,
       `ActionReadiness { Enabled, DisabledReason }`, reuse it in each typed
       feature-operation snapshot, and include a value for every listed action
-      and selectable backend/variant in the app-owned domain-window model. Do
-      not create a monolithic Sandbox readiness service/facade.
+      and selectable backend/variant in its family-owned prepared frame. Do
+      not create a monolithic readiness service or an all-method interface
+      that expands shared editor compile dependencies.
 - [ ] Derive readiness in runtime from the same selection snapshots, config preview results, capability state, property compatibility checks, and command validators that govern apply. Factor shared pure predicates/results where necessary; do not copy command rules into a parallel readiness implementation.
 - [ ] Make every disabled reason deterministic, non-empty, and actionable: name the failed prerequisite and the user action that can satisfy it. Preserve the first stable blocking reason when several prerequisites are absent.
 - [ ] Keep actions in their existing linear order and render them even when

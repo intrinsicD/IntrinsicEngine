@@ -30,6 +30,10 @@ contracts:
 - No agent-specific selector or long-lived orchestration service.
 
 ## Context
+- BUG-171 owns failed-receipt supersession/reconciliation. Consume that
+  outcome when binding unified verifier receipts; do not implement a second
+  receipt reconciliation policy in this task.
+
 
 - Owner: agent/task workflow docs, validators, and verifier integration; no
   production engine code.

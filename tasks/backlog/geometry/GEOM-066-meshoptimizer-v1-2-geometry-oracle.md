@@ -5,6 +5,15 @@ depends_on:
   - REVIEW-003
   - GRAPHICS-105
 maturity_target: CPUContracted
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: [repo.source-documentation]
 ---
 # GEOM-066 — meshoptimizer v1.2 geometry oracle and adoption evidence
 
@@ -37,9 +46,10 @@ maturity_target: CPUContracted
   separately reviewed adoption task is opened.
 - Issue 445 highlights meshoptimizer v1.2's MikkTSpace-compatible tangent
   generator, revised tangent weighting, geometry filtering, faster vertex
-  codecs, and cluster-hierarchy support. The local vcpkg catalog currently
-  carries meshoptimizer 1.1.1, so v1.2 requires an explicit manifest override
-  or repository overlay port for this evidence run.
+  codecs, and cluster-hierarchy support. The initial intake observed
+  meshoptimizer 1.1.1 in the local vcpkg catalog. Recheck the pinned catalog
+  before implementation; add a manifest override or repository overlay only
+  if the selected v1.2 evidence version still requires one.
 - `GRAPHICS-105` and `RUNTIME-129` explicitly exclude MikkTSpace/tangent-space
   normal work. This task measures the primitive without reopening that current
   object-space-normal scope.

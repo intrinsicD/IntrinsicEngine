@@ -28,7 +28,10 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, method.e
 - Method package: `methods/geometry/parametric_gauss_orientation/`; implementation is package-local (`include/` + `src/`, the `progressive_poisson` pattern).
 - Reuse: `Geometry.KDTree` for the near-field regularization width (kNN spacing); `Geometry.PointCloud.SurfaceSampling` for fixtures. The exported `Geometry.LinearSolver` targets assembled sparse systems; the dense matrix-free CG here is method-local by design (documented, not exported).
 - Fully deterministic: no RNG anywhere; fixed CG iteration count and summation order.
-- Metrics use the same names as `METHOD-032` (`oriented_correct_fraction`, `runtime_ms`) plus `confidence_mean` and `cg_residual` so results are directly comparable in `METHOD-036`.
+- Share diagnostic names with METHOD-032, including `oriented_correct_fraction`,
+  and record `confidence_mean` and `cg_residual`. METHOD-036 separates comparison
+  groups by consumed inputs and information budgets; shared names alone do not
+  make orientation-only and joint-reconstruction methods comparable.
 
 ## Engine integration
 
@@ -57,7 +60,11 @@ See the [shared spatial-index consumer inventory](../../../docs/architecture/spa
 - [ ] Package-local reference implementation: params (regularization width factor, CG iteration count/tolerance, hard input-size cap), result (oriented normals, per-point confidence from surfel magnitude, status), diagnostics (residual history summary, capped-input rejection).
 - [ ] Deterministic: identical `(input, params)` produce bitwise-identical outputs across runs and thread counts.
 - [ ] Fail-closed with explicit statuses: empty/too-small input, non-finite data, input size above the documented `O(N^2)` guard, CG non-convergence beyond tolerance (distinct non-success status).
-- [ ] Smoke benchmark manifest; extend the benchmark metric schema in the same change (`ALLOWED_METRICS` in `tools/benchmark/validate_benchmark_manifests.py` plus `docs/benchmarking/metrics.md` / `benchmark-manifest-schema.md`) with any of this task's declared metrics not yet allowed (`oriented_correct_fraction`, `confidence_mean`, `cg_residual`).
+- [ ] Smoke benchmark manifest uses existing allowed metrics (`runtime_ms`,
+      `quality_error_l2`). Keep `oriented_correct_fraction`, `confidence_mean`
+      and `cg_residual` in method metadata and structured result diagnostics.
+      A global metric-schema extension needs a separately justified shared
+      decision with METHOD-032/034/036; this baseline does not require one.
 
 ## Tests
 - [ ] `tests/unit/geometry/Test.ParametricGaussOrientation.cpp` with `unit;geometry` labels.

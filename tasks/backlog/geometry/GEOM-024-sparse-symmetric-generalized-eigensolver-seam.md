@@ -43,9 +43,9 @@ contract_review: Sparse matrix algebra and a private dependency; no method packa
   smallest-eigenvalue problem `A z = λ M z` in its Step 4 and is gated on
   this seam. `docs/roadmap.md` also lists spectral mesh processing as a
   remaining geometry-processing capability that will reuse it.
-- Depends on `GEOM-020` because the recommended shift-invert backend needs a
-  sparse factorization of `(A - σM)` as its inner solve; the LDLT seam is
-  that factorization.
+- GEOM-020 is delivered: `SparseLDLT` in `Geometry.Sparse` supplies the
+  factorization of `(A - σM)` needed by shift-invert. This satisfied dependency
+  is the existing inner solve; the generalized eigensolver remains missing.
 
 ## Backend options and default selection
 

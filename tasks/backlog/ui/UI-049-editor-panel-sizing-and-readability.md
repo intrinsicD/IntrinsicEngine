@@ -31,7 +31,7 @@ contract_review: >-
 Observed across a full pass over the mesh domain and processing panels:
 
 - **Domain windows default to 340×300** (`SetNextWindowSize(ImVec2(340, 300),
-  ImGuiCond_FirstUseEver)` in `Sandbox.MeshProcessingPanels.cpp:511-512`), which
+  ImGuiCond_FirstUseEver)` in `Sandbox.DomainPanels.cpp`), which
   is smaller than their content. The consequence is not cosmetic: after clicking
   **Denoise**, the run result (`Last denoise run: Applied`, moved/written
   counts, pinned-boundary count, sigma values) is **below the fold behind a
@@ -60,6 +60,11 @@ Observed across a full pass over the mesh domain and processing panels:
   window title is set on the `platform` window creation path.
 
 ## Required changes
+Reproduce the historical label/result/table symptoms against the current
+UI-054 shared processing workflow before changing individual controls. Put
+shared sizing/readability fixes in that owner once; keep only genuinely
+panel-specific layout in individual panels.
+
 - [ ] Size domain/processing windows to their content, or make results visible
       without manual resizing.
 - [ ] Budget the label column so control labels are not clipped.

@@ -14,7 +14,7 @@ maturity_target: Operational
 # RUNTIME-222 — Model-space point radius rendering
 
 ## Goal
-Bind published radius properties to retained points with explicit model-space units and correct camera projection. RUNTIME-221 estimates radii and offers scalar colors; current retained point sizes are pixels and cloud residency rejects named size sources.
+Bind published radius properties to retained points with explicit model-space units and correct camera projection. RUNTIME-221 estimates radii and offers scalar colors; current retained point sizes are pixels. `Runtime.RenderExtraction.cpp` rejects the `PointSize` presentation slot and supplies only uniform point size. `GpuEntityPointConfig::PointSizeBDA` is existing transport, not proof that a named model-space radius is uploaded, projected or rendered.
 
 ## Scope and design decisions
 - Reuse geometry presentation/config recipes and canonical typed properties. Do not bind model-space radii directly to the existing pixel-size slot.

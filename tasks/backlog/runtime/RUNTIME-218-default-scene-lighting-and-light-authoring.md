@@ -32,7 +32,7 @@ contract_review: >-
   near-uniform white silhouette with no depth or form. Orbiting the camera does
   not change the shading.
 - Cause: **no light is authored anywhere.**
-  `Runtime.ReferenceScene.cpp` creates no light; the import path creates none;
+  `src/runtime/Scene/Runtime.ReferenceScene.cpp` creates no light; the import path creates none;
   and there is no UI to create one (`grep -rn 'Light' src/app/Sandbox/` is
   empty, and there is no add-entity command in the editor at all). Lights exist
   only if a loaded scene document happens to contain them.
@@ -41,7 +41,8 @@ contract_review: >-
   `debug_surface.frag:26`, `point.frag:55` — which yields flat unshaded fill.
 - The consuming machinery already exists and is unused: ECS
   `Lights::DirectionalLight` / `Lights::PointLight` components,
-  `Runtime.RenderExtraction.cpp:1279-1285` extraction, `LightSystem`,
+  the light snapshot extraction in `Runtime.RenderExtraction.cpp` and
+  `Runtime.RenderExtraction.Internal.cpp`, `LightSystem`,
   and clustered-light resources
   (`Graphics.Renderer.cpp:EnsureClusterLightResources`). Only authoring is
   missing.

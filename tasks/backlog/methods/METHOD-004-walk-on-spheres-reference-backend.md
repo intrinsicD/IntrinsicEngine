@@ -157,7 +157,11 @@ See the [shared spatial-index consumer inventory](../../../docs/architecture/spa
 - [ ] Register module in `src/geometry/CMakeLists.txt`; do not umbrella-export.
 
 ### Deterministic RNG contract
-- [ ] Add `Geometry::Random::SplitMix64` / `PCG32` in `src/geometry/Geometry.Random.cppm` (if not already present from `GEOM-009` benchmark fixtures).
+- [ ] Add `Geometry::Random::SplitMix64` / `PCG32` in `src/geometry/Geometry.Random.cppm` only if the seeded walker contract needs a shared surface. Current
+      SplitMix64/PCG32 helpers in `Geometry.Rotation.cpp` are file-local;
+      compare their exact seed/stream semantics before reusing or factoring
+      them. Keep a single-consumer walker RNG private unless a present second
+      caller justifies the module.
 - [ ] Document: each walk stream is derived from
       `(seed, point_index, walk_index)` and each variate from
       `(step_index, draw_index)`, so multiple draws within one step remain
@@ -201,7 +205,7 @@ See the [shared spatial-index consumer inventory](../../../docs/architecture/spa
 
 ## Docs
 - [ ] `methods/geometry/walk_on_stars/README.md`.
-- [ ] Add a deterministic-RNG section to `docs/methods/reference-implementation-policy.md` (or new `docs/methods/stochastic-determinism.md`) capturing the seed-per-point contract.
+- [ ] Add a deterministic-RNG section to `docs/methods/reference-implementation-policy.md` capturing the seed-per-point contract.
 - [ ] Register and document the stable correctness-smoke ID and built-in
       dataset under `benchmarks/geometry/`.
 - [ ] Regenerate module inventory.

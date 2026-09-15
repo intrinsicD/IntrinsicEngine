@@ -14,7 +14,7 @@ contracts:
   - geometry.element-domain-sources
   - geometry.property-coherence
 ---
-# UI-050 — Vector-field properties cannot be visualized
+# UI-050 — Generic vector-property actions in Geometry Visualization
 
 ## Goal
 - Let the Geometry Visualization panel display `vec3` element-domain properties
@@ -33,24 +33,27 @@ contracts:
   for them. Each shows the line:
   "Vector-field candidate; adapter residency is not owned by this UI slice."
 - Two problems in one:
-  1. **Missing capability.** Principal-direction and normal visualization is a
-     core instrument for a geometry-processing engine; the properties are
-     computed and published but cannot be seen. By contrast `v:mean_curvature`
+  1. **Missing generic property-list action.** Specialized normal/direction
+     visualization and the vector recipe/render path already exist. The
+     Geometry Visualization list does not expose arbitrary compatible vectors.
+     By contrast `v:mean_curvature`
      and `v:gaussian_curvature` offer working `Scalar` and `Isolines` actions,
      so the scalar path proves the surrounding plumbing works.
   2. **Wrong audience for the message.** "adapter residency is not owned by this
      UI slice" is an internal implementation note about slice ownership shown
      verbatim to end users. Whatever the disposition, the user-facing text
      should say what they can or cannot do.
-- Also observed: `UInt32` properties (`v:source_vertex`, `f:source_face`) offer
+- Historical observation to recheck against current typed scalar support: `UInt32` properties (`v:source_vertex`, `f:source_face`) offer
   no action at all, with no explanation. Decide in this task whether integer
   properties are visualizable (as categorical/label color) or explicitly out of
   scope, and say so in the UI.
 - Owner: `runtime` owns the visualization model, residency, and recipe; `app`
   owns presentation. `graphics` already carries per-entity visualization
   configuration and colormap machinery used by the scalar path.
-- Line-drawing infrastructure already exists (`assets/shaders/line.vert`,
-  `line.frag`) and is a plausible substrate for glyph/segment rendering.
+- Reuse `VectorFieldVisualizationRecipe` in `Runtime.VisualizationRecipes`,
+  its `AppendVectorFieldPacket` path, and `VisualizationVectorFields` extraction.
+  Rendering is not a missing backend; bind generic canonical vector/position
+  properties to the existing residency and recipe path.
 
 ## Control surfaces
 - Config: vector-field scale/normalization/subsampling through the existing
@@ -59,14 +62,16 @@ contracts:
 - Agent/CLI: reachable through the same validated visualization recipe path.
 
 ## Required changes
-- [ ] Add a vector-field visualization source to the runtime visualization model
-      and recipe for count-matched `vec3` element-domain properties.
+- [ ] Connect count-matched canonical `vec3` vector/position property sources
+      to the existing vector recipe/residency path. Reuse specialized Show
+      actions' publication logic rather than adding a second renderer.
 - [ ] Add the `Vector field` action to the Geometry Visualization property list.
-- [ ] Provide scale, normalization, and subsampling controls through the
-      validated config lane.
+- [ ] Reuse existing vector-scale config. Add only missing normalization and
+      subsampling controls through the same validated config lane.
 - [ ] Replace the "adapter residency is not owned by this UI slice" text with a
       user-facing statement of capability or prerequisite.
-- [ ] Decide and state the disposition for integer-typed properties.
+- [ ] Recheck integer properties against current typed scalar/label support;
+      reuse supported actions and explain genuinely unsupported cases.
 
 ## Tests
 - [ ] Add a runtime contract test asserting a `vec3` vertex property is offered

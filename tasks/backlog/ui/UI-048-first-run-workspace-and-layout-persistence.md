@@ -39,14 +39,14 @@ Four related first-run defects observed on a clean launch:
 - **There is no `File` menu.** The top-level menus are
   `View | PointCloud | Graph | Mesh`. `File / Scene` and `File / Import` are
   window *titles* registered with `MenuPath = {"View"}`
-  (`Sandbox.EditorShell.cpp:3206` and `kBuiltinWindows` at `:169-177`), so
+  (the View registration and `kBuiltinWindows` in `Sandbox.EditorShell.cpp`), so
   opening a file means View → "File / Import". File operations are the most
   common entry point and are the least discoverable.
 - **All windows open stacked at the same default position**, so opening two
   windows hides one behind the other with no visual cue. During testing,
   `Geometry Visualization` opened directly underneath `PointCloud / Appearance`
   and appeared not to have opened at all.
-- **Layout is never persisted.** `Runtime.ImGuiAdapter.cpp:299` sets
+- **Layout is never persisted.** `src/runtime/ImGui/Runtime.ImGuiAdapter.cpp` sets
   `io.IniFilename = nullptr` with the comment "the engine owns persistence" —
   but nothing in the repo saves or restores ImGui settings
   (`grep -rn 'SaveIniSettings\|LoadIniSettings'` is empty). The comment asserts

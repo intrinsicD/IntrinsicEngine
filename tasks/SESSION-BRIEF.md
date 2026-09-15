@@ -121,7 +121,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `UI-047` — File paths must be hand-typed into a raw text field (tasks/backlog/ui/UI-047-file-chooser-for-import-and-scene-paths.md)
 - unblocked: `UI-048` — Editor opens empty, hides file operations under View, and never remembers layout (tasks/backlog/ui/UI-048-first-run-workspace-and-layout-persistence.md)
 - unblocked: `UI-049` — Editor panels are sized so that labels clip and results are hidden (tasks/backlog/ui/UI-049-editor-panel-sizing-and-readability.md)
-- unblocked: `UI-050` — Vector-field properties cannot be visualized (tasks/backlog/ui/UI-050-vector-field-property-visualization.md)
+- unblocked: `UI-050` — Generic vector-property actions in Geometry Visualization (tasks/backlog/ui/UI-050-vector-field-property-visualization.md)
 - unblocked: `UI-051` — A mesh does not pass as a graph or a point cloud in the domain windows (tasks/backlog/ui/UI-051-domain-agnostic-appearance-properties-selection-windows.md)
 
 ## Unthemed

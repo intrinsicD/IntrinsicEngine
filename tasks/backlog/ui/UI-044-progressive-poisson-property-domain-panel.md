@@ -10,7 +10,7 @@ branch:
 worktree:
 claimed_at:
 contract_schema: 1
-contracts: [geometry.element-domain-sources, method.engine-integration]
+contracts: [geometry.element-domain-sources, method.engine-integration, runtime.editor-prepared-frame-locality]
 maturity_target: Operational
 ---
 # UI-044 — Progressive Poisson property-domain panel
@@ -26,6 +26,10 @@ maturity_target: Operational
   retired `UI-038` history.
 
 ## Context
+- Reuse the shared processing-panel workflow in `Sandbox.PanelSupport`
+  delivered by UI-054 for entity drafts, selection, run/status and Show actions.
+  Consume family-owned runtime prepared frames; add no parallel panel scaffold.
+
 
 - `UI-038` delivered correct Mesh/Graph/PointCloud provenance discovery but
   only for `Vertices`; `RUNTIME-212` supplies the clarified property contract.

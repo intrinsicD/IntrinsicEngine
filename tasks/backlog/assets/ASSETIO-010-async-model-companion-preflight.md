@@ -3,6 +3,15 @@ id: ASSETIO-010
 theme: F
 depends_on: [BUG-093, RUNTIME-194, RUNTIME-200]
 maturity_target: Operational
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: [repo.source-documentation]
 ---
 # ASSETIO-010 — Async model companion preflight
 
@@ -67,12 +76,12 @@ maturity_target: Operational
   overall GLTF loading; `data:` URIs and images backed by `bufferView` require
   no separate loose file, although a buffer-view image inherits the readiness
   of its owning buffer.
-- The current `Asset.ModelTextureIOBridge` resolves external paths relative to
-  the source parent, while runtime TinyGLTF callbacks also receive/join a base
-  directory. `RUNTIME-200` removes that callback registry, so preview and
-  import must instead share one pure assets-owned external-resource path
-  resolver and resolve a repository-relative URI exactly once; existing
-  absolute-path-only tests are not sufficient evidence.
+- `AssetWorkflowModule` already owns the staged `AssetImportRecipe`; the
+  old IO bridge/callback registry was removed by RUNTIME-200. Extend this
+  existing recipe with preview. Preview and the authoritative decoder must
+  share one pure assets-owned external-resource path resolver and resolve a
+  repository-relative URI exactly once; absolute-path-only tests do not
+  establish that contract.
 - Runtime architecture requires model/texture reads and decode to run through
   the persistent `JobService`, with only bounded main-thread result apply
   mutating editor/runtime state. Preview is an advisory recipe-stage result;
@@ -106,8 +115,8 @@ maturity_target: Operational
       function used by both recipe preview and the authoritative runtime
       decoder. Relative URI resolves against the model's parent, absolute
       paths remain absolute, `data:` URIs remain embedded, and no caller
-      pre-joins, re-resolves, or fallback-searches the result. Do not retain
-      `Asset.ModelTextureIOBridge` merely to host this function.
+      pre-joins, re-resolves, or fallback-searches the result. Keep the pure
+      resolver in the existing assets IO owner.
 - [ ] Implement manifest-only GLTF/GLB inspection in the existing promoted
       model IO implementation: classify `buffers[].uri`, `images[].uri`, data
       URIs, buffer-view images, and embedded GLB chunks without materializing
@@ -241,7 +250,7 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
   missing/short external buffers as warnings.
 - Moving TinyGLTF parsing, IO backend access, `AssetService`, ECS, graphics, or
   runtime ownership into the app or assets layer.
-- Resolving one external URI in both runtime and the bridge, or exposing an API
+- Resolving one external URI in both preview and the authoritative decoder, or exposing an API
   whose caller cannot tell whether its input is unresolved or canonical.
 - Adding a parallel executor, generic dependency registry/service, decoded
   payload cache, remote fetcher, file watcher, or unrelated import format.

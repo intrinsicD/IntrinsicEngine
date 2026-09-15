@@ -3,6 +3,15 @@ id: METHOD-025
 theme: I
 depends_on: [METHOD-022, RUNTIME-176, UI-036]
 maturity_target: ParityProven
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: [repo.source-documentation, geometry.element-domain-sources, method.engine-integration, runtime.editor-prepared-frame-locality]
 ---
 # METHOD-025 — Progressive SLIM optimized CPU backend and comparison benchmark
 
@@ -40,14 +49,32 @@ maturity_target: ParityProven
 - Benchmark policy: per the benchmark workflow, a speedup claim requires a baseline comparison on declared fixtures; the comparison benchmark records reference and optimized runtime and the parity delta.
 
 ## Control surfaces
+- `ParameterizationStrategyConfig` currently has no backend axis. Introduce
+  the minimal SLIM-only choice only if this task's adoption gate passes, through
+  `Runtime.ParameterizationOperations` and its family-owned prepared frame.
+
 - Config/UI/Agent: this task extends the config/result model delivered by
   retired `RUNTIME-176` and the panel delivered by retired `UI-036` with
   `cpu_optimized` only for SLIM after the implementation exists; no
   placeholder choice is exposed beforehand.
 
 ## Backends
+
+
 - Backend axis: adds SLIM `cpu_optimized` with parity to `cpu_reference`;
   `gpu_vulkan_compute` is deferred to `METHOD-026`.
+
+## Engine integration
+
+| Field | Disposition |
+| --- | --- |
+| Least-structured input | Triangle mesh topology, float positions, and strategy-specific pins/boundary constraints; faces are semantic inputs. |
+| Compatible entity sources | Existing editable mesh contract; validate canonical property references without widening to unsupported topology. |
+| RuntimeModule | Extend `Runtime.ParameterizationOperations`; keep implementation and backend dependencies private to the family. |
+| Config/agent | Existing parameterization preview/apply path gains only adopted strategy/backend choices and honest requested/actual/fallback results. |
+| UI | Extend the existing parameterization panel and `EditorParameterizationPreparedFrame`, using shared panel support. |
+| Publication | Existing validated UV publication/history path preserves unrelated properties and rejects stale work. |
+| End-to-end tests | This task owns backend selection, config source parity, fallback, and result publication coverage; the tests below own numerical/backend evidence. |
 
 ## Slice plan
 - **Slice A — parity/measurement contract.** Freeze aligned-UV/energy metrics,

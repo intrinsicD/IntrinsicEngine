@@ -27,7 +27,7 @@ contracts:
 ## Context
 - Symptom: both `File / Import` and `File / Scene` expose only an
   `ImGui::InputText` over a `std::array<char,1024>`
-  (`Sandbox.EditorShell.cpp:3173-3174`) and no chooser of any kind.
+  (the Scene path and import Path controls in `Sandbox.EditorShell.cpp`) and no chooser of any kind.
 - The 2026-08-07 observation was compounded by missing key events. Retired
   `BUG-139` repaired keyboard editing; it is not a current blocker. The missing
   chooser remains a separate usability gap.

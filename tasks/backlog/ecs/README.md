@@ -1,91 +1,12 @@
 # ECS Backlog
 
-Promoted ECS layer hardening: scene bootstrap, hierarchy/transform parity,
-layer boundary cleanup, event/command seams, geometry-source authoring,
-render-sync/export policy, bounds propagation, identity metadata, and authoring
-contracts. `ecs -> core` only; geometry handles/types are allowed when
-explicitly required, and graphics/runtime/platform/app imports are forbidden.
-
-See [`tasks/backlog/README.md`](../README.md) for the cross-domain convergence
-map.
+Current unstarted work. Use the [convergence priorities](../README.md) and
+[resolved task state](../../SESSION-BRIEF.md) before selection. Each task owns
+its dependencies, conditional gates, scope and verification.
 
 ## Tasks
 
-No ECS tasks are currently in backlog.
+No open tasks in this category.
 
-## Convergence
-
-- HARDEN-060..068 contribute to **Theme D — ECS hardening parity**.
-- HARDEN-060..062 are required prerequisites for **Theme A — Shortest path to
-  sandbox visible geometry** (renderable extraction needs promoted scene
-  bootstrap and hierarchy/transform behavior).
-- HARDEN-064 is in **Theme C — Physics readiness** and is retired to
-  `tasks/done`.
-  The upstream
-  `ARCH-001`
-  gate is accepted via
-  [ADR-0019](../../../docs/adr/0019-physics-layer-ownership-and-ecs-integration.md),
-  and the ECS authoring contract shipped without storing physics-world handles
-  in canonical ECS components.
-- HARDEN-065 is a near-term follow-up from the
-  [`src/ecs` gap analysis](../../../docs/reviews/2026-05-13-src-ecs-gap-analysis.md)
-  and must not move GPU residency or runtime extraction ownership into ECS.
-  HARDEN-066 is the same family and landed as a CPU-only tag-forwarding pass
-  (see `tasks/done/HARDEN-066`).
-- HARDEN-067 depends on promoted transform hierarchy semantics from
-  `HARDEN-061`
-  and pairs naturally with runtime fixed-step activation.
-- HARDEN-068 should precede runtime scene-serialization implementation that
-  needs stable ECS entity references.
-- HARDEN-080 is a module-interface hygiene follow-up for promoted ECS `.cppm`
-  targets found by the 2026-06-06 implementation-body audit. It must preserve
-  the existing ECS contracts from HARDEN-060..068 and move only non-trivial
-  non-template bodies plus implementation-only includes/imports.
-- HARDEN-081 retired the final named ECS compatibility decision gate from
-  `LEGACY-011` while keeping `ecs -> core` only.
-- HARDEN-083 retired the promoted `GeometrySources` CPU source-availability
-  contract: it separates underlying provenance from available vertex/node,
-  edge, halfedge, and face source data so runtime/UI consumers do not treat
-  exact `ActiveDomain` as the only capability query.
-- Retired `HARDEN-087` is the explicit follow-up to the physical-layout
-  contradiction found by
-  `PROC-030`: it retains `HARDEN-083`'s provenance-vs-capability split while
-  removing the graph-only `Nodes` component and promoting existing graph
-  halfedge data into the shared ECS source component.
-- Retired HARDEN-086 is a **Theme F** architecture/runtime foundation leaf
-  rather than a reopening of completed Theme D. It removes two runtime-local
-  hierarchy walks while keeping query mechanics in ECS and editor/composition
-  policy in runtime.
-- Forbidden across all members: physics-world handles, runtime sidecars,
-  graphics handles, RHI handles, or live `AssetService` traffic in canonical
-  ECS components.
-
-## Retired
-
-Retired entries moved here verbatim by the PROC-008 state/history
-split; narratives live in the retirement log.
-
-- [HARDEN-087 — Unified geometry element-source components](../../done/HARDEN-087-unified-geometry-element-source-components.md)
-  (done, 2026-08-02, `Operational`): point clouds, graphs, and meshes share
-  canonical element-source components while provenance remains independent.
-- [HARDEN-086 — Guarded hierarchy query helpers](../../done/HARDEN-086-guarded-hierarchy-query-helpers.md)
-  (done, 2026-07-18, `CPUContracted`): deterministic, all-or-nothing
-  child/preorder queries in the existing hierarchy-structure module, adopted
-  by editor delete planning and progressive composition summaries.
-- [HARDEN-060 — Promote ECS scene bootstrap contract](../../archive/HARDEN-060-ecs-scene-bootstrap-contract.md) (done).
-- [HARDEN-061 — Promote ECS hierarchy and transform system parity](../../archive/HARDEN-061-ecs-hierarchy-transform-system-parity.md) (done).
-- [HARDEN-062 — Harden ECS layering and component boundaries](../../archive/HARDEN-062-ecs-layering-and-component-boundary-hardening.md) (done).
-- [HARDEN-063 — Define promoted ECS event and command seams](../../archive/HARDEN-063-ecs-events-and-command-seams.md) (done).
-- [HARDEN-064 — Define ECS collider and rigid-body authoring contracts](../../archive/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) (done).
-- [HARDEN-065 — Promote ECS geometry-source population and dirty-domain helpers](../../archive/HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md) (done).
-- [HARDEN-066 — Define ECS render-sync/export dirty-tag policy](../../archive/HARDEN-066-ecs-render-sync-export-policy.md) (done).
-- [HARDEN-067 — Add ECS world-bounds propagation system](../../archive/HARDEN-067-ecs-bounds-propagation-system.md) (done).
-- [HARDEN-068 — Define ECS stable identity and scene metadata contract](../../archive/HARDEN-068-ecs-stable-identity-and-scene-metadata.md) (done).
-- [HARDEN-080 — ECS module implementation splits](../../archive/HARDEN-080-ecs-module-implementation-splits.md).
-- [HARDEN-081 — ECS legacy component compatibility decisions](../../archive/HARDEN-081-ecs-legacy-component-compatibility-decisions.md) (done):
-  retired remaining legacy `NameTag`, `AxisRotator`, DEC wrapper, and
-  feature-token compatibility gaps without moving runtime/graphics ownership
-  into ECS.
-- [HARDEN-083 — Geometry source availability and provenance contract](../../archive/HARDEN-083-geometry-source-availability-contract.md)
-  (done, 2026-06-19, `CPUContracted`): `GeometrySources` now reports CPU
-  source capabilities separately from exact active domain and provenance.
+Completed and superseded work is recorded in the
+[retirement log](../../done/RETIREMENT-LOG.md) and Git history.

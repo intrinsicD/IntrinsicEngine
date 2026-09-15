@@ -41,10 +41,10 @@ contracts:
 - Mechanism: `ECS.Component.GeometrySources.cpp:DetectDomain()` assigns exactly
   one `Domain` per entity (Mesh iff vertices+edges+halfedges+faces; Graph iff
   graph-marked; PointCloud iff vertices only).
-  `Runtime.EditorWorkspaceSnapshots.Models.cpp:4421` then computes
+  `Runtime.EditorWorkspaceSnapshots.Models.cpp` then computes
   `DomainMatches = SelectedDomain == ExpectedDomain`, and the panels refuse to
   draw controls when it is false
-  (`Sandbox.MeshProcessingPanels.cpp:519-524`,
+  (`Sandbox.PanelSupport.cpp` and `Sandbox.MeshProcessingPanels.cpp`,
   `Sandbox.DomainPanels.cpp` via `DomainAppearanceReady`).
 - This is a provenance test standing in for a capability test. A mesh's vertices
   *are* a point set and its edges *are* a graph, so the data the windows need is
