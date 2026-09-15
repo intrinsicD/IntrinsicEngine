@@ -1,0 +1,9 @@
+schema_version: 1
+task_id: BUG-134
+sealed_revision: a3f9e8bf687c18ae68cad771d23f8677e2a4ba11
+source_content_digest: a0b482b4ee51a98178e9eb2b6a0c739a0d89f17dd6d3de7c26648a84820d1dc7
+report_sha256: dfb8d83167e1b4fafcd9869b12710c562e19313f98eaf7f9bbf643399d32e656
+records: []
+reason: Bind completed ImGui test repair, unchanged production restoration and final passing verification;
+  zero-context mutation patch retains the exact executed mutation.
+generated_by: tools/agents/workflow_evidence.py
