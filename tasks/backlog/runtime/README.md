@@ -62,4 +62,4 @@ retired task records. The directory indexes are
 [`tasks/done/README.md`](../../done/README.md) and
 [`tasks/archive/README.md`](../../archive/README.md).
 
-- [RUNTIME-268 — Reduce workspace snapshot BMI serialization](RUNTIME-268-workspace-snapshot-bmi-serialization.md)
+- [RUNTIME-268 — Reduce workspace snapshot BMI serialization](../../active/RUNTIME-268-workspace-snapshot-bmi-serialization.md)

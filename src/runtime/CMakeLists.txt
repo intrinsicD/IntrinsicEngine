@@ -54,6 +54,7 @@ target_sources(${target_name}
         Editor/Operations/Runtime.ParameterizationOperations.cppm
         Editor/Runtime.EditorWorkspaceAttachment.cppm
         Editor/Runtime.EditorWorkspaceSnapshots.cppm
+        Editor/internal/Runtime.EditorWorkspaceSnapshots.Std.cppm
         Editor/Runtime.EditorJobProjection.cppm
         Editor/Operations/Runtime.SceneEditingOperations.cppm
         Editor/Operations/Runtime.GeometryProcessingOperations.cppm

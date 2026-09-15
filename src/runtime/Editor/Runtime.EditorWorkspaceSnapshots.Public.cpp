@@ -20,6 +20,11 @@ import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 
 namespace Extrinsic::Runtime {
+// Compare standard containers beside their headers; the interface imports only
+// the value-type declarations and need not publish standard operator overloads.
+bool operator==(const EditorSelectedModelCacheKey&,
+                const EditorSelectedModelCacheKey&) = default;
+
 extern "C++" {
 void EditorSelectedModelCache::Clear() noexcept
 {

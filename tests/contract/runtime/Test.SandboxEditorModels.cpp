@@ -15,6 +15,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -80,6 +81,7 @@ import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.GeometryProcessingOperations;
@@ -540,6 +542,38 @@ void AddGraphSource(ECS::Scene::Registry& registry,
         return request;
     }
 }
+TEST(SandboxEditorUi, SnapshotRecordsKeepStandardTypesAndAggregateInitialization)
+{
+    using namespace Extrinsic::Runtime;
+    static_assert(std::is_aggregate_v<EditorWorkspaceSnapshot>);
+    static_assert(std::is_aggregate_v<EditorInspectorModel>);
+    static_assert(std::is_aggregate_v<EditorDomainWindowModel>);
+    static_assert(std::is_aggregate_v<EditorWorkspaceSnapshotContext>);
+    static_assert(std::is_same_v<decltype(EditorWorkspaceSnapshot::Hierarchy),
+                                 std::vector<EditorEntityRow>>);
+    static_assert(std::is_same_v<decltype(EditorSelectedModelCache::SelectedAnalysis),
+                                 std::array<EditorSelectedAnalysisCacheEntry, 4u>>);
+    static_assert(std::is_same_v<decltype(PrepareEditorWorkspaceSnapshotFrame(
+                                     std::declval<const EditorWorkspaceAttachment&>())),
+                                 std::optional<EditorWorkspaceSnapshotPreparedFrame>>);
+    using SnapshotFactory = std::optional<EditorWorkspaceSnapshotPreparedFrame> (*)(
+        const EditorWorkspaceAttachment&, const EditorWorkspaceSnapshotRequest&,
+        std::string, EditorAssetPayloadKind, std::string);
+    static_assert(std::is_same_v<decltype(&PrepareEditorWorkspaceSnapshotFrame),
+                                 SnapshotFactory>);
+    EditorSelectedModelCacheKey key{};
+    auto other = key;
+    EXPECT_EQ(key, other);
+    other.SelectedStableIds.push_back(42u);
+    EXPECT_NE(key, other);
+    EditorWorkspaceSnapshot snapshot{.Hierarchy = {{.Name = "retained"}}};
+    auto copied = snapshot;
+    snapshot.Hierarchy.front().Name = "changed";
+    ASSERT_EQ(copied.Hierarchy.size(), 1u);
+    EXPECT_EQ(copied.Hierarchy.front().Name, "retained");
+    EXPECT_FALSE(copied.Inspector.HasEntity);
+}
+
 TEST(SandboxEditorUi, EmptyContextProducesDeterministicDisabledDiagnostics)
 {
     const Intrinsic::Tests::EditorFeatureTestContext context{};

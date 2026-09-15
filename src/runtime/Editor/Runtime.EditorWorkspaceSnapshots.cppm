@@ -2,15 +2,12 @@
 // Exposes copied presentation state without granting scene mutation access.
 module;
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
-#include <memory>
-#include <optional>
-#include <string>
-#include <vector>
 
 export module Extrinsic.Runtime.EditorWorkspaceSnapshots;
+
+import Extrinsic.Runtime.Private.EditorSnapshotStd;
 
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.EditorCommon;
@@ -51,7 +48,7 @@ export namespace Extrinsic::Runtime
         EditorBoundRenderStateModel BoundState{};
         EditorTextureBakeControlsModel TextureBake{};
         EditorGeometryProcessingCapabilities Processing{};
-        std::vector<EditorDiagnostic> Diagnostics{};
+        SnapshotStd::vector<EditorDiagnostic> Diagnostics{};
     };
     struct EditorDomainWindowModel
     {
@@ -78,7 +75,7 @@ export namespace Extrinsic::Runtime
         EditorTextureBakeControlsModel TextureBake{};
         EditorGeometryProcessingModel Processing{};
         EditorPrimitiveDetailModel Primitive{};
-        std::vector<EditorDiagnostic> Diagnostics{};
+        SnapshotStd::vector<EditorDiagnostic> Diagnostics{};
     };
     enum class EditorSelectedModelCacheSection : std::uint8_t
     {
@@ -101,7 +98,7 @@ export namespace Extrinsic::Runtime
         EditorVisualizationTarget VisualizationTarget{
             EditorVisualizationTarget::Entity};
         std::uint32_t PrimaryStableId{0u};
-        std::vector<std::uint32_t> SelectedStableIds{};
+        SnapshotStd::vector<std::uint32_t> SelectedStableIds{};
         std::uint64_t SelectionGeneration{0u};
         std::uint64_t PrimitiveSelectionGeneration{0u};
         ECS::Components::GeometrySources::Domain SelectedDomain{
@@ -126,7 +123,7 @@ export namespace Extrinsic::Runtime
 
         friend bool operator==(
             const EditorSelectedModelCacheKey&,
-            const EditorSelectedModelCacheKey&) = default;
+            const EditorSelectedModelCacheKey&);
     };
     struct EditorSelectedAnalysisModel
     {
@@ -161,9 +158,9 @@ export namespace Extrinsic::Runtime
     extern "C++" {
     struct EditorSelectedModelCache
     {
-        std::array<EditorSelectedAnalysisCacheEntry, 4u>
+        SnapshotStd::array<EditorSelectedAnalysisCacheEntry, 4u>
             SelectedAnalysis{};
-        std::array<EditorVisualizationModelCacheEntry, 4u>
+        SnapshotStd::array<EditorVisualizationModelCacheEntry, 4u>
             Visualization{};
         EditorSelectedModelCacheStats Counters{};
 
@@ -187,7 +184,7 @@ export namespace Extrinsic::Runtime
     };
     struct EditorWorkspaceSnapshot
     {
-        std::vector<EditorEntityRow> Hierarchy{};
+        SnapshotStd::vector<EditorEntityRow> Hierarchy{};
         EditorInspectorModel         Inspector{};
         EditorSelectionModel         Selection{};
         EditorDocumentModel          Document{};
@@ -199,7 +196,7 @@ export namespace Extrinsic::Runtime
         EditorCameraRenderModel      CameraRender{};
         EditorVisualizationModel     Visualization{};
         EditorWorkspaceSnapshotStats        ModelBuildStats{};
-        std::vector<EditorDiagnostic> Diagnostics{};
+        SnapshotStd::vector<EditorDiagnostic> Diagnostics{};
     };
     struct EditorWorkspaceSnapshotContext
     {
@@ -219,10 +216,10 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] bool IsBound() const noexcept;
 
     private:
-        std::shared_ptr<const EditorWorkspaceSnapshotContext> m_Context{};
+        SnapshotStd::shared_ptr<const EditorWorkspaceSnapshotContext> m_Context{};
 
         explicit EditorWorkspaceSnapshotQueries(
-            std::shared_ptr<const EditorWorkspaceSnapshotContext> context);
+            SnapshotStd::shared_ptr<const EditorWorkspaceSnapshotContext> context);
         friend struct EditorWorkspaceSnapshotQueriesAccess;
         friend EditorWorkspaceSnapshotQueries
         BindEditorWorkspaceSnapshotQueries(
@@ -241,11 +238,11 @@ export namespace Extrinsic::Runtime
     // An explicit entity binds all model sections without changing scene selection; zero means no entity.
     [[nodiscard]] EditorInspectorModel BuildEditorInspectorModel(
         const EditorWorkspaceSnapshotContext& context,
-        std::optional<std::uint32_t> entity = std::nullopt);
+        SnapshotStd::optional<std::uint32_t> entity = SnapshotStd::nullopt);
     [[nodiscard]] EditorDomainWindowModel BuildEditorDomainWindowModel(
         const EditorWorkspaceSnapshotContext& context,
         EditorDomainWindowKind kind,
-        std::optional<std::uint32_t> entity = std::nullopt);
+        SnapshotStd::optional<std::uint32_t> entity = SnapshotStd::nullopt);
     [[nodiscard]] EditorWorkspaceSnapshot BuildEditorWorkspaceSnapshot(
         const EditorWorkspaceSnapshotQueries& queries);
     [[nodiscard]] EditorWorkspaceSnapshot BuildEditorWorkspaceSnapshot(
@@ -254,12 +251,12 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] EditorInspectorModel BuildEditorInspectorModel(
         const EditorWorkspaceSnapshotQueries& queries,
         EditorWorkspaceSnapshotStats* modelBuildStats = nullptr,
-        std::optional<std::uint32_t> entity = std::nullopt);
+        SnapshotStd::optional<std::uint32_t> entity = SnapshotStd::nullopt);
     [[nodiscard]] EditorDomainWindowModel BuildEditorDomainWindowModel(
         const EditorWorkspaceSnapshotQueries& queries,
         EditorDomainWindowKind kind,
         EditorWorkspaceSnapshotStats* modelBuildStats = nullptr,
-        std::optional<std::uint32_t> entity = std::nullopt);
+        SnapshotStd::optional<std::uint32_t> entity = SnapshotStd::nullopt);
 
     struct EditorWorkspaceSnapshotPreparedFrame
     {
@@ -267,12 +264,12 @@ export namespace Extrinsic::Runtime
         EditorWorkspaceSnapshotQueries SnapshotQueries{};
     };
 
-    [[nodiscard]] std::optional<EditorWorkspaceSnapshotPreparedFrame>
+    [[nodiscard]] SnapshotStd::optional<EditorWorkspaceSnapshotPreparedFrame>
     PrepareEditorWorkspaceSnapshotFrame(
         const EditorWorkspaceAttachment& attachment,
         const EditorWorkspaceSnapshotRequest& request = {},
-        std::string pendingAssetImportPath = {},
+        SnapshotStd::string pendingAssetImportPath = {},
         EditorAssetPayloadKind pendingAssetImportPayloadKind =
             EditorAssetPayloadKind::Unknown,
-        std::string pendingSceneFilePath = {});
+        SnapshotStd::string pendingSceneFilePath = {});
 }

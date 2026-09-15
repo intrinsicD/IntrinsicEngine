@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 97 |
+| `runtime` | 98 |
 
 ## Modules
 
@@ -385,6 +385,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.EditorWorkspaceAttachment` | `src/runtime/Editor/Runtime.EditorWorkspaceAttachment.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorWorkspaceSnapshots` | `src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm` | `runtime` |
 | `Extrinsic.Runtime.Private.EditorWorkspaceAttachment` | `src/runtime/Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm` | `runtime` |
+| `Extrinsic.Runtime.Private.EditorSnapshotStd` | `src/runtime/Editor/internal/Runtime.EditorWorkspaceSnapshots.Std.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeometryAvailability` | `src/runtime/GeometryIntegration/Runtime.GeometryAvailability.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeometryPlanBuilders` | `src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeometryPresentation` | `src/runtime/GeometryIntegration/Runtime.GeometryPresentation.cppm` | `runtime` |
@@ -445,4 +446,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **418**
+Total modules: **419**

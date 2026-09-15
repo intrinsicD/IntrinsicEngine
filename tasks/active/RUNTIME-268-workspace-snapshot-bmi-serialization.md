@@ -20,7 +20,7 @@ serialization, then make the smallest beneficial ownership/export change.
 - Explicit operator-directed continuation of compile-time cleanup. RUNTIME-266
   already removed the complete registry from pointer/reference consumers; keep
   that verified boundary and do not count its work again.
-- Its [report](../../../ara/evidence/tables/runtime266_registry_borrow_measurement.md)
+- Its [report](../../ara/evidence/tables/runtime266_registry_borrow_measurement.md)
   retains a diagnostic snapshot trace: WriteAST dominates. A synthetic control
   keeps every direct import and global-fragment include while replacing the own
   declarations with a trivial export; its serialization footprint is much smaller.
@@ -74,3 +74,63 @@ python3 tools/repo/check_layering.py --root src --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 ```
+
+## Selected experiment
+- Operator-directed compile/reuse continuation on `codex/editor-compile-locality`, starting at `4fa241cc2`. Root is the only writer; Claude reviews fixed source packets.
+- Reuse the existing snapshot record owner and its Public implementation unit. Compare isolated declaration groups, then move only proven expensive inline initialization/equality work if that preserves semantics. Keep existing cache, context and attachment contracts.
+- New modules, generic facades, duplicate records and runtime allocations are not the default solution. Record diagnostic controls separately from a frozen focused comparison.
+
+## Implemented candidate and review
+- Disjoint record controls, empty member initializer removal, equality relocation,
+  namespace changes and pointer-only standard type controls do not isolate a
+  useful record split. Single-import controls show that the cost grows with the
+  imported graph; it is not an irreducible standard-type cost.
+- Reuse the original standard entities through one narrow module interface,
+  `Extrinsic.Runtime.Private.EditorSnapshotStd`. Its six using-declarations stay
+  in an engine namespace and introduce no wrapper, allocation or duplicate type.
+  Snapshot scalar headers remain local. Existing snapshot record definitions,
+  value initialization, copy/move ownership and attachment guards remain.
+- Correct rejected prototypes before measuring: no namespace-std additions; no
+  implementation-partition reachability reliance; the CMake public fileset carries
+  dependency metadata. Default cache-key comparison now compiles at the existing
+  Public implementation owner, avoiding standard-operator namespace pollution.
+  No in-tree constant-evaluation consumer of that comparison exists.
+- The new contract test checks standard type/function identity, aggregate
+  initialization, copied string independence and key comparison. Explicitly import
+  the Attachment owner for the newly named test type. Existing lifecycle/cache and
+  compiler-boundary tests remain authoritative.
+- Charge the new declaration module to the candidate comparison. Time every
+  affected runtime producer plus a genuine Sandbox consumer; retain fixed source
+  paths, prerequisite BMI hashes, exact source commits and per-command records.
+  This is serial focused compilation, not a clean/parallel/full-engine benchmark.
+
+## Verification before the timing cohort
+- Canonical `ci` configure and complete `IntrinsicTests` build pass on Clang 23.
+  Focused tests: 271 passes. Full CPU: 4,664 passes, no failures and one expected
+  ASan-only leak-control skip (4,665 selected). No GPU/sanitizer runtime claim.
+- Fresh cache-off Clang 20 compiles the Sandbox editor library and its whole engine
+  closure, plus the snapshot model contract object. Its snapshot and standard-owner
+  dependency checks preserve the registry/device/spatial-cache exclusions.
+- Claude reviewed the plan, discarded prototypes, final source and benchmark
+  design. Keep cache equality out of line; constant-expression use is absent in
+  current callers, and the comparison is no longer implicitly inline/constexpr.
+  No runtime performance claim is made for that trade-off.
+- The private-import policy permits only the exact new edge at the exact snapshot
+  path and continues scanning after a missing-edge failure. Negative controls
+  reject an additional private import and a re-export; exact source restoration
+  passes. All original private-import restrictions remain.
+- Strict layering, task policy, documentation links, test layout and source
+  documentation checks pass. The retained explicit-entity comment explains a
+  required selection contract. Module inventory now includes the one new owner.
+
+## Clean-workshop review
+| Row | Result | Evidence |
+|---|---|---|
+| 1: layer imports | pass | Strict layering check; one runtime-local declaration dependency. |
+| 2: target links | pass | Same target; no new target-link edge. |
+| 3: public types | pass | Exact standard type/function assertions; no new higher-layer type flow. |
+| 4: renderer ownership | n/a | No renderer state change. |
+| 5: pass identity | n/a | No pass change. |
+| 6: recipe dependencies | n/a | No recipe change. |
+| 7: maturity | pass | CPUContracted refactor endpoint; no backend capability promotion. |
+| 8: exceptions | pass | No layering exception; the exact private declaration edge is guarded. |
