@@ -1,0 +1,9 @@
+schema_version: 1
+task_id: RUNTIME-258
+sealed_revision: a9dd86071fe6a4169923992dfd8c6c9f339dd3f1
+source_content_digest: 7580ba874d8ac4db6ffe2e9ae7e76dc7168168fc85012b72eeae6d0ac678719a
+report_sha256: af2c815cbac8adae328dc7cf5f626df4e4d2e90ea8c7d797c7284a86108ff1f6
+records: []
+reason: Bind exact four-block deletion, independent review and passing CPU/sanitizer/build evidence to
+  local source
+generated_by: tools/agents/workflow_evidence.py
