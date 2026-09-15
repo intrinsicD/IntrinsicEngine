@@ -12382,7 +12382,10 @@ tree:
     evidence:
     - AGENTS.md
     - src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
-    status: open
+    status: resolved
+    result: Bounded overnight run closed after the 08:00 Berlin deadline; 16 tasks completed,
+      final reviewed source unchanged and heartbeat paused. N584 records the handoff;
+      matched compile timings and broader engine work remain open.
 
   - id: N570
     type: experiment
@@ -12780,4 +12783,25 @@ tree:
     - tasks/evidence/RUNTIME-263/seal.yaml
     - tasks/evidence/RUNTIME-263/overnight-review.txt
     - tasks/evidence/RUNTIME-263/overnight-reconciliation.json
+    status: resolved
+
+  - id: N584
+    type: decision
+    title: Close the bounded overnight cleanup at the morning deadline
+    provenance: ai-executed
+    timestamp: '2026-09-15T08:02:30+02:00'
+    result: Final deadline check at2026-09-15T06:01:19UTC confirmed clean checkout,no taskclaims,no implementation/build/reviewprocesses,all32reviewedsource/test/tool
+      hashes unchanged,and all16completedsource seals resolving. Aggregate Claude review remainsapproved.
+      No new implementation,review or build started afterdeadline. Paused intrinsicengine-cleanup-until-08-00
+      through the app. Closed only the bounded N569 overnightdecision; BUILD007/C92,BUILD006,Framework24convergence,saliencydisplay
+      and existingcache/GPU/pacing/disk-headroom work remainopen. Final evidence retains250focusednative,4636fullCPU
+      plus oneexpectedskip,217focusedASan,217focusedUBSan,Vulkanruntimecompilation only,zero evidenceerrors105existingwarnings.
+      Against29d75ebe7 net550fewerproduction/buildlines,fourproductionfilesremoved and Modelscompilerclosure196to120
+      are exactstructuralobservations,not measuredspeedups. All code/evidence committedlocally; no push. Final
+      handoff metadata is committed separately without changing reviewedsource.
+    evidence:
+    - tasks/evidence/RUNTIME-263/overnight-reconciliation.json
+    - tasks/evidence/RUNTIME-263/overnight-review.txt
+    - tasks/evidence/RUNTIME-263/seal.yaml
+    - tasks/evidence/RUNTIME-262/seal.yaml
     status: resolved
