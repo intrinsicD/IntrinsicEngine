@@ -860,6 +860,53 @@ class CompileHotspotTests(unittest.TestCase):
 
 
 class CompileIterationMeasurementTests(unittest.TestCase):
+    def test_dependency_snapshot_tracks_content_paths_and_membership(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with self.assertRaisesRegex(ValueError, "Preinstalled dependencies are missing"):
+                bench.dependency_snapshot(root)
+            header = root / "header.h"
+            header.write_bytes(b"before")
+            original = bench.dependency_snapshot(root)
+            self.assertEqual(original, bench.dependency_snapshot(root))
+            self.assertEqual(original["file_count"], 1)
+            header.write_bytes(b"change")  # Same size still invalidates the snapshot.
+            self.assertNotEqual(original, bench.dependency_snapshot(root))
+            header.write_bytes(b"before")
+            renamed = root / "renamed.h"
+            header.rename(renamed)
+            self.assertNotEqual(original, bench.dependency_snapshot(root))
+            renamed.rename(header)
+            self.assertEqual(original, bench.dependency_snapshot(root))
+            (root / "new.h").touch()
+            self.assertEqual(bench.dependency_snapshot(root)["file_count"], 2)
+            self.assertNotEqual(original, bench.dependency_snapshot(root))
+
+    def test_dependency_snapshot_tracks_links_and_permissions(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            first, second, link = root / "first", root / "second", root / "link"
+            first.write_bytes(b"same")
+            second.write_bytes(b"same")
+            link.symlink_to(first.name)
+            original = bench.dependency_snapshot(root)
+            link.unlink()
+            link.symlink_to(second.name)
+            self.assertNotEqual(original, bench.dependency_snapshot(root))
+            link.unlink()
+            link.symlink_to(first.name)
+            self.assertEqual(original, bench.dependency_snapshot(root))
+            first.chmod(first.stat().st_mode ^ 0o100)
+            self.assertNotEqual(original, bench.dependency_snapshot(root))
+            link.unlink()
+            without_link = bench.dependency_snapshot(root)
+            link.symlink_to("missing")
+            self.assertNotEqual(without_link, bench.dependency_snapshot(root))
+            link.unlink()
+            link.symlink_to(root, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "Unsupported dependency directory symlink"):
+                bench.dependency_snapshot(root)
+
     def test_log_window_excludes_old_commands_and_rejects_compaction(self):
         old = b"# ninja log v5\n0\t20\t0\told.o\ta\n"
         new = b"20\t30\t0\tnew.o\tb\n"

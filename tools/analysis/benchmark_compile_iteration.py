@@ -35,6 +35,27 @@ def command(args: list[str], cwd: Path) -> str:
     return subprocess.check_output(args, cwd=cwd, text=True)
 
 
+def dependency_snapshot(root: Path) -> dict:
+    files = sorted(path for path in root.rglob("*") if path.is_symlink() or path.is_file())
+    if not files:
+        raise ValueError(f"Preinstalled dependencies are missing from {root}")
+    digest = hashlib.sha256()
+    for path in files:
+        digest.update(path.relative_to(root).as_posix().encode() + b"\0")
+        digest.update(str(path.lstat().st_mode).encode() + b"\0")
+        if path.is_symlink():
+            if path.is_dir():
+                raise ValueError(f"Unsupported dependency directory symlink: {path}")
+            digest.update(os.fsencode(path.readlink()) + b"\0")
+        if not path.is_file():
+            continue  # A dangling link is still part of the recorded identity.
+        digest.update(str(path.stat().st_size).encode() + b"\0")
+        with path.open("rb") as stream:
+            while chunk := stream.read(1024 * 1024):
+                digest.update(chunk)
+    return {"sha256": digest.hexdigest(), "file_count": len(files)}
+
+
 def log_window(before: bytes, after: bytes) -> bytes:
     """Reject compaction instead of misattributing historical compiler invocations."""
     if not after.startswith(before):
@@ -125,7 +146,10 @@ def main() -> None:
     assert build.parent.is_dir() and build not in (source, REPO)
     output.mkdir(parents=True)
     env = dict(os.environ, CCACHE_DISABLE="1", VCPKG_FORCE_SYSTEM_BINARIES="1")
-    configure = ["cmake", "--preset", params["preset"], "-B", str(build)] + params["configure_options"]
+    # This runner borrows preinstalled packages; configure must never reinstall
+    # them when a disposable worktree changes vcpkg's toolchain/overlay identity.
+    configure = (["cmake", "--preset", params["preset"], "-B", str(build)] +
+                 params["configure_options"] + ["-DVCPKG_MANIFEST_INSTALL=OFF"])
     compile_command = ["cmake", "--build", str(build), "--target", params["target"],
                        "--parallel", str(params["jobs"])]
     counters = defaultdict(int)
@@ -189,23 +213,18 @@ def main() -> None:
         # Pre-read the same input populations; this is not a cold-filesystem experiment.
         files = [source / f for f in command(["git", "ls-files"], source).splitlines()]
         dependency_root = source / "external/vcpkg-installed/ci"
-        dependency_files = sorted(p for p in dependency_root.rglob("*") if p.is_file())
-        files += dependency_files
-        dependency_hash = hashlib.sha256()
         for path in files:
             if path.is_file():
-                is_dependency = path.is_relative_to(dependency_root)
-                if is_dependency:
-                    dependency_hash.update(path.relative_to(dependency_root).as_posix().encode() + b"\0")
                 with path.open("rb") as stream:
                     while chunk := stream.read(1024 * 1024):
-                        if is_dependency:
-                            dependency_hash.update(chunk)
-        digest = dependency_hash.hexdigest()
+                        pass
+        snapshot = dependency_snapshot(dependency_root)
+        digest = snapshot["sha256"]
         assert dependency_digest in (None, digest), "Preinstalled dependencies changed between samples"
         dependency_digest = digest
-        write_json(directory / "dependencies.json", {"sha256": digest, "file_count": len(dependency_files)})
+        write_json(directory / "dependencies.json", snapshot)
         initial_configure = measured("initial-configure", configure, directory)
+        assert dependency_snapshot(dependency_root) == snapshot, "Preinstalled dependencies changed during configure"
         commands = json.loads((build / "compile_commands.json").read_text())
         assert all("ccache" not in row["command"] for row in commands)
         assert all(params["compiler"] in row["command"] for row in commands if row["file"].endswith((".cpp", ".cppm")))
@@ -221,11 +240,13 @@ def main() -> None:
                 os.utime(source / path, None)
             if scenario == "reconfigure":
                 cfg = measured("reconfigure-configure", configure, directory)
+                assert dependency_snapshot(dependency_root) == snapshot, "Preinstalled dependencies changed during reconfigure"
                 configure_times[scenario] = cfg["wall_ms"]
                 assert (build / "compile_commands.json").read_bytes() == (directory / "compile_commands.json").read_bytes(), "Reconfigure changed compiler commands"
             clean_source(revision)
             print(f"  {scenario}", flush=True)
             record = measured(scenario, compile_command, directory, capture_ninja=True)
+            assert dependency_snapshot(dependency_root) == snapshot, "Preinstalled dependencies changed during measured build"
             clean_source(revision)
             window_path = directory / f"{scenario}.ninja_log"
             rows = [hotspots.build_report_row(source, resolver, entry)

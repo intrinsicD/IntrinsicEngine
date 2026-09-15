@@ -8,7 +8,8 @@ Static analysis and performance analysis tooling.
   alternating source comparison in a detached worktree and disposable build
   directory. It reuses the hotspot parser and result sealer, preserves each
   command's log window, and reports dependency-path timings and single-process
-  memory. It validates sealed results before writing them. See
+  memory. Configure disables vcpkg package installation; the preinstalled dependency
+  tree is fingerprinted before sampling, after configure and after each build. It validates sealed results before writing them. See
   `benchmarks/ci/manifests/engine_compile_iteration_overnight.yaml` and the
   [matched overnight measurements](../../ara/evidence/tables/build007_overnight_compile_measurement.md).
 

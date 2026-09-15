@@ -1,0 +1,55 @@
+benchmark_id: build.engine_compile_iteration.service_borrows.v1
+method: build.engine_compile_iteration
+dataset: intrinsicengine.source.service_borrows_2026_09_15
+params:
+  intent: performance
+  source_revisions:
+    before: 6570bc106ec13e9e9be3220cf8ca302306499c69
+    after: ee647ec91b677fc1051be3b97405e3cd07b06aaf
+  sample_order:
+  - before
+  - after
+  - after
+  - before
+  measured_iterations: 2
+  warmup_iterations: 0
+  warmup_scope: No discarded pilots; identical input pre-read before every measured
+    sample.
+  preset: ci
+  target: ExtrinsicRuntime
+  compiler: /usr/bin/clang++-23
+  jobs: 4
+  minimum_interface_importers: 1
+  configure_options:
+  - -DEXTRINSIC_BACKEND=Null
+  - -DINTRINSIC_PLATFORM_BACKEND=Null
+  - -DINTRINSIC_HEADLESS_NO_GLFW=ON
+  - -DINTRINSIC_BUILD_TESTS=OFF
+  - -DINTRINSIC_BUILD_BENCHMARKS=OFF
+  - -DINTRINSIC_ENABLE_CCACHE=OFF
+  - -DCMAKE_CXX_COMPILER_LAUNCHER=
+  - -DCMAKE_C_COMPILER_LAUNCHER=
+  scenarios:
+    clean: null
+    noop: null
+    spatial_interface: src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm
+  invalidation: mtime only; source bytes remain at the exact clean commit; require
+    observed importer fan-out
+  build_storage: one disposable tmpfs directory; fresh artifacts per full-build sample
+  dependency_state: identical preinstalled vcpkg packages, no package installation
+    during sampling
+  operating_system_cache: input pre-read, no cache flushing, no cold-filesystem claim
+  memory_measurement: GNU time maximum single-process RSS, not aggregate concurrent
+    memory
+  critical_path: Ninja target DAG weighted by unfiltered per-invocation timings; unmatched
+    meta-edges reported
+  summary: Report both raw values and min/max per arm; retain all four samples and
+    negative results. Two observations per arm cannot establish a general speedup.
+  sample_sequence: Configure, clean build, no-op, then spatial interface touch/rebuild
+    in the same populated tree; recreate the owned build directory only between samples.
+metrics:
+- build_time_ms
+- configure_time_ms
+- memory_peak_bytes
+- sample_count
+thresholds: {}
