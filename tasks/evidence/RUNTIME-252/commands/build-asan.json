@@ -1,0 +1,24 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "VCPKG_FORCE_SYSTEM_BINARIES=1",
+    "bash",
+    "-c",
+    "set -o pipefail; cmake --build --preset ci-asan --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests -j 2 2>&1 | tee /tmp/intrinsic-overnight-20260915/build-asan.log"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 bash -c 'set -o pipefail; cmake --build --preset ci-asan --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests -j 2 2>&1 | tee /tmp/intrinsic-overnight-20260915/build-asan.log'",
+  "cwd": ".",
+  "duration_ms": 234212,
+  "exit_code": 0,
+  "finished_at": "2026-09-14T23:50:08Z",
+  "label": "build-asan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-14T23:46:14Z",
+  "stderr_path": "tasks/evidence/RUNTIME-252/commands/build-asan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-252/commands/build-asan.stdout.log",
+  "stdout_sha256": "8bad13ccd29c803158f028c2ef96f4b2ec2e96ecdba53f3c9f96d82dfbee446f",
+  "task_id": "RUNTIME-252"
+}

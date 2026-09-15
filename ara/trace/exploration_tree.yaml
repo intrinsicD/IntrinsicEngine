@@ -12367,3 +12367,19 @@ tree:
     - tests/contract/runtime/Test.SandboxEditorModels.cpp
     - tests/CMakeLists.txt
     status: resolved
+
+  - id: N569
+    type: decision
+    title: Continue bounded engine cleanup with Claude until the morning deadline
+    provenance: user
+    timestamp: '2026-09-15T01:34:53+02:00'
+    choice: Repeat source-backed cleanup, review, tests, fixes and local commits until 2026-09-15 08:00 Europe/Berlin;
+      reserve the final 45 minutes for verification/reporting. A thread heartbeat is active with a finite deadline.
+      RUNTIME-252 starts with direct shared config codec definitions; its implementation remains provisional until
+      the ongoing build, independent review and remaining gates pass.
+    alternatives:
+    - Stop after the previous single cleanup slice.
+    evidence:
+    - AGENTS.md
+    - src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+    status: open

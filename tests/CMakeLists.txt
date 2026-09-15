@@ -498,6 +498,27 @@ add_test(NAME EditorCompilationLocality.WorkspaceSnapshots
         --forbid-module Extrinsic.Graphics.Renderer
         --forbid-module Extrinsic.Graphics.GpuAssetCache
         --forbid-module Extrinsic.Runtime.RenderExtraction)
+# Feature conversion/token implementations do not depend on unrelated config families.
+foreach(_intrinsic_config_family IN ITEMS CurvatureSegmentation PointCloudConsolidation)
+    if(_intrinsic_config_family STREQUAL "CurvatureSegmentation")
+        set(_intrinsic_other_config_family PointCloudConsolidation)
+    else()
+        set(_intrinsic_other_config_family CurvatureSegmentation)
+    endif()
+    add_test(NAME ConfigCompilationLocality.${_intrinsic_config_family}
+        COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
+            ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+            --check-source src/runtime/Modules/${_intrinsic_config_family}/Runtime.${_intrinsic_config_family}Config.cpp
+            # Reject reintroducing the former forwarding module.
+            --forbid-module Extrinsic.Runtime.Private.FeatureConfigCodecs
+            --forbid-module Extrinsic.Runtime.${_intrinsic_other_config_family}Config
+            --forbid-module Extrinsic.Runtime.ClusteringConfig
+            --forbid-module Extrinsic.Runtime.ParameterizationConfig
+            --forbid-module Extrinsic.Runtime.ProgressivePoissonConfig)
+    set_tests_properties(ConfigCompilationLocality.${_intrinsic_config_family}
+        PROPERTIES LABELS "contract;build;runtime" TIMEOUT 30)
+endforeach()
+
 # Snapshot query preparation uses the narrow context adapter, not concrete services.
 add_test(NAME EditorCompilationLocality.WorkspaceSnapshotQueries
     COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}

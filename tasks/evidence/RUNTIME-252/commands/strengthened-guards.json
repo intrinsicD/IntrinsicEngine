@@ -1,0 +1,24 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "VCPKG_FORCE_SYSTEM_BINARIES=1",
+    "python3",
+    "-c",
+    "import subprocess; [subprocess.run(cmd, check=True) for p in [\"ci\", \"ci-asan\", \"ci-ubsan\"] for cmd in [[\"cmake\", \"--preset\", p], [\"ctest\", \"--test-dir\", \"build/\"+p, \"--output-on-failure\", \"-R\", \"^ConfigCompilationLocality\", \"--no-tests=error\", \"--timeout\", \"60\", \"--parallel\", \"1\"]]]"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 python3 -c 'import subprocess; [subprocess.run(cmd, check=True) for p in [\"ci\", \"ci-asan\", \"ci-ubsan\"] for cmd in [[\"cmake\", \"--preset\", p], [\"ctest\", \"--test-dir\", \"build/\"+p, \"--output-on-failure\", \"-R\", \"^ConfigCompilationLocality\", \"--no-tests=error\", \"--timeout\", \"60\", \"--parallel\", \"1\"]]]'",
+  "cwd": ".",
+  "duration_ms": 6845,
+  "exit_code": 0,
+  "finished_at": "2026-09-14T23:59:59Z",
+  "label": "strengthened-guards",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-14T23:59:52Z",
+  "stderr_path": "tasks/evidence/RUNTIME-252/commands/strengthened-guards.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-252/commands/strengthened-guards.stdout.log",
+  "stdout_sha256": "e3b287269d512ae7d84bed0e66fa55b25666dbf15fe3131d0e49e41af16f799e",
+  "task_id": "RUNTIME-252"
+}

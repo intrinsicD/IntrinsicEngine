@@ -1,3 +1,4 @@
+// Persisted progressive Poisson playground controls and typed point bindings.
 module;
 
 #include <cstdint>
@@ -60,24 +61,29 @@ export namespace Extrinsic::Runtime
 
     };
 
-    [[nodiscard]] std::string SerializeProgressivePoissonPlaygroundConfig(
-        const ProgressivePoissonPlaygroundConfig& config);
+    // Defined by the shared config codec translation unit, which compiles the
+    // JSON dependency once for every feature family.
+    extern "C++"
+    {
+        [[nodiscard]] std::string SerializeProgressivePoissonPlaygroundConfig(
+            const ProgressivePoissonPlaygroundConfig& config);
 
-    [[nodiscard]] Core::Config::EngineConfigSectionValidationResult
-    ValidateProgressivePoissonConfigSection(
-        std::string_view documentPayloadJson,
-        std::string_view referencePayloadJson,
-        std::string_view diagnosticSubject);
+        [[nodiscard]] Core::Config::EngineConfigSectionValidationResult
+        ValidateProgressivePoissonConfigSection(
+            std::string_view documentPayloadJson,
+            std::string_view referencePayloadJson,
+            std::string_view diagnosticSubject);
 
-    [[nodiscard]] std::optional<ProgressivePoissonPlaygroundConfig>
-    GetProgressivePoissonPlaygroundConfig(
-        const Core::Config::EngineConfig& config);
+        [[nodiscard]] std::optional<ProgressivePoissonPlaygroundConfig>
+        GetProgressivePoissonPlaygroundConfig(
+            const Core::Config::EngineConfig& config);
 
-    void SetProgressivePoissonPlaygroundConfig(
-        Core::Config::EngineConfig& config,
-        const ProgressivePoissonPlaygroundConfig& value);
+        void SetProgressivePoissonPlaygroundConfig(
+            Core::Config::EngineConfig& config,
+            const ProgressivePoissonPlaygroundConfig& value);
 
-    [[nodiscard]] Core::Config::EngineConfigSectionRegistration
-    MakeProgressivePoissonConfigSectionRegistration(
-        Core::Config::EngineConfigSectionChangedCallback onChanged = {});
+        [[nodiscard]] Core::Config::EngineConfigSectionRegistration
+        MakeProgressivePoissonConfigSectionRegistration(
+            Core::Config::EngineConfigSectionChangedCallback onChanged = {});
+    }
 }

@@ -1,3 +1,4 @@
+// Persisted clustering parameters, backend selection, and typed property bindings.
 module;
 
 #include <cstdint>
@@ -26,31 +27,36 @@ export namespace Extrinsic::Runtime
         std::optional<KMeansPropertyRefs> Properties{};
     };
 
-    [[nodiscard]] RunKMeans MakeConfiguredKMeansRequest(
-        std::uint32_t stableEntityId,
-        KMeansPropertyRefs properties,
-        const ClusteringConfig& config);
+    // Defined by the shared config codec translation unit, which compiles the
+    // JSON dependency once for every feature family.
+    extern "C++"
+    {
+        [[nodiscard]] RunKMeans MakeConfiguredKMeansRequest(
+            std::uint32_t stableEntityId,
+            KMeansPropertyRefs properties,
+            const ClusteringConfig& config);
 
-    [[nodiscard]] RunKMeans MakeConfiguredKMeansRequest(
-        std::uint32_t stableEntityId, const ClusteringConfig& config);
+        [[nodiscard]] RunKMeans MakeConfiguredKMeansRequest(
+            std::uint32_t stableEntityId, const ClusteringConfig& config);
 
-    [[nodiscard]] std::string SerializeClusteringConfig(
-        const ClusteringConfig& config);
+        [[nodiscard]] std::string SerializeClusteringConfig(
+            const ClusteringConfig& config);
 
-    [[nodiscard]] Core::Config::EngineConfigSectionValidationResult
-    ValidateClusteringConfigSection(
-        std::string_view documentPayloadJson,
-        std::string_view referencePayloadJson,
-        std::string_view diagnosticSubject);
+        [[nodiscard]] Core::Config::EngineConfigSectionValidationResult
+        ValidateClusteringConfigSection(
+            std::string_view documentPayloadJson,
+            std::string_view referencePayloadJson,
+            std::string_view diagnosticSubject);
 
-    [[nodiscard]] std::optional<ClusteringConfig>
-    GetClusteringConfig(const Core::Config::EngineConfig& config);
+        [[nodiscard]] std::optional<ClusteringConfig>
+        GetClusteringConfig(const Core::Config::EngineConfig& config);
 
-    void SetClusteringConfig(
-        Core::Config::EngineConfig& config,
-        const ClusteringConfig& value);
+        void SetClusteringConfig(
+            Core::Config::EngineConfig& config,
+            const ClusteringConfig& value);
 
-    [[nodiscard]] Core::Config::EngineConfigSectionRegistration
-    MakeClusteringConfigSectionRegistration(
-        Core::Config::EngineConfigSectionChangedCallback onChanged = {});
+        [[nodiscard]] Core::Config::EngineConfigSectionRegistration
+        MakeClusteringConfigSectionRegistration(
+            Core::Config::EngineConfigSectionChangedCallback onChanged = {});
+    }
 }

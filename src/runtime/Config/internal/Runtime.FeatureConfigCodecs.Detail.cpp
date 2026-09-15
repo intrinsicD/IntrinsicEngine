@@ -1,5 +1,5 @@
-module;
-
+// Defines the five feature config families' codecs in one ordinary translation
+// unit so their JSON parsing and validation share one compiled implementation.
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -16,12 +16,15 @@ module;
 
 #include <nlohmann/json.hpp>
 
-module Extrinsic.Runtime.Private.FeatureConfigCodecs;
-
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
+import Extrinsic.Runtime.ClusteringConfig;
+import Extrinsic.Runtime.CurvatureSegmentationConfig;
+import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.PointCloudConsolidationConfig;
+import Extrinsic.Runtime.ProgressivePoissonConfig;
 
-namespace Extrinsic::Runtime::FeatureConfigDetail
+namespace Extrinsic::Runtime
 {
     namespace
     {
@@ -2081,7 +2084,7 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
         }
     }
 
-    RunKMeans MakeConfiguredKMeansRequestImpl(
+    RunKMeans MakeConfiguredKMeansRequest(
         const std::uint32_t stableEntityId,
         KMeansPropertyRefs properties,
         const ClusteringConfig& config)
@@ -2094,7 +2097,13 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
         };
     }
 
-    std::string SerializeClusteringConfigImpl(
+    RunKMeans MakeConfiguredKMeansRequest(
+        const std::uint32_t stableEntityId, const ClusteringConfig& config)
+    {
+        return MakeConfiguredKMeansRequest(stableEntityId, config.Properties.value_or(KMeansPropertyRefs{}), config);
+    }
+
+    std::string SerializeClusteringConfig(
         const ClusteringConfig& config)
     {
         json properties = nullptr;
@@ -2115,7 +2124,7 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
         }).dump();
     }
 
-    std::string SerializeCurvatureSegmentationConfigImpl(
+    std::string SerializeCurvatureSegmentationConfig(
         const CurvatureSegmentationConfig& config)
     {
         return json::object({
@@ -2154,7 +2163,7 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
         }).dump();
     }
 
-    std::string SerializeProgressivePoissonPlaygroundConfigImpl(
+    std::string SerializeProgressivePoissonPlaygroundConfig(
         const ProgressivePoissonPlaygroundConfig& config)
     {
         return json::object({
@@ -2181,7 +2190,7 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
         }).dump();
     }
 
-    std::string SerializeParameterizationConfigImpl(
+    std::string SerializeParameterizationConfig(
         const ParameterizationConfig& config)
     {
         return json::object({
@@ -2227,7 +2236,7 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
         }).dump();
     }
 
-    std::string SerializePointCloudConsolidationConfigImpl(
+    std::string SerializePointCloudConsolidationConfig(
         const PointCloudConsolidationConfig& config)
     {
         return json::object({
@@ -2259,7 +2268,7 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
     }
 
     Core::Config::EngineConfigSectionValidationResult
-    ValidateClusteringConfigSectionImpl(
+    ValidateClusteringConfigSection(
         const std::string_view documentPayloadJson,
         const std::string_view referencePayloadJson,
         const std::string_view diagnosticSubject)
@@ -2278,12 +2287,12 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                 .Result = &result,
                 .Path = std::string{diagnosticSubject},
             });
-        result.CanonicalPayloadJson = SerializeClusteringConfigImpl(config);
+        result.CanonicalPayloadJson = SerializeClusteringConfig(config);
         return result;
     }
 
     Core::Config::EngineConfigSectionValidationResult
-    ValidateCurvatureSegmentationConfigSectionImpl(
+    ValidateCurvatureSegmentationConfigSection(
         const std::string_view documentPayloadJson,
         const std::string_view referencePayloadJson,
         const std::string_view diagnosticSubject)
@@ -2305,12 +2314,12 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                     .Path = std::string{diagnosticSubject},
                 });
         result.CanonicalPayloadJson =
-            SerializeCurvatureSegmentationConfigImpl(config);
+            SerializeCurvatureSegmentationConfig(config);
         return result;
     }
 
     Core::Config::EngineConfigSectionValidationResult
-    ValidateProgressivePoissonConfigSectionImpl(
+    ValidateProgressivePoissonConfigSection(
         const std::string_view documentPayloadJson,
         const std::string_view referencePayloadJson,
         const std::string_view diagnosticSubject)
@@ -2332,12 +2341,12 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                     .Path = std::string{diagnosticSubject},
                 });
         result.CanonicalPayloadJson =
-            SerializeProgressivePoissonPlaygroundConfigImpl(config);
+            SerializeProgressivePoissonPlaygroundConfig(config);
         return result;
     }
 
     Core::Config::EngineConfigSectionValidationResult
-    ValidateParameterizationConfigSectionImpl(
+    ValidateParameterizationConfigSection(
         const std::string_view documentPayloadJson,
         const std::string_view referencePayloadJson,
         const std::string_view diagnosticSubject)
@@ -2356,12 +2365,12 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                 .Result = &result,
                 .Path = std::string{diagnosticSubject},
             });
-        result.CanonicalPayloadJson = SerializeParameterizationConfigImpl(config);
+        result.CanonicalPayloadJson = SerializeParameterizationConfig(config);
         return result;
     }
 
     Core::Config::EngineConfigSectionValidationResult
-    ValidatePointCloudConsolidationConfigSectionImpl(
+    ValidatePointCloudConsolidationConfigSection(
         const std::string_view documentPayloadJson,
         const std::string_view referencePayloadJson,
         const std::string_view diagnosticSubject)
@@ -2383,11 +2392,11 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                     .Path = std::string{diagnosticSubject},
                 });
         result.CanonicalPayloadJson =
-            SerializePointCloudConsolidationConfigImpl(config);
+            SerializePointCloudConsolidationConfig(config);
         return result;
     }
 
-    std::optional<ClusteringConfig> GetClusteringConfigImpl(
+    std::optional<ClusteringConfig> GetClusteringConfig(
         const Core::Config::EngineConfig& config)
     {
         const Core::Config::EngineConfigSection* section =
@@ -2401,16 +2410,16 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
         {
             return std::nullopt;
         }
-        const auto validated = ValidateClusteringConfigSectionImpl(
+        const auto validated = ValidateClusteringConfigSection(
             section->PayloadJson,
-            SerializeClusteringConfigImpl(ClusteringConfig{}),
+            SerializeClusteringConfig(ClusteringConfig{}),
             kClusteringConfigSectionName);
         if (validated.State != Core::Config::EngineConfigState::Valid)
             return std::nullopt;
         return DecodeClusteringCanonical(validated.CanonicalPayloadJson);
     }
 
-    void SetClusteringConfigImpl(
+    void SetClusteringConfig(
         Core::Config::EngineConfig& config,
         const ClusteringConfig& value)
     {
@@ -2420,12 +2429,12 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                 .Name = std::string{kClusteringConfigSectionName},
                 .SchemaId = std::string{kClusteringConfigSectionSchemaId},
                 .SchemaVersion = kClusteringConfigSectionSchemaVersion,
-                .PayloadJson = SerializeClusteringConfigImpl(value),
+                .PayloadJson = SerializeClusteringConfig(value),
             });
     }
 
     std::optional<CurvatureSegmentationConfig>
-    GetCurvatureSegmentationConfigImpl(
+    GetCurvatureSegmentationConfig(
         const Core::Config::EngineConfig& config)
     {
         const Core::Config::EngineConfigSection* section =
@@ -2441,9 +2450,9 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             return std::nullopt;
         }
         const auto validated =
-            ValidateCurvatureSegmentationConfigSectionImpl(
+            ValidateCurvatureSegmentationConfigSection(
                 section->PayloadJson,
-                SerializeCurvatureSegmentationConfigImpl(
+                SerializeCurvatureSegmentationConfig(
                     CurvatureSegmentationConfig{}),
                 kCurvatureSegmentationConfigSectionName);
         if (validated.State != Core::Config::EngineConfigState::Valid)
@@ -2452,7 +2461,7 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             validated.CanonicalPayloadJson);
     }
 
-    void SetCurvatureSegmentationConfigImpl(
+    void SetCurvatureSegmentationConfig(
         Core::Config::EngineConfig& config,
         const CurvatureSegmentationConfig& value)
     {
@@ -2466,12 +2475,12 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                 .SchemaVersion =
                     kCurvatureSegmentationConfigSectionSchemaVersion,
                 .PayloadJson =
-                    SerializeCurvatureSegmentationConfigImpl(value),
+                    SerializeCurvatureSegmentationConfig(value),
             });
     }
 
     std::optional<ProgressivePoissonPlaygroundConfig>
-    GetProgressivePoissonPlaygroundConfigImpl(
+    GetProgressivePoissonPlaygroundConfig(
         const Core::Config::EngineConfig& config)
     {
         const Core::Config::EngineConfigSection* section =
@@ -2485,9 +2494,9 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
         {
             return std::nullopt;
         }
-        const auto validated = ValidateProgressivePoissonConfigSectionImpl(
+        const auto validated = ValidateProgressivePoissonConfigSection(
             section->PayloadJson,
-            SerializeProgressivePoissonPlaygroundConfigImpl(
+            SerializeProgressivePoissonPlaygroundConfig(
                 ProgressivePoissonPlaygroundConfig{}),
             kProgressivePoissonConfigSectionName);
         if (validated.State != Core::Config::EngineConfigState::Valid)
@@ -2498,7 +2507,7 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             validated.CanonicalPayloadJson);
     }
 
-    void SetProgressivePoissonPlaygroundConfigImpl(
+    void SetProgressivePoissonPlaygroundConfig(
         Core::Config::EngineConfig& config,
         const ProgressivePoissonPlaygroundConfig& value)
     {
@@ -2511,11 +2520,11 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                 .SchemaVersion =
                     kProgressivePoissonConfigSectionSchemaVersion,
                 .PayloadJson =
-                    SerializeProgressivePoissonPlaygroundConfigImpl(value),
+                    SerializeProgressivePoissonPlaygroundConfig(value),
             });
     }
 
-    std::optional<ParameterizationConfig> GetParameterizationConfigImpl(
+    std::optional<ParameterizationConfig> GetParameterizationConfig(
         const Core::Config::EngineConfig& config)
     {
         const Core::Config::EngineConfigSection* section =
@@ -2529,9 +2538,9 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
         {
             return std::nullopt;
         }
-        const auto validated = ValidateParameterizationConfigSectionImpl(
+        const auto validated = ValidateParameterizationConfigSection(
             section->PayloadJson,
-            SerializeParameterizationConfigImpl(ParameterizationConfig{}),
+            SerializeParameterizationConfig(ParameterizationConfig{}),
             kParameterizationConfigSectionName);
         if (validated.State != Core::Config::EngineConfigState::Valid)
         {
@@ -2540,7 +2549,7 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
         return DecodeParameterizationCanonical(validated.CanonicalPayloadJson);
     }
 
-    void SetParameterizationConfigImpl(
+    void SetParameterizationConfig(
         Core::Config::EngineConfig& config,
         const ParameterizationConfig& value)
     {
@@ -2550,12 +2559,12 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                 .Name = std::string{kParameterizationConfigSectionName},
                 .SchemaId = std::string{kParameterizationConfigSectionSchemaId},
                 .SchemaVersion = kParameterizationConfigSectionSchemaVersion,
-                .PayloadJson = SerializeParameterizationConfigImpl(value),
+                .PayloadJson = SerializeParameterizationConfig(value),
             });
     }
 
     std::optional<PointCloudConsolidationConfig>
-    GetPointCloudConsolidationConfigImpl(
+    GetPointCloudConsolidationConfig(
         const Core::Config::EngineConfig& config)
     {
         const Core::Config::EngineConfigSection* section =
@@ -2571,9 +2580,9 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             return std::nullopt;
         }
         const auto validated =
-            ValidatePointCloudConsolidationConfigSectionImpl(
+            ValidatePointCloudConsolidationConfigSection(
                 section->PayloadJson,
-                SerializePointCloudConsolidationConfigImpl(
+                SerializePointCloudConsolidationConfig(
                     PointCloudConsolidationConfig{}),
                 kPointCloudConsolidationConfigSectionName);
         if (validated.State != Core::Config::EngineConfigState::Valid)
@@ -2582,7 +2591,7 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             validated.CanonicalPayloadJson);
     }
 
-    void SetPointCloudConsolidationConfigImpl(
+    void SetPointCloudConsolidationConfig(
         Core::Config::EngineConfig& config,
         const PointCloudConsolidationConfig& value)
     {
@@ -2596,12 +2605,12 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                 .SchemaVersion =
                     kPointCloudConsolidationConfigSectionSchemaVersion,
                 .PayloadJson =
-                    SerializePointCloudConsolidationConfigImpl(value),
+                    SerializePointCloudConsolidationConfig(value),
             });
     }
 
     Core::Config::EngineConfigSectionRegistration
-    MakeClusteringConfigSectionRegistrationImpl(
+    MakeClusteringConfigSectionRegistration(
         Core::Config::EngineConfigSectionChangedCallback onChanged)
     {
         return Core::Config::EngineConfigSectionRegistration{
@@ -2613,15 +2622,15 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                     .SchemaVersion =
                         kClusteringConfigSectionSchemaVersion,
                     .PayloadJson =
-                        SerializeClusteringConfigImpl(ClusteringConfig{}),
+                        SerializeClusteringConfig(ClusteringConfig{}),
                 },
-            .Validate = ValidateClusteringConfigSectionImpl,
+            .Validate = ValidateClusteringConfigSection,
             .OnChanged = std::move(onChanged),
         };
     }
 
     Core::Config::EngineConfigSectionRegistration
-    MakeCurvatureSegmentationConfigSectionRegistrationImpl(
+    MakeCurvatureSegmentationConfigSectionRegistration(
         Core::Config::EngineConfigSectionChangedCallback onChanged)
     {
         return Core::Config::EngineConfigSectionRegistration{
@@ -2634,17 +2643,17 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                     .SchemaVersion =
                         kCurvatureSegmentationConfigSectionSchemaVersion,
                     .PayloadJson =
-                        SerializeCurvatureSegmentationConfigImpl(
+                        SerializeCurvatureSegmentationConfig(
                             CurvatureSegmentationConfig{}),
                 },
             .Validate =
-                ValidateCurvatureSegmentationConfigSectionImpl,
+                ValidateCurvatureSegmentationConfigSection,
             .OnChanged = std::move(onChanged),
         };
     }
 
     Core::Config::EngineConfigSectionRegistration
-    MakeProgressivePoissonConfigSectionRegistrationImpl(
+    MakeProgressivePoissonConfigSectionRegistration(
         Core::Config::EngineConfigSectionChangedCallback onChanged)
     {
         return Core::Config::EngineConfigSectionRegistration{
@@ -2658,16 +2667,16 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                     .SchemaVersion =
                         kProgressivePoissonConfigSectionSchemaVersion,
                     .PayloadJson =
-                        SerializeProgressivePoissonPlaygroundConfigImpl(
+                        SerializeProgressivePoissonPlaygroundConfig(
                             ProgressivePoissonPlaygroundConfig{}),
                 },
-            .Validate = ValidateProgressivePoissonConfigSectionImpl,
+            .Validate = ValidateProgressivePoissonConfigSection,
             .OnChanged = std::move(onChanged),
         };
     }
 
     Core::Config::EngineConfigSectionRegistration
-    MakeParameterizationConfigSectionRegistrationImpl(
+    MakeParameterizationConfigSectionRegistration(
         Core::Config::EngineConfigSectionChangedCallback onChanged)
     {
         return Core::Config::EngineConfigSectionRegistration{
@@ -2679,16 +2688,16 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                     .SchemaVersion =
                         kParameterizationConfigSectionSchemaVersion,
                     .PayloadJson =
-                        SerializeParameterizationConfigImpl(
+                        SerializeParameterizationConfig(
                             ParameterizationConfig{}),
                 },
-            .Validate = ValidateParameterizationConfigSectionImpl,
+            .Validate = ValidateParameterizationConfigSection,
             .OnChanged = std::move(onChanged),
         };
     }
 
     Core::Config::EngineConfigSectionRegistration
-    MakePointCloudConsolidationConfigSectionRegistrationImpl(
+    MakePointCloudConsolidationConfigSectionRegistration(
         Core::Config::EngineConfigSectionChangedCallback onChanged)
     {
         return Core::Config::EngineConfigSectionRegistration{
@@ -2701,11 +2710,11 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                     .SchemaVersion =
                         kPointCloudConsolidationConfigSectionSchemaVersion,
                     .PayloadJson =
-                        SerializePointCloudConsolidationConfigImpl(
+                        SerializePointCloudConsolidationConfig(
                             PointCloudConsolidationConfig{}),
                 },
             .Validate =
-                ValidatePointCloudConsolidationConfigSectionImpl,
+                ValidatePointCloudConsolidationConfigSection,
             .OnChanged = std::move(onChanged),
         };
     }

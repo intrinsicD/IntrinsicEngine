@@ -38,8 +38,13 @@ it uses. Helpers retain C++ linkage across their owning operation units.
 `EditorCompilationLocality.Actions` excludes unrelated processing services,
 render-recipe editing, renderer and workspace snapshots from both action units.
 Scene primitive-view history and visualization render-hint history retain separate
-state because only visualization history owns surface visualization settings. The feature config codecs and
-workspace attachment retain private module interfaces. Production app sources
+state because only visualization history owns surface visualization settings.
+The five feature config modules own their public schemas and globally attached
+codec declarations. `Runtime.FeatureConfigCodecs.Detail.cpp` directly defines
+those functions as one ordinary translation unit, sharing JSON parsing without
+a private forwarding module. Curvature parameter conversion and consolidation
+token functions retain their feature implementation owners. The workspace
+attachment retains its private module interface. Production app sources
 may not import `Extrinsic.Runtime.Private.*` or include runtime-private headers.
 
 Physical implementation ownership follows the feature split. Geometry operation

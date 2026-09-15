@@ -115,23 +115,28 @@ export namespace Extrinsic::Runtime
 
     };
 
-    [[nodiscard]] std::string SerializeParameterizationConfig(
-        const ParameterizationConfig& config);
+    // Defined by the shared config codec translation unit, which compiles the
+    // JSON dependency once for every feature family.
+    extern "C++"
+    {
+        [[nodiscard]] std::string SerializeParameterizationConfig(
+            const ParameterizationConfig& config);
 
-    [[nodiscard]] Core::Config::EngineConfigSectionValidationResult
-    ValidateParameterizationConfigSection(
-        std::string_view documentPayloadJson,
-        std::string_view referencePayloadJson,
-        std::string_view diagnosticSubject);
+        [[nodiscard]] Core::Config::EngineConfigSectionValidationResult
+        ValidateParameterizationConfigSection(
+            std::string_view documentPayloadJson,
+            std::string_view referencePayloadJson,
+            std::string_view diagnosticSubject);
 
-    [[nodiscard]] std::optional<ParameterizationConfig>
-    GetParameterizationConfig(const Core::Config::EngineConfig& config);
+        [[nodiscard]] std::optional<ParameterizationConfig>
+        GetParameterizationConfig(const Core::Config::EngineConfig& config);
 
-    void SetParameterizationConfig(
-        Core::Config::EngineConfig& config,
-        const ParameterizationConfig& value);
+        void SetParameterizationConfig(
+            Core::Config::EngineConfig& config,
+            const ParameterizationConfig& value);
 
-    [[nodiscard]] Core::Config::EngineConfigSectionRegistration
-    MakeParameterizationConfigSectionRegistration(
-        Core::Config::EngineConfigSectionChangedCallback onChanged = {});
+        [[nodiscard]] Core::Config::EngineConfigSectionRegistration
+        MakeParameterizationConfigSectionRegistration(
+            Core::Config::EngineConfigSectionChangedCallback onChanged = {});
+    }
 }

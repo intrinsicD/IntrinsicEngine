@@ -1,0 +1,44 @@
+{
+  "baseline": {
+    "src/runtime/CMakeLists.txt": 311,
+    "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cppm": 150,
+    "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp": 2712,
+    "src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cppm": 56,
+    "src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cpp": 67,
+    "src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm": 117,
+    "src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp": 176,
+    "src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cppm": 137,
+    "src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cpp": 53,
+    "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm": 117,
+    "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp": 114,
+    "src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm": 83,
+    "src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cpp": 57
+  },
+  "current": {
+    "src/runtime/CMakeLists.txt": 305,
+    "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cppm": 0,
+    "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp": 2721,
+    "src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cppm": 62,
+    "src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cpp": 0,
+    "src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm": 122,
+    "src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp": 125,
+    "src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cppm": 142,
+    "src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cpp": 0,
+    "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm": 122,
+    "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp": 62,
+    "src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm": 89,
+    "src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cpp": 0
+  },
+  "baseline_revision": "29d75ebe7",
+  "dependency_counts": {
+    "CurvatureSegmentation": {
+      "before": 39,
+      "after": 17
+    },
+    "PointCloudConsolidation": {
+      "before": 39,
+      "after": 6
+    }
+  },
+  "timing_claim": false
+}

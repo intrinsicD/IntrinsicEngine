@@ -100,9 +100,6 @@ target_sources(${target_name}
         GeometryIntegration/Runtime.VertexChannelStreams.cppm
         Visualization/Runtime.VisualizationRecipes.cppm
         PRIVATE
-        FILE_SET feature_config_impl TYPE CXX_MODULES FILES
-        Config/internal/Runtime.FeatureConfigCodecs.Detail.cppm
-        PRIVATE
         FILE_SET editor_feature_impl TYPE CXX_MODULES FILES
         Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm
         PRIVATE
@@ -137,9 +134,7 @@ target_sources(${target_name}
         GeometryIntegration/Runtime.GeometryPresentation.cpp
         Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cpp
         Rendering/Runtime.RenderArtifactPublication.cpp
-        Modules/Clustering/Runtime.ClusteringConfig.cpp
         Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp
-        Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cpp
         Modules/Curvature/Runtime.MeshCurvatureConfig.cpp
         Modules/Geodesics/Runtime.GeodesicsConfig.cpp
         Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp
@@ -165,7 +160,6 @@ target_sources(${target_name}
         Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp
         Modules/Registration/Runtime.RegistrationConfig.cpp
-        Modules/Parameterization/Runtime.ParameterizationConfig.cpp
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cpp

@@ -2,17 +2,11 @@ module;
 
 #include <cmath>
 #include <array>
-#include <cstdint>
-#include <optional>
+#include <cstddef>
 #include <string>
-#include <string_view>
-#include <utility>
 
 module Extrinsic.Runtime.CurvatureSegmentationConfig;
 
-import Extrinsic.Core.Config.Engine;
-import Extrinsic.Core.Config.EngineLoad;
-import Extrinsic.Runtime.Private.FeatureConfigCodecs;
 import Geometry.HalfedgeMesh.CurvatureSegmentation;
 
 namespace Extrinsic::Runtime
@@ -127,50 +121,5 @@ namespace Extrinsic::Runtime
                std::isfinite(config.PatchComplexityCost) &&
                config.PatchComplexityCost >= 0.0 &&
                config.PatchComplexityCost <= 1.0e12;
-    }
-
-    std::string SerializeCurvatureSegmentationConfig(
-        const CurvatureSegmentationConfig& config)
-    {
-        return FeatureConfigDetail::
-            SerializeCurvatureSegmentationConfigImpl(config);
-    }
-
-    Core::Config::EngineConfigSectionValidationResult
-    ValidateCurvatureSegmentationConfigSection(
-        const std::string_view documentPayloadJson,
-        const std::string_view referencePayloadJson,
-        const std::string_view diagnosticSubject)
-    {
-        return FeatureConfigDetail::
-            ValidateCurvatureSegmentationConfigSectionImpl(
-                documentPayloadJson,
-                referencePayloadJson,
-                diagnosticSubject);
-    }
-
-    std::optional<CurvatureSegmentationConfig>
-    GetCurvatureSegmentationConfig(
-        const Core::Config::EngineConfig& config)
-    {
-        return FeatureConfigDetail::
-            GetCurvatureSegmentationConfigImpl(config);
-    }
-
-    void SetCurvatureSegmentationConfig(
-        Core::Config::EngineConfig& config,
-        const CurvatureSegmentationConfig& value)
-    {
-        FeatureConfigDetail::SetCurvatureSegmentationConfigImpl(
-            config, value);
-    }
-
-    Core::Config::EngineConfigSectionRegistration
-    MakeCurvatureSegmentationConfigSectionRegistration(
-        Core::Config::EngineConfigSectionChangedCallback onChanged)
-    {
-        return FeatureConfigDetail::
-            MakeCurvatureSegmentationConfigSectionRegistrationImpl(
-                std::move(onChanged));
     }
 }

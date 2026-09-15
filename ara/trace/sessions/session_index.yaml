@@ -590,9 +590,9 @@ sessions:
 
 - id: 2026-09-15_001
   date: '2026-09-15'
-  summary: Snapshot contexts reuse one adapter; query scaffolding removed. Claude implemented and reviewed source;
-    full CPU, focused ASan/UBSan and three Vulkan checks passed. RUNTIME-251 retired; no compile-time claim.
-  turn_count: 1
-  events_count: 1
+  summary: RUNTIME-251 verified and retired; bounded overnight continuation scheduled through 08:00 Berlin. RUNTIME-252
+    implementation is under build/review; no completion or timing claim yet.
+  turn_count: 2
+  events_count: 2
   claims_touched: []
-  open_threads: 9
+  open_threads: 10

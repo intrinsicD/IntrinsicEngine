@@ -1,0 +1,24 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "VCPKG_FORCE_SYSTEM_BINARIES=1",
+    "bash",
+    "-c",
+    "set -o pipefail; ctest --test-dir build/ci-asan --output-on-failure -R \"^(SandboxConfigSections|PointCloudConsolidationConfig|RuntimeConfigControl|SandboxEditorUi|SandboxEditorPresentation|EditorCompilationLocality|ConfigCompilationLocality)\" --no-tests=error --timeout 60 --parallel 1 2>&1 | tee /tmp/intrinsic-overnight-20260915/focused-asan.log"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 bash -c 'set -o pipefail; ctest --test-dir build/ci-asan --output-on-failure -R \"^(SandboxConfigSections|PointCloudConsolidationConfig|RuntimeConfigControl|SandboxEditorUi|SandboxEditorPresentation|EditorCompilationLocality|ConfigCompilationLocality)\" --no-tests=error --timeout 60 --parallel 1 2>&1 | tee /tmp/intrinsic-overnight-20260915/focused-asan.log'",
+  "cwd": ".",
+  "duration_ms": 37876,
+  "exit_code": 0,
+  "finished_at": "2026-09-14T23:51:50Z",
+  "label": "focused-asan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-14T23:51:12Z",
+  "stderr_path": "tasks/evidence/RUNTIME-252/commands/focused-asan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-252/commands/focused-asan.stdout.log",
+  "stdout_sha256": "e4be4e2f97a4d8b293f5e5f82868e375d5dcb40857b208c032e0b5a18d1e4c60",
+  "task_id": "RUNTIME-252"
+}

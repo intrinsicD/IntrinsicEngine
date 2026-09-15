@@ -1,0 +1,157 @@
+schema_version: 1
+task_id: RUNTIME-252
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-15T00:00:40Z'
+claim_eligible: false
+source:
+  base_ref: 29d75ebe7
+  base_revision: 29d75ebe7a9aa427d58c00764b3ba284f4dab0e3
+  head_revision: 29d75ebe7a9aa427d58c00764b3ba284f4dab0e3
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 5b51f99f076fcd9db199ff6f8efd380031e21a162d6b552593e2c7b139d77786
+  - path: ara/trace/pm_reasoning_log.yaml
+    sha256: e79625b79d3dd71aa6cc95c9bc20856c285c0bc23fc68fb3433e9e38fc26d516
+  - path: ara/trace/sessions/2026-09-15_001.yaml
+    sha256: f4d6d252b818e93daf9eb466b8cf69736f2ccc900d9ee5b654e8c1831c72f8af
+  - path: ara/trace/sessions/session_index.yaml
+    sha256: b13261c586717f6ab2ab50ec9495e211214043dcc41b34ffc3cde41949c1b15f
+  - path: docs/api/generated/module_inventory.md
+    sha256: bfde367715e7967b3878bf8692bc3bd4911cfb0502f26798b1fd8e3ad19b927e
+  - path: docs/architecture/sandbox-editor-feature-boundaries.md
+    sha256: e931cc3607990790aac6ea969aa80617fde7240f3b297adfa2e1e60d48b4364a
+  - path: src/runtime/CMakeLists.txt
+    sha256: 00164529daef5cc77dfd30f86e40634df273d72a043b38ee548621095a7269b3
+  - path: src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+    sha256: 56f1af123ec9cd79d574d60eda6d00896a72236802c41e2375b3992f33e5eeb6
+  - path: src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cppm
+    sha256: null
+  - path: src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cpp
+    sha256: null
+  - path: src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cppm
+    sha256: 18f48dfeff684c843effae93d3b9833a0f7f823d9e14240b8e1b836dc7ba9a6f
+  - path: src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp
+    sha256: b3e0c37cdc1fd912ab6c14b0f2c5c9080d4cf23ec9fa67a9a301df258d064ceb
+  - path: src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm
+    sha256: a2ab9f33bcda9ec562cea0055e76dac94853d01e4da614c1291f352f907cd815
+  - path: src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cpp
+    sha256: null
+  - path: src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cppm
+    sha256: 9103fd286ac666c8fbb02a4cb806c53869662b91193e4032a50d9db97eaca3fc
+  - path: src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp
+    sha256: 63a1e066e1ee97337bb18a550d7303def5e83e640c8725541a2cdd2a94adf2dc
+  - path: src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm
+    sha256: db096a516d6ebb48878bd4472e14934a56868108ea355b4ca4a890ceb2de8a7f
+  - path: src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cpp
+    sha256: null
+  - path: src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm
+    sha256: 9b1bbf948150fc8678869057a044b1be2523d72c06f8244e4ed2439fb1acc7ca
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 049a2f8e7110cab8aa7ad6af98d895b09e12bd3418a179d550a1f0b2b0db6efa
+  - path: tasks/done/RUNTIME-252-direct-shared-config-codecs.md
+    sha256: 7bd633e4ad1d7d6bd5ed79edf6c29826668e7a1569d0874cdfa7fd3ffcae22f1
+  - path: tests/CMakeLists.txt
+    sha256: e27d4115411c26951815b343a14c9abbcb9484f8848a98ea1634f4c15866b9cc
+  - path: tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+    sha256: 3671ecba3d900662e895e9b10f30deca3bec26099f5f2835f897dc0eaf56f791
+  - path: tools/agents/skills/intrinsicengine-reuse/references/owner-routes.md
+    sha256: e8dd51a233143ac42ceff2fe0a83bde87e13fc1db8dcb50feb33d8190115407f
+  content_digest: 5bfc0fcc0c80f7754f24b8f2a72ef86332b72a25f8b725b897296aeeb5232e74
+touched:
+  paths:
+  - ara/trace/exploration_tree.yaml
+  - ara/trace/pm_reasoning_log.yaml
+  - ara/trace/sessions/2026-09-15_001.yaml
+  - ara/trace/sessions/session_index.yaml
+  - docs/api/generated/module_inventory.md
+  - docs/architecture/sandbox-editor-feature-boundaries.md
+  - src/runtime/CMakeLists.txt
+  - src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+  - src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cppm
+  - src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cpp
+  - src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cppm
+  - src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp
+  - src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm
+  - src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cpp
+  - src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cppm
+  - src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp
+  - src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm
+  - src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cpp
+  - src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-252-direct-shared-config-codecs.md
+  - tests/CMakeLists.txt
+  - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+  - tools/agents/skills/intrinsicengine-reuse/references/owner-routes.md
+  layers:
+  - runtime
+  modules:
+  - Extrinsic.Runtime.ClusteringConfig
+  - Extrinsic.Runtime.CurvatureSegmentationConfig
+  - Extrinsic.Runtime.ParameterizationConfig
+  - Extrinsic.Runtime.PointCloudConsolidationConfig
+  - Extrinsic.Runtime.ProgressivePoissonConfig
+extension_seam: Five feature-owned public schemas with direct functions in the shared compiled codec owner
+future_change_plan: Keep family parsers and public schemas distinct; reuse common config mechanisms in
+  the existing implementation
+acceptance:
+- criterion: One compiled JSON owner, no forwarding-only private codec module.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Public config behavior unchanged with successful native/sanitizer checks.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Reviewed final diff, synchronized docs and valid completion evidence.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-252/commands/build-asan.json
+- receipt: tasks/evidence/RUNTIME-252/commands/build-ci.json
+- receipt: tasks/evidence/RUNTIME-252/commands/build-ubsan.json
+- receipt: tasks/evidence/RUNTIME-252/commands/clean-workshop.json
+- receipt: tasks/evidence/RUNTIME-252/commands/configure-ci.json
+- receipt: tasks/evidence/RUNTIME-252/commands/final-structural.json
+- receipt: tasks/evidence/RUNTIME-252/commands/focused-asan.json
+- receipt: tasks/evidence/RUNTIME-252/commands/focused-ubsan.json
+- receipt: tasks/evidence/RUNTIME-252/commands/full-cpu.json
+- receipt: tasks/evidence/RUNTIME-252/commands/retirement-structural.json
+- receipt: tasks/evidence/RUNTIME-252/commands/source-docs.json
+- receipt: tasks/evidence/RUNTIME-252/commands/strengthened-guards.json
+- receipt: tasks/evidence/RUNTIME-252/commands/structural.json
+changed_public_contracts:
+- Function language linkage changed; public signatures and schema behavior preserved; no compatibility
+  obligation
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/RUNTIME-252-direct-shared-config-codecs.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Structural counts only; no matched compile-time claim. Focused sanitizer checks are not full sanitizer
+  gates; GPU execution unchanged.
+skipped_checks: []
+artifacts:
+- path: tasks/evidence/RUNTIME-252/structural-counts.json
+  sha256: 55f7d4c53609414a12cf3f2597a18a1d629796ddb460ea2917b46fd0ba8de7eb
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/RUNTIME-252/handoff.jsonl
+review: tasks/evidence/RUNTIME-252/reviews.jsonl

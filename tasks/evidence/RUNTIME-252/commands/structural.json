@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-c",
+    "set -e; python3 tools/agents/check_task_state_links.py --root . --strict; python3 tools/repo/check_test_layout.py --root . --strict; python3 tools/repo/check_root_hygiene.py --root .; python3 tools/agents/sync_skills.py --check; git diff --check"
+  ],
+  "command_display": "bash -c 'set -e; python3 tools/agents/check_task_state_links.py --root . --strict; python3 tools/repo/check_test_layout.py --root . --strict; python3 tools/repo/check_root_hygiene.py --root .; python3 tools/agents/sync_skills.py --check; git diff --check'",
+  "cwd": ".",
+  "duration_ms": 681,
+  "exit_code": 0,
+  "finished_at": "2026-09-14T23:52:40Z",
+  "label": "structural",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-14T23:52:39Z",
+  "stderr_path": "tasks/evidence/RUNTIME-252/commands/structural.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-252/commands/structural.stdout.log",
+  "stdout_sha256": "d5d5bc3d9a665823c74a2294cf2a22bfacb1cfac19470983f09dacee60154904",
+  "task_id": "RUNTIME-252"
+}

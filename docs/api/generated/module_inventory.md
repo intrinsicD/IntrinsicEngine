@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 98 |
+| `runtime` | 97 |
 
 ## Modules
 
@@ -359,7 +359,6 @@ Root scanned: `src`
 | `Extrinsic.Runtime.EngineConfigBoot` | `src/runtime/Config/Runtime.EngineConfigBoot.cppm` | `runtime` |
 | `Extrinsic.Runtime.EngineConfigControl` | `src/runtime/Config/Runtime.EngineConfigControl.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderRecipeActivation` | `src/runtime/Config/Runtime.RenderRecipeActivation.cppm` | `runtime` |
-| `Extrinsic.Runtime.Private.FeatureConfigCodecs` | `src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeometryProcessingOperations` | `src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshFieldOperations` | `src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshTopologyOperations` | `src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cppm` | `runtime` |
@@ -445,4 +444,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **418**
+Total modules: **417**

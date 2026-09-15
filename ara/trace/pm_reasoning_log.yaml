@@ -2323,3 +2323,8 @@ entries:
     - Full-source Claude implementation/review succeeded under standing authorization. Keep the first failing importer
       expectation, its narrow fix, separate sanitizer/GPU evidence and BUG-180 limitation explicit.
     - Existing staged research topics retain named open owners; this cleanup does not close their broader hypotheses.
+
+  - turn: 2026-09-15_001#2
+    notes:
+    - Record the user deadline and scheduled continuation as N569. RUNTIME-252 is provisional; source counts and unchanged-body checks are not completed verification or timing evidence.
+    - No new claim or observation; existing staged topics retain their owners and flags. The next continuation must finish the owned build/review, not duplicate it.

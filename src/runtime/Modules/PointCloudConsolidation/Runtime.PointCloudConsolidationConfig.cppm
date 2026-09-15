@@ -94,24 +94,29 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::string_view StableToken(
         PointCloudConsolidationSupportRadiusMode mode) noexcept;
 
-    [[nodiscard]] std::string SerializePointCloudConsolidationConfig(
-        const PointCloudConsolidationConfig& config);
+    // Defined by the shared config codec translation unit, which compiles the
+    // JSON dependency once for every feature family.
+    extern "C++"
+    {
+        [[nodiscard]] std::string SerializePointCloudConsolidationConfig(
+            const PointCloudConsolidationConfig& config);
 
-    [[nodiscard]] Core::Config::EngineConfigSectionValidationResult
-    ValidatePointCloudConsolidationConfigSection(
-        std::string_view documentPayloadJson,
-        std::string_view referencePayloadJson,
-        std::string_view diagnosticSubject);
+        [[nodiscard]] Core::Config::EngineConfigSectionValidationResult
+        ValidatePointCloudConsolidationConfigSection(
+            std::string_view documentPayloadJson,
+            std::string_view referencePayloadJson,
+            std::string_view diagnosticSubject);
 
-    [[nodiscard]] std::optional<PointCloudConsolidationConfig>
-    GetPointCloudConsolidationConfig(
-        const Core::Config::EngineConfig& config);
+        [[nodiscard]] std::optional<PointCloudConsolidationConfig>
+        GetPointCloudConsolidationConfig(
+            const Core::Config::EngineConfig& config);
 
-    void SetPointCloudConsolidationConfig(
-        Core::Config::EngineConfig& config,
-        const PointCloudConsolidationConfig& value);
+        void SetPointCloudConsolidationConfig(
+            Core::Config::EngineConfig& config,
+            const PointCloudConsolidationConfig& value);
 
-    [[nodiscard]] Core::Config::EngineConfigSectionRegistration
-    MakePointCloudConsolidationConfigSectionRegistration(
-        Core::Config::EngineConfigSectionChangedCallback onChanged = {});
+        [[nodiscard]] Core::Config::EngineConfigSectionRegistration
+        MakePointCloudConsolidationConfigSectionRegistration(
+            Core::Config::EngineConfigSectionChangedCallback onChanged = {});
+    }
 }

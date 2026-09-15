@@ -1,0 +1,24 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "VCPKG_FORCE_SYSTEM_BINARIES=1",
+    "bash",
+    "-c",
+    "set -o pipefail; ctest --test-dir build/ci-ubsan --output-on-failure -R \"^(SandboxConfigSections|PointCloudConsolidationConfig|RuntimeConfigControl|SandboxEditorUi|SandboxEditorPresentation|EditorCompilationLocality|ConfigCompilationLocality)\" --no-tests=error --timeout 60 --parallel 1 2>&1 | tee /tmp/intrinsic-overnight-20260915/focused-ubsan.log"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 bash -c 'set -o pipefail; ctest --test-dir build/ci-ubsan --output-on-failure -R \"^(SandboxConfigSections|PointCloudConsolidationConfig|RuntimeConfigControl|SandboxEditorUi|SandboxEditorPresentation|EditorCompilationLocality|ConfigCompilationLocality)\" --no-tests=error --timeout 60 --parallel 1 2>&1 | tee /tmp/intrinsic-overnight-20260915/focused-ubsan.log'",
+  "cwd": ".",
+  "duration_ms": 20079,
+  "exit_code": 0,
+  "finished_at": "2026-09-14T23:56:36Z",
+  "label": "focused-ubsan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-14T23:56:16Z",
+  "stderr_path": "tasks/evidence/RUNTIME-252/commands/focused-ubsan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-252/commands/focused-ubsan.stdout.log",
+  "stdout_sha256": "e547a085ef39aa835e7e1ec40240d481ad03a993ef3f5ccb3c11b8ea42fd71c3",
+  "task_id": "RUNTIME-252"
+}

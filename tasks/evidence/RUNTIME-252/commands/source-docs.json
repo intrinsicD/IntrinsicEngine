@@ -1,0 +1,33 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py",
+    "--root",
+    ".",
+    "--path",
+    "src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cppm",
+    "--path",
+    "src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm",
+    "--path",
+    "src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cppm",
+    "--path",
+    "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm",
+    "--path",
+    "src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm",
+    "--summary"
+  ],
+  "command_display": "python3 tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py --root . --path src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cppm --path src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm --path src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cppm --path src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm --path src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm --summary",
+  "cwd": ".",
+  "duration_ms": 33,
+  "exit_code": 0,
+  "finished_at": "2026-09-14T23:45:15Z",
+  "label": "source-docs",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-14T23:45:15Z",
+  "stderr_path": "tasks/evidence/RUNTIME-252/commands/source-docs.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-252/commands/source-docs.stdout.log",
+  "stdout_sha256": "f44246d4456ddae6dbe09b5bf6408b10147211036adc1cf784c8e2ec5646045b",
+  "task_id": "RUNTIME-252"
+}

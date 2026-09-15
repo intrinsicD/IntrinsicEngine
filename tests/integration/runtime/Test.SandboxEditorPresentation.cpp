@@ -966,14 +966,17 @@ TEST(SandboxEditorPresentation,
     const auto firstPrivateSourceSet = runtimeCMake.find("\n        PRIVATE\n");
     ASSERT_NE(firstPrivateSourceSet, std::string::npos);
     const std::string_view publicRuntimeSources{runtimeCMake.data(), firstPrivateSourceSet};
-    for (const std::string_view privateModule : {"internal/Runtime.FeatureConfigCodecs.Detail.cppm",
-                                                 "internal/Runtime.EditorWorkspaceAttachment.Detail.cppm"})
+    for (const std::string_view privateModule : {"internal/Runtime.EditorWorkspaceAttachment.Detail.cppm"})
     {
         EXPECT_EQ(publicRuntimeSources.find(privateModule), std::string_view::npos)
             << privateModule;
         EXPECT_NE(runtimeCMake.find(privateModule), std::string::npos) << privateModule;
     }
-    EXPECT_NE(runtimeCMake.find("PRIVATE\n        FILE_SET feature_config_impl TYPE CXX_MODULES"),
+    EXPECT_EQ(runtimeCMake.find("FILE_SET feature_config_impl"),
+              std::string::npos);
+    EXPECT_EQ(runtimeCMake.find("Runtime.FeatureConfigCodecs.Detail.cppm"),
+              std::string::npos);
+    EXPECT_NE(runtimeCMake.find("Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp"),
               std::string::npos);
     EXPECT_NE(runtimeCMake.find("PRIVATE\n        FILE_SET editor_feature_impl TYPE CXX_MODULES"),
               std::string::npos);
@@ -1015,7 +1018,7 @@ TEST(SandboxEditorPresentation,
     EXPECT_FALSE(std::filesystem::exists(std::filesystem::path{ENGINE_ROOT_DIR} /
                                          "tests/unit/runtime/Test.RegistrationAlignment.cpp"));
 
-    constexpr std::array<std::string_view, 29> allowedPrivateImporters{{
+    constexpr std::array<std::string_view, 24> allowedPrivateImporters{{
         "Runtime.EditorWorkspaceSession.cpp",
         "Runtime.EditorCommon.Public.cpp",
         "Runtime.EditorJobProjection.Public.cpp",
@@ -1038,11 +1041,6 @@ TEST(SandboxEditorPresentation,
         "Runtime.VisualizationEditingOperations.Public.cpp",
         "Runtime.VisualizationEditingOperations.Actions.cpp",
         "Runtime.RenderRecipeEditingOperations.Public.cpp",
-        "Runtime.ProgressivePoissonConfig.cpp",
-        "Runtime.ParameterizationConfig.cpp",
-        "Runtime.ClusteringConfig.cpp",
-        "Runtime.PointCloudConsolidationConfig.cpp",
-        "Runtime.CurvatureSegmentationConfig.cpp",
         "Runtime.EditorWorkspaceAttachment.Detail.cppm",
         "Runtime.EditorWorkspaceAttachment.cpp",
     }};

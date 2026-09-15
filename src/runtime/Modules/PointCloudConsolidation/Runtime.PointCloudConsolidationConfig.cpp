@@ -1,15 +1,8 @@
 module;
 
-#include <optional>
-#include <string>
 #include <string_view>
-#include <utility>
 
 module Extrinsic.Runtime.PointCloudConsolidationConfig;
-
-import Extrinsic.Core.Config.Engine;
-import Extrinsic.Core.Config.EngineLoad;
-import Extrinsic.Runtime.Private.FeatureConfigCodecs;
 
 namespace Extrinsic::Runtime
 {
@@ -65,50 +58,5 @@ namespace Extrinsic::Runtime
             return "manual";
         }
         return {};
-    }
-
-    std::string SerializePointCloudConsolidationConfig(
-        const PointCloudConsolidationConfig& config)
-    {
-        return FeatureConfigDetail::
-            SerializePointCloudConsolidationConfigImpl(config);
-    }
-
-    Core::Config::EngineConfigSectionValidationResult
-    ValidatePointCloudConsolidationConfigSection(
-        const std::string_view documentPayloadJson,
-        const std::string_view referencePayloadJson,
-        const std::string_view diagnosticSubject)
-    {
-        return FeatureConfigDetail::
-            ValidatePointCloudConsolidationConfigSectionImpl(
-                documentPayloadJson,
-                referencePayloadJson,
-                diagnosticSubject);
-    }
-
-    std::optional<PointCloudConsolidationConfig>
-    GetPointCloudConsolidationConfig(
-        const Core::Config::EngineConfig& config)
-    {
-        return FeatureConfigDetail::GetPointCloudConsolidationConfigImpl(
-            config);
-    }
-
-    void SetPointCloudConsolidationConfig(
-        Core::Config::EngineConfig& config,
-        const PointCloudConsolidationConfig& value)
-    {
-        FeatureConfigDetail::SetPointCloudConsolidationConfigImpl(
-            config, value);
-    }
-
-    Core::Config::EngineConfigSectionRegistration
-    MakePointCloudConsolidationConfigSectionRegistration(
-        Core::Config::EngineConfigSectionChangedCallback onChanged)
-    {
-        return FeatureConfigDetail::
-            MakePointCloudConsolidationConfigSectionRegistrationImpl(
-                std::move(onChanged));
     }
 }

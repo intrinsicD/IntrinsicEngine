@@ -1,0 +1,24 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "VCPKG_FORCE_SYSTEM_BINARIES=1",
+    "bash",
+    "-c",
+    "set -o pipefail; cmake --build --preset ci-ubsan --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests -j2 2>&1 | tee /tmp/intrinsic-overnight-20260915/build-ubsan.log"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 bash -c 'set -o pipefail; cmake --build --preset ci-ubsan --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests -j2 2>&1 | tee /tmp/intrinsic-overnight-20260915/build-ubsan.log'",
+  "cwd": ".",
+  "duration_ms": 230817,
+  "exit_code": 0,
+  "finished_at": "2026-09-14T23:55:52Z",
+  "label": "build-ubsan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-14T23:52:01Z",
+  "stderr_path": "tasks/evidence/RUNTIME-252/commands/build-ubsan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-252/commands/build-ubsan.stdout.log",
+  "stdout_sha256": "9b4e51b7fd1bd6f766ddcedc71b16f04a56ce245f4b4096b5994e2805f358529",
+  "task_id": "RUNTIME-252"
+}

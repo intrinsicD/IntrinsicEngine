@@ -94,24 +94,29 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] bool IsValidCurvatureSegmentationConfig(
         const CurvatureSegmentationConfig& config) noexcept;
 
-    [[nodiscard]] std::string SerializeCurvatureSegmentationConfig(
-        const CurvatureSegmentationConfig& config);
+    // Defined by the shared config codec translation unit, which compiles the
+    // JSON dependency once for every feature family.
+    extern "C++"
+    {
+        [[nodiscard]] std::string SerializeCurvatureSegmentationConfig(
+            const CurvatureSegmentationConfig& config);
 
-    [[nodiscard]] Core::Config::EngineConfigSectionValidationResult
-    ValidateCurvatureSegmentationConfigSection(
-        std::string_view documentPayloadJson,
-        std::string_view referencePayloadJson,
-        std::string_view diagnosticSubject);
+        [[nodiscard]] Core::Config::EngineConfigSectionValidationResult
+        ValidateCurvatureSegmentationConfigSection(
+            std::string_view documentPayloadJson,
+            std::string_view referencePayloadJson,
+            std::string_view diagnosticSubject);
 
-    [[nodiscard]] std::optional<CurvatureSegmentationConfig>
-    GetCurvatureSegmentationConfig(
-        const Core::Config::EngineConfig& config);
+        [[nodiscard]] std::optional<CurvatureSegmentationConfig>
+        GetCurvatureSegmentationConfig(
+            const Core::Config::EngineConfig& config);
 
-    void SetCurvatureSegmentationConfig(
-        Core::Config::EngineConfig& config,
-        const CurvatureSegmentationConfig& value);
+        void SetCurvatureSegmentationConfig(
+            Core::Config::EngineConfig& config,
+            const CurvatureSegmentationConfig& value);
 
-    [[nodiscard]] Core::Config::EngineConfigSectionRegistration
-    MakeCurvatureSegmentationConfigSectionRegistration(
-        Core::Config::EngineConfigSectionChangedCallback onChanged = {});
+        [[nodiscard]] Core::Config::EngineConfigSectionRegistration
+        MakeCurvatureSegmentationConfigSectionRegistration(
+            Core::Config::EngineConfigSectionChangedCallback onChanged = {});
+    }
 }

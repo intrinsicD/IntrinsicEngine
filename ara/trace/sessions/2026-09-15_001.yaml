@@ -2,10 +2,9 @@ session:
   id: 2026-09-15_001
   date: '2026-09-15'
   started: '2026-09-15T00:37:12+02:00'
-  last_turn: '2026-09-15T00:37:12+02:00'
-  turn_count: 1
-  summary: Snapshot contexts reuse one adapter; query scaffolding removed. Claude implemented and reviewed source;
-    full CPU, focused ASan/UBSan and three Vulkan checks passed. RUNTIME-251 retired; no compile-time claim.
+  last_turn: '2026-09-15T01:34:53+02:00'
+  turn_count: 2
+  summary: RUNTIME-251 verified and retired; bounded overnight continuation scheduled through 08:00 Berlin. RUNTIME-252 implementation is under build/review; no completion or timing claim yet.
 events_logged:
 - turn: 1
   type: experiment
@@ -14,6 +13,13 @@ events_logged:
   provenance: ai-executed
   summary: Snapshot contexts reuse one adapter; query scaffolding removed. Claude implemented and reviewed source;
     full CPU, focused ASan/UBSan and three Vulkan checks passed. RUNTIME-251 retired; no compile-time claim.
+- turn: 2
+  type: decision
+  id: N569
+  routing: direct
+  provenance: user
+  summary: Bounded overnight continuation scheduled; first codec cleanup implemented but verification remains in
+    progress.
 ai_actions:
 - turn: 1
   action: Claude implemented five production files; root reviewed, added lifetime/statistics and compiler-boundary
@@ -26,12 +32,25 @@ ai_actions:
   - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
   - tests/CMakeLists.txt
   - tasks/done/RUNTIME-251-editor-snapshot-context-reuse.md
+- turn: 2
+  action: Created finite thread continuation, prepared/claimed RUNTIME-252 and delegated source implementation to
+    Claude. Root compared unchanged parser and codec bodies, removed four retired files and started canonical reconciliation
+    plus independent source review. Config timestamp churn and remaining gates are recorded in the active task;
+    no slice completion claimed.
+  provenance: ai-executed
+  files_changed:
+  - src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+  - tests/CMakeLists.txt
+  - tasks/active/RUNTIME-252-direct-shared-config-codecs.md
 claims_touched: []
 key_context:
 - turn: 1
   excerpt: User requested continued duplication and compilation cleanup with Claude through plan, implementation,
     review, tests and fixes. Standing source-sharing and local commit authorization applies.
+- turn: 2
+  excerpt: User requested repeating the cleanup until morning 08:00; deadline is 2026-09-15 in Europe/Berlin.
 open_threads:
+- Overnight continuation and RUNTIME-252 remain in progress; complete verification and reviewed retirement before further slices, then report by 08:00.
 - BUILD-007 owns matched clean-source engine compile reconciliation; BUILD-006 separately owns backend/cache comparisons.
   C92 remains a hypothesis.
 - BUG-193 owns unexplained GPU pacing variability and WLOP watchdog margin; BUG-189/191/192 closed only finite-work
