@@ -1,0 +1,36 @@
+## Audit result — 6 definitively unused facade imports
+
+Read-only; nothing edited, built, or tested. Method: enumerate the exported names of each candidate module (including its `export import` re-exports), then match those exact names against the full Models.cpp body and all four headers in the include chain (`Runtime.EditorFeatures.Internal.hpp` + `EditorGeometryHelpers` / `EditorFeatureCommands.Internal` / `EditorFeatureProperties.Internal`). Namespace tokens were ignored as you instructed.
+
+### Remove (6)
+
+[ROOT CORRECTION: ClusteringTypes exports two ToString overloads. The two name hits use GeometryPresentationSlotSemantic/SourceKind, whose exact canonical Runtime.GeometryPresentation overloads remain; scoped enums cannot convert to ClusteringBackend/KMeansRunStatus. The absence claim excludes this explicitly resolved shared name. See owner-audit.json.]
+
+| Import | Source proof |
+|---|---|
+| `Extrinsic.Runtime.ClusteringModule` | Exports only `ClusteringService`, `ClusteringModule`; re-exports `ClusteringTypes`, `GeometryAvailability`. Zero `Cluster*`/`KMeans*` tokens in body or headers except `model.KMeansDomains = GetAvailableEditorKMeansDomains(...)` (`Models.cpp:2244`), declared in `Runtime.GeometryProcessingOperations.cppm:151`, already imported at line 92. No type name is spelled, so only reachability (not visibility) is needed. `GeometryAvailability` is imported directly at line 64. |
+| `Extrinsic.Runtime.MeshPrimitiveView` | Exports `MeshVertexViewRenderMode`, `MeshPrimitiveViewSettings` only. Zero occurrences anywhere in the TU. No re-exports. |
+| `Extrinsic.Runtime.ProgressivePoissonGpuBackend` | ~45 exported `ProgressivePoissonGpu*` names + `DebugNameFor…`/`Build…` functions; zero occurrences. The `ProgressivePoisson*` tokens at 2323–2387 are local variables, model fields, and `…::ProgressivePoissonSampling` from `GeometryAvailability` (line 64). No re-exports. |
+| `Extrinsic.Runtime.ParameterizationConfig` | Exports `kParameterizationConfigSection*`, five `Parameterization*` enums, six config structs, five codec functions; re-exports `GeometryAvailability`. Zero matches. The only `Parameterization` hits are `EditorParameterizationUvViewCommandSurface`, forward-declared in `Internal.hpp:17` itself. |
+| `Extrinsic.Runtime.ProgressivePoissonConfig` | Exports `kProgressivePoissonConfigSection*`, `ProgressivePoissonPlaygroundChannel/Backend/Config`, five codec functions; re-exports `GeometryAvailability`. Zero matches for any `…Playground…` or codec name. |
+| `Extrinsic.Runtime.SceneInteractionModule` | Exports only the class `SceneInteractionModule`; no `export import`. Zero occurrences of the class, `GizmoInteraction`, or `StableEntityLookupDiagnostics`. The `PrimitiveSelectionResult` uses (474, 568, 871, 2406, 3413, `Internal.hpp:35`) are satisfied by `Runtime.PrimitiveSelectionRefinement` (line 70), where the struct is defined (`Runtime.PrimitiveSelectionRefinement.cppm:116`). |
+
+### Retain — coupled owners
+
+- **`Extrinsic.Runtime.AssetWorkflowModule`** — `Internal.hpp:114` names `RuntimeAssetImportEvent`, exported at `Runtime.AssetWorkflowModule.cppm:278`. (Note `RuntimeAssetImportQueueSnapshot` at `Internal.hpp:49` comes from `AssetIngestStateMachine`, separately imported — but the event alone pins this owner.)
+- **`Extrinsic.Runtime.SceneDocumentModule`** — `Internal.hpp:116` names `RuntimeSceneFileEvent`, exported at `Runtime.SceneDocumentModule.cppm:35`.
+- **`Extrinsic.Runtime.RenderExtraction`** — body names `VisualizationRecipe` (914, 3109) and `GetVisualizationRecipeKind` (918), defined in `Runtime.VisualizationRecipes.cppm:169,186`. `RenderExtraction.cppm:23` is the **only** `export import Extrinsic.Runtime.VisualizationRecipes;` in the tree, so it is the sole visibility path in this TU. Its own names (`RenderExtractionCache`, `RuntimeRenderable*`) are unused, but the re-export is load-bearing.
+- **`Extrinsic.Runtime.PointCloudConsolidationModule`** — zero name matches, so it *looks* removable, but it re-exports `PointCloudConsolidationTypes`; I could not establish within budget that nothing in the TU depends on that path via an unspelled-but-looked-up name (ADL on a `Consolidation*` type in an operation call). Held back as ambiguous rather than counted in the six.
+
+### Remaining unknowns
+
+1. ADL/operator visibility: name-token matching cannot see operators found by ADL on argument types. The six removals are all types/functions with zero tokens *and* whose modules export no free operators, which makes this low-risk but not compiler-proven.
+2. Transitive re-export chains: I verified the direct `export import` graph one level deep for `VisualizationRecipes`; a two-hop chain through `VisualizationEditingOperations` or `Graphics.Component.VisualizationConfig` could make `RenderExtraction` removable too. Not resolved.
+3. `PointCloudConsolidationTypes` reachability, as above.
+4. Closure effect is unmeasured. Six direct deletions ≠ six closure units; `ProgressivePoissonGpuBackend` (pulls `RHI::BufferDesc`/`PipelineDesc`) is the likeliest real win, the two config modules likely net zero since `GeometryAvailability` stays imported.
+
+### Bounded verification (for whoever implements after RUNTIME-260 retires)
+
+Delete exactly lines 61, 67, 68, 73, 74, 76; leave every other import, both `#include` blocks, EnTT/`Geometry.Graph`/`GeometrySourcesPopulate`, and all 3463 lines of body bytes untouched. Then configure the existing supported Clang 23 preset and build the real implementation unit via the `IntrinsicRuntimeContractTests` target — no new module target, no BMI-map change, no forward declarations or replacement helpers. A clean compile of that one TU is the proof; a lookup failure names the exact re-export dependency and identifies which of the six to restore individually.
+
+Root: baseline contains3463total lines, not3463body lines. All bytes except six import lines must stay unchanged. Use exact task commands and actual implementation producer; no module-interface change.

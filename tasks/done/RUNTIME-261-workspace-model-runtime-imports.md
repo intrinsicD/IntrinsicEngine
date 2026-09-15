@@ -5,6 +5,10 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
+owner: "codex-overnight"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-09-15T04:26:16Z"
 contract_schema: 1
 contracts: [runtime.render-diagnostics-locality]
 ---
@@ -66,23 +70,23 @@ from the compiler's transitive closure. Record the measured structural count;
 no timing or BMI/public-interface change. Existing architecture remains accurate.
 
 ## Required changes
-- [ ] Bind baseline source/map, exported types/functions/constants/reexports and recursive-header/overload proof.
-- [ ] Have Claude delete only the six proven import lines; preserve all remaining bytes and other production files.
-- [ ] Record actual compiler closure and restore any needed candidate rather than introducing a declaration workaround.
+- [x] Bind baseline source/map, exported types/functions/constants/reexports and recursive-header/overload proof.
+- [x] Have Claude delete only the six proven import lines; preserve all remaining bytes and other production files.
+- [x] Record actual compiler closure and restore any needed candidate rather than introducing a declaration workaround.
 
 ## Tests
-- [ ] Supported ci producer build and focused editor/locality tests pass.
-- [ ] IntrinsicTests build and full supported CPU suite pass.
-- [ ] Focused editor ASan/UBSan and promoted-Vulkan runtime compilation pass.
+- [x] Supported ci producer build and focused editor/locality tests pass.
+- [x] IntrinsicTests build and full supported CPU suite pass.
+- [x] Focused editor ASan/UBSan and promoted-Vulkan runtime compilation pass.
 
 ## Docs
-- [ ] Record fixed-source Claude review, owner proof and gate receipts.
-- [ ] Retire, locally commit/seal and update task brief/index; keep accurate existing architecture docs.
+- [x] Record fixed-source Claude review, owner proof and gate receipts.
+- [x] Retire, locally commit/seal and update task brief/index; keep accurate existing architecture docs.
 
 ## Acceptance criteria
-- [ ] Only proven unused import lines change in Models.cpp; every remaining byte and other production file stays identical.
-- [ ] Canonical owners and feature behavior remain, with passing actual compiler/native/sanitizer/build evidence and truthful dependency counts.
-- [ ] Fixed diff is Claude-reviewed, locally committed, retired and sealed without timing, GPU execution or whole-engine completion claims.
+- [x] Only proven unused import lines change in Models.cpp; every remaining byte and other production file stays identical.
+- [x] Canonical owners and feature behavior remain, with passing actual compiler/native/sanitizer/build evidence and truthful dependency counts.
+- [x] Fixed diff is Claude-reviewed, locally committed, retired and sealed without timing, GPU execution or whole-engine completion claims.
 
 ## Verification
 ```bash
@@ -109,3 +113,37 @@ new compiled trees. No test that merely asserts deleted source text is needed.
 - Treating shared ToString names or re-exported declarations as unused without call/type proof.
 - Changing layers, APIs, test selectors, backend/cache identities or user-facing methods.
 - Pushing or starting implementation after the deadline reserve begins.
+
+## Completion — 2026-09-15
+- Endpoint: **Retired**, six unused runtime imports in Models.cpp.
+- Commit: implementation and retirement are in the enclosing local commit;
+  `tasks/evidence/RUNTIME-261/seal.yaml` binds the exact source revision.
+- Exactly six planned import lines removed: 3,463 to 3,457 source lines,
+  66 to 60 direct imports. Every remaining byte and all 876 other tracked
+  production files stay unchanged. No body/header, public interface, new
+  helper/file or sibling editor-unit change.
+- Actual rebuilt compiler module closure decreases 171 to 161. Five removed
+  direct imports leave with five further dependencies: ClusteringTypes,
+  GizmoInteraction, ComputeParallelPrimitives, GpuTransfer and BufferTransfer.
+  MeshPrimitiveView remains indirectly reachable. No timing claim.
+- The two ToString calls retain exact GeometryPresentation overloads; the
+  removed clustering overloads take distinct scoped enums and are not viable.
+  Direct GeometryAvailability satisfies its re-exported names. KMeans-domain
+  lookup and PrimitiveSelectionResult keep their processing/selection owners.
+  Required asset/scene event owners and unproven imports remain untouched.
+- Claude's first review blocked on a real evidence omission: the prefix-based
+  function inventory missed individually exported
+  BuildPrimitiveSelectionRenderSnapshot. Root searched the complete file and
+  four recursive headers (zero hits), manually re-enumerated namespace-level
+  declarations, and labeled the type inventory as conservative including
+  private declarations. The original review remains recorded. Independent
+  follow-up review approved the corrected evidence; no source fix was needed.
+- All gates pass: exact source/compiler proof, 235 focused native tests,
+  4,636 full CPU cases plus one expected GLFW/LSan control skip, 202 focused
+  ASan and 202 focused UBSan cases, promoted-Vulkan runtime compilation,
+  corrected owner-audit receipt and strict structural checks. Vulkan build
+  evidence is not GPU execution; sanitizer coverage is focused, not full-suite.
+- Existing architecture remains accurate. Clean-workshop rows 1–3 and 8 pass
+  (unchanged layers, owners, public boundaries and no exception); rows 4–7
+  do not apply (no frame/pass/protocol/maturity change). BUILD-007/C92,
+  broader engine cleanup and Framework24 convergence remain open.

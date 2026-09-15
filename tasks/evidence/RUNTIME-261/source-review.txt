@@ -1,0 +1,21 @@
+**APPROVE** — blocker resolved.
+
+**Blocker closure verified:**
+- `BuildPrimitiveSelectionRenderSnapshot` is now enumerated for `SceneInteractionModule` and searched with 0 hits across the full body and all four recursive headers. I independently confirm it is absent from the four supplied headers; the body search is root-attested and the name has no retained alternate owner, so 0 hits is the correct clearing condition and it was applied.
+- The enumeration method is now a manual namespace-scope declaration inventory rather than a name-prefix heuristic, and the `Impl` artifact is disclosed as deliberate conservatism (private types included, not an export parser) rather than extractor noise. That removes the systematic-underreporting concern.
+
+**Re-audited the other six lists against the supplied interfaces — all exhaustive:**
+- `ClusteringModule`: no namespace functions (both exports are classes); reexports `ClusteringTypes` + `GeometryAvailability`. ✓
+- `ClusteringTypes`: `ToString` (2 overloads), `MakeKMeansPropertyRefs`. ✓
+- `MeshPrimitiveView`: none; `AnyEnabled` is a member. ✓
+- `ProgressivePoissonGpuBackend`: 13 declared, 13 listed, plus `kProgressivePoissonGpuGroupSize`. ✓
+- `ParameterizationConfig` / `ProgressivePoissonConfig`: 5 functions + 3 constants each, including those inside the nested `extern "C++"` blocks. ✓
+- `SceneInteractionModule`: 1, now present. ✓
+
+**Standing findings unchanged:** `ToString` overload resolution is safe (both call sites take `GeometryPresentationSlotSemantic`/`SourceKind`, exact retained overloads in `Runtime.GeometryPresentation`; the removed `ClusteringBackend`/`KMeansRunStatus` overloads are non-viable on distinct scoped enums). `GeometryAvailability` is directly imported at the retained line, so all three reexport chains are redundant. Diff is six `-` lines in the import block only, no `+` lines.
+
+**Non-blocking, settled by the producer compile:** types from removed modules that survive as members of retained-module structs (`EditorPrimitiveViewCommandSurface`'s possible `MeshPrimitiveViewSettings`, `GetAvailableEditorKMeansDomains`'s return type) stay *reachable* through their owning module's own import, which is sufficient for member access and assignment in C++20 — and holds only because no such name is spelled in the TU, which the zero-hit search establishes.
+
+Approval is on the source review. The Clang-23 producer/native/ASan/UBSan/Vulkan gates are not presumed passing; a failure there reopens this.
+
+Root closure: initial review is preserved in initial-review.txt. It caught a real omission in the evidence inventory: individually exported BuildPrimitiveSelectionRenderSnapshot was absent from the prefix heuristic. Full namespace-function declarations were manually enumerated, that name has zero matches in complete Models.cpp/four headers, and type inventory is explicitly conservative including private names. Independent follow-up review resolves the blocker; production source was unchanged throughout. All named gates now pass:235focusednative,4636fullCPUplus expectedskip,202ASan,202UBSan and Vulkanruntimecompile. Exact six-line deletion, all remaining bytes and876other productionfiles unchanged. Imports66to60; actual moduleclosure171to161 with MeshPrimitiveView still transitive. Retained GeometryPresentation overloads and direct GeometryAvailability/processing/selection owners satisfy uses. No timing,GPUexecution or fullsanitizersuite claim.

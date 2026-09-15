@@ -12720,5 +12720,5 @@ tree:
     - tasks/done/RUNTIME-260-workspace-model-graphics-imports.md
     - tasks/evidence/RUNTIME-260/seal.yaml
     - tasks/evidence/RUNTIME-260/structural-counts.json
-    - tasks/backlog/runtime/RUNTIME-261-workspace-model-runtime-imports.md
+    - tasks/done/RUNTIME-261-workspace-model-runtime-imports.md
     status: resolved

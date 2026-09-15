@@ -1,0 +1,28 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "VCPKG_FORCE_SYSTEM_BINARIES=1",
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-vulkan",
+    "--target",
+    "ExtrinsicRuntime",
+    "-j2"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 cmake --build --preset ci-vulkan --target ExtrinsicRuntime -j2",
+  "cwd": ".",
+  "duration_ms": 25910,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T04:33:17Z",
+  "label": "vulkan-runtime-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T04:32:51Z",
+  "stderr_path": "tasks/evidence/RUNTIME-261/commands/vulkan-runtime-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-261/commands/vulkan-runtime-build.stdout.log",
+  "stdout_sha256": "1ed9b26e76550daee1c325b6f9e63e1f0a09535819748261b0ca56a618408494",
+  "task_id": "RUNTIME-261"
+}

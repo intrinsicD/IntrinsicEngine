@@ -1,0 +1,25 @@
+**BLOCKER (1) — audit's export enumeration for `Runtime.SceneInteractionModule` is incomplete, so the name search that justifies removal #6 is unsound.**
+
+The supplied interface declares an exported free function:
+
+```cpp
+export RuntimeSceneInteractionRenderSnapshot BuildPrimitiveSelectionRenderSnapshot(
+    const ECS::Scene::Registry&, const SelectionController&, WorldHandle);
+```
+
+but `candidate_exports["...SceneInteractionModule.cppm"].namespace_functions` is `[]`, and `exact_name_hits` for that module is `{}`. `BuildPrimitiveSelectionRenderSnapshot` was therefore never searched in `Models.cpp` or the four headers. Unlike the `ToString` case, this name has no retained alternate owner in the retained import set, so a single call site would be a hard break.
+
+Corroborating signal that the extractor is not keying on `export`: it lists `Impl` under `declared_types` for the same module, which is a private nested `struct Impl;` inside `SceneInteractionModule`, never exported. The same extraction defect that invented `Impl` is what dropped the free function, so the omission is systematic, not a one-off — the other six candidates' `namespace_functions` lists cannot be assumed exhaustive either, though for the five `export namespace` files the block form makes under-reporting less likely.
+
+**To clear:** re-run the exact-name search over the full `Models.cpp` body plus the four recursive headers for `BuildPrimitiveSelectionRenderSnapshot` (zero hits required), and re-extract exports by `export` keyword rather than by whatever heuristic produced `Impl`. If zero hits, removal #6 is clean.
+
+**Verified from supplied code, no blockers:**
+
+- **`ToString` shared-name resolution is correct.** Both call sites (`ToString(slot.Semantic)`, `ToString(slot.SourceKind)`) take `GeometryPresentationSlotSemantic` / `GeometryPresentationSourceKind`, whose `ToString` overloads are declared in the retained `Runtime.GeometryPresentation`. The removed `ClusteringTypes` overloads take `ClusteringBackend` / `KMeansRunStatus` — distinct scoped enums with no implicit conversion, so they were never viable candidates. Dropping them cannot change overload resolution or make it ambiguous.
+- **`GeometryAvailability` reexport paths are genuinely redundant.** It is directly imported at line 66; the `ClusteringModule → ClusteringTypes → GeometryAvailability` and both `*Config → GeometryAvailability` `export import` chains supply nothing additional for `GeometryPropertyRef`, `GeometryElementDomain`, `Geometry::PropertyValueKind`.
+- **Non-exported imports of the removed modules are not a loss vector.** `ProgressivePoissonGpuBackend`'s `Graphics.GpuTransfer` / `RHI.*` and `SceneInteractionModule`'s `RenderExtraction` / `PrimitiveSelectionRefinement` are plain `import`, never visible in `Models.cpp` through them; the two the file needs are directly imported.
+- **Diff shape matches the claim:** exactly six `-` lines, all in the import block, no `+` lines, no header or interface edits.
+
+**One note, not blocking:** `model.KMeansDomains = GetAvailableEditorKMeansDomains(...)` is owned by the retained `GeometryProcessingOperations`. If its return type originates in `ClusteringTypes`, the type stays *reachable* (not visible) through that module's own import, which suffices for an unnamed assignment — but this only holds because no `ClusteringTypes` name is spelled at the call site. The producer compile will settle it.
+
+**Verdict: BLOCKED pending the `BuildPrimitiveSelectionRenderSnapshot` search.** Everything else in the audit checks out against the supplied source; the full Clang-23 producer/native/ASan/UBSan/Vulkan gates remain outstanding and are not presumed passing.

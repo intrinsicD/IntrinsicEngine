@@ -1,0 +1,200 @@
+{
+  "hash_provenance": "pre-change source at6d5ad8f3a; recursive headers stay unchanged",
+  "files_sha256": {
+    "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp": "3700bd0d5b99806f4452d89be20a26341bc561c0eb485a003a17f36fa5258224",
+    "src/runtime/Editor/internal/Runtime.EditorFeatures.Internal.hpp": "d50ff6000032cc34a795775c09e6e574989812a472f81cfed13c2ece05bf38e5",
+    "src/runtime/Editor/internal/Runtime.EditorGeometryHelpers.hpp": "28ea111a6c4804dfd716c63f2e39c57e3e59987b71c466510c73bbe1a9449947",
+    "src/runtime/Editor/internal/Runtime.EditorFeatureCommands.Internal.hpp": "e9212d20569b30349c127e98b81662276f323626c7ac9dfdf6400d8161b18c99",
+    "src/runtime/Editor/internal/Runtime.EditorFeatureProperties.Internal.hpp": "eb7a0803e598c47ad8894c54b8767cdfdebef2779707986772f614e2125dd788"
+  },
+  "candidate_interface_sha256": {
+    "src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm": "16a6d76279787d247c37e4b5e1933c8a8cb2d019645974fedaad531f86c356eb",
+    "src/runtime/Modules/Clustering/Runtime.ClusteringTypes.cppm": "2a11a0a6a16fdf659bbe31491d1190282cff8dba9f732102d6dc4f4b17437108",
+    "src/runtime/GeometryIntegration/Runtime.MeshPrimitiveView.cppm": "95a6585392ac5a7d80f8cc51d06374bcfdfe2a8fb359f63f3d88496f83da87de",
+    "src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cppm": "897593cab0833eec856953151446376873a22b5195f5b44fbdd2862ced413182",
+    "src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cppm": "9103fd286ac666c8fbb02a4cb806c53869662b91193e4032a50d9db97eaca3fc",
+    "src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm": "9b1bbf948150fc8678869057a044b1be2523d72c06f8244e4ed2439fb1acc7ca",
+    "src/runtime/Scene/Runtime.SceneInteractionModule.cppm": "10ab94a40434d644335d4303704567db7df037e6781cc713e0746a721b28bb5b"
+  },
+  "name_search_scope": "Full Models.cpp and all four recursive private headers, import declarations excluded",
+  "candidate_exports": {
+    "src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm": {
+      "declared_constants": [],
+      "namespace_functions": [],
+      "reexports": [
+        "Extrinsic.Runtime.ClusteringTypes",
+        "Extrinsic.Runtime.GeometryAvailability"
+      ],
+      "all_declared_types_including_private": [
+        "ClusteringGpuState",
+        "ClusteringModule",
+        "ClusteringService"
+      ]
+    },
+    "src/runtime/Modules/Clustering/Runtime.ClusteringTypes.cppm": {
+      "declared_constants": [],
+      "namespace_functions": [
+        "ToString",
+        "MakeKMeansPropertyRefs"
+      ],
+      "reexports": [
+        "Extrinsic.Runtime.GeometryAvailability"
+      ],
+      "all_declared_types_including_private": [
+        "ClusterLabelsChanged",
+        "ClusteringBackend",
+        "ClusteringModuleStats",
+        "KMeansInitialization",
+        "KMeansParameters",
+        "KMeansPropertyRefs",
+        "KMeansRunCompleted",
+        "KMeansRunStatus",
+        "RunKMeans"
+      ]
+    },
+    "src/runtime/GeometryIntegration/Runtime.MeshPrimitiveView.cppm": {
+      "declared_constants": [],
+      "namespace_functions": [],
+      "reexports": [],
+      "all_declared_types_including_private": [
+        "MeshPrimitiveViewSettings",
+        "MeshVertexViewRenderMode"
+      ]
+    },
+    "src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cppm": {
+      "declared_constants": [
+        "kProgressivePoissonGpuGroupSize"
+      ],
+      "namespace_functions": [
+        "DebugNameForProgressivePoissonGpuStatus",
+        "DebugNameForProgressivePoissonGpuPassKind",
+        "DebugNameForProgressivePoissonGpuBufferRole",
+        "ComputeProgressivePoissonGpuDispatchPlan",
+        "BuildProgressivePoissonGpuStateBufferDesc",
+        "BuildProgressivePoissonGpuWorkBufferDesc",
+        "BuildProgressivePoissonBuildCellsPipelineDesc",
+        "BuildProgressivePoissonAcceptPhasePipelineDesc",
+        "ResolveProgressivePoissonGpuRequest",
+        "BuildProgressivePoissonGpuStateRecord",
+        "RecordProgressivePoissonGpuPasses",
+        "RecordProgressivePoissonGpuExecution",
+        "CompareProgressivePoissonGpuOutputToReference"
+      ],
+      "reexports": [],
+      "all_declared_types_including_private": [
+        "ProgressivePoissonGpuBufferLayout",
+        "ProgressivePoissonGpuBufferRole",
+        "ProgressivePoissonGpuBufferSpan",
+        "ProgressivePoissonGpuConfig",
+        "ProgressivePoissonGpuDispatchDesc",
+        "ProgressivePoissonGpuDispatchPlan",
+        "ProgressivePoissonGpuExecutionDesc",
+        "ProgressivePoissonGpuExecutionResources",
+        "ProgressivePoissonGpuExecutionResult",
+        "ProgressivePoissonGpuLevelPlan",
+        "ProgressivePoissonGpuParityDesc",
+        "ProgressivePoissonGpuParityDiagnostics",
+        "ProgressivePoissonGpuPassKind",
+        "ProgressivePoissonGpuPassPushConstants",
+        "ProgressivePoissonGpuPipelineSet",
+        "ProgressivePoissonGpuPlanDesc",
+        "ProgressivePoissonGpuReadbackResult",
+        "ProgressivePoissonGpuRecordDesc",
+        "ProgressivePoissonGpuRecordResult",
+        "ProgressivePoissonGpuReferenceView",
+        "ProgressivePoissonGpuResolveDesc",
+        "ProgressivePoissonGpuResolveResult",
+        "ProgressivePoissonGpuResourceSet",
+        "ProgressivePoissonGpuResultReadback",
+        "ProgressivePoissonGpuStateBufferRecord",
+        "ProgressivePoissonGpuStatus"
+      ]
+    },
+    "src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cppm": {
+      "declared_constants": [
+        "kParameterizationConfigSectionName",
+        "kParameterizationConfigSectionSchemaId",
+        "kParameterizationConfigSectionSchemaVersion"
+      ],
+      "namespace_functions": [
+        "SerializeParameterizationConfig",
+        "ValidateParameterizationConfigSection",
+        "GetParameterizationConfig",
+        "SetParameterizationConfig",
+        "MakeParameterizationConfigSectionRegistration"
+      ],
+      "reexports": [
+        "Extrinsic.Runtime.GeometryAvailability"
+      ],
+      "all_declared_types_including_private": [
+        "ParameterizationBffBoundaryMode",
+        "ParameterizationBffConfig",
+        "ParameterizationBoundaryPolicy",
+        "ParameterizationConfig",
+        "ParameterizationHarmonicConfig",
+        "ParameterizationLscmConfig",
+        "ParameterizationStrategyKind",
+        "ParameterizationUvBackgroundMode",
+        "ParameterizationUvConfig",
+        "ParameterizationUvRenderMode",
+        "ParameterizationViewConfig"
+      ]
+    },
+    "src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm": {
+      "declared_constants": [
+        "kProgressivePoissonConfigSectionName",
+        "kProgressivePoissonConfigSectionSchemaId",
+        "kProgressivePoissonConfigSectionSchemaVersion"
+      ],
+      "namespace_functions": [
+        "SerializeProgressivePoissonPlaygroundConfig",
+        "ValidateProgressivePoissonConfigSection",
+        "GetProgressivePoissonPlaygroundConfig",
+        "SetProgressivePoissonPlaygroundConfig",
+        "MakeProgressivePoissonConfigSectionRegistration"
+      ],
+      "reexports": [
+        "Extrinsic.Runtime.GeometryAvailability"
+      ],
+      "all_declared_types_including_private": [
+        "ProgressivePoissonPlaygroundBackend",
+        "ProgressivePoissonPlaygroundChannel",
+        "ProgressivePoissonPlaygroundConfig"
+      ]
+    },
+    "src/runtime/Scene/Runtime.SceneInteractionModule.cppm": {
+      "declared_constants": [],
+      "namespace_functions": [
+        "BuildPrimitiveSelectionRenderSnapshot"
+      ],
+      "reexports": [],
+      "all_declared_types_including_private": [
+        "Impl",
+        "SceneInteractionModule"
+      ]
+    }
+  },
+  "exact_name_hits": {
+    "src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm": {},
+    "src/runtime/Modules/Clustering/Runtime.ClusteringTypes.cppm": {
+      "ToString": 2
+    },
+    "src/runtime/GeometryIntegration/Runtime.MeshPrimitiveView.cppm": {},
+    "src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cppm": {},
+    "src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cppm": {},
+    "src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm": {},
+    "src/runtime/Scene/Runtime.SceneInteractionModule.cppm": {}
+  },
+  "shared_name_resolution": "Both ToString call arguments are GeometryPresentationSlotSemantic/SourceKind with retained exact Runtime.GeometryPresentation overloads. ClusteringBackend/KMeansRunStatus are distinct scoped enums; no implicit conversion makes the removed overloads viable.",
+  "retained_reexports": "GeometryAvailability is directly imported; ClusteringModule -> ClusteringTypes -> GeometryAvailability and both config -> GeometryAvailability paths are redundant for those names.",
+  "retained_owners": "GeometryProcessingOperations owns GetAvailableEditorKMeansDomains; PrimitiveSelectionRefinement owns PrimitiveSelectionResult. AssetWorkflowModule and SceneDocumentModule supply required event records in private bindings. RenderExtraction and PointCloudConsolidationModule stay pinned.",
+  "limits": "Actual producer compilation and map required; deleted direct imports may remain transitive. No namespace operator exported by candidates; member assignments are not free operators. No body, header, sibling or public-interface edits.",
+  "function_enumeration": "Manual namespace-scope declaration inventory from fixed candidate interfaces, including both export-namespace blocks and the individually exported SceneInteraction function. Replaces the incomplete prefix heuristic. Overloaded ToString appears once by name; both overload parameter types are checked separately.",
+  "type_inventory_scope": "Conservative all-declared-type name inventory, including private nested Impl; not represented as exported types or a C++ export parser.",
+  "corrected_omission": {
+    "function": "BuildPrimitiveSelectionRenderSnapshot",
+    "matches_in_complete_source_and_four_headers": 0,
+    "reason": "Initial name-prefix enumeration omitted the individually exported function. Fixed inventory and exact-name search; production source was already correct."
+  },
+  "post_change_source_sha256": "05733f0d9aa62a55fd8a539f7e41cbce985743e5beb2e72d164bfaef1a98cbed"
+}

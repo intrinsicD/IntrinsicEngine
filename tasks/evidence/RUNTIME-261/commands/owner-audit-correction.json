@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "/tmp/intrinsic-overnight-20260915/runtime261/correct_audit.py"
+  ],
+  "command_display": "python3 /tmp/intrinsic-overnight-20260915/runtime261/correct_audit.py",
+  "cwd": ".",
+  "duration_ms": 110,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T04:31:19Z",
+  "label": "owner-audit-correction",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T04:31:18Z",
+  "stderr_path": "tasks/evidence/RUNTIME-261/commands/owner-audit-correction.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-261/commands/owner-audit-correction.stdout.log",
+  "stdout_sha256": "c9f27f94947aa787f2440b44c8b18c4cef10e39d3701378f07a09bb0e3e274f3",
+  "task_id": "RUNTIME-261"
+}

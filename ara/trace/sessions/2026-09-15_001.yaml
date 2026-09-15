@@ -237,7 +237,7 @@ ai_actions:
   - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
   - tasks/done/RUNTIME-259-workspace-model-unused-imports.md
   - tasks/done/RUNTIME-260-workspace-model-graphics-imports.md
-  - tasks/backlog/runtime/RUNTIME-261-workspace-model-runtime-imports.md
+  - tasks/done/RUNTIME-261-workspace-model-runtime-imports.md
 claims_touched: []
 key_context:
 - turn: 1
