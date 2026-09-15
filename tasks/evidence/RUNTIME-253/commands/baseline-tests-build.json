@@ -1,0 +1,28 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "VCPKG_FORCE_SYSTEM_BINARIES=1",
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicSandboxEditorIntegrationTests",
+    "-j2"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 cmake --build --preset ci --target IntrinsicSandboxEditorIntegrationTests -j2",
+  "cwd": ".",
+  "duration_ms": 7197,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T00:12:59Z",
+  "label": "baseline-tests-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T00:12:52Z",
+  "stderr_path": "tasks/evidence/RUNTIME-253/commands/baseline-tests-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-253/commands/baseline-tests-build.stdout.log",
+  "stdout_sha256": "0259fd7dda97ea03481f4a26928ede4ad4a2f8ad4ba5e9e3dbf5bec433af0de8",
+  "task_id": "RUNTIME-253"
+}

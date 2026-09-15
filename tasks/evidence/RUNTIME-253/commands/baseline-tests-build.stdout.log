@@ -1,0 +1,9 @@
+[0/2] Re-checking globbed directories...
+[1/8] Scanning /home/alex/Documents/IntrinsicEngine/build/ci/generated/deps/tinygltf_impl.cpp for CXX dependencies
+[2/8] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.SandboxConfigSections.cpp for CXX dependencies
+[3/8] Generating CXX dyndep file CMakeFiles/tinygltf.dir/CXX.dd
+[4/8] Generating CXX dyndep file tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/CXX.dd
+[5/8] Building CXX object CMakeFiles/tinygltf.dir/generated/deps/tinygltf_impl.cpp.o
+[6/8] Linking CXX static library lib/libtinygltf.a
+[7/8] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxConfigSections.cpp.o
+[8/8] Linking CXX executable bin/IntrinsicSandboxEditorIntegrationTests

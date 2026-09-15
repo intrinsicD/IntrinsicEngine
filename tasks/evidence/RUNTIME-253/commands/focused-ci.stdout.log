@@ -1,0 +1,38 @@
+[0/2] Re-checking globbed directories...
+[1/7] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp for CXX dependencies
+[2/7] Generating CXX dyndep file src/runtime/CMakeFiles/ExtrinsicRuntime.dir/CXX.dd
+[3/7] Generating CXX dyndep file src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/CXX.dd
+[4/7] Generating CXX dyndep file tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/CXX.dd
+[5/7] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp.o
+[6/7] Linking CXX static library lib/libExtrinsicRuntime.a
+[7/7] Linking CXX executable bin/IntrinsicSandboxEditorIntegrationTests
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start 1422: SandboxConfigSections.BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
+ 1/10 Test #1422: SandboxConfigSections.BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun .............   Passed    0.06 sec
+      Start 1423: SandboxConfigSections.PhysicsSourcesProduceIdenticalValidatedState
+ 2/10 Test #1423: SandboxConfigSections.PhysicsSourcesProduceIdenticalValidatedState .....................   Passed    0.13 sec
+      Start 1424: SandboxConfigSections.PointCloudConsolidationSourcesProduceIdenticalValidatedState
+ 3/10 Test #1424: SandboxConfigSections.PointCloudConsolidationSourcesProduceIdenticalValidatedState .....   Passed    0.14 sec
+      Start 1425: SandboxConfigSections.CurvatureSegmentationSourcesProduceIdenticalValidatedState
+ 4/10 Test #1425: SandboxConfigSections.CurvatureSegmentationSourcesProduceIdenticalValidatedState .......   Passed    0.35 sec
+      Start 1426: SandboxConfigSections.CurvatureSegmentationDefaultsAndInvalidRangesFailClosed
+ 5/10 Test #1426: SandboxConfigSections.CurvatureSegmentationDefaultsAndInvalidRangesFailClosed ..........   Passed    0.05 sec
+      Start 1427: SandboxConfigSections.CurvatureBindingsRoundTripAndRejectAliasing
+ 6/10 Test #1427: SandboxConfigSections.CurvatureBindingsRoundTripAndRejectAliasing ......................   Passed    0.06 sec
+      Start 1428: SandboxConfigSections.AllFeatureFamilySectionsCoexistAndDecodeIndependently
+ 7/10 Test #1428: SandboxConfigSections.AllFeatureFamilySectionsCoexistAndDecodeIndependently ............   Passed    0.01 sec
+      Start 1429: SandboxConfigSections.FeatureSectionRegistrationsCarryFreshSchemaIdentityDefaults
+ 8/10 Test #1429: SandboxConfigSections.FeatureSectionRegistrationsCarryFreshSchemaIdentityDefaults ......   Passed    0.00 sec
+      Start 1430: SandboxConfigSections.FeatureSectionGetAcceptsOnlyValidMatchingSchemaSections
+ 9/10 Test #1430: SandboxConfigSections.FeatureSectionGetAcceptsOnlyValidMatchingSchemaSections ..........   Passed    0.00 sec
+      Start 1431: SandboxConfigSections.FeatureSectionSetStoresRawPayloadAndPreservesUnrelatedSections
+10/10 Test #1431: SandboxConfigSections.FeatureSectionSetStoresRawPayloadAndPreservesUnrelatedSections ...   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 10
+
+Label Time Summary:
+integration    =   0.79 sec*proc (10 tests)
+runtime        =   0.79 sec*proc (10 tests)
+
+Total Test time (real) =   0.96 sec

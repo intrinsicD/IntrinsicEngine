@@ -1,0 +1,35 @@
+[0/2] Re-checking globbed directories...
+[1/4] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.SandboxConfigSections.cpp for CXX dependencies
+[2/4] Generating CXX dyndep file tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/CXX.dd
+[3/4] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxConfigSections.cpp.o
+[4/4] Linking CXX executable bin/IntrinsicSandboxEditorIntegrationTests
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start 1422: SandboxConfigSections.BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
+ 1/10 Test #1422: SandboxConfigSections.BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun .............   Passed    0.06 sec
+      Start 1423: SandboxConfigSections.PhysicsSourcesProduceIdenticalValidatedState
+ 2/10 Test #1423: SandboxConfigSections.PhysicsSourcesProduceIdenticalValidatedState .....................   Passed    0.14 sec
+      Start 1424: SandboxConfigSections.PointCloudConsolidationSourcesProduceIdenticalValidatedState
+ 3/10 Test #1424: SandboxConfigSections.PointCloudConsolidationSourcesProduceIdenticalValidatedState .....   Passed    0.13 sec
+      Start 1425: SandboxConfigSections.CurvatureSegmentationSourcesProduceIdenticalValidatedState
+ 4/10 Test #1425: SandboxConfigSections.CurvatureSegmentationSourcesProduceIdenticalValidatedState .......   Passed    0.32 sec
+      Start 1426: SandboxConfigSections.CurvatureSegmentationDefaultsAndInvalidRangesFailClosed
+ 5/10 Test #1426: SandboxConfigSections.CurvatureSegmentationDefaultsAndInvalidRangesFailClosed ..........   Passed    0.05 sec
+      Start 1427: SandboxConfigSections.CurvatureBindingsRoundTripAndRejectAliasing
+ 6/10 Test #1427: SandboxConfigSections.CurvatureBindingsRoundTripAndRejectAliasing ......................   Passed    0.05 sec
+      Start 1428: SandboxConfigSections.AllFeatureFamilySectionsCoexistAndDecodeIndependently
+ 7/10 Test #1428: SandboxConfigSections.AllFeatureFamilySectionsCoexistAndDecodeIndependently ............   Passed    0.01 sec
+      Start 1429: SandboxConfigSections.FeatureSectionRegistrationsCarryFreshSchemaIdentityDefaults
+ 8/10 Test #1429: SandboxConfigSections.FeatureSectionRegistrationsCarryFreshSchemaIdentityDefaults ......   Passed    0.00 sec
+      Start 1430: SandboxConfigSections.FeatureSectionGetAcceptsOnlyValidMatchingSchemaSections
+ 9/10 Test #1430: SandboxConfigSections.FeatureSectionGetAcceptsOnlyValidMatchingSchemaSections ..........   Passed    0.00 sec
+      Start 1431: SandboxConfigSections.FeatureSectionSetStoresRawPayloadAndPreservesUnrelatedSections
+10/10 Test #1431: SandboxConfigSections.FeatureSectionSetStoresRawPayloadAndPreservesUnrelatedSections ...   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 10
+
+Label Time Summary:
+integration    =   0.76 sec*proc (10 tests)
+runtime        =   0.76 sec*proc (10 tests)
+
+Total Test time (real) =   1.57 sec

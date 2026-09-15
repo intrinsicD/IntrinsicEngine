@@ -63,6 +63,27 @@ contract_review: "Reviewed the full catalog; this task diagnoses an intermittent
 - The captured recurrence establishes the failed timer assertion, not its
   root cause. Another passing run does not resolve this defect.
 
+## Recurrence — 2026-09-15
+
+RUNTIME-253's complete CPU gate reproduced the exact assertion at line 298:
+`LastEndFrameMicros` was 11 and `LastEditorCallbackMicros` was 12. Every draw-list
+assertion passed. The full failing receipt and output remain in
+`tasks/evidence/RUNTIME-253/commands/full-cpu.json` and its bound stdout log.
+No ImGui adapter/test source was changed by that config-helper refactor.
+
+Current source supplies a stronger diagnosis: `BuildEditorFrame()` measures the
+callback before returning; `EndFrame()` starts its own timer afterward. Commit
+`2785191443` (2026-07-19, editor UI module extraction) split those phases while
+retaining the old containment assertion. Thus callback time is outside the
+measured EndFrame interval. `LastImGuiRenderMicros` and `LastDrawDataCopyMicros`
+remain genuinely nested in EndFrame and their containment assertions stay valid.
+A separate scoped repair must replace the invalid cross-phase assertion with
+phase-lifecycle coverage, keep draw-list and genuine nested-phase checks, and
+provide a deterministic discriminator. Another passing complete run does not
+close this bug. Claude independently confirmed the source/history diagnosis
+and recommended exact counter/reset/unchanged-snapshot checks across
+BeginFrame, BuildEditorFrame and EndFrame; no production fix is part of RUNTIME-253.
+
 ## Required changes
 
 - [ ] Retain the captured `12 vs 13` timer failure and reduce it to a

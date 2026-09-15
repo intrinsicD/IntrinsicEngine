@@ -1,0 +1,36 @@
+## Verdict: APPROVE
+
+No blocking findings. Approval covers the diff as shown; the pending native + ASan/UBSan runs are the only remaining gate (see "Compile-linkage risk" below, which is the one thing a build would resolve rather than review).
+
+## What I checked
+
+**Schema/default/validator pairings (15 call sites)** — every triple is family-consistent:
+
+| Family | Name/SchemaId/Version prefix | Default serializer | Validator |
+|---|---|---|---|
+| Clustering | `kClusteringConfigSection*` | `SerializeClusteringConfig(ClusteringConfig{})` | `ValidateClusteringConfigSection` |
+| CurvatureSegmentation | `kCurvatureSegmentationConfigSection*` | `SerializeCurvatureSegmentationConfig(...)` | `ValidateCurvatureSegmentationConfigSection` |
+| ProgressivePoisson | `kProgressivePoissonConfigSection*` | `SerializeProgressivePoissonPlaygroundConfig(...)` | `ValidateProgressivePoissonConfigSection` |
+| Parameterization | `kParameterizationConfigSection*` | `SerializeParameterizationConfig(...)` | `ValidateParameterizationConfigSection` |
+| PointCloudConsolidation | `kPointCloudConsolidationConfigSection*` | `SerializePointCloudConsolidationConfig(...)` | `ValidatePointCloudConsolidationConfigSection` |
+
+No cross-wiring, including the `ProgressivePoisson` / `...PlaygroundConfig` naming asymmetry, which is carried over faithfully. Each `Set` uses the same triple with `Serialize*(value)`; each registration uses the same triple with the default-constructed value.
+
+**Gate semantics.** `FindValidatedCanonicalPayload` reproduces the original branch exactly: null section, `SchemaId` mismatch, or `SchemaVersion` mismatch → `nullopt`, *before* the default is serialized (same as the original, where serialization was an argument to the post-check `validate` call). Only `EngineConfigState::Valid` decodes; `FallbackApplied` and every other state return `nullopt`. Validator argument order `(document, reference, diagnosticSubject)` matches all five original call sites.
+
+**Lifetimes.** `referencePayloadJson` is a named local that outlives the `validate` call — strictly safer than the original full-expression temporary. `std::move(validated.CanonicalPayloadJson)` moves from a non-const local into the returned `optional`; `validated`'s remaining fields were already discarded at the same point before. Callers hold the `optional` in a named `const` local and dereference it for `Decode*`, so no dangling across the call. In test 3, `section` is not used after `AppSections.clear()`.
+
+**Move/callback behavior.** `MakeSectionRegistration(..., EngineConfigSectionChangedCallback&& onChanged)` binds the caller's `std::move(onChanged)` with zero moves, then performs exactly one move into `.OnChanged` — previously one move. No extra copy, requirement "move the callback once" satisfied. Aggregate designated-initializer order (`DefaultSection`, `Validate`, `OnChanged`; `Name`, `SchemaId`, `SchemaVersion`, `PayloadJson`) matches the originals, so declaration order is unchanged and field-order-dependent init is preserved. `defaultPayloadJson` is by-value-then-moved, so defaults are freshly serialized per call — no caching introduced.
+
+**Lambda/function-pointer linkage.** All five default serializers are captureless lambdas returning `std::string`, converting to `std::string (*)()`; no `std::function` is constructed per `Get`, as required. Validators are passed as plain function pointers, exactly the decay that already happened at `.Validate = ValidateXSection`.
+
+**Tests.** The four additions do guard the refactor's actual risk surface: cross-family independence plus erase-one-family isolation (catches a mis-wired name/decoder), registration triple + byte-equal default payload per family (catches a mis-wired schema id/version/serializer), the three `Get` gates and explicit `FallbackApplied && Usable()` rejection (catches accepting fallback), and raw `Set` with sortedness + unrelated-section preservation and repeated upsert. New includes (`<algorithm>`, `<cstddef>`, `<vector>`) cover `is_sorted` / `size_t` / `erase_if`.
+
+## Optional notes (non-blocking)
+
+1. **Compile-linkage risk, resolved only by the build.** The single thing review cannot settle is whether every `Validate*ConfigSection` declaration matches `SectionValidatorFn` exactly (`std::string_view` ×3, returning `EngineConfigSectionValidationResult`). A `const std::string&` parameter anywhere would be a hard error, not a silent behavior change — so the pending native build is a sufficient check. `noexcept` on any validator would still convert fine.
+2. **Registration freshness isn't directly asserted.** Test 2 builds each registration once, so "fresh defaults on every call" is inferred from the source rather than tested. A second call compared against the first (or mutating one and re-calling) would pin the forbidden "default caching" change.
+3. **No test drives a non-empty `OnChanged` through the new rvalue-ref path**; test 2 only asserts the empty callback stays empty. Existing config/editor callback coverage presumably carries this, but the move path itself is newly shared.
+4. **Owner-route wording.** "Set preserves raw values for validation" reads ambiguously; "Set stores the raw serialized payload without validating" states the contract directly. Also consider noting that the three mechanisms are TU-local, so a future family reuses them by being added to this TU — as written, a reader could take them for callable shared helpers.
+5. **Brace style drift.** Two refactored `Get`s use braceless `if (!payload.has_value()) return std::nullopt;` while three use braces. This mirrors the pre-existing variance, so it's a wash, but the shared shape now makes it visible.
+Root closure notes: source and C++ tests are unchanged after this review. The native build resolves all function-pointer conversion concerns. The existing BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun passes non-empty callbacks through all five Make*Registration functions via Sandbox::CreateSandboxConfigSectionRegistry and checks callback counts; additional callback-copy tests would be redundant. Fresh default serialization is evident in each unchanged default expression and is not cached. Owner-route wording was clarified as suggested. Actual completed source count is 2701 lines, not the provisional 2710 in the review prompt.

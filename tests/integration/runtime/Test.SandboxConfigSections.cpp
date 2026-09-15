@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -8,6 +10,7 @@
 #include <string_view>
 #include <system_error>
 #include <utility>
+#include <vector>
 
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
@@ -782,4 +785,287 @@ TEST(SandboxConfigSections, CurvatureBindingsRoundTripAndRejectAliasing)
     ASSERT_TRUE(noScalarLabels->Properties);
     EXPECT_FALSE(noScalarLabels->Properties->OutputScalarLabels);
 
+}
+
+TEST(SandboxConfigSections,
+     AllFeatureFamilySectionsCoexistAndDecodeIndependently)
+{
+    CoreConfig::EngineConfig config{};
+
+    Runtime::ClusteringConfig clustering{};
+    clustering.Parameters.ClusterCount = 9u;
+    Runtime::SetClusteringConfig(config, clustering);
+
+    Runtime::CurvatureSegmentationConfig curvatureSegmentation{};
+    curvatureSegmentation.SelectionMode =
+        Runtime::CurvatureSegmentationSelectionMode::FixedCount;
+    curvatureSegmentation.FixedComponentCount = 11u;
+    Runtime::SetCurvatureSegmentationConfig(config, curvatureSegmentation);
+
+    Runtime::ProgressivePoissonPlaygroundConfig progressivePoisson{};
+    progressivePoisson.Channel =
+        Runtime::ProgressivePoissonPlaygroundChannel::Rank;
+    Runtime::SetProgressivePoissonPlaygroundConfig(config, progressivePoisson);
+
+    Runtime::ParameterizationConfig parameterization{};
+    parameterization.View.BackgroundMode =
+        Runtime::ParameterizationUvBackgroundMode::TexelDensity;
+    Runtime::SetParameterizationConfig(config, parameterization);
+
+    Runtime::PointCloudConsolidationConfig pointCloudConsolidation{};
+    pointCloudConsolidation.Strategy =
+        Runtime::PointCloudConsolidationStrategy::Clop;
+    Runtime::SetPointCloudConsolidationConfig(config, pointCloudConsolidation);
+
+    ASSERT_EQ(config.AppSections.size(), 5u);
+    EXPECT_EQ(config.AppSections[0].Name,
+              Runtime::kClusteringConfigSectionName);
+    EXPECT_EQ(config.AppSections[1].Name,
+              Runtime::kCurvatureSegmentationConfigSectionName);
+    EXPECT_EQ(config.AppSections[2].Name,
+              Runtime::kParameterizationConfigSectionName);
+    EXPECT_EQ(config.AppSections[3].Name,
+              Runtime::kPointCloudConsolidationConfigSectionName);
+    EXPECT_EQ(config.AppSections[4].Name,
+              Runtime::kProgressivePoissonConfigSectionName);
+
+    const auto decodedClustering = Runtime::GetClusteringConfig(config);
+    ASSERT_TRUE(decodedClustering.has_value());
+    EXPECT_EQ(decodedClustering->Parameters.ClusterCount, 9u);
+
+    const auto decodedCurvatureSegmentation =
+        Runtime::GetCurvatureSegmentationConfig(config);
+    ASSERT_TRUE(decodedCurvatureSegmentation.has_value());
+    EXPECT_EQ(decodedCurvatureSegmentation->FixedComponentCount, 11u);
+
+    const auto decodedProgressivePoisson =
+        Runtime::GetProgressivePoissonPlaygroundConfig(config);
+    ASSERT_TRUE(decodedProgressivePoisson.has_value());
+    EXPECT_EQ(decodedProgressivePoisson->Channel,
+              Runtime::ProgressivePoissonPlaygroundChannel::Rank);
+
+    const auto decodedParameterization =
+        Runtime::GetParameterizationConfig(config);
+    ASSERT_TRUE(decodedParameterization.has_value());
+    EXPECT_EQ(decodedParameterization->View.BackgroundMode,
+              Runtime::ParameterizationUvBackgroundMode::TexelDensity);
+
+    const auto decodedPointCloudConsolidation =
+        Runtime::GetPointCloudConsolidationConfig(config);
+    ASSERT_TRUE(decodedPointCloudConsolidation.has_value());
+    EXPECT_EQ(decodedPointCloudConsolidation->Strategy,
+              Runtime::PointCloudConsolidationStrategy::Clop);
+
+    // Dropping one family's section must not disturb the other four decoders.
+    ASSERT_EQ(config.AppSections.front().Name,
+              Runtime::kClusteringConfigSectionName);
+    config.AppSections.erase(config.AppSections.begin());
+    EXPECT_FALSE(Runtime::GetClusteringConfig(config).has_value());
+    EXPECT_TRUE(Runtime::GetCurvatureSegmentationConfig(config).has_value());
+    EXPECT_TRUE(
+        Runtime::GetProgressivePoissonPlaygroundConfig(config).has_value());
+    EXPECT_TRUE(Runtime::GetParameterizationConfig(config).has_value());
+    EXPECT_TRUE(
+        Runtime::GetPointCloudConsolidationConfig(config).has_value());
+}
+
+TEST(SandboxConfigSections,
+     FeatureSectionRegistrationsCarryFreshSchemaIdentityDefaults)
+{
+    const std::array<CoreConfig::EngineConfigSectionRegistration, 5u>
+        registrations{
+            Runtime::MakeClusteringConfigSectionRegistration(),
+            Runtime::MakeCurvatureSegmentationConfigSectionRegistration(),
+            Runtime::MakeProgressivePoissonConfigSectionRegistration(),
+            Runtime::MakeParameterizationConfigSectionRegistration(),
+            Runtime::MakePointCloudConsolidationConfigSectionRegistration(),
+        };
+    const std::array<std::string_view, 5u> expectedNames{
+        Runtime::kClusteringConfigSectionName,
+        Runtime::kCurvatureSegmentationConfigSectionName,
+        Runtime::kProgressivePoissonConfigSectionName,
+        Runtime::kParameterizationConfigSectionName,
+        Runtime::kPointCloudConsolidationConfigSectionName,
+    };
+    const std::array<std::string_view, 5u> expectedSchemaIds{
+        Runtime::kClusteringConfigSectionSchemaId,
+        Runtime::kCurvatureSegmentationConfigSectionSchemaId,
+        Runtime::kProgressivePoissonConfigSectionSchemaId,
+        Runtime::kParameterizationConfigSectionSchemaId,
+        Runtime::kPointCloudConsolidationConfigSectionSchemaId,
+    };
+    const std::array<std::uint32_t, 5u> expectedSchemaVersions{
+        Runtime::kClusteringConfigSectionSchemaVersion,
+        Runtime::kCurvatureSegmentationConfigSectionSchemaVersion,
+        Runtime::kProgressivePoissonConfigSectionSchemaVersion,
+        Runtime::kParameterizationConfigSectionSchemaVersion,
+        Runtime::kPointCloudConsolidationConfigSectionSchemaVersion,
+    };
+    const std::array<std::string, 5u> expectedPayloads{
+        Runtime::SerializeClusteringConfig(Runtime::ClusteringConfig{}),
+        Runtime::SerializeCurvatureSegmentationConfig(
+            Runtime::CurvatureSegmentationConfig{}),
+        Runtime::SerializeProgressivePoissonPlaygroundConfig(
+            Runtime::ProgressivePoissonPlaygroundConfig{}),
+        Runtime::SerializeParameterizationConfig(
+            Runtime::ParameterizationConfig{}),
+        Runtime::SerializePointCloudConsolidationConfig(
+            Runtime::PointCloudConsolidationConfig{}),
+    };
+
+    CoreConfig::EngineConfig config{};
+    for (std::size_t index = 0; index < registrations.size(); ++index)
+    {
+        const CoreConfig::EngineConfigSectionRegistration& registration =
+            registrations[index];
+        EXPECT_EQ(registration.DefaultSection.Name, expectedNames[index]);
+        EXPECT_EQ(registration.DefaultSection.SchemaId,
+                  expectedSchemaIds[index]);
+        EXPECT_EQ(registration.DefaultSection.SchemaVersion,
+                  expectedSchemaVersions[index]);
+        EXPECT_EQ(registration.DefaultSection.PayloadJson,
+                  expectedPayloads[index]);
+        EXPECT_TRUE(static_cast<bool>(registration.Validate));
+        EXPECT_FALSE(static_cast<bool>(registration.OnChanged));
+        CoreConfig::UpsertEngineConfigSection(
+            config.AppSections,
+            registration.DefaultSection);
+    }
+
+    ASSERT_EQ(config.AppSections.size(), 5u);
+    const auto defaultClustering = Runtime::GetClusteringConfig(config);
+    ASSERT_TRUE(defaultClustering.has_value());
+    EXPECT_EQ(Runtime::SerializeClusteringConfig(*defaultClustering),
+              expectedPayloads[0]);
+    const auto defaultCurvatureSegmentation =
+        Runtime::GetCurvatureSegmentationConfig(config);
+    ASSERT_TRUE(defaultCurvatureSegmentation.has_value());
+    EXPECT_EQ(Runtime::SerializeCurvatureSegmentationConfig(
+                  *defaultCurvatureSegmentation),
+              expectedPayloads[1]);
+    const auto defaultProgressivePoisson =
+        Runtime::GetProgressivePoissonPlaygroundConfig(config);
+    ASSERT_TRUE(defaultProgressivePoisson.has_value());
+    EXPECT_EQ(Runtime::SerializeProgressivePoissonPlaygroundConfig(
+                  *defaultProgressivePoisson),
+              expectedPayloads[2]);
+    const auto defaultParameterization =
+        Runtime::GetParameterizationConfig(config);
+    ASSERT_TRUE(defaultParameterization.has_value());
+    EXPECT_EQ(
+        Runtime::SerializeParameterizationConfig(*defaultParameterization),
+        expectedPayloads[3]);
+    const auto defaultPointCloudConsolidation =
+        Runtime::GetPointCloudConsolidationConfig(config);
+    ASSERT_TRUE(defaultPointCloudConsolidation.has_value());
+    EXPECT_EQ(Runtime::SerializePointCloudConsolidationConfig(
+                  *defaultPointCloudConsolidation),
+              expectedPayloads[4]);
+}
+
+TEST(SandboxConfigSections,
+     FeatureSectionGetAcceptsOnlyValidMatchingSchemaSections)
+{
+    CoreConfig::EngineConfig config{};
+    Runtime::ClusteringConfig clustering{};
+    clustering.Parameters.ClusterCount = 12u;
+    Runtime::SetClusteringConfig(config, clustering);
+    ASSERT_TRUE(Runtime::GetClusteringConfig(config).has_value());
+
+    CoreConfig::EngineConfigSection* const section =
+        CoreConfig::FindEngineConfigSection(
+            config.AppSections,
+            Runtime::kClusteringConfigSectionName);
+    ASSERT_NE(section, nullptr);
+
+    section->SchemaId = "intrinsic.runtime.sandbox.clustering.foreign";
+    EXPECT_FALSE(Runtime::GetClusteringConfig(config).has_value());
+    section->SchemaId = std::string{Runtime::kClusteringConfigSectionSchemaId};
+
+    section->SchemaVersion =
+        Runtime::kClusteringConfigSectionSchemaVersion + 1u;
+    EXPECT_FALSE(Runtime::GetClusteringConfig(config).has_value());
+    section->SchemaVersion = Runtime::kClusteringConfigSectionSchemaVersion;
+    EXPECT_TRUE(Runtime::GetClusteringConfig(config).has_value());
+
+    // A usable fallback is still not a decodable section for Get.
+    constexpr std::string_view unknownFieldPayload =
+        R"({"cluster_count":12,"totally_unknown_field":true})";
+    section->PayloadJson = std::string{unknownFieldPayload};
+    const CoreConfig::EngineConfigSectionValidationResult clusteringFallback =
+        Runtime::ValidateClusteringConfigSection(
+            unknownFieldPayload,
+            Runtime::SerializeClusteringConfig(Runtime::ClusteringConfig{}),
+            Runtime::kClusteringConfigSectionName);
+    EXPECT_EQ(clusteringFallback.State,
+              CoreConfig::EngineConfigState::FallbackApplied);
+    EXPECT_TRUE(clusteringFallback.Usable());
+    EXPECT_FALSE(Runtime::GetClusteringConfig(config).has_value());
+
+    config.AppSections.clear();
+    EXPECT_FALSE(Runtime::GetClusteringConfig(config).has_value());
+}
+
+TEST(SandboxConfigSections,
+     FeatureSectionSetStoresRawPayloadAndPreservesUnrelatedSections)
+{
+    CoreConfig::EngineConfig config{};
+    Runtime::SetParameterizationConfig(
+        config,
+        Runtime::ParameterizationConfig{});
+    Runtime::SetProgressivePoissonPlaygroundConfig(
+        config,
+        Runtime::ProgressivePoissonPlaygroundConfig{});
+
+    const auto unrelatedSections = config.AppSections;
+
+    // Set never validates: the raw serializer output is stored verbatim even
+    // when the payload cannot survive the Get validation gate.
+    Runtime::ClusteringConfig unusable{};
+    unusable.Parameters.ClusterCount = 0u;
+    Runtime::SetClusteringConfig(config, unusable);
+    ASSERT_EQ(config.AppSections.size(), 3u);
+    const CoreConfig::EngineConfigSection* stored =
+        CoreConfig::FindEngineConfigSection(
+            config.AppSections,
+            Runtime::kClusteringConfigSectionName);
+    ASSERT_NE(stored, nullptr);
+    EXPECT_EQ(stored->PayloadJson,
+              Runtime::SerializeClusteringConfig(unusable));
+    EXPECT_EQ(stored->SchemaId, Runtime::kClusteringConfigSectionSchemaId);
+    EXPECT_EQ(stored->SchemaVersion,
+              Runtime::kClusteringConfigSectionSchemaVersion);
+    EXPECT_FALSE(Runtime::GetClusteringConfig(config).has_value());
+
+    Runtime::ClusteringConfig repaired{};
+    repaired.Parameters.ClusterCount = 6u;
+    repaired.Parameters.MaxIterations = 44u;
+    Runtime::SetClusteringConfig(config, repaired);
+
+    ASSERT_EQ(config.AppSections.size(), 3u);
+    EXPECT_TRUE(std::is_sorted(
+        config.AppSections.begin(),
+        config.AppSections.end(),
+        [](const CoreConfig::EngineConfigSection& lhs,
+           const CoreConfig::EngineConfigSection& rhs)
+        {
+            return lhs.Name < rhs.Name;
+        }));
+    stored = CoreConfig::FindEngineConfigSection(
+        config.AppSections,
+        Runtime::kClusteringConfigSectionName);
+    ASSERT_NE(stored, nullptr);
+    EXPECT_EQ(stored->PayloadJson,
+              Runtime::SerializeClusteringConfig(repaired));
+    auto preserved = config.AppSections;
+    std::erase_if(preserved, [](const auto& section)
+    {
+        return section.Name == Runtime::kClusteringConfigSectionName;
+    });
+    EXPECT_EQ(preserved, unrelatedSections);
+
+    const auto decoded = Runtime::GetClusteringConfig(config);
+    ASSERT_TRUE(decoded.has_value());
+    EXPECT_EQ(decoded->Parameters.ClusterCount, 6u);
+    EXPECT_EQ(decoded->Parameters.MaxIterations, 44u);
 }

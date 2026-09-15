@@ -1,0 +1,125 @@
+schema_version: 1
+task_id: RUNTIME-253
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-15T00:27:57Z'
+claim_eligible: false
+source:
+  base_ref: 3ab89b073
+  base_revision: 3ab89b0735a68d2e44af9ed846c3a2ee6d5bfbce
+  head_revision: 3ab89b0735a68d2e44af9ed846c3a2ee6d5bfbce
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+    sha256: dd46c9aaf4fac329e6129533b0001f51fd2f9788367d49e2aa3b1522abd81b43
+  - path: tasks/SESSION-BRIEF.md
+    sha256: f0c709f5013c3770d3cd2e2d60fde4890d5ca26e3d08f8222c32b242842e15f7
+  - path: tasks/backlog/bugs/BUG-134-imgui-adapter-panel-draw-list-intermittent.md
+    sha256: 8a6e364bb83877a6838b0eb360a7a35d0bd022b04892adaec44c8aac3f0d3e17
+  - path: tasks/backlog/runtime/RUNTIME-253-feature-config-section-reuse.md
+    sha256: null
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 4ecd4d7d155d2fa6a89751b9e930fd457cd2595e6843abe93ca5a4f6a6cd258a
+  - path: tasks/done/RUNTIME-253-feature-config-section-reuse.md
+    sha256: fe40e078ff829b548873a5397b6f977a964d7bf8cdffdbcaa11ceb2a6bab4fc5
+  - path: tests/integration/runtime/Test.SandboxConfigSections.cpp
+    sha256: 648023ab1ba210de0e88d37b0856487b05704470d414dff2474d96ba3e2d5bf8
+  - path: tools/agents/skills/intrinsicengine-reuse/references/owner-routes.md
+    sha256: 3c95c3d8ec73a31e1c6afb34f94e9d810814a20dcc7ed98cf6ccdc9e5e7b24f8
+  content_digest: 95faea498f834762c6f15913fdcc67ef356f1a7475d1db36ec4c12d2bcbfcc68
+touched:
+  paths:
+  - src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/BUG-134-imgui-adapter-panel-draw-list-intermittent.md
+  - tasks/backlog/runtime/RUNTIME-253-feature-config-section-reuse.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-253-feature-config-section-reuse.md
+  - tests/integration/runtime/Test.SandboxConfigSections.cpp
+  - tools/agents/skills/intrinsicengine-reuse/references/owner-routes.md
+  layers:
+  - runtime
+  modules:
+  - Extrinsic.Runtime.ClusteringConfig
+  - Extrinsic.Runtime.CurvatureSegmentationConfig
+  - Extrinsic.Runtime.ParameterizationConfig
+  - Extrinsic.Runtime.PointCloudConsolidationConfig
+  - Extrinsic.Runtime.ProgressivePoissonConfig
+extension_seam: Three TU-local helpers for five feature config families in the existing compiled codec
+  owner
+future_change_plan: Reuse these mechanisms only for families sharing exact section semantics; keep typed
+  decoders and schemas feature-owned
+acceptance:
+- criterion: Three local helpers, fifteen callers, no added production file/interface.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/RUNTIME-253/structural-counts.json
+  - tasks/evidence/RUNTIME-253/source-review.txt
+  reason: null
+- criterion: Public config behavior preserved under baseline and final regressions.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/RUNTIME-253/commands/baseline-regressions.json
+  - tasks/evidence/RUNTIME-253/commands/focused-ci.json
+  - tasks/evidence/RUNTIME-253/commands/full-cpu-final.json
+  - tasks/evidence/RUNTIME-253/commands/focused-asan.json
+  - tasks/evidence/RUNTIME-253/commands/focused-ubsan.json
+  reason: null
+- criterion: Verified, reviewed, locally committed and retired with sealed evidence.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/RUNTIME-253/commands/final-structural.json
+  - tasks/evidence/RUNTIME-253/source-review.txt
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-253/commands/baseline-regressions.json
+- receipt: tasks/evidence/RUNTIME-253/commands/baseline-tests-build.json
+- receipt: tasks/evidence/RUNTIME-253/commands/configure-ci.json
+- receipt: tasks/evidence/RUNTIME-253/commands/final-structural.json
+- receipt: tasks/evidence/RUNTIME-253/commands/focused-asan.json
+- receipt: tasks/evidence/RUNTIME-253/commands/focused-ci.json
+- receipt: tasks/evidence/RUNTIME-253/commands/focused-ubsan.json
+- receipt: tasks/evidence/RUNTIME-253/commands/full-cpu-final.json
+- receipt: tasks/evidence/RUNTIME-253/commands/retirement-preflight.json
+- receipt: tasks/evidence/RUNTIME-253/commands/structural.json
+changed_public_contracts:
+- No public signature, module, schema, validation, default or callback contract changed
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/RUNTIME-253-feature-config-section-reuse.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: true
+residual_risks:
+- Initial full CPU failed on known BUG-134, preserved as historical evidence; final unchanged selector
+  passes. BUG-134 remains open. Focused sanitizer coverage only; no GPU change or timing claim.
+skipped_checks: []
+artifacts:
+- path: tasks/evidence/RUNTIME-253/structural-counts.json
+  sha256: bf37c569b7f72639326ae963024dd5aedfcb44cd705396dca6f9f4d8cd0651f6
+  kind: file
+- path: tasks/evidence/RUNTIME-253/source-review.txt
+  sha256: 177ee99897b4d5754b93137c03e0452addc1e7e1d1189b0f1345262400b8e105
+  kind: file
+- path: tasks/evidence/RUNTIME-253/commands/full-cpu.json
+  sha256: d3ba9f17a0d8cd5d99d33c6476b733e11c210b23eefb9285adf597ccdead8014
+  kind: file
+- path: tasks/evidence/RUNTIME-253/commands/full-cpu.stdout.log
+  sha256: ccfe522aad0260cd002b57bfab6924c5b36108405b056af61b0651301b1ea52a
+  kind: file
+- path: tasks/evidence/RUNTIME-253/commands/full-cpu.stderr.log
+  sha256: 18e00877dc1071c85cd4f479d451bebeef8309022e46cf8c63b0bed5151984a4
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true

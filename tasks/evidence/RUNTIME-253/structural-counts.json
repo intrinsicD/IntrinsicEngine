@@ -1,0 +1,10 @@
+{
+  "baseline_revision": "3ab89b073",
+  "source": "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp",
+  "before_lines": 2721,
+  "after_lines": 2701,
+  "preserved_parser_serializer_validator_and_request_block_sha256": "29c0d433eeb9601932063344e95340f86c4c14de67252b797ba33c51a59e3180",
+  "includes_and_imports_unchanged": true,
+  "public_signatures_unchanged": true,
+  "timing_claim": false
+}

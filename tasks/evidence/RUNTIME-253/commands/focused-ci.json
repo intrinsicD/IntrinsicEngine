@@ -1,0 +1,24 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "VCPKG_FORCE_SYSTEM_BINARIES=1",
+    "bash",
+    "-c",
+    "set -e; cmake --build --preset ci --target IntrinsicSandboxEditorIntegrationTests -j2; ctest --test-dir build/ci --output-on-failure -R \"^SandboxConfigSections\\.\" --no-tests=error --timeout 60"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 bash -c 'set -e; cmake --build --preset ci --target IntrinsicSandboxEditorIntegrationTests -j2; ctest --test-dir build/ci --output-on-failure -R \"^SandboxConfigSections\\.\" --no-tests=error --timeout 60'",
+  "cwd": ".",
+  "duration_ms": 8718,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T00:17:31Z",
+  "label": "focused-ci",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T00:17:22Z",
+  "stderr_path": "tasks/evidence/RUNTIME-253/commands/focused-ci.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-253/commands/focused-ci.stdout.log",
+  "stdout_sha256": "e4fa06ab9590cfd2ef85e79383b733eaa42fa10f0646415ee442388a01509334",
+  "task_id": "RUNTIME-253"
+}

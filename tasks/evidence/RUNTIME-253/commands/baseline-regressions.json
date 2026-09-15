@@ -1,0 +1,24 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "VCPKG_FORCE_SYSTEM_BINARIES=1",
+    "bash",
+    "-c",
+    "set -e; cmake --build --preset ci --target IntrinsicSandboxEditorIntegrationTests -j2; ctest --test-dir build/ci --output-on-failure -R \"^SandboxConfigSections\\.\" --no-tests=error --timeout 60"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 bash -c 'set -e; cmake --build --preset ci --target IntrinsicSandboxEditorIntegrationTests -j2; ctest --test-dir build/ci --output-on-failure -R \"^SandboxConfigSections\\.\" --no-tests=error --timeout 60'",
+  "cwd": ".",
+  "duration_ms": 8821,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T00:13:29Z",
+  "label": "baseline-regressions",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T00:13:20Z",
+  "stderr_path": "tasks/evidence/RUNTIME-253/commands/baseline-regressions.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-253/commands/baseline-regressions.stdout.log",
+  "stdout_sha256": "74564bed593222c8427c1aa588b5fc90a407396102c8e25ad0969f4f071b9481",
+  "task_id": "RUNTIME-253"
+}

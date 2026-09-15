@@ -1,0 +1,24 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "VCPKG_FORCE_SYSTEM_BINARIES=1",
+    "bash",
+    "-c",
+    "set -e; cmake --build --preset ci-ubsan --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests -j2; ctest --test-dir build/ci-ubsan --output-on-failure -R \"^(SandboxConfigSections|PointCloudConsolidationConfig|RuntimeConfigControl|SandboxEditorUi|SandboxEditorPresentation|EditorCompilationLocality|ConfigCompilationLocality)\" --no-tests=error --timeout 60 --parallel 1"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 bash -c 'set -e; cmake --build --preset ci-ubsan --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests -j2; ctest --test-dir build/ci-ubsan --output-on-failure -R \"^(SandboxConfigSections|PointCloudConsolidationConfig|RuntimeConfigControl|SandboxEditorUi|SandboxEditorPresentation|EditorCompilationLocality|ConfigCompilationLocality)\" --no-tests=error --timeout 60 --parallel 1'",
+  "cwd": ".",
+  "duration_ms": 31683,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T00:22:57Z",
+  "label": "focused-ubsan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T00:22:25Z",
+  "stderr_path": "tasks/evidence/RUNTIME-253/commands/focused-ubsan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-253/commands/focused-ubsan.stdout.log",
+  "stdout_sha256": "89d0e8419a61e34e74f9fe4251e4850dd188c013f00d796a8b7ad55b6d177ba5",
+  "task_id": "RUNTIME-253"
+}

@@ -1,0 +1,24 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "VCPKG_FORCE_SYSTEM_BINARIES=1",
+    "bash",
+    "-c",
+    "set -e; cmake --build --preset ci --target IntrinsicTests -j4; ctest --test-dir build/ci --output-on-failure -LE \"gpu|vulkan|slow|flaky-quarantine\" --no-tests=error --timeout 60"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 bash -c 'set -e; cmake --build --preset ci --target IntrinsicTests -j4; ctest --test-dir build/ci --output-on-failure -LE \"gpu|vulkan|slow|flaky-quarantine\" --no-tests=error --timeout 60'",
+  "cwd": ".",
+  "duration_ms": 141151,
+  "exit_code": 8,
+  "finished_at": "2026-09-15T00:20:24Z",
+  "label": "full-cpu",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T00:18:03Z",
+  "stderr_path": "tasks/evidence/RUNTIME-253/commands/full-cpu.stderr.log",
+  "stderr_sha256": "18e00877dc1071c85cd4f479d451bebeef8309022e46cf8c63b0bed5151984a4",
+  "stdout_path": "tasks/evidence/RUNTIME-253/commands/full-cpu.stdout.log",
+  "stdout_sha256": "ccfe522aad0260cd002b57bfab6924c5b36108405b056af61b0651301b1ea52a",
+  "task_id": "RUNTIME-253"
+}

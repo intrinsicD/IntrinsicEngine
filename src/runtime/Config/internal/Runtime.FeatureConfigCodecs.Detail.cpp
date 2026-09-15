@@ -30,6 +30,73 @@ namespace Extrinsic::Runtime
     {
         using json = nlohmann::json;
 
+        // All five family validators are free functions, so the shared lookup
+        // takes a raw function pointer instead of building a std::function.
+        using SectionValidatorFn =
+            Core::Config::EngineConfigSectionValidationResult (*)(
+                std::string_view documentPayloadJson,
+                std::string_view referencePayloadJson,
+                std::string_view diagnosticSubject);
+
+        [[nodiscard]] Core::Config::EngineConfigSection MakeConfigSection(
+            const std::string_view name,
+            const std::string_view schemaId,
+            const std::uint32_t schemaVersion,
+            std::string payloadJson)
+        {
+            return Core::Config::EngineConfigSection{
+                .Name = std::string{name},
+                .SchemaId = std::string{schemaId},
+                .SchemaVersion = schemaVersion,
+                .PayloadJson = std::move(payloadJson),
+            };
+        }
+
+        [[nodiscard]] std::optional<std::string> FindValidatedCanonicalPayload(
+            const Core::Config::EngineConfig& config,
+            const std::string_view name,
+            const std::string_view schemaId,
+            const std::uint32_t schemaVersion,
+            std::string (*serializeDefault)(),
+            const SectionValidatorFn validate)
+        {
+            const Core::Config::EngineConfigSection* section =
+                Core::Config::FindEngineConfigSection(config.AppSections, name);
+            if (section == nullptr || section->SchemaId != schemaId ||
+                section->SchemaVersion != schemaVersion)
+            {
+                return std::nullopt;
+            }
+            const std::string referencePayloadJson = serializeDefault();
+            Core::Config::EngineConfigSectionValidationResult validated =
+                validate(section->PayloadJson, referencePayloadJson, name);
+            if (validated.State != Core::Config::EngineConfigState::Valid)
+            {
+                return std::nullopt;
+            }
+            return std::move(validated.CanonicalPayloadJson);
+        }
+
+        [[nodiscard]] Core::Config::EngineConfigSectionRegistration
+        MakeSectionRegistration(
+            const std::string_view name,
+            const std::string_view schemaId,
+            const std::uint32_t schemaVersion,
+            std::string defaultPayloadJson,
+            const SectionValidatorFn validate,
+            Core::Config::EngineConfigSectionChangedCallback&& onChanged)
+        {
+            return Core::Config::EngineConfigSectionRegistration{
+                .DefaultSection = MakeConfigSection(
+                    name,
+                    schemaId,
+                    schemaVersion,
+                    std::move(defaultPayloadJson)),
+                .Validate = validate,
+                .OnChanged = std::move(onChanged),
+            };
+        }
+
         struct ValidationContext
         {
             Core::Config::EngineConfigSectionValidationResult* Result{};
@@ -2399,24 +2466,17 @@ namespace Extrinsic::Runtime
     std::optional<ClusteringConfig> GetClusteringConfig(
         const Core::Config::EngineConfig& config)
     {
-        const Core::Config::EngineConfigSection* section =
-            Core::Config::FindEngineConfigSection(
-                config.AppSections,
-                kClusteringConfigSectionName);
-        if (section == nullptr ||
-            section->SchemaId != kClusteringConfigSectionSchemaId ||
-            section->SchemaVersion !=
-                kClusteringConfigSectionSchemaVersion)
-        {
+        const std::optional<std::string> payload =
+            FindValidatedCanonicalPayload(
+                config,
+                kClusteringConfigSectionName,
+                kClusteringConfigSectionSchemaId,
+                kClusteringConfigSectionSchemaVersion,
+                [] { return SerializeClusteringConfig(ClusteringConfig{}); },
+                ValidateClusteringConfigSection);
+        if (!payload.has_value())
             return std::nullopt;
-        }
-        const auto validated = ValidateClusteringConfigSection(
-            section->PayloadJson,
-            SerializeClusteringConfig(ClusteringConfig{}),
-            kClusteringConfigSectionName);
-        if (validated.State != Core::Config::EngineConfigState::Valid)
-            return std::nullopt;
-        return DecodeClusteringCanonical(validated.CanonicalPayloadJson);
+        return DecodeClusteringCanonical(*payload);
     }
 
     void SetClusteringConfig(
@@ -2425,40 +2485,32 @@ namespace Extrinsic::Runtime
     {
         Core::Config::UpsertEngineConfigSection(
             config.AppSections,
-            Core::Config::EngineConfigSection{
-                .Name = std::string{kClusteringConfigSectionName},
-                .SchemaId = std::string{kClusteringConfigSectionSchemaId},
-                .SchemaVersion = kClusteringConfigSectionSchemaVersion,
-                .PayloadJson = SerializeClusteringConfig(value),
-            });
+            MakeConfigSection(
+                kClusteringConfigSectionName,
+                kClusteringConfigSectionSchemaId,
+                kClusteringConfigSectionSchemaVersion,
+                SerializeClusteringConfig(value)));
     }
 
     std::optional<CurvatureSegmentationConfig>
     GetCurvatureSegmentationConfig(
         const Core::Config::EngineConfig& config)
     {
-        const Core::Config::EngineConfigSection* section =
-            Core::Config::FindEngineConfigSection(
-                config.AppSections,
-                kCurvatureSegmentationConfigSectionName);
-        if (section == nullptr ||
-            section->SchemaId !=
-                kCurvatureSegmentationConfigSectionSchemaId ||
-            section->SchemaVersion !=
-                kCurvatureSegmentationConfigSectionSchemaVersion)
-        {
+        const std::optional<std::string> payload =
+            FindValidatedCanonicalPayload(
+                config,
+                kCurvatureSegmentationConfigSectionName,
+                kCurvatureSegmentationConfigSectionSchemaId,
+                kCurvatureSegmentationConfigSectionSchemaVersion,
+                []
+                {
+                    return SerializeCurvatureSegmentationConfig(
+                        CurvatureSegmentationConfig{});
+                },
+                ValidateCurvatureSegmentationConfigSection);
+        if (!payload.has_value())
             return std::nullopt;
-        }
-        const auto validated =
-            ValidateCurvatureSegmentationConfigSection(
-                section->PayloadJson,
-                SerializeCurvatureSegmentationConfig(
-                    CurvatureSegmentationConfig{}),
-                kCurvatureSegmentationConfigSectionName);
-        if (validated.State != Core::Config::EngineConfigState::Valid)
-            return std::nullopt;
-        return DecodeCurvatureSegmentationCanonical(
-            validated.CanonicalPayloadJson);
+        return DecodeCurvatureSegmentationCanonical(*payload);
     }
 
     void SetCurvatureSegmentationConfig(
@@ -2467,44 +2519,34 @@ namespace Extrinsic::Runtime
     {
         Core::Config::UpsertEngineConfigSection(
             config.AppSections,
-            Core::Config::EngineConfigSection{
-                .Name = std::string{
-                    kCurvatureSegmentationConfigSectionName},
-                .SchemaId = std::string{
-                    kCurvatureSegmentationConfigSectionSchemaId},
-                .SchemaVersion =
-                    kCurvatureSegmentationConfigSectionSchemaVersion,
-                .PayloadJson =
-                    SerializeCurvatureSegmentationConfig(value),
-            });
+            MakeConfigSection(
+                kCurvatureSegmentationConfigSectionName,
+                kCurvatureSegmentationConfigSectionSchemaId,
+                kCurvatureSegmentationConfigSectionSchemaVersion,
+                SerializeCurvatureSegmentationConfig(value)));
     }
 
     std::optional<ProgressivePoissonPlaygroundConfig>
     GetProgressivePoissonPlaygroundConfig(
         const Core::Config::EngineConfig& config)
     {
-        const Core::Config::EngineConfigSection* section =
-            Core::Config::FindEngineConfigSection(
-                config.AppSections,
-                kProgressivePoissonConfigSectionName);
-        if (section == nullptr ||
-            section->SchemaId != kProgressivePoissonConfigSectionSchemaId ||
-            section->SchemaVersion !=
-                kProgressivePoissonConfigSectionSchemaVersion)
+        const std::optional<std::string> payload =
+            FindValidatedCanonicalPayload(
+                config,
+                kProgressivePoissonConfigSectionName,
+                kProgressivePoissonConfigSectionSchemaId,
+                kProgressivePoissonConfigSectionSchemaVersion,
+                []
+                {
+                    return SerializeProgressivePoissonPlaygroundConfig(
+                        ProgressivePoissonPlaygroundConfig{});
+                },
+                ValidateProgressivePoissonConfigSection);
+        if (!payload.has_value())
         {
             return std::nullopt;
         }
-        const auto validated = ValidateProgressivePoissonConfigSection(
-            section->PayloadJson,
-            SerializeProgressivePoissonPlaygroundConfig(
-                ProgressivePoissonPlaygroundConfig{}),
-            kProgressivePoissonConfigSectionName);
-        if (validated.State != Core::Config::EngineConfigState::Valid)
-        {
-            return std::nullopt;
-        }
-        return DecodeProgressivePoissonCanonical(
-            validated.CanonicalPayloadJson);
+        return DecodeProgressivePoissonCanonical(*payload);
     }
 
     void SetProgressivePoissonPlaygroundConfig(
@@ -2513,40 +2555,33 @@ namespace Extrinsic::Runtime
     {
         Core::Config::UpsertEngineConfigSection(
             config.AppSections,
-            Core::Config::EngineConfigSection{
-                .Name = std::string{kProgressivePoissonConfigSectionName},
-                .SchemaId =
-                    std::string{kProgressivePoissonConfigSectionSchemaId},
-                .SchemaVersion =
-                    kProgressivePoissonConfigSectionSchemaVersion,
-                .PayloadJson =
-                    SerializeProgressivePoissonPlaygroundConfig(value),
-            });
+            MakeConfigSection(
+                kProgressivePoissonConfigSectionName,
+                kProgressivePoissonConfigSectionSchemaId,
+                kProgressivePoissonConfigSectionSchemaVersion,
+                SerializeProgressivePoissonPlaygroundConfig(value)));
     }
 
     std::optional<ParameterizationConfig> GetParameterizationConfig(
         const Core::Config::EngineConfig& config)
     {
-        const Core::Config::EngineConfigSection* section =
-            Core::Config::FindEngineConfigSection(
-                config.AppSections,
-                kParameterizationConfigSectionName);
-        if (section == nullptr ||
-            section->SchemaId != kParameterizationConfigSectionSchemaId ||
-            section->SchemaVersion !=
-                kParameterizationConfigSectionSchemaVersion)
+        const std::optional<std::string> payload =
+            FindValidatedCanonicalPayload(
+                config,
+                kParameterizationConfigSectionName,
+                kParameterizationConfigSectionSchemaId,
+                kParameterizationConfigSectionSchemaVersion,
+                []
+                {
+                    return SerializeParameterizationConfig(
+                        ParameterizationConfig{});
+                },
+                ValidateParameterizationConfigSection);
+        if (!payload.has_value())
         {
             return std::nullopt;
         }
-        const auto validated = ValidateParameterizationConfigSection(
-            section->PayloadJson,
-            SerializeParameterizationConfig(ParameterizationConfig{}),
-            kParameterizationConfigSectionName);
-        if (validated.State != Core::Config::EngineConfigState::Valid)
-        {
-            return std::nullopt;
-        }
-        return DecodeParameterizationCanonical(validated.CanonicalPayloadJson);
+        return DecodeParameterizationCanonical(*payload);
     }
 
     void SetParameterizationConfig(
@@ -2555,40 +2590,32 @@ namespace Extrinsic::Runtime
     {
         Core::Config::UpsertEngineConfigSection(
             config.AppSections,
-            Core::Config::EngineConfigSection{
-                .Name = std::string{kParameterizationConfigSectionName},
-                .SchemaId = std::string{kParameterizationConfigSectionSchemaId},
-                .SchemaVersion = kParameterizationConfigSectionSchemaVersion,
-                .PayloadJson = SerializeParameterizationConfig(value),
-            });
+            MakeConfigSection(
+                kParameterizationConfigSectionName,
+                kParameterizationConfigSectionSchemaId,
+                kParameterizationConfigSectionSchemaVersion,
+                SerializeParameterizationConfig(value)));
     }
 
     std::optional<PointCloudConsolidationConfig>
     GetPointCloudConsolidationConfig(
         const Core::Config::EngineConfig& config)
     {
-        const Core::Config::EngineConfigSection* section =
-            Core::Config::FindEngineConfigSection(
-                config.AppSections,
-                kPointCloudConsolidationConfigSectionName);
-        if (section == nullptr ||
-            section->SchemaId !=
-                kPointCloudConsolidationConfigSectionSchemaId ||
-            section->SchemaVersion !=
-                kPointCloudConsolidationConfigSectionSchemaVersion)
-        {
+        const std::optional<std::string> payload =
+            FindValidatedCanonicalPayload(
+                config,
+                kPointCloudConsolidationConfigSectionName,
+                kPointCloudConsolidationConfigSectionSchemaId,
+                kPointCloudConsolidationConfigSectionSchemaVersion,
+                []
+                {
+                    return SerializePointCloudConsolidationConfig(
+                        PointCloudConsolidationConfig{});
+                },
+                ValidatePointCloudConsolidationConfigSection);
+        if (!payload.has_value())
             return std::nullopt;
-        }
-        const auto validated =
-            ValidatePointCloudConsolidationConfigSection(
-                section->PayloadJson,
-                SerializePointCloudConsolidationConfig(
-                    PointCloudConsolidationConfig{}),
-                kPointCloudConsolidationConfigSectionName);
-        if (validated.State != Core::Config::EngineConfigState::Valid)
-            return std::nullopt;
-        return DecodePointCloudConsolidationCanonical(
-            validated.CanonicalPayloadJson);
+        return DecodePointCloudConsolidationCanonical(*payload);
     }
 
     void SetPointCloudConsolidationConfig(
@@ -2597,125 +2624,78 @@ namespace Extrinsic::Runtime
     {
         Core::Config::UpsertEngineConfigSection(
             config.AppSections,
-            Core::Config::EngineConfigSection{
-                .Name = std::string{
-                    kPointCloudConsolidationConfigSectionName},
-                .SchemaId = std::string{
-                    kPointCloudConsolidationConfigSectionSchemaId},
-                .SchemaVersion =
-                    kPointCloudConsolidationConfigSectionSchemaVersion,
-                .PayloadJson =
-                    SerializePointCloudConsolidationConfig(value),
-            });
+            MakeConfigSection(
+                kPointCloudConsolidationConfigSectionName,
+                kPointCloudConsolidationConfigSectionSchemaId,
+                kPointCloudConsolidationConfigSectionSchemaVersion,
+                SerializePointCloudConsolidationConfig(value)));
     }
 
     Core::Config::EngineConfigSectionRegistration
     MakeClusteringConfigSectionRegistration(
         Core::Config::EngineConfigSectionChangedCallback onChanged)
     {
-        return Core::Config::EngineConfigSectionRegistration{
-            .DefaultSection =
-                Core::Config::EngineConfigSection{
-                    .Name = std::string{kClusteringConfigSectionName},
-                    .SchemaId =
-                        std::string{kClusteringConfigSectionSchemaId},
-                    .SchemaVersion =
-                        kClusteringConfigSectionSchemaVersion,
-                    .PayloadJson =
-                        SerializeClusteringConfig(ClusteringConfig{}),
-                },
-            .Validate = ValidateClusteringConfigSection,
-            .OnChanged = std::move(onChanged),
-        };
+        return MakeSectionRegistration(
+            kClusteringConfigSectionName,
+            kClusteringConfigSectionSchemaId,
+            kClusteringConfigSectionSchemaVersion,
+            SerializeClusteringConfig(ClusteringConfig{}),
+            ValidateClusteringConfigSection,
+            std::move(onChanged));
     }
 
     Core::Config::EngineConfigSectionRegistration
     MakeCurvatureSegmentationConfigSectionRegistration(
         Core::Config::EngineConfigSectionChangedCallback onChanged)
     {
-        return Core::Config::EngineConfigSectionRegistration{
-            .DefaultSection =
-                Core::Config::EngineConfigSection{
-                    .Name = std::string{
-                        kCurvatureSegmentationConfigSectionName},
-                    .SchemaId = std::string{
-                        kCurvatureSegmentationConfigSectionSchemaId},
-                    .SchemaVersion =
-                        kCurvatureSegmentationConfigSectionSchemaVersion,
-                    .PayloadJson =
-                        SerializeCurvatureSegmentationConfig(
-                            CurvatureSegmentationConfig{}),
-                },
-            .Validate =
-                ValidateCurvatureSegmentationConfigSection,
-            .OnChanged = std::move(onChanged),
-        };
+        return MakeSectionRegistration(
+            kCurvatureSegmentationConfigSectionName,
+            kCurvatureSegmentationConfigSectionSchemaId,
+            kCurvatureSegmentationConfigSectionSchemaVersion,
+            SerializeCurvatureSegmentationConfig(
+                CurvatureSegmentationConfig{}),
+            ValidateCurvatureSegmentationConfigSection,
+            std::move(onChanged));
     }
 
     Core::Config::EngineConfigSectionRegistration
     MakeProgressivePoissonConfigSectionRegistration(
         Core::Config::EngineConfigSectionChangedCallback onChanged)
     {
-        return Core::Config::EngineConfigSectionRegistration{
-            .DefaultSection =
-                Core::Config::EngineConfigSection{
-                    .Name =
-                        std::string{kProgressivePoissonConfigSectionName},
-                    .SchemaId =
-                        std::string{
-                            kProgressivePoissonConfigSectionSchemaId},
-                    .SchemaVersion =
-                        kProgressivePoissonConfigSectionSchemaVersion,
-                    .PayloadJson =
-                        SerializeProgressivePoissonPlaygroundConfig(
-                            ProgressivePoissonPlaygroundConfig{}),
-                },
-            .Validate = ValidateProgressivePoissonConfigSection,
-            .OnChanged = std::move(onChanged),
-        };
+        return MakeSectionRegistration(
+            kProgressivePoissonConfigSectionName,
+            kProgressivePoissonConfigSectionSchemaId,
+            kProgressivePoissonConfigSectionSchemaVersion,
+            SerializeProgressivePoissonPlaygroundConfig(
+                ProgressivePoissonPlaygroundConfig{}),
+            ValidateProgressivePoissonConfigSection,
+            std::move(onChanged));
     }
 
     Core::Config::EngineConfigSectionRegistration
     MakeParameterizationConfigSectionRegistration(
         Core::Config::EngineConfigSectionChangedCallback onChanged)
     {
-        return Core::Config::EngineConfigSectionRegistration{
-            .DefaultSection =
-                Core::Config::EngineConfigSection{
-                    .Name = std::string{kParameterizationConfigSectionName},
-                    .SchemaId =
-                        std::string{kParameterizationConfigSectionSchemaId},
-                    .SchemaVersion =
-                        kParameterizationConfigSectionSchemaVersion,
-                    .PayloadJson =
-                        SerializeParameterizationConfig(
-                            ParameterizationConfig{}),
-                },
-            .Validate = ValidateParameterizationConfigSection,
-            .OnChanged = std::move(onChanged),
-        };
+        return MakeSectionRegistration(
+            kParameterizationConfigSectionName,
+            kParameterizationConfigSectionSchemaId,
+            kParameterizationConfigSectionSchemaVersion,
+            SerializeParameterizationConfig(ParameterizationConfig{}),
+            ValidateParameterizationConfigSection,
+            std::move(onChanged));
     }
 
     Core::Config::EngineConfigSectionRegistration
     MakePointCloudConsolidationConfigSectionRegistration(
         Core::Config::EngineConfigSectionChangedCallback onChanged)
     {
-        return Core::Config::EngineConfigSectionRegistration{
-            .DefaultSection =
-                Core::Config::EngineConfigSection{
-                    .Name = std::string{
-                        kPointCloudConsolidationConfigSectionName},
-                    .SchemaId = std::string{
-                        kPointCloudConsolidationConfigSectionSchemaId},
-                    .SchemaVersion =
-                        kPointCloudConsolidationConfigSectionSchemaVersion,
-                    .PayloadJson =
-                        SerializePointCloudConsolidationConfig(
-                            PointCloudConsolidationConfig{}),
-                },
-            .Validate =
-                ValidatePointCloudConsolidationConfigSection,
-            .OnChanged = std::move(onChanged),
-        };
+        return MakeSectionRegistration(
+            kPointCloudConsolidationConfigSectionName,
+            kPointCloudConsolidationConfigSectionSchemaId,
+            kPointCloudConsolidationConfigSectionSchemaVersion,
+            SerializePointCloudConsolidationConfig(
+                PointCloudConsolidationConfig{}),
+            ValidatePointCloudConsolidationConfigSection,
+            std::move(onChanged));
     }
 }
