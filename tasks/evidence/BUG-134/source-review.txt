@@ -48,3 +48,5 @@ Nothing was lost: all rendering/byte-accounting assertions are untouched, `Frame
 No unnecessary additions found: every new line either establishes a phase boundary or replaces the deleted inequality. No new API surface, no production change in the final diff.
 
 Root disposition: approve. Production restoration independently checked with exact bytes against HEAD and bound by restored-source.json. Optional test splitting/renaming and alias changes add unrelated churn; retain the existing fixture and assertions. The short phase comment covers the complete snapshot block; no correctness issue. Do not add a LastBeginFrameMicros duration inequality. Final gate results will be bound in report.yaml.
+
+Evidence packaging: the same mutation patch is stored with zero context so empty context lines do not trigger Git trailing-whitespace checks; mutation content is unchanged.

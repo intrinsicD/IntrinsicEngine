@@ -1,33 +1,31 @@
-diff --git a/src/runtime/ImGui/Runtime.ImGuiAdapter.cpp b/src/runtime/ImGui/Runtime.ImGuiAdapter.cpp
-index 8958c02c8..dc4b3e187 100644
 --- a/src/runtime/ImGui/Runtime.ImGuiAdapter.cpp
 +++ b/src/runtime/ImGui/Runtime.ImGuiAdapter.cpp
-@@ -530,13 +530,6 @@ namespace Extrinsic::Runtime
- 
-         m_Diagnostics.LastEditorCallbackMicros = 0u;
-         ImGui::SetCurrentContext(m_Context);
--        if (m_EditorVisible && m_EditorCallback)
--        {
--            const auto callbackBegin = std::chrono::steady_clock::now();
--            m_EditorCallback();
--            m_Diagnostics.LastEditorCallbackMicros = ElapsedMicros(callbackBegin);
--            ++m_Diagnostics.EditorCallbackInvocations;
--        }
-     }
- 
-     void ImGuiAdapter::EndFrame()
-@@ -551,6 +544,14 @@ namespace Extrinsic::Runtime
- 
-         ImGui::SetCurrentContext(m_Context);
- 
-+        if (m_EditorVisible && m_EditorCallback)
-+        {
-+            const auto callbackBegin = std::chrono::steady_clock::now();
-+            m_EditorCallback();
-+            m_Diagnostics.LastEditorCallbackMicros = ElapsedMicros(callbackBegin);
-+            ++m_Diagnostics.EditorCallbackInvocations;
-+        }
+@@ -532,0 +533,14 @@
++    }
 +
-         if (m_EditorVisible)
-         {
-             const ImGuiIO& io = ImGui::GetIO();
++    void ImGuiAdapter::EndFrame()
++    {
++        if (m_Context == nullptr || !m_FrameStarted)
++            return;
++
++        const auto endFrameBegin = std::chrono::steady_clock::now();
++        m_Diagnostics.LastImGuiRenderMicros = 0u;
++        m_Diagnostics.LastDrawDataCopyMicros = 0u;
++        m_Diagnostics.LastEndFrameMicros = 0u;
++
++        ImGui::SetCurrentContext(m_Context);
++
+@@ -540,13 +553,0 @@
+-    }
+-
+-    void ImGuiAdapter::EndFrame()
+-    {
+-        if (m_Context == nullptr || !m_FrameStarted)
+-            return;
+-
+-        const auto endFrameBegin = std::chrono::steady_clock::now();
+-        m_Diagnostics.LastImGuiRenderMicros = 0u;
+-        m_Diagnostics.LastDrawDataCopyMicros = 0u;
+-        m_Diagnostics.LastEndFrameMicros = 0u;
+-
+-        ImGui::SetCurrentContext(m_Context);

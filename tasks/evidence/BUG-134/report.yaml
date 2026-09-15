@@ -103,13 +103,13 @@ residual_risks:
 skipped_checks: []
 artifacts:
 - path: tasks/evidence/BUG-134/source-review.txt
-  sha256: 47edc663284ec38bc96a48223fdd57ec00024889baf96ebbc053d9b21316fdf0
+  sha256: 9c4f4646381bf0bbbd5bfc3c3db7cc4b53336512ebc7c13bcd1d2d342977836a
   kind: file
 - path: tasks/evidence/BUG-134/restored-source.json
   sha256: d5db8a92ba1adf15bd3d92e51595321e80a7023f7be08eba77894d81d9e1ec8f
   kind: file
 - path: tasks/evidence/BUG-134/postpone-callback-mutation.patch
-  sha256: 7ab196821482e8d35c46d205328cfddd132b522f1fc09062fff0b78129d8cc56
+  sha256: 3866016aedb42b55f3db3fd97806b486a004915f8706321e0ca6808deea95ff5
   kind: file
 - path: tasks/evidence/BUG-134/commands/structural.json
   sha256: 76bb215ff3a45dba52715d0845d930ad2408af83024b18d199dc883401431f1c
