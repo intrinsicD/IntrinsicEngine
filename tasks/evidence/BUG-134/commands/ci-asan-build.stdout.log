@@ -1,0 +1,9 @@
+[0/2] Re-checking globbed directories...
+[1/8] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/ImGui/Runtime.ImGuiAdapter.cpp for CXX dependencies
+[2/8] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.ImGuiAdapter.cpp for CXX dependencies
+[3/8] Generating CXX dyndep file src/runtime/CMakeFiles/ExtrinsicRuntime.dir/CXX.dd
+[4/8] Generating CXX dyndep file tests/CMakeFiles/RuntimeContractTestObjs.dir/CXX.dd
+[5/8] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/ImGui/Runtime.ImGuiAdapter.cpp.o
+[6/8] Linking CXX static library lib/libExtrinsicRuntime.a
+[7/8] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.ImGuiAdapter.cpp.o
+[8/8] Linking CXX executable bin/IntrinsicRuntimeContractTests

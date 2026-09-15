@@ -1,0 +1,21 @@
+{
+  "command": [
+    "tools/ci/run_clean_workshop_review.sh",
+    ".",
+    "--strict"
+  ],
+  "command_display": "tools/ci/run_clean_workshop_review.sh . --strict",
+  "cwd": ".",
+  "duration_ms": 2485,
+  "exit_code": 1,
+  "finished_at": "2026-09-15T00:42:28Z",
+  "label": "structural",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T00:42:26Z",
+  "stderr_path": "tasks/evidence/BUG-134/commands/structural.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-134/commands/structural.stdout.log",
+  "stdout_sha256": "753e551511686ab1e7860678f7035dbe805b926efbdc3112d23efd43c970ec12",
+  "task_id": "BUG-134"
+}

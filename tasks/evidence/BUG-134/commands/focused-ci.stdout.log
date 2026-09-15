@@ -1,0 +1,70 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start 437: EditorUiHost.ComposedModulePublishesHostAndRunsFrameContribution
+ 1/30 Test #437: EditorUiHost.ComposedModulePublishesHostAndRunsFrameContribution ...................   Passed    0.04 sec
+      Start 438: EditorUiHost.OmittedModuleLeavesEditorHostUnpublished
+ 2/30 Test #438: EditorUiHost.OmittedModuleLeavesEditorHostUnpublished ..............................   Passed    0.04 sec
+      Start 439: EditorUiHost.VisibilityCommandPreservesRegisteredWindowOpenState
+ 3/30 Test #439: EditorUiHost.VisibilityCommandPreservesRegisteredWindowOpenState ...................   Passed    0.00 sec
+      Start 440: EditorUiHost.FrameContributionMutationIsSafeAndDeterministic
+ 4/30 Test #440: EditorUiHost.FrameContributionMutationIsSafeAndDeterministic .......................   Passed    0.00 sec
+      Start 453: ImGuiAdapter.InitializeProducesZeroListFrameForEmptyWindow
+ 5/30 Test #453: ImGuiAdapter.InitializeProducesZeroListFrameForEmptyWindow .........................   Passed    0.01 sec
+      Start 454: ImGuiAdapter.InitializeRejectsDoubleInitialize
+ 6/30 Test #454: ImGuiAdapter.InitializeRejectsDoubleInitialize .....................................   Passed    0.01 sec
+      Start 455: ImGuiAdapter.InitializeLoadsBundledRobotoAndBuildsLegacyFontAtlas
+ 7/30 Test #455: ImGuiAdapter.InitializeLoadsBundledRobotoAndBuildsLegacyFontAtlas ..................   Passed    0.01 sec
+      Start 456: ImGuiAdapter.HiDpiFontKeepsLogicalMetricsAndUsesRasterizerDensity
+ 8/30 Test #456: ImGuiAdapter.HiDpiFontKeepsLogicalMetricsAndUsesRasterizerDensity ..................   Passed    0.01 sec
+      Start 457: ImGuiAdapter.FontAtlasPayloadIsCopiedOnlyWhenDirty
+ 9/30 Test #457: ImGuiAdapter.FontAtlasPayloadIsCopiedOnlyWhenDirty .................................   Passed    0.01 sec
+      Start 458: ImGuiAdapter.EditorPanelDrawProducesNonEmptyDrawList
+10/30 Test #458: ImGuiAdapter.EditorPanelDrawProducesNonEmptyDrawList ...............................   Passed    0.01 sec
+      Start 459: ImGuiAdapter.ImageDrawPreservesUserTextureBindlessCommand
+11/30 Test #459: ImGuiAdapter.ImageDrawPreservesUserTextureBindlessCommand ..........................   Passed    0.01 sec
+      Start 460: ImGuiAdapter.LargeDrawListPreservesNonZeroVertexOffset
+12/30 Test #460: ImGuiAdapter.LargeDrawListPreservesNonZeroVertexOffset .............................   Passed    0.01 sec
+      Start 461: ImGuiAdapter.NestedChildDrawPreservesFramebufferScissor
+13/30 Test #461: ImGuiAdapter.NestedChildDrawPreservesFramebufferScissor ............................   Passed    0.01 sec
+      Start 462: ImGuiAdapter.ScalesClampsAndRejectsInvalidFramebufferClipRects
+14/30 Test #462: ImGuiAdapter.ScalesClampsAndRejectsInvalidFramebufferClipRects .....................   Passed    0.02 sec
+      Start 463: ImGuiAdapter.EditorCallbackInvokedOncePerFramePair
+15/30 Test #463: ImGuiAdapter.EditorCallbackInvokedOncePerFramePair .................................   Passed    0.01 sec
+      Start 464: ImGuiAdapter.PumpsInputAndResizeReportsFramebufferPixelsWithoutDoubleScaling
+16/30 Test #464: ImGuiAdapter.PumpsInputAndResizeReportsFramebufferPixelsWithoutDoubleScaling .......   Passed    0.01 sec
+      Start 465: ImGuiAdapter.PumpedKeyEventsReachImGuiIoWithModifierChords
+17/30 Test #465: ImGuiAdapter.PumpedKeyEventsReachImGuiIoWithModifierChords .........................   Passed    0.01 sec
+      Start 466: ImGuiAdapter.BackspaceShortensSeededInputTextAndCapturesKeyboard
+18/30 Test #466: ImGuiAdapter.BackspaceShortensSeededInputTextAndCapturesKeyboard ...................   Passed    0.01 sec
+      Start 467: ImGuiAdapter.SnapshotsCaptureStateOncePerCompletedEditorFrame
+19/30 Test #467: ImGuiAdapter.SnapshotsCaptureStateOncePerCompletedEditorFrame ......................   Passed    0.01 sec
+      Start 468: ImGuiAdapter.HiddenEditorClearsStaleCaptureState
+20/30 Test #468: ImGuiAdapter.HiddenEditorClearsStaleCaptureState ...................................   Passed    0.01 sec
+      Start 469: ImGuiAdapter.RebuildForDisplayChangeCyclesOverlayExactlyOnce
+21/30 Test #469: ImGuiAdapter.RebuildForDisplayChangeCyclesOverlayExactlyOnce .......................   Passed    0.01 sec
+      Start 470: ImGuiAdapter.RebuildBeforeInitializeIsUncounted
+22/30 Test #470: ImGuiAdapter.RebuildBeforeInitializeIsUncounted ....................................   Passed    0.00 sec
+      Start 471: ImGuiAdapterEngineWiring.AdapterInitializedAfterEngineInitialize
+23/30 Test #471: ImGuiAdapterEngineWiring.AdapterInitializedAfterEngineInitialize ...................   Passed    0.07 sec
+      Start 472: ImGuiAdapterEngineWiring.RunProducesOneOverlayFramePerEngineFrame
+24/30 Test #472: ImGuiAdapterEngineWiring.RunProducesOneOverlayFramePerEngineFrame ..................   Passed    0.06 sec
+      Start 473: ImGuiAdapterEngineWiring.EditorHookInvokedOncePerFrameAndProducesDrawLists
+25/30 Test #473: ImGuiAdapterEngineWiring.EditorHookInvokedOncePerFrameAndProducesDrawLists .........   Passed    0.06 sec
+      Start 474: ImGuiAdapterEngineWiring.FramePacingDiagnosticsPopulateOnNullBackend
+26/30 Test #474: ImGuiAdapterEngineWiring.FramePacingDiagnosticsPopulateOnNullBackend ...............   Passed    0.04 sec
+      Start 475: ImGuiAdapterEngineWiring.EditorCallbackStaysBoundedAndRenderAdvancesWhileJobRuns
+27/30 Test #475: ImGuiAdapterEngineWiring.EditorCallbackStaysBoundedAndRenderAdvancesWhileJobRuns ...   Passed    0.29 sec
+      Start 476: ImGuiAdapterEngineWiring.UiCaptureSuppressesRuntimeInputConsumers
+28/30 Test #476: ImGuiAdapterEngineWiring.UiCaptureSuppressesRuntimeInputConsumers ..................   Passed    0.05 sec
+      Start 477: ImGuiAdapterEngineWiring.RunNormalizesNativeCloseBeforeFirstFrame
+29/30 Test #477: ImGuiAdapterEngineWiring.RunNormalizesNativeCloseBeforeFirstFrame ..................   Passed    0.06 sec
+      Start 478: ImGuiAdapterEngineWiring.RunNormalizesNativeCloseAfterInteractiveInput
+30/30 Test #478: ImGuiAdapterEngineWiring.RunNormalizesNativeCloseAfterInteractiveInput .............   Passed    0.06 sec
+
+100% tests passed, 0 tests failed out of 30
+
+Label Time Summary:
+contract    =   0.94 sec*proc (30 tests)
+runtime     =   0.94 sec*proc (30 tests)
+
+Total Test time (real) =   1.10 sec

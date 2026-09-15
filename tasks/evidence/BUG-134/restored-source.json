@@ -1,0 +1,6 @@
+{
+  "source": "src/runtime/ImGui/Runtime.ImGuiAdapter.cpp",
+  "original_sha256": "aecea2f7c33ca2bba35b5975044359f4ae16978ee2219610175216e29ea84e8c",
+  "restored_sha256": "aecea2f7c33ca2bba35b5975044359f4ae16978ee2219610175216e29ea84e8c",
+  "matches_head": true
+}

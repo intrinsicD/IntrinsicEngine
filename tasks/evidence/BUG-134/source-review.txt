@@ -1,0 +1,50 @@
+## Verdict: APPROVE (test-only diff; no blockers)
+
+The replacement is sound, and the mutation result is correctly interpreted. Details below.
+
+### Correctness vs. the production phases
+
+Every new assertion is derivable from the posted implementation:
+
+- `BeginFrame` unconditionally sets `LastEditorCallbackMicros = 0u` (before the null-context guard) and touches none of `EditorCallbackInvocations`, `FramesProduced`, `CaptureSnapshots`, `LastImGuiRenderMicros`, `LastDrawDataCopyMicros`, `LastEndFrameMicros` → the whole `afterBegin` block holds by construction.
+- `BuildEditorFrame` only writes `LastEditorCallbackMicros` and `++EditorCallbackInvocations` → the `afterBuild` block (invocations 2, frames/captures still 1, three EndFrame timings unchanged from warm-up) holds by construction.
+- `EndFrame` never writes `LastEditorCallbackMicros` → `afterEnd.LastEditorCallbackMicros == afterBuild.LastEditorCallbackMicros` is an identity on correct code, not a timing claim. This is the right way to express "the callback is already finished when EndFrame starts" without an inequality.
+
+The old `LastEndFrameMicros >= LastEditorCallbackMicros` was indeed invalid after `2785191443`: the two intervals are now disjoint, so the comparison was a coin flip between two unrelated durations — consistent with the captured `11 vs 12` / historical `12 vs 13` failures. Deleting it rather than weakening it is correct.
+
+### Determinism
+
+No clock-value dependence in any new assertion:
+
+- Counter equalities are integer bookkeeping.
+- `afterBegin.LastEditorCallbackMicros == 0u` is an unconditional store.
+- The three retained-timing equalities compare two reads of fields not written by the intervening call.
+- The callback-micros retention is an equality on an untouched field, so it passes even when the callback measures `0` µs (sub-microsecond panel body).
+
+The two preserved `EXPECT_GE(LastEndFrameMicros, ...)` remain valid: `renderBegin`/`copyBegin` both lie inside `[endFrameBegin, end]`, and truncating `duration_cast` to microseconds is monotone, so the nested elapsed values cannot exceed the enclosing one under a monotonic `steady_clock`. No sleeps or bounds added — good.
+
+Snapshot-by-value is required here (the previous `const auto&` aliased live mutable state); taking four value copies is the correct fix, not incidental churn.
+
+### Mutation interpretation
+
+The mutation moved the unchanged callback body from `BuildEditorFrame` into `EndFrame` before the capture snapshot — a faithful re-creation of the pre-split ordering, and the minimal edit that the new assertions are supposed to catch. Both reported failures are the expected ones:
+
+- `afterBuild.EditorCallbackInvocations` 1 vs 2 — this is the clock-independent kill. Your claim that the after-Build counter fails regardless of clock values is correct.
+- `afterEnd.LastEditorCallbackMicros` 7 vs 0 — a genuine second signal, but note it is *sensitivity*-dependent on the clock: had the panel body measured 0 µs under the mutation, this one would have passed silently. That is fine because the counter assertion is unconditional; just don't record this line as an independent guarantee.
+
+Restoration of the original production bytes is asserted by you and is outside a read-only review's reach — I am taking it on report, and the final native/fullCPU/focused sanitizer runs are the remaining gate. Approval is on the diff as posted, conditional on those runs being green and on the production file being byte-identical to `HEAD`.
+
+### Assertion coverage
+
+Nothing was lost: all rendering/byte-accounting assertions are untouched, `FramesProduced`/`EditorCallbackInvocations == 2` still assert end-state, and the new blocks add phase disjointness that the file previously did not cover at all. The `afterBuild` repetition of the three timing equalities is not redundant with `afterBegin` — it is what pins `BuildEditorFrame` as a non-writer of EndFrame timings.
+
+### Optional nits (none gating)
+
+1. **Test scope.** The test is named `EditorPanelDrawProducesNonEmptyDrawList` but now carries the adapter's phase-accounting contract; a failure in phase bookkeeping will be reported as a draw-list failure. A follow-up split into e.g. `ImGuiAdapter.FramePhaseCountersAreDisjoint` (sharing the warm-up setup) would localise blame. I would not expand this diff to do it.
+2. **`const ImGuiAdapterDiagnostics& diag = afterEnd;`** is an alias kept purely to avoid touching the pre-existing assertions. Lifetime is fine. Defensible as diff minimisation; slightly clearer to rename uses to `afterEnd` later.
+3. **Comment placement.** "BeginFrame resets callback timing; EndFrame retains its previous timings until the next completed frame" sits above the `afterWarmup` counter block, which is about neither. Move it above the `afterBegin` block.
+4. **`LastBeginFrameMicros`** is the one phase field with no coverage; an `EXPECT_NE(afterBegin.LastBeginFrameMicros, ...)`-style check would need a timing assumption, so leaving it out is the right call — mentioning only so it is a conscious gap.
+
+No unnecessary additions found: every new line either establishes a phase boundary or replaces the deleted inequality. No new API surface, no production change in the final diff.
+
+Root disposition: approve. Production restoration independently checked with exact bytes against HEAD and bound by restored-source.json. Optional test splitting/renaming and alias changes add unrelated churn; retain the existing fixture and assertions. The short phase comment covers the complete snapshot block; no correctness issue. Do not add a LastBeginFrameMicros duration inequality. Final gate results will be bound in report.yaml.

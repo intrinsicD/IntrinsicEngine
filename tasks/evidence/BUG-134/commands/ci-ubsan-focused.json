@@ -1,0 +1,29 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-ubsan",
+    "--output-on-failure",
+    "-R",
+    "^(ImGuiAdapter|EditorUiHost)",
+    "--no-tests=error",
+    "--timeout",
+    "60",
+    "--parallel",
+    "1"
+  ],
+  "command_display": "ctest --test-dir build/ci-ubsan --output-on-failure -R '^(ImGuiAdapter|EditorUiHost)' --no-tests=error --timeout 60 --parallel 1",
+  "cwd": ".",
+  "duration_ms": 2200,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T00:44:19Z",
+  "label": "ci-ubsan-focused",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T00:44:17Z",
+  "stderr_path": "tasks/evidence/BUG-134/commands/ci-ubsan-focused.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-134/commands/ci-ubsan-focused.stdout.log",
+  "stdout_sha256": "47916b7d57126131805525277343ccdcd24523679cd367834582b890d444bb7a",
+  "task_id": "BUG-134"
+}

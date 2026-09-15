@@ -1,0 +1,28 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "VCPKG_FORCE_SYSTEM_BINARIES=1",
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicRuntimeContractTests",
+    "-j2"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 cmake --build --preset ci --target IntrinsicRuntimeContractTests -j2",
+  "cwd": ".",
+  "duration_ms": 9213,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T00:40:09Z",
+  "label": "mutation-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T00:40:00Z",
+  "stderr_path": "tasks/evidence/BUG-134/commands/mutation-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-134/commands/mutation-build.stdout.log",
+  "stdout_sha256": "4d759f4d60e5f798036fd856a8c54b6db9f75ade681f63aaa24f37f39c998260",
+  "task_id": "BUG-134"
+}

@@ -1,0 +1,46 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+    Start 458: ImGuiAdapter.EditorPanelDrawProducesNonEmptyDrawList
+1/1 Test #458: ImGuiAdapter.EditorPanelDrawProducesNonEmptyDrawList ...***Failed    0.01 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = ImGuiAdapter.EditorPanelDrawProducesNonEmptyDrawList
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from ImGuiAdapter
+[ RUN      ] ImGuiAdapter.EditorPanelDrawProducesNonEmptyDrawList
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.ImGuiAdapter.cpp:327: Failure
+Expected equality of these values:
+  afterBuild.EditorCallbackInvocations
+    Which is: 1
+  2u
+    Which is: 2
+
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.ImGuiAdapter.cpp:337: Failure
+Expected equality of these values:
+  afterEnd.LastEditorCallbackMicros
+    Which is: 7
+  afterBuild.LastEditorCallbackMicros
+    Which is: 0
+
+[  FAILED  ] ImGuiAdapter.EditorPanelDrawProducesNonEmptyDrawList (2 ms)
+[----------] 1 test from ImGuiAdapter (2 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (2 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] ImGuiAdapter.EditorPanelDrawProducesNonEmptyDrawList
+
+ 1 FAILED TEST
+
+
+0% tests passed, 1 tests failed out of 1
+
+Label Time Summary:
+contract    =   0.01 sec*proc (1 test)
+runtime     =   0.01 sec*proc (1 test)
+
+Total Test time (real) =   0.82 sec
+
+The following tests FAILED:
+	458 - ImGuiAdapter.EditorPanelDrawProducesNonEmptyDrawList (Failed)

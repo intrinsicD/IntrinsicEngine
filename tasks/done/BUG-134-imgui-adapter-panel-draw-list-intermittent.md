@@ -5,13 +5,12 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "codex-overnight"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-09-15T00:37:32Z"
 contract_schema: 1
-contracts: []
-contract_review: "Reviewed the full catalog; this task diagnoses an intermittent existing runtime contract-test failure and changes no reusable subsystem, data-domain, publication, or control-surface contract unless a later reproducible cause proves otherwise."
+contracts: [repo.source-documentation]
 ---
 # BUG-134 — ImGui timing test retains an obsolete containment assertion
 
@@ -42,8 +41,9 @@ contract_review: "Reviewed the full catalog; this task diagnoses an intermittent
   `--repeat until-fail:10` executions, and an immediate complete selector
   rerun passed all 4,103 selected cases with the same expected skip. The
   failure is therefore intermittent and currently lacks a stable repro.
-- Expected behavior: the panel produces a non-empty ImGui draw list, and the
-  whole-frame duration consistently contains its measured nested phases.
+- Original expectation (later disproved for callback timing): the panel produces
+  a non-empty ImGui draw list, and the measured EndFrame duration contains all
+  measured phases. The corrected contract below retains only truly nested spans.
 - Impact: a recurrence can make the required full CPU gate nondeterministic.
   The fresh `REVIEW-003` audit completed without recurrence, so that readiness
   gate retired cleanly and this bug remains an independent follow-up.
@@ -53,10 +53,9 @@ contract_review: "Reviewed the full catalog; this task diagnoses an intermittent
   assertion passed; the failure was
   `Test.ImGuiAdapter.cpp:298`,
   `EXPECT_GE(diag.LastEndFrameMicros, diag.LastEditorCallbackMicros)`, actual
-  `12 vs 13`. That is a whole-frame duration compared against one of its own
-  nested phases at microsecond resolution, where the two are within one tick of
-  each other; an immediate rerun of the complete selector passed 4156/4156.
-  This reframes the diagnosis: the candidate is the timing instrumentation
+  `12 vs 13`; an immediate complete selector rerun passed 4156/4156. The
+  initial interpretation treated the callback as nested, which September source
+  and history inspection disproved. At that time the candidates were timing instrumentation
   (independent clock reads, rounding at 1 µs granularity, or a phase timer that
   is not strictly nested inside the frame timer), not the ImGui frame lifecycle
   or draw-data translation. The three `LastEndFrameMicros >= <phase>` assertions
@@ -130,29 +129,29 @@ regression replaces a load-sensitive false invariant. It does not claim a clock
 or renderer fix, and a passing rerun alone does not satisfy acceptance.
 
 ## Required changes
-- [ ] Add exact phase reset/retention/order assertions in the existing draw-list
+- [x] Add exact phase reset/retention/order assertions in the existing draw-list
   test, then replace only the diagnosed invalid callback containment comparison.
-- [ ] Preserve every draw-data and genuine nested-phase assertion; make no
+- [x] Preserve every draw-data and genuine nested-phase assertion; make no
   permanent production source change or new source file.
-- [ ] Claude reviews the fixed test diff and mutation interpretation; fix concrete
+- [x] Claude reviews the fixed test diff and mutation interpretation; fix concrete
   findings and record the diagnosis against all observed failures/passes.
 
 ## Tests
-- [ ] Capture deterministic failure with callback work postponed until EndFrame;
+- [x] Capture deterministic failure with callback work postponed until EndFrame;
   restore exact production source and rebuild before the passing check.
-- [ ] Exact case passes 1,000 repeats; ImGuiAdapter and editor-host tests pass.
-- [ ] Full CPU and focused isolated ASan/UBSan gates pass with unchanged selectors.
+- [x] Exact case passes 1,000 repeats; ImGuiAdapter and editor-host tests pass.
+- [x] Full CPU and focused isolated ASan/UBSan gates pass with unchanged selectors.
 
 ## Docs
-- [ ] Record the obsolete premise and replacement coverage, update bug index,
+- [x] Record the obsolete premise and replacement coverage, update bug index,
   retire and seal completed evidence. No runtime architecture change is needed.
 
 ## Acceptance criteria
-- [ ] Captured original failure is explained by disjoint phases; deterministic
+- [x] Captured original failure is explained by disjoint phases; deterministic
   regression detects callback execution being moved back into EndFrame.
-- [ ] Current-phase checks and all retained rendering assertions pass, without
+- [x] Current-phase checks and all retained rendering assertions pass, without
   quarantine, retry semantics, clock injection or timing upper bounds.
-- [ ] Final source restored, independently reviewed, verified and retired with
+- [x] Final source restored, independently reviewed, verified and retired with
   strict task/layering/evidence checks and local commits.
 
 ## Verification
@@ -181,3 +180,51 @@ run on the restored source. No GPU execution change or capability promotion.
 - Quarantine labels, retries in CI, relaxed timeouts, or production timer changes
   that manufacture the obsolete duration relationship.
 - New source files, clock abstractions, or unrelated UI/runtime cleanup.
+
+## Observation ledger — 2026-09-15 repair
+
+1. **Prior failing loop:** RUNTIME-253 `full-cpu` receipt retains the original
+   callback-versus-EndFrame failure (`11 vs 12`), with all draw-data checks passing.
+   Earlier `12 vs 13` failures and intermittent passes fit disjoint intervals;
+   their relative durations depend on the work and scheduling of each phase.
+2. **Source/history discriminator:** July commit `2785191443` moved the callback
+   into `BuildEditorFrame`, before EndFrame's start timestamp. This supports the
+   obsolete nesting premise and rules out rounding of truly nested intervals as
+   an explanation for this specific inequality. No production timing defect found.
+3. **Mutation:** temporarily moved the unchanged callback body from Build to
+   EndFrame, before capture. Predicted `afterBuild.EditorCallbackInvocations == 2`
+   would fail. `mutation-regression` did fail with `1 vs 2`; callback retention also
+   failed (`7 vs 0`). The latter alone is clock-resolution dependent, while the
+   count mismatch is deterministic. Patch and raw exit-8 receipt are preserved.
+4. **Restoration:** production source SHA-256 exactly matches the clean baseline
+   (`restored-source.json`). Root shortened test comments after mutation without
+   changing any assertion. The required final gates use this restored source.
+5. **Focused verification:** `repeat-1000` completed 1,000 consecutive isolated
+   executions; `focused-ci` passed all selected ImGui/editor-host cases. No retries
+   were added to CI. Full CPU passed 4,632 executed cases with one expected
+   unsanitized GLFW/LSan control skip; focused ASan and UBSan passed 30/30 each.
+6. **Review/docs:** Claude approved the fixed final test diff. An initial structural
+   run found a moved task link in the historical REVIEW-003 report; corrected the
+   link without changing that report's historical finding. Raw failure receipt is
+   retained; the final structural run is the completion gate.
+
+Reuse decision: extend the existing panel-draw test and public diagnostic snapshot
+seam. No new fixture, production helper, clock abstraction, source file or API.
+The regression would have been prevented by checking phase ownership and ordering
+when the callback phase was extracted, rather than retaining a duration relation.
+
+## Completion
+- Date: 2026-09-15.
+- Commit: implementation and retirement are in the enclosing local commit;
+  `tasks/evidence/BUG-134/seal.yaml` binds the exact committed evidence.
+- Endpoint: **Retired**, test-contract correction with CPU/ImGui and isolated
+  sanitizer evidence. No renderer/backend capability or performance promotion.
+- Four diagnostic snapshots replace the obsolete sibling-duration inequality.
+  All draw-data checks and both true containment assertions remain intact.
+  Production source and public APIs are unchanged; no added production file.
+- Independent source review: `tasks/evidence/BUG-134/source-review.txt`.
+- Mutation, restoration, command logs and final report are in
+  `tasks/evidence/BUG-134/`. The mutation's optional exit-8 result is expected
+  sensitivity evidence; it is not a failed final gate.
+- No runtime defect remained after correcting the stale test premise. Existing
+  compiler-cache, Vulkan leak, pacing and disk-headroom tasks remain separate.

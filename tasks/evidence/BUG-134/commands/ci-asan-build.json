@@ -1,0 +1,28 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "VCPKG_FORCE_SYSTEM_BINARIES=1",
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-asan",
+    "--target",
+    "IntrinsicRuntimeContractTests",
+    "-j2"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 cmake --build --preset ci-asan --target IntrinsicRuntimeContractTests -j2",
+  "cwd": ".",
+  "duration_ms": 8001,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T00:44:04Z",
+  "label": "ci-asan-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T00:43:56Z",
+  "stderr_path": "tasks/evidence/BUG-134/commands/ci-asan-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-134/commands/ci-asan-build.stdout.log",
+  "stdout_sha256": "e80f35cf461702835eda1a40ce72cda5d7b489ee8965ea7b94082ded181303f1",
+  "task_id": "BUG-134"
+}

@@ -1,0 +1,29 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-asan",
+    "--output-on-failure",
+    "-R",
+    "^(ImGuiAdapter|EditorUiHost)",
+    "--no-tests=error",
+    "--timeout",
+    "60",
+    "--parallel",
+    "1"
+  ],
+  "command_display": "ctest --test-dir build/ci-asan --output-on-failure -R '^(ImGuiAdapter|EditorUiHost)' --no-tests=error --timeout 60 --parallel 1",
+  "cwd": ".",
+  "duration_ms": 3567,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T00:44:08Z",
+  "label": "ci-asan-focused",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T00:44:05Z",
+  "stderr_path": "tasks/evidence/BUG-134/commands/ci-asan-focused.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-134/commands/ci-asan-focused.stdout.log",
+  "stdout_sha256": "3271df7c0c695eeaff395ea9e79763c6b7c873440c74a33937516e603be3d83d",
+  "task_id": "BUG-134"
+}

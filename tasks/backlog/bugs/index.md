@@ -28,11 +28,6 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   reports failure. Resolve the exact output type/root and propagate both stage
   statuses without touching sibling JSON.
 
-- [`BUG-134` — ImGui timing test retains an obsolete containment assertion](BUG-134-imgui-adapter-panel-draw-list-intermittent.md):
-  July's editor-phase extraction left a callback-versus-EndFrame comparison even
-  though the spans are disjoint. The latest recurrence is 11 versus 12 microseconds;
-  replace that false invariant with deterministic phase-lifecycle coverage while
-  retaining draw-data and true render/copy containment checks. Settled overnight slice.
 - [`BUG-097` — Progressive model-scene UV job publishes a zero atlas](BUG-097-progressive-model-scene-zero-uv-atlas.md):
   the default-off path still fabricates UVs. Interim repair requires a current
   affected-workflow reproduction and coordination with the operator's shared

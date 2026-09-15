@@ -1,0 +1,128 @@
+schema_version: 1
+task_id: BUG-134
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-15T00:45:48Z'
+claim_eligible: false
+source:
+  base_ref: c3a7eabe7
+  base_revision: c3a7eabe7fe2b51c0f98be35017dbd4b84f1950e
+  head_revision: c3a7eabe7fe2b51c0f98be35017dbd4b84f1950e
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 9900b2f9cbedbb7fcde7e0c111f50e5149998bc63cf89d07dbc00ad6598aab06
+  - path: docs/reports/2026-08-06-architecture-stability-readiness.md
+    sha256: f89c5ca002ec4aa0a671423aa593e0f143d056f49e5ce901e280b3b4c71c4dae
+  - path: tasks/SESSION-BRIEF.md
+    sha256: b7cc46325243e8621015404f2d9e714d0b389254f0db320992d286a00da1bb92
+  - path: tasks/backlog/bugs/BUG-134-imgui-adapter-panel-draw-list-intermittent.md
+    sha256: null
+  - path: tasks/backlog/bugs/index.md
+    sha256: 4d81f32650be1a0742b127fdbdde74060784ee7f071f289311c2b26bab4ad326
+  - path: tasks/done/BUG-134-imgui-adapter-panel-draw-list-intermittent.md
+    sha256: 6e53d13436d653e1fe623e8fd023c4b2749e146a5fb919323d0a6afeb4340dc6
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 373d2c2c76b9a6f60651b51dd98e336ee6c9c806b11d76901e134227c75b6115
+  - path: tests/contract/runtime/Test.ImGuiAdapter.cpp
+    sha256: d33e50fe9b83f5e3ac000592b561edf57a2468dea1553322591d02eef3212f16
+  content_digest: a0b482b4ee51a98178e9eb2b6a0c739a0d89f17dd6d3de7c26648a84820d1dc7
+touched:
+  paths:
+  - ara/trace/exploration_tree.yaml
+  - docs/reports/2026-08-06-architecture-stability-readiness.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/BUG-134-imgui-adapter-panel-draw-list-intermittent.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-134-imgui-adapter-panel-draw-list-intermittent.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/contract/runtime/Test.ImGuiAdapter.cpp
+  layers:
+  - runtime
+  modules:
+  - Extrinsic.Runtime.ImGuiAdapter
+extension_seam: Existing ImGui panel test and public diagnostic snapshots
+future_change_plan: Preserve phase ownership/order checks when changing the frame lifecycle; keep duration
+  containment only for genuinely nested intervals
+acceptance:
+- criterion: Captured original failure is explained by disjoint phases; deterministic
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/BUG-134/commands/mutation-regression.json
+  - tasks/evidence/BUG-134/postpone-callback-mutation.patch
+  - tasks/evidence/BUG-134/source-review.txt
+  reason: null
+- criterion: Current-phase checks and all retained rendering assertions pass, without
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/BUG-134/commands/repeat-1000.json
+  - tasks/evidence/BUG-134/commands/focused-ci.json
+  - tasks/evidence/BUG-134/commands/full-cpu.json
+  - tasks/evidence/BUG-134/commands/ci-asan-focused.json
+  - tasks/evidence/BUG-134/commands/ci-ubsan-focused.json
+  reason: null
+- criterion: Final source restored, independently reviewed, verified and retired with
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/BUG-134/restored-source.json
+  - tasks/evidence/BUG-134/source-review.txt
+  - tasks/evidence/BUG-134/commands/final-structural.json
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-134/commands/ci-asan-build.json
+- receipt: tasks/evidence/BUG-134/commands/ci-asan-focused.json
+- receipt: tasks/evidence/BUG-134/commands/ci-ubsan-build.json
+- receipt: tasks/evidence/BUG-134/commands/ci-ubsan-focused.json
+- receipt: tasks/evidence/BUG-134/commands/configure-ci.json
+- receipt: tasks/evidence/BUG-134/commands/final-structural.json
+- receipt: tasks/evidence/BUG-134/commands/focused-ci.json
+- receipt: tasks/evidence/BUG-134/commands/full-cpu-build.json
+- receipt: tasks/evidence/BUG-134/commands/full-cpu.json
+- receipt: tasks/evidence/BUG-134/commands/mutation-build.json
+- receipt: tasks/evidence/BUG-134/commands/mutation-regression.json
+- receipt: tasks/evidence/BUG-134/commands/repeat-1000.json
+- receipt: tasks/evidence/BUG-134/commands/restored-build.json
+changed_public_contracts:
+- No production API or timing behavior change; test assertion corrected to the current phase contract
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-134-imgui-adapter-panel-draw-list-intermittent.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Test-only correction. Focused sanitizer coverage; no GPU or performance claim. Expected mutation failure
+  and repaired intermediate doc-link failure retained.
+skipped_checks: []
+artifacts:
+- path: tasks/evidence/BUG-134/source-review.txt
+  sha256: 47edc663284ec38bc96a48223fdd57ec00024889baf96ebbc053d9b21316fdf0
+  kind: file
+- path: tasks/evidence/BUG-134/restored-source.json
+  sha256: d5db8a92ba1adf15bd3d92e51595321e80a7023f7be08eba77894d81d9e1ec8f
+  kind: file
+- path: tasks/evidence/BUG-134/postpone-callback-mutation.patch
+  sha256: 7ab196821482e8d35c46d205328cfddd132b522f1fc09062fff0b78129d8cc56
+  kind: file
+- path: tasks/evidence/BUG-134/commands/structural.json
+  sha256: 76bb215ff3a45dba52715d0845d930ad2408af83024b18d199dc883401431f1c
+  kind: file
+- path: tasks/evidence/BUG-134/commands/structural.stdout.log
+  sha256: 753e551511686ab1e7860678f7035dbe805b926efbdc3112d23efd43c970ec12
+  kind: file
+- path: tasks/evidence/BUG-134/commands/structural.stderr.log
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true

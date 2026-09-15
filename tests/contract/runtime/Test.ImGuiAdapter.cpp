@@ -269,11 +269,16 @@ TEST(ImGuiAdapter, EditorPanelDrawProducesNonEmptyDrawList)
     adapter.BeginFrame(kFrameDelta);
     adapter.BuildEditorFrame();
     adapter.EndFrame();
-    adapter.BeginFrame(kFrameDelta);
-    adapter.BuildEditorFrame();
-    adapter.EndFrame();
+    const Runtime::ImGuiAdapterDiagnostics afterWarmup = adapter.GetDiagnostics();
 
-    const auto& diag = adapter.GetDiagnostics();
+    adapter.BeginFrame(kFrameDelta);
+    const Runtime::ImGuiAdapterDiagnostics afterBegin = adapter.GetDiagnostics();
+    adapter.BuildEditorFrame();
+    const Runtime::ImGuiAdapterDiagnostics afterBuild = adapter.GetDiagnostics();
+    adapter.EndFrame();
+    const Runtime::ImGuiAdapterDiagnostics afterEnd = adapter.GetDiagnostics();
+
+    const Runtime::ImGuiAdapterDiagnostics& diag = afterEnd;
     EXPECT_EQ(diag.FramesProduced, 2u);
     EXPECT_EQ(diag.EditorCallbackInvocations, 2u);
     EXPECT_GE(diag.LastDrawListCount, 1u);
@@ -295,7 +300,34 @@ TEST(ImGuiAdapter, EditorPanelDrawProducesNonEmptyDrawList)
                   diag.LastFrameVertexCopyBytes +
                   diag.LastFrameIndexCopyBytes +
                   diag.LastFrameCommandCopyBytes);
-    EXPECT_GE(diag.LastEndFrameMicros, diag.LastEditorCallbackMicros);
+    // BeginFrame resets callback timing; EndFrame retains its previous timings
+    // until the next completed frame.
+    EXPECT_EQ(afterWarmup.EditorCallbackInvocations, 1u);
+    EXPECT_EQ(afterWarmup.FramesProduced, 1u);
+    EXPECT_EQ(afterWarmup.CaptureSnapshots, 1u);
+
+    EXPECT_EQ(afterBegin.LastEditorCallbackMicros, 0u);
+    EXPECT_EQ(afterBegin.EditorCallbackInvocations, 1u);
+    EXPECT_EQ(afterBegin.FramesProduced, 1u);
+    EXPECT_EQ(afterBegin.CaptureSnapshots, 1u);
+    EXPECT_EQ(afterBegin.LastImGuiRenderMicros, afterWarmup.LastImGuiRenderMicros);
+    EXPECT_EQ(afterBegin.LastDrawDataCopyMicros, afterWarmup.LastDrawDataCopyMicros);
+    EXPECT_EQ(afterBegin.LastEndFrameMicros, afterWarmup.LastEndFrameMicros);
+
+    // Decisive ordering check: the callback has already run for the second time
+    // before EndFrame begins, and EndFrame's own work has not started yet.
+    EXPECT_EQ(afterBuild.EditorCallbackInvocations, 2u);
+    EXPECT_EQ(afterBuild.FramesProduced, 1u);
+    EXPECT_EQ(afterBuild.CaptureSnapshots, 1u);
+    EXPECT_EQ(afterBuild.LastImGuiRenderMicros, afterWarmup.LastImGuiRenderMicros);
+    EXPECT_EQ(afterBuild.LastDrawDataCopyMicros, afterWarmup.LastDrawDataCopyMicros);
+    EXPECT_EQ(afterBuild.LastEndFrameMicros, afterWarmup.LastEndFrameMicros);
+
+    // EndFrame retains the timing of the already completed callback.
+    EXPECT_EQ(afterEnd.CaptureSnapshots, 2u);
+    EXPECT_EQ(afterEnd.LastEditorCallbackMicros, afterBuild.LastEditorCallbackMicros);
+
+    // Only render and draw-data copy timings are nested inside EndFrame.
     EXPECT_GE(diag.LastEndFrameMicros, diag.LastImGuiRenderMicros);
     EXPECT_GE(diag.LastEndFrameMicros, diag.LastDrawDataCopyMicros);
 }

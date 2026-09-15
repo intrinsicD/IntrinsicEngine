@@ -1,0 +1,28 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "VCPKG_FORCE_SYSTEM_BINARIES=1",
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicTests",
+    "-j4"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 cmake --build --preset ci --target IntrinsicTests -j4",
+  "cwd": ".",
+  "duration_ms": 9145,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T00:41:46Z",
+  "label": "full-cpu-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T00:41:37Z",
+  "stderr_path": "tasks/evidence/BUG-134/commands/full-cpu-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-134/commands/full-cpu-build.stdout.log",
+  "stdout_sha256": "823b77e70962d0117973b740114e312f999317c33c0fb4cfba0477e9929150b2",
+  "task_id": "BUG-134"
+}

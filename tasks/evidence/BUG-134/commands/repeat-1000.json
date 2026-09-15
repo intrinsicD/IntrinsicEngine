@@ -1,0 +1,29 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^ImGuiAdapter\\.EditorPanelDrawProducesNonEmptyDrawList$",
+    "--repeat",
+    "until-fail:1000",
+    "--no-tests=error",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^ImGuiAdapter\\.EditorPanelDrawProducesNonEmptyDrawList$' --repeat until-fail:1000 --no-tests=error --timeout 60",
+  "cwd": ".",
+  "duration_ms": 9709,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T00:41:35Z",
+  "label": "repeat-1000",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T00:41:26Z",
+  "stderr_path": "tasks/evidence/BUG-134/commands/repeat-1000.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-134/commands/repeat-1000.stdout.log",
+  "stdout_sha256": "f8f87497bcd21698ef1f1a645f9acd6201d9b9a215926cb0c2788599f253a520",
+  "task_id": "BUG-134"
+}

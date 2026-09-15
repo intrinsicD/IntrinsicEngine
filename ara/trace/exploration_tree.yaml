@@ -12429,5 +12429,5 @@ tree:
     - tasks/evidence/RUNTIME-253/seal.yaml
     - tasks/evidence/RUNTIME-253/commands/full-cpu.json
     - tasks/evidence/RUNTIME-253/commands/full-cpu-final.json
-    - tasks/backlog/bugs/BUG-134-imgui-adapter-panel-draw-list-intermittent.md
+    - tasks/done/BUG-134-imgui-adapter-panel-draw-list-intermittent.md
     status: resolved

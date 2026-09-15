@@ -1,0 +1,27 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^ImGuiAdapter\\.EditorPanelDrawProducesNonEmptyDrawList$",
+    "--no-tests=error",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^ImGuiAdapter\\.EditorPanelDrawProducesNonEmptyDrawList$' --no-tests=error --timeout 60",
+  "cwd": ".",
+  "duration_ms": 825,
+  "exit_code": 8,
+  "finished_at": "2026-09-15T00:40:16Z",
+  "label": "mutation-regression",
+  "required": false,
+  "schema_version": 1,
+  "started_at": "2026-09-15T00:40:15Z",
+  "stderr_path": "tasks/evidence/BUG-134/commands/mutation-regression.stderr.log",
+  "stderr_sha256": "18e00877dc1071c85cd4f479d451bebeef8309022e46cf8c63b0bed5151984a4",
+  "stdout_path": "tasks/evidence/BUG-134/commands/mutation-regression.stdout.log",
+  "stdout_sha256": "e2d143ab7d161f3a4856e794b7263ffc9683f8e5b1ebcc11fdfae9ec90c95352",
+  "task_id": "BUG-134"
+}

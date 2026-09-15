@@ -1,0 +1,27 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^(ImGuiAdapter|EditorUiHost)",
+    "--no-tests=error",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^(ImGuiAdapter|EditorUiHost)' --no-tests=error --timeout 60",
+  "cwd": ".",
+  "duration_ms": 1104,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T00:41:37Z",
+  "label": "focused-ci",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T00:41:36Z",
+  "stderr_path": "tasks/evidence/BUG-134/commands/focused-ci.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-134/commands/focused-ci.stdout.log",
+  "stdout_sha256": "7e7a6e4430b905df7dfd1e33e40bb98d523202ee1a5b10e1e117d470aec8e3eb",
+  "task_id": "BUG-134"
+}
