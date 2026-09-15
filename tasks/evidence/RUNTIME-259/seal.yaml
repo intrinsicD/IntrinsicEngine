@@ -1,0 +1,9 @@
+schema_version: 1
+task_id: RUNTIME-259
+sealed_revision: a0620c9f99a9fc27023778a9eddacacc8408f371
+source_content_digest: 01c7b75c703721678116bb36d54a2cc913a8a3d0bf77c863dde5232753e5d408
+report_sha256: b11183644e73792bcda6e01873fd1d0c552d4124a21cfe38e6abd627cc3da0aa
+records: []
+reason: Bind eight exact import deletions, source and owner proof, fixed Claude review, full CPU and focused
+  sanitizer/Vulkan build verification
+generated_by: tools/agents/workflow_evidence.py
