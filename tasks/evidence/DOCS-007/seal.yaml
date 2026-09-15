@@ -1,0 +1,9 @@
+schema_version: 1
+task_id: DOCS-007
+sealed_revision: 4d2135f87e46c7fe65718d02ef4dc2e666b61001
+source_content_digest: 1ff235d25d2e7cbf43c998cd30e0b22c91cf3b7a1a9a53ebbdcefd227bbf3b82
+report_sha256: 44b4f1c1b11cbb907322178dad67f2dd6f8f38aa23e24adc1e7afda3a69ddfd9
+records: []
+reason: Bind Claude-reviewed current backlog text, preserved link/history coverage and final strict checks
+  to the exact local retirement commit
+generated_by: tools/agents/workflow_evidence.py
