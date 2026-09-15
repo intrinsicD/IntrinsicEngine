@@ -1,0 +1,9 @@
+schema_version: 1
+task_id: RUNTIME-257
+sealed_revision: c53d30544928810dab1b2574b29c537e9265b75f
+source_content_digest: 7cc5125de70cfc5f60833de9dd85f1bf5bf2539390408c990c3d1e9e1de5cca9
+report_sha256: 551578a0ba6c11ad88116fc6d97ae239553984ca4cd5f1d021eed39af220beb5
+records: []
+reason: Bind reviewed preamble-only source and passing native/sanitizer/compiler-boundary evidence to
+  exact local source
+generated_by: tools/agents/workflow_evidence.py
