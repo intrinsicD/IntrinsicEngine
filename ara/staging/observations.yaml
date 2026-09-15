@@ -3927,8 +3927,20 @@ observations:
     content: The six retained BUILD-009 samples measure a local clean-library median of 354.475 to 333.377 seconds; config, snapshot and renderer interface medians decrease 32.2%, 11.4% and 8.4%. Implementation and no-op populations overlap. Compiler units remain 775 to 776 for clean builds and 13 to 12 for the config probe.
     context: Exact post-overnight and latest implementation checkpoints, immutable dependencies, four jobs, cache-off Clang23 Debug Null/headless engine libraries. RUNTIME-266 is outside the measured sources; BUILD-007 is a separate historical comparison.
     potential_type: claim
-    bound_to: []
+    bound_to: [N596]
     promoted: true
     promoted_to: logic/claims.md:C97
+    crystallized_via: artifact-commitment
+    stale: false
+
+  - id: O231
+    timestamp: '2026-09-15T21:18:09.642542+00:00'
+    provenance: ai-executed
+    content: RUNTIME-266 retains the verified registry dependency cut (snapshot closure 92 to 91) but does not establish stable timing gains from its four noisy samples. A separate snapshot trace is dominated by WriteAST; a synthetic control retaining all imports but replacing own declarations has a much smaller serialized footprint. That control lacks the engine feature contract.
+    context: Exact sources 45d5a4f1fc and 08728e2e1, ABBA two samples per arm, all 776 commands and dependency fingerprints identical; canonical CPU and fresh Clang 20 checks pass. Final before sample is slower across multiple probes. Full-BMI final-job trace is excluded from whole-driver comparisons.
+    potential_type: claim
+    bound_to: [N597]
+    promoted: true
+    promoted_to: logic/claims.md:C98
     crystallized_via: artifact-commitment
     stale: false

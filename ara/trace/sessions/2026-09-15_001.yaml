@@ -2,9 +2,11 @@ session:
   id: 2026-09-15_001
   date: '2026-09-15'
   started: '2026-09-15T00:37:12+02:00'
-  last_turn: "2026-09-15T20:39:04+02:00"
-  turn_count: 25
-  summary: "Created BUILD-009, RUNTIME-266/267 and GRAPHICS-144 for remaining compile work; retained UI-037, GRAPHICS-105, LEGACY-043 and BUILD-006 with current scope. Claude reviewed; task/dependency/doc checks pass. Planning only."
+  last_turn: "2026-09-15T23:24:33+02:00"
+  turn_count: 26
+  summary: "Measured and retired BUILD-009; implemented and retired RUNTIME-266 after Claude\
+  \ review, full CPU and fresh Clang 20 build. Registry timing remains inconclusive;\
+  \ diagnostic serialization work is assigned to RUNTIME-268."
 events_logged:
 - turn: 1
   type: experiment
@@ -208,6 +210,33 @@ events_logged:
   routing: direct
   provenance: user
   summary: "Created BUILD-009, RUNTIME-266/267 and GRAPHICS-144 for remaining compile work; retained UI-037, GRAPHICS-105, LEGACY-043 and BUILD-006 with current scope. Claude reviewed; task/dependency/doc checks pass. Planning only."
+
+- turn: 26
+  type: experiment
+  id: N596
+  routing: direct
+  provenance: ai-executed
+  summary: BUILD-009 retains six balanced samples, three per arm, Clang 23 Debug Null/headless engine libraries, four jobs and immutable dependencies.
+    Clean median 354.475 to 333.377 seconds; config, snapshot and renderer interface medians fall 32.2%, 11.4% and 8.4%. Implementation and no-op
+    populations overlap. These local observations remain claim_eligible false and exclude the later registry change.
+- turn: 26
+  type: experiment
+  id: N597
+  routing: direct
+  provenance: ai-executed
+  summary: RUNTIME-266 ABBA has two samples per arm and identical 776 compiler commands/dependencies. Snapshot closure removes only ECS.Scene.Registry,
+    92 to 91. Final before sample is broadly slower; no stable timing gain follows. A separate real-source trace records WriteAST 14.727 of ExecuteCompiler
+    16.690 seconds. Import-preserving synthetic control removes own declarations and emits far less metadata, but lacks feature equivalence. Exclude
+    the overwritten full-BMI backend-only trace from whole-driver comparisons.
+- turn: 26
+  type: decision
+  id: N598
+  routing: direct
+  provenance: ai-executed
+  summary: Retire BUILD-009 with its refreshed measurement and RUNTIME-266 with the existing registry owner and ten forward-declared borrow interfaces.
+    Net production change is plus 29 lines, no new file/module/allocation. Claude reviewed plan, fixed diff and result limits. Full canonical
+    CPU has 4663 passes and one expected skip; fresh cache-off Clang 20 compiles the app editor and engine closure. RUNTIME-268 owns declaration-group
+    serialization experiments; RUNTIME-267 and GRAPHICS-144 keep distinct config and renderer ownership.
 
 ai_actions:
 - turn: 1
@@ -428,6 +457,18 @@ ai_actions:
   provenance: ai-executed
   files_changed: [tasks/backlog/process/BUILD-009-current-source-compile-baseline.md, tasks/backlog/runtime/RUNTIME-266-editor-snapshot-consumer-locality.md, tasks/backlog/runtime/RUNTIME-267-processing-config-consumer-locality.md, tasks/backlog/rendering/GRAPHICS-144-renderer-consumer-locality.md, tasks/backlog/README.md]
 
+- turn: 26
+  action: Ran six baseline and four registry-borrow samples; implemented the canonical borrow cut; reconciled all CPU tests and the minimum compiler;
+    reviewed code/results with Claude, preserved diagnostic trace limits, retired two tasks and created RUNTIME-268.
+  provenance: ai-executed
+  files_changed:
+  - src/ecs/ECS.Scene.Registry.cppm
+  - src/runtime/Editor/Runtime.EditorProcessing.cppm
+  - tests/CMakeLists.txt
+  - ara/evidence/tables/build009_current_compile_measurement.md
+  - ara/evidence/tables/runtime266_registry_borrow_measurement.md
+  - tasks/backlog/runtime/RUNTIME-268-workspace-snapshot-bmi-serialization.md
+
 claims_touched:
 - id: C94
   action: crystallized
@@ -439,6 +480,13 @@ claims_touched:
 - id: C96
   action: crystallized
   turn: 20
+
+- id: C97
+  action: crystallized
+  turn: 26
+- id: C98
+  action: crystallized
+  turn: 26
 
 key_context:
 - turn: 1
@@ -507,6 +555,10 @@ key_context:
 - turn: 25
   excerpt: User requested explicit tasks for each remaining item in the compile/reuse todo list. Create actionable repository notes while retaining existing task owners; implementation and measurement are future work.
 
+- turn: 26
+  excerpt: User requested continued open-task compilation and reuse work with Claude through planning, implementation, review, tests and fixes.
+    Source-sharing authorization persists; no main merge requested.
+
 open_threads:
 - The broader C92 processing-family hypothesis still needs a selected baseline and repeated family-edit measurements; BUILD-006 separately owns backend/cache comparisons.
 - BUG-193 owns unexplained GPU pacing variability and WLOP watchdog margin; BUG-189/191/192 closed only finite-work
@@ -525,7 +577,7 @@ open_threads:
   CPU and Vulkan probes select the scalar; exact Display status, acceleration and Appearance behavior remain needed.'
 - BUG-195 owns disk-headroom preflight and evidence-write recovery; completed backend verification does not close
   that tooling work.
-- GRAPHICS-138–143 and RUNTIME-264/265 are complete. BUILD-009 owns fresh source timings; RUNTIME-266 then RUNTIME-267 own editor/config consumer locality, and GRAPHICS-144 owns renderer dependency follow-up with conditional upload-helper review. UI-037 and GRAPHICS-105 remain independently ready; LEGACY-043 follows GRAPHICS-105. BUILD-006 retains its separate CI/toolchain prerequisites and backend/cache comparison.
+- GRAPHICS-138–143, RUNTIME-264–266 and BUILD-009 are complete. RUNTIME-268 owns snapshot BMI serialization isolation; RUNTIME-267 owns config locality after RUNTIME-266, and GRAPHICS-144 owns renderer dependencies. UI-037 and GRAPHICS-105 remain ready; LEGACY-043 follows GRAPHICS-105. BUILD-006 retains separate CI/toolchain prerequisites and backend/cache comparison.
 
 ai_suggestions_pending:
 - Existing staged topics retain their open owners and flags; this ordinary refactor supplies no new closure signal.

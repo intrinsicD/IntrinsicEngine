@@ -1,0 +1,25 @@
+## Review: RUNTIME-266 borrowed-registry patch
+
+No blocking linkage defect. `export extern "C++" { class Registry {...}; }` is a well-formed export of a linkage-specification, the consumer forward declarations (`extern "C++" { namespace Extrinsic::ECS::Scene { class Registry; } }`) name the same global-module entity, and the redundant `extern "C++"` wrapper in `ECS.Scene.Registry.cpp:7` is harmless (members already inherit the class's language linkage). `WorldRegistry`'s `std::unique_ptr<ECS::Scene::Registry>` member is safe: `~WorldRegistry()` is user-declared and defined in `Runtime.WorldRegistry.cpp`, which imports the owner.
+
+### Items to confirm before the rebuild
+
+**1. Implementation units that lost completeness transitively — highest risk.**
+Ten interfaces dropped `import Extrinsic.ECS.Scene.Registry`, but only four implementation units gained it (`Runtime.EditorCommandHistory.cpp:16`, `Runtime.SelectionController.cpp:15`, `Runtime.SelectionController.Primitives.cpp:9`, `Runtime.StableEntityLookup.cpp:15`). Any `.cpp` of the other six that dereferenced a `Registry&` and relied on the interface's transitive import is now an incomplete-type error:
+- `Runtime.SceneSerialization.cpp`
+- `Runtime.PrimitiveSelectionRefinement.cpp`
+- `Runtime.EditorProcessing.cpp`
+- the three `Editor/Operations/*.cpp`
+- `Runtime.EditorWorkspaceSnapshots.cpp`
+
+Not visible in this diff, so I can't tell whether they already import it. The full rebuild will catch it; worth checking directly rather than waiting.
+
+**2. `Runtime.SceneEditingOperations.cppm:26` — unrelated removal.**
+This drops `import Extrinsic.ECS.Components.GeometrySources;` in the same patch, with no forward declaration to replace it and no coverage from `--forbid-module Extrinsic.ECS.Scene.Registry`. If any exported signature in that interface names a GeometrySources type by value, it won't compile; if it was genuinely dead, it's still scope creep into a patch whose point is a compile-time measurement — it will contaminate the before/after delta attributed to the registry change. Consider splitting it out.
+
+**3. `tests/CMakeLists.txt:557` lists `Runtime.EditorWorkspaceSnapshots.cppm`** among the checked sources, but that file isn't touched by the patch. Either it never imported the owner (fine — legitimate regression guard) or the test fails on first run. Verify which.
+
+### Non-findings
+- Global contexts holding a `Registry*` were already legal; nothing here changes that.
+- `Raw()` remains inline and entt-dependent, so complete-type users still import the owner — unchanged from before.
+- `SelectionController` and `StableEntityLookup` stay module-attached while only naming `Registry` through pointers/references and out-of-line member declarations; no completeness requirement introduced in either interface.

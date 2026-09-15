@@ -2526,3 +2526,14 @@ entries:
     - Reuse four existing backlog owners and create only missing source-measurement/editor/config/renderer notes. Shared-file ordering and immediate-before baselines keep future slices independently reviewable.
     - Clarify rather than remove the interactive micro exemption. This task owns its benchmark artifacts; only unattended completion reports are exempt. Preserve separate BUILD-006 prerequisites and all existing capability contracts.
     - Existing staged observations and research claims retain their owners, status and flags; creating tasks supplies no evidence or closure for their substantive hypotheses.
+
+  - turn: 2026-09-15_001#26
+    notes:
+    - Bind O230/C97 only to the exact six-sample broader cleanup comparison; it excludes RUNTIME-266 and is not additive with BUILD-007. Artifact
+      commitment is the reporting/task closure, not inferred user endorsement.
+    - Bind O231/C98 to bounded noisy observations and diagnostic phase accounting. Preserve the slow final before sample, non-equivalent imports-only
+      control and excluded overwritten trace; no stable registry speedup or causal memory claim.
+    - Retain the implementation for its verified ownership boundary; plus 29 production lines is not code-size reduction. Full CPU uses canonical
+      Clang 23, while fresh Clang 20 proves compilation and metadata boundaries only. No GPU or sanitizer runtime evidence added.
+    - Existing staged observations retain their owners and flags; these task retirements do not settle broader compilation or product hypotheses.
+      Record RUNTIME-268 as a concrete follow-up instead of declaring editor compilation complete.

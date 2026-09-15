@@ -590,8 +590,10 @@ sessions:
 
 - id: 2026-09-15_001
   date: '2026-09-15'
-  summary: "Created BUILD-009, RUNTIME-266/267 and GRAPHICS-144 for remaining compile work; retained UI-037, GRAPHICS-105, LEGACY-043 and BUILD-006 with current scope. Claude reviewed; task/dependency/doc checks pass. Planning only."
-  turn_count: 25
-  events_count: 31
-  claims_touched: [C94, C95, C96]
+  summary: "Measured and retired BUILD-009; implemented and retired RUNTIME-266 after Claude\
+  \ review, full CPU and fresh Clang 20 build. Registry timing remains inconclusive;\
+  \ diagnostic serialization work is assigned to RUNTIME-268."
+  turn_count: 26
+  events_count: 34
+  claims_touched: [C94, C95, C96, C97, C98]
   open_threads: 10

@@ -1,0 +1,1324 @@
+{
+  "schema_version": 2,
+  "benchmark_id": "build.engine_compile_iteration.registry_borrow.v1",
+  "run_id": "cohort-20260915",
+  "attempt_id": "02-after-1",
+  "method": "build.engine_compile_iteration",
+  "backend": "external_baseline",
+  "dataset": "intrinsicengine.source.registry_borrow_2026_09_15",
+  "commit": "08728e2e1e05c1881d4ff82b36f1022fd9fbbb2b",
+  "source": {
+    "revision": "08728e2e1e05c1881d4ff82b36f1022fd9fbbb2b",
+    "state": "clean_commit"
+  },
+  "claim_eligible": false,
+  "manifest": {
+    "path": "benchmarks/ci/manifests/engine_compile_iteration_registry_borrow.yaml",
+    "sha256": "d1a1da05120fb0bf7ccb2086b73d0abc82cfadb7f130be3ec4395a053c7768e7"
+  },
+  "resolved_params": {
+    "intent": "performance",
+    "source_revisions": {
+      "before": "45d5a4f1fc0c7e51172a0e4a0edbca2f675448ea",
+      "after": "08728e2e1e05c1881d4ff82b36f1022fd9fbbb2b"
+    },
+    "sample_order": [
+      "before",
+      "after",
+      "after",
+      "before"
+    ],
+    "measured_iterations": 2,
+    "warmup_iterations": 0,
+    "warmup_scope": "No discarded pilots; same source/dependency input pre-read before each sample. Resource protocol established by BUILD-009.",
+    "preset": "ci",
+    "target": "ExtrinsicRuntime",
+    "compiler": "/usr/bin/clang++-23",
+    "jobs": 4,
+    "minimum_interface_importers": 1,
+    "configure_options": [
+      "-DEXTRINSIC_BACKEND=Null",
+      "-DINTRINSIC_PLATFORM_BACKEND=Null",
+      "-DINTRINSIC_HEADLESS_NO_GLFW=ON",
+      "-DINTRINSIC_BUILD_TESTS=OFF",
+      "-DINTRINSIC_BUILD_BENCHMARKS=OFF",
+      "-DINTRINSIC_ENABLE_CCACHE=OFF",
+      "-DCMAKE_CXX_COMPILER_LAUNCHER=",
+      "-DCMAKE_C_COMPILER_LAUNCHER=",
+      "-DVCPKG_MANIFEST_INSTALL=OFF",
+      "-DCMAKE_C_COMPILER=/usr/bin/clang-23",
+      "-DCMAKE_CXX_COMPILER=/usr/bin/clang++-23",
+      "-DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-23"
+    ],
+    "scenarios": {
+      "clean": null,
+      "noop": null,
+      "workspace_impl": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp",
+      "snapshot_interface": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm",
+      "scene_interface": "src/runtime/Editor/Operations/Runtime.SceneEditingOperations.cppm"
+    },
+    "invalidation": "mtime only; source bytes remain at the exact clean commit; require observed importer fan-out",
+    "build_storage": "Owned fresh tmpfs build at /dev/shm/intrinsic-runtime266-measure; reuse the disk-backed disposable source worktree at /tmp/intrinsic-build009/source. Source/build paths identical in both arms.",
+    "dependency_state": "identical preinstalled vcpkg packages, no package installation during sampling",
+    "operating_system_cache": "input pre-read, no cache flushing, no cold-filesystem claim",
+    "memory_measurement": "GNU time maximum single-process RSS, not aggregate concurrent memory",
+    "critical_path": "Ninja target DAG weighted by unfiltered per-invocation timings; unmatched meta-edges reported",
+    "summary": "Descriptive median and min/max from two samples per arm, all values and negative outcomes retained. No statistical/general or cross-host guarantee; engine-library closure excludes tests/Sandbox/GPU execution.",
+    "sample_sequence": "Configure, clean, no-op, workspace implementation edit, snapshot interface edit, scene-editing interface edit; mtime-only invalidation with a retained populated tree within each sample. Recreate owned build tree between samples.",
+    "noise_scope": "Normal desktop host; no CPU affinity/governor/turbo control. No competing compilation or tests; source inspection and remote review may run. Local descriptive comparison, not an isolated-machine or statistical claim.",
+    "configure_measurement": "initial configure only; source iteration cohort deliberately excludes the already-measured reconfigure scenario."
+  },
+  "config_digest": "c71f1354f1fc7d3c88d295a0b49e0603e2f11d69c664c391626bfe9b3adf1e46",
+  "warmup_policy": {
+    "measured_iterations": 2,
+    "warmup_iterations": 0,
+    "warmup_scope": "No discarded pilots; same source/dependency input pre-read before each sample. Resource protocol established by BUILD-009."
+  },
+  "metrics": {
+    "build_time_ms": {
+      "clean": 332952.3069879506,
+      "noop": 73.46933195367455,
+      "workspace_impl": 7262.9068290116265,
+      "snapshot_interface": 25441.44669303205,
+      "scene_interface": 35621.804900001734
+    },
+    "configure_time_ms": {
+      "initial": 5483.819466084242
+    },
+    "memory_peak_bytes": {
+      "clean": 2851004416,
+      "noop": 22474752,
+      "workspace_impl": 1771683840,
+      "snapshot_interface": 2847850496,
+      "scene_interface": 2846298112
+    },
+    "sample_count": 1
+  },
+  "diagnostics": {
+    "arm": "after",
+    "position": 2,
+    "sample": 1,
+    "toolchain_backend": "/usr/bin/clang++-23",
+    "scenarios": {
+      "clean": {
+        "execution": {
+          "cpu_user_s": 1201.93,
+          "cpu_system_s": 76.59,
+          "max_single_process_rss_kib": 2784184,
+          "wall_ms": 332952.3069879506,
+          "started_at": "2026-09-15T20:42:49.345330+00:00",
+          "exit_code": 0,
+          "command": [
+            "cmake",
+            "--build",
+            "/dev/shm/intrinsic-runtime266-measure",
+            "--target",
+            "ExtrinsicRuntime",
+            "--parallel",
+            "4"
+          ],
+          "loadavg_before": [
+            2.1943359375,
+            3.35498046875,
+            3.68701171875
+          ]
+        },
+        "compiler_invocations": 776,
+        "critical_path": {
+          "duration_ms": 48622,
+          "timed_path": [
+            {
+              "output": "src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.CurvatureExtrema.cpp.o.ddi",
+              "duration_ms": 77
+            },
+            {
+              "output": "src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Linalg.cppm.o.modmap",
+              "duration_ms": 16
+            },
+            {
+              "output": "src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Linalg.pcm",
+              "duration_ms": 2085
+            },
+            {
+              "output": "src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Properties.pcm",
+              "duration_ms": 1685
+            },
+            {
+              "output": "src/ecs/CMakeFiles/ExtrinsicECS.dir/Extrinsic.ECS.Components.GeometrySources.pcm",
+              "duration_ms": 1320
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.GeometryAvailability.pcm",
+              "duration_ms": 1589
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.GeometryPresentation.pcm",
+              "duration_ms": 1050
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.EditorJobProjection.pcm",
+              "duration_ms": 1647
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.EditorCommon.pcm",
+              "duration_ms": 1294
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.SceneEditingOperations.pcm",
+              "duration_ms": 10283
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.EditorWorkspaceSnapshots.pcm",
+              "duration_ms": 17234
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorWorkspaceSession.cpp.o",
+              "duration_ms": 10193
+            },
+            {
+              "output": "lib/libExtrinsicRuntime.a",
+              "duration_ms": 149
+            }
+          ],
+          "timed_output_count": 2770,
+          "unlabelled_ancillary_outputs": 13,
+          "unmapped_ancillary_outputs": [
+            "/dev/shm/intrinsic-runtime266-measure/CMakeFiles/IntrinsicProgressivePoissonReference.dir/CXXModules.json",
+            "/dev/shm/intrinsic-runtime266-measure/CMakeFiles/tinygltf.dir/CXXModules.json",
+            "/dev/shm/intrinsic-runtime266-measure/src/runtime/CMakeFiles/ExtrinsicRuntime.dir/CXXModules.json",
+            "src/assets/CMakeFiles/ExtrinsicAssets.dir/Extrinsic.Asset.OperationStatus.pcm",
+            "src/core/CMakeFiles/ExtrinsicCore.dir/Extrinsic.Core.Memory-LinearArena.Impl.pcm",
+            "src/core/CMakeFiles/ExtrinsicCore.dir/Extrinsic.Core.Memory-Polymorphic.Impl.pcm",
+            "src/core/CMakeFiles/ExtrinsicCore.dir/Extrinsic.Core.Memory-ScopeStack.Impl.pcm",
+            "src/core/CMakeFiles/ExtrinsicCore.dir/Extrinsic.Core.RingBuffer.pcm",
+            "src/core/CMakeFiles/ExtrinsicCore.dir/Extrinsic.Core.Tasks-Internal.Impl.pcm",
+            "src/core/CMakeFiles/ExtrinsicCore.dir/Extrinsic.Core.Tasks-LocalTask.impl.pcm",
+            "src/ecs/CMakeFiles/ExtrinsicECS.dir/Extrinsic.ECS.Component.Culling.Proxy.pcm",
+            "src/ecs/CMakeFiles/ExtrinsicECS.dir/Extrinsic.ECS.Events.pcm",
+            "src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.pcm"
+          ],
+          "unmapped_meta_outputs": []
+        },
+        "top_producers": [
+          {
+            "edge_id": "9d9b56021972518c2b2210fd3a7f8c5f0dfba7c16dd22238ff04cdbea25b2feb",
+            "physical_identity": {
+              "start_ms": 283896,
+              "end_ms": 301130,
+              "command_hash": "32fcdb1c804bd49b",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 17234,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.cppm.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.cppm.o",
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.EditorWorkspaceSnapshots.pcm"
+            ],
+            "edge_kind": "module-interface",
+            "source": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.cppm.o"
+              ],
+              "candidates": [
+                "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm"
+              ]
+            },
+            "source_lines": 278,
+            "includes": 7,
+            "imports": 8,
+            "exports": 2
+          },
+          {
+            "edge_id": "12754e22a9f9486a26df9cb4860601ad942267fefa421741462b0ae8907df0e7",
+            "physical_identity": {
+              "start_ms": 153563,
+              "end_ms": 167885,
+              "command_hash": "781b070b8a95f311",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 14322,
+            "output": "src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.Renderer.cpp.o",
+            "outputs": [
+              "src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.Renderer.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/graphics/renderer/Graphics.Renderer.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/graphics/renderer/Graphics.Renderer.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.Renderer.cpp.o"
+              ],
+              "candidates": [
+                "src/graphics/renderer/Graphics.Renderer.cpp"
+              ]
+            },
+            "source_lines": 10957,
+            "includes": 21,
+            "imports": 74,
+            "exports": 0
+          },
+          {
+            "edge_id": "9577940af6459af0a58f1672e7a3778edd3eb75b1e0a10364e432ae890cd153d",
+            "physical_identity": {
+              "start_ms": 140547,
+              "end_ms": 153563,
+              "command_hash": "fb06173432a36b6c",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 13016,
+            "output": "src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.Renderer.cppm.o",
+            "outputs": [
+              "src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Extrinsic.Graphics.Renderer.pcm",
+              "src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.Renderer.cppm.o"
+            ],
+            "edge_kind": "module-interface",
+            "source": "src/graphics/renderer/Graphics.Renderer.cppm",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/graphics/renderer/Graphics.Renderer.cppm",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.Renderer.cppm.o"
+              ],
+              "candidates": [
+                "src/graphics/renderer/Graphics.Renderer.cppm"
+              ]
+            },
+            "source_lines": 404,
+            "includes": 7,
+            "imports": 25,
+            "exports": 13
+          },
+          {
+            "edge_id": "4a7f2d9e0b720402bcafa1805ead1460886d0f2e9517275fbf15c2e252e919bf",
+            "physical_identity": {
+              "start_ms": 312679,
+              "end_ms": 324737,
+              "command_hash": "eb5ca9a3e85fe410",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 12058,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderExtraction.Internal.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.RenderExtraction-Internal.pcm",
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderExtraction.Internal.cpp.o"
+            ],
+            "edge_kind": "module-implementation",
+            "source": "src/runtime/Rendering/Runtime.RenderExtraction.Internal.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Rendering/Runtime.RenderExtraction.Internal.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderExtraction.Internal.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Rendering/Runtime.RenderExtraction.Internal.cpp"
+              ]
+            },
+            "source_lines": 342,
+            "includes": 10,
+            "imports": 25,
+            "exports": 0
+          },
+          {
+            "edge_id": "61820e67dd2cd091415909703cf68849d28bf72827c27e8287f8969d0487e1f9",
+            "physical_identity": {
+              "start_ms": 38591,
+              "end_ms": 50571,
+              "command_hash": "50419639dc24477b",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 11980,
+            "output": "src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.CurvatureExtrema.cpp.o",
+            "outputs": [
+              "src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.CurvatureExtrema.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/geometry/Geometry.HalfedgeMesh.CurvatureExtrema.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/geometry/Geometry.HalfedgeMesh.CurvatureExtrema.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.CurvatureExtrema.cpp.o"
+              ],
+              "candidates": [
+                "src/geometry/Geometry.HalfedgeMesh.CurvatureExtrema.cpp"
+              ]
+            },
+            "source_lines": 863,
+            "includes": 16,
+            "imports": 2,
+            "exports": 0
+          },
+          {
+            "edge_id": "30783cd047f16ce038892ffa3ce53fa85b04f907744b903be480257126f6548e",
+            "physical_identity": {
+              "start_ms": 299389,
+              "end_ms": 310174,
+              "command_hash": "392965f2b4a1fdaa",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 10785,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp"
+              ]
+            },
+            "source_lines": 2199,
+            "includes": 12,
+            "imports": 34,
+            "exports": 0
+          },
+          {
+            "edge_id": "39b24c7f20f654a33b652d58c9d95957049f76597c0d616f40238c27e82636df",
+            "physical_identity": {
+              "start_ms": 248973,
+              "end_ms": 259256,
+              "command_hash": "118edbad2be4bcd",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 10283,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.cppm.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.cppm.o",
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.SceneEditingOperations.pcm"
+            ],
+            "edge_kind": "module-interface",
+            "source": "src/runtime/Editor/Operations/Runtime.SceneEditingOperations.cppm",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Editor/Operations/Runtime.SceneEditingOperations.cppm",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.cppm.o"
+              ],
+              "candidates": [
+                "src/runtime/Editor/Operations/Runtime.SceneEditingOperations.cppm"
+              ]
+            },
+            "source_lines": 486,
+            "includes": 11,
+            "imports": 19,
+            "exports": 2
+          },
+          {
+            "edge_id": "62185674b8d6dcf001876e737f2c253e5ca05b0b59a4b69420d0e326f6d51bed",
+            "physical_identity": {
+              "start_ms": 304448,
+              "end_ms": 314641,
+              "command_hash": "9a427994fb1db890",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 10193,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorWorkspaceSession.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorWorkspaceSession.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorWorkspaceSession.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp"
+              ]
+            },
+            "source_lines": 959,
+            "includes": 16,
+            "imports": 60,
+            "exports": 0
+          },
+          {
+            "edge_id": "454cdd18f2f18fb57de6db5f88764b50b5a0eb906146c73cd8f9be7e109b406a",
+            "physical_identity": {
+              "start_ms": 303147,
+              "end_ms": 313057,
+              "command_hash": "801967fbc337cc98",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 9910,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp"
+              ]
+            },
+            "source_lines": 2274,
+            "includes": 21,
+            "imports": 54,
+            "exports": 0
+          },
+          {
+            "edge_id": "cc8c99c8a61145243f2508055d1e9ac77faa645e385b952e579b76caf7ca9faa",
+            "physical_identity": {
+              "start_ms": 21358,
+              "end_ms": 31046,
+              "command_hash": "35e96c80d3f1257d",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 9688,
+            "output": "src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Linalg.cpp.o",
+            "outputs": [
+              "src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Linalg.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/geometry/Geometry.Linalg.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/geometry/Geometry.Linalg.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Linalg.cpp.o"
+              ],
+              "candidates": [
+                "src/geometry/Geometry.Linalg.cpp"
+              ]
+            },
+            "source_lines": 661,
+            "includes": 13,
+            "imports": 0,
+            "exports": 0
+          },
+          {
+            "edge_id": "9b915ae96241364fad24f29c9bb7b1907f38ed3c45042ff19824bad1515378db",
+            "physical_identity": {
+              "start_ms": 283677,
+              "end_ms": 293288,
+              "command_hash": "ac778f2cd5c61753",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 9611,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/TextureBake/Runtime.TextureBakeModule.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/TextureBake/Runtime.TextureBakeModule.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/TextureBake/Runtime.TextureBakeModule.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp"
+              ]
+            },
+            "source_lines": 3064,
+            "includes": 18,
+            "imports": 36,
+            "exports": 0
+          },
+          {
+            "edge_id": "7fd8f14a44773fccb14a1792da2acf1cc07affc660fb2a62d283add490750c48",
+            "physical_identity": {
+              "start_ms": 206663,
+              "end_ms": 216160,
+              "command_hash": "a7c9870b8a79ef2a",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 9497,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.PointCloudConsolidationModule.pcm",
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm.o"
+            ],
+            "edge_kind": "module-interface",
+            "source": "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm.o"
+              ],
+              "candidates": [
+                "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm"
+              ]
+            },
+            "source_lines": 72,
+            "includes": 6,
+            "imports": 12,
+            "exports": 4
+          }
+        ]
+      },
+      "noop": {
+        "execution": {
+          "cpu_user_s": 0.05,
+          "cpu_system_s": 0.01,
+          "max_single_process_rss_kib": 21948,
+          "wall_ms": 73.46933195367455,
+          "started_at": "2026-09-15T20:48:22.927312+00:00",
+          "exit_code": 0,
+          "command": [
+            "cmake",
+            "--build",
+            "/dev/shm/intrinsic-runtime266-measure",
+            "--target",
+            "ExtrinsicRuntime",
+            "--parallel",
+            "4"
+          ],
+          "loadavg_before": [
+            3.29736328125,
+            3.65234375,
+            3.7490234375
+          ]
+        },
+        "compiler_invocations": 0,
+        "critical_path": {
+          "duration_ms": 0,
+          "timed_path": [],
+          "timed_output_count": 0,
+          "unlabelled_ancillary_outputs": 13,
+          "unmapped_ancillary_outputs": [],
+          "unmapped_meta_outputs": []
+        },
+        "top_producers": []
+      },
+      "workspace_impl": {
+        "execution": {
+          "cpu_user_s": 6.8,
+          "cpu_system_s": 0.45,
+          "max_single_process_rss_kib": 1730160,
+          "wall_ms": 7262.9068290116265,
+          "started_at": "2026-09-15T20:48:23.349183+00:00",
+          "exit_code": 0,
+          "command": [
+            "cmake",
+            "--build",
+            "/dev/shm/intrinsic-runtime266-measure",
+            "--target",
+            "ExtrinsicRuntime",
+            "--parallel",
+            "4"
+          ],
+          "loadavg_before": [
+            3.29736328125,
+            3.65234375,
+            3.7490234375
+          ]
+        },
+        "compiler_invocations": 1,
+        "critical_path": {
+          "duration_ms": 7187,
+          "timed_path": [
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp.o.ddi",
+              "duration_ms": 64
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/CXX.dd",
+              "duration_ms": 31
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp.o",
+              "duration_ms": 6925
+            },
+            {
+              "output": "lib/libExtrinsicRuntime.a",
+              "duration_ms": 167
+            }
+          ],
+          "timed_output_count": 243,
+          "unlabelled_ancillary_outputs": 13,
+          "unmapped_ancillary_outputs": [
+            "/dev/shm/intrinsic-runtime266-measure/src/runtime/CMakeFiles/ExtrinsicRuntime.dir/CXXModules.json"
+          ],
+          "unmapped_meta_outputs": []
+        },
+        "top_producers": [
+          {
+            "edge_id": "a25c4189721cdff54de67e14ba81b18dfa9d8aeb20c9f322bcb28c97e7d4b65c",
+            "physical_identity": {
+              "start_ms": 161,
+              "end_ms": 7086,
+              "command_hash": "159c7d60f7d01d97",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 6925,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp"
+              ]
+            },
+            "source_lines": 3454,
+            "includes": 24,
+            "imports": 57,
+            "exports": 0
+          }
+        ]
+      },
+      "snapshot_interface": {
+        "execution": {
+          "cpu_user_s": 44.09,
+          "cpu_system_s": 1.83,
+          "max_single_process_rss_kib": 2781104,
+          "wall_ms": 25441.44669303205,
+          "started_at": "2026-09-15T20:48:30.982477+00:00",
+          "exit_code": 0,
+          "command": [
+            "cmake",
+            "--build",
+            "/dev/shm/intrinsic-runtime266-measure",
+            "--target",
+            "ExtrinsicRuntime",
+            "--parallel",
+            "4"
+          ],
+          "loadavg_before": [
+            3.017578125,
+            3.58056640625,
+            3.72412109375
+          ]
+        },
+        "compiler_invocations": 5,
+        "critical_path": {
+          "duration_ms": 25367,
+          "timed_path": [
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.cppm.o.ddi",
+              "duration_ms": 49
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/CXX.dd",
+              "duration_ms": 28
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.EditorWorkspaceSnapshots.pcm",
+              "duration_ms": 15234
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorWorkspaceSession.cpp.o",
+              "duration_ms": 9892
+            },
+            {
+              "output": "lib/libExtrinsicRuntime.a",
+              "duration_ms": 164
+            }
+          ],
+          "timed_output_count": 248,
+          "unlabelled_ancillary_outputs": 13,
+          "unmapped_ancillary_outputs": [
+            "/dev/shm/intrinsic-runtime266-measure/src/runtime/CMakeFiles/ExtrinsicRuntime.dir/CXXModules.json"
+          ],
+          "unmapped_meta_outputs": []
+        },
+        "top_producers": [
+          {
+            "edge_id": "9d9b56021972518c2b2210fd3a7f8c5f0dfba7c16dd22238ff04cdbea25b2feb",
+            "physical_identity": {
+              "start_ms": 142,
+              "end_ms": 15376,
+              "command_hash": "32fcdb1c804bd49b",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 15234,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.cppm.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.cppm.o",
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.EditorWorkspaceSnapshots.pcm"
+            ],
+            "edge_kind": "module-interface",
+            "source": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.cppm.o"
+              ],
+              "candidates": [
+                "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm"
+              ]
+            },
+            "source_lines": 278,
+            "includes": 7,
+            "imports": 8,
+            "exports": 2
+          },
+          {
+            "edge_id": "62185674b8d6dcf001876e737f2c253e5ca05b0b59a4b69420d0e326f6d51bed",
+            "physical_identity": {
+              "start_ms": 15377,
+              "end_ms": 25269,
+              "command_hash": "9a427994fb1db890",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 9892,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorWorkspaceSession.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorWorkspaceSession.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorWorkspaceSession.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp"
+              ]
+            },
+            "source_lines": 959,
+            "includes": 16,
+            "imports": 60,
+            "exports": 0
+          },
+          {
+            "edge_id": "454cdd18f2f18fb57de6db5f88764b50b5a0eb906146c73cd8f9be7e109b406a",
+            "physical_identity": {
+              "start_ms": 15377,
+              "end_ms": 24959,
+              "command_hash": "801967fbc337cc98",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 9582,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp"
+              ]
+            },
+            "source_lines": 2274,
+            "includes": 21,
+            "imports": 54,
+            "exports": 0
+          },
+          {
+            "edge_id": "a25c4189721cdff54de67e14ba81b18dfa9d8aeb20c9f322bcb28c97e7d4b65c",
+            "physical_identity": {
+              "start_ms": 15376,
+              "end_ms": 23012,
+              "command_hash": "159c7d60f7d01d97",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 7636,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp"
+              ]
+            },
+            "source_lines": 3454,
+            "includes": 24,
+            "imports": 57,
+            "exports": 0
+          },
+          {
+            "edge_id": "1019e4090bf4d3ebab1c32a608a5cb4a8726265940ec9d511a0a814a34dd6ffa",
+            "physical_identity": {
+              "start_ms": 15376,
+              "end_ms": 18653,
+              "command_hash": "65b6751550b1427a",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 3277,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp"
+              ]
+            },
+            "source_lines": 142,
+            "includes": 8,
+            "imports": 8,
+            "exports": 0
+          }
+        ]
+      },
+      "scene_interface": {
+        "execution": {
+          "cpu_user_s": 64.27,
+          "cpu_system_s": 2.78,
+          "max_single_process_rss_kib": 2779588,
+          "wall_ms": 35621.804900001734,
+          "started_at": "2026-09-15T20:48:56.806792+00:00",
+          "exit_code": 0,
+          "command": [
+            "cmake",
+            "--build",
+            "/dev/shm/intrinsic-runtime266-measure",
+            "--target",
+            "ExtrinsicRuntime",
+            "--parallel",
+            "4"
+          ],
+          "loadavg_before": [
+            2.796875,
+            3.4716796875,
+            3.68359375
+          ]
+        },
+        "compiler_invocations": 10,
+        "critical_path": {
+          "duration_ms": 35123,
+          "timed_path": [
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.cppm.o.ddi",
+              "duration_ms": 56
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.cppm.o.modmap",
+              "duration_ms": 29
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.SceneEditingOperations.pcm",
+              "duration_ms": 9312
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.EditorWorkspaceSnapshots.pcm",
+              "duration_ms": 15709
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorWorkspaceSession.cpp.o",
+              "duration_ms": 9857
+            },
+            {
+              "output": "lib/libExtrinsicRuntime.a",
+              "duration_ms": 160
+            }
+          ],
+          "timed_output_count": 254,
+          "unlabelled_ancillary_outputs": 13,
+          "unmapped_ancillary_outputs": [
+            "/dev/shm/intrinsic-runtime266-measure/src/runtime/CMakeFiles/ExtrinsicRuntime.dir/CXXModules.json"
+          ],
+          "unmapped_meta_outputs": []
+        },
+        "top_producers": [
+          {
+            "edge_id": "9d9b56021972518c2b2210fd3a7f8c5f0dfba7c16dd22238ff04cdbea25b2feb",
+            "physical_identity": {
+              "start_ms": 9888,
+              "end_ms": 25597,
+              "command_hash": "32fcdb1c804bd49b",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 15709,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.cppm.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.cppm.o",
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.EditorWorkspaceSnapshots.pcm"
+            ],
+            "edge_kind": "module-interface",
+            "source": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.cppm.o"
+              ],
+              "candidates": [
+                "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm"
+              ]
+            },
+            "source_lines": 278,
+            "includes": 7,
+            "imports": 8,
+            "exports": 2
+          },
+          {
+            "edge_id": "62185674b8d6dcf001876e737f2c253e5ca05b0b59a4b69420d0e326f6d51bed",
+            "physical_identity": {
+              "start_ms": 25597,
+              "end_ms": 35454,
+              "command_hash": "9a427994fb1db890",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 9857,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorWorkspaceSession.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorWorkspaceSession.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorWorkspaceSession.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp"
+              ]
+            },
+            "source_lines": 959,
+            "includes": 16,
+            "imports": 60,
+            "exports": 0
+          },
+          {
+            "edge_id": "454cdd18f2f18fb57de6db5f88764b50b5a0eb906146c73cd8f9be7e109b406a",
+            "physical_identity": {
+              "start_ms": 25597,
+              "end_ms": 35140,
+              "command_hash": "801967fbc337cc98",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 9543,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp"
+              ]
+            },
+            "source_lines": 2274,
+            "includes": 21,
+            "imports": 54,
+            "exports": 0
+          },
+          {
+            "edge_id": "39b24c7f20f654a33b652d58c9d95957049f76597c0d616f40238c27e82636df",
+            "physical_identity": {
+              "start_ms": 152,
+              "end_ms": 9464,
+              "command_hash": "118edbad2be4bcd",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 9312,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.cppm.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.cppm.o",
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.SceneEditingOperations.pcm"
+            ],
+            "edge_kind": "module-interface",
+            "source": "src/runtime/Editor/Operations/Runtime.SceneEditingOperations.cppm",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Editor/Operations/Runtime.SceneEditingOperations.cppm",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.cppm.o"
+              ],
+              "candidates": [
+                "src/runtime/Editor/Operations/Runtime.SceneEditingOperations.cppm"
+              ]
+            },
+            "source_lines": 486,
+            "includes": 11,
+            "imports": 19,
+            "exports": 2
+          },
+          {
+            "edge_id": "a25c4189721cdff54de67e14ba81b18dfa9d8aeb20c9f322bcb28c97e7d4b65c",
+            "physical_identity": {
+              "start_ms": 25597,
+              "end_ms": 33184,
+              "command_hash": "159c7d60f7d01d97",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 7587,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp"
+              ]
+            },
+            "source_lines": 3454,
+            "includes": 24,
+            "imports": 57,
+            "exports": 0
+          },
+          {
+            "edge_id": "103fd2bc585babd5e6295a50763cdcacfca99fed98715e409adf5af0b77aef67",
+            "physical_identity": {
+              "start_ms": 9465,
+              "end_ms": 15795,
+              "command_hash": "fac8e2683ea03486",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 6330,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp"
+              ]
+            },
+            "source_lines": 3015,
+            "includes": 23,
+            "imports": 24,
+            "exports": 0
+          },
+          {
+            "edge_id": "1019e4090bf4d3ebab1c32a608a5cb4a8726265940ec9d511a0a814a34dd6ffa",
+            "physical_identity": {
+              "start_ms": 25597,
+              "end_ms": 28857,
+              "command_hash": "65b6751550b1427a",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 3260,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp"
+              ]
+            },
+            "source_lines": 142,
+            "includes": 8,
+            "imports": 8,
+            "exports": 0
+          },
+          {
+            "edge_id": "c0f3d2e41e57d916a773d8e3fc1bba323a21c12d9316e8b80a3d8db77c1c7cab",
+            "physical_identity": {
+              "start_ms": 9464,
+              "end_ms": 12661,
+              "command_hash": "da876b3387c50dcc",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 3197,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp"
+              ]
+            },
+            "source_lines": 680,
+            "includes": 16,
+            "imports": 16,
+            "exports": 0
+          },
+          {
+            "edge_id": "13af618c1777f98c60c3c68c0461de7696fcc6058e5e1d3efc94b62703235f2b",
+            "physical_identity": {
+              "start_ms": 9464,
+              "end_ms": 11006,
+              "command_hash": "8397ab6f27284291",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 1542,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.Public.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.Public.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Public.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Public.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.Public.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Public.cpp"
+              ]
+            },
+            "source_lines": 162,
+            "includes": 4,
+            "imports": 2,
+            "exports": 0
+          },
+          {
+            "edge_id": "7a293baab58974a8d8fbc486c8cb7818de7702ee5a6e35c36e0435cdd65bbe12",
+            "physical_identity": {
+              "start_ms": 9465,
+              "end_ms": 9888,
+              "command_hash": "5b7ae5b3b7f0fa39",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 423,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.Debug.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.Debug.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Debug.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Debug.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.Debug.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Debug.cpp"
+              ]
+            },
+            "source_lines": 54,
+            "includes": 2,
+            "imports": 0,
+            "exports": 0
+          }
+        ]
+      }
+    },
+    "source_clean_before_after": true
+  },
+  "thresholds": {},
+  "threshold_disposition": [],
+  "execution_status": "passed",
+  "status": "passed"
+}

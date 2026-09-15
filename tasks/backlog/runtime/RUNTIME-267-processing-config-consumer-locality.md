@@ -70,3 +70,8 @@ python3 tools/docs/check_doc_links.py --root .
 BUILD-009 is complete. Use its [matched source comparison](../../../ara/evidence/tables/build009_current_compile_measurement.md)
 and retained producer/critical-path records; the old BUILD-007 costs are historical.
 Freeze this task's immediate-before source before attributing its own changes.
+
+RUNTIME-266 is complete at `08728e2e1`: the registry import cut is retained and
+fully verified; its noisy two-sample timings imply no stable speedup. RUNTIME-268
+owns the separately diagnosed snapshot serialization footprint. Coordinate shared
+context/session edits and freeze a fresh config baseline for this task.

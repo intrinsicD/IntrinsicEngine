@@ -1,0 +1,602 @@
+{
+  "totals": [
+    {
+      "name": "Total ExecuteCompiler",
+      "milliseconds": 16689.719,
+      "args": {
+        "count": 1,
+        "avg ms": 16689
+      }
+    },
+    {
+      "name": "Total WriteAST",
+      "milliseconds": 14727.129,
+      "args": {
+        "count": 1,
+        "avg ms": 14727
+      }
+    },
+    {
+      "name": "Total Frontend",
+      "milliseconds": 1923.639,
+      "args": {
+        "count": 2,
+        "avg ms": 961
+      }
+    },
+    {
+      "name": "Total ParseClass",
+      "milliseconds": 1003.496,
+      "args": {
+        "count": 1488,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total ParseDeclarationOrFunctionDefinition",
+      "milliseconds": 915.988,
+      "args": {
+        "count": 735,
+        "avg ms": 1
+      }
+    },
+    {
+      "name": "Total Load External Specializations for ",
+      "milliseconds": 748.957,
+      "args": {
+        "count": 13458,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total Source",
+      "milliseconds": 683.816,
+      "args": {
+        "count": 4,
+        "avg ms": 170
+      }
+    },
+    {
+      "name": "Total InstantiateFunction",
+      "milliseconds": 605.37,
+      "args": {
+        "count": 296,
+        "avg ms": 2
+      }
+    },
+    {
+      "name": "Total InstantiateClass",
+      "milliseconds": 411.551,
+      "args": {
+        "count": 771,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total CheckConstraintSatisfaction",
+      "milliseconds": 335.377,
+      "args": {
+        "count": 28442,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total PerformPendingInstantiations",
+      "milliseconds": 287.031,
+      "args": {
+        "count": 2,
+        "avg ms": 143
+      }
+    },
+    {
+      "name": "Total ParseFunctionDefinition",
+      "milliseconds": 232.38,
+      "args": {
+        "count": 1454,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total Module Load",
+      "milliseconds": 28.349,
+      "args": {
+        "count": 8,
+        "avg ms": 3
+      }
+    },
+    {
+      "name": "Total ReadAST",
+      "milliseconds": 28.328,
+      "args": {
+        "count": 8,
+        "avg ms": 3
+      }
+    },
+    {
+      "name": "Total EvaluateAsInitializer",
+      "milliseconds": 21.57,
+      "args": {
+        "count": 2982,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total Stable Hash for Template Arguments",
+      "milliseconds": 19.765,
+      "args": {
+        "count": 228779,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total Read Loaded AST",
+      "milliseconds": 16.901,
+      "args": {
+        "count": 91,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total EvaluateAsConstantExpr",
+      "milliseconds": 14.193,
+      "args": {
+        "count": 12539,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total EvaluateAsRValue",
+      "milliseconds": 9.093,
+      "args": {
+        "count": 9813,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total EvaluateForOverflow",
+      "milliseconds": 6.227,
+      "args": {
+        "count": 3984,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total Backend",
+      "milliseconds": 5.69,
+      "args": {
+        "count": 1,
+        "avg ms": 5
+      }
+    },
+    {
+      "name": "Total EvaluateAsBooleanCondition",
+      "milliseconds": 2.095,
+      "args": {
+        "count": 1242,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total EvaluateAsInt",
+      "milliseconds": 1.478,
+      "args": {
+        "count": 1693,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total CodeGenPasses",
+      "milliseconds": 1.108,
+      "args": {
+        "count": 1,
+        "avg ms": 1
+      }
+    },
+    {
+      "name": "Total OptModule",
+      "milliseconds": 1.095,
+      "args": {
+        "count": 1,
+        "avg ms": 1
+      }
+    },
+    {
+      "name": "Total DebugType",
+      "milliseconds": 0.663,
+      "args": {
+        "count": 308,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total isIntegerConstantExpr",
+      "milliseconds": 0.567,
+      "args": {
+        "count": 628,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total OptFunction",
+      "milliseconds": 0.471,
+      "args": {
+        "count": 1,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total RunPass",
+      "milliseconds": 0.465,
+      "args": {
+        "count": 68,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total EvaluateKnownConstInt",
+      "milliseconds": 0.289,
+      "args": {
+        "count": 833,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total Optimizer",
+      "milliseconds": 0.036,
+      "args": {
+        "count": 1,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total ModuleToFunctionPassAdaptor",
+      "milliseconds": 0.013,
+      "args": {
+        "count": 2,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total CoroConditionalWrapper",
+      "milliseconds": 0.005,
+      "args": {
+        "count": 1,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total AlwaysInlinerPass",
+      "milliseconds": 0.005,
+      "args": {
+        "count": 1,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total AnnotationRemarksPass",
+      "milliseconds": 0.005,
+      "args": {
+        "count": 1,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total ProfileSummaryAnalysis",
+      "milliseconds": 0.002,
+      "args": {
+        "count": 1,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total EntryExitInstrumenterPass",
+      "milliseconds": 0.001,
+      "args": {
+        "count": 1,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total TargetLibraryAnalysis",
+      "milliseconds": 0.001,
+      "args": {
+        "count": 1,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total AllocTokenPass",
+      "milliseconds": 0.001,
+      "args": {
+        "count": 1,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total InnerAnalysisManagerProxy<FunctionAnalysisManager, Module>",
+      "milliseconds": 0.0,
+      "args": {
+        "count": 1,
+        "avg ms": 0
+      }
+    }
+  ],
+  "longest_events": [
+    {
+      "name": "ExecuteCompiler",
+      "milliseconds": 16689.719,
+      "args": {}
+    },
+    {
+      "name": "WriteAST",
+      "milliseconds": 14727.129,
+      "args": {
+        "detail": "/tmp/intrinsic-runtime266/snapshot-trace.pcm"
+      }
+    },
+    {
+      "name": "Frontend",
+      "milliseconds": 1923.257,
+      "args": {}
+    },
+    {
+      "name": "ParseDeclarationOrFunctionDefinition",
+      "milliseconds": 357.325,
+      "args": {
+        "detail": "/home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm:42:5"
+      }
+    },
+    {
+      "name": "ParseClass",
+      "milliseconds": 357.306,
+      "args": {
+        "detail": "Extrinsic::Runtime::EditorInspectorModel"
+      }
+    },
+    {
+      "name": "PerformPendingInstantiations",
+      "milliseconds": 282.348,
+      "args": {}
+    },
+    {
+      "name": "InstantiateFunction",
+      "milliseconds": 137.839,
+      "args": {
+        "detail": "std::vector<Extrinsic::Runtime::EditorPropertyCatalogRow>::~vector"
+      }
+    },
+    {
+      "name": "InstantiateFunction",
+      "milliseconds": 136.028,
+      "args": {
+        "detail": "std::vformat_to<std::__format::_Sink_iter<char>>"
+      }
+    },
+    {
+      "name": "InstantiateFunction",
+      "milliseconds": 135.908,
+      "args": {
+        "detail": "std::__format::__do_vformat_to<std::__format::_Sink_iter<char>, char, std::basic_format_context<std::__format::_Sink_iter<char>, char>>"
+      }
+    },
+    {
+      "name": "InstantiateFunction",
+      "milliseconds": 131.957,
+      "args": {
+        "detail": "std::_Destroy<Extrinsic::Runtime::EditorPropertyCatalogRow *, Extrinsic::Runtime::EditorPropertyCatalogRow>"
+      }
+    },
+    {
+      "name": "InstantiateFunction",
+      "milliseconds": 131.908,
+      "args": {
+        "detail": "std::_Destroy<Extrinsic::Runtime::EditorPropertyCatalogRow *>"
+      }
+    },
+    {
+      "name": "ParseDeclarationOrFunctionDefinition",
+      "milliseconds": 104.854,
+      "args": {
+        "detail": "/home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm:95:5"
+      }
+    },
+    {
+      "name": "ParseClass",
+      "milliseconds": 104.843,
+      "args": {
+        "detail": "Extrinsic::Runtime::EditorSelectedModelCacheKey"
+      }
+    },
+    {
+      "name": "InstantiateFunction",
+      "milliseconds": 103.007,
+      "args": {
+        "detail": "std::vformat_to<std::__format::_Sink_iter<wchar_t>>"
+      }
+    },
+    {
+      "name": "InstantiateFunction",
+      "milliseconds": 102.889,
+      "args": {
+        "detail": "std::__format::__do_vformat_to<std::__format::_Sink_iter<wchar_t>, wchar_t, std::basic_format_context<std::__format::_Sink_iter<wchar_t>, wchar_t>>"
+      }
+    },
+    {
+      "name": "ParseDeclarationOrFunctionDefinition",
+      "milliseconds": 73.834,
+      "args": {
+        "detail": "/home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm:161:5"
+      }
+    },
+    {
+      "name": "ParseDeclarationOrFunctionDefinition",
+      "milliseconds": 67.238,
+      "args": {
+        "detail": "/home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm:31:5"
+      }
+    },
+    {
+      "name": "ParseClass",
+      "milliseconds": 67.23,
+      "args": {
+        "detail": "Extrinsic::Runtime::EditorGeometryDomainModel"
+      }
+    },
+    {
+      "name": "ParseDeclarationOrFunctionDefinition",
+      "milliseconds": 53.326,
+      "args": {
+        "detail": "/home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm:188:5"
+      }
+    },
+    {
+      "name": "ParseClass",
+      "milliseconds": 53.314,
+      "args": {
+        "detail": "Extrinsic::Runtime::EditorWorkspaceSnapshot"
+      }
+    },
+    {
+      "name": "InstantiateClass",
+      "milliseconds": 50.804,
+      "args": {
+        "detail": "std::is_destructible<Extrinsic::Runtime::EditorPropertyCatalogRow>"
+      }
+    },
+    {
+      "name": "ParseDeclarationOrFunctionDefinition",
+      "milliseconds": 48.049,
+      "args": {
+        "detail": "/home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm:56:5"
+      }
+    },
+    {
+      "name": "ParseClass",
+      "milliseconds": 48.021,
+      "args": {
+        "detail": "Extrinsic::Runtime::EditorDomainWindowModel"
+      }
+    },
+    {
+      "name": "InstantiateFunction",
+      "milliseconds": 36.876,
+      "args": {
+        "detail": "std::formatter<bool>::format<std::__format::_Sink_iter<char>>"
+      }
+    },
+    {
+      "name": "InstantiateFunction",
+      "milliseconds": 36.794,
+      "args": {
+        "detail": "std::__format::__formatter_int<char>::format<std::__format::_Sink_iter<char>>"
+      }
+    },
+    {
+      "name": "ParseDeclarationOrFunctionDefinition",
+      "milliseconds": 36.555,
+      "args": {
+        "detail": "/home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm:214:5"
+      }
+    },
+    {
+      "name": "ParseClass",
+      "milliseconds": 36.537,
+      "args": {
+        "detail": "Extrinsic::Runtime::EditorWorkspaceSnapshotQueries"
+      }
+    },
+    {
+      "name": "InstantiateClass",
+      "milliseconds": 35.968,
+      "args": {
+        "detail": "std::shared_ptr<const Extrinsic::Runtime::EditorWorkspaceSnapshotContext>"
+      }
+    },
+    {
+      "name": "ParseClass",
+      "milliseconds": 33.264,
+      "args": {
+        "detail": "std::formatter"
+      }
+    },
+    {
+      "name": "InstantiateFunction",
+      "milliseconds": 32.607,
+      "args": {
+        "detail": "std::__format::__formatter_int<wchar_t>::_M_parse<char>"
+      }
+    },
+    {
+      "name": "InstantiateFunction",
+      "milliseconds": 32.367,
+      "args": {
+        "detail": "std::__format::__formatter_int<wchar_t>::_M_do_parse"
+      }
+    },
+    {
+      "name": "InstantiateFunction",
+      "milliseconds": 32.246,
+      "args": {
+        "detail": "std::__format::__formatter_int<char>::format<unsigned char, std::__format::_Sink_iter<char>>"
+      }
+    },
+    {
+      "name": "ParseDeclarationOrFunctionDefinition",
+      "milliseconds": 31.727,
+      "args": {
+        "detail": "/usr/lib/gcc/x86_64-linux-gnu/14/../../../../include/c++/14/format:4251:3"
+      }
+    },
+    {
+      "name": "ParseFunctionDefinition",
+      "milliseconds": 31.717,
+      "args": {
+        "detail": "vformat"
+      }
+    },
+    {
+      "name": "InstantiateFunction",
+      "milliseconds": 30.941,
+      "args": {
+        "detail": "std::__format::__formatter_int<char>::_M_format_int<std::__format::_Sink_iter<char>>"
+      }
+    },
+    {
+      "name": "ParseDeclarationOrFunctionDefinition",
+      "milliseconds": 28.38,
+      "args": {
+        "detail": "/usr/lib/gcc/x86_64-linux-gnu/14/../../../../include/c++/14/format:4261:3"
+      }
+    },
+    {
+      "name": "ParseFunctionDefinition",
+      "milliseconds": 28.348,
+      "args": {
+        "detail": "vformat"
+      }
+    },
+    {
+      "name": "InstantiateClass",
+      "milliseconds": 27.068,
+      "args": {
+        "detail": "std::__format::_Seq_sink<std::basic_string<char>>"
+      }
+    },
+    {
+      "name": "InstantiateClass",
+      "milliseconds": 26.947,
+      "args": {
+        "detail": "std::__format::_Buf_sink<char>"
+      }
+    },
+    {
+      "name": "InstantiateClass",
+      "milliseconds": 26.856,
+      "args": {
+        "detail": "std::__format::_Sink<char>"
+      }
+    }
+  ],
+  "event_count": 1437,
+  "scope": "Single diagnostic compile of the verified after source, outside timed samples; isolated output PCM/object, existing dependency BMIs read only. Trace overhead is not benchmark timing."
+}

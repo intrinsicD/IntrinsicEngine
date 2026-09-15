@@ -1,0 +1,34 @@
+## Verdict
+
+Authorize the **whole ten-interface cut**, but it is gated on one precondition the supplied owner source does not yet satisfy.
+
+## Blocking precondition
+
+`Extrinsic.ECS.Scene.Registry` as supplied declares `export class Registry` in the module purview with **no `extern "C++"`** — it is *module-attached*, not globally attached. A `class Registry;` forward declaration written in any of the ten consumer purviews would therefore declare a different entity with different linkage, not match this one. The premise "same sole globally attached class definition" is not true of the current source.
+
+So the cut must include wrapping the owner definition in `export extern "C++" { … }` (same shape as `WorldRegistry` already uses, same file, no new files). This also repairs a latent mismatch that exists today: `EditorProcessingContext`, `EditorSceneEditingContext`, and `EditorVisualizationEditingContext` are already globally attached and hold `Registry*` to a module-attached class.
+
+With that done the path is closed: all ten use plain (non-`export`) imports, so nothing re-exports Registry transitively, and the graph lists these ten as the only direct importers inside the 92-module closure.
+
+## Per-interface audit — no complete-type use in any of the ten
+
+- **EditorCommandHistory** — `Registry* Scene` member, `const Registry&` param. Incomplete OK.
+- **EditorProcessing** — `Registry* Scene` only.
+- **GeometryProcessingOperations** — `const Registry&` params only.
+- **PrimitiveSelectionRefinement** — `Registry& scene` params only.
+- **SceneEditingOperations** — `Registry* Scene` member.
+- **SceneSerialization** — `Registry&` / `const Registry&` params only.
+- **SelectionController** — `using Registry = …` alias plus references/pointers; the one inline body (`ToStableEntityId`) touches only `StableEntityLookup`. An alias to an incomplete type is fine.
+- **StableEntityLookup** — references only; the three inline bodies (`ContainsStableId`, `ToRenderId`, `ToEntityHandle`) never name Registry.
+- **VisualizationEditingOperations** — `Registry* Scene` member.
+- **WorldRegistry** — see below.
+
+No lifetime hazard: every entity is a borrowed pointer/reference with no ownership or inline dereference.
+
+## WorldRegistry / WorldRecord
+
+An ordinary out-of-line owner is **enough**; no explicit `WorldRecord` destructor is required. `unique_ptr<Registry>` may be *declared* against an incomplete type; completeness is needed only where the deleter is instantiated. `WorldRecord`'s implicit destructor and move operations are odr-used solely from `WorldRegistry`'s ctor/dtor, `ApplyMaintenance`, `Clear`, and vector growth inside those bodies — all out-of-line in the implementation unit, where Registry is complete. The interface defines no member function bodies, so nothing instantiates there. The standing constraint: no `WorldRegistry` member may later be defined inline in the interface.
+
+## Same-boundary extra
+
+Dropping the `GeometrySources` import from `SceneEditingOperations` is safe for consumers (plain import, not transitively visible), but its implementation unit inherits the interface's imports — confirm `Runtime.SceneEditingOperations.cpp` does not rely on it before removing, and add an explicit import there if it does. Claim only the combined result.

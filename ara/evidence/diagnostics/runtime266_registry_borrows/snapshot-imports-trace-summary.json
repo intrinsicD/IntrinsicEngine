@@ -1,0 +1,222 @@
+{
+  "command": [
+    "/usr/bin/clang++-23",
+    "-DEIGEN_MPL2_ONLY",
+    "-DENGINE_ROOT_DIR=\"/home/alex/Documents/IntrinsicEngine\"",
+    "-DGLM_FORCE_DEPTH_ZERO_TO_ONE",
+    "-DGLM_FORCE_RADIANS",
+    "-DGLM_FORCE_XYZW_ONLY",
+    "-DGLM_RIGHT_HANDED",
+    "-DTINYGLTF_ENABLE_DRACO",
+    "-DTINYGLTF_NOEXCEPTION",
+    "-I/home/alex/Documents/IntrinsicEngine/src/runtime/.",
+    "-I/home/alex/Documents/IntrinsicEngine/src/assets/.",
+    "-I/home/alex/Documents/IntrinsicEngine/src/core/.",
+    "-I/home/alex/Documents/IntrinsicEngine/src/ecs/.",
+    "-I/home/alex/Documents/IntrinsicEngine/src/ecs/Components/.",
+    "-I/home/alex/Documents/IntrinsicEngine/src/ecs/Events/.",
+    "-I/home/alex/Documents/IntrinsicEngine/src/ecs/Systems/.",
+    "-I/home/alex/Documents/IntrinsicEngine/src/graphics/renderer/.",
+    "-I/home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Components/.",
+    "-I/home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Backends/Null/.",
+    "-I/home/alex/Documents/IntrinsicEngine/src/graphics/rhi/.",
+    "-I/home/alex/Documents/IntrinsicEngine/src/graphics/assets/.",
+    "-I/home/alex/Documents/IntrinsicEngine/src/graphics/framegraph/.",
+    "-I/home/alex/Documents/IntrinsicEngine/src/physics/.",
+    "-I/home/alex/Documents/IntrinsicEngine/src/geometry/.",
+    "-I/home/alex/Documents/IntrinsicEngine/src/platform/.",
+    "-I/home/alex/Documents/IntrinsicEngine/methods/geometry/progressive_poisson/include",
+    "-isystem",
+    "/home/alex/Documents/IntrinsicEngine/external/vcpkg-installed/ci/x64-linux/include",
+    "-isystem",
+    "/home/alex/Documents/IntrinsicEngine/external/vcpkg-installed/ci/x64-linux/include/eigen3",
+    "-isystem",
+    "/home/alex/Documents/IntrinsicEngine/external/vcpkg-installed/ci/x64-linux/include/backends",
+    "-g",
+    "-std=c++23",
+    "-Wall",
+    "-Wextra",
+    "-Wpedantic",
+    "-Wno-unknown-pragmas",
+    "-Werror=return-type",
+    "-fno-exceptions",
+    "-fno-rtti",
+    "@/tmp/intrinsic-runtime266/snapshot-imports-trace.modmap",
+    "-o",
+    "/tmp/intrinsic-runtime266/snapshot-imports-trace.o",
+    "-c",
+    "/tmp/intrinsic-runtime266/SnapshotImportsOnly.cppm",
+    "-ftime-trace=/tmp/intrinsic-runtime266/snapshot-imports-trace.json"
+  ],
+  "cwd": "/home/alex/Documents/IntrinsicEngine/build/ci",
+  "source": "/tmp/intrinsic-runtime266/SnapshotImportsOnly.cppm",
+  "wall_seconds": 1.6784653950016946,
+  "pcm_bytes": 1509248,
+  "totals": [
+    {
+      "name": "Total ExecuteCompiler",
+      "milliseconds": 1635.911
+    },
+    {
+      "name": "Total Frontend",
+      "milliseconds": 1451.409
+    },
+    {
+      "name": "Total Source",
+      "milliseconds": 707.703
+    },
+    {
+      "name": "Total InstantiateFunction",
+      "milliseconds": 380.626
+    },
+    {
+      "name": "Total CheckConstraintSatisfaction",
+      "milliseconds": 333.638
+    },
+    {
+      "name": "Total ParseClass",
+      "milliseconds": 330.147
+    },
+    {
+      "name": "Total PerformPendingInstantiations",
+      "milliseconds": 290.789
+    },
+    {
+      "name": "Total ParseFunctionDefinition",
+      "milliseconds": 273.164
+    },
+    {
+      "name": "Total InstantiateClass",
+      "milliseconds": 251.874
+    },
+    {
+      "name": "Total ParseDeclarationOrFunctionDefinition",
+      "milliseconds": 248.104
+    },
+    {
+      "name": "Total WriteAST",
+      "milliseconds": 174.904
+    },
+    {
+      "name": "Total Load External Specializations for ",
+      "milliseconds": 35.956
+    },
+    {
+      "name": "Total Module Load",
+      "milliseconds": 27.461
+    },
+    {
+      "name": "Total ReadAST",
+      "milliseconds": 27.44
+    },
+    {
+      "name": "Total Read Loaded AST",
+      "milliseconds": 16.445
+    },
+    {
+      "name": "Total EvaluateAsConstantExpr",
+      "milliseconds": 12.103
+    },
+    {
+      "name": "Total EvaluateAsRValue",
+      "milliseconds": 8.625
+    },
+    {
+      "name": "Total EvaluateForOverflow",
+      "milliseconds": 6.171
+    },
+    {
+      "name": "Total EvaluateAsInitializer",
+      "milliseconds": 5.04
+    },
+    {
+      "name": "Total Backend",
+      "milliseconds": 2.619
+    },
+    {
+      "name": "Total EvaluateAsBooleanCondition",
+      "milliseconds": 1.99
+    },
+    {
+      "name": "Total EvaluateAsInt",
+      "milliseconds": 1.539
+    },
+    {
+      "name": "Total CodeGenPasses",
+      "milliseconds": 1.252
+    },
+    {
+      "name": "Total OptModule",
+      "milliseconds": 1.236
+    },
+    {
+      "name": "Total DebugType",
+      "milliseconds": 0.69
+    },
+    {
+      "name": "Total isIntegerConstantExpr",
+      "milliseconds": 0.577
+    },
+    {
+      "name": "Total OptFunction",
+      "milliseconds": 0.523
+    },
+    {
+      "name": "Total RunPass",
+      "milliseconds": 0.516
+    },
+    {
+      "name": "Total EvaluateKnownConstInt",
+      "milliseconds": 0.281
+    },
+    {
+      "name": "Total Stable Hash for Template Arguments",
+      "milliseconds": 0.04
+    },
+    {
+      "name": "Total Optimizer",
+      "milliseconds": 0.035
+    },
+    {
+      "name": "Total BuildCFG",
+      "milliseconds": 0.018
+    },
+    {
+      "name": "Total ModuleToFunctionPassAdaptor",
+      "milliseconds": 0.012
+    },
+    {
+      "name": "Total CoroConditionalWrapper",
+      "milliseconds": 0.006
+    },
+    {
+      "name": "Total AnnotationRemarksPass",
+      "milliseconds": 0.005
+    },
+    {
+      "name": "Total AlwaysInlinerPass",
+      "milliseconds": 0.004
+    },
+    {
+      "name": "Total TargetLibraryAnalysis",
+      "milliseconds": 0.001
+    },
+    {
+      "name": "Total EntryExitInstrumenterPass",
+      "milliseconds": 0.001
+    },
+    {
+      "name": "Total ProfileSummaryAnalysis",
+      "milliseconds": 0.001
+    },
+    {
+      "name": "Total AllocTokenPass",
+      "milliseconds": 0.001
+    },
+    {
+      "name": "Total InnerAnalysisManagerProxy<FunctionAnalysisManager, Module>",
+      "milliseconds": 0.0
+    }
+  ],
+  "scope": "Synthetic diagnostic retaining the snapshot GMF/includes and every direct import, replacing own declarations with one trivial exported function. Different module identity, no correctness equivalence or benchmark speedup claim."
+}

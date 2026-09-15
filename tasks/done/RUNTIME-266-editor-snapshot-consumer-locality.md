@@ -48,11 +48,11 @@ compile cost while retaining one canonical implementation of every record and ad
 - [x] Run focused and full CPU verification. If named-module attachment changes,
       rebuild all in-tree users and verify affected producers with fresh cache-off
       minimum-supported Clang; declare any GPU/sanitizer evidence separately.
-- [ ] Use the existing benchmark runner for matched before/after snapshot and
+- [x] Use the existing benchmark runner for matched before/after snapshot and
       scene-edit probes. Report source/file/dependency costs and timing separately;
       reject a harmful split, or close with an explicit no-change verdict supported
       by the experiment. Do not relabel the broader editor area as finished.
-- [ ] Update the canonical editor-boundary documentation and module inventory
+- [x] Update the canonical editor-boundary documentation and module inventory
       when changed; retire the task with review/test/measurement references.
 
 ## Verification
@@ -81,8 +81,8 @@ python3 tools/docs/check_doc_links.py --root .
   wrapper, source file, allocation or alternate record definition is needed.
 - The original compiler metadata rejects the proposed boundary for all eleven
   checked consumers. Canonical compilation, fixed-diff review and CPU verification now pass;
-  minimum-Clang proof also passes; matched measurement remains pending. Reject the
-  patch if it does not improve the selected compile boundary.
+  minimum-Clang proof also passes. The completed matched measurements below
+  support no stable timing-gain claim; the compiler boundary itself improves.
 - Fixed-diff review found no blocking linkage/lifetime defect. Resolve its
   completeness questions through source inspection: concrete scene serialization,
   refinement, world management and operation-action units already import the
@@ -116,3 +116,34 @@ Freeze this task's immediate-before source before attributing its own changes.
   engine prerequisites and app editor modules. All eleven new boundary producers
   pass against that fresh compiler metadata. No Clang20 tests or GPU execution
   are claimed; CPU runtime verification above uses canonical Clang23.
+
+## Completion — 2026-09-15
+- CPUContracted, the intended refactor endpoint. Commit reference: implementation
+  `08728e2e1`; frozen timing protocol `cc3a8ea86`.
+- [Report](../../ara/evidence/tables/runtime266_registry_borrow_measurement.md) and
+  [evidence index](../../ara/evidence/diagnostics/runtime266_registry_borrows/evidence-index.json)
+  retain all four canonical samples, exact source/command/dependency identities,
+  compiler guards, CPU/minimum-compiler verification and Claude reviews.
+- Retain the dependency cut with no stable timing-gain claim; the slower final
+  baseline sample limits the two-sample medians. C98 owns these bounded
+  observations and the separate diagnostic trace/control, not a general speedup.
+- Net production change is +29 declaration/comment lines; no new production
+  file, module, allocation, duplicate implementation or compatibility path.
+- Trace and synthetic control implicate snapshot declaration shape and reachable
+  types in BMI serialization. RUNTIME-268 owns isolating that dominant cost;
+  RUNTIME-267 owns config coupling. Broader editor cleanup remains open.
+
+## Clean-workshop review
+`tools/ci/run_clean_workshop_review.sh . --strict` passes. Manual review of the
+fixed diff finds no new dependency edge, duplicated owner or lifetime change.
+
+| Row | Result | Evidence |
+|---|---|---|
+| 1: layer imports | pass | Strict layering check; the patch removes imports. |
+| 2: CMake links | pass | No target-link changes. |
+| 3: public type direction | pass | Same ECS registry owner; runtime declarations borrow that lower-layer type. |
+| 4: renderer ownership | n/a | No renderer state or subsystem change. |
+| 5: typed pass identity | n/a | No frame-pass change. |
+| 6: recipe dependencies | n/a | No recipe or ordering change. |
+| 7: maturity closure | pass | CPUContracted endpoint verified; RUNTIME-268 retains the broader serialization work. |
+| 8: exceptions | pass | No new exception; strict allowlist check passes. |

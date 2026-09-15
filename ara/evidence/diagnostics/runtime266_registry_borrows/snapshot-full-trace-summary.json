@@ -1,0 +1,191 @@
+{
+  "totals": [
+    {
+      "name": "Total ExecuteCompiler",
+      "milliseconds": 309.229,
+      "args": {
+        "count": 1,
+        "avg ms": 309
+      }
+    },
+    {
+      "name": "Total DebugType",
+      "milliseconds": 150.547,
+      "args": {
+        "count": 85,
+        "avg ms": 1
+      }
+    },
+    {
+      "name": "Total ReadAST",
+      "milliseconds": 26.531,
+      "args": {
+        "count": 1,
+        "avg ms": 26
+      }
+    },
+    {
+      "name": "Total Read Loaded AST",
+      "milliseconds": 15.933,
+      "args": {
+        "count": 92,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total Backend",
+      "milliseconds": 2.224,
+      "args": {
+        "count": 1,
+        "avg ms": 2
+      }
+    },
+    {
+      "name": "Total Load External Specializations for ",
+      "milliseconds": 1.679,
+      "args": {
+        "count": 552,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total CodeGenPasses",
+      "milliseconds": 1.345,
+      "args": {
+        "count": 1,
+        "avg ms": 1
+      }
+    },
+    {
+      "name": "Total OptModule",
+      "milliseconds": 1.335,
+      "args": {
+        "count": 1,
+        "avg ms": 1
+      }
+    },
+    {
+      "name": "Total OptFunction",
+      "milliseconds": 0.526,
+      "args": {
+        "count": 1,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total RunPass",
+      "milliseconds": 0.521,
+      "args": {
+        "count": 68,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total Frontend",
+      "milliseconds": 0.342,
+      "args": {
+        "count": 2,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total Stable Hash for Template Arguments",
+      "milliseconds": 0.101,
+      "args": {
+        "count": 552,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total Optimizer",
+      "milliseconds": 0.024,
+      "args": {
+        "count": 1,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total ModuleToFunctionPassAdaptor",
+      "milliseconds": 0.007,
+      "args": {
+        "count": 2,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total CoroConditionalWrapper",
+      "milliseconds": 0.003,
+      "args": {
+        "count": 1,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total AnnotationRemarksPass",
+      "milliseconds": 0.003,
+      "args": {
+        "count": 1,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total AlwaysInlinerPass",
+      "milliseconds": 0.003,
+      "args": {
+        "count": 1,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total PerformPendingInstantiations",
+      "milliseconds": 0.002,
+      "args": {
+        "count": 1,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total TargetLibraryAnalysis",
+      "milliseconds": 0.001,
+      "args": {
+        "count": 1,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total EntryExitInstrumenterPass",
+      "milliseconds": 0.0,
+      "args": {
+        "count": 1,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total AllocTokenPass",
+      "milliseconds": 0.0,
+      "args": {
+        "count": 1,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total ProfileSummaryAnalysis",
+      "milliseconds": 0.0,
+      "args": {
+        "count": 1,
+        "avg ms": 0
+      }
+    },
+    {
+      "name": "Total InnerAnalysisManagerProxy<FunctionAnalysisManager, Module>",
+      "milliseconds": 0.0,
+      "args": {
+        "count": 1,
+        "avg ms": 0
+      }
+    }
+  ],
+  "pcm_bytes": 32601784,
+  "scope": "Full-BMI driver runs two cc1 jobs; the second overwrote the first trace at the explicitly shared trace path. This JSON describes only the final backend job, not full compilation. No mode-speedup claim or project setting change.",
+  "status": "incomplete_for_whole_compilation_comparison"
+}

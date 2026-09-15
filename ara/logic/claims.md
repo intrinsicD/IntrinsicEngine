@@ -2232,3 +2232,14 @@
 - **Dependencies**: []
 - **Tags**: compilation, C++23 modules, matched local observations, CPU build, editor, renderer
 - **From staging**: O230
+
+## C98: Bounded registry-borrow observations and snapshot serialization diagnostic
+- **Statement**: RUNTIME-266's retained Clang23 ABBA observations have unchanged compiler counts (776 clean, 5 snapshot edit, 10 scene edit). Snapshot edit ranges are 26.306–29.077 seconds before and 25.441–25.929 after; scene edit ranges are 36.450–39.972 before and 35.622–36.171 after. The final before sample is slower across multiple probes, so no stable clean, per-producer or edit speedup is established. A separate after-source diagnostic trace records WriteAST 14.727 seconds within ExecuteCompiler 16.690 seconds and a 28,482,868-byte BMI. A synthetic control preserving all imports/global-fragment includes but replacing own declarations records ExecuteCompiler 1.636 seconds and a 1,509,248-byte BMI; it is not feature-equivalent and proves no engine performance gain.
+- **Status**: supported — local observations and diagnostic phase accounting only; all four benchmark results remain claim_eligible:false. No statistical/general, causal memory, publication-qualified, cross-host/compiler, runtime/GPU or synthetic-to-engine speedup conclusion. Serialization may include work induced by transitively reachable imported types.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Recomputed raw records disagree with the stated ranges/counts/trace totals or source/flag/dependency identities differ. The synthetic control must remain distinguishable from feature-complete source; the overwritten full-BMI backend-only trace must not be used as whole-driver timing.
+- **Proof**: [ara/evidence/tables/runtime266_registry_borrow_measurement.md, ara/evidence/diagnostics/runtime266_registry_borrows/evidence-index.json, ara/evidence/diagnostics/runtime266_registry_borrows/summary.json, ara/evidence/diagnostics/runtime266_registry_borrows/snapshot-trace-summary.json, ara/evidence/diagnostics/runtime266_registry_borrows/snapshot-imports-trace-summary.json, ara/evidence/diagnostics/runtime266_registry_borrows/raw-evidence.tar.gz, benchmarks/ci/manifests/engine_compile_iteration_registry_borrow.yaml]
+- **Dependencies**: []
+- **Tags**: compilation, C++23 modules, snapshot serialization, matched local observations, diagnostic control
+- **From staging**: O231

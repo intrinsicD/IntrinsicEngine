@@ -84,8 +84,8 @@ Claude approved the medians, ranges, scope and accounting. All 24 reported criti
 durations/counts were recomputed from raw DOT/Ninja logs; alternate tied path witnesses
 have identical duration. Pre-timing canonical ci build and 90 focused CPU/compilation
 checks pass, as do 26 hotspot-tool and 15 result-validator tests. All six measured
-source builds succeed. The owned timed build was removed; its source checkout is
-retained for the bounded RUNTIME-266 experiment. Current refactor verification is
+source builds succeed. The owned timed build was removed; its source checkout was
+reused for RUNTIME-266 and removed after that experiment. Current refactor verification is
 recorded separately and is not attributed to these measured source revisions.
 
 [Results review](../diagnostics/build009_compile_followup/claude-results-review.txt) ·

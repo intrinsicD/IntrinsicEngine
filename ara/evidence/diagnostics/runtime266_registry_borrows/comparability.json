@@ -1,0 +1,37 @@
+{
+  "samples": [
+    {
+      "attempt": "01-before-1",
+      "arm": "before",
+      "sha256": "fa7e2c3dec6336a10bf065ef5fc4f9435b0932a396ab9e6491867bd3b2c4b45f"
+    },
+    {
+      "attempt": "02-after-1",
+      "arm": "after",
+      "sha256": "ce2dc3eb3bdc738111c976b45e88e5b6b86c50148d5568b290c4b7daede01344"
+    },
+    {
+      "attempt": "03-after-2",
+      "arm": "after",
+      "sha256": "51fd87996f1b4620086666a878be04378ee244a9209594f4d239d87f37866709"
+    },
+    {
+      "attempt": "04-before-2",
+      "arm": "before",
+      "sha256": "724d3a0607204c6616109bc03abab2ccd70cbdfed01efe84e11c88523fe35c16"
+    }
+  ],
+  "sample_counts": {
+    "before": 2,
+    "after": 2
+  },
+  "shared_sources_with_identical_compiler_commands": 776,
+  "identical_dependencies_all_four": {
+    "sha256": "0ecb7332b14479eabffbc061dba9d94492bfb494a936e9be5bf2caf384e97c54",
+    "file_count": 1728
+  },
+  "before_only_sources": [],
+  "after_only_sources": [],
+  "claim_eligible": false,
+  "raw_scenario_execution_records_identical_to_results": true
+}

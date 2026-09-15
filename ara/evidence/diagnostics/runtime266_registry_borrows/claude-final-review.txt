@@ -1,0 +1,11 @@
+Yes — it refines the verdict, in both directions.
+
+**Corrections accepted.** The diff is +29 production lines (41 added, 12 removed) plus 17 CMake test lines, not 46 production lines. I withdraw the universal no-regression statement, the bimodality inference (n=2 cannot distinguish a bimodal distribution from two draws of a noisy one), and the RSS causal claim. What survives is the structural point: the interface boundary change is supported on inspection of the code, independent of timing.
+
+**Timing, restated without a speedup claim.** Report raw wall-clock ranges per configuration and note that baseline 4 is conspicuously slow; with the sample sizes available, no stable per-TU speedup is established.
+
+**The synthetic control is stronger evidence than I credited, and narrower than it reads.** Preserving the full GMF, every include, and every direct import while replacing only the module's own declarations with one exported `constexpr`-style function and a distinct module identity isolates the exported declaration surface. The gap — 1.678 s wall / 1.636 s ExecuteCompiler / 1.509 MB PCM against 16.690 s Execute, 14.727 s WriteAST, 28.48 MB PCM — implicates the exported declaration shape *and everything transitively reachable through it*, not the module's own syntax alone. It is not a feature-equivalence or performance proof. ReadAST is the wrong dual to WriteAST, since it excludes serialization work WriteAST triggers.
+
+**Toolchain.** Agreed: clang 23's actual driver defaults to ReducedBMI (`-###` plus upstream docs). The FullBMI attempt ran two `cc1` jobs onto a shared trace path overwritten by the 309 ms backend job; that number is not whole-compile time and is correctly excluded.
+
+**Next step.** RUNTIME-268 as you framed it is the right task: declaration-group isolation to find the dominant contributor, then one small measured ownership/export change. Endorsed.

@@ -12926,3 +12926,53 @@ tree:
     alternatives: [Reopen completed bounded refactors, duplicate existing readiness or visualization tasks, treat historical timings as current, create another build backend task, claim benchmark completion from a planning note]
     evidence: [tasks/backlog/README.md, tasks/backlog/process/BUILD-009-current-source-compile-baseline.md, tasks/backlog/runtime/RUNTIME-266-editor-snapshot-consumer-locality.md, tasks/backlog/runtime/RUNTIME-267-processing-config-consumer-locality.md, tasks/backlog/rendering/GRAPHICS-144-renderer-consumer-locality.md, tasks/SESSION-BRIEF.md]
     status: resolved
+
+  - id: N596
+    type: experiment
+    title: Refresh the exact-source engine compile baseline
+    provenance: ai-executed
+    timestamp: '2026-09-15T23:24:33+02:00'
+    result: BUILD-009 retains six balanced samples, three per arm, Clang 23 Debug Null/headless engine libraries, four jobs and immutable dependencies. Clean median
+      354.475 to 333.377 seconds; config, snapshot and renderer interface medians fall 32.2%, 11.4% and 8.4%. Implementation and no-op populations overlap. These local
+      observations remain claim_eligible false and exclude the later registry change.
+    evidence:
+    - O230
+    - ara/evidence/tables/build009_current_compile_measurement.md
+    - tasks/done/BUILD-009-current-source-compile-baseline.md
+    status: resolved
+  - id: N597
+    type: experiment
+    title: Measure registry borrows and isolate remaining snapshot compiler work
+    provenance: ai-executed
+    timestamp: '2026-09-15T23:24:33+02:00'
+    result: RUNTIME-266 ABBA has two samples per arm and identical 776 compiler commands/dependencies. Snapshot closure removes only ECS.Scene.Registry, 92 to 91. Final
+      before sample is broadly slower; no stable timing gain follows. A separate real-source trace records WriteAST 14.727 of ExecuteCompiler 16.690 seconds. Import-preserving
+      synthetic control removes own declarations and emits far less metadata, but lacks feature equivalence. Exclude the overwritten full-BMI backend-only trace from
+      whole-driver comparisons.
+    evidence:
+    - O231
+    - ara/evidence/tables/runtime266_registry_borrow_measurement.md
+    - ara/evidence/diagnostics/runtime266_registry_borrows/evidence-index.json
+    status: resolved
+  - id: N598
+    type: decision
+    title: Retain the verified registry boundary and give serialization a separate owner
+    provenance: ai-executed
+    timestamp: '2026-09-15T23:24:33+02:00'
+    choice: Retire BUILD-009 with its refreshed measurement and RUNTIME-266 with the existing registry owner and ten forward-declared borrow interfaces. Net production
+      change is plus 29 lines, no new file/module/allocation. Claude reviewed plan, fixed diff and result limits. Full canonical CPU has 4663 passes and one expected
+      skip; fresh cache-off Clang 20 compiles the app editor and engine closure. RUNTIME-268 owns declaration-group serialization experiments; RUNTIME-267 and GRAPHICS-144
+      keep distinct config and renderer ownership.
+    alternatives:
+    - Attribute the broader 6% clean median change to the later registry patch
+    - Claim stable speedup from two noisy samples per arm
+    - Treat an imports-only control as feature-equivalent
+    - Split snapshot records without identifying their serialization cost
+    evidence:
+    - O230
+    - O231
+    - N596
+    - N597
+    - tasks/done/RUNTIME-266-editor-snapshot-consumer-locality.md
+    - tasks/backlog/runtime/RUNTIME-268-workspace-snapshot-bmi-serialization.md
+    status: resolved

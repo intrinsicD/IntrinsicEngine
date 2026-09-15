@@ -7,6 +7,23 @@ relative to `tasks/done/`, which sits at the same depth as `tasks/active/`,
 so blocks moved from the old active-README history work verbatim.
 
 
+## 2026-09-15 — RUNTIME-266: scene-registry borrows
+
+Retired [RUNTIME-266](RUNTIME-266-editor-snapshot-consumer-locality.md) at
+CPUContracted, its intended endpoint. Implementation `08728e2e1` removes the full
+registry definition from ten borrowed-context interfaces and the snapshot's
+transitive closure. No new production file/module/allocation; +29 declaration/
+comment lines and 17 compiler-test lines. Existing owners and behavior remain.
+
+Claude reviewed code, measurements and diagnostics. Canonical full CPU verification
+has 4,663 passes and one expected ASan-only skip; 408 focused cases and fresh
+Clang20 Sandbox editor/engine compilation pass. Original eleven boundary witnesses
+reject the dependency; both final compiler graphs pass. C98 retains the noisy
+four-sample observations without a stable timing-gain claim. The diagnostic
+serialization finding is owned next by RUNTIME-268; config work stays RUNTIME-267.
+[Report and raw evidence](../../ara/evidence/tables/runtime266_registry_borrow_measurement.md).
+
+
 ## 2026-09-15 — BUILD-009: refreshed compile baseline
 
 Retired [BUILD-009](BUILD-009-current-source-compile-baseline.md) at CPUContracted,

@@ -1,0 +1,50 @@
+{
+  "canonical_ci": {
+    "compiler": "Clang 23",
+    "configure": "cmake --preset ci",
+    "build": "cmake --build --preset ci --target IntrinsicTests -j 4",
+    "focused_selected": 408,
+    "focused_passed": 408,
+    "full_selected": 4664,
+    "full_passed": 4663,
+    "failed": 0,
+    "skipped": 1,
+    "skip": "GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl: ASan-only leak control",
+    "full_seconds": 141.31
+  },
+  "dependency_guard": {
+    "name": "EditorCompilationLocality.SceneRegistryBorrows",
+    "before": "11 forbidden-dependency witnesses",
+    "after": "11 producers pass",
+    "closure_before": 92,
+    "closure_after": 91,
+    "removed": [
+      "Extrinsic.ECS.Scene.Registry"
+    ]
+  },
+  "structural": {
+    "task_policy": "passed",
+    "doc_links": "passed",
+    "layering": "passed, no allowlist additions",
+    "module_inventory": "regenerated, unchanged"
+  },
+  "minimum_compiler": {
+    "compiler": "Clang20",
+    "target": "ExtrinsicSandboxEditor with complete engine dependency closure",
+    "result": "passed",
+    "boundary_producers": 11,
+    "fresh_build": true,
+    "cache_off": true,
+    "headless": true,
+    "test_configuration_enabled_for_app_target": true,
+    "tests_built_or_run": false
+  },
+  "scope": "No implementation-body, storage-layout, algorithm, GPU resource lifetime or persisted-format change.",
+  "engine_source_revision": "08728e2e1e05c1881d4ff82b36f1022fd9fbbb2b",
+  "manifest_revision": "cc3a8ea86",
+  "reviews": {
+    "plan": "/tmp/intrinsic-build009/snapshot-cut.txt",
+    "fixed_diff": "/tmp/intrinsic-build009/registry-diff.txt",
+    "resolved_findings": "No blocking defect; confirmed existing concrete Registry imports, added four missing owner imports; unused GeometrySources import checked, combined comparison attribution; snapshot intentionally guards a transitive dependency."
+  }
+}
