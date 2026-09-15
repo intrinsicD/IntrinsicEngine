@@ -1,0 +1,12 @@
+**BUILD-009 accounting review: confirmed.**
+
+Clean-build medians reproduce exactly: CPU 1365.590 → 1284.420 s (−81.170, −5.9%); critical path 53.433 → 49.492 s (−3.941, −7.4%). Compiler units 775 → 776 (+1).
+
+Probe medians (before → after):
+- config_interface: CPU 67.100 → 51.720 (−22.9%); critical 33.454 → 22.666 (−32.2%); units 13 → 12.
+- snapshot_interface: CPU 50.730 → 46.650 (−8.0%); critical 29.259 → 25.901 (−11.5%); units 5 → 5.
+- renderer_interface: CPU 129.410 → 117.840 (−8.9%); critical 28.786 → 26.389 (−8.3%); units 14 → 14.
+
+All 24 recomputed critical-path durations and counts match the archived DOT/Ninja derivations, and recorded path weights sum correctly; ties may select different equal-duration branches, which does not affect durations.
+
+Wording correction accepted: 45d5a4f1 is the measured implementation checkpoint; 6a000ce9d is task/manifest HEAD with identical engine source.

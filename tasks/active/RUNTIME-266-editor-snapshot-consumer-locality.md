@@ -65,3 +65,34 @@ python3 tools/repo/check_layering.py --root src --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 ```
+
+## Implementation experiment — 2026-09-15
+- BUILD-009's source-identical current arm is frozen at `45d5a4f1f`; its repeated
+  measurement runs in a separate checkout. Prepare this patch while that run
+  completes; no competing compilation or testing during timed samples.
+- The snapshot interface reaches 92 named modules. Ten interfaces on that graph
+  import `ECS.Scene.Registry` but need only its pointer/reference type; that
+  owner is the closure's sole full EnTT registry include. Reuse the existing
+  C++-linkage borrow pattern from RUNTIME-265 and the sole registry definition.
+- Claude reviewed all ten interfaces, including WorldRegistry's existing
+  `unique_ptr` member and out-of-line lifecycle. Change owner attachment and
+  borrow declarations together; preserve storage and behavior. Remove the
+  unused GeometrySources import from the scene-editing interface. No new
+  wrapper, source file, allocation or alternate record definition is needed.
+- The original compiler metadata rejects the proposed boundary for all eleven
+  checked consumers. Final compilation, fixed-diff review, minimum-Clang proof,
+  correctness verification and matched measurement remain pending. Reject the
+  patch if it does not improve the selected compile boundary.
+- Fixed-diff review found no blocking linkage/lifetime defect. Resolve its
+  completeness questions through source inspection: concrete scene serialization,
+  refinement, world management and operation-action units already import the
+  registry; the four newly explicit imports cover the remaining dereferences.
+  Context/debug/frame-only units require no complete registry. GeometrySources
+  was unused in the scene-editing interface; report the combined patch rather
+  than attributing every timing change to a single import. The untouched snapshot
+  interface is deliberately a transitive regression consumer in the new guard.
+
+## Refreshed baseline
+BUILD-009 is complete. Use its [matched source comparison](../../ara/evidence/tables/build009_current_compile_measurement.md)
+and retained producer/critical-path records; the old BUILD-007 costs are historical.
+Freeze this task's immediate-before source before attributing its own changes.

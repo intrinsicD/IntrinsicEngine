@@ -1,0 +1,80 @@
+{
+  "samples": [
+    {
+      "attempt": "01-before-1",
+      "arm": "before",
+      "sha256": "70bb2df3cb63e64ec039289074ec3786021c6d8f36e3cf3e5bc24d9c968ceb75"
+    },
+    {
+      "attempt": "02-after-1",
+      "arm": "after",
+      "sha256": "563d1bb968756c06c73d113f043ae6b6d4a0b4cf78422fd1d43eb4bcdc119570"
+    },
+    {
+      "attempt": "03-after-2",
+      "arm": "after",
+      "sha256": "52ff5d11900f25a4f818dcdfaa8a339ded45a66e13f15c7066ed2a9e7e4669e4"
+    },
+    {
+      "attempt": "04-before-2",
+      "arm": "before",
+      "sha256": "63bb63542e3d05ef19d23489f0c58e70571d6ee5901c2718336b2d65634e532a"
+    },
+    {
+      "attempt": "05-before-3",
+      "arm": "before",
+      "sha256": "5cf9fb7a486546e5d855e062a51ccaa84eb209d98cd984e24fd7e8ed73a22fa7"
+    },
+    {
+      "attempt": "06-after-3",
+      "arm": "after",
+      "sha256": "959e39408bc37dc792a159a558957e2629be67775ce527dc1f65ad1f09fdc333"
+    }
+  ],
+  "sample_counts": {
+    "before": 3,
+    "after": 3
+  },
+  "shared_sources_with_identical_compiler_commands": 775,
+  "identical_dependencies_all_six": {
+    "sha256": "0ecb7332b14479eabffbc061dba9d94492bfb494a936e9be5bf2caf384e97c54",
+    "file_count": 1728
+  },
+  "before_only_sources": [],
+  "after_only_sources": [
+    "src/graphics/renderer/Graphics.SceneHandles.cppm"
+  ],
+  "claim_eligible": false,
+  "raw_scenario_execution_records_identical_to_results": true,
+  "benchmark_id": "build.engine_compile_iteration.followup.v1",
+  "tooling_commit": "6a000ce9d6703ec75f231ee8cd3d45cd6f03312d",
+  "tooling_sha256": {
+    "tools/analysis/benchmark_compile_iteration.py": "256fa3e5d4b85bda3b244328aa70904f5f0bbd7eb295db1e687132523561e423",
+    "tools/analysis/compile_hotspots.py": "deac44f7fb172b9bdea36968e4c3d79f63c280e3fde587ac4035f4e0bf77e40d",
+    "tools/benchmark/seal_benchmark_results.py": "ff20f2d2c3c8466d3217224bd16a4d2045579f7c84b3a2fd5e3043d567d4e092",
+    "benchmarks/ci/manifests/engine_compile_iteration_followup.yaml": "560be58c6e936f388d90664d34563cbab6740ee4fb4819f8ed8cd0a3cef5b15c"
+  },
+  "raw_archive": {
+    "path": "raw-evidence.tar.gz",
+    "sha256": "945bc62377f60a1804aac4d7c69f47e7a6248797583e19074ab376629c63c29e",
+    "bytes": 6892596,
+    "contents": [
+      "cohort-20260915",
+      "runner.log",
+      "summarize.py",
+      "check-comparability.py",
+      "host-preflight.json",
+      "dependency-preflight.json",
+      "source-identity.json",
+      "preflight-checks.txt",
+      "ci-configure.log",
+      "ci-build.log",
+      "ci-focused.log",
+      "tooling-hotspots.log",
+      "tooling-validator.log",
+      "plan-prompt.txt",
+      "plan.txt"
+    ]
+  },
+  "scope": "Matched local Clang23 Debug Null/headless ExtrinsicRuntime closure; three samples per arm. Descriptive and non-claim-eligible, not a statistical or cross-host guarantee."
+}

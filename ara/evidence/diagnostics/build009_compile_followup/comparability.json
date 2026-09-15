@@ -1,0 +1,49 @@
+{
+  "samples": [
+    {
+      "attempt": "01-before-1",
+      "arm": "before",
+      "sha256": "70bb2df3cb63e64ec039289074ec3786021c6d8f36e3cf3e5bc24d9c968ceb75"
+    },
+    {
+      "attempt": "02-after-1",
+      "arm": "after",
+      "sha256": "563d1bb968756c06c73d113f043ae6b6d4a0b4cf78422fd1d43eb4bcdc119570"
+    },
+    {
+      "attempt": "03-after-2",
+      "arm": "after",
+      "sha256": "52ff5d11900f25a4f818dcdfaa8a339ded45a66e13f15c7066ed2a9e7e4669e4"
+    },
+    {
+      "attempt": "04-before-2",
+      "arm": "before",
+      "sha256": "63bb63542e3d05ef19d23489f0c58e70571d6ee5901c2718336b2d65634e532a"
+    },
+    {
+      "attempt": "05-before-3",
+      "arm": "before",
+      "sha256": "5cf9fb7a486546e5d855e062a51ccaa84eb209d98cd984e24fd7e8ed73a22fa7"
+    },
+    {
+      "attempt": "06-after-3",
+      "arm": "after",
+      "sha256": "959e39408bc37dc792a159a558957e2629be67775ce527dc1f65ad1f09fdc333"
+    }
+  ],
+  "sample_counts": {
+    "before": 3,
+    "after": 3
+  },
+  "shared_sources_with_identical_compiler_commands": 775,
+  "identical_dependencies_all_six": {
+    "sha256": "0ecb7332b14479eabffbc061dba9d94492bfb494a936e9be5bf2caf384e97c54",
+    "file_count": 1728
+  },
+  "before_only_sources": [],
+  "after_only_sources": [
+    "src/graphics/renderer/Graphics.SceneHandles.cppm"
+  ],
+  "claim_eligible": false,
+  "raw_scenario_execution_records_identical_to_results": true
+}

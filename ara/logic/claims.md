@@ -2221,3 +2221,14 @@
 - **Dependencies**: []
 - **Tags**: compilation, renderer interface, C++23 modules, matched local observations, CPU build
 - **From staging**: O229
+
+## C97: Bounded current-source compile comparison
+- **Statement**: In BUILD-009's retained six-sample local Clang23 cohort, three samples per exact source arm, clean ExtrinsicRuntime-closure median time changes from 354.475 to 333.377 seconds (6.0% reduction). Config, snapshot and renderer interface-touch medians change from 33.533 to 22.743, 29.337 to 25.978, and 47.718 to 43.732 seconds (32.2%, 11.4%, 8.4%). Clean compiler units change from 775 to 776; config probe units change from 13 to 12. No-op and selected implementation ranges overlap, so those small differences establish no improvement.
+- **Status**: supported — descriptive local observations only, all six results claim_eligible:false. No statistical/general, publication-qualified, cross-host/compiler, runtime/GPU, Sandbox/test-suite compile-time conclusion, or additive combination with historical BUILD-007 percentages. The prepared RUNTIME-266 change is excluded from these source identities.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Recalculation from the retained six exact-source execution records disagrees with stated medians, ranges or counts, or compiler/manifest/dependency fingerprints show unmatched conditions. Fewer rebuilt sources must not be conflated with faster individual compilation or fewer clean-build units.
+- **Proof**: [ara/evidence/tables/build009_current_compile_measurement.md, ara/evidence/diagnostics/build009_compile_followup/evidence-index.json, ara/evidence/diagnostics/build009_compile_followup/summary.json, ara/evidence/diagnostics/build009_compile_followup/raw-evidence.tar.gz, ara/evidence/diagnostics/build009_compile_followup/recomputed-accounting.json, benchmarks/ci/manifests/engine_compile_iteration_followup.yaml]
+- **Dependencies**: []
+- **Tags**: compilation, C++23 modules, matched local observations, CPU build, editor, renderer
+- **From staging**: O230

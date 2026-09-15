@@ -1,0 +1,15 @@
+## Referee verdict: approved
+
+Recomputed all eight scenarios from the six result JSONs independently (medians of 3, ms→s).
+
+**Medians, ranges, percentages — all match.** Spot values: clean 354.475→333.377 = 5.95% → "+6.0%" ✓; config_interface 33.533→22.743 = 32.18% → "32.2%" ✓; snapshot_interface 11.45% → "11.4%" ✓; renderer_interface 8.35% → "8.4%" ✓; renderer_impl 2.27% ✓; regressions workspace_impl −0.28% and config_impl −1.31% ✓; noop +0.42% ✓. Every bracketed min–max matches the three samples, and each median is the true middle value (not a mean).
+
+**Overlap claims are correct.** renderer_impl (after 12.803–13.343 vs before 13.102–13.201), workspace_impl, config_impl and noop all overlap, and the report declines to claim them — including declining renderer_impl's 2.3% median. clean, config_interface, snapshot_interface and renderer_interface are fully separated, and the report claims no more than medians for them.
+
+**Clean-build RSS reconciles** against `memory_peak_bytes.clean`: before median 3037536256 B = 2896.82 MiB, after 2858864640 B = 2726.43 MiB ✓, and the "largest single process, not aggregate" caveat is properly stated.
+
+**Scope and consistency.** After-arm revision `45d5a4f1` matches the committed HEAD, all six samples are `clean_commit` with `claim_eligible: false`, so the uncommitted RUNTIME-266 tree is genuinely outside the measurement. Unit accounting is self-consistent (775 shared + 1 after-only `Graphics.SceneHandles.cppm` = 776 vs 775), and the report correctly notes the speedup came *despite* one added unit. Order-of-execution counterbalancing (B/A/A/B/B/A) is honored. Engine-library targeting with tests/Sandbox/Vulkan excluded is consistent throughout.
+
+**No overclaims found.** BUILD-007's 4.7% is explicitly walled off as non-additive; "no runtime algorithm speedup is measured"; remaining large TUs are labeled candidates for diagnosis rather than evidence; BUILD-006 is held separate; and the non-isolated desktop host plus concurrent review activity is disclosed.
+
+One non-blocking note, not a correction: three figures cannot be checked against the supplied raw metrics because they live only in `summary.json` — CPU user+system (1365.590→1284.420 s), weighted Ninja critical path (53.433→49.492 s), and the per-probe compiler-unit counts (notably config_interface 13→12). They are internally plausible and not contradicted by anything provided; flagging only so the gap in this audit's coverage is on record.

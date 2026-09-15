@@ -65,3 +65,8 @@ python3 tools/repo/check_layering.py --root src --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 ```
+
+## Refreshed baseline
+BUILD-009 is complete. Use its [matched source comparison](../../../ara/evidence/tables/build009_current_compile_measurement.md)
+and retained producer/critical-path records; the old BUILD-007 costs are historical.
+Freeze this task's immediate-before source before attributing its own changes.

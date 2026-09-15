@@ -9,11 +9,11 @@ picking backlog work; theme priorities and rationale live in
 ## Active tasks
 
 - `BUG-194` — Large-mesh property display and geodesic controls (tasks/active/BUG-194-large-mesh-property-display.md)
-- `BUILD-009` — Remeasure current engine compile costs (tasks/active/BUILD-009-current-source-compile-baseline.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
 - `METHOD-044` — Feature-aware patches and distortion-aware atlas merging (tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md)
 - `METHOD-045` — Preserve baseline regions while constructing UV charts (tasks/active/METHOD-045-baseline-preserving-atlas-cuts.md)
+- `RUNTIME-266` — Narrow remaining editor snapshot consumers (tasks/active/RUNTIME-266-editor-snapshot-consumer-locality.md)
 - `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
 
 ## Theme B — Rendering modernization
@@ -28,7 +28,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `GRAPHICS-126` — Bandwidth-priced frame-recipe trace model (tasks/backlog/rendering/GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md)
 - blocked by `GRAPHICS-137`: `GRAPHICS-136` — Rename `Pipeline*` to `GraphicsState*` at the RHI boundary (tasks/backlog/rendering/GRAPHICS-136-rename-pipeline-to-graphics-state-rhi-boundary.md)
 - unblocked: `GRAPHICS-137` — Shader-object realization spike (ADR-0028 killing experiment) (tasks/backlog/rendering/GRAPHICS-137-shader-object-realization-spike.md)
-- blocked by `BUILD-009`: `GRAPHICS-144` — Reduce remaining renderer interface and implementation dependencies (tasks/backlog/rendering/GRAPHICS-144-renderer-consumer-locality.md)
+- unblocked: `GRAPHICS-144` — Reduce remaining renderer interface and implementation dependencies (tasks/backlog/rendering/GRAPHICS-144-renderer-consumer-locality.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
@@ -36,7 +36,6 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `ASSETIO-010`: `ASSETIO-011` — Semantic Sandbox File / Import workflow matrix (tasks/backlog/assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md)
 - blocked by `GRAPHICS-105`: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
-- blocked by `BUILD-009`: `RUNTIME-266` — Narrow remaining editor snapshot consumers (tasks/backlog/runtime/RUNTIME-266-editor-snapshot-consumer-locality.md)
 - blocked by `RUNTIME-266`: `RUNTIME-267` — Isolate processing config edits from unrelated editor consumers (tasks/backlog/runtime/RUNTIME-267-processing-config-consumer-locality.md)
 - unblocked: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)
 

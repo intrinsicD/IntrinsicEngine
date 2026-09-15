@@ -1,0 +1,8 @@
+{
+  "removed_build": "/dev/shm/intrinsic-build009",
+  "owner": "/tmp/intrinsic-build009/cohort-20260915",
+  "removed_at": "2026-09-15T20:19:14.595980+00:00",
+  "source_checkout": "/tmp/intrinsic-build009/source",
+  "source_disposition": "Retained for the next RUNTIME-266 matched experiment; release after that bounded use.",
+  "unrelated_builds_touched": false
+}

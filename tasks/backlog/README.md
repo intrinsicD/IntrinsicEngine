@@ -77,8 +77,8 @@ front-matter owns prerequisite state.
 
 | Area | Task |
 | --- | --- |
-| Fresh compile baseline and remaining hotspot ranking | [BUILD-009](../active/BUILD-009-current-source-compile-baseline.md) |
-| Editor snapshot/context consumers | [RUNTIME-266](runtime/RUNTIME-266-editor-snapshot-consumer-locality.md) |
+| Fresh compile baseline and remaining hotspot ranking | [BUILD-009](../done/BUILD-009-current-source-compile-baseline.md) |
+| Editor snapshot/context consumers | [RUNTIME-266](../active/RUNTIME-266-editor-snapshot-consumer-locality.md) |
 | Processing config dependency chain | [RUNTIME-267](runtime/RUNTIME-267-processing-config-consumer-locality.md) |
 | Renderer surface and implementation dependencies | [GRAPHICS-144](rendering/GRAPHICS-144-renderer-consumer-locality.md) |
 | Shared action readiness and disabled reasons | [UI-037](ui/UI-037-linear-domain-action-readiness-tooltips.md) |

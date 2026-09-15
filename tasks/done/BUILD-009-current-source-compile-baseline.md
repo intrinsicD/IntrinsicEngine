@@ -38,26 +38,26 @@ editor, processing-config and renderer work before choosing more structural chan
   task does not claim benefits for changes that have not been implemented.
 
 ## Acceptance criteria
-- [ ] Create the named follow-up manifest and freeze source revisions, scenarios,
+- [x] Create the named follow-up manifest and freeze source revisions, scenarios,
       toolchain/preset, target, job count, warmup/cache state, repeat count and
       reporting limits before validation and timing. This task owns the source
       identity, result sealing/validation and evidence report; none is deferred.
-- [ ] Measure clean engine libraries, settled no-op, representative implementation
+- [x] Measure clean engine libraries, settled no-op, representative implementation
       edits, and consolidation-config, editor-snapshot and renderer interface edits.
       Include actual changed compiler units, dominating producers, weighted critical
       paths, CPU work, peak-process RSS and elapsed time. Separate target scopes.
-- [ ] Use at least three retained samples per comparison arm in a balanced order;
+- [x] Use at least three retained samples per comparison arm in a balanced order;
       preserve raw samples, negative/null results and rejected attempts. Do not
       run competing builds/tests or install/mutate shared dependencies during timing.
-- [ ] Preflight storage and use owned disposable source/build trees; disable package
+- [x] Preflight storage and use owned disposable source/build trees; disable package
       installation against the fingerprinted installed dependencies. Preserve all
       user builds and clean up only owned scratch storage. Freeze the storage
       choice across arms; record tmpfs capacity and host memory pressure alongside
       process RSS rather than treating tmpfs pages as measured process memory.
-- [ ] Validate machine-readable results and publish a concise comparison/ranking
+- [x] Validate machine-readable results and publish a concise comparison/ranking
       bound to exact sources. Record claim eligibility honestly; any performance
       statement follows AGENTS §8/8b and cites its matched evidence.
-- [ ] Link the baseline from the three implementation tasks and state the selected
+- [x] Link the baseline from the three implementation tasks and state the selected
       next candidate or evidence that no further split is justified. Preserve
       BUILD-006 as a separate backend decision.
 
@@ -111,3 +111,26 @@ python3 tools/docs/check_doc_links.py --root .
   storage; local descriptive results imply no statistical/cross-host guarantee.
   Final owned build cleanup occurs after complete evidence capture; unrelated
   trees and any failed population remain intact.
+
+## Completion — 2026-09-15
+- Commit reference: protocol `6a000ce9d`; measured source checkpoints `07a8b29147`
+  and `45d5a4f1fc`. The report/evidence archive accompanies this retirement.
+- Completed at CPUContracted, the intended measurement/tooling endpoint. Frozen
+  protocol commit `6a000ce9d`; exact source checkpoints are recorded above.
+- Six retained samples, three per arm, pass source/command/dependency checks and
+  canonical result validation. All 775 shared compiler commands and all installed
+  dependency fingerprints match. No failed measured population was discarded.
+- [Report](../../ara/evidence/tables/build009_current_compile_measurement.md) and
+  [evidence index](../../ara/evidence/diagnostics/build009_compile_followup/evidence-index.json)
+  contain raw samples, producer ranking, accounting, scope and controls. C97
+  records the bounded observations; implementation/no-op overlap is retained.
+- Claude's results and accounting reviews are resolved. Recomputed 24 raw Ninja
+  critical-path durations/counts; tied path witnesses preserve equal durations.
+- Pre-timing canonical ci build, 90 focused checks, 26 hotspot-tool tests and 15
+  result-validator tests pass. Six measured library builds succeed. This task
+  makes no Vulkan or sanitizer execution claim.
+- Removed the owned timed build; retain the detached source only for RUNTIME-266's
+  immediately following experiment. User build trees remain intact.
+- RUNTIME-266 is selected first using the remaining snapshot/scene-edit cost;
+  RUNTIME-267 follows its shared session boundary. GRAPHICS-144 owns the renderer
+  follow-up. BUILD-006 remains the independent gated build/cache decision.

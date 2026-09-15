@@ -3920,3 +3920,15 @@ observations:
     promoted_to: logic/claims.md:C96
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O230
+    timestamp: '2026-09-15T20:22:48.887663+00:00'
+    provenance: ai-executed
+    content: The six retained BUILD-009 samples measure a local clean-library median of 354.475 to 333.377 seconds; config, snapshot and renderer interface medians decrease 32.2%, 11.4% and 8.4%. Implementation and no-op populations overlap. Compiler units remain 775 to 776 for clean builds and 13 to 12 for the config probe.
+    context: Exact post-overnight and latest implementation checkpoints, immutable dependencies, four jobs, cache-off Clang23 Debug Null/headless engine libraries. RUNTIME-266 is outside the measured sources; BUILD-007 is a separate historical comparison.
+    potential_type: claim
+    bound_to: []
+    promoted: true
+    promoted_to: logic/claims.md:C97
+    crystallized_via: artifact-commitment
+    stale: false

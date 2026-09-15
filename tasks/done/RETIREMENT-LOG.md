@@ -7,6 +7,19 @@ relative to `tasks/done/`, which sits at the same depth as `tasks/active/`,
 so blocks moved from the old active-README history work verbatim.
 
 
+## 2026-09-15 — BUILD-009: refreshed compile baseline
+
+Retired [BUILD-009](BUILD-009-current-source-compile-baseline.md) at CPUContracted,
+its measurement/tooling endpoint. Protocol `6a000ce9d` freezes exact sources,
+three samples per arm, Clang23 Debug Null/headless libraries and four jobs.
+All six results validate; shared compiler commands and installed dependencies match.
+C97 records the local clean/interface observations and overlapping implementation
+populations. Claude reviewed calculations and scope; raw accounting was recomputed.
+[Report and evidence](../../ara/evidence/tables/build009_current_compile_measurement.md).
+Owned timed build storage was removed. RUNTIME-266, RUNTIME-267 and GRAPHICS-144
+retain their implementation ownership; BUILD-006 remains separately gated.
+
+
 ## 2026-09-15 — RUNTIME-265 and BUG-197: editor service borrows and fixed-input measurement
 
 Retired [RUNTIME-265](RUNTIME-265-editor-snapshot-compile-surface.md) and

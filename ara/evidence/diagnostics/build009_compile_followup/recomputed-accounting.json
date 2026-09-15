@@ -1,0 +1,157 @@
+{
+  "samples": [
+    {
+      "attempt": "01-before-1",
+      "scenarios": {
+        "clean": {
+          "cpu_seconds": 1365.59,
+          "critical_seconds": 54.985,
+          "compiler_units": 775
+        },
+        "config_interface": {
+          "cpu_seconds": 67.28,
+          "critical_seconds": 33.533,
+          "compiler_units": 13
+        },
+        "snapshot_interface": {
+          "cpu_seconds": 50.69,
+          "critical_seconds": 29.252,
+          "compiler_units": 5
+        },
+        "renderer_interface": {
+          "cpu_seconds": 129.94,
+          "critical_seconds": 28.886,
+          "compiler_units": 14
+        }
+      }
+    },
+    {
+      "attempt": "02-after-1",
+      "scenarios": {
+        "clean": {
+          "cpu_seconds": 1280.71,
+          "critical_seconds": 49.409,
+          "compiler_units": 776
+        },
+        "config_interface": {
+          "cpu_seconds": 51.720000000000006,
+          "critical_seconds": 22.666,
+          "compiler_units": 12
+        },
+        "snapshot_interface": {
+          "cpu_seconds": 46.650000000000006,
+          "critical_seconds": 25.901,
+          "compiler_units": 5
+        },
+        "renderer_interface": {
+          "cpu_seconds": 117.84,
+          "critical_seconds": 26.097,
+          "compiler_units": 14
+        }
+      }
+    },
+    {
+      "attempt": "03-after-2",
+      "scenarios": {
+        "clean": {
+          "cpu_seconds": 1289.9199999999998,
+          "critical_seconds": 49.724,
+          "compiler_units": 776
+        },
+        "config_interface": {
+          "cpu_seconds": 52.71,
+          "critical_seconds": 23.133,
+          "compiler_units": 12
+        },
+        "snapshot_interface": {
+          "cpu_seconds": 47.760000000000005,
+          "critical_seconds": 26.595,
+          "compiler_units": 5
+        },
+        "renderer_interface": {
+          "cpu_seconds": 122.14999999999999,
+          "critical_seconds": 27.144,
+          "compiler_units": 14
+        }
+      }
+    },
+    {
+      "attempt": "04-before-2",
+      "scenarios": {
+        "clean": {
+          "cpu_seconds": 1366.23,
+          "critical_seconds": 53.358,
+          "compiler_units": 775
+        },
+        "config_interface": {
+          "cpu_seconds": 67.01,
+          "critical_seconds": 33.454,
+          "compiler_units": 13
+        },
+        "snapshot_interface": {
+          "cpu_seconds": 50.730000000000004,
+          "critical_seconds": 29.259,
+          "compiler_units": 5
+        },
+        "renderer_interface": {
+          "cpu_seconds": 129.11,
+          "critical_seconds": 28.55,
+          "compiler_units": 14
+        }
+      }
+    },
+    {
+      "attempt": "05-before-3",
+      "scenarios": {
+        "clean": {
+          "cpu_seconds": 1346.7299999999998,
+          "critical_seconds": 53.433,
+          "compiler_units": 775
+        },
+        "config_interface": {
+          "cpu_seconds": 67.1,
+          "critical_seconds": 33.396,
+          "compiler_units": 13
+        },
+        "snapshot_interface": {
+          "cpu_seconds": 51.07,
+          "critical_seconds": 29.505,
+          "compiler_units": 5
+        },
+        "renderer_interface": {
+          "cpu_seconds": 129.41,
+          "critical_seconds": 28.786,
+          "compiler_units": 14
+        }
+      }
+    },
+    {
+      "attempt": "06-after-3",
+      "scenarios": {
+        "clean": {
+          "cpu_seconds": 1284.42,
+          "critical_seconds": 49.492,
+          "compiler_units": 776
+        },
+        "config_interface": {
+          "cpu_seconds": 51.18000000000001,
+          "critical_seconds": 22.39,
+          "compiler_units": 12
+        },
+        "snapshot_interface": {
+          "cpu_seconds": 46.36,
+          "critical_seconds": 25.853,
+          "compiler_units": 5
+        },
+        "renderer_interface": {
+          "cpu_seconds": 117.81,
+          "critical_seconds": 26.389,
+          "compiler_units": 14
+        }
+      }
+    }
+  ],
+  "recomputed_records": 24,
+  "equal_duration_alternate_path_witnesses": 14,
+  "all_metric_fields_match": true
+}
