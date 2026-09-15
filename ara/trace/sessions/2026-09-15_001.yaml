@@ -136,7 +136,7 @@ ai_actions:
   - docs/architecture/runtime.md
   - tasks/done/RUNTIME-256-render-recipe-extraction-dependencies.md
   - tasks/evidence/RUNTIME-256/report.yaml
-  - tasks/backlog/process/DOCS-007-runtime-backlog-current-state.md
+  - tasks/done/DOCS-007-runtime-backlog-current-state.md
 claims_touched: []
 key_context:
 - turn: 1

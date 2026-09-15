@@ -1,0 +1,1099 @@
+{
+  "base_revision": "cdf18f5c0478b522eb56b552771b2b6e87feb287",
+  "baseline_readme_lines": 1209,
+  "current_readme_lines": 54,
+  "baseline_sha256": "a8a9b54d830cbd2c98e5951d6799d9aa7323a44e001f4a0bc55044b2e1fdae1d",
+  "current_sha256": "6e8b6428604d6c64f5e4cff416d3afb0a91d8b21d8d04f3fa47b1e2cb7ee213e",
+  "required_open_targets": [
+    "tasks/backlog/architecture/README.md",
+    "tasks/backlog/geometry/README.md",
+    "tasks/backlog/rendering/README.md",
+    "tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md",
+    "tasks/backlog/runtime/RUNTIME-211-kmeans-property-domain-integration.md",
+    "tasks/backlog/runtime/RUNTIME-212-progressive-poisson-property-domain-publication.md",
+    "tasks/backlog/runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md",
+    "tasks/backlog/runtime/RUNTIME-222-model-space-point-radius-rendering.md"
+  ],
+  "missing_open_targets": [],
+  "local_tasks": [
+    "tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md",
+    "tasks/backlog/runtime/RUNTIME-211-kmeans-property-domain-integration.md",
+    "tasks/backlog/runtime/RUNTIME-212-progressive-poisson-property-domain-publication.md",
+    "tasks/backlog/runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md",
+    "tasks/backlog/runtime/RUNTIME-222-model-space-point-radius-rendering.md"
+  ],
+  "historical_task_records_checked": 127,
+  "historical_task_hashes": {
+    "tasks/done/RUNTIME-217-inline-single-use-core-frame-loop-contracts.md": "14178f8679403050329690054dbeb7d473ba099995b2da558715b5857af949e1",
+    "tasks/done/RUNTIME-216-inline-render-extraction-engine-glue.md": "35a1e38b420d53b58d9263d1545883ed23764188ad94b25aef6ec4268d1d07b1",
+    "tasks/done/RUNTIME-215-organize-runtime-source-layout.md": "89407655af94b7a90167e5b2df39c503ba5d9fb67731475e98b76dbc07fb7924",
+    "tasks/done/RUNTIME-214-universal-geometry-property-coherence.md": "76385b6ef111aa6237cec9bb47d95a692c2ac5e16076fd851eae107e2b721c7a",
+    "tasks/done/RUNTIME-206-lop-element-domain-source-integration.md": "704d2644c454bd2628a32f897fe7eea62f301e5c0319c72436cd34981780949c",
+    "tasks/done/RUNTIME-208-progressive-poisson-element-domain-publication.md": "7af2d52091e298e2a2bc9d33b8319d50b52a3d11d03edb3c5b5ab477a0f557c5",
+    "tasks/done/UI-038-progressive-poisson-multi-domain-panel.md": "facff054197b322530ba52fdcc9735f4f72f594ef0c2ed6cd157b21010b63e78",
+    "tasks/done/RUNTIME-205-internalize-scene-interaction-helpers.md": "e3967c5c614db1a9a71ec5cbacfe4b94d76dbb487deed6f0f51c9fccf1d02af7",
+    "tasks/done/RUNTIME-203-internalize-engine-composition-helpers.md": "ab9caab465d633abe5acbf1a3f276d74b7dccb7407d40dbf4c74d603a662509b",
+    "tasks/done/RUNTIME-202-retire-sandbox-runtime-facade.md": "752e9dd6571a8d152298c2887cdb893657fdfa7cce4760ccb907f0ae1ac4a380",
+    "tasks/done/RUNTIME-200-staged-asset-import-materialization-recipe.md": "96a2967ad412d08031fccd18a0970a90782f4a8609d84523178d88ab668c2f33",
+    "tasks/done/RUNTIME-201-unified-editor-mutation-history-transaction.md": "1e99ba9e6062cff034f5e9545277e939f8a0e770df99604318c9d23a0d37fba4",
+    "tasks/done/RUNTIME-198-data-driven-visualization-recipes.md": "82a0b1c1bcd192ae0e02f3a03d559a9f658a50a8673c14ad83695b43f72716c7",
+    "tasks/done/RUNTIME-197-unified-geometry-upload-residency-coordinator.md": "68fbc202ec633a9099debb2f9c1362946e2085a9e3f6d1e484591918d335556d",
+    "tasks/done/RUNTIME-194-consolidate-runtime-work-execution.md": "bef199b0c92609b0c0c31399c33e56ea978c1461649d757a196b3a522fffe662",
+    "tasks/done/RUNTIME-195-unified-gpu-result-readback.md": "173a4548d72d42c976961ca44561b3577afa0bb7b65d6433702f56d565c67cc0",
+    "tasks/done/RUNTIME-196-canonical-clustering-service-path.md": "5cadaaba9b08f5f96f3a910806bcf9f4019304a1cdaa5661379d42448c944f07",
+    "tasks/done/RUNTIME-192-canonical-geometry-property-reference-and-catalog.md": "4356550b0ff04d8a176a88ce369a68edf130126d63108e9c70732f2a9c674bca",
+    "tasks/done/RUNTIME-199-retire-dormant-spatial-debug-registry.md": "76f9b961fd52356a3605f5e465d0f1ede53099ee79b32b3385d892e136c124e8",
+    "tasks/done/RUNTIME-204-withdraw-dormant-method-figure-export.md": "3c81fb4f8da43d6e958b1b8d8a72ef2289103e8dedc8fc4b909f3756592c8467",
+    "tasks/done/RUNTIME-190-gpu-property-texture-bake-module.md": "06136458f71530aecb6f40a71025716d2afdbf63713e49200a7908eb29e71507",
+    "tasks/done/RUNTIME-191-unified-property-texture-bake-pipeline.md": "19674a97e3c0cc4192facbb8f868a194f150440a96c91f80775ed428f17a11b9",
+    "tasks/done/RUNTIME-187-finalize-domain-free-engine-surface.md": "f40580cb8def497b0660bb4093fc57fcaed804c8c0357c98b06dd9ebda81587f",
+    "tasks/done/RUNTIME-186-retire-engine-auxiliary-surface.md": "edff399a367790fb399269ca273347edc9c36946ae0ea700150e148d74b99382",
+    "tasks/done/RUNTIME-185-prune-runtime-composition-mechanisms.md": "f9b186718c5dad0e2c24061db819c51f90f1564f7bfb0709cefdf3d64553b43d",
+    "tasks/done/RUNTIME-184-replace-application-lifecycle.md": "e3b0fc20638439b52844dad67577fff024887eafaad3aa95643ce9ebf21368f8",
+    "tasks/done/RUNTIME-183-extract-asset-workflow-module.md": "86b445169a04833cc7b02828f1ccf800fd93fd152f4a19f5ce5e2529e4d879bd",
+    "tasks/done/RUNTIME-182-extract-editor-ui-module.md": "e21e1e94c5328371308355d98446ba7679836531c4e10ad630f09dfebba7ae4e",
+    "tasks/done/RUNTIME-181-extract-config-control-module.md": "e98dd0bb3f2eff591b1e513ece09261fcf7e13daec8b7de2e2fc0499e98000b1",
+    "tasks/done/RUNTIME-179-extract-async-work-module.md": "a75f962e38ed00dca24c81efd3a9e29885e1e135ce49d27f78384b12b5168166",
+    "tasks/archive/RUNTIME-165-extract-async-work-service.md": "538bf6911eaeaace77f2f9c69378d2d8157f6363e16524c80da5e89473ab90cc",
+    "tasks/archive/RUNTIME-164-extract-asset-residency-service.md": "7b9c236f1eee4ae1c5529024922a34fa75585eb3a8ac08ef4e3b0566e6a24582",
+    "tasks/archive/RUNTIME-163-extract-render-extraction-service.md": "a374cc43a2d1a17b80f09f6a8f1a2c16d6705a7f72e71f43aedec329d92d3350",
+    "tasks/done/RUNTIME-166-slim-render-extraction-module.md": "e9f6d4fbda2d72cee27225f21a4c45db3c56309c7cb33cae17441679f3801bf6",
+    "tasks/done/RUNTIME-168-privatize-sandbox-default-policies-surface.md": "3c03954ee6dde8ae69eedb32893f0c2b98d76e14048d3e980ad84f79c0a97d70",
+    "tasks/done/RUNTIME-188-extract-scene-interaction-module.md": "aa4f76dc89421433be503e57098eeba69cbf1041aaf9c776db9b521cbc96dbaa",
+    "tasks/done/RUNTIME-172-extract-scene-document-module.md": "51fb19bd0d213bfa35ae68d67b7ded69b1ae02b3feaaf2a870b378f8e1e0b087",
+    "tasks/done/RUNTIME-178-restore-engine-convergence-budget.md": "d88b6f2d95950d22e2c028c8e4b1430218910494b3d7b1b7817446ac54b97555",
+    "tasks/done/RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md": "50b4be8ae7f48e4e16ccb52fb50f3db76adeeb309ed48801994ac36836bf36f7",
+    "tasks/done/RUNTIME-171-privatize-asset-residency-service-surface.md": "46b47c43bfc89a80d2c298610996ac798fe14cedabeb559d21ef0656bb2a612f",
+    "tasks/done/RUNTIME-169-privatize-render-extraction-service-surface.md": "f6a8691c7c98de39175cdbd67c93d9178d8f32c50c87b062024df77b06e5032f",
+    "tasks/done/RUNTIME-174-privatize-imgui-editor-bridge-surface.md": "bad4b97a82a7b0e8785082faf8d9616b85e19dfe792f91f9b8ff9c43f7079191",
+    "tasks/done/RUNTIME-167-privatize-engine-frameloop-surface.md": "cb1c343209dae983c5b0e3586cb6af295924f3805a6334d1ea20324d8d8870a9",
+    "tasks/done/RUNTIME-170-privatize-object-space-normal-gpu-queue-surface.md": "584dcb719175c7bff9f76ff2c6d27c4ff4f87ed452a619e4565499b2eb25bbb5",
+    "tasks/done/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md": "9a8c90f925c6cac908a3fc2c14d21b90d4edf4234d053a72c8ead9b6487e9bcf",
+    "tasks/done/UI-035-sandbox-pointcloud-consolidation-editor-panel.md": "f6be56d7a8b398289297bf536a80b02a4a4f893899fb885f40994f992d280ed2",
+    "tasks/done/RUNTIME-189-withdraw-premature-orientation-debug-view.md": "4e8f4934c72b663f37f983cca1607095f5225fc07eed57dde3bd82109b5258d8",
+    "tasks/done/RUNTIME-177-immediate-mode-debug-draw-seam.md": "0312a8425c6686679f72b052243a8b616bc052344be56dcb6b55a28556ef76f7",
+    "tasks/archive/RUNTIME-146-extract-engine-config-boot-module.md": "4cc7c23823b53253ccd2fbb3bc2fe040a3fe438e64d9b474cfe206b9fb326d71",
+    "tasks/archive/RUNTIME-147-extract-asset-import-pipeline-subsystem.md": "db7824b1d264112e594a6be8a554957255f5e04f40cbeacbb5a1fce25857b87d",
+    "tasks/archive/RUNTIME-148-extract-scene-document-subsystem.md": "652eabfb68f3448bf2f7d70bf6352e242e53c1ae1e3520f06e5c3faace361219",
+    "tasks/archive/RUNTIME-149-extract-engine-config-control-subsystem.md": "5972c49b13fc0e06d9ff7ec115ae53279508bc6f2db733f456652084dbc992cb",
+    "tasks/archive/RUNTIME-150-split-engine-frame-loop-implementation-unit.md": "8669b9e97c93572a12ecddad6473f8f259a7aef848a59b3a0d2fb204687d3535",
+    "tasks/archive/RUNTIME-151-slim-engine-interface-and-remove-entt-leak.md": "a5b23899284bb890524d319cae18d3858dedc71ce7a291dec60446e7f7509eac",
+    "tasks/archive/RUNTIME-152-extract-runtime-device-bootstrap.md": "8f3120073ab227d4ba231497a403e9a19b4e23ca09eef26a793795cac2d19f57",
+    "tasks/archive/RUNTIME-153-extract-mesh-primitive-view-controls.md": "5fda7f5dd15e1cbf2266aa29d482742a5ce58c7a3c59cf8559d4e96c7ed4e39d",
+    "tasks/archive/RUNTIME-154-extract-reference-scene-control.md": "3db802fd773fc10034b34ec2d0daa584f47d316635ebca3e4126f28ee173a985",
+    "tasks/archive/RUNTIME-155-extract-runtime-input-action-registry.md": "686d56f009395e846a751c2bc2059c239078a567f340a9e55124af2e2df5cc7c",
+    "tasks/archive/RUNTIME-156-extract-runtime-module-schedule.md": "fa4bbe09cefa296de81dcccdbe893822d044751d9b6bb10ef4953ca224b9fa69",
+    "tasks/archive/RUNTIME-157-extract-selection-readback-state.md": "14970f285e76cc93e449db5f6c6a65a610260ec4eb7254d89805dade76481180",
+    "tasks/archive/RUNTIME-158-extract-frame-pacing-diagnostics.md": "38e271961eb9b8a8e1e3a3f6e384ca65a4177796d3e5a74b83c61f26f4fa0b4e",
+    "tasks/archive/RUNTIME-159-extract-imgui-editor-bridge.md": "a22adbf5eed412b3c738182fd38c022b9b7d2b6e1544e75bf06678226ddcb713",
+    "tasks/archive/RUNTIME-160-extract-jobservice-gpu-queue-bridge.md": "67feead9b95335dadea4b7f413142fe34075e8c0b80adc38227835e227fd3cc4",
+    "tasks/archive/RUNTIME-161-extract-object-space-normal-bake-service.md": "1c4d9b1a32e5fd46b322638692c61da1fb473a4a774fc0f64ec3e0813d9b245d",
+    "tasks/archive/RUNTIME-162-extract-gizmo-frame-service.md": "103e12f18dccd91821393f391e66a46ad3afabfd573b167947fb955c03666518",
+    "tasks/archive/RUNTIME-140-remove-global-waitforall-from-import-apply.md": "d7d6bf91f5410a3d29e9d8b94ea10e56a839b6883c7d7c1cb2a92f6a583f211d",
+    "tasks/archive/RUNTIME-142-async-modelscene-texture-scenefile-io.md": "3ff2b7b90c8fb3ec8d8d241325493c36b673000610d07bc8833273fd17c3fe63",
+    "tasks/archive/RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md": "aae29928eda37bf25ba70ba4107b0bf1fae459f62a460b1bf17d3abba766d986",
+    "tasks/archive/RUNTIME-144-post-import-processor-and-ux-policy-seam.md": "e1dc3e03e07565694d30df6f87fe189dbc159f22c6881ecf05b3cfa44c571a7d",
+    "tasks/archive/RUNTIME-125-aos-static-fast-lane.md": "37b4e63f258f8805e241c06f0296205ecb36e166f2f334d94b72138d90e0119d",
+    "tasks/archive/RUNTIME-136-sandbox-method-backend-selectors.md": "b32f71b9ea1bc2293d96d378a387f4e28f366a4f1bf58903bb18c8882fba1e75",
+    "tasks/archive/RUNTIME-135-spatialdebug-closest-face-picking.md": "d0502a5b5845234b0d0f662fb15597eaa5c7398faff3d9b5ecbf2e7f55e8db79",
+    "tasks/archive/CORE-004-indexed-decrease-key-heap.md": "baf28cf5fb07f851789d1d51895e828d7baba50ee74d048fad86c209be12e8ad",
+    "tasks/archive/RUNTIME-132-lift-runframe-hook-adapters.md": "2d684cdfb451bf295d18bea0fcd9d929d700bc6d74e726a853d93130b59ab516",
+    "tasks/archive/RUNTIME-128-default-lit-material-for-materialless-imports.md": "c3c1ebe503baad16f4d38db2ffe78e81244a5dbdfd1f3af3623cfe0d7411ebdd",
+    "tasks/archive/RUNTIME-127-render-artifact-publication.md": "33b8a8b18a3bcd281e59ec26e7e89d0f91609a61cc6f031959fea8321c9d1306",
+    "tasks/archive/RUNTIME-109-extensible-mesh-attribute-texture-bakes.md": "93e398ac5504a4ea4e36b433567d6557a11a70851de00a594bd6ead6a9a78201",
+    "tasks/archive/RUNTIME-120-vertex-attribute-binding-resolver.md": "7d62fe6777a9cf9a767f1fb63973a6f7ed555d5bd3ef611c22dc9140a7306b37",
+    "tasks/archive/RUNTIME-121-vertex-color-channel-upload.md": "15ce40363ae5c8c8df91afacd0799d63e7c5607986c43fb264c6b057c6fead72",
+    "tasks/archive/RUNTIME-122-gpu-soa-vertex-channel-storage-and-shader-fetch.md": "e3dd591b7151412413106d5c529cf5cab1782f1a74f3001b9cf96dbe4396aab9",
+    "tasks/archive/RUNTIME-123-editor-bind-property-as-channel.md": "d86a7e5bb0b7e0e3e34197fa8ac9bb06835c97c41ac1e00edfd31cfe4336311d",
+    "tasks/archive/RUNTIME-124-per-channel-partial-uploads.md": "0132d0b712cb873eedb1466f62ab6e56f206104e3e12ea581eb5490858679a1b",
+    "tasks/archive/RUNTIME-126-gpu-readback-jobs-and-property-writeback.md": "f00cdfdf7eb5dbbe7b62df6ce7eca8415e87d4bc4a734edf770f1b262b165ba9",
+    "tasks/archive/RUNTIME-119-gpu-renderable-availability-snapshot.md": "790ec71a0c287778dcdfd11f7f2480b98c66a235543c5ffe3e0cbe69bc51f3a1",
+    "tasks/archive/RUNTIME-118-geometry-availability-consumer-migration.md": "9ebac6efdb5136143f9d8a0934a4963fddc46cb0f22602a9451b45b7bd1d17d3",
+    "tasks/archive/RUNTIME-117-geometry-availability-render-lane-resolver.md": "d5d6b43078504205a79d004336d440ceeb7c0aef40f2bff1927955bbe5104b53",
+    "tasks/archive/RUNTIME-115-selected-mesh-bake-command-surface.md": "78ba2d135f798bb84f8aa569c6acfd9e90f861ef064b94eaa7fc21d3e44734b7",
+    "tasks/archive/RUNTIME-114-progressive-import-enrichment-pipeline.md": "a8c7c831d37ec4155acbcca4a79c893cc7250e362b27ae545f58df74b45a8ff6",
+    "tasks/archive/RUNTIME-113-progressive-domain-presentation-extraction.md": "695622de3e243e7f73863f6553bb41dffbdfa670e712b991af0ec2cb219f63e6",
+    "tasks/archive/RUNTIME-112-entity-derived-job-graph.md": "8940c747fe87c7b4b477b18f3aae596d17a9be407f3b1b07f371c31d940f8d04",
+    "tasks/archive/RUNTIME-111-progressive-render-data-descriptors.md": "c241d057739d39e6e1987ad6280a6bfcb9dea69d62a88c0b909b41e0da1d949e",
+    "tasks/archive/RUNTIME-110-progressive-entity-render-data-pipeline.md": "f75c669fbd77b5dbf9e6b2ce7f1b86e2fec74ce6aba2e16333aa09d24a9636d1",
+    "tasks/archive/RUNTIME-101-asset-ingest-state-machine.md": "2b7c31fb070c01ef0794e50252f4ba508790a92f2b0b127fa7608098623db05a",
+    "tasks/archive/RUNTIME-108-resolved-uv-render-residency.md": "d43defda36cbe88547f6c3b8f4e8131a2f2c6180f48d314c29ad7ce91ebdc792",
+    "tasks/archive/RUNTIME-105-remove-streaming-graph-bridge.md": "ff828a4edc305f8012f7069b4e46e74594cee804c1a8b499d9571cb4c28f98d9",
+    "tasks/archive/RUNTIME-103-geometry-algorithm-execution-queue.md": "1dc3c31ed03102e3716f563a4e59f4244ab63c1ef96aba69ae45d97bf2fb614e",
+    "tasks/archive/RUNTIME-107-headless-engine-loop-coverage.md": "0db33c679b4afe245c9fd731310d3c39962d6fa7ddf14be28e01cef474171ecb",
+    "tasks/archive/GRAPHICS-084-visualization-property-buffer-residency.md": "42be45e6dcaa283d59456235ca02aa7f597ab463775ab49a7d7debafbdf88d65",
+    "tasks/archive/RORG-031C-runtime-composition.md": "2d48422155a4938d6eced18e28bf2fbb0fb4357c8612a7b6f120dc674d7e6048",
+    "tasks/archive/RUNTIME-104-derived-overlay-producer-lifecycle.md": "b5810a491b526d7d3ba96d394a34d0365af070bf9f02938122d860b8c2aa4bee",
+    "tasks/archive/GRAPHICS-085-overlay-packet-backend-parity.md": "7b6ff2531840738c03190d019249b167d39dc99ac0e4fb7bacdbc676e7c02459",
+    "tasks/archive/RUNTIME-106-render-component-domain-composition.md": "005363f17bfc679d6637e8b88a2b7f56d2cd92c54e5e23d09ca32b28f1e00ddb",
+    "tasks/archive/RUNTIME-091-promoted-ecs-system-bundle-activation.md": "b0a03d7d914b16d1301a14dd411e41ad84ed0ba6f6e7eba687beb414012250d5",
+    "tasks/archive/RUNTIME-096-runtime-module-implementation-splits.md": "bacb5854243fde85e3322880cf1125804f4deb224ca38890f6475423e168c20b",
+    "tasks/archive/RUNTIME-097-default-sandbox-ecs-triangle.md": "b33baa4a2716932b24d69bc8e33bb3f46dfb1be3b9322cd0da9063caddefa5a3",
+    "tasks/archive/RUNTIME-098-promoted-scene-serialization.md": "c7ba8a9f5abe30f3b68d44bebe1f39326123a44f2a46c60f81a0a3e2011771c7",
+    "tasks/archive/RUNTIME-099-runtime-lifecycle-composition.md": "86b7f9fe73032d7b8668702c8dd4f7a3360c6e14dc2296ad858feca6bc41a34c",
+    "tasks/archive/RUNTIME-100-scene-manager-lifecycle.md": "34e1d317691d8ed2b68b8b2a0a0968d84df62dfcf9c6696be4073f270763866b",
+    "tasks/archive/RUNTIME-102-editor-command-history.md": "38989b9b4ad9c0200bbaf149ae48069ea566f4a8af107cac3c4b09d0ac2d75f2",
+    "tasks/archive/RUNTIME-070-fallback-texture-bootstrap.md": "6f67c21f517cac42ec901cb7126caab9d41842777126789d2d59ea37cbfabfb6",
+    "tasks/archive/BUILD-001-sandbox-shader-compile-wiring.md": "d5b3316dd1b04f7a58fe555084c0003dfb5c1c22ba975b3ed3b129a8fe307d9e",
+    "tasks/archive/RUNTIME-081-camera-controllers.md": "25b3c78c77691d84c5786b74d52777591c28533987a0df18b840494869af869a",
+    "tasks/archive/RUNTIME-080-asset-bridges-texture.md": "48d9bdc19bfd761375e075975c5b88a1ed5cfcb17dcc0c29247ff2b7d32f0bee",
+    "tasks/archive/RUNTIME-082-spatial-debug-adapters.md": "8a8b1cd948bbbf56f1d3c5f308651673d43533277fd31ea825dc29ab69471163",
+    "tasks/archive/RUNTIME-083-visualization-adapters.md": "d3f999c0f9b3e024b202521d38bc881dafeb0988dd155496337b8625ad55197e",
+    "tasks/archive/RUNTIME-084-gizmo-interaction.md": "90f40a410c1d43af2083cbf4df4b032836ee9766f248cb49e9abc6b98b497b9b",
+    "tasks/archive/RUNTIME-090-imgui-platform-renderer-adapter.md": "4610fb2621fbb797c6af25d3bc81f53610cdd17b4d0ace35dc74d1cbe2d1b437",
+    "tasks/archive/RUNTIME-085-geometrysources-mesh-residency.md": "7eded8996877b8af65124f220eebee54f1cdd52030edd83c15df9976d7c25f9a",
+    "tasks/archive/RUNTIME-086-geometrysources-graph-residency.md": "b2ce89008d5293f8148347e3278c48ca5fa0024e5f456e62f373df3e80739ffa",
+    "tasks/archive/RUNTIME-087-geometrysources-pointcloud-residency.md": "e67a44bf394215275c3af0644804cecbff2e9f0822cefdd8cf37e600f1a0cdab",
+    "tasks/archive/RUNTIME-088-mesh-primitive-view-lifecycle.md": "505af36bb914198a5e95d390249d1ed8e5de9a6f387d22f718a466bcadab4adc",
+    "tasks/archive/RUNTIME-089-selection-controller.md": "f49dc282f5b7de6f541eab6fbe602ad90ba48e1fba129748ffcba72cbf762212",
+    "tasks/archive/RUNTIME-092-stable-entity-lookup.md": "793720d97eb08a125fe887106f403516539487a1f6e23b1c69461b6b12e091fe",
+    "tasks/archive/RUNTIME-093-primitive-selection-refinement.md": "1433cd4816fa63331fc5e942f860650d769f9751fafdb53f928309b197007491",
+    "tasks/archive/RUNTIME-095-working-sandbox-acceptance.md": "582c5fddd279c1fc9d45ab898afc15c9f66bd1cd5ed2d71321bd2c838d34a428",
+    "tasks/archive/GRAPHICS-016-runtime-extraction-handoff.md": "99f22e767c6c393ca23ff17c56efc2a2694efbb3c6e6d24fb3378bc6fdaeb3f7",
+    "tasks/archive/GRAPHICS-001-rendering-parity-inventory.md": "18793b31119b083f6d57be9b446e261d59f57f0af3d6e16c8be32b8e38578545"
+  },
+  "modified_historical_task_records": [],
+  "executable_build_tool_sources_unchanged": true,
+  "current_links": [
+    {
+      "raw": "../../../AGENTS.md",
+      "target": "AGENTS.md"
+    },
+    {
+      "raw": "../../active/",
+      "target": "tasks/active"
+    },
+    {
+      "raw": "../../SESSION-BRIEF.md",
+      "target": "tasks/SESSION-BRIEF.md"
+    },
+    {
+      "raw": "../../../docs/architecture/geometry-api-style.md",
+      "target": "docs/architecture/geometry-api-style.md"
+    },
+    {
+      "raw": "RUNTIME-210-signed-heat-runtime-config-integration.md",
+      "target": "tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md"
+    },
+    {
+      "raw": "RUNTIME-211-kmeans-property-domain-integration.md",
+      "target": "tasks/backlog/runtime/RUNTIME-211-kmeans-property-domain-integration.md"
+    },
+    {
+      "raw": "RUNTIME-212-progressive-poisson-property-domain-publication.md",
+      "target": "tasks/backlog/runtime/RUNTIME-212-progressive-poisson-property-domain-publication.md"
+    },
+    {
+      "raw": "RUNTIME-218-default-scene-lighting-and-light-authoring.md",
+      "target": "tasks/backlog/runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md"
+    },
+    {
+      "raw": "RUNTIME-222-model-space-point-radius-rendering.md",
+      "target": "tasks/backlog/runtime/RUNTIME-222-model-space-point-radius-rendering.md"
+    },
+    {
+      "raw": "../architecture/README.md",
+      "target": "tasks/backlog/architecture/README.md"
+    },
+    {
+      "raw": "../geometry/README.md",
+      "target": "tasks/backlog/geometry/README.md"
+    },
+    {
+      "raw": "../rendering/README.md",
+      "target": "tasks/backlog/rendering/README.md"
+    },
+    {
+      "raw": "../../../docs/architecture/index.md",
+      "target": "docs/architecture/index.md"
+    },
+    {
+      "raw": "../../done/RETIREMENT-LOG.md",
+      "target": "tasks/done/RETIREMENT-LOG.md"
+    }
+  ],
+  "baseline_link_dispositions": [
+    {
+      "raw": "RUNTIME-218-default-scene-lighting-and-light-authoring.md",
+      "target": "tasks/backlog/runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md",
+      "kind": "open",
+      "disposition": "retained"
+    },
+    {
+      "raw": "../../../docs/reviews/2026-08-02-method-engine-integration-contract-audit.md",
+      "target": "docs/reviews/2026-08-02-method-engine-integration-contract-audit.md",
+      "kind": "reference",
+      "disposition": "dropped-duplicated-reference"
+    },
+    {
+      "raw": "RUNTIME-210-signed-heat-runtime-config-integration.md",
+      "target": "tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md",
+      "kind": "open",
+      "disposition": "retained"
+    },
+    {
+      "raw": "RUNTIME-211-kmeans-property-domain-integration.md",
+      "target": "tasks/backlog/runtime/RUNTIME-211-kmeans-property-domain-integration.md",
+      "kind": "open",
+      "disposition": "retained"
+    },
+    {
+      "raw": "RUNTIME-212-progressive-poisson-property-domain-publication.md",
+      "target": "tasks/backlog/runtime/RUNTIME-212-progressive-poisson-property-domain-publication.md",
+      "kind": "open",
+      "disposition": "retained"
+    },
+    {
+      "raw": "../../done/RUNTIME-217-inline-single-use-core-frame-loop-contracts.md",
+      "target": "tasks/done/RUNTIME-217-inline-single-use-core-frame-loop-contracts.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-216-inline-render-extraction-engine-glue.md",
+      "target": "tasks/done/RUNTIME-216-inline-render-extraction-engine-glue.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-215-organize-runtime-source-layout.md",
+      "target": "tasks/done/RUNTIME-215-organize-runtime-source-layout.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-214-universal-geometry-property-coherence.md",
+      "target": "tasks/done/RUNTIME-214-universal-geometry-property-coherence.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-206-lop-element-domain-source-integration.md",
+      "target": "tasks/done/RUNTIME-206-lop-element-domain-source-integration.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-208-progressive-poisson-element-domain-publication.md",
+      "target": "tasks/done/RUNTIME-208-progressive-poisson-element-domain-publication.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/UI-038-progressive-poisson-multi-domain-panel.md",
+      "target": "tasks/done/UI-038-progressive-poisson-multi-domain-panel.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-205-internalize-scene-interaction-helpers.md",
+      "target": "tasks/done/RUNTIME-205-internalize-scene-interaction-helpers.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-203-internalize-engine-composition-helpers.md",
+      "target": "tasks/done/RUNTIME-203-internalize-engine-composition-helpers.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-202-retire-sandbox-runtime-facade.md",
+      "target": "tasks/done/RUNTIME-202-retire-sandbox-runtime-facade.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-200-staged-asset-import-materialization-recipe.md",
+      "target": "tasks/done/RUNTIME-200-staged-asset-import-materialization-recipe.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-201-unified-editor-mutation-history-transaction.md",
+      "target": "tasks/done/RUNTIME-201-unified-editor-mutation-history-transaction.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-198-data-driven-visualization-recipes.md",
+      "target": "tasks/done/RUNTIME-198-data-driven-visualization-recipes.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-197-unified-geometry-upload-residency-coordinator.md",
+      "target": "tasks/done/RUNTIME-197-unified-geometry-upload-residency-coordinator.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-194-consolidate-runtime-work-execution.md",
+      "target": "tasks/done/RUNTIME-194-consolidate-runtime-work-execution.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-195-unified-gpu-result-readback.md",
+      "target": "tasks/done/RUNTIME-195-unified-gpu-result-readback.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-196-canonical-clustering-service-path.md",
+      "target": "tasks/done/RUNTIME-196-canonical-clustering-service-path.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-192-canonical-geometry-property-reference-and-catalog.md",
+      "target": "tasks/done/RUNTIME-192-canonical-geometry-property-reference-and-catalog.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-199-retire-dormant-spatial-debug-registry.md",
+      "target": "tasks/done/RUNTIME-199-retire-dormant-spatial-debug-registry.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-204-withdraw-dormant-method-figure-export.md",
+      "target": "tasks/done/RUNTIME-204-withdraw-dormant-method-figure-export.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-190-gpu-property-texture-bake-module.md",
+      "target": "tasks/done/RUNTIME-190-gpu-property-texture-bake-module.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-191-unified-property-texture-bake-pipeline.md",
+      "target": "tasks/done/RUNTIME-191-unified-property-texture-bake-pipeline.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../../docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md",
+      "target": "docs/reviews/2026-07-03-mainloop-taskgraph-rendergraph-review.md",
+      "kind": "reference",
+      "disposition": "dropped-duplicated-reference"
+    },
+    {
+      "raw": "../architecture/README.md",
+      "target": "tasks/backlog/architecture/README.md",
+      "kind": "open",
+      "disposition": "retained"
+    },
+    {
+      "raw": "../../../docs/adr/0024-kernel-module-architecture.md",
+      "target": "docs/adr/0024-kernel-module-architecture.md",
+      "kind": "reference",
+      "disposition": "dropped-duplicated-reference"
+    },
+    {
+      "raw": "../../../docs/adr/0027-right-sized-runtime-composition.md",
+      "target": "docs/adr/0027-right-sized-runtime-composition.md",
+      "kind": "reference",
+      "disposition": "dropped-duplicated-reference"
+    },
+    {
+      "raw": "../../done/RUNTIME-187-finalize-domain-free-engine-surface.md",
+      "target": "tasks/done/RUNTIME-187-finalize-domain-free-engine-surface.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-186-retire-engine-auxiliary-surface.md",
+      "target": "tasks/done/RUNTIME-186-retire-engine-auxiliary-surface.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-185-prune-runtime-composition-mechanisms.md",
+      "target": "tasks/done/RUNTIME-185-prune-runtime-composition-mechanisms.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-184-replace-application-lifecycle.md",
+      "target": "tasks/done/RUNTIME-184-replace-application-lifecycle.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-183-extract-asset-workflow-module.md",
+      "target": "tasks/done/RUNTIME-183-extract-asset-workflow-module.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-182-extract-editor-ui-module.md",
+      "target": "tasks/done/RUNTIME-182-extract-editor-ui-module.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-181-extract-config-control-module.md",
+      "target": "tasks/done/RUNTIME-181-extract-config-control-module.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-179-extract-async-work-module.md",
+      "target": "tasks/done/RUNTIME-179-extract-async-work-module.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-165-extract-async-work-service.md",
+      "target": "tasks/archive/RUNTIME-165-extract-async-work-service.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-164-extract-asset-residency-service.md",
+      "target": "tasks/archive/RUNTIME-164-extract-asset-residency-service.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-163-extract-render-extraction-service.md",
+      "target": "tasks/archive/RUNTIME-163-extract-render-extraction-service.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-166-slim-render-extraction-module.md",
+      "target": "tasks/done/RUNTIME-166-slim-render-extraction-module.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-168-privatize-sandbox-default-policies-surface.md",
+      "target": "tasks/done/RUNTIME-168-privatize-sandbox-default-policies-surface.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-188-extract-scene-interaction-module.md",
+      "target": "tasks/done/RUNTIME-188-extract-scene-interaction-module.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-172-extract-scene-document-module.md",
+      "target": "tasks/done/RUNTIME-172-extract-scene-document-module.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-178-restore-engine-convergence-budget.md",
+      "target": "tasks/done/RUNTIME-178-restore-engine-convergence-budget.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md",
+      "target": "tasks/done/RUNTIME-173-privatize-kmeans-gpu-job-queue-surface.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-171-privatize-asset-residency-service-surface.md",
+      "target": "tasks/done/RUNTIME-171-privatize-asset-residency-service-surface.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-169-privatize-render-extraction-service-surface.md",
+      "target": "tasks/done/RUNTIME-169-privatize-render-extraction-service-surface.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-174-privatize-imgui-editor-bridge-surface.md",
+      "target": "tasks/done/RUNTIME-174-privatize-imgui-editor-bridge-surface.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-167-privatize-engine-frameloop-surface.md",
+      "target": "tasks/done/RUNTIME-167-privatize-engine-frameloop-surface.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-170-privatize-object-space-normal-gpu-queue-surface.md",
+      "target": "tasks/done/RUNTIME-170-privatize-object-space-normal-gpu-queue-surface.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../geometry/README.md",
+      "target": "tasks/backlog/geometry/README.md",
+      "kind": "open",
+      "disposition": "retained"
+    },
+    {
+      "raw": "../../done/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md",
+      "target": "tasks/done/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/UI-035-sandbox-pointcloud-consolidation-editor-panel.md",
+      "target": "tasks/done/UI-035-sandbox-pointcloud-consolidation-editor-panel.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../done/RUNTIME-189-withdraw-premature-orientation-debug-view.md",
+      "target": "tasks/done/RUNTIME-189-withdraw-premature-orientation-debug-view.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../../docs/adr/0025-parameterization-uv-view-and-split-view.md",
+      "target": "docs/adr/0025-parameterization-uv-view-and-split-view.md",
+      "kind": "reference",
+      "disposition": "dropped-duplicated-reference"
+    },
+    {
+      "raw": "../../../docs/adr/0022-vertex-storage-soa-per-channel-streaming.md",
+      "target": "docs/adr/0022-vertex-storage-soa-per-channel-streaming.md",
+      "kind": "reference",
+      "disposition": "dropped-duplicated-reference"
+    },
+    {
+      "raw": "../../../docs/adr/0023-cpu-gpu-transfer-foundation.md",
+      "target": "docs/adr/0023-cpu-gpu-transfer-foundation.md",
+      "kind": "reference",
+      "disposition": "dropped-duplicated-reference"
+    },
+    {
+      "raw": "../../done/RUNTIME-177-immediate-mode-debug-draw-seam.md",
+      "target": "tasks/done/RUNTIME-177-immediate-mode-debug-draw-seam.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../../AGENTS.md",
+      "target": "AGENTS.md",
+      "kind": "reference",
+      "disposition": "retained"
+    },
+    {
+      "raw": "../rendering/README.md",
+      "target": "tasks/backlog/rendering/README.md",
+      "kind": "open",
+      "disposition": "retained"
+    },
+    {
+      "raw": "../../done/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md",
+      "target": "tasks/done/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-146-extract-engine-config-boot-module.md",
+      "target": "tasks/archive/RUNTIME-146-extract-engine-config-boot-module.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-147-extract-asset-import-pipeline-subsystem.md",
+      "target": "tasks/archive/RUNTIME-147-extract-asset-import-pipeline-subsystem.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-148-extract-scene-document-subsystem.md",
+      "target": "tasks/archive/RUNTIME-148-extract-scene-document-subsystem.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-149-extract-engine-config-control-subsystem.md",
+      "target": "tasks/archive/RUNTIME-149-extract-engine-config-control-subsystem.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-150-split-engine-frame-loop-implementation-unit.md",
+      "target": "tasks/archive/RUNTIME-150-split-engine-frame-loop-implementation-unit.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-151-slim-engine-interface-and-remove-entt-leak.md",
+      "target": "tasks/archive/RUNTIME-151-slim-engine-interface-and-remove-entt-leak.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-152-extract-runtime-device-bootstrap.md",
+      "target": "tasks/archive/RUNTIME-152-extract-runtime-device-bootstrap.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-153-extract-mesh-primitive-view-controls.md",
+      "target": "tasks/archive/RUNTIME-153-extract-mesh-primitive-view-controls.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-154-extract-reference-scene-control.md",
+      "target": "tasks/archive/RUNTIME-154-extract-reference-scene-control.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-155-extract-runtime-input-action-registry.md",
+      "target": "tasks/archive/RUNTIME-155-extract-runtime-input-action-registry.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-156-extract-runtime-module-schedule.md",
+      "target": "tasks/archive/RUNTIME-156-extract-runtime-module-schedule.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-157-extract-selection-readback-state.md",
+      "target": "tasks/archive/RUNTIME-157-extract-selection-readback-state.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-158-extract-frame-pacing-diagnostics.md",
+      "target": "tasks/archive/RUNTIME-158-extract-frame-pacing-diagnostics.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-159-extract-imgui-editor-bridge.md",
+      "target": "tasks/archive/RUNTIME-159-extract-imgui-editor-bridge.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-160-extract-jobservice-gpu-queue-bridge.md",
+      "target": "tasks/archive/RUNTIME-160-extract-jobservice-gpu-queue-bridge.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-161-extract-object-space-normal-bake-service.md",
+      "target": "tasks/archive/RUNTIME-161-extract-object-space-normal-bake-service.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-162-extract-gizmo-frame-service.md",
+      "target": "tasks/archive/RUNTIME-162-extract-gizmo-frame-service.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-140-remove-global-waitforall-from-import-apply.md",
+      "target": "tasks/archive/RUNTIME-140-remove-global-waitforall-from-import-apply.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-142-async-modelscene-texture-scenefile-io.md",
+      "target": "tasks/archive/RUNTIME-142-async-modelscene-texture-scenefile-io.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md",
+      "target": "tasks/archive/RUNTIME-143-frame-hook-registry-and-kmeans-decoupling.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-144-post-import-processor-and-ux-policy-seam.md",
+      "target": "tasks/archive/RUNTIME-144-post-import-processor-and-ux-policy-seam.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-125-aos-static-fast-lane.md",
+      "target": "tasks/archive/RUNTIME-125-aos-static-fast-lane.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-136-sandbox-method-backend-selectors.md",
+      "target": "tasks/archive/RUNTIME-136-sandbox-method-backend-selectors.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-135-spatialdebug-closest-face-picking.md",
+      "target": "tasks/archive/RUNTIME-135-spatialdebug-closest-face-picking.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/CORE-004-indexed-decrease-key-heap.md",
+      "target": "tasks/archive/CORE-004-indexed-decrease-key-heap.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-132-lift-runframe-hook-adapters.md",
+      "target": "tasks/archive/RUNTIME-132-lift-runframe-hook-adapters.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-128-default-lit-material-for-materialless-imports.md",
+      "target": "tasks/archive/RUNTIME-128-default-lit-material-for-materialless-imports.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-127-render-artifact-publication.md",
+      "target": "tasks/archive/RUNTIME-127-render-artifact-publication.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-109-extensible-mesh-attribute-texture-bakes.md",
+      "target": "tasks/archive/RUNTIME-109-extensible-mesh-attribute-texture-bakes.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-120-vertex-attribute-binding-resolver.md",
+      "target": "tasks/archive/RUNTIME-120-vertex-attribute-binding-resolver.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-121-vertex-color-channel-upload.md",
+      "target": "tasks/archive/RUNTIME-121-vertex-color-channel-upload.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-122-gpu-soa-vertex-channel-storage-and-shader-fetch.md",
+      "target": "tasks/archive/RUNTIME-122-gpu-soa-vertex-channel-storage-and-shader-fetch.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-123-editor-bind-property-as-channel.md",
+      "target": "tasks/archive/RUNTIME-123-editor-bind-property-as-channel.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-124-per-channel-partial-uploads.md",
+      "target": "tasks/archive/RUNTIME-124-per-channel-partial-uploads.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-126-gpu-readback-jobs-and-property-writeback.md",
+      "target": "tasks/archive/RUNTIME-126-gpu-readback-jobs-and-property-writeback.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-119-gpu-renderable-availability-snapshot.md",
+      "target": "tasks/archive/RUNTIME-119-gpu-renderable-availability-snapshot.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-118-geometry-availability-consumer-migration.md",
+      "target": "tasks/archive/RUNTIME-118-geometry-availability-consumer-migration.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-117-geometry-availability-render-lane-resolver.md",
+      "target": "tasks/archive/RUNTIME-117-geometry-availability-render-lane-resolver.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-115-selected-mesh-bake-command-surface.md",
+      "target": "tasks/archive/RUNTIME-115-selected-mesh-bake-command-surface.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-114-progressive-import-enrichment-pipeline.md",
+      "target": "tasks/archive/RUNTIME-114-progressive-import-enrichment-pipeline.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-113-progressive-domain-presentation-extraction.md",
+      "target": "tasks/archive/RUNTIME-113-progressive-domain-presentation-extraction.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-112-entity-derived-job-graph.md",
+      "target": "tasks/archive/RUNTIME-112-entity-derived-job-graph.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-111-progressive-render-data-descriptors.md",
+      "target": "tasks/archive/RUNTIME-111-progressive-render-data-descriptors.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-110-progressive-entity-render-data-pipeline.md",
+      "target": "tasks/archive/RUNTIME-110-progressive-entity-render-data-pipeline.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-101-asset-ingest-state-machine.md",
+      "target": "tasks/archive/RUNTIME-101-asset-ingest-state-machine.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-108-resolved-uv-render-residency.md",
+      "target": "tasks/archive/RUNTIME-108-resolved-uv-render-residency.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-105-remove-streaming-graph-bridge.md",
+      "target": "tasks/archive/RUNTIME-105-remove-streaming-graph-bridge.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-103-geometry-algorithm-execution-queue.md",
+      "target": "tasks/archive/RUNTIME-103-geometry-algorithm-execution-queue.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-107-headless-engine-loop-coverage.md",
+      "target": "tasks/archive/RUNTIME-107-headless-engine-loop-coverage.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/GRAPHICS-084-visualization-property-buffer-residency.md",
+      "target": "tasks/archive/GRAPHICS-084-visualization-property-buffer-residency.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RORG-031C-runtime-composition.md",
+      "target": "tasks/archive/RORG-031C-runtime-composition.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-104-derived-overlay-producer-lifecycle.md",
+      "target": "tasks/archive/RUNTIME-104-derived-overlay-producer-lifecycle.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/GRAPHICS-085-overlay-packet-backend-parity.md",
+      "target": "tasks/archive/GRAPHICS-085-overlay-packet-backend-parity.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-106-render-component-domain-composition.md",
+      "target": "tasks/archive/RUNTIME-106-render-component-domain-composition.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-091-promoted-ecs-system-bundle-activation.md",
+      "target": "tasks/archive/RUNTIME-091-promoted-ecs-system-bundle-activation.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-096-runtime-module-implementation-splits.md",
+      "target": "tasks/archive/RUNTIME-096-runtime-module-implementation-splits.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-097-default-sandbox-ecs-triangle.md",
+      "target": "tasks/archive/RUNTIME-097-default-sandbox-ecs-triangle.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-098-promoted-scene-serialization.md",
+      "target": "tasks/archive/RUNTIME-098-promoted-scene-serialization.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-099-runtime-lifecycle-composition.md",
+      "target": "tasks/archive/RUNTIME-099-runtime-lifecycle-composition.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-100-scene-manager-lifecycle.md",
+      "target": "tasks/archive/RUNTIME-100-scene-manager-lifecycle.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-102-editor-command-history.md",
+      "target": "tasks/archive/RUNTIME-102-editor-command-history.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-070-fallback-texture-bootstrap.md",
+      "target": "tasks/archive/RUNTIME-070-fallback-texture-bootstrap.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/BUILD-001-sandbox-shader-compile-wiring.md",
+      "target": "tasks/archive/BUILD-001-sandbox-shader-compile-wiring.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-081-camera-controllers.md",
+      "target": "tasks/archive/RUNTIME-081-camera-controllers.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-080-asset-bridges-texture.md",
+      "target": "tasks/archive/RUNTIME-080-asset-bridges-texture.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-082-spatial-debug-adapters.md",
+      "target": "tasks/archive/RUNTIME-082-spatial-debug-adapters.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-083-visualization-adapters.md",
+      "target": "tasks/archive/RUNTIME-083-visualization-adapters.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-084-gizmo-interaction.md",
+      "target": "tasks/archive/RUNTIME-084-gizmo-interaction.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-090-imgui-platform-renderer-adapter.md",
+      "target": "tasks/archive/RUNTIME-090-imgui-platform-renderer-adapter.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-085-geometrysources-mesh-residency.md",
+      "target": "tasks/archive/RUNTIME-085-geometrysources-mesh-residency.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-086-geometrysources-graph-residency.md",
+      "target": "tasks/archive/RUNTIME-086-geometrysources-graph-residency.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-087-geometrysources-pointcloud-residency.md",
+      "target": "tasks/archive/RUNTIME-087-geometrysources-pointcloud-residency.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-088-mesh-primitive-view-lifecycle.md",
+      "target": "tasks/archive/RUNTIME-088-mesh-primitive-view-lifecycle.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-089-selection-controller.md",
+      "target": "tasks/archive/RUNTIME-089-selection-controller.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-092-stable-entity-lookup.md",
+      "target": "tasks/archive/RUNTIME-092-stable-entity-lookup.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-093-primitive-selection-refinement.md",
+      "target": "tasks/archive/RUNTIME-093-primitive-selection-refinement.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-095-working-sandbox-acceptance.md",
+      "target": "tasks/archive/RUNTIME-095-working-sandbox-acceptance.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-097-default-sandbox-ecs-triangle.md",
+      "target": "tasks/archive/RUNTIME-097-default-sandbox-ecs-triangle.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/RUNTIME-098-promoted-scene-serialization.md",
+      "target": "tasks/archive/RUNTIME-098-promoted-scene-serialization.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../../archive/GRAPHICS-016-runtime-extraction-handoff.md",
+      "target": "tasks/archive/GRAPHICS-016-runtime-extraction-handoff.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "../rendering/README.md",
+      "target": "tasks/backlog/rendering/README.md",
+      "kind": "open",
+      "disposition": "retained"
+    },
+    {
+      "raw": "../../archive/GRAPHICS-001-rendering-parity-inventory.md",
+      "target": "tasks/archive/GRAPHICS-001-rendering-parity-inventory.md",
+      "kind": "historical",
+      "disposition": "dropped-historical-index-entry"
+    },
+    {
+      "raw": "RUNTIME-222-model-space-point-radius-rendering.md",
+      "target": "tasks/backlog/runtime/RUNTIME-222-model-space-point-radius-rendering.md",
+      "kind": "open",
+      "disposition": "retained"
+    }
+  ]
+}

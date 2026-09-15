@@ -5,10 +5,10 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "codex-overnight"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-09-15T02:24:34Z"
 contract_schema: 1
 contracts: [repo.source-documentation]
 ---
@@ -58,22 +58,22 @@ Reuse/right-sizing: canonical task files plus existing indexes/logs provide
 all needed ownership and history; no replacement data structure or generator.
 
 ## Required changes
-- [ ] Rewrite only the runtime backlog README into a concise current entry point.
-- [ ] Keep all actual open local tasks and existing open backlog category links discoverable.
-- [ ] Remove completed-gate claims and duplicated history while linking its existing owners.
+- [x] Rewrite only the runtime backlog README into a concise current entry point.
+- [x] Keep all actual open local tasks and existing open backlog category links discoverable.
+- [x] Remove completed-gate claims and duplicated history while linking its existing owners.
 
 ## Tests
-- [ ] Save baseline/final line counts, open-link identities and local task coverage.
-- [ ] Source-documentation audit and strict task-state/doc/task/root checks pass.
-- [ ] Claude reviews the final fixed text against actual current task locations.
+- [x] Save baseline/final line counts, open-link identities and local task coverage.
+- [x] Source-documentation audit and strict task-state/doc/task/root checks pass.
+- [x] Claude reviews the final fixed text against actual current task locations.
 
 ## Docs
-- [ ] Retire with exact local source identity and standard completion evidence.
+- [x] Retire with exact local source identity and standard completion evidence.
 
 ## Acceptance criteria
-- [ ] README provides concise current task and contract discovery without retired-gate claims.
-- [ ] Open task coverage and existing historical records are preserved with passing checks and Claude review.
-- [ ] Docs-only slice is locally committed, retired and sealed with no source/build/behavior change.
+- [x] README provides concise current task and contract discovery without retired-gate claims.
+- [x] Open task coverage and existing historical records are preserved with passing checks and Claude review.
+- [x] Docs-only slice is locally committed, retired and sealed with no source/build/behavior change.
 
 ## Verification
 ```bash
@@ -95,3 +95,41 @@ owns the preceding source verification. No timing measurements are made.
 - Closing or changing scope of open task files merely to make the index shorter.
 - Deleting archived/done task records or copying them into another new index.
 - Broad changes to other backlog READMEs, source docs, agents, policy or code.
+
+## Validator finding — retirement navigation
+The initial strict task-state check classified links to the done/archive README
+indexes as retired task entries and required a history heading. That conflicts
+with the current source-documentation rule permitting brief navigation while
+rejecting history sections. `validate_category_indexes` checks only whether a
+resolved path is beneath done/archive; it does not distinguish index navigation
+from task membership. Directory links have the same false positive. BUG-196 owns
+the narrow checker repair and restoration of clickable index navigation.
+
+This slice keeps the existing supported retirement-log link and cites both index
+paths plainly, as the checker permits. Open task links and historical records
+remain preserved. The initial failing receipt stays bound as evidence; the final
+checks must pass. No validator or policy is changed in DOCS-007.
+
+## Completion — 2026-09-15
+- Endpoint: **Retired**, current-state documentation cleanup.
+- Commit: implementation and retirement are in the enclosing local commit;
+  `tasks/evidence/DOCS-007/seal.yaml` binds the exact source revision.
+- Runtime backlog README shrinks from 1,209 to 54 lines. All eight required
+  open link targets and five local task files remain discoverable; 127 linked
+  historical task records retain exact hashes. No executable, build or tool
+  source changed. Existing task notes and indexes remain the authoritative owners.
+- Source-documentation audit improves from 11 objective errors and 359 review
+  notes to zero errors and six reviewed heuristic notes. Those six are the five
+  necessary live task links and brief historical navigation, not duplicated
+  chronology. Strict final doc/task/state/root checks pass.
+- Claude approved the fixed final text and its match to the exact task goals.
+  Root clarified ownership phrasing, retained the existing retirement-log link
+  and plain index paths, and recorded BUG-196 for the checker false positive.
+  Optional methods-queue navigation was not required by the preserved target set.
+- The initial structural failure exposed BUG-196. The next preflight caught a
+  missing required Context heading in that new bug note; fixed without changing
+  the approved README. Both raw failures remain bound as artifacts, with the
+  passing final check as the completion gate. No validator was weakened.
+- No C++/sanitizer/GPU build or execution is claimed for this docs-only slice.
+  The preceding RUNTIME-256 owns source verification. No research or timing claim;
+  BUILD-007/C92 and the remaining engine/product work stay open.

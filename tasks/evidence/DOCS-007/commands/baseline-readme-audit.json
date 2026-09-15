@@ -1,0 +1,25 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py",
+    "--root",
+    ".",
+    "--path",
+    "tasks/backlog/runtime/README.md",
+    "--summary"
+  ],
+  "command_display": "python3 tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py --root . --path tasks/backlog/runtime/README.md --summary",
+  "cwd": ".",
+  "duration_ms": 34,
+  "exit_code": 1,
+  "finished_at": "2026-09-15T02:25:18Z",
+  "label": "baseline-readme-audit",
+  "required": false,
+  "schema_version": 1,
+  "started_at": "2026-09-15T02:25:18Z",
+  "stderr_path": "tasks/evidence/DOCS-007/commands/baseline-readme-audit.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/DOCS-007/commands/baseline-readme-audit.stdout.log",
+  "stdout_sha256": "b895b81b37e2f45bbfd320df4f86d5315e19a4e576321adb531f087177fae839",
+  "task_id": "DOCS-007"
+}

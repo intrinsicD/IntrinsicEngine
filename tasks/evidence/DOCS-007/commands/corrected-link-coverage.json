@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "/tmp/intrinsic-overnight-20260915/docs007/coverage.py"
+  ],
+  "command_display": "python3 /tmp/intrinsic-overnight-20260915/docs007/coverage.py",
+  "cwd": ".",
+  "duration_ms": 31,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T02:33:12Z",
+  "label": "corrected-link-coverage",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T02:33:12Z",
+  "stderr_path": "tasks/evidence/DOCS-007/commands/corrected-link-coverage.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/DOCS-007/commands/corrected-link-coverage.stdout.log",
+  "stdout_sha256": "5fe4533edaa819baf33a7a8732133cd75f46db7c0a88e331900f77836a9c019d",
+  "task_id": "DOCS-007"
+}

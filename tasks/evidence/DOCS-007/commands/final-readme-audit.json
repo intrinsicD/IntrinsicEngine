@@ -1,0 +1,25 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py",
+    "--root",
+    ".",
+    "--path",
+    "tasks/backlog/runtime/README.md",
+    "--summary"
+  ],
+  "command_display": "python3 tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py --root . --path tasks/backlog/runtime/README.md --summary",
+  "cwd": ".",
+  "duration_ms": 30,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T02:28:41Z",
+  "label": "final-readme-audit",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T02:28:41Z",
+  "stderr_path": "tasks/evidence/DOCS-007/commands/final-readme-audit.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/DOCS-007/commands/final-readme-audit.stdout.log",
+  "stdout_sha256": "a487aed9f10e76eb3c76cb9313807d98c64409b54d3ded8913fd37f149bb4163",
+  "task_id": "DOCS-007"
+}

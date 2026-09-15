@@ -46,6 +46,7 @@ picking backlog work; theme priorities and rationale live in
 
 ## Theme H — Agentic workflow hardening
 
+- unblocked: `BUG-196` — Retirement navigation is misclassified as task membership (tasks/backlog/bugs/BUG-196-retirement-index-navigation-false-positive.md)
 - blocked by `CI-012`: `BUILD-005` — Define hermetic toolchain and action identity (tasks/backlog/process/BUILD-005-hermetic-toolchain-action-identity.md)
 - blocked by `CI-013`: `BUILD-006` — Run a C++23-module build and cache backend bake-off (tasks/backlog/process/BUILD-006-cxx23-module-build-backend-bakeoff.md)
 - unblocked: `CI-012` — Compile a versioned verification evidence graph (tasks/backlog/process/CI-012-versioned-verification-evidence-graph.md)
@@ -57,7 +58,6 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `CI-013`: `CI-018` — Admit hybrid impact-based verification selection (tasks/backlog/process/CI-018-hybrid-impact-selection-admission.md)
 - blocked by `BUILD-006`: `CI-019` — Make CI thin and run full confidence once per merge group (tasks/backlog/process/CI-019-thin-ci-merge-queue-topology.md)
 - blocked by `CI-019`: `CI-020` — Cut over verification and retire legacy policy (tasks/backlog/process/CI-020-verification-cutover-and-legacy-retirement.md)
-- unblocked: `DOCS-007` — Make runtime backlog discovery current and concise (tasks/backlog/process/DOCS-007-runtime-backlog-current-state.md)
 - blocked by `CI-013`: `PROC-031` — Bind agent workflow to unified verification receipts (tasks/backlog/process/PROC-031-agent-verification-receipts.md)
 
 ## Theme I — Research method implementation (paused except explicit P0 dependencies)

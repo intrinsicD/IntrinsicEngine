@@ -1,0 +1,11 @@
+[check_doc_links] Root: /home/alex/Documents/IntrinsicEngine
+[check_doc_links] Checked relative links: 4052
+[check_doc_links] Mode: strict
+[check_doc_links] No broken relative links found.
+[check_task_state_links] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_state_links] Indexed task IDs: 1006
+[check_task_state_links] Mode: strict
+[check_task_state_links] Findings:
+  - tasks/backlog/runtime/README.md:52: category index links retired task README.md outside a history-marked heading; move the entry under a history section (e.g. '## Retired') or cite it as plain text
+  - tasks/backlog/runtime/README.md:54: category index links retired task README.md outside a history-marked heading; move the entry under a history section (e.g. '## Retired') or cite it as plain text
+[check_task_state_links] STRICT MODE: failing.

@@ -1,0 +1,134 @@
+schema_version: 1
+task_id: DOCS-007
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-15T02:38:24Z'
+claim_eligible: false
+source:
+  base_ref: cdf18f5c0
+  base_revision: cdf18f5c0478b522eb56b552771b2b6e87feb287
+  head_revision: cdf18f5c0478b522eb56b552771b2b6e87feb287
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 48374fc3fe0d0c5e9ba6505a3a929f434b17ea851f51d36f7b280473bf6ba59d
+  - path: ara/trace/sessions/2026-09-15_001.yaml
+    sha256: 3a0bb626078e43a8b5d7c30ad27a6777e72b192a6d7c1708e8fd145d702bf7e9
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 7913a2189346d2972cbe02992f2b61b32d1363c66267cb383f9c2ebf8967977d
+  - path: tasks/backlog/bugs/BUG-196-retirement-index-navigation-false-positive.md
+    sha256: e5b4546b6fdf4a9bbeed5a2a3276df8aa2b7c1d8e28c3de082e234ae8fbe8296
+  - path: tasks/backlog/process/DOCS-007-runtime-backlog-current-state.md
+    sha256: null
+  - path: tasks/backlog/runtime/README.md
+    sha256: 6e8b6428604d6c64f5e4cff416d3afb0a91d8b21d8d04f3fa47b1e2cb7ee213e
+  - path: tasks/done/DOCS-007-runtime-backlog-current-state.md
+    sha256: 48eabc474d79deaff39995b9660afe34b60977ea48fa2dda5a48cb2c4fa0556d
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 3be9bbceb9d0ab840d902bdf90a2c39dc56d8552c5274cdbeb07162c36a70c78
+  content_digest: 1ff235d25d2e7cbf43c998cd30e0b22c91cf3b7a1a9a53ebbdcefd227bbf3b82
+touched:
+  paths:
+  - ara/trace/exploration_tree.yaml
+  - ara/trace/sessions/2026-09-15_001.yaml
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/BUG-196-retirement-index-navigation-false-positive.md
+  - tasks/backlog/process/DOCS-007-runtime-backlog-current-state.md
+  - tasks/backlog/runtime/README.md
+  - tasks/done/DOCS-007-runtime-backlog-current-state.md
+  - tasks/done/RETIREMENT-LOG.md
+  layers:
+  - docs
+  - tasks
+  modules: []
+extension_seam: Existing task notes, category indexes and retirement log remain the owners; no new index
+  or policy
+future_change_plan: Keep current task discovery in the README and detailed scope/history in their owners;
+  BUG-196 repairs canonical retirement-navigation classification
+acceptance:
+- criterion: README provides concise current task and contract discovery without retired-gate claims.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/backlog/runtime/README.md
+  - tasks/evidence/DOCS-007/source-review.txt
+  reason: null
+- criterion: Open task coverage and existing historical records are preserved with passing checks and
+    Claude review.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/DOCS-007/link-coverage.json
+  - tasks/evidence/DOCS-007/commands/retirement-structural.stdout.log
+  reason: null
+- criterion: Docs-only slice is locally committed, retired and sealed with no source/build/behavior change.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/done/DOCS-007-runtime-backlog-current-state.md
+  - tasks/evidence/DOCS-007/seal.yaml
+  reason: null
+commands:
+- receipt: tasks/evidence/DOCS-007/commands/baseline-readme-audit.json
+- receipt: tasks/evidence/DOCS-007/commands/corrected-link-coverage.json
+- receipt: tasks/evidence/DOCS-007/commands/final-readme-audit.json
+- receipt: tasks/evidence/DOCS-007/commands/link-coverage.json
+- receipt: tasks/evidence/DOCS-007/commands/readme-audit.json
+- receipt: tasks/evidence/DOCS-007/commands/retirement-coverage.json
+- receipt: tasks/evidence/DOCS-007/commands/retirement-structural.json
+changed_public_contracts: []
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/DOCS-007-runtime-backlog-current-state.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: true
+residual_risks:
+- BUG-196 temporarily requires plain done/archive index paths beside the permitted retirement-log link;
+  actual open task links and historical records remain intact.
+- Initial navigation false-positive and subsequent new-note Context-heading failure remain immutable artifacts.
+  Final retirement-structural is the passing completion gate; neither failed receipt was modified or reclassified.
+skipped_checks:
+- check: cpp-build
+  reason: No executable, interface, test, build input or runtime configuration changed
+- check: asan-ubsan
+  reason: No executable ownership, memory or numeric behavior changed
+- check: gpu-vulkan
+  reason: No graphics, shader, renderer, resource or backend behavior changed
+- check: benchmark
+  reason: No performance conclusion is made; BUILD-007 owns matched timing
+artifacts:
+- path: tasks/evidence/DOCS-007/link-coverage.json
+  sha256: c5ed60ed90b7c445bab0ccc3b0614603c20330dc04cafe3b8708e121df4e3b90
+  kind: file
+- path: tasks/evidence/DOCS-007/source-review.txt
+  sha256: cffb08124f4c9bb5ab334de650ecd1e6a7785c92f9111e9f3bedb7cd15746eae
+  kind: file
+- path: tasks/evidence/DOCS-007/commands/structural.json
+  sha256: 1c76badeaaa15d3b91513afa9ccbb5af7c7c8a49f4491b1cc0c588d946b0cbb0
+  kind: file
+- path: tasks/evidence/DOCS-007/commands/structural.stdout.log
+  sha256: 266d4c78f502f611a7ca564180e56da84fbd28e1382f714ac76926a4a83ef5d3
+  kind: file
+- path: tasks/evidence/DOCS-007/commands/structural.stderr.log
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  kind: file
+- path: tasks/evidence/DOCS-007/commands/corrected-structural.json
+  sha256: dadf69824ba35cd1ff1e90d417091f44f0567268dc1f821cadf4ba0b1486cb50
+  kind: file
+- path: tasks/evidence/DOCS-007/commands/corrected-structural.stdout.log
+  sha256: a53663d033f2cc5943306c7861eb39f1bc2e61b62e8e3b5ae2feb5bcb2e00b0d
+  kind: file
+- path: tasks/evidence/DOCS-007/commands/corrected-structural.stderr.log
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true

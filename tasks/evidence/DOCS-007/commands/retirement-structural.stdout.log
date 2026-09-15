@@ -1,0 +1,58 @@
+[check_doc_links] Root: /home/alex/Documents/IntrinsicEngine
+[check_doc_links] Checked relative links: 4051
+[check_doc_links] Mode: strict
+[check_doc_links] No broken relative links found.
+[check_task_state_links] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_state_links] Indexed task IDs: 1007
+[check_task_state_links] Mode: strict
+[check_task_state_links] No task-state link findings.
+Validated 371 task file(s); findings: 0; mode: strict.
+[check_task_maturity_followups] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_maturity_followups] Open task files scanned: 107
+[check_task_maturity_followups] No maturity follow-up findings.
+Task policy check complete. findings=0 mode=strict.
+[check_root_hygiene] Root: /home/alex/Documents/IntrinsicEngine
+[check_root_hygiene] Root markdown files:
+  - AGENTS.md: allowed
+  - CLAUDE.md: allowed
+  - README.md: allowed
+[check_root_hygiene] Root allowlist: /home/alex/Documents/IntrinsicEngine/tools/repo/root_allowlist.yaml
+[check_root_hygiene] Allowed repository entries present:
+  - .claude/
+  - .codex/
+  - .github/
+  - .gitignore
+  - .mcp.json
+  - AGENTS.md
+  - CLAUDE.md
+  - CMakeLists.txt
+  - CMakePresets.json
+  - README.md
+  - ara/
+  - assets/
+  - benchmarks/
+  - cmake/
+  - docs/
+  - lsan.supp
+  - methods/
+  - research/
+  - src/
+  - tasks/
+  - tests/
+  - tools/
+  - vcpkg-configuration.json
+  - vcpkg.json
+[check_root_hygiene] Ignored named local entries:
+  - .agents/
+  - .idea/
+  - .ruff_cache/
+  - build/
+  - cmake-build-debug/
+  - experimental/
+  - external/
+[check_root_hygiene] Root entries match repository-owned policy.
+tasks/SESSION-BRIEF.md is up to date.
+[source-documentation] files=1 interfaces=0 cpp=0 readmes=1 errors=0 review=6
+[source-documentation] rules: readme-chronology=6
+HOTSPOT tasks/backlog/runtime/README.md findings=6 errors=0 review=6
+check_ara_claims: OK (93 claims)

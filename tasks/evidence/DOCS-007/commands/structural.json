@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-c",
+    "python3 tools/docs/check_doc_links.py --root . --strict && python3 tools/agents/check_task_state_links.py --root . --strict && python3 tools/agents/check_task_policy.py --root . --strict && python3 tools/repo/check_root_hygiene.py --root . && python3 tools/agents/generate_session_brief.py --check && git diff --check"
+  ],
+  "command_display": "bash -c 'python3 tools/docs/check_doc_links.py --root . --strict && python3 tools/agents/check_task_state_links.py --root . --strict && python3 tools/agents/check_task_policy.py --root . --strict && python3 tools/repo/check_root_hygiene.py --root . && python3 tools/agents/generate_session_brief.py --check && git diff --check'",
+  "cwd": ".",
+  "duration_ms": 1835,
+  "exit_code": 1,
+  "finished_at": "2026-09-15T02:28:43Z",
+  "label": "structural",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T02:28:41Z",
+  "stderr_path": "tasks/evidence/DOCS-007/commands/structural.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/DOCS-007/commands/structural.stdout.log",
+  "stdout_sha256": "266d4c78f502f611a7ca564180e56da84fbd28e1382f714ac76926a4a83ef5d3",
+  "task_id": "DOCS-007"
+}

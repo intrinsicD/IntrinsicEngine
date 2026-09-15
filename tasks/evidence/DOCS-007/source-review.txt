@@ -1,0 +1,18 @@
+**APPROVE** — DOCS-007 final README text, base revision `cdf18f5c0`, current README sha256 `6e8b642…e213e` (54 lines, from baseline `a8a9b54…ae1d`, 1209 lines).
+
+**Text vs. task goal**
+
+- All five local open tasks are present with summaries that match their own `## Goal` text and add nothing: 210 = mesh-only runtime/config integration + per-vertex publication for the Signed Heat CPU reference; 211 = selected finite `vec3` inputs and same-domain label/color/scalar publication for CPU/Vulkan K-Means; 212 = selected finite `vec3` inputs and source-cardinality hierarchy publication on the originating element domain; 218 = default scene lighting and editor light authoring; 222 = published radius-property binding and model-space camera projection. No scope is widened, narrowed, or invented; paired UI/method dependencies are deferred to the task files, as the README states.
+- Coverage confirms all 8 required open targets resolved, `missing_open_targets` empty, local task coverage complete (5/5), 127 historical task records unmodified, no executable/build/tool source changed. Every raw link resolves correctly from `tasks/backlog/runtime/` (`../../../AGENTS.md`, `../../active/`, `../../SESSION-BRIEF.md`, `../architecture|geometry|rendering/README.md`, `../../done/RETIREMENT-LOG.md`, `../../../docs/architecture/{index,geometry-api-style}.md`).
+- Removals match the brief: no hardcoded counts, no retired-gate claims for HARDEN-087 / UI-039 / REVIEW-003 / CORE-005..009 / ARCH-006 / METHOD-019/020 / BUG-055, no chronology, no deferred roadmap. Headings are Ownership, Method property-domain integration, Scene lighting and point presentation, Related queues and documentation — no History/Retired/Deferred heading, consistent with source-documentation policy.
+- No new roadmap, API, capability, or performance claim appears anywhere in the text.
+
+**BUG-196 workaround**
+
+Accepted as specified. `validate_category_indexes` tests only "path beneath done/archive" (minus RETIREMENT-LOG.md), so index and directory links are structurally indistinguishable from retired task membership to it; the false positive is in the checker, not in this text. Keeping the permitted retirement-log link plus plain `tasks/done/README.md` / `tasks/archive/README.md` paths satisfies both gates without weakening any validator, and BUG-196 owns the narrow predicate repair, focused-test reproduction, and restoration of clickable navigation. I am not requesting a history section or any code change in this slice. The failing initial receipt being bound as evidence alongside passing final checks is the right record.
+
+**One non-blocking note**
+
+Accepted amendment 2 ("link the methods queue rather than repeating individual future integration IDs") is only half-realized: no individual method IDs are repeated (the substance of the amendment), but no methods-queue link appears. The fixed required-open-target set excludes it, so this is not a gate failure; if `tasks/backlog/methods/README.md` exists, consider adding it to the related-queues sentence in BUG-196's navigation restoration rather than reopening this slice.
+
+Scope, goals, and evidence are met. Proceed to retire and seal.
