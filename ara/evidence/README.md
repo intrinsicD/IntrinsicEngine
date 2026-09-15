@@ -42,3 +42,5 @@
 - [Point LBVH kNN and PCA verification](tables/point_lbvh_knn_verification_2026-09-08.md) — bounded C78 CPU/Vulkan queries, framed reuse and supplied CPU PCA; defaults unchanged.
 
 - [Normal estimation verification](tables/normal_estimation_verification_2026-09-08.md) — canonical-domain CPU PCA/topology methods, cached LBVH, shared config/window and guarded publication.
+
+- [Editor service-borrow compile measurement](tables/runtime265_service_borrow_compile_measurement.md) — four bounded local Clang 23 samples, immutable dependencies, rejected-attempt retention and full CPU reconciliation; C95.

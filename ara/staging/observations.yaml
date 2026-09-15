@@ -3896,3 +3896,15 @@ observations:
     promoted_to: logic/claims.md:C94
     crystallized_via: empirical-resolution
     stale: false
+
+  - id: O228
+    timestamp: '2026-09-15T13:09:19+02:00'
+    provenance: ai-executed
+    content: The four retained Clang 23 samples show a narrower spatial-cache interface rebuild, 61 to 22 compiler units and 84.131–84.456 to 39.179–39.477 seconds. Clean compiler count stays 775; no established clean-build speedup or generalized performance result.
+    context: N587 records an exact-source ABBA cohort with immutable dependencies; N588 retains the refactor using this bounded evidence. The dependency-mutating first cohort is excluded.
+    potential_type: claim
+    bound_to: [N587]
+    promoted: true
+    promoted_to: logic/claims.md:C95
+    crystallized_via: artifact-commitment
+    stale: false

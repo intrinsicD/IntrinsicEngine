@@ -12827,3 +12827,33 @@ tree:
     - benchmarks/ci/manifests/engine_compile_iteration_overnight.yaml
     - tasks/done/BUILD-007-engine-compile-time-reconciliation.md
     status: resolved
+
+  - id: N586
+    type: dead_end
+    title: Reject the compile cohort that reinstalled borrowed dependencies
+    provenance: ai-executed
+    timestamp: '2026-09-15T13:09:19+02:00'
+    hypothesis: The existing compile runner can borrow the canonical vcpkg installation without mutating it.
+    failure_mode: Disposable-worktree configure restored 18 packages; the before-sample-two digest guard detected changed dependencies. Exclude the whole incomplete cohort.
+    lesson: Disable vcpkg installation for borrowed packages and check content, paths, permissions and links immediately after configure and builds, then restart the full cohort.
+    evidence: [ara/evidence/diagnostics/runtime265_20260915/raw-evidence.tar.gz, tasks/done/BUG-197-compile-benchmark-preinstalled-dependencies.md]
+    status: resolved
+
+  - id: N587
+    type: experiment
+    title: Measure editor service-borrow compilation boundaries
+    provenance: ai-executed
+    timestamp: '2026-09-15T13:09:19+02:00'
+    result: Exact-source Clang 23 four-job Null/headless ABBA, two samples per arm, gives spatial-interface rebuild 84.131–84.456 to 39.179–39.477 seconds and 61 to 22 compiler invocations. Full clean count stays 775 with no established clean speedup. All four results validate and match restored dependency identity. Canonical ci rebuild and 4640 CPU tests pass with one expected skip; 335 focused, 26 tooling and nine scanner-level negative-control cases pass. No GPU/sanitizer runtime claim.
+    evidence: [ara/evidence/tables/runtime265_service_borrow_compile_measurement.md, ara/evidence/diagnostics/runtime265_20260915/inputs.json, ara/evidence/diagnostics/runtime265_20260915/verification.json]
+    status: resolved
+
+  - id: N588
+    type: decision
+    title: Retain the bounded service-borrow refactor and retire its completed tasks
+    provenance: ai-executed
+    timestamp: '2026-09-15T13:09:19+02:00'
+    choice: Keep existing device/cache owners with matching C++ linkage and forward-declare borrowed pointers in EditorProcessing. Add no production file, module or service; net production change is ten declaration/linkage lines. Retire RUNTIME-265 and BUG-197 after Claude source/protocol review and full CPU reconciliation. Preserve GRAPHICS-138 as a prepared renderer follow-up and broader compilation hypotheses as open.
+    alternatives: [Copy context records, add a generic facade, retain complete pointer-only imports, claim a general speedup from two local samples]
+    evidence: [O228, N587, ara/evidence/tables/runtime265_service_borrow_compile_measurement.md, tasks/done/RUNTIME-265-editor-snapshot-compile-surface.md]
+    status: resolved

@@ -51,3 +51,18 @@ python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Read-only preparation (2026-09-15)
+- Claude identified four forwarding accessors with no callers beyond declaration
+  and override: `GetForwardSystem`, `GetDeferredSystem`, `GetTransformSyncSystem`
+  and `GetLightSystem`. Confirmed with repository-wide source/test/tool/doc search.
+- `Graphics.Renderer.cppm` imports ForwardSystem and DeferredSystem only for those
+  accessor types. The implementation already directly imports both owners.
+- The compiler graph also reaches both through the renderer's re-export of
+  `Graphics.RenderSubsystemRegistry`. No declaration in the renderer interface
+  names a registry type. Audit consumers of that unused re-export and replace any
+  reliance with direct owner imports; merely removing the two direct system imports
+  leaves the transitive path intact.
+- Light and transform imports remain necessary for snapshot value records. Keep
+  getters used by runtime workflows and explicit tests. No implementation or
+  timing result is claimed by this preparation; the acceptance criteria remain open.

@@ -2199,3 +2199,14 @@
 - **Dependencies**: []
 - **Tags**: compilation, C++23 modules, matched local measurements, CPU build, limited performance observation
 - **From staging**: O227
+
+## C95: Bounded service-borrow interface rebuild measurements
+- **Statement**: In the retained 2026-09-15 local Clang 23 ABBA cohort, two samples per exact source revision, the spatial-cache interface touch rebuild changes from 84.131–84.456 to 39.179–39.477 seconds and from 61 to 22 compiler invocations. Thirty-nine source files leave the rebuild with none added. Full engine-library compiler count remains 775; the small observed clean-time difference establishes no clean-build speedup.
+- **Status**: supported — descriptive local observations only; all four canonical results remain claim_eligible:false. No general/statistical, publication-qualified, cross-host/compiler, runtime/GPU, Sandbox/test-suite compile-time or broader C92 performance conclusion.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Recalculation from the retained four execution records disagrees with the stated ranges/counts, or source/runner/toolchain/dependency checks reveal unmatched inputs. The excluded incomplete dependency-mutating attempt must remain distinguishable and must not enter this cohort.
+- **Proof**: [ara/evidence/tables/runtime265_service_borrow_compile_measurement.md, ara/evidence/diagnostics/runtime265_20260915/evidence-index.json, ara/evidence/diagnostics/runtime265_20260915/summary.json, ara/evidence/diagnostics/runtime265_20260915/inputs.json, ara/evidence/diagnostics/runtime265_20260915/raw-evidence.tar.gz, benchmarks/ci/manifests/engine_compile_iteration_service_borrows.yaml, tests/CMakeLists.txt]
+- **Dependencies**: []
+- **Tags**: compilation, service borrows, C++23 modules, matched local measurements, CPU build, bounded observation
+- **From staging**: O228

@@ -2,9 +2,9 @@ session:
   id: 2026-09-15_001
   date: '2026-09-15'
   started: '2026-09-15T00:37:12+02:00'
-  last_turn: '2026-09-15T09:38:50+02:00'
-  turn_count: 18
-  summary: "Measured overnight cleanup: clean engine build 4.7% shorter, selected implementation rebuilds 41.6–45.2% shorter; six local samples, Claude review and focused verification. BUILD-007 retired; broader C92 remains open."
+  last_turn: "2026-09-15T13:09:19+02:00"
+  turn_count: 19
+  summary: "Editor service borrows reduce the measured spatial-interface rebuild from 61 to 22 compiler units; no established clean-build speedup. Claude reviewed; full CPU passes. RUNTIME-265 and BUG-197 retired; renderer follow-up remains open."
 events_logged:
 - turn: 1
   type: experiment
@@ -130,6 +130,31 @@ events_logged:
   routing: crystallized
   provenance: ai-executed
   summary: Bounded six-sample local observations committed as C94; broader C92 is unchanged.
+- turn: 19
+  type: dead_end
+  id: N586
+  routing: direct
+  provenance: ai-executed
+  summary: Excluded the dependency-mutating first cohort; fixed borrowed-package installation and immediate fingerprint checks.
+- turn: 19
+  type: experiment
+  id: N587
+  routing: direct
+  provenance: ai-executed
+  summary: Retained all four exact-source ABBA samples with one dependency identity; full CPU reconciliation passed.
+- turn: 19
+  type: decision
+  id: N588
+  routing: direct
+  provenance: ai-executed
+  summary: Retain the bounded service-borrow refactor, retire RUNTIME-265 and BUG-197, preserve renderer follow-up and broader hypotheses.
+- turn: 19
+  type: claim
+  id: O228
+  routing: crystallized
+  provenance: ai-executed
+  summary: C95 records only the bounded local interface rebuild observations; no established clean-build speedup.
+
 ai_actions:
 - turn: 1
   action: Claude implemented five production files; root reviewed, added lifetime/statistics and compiler-boundary
@@ -314,10 +339,19 @@ ai_actions:
   - ara/evidence/tables/build007_overnight_compile_measurement.md
   - ara/evidence/diagnostics/build007_20260915
   - tasks/done/BUILD-007-engine-compile-time-reconciliation.md
+- turn: 19
+  action: Refactored matching service class attachment, added a compiler boundary guard, fixed and tested dependency-immutable benchmarking, measured four samples, resolved Claude reviews and reconciled the complete CPU build/tests.
+  provenance: ai-executed
+  files_changed: [src/runtime/Editor/Runtime.EditorProcessing.cppm, src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm, src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp, src/graphics/rhi/RHI.Device.cppm, tools/analysis/benchmark_compile_iteration.py, tests/regression/tooling/Test.CompileHotspots.py, ara/evidence/tables/runtime265_service_borrow_compile_measurement.md]
+
 claims_touched:
 - id: C94
   action: crystallized
   turn: 18
+- id: C95
+  action: crystallized
+  turn: 19
+
 key_context:
 - turn: 1
   excerpt: User requested continued duplication and compilation cleanup with Claude through plan, implementation,
@@ -364,6 +398,9 @@ key_context:
 - turn: 18
   excerpt: 'User: Please measure the improvements. This is a new interactive measurement request after the
     completed overnight deadline, not another overnight cleanup iteration.'
+- turn: 19
+  excerpt: User requested continued compilation and duplication cleanup with Claude through planning, implementation, review, testing and fixes. Existing source-sharing authorization applies; no main merge requested.
+
 open_threads:
 - The broader C92 processing-family hypothesis still needs a selected baseline and repeated family-edit measurements; BUILD-006 separately owns backend/cache comparisons.
 - BUG-193 owns unexplained GPU pacing variability and WLOP watchdog margin; BUG-189/191/192 closed only finite-work
@@ -382,5 +419,7 @@ open_threads:
   CPU and Vulkan probes select the scalar; exact Display status, acceleration and Appearance behavior remain needed.'
 - BUG-195 owns disk-headroom preflight and evidence-write recovery; completed backend verification does not close
   that tooling work.
+- GRAPHICS-138 retains the prepared renderer forwarding/import cleanup; service-borrow RUNTIME-265 and benchmark harness BUG-197 are complete.
+
 ai_suggestions_pending:
 - Existing staged topics retain their open owners and flags; this ordinary refactor supplies no new closure signal.

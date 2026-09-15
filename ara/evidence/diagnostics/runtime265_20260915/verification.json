@@ -1,0 +1,28 @@
+{
+  "source_revision": "ee647ec91b677fc1051be3b97405e3cd07b06aaf",
+  "harness_revision": "1412c572def53ef18c28acac389e35bc214b4cc8",
+  "compiler": "Clang 23.0.0; repository minimum Clang 20",
+  "ci_configure": "passed",
+  "IntrinsicTests_build": "passed",
+  "focused_cpu_passed": 335,
+  "full_cpu": {
+    "selected": 4641,
+    "passed": 4640,
+    "failed": 0,
+    "skipped": 1,
+    "skip": "GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl requires ASan",
+    "elapsed_seconds": 133.88
+  },
+  "hotspot_tooling_tests_passed": 26,
+  "canonical_results_validated": 4,
+  "negative_control": "Nine scanner-level forbidden-import injections rejected using real ci metadata; unchanged scans passed. No source or real metadata mutation and no recompiled negative control.",
+  "gpu_or_sanitizer_runtime_claim": false,
+  "claude_review": "Source, runner and measurement reviewed; mandatory full CPU reconciliation completed after final review.",
+  "production_lines": {
+    "before": 1274,
+    "after": 1284,
+    "new_files": 0,
+    "new_modules": 0,
+    "new_services": 0
+  }
+}

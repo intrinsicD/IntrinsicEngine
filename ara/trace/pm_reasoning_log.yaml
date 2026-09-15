@@ -2477,3 +2477,10 @@ entries:
       and broader C92 have no new closure signal.
     - Retire BUILD-007 only for its explicitly selected overnight comparison. Engine runtime/GPU speed and
       all earlier family migrations were not measured.
+
+  - turn: 2026-09-15_001#19
+    notes:
+    - Record the dependency-mutating attempt as an excluded dead end, not a timing sample or a refutation of the engine change. Its original raw evidence is retained; the runner fix has its own exact source identity.
+    - Crystallize only O228 into descriptive C95 through the explicit retain decision. Keep all four results claim_eligible false, preserve raw clean values and state no established clean-build speedup; no user performance endorsement is inferred.
+    - Ordinary refactor facts stay in task/review records. Net production size is plus ten lines, with no new file/module/service; do not describe this slice as a line-count reduction.
+    - Existing staged topics retain their named open owners and flags; this turn adds no closure signal for their broader hypotheses. C92, BUILD-006 and product convergence remain open; the prepared renderer follow-up is not implemented or retired.

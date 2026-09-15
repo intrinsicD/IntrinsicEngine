@@ -33,9 +33,9 @@ in a disposable worktree, and detect mutation before consuming invalid timings.
       checks before sampling, after configure, and after measured builds.
 - [x] Regression tests detect missing trees, content changes with unchanged
       size, path changes, membership changes, symlink targets and permissions.
-- [ ] Claude reviews the correction and a fresh complete matched cohort passes
+- [x] Claude reviews the correction and a fresh complete matched cohort passes
       with one dependency digest throughout; retain the rejected attempt.
-- [ ] Restore and reconcile the canonical ci dependency/build state after the
+- [x] Restore and reconcile the canonical ci dependency/build state after the
       accidental reinstall, then retire with exact validation evidence.
 
 ## Verification
@@ -65,3 +65,21 @@ python3 tools/agents/check_task_policy.py --root . --strict
   reconciliation verifies the restored tree.
 - Regression suite: 26 tests passed. The previous incomplete cohort remains
   excluded; the complete ABBA run restarts under `measurement-fixed`.
+
+## Completion
+- Completed 2026-09-15. Commit reference: `1412c572d` for the harness fix; the
+  enclosing commit retains evidence and retirement.
+- Maturity: CPUContracted, the intended benchmark-tooling endpoint.
+- Claude reviewed and accepted the source/protocol corrections. Twenty-six
+  tooling tests pass. The complete four-sample restarted cohort matches the
+  independently saved restored dependency fingerprint before/after every checked
+  operation; actual configure commands record installation disabled.
+- Canonical ci configure, full IntrinsicTests build and CPU reconciliation pass:
+  4,640 passes, zero failures, one expected ASan-only skip. The restored dependency
+  digest also agrees after reconfiguration. Four canonical results validate.
+- [Retained evidence and limitations](../../ara/evidence/tables/runtime265_service_borrow_compile_measurement.md)
+  distinguish the excluded incomplete attempt, exact runner/source provenance and
+  accepted cohort. Stability checks do not prove package correctness before the
+  first check; no earlier known-good package digest exists.
+- Removed only this run's owned temporary worktree and tmpfs build after preserving
+  evidence. The shared dependency owner and unrelated temporary builds remain.

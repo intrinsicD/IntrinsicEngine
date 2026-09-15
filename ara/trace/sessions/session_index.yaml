@@ -590,8 +590,8 @@ sessions:
 
 - id: 2026-09-15_001
   date: '2026-09-15'
-  summary: "Measured overnight cleanup: clean engine build 4.7% shorter, selected implementation rebuilds 41.6–45.2% shorter; six local samples, Claude review and focused verification. BUILD-007 retired; broader C92 remains open."
-  turn_count: 18
-  events_count: 19
-  claims_touched: [C94]
-  open_threads: 9
+  summary: "Editor service borrows reduce the measured spatial-interface rebuild from 61 to 22 compiler units; no established clean-build speedup. Claude reviewed; full CPU passes. RUNTIME-265 and BUG-197 retired; renderer follow-up remains open."
+  turn_count: 19
+  events_count: 23
+  claims_touched: [C94, C95]
+  open_threads: 10

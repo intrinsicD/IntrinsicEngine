@@ -7,6 +7,29 @@ relative to `tasks/done/`, which sits at the same depth as `tasks/active/`,
 so blocks moved from the old active-README history work verbatim.
 
 
+## 2026-09-15 — RUNTIME-265 and BUG-197: editor service borrows and fixed-input measurement
+
+Retired [RUNTIME-265](RUNTIME-265-editor-snapshot-compile-surface.md) and
+[BUG-197](BUG-197-compile-benchmark-preinstalled-dependencies.md) at CPUContracted,
+their intended refactor/tooling endpoint. Editor processing borrows device/cache
+pointers without importing their complete APIs; existing class owners and member
+definitions use matching C++ linkage. No new production file/module/service;
+net production source change is +10 declaration/linkage lines.
+
+Claude reviewed the source, harness and results. Corrected borrowed-dependency
+installation and strengthened identity checks; excluded and retained the first
+incomplete cohort. C95 records the restarted local comparison: interface-touch
+rebuilds 61 → 22 compiler units, 84.131–84.456 → 39.179–39.477 seconds. No established
+clean-build speedup, general performance or GPU/sanitizer runtime claim.
+[Report and raw evidence](../../ara/evidence/tables/runtime265_service_borrow_compile_measurement.md).
+
+Canonical ci rebuild and full CPU reconciliation pass: 4,640 passes, zero failures,
+one expected skip; 335 focused and 26 tooling tests pass. Compiler boundary guards
+reject nine scanner-level injected faults. Engine source `ee647ec91b`, harness
+`1412c572d`; enclosing commit records retirement. [GRAPHICS-138](../backlog/rendering/GRAPHICS-138-renderer-compile-surface.md)
+retains the prepared renderer follow-up.
+
+
 ## 2026-09-15 — RUNTIME-264: processing service and comparison ownership
 
 Retired [RUNTIME-264](RUNTIME-264-processing-service-and-value-locality.md) at
@@ -21,7 +44,7 @@ and old-owner test findings; 96 focused cases and the full CPU gate passed
 (4,639 passed, one expected ASan-only skip). Strict structural checks passed.
 No new timing, sanitizer or GPU claim is made. Remaining editor snapshot/config
 and renderer compilation work is tracked by
-[RUNTIME-265](../active/RUNTIME-265-editor-snapshot-compile-surface.md) and
+[RUNTIME-265](RUNTIME-265-editor-snapshot-compile-surface.md) and
 [GRAPHICS-138](../backlog/rendering/GRAPHICS-138-renderer-compile-surface.md).
 
 

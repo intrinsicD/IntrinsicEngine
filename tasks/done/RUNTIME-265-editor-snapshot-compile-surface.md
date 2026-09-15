@@ -37,7 +37,7 @@ contracts: [repo.source-documentation, runtime.editor-prepared-frame-locality, r
 - [x] Preserve config-file/UI/agent behavior, snapshot caching, stale/detach
       guards and command-time validation; relevant editor tests pass.
 - [x] Add/update compiler-boundary checks and architecture/owner documentation.
-- [ ] Use the existing BUILD-007 measurement tooling for matched before/after
+- [x] Use the existing BUILD-007 measurement tooling for matched before/after
       evidence before claiming a timing gain; retire with an explicit negative
       result if no beneficial refactor survives the measured comparison.
 
@@ -83,7 +83,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Both existing `WorldRegistry` and `ICommandContext` precedents use matching
   C++ linkage at their owners. No copied record or new binding implementation.
 - In-tree users must rebuild because module attachment can change mangled names.
-  The runtime build passed; all `IntrinsicTests` producers are being reconciled,
+  The runtime build passed; all `IntrinsicTests` producers were reconciled,
   with clean cache-disabled runtime builds included in the matched benchmark.
 - Added the explicit `<string_view>` include noted by Claude in the touched
   spatial cache interface; the final test build includes that correction.
@@ -110,4 +110,29 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Four production files changed, 1,274 → 1,284 physical lines (+10 for declaration
   and linkage boundaries). No new production file, module, service, state, facade
   or implementation is introduced. Device/cache implementations retain one owner.
-- Matched benchmark remains the final unchecked acceptance item.
+- Matched measurement and final dependency-restoration reconciliation completed below.
+
+## Completion
+- Completed 2026-09-15. Commit reference: `ee647ec91b677fc1051be3b97405e3cd07b06aaf` for the engine change; the enclosing commit records measurement and retirement.
+- Maturity: CPUContracted, the intended refactor endpoint. No GPU or sanitizer
+  runtime capability is promoted.
+- [C95 measurement report](../../ara/evidence/tables/runtime265_service_borrow_compile_measurement.md)
+  retains two exact-source samples per arm: spatial-interface rebuilds
+  84.131–84.456 → 39.179–39.477 seconds, 61 → 22 compiler units. No new source
+  enters that rebuild. Full clean count stays 775; the small observed clean-time
+  difference establishes no clean-build speedup. All results remain deliberately
+  non-claim-eligible and scoped to the measured local Clang 23 host.
+- BUG-197 corrected the benchmark's borrowed-dependency mutation. The complete
+  cohort restarted with installation disabled and identity checks after every
+  configure/build. The rejected attempt is retained and excluded in full.
+- Claude's final review resolutions are complete: matching declaration attachment,
+  full in-tree rebuild requirement, exact external runner provenance, explicit
+  compiler scope and conservative clean-build interpretation. Nine scanner-level
+  forbidden-import faults on real ci metadata are rejected; untouched metadata
+  passes. No recompiled negative control is implied.
+- After canonical dependency restoration: ci configure and complete IntrinsicTests
+  build pass; full CPU gate has 4,640 passes, zero failures and one expected
+  ASan-only skip (4,641 selected, 133.88 seconds). The 335 focused cases, 26
+  tooling tests, four canonical results and strict structural checks pass.
+- GRAPHICS-138 remains open with a source/compiler-backed renderer cleanup plan;
+  this retirement does not complete all compilation or product convergence work.

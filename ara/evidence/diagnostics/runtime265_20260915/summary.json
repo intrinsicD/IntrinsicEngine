@@ -1,0 +1,162 @@
+{
+  "benchmark_id": "build.engine_compile_iteration.service_borrows.v1",
+  "claim_eligible": false,
+  "sample_count_per_arm": 2,
+  "samples": [
+    {
+      "attempt_id": "01-before-1",
+      "arm": "before",
+      "source": {
+        "revision": "6570bc106ec13e9e9be3220cf8ca302306499c69",
+        "state": "clean_commit"
+      },
+      "build_time_ms": {
+        "clean": 348403.7480769912,
+        "noop": 78.03479908034205,
+        "spatial_interface": 84456.14951499738
+      },
+      "compiler_invocations": {
+        "clean": 775,
+        "noop": 0,
+        "spatial_interface": 61
+      },
+      "critical_path_ms": {
+        "clean": 51679,
+        "noop": 0,
+        "spatial_interface": 40604
+      },
+      "max_single_process_rss_bytes": {
+        "clean": 2992852992,
+        "noop": 22556672,
+        "spatial_interface": 2991194112
+      }
+    },
+    {
+      "attempt_id": "02-after-1",
+      "arm": "after",
+      "source": {
+        "revision": "ee647ec91b677fc1051be3b97405e3cd07b06aaf",
+        "state": "clean_commit"
+      },
+      "build_time_ms": {
+        "clean": 342833.1458939938,
+        "noop": 71.28851802553982,
+        "spatial_interface": 39477.09667799063
+      },
+      "compiler_invocations": {
+        "clean": 775,
+        "noop": 0,
+        "spatial_interface": 22
+      },
+      "critical_path_ms": {
+        "clean": 51642,
+        "noop": 0,
+        "spatial_interface": 19614
+      },
+      "max_single_process_rss_bytes": {
+        "clean": 2979512320,
+        "noop": 22626304,
+        "spatial_interface": 2977718272
+      }
+    },
+    {
+      "attempt_id": "03-after-2",
+      "arm": "after",
+      "source": {
+        "revision": "ee647ec91b677fc1051be3b97405e3cd07b06aaf",
+        "state": "clean_commit"
+      },
+      "build_time_ms": {
+        "clean": 342774.8487900244,
+        "noop": 71.63459400180727,
+        "spatial_interface": 39178.92868700437
+      },
+      "compiler_invocations": {
+        "clean": 775,
+        "noop": 0,
+        "spatial_interface": 22
+      },
+      "critical_path_ms": {
+        "clean": 51494,
+        "noop": 0,
+        "spatial_interface": 19416
+      },
+      "max_single_process_rss_bytes": {
+        "clean": 2978385920,
+        "noop": 22568960,
+        "spatial_interface": 2977718272
+      }
+    },
+    {
+      "attempt_id": "04-before-2",
+      "arm": "before",
+      "source": {
+        "revision": "6570bc106ec13e9e9be3220cf8ca302306499c69",
+        "state": "clean_commit"
+      },
+      "build_time_ms": {
+        "clean": 347645.8512140671,
+        "noop": 73.51186405867338,
+        "spatial_interface": 84131.04113796726
+      },
+      "compiler_invocations": {
+        "clean": 775,
+        "noop": 0,
+        "spatial_interface": 61
+      },
+      "critical_path_ms": {
+        "clean": 51739,
+        "noop": 0,
+        "spatial_interface": 40804
+      },
+      "max_single_process_rss_bytes": {
+        "clean": 2993541120,
+        "noop": 22634496,
+        "spatial_interface": 2990690304
+      }
+    }
+  ],
+  "removed_spatial_rebuild_sources": [
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Frame.cpp",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.cpp",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Uv.cpp",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm",
+    "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Curvature.cpp",
+    "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Frame.cpp",
+    "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Geodesics.cpp",
+    "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cpp",
+    "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cppm",
+    "src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.Frame.cpp",
+    "src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.Topology.cpp",
+    "src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cpp",
+    "src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cppm",
+    "src/runtime/Editor/Operations/Runtime.NormalOperations.Frame.cpp",
+    "src/runtime/Editor/Operations/Runtime.NormalOperations.cpp",
+    "src/runtime/Editor/Operations/Runtime.NormalOperations.cppm",
+    "src/runtime/Editor/Operations/Runtime.ParameterizationOperations.Frame.cpp",
+    "src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp",
+    "src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cppm",
+    "src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Frame.cpp",
+    "src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cpp",
+    "src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cppm",
+    "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.Frame.cpp",
+    "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cppm",
+    "src/runtime/Editor/Operations/Runtime.PointConstructionOperations.Frame.cpp",
+    "src/runtime/Editor/Operations/Runtime.PointConstructionOperations.cppm",
+    "src/runtime/Editor/Operations/Runtime.PointFieldOperations.Frame.cpp",
+    "src/runtime/Editor/Operations/Runtime.PointFieldOperations.cpp",
+    "src/runtime/Editor/Operations/Runtime.PointFieldOperations.cppm",
+    "src/runtime/Editor/Operations/Runtime.PointSetOperations.Frame.cpp",
+    "src/runtime/Editor/Operations/Runtime.PointSetOperations.cppm",
+    "src/runtime/Editor/Operations/Runtime.RegistrationOperations.Frame.cpp",
+    "src/runtime/Editor/Operations/Runtime.RegistrationOperations.cpp",
+    "src/runtime/Editor/Operations/Runtime.RegistrationOperations.cppm",
+    "src/runtime/Editor/Runtime.EditorProcessing.cpp",
+    "src/runtime/Editor/Runtime.EditorProcessing.cppm",
+    "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp",
+    "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm"
+  ],
+  "added_spatial_rebuild_sources": [],
+  "interpretation": "Descriptive local Clang 23 cohort only. Spatial-interface invalidation is narrower; no established clean-build speedup, statistical inference, cross-host/compiler, runtime or GPU result."
+}

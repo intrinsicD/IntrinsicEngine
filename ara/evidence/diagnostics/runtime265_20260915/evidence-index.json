@@ -1,0 +1,43 @@
+{
+  "accepted_cohort": "measurement-fixed",
+  "rejected_cohort": {
+    "name": "measurement",
+    "reason": "Initial configure reinstalled 18 shared packages; cross-sample dependency guard rejected sample two. Whole incomplete cohort excluded."
+  },
+  "files": {
+    "inputs.json": {
+      "sha256": "f0bebde954c4c823cce700e3c6bfb18e08ed259e554613a1ee483c94eb546406",
+      "bytes": 8539
+    },
+    "raw-evidence.tar.gz": {
+      "sha256": "aa8de5b9a924ded2e38b59cbf3746855c5375c9f1953523454d96b05c1c51211",
+      "bytes": 2971866
+    },
+    "summary.json": {
+      "sha256": "b9c71526f01fdb1930c846673bab257884b3a0f785d3c726fc3da930b55e6ed1",
+      "bytes": 6213
+    },
+    "verification.json": {
+      "sha256": "1803954ff5b08476ee8961c434d60b2e4ed6b22d0316b1ea8658428cb5dc15a1",
+      "bytes": 1073
+    }
+  },
+  "canonical_results_in_archive": {
+    "accepted-cohort/results/01-before-1.json": {
+      "sha256": "aca90b2bc01f4f603724237b9d8249291fe8b6d05a61703c20ca7a747f23e864",
+      "bytes": 47793
+    },
+    "accepted-cohort/results/02-after-1.json": {
+      "sha256": "eaba2d51e2f73e050e763dbf18e3ad9b80a230047abd250185aa56921e8b5121",
+      "bytes": 47266
+    },
+    "accepted-cohort/results/03-after-2.json": {
+      "sha256": "ff3837b07b0c9f667c8057352d8a69088d705f961a8d77e3c30ffd7981f2c5eb",
+      "bytes": 47418
+    },
+    "accepted-cohort/results/04-before-2.json": {
+      "sha256": "faa312c375a29fbe8a6083b2654e52c98fc23ec28d84d0c30e8bacd21b0248c1",
+      "bytes": 47809
+    }
+  }
+}
