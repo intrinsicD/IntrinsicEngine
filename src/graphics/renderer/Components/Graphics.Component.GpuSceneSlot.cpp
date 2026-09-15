@@ -12,8 +12,8 @@ namespace Extrinsic::Graphics::Components
 {
     RHI::BufferHandle GpuSceneSlot::Find(std::string_view name) const noexcept
     {
-        if (auto it = NamedBuffers.find(std::string{name}); it != NamedBuffers.end())
-            return it->second;
+        if (const BufferEntry* entry = FindEntry(name))
+            return entry->Handle;
         return {};
     }
 
@@ -29,11 +29,8 @@ namespace Extrinsic::Graphics::Components
                               std::uint32_t elementCount,
                               std::uint32_t stride)
     {
-        const std::string key = std::move(name);
-        NamedBuffers.insert_or_assign(key, handle);
-        NamedBufferEntries.insert_or_assign(key,
+        NamedBufferEntries.insert_or_assign(std::move(name),
                                             BufferEntry{
-                                                .Name = key,
                                                 .Handle = handle,
                                                 .ElementCount = elementCount,
                                                 .Stride = stride,
@@ -42,9 +39,7 @@ namespace Extrinsic::Graphics::Components
 
     void GpuSceneSlot::Remove(std::string_view name)
     {
-        const std::string key{name};
-        NamedBuffers.erase(key);
-        NamedBufferEntries.erase(key);
+        NamedBufferEntries.erase(std::string{name});
     }
 
     void GpuSceneSlot::SetSourceAsset(Assets::AssetId asset, std::uint64_t generation) noexcept

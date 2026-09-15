@@ -2,9 +2,9 @@ session:
   id: 2026-09-15_001
   date: '2026-09-15'
   started: '2026-09-15T00:37:12+02:00'
-  last_turn: "2026-09-15T14:35:59+02:00"
-  turn_count: 22
-  summary: "Eight graphics interfaces reuse borrowed device declarations with narrower dependencies and unchanged algorithm bodies. Claude reviewed; 4653 CPU passes plus one skip, 185 focused passes and fresh Clang 20 graphics verification. No timing claim."
+  last_turn: '2026-09-15T15:47:37+02:00'
+  turn_count: 23
+  summary: "Canonical GPU scene handles and one named-buffer map replace redundant declarations and storage. Claude reviewed both iterations; final full ci build, 139 focused and 4658 CPU passes plus one skip. No elapsed build-time claim."
 events_logged:
 - turn: 1
   type: experiment
@@ -187,6 +187,13 @@ events_logged:
   routing: direct
   provenance: ai-executed
   summary: Retain eight graphics device borrows with required MemoryAccess ownership intact; no timing or GPU runtime claim.
+
+- turn: 23
+  type: decision
+  id: N593
+  routing: direct
+  provenance: ai-executed
+  summary: Complete scene dependency cleanup and consolidate duplicated named-buffer storage through the existing canonical owner.
 
 ai_actions:
 - turn: 1
@@ -392,6 +399,11 @@ ai_actions:
   provenance: ai-executed
   files_changed: [src/graphics/renderer/Graphics.PointLBVH.cppm, src/graphics/renderer/Graphics.PointKeypoints.cppm, src/graphics/renderer/Graphics.ComputeParallelPrimitives.cppm, src/graphics/renderer/Graphics.GpuTransfer.cppm, src/graphics/renderer/Graphics.VisualizationPropertyBufferResidency.cppm, src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cppm, src/graphics/renderer/Graphics.ImGuiOverlaySystem.cppm, src/graphics/renderer/Graphics.ImGuiUploadHelper.cppm, src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp, tests/CMakeLists.txt, tasks/done/GRAPHICS-140-graphics-service-borrows.md]
 
+- turn: 23
+  action: Reused scene handle aliases, narrowed device/command imports, corrected consumer reachability, passed 159 focused and 4657 CPU cases plus one skip and fresh Clang 20 graphics verification, then committed GRAPHICS-141. Applied the exact Claude-reviewed map consolidation with an overwrite/remove regression; full ci build, 139 focused and 4658 CPU cases plus one skip pass on the combined source. Retired GRAPHICS-142; no new production file or measured timing claim.
+  provenance: ai-executed
+  files_changed: [src/graphics/renderer/Graphics.GpuWorld.cppm, src/graphics/renderer/Graphics.GpuWorld.cpp, src/graphics/renderer/Graphics.RenderWorld.cppm, src/graphics/renderer/Graphics.TransientDebugUploadHelper.cppm, src/graphics/renderer/Graphics.TransientDebugUploadHelper.cpp, src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cppm, src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cpp, tests/unit/graphics/Test.Graphics.GpuSceneSlot.cpp, tests/CMakeLists.txt, tasks/done/GRAPHICS-141-scene-service-dependencies.md, tasks/done/GRAPHICS-142-named-buffer-single-owner.md]
+
 claims_touched:
 - id: C94
   action: crystallized
@@ -462,6 +474,9 @@ key_context:
 - turn: 22
   excerpt: User requested continued duplicate-code and compilation cleanup with Claude through planning, implementation, review, tests and fixes. Source-sharing authorization persists; no main merge requested.
 
+- turn: 23
+  excerpt: User requested continued duplication and compilation cleanup with Claude through planning, implementation, review, tests and fixes. Existing sharing/delegation authorization applies; no main merge requested.
+
 open_threads:
 - The broader C92 processing-family hypothesis still needs a selected baseline and repeated family-edit measurements; BUILD-006 separately owns backend/cache comparisons.
 - BUG-193 owns unexplained GPU pacing variability and WLOP watchdog margin; BUG-189/191/192 closed only finite-work
@@ -480,7 +495,7 @@ open_threads:
   CPU and Vulkan probes select the scalar; exact Display status, acceleration and Appearance behavior remain needed.'
 - BUG-195 owns disk-headroom preflight and evidence-write recovery; completed backend verification does not close
   that tooling work.
-- GRAPHICS-138 is complete. The renderer implementation remains about 13 seconds in the bounded interface-touch probe; further splitting needs a concrete dependency/cost justification. BUILD-006 retains separate backend/cache comparisons. GRAPHICS-139 and GRAPHICS-140 are complete; RenderWorld/GpuWorld dependencies and upload-sharing candidates still need consumer and behavior review.
+- GRAPHICS-138 through GRAPHICS-142 are complete. BUILD-006 retains separate backend/cache comparisons. RenderWorld/LightSystem still depend on GpuWorld, and the shared GpuSceneSlot record has broad consumer fan-out; further narrowing needs ownership/cost review. Upload sharing still needs matching byte/vertex caps, empty-input and failure contracts.
 
 ai_suggestions_pending:
 - Existing staged topics retain their open owners and flags; this ordinary refactor supplies no new closure signal.

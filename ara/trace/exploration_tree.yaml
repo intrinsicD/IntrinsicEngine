@@ -12896,3 +12896,13 @@ tree:
     alternatives: [Split MemoryAccess into another module without a demonstrated need, add a service facade or shared declaration header, assume source review alone proves consumer reachability, claim timing improvement from dependency counts]
     evidence: [tasks/done/GRAPHICS-140-graphics-service-borrows.md, src/graphics/renderer/Graphics.PointLBVH.cppm, src/graphics/renderer/Graphics.ComputeParallelPrimitives.cppm, src/graphics/renderer/Graphics.GpuTransfer.cppm, src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp, tests/CMakeLists.txt]
     status: resolved
+
+  - id: N593
+    type: decision
+    title: Reuse canonical scene handles and consolidate named-buffer storage
+    provenance: ai-executed
+    timestamp: '2026-09-15T15:47:37+02:00'
+    choice: Retire GRAPHICS-141 in d78fd33c0 after narrowing device/command dependencies and removing duplicate scene handle aliases, updating eight real consumers and the slot allocator's direct owner imports. Then apply the exact Claude-reviewed GRAPHICS-142 patch to replace two named-buffer maps and a repeated entry name with one existing entry map; Find reuses FindEntry. Preserve handle generations, metadata, unrelated entries and asset/residency behavior. Both iterations pass full ci builds and CPU suites; the final source passes 139 focused and 4658 CPU tests with one expected ASan-only skip. Fresh Clang 20 graphics verification applies to the first dependency slice only.
+    alternatives: [Retain duplicate aliases or add a re-export shim, change GpuWorld attachment to break LightSystem dependencies without a separate review, maintain two mutable buffer maps, add a wrapper instead of reusing the existing entry owner]
+    evidence: [tasks/done/GRAPHICS-141-scene-service-dependencies.md, tasks/done/GRAPHICS-142-named-buffer-single-owner.md, src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cppm, src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cpp, tests/unit/graphics/Test.Graphics.GpuSceneSlot.cpp, tests/CMakeLists.txt]
+    status: resolved

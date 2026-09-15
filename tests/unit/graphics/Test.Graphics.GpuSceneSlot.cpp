@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
-#include <string>
 
 import Extrinsic.Asset.Registry;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
@@ -88,7 +87,6 @@ TEST(GraphicsGpuSceneSlot, ClearingSourceAssetPreservesResidencyAndBuffers)
     ASSERT_EQ(slot.Find("positions"), positions);
     const auto* entry = slot.FindEntry("positions");
     ASSERT_NE(entry, nullptr);
-    EXPECT_EQ(entry->Name, std::string("positions"));
     EXPECT_EQ(entry->Handle, positions);
     EXPECT_EQ(entry->ElementCount, 123u);
     EXPECT_EQ(entry->Stride, 12u);
@@ -130,4 +128,39 @@ TEST(GraphicsGpuSceneSlot, EvaluatesAssetRebindDecisionDeterministically)
 
     EXPECT_EQ(slot.EvaluateSourceAssetRebind(asset, 11u), Decision::RebindRequired);
     EXPECT_TRUE(slot.NeedsSourceAssetRebind(asset, 11u));
+}
+
+TEST(GraphicsGpuSceneSlot, NamedBufferLookupsAgreeAcrossUpsertAndRemove)
+{
+    Graphics::Components::GpuSceneSlot slot{};
+    const auto positions = MakeBufferHandle(9u, 10u);
+    const auto rebound = MakeBufferHandle(9u, 11u);
+    const auto normals = MakeBufferHandle(4u, 1u);
+
+    slot.Upsert("positions", positions, 123u, 12u);
+    slot.Upsert("normals", normals, 50u, 12u);
+    slot.Upsert("positions", rebound, 456u, 16u);
+
+    const auto* entry = slot.FindEntry("positions");
+    ASSERT_NE(entry, nullptr);
+    EXPECT_EQ(entry->Handle, rebound);
+    EXPECT_EQ(entry->ElementCount, 456u);
+    EXPECT_EQ(entry->Stride, 16u);
+    EXPECT_EQ(slot.Find("positions"), rebound);
+    EXPECT_EQ(slot.NamedBufferEntries.size(), 2u);
+
+    slot.Remove("positions");
+    EXPECT_EQ(slot.FindEntry("positions"), nullptr);
+    EXPECT_FALSE(slot.Find("positions").IsValid());
+
+    const auto* normalsEntry = slot.FindEntry("normals");
+    ASSERT_NE(normalsEntry, nullptr);
+    EXPECT_EQ(normalsEntry->Handle, normals);
+    EXPECT_EQ(normalsEntry->ElementCount, 50u);
+    EXPECT_EQ(normalsEntry->Stride, 12u);
+    EXPECT_EQ(slot.Find("normals"), normals);
+    EXPECT_EQ(slot.NamedBufferEntries.size(), 1u);
+
+    slot.Remove("absent");
+    EXPECT_EQ(slot.NamedBufferEntries.size(), 1u);
 }

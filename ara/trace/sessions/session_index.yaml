@@ -590,8 +590,8 @@ sessions:
 
 - id: 2026-09-15_001
   date: '2026-09-15'
-  summary: "Eight graphics interfaces reuse borrowed device declarations with narrower dependencies and unchanged algorithm bodies. Claude reviewed; 4653 CPU passes plus one skip, 185 focused passes and fresh Clang 20 graphics verification. No timing claim."
-  turn_count: 22
-  events_count: 28
+  summary: "Canonical GPU scene handles and one named-buffer map replace redundant declarations and storage. Claude reviewed both iterations; final full ci build, 139 focused and 4658 CPU passes plus one skip. No elapsed build-time claim."
+  turn_count: 23
+  events_count: 29
   claims_touched: [C94, C95, C96]
   open_threads: 10

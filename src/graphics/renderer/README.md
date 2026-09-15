@@ -2578,7 +2578,7 @@ Concretely:
   `Graphics.GpuAssetCache` or query live asset state. Graphics render passes
   consume only submitted snapshots/views and never query live ECS or runtime
   sidecar state. ECS dirty tags remain CPU-only semantics; runtime maps them to
-  copied `GeometryUploadPlan` values, `GpuSceneSlot::NamedBuffers`, or
+  copied `GeometryUploadPlan` values, `GpuSceneSlot::NamedBufferEntries`, or
   per-instance updates through private typed topology adapters.
 - Per
   [`GRAPHICS-030`](../../../tasks/archive/GRAPHICS-030-runtime-geometry-residency-bridge.md)

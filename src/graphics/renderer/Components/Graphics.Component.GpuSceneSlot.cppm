@@ -31,9 +31,8 @@ export namespace Extrinsic::Graphics::Components
         RebindRequired,
     };
 
-    // A named GPU buffer view owned by this renderable's GpuSceneSlot.
-    // The lifecycle system populates these; render passes and visualization
-    // components reference them by name.
+    // GPU buffer metadata keyed by name in GpuSceneSlot::NamedBufferEntries.
+    // Lifecycle sidecars populate it for render passes and visualization.
     //
     // Well-known canonical names (convention, not enforced by type):
     //   "positions"   — vec3 vertex / node / point positions
@@ -45,7 +44,6 @@ export namespace Extrinsic::Graphics::Components
     //   RenderEdges::WidthSource names — float per-edge screen-space widths
     struct BufferEntry
     {
-        std::string    Name;
         RHI::BufferHandle Handle;
         uint32_t       ElementCount = 0;  // number of elements (not bytes)
         uint32_t       Stride       = 0;  // bytes per element
@@ -63,7 +61,6 @@ export namespace Extrinsic::Graphics::Components
         Assets::AssetId SourceAsset{};
         std::uint64_t LastSeenAssetGeneration = 0;
 
-        std::unordered_map<std::string, RHI::BufferHandle> NamedBuffers;
         std::unordered_map<std::string, BufferEntry> NamedBufferEntries;
 
         [[nodiscard]] bool HasInstance() const noexcept

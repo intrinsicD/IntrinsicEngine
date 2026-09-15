@@ -2505,3 +2505,10 @@ entries:
     - Retain CommandContext for MemoryAccess instead of inventing another type owner. Compiler feedback and completed whole-tree compilation resolve actual reachability failures; do not fabricate the nonexistent test paths named by the final source review.
     - Fresh Clang 20 evidence covers graphics producers and boundary metadata only. Full CPU and focused runs use canonical Clang 23; no GPU or sanitizer runtime is represented.
     - Existing staged topics retain their open owners and flags. No new closure signal or user endorsement applies to broader compilation, method, architecture or product hypotheses.
+
+  - turn: 2026-09-15_001#23
+    notes:
+    - Record N593 as ordinary implementation/refactoring history. Two separately reviewed iterations have independent verification and retirement; no claim or staged observation is added, and no elapsed build improvement is inferred from dependency counts.
+    - Compiler feedback proves actual owner imports were needed after duplicate alias removal. Retain present value-type owners and the LightSystem/GpuWorld relationship instead of silently expanding into another attachment or module split.
+    - The second slice changes CPU map storage; its exact applied source/test patch was independently reviewed. One existing map now owns names, handles and metadata. Fresh Clang 20 evidence applies to the preceding dependency slice, while the final combined source has full Clang 23 CPU evidence only.
+    - Existing staged topics retain their named owners and flags; neither cleanup settles broader compilation, backend, method or product hypotheses. Update session last_turn from the actual current epilogue timestamp without assuming YAML quoting style.
