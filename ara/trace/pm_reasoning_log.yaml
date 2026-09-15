@@ -2334,3 +2334,9 @@ entries:
     - Direct-route N570 as verified implementation and workflow facts; no new observation/claim. Line and dependency counts do not settle C92 or BUILD-007.
     - Retain the pre-seal validation failure as workflow ordering evidence; the sealed result is clean. Claude's useful guard finding was fixed and rechecked without repeating unaffected C++ tests.
     - Keep N569 open until the morning deadline; RUNTIME-253 is prepared, not implemented. Existing staged topics retain their open owners and flags, without new closure signals.
+
+  - turn: 2026-09-15_001#4
+    notes:
+    - Record N571 as implementation/verification and diagnosis facts. No new claim/observation; structural reuse does not settle C92 or BUILD-007.
+    - Preserve the initial BUG-134 failed receipt and passing final gate distinctly. Source/history refute the old nested-timer premise; the prepared repair is not yet a completed bug fix.
+    - Update the moved RUNTIME-253 evidence link. Keep N569 and the overnight thread open; existing staged research topics retain their open owners and flags.

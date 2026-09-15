@@ -590,8 +590,8 @@ sessions:
 
 - id: 2026-09-15_001
   date: '2026-09-15'
-  summary: RUNTIME-252 retired in 29d823f99 and sealed in c96ebd721; full CPU and focused ASan/UBSan pass. RUNTIME-253 is night-ready; overnight cleanup continues until 08:00 Berlin, without a timing claim.
-  turn_count: 3
-  events_count: 3
+  summary: RUNTIME-253 section handling is verified, committed and sealed; BUG-134 recurrence is diagnosed and its test-only repair is night-ready. Overnight continuation remains active until 08:00 Berlin; no timing claim.
+  turn_count: 4
+  events_count: 4
   claims_touched: []
   open_threads: 10

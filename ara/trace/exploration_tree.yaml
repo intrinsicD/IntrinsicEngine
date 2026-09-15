@@ -12403,5 +12403,31 @@ tree:
     - tasks/evidence/RUNTIME-252/report.yaml
     - tasks/evidence/RUNTIME-252/seal.yaml
     - tasks/evidence/RUNTIME-252/reviews.jsonl
-    - tasks/backlog/runtime/RUNTIME-253-feature-config-section-reuse.md
+    - tasks/done/RUNTIME-253-feature-config-section-reuse.md
+    status: resolved
+
+  - id: N571
+    type: experiment
+    title: Reuse feature config sections and diagnose an obsolete ImGui timing assertion
+    provenance: ai-executed
+    timestamp: '2026-09-15T02:32:43+02:00'
+    result: Claude implemented four public-entry tests and three TU-local section helpers for five families;
+      root trimmed redundant checks, verified the baseline and reviewed the unchanged parser/validator block.
+      Production source shrinks 2721 to 2701 lines, with no new production file/interface or timing claim.
+      Baseline and final config tests pass 10 each; focused isolated ASan and UBSan pass 257 each.
+      Initial full CPU failed only BUG-134's EndFrame-versus-callback comparison, 11 versus 12 microseconds;
+      final unchanged full selector passes 4632 tests with one expected unsanitized leak-control skip.
+      The initial failure remains hash-bound historical evidence, not bug resolution. Source and July history
+      show the measured phases are disjoint; Claude confirmed the stale test premise and reviewed a deterministic
+      counter/reset/retention replacement preserving true render/copy containment and draw-data coverage.
+      RUNTIME-253 is retired in b20c68f92 and sealed in ed840a724; evidence validates with zero errors.
+      BUG-134 is settled for the next separate slice but unimplemented. An optional private render-partition
+      include/import narrowing remains discovery; no ECS Registry Pimpl is justified by current evidence.
+    evidence:
+    - tasks/done/RUNTIME-253-feature-config-section-reuse.md
+    - tasks/evidence/RUNTIME-253/report.yaml
+    - tasks/evidence/RUNTIME-253/seal.yaml
+    - tasks/evidence/RUNTIME-253/commands/full-cpu.json
+    - tasks/evidence/RUNTIME-253/commands/full-cpu-final.json
+    - tasks/backlog/bugs/BUG-134-imgui-adapter-panel-draw-list-intermittent.md
     status: resolved
