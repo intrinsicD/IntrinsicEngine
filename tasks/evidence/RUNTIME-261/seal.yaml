@@ -1,0 +1,9 @@
+schema_version: 1
+task_id: RUNTIME-261
+sealed_revision: 143e8f97cc9e033232e9ca5863e2866167ba4f6b
+source_content_digest: 3259303abed52d0094843d8575ec5b952ddc6f9972460a4d5ee8de2fe2c43ffb
+report_sha256: 8e6734a5133ae83ed137e84d7e49bd10c9668e114a4c745c7b1cef06baedb860
+records: []
+reason: Bind six exact imports removed, corrected complete export audit and approved follow-up review,
+  unchanged source proof and passing CPU/sanitizer/Vulkan build gates
+generated_by: tools/agents/workflow_evidence.py
