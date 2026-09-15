@@ -12431,3 +12431,29 @@ tree:
     - tasks/evidence/RUNTIME-253/commands/full-cpu-final.json
     - tasks/done/BUG-134-imgui-adapter-panel-draw-list-intermittent.md
     status: resolved
+
+  - id: N572
+    type: experiment
+    title: Repair the obsolete ImGui timing test and prepare private render dependency cleanup
+    provenance: ai-executed
+    timestamp: '2026-09-15T02:50:55+02:00'
+    result: Claude implemented and approved exact phase snapshots in the existing panel-draw test;
+      root shortened comments and preserved every draw-data and true render/copy containment assertion.
+      Moving the callback into EndFrame failed the new after-Build invocation count deterministically
+      (1 versus 2). Original production source was restored byte-identically before final verification.
+      The test passed 1000 isolated repetitions, 30 focused native cases, 4632 full CPU cases plus one
+      expected unsanitized GLFW/LSan skip, and 30 focused cases each on isolated ASan and UBSan.
+      A moved documentation link caused the initial structural failure and was repaired; final checks pass.
+      BUG-134 retired in 3e2dc448e; zero-context mutation evidence normalization is a3f9e8bf6 and seal
+      8ba6221a4. Sealed validation reports zero errors and 97 historical warnings; claim released.
+      RUNTIME-254 has a settled Claude-reviewed private partition include/import plan, not implementation.
+      Actual graph discovery retains MaterialSystem through the MaterialInstance lease; Renderer is the
+      unnecessary edge. No production timing change, GPU capability or compile-speed claim.
+    evidence:
+    - tasks/done/BUG-134-imgui-adapter-panel-draw-list-intermittent.md
+    - tasks/evidence/BUG-134/report.yaml
+    - tasks/evidence/BUG-134/seal.yaml
+    - tasks/evidence/BUG-134/commands/mutation-regression.json
+    - tasks/evidence/BUG-134/restored-source.json
+    - tasks/backlog/runtime/RUNTIME-254-render-extraction-private-dependencies.md
+    status: resolved

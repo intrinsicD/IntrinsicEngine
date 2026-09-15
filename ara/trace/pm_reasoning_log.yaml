@@ -2340,3 +2340,9 @@ entries:
     - Record N571 as implementation/verification and diagnosis facts. No new claim/observation; structural reuse does not settle C92 or BUILD-007.
     - Preserve the initial BUG-134 failed receipt and passing final gate distinctly. Source/history refute the old nested-timer premise; the prepared repair is not yet a completed bug fix.
     - Update the moved RUNTIME-253 evidence link. Keep N569 and the overnight thread open; existing staged research topics retain their open owners and flags.
+
+  - turn: 2026-09-15_001#5
+    notes:
+    - Record N572 as test diagnosis, mutation and verified implementation facts; no research claim or new staged observation. Existing 32 pending observations retain their current owners/flags and lack a new closure signal.
+    - Distinguish the deterministic invocation-count mutation failure from its clock-resolution-dependent retention symptom; production timers were not changed. Preserve both original recurring failures and final passing gates.
+    - Keep N569 open until the deadline. RUNTIME-254 is planned, not implemented; direct MaterialSystem import removal does not remove its lease-owned transitive dependency. C92 and BUILD-007 remain open.

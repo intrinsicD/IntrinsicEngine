@@ -590,8 +590,8 @@ sessions:
 
 - id: 2026-09-15_001
   date: '2026-09-15'
-  summary: RUNTIME-253 section handling is verified, committed and sealed; BUG-134 recurrence is diagnosed and its test-only repair is night-ready. Overnight continuation remains active until 08:00 Berlin; no timing claim.
-  turn_count: 4
-  events_count: 4
+  summary: BUG-134 test-contract repair is verified, locally committed and sealed; RUNTIME-254 private render dependencies has a settled Claude-reviewed plan. Overnight continuation remains active until 08:00 Berlin; no timing claim.
+  turn_count: 5
+  events_count: 5
   claims_touched: []
   open_threads: 10

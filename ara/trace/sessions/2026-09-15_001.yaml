@@ -2,9 +2,9 @@ session:
   id: 2026-09-15_001
   date: '2026-09-15'
   started: '2026-09-15T00:37:12+02:00'
-  last_turn: '2026-09-15T02:32:43+02:00'
-  turn_count: 4
-  summary: RUNTIME-253 section handling is verified, committed and sealed; BUG-134 recurrence is diagnosed and its test-only repair is night-ready. Overnight continuation remains active until 08:00 Berlin; no timing claim.
+  last_turn: '2026-09-15T02:50:55+02:00'
+  turn_count: 5
+  summary: BUG-134 test-contract repair is verified, locally committed and sealed; RUNTIME-254 private render dependencies has a settled Claude-reviewed plan. Overnight continuation remains active until 08:00 Berlin; no timing claim.
 events_logged:
 - turn: 1
   type: experiment
@@ -32,6 +32,12 @@ events_logged:
   routing: direct
   provenance: ai-executed
   summary: Shared config section handling verified and sealed; known timer-test recurrence diagnosed, with a separate deterministic repair prepared.
+- turn: 5
+  type: experiment
+  id: N572
+  routing: direct
+  provenance: ai-executed
+  summary: Obsolete ImGui duration assertion replaced with mutation-tested phase coverage; all final gates pass, task retired and next dependency cleanup prepared.
 ai_actions:
 - turn: 1
   action: Claude implemented five production files; root reviewed, added lifetime/statistics and compiler-boundary
@@ -74,6 +80,15 @@ ai_actions:
   - tasks/done/RUNTIME-253-feature-config-section-reuse.md
   - tasks/evidence/RUNTIME-253/report.yaml
   - tasks/backlog/bugs/BUG-134-imgui-adapter-panel-draw-list-intermittent.md
+- turn: 5
+  action: Claude implemented and reviewed the test repair; root proved mutation sensitivity, restored production bytes, verified all final gates, fixed the moved report link, retired/sealed BUG-134 and prepared RUNTIME-254 with Claude.
+  provenance: ai-executed
+  files_changed:
+  - tests/contract/runtime/Test.ImGuiAdapter.cpp
+  - tasks/done/BUG-134-imgui-adapter-panel-draw-list-intermittent.md
+  - tasks/evidence/BUG-134/report.yaml
+  - tasks/evidence/BUG-134/seal.yaml
+  - tasks/backlog/runtime/RUNTIME-254-render-extraction-private-dependencies.md
 claims_touched: []
 key_context:
 - turn: 1
@@ -85,8 +100,10 @@ key_context:
   excerpt: Automatic continuation of the user-authorized cleanup until 08:00; no new scope decision or performance endorsement inferred.
 - turn: 4
   excerpt: Automatic overnight continuation; the passing recheck does not close BUG-134. Fix the diagnosed false timing premise next, without changing production timers or removing valid coverage.
+- turn: 5
+  excerpt: Automatic overnight continuation; retire completed work, preserve exact evidence and features, continue with Claude until the 08:00 Berlin deadline.
 open_threads:
-- Overnight cleanup remains active until 08:00; RUNTIME-252/253 are retired and sealed. Next is the settled BUG-134 test-only phase-contract repair; stop new implementation by 07:15. Optional render-partition include narrowing remains discovery.
+- Overnight cleanup remains active until 08:00; RUNTIME-252/253 and BUG-134 are retired and sealed. Next is settled RUNTIME-254 private render-partition dependency narrowing; stop new implementation by 07:15.
 - BUILD-007 owns matched clean-source engine compile reconciliation; BUILD-006 separately owns backend/cache comparisons.
   C92 remains a hypothesis.
 - BUG-193 owns unexplained GPU pacing variability and WLOP watchdog margin; BUG-189/191/192 closed only finite-work
