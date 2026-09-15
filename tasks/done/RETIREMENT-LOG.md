@@ -26,7 +26,7 @@ clean-build speedup, general performance or GPU/sanitizer runtime claim.
 Canonical ci rebuild and full CPU reconciliation pass: 4,640 passes, zero failures,
 one expected skip; 335 focused and 26 tooling tests pass. Compiler boundary guards
 reject nine scanner-level injected faults. Engine source `ee647ec91b`, harness
-`1412c572d`; enclosing commit records retirement. [GRAPHICS-138](../backlog/rendering/GRAPHICS-138-renderer-compile-surface.md)
+`1412c572d`; enclosing commit records retirement. [GRAPHICS-138](../active/GRAPHICS-138-renderer-compile-surface.md)
 retains the prepared renderer follow-up.
 
 
@@ -45,7 +45,7 @@ and old-owner test findings; 96 focused cases and the full CPU gate passed
 No new timing, sanitizer or GPU claim is made. Remaining editor snapshot/config
 and renderer compilation work is tracked by
 [RUNTIME-265](RUNTIME-265-editor-snapshot-compile-surface.md) and
-[GRAPHICS-138](../backlog/rendering/GRAPHICS-138-renderer-compile-surface.md).
+[GRAPHICS-138](../active/GRAPHICS-138-renderer-compile-surface.md).
 
 
 ## 2026-09-14 — BUG-184 and BUG-181: job accounting and shader feedback

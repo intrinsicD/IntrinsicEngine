@@ -81,14 +81,14 @@ namespace
             std::vector<std::thread::id>* observedThreads = nullptr)
         {
             return RenderPrepPipelineInputs{
-                .PipelineManager = Registry.PipelineManager() ? &*Registry.PipelineManager() : nullptr,
-                .Materials = Registry.MaterialSystemRegistry() ? &*Registry.MaterialSystemRegistry() : nullptr,
-                .Colormaps = Registry.ColormapSystemRegistry() ? &*Registry.ColormapSystemRegistry() : nullptr,
-                .VisualizationSync = Registry.VisualizationSyncSystemRegistry() ? &*Registry.VisualizationSyncSystemRegistry() : nullptr,
-                .TransformSync = Registry.TransformSyncSystemRegistry() ? &*Registry.TransformSyncSystemRegistry() : nullptr,
-                .Lights = Registry.LightSystemRegistry() ? &*Registry.LightSystemRegistry() : nullptr,
-                .World = Registry.GpuWorldSystem() ? &*Registry.GpuWorldSystem() : nullptr,
-                .Culling = Registry.CullingSystemRegistry() ? &*Registry.CullingSystemRegistry() : nullptr,
+                .PipelineManager = Registry.PipelineManager ? &*Registry.PipelineManager : nullptr,
+                .Materials = Registry.MaterialSystemRegistry ? &*Registry.MaterialSystemRegistry : nullptr,
+                .Colormaps = Registry.ColormapSystemRegistry ? &*Registry.ColormapSystemRegistry : nullptr,
+                .VisualizationSync = Registry.VisualizationSyncSystemRegistry ? &*Registry.VisualizationSyncSystemRegistry : nullptr,
+                .TransformSync = Registry.TransformSyncSystemRegistry ? &*Registry.TransformSyncSystemRegistry : nullptr,
+                .Lights = Registry.LightSystemRegistry ? &*Registry.LightSystemRegistry : nullptr,
+                .World = Registry.GpuWorldSystem ? &*Registry.GpuWorldSystem : nullptr,
+                .Culling = Registry.CullingSystemRegistry ? &*Registry.CullingSystemRegistry : nullptr,
                 .VisualizationSyncRecords = std::span<VisualizationSyncRecord>{VisualizationRecords},
                 .TransformSyncRecords = std::span<const TransformSyncRecord>{TransformRecords},
                 .LightSnapshots = std::span<const LightSnapshot>{Lights},

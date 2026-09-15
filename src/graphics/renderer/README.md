@@ -492,7 +492,13 @@ into graphics public contracts.
   lifetime seam: RHI buffer/texture/sampler/pipeline managers, `GpuWorld`,
   material, colormap, visualization sync, culling, transform sync, light,
   selection, forward, deferred, postprocess, and shadow systems. `NullRenderer`
-  forwards existing `IRenderer` accessors through the registry, while retaining
+  forwards the public accessors used by callers to the registry's owned optional
+  fields. The registry keeps lifecycle methods and private diagnostic state;
+  storage access adds no forwarding methods. Transform,
+  light, forward and deferred system access stays within the renderer; snapshot
+  value types remain public. Registry, prep-pipeline, ImGui upload and visualization
+  pass APIs are imported directly by their consumers, not re-exported by
+  `Graphics.Renderer`. The renderer retains
   pass objects, pipeline leases, upload helpers, and frame-transient resources
   whose destruction must occur before registry storage resets.
 - `Graphics.RenderPrepPipeline` owns the CPU-side `PrepareFrame()` sequencing

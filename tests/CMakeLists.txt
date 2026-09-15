@@ -372,6 +372,20 @@ add_test(NAME RenderCompilationLocality.RuntimeDiagnostics
 set_tests_properties(RenderCompilationLocality.RuntimeDiagnostics
     PROPERTIES LABELS "contract;build;runtime;graphics" TIMEOUT 30)
 
+# Renderer clients need its public contracts, not implementation-owned helpers.
+add_test(NAME RenderCompilationLocality.RendererInterface
+    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
+        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+        --check-source src/graphics/renderer/Graphics.Renderer.cppm
+        --forbid-module Extrinsic.Graphics.ForwardSystem
+        --forbid-module Extrinsic.Graphics.DeferredSystem
+        --forbid-module Extrinsic.Graphics.RenderSubsystemRegistry
+        --forbid-module Extrinsic.Graphics.RenderPrepPipeline
+        --forbid-module Extrinsic.Graphics.ImGuiUploadHelper
+        --forbid-module Extrinsic.Graphics.Pass.VisualizationOverlay)
+set_tests_properties(RenderCompilationLocality.RendererInterface
+    PROPERTIES LABELS "contract;build;graphics" TIMEOUT 30)
+
 # The kernel's public interface borrows `IRenderer` and the runtime frame-hook
 # records through declarations only. A renderer, concrete rendering-system or
 # runtime-module-composition edge here means Engine's interface started pulling

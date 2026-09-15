@@ -33,8 +33,6 @@ import Extrinsic.Graphics.VisualizationSyncSystem;
 import Extrinsic.Graphics.CullingSystem;
 import Extrinsic.Graphics.LightSystem;
 import Extrinsic.Graphics.SelectionSystem;
-import Extrinsic.Graphics.ForwardSystem;
-import Extrinsic.Graphics.DeferredSystem;
 import Extrinsic.Graphics.PostProcessSystem;
 import Extrinsic.Graphics.ShadowSystem;
 import Extrinsic.Graphics.HZB;
@@ -44,8 +42,6 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 export import Extrinsic.Graphics.RenderingContract;
 export import Extrinsic.Graphics.RenderCommandRouter;
-export import Extrinsic.Graphics.RenderPrepPipeline;
-export import Extrinsic.Graphics.RenderSubsystemRegistry;
 // Canonical owners of the renderer's data contracts, re-exported because they
 // appear directly in this interface: the per-frame diagnostics record returned
 // by `GetLastRenderGraphStats()`, the config-lane `FrameRecipeOverride` the
@@ -54,10 +50,6 @@ export import Extrinsic.Graphics.RenderSubsystemRegistry;
 export import Extrinsic.Graphics.RenderDiagnostics;
 export import Extrinsic.Graphics.RenderRecipeConfig;
 export import Extrinsic.Graphics.FrameRecipe;
-// GRAPHICS-079 Slice C — re-export the ImGui upload helper result packets for
-// pass-level contract tests. The renderer still owns the concrete helper.
-export import Extrinsic.Graphics.ImGuiUploadHelper;
-export import Extrinsic.Graphics.Pass.VisualizationOverlay;
 // RUNTIME-082 Slice D — `RuntimeRenderSnapshotBatch` carries spans of
 // `SpatialDebugAabb` / `SpatialDebugHierarchyNode` / `SpatialDebugSplitPlane`
 // / `SpatialDebugWireEdge` produced by the runtime spatial-debug adapter
@@ -266,11 +258,7 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual ColormapSystem&        GetColormapSystem()  = 0;
         [[nodiscard]] virtual VisualizationSyncSystem& GetVisualizationSyncSystem() = 0;
         [[nodiscard]] virtual CullingSystem&         GetCullingSystem()   = 0;
-        [[nodiscard]] virtual TransformSyncSystem&   GetTransformSyncSystem() = 0;
-        [[nodiscard]] virtual LightSystem&           GetLightSystem()     = 0;
         [[nodiscard]] virtual SelectionSystem&       GetSelectionSystem() = 0;
-        [[nodiscard]] virtual ForwardSystem&         GetForwardSystem()   = 0;
-        [[nodiscard]] virtual DeferredSystem&        GetDeferredSystem()  = 0;
         [[nodiscard]] virtual PostProcessSystem&     GetPostProcessSystem() = 0;
         [[nodiscard]] virtual ShadowSystem&          GetShadowSystem()    = 0;
         [[nodiscard]] virtual HZBSystem&             GetHZBSystem()       = 0;

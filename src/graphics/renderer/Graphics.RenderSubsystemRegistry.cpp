@@ -52,198 +52,198 @@ namespace Extrinsic::Graphics
             return options.StopAfterStage.has_value() && *options.StopAfterStage == stage;
         };
 
-        m_BufferManager.emplace(device);
+        BufferManager.emplace(device);
         RecordInitialize(RenderSubsystemStage::BufferManager);
         if (shouldStop(RenderSubsystemStage::BufferManager)) return;
 
-        m_SamplerManager.emplace(device);
+        SamplerManager.emplace(device);
         RecordInitialize(RenderSubsystemStage::SamplerManager);
         if (shouldStop(RenderSubsystemStage::SamplerManager)) return;
 
-        m_TextureManager.emplace(device, device.GetBindlessHeap());
+        TextureManager.emplace(device, device.GetBindlessHeap());
         RecordInitialize(RenderSubsystemStage::TextureManager);
         if (shouldStop(RenderSubsystemStage::TextureManager)) return;
 
-        m_PipelineManager.emplace(device);
+        PipelineManager.emplace(device);
         RecordInitialize(RenderSubsystemStage::PipelineManager);
         if (shouldStop(RenderSubsystemStage::PipelineManager)) return;
 
-        m_GpuWorld.emplace();
-        m_GpuWorld->Initialize(device, *m_BufferManager);
+        GpuWorldSystem.emplace();
+        GpuWorldSystem->Initialize(device, *BufferManager);
         RecordInitialize(RenderSubsystemStage::GpuWorld);
         if (shouldStop(RenderSubsystemStage::GpuWorld)) return;
 
-        m_MaterialSystem.emplace();
-        m_MaterialSystem->Initialize(device, *m_BufferManager);
+        MaterialSystemRegistry.emplace();
+        MaterialSystemRegistry->Initialize(device, *BufferManager);
         RecordInitialize(RenderSubsystemStage::MaterialSystem);
         if (shouldStop(RenderSubsystemStage::MaterialSystem)) return;
 
-        m_ColormapSystem.emplace();
-        m_ColormapSystem->Initialize(device, *m_TextureManager, *m_SamplerManager);
+        ColormapSystemRegistry.emplace();
+        ColormapSystemRegistry->Initialize(device, *TextureManager, *SamplerManager);
         RecordInitialize(RenderSubsystemStage::ColormapSystem);
         if (shouldStop(RenderSubsystemStage::ColormapSystem)) return;
 
-        m_VisualizationSyncSystem.emplace();
-        m_VisualizationSyncSystem->Initialize(*m_MaterialSystem, device);
+        VisualizationSyncSystemRegistry.emplace();
+        VisualizationSyncSystemRegistry->Initialize(*MaterialSystemRegistry, device);
         RecordInitialize(RenderSubsystemStage::VisualizationSyncSystem);
         if (shouldStop(RenderSubsystemStage::VisualizationSyncSystem)) return;
 
-        m_TransformSyncSystem.emplace();
-        m_TransformSyncSystem->Initialize();
+        TransformSyncSystemRegistry.emplace();
+        TransformSyncSystemRegistry->Initialize();
         RecordInitialize(RenderSubsystemStage::TransformSyncSystem);
         if (shouldStop(RenderSubsystemStage::TransformSyncSystem)) return;
 
-        m_GpuWorld->SetMaterialBuffer(
-            m_MaterialSystem->GetBuffer(),
-            m_MaterialSystem->GetCapacity());
+        GpuWorldSystem->SetMaterialBuffer(
+            MaterialSystemRegistry->GetBuffer(),
+            MaterialSystemRegistry->GetCapacity());
 
-        m_CullingSystem.emplace();
+        CullingSystemRegistry.emplace();
         RecordInitialize(RenderSubsystemStage::CullingSystem);
         if (shouldStop(RenderSubsystemStage::CullingSystem)) return;
 
-        m_LightSystem.emplace();
-        m_LightSystem->Initialize();
+        LightSystemRegistry.emplace();
+        LightSystemRegistry->Initialize();
         RecordInitialize(RenderSubsystemStage::LightSystem);
         if (shouldStop(RenderSubsystemStage::LightSystem)) return;
 
-        m_SelectionSystem.emplace();
-        m_SelectionSystem->Initialize();
+        SelectionSystemRegistry.emplace();
+        SelectionSystemRegistry->Initialize();
         RecordInitialize(RenderSubsystemStage::SelectionSystem);
         if (shouldStop(RenderSubsystemStage::SelectionSystem)) return;
 
-        m_ForwardSystem.emplace();
-        m_ForwardSystem->Initialize();
+        ForwardSystemRegistry.emplace();
+        ForwardSystemRegistry->Initialize();
         RecordInitialize(RenderSubsystemStage::ForwardSystem);
         if (shouldStop(RenderSubsystemStage::ForwardSystem)) return;
 
-        m_ShadowSystem.emplace();
-        m_ShadowSystem->Initialize(device, *m_TextureManager, *m_SamplerManager);
+        ShadowSystemRegistry.emplace();
+        ShadowSystemRegistry->Initialize(device, *TextureManager, *SamplerManager);
         RecordInitialize(RenderSubsystemStage::ShadowSystem);
         if (shouldStop(RenderSubsystemStage::ShadowSystem)) return;
 
-        m_DeferredSystem.emplace();
-        m_DeferredSystem->Initialize();
+        DeferredSystemRegistry.emplace();
+        DeferredSystemRegistry->Initialize();
         RecordInitialize(RenderSubsystemStage::DeferredSystem);
         if (shouldStop(RenderSubsystemStage::DeferredSystem)) return;
 
-        m_PostProcessSystem.emplace();
-        m_PostProcessSystem->Initialize(device, *m_TextureManager, *m_BufferManager);
+        PostProcessSystemRegistry.emplace();
+        PostProcessSystemRegistry->Initialize(device, *TextureManager, *BufferManager);
         RecordInitialize(RenderSubsystemStage::PostProcessSystem);
         if (shouldStop(RenderSubsystemStage::PostProcessSystem)) return;
 
-        m_UvView.emplace();
-        m_UvView->Initialize(device,
-                             *m_BufferManager,
-                             *m_TextureManager,
-                             *m_SamplerManager,
-                             *m_PipelineManager);
+        UvViewSystem.emplace();
+        UvViewSystem->Initialize(device,
+                             *BufferManager,
+                             *TextureManager,
+                             *SamplerManager,
+                             *PipelineManager);
         RecordInitialize(RenderSubsystemStage::UvView);
     }
 
     void RenderSubsystemRegistry::ShutdownSystems()
     {
-        if (m_UvView)
+        if (UvViewSystem)
         {
-            m_UvView->Shutdown();
+            UvViewSystem->Shutdown();
         }
         RecordShutdownIfPresent(RenderSubsystemStage::UvView);
 
-        if (m_SelectionSystem)
+        if (SelectionSystemRegistry)
         {
-            m_SelectionSystem->Shutdown();
+            SelectionSystemRegistry->Shutdown();
         }
         RecordShutdownIfPresent(RenderSubsystemStage::SelectionSystem);
 
-        if (m_LightSystem)
+        if (LightSystemRegistry)
         {
-            m_LightSystem->Shutdown();
+            LightSystemRegistry->Shutdown();
         }
         RecordShutdownIfPresent(RenderSubsystemStage::LightSystem);
 
-        if (m_ForwardSystem)
+        if (ForwardSystemRegistry)
         {
-            m_ForwardSystem->Shutdown();
+            ForwardSystemRegistry->Shutdown();
         }
         RecordShutdownIfPresent(RenderSubsystemStage::ForwardSystem);
 
-        if (m_DeferredSystem)
+        if (DeferredSystemRegistry)
         {
-            m_DeferredSystem->Shutdown();
+            DeferredSystemRegistry->Shutdown();
         }
         RecordShutdownIfPresent(RenderSubsystemStage::DeferredSystem);
 
-        if (m_PostProcessSystem)
+        if (PostProcessSystemRegistry)
         {
-            m_PostProcessSystem->Shutdown();
+            PostProcessSystemRegistry->Shutdown();
         }
         RecordShutdownIfPresent(RenderSubsystemStage::PostProcessSystem);
 
-        if (m_ShadowSystem)
+        if (ShadowSystemRegistry)
         {
-            m_ShadowSystem->Shutdown();
+            ShadowSystemRegistry->Shutdown();
         }
         RecordShutdownIfPresent(RenderSubsystemStage::ShadowSystem);
 
-        if (m_CullingSystem)
+        if (CullingSystemRegistry)
         {
-            m_CullingSystem->Shutdown();
+            CullingSystemRegistry->Shutdown();
         }
         RecordShutdownIfPresent(RenderSubsystemStage::CullingSystem);
 
-        if (m_TransformSyncSystem)
+        if (TransformSyncSystemRegistry)
         {
-            m_TransformSyncSystem->Shutdown();
+            TransformSyncSystemRegistry->Shutdown();
         }
         RecordShutdownIfPresent(RenderSubsystemStage::TransformSyncSystem);
 
-        if (m_VisualizationSyncSystem)
+        if (VisualizationSyncSystemRegistry)
         {
-            m_VisualizationSyncSystem->Shutdown();
+            VisualizationSyncSystemRegistry->Shutdown();
         }
         RecordShutdownIfPresent(RenderSubsystemStage::VisualizationSyncSystem);
 
-        if (m_ColormapSystem)
+        if (ColormapSystemRegistry)
         {
-            m_ColormapSystem->Shutdown();
+            ColormapSystemRegistry->Shutdown();
         }
         RecordShutdownIfPresent(RenderSubsystemStage::ColormapSystem);
 
-        if (m_GpuWorld)
+        if (GpuWorldSystem)
         {
-            m_GpuWorld->Shutdown();
+            GpuWorldSystem->Shutdown();
         }
         RecordShutdownIfPresent(RenderSubsystemStage::GpuWorld);
 
-        if (m_MaterialSystem)
+        if (MaterialSystemRegistry)
         {
-            m_MaterialSystem->Shutdown();
+            MaterialSystemRegistry->Shutdown();
         }
         RecordShutdownIfPresent(RenderSubsystemStage::MaterialSystem);
     }
 
     void RenderSubsystemRegistry::ResetStorage()
     {
-        m_UvView.reset();
-        m_SelectionSystem.reset();
-        m_LightSystem.reset();
-        m_ForwardSystem.reset();
-        m_DeferredSystem.reset();
-        m_PostProcessSystem.reset();
-        m_ShadowSystem.reset();
-        m_CullingSystem.reset();
-        m_TransformSyncSystem.reset();
-        m_VisualizationSyncSystem.reset();
-        m_ColormapSystem.reset();
-        m_GpuWorld.reset();
-        m_MaterialSystem.reset();
+        UvViewSystem.reset();
+        SelectionSystemRegistry.reset();
+        LightSystemRegistry.reset();
+        ForwardSystemRegistry.reset();
+        DeferredSystemRegistry.reset();
+        PostProcessSystemRegistry.reset();
+        ShadowSystemRegistry.reset();
+        CullingSystemRegistry.reset();
+        TransformSyncSystemRegistry.reset();
+        VisualizationSyncSystemRegistry.reset();
+        ColormapSystemRegistry.reset();
+        GpuWorldSystem.reset();
+        MaterialSystemRegistry.reset();
         RecordShutdownIfPresent(RenderSubsystemStage::PipelineManager);
-        m_PipelineManager.reset();
+        PipelineManager.reset();
         RecordShutdownIfPresent(RenderSubsystemStage::TextureManager);
-        m_TextureManager.reset();
+        TextureManager.reset();
         RecordShutdownIfPresent(RenderSubsystemStage::SamplerManager);
-        m_SamplerManager.reset();
+        SamplerManager.reset();
         RecordShutdownIfPresent(RenderSubsystemStage::BufferManager);
-        m_BufferManager.reset();
+        BufferManager.reset();
     }
 
     void RenderSubsystemRegistry::Shutdown()
@@ -256,39 +256,39 @@ namespace Extrinsic::Graphics
     {
         m_LastRebuildSucceeded = false;
         m_LastRebuildFailedMissingRequiredSubsystem = false;
-        if (!m_BufferManager || !m_MaterialSystem || !m_GpuWorld)
+        if (!BufferManager || !MaterialSystemRegistry || !GpuWorldSystem)
         {
             m_LastRebuildFailedMissingRequiredSubsystem = true;
             return false;
         }
 
-        if (!m_MaterialSystem->RebuildGpuResources(device, *m_BufferManager))
+        if (!MaterialSystemRegistry->RebuildGpuResources(device, *BufferManager))
         {
             return false;
         }
-        if (!m_GpuWorld->RebuildGpuResources(device, *m_BufferManager))
+        if (!GpuWorldSystem->RebuildGpuResources(device, *BufferManager))
         {
             return false;
         }
-        if (m_ColormapSystem && m_TextureManager && m_SamplerManager &&
-            !m_ColormapSystem->IsInitialized())
+        if (ColormapSystemRegistry && TextureManager && SamplerManager &&
+            !ColormapSystemRegistry->IsInitialized())
         {
-            m_ColormapSystem->Initialize(device, *m_TextureManager, *m_SamplerManager);
+            ColormapSystemRegistry->Initialize(device, *TextureManager, *SamplerManager);
         }
 
-        m_GpuWorld->SetMaterialBuffer(
-            m_MaterialSystem->GetBuffer(),
-            m_MaterialSystem->GetCapacity());
-        m_MaterialSystem->SyncGpuBuffer();
-        m_GpuWorld->SyncFrame();
+        GpuWorldSystem->SetMaterialBuffer(
+            MaterialSystemRegistry->GetBuffer(),
+            MaterialSystemRegistry->GetCapacity());
+        MaterialSystemRegistry->SyncGpuBuffer();
+        GpuWorldSystem->SyncFrame();
 
-        if (m_PostProcessSystem && m_TextureManager)
+        if (PostProcessSystemRegistry && TextureManager)
         {
-            m_PostProcessSystem->Initialize(device, *m_TextureManager, *m_BufferManager);
+            PostProcessSystemRegistry->Initialize(device, *TextureManager, *BufferManager);
         }
-        if (m_UvView)
+        if (UvViewSystem)
         {
-            (void)m_UvView->RebuildOperationalResources(device);
+            (void)UvViewSystem->RebuildOperationalResources(device);
         }
 
         m_LastRebuildSucceeded = true;
@@ -319,202 +319,28 @@ namespace Extrinsic::Graphics
         return diagnostics;
     }
 
-    std::optional<RHI::BufferManager>& RenderSubsystemRegistry::BufferManager() noexcept
-    {
-        return m_BufferManager;
-    }
-
-    const std::optional<RHI::BufferManager>& RenderSubsystemRegistry::BufferManager() const noexcept
-    {
-        return m_BufferManager;
-    }
-
-    std::optional<RHI::SamplerManager>& RenderSubsystemRegistry::SamplerManager() noexcept
-    {
-        return m_SamplerManager;
-    }
-
-    const std::optional<RHI::SamplerManager>& RenderSubsystemRegistry::SamplerManager() const noexcept
-    {
-        return m_SamplerManager;
-    }
-
-    std::optional<RHI::TextureManager>& RenderSubsystemRegistry::TextureManager() noexcept
-    {
-        return m_TextureManager;
-    }
-
-    const std::optional<RHI::TextureManager>& RenderSubsystemRegistry::TextureManager() const noexcept
-    {
-        return m_TextureManager;
-    }
-
-    std::optional<RHI::PipelineManager>& RenderSubsystemRegistry::PipelineManager() noexcept
-    {
-        return m_PipelineManager;
-    }
-
-    const std::optional<RHI::PipelineManager>& RenderSubsystemRegistry::PipelineManager() const noexcept
-    {
-        return m_PipelineManager;
-    }
-
-    std::optional<GpuWorld>& RenderSubsystemRegistry::GpuWorldSystem() noexcept
-    {
-        return m_GpuWorld;
-    }
-
-    const std::optional<GpuWorld>& RenderSubsystemRegistry::GpuWorldSystem() const noexcept
-    {
-        return m_GpuWorld;
-    }
-
-    std::optional<MaterialSystem>& RenderSubsystemRegistry::MaterialSystemRegistry() noexcept
-    {
-        return m_MaterialSystem;
-    }
-
-    const std::optional<MaterialSystem>& RenderSubsystemRegistry::MaterialSystemRegistry() const noexcept
-    {
-        return m_MaterialSystem;
-    }
-
-    std::optional<ColormapSystem>& RenderSubsystemRegistry::ColormapSystemRegistry() noexcept
-    {
-        return m_ColormapSystem;
-    }
-
-    const std::optional<ColormapSystem>& RenderSubsystemRegistry::ColormapSystemRegistry() const noexcept
-    {
-        return m_ColormapSystem;
-    }
-
-    std::optional<VisualizationSyncSystem>&
-    RenderSubsystemRegistry::VisualizationSyncSystemRegistry() noexcept
-    {
-        return m_VisualizationSyncSystem;
-    }
-
-    const std::optional<VisualizationSyncSystem>&
-    RenderSubsystemRegistry::VisualizationSyncSystemRegistry() const noexcept
-    {
-        return m_VisualizationSyncSystem;
-    }
-
-    std::optional<CullingSystem>& RenderSubsystemRegistry::CullingSystemRegistry() noexcept
-    {
-        return m_CullingSystem;
-    }
-
-    const std::optional<CullingSystem>& RenderSubsystemRegistry::CullingSystemRegistry() const noexcept
-    {
-        return m_CullingSystem;
-    }
-
-    std::optional<TransformSyncSystem>& RenderSubsystemRegistry::TransformSyncSystemRegistry() noexcept
-    {
-        return m_TransformSyncSystem;
-    }
-
-    const std::optional<TransformSyncSystem>&
-    RenderSubsystemRegistry::TransformSyncSystemRegistry() const noexcept
-    {
-        return m_TransformSyncSystem;
-    }
-
-    std::optional<LightSystem>& RenderSubsystemRegistry::LightSystemRegistry() noexcept
-    {
-        return m_LightSystem;
-    }
-
-    const std::optional<LightSystem>& RenderSubsystemRegistry::LightSystemRegistry() const noexcept
-    {
-        return m_LightSystem;
-    }
-
-    std::optional<SelectionSystem>& RenderSubsystemRegistry::SelectionSystemRegistry() noexcept
-    {
-        return m_SelectionSystem;
-    }
-
-    const std::optional<SelectionSystem>& RenderSubsystemRegistry::SelectionSystemRegistry() const noexcept
-    {
-        return m_SelectionSystem;
-    }
-
-    std::optional<ForwardSystem>& RenderSubsystemRegistry::ForwardSystemRegistry() noexcept
-    {
-        return m_ForwardSystem;
-    }
-
-    const std::optional<ForwardSystem>& RenderSubsystemRegistry::ForwardSystemRegistry() const noexcept
-    {
-        return m_ForwardSystem;
-    }
-
-    std::optional<DeferredSystem>& RenderSubsystemRegistry::DeferredSystemRegistry() noexcept
-    {
-        return m_DeferredSystem;
-    }
-
-    const std::optional<DeferredSystem>& RenderSubsystemRegistry::DeferredSystemRegistry() const noexcept
-    {
-        return m_DeferredSystem;
-    }
-
-    std::optional<PostProcessSystem>& RenderSubsystemRegistry::PostProcessSystemRegistry() noexcept
-    {
-        return m_PostProcessSystem;
-    }
-
-    const std::optional<PostProcessSystem>&
-    RenderSubsystemRegistry::PostProcessSystemRegistry() const noexcept
-    {
-        return m_PostProcessSystem;
-    }
-
-    std::optional<ShadowSystem>& RenderSubsystemRegistry::ShadowSystemRegistry() noexcept
-    {
-        return m_ShadowSystem;
-    }
-
-    const std::optional<ShadowSystem>& RenderSubsystemRegistry::ShadowSystemRegistry() const noexcept
-    {
-        return m_ShadowSystem;
-    }
-
-    std::optional<UvView>& RenderSubsystemRegistry::UvViewSystem() noexcept
-    {
-        return m_UvView;
-    }
-
-    const std::optional<UvView>& RenderSubsystemRegistry::UvViewSystem() const noexcept
-    {
-        return m_UvView;
-    }
-
     bool RenderSubsystemRegistry::IsPresent(const RenderSubsystemStage stage) const noexcept
     {
         switch (stage)
         {
-        case RenderSubsystemStage::BufferManager: return m_BufferManager.has_value();
-        case RenderSubsystemStage::SamplerManager: return m_SamplerManager.has_value();
-        case RenderSubsystemStage::TextureManager: return m_TextureManager.has_value();
-        case RenderSubsystemStage::PipelineManager: return m_PipelineManager.has_value();
-        case RenderSubsystemStage::GpuWorld: return m_GpuWorld.has_value();
-        case RenderSubsystemStage::MaterialSystem: return m_MaterialSystem.has_value();
-        case RenderSubsystemStage::ColormapSystem: return m_ColormapSystem.has_value();
+        case RenderSubsystemStage::BufferManager: return BufferManager.has_value();
+        case RenderSubsystemStage::SamplerManager: return SamplerManager.has_value();
+        case RenderSubsystemStage::TextureManager: return TextureManager.has_value();
+        case RenderSubsystemStage::PipelineManager: return PipelineManager.has_value();
+        case RenderSubsystemStage::GpuWorld: return GpuWorldSystem.has_value();
+        case RenderSubsystemStage::MaterialSystem: return MaterialSystemRegistry.has_value();
+        case RenderSubsystemStage::ColormapSystem: return ColormapSystemRegistry.has_value();
         case RenderSubsystemStage::VisualizationSyncSystem:
-            return m_VisualizationSyncSystem.has_value();
-        case RenderSubsystemStage::TransformSyncSystem: return m_TransformSyncSystem.has_value();
-        case RenderSubsystemStage::CullingSystem: return m_CullingSystem.has_value();
-        case RenderSubsystemStage::LightSystem: return m_LightSystem.has_value();
-        case RenderSubsystemStage::SelectionSystem: return m_SelectionSystem.has_value();
-        case RenderSubsystemStage::ForwardSystem: return m_ForwardSystem.has_value();
-        case RenderSubsystemStage::ShadowSystem: return m_ShadowSystem.has_value();
-        case RenderSubsystemStage::DeferredSystem: return m_DeferredSystem.has_value();
-        case RenderSubsystemStage::PostProcessSystem: return m_PostProcessSystem.has_value();
-        case RenderSubsystemStage::UvView: return m_UvView.has_value();
+            return VisualizationSyncSystemRegistry.has_value();
+        case RenderSubsystemStage::TransformSyncSystem: return TransformSyncSystemRegistry.has_value();
+        case RenderSubsystemStage::CullingSystem: return CullingSystemRegistry.has_value();
+        case RenderSubsystemStage::LightSystem: return LightSystemRegistry.has_value();
+        case RenderSubsystemStage::SelectionSystem: return SelectionSystemRegistry.has_value();
+        case RenderSubsystemStage::ForwardSystem: return ForwardSystemRegistry.has_value();
+        case RenderSubsystemStage::ShadowSystem: return ShadowSystemRegistry.has_value();
+        case RenderSubsystemStage::DeferredSystem: return DeferredSystemRegistry.has_value();
+        case RenderSubsystemStage::PostProcessSystem: return PostProcessSystemRegistry.has_value();
+        case RenderSubsystemStage::UvView: return UvViewSystem.has_value();
         case RenderSubsystemStage::Count: return false;
         }
         return false;

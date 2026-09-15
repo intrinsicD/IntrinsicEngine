@@ -9,6 +9,7 @@ picking backlog work; theme priorities and rationale live in
 ## Active tasks
 
 - `BUG-194` — Large-mesh property display and geodesic controls (tasks/active/BUG-194-large-mesh-property-display.md)
+- `GRAPHICS-138` — Reduce renderer interface compilation cost (tasks/active/GRAPHICS-138-renderer-compile-surface.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
 - `METHOD-044` — Feature-aware patches and distortion-aware atlas merging (tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md)
@@ -114,7 +115,6 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-172` — Synchronous CPU completion can observe an unfinished or stale load transition (tasks/backlog/bugs/BUG-172-synchronous-cpu-load-completion-race.md)
 - unblocked: `BUG-176` — Concurrent CTest discovery can duplicate generated registrations (tasks/backlog/bugs/BUG-176-concurrent-ctest-discovery.md)
 - unblocked: `GRAPHICS-135` — Measure current render-prep scheduling and material-sync overhead (tasks/backlog/rendering/GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md)
-- unblocked: `GRAPHICS-138` — Reduce renderer interface compilation cost (tasks/backlog/rendering/GRAPHICS-138-renderer-compile-surface.md)
 - blocked by `BENCH-001`: `REVIEW-004` — Framework24 product-convergence audit (tasks/backlog/architecture/REVIEW-004-framework24-product-convergence-audit.md)
 - unblocked: `RUNTIME-218` — Nothing in the scene is ever lit: add default lighting and light authoring (tasks/backlog/runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md)
 - unblocked: `RUNTIME-222` — Model-space point radius rendering (tasks/backlog/runtime/RUNTIME-222-model-space-point-radius-rendering.md)

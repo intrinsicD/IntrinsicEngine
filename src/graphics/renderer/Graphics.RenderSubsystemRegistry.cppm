@@ -1,3 +1,5 @@
+// Renderer-owned subsystem storage and ordered lifecycle. Release pass borrowers
+// before resetting the stored systems.
 module;
 
 #include <array>
@@ -90,63 +92,29 @@ namespace Extrinsic::Graphics
         [[nodiscard]] bool RebuildOperationalResources(RHI::IDevice& device);
         [[nodiscard]] RenderSubsystemRegistryDiagnostics GetDiagnostics() const;
 
-        [[nodiscard]] std::optional<RHI::BufferManager>& BufferManager() noexcept;
-        [[nodiscard]] const std::optional<RHI::BufferManager>& BufferManager() const noexcept;
-        [[nodiscard]] std::optional<RHI::SamplerManager>& SamplerManager() noexcept;
-        [[nodiscard]] const std::optional<RHI::SamplerManager>& SamplerManager() const noexcept;
-        [[nodiscard]] std::optional<RHI::TextureManager>& TextureManager() noexcept;
-        [[nodiscard]] const std::optional<RHI::TextureManager>& TextureManager() const noexcept;
-        [[nodiscard]] std::optional<RHI::PipelineManager>& PipelineManager() noexcept;
-        [[nodiscard]] const std::optional<RHI::PipelineManager>& PipelineManager() const noexcept;
-        [[nodiscard]] std::optional<GpuWorld>& GpuWorldSystem() noexcept;
-        [[nodiscard]] const std::optional<GpuWorld>& GpuWorldSystem() const noexcept;
-        [[nodiscard]] std::optional<MaterialSystem>& MaterialSystemRegistry() noexcept;
-        [[nodiscard]] const std::optional<MaterialSystem>& MaterialSystemRegistry() const noexcept;
-        [[nodiscard]] std::optional<ColormapSystem>& ColormapSystemRegistry() noexcept;
-        [[nodiscard]] const std::optional<ColormapSystem>& ColormapSystemRegistry() const noexcept;
-        [[nodiscard]] std::optional<VisualizationSyncSystem>& VisualizationSyncSystemRegistry() noexcept;
-        [[nodiscard]] const std::optional<VisualizationSyncSystem>& VisualizationSyncSystemRegistry() const noexcept;
-        [[nodiscard]] std::optional<CullingSystem>& CullingSystemRegistry() noexcept;
-        [[nodiscard]] const std::optional<CullingSystem>& CullingSystemRegistry() const noexcept;
-        [[nodiscard]] std::optional<TransformSyncSystem>& TransformSyncSystemRegistry() noexcept;
-        [[nodiscard]] const std::optional<TransformSyncSystem>& TransformSyncSystemRegistry() const noexcept;
-        [[nodiscard]] std::optional<LightSystem>& LightSystemRegistry() noexcept;
-        [[nodiscard]] const std::optional<LightSystem>& LightSystemRegistry() const noexcept;
-        [[nodiscard]] std::optional<SelectionSystem>& SelectionSystemRegistry() noexcept;
-        [[nodiscard]] const std::optional<SelectionSystem>& SelectionSystemRegistry() const noexcept;
-        [[nodiscard]] std::optional<ForwardSystem>& ForwardSystemRegistry() noexcept;
-        [[nodiscard]] const std::optional<ForwardSystem>& ForwardSystemRegistry() const noexcept;
-        [[nodiscard]] std::optional<DeferredSystem>& DeferredSystemRegistry() noexcept;
-        [[nodiscard]] const std::optional<DeferredSystem>& DeferredSystemRegistry() const noexcept;
-        [[nodiscard]] std::optional<PostProcessSystem>& PostProcessSystemRegistry() noexcept;
-        [[nodiscard]] const std::optional<PostProcessSystem>& PostProcessSystemRegistry() const noexcept;
-        [[nodiscard]] std::optional<ShadowSystem>& ShadowSystemRegistry() noexcept;
-        [[nodiscard]] const std::optional<ShadowSystem>& ShadowSystemRegistry() const noexcept;
-        [[nodiscard]] std::optional<UvView>& UvViewSystem() noexcept;
-        [[nodiscard]] const std::optional<UvView>& UvViewSystem() const noexcept;
+        std::optional<RHI::BufferManager>   BufferManager{};
+        std::optional<RHI::SamplerManager>  SamplerManager{};
+        std::optional<RHI::TextureManager>  TextureManager{};
+        std::optional<RHI::PipelineManager> PipelineManager{};
+        std::optional<GpuWorld>             GpuWorldSystem{};
+        std::optional<MaterialSystem>       MaterialSystemRegistry{};
+        std::optional<ColormapSystem>       ColormapSystemRegistry{};
+        std::optional<VisualizationSyncSystem> VisualizationSyncSystemRegistry{};
+        std::optional<CullingSystem>        CullingSystemRegistry{};
+        std::optional<TransformSyncSystem>  TransformSyncSystemRegistry{};
+        std::optional<LightSystem>          LightSystemRegistry{};
+        std::optional<SelectionSystem>      SelectionSystemRegistry{};
+        std::optional<ForwardSystem>        ForwardSystemRegistry{};
+        std::optional<DeferredSystem>       DeferredSystemRegistry{};
+        std::optional<PostProcessSystem>    PostProcessSystemRegistry{};
+        std::optional<ShadowSystem>         ShadowSystemRegistry{};
+        std::optional<UvView>               UvViewSystem{};
 
     private:
         [[nodiscard]] bool IsPresent(RenderSubsystemStage stage) const noexcept;
         void RecordInitialize(RenderSubsystemStage stage);
         void RecordShutdownIfPresent(RenderSubsystemStage stage);
 
-        std::optional<RHI::BufferManager>   m_BufferManager{};
-        std::optional<RHI::SamplerManager>  m_SamplerManager{};
-        std::optional<RHI::TextureManager>  m_TextureManager{};
-        std::optional<RHI::PipelineManager> m_PipelineManager{};
-        std::optional<GpuWorld>             m_GpuWorld{};
-        std::optional<MaterialSystem>       m_MaterialSystem{};
-        std::optional<ColormapSystem>       m_ColormapSystem{};
-        std::optional<VisualizationSyncSystem> m_VisualizationSyncSystem{};
-        std::optional<CullingSystem>        m_CullingSystem{};
-        std::optional<TransformSyncSystem>  m_TransformSyncSystem{};
-        std::optional<LightSystem>          m_LightSystem{};
-        std::optional<SelectionSystem>      m_SelectionSystem{};
-        std::optional<ForwardSystem>        m_ForwardSystem{};
-        std::optional<DeferredSystem>       m_DeferredSystem{};
-        std::optional<PostProcessSystem>    m_PostProcessSystem{};
-        std::optional<ShadowSystem>         m_ShadowSystem{};
-        std::optional<UvView>               m_UvView{};
         bool m_LastRebuildSucceeded = false;
         bool m_LastRebuildFailedMissingRequiredSubsystem = false;
         std::vector<RenderSubsystemLifecycleEvent> m_LifecycleEvents{};
