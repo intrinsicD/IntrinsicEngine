@@ -1,3 +1,4 @@
+// Leased buffer ownership and views; device operations stay in the implementation.
 module;
 
 #include <cstdint>
@@ -11,7 +12,7 @@ import Extrinsic.Core.StrongHandle;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.BufferView;
-import Extrinsic.RHI.Device;
+extern "C++" { namespace Extrinsic::RHI { class IDevice; } }
 
 // ============================================================
 // BufferManager

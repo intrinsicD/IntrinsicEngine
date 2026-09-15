@@ -16,6 +16,10 @@ This directory contains the `RHI` module/files.
 `IDevice` stays defined in `RHI.Device`. Its C++ linkage lets pointer-only clients
 forward declare it without importing the complete resource/submission interface.
 Clients that invoke methods or derive a backend import the owning module.
+Buffer, texture, sampler and pipeline manager interfaces use the same borrowed
+declaration for their constructor references; their implementations import the
+complete device API. The compiler-boundary tests keep the manager interfaces free of the complete
+device dependency.
 
 ## Queue affinity
 

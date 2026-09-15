@@ -36,6 +36,9 @@ Graphics is organized into explicit sublayers:
   `Graphics.TransientDebugUploadHelper`; each helper owns its per-lane limits
   and reusable frame slots. Their pipeline factories use one descriptor
   initializer for HDR color, prepass depth, disabled blending and depth writes.
+- The four RHI resource-manager interfaces borrow `IDevice` through its existing
+  C++ linkage declaration. Their implementation units import `RHI.Device`; a
+  manager constructor declaration does not expose device submission dependencies.
 - `RHI::NullCommandContext` supplies the inert command surface for the Null
   backend and CPU-only compute execution; recording test doubles keep their
   own implementations.

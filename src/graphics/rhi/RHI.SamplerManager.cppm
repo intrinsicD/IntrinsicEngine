@@ -1,3 +1,4 @@
+// Cached sampler leases; device allocation stays in the implementation.
 module;
 
 #include <cstdint>
@@ -9,7 +10,7 @@ import Extrinsic.Core.Error;
 import Extrinsic.Core.HandleLease;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
-import Extrinsic.RHI.Device;
+extern "C++" { namespace Extrinsic::RHI { class IDevice; } }
 
 // ============================================================
 // SamplerManager

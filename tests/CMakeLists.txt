@@ -372,6 +372,17 @@ add_test(NAME RenderCompilationLocality.RuntimeDiagnostics
 set_tests_properties(RenderCompilationLocality.RuntimeDiagnostics
     PROPERTIES LABELS "contract;build;runtime;graphics" TIMEOUT 30)
 
+# Resource managers borrow the device; only their implementations import its API.
+foreach(_manager IN ITEMS BufferManager TextureManager SamplerManager PipelineManager)
+    add_test(NAME RenderCompilationLocality.${_manager}DeviceBorrow
+        COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
+            ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+            --check-source src/graphics/rhi/RHI.${_manager}.cppm
+            --forbid-module Extrinsic.RHI.Device)
+    set_tests_properties(RenderCompilationLocality.${_manager}DeviceBorrow
+        PROPERTIES LABELS "contract;build;graphics" TIMEOUT 30)
+endforeach()
+
 # Renderer clients need its public contracts, not implementation-owned helpers.
 add_test(NAME RenderCompilationLocality.RendererInterface
     COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
