@@ -1,7 +1,7 @@
+// Clustering module lifecycle and private execution state; callers use ClusteringTypes.
 module;
 
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -25,37 +25,7 @@ namespace Extrinsic::Runtime
 {
     class ClusteringGpuState;
 
-    export class ClusteringService
-    {
-    public:
-        ClusteringService() = default;
-        ClusteringService(const ClusteringService&) = delete;
-        ClusteringService& operator=(const ClusteringService&) = delete;
-
-        [[nodiscard]] bool Available() const noexcept;
-        [[nodiscard]] CommandCorrelationId RunKMeans(RunKMeans command);
-
-        [[nodiscard]] KernelEventSubscription SubscribeRunCompleted(
-            std::function<void(const KMeansRunCompleted&)> listener);
-        [[nodiscard]] KernelEventSubscription SubscribeClusterLabelsChanged(
-            std::function<void(const ClusterLabelsChanged&)> listener);
-        void Unsubscribe(KernelEventSubscription subscription);
-
-        [[nodiscard]] ClusteringModuleStats Stats() const noexcept;
-
-    private:
-        friend class ClusteringModule;
-
-        void Bind(CommandBus* commands,
-                  KernelEventBus* events,
-                  const ClusteringModuleStats* stats) noexcept;
-
-        CommandBus* m_Commands{};
-        KernelEventBus* m_Events{};
-        const ClusteringModuleStats* m_Stats{};
-    };
-
-    export class ClusteringModule final : public IRuntimeModule
+    export extern "C++" class ClusteringModule final : public IRuntimeModule
     {
     public:
         ClusteringModule();

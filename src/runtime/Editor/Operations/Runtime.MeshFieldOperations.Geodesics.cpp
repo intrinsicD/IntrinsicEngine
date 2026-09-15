@@ -1,5 +1,6 @@
 // Virtual-source geodesic distance published on the mesh's own vertices.
 module;
+#include "GeometryIntegration/Runtime.GeometryValueComparison.hpp"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>

@@ -1,4 +1,5 @@
 module;
+#include "GeometryIntegration/Runtime.GeometryValueComparison.hpp"
 #include <functional>
 
 #include <algorithm>
@@ -601,55 +602,7 @@ namespace Extrinsic::Runtime
             const T& lhs,
             const T& rhs) noexcept
         {
-            return lhs == rhs;
-        }
-
-        template <>
-        [[nodiscard]] bool SameProgressivePoissonValue<float>(
-            const float& lhs,
-            const float& rhs) noexcept
-        {
-            return std::bit_cast<std::uint32_t>(lhs) ==
-                   std::bit_cast<std::uint32_t>(rhs);
-        }
-
-        template <>
-        [[nodiscard]] bool SameProgressivePoissonValue<double>(
-            const double& lhs,
-            const double& rhs) noexcept
-        {
-            return std::bit_cast<std::uint64_t>(lhs) ==
-                   std::bit_cast<std::uint64_t>(rhs);
-        }
-
-        template <>
-        [[nodiscard]] bool SameProgressivePoissonValue<glm::vec2>(
-            const glm::vec2& lhs,
-            const glm::vec2& rhs) noexcept
-        {
-            return SameProgressivePoissonValue(lhs.x, rhs.x) &&
-                   SameProgressivePoissonValue(lhs.y, rhs.y);
-        }
-
-        template <>
-        [[nodiscard]] bool SameProgressivePoissonValue<glm::vec3>(
-            const glm::vec3& lhs,
-            const glm::vec3& rhs) noexcept
-        {
-            return SameProgressivePoissonValue(lhs.x, rhs.x) &&
-                   SameProgressivePoissonValue(lhs.y, rhs.y) &&
-                   SameProgressivePoissonValue(lhs.z, rhs.z);
-        }
-
-        template <>
-        [[nodiscard]] bool SameProgressivePoissonValue<glm::vec4>(
-            const glm::vec4& lhs,
-            const glm::vec4& rhs) noexcept
-        {
-            return SameProgressivePoissonValue(lhs.x, rhs.x) &&
-                   SameProgressivePoissonValue(lhs.y, rhs.y) &&
-                   SameProgressivePoissonValue(lhs.z, rhs.z) &&
-                   SameProgressivePoissonValue(lhs.w, rhs.w);
+            return GeometryValueComparison::BitEqual(lhs, rhs);
         }
 
         template <>

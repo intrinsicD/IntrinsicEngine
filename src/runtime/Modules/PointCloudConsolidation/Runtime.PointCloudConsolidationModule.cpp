@@ -1,4 +1,5 @@
 module;
+#include "GeometryIntegration/Runtime.GeometryValueComparison.hpp"
 #include <chrono>
 
 #include <algorithm>
@@ -75,70 +76,7 @@ namespace Extrinsic::Runtime
                 : ECS::InvalidEntityHandle;
         }
 
-        [[nodiscard]] bool SameValue(const bool lhs, const bool rhs) noexcept
-        {
-            return lhs == rhs;
-        }
-
-        [[nodiscard]] bool SameValue(
-            const std::int32_t lhs,
-            const std::int32_t rhs) noexcept
-        {
-            return lhs == rhs;
-        }
-
-        [[nodiscard]] bool SameValue(
-            const std::uint32_t lhs,
-            const std::uint32_t rhs) noexcept
-        {
-            return lhs == rhs;
-        }
-
-        [[nodiscard]] bool SameValue(
-            const std::uint64_t lhs,
-            const std::uint64_t rhs) noexcept
-        {
-            return lhs == rhs;
-        }
-
-        [[nodiscard]] bool SameValue(
-            const float lhs,
-            const float rhs) noexcept
-        {
-            return std::bit_cast<std::uint32_t>(lhs) ==
-                   std::bit_cast<std::uint32_t>(rhs);
-        }
-
-        [[nodiscard]] bool SameValue(
-            const double lhs,
-            const double rhs) noexcept
-        {
-            return std::bit_cast<std::uint64_t>(lhs) ==
-                   std::bit_cast<std::uint64_t>(rhs);
-        }
-
-        [[nodiscard]] bool SameValue(
-            const glm::vec2& lhs,
-            const glm::vec2& rhs) noexcept
-        {
-            return SameValue(lhs.x, rhs.x) && SameValue(lhs.y, rhs.y);
-        }
-
-        [[nodiscard]] bool SameValue(
-            const glm::vec3& lhs,
-            const glm::vec3& rhs) noexcept
-        {
-            return SameValue(lhs.x, rhs.x) && SameValue(lhs.y, rhs.y) &&
-                   SameValue(lhs.z, rhs.z);
-        }
-
-        [[nodiscard]] bool SameValue(
-            const glm::vec4& lhs,
-            const glm::vec4& rhs) noexcept
-        {
-            return SameValue(lhs.x, rhs.x) && SameValue(lhs.y, rhs.y) &&
-                   SameValue(lhs.z, rhs.z) && SameValue(lhs.w, rhs.w);
-        }
+        using GeometryValueComparison::BitEqual;
 
         template <typename TValue>
         [[nodiscard]] bool SameProperty(
@@ -157,7 +95,7 @@ namespace Extrinsic::Runtime
                  index < lhsProperty.Vector().size();
                  ++index)
             {
-                if (!SameValue(
+                if (!BitEqual(
                         static_cast<TValue>(lhsProperty[index]),
                         static_cast<TValue>(rhsProperty[index])))
                 {
@@ -1689,7 +1627,7 @@ namespace Extrinsic::Runtime
                      index < snapshot.Values.size();
                      ++index)
                 {
-                    if (!SameValue(property[index], snapshot.Values[index]))
+                    if (!BitEqual(property[index], snapshot.Values[index]))
                         return false;
                 }
             }
@@ -2623,54 +2561,8 @@ namespace Extrinsic::Runtime
             availability, properties, config);
     }
 
-    bool PointCloudConsolidationService::Available() const noexcept
+    extern "C++"
     {
-        return m_Commands != nullptr && m_Events != nullptr;
-    }
-
-    CommandCorrelationId PointCloudConsolidationService::Run(
-        PointCloudConsolidationRequest request)
-    {
-        return m_Commands != nullptr
-            ? m_Commands->Enqueue(std::move(request))
-            : CommandCorrelationId{};
-    }
-
-    KernelEventSubscription
-    PointCloudConsolidationService::SubscribeCompleted(
-        std::function<void(const PointCloudConsolidationResult&)> listener)
-    {
-        return m_Events != nullptr && listener
-            ? m_Events->Subscribe<PointCloudConsolidationResult>(
-                  std::move(listener))
-            : KernelEventSubscription{};
-    }
-
-    void PointCloudConsolidationService::Unsubscribe(
-        const KernelEventSubscription subscription)
-    {
-        if (m_Events != nullptr && subscription.IsValid())
-            m_Events->Unsubscribe(subscription);
-    }
-
-    PointCloudConsolidationModuleStats
-    PointCloudConsolidationService::Stats() const noexcept
-    {
-        return m_Stats != nullptr
-            ? *m_Stats
-            : PointCloudConsolidationModuleStats{};
-    }
-
-    void PointCloudConsolidationService::Bind(
-        CommandBus* commands,
-        KernelEventBus* events,
-        const PointCloudConsolidationModuleStats* stats) noexcept
-    {
-        m_Commands = commands;
-        m_Events = events;
-        m_Stats = stats;
-    }
-
     PointCloudConsolidationModule::PointCloudConsolidationModule() = default;
     PointCloudConsolidationModule::~PointCloudConsolidationModule() = default;
 
@@ -2804,4 +2696,6 @@ namespace Extrinsic::Runtime
         m_SpatialIndices = nullptr;
         m_Device = nullptr;
     }
+    }
+
 }

@@ -1,7 +1,9 @@
 // Mesh source snapshots and mesh-specific helpers shared by geometry operation
 // implementation units. Included after their runtime/geometry imports, which must
-// cover halfedge-mesh, mesh-soup, command-history and job-projection types; no
-// public module surface is added.
+// cover halfedge-mesh, mesh-soup, command-history and job-projection types.
+// Include GeometryIntegration/Runtime.GeometryValueComparison.hpp in the global
+// module fragment first; including it here would attach its definitions to the
+// importing named module. No public module surface is added.
 #pragma once
 #include "Runtime.GeometryProcessingOperations.MeshSources.hpp"
 // Job envelope and the shared job/cache/finite-position helpers are declared by
@@ -39,61 +41,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             std::string_view positionProperty = GS::PropertyNames::kPosition);
 
 
-        template <typename T>
-        [[nodiscard]] bool SameKnownPropertyValue(
-            const T& lhs,
-            const T& rhs) noexcept
-        {
-            return lhs == rhs;
-        }
-
-        template <>
-        [[nodiscard]] inline bool SameKnownPropertyValue<float>(
-            const float& lhs,
-            const float& rhs) noexcept
-        {
-            return std::bit_cast<std::uint32_t>(lhs) ==
-                   std::bit_cast<std::uint32_t>(rhs);
-        }
-
-        template <>
-        [[nodiscard]] inline bool SameKnownPropertyValue<double>(
-            const double& lhs,
-            const double& rhs) noexcept
-        {
-            return std::bit_cast<std::uint64_t>(lhs) ==
-                   std::bit_cast<std::uint64_t>(rhs);
-        }
-
-        template <>
-        [[nodiscard]] inline bool SameKnownPropertyValue<glm::vec2>(
-            const glm::vec2& lhs,
-            const glm::vec2& rhs) noexcept
-        {
-            return SameKnownPropertyValue(lhs.x, rhs.x) &&
-                   SameKnownPropertyValue(lhs.y, rhs.y);
-        }
-
-        template <>
-        [[nodiscard]] inline bool SameKnownPropertyValue<glm::vec3>(
-            const glm::vec3& lhs,
-            const glm::vec3& rhs) noexcept
-        {
-            return SameKnownPropertyValue(lhs.x, rhs.x) &&
-                   SameKnownPropertyValue(lhs.y, rhs.y) &&
-                   SameKnownPropertyValue(lhs.z, rhs.z);
-        }
-
-        template <>
-        [[nodiscard]] inline bool SameKnownPropertyValue<glm::vec4>(
-            const glm::vec4& lhs,
-            const glm::vec4& rhs) noexcept
-        {
-            return SameKnownPropertyValue(lhs.x, rhs.x) &&
-                   SameKnownPropertyValue(lhs.y, rhs.y) &&
-                   SameKnownPropertyValue(lhs.z, rhs.z) &&
-                   SameKnownPropertyValue(lhs.w, rhs.w);
-        }
+        using GeometryValueComparison::BitEqual;
 
         template <typename T>
         [[nodiscard]] std::optional<bool> SameTypedPropertyValues(
@@ -119,7 +67,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             {
                 const T currentValue = currentProperty[i];
                 const T expectedValue = expectedProperty[i];
-                if (!SameKnownPropertyValue(
+                if (!BitEqual(
                         currentValue,
                         expectedValue))
                 {

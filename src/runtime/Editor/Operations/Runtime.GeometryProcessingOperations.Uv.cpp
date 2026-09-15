@@ -1,4 +1,5 @@
 module;
+#include "GeometryIntegration/Runtime.GeometryValueComparison.hpp"
 #include <functional>
 #include <entt/entity/fwd.hpp>
 

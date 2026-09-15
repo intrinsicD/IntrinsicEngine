@@ -1,11 +1,13 @@
-// Clustering parameters, property bindings and completion records without service setup.
+// Clustering parameters, property bindings and completion records and borrowed service access, independent of lifecycle setup.
 module;
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
 export module Extrinsic.Runtime.ClusteringTypes;
 import Extrinsic.Core.Error;
+import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.CommandBus;
 export import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.WorldHandle;
@@ -135,6 +137,40 @@ export namespace Extrinsic::Runtime
         std::uint64_t CommitsDropped{0};
         std::uint64_t ClusterLabelsChangedEvents{0};
         std::uint64_t VisualizationRefreshReactions{0};
+    };
+
+    // Only the lifecycle owner may bind the service. C++ linkage lets its
+    // definition stay in the lifecycle module without importing that module here.
+    extern "C++" { class ClusteringModule; }
+
+    class ClusteringService
+    {
+    public:
+        ClusteringService() = default;
+        ClusteringService(const ClusteringService&) = delete;
+        ClusteringService& operator=(const ClusteringService&) = delete;
+
+        [[nodiscard]] bool Available() const noexcept;
+        [[nodiscard]] CommandCorrelationId RunKMeans(RunKMeans command);
+
+        [[nodiscard]] KernelEventSubscription SubscribeRunCompleted(
+            std::function<void(const KMeansRunCompleted&)> listener);
+        [[nodiscard]] KernelEventSubscription SubscribeClusterLabelsChanged(
+            std::function<void(const ClusterLabelsChanged&)> listener);
+        void Unsubscribe(KernelEventSubscription subscription);
+
+        [[nodiscard]] ClusteringModuleStats Stats() const noexcept;
+
+    private:
+        friend class ClusteringModule;
+
+        void Bind(CommandBus* commands,
+                  KernelEventBus* events,
+                  const ClusteringModuleStats* stats) noexcept;
+
+        CommandBus* m_Commands{};
+        KernelEventBus* m_Events{};
+        const ClusteringModuleStats* m_Stats{};
     };
 
 }

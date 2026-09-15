@@ -17,6 +17,7 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryAvailability;
+import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.SelectionController;
 
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"

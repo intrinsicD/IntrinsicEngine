@@ -131,14 +131,29 @@ method services and snapshot modules; `.SceneFrame`, `.VisualizationFrame` and
 conversion implementations remain in `Runtime.EditorFeatureContextAdapters.cpp`;
 the broad private header retains matching declarations for its existing consumers.
 
-Clustering and consolidation records have canonical owners in
-`Runtime.ClusteringTypes` and `Runtime.PointCloudConsolidationTypes`; their
-service modules re-export those contracts. `Runtime.ClusteringConfig` imports
-only the clustering value contract. `Runtime.ModuleLifecycle` provides the
-minimal lifecycle interface; complete setup/frame/recipe capabilities remain in
+Clustering and consolidation records and borrowed service APIs have canonical
+owners in `Runtime.ClusteringTypes` and `Runtime.PointCloudConsolidationTypes`.
+Service member implementations compile with those Types owners; lifecycle
+modules re-export the contracts and exclusively bind the services. Lifecycle
+class forward declarations and definitions use matching C++ linkage so private
+friendship does not pull registration, GPU or world state into the service API.
+`PointCloudServiceOperations`, its prepared frame, and the editor session consume
+Types directly. Within the operations family, only the implementation imports
+module-owned consolidation preflight. The compiler-derived
+`EditorCompilationLocality.PointCloudServices` check enforces these boundaries.
+`Runtime.ClusteringConfig` imports the Types owner without importing the lifecycle
+module. `Runtime.ModuleLifecycle` provides the minimal lifecycle interface;
+complete setup/frame/recipe capabilities remain in
 `Runtime.Module` for implementation and composition callers. The shared UV
 inspection record belongs to `Runtime.EditorCommon`, so appearance models do
 not import the geometry-processing operation interface.
+
+Bit-exact property guards share the private
+`GeometryIntegration/Runtime.GeometryValueComparison.hpp` overloads across mesh
+properties, Progressive Poisson, clustering and consolidation. Callers materialize
+typed values before comparison; graph/topology tags and unsupported-property
+policies remain local. Mesh position guards retain numeric comparison, including
+its distinct signed-zero/NaN behavior; they do not use the bit-exact helper.
 
 Density, spacing, density weights, keypoints and outlier analysis share live
 position/deletion capture and same-domain output preflight in

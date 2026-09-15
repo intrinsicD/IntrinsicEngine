@@ -1,4 +1,5 @@
 module;
+#include "GeometryIntegration/Runtime.GeometryValueComparison.hpp"
 #include <functional>
 #include <chrono>
 
@@ -260,12 +261,7 @@ namespace Extrinsic::Runtime
                 return false;
             for (std::size_t i = 0u; i < lhs.size(); ++i)
             {
-                if (std::bit_cast<std::uint32_t>(lhs[i].x) !=
-                        std::bit_cast<std::uint32_t>(rhs[i].x) ||
-                    std::bit_cast<std::uint32_t>(lhs[i].y) !=
-                        std::bit_cast<std::uint32_t>(rhs[i].y) ||
-                    std::bit_cast<std::uint32_t>(lhs[i].z) !=
-                        std::bit_cast<std::uint32_t>(rhs[i].z))
+                if (!GeometryValueComparison::BitEqual(lhs[i], rhs[i]))
                 {
                     return false;
                 }
@@ -354,13 +350,7 @@ namespace Extrinsic::Runtime
                 out.ScalarLabels);
         }
 
-        [[nodiscard]] bool SameFloatBits(
-            const float lhs,
-            const float rhs) noexcept
-        {
-            return std::bit_cast<std::uint32_t>(lhs) ==
-                   std::bit_cast<std::uint32_t>(rhs);
-        }
+        using GeometryValueComparison::BitEqual;
 
         [[nodiscard]] bool SameKMeansOutputPropertyState(
             const KMeansOutputPropertyState& lhs,
@@ -380,10 +370,10 @@ namespace Extrinsic::Runtime
             {
                 const glm::vec4& a = lhs.Colors[i];
                 const glm::vec4& b = rhs.Colors[i];
-                if (!SameFloatBits(a.x, b.x) ||
-                    !SameFloatBits(a.y, b.y) ||
-                    !SameFloatBits(a.z, b.z) ||
-                    !SameFloatBits(a.w, b.w))
+                if (!BitEqual(a.x, b.x) ||
+                    !BitEqual(a.y, b.y) ||
+                    !BitEqual(a.z, b.z) ||
+                    !BitEqual(a.w, b.w))
                 {
                     return false;
                 }
@@ -392,7 +382,7 @@ namespace Extrinsic::Runtime
                  i < lhs.ScalarLabels.size();
                  ++i)
             {
-                if (!SameFloatBits(
+                if (!BitEqual(
                         lhs.ScalarLabels[i],
                         rhs.ScalarLabels[i]))
                     return false;
@@ -1402,55 +1392,8 @@ namespace Extrinsic::Runtime
         }
     }
 
-    bool ClusteringService::Available() const noexcept
+    extern "C++"
     {
-        return m_Commands != nullptr && m_Events != nullptr;
-    }
-
-    CommandCorrelationId ClusteringService::RunKMeans(
-        ::Extrinsic::Runtime::RunKMeans command)
-    {
-        if (m_Commands == nullptr)
-            return {};
-        return m_Commands->Enqueue(std::move(command));
-    }
-
-    KernelEventSubscription ClusteringService::SubscribeRunCompleted(
-        std::function<void(const KMeansRunCompleted&)> listener)
-    {
-        if (m_Events == nullptr || !listener)
-            return {};
-        return m_Events->Subscribe<KMeansRunCompleted>(std::move(listener));
-    }
-
-    KernelEventSubscription ClusteringService::SubscribeClusterLabelsChanged(
-        std::function<void(const ClusterLabelsChanged&)> listener)
-    {
-        if (m_Events == nullptr || !listener)
-            return {};
-        return m_Events->Subscribe<ClusterLabelsChanged>(std::move(listener));
-    }
-
-    void ClusteringService::Unsubscribe(KernelEventSubscription subscription)
-    {
-        if (m_Events != nullptr && subscription.IsValid())
-            m_Events->Unsubscribe(subscription);
-    }
-
-    ClusteringModuleStats ClusteringService::Stats() const noexcept
-    {
-        return m_Stats != nullptr ? *m_Stats : ClusteringModuleStats{};
-    }
-
-    void ClusteringService::Bind(CommandBus* commands,
-                                 KernelEventBus* events,
-                                 const ClusteringModuleStats* stats) noexcept
-    {
-        m_Commands = commands;
-        m_Events = events;
-        m_Stats = stats;
-    }
-
     ClusteringModule::ClusteringModule() = default;
     ClusteringModule::~ClusteringModule() = default;
 
@@ -1592,4 +1535,6 @@ namespace Extrinsic::Runtime
         m_History = nullptr;
         m_Device = nullptr;
     }
+    }
+
 }

@@ -1,6 +1,7 @@
 // Mesh source snapshots, topology fingerprints, job messages and topology
 // publication shared by several geometry-operation families. Compiled once as an
 // ordinary translation unit so no family depends on another family module.
+#include "GeometryIntegration/Runtime.GeometryValueComparison.hpp"
 #include <algorithm>
 #include <array>
 #include <bit>

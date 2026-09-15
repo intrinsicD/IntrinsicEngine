@@ -1,4 +1,6 @@
 module;
+#include <functional>
+#include <utility>
 #include <string_view>
 #include <string>
 #include <optional>
@@ -70,6 +72,55 @@ namespace Extrinsic::Runtime
             };
         }
         return refs;
+    }
+
+    bool ClusteringService::Available() const noexcept
+    {
+        return m_Commands != nullptr && m_Events != nullptr;
+    }
+
+    CommandCorrelationId ClusteringService::RunKMeans(
+        ::Extrinsic::Runtime::RunKMeans command)
+    {
+        if (m_Commands == nullptr)
+            return {};
+        return m_Commands->Enqueue(std::move(command));
+    }
+
+    KernelEventSubscription ClusteringService::SubscribeRunCompleted(
+        std::function<void(const KMeansRunCompleted&)> listener)
+    {
+        if (m_Events == nullptr || !listener)
+            return {};
+        return m_Events->Subscribe<KMeansRunCompleted>(std::move(listener));
+    }
+
+    KernelEventSubscription ClusteringService::SubscribeClusterLabelsChanged(
+        std::function<void(const ClusterLabelsChanged&)> listener)
+    {
+        if (m_Events == nullptr || !listener)
+            return {};
+        return m_Events->Subscribe<ClusterLabelsChanged>(std::move(listener));
+    }
+
+    void ClusteringService::Unsubscribe(KernelEventSubscription subscription)
+    {
+        if (m_Events != nullptr && subscription.IsValid())
+            m_Events->Unsubscribe(subscription);
+    }
+
+    ClusteringModuleStats ClusteringService::Stats() const noexcept
+    {
+        return m_Stats != nullptr ? *m_Stats : ClusteringModuleStats{};
+    }
+
+    void ClusteringService::Bind(CommandBus* commands,
+                                 KernelEventBus* events,
+                                 const ClusteringModuleStats* stats) noexcept
+    {
+        m_Commands = commands;
+        m_Events = events;
+        m_Stats = stats;
     }
 
 }

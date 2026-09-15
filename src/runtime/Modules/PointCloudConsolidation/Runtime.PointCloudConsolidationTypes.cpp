@@ -1,8 +1,9 @@
 module;
+#include <functional>
+#include <utility>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <utility>
 module Extrinsic.Runtime.PointCloudConsolidationTypes;
 namespace Extrinsic::Runtime
 {
@@ -73,6 +74,54 @@ namespace Extrinsic::Runtime
             return "ModuleUnavailable";
         }
         return "Unknown";
+    }
+
+    bool PointCloudConsolidationService::Available() const noexcept
+    {
+        return m_Commands != nullptr && m_Events != nullptr;
+    }
+
+    CommandCorrelationId PointCloudConsolidationService::Run(
+        PointCloudConsolidationRequest request)
+    {
+        return m_Commands != nullptr
+            ? m_Commands->Enqueue(std::move(request))
+            : CommandCorrelationId{};
+    }
+
+    KernelEventSubscription
+    PointCloudConsolidationService::SubscribeCompleted(
+        std::function<void(const PointCloudConsolidationResult&)> listener)
+    {
+        return m_Events != nullptr && listener
+            ? m_Events->Subscribe<PointCloudConsolidationResult>(
+                  std::move(listener))
+            : KernelEventSubscription{};
+    }
+
+    void PointCloudConsolidationService::Unsubscribe(
+        const KernelEventSubscription subscription)
+    {
+        if (m_Events != nullptr && subscription.IsValid())
+            m_Events->Unsubscribe(subscription);
+    }
+
+    PointCloudConsolidationModuleStats
+    PointCloudConsolidationService::Stats() const noexcept
+    {
+        return m_Stats != nullptr
+            ? *m_Stats
+            : PointCloudConsolidationModuleStats{};
+    }
+
+    void PointCloudConsolidationService::Bind(
+        CommandBus* commands,
+        KernelEventBus* events,
+        const PointCloudConsolidationModuleStats* stats) noexcept
+    {
+        m_Commands = commands;
+        m_Events = events;
+        m_Stats = stats;
     }
 
 }

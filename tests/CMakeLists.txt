@@ -498,6 +498,20 @@ add_test(NAME EditorCompilationLocality.WorkspaceSnapshots
         --forbid-module Extrinsic.Graphics.Renderer
         --forbid-module Extrinsic.Graphics.GpuAssetCache
         --forbid-module Extrinsic.Runtime.RenderExtraction)
+# Editor interfaces, frames and session wiring consume service/types APIs.
+# The operation implementation still imports module-owned consolidation preflight.
+add_test(NAME EditorCompilationLocality.PointCloudServices
+    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
+        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+        --check-source src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.Frame.cpp
+        --check-source src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp
+        --check-source src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+        --forbid-module Extrinsic.Runtime.ClusteringModule
+        --forbid-module Extrinsic.Runtime.PointCloudConsolidationModule)
+set_tests_properties(EditorCompilationLocality.PointCloudServices
+    PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
+
 # Feature conversion/token implementations do not depend on unrelated config families.
 foreach(_intrinsic_config_family IN ITEMS CurvatureSegmentation PointCloudConsolidation)
     if(_intrinsic_config_family STREQUAL "CurvatureSegmentation")
@@ -902,6 +916,7 @@ if(TARGET ExtrinsicRuntime)
         Test.GizmoInteractionEngineWiring.cpp
         Test.GraphGeometryExtraction.cpp
         Test.GeometryAvailability.cpp
+        Test.GeometryValueComparison.cpp
         Test.GeometryPresentation.cpp
         Test.PointCloudGeometryExtraction.cpp
         Test.GeodesicsOperations.cpp

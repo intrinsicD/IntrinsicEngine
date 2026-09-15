@@ -7,6 +7,24 @@ relative to `tasks/done/`, which sits at the same depth as `tasks/active/`,
 so blocks moved from the old active-README history work verbatim.
 
 
+## 2026-09-15 — RUNTIME-264: processing service and comparison ownership
+
+Retired [RUNTIME-264](RUNTIME-264-processing-service-and-value-locality.md) at
+CPUContracted, its intended refactor endpoint. Existing Types modules now own
+clustering/consolidation service declarations and implementations; editor callers
+avoid lifecycle imports. Four processing paths reuse a private bit-exact value
+comparison header, preserving mesh position semantics and caller-owned guards.
+The production source delta is −104 lines with no new module or service.
+
+Claude reviewed the plan and fixed diff. Resolved module linkage, include-placement
+and old-owner test findings; 96 focused cases and the full CPU gate passed
+(4,639 passed, one expected ASan-only skip). Strict structural checks passed.
+No new timing, sanitizer or GPU claim is made. Remaining editor snapshot/config
+and renderer compilation work is tracked by
+[RUNTIME-265](../backlog/runtime/RUNTIME-265-editor-snapshot-compile-surface.md) and
+[GRAPHICS-138](../backlog/rendering/GRAPHICS-138-renderer-compile-surface.md).
+
+
 ## 2026-09-14 — BUG-184 and BUG-181: job accounting and shader feedback
 
 Retired [BUG-184](BUG-184-job-service-waiting-state-accounting.md) and

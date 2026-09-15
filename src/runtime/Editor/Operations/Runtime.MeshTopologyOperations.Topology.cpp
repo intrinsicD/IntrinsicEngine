@@ -2,6 +2,7 @@
 // entity's halfedge mesh. Their shared scratch-mesh source, UV-preservation
 // reporting and replacement commit are what make them one family.
 module;
+#include "GeometryIntegration/Runtime.GeometryValueComparison.hpp"
 #include <functional>
 #include <entt/entity/fwd.hpp>
 

@@ -3,7 +3,6 @@ module;
 
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -39,37 +38,8 @@ export namespace Extrinsic::Runtime
         const PointCloudConsolidationPropertyRefs& properties,
         const PointCloudConsolidationConfig& config);
 
-    class PointCloudConsolidationService
-    {
-    public:
-        PointCloudConsolidationService() = default;
-        PointCloudConsolidationService(
-            const PointCloudConsolidationService&) = delete;
-        PointCloudConsolidationService& operator=(
-            const PointCloudConsolidationService&) = delete;
 
-        [[nodiscard]] bool Available() const noexcept;
-        [[nodiscard]] CommandCorrelationId Run(
-            PointCloudConsolidationRequest request);
-        [[nodiscard]] KernelEventSubscription SubscribeCompleted(
-            std::function<void(const PointCloudConsolidationResult&)> listener);
-        void Unsubscribe(KernelEventSubscription subscription);
-        [[nodiscard]] PointCloudConsolidationModuleStats Stats() const noexcept;
-
-    private:
-        friend class PointCloudConsolidationModule;
-
-        void Bind(
-            CommandBus* commands,
-            KernelEventBus* events,
-            const PointCloudConsolidationModuleStats* stats) noexcept;
-
-        CommandBus* m_Commands{};
-        KernelEventBus* m_Events{};
-        const PointCloudConsolidationModuleStats* m_Stats{};
-    };
-
-    class PointCloudConsolidationModule final : public IRuntimeModule
+    extern "C++" class PointCloudConsolidationModule final : public IRuntimeModule
     {
     public:
         PointCloudConsolidationModule();

@@ -1,12 +1,14 @@
-// Consolidation requests and result records independent of runtime service setup.
+// Consolidation requests and result records and borrowed service access, independent of lifecycle setup.
 module;
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
 export module Extrinsic.Runtime.PointCloudConsolidationTypes;
 import Extrinsic.Core.Error;
+import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.CommandBus;
 export import Extrinsic.Runtime.GeometryAvailability;
 export import Extrinsic.Runtime.PointCloudConsolidationConfig;
@@ -148,6 +150,40 @@ export namespace Extrinsic::Runtime
         std::uint64_t CompletionEvents{0u};
         std::uint64_t ResultsCommitted{0u};
         std::uint64_t CommitsDropped{0u};
+    };
+
+    // Only the lifecycle owner may bind the service. C++ linkage lets its
+    // definition stay in the lifecycle module without importing that module here.
+    extern "C++" { class PointCloudConsolidationModule; }
+
+    class PointCloudConsolidationService
+    {
+    public:
+        PointCloudConsolidationService() = default;
+        PointCloudConsolidationService(
+            const PointCloudConsolidationService&) = delete;
+        PointCloudConsolidationService& operator=(
+            const PointCloudConsolidationService&) = delete;
+
+        [[nodiscard]] bool Available() const noexcept;
+        [[nodiscard]] CommandCorrelationId Run(
+            PointCloudConsolidationRequest request);
+        [[nodiscard]] KernelEventSubscription SubscribeCompleted(
+            std::function<void(const PointCloudConsolidationResult&)> listener);
+        void Unsubscribe(KernelEventSubscription subscription);
+        [[nodiscard]] PointCloudConsolidationModuleStats Stats() const noexcept;
+
+    private:
+        friend class PointCloudConsolidationModule;
+
+        void Bind(
+            CommandBus* commands,
+            KernelEventBus* events,
+            const PointCloudConsolidationModuleStats* stats) noexcept;
+
+        CommandBus* m_Commands{};
+        KernelEventBus* m_Events{};
+        const PointCloudConsolidationModuleStats* m_Stats{};
     };
 
 }

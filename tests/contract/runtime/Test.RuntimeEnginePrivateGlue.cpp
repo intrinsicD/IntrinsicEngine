@@ -876,6 +876,8 @@ TEST(RuntimeEnginePrivateGlue, ClusteringServiceIsTheSoleKMeansRuntimeRoute)
         root / "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cpp");
     const auto moduleInterface = ReadFile(
         root / "src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm");
+    const auto serviceInterface = ReadFile(
+        root / "src/runtime/Modules/Clustering/Runtime.ClusteringTypes.cppm");
     const auto gpuPartition = ReadFile(
         root / "src/runtime/Modules/Clustering/Runtime.ClusteringGpuBackend.cppm");
     const auto gpuState = ReadFile(
@@ -884,9 +886,11 @@ TEST(RuntimeEnginePrivateGlue, ClusteringServiceIsTheSoleKMeansRuntimeRoute)
     const auto moduleInventory = ReadFile(
         root / "docs/api/generated/module_inventory.md");
 
-    EXPECT_NE(moduleInterface.find("class ClusteringService"),
+    EXPECT_EQ(moduleInterface.find("class ClusteringService"),
               std::string::npos);
-    EXPECT_NE(moduleInterface.find("RunKMeans(RunKMeans command)"),
+    EXPECT_NE(serviceInterface.find("class ClusteringService"),
+              std::string::npos);
+    EXPECT_NE(serviceInterface.find("RunKMeans(RunKMeans command)"),
               std::string::npos);
     EXPECT_EQ(facadeInterface.find("ClusteringService* Clustering"),
               std::string::npos);

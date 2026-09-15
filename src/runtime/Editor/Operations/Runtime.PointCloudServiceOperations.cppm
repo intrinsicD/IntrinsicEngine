@@ -16,9 +16,9 @@ export module Extrinsic.Runtime.PointCloudServiceOperations;
 export import Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.EditorCommon;
 export import Extrinsic.Runtime.ClusteringConfig;
-export import Extrinsic.Runtime.ClusteringModule;
+export import Extrinsic.Runtime.ClusteringTypes;
 export import Extrinsic.Runtime.PointCloudConsolidationConfig;
-export import Extrinsic.Runtime.PointCloudConsolidationModule;
+export import Extrinsic.Runtime.PointCloudConsolidationTypes;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
 export namespace Extrinsic::Runtime
