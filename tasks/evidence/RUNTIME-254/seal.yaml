@@ -1,0 +1,9 @@
+schema_version: 1
+task_id: RUNTIME-254
+sealed_revision: 9a7c3f0c03093322147bdd991cfa38a581ea417f
+source_content_digest: 5e225eddf40ccdfde414b483d332e54b73e286533b03239815a559baa563c3b0
+report_sha256: 4adbd43236d93b0fd7889fd638557af437a902bfa2bfbb0540b2a408355c0054
+records: []
+reason: Bind exact include-only private render dependency reduction and passing CPU, focused sanitizer,
+  Vulkan compile and structural evidence.
+generated_by: tools/agents/workflow_evidence.py
