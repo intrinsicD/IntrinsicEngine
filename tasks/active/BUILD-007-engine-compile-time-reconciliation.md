@@ -88,3 +88,13 @@ Report all three samples, medians/ranges and null/negative differences. Results
 are descriptive local measurements, not publication-grade performance claims;
 `claim_eligible` remains false. Claude reviews the protocol and fixed driver and
 will review the resulting comparison. No overnight claim/work-graph machinery.
+
+### Harness correction before the retained cohort
+The first attempt passed all engine build/probe phases, then its log-window
+check rejected CMake's legitimate Ninja log recompaction during reconfiguration.
+This is a harness error, not an engine failure or a timing-based rejection.
+The incomplete population remains under `/tmp/intrinsic-build007-measure/cohort-20260915`;
+it contributes no retained comparison sample. Restrict compiler log windows to
+build commands, preserve configure timing separately, and start a fresh six-sample
+population with the same frozen manifest/order. Original logs and the corrected
+runner revisions remain available; no failed attempt is overwritten.

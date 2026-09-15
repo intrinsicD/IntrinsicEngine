@@ -145,7 +145,7 @@ def main() -> None:
         assert command(["git", "rev-parse", "HEAD"], source).strip() == revision
         assert not command(["git", "status", "--porcelain"], source), "Source is dirty"
 
-    def measured(label: str, argv: list[str], directory: Path) -> dict:
+    def measured(label: str, argv: list[str], directory: Path, *, capture_ninja: bool = False) -> dict:
         before = (build / ".ninja_log").read_bytes() if (build / ".ninja_log").exists() else b""
         stamp = datetime.now(UTC).isoformat()
         load_before = os.getloadavg()
@@ -162,8 +162,11 @@ def main() -> None:
         if result.returncode:
             raise RuntimeError(f"{label} failed; preserve {directory}")
         after = (build / ".ninja_log").read_bytes() if (build / ".ninja_log").exists() else b""
-        window = log_window(before, after) if after else b"# ninja log v5\n"
-        (directory / f"{label}.ninja_log").write_bytes(window)
+        # CMake may deliberately recompact Ninja state during generation. Only
+        # build invocations need an append-only window for compiler attribution.
+        if capture_ninja:
+            window = log_window(before, after) if after else b"# ninja log v5\n"
+            (directory / f"{label}.ninja_log").write_bytes(window)
         return record
 
     for position, arm in enumerate(params["sample_order"], 1):
@@ -221,7 +224,7 @@ def main() -> None:
                 assert (build / "compile_commands.json").read_bytes() == (directory / "compile_commands.json").read_bytes(), "Reconfigure changed compiler commands"
             clean_source(revision)
             print(f"  {scenario}", flush=True)
-            record = measured(scenario, compile_command, directory)
+            record = measured(scenario, compile_command, directory, capture_ninja=True)
             clean_source(revision)
             window_path = directory / f"{scenario}.ninja_log"
             rows = [hotspots.build_report_row(source, resolver, entry)
