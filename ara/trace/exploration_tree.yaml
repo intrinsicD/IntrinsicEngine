@@ -12857,3 +12857,22 @@ tree:
     alternatives: [Copy context records, add a generic facade, retain complete pointer-only imports, claim a general speedup from two local samples]
     evidence: [O228, N587, ara/evidence/tables/runtime265_service_borrow_compile_measurement.md, tasks/done/RUNTIME-265-editor-snapshot-compile-surface.md]
     status: resolved
+
+  - id: N589
+    type: experiment
+    title: Measure the narrowed renderer interface and registry cleanup
+    provenance: ai-executed
+    timestamp: '2026-09-15T13:49:36+02:00'
+    result: Exact clean revisions, Clang 23 Debug Null/headless ExtrinsicGraphics, four jobs, cache off, ABBA two observations per arm. Interface touch omits one critical-path producer, 12 to 11 invocations; observed 29.734–29.749 to 16.174–16.279 seconds. Clean 266 invocations in both arms, observed 89.402–89.877 to 85.373–86.213 seconds. All four results validate and retain claim_eligible false; dependencies unchanged. Full CPU 4641 pass, one expected ASan-only skip; focused 151 pass. No GPU/sanitizer runtime claim.
+    evidence: [ara/evidence/tables/graphics138_renderer_compile_measurement.md, ara/evidence/diagnostics/graphics138_20260915/inputs.json, ara/evidence/diagnostics/graphics138_20260915/verification.json]
+    status: resolved
+
+  - id: N590
+    type: decision
+    title: Retain renderer cleanup and retire the bounded task
+    provenance: ai-executed
+    timestamp: '2026-09-15T13:49:36+02:00'
+    choice: Remove four unused renderer accessors and six unused interface imports, and replace 34 trivial registry getter methods with reads of the same owned fields. Preserve lifecycle types/order and algorithms; remove 222 production lines with no new production file. Retire GRAPHICS-138 after Claude plan/source/results review, full CPU and matched measurements. Keep timing statements descriptive and distinguish one omitted probe producer from seven removed interface dependencies.
+    alternatives: [Add another facade or Pimpl, retain forwarding-only accessors, infer broad build speedup from two local observations]
+    evidence: [O229, N589, ara/evidence/tables/graphics138_renderer_compile_measurement.md, tasks/done/GRAPHICS-138-renderer-compile-surface.md]
+    status: resolved

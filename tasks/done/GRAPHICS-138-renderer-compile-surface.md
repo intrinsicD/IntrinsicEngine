@@ -38,7 +38,7 @@ contracts: [repo.source-documentation, runtime.render-diagnostics-locality]
       including any new private header or implementation unit.
 - [x] Compiler-boundary checks, affected CPU tests and any GPU/lifetime tests
       required by the chosen change pass; generated inventory/docs are current.
-- [ ] Reuse BUILD-007 tooling for matched timing evidence before a performance
+- [x] Reuse BUILD-007 tooling for matched timing evidence before a performance
       claim; reject the change if complexity or compilation cost increases.
 
 ## Verification
@@ -136,3 +136,22 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Two benchmark samples per arm provide descriptive corroboration only, with raw
   values/ranges retained and no statistical or cross-host claim. Three or more
   samples were suggested during review; no general timing claim is sought here.
+
+## Completion — 2026-09-15
+- Commit reference: `1f84ec611120b8a0c5f9428be015284a40c68a03`; the enclosing
+  evidence commit records retirement. All acceptance criteria for this bounded
+  renderer surface change are met; this is not whole-engine completion.
+- Four exact-source ABBA results validate. ForwardSystem interface touch omits
+  exactly one critical-path producer, Graphics.Renderer.cppm (12 → 11); observed
+  times are 29.734–29.749 → 16.174–16.279 seconds. The renderer implementation
+  remains in the rebuild. Clean graphics builds still compile 266 producers,
+  with observed times 89.402–89.877 → 85.373–86.213 seconds. Two observations per
+  arm establish no general/statistical or clean-build speedup.
+- C96 and the [measurement report](../../ara/evidence/tables/graphics138_renderer_compile_measurement.md)
+  retain raw values, ranges, commands, immutable dependency identity, source
+  checks and all review/test logs. Every result is claim_eligible false.
+- Claude's final reporting findings are resolved: seven removed renderer-import
+  dependencies do not mean seven removed target producers; timings are
+  descriptive, combined-patch attribution is limited, and no RSS gain is claimed.
+- Further renderer splitting needs a concrete dependency and cost justification;
+  no additional wrapper or upload abstraction was introduced by this task.

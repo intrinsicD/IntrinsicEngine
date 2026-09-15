@@ -590,8 +590,8 @@ sessions:
 
 - id: 2026-09-15_001
   date: '2026-09-15'
-  summary: "Editor service borrows reduce the measured spatial-interface rebuild from 61 to 22 compiler units; no established clean-build speedup. Claude reviewed; full CPU passes. RUNTIME-265 and BUG-197 retired; renderer follow-up remains open."
-  turn_count: 19
-  events_count: 23
-  claims_touched: [C94, C95]
+  summary: "Renderer cleanup removes 222 production lines; the measured graphics interface edit omits one expensive producer. Claude reviewed; full CPU passes and GRAPHICS-138 retires. Timings remain descriptive, broader compile work stays open."
+  turn_count: 20
+  events_count: 26
+  claims_touched: [C94, C95, C96]
   open_threads: 10

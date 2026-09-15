@@ -3908,3 +3908,15 @@ observations:
     promoted_to: logic/claims.md:C95
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O229
+    timestamp: '2026-09-15T13:49:36+02:00'
+    provenance: ai-executed
+    content: The retained graphics-library interface-touch observations omit one expensive renderer-interface producer, 12 to 11 invocations, with observed times 29.734–29.749 to 16.174–16.279 seconds. Clean builds still compile 266 producers; renderer import closure 66 to 59 is a different measure. No general timing or memory improvement is established.
+    context: N589 records the exact-source immutable-dependency ABBA cohort; N590 retains the bounded cleanup based on its structural evidence and descriptive measurements.
+    potential_type: claim
+    bound_to: [N589]
+    promoted: true
+    promoted_to: logic/claims.md:C96
+    crystallized_via: artifact-commitment
+    stale: false

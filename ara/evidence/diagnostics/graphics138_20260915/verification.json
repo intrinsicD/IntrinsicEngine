@@ -1,0 +1,40 @@
+{
+  "source_revision": "1f84ec611120b8a0c5f9428be015284a40c68a03",
+  "compiler": "Clang 23.0.0; repository minimum Clang 20",
+  "ci_configure": "passed",
+  "IntrinsicTests_build": "passed",
+  "focused_cpu": {
+    "passed": 151,
+    "elapsed_seconds": 10.2,
+    "selector": "RenderCompilationLocality|RenderSubsystemRegistry|RenderPrepPipeline|RendererFrameLifecycle|RendererRhiBoundary|ImGuiPresentContract|VisualizationOverlayPass"
+  },
+  "full_cpu": {
+    "selected": 4642,
+    "passed": 4641,
+    "failed": 0,
+    "skipped": 1,
+    "skip": "GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl requires ASan",
+    "elapsed_seconds": 133.31
+  },
+  "canonical_results_validated": 4,
+  "negative_control": "Before editing, the new guard rejected all six forbidden roots on actual original compiler metadata with expected exit 2; final metadata passes. No simulated or recompiled fault claimed.",
+  "gpu_or_sanitizer_runtime_claim": false,
+  "claude_review": "Plan, exact source and results reviewed; corrected initial duplicate-implementer inference, Light/Transform wording and final distinction between one avoided critical-path compilation and seven removed interface dependencies. No source correctness blocker.",
+  "checks": [
+    "strict layering",
+    "strict task policy",
+    "test layout",
+    "documentation links",
+    "clean-workshop",
+    "explicit changed-path docs sync",
+    "module inventory refreshed: 417"
+  ],
+  "public_cpp_api": "Four removed virtual accessors and 34 registry getter methods; complete in-tree rebuild; no ABI compatibility commitment.",
+  "review_resolutions": [
+    "Twelve to eleven measured producers means one avoided renderer-interface compilation, not broad target fanout relief.",
+    "Sixty-six to fifty-nine is the renderer import closure; all clean target builds still compile 266 producers.",
+    "Clean timing and weighted critical paths are observations; no causal attribution or general speedup from two samples per arm.",
+    "No-op, configure and RSS raw values retained; no RSS gain claimed.",
+    "The combined patch does not isolate timing impact of the getter consolidation."
+  ]
+}

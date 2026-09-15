@@ -44,3 +44,5 @@
 - [Normal estimation verification](tables/normal_estimation_verification_2026-09-08.md) — canonical-domain CPU PCA/topology methods, cached LBVH, shared config/window and guarded publication.
 
 - [Editor service-borrow compile measurement](tables/runtime265_service_borrow_compile_measurement.md) — four bounded local Clang 23 samples, immutable dependencies, rejected-attempt retention and full CPU reconciliation; C95.
+
+- [Renderer surface measurement](tables/graphics138_renderer_compile_measurement.md) — C96 bounded graphics-library observations; one omitted interface-touch producer, unchanged clean compilation count, no general speedup claim.

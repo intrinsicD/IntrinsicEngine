@@ -1,0 +1,40 @@
+{
+  "accepted_cohort": "measurement",
+  "rejected_cohort": null,
+  "files": {
+    "inputs.json": {
+      "sha256": "42952de561f66bd0647aab6af6da07c08a0984a89b7c5b9b865c083018622500",
+      "bytes": 19055
+    },
+    "raw-evidence.tar.gz": {
+      "sha256": "d6550cc1f58db00eb82a439346e4b404c6c9ca972e0eb116ad289fb014959f78",
+      "bytes": 1044245
+    },
+    "summary.json": {
+      "sha256": "b768b0aa9a62d8997176e9a59d5ef799d710c87e2a220e038053aeaf1709af8d",
+      "bytes": 6193
+    },
+    "verification.json": {
+      "sha256": "8149704c8b2671bd064621d97c7b77cda995b45e3183cf17b7d142bb6d40dab7",
+      "bytes": 2141
+    }
+  },
+  "canonical_results_in_archive": {
+    "accepted-cohort/results/01-before-1.json": {
+      "sha256": "5d28384b32290e5a8fdd4afa0218808f272f119df5ab9b9624734a289710f501",
+      "bytes": 45785
+    },
+    "accepted-cohort/results/02-after-1.json": {
+      "sha256": "0489fda04051678638ea05c61b293acae17462d160f226753bdfc35fa8ea3cfc",
+      "bytes": 43997
+    },
+    "accepted-cohort/results/03-after-2.json": {
+      "sha256": "9ec667fb7c74e38b8b70b8e85df1660b5c8601f8873cc403f00f780a0113cafd",
+      "bytes": 43994
+    },
+    "accepted-cohort/results/04-before-2.json": {
+      "sha256": "3b1dba0923c79309db415c80250057d747071485b3789203fcbca361e0811e23",
+      "bytes": 45807
+    }
+  }
+}

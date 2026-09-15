@@ -2210,3 +2210,14 @@
 - **Dependencies**: []
 - **Tags**: compilation, service borrows, C++23 modules, matched local measurements, CPU build, bounded observation
 - **From staging**: O228
+
+## C96: Bounded renderer-interface rebuild observations
+- **Statement**: In the retained 2026-09-15 Clang 23 ABBA cohort, two observations per exact revision, a ForwardSystem interface touch omits one producer, Graphics.Renderer.cppm, from the graphics-library rebuild (12 to 11 compiler invocations). Observed times are 29.734–29.749 seconds before and 16.174–16.279 after. The renderer import closure narrows from 66 to 59; every clean graphics-library build still compiles 266 producers.
+- **Status**: supported — descriptive local observations only, with all four results claim_eligible:false. No statistical/general, publication-qualified, cross-host/compiler, runtime/GPU, Sandbox/test-suite or broader C92 performance conclusion. The observed clean times do not establish a general clean-build speedup.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Recomputing the retained four records disagrees with the stated ranges/counts or removed producer, or exact source/runner/toolchain/dependency checks reveal unmatched conditions. Removed interface dependencies must not be counted as removed clean-build producers.
+- **Proof**: [ara/evidence/tables/graphics138_renderer_compile_measurement.md, ara/evidence/diagnostics/graphics138_20260915/evidence-index.json, ara/evidence/diagnostics/graphics138_20260915/summary.json, ara/evidence/diagnostics/graphics138_20260915/inputs.json, ara/evidence/diagnostics/graphics138_20260915/raw-evidence.tar.gz, benchmarks/ci/manifests/engine_compile_iteration_renderer_surface.yaml, tests/CMakeLists.txt]
+- **Dependencies**: []
+- **Tags**: compilation, renderer interface, C++23 modules, matched local observations, CPU build
+- **From staging**: O229

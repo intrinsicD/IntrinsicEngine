@@ -1,0 +1,258 @@
+{
+  "benchmark_id": "build.engine_compile_iteration.renderer_surface.v1",
+  "target": "ExtrinsicGraphics",
+  "sample_order": [
+    "before",
+    "after",
+    "after",
+    "before"
+  ],
+  "samples": [
+    {
+      "attempt_id": "01-before-1",
+      "arm": "before",
+      "revision": "7ec9673797ed581feebae9b3cae9d93bb27d670c",
+      "configure_ms": {
+        "initial": 6678.64403501153
+      },
+      "scenarios": {
+        "clean": {
+          "wall_ms": 89402.47166191693,
+          "compiler_invocations": 266,
+          "critical_path_ms": 48283,
+          "max_single_process_rss_kib": 1845940
+        },
+        "noop": {
+          "wall_ms": 31.899036024697125,
+          "compiler_invocations": 0,
+          "critical_path_ms": 0,
+          "max_single_process_rss_kib": 17888
+        },
+        "forward_interface": {
+          "wall_ms": 29749.353626044467,
+          "compiler_invocations": 12,
+          "critical_path_ms": 29714,
+          "max_single_process_rss_kib": 1845496
+        }
+      }
+    },
+    {
+      "attempt_id": "02-after-1",
+      "arm": "after",
+      "revision": "1f84ec611120b8a0c5f9428be015284a40c68a03",
+      "configure_ms": {
+        "initial": 6708.064347039908
+      },
+      "scenarios": {
+        "clean": {
+          "wall_ms": 85373.4525119653,
+          "compiler_invocations": 266,
+          "critical_path_ms": 40893,
+          "max_single_process_rss_kib": 1843240
+        },
+        "noop": {
+          "wall_ms": 35.210625967010856,
+          "compiler_invocations": 0,
+          "critical_path_ms": 0,
+          "max_single_process_rss_kib": 18200
+        },
+        "forward_interface": {
+          "wall_ms": 16173.827348975465,
+          "compiler_invocations": 11,
+          "critical_path_ms": 16140,
+          "max_single_process_rss_kib": 1839292
+        }
+      }
+    },
+    {
+      "attempt_id": "03-after-2",
+      "arm": "after",
+      "revision": "1f84ec611120b8a0c5f9428be015284a40c68a03",
+      "configure_ms": {
+        "initial": 7146.869512973353
+      },
+      "scenarios": {
+        "clean": {
+          "wall_ms": 86212.58730103727,
+          "compiler_invocations": 266,
+          "critical_path_ms": 41247,
+          "max_single_process_rss_kib": 1843148
+        },
+        "noop": {
+          "wall_ms": 31.48055204655975,
+          "compiler_invocations": 0,
+          "critical_path_ms": 0,
+          "max_single_process_rss_kib": 18044
+        },
+        "forward_interface": {
+          "wall_ms": 16278.65502203349,
+          "compiler_invocations": 11,
+          "critical_path_ms": 16237,
+          "max_single_process_rss_kib": 1839832
+        }
+      }
+    },
+    {
+      "attempt_id": "04-before-2",
+      "arm": "before",
+      "revision": "7ec9673797ed581feebae9b3cae9d93bb27d670c",
+      "configure_ms": {
+        "initial": 6392.986127990298
+      },
+      "scenarios": {
+        "clean": {
+          "wall_ms": 89877.04744003713,
+          "compiler_invocations": 266,
+          "critical_path_ms": 48508,
+          "max_single_process_rss_kib": 1845440
+        },
+        "noop": {
+          "wall_ms": 33.94022106658667,
+          "compiler_invocations": 0,
+          "critical_path_ms": 0,
+          "max_single_process_rss_kib": 18208
+        },
+        "forward_interface": {
+          "wall_ms": 29733.72611508239,
+          "compiler_invocations": 12,
+          "critical_path_ms": 29697,
+          "max_single_process_rss_kib": 1845088
+        }
+      }
+    }
+  ],
+  "forward_interface_sources_removed": [
+    "src/graphics/renderer/Graphics.Renderer.cppm"
+  ],
+  "forward_interface_sources_added": [],
+  "ranges": {
+    "before": {
+      "clean": {
+        "wall_ms": [
+          89402.47166191693,
+          89877.04744003713
+        ],
+        "compiler_invocations": [
+          266,
+          266
+        ],
+        "critical_path_ms": [
+          48283,
+          48508
+        ],
+        "max_single_process_rss_kib": [
+          1845440,
+          1845940
+        ]
+      },
+      "noop": {
+        "wall_ms": [
+          31.899036024697125,
+          33.94022106658667
+        ],
+        "compiler_invocations": [
+          0,
+          0
+        ],
+        "critical_path_ms": [
+          0,
+          0
+        ],
+        "max_single_process_rss_kib": [
+          17888,
+          18208
+        ]
+      },
+      "forward_interface": {
+        "wall_ms": [
+          29733.72611508239,
+          29749.353626044467
+        ],
+        "compiler_invocations": [
+          12,
+          12
+        ],
+        "critical_path_ms": [
+          29697,
+          29714
+        ],
+        "max_single_process_rss_kib": [
+          1845088,
+          1845496
+        ]
+      }
+    },
+    "after": {
+      "clean": {
+        "wall_ms": [
+          85373.4525119653,
+          86212.58730103727
+        ],
+        "compiler_invocations": [
+          266,
+          266
+        ],
+        "critical_path_ms": [
+          40893,
+          41247
+        ],
+        "max_single_process_rss_kib": [
+          1843148,
+          1843240
+        ]
+      },
+      "noop": {
+        "wall_ms": [
+          31.48055204655975,
+          35.210625967010856
+        ],
+        "compiler_invocations": [
+          0,
+          0
+        ],
+        "critical_path_ms": [
+          0,
+          0
+        ],
+        "max_single_process_rss_kib": [
+          18044,
+          18200
+        ]
+      },
+      "forward_interface": {
+        "wall_ms": [
+          16173.827348975465,
+          16278.65502203349
+        ],
+        "compiler_invocations": [
+          11,
+          11
+        ],
+        "critical_path_ms": [
+          16140,
+          16237
+        ],
+        "max_single_process_rss_kib": [
+          1839292,
+          1839832
+        ]
+      }
+    }
+  },
+  "dependencies_before_all_samples_after": {
+    "sha256": "0ecb7332b14479eabffbc061dba9d94492bfb494a936e9be5bf2caf384e97c54",
+    "file_count": 1728
+  },
+  "runner_sha256": "256fa3e5d4b85bda3b244328aa70904f5f0bbd7eb295db1e687132523561e423",
+  "claim_eligible": false,
+  "configure_ranges_ms": {
+    "before": [
+      6392.986127990298,
+      6678.64403501153
+    ],
+    "after": [
+      6708.064347039908,
+      7146.869512973353
+    ]
+  }
+}

@@ -2,9 +2,9 @@ session:
   id: 2026-09-15_001
   date: '2026-09-15'
   started: '2026-09-15T00:37:12+02:00'
-  last_turn: "2026-09-15T13:09:19+02:00"
-  turn_count: 19
-  summary: "Editor service borrows reduce the measured spatial-interface rebuild from 61 to 22 compiler units; no established clean-build speedup. Claude reviewed; full CPU passes. RUNTIME-265 and BUG-197 retired; renderer follow-up remains open."
+  last_turn: "2026-09-15T13:49:36+02:00"
+  turn_count: 20
+  summary: "Renderer cleanup removes 222 production lines; the measured graphics interface edit omits one expensive producer. Claude reviewed; full CPU passes and GRAPHICS-138 retires. Timings remain descriptive, broader compile work stays open."
 events_logged:
 - turn: 1
   type: experiment
@@ -154,6 +154,25 @@ events_logged:
   routing: crystallized
   provenance: ai-executed
   summary: C95 records only the bounded local interface rebuild observations; no established clean-build speedup.
+
+- turn: 20
+  type: experiment
+  id: N589
+  routing: direct
+  provenance: ai-executed
+  summary: Four immutable-dependency exact-source graphics-library samples, compiler graph and full CPU verification.
+- turn: 20
+  type: decision
+  id: N590
+  routing: direct
+  provenance: ai-executed
+  summary: Retain reviewed renderer/registry simplification and retire GRAPHICS-138 with bounded evidence.
+- turn: 20
+  type: observation
+  id: O229
+  routing: crystallized
+  provenance: ai-executed
+  summary: Record C96 as descriptive local observations only, no generalized timing or memory claim.
 
 ai_actions:
 - turn: 1
@@ -344,6 +363,11 @@ ai_actions:
   provenance: ai-executed
   files_changed: [src/runtime/Editor/Runtime.EditorProcessing.cppm, src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm, src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp, src/graphics/rhi/RHI.Device.cppm, tools/analysis/benchmark_compile_iteration.py, tests/regression/tooling/Test.CompileHotspots.py, ara/evidence/tables/runtime265_service_borrow_compile_measurement.md]
 
+- turn: 20
+  action: Removed unused renderer surface and registry getter forwarding, updated callers and the compiler guard, resolved Claude reviews, rebuilt and tested, measured four samples and archived evidence.
+  provenance: ai-executed
+  files_changed: [src/graphics/renderer/Graphics.Renderer.cppm, src/graphics/renderer/Graphics.Renderer.cpp, src/graphics/renderer/Graphics.RenderSubsystemRegistry.cppm, src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp, tests/CMakeLists.txt, ara/evidence/tables/graphics138_renderer_compile_measurement.md, tasks/done/GRAPHICS-138-renderer-compile-surface.md]
+
 claims_touched:
 - id: C94
   action: crystallized
@@ -351,6 +375,10 @@ claims_touched:
 - id: C95
   action: crystallized
   turn: 19
+
+- id: C96
+  action: crystallized
+  turn: 20
 
 key_context:
 - turn: 1
@@ -401,6 +429,9 @@ key_context:
 - turn: 19
   excerpt: User requested continued compilation and duplication cleanup with Claude through planning, implementation, review, testing and fixes. Existing source-sharing authorization applies; no main merge requested.
 
+- turn: 20
+  excerpt: User requested continued duplication and compilation cleanup with Claude through planning, implementation, review, tests and fixes; existing source-sharing authorization applies. No main merge requested.
+
 open_threads:
 - The broader C92 processing-family hypothesis still needs a selected baseline and repeated family-edit measurements; BUILD-006 separately owns backend/cache comparisons.
 - BUG-193 owns unexplained GPU pacing variability and WLOP watchdog margin; BUG-189/191/192 closed only finite-work
@@ -419,7 +450,7 @@ open_threads:
   CPU and Vulkan probes select the scalar; exact Display status, acceleration and Appearance behavior remain needed.'
 - BUG-195 owns disk-headroom preflight and evidence-write recovery; completed backend verification does not close
   that tooling work.
-- GRAPHICS-138 retains the prepared renderer forwarding/import cleanup; service-borrow RUNTIME-265 and benchmark harness BUG-197 are complete.
+- GRAPHICS-138 is complete. The renderer implementation remains about 13 seconds in the bounded interface-touch probe; further splitting needs a concrete dependency/cost justification. BUILD-006 retains separate backend/cache comparisons.
 
 ai_suggestions_pending:
 - Existing staged topics retain their open owners and flags; this ordinary refactor supplies no new closure signal.
