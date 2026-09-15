@@ -37,6 +37,8 @@ params:
     keep root source and shared dependencies unchanged throughout sampling.
   host_noise: Pre-read inputs; normal desktop, uncontrolled affinity/governor/turbo/filesystem cache;
     no competing builds/tests, no discarded timed samples.
+  derived_metric: build_time_ms.owner_and_snapshot is the sum of the two sequential producer wall times;
+    memory_peak_bytes retains only the two measured single-process values (no sum).
 metrics:
 - build_time_ms
 - memory_peak_bytes
