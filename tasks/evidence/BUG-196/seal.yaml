@@ -1,0 +1,9 @@
+schema_version: 1
+task_id: BUG-196
+sealed_revision: df93c9fe3fb512973e04bbc01c112edbcdce80d9
+source_content_digest: dc966ffce46ec20bc7b2568303432e5a95acb6dfcc65e6205de7031c131aa881
+report_sha256: cef9bd77b70017b28e5673c620c23ee19602cd7bfe54412491f9a2991431876a
+records: []
+reason: Bind completed Claude-reviewed navigation fix and passing tooling/structural evidence to exact
+  local source
+generated_by: tools/agents/workflow_evidence.py
