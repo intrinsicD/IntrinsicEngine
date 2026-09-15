@@ -1,0 +1,9 @@
+schema_version: 1
+task_id: RUNTIME-262
+sealed_revision: faa9e513c8a43650ddf8a6b511e1956d522997dc
+source_content_digest: f904da007d6c931bfbd073569c66d5c8f2dfc2171afaef75c7fcbf5bb5adc11c
+report_sha256: 2d9bd036d8d928faf04784985b3a8f692118b14b9a2412170a74f8521ce732fc
+records: []
+reason: Bind one-line recipe-owner substitution, architecture note and fixed Claude review to exact source
+  and passing editor/recipe CPU/sanitizer/Vulkan build evidence
+generated_by: tools/agents/workflow_evidence.py
