@@ -1,0 +1,62 @@
+benchmark_id: build.engine_compile_iteration.graphics_std.v1
+method: build.engine_compile_iteration
+dataset: intrinsicengine.graphics_standard_declarations_2026_09_16
+params:
+  intent: performance
+  source_revisions:
+    before: dc606482aecec0f0412b06b7a811a62835e98438
+    after: 5537a4dda505959e6e818713963ce43ad7805c90
+  sample_order:
+  - before
+  - after
+  - after
+  - before
+  - before
+  - after
+  - after
+  - before
+  - before
+  - after
+  measured_iterations: 5
+  warmup_iterations: 0
+  warmup_scope: No discarded pilots; identical input pre-read before every measured sample.
+  preset: ci
+  target: ExtrinsicGraphics
+  compiler: /usr/bin/clang++-23
+  jobs: 4
+  minimum_interface_importers: 1
+  configure_options:
+  - -DEXTRINSIC_BACKEND=Null
+  - -DINTRINSIC_PLATFORM_BACKEND=Null
+  - -DINTRINSIC_HEADLESS_NO_GLFW=ON
+  - -DINTRINSIC_BUILD_TESTS=OFF
+  - -DINTRINSIC_BUILD_BENCHMARKS=OFF
+  - -DINTRINSIC_ENABLE_CCACHE=OFF
+  - -DCMAKE_CXX_COMPILER_LAUNCHER=
+  - -DCMAKE_C_COMPILER_LAUNCHER=
+  scenarios:
+    clean: null
+    noop: null
+    renderer_impl: src/graphics/renderer/Graphics.Renderer.cpp
+    renderer_interface: src/graphics/renderer/Graphics.Renderer.cppm
+  invalidation: mtime only; source bytes remain at the exact clean commit; require observed importer fan-out
+  build_storage: one disposable tmpfs directory; fresh artifacts per full-build sample
+  dependency_state: identical preinstalled vcpkg packages, no package installation during sampling
+  operating_system_cache: input pre-read, no cache flushing, no cold-filesystem claim
+  memory_measurement: GNU time maximum single-process RSS, not aggregate concurrent memory
+  critical_path: Ninja target DAG weighted by unfiltered per-invocation timings; unmatched meta-edges
+    reported
+  summary: Report every sample, median/min/max and compiler units; compare identical common compiler commands
+    and package fingerprints. Charge the added Core.Std producer in the clean graphics target. Interface/implementation
+    edits reuse that settled owner. No whole-engine, runtime/GPU, aggregate-memory, cross-host or statistical
+    significance claim. Separate snapshot control has its own manifest.
+  sample_sequence: Configure, clean graphics-library build, no-op, renderer implementation edit, renderer
+    interface edit; recreate owned build between samples.
+  host_noise: Normal desktop, input pre-read, no CPU affinity/governor/turbo control and no competing
+    builds/tests during sampling. Retain all samples; no discarded pilots or cold-cache claim.
+metrics:
+- build_time_ms
+- configure_time_ms
+- memory_peak_bytes
+- sample_count
+thresholds: {}

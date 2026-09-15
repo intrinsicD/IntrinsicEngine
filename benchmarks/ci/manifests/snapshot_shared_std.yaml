@@ -1,0 +1,44 @@
+benchmark_id: build.engine_compile_iteration.snapshot_shared_std.v1
+method: build.engine_compile_iteration
+dataset: intrinsicengine.snapshot_shared_std_control_2026_09_16
+params:
+  intent: performance
+  source_revisions:
+    before: dc606482aecec0f0412b06b7a811a62835e98438
+    after: 5537a4dda505959e6e818713963ce43ad7805c90
+  sample_order:
+  - before
+  - after
+  - after
+  - before
+  - before
+  - after
+  - after
+  - before
+  - before
+  - after
+  measured_iterations: 5
+  warmup_iterations: 0
+  scope: Focused serial compile replay of the standard declaration owner and snapshot interface. Before
+    uses runtime-local owner; after uses shared Core.Std. Charge both owners; distinguish this isolated
+    pair cost from a build where graphics already compiled the shared owner. No whole-build/runtime/statistical
+    claim.
+  compiler: /usr/bin/clang++-23
+  build_type: Debug
+  jobs: 1
+  flags: Captured canonical ci commands and actual named-module maps. Use baseline runtime-owner flags
+    for both owner sources; snapshot command is byte-identical. Actual after Core target command retained
+    for provenance; its natural target flags are charged by the separate graphics-library cohort. Project
+    paths remapped to one fixed clean source worktree; engine-root macro and external/system include paths
+    remain fixed. No cache/tracing/scanning/linking.
+  prerequisites: Freeze only unchanged prerequisite BMIs; hash and verify package fingerprint before/after
+    each sample; require no prerequisite import of either standard owner, renderer or snapshot. Own modules
+    are rebuilt every sample. Hash every recorded prerequisite BMI input file before/after each sample;
+    keep root source and shared dependencies unchanged throughout sampling.
+  host_noise: Pre-read inputs; normal desktop, uncontrolled affinity/governor/turbo/filesystem cache;
+    no competing builds/tests, no discarded timed samples.
+metrics:
+- build_time_ms
+- memory_peak_bytes
+- sample_count
+thresholds: {}
