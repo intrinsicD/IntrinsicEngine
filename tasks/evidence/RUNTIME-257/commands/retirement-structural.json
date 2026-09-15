@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-c",
+    "set -e; python3 tools/agents/check_task_policy.py --root . --strict; python3 tools/agents/check_task_state_links.py --root . --strict; python3 tools/docs/check_doc_links.py --root . --strict; python3 tools/agents/check_ara_claims.py --root . --strict; git diff --check"
+  ],
+  "command_display": "bash -c 'set -e; python3 tools/agents/check_task_policy.py --root . --strict; python3 tools/agents/check_task_state_links.py --root . --strict; python3 tools/docs/check_doc_links.py --root . --strict; python3 tools/agents/check_ara_claims.py --root . --strict; git diff --check'",
+  "cwd": ".",
+  "duration_ms": 2761,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T03:14:27Z",
+  "label": "retirement-structural",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T03:14:25Z",
+  "stderr_path": "tasks/evidence/RUNTIME-257/commands/retirement-structural.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-257/commands/retirement-structural.stdout.log",
+  "stdout_sha256": "f3d02c166c3d6f3cf77bf7ebf67e0b72c7ce3e5829e3be6ae0317a86f42e7645",
+  "task_id": "RUNTIME-257"
+}

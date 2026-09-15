@@ -1,0 +1,37 @@
+## APPROVE — conditional on the stated pending gates
+
+Verdict is scoped to the fixed source supplied; the native/CPU/sanitizer/Vulkan-runtime compile gates are the only thing that can close the reachability question over the ~3.3k unshown lines, and I treat them as running, not passed.
+
+### Correctness of the two new owners
+
+Every `Graphics::`-qualified name in the shown diagnostics projection resolves to exactly one of the two new imports:
+
+- `RenderCommandPassStatus` — spelled in the `RenderCommandStatusName` signature and in three `case` labels; owned and exported by `Graphics.RenderCommandRouter.cppm`. `Graphics.RenderDiagnostics.cppm` does `import Extrinsic.Graphics.RenderCommandRouter;` **without** `export`, so the direct import is not redundant — it is load-bearing. The docs sentence asserting this is accurate against the owner header.
+- `RenderGraphFrameStats`, `RenderGraphCommandPassStats`, `RenderGraphGpuProfileStats/QueueStats/PassStats/Status` — all exported by `Graphics.RenderDiagnostics`. That header's own preamble states it exists precisely so "editor diagnostics … observe frame diagnostics without importing renderer execution modules," so this change is the documented intent of the owner, not a workaround.
+- `RHI::GpuTimestampSource` and `RHI::QueueAffinityName` come from `Extrinsic.RHI.Profiler` / `Extrinsic.RHI.QueueAffinity`, both still directly imported — not leaned on via `RenderDiagnostics`, which also does not re-export them.
+- `FramePassId` is never *spelled*; only `pass.Id.IsValid()` / `pass.Id.Value` member access. That needs reachability, not visibility ([module.reach]), and the pre-edit state was identical in this respect (`RenderGraph` was not directly imported before either). No regression.
+- `EditorFeatureBindings` in `Runtime.EditorFeatures.Internal.hpp` names `const Graphics::RenderGraphFrameStats*` and `const Graphics::RenderRecipeConfigContext*`; both owners are directly imported in the new preamble.
+
+Import placement follows the existing case-insensitive ordering of the `Extrinsic.Graphics.*` block.
+
+### Absence of feature/API loss
+
+Two independent reasons, both structural rather than empirical:
+
+1. `Models.cpp` is an **implementation unit** (`module Extrinsic.Runtime.EditorWorkspaceSnapshots;`, no `export`). Its imports never propagate to consumers of the module, so no import edit here can alter the module's exported interface. Public-contract loss is not reachable from this diff.
+2. `Runtime.EditorMutation.Internal.hpp` is header-only with **internal linkage throughout**: `InitialMutationState` sits in an unnamed namespace and `ExecuteUndoableEntityMutation` is a `static` template. Each including TU gets its own copy, and the header's own comment anticipates multiple implementation units of one module including it. Dropping the include from one TU is therefore strictly TU-local — no ODR, linkage, or ABI effect on the sibling units that still include it. Given zero token uses of both identifiers, removal is safe.
+
+Dependency direction is monotonically narrower: a re-export facade is replaced by two leaf owners, so any layering rule the file satisfied before it still satisfies. No performance inference drawn from the count change.
+
+### Non-blocking findings
+
+1. **Unverifiable doc cross-reference.** The new paragraph says "the `RuntimeDiagnostics` CTest above covers the public contracts" and refers to "the compiler-boundary tool." The supplied 3-line context shows only the `RenderCompilationLocality.EngineInterface` discussion; an independent reader cannot confirm from this excerpt that a `RuntimeDiagnostics` CTest is in fact named earlier in `runtime.md`. Worth a one-line confirmation that the referent exists upstream in the same document — if it does not, the sentence should name the target directly instead of "above."
+2. **Doc bit-rot surface.** Enumerating one implementation unit's imports in an architecture doc will drift the first time that preamble changes. The durable content is the *non-re-export* rationale for `RenderCommandRouter`; the file-level enumeration is the perishable part. Acceptable as written, but if it drifts later, keep the rationale and drop the enumeration.
+
+### Residual risk the gates must close
+
+`Extrinsic.Graphics.Renderer` was a re-export facade, so it may have made names from modules like `RenderGraph` or `VisualizationPackets` *visible* in this TU. If any of the unshown ~3.3k lines spells such a name directly (rather than reaching it through a member), that use now breaks. The shown region has no such spelling, and nothing in the diff suggests otherwise, but this is exactly the failure mode the compile closure detects. Neither CLI limitation described supplies that evidence, and I do not treat the 3555-line / 196-module source baseline as a post-compile closure figure.
+
+Approve the diff as written; seal only after the four gates report green.
+
+Root closure: all named gates now pass. The source hashes still match the reviewed packet. The full CTest name RenderCompilationLocality.RuntimeDiagnostics occurs directly above the new architecture paragraph and covers the listed public-contract sources, not Models.cpp. Actual module closure is 196 to 176 with no additions; full body hash unchanged and all other 876 tracked production files unchanged. No API, layer, ownership, config, lifetime or behavior change; no performance claim.

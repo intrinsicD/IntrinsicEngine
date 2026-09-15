@@ -1,0 +1,11 @@
+[0/2] Re-checking globbed directories...
+[1/10] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp for CXX dependencies
+[2/10] Scanning /home/alex/Documents/IntrinsicEngine/build/ci/generated/deps/tinygltf_impl.cpp for CXX dependencies
+[3/10] Generating CXX dyndep file CMakeFiles/tinygltf.dir/CXX.dd
+[4/10] Generating CXX dyndep file src/runtime/CMakeFiles/ExtrinsicRuntime.dir/CXX.dd
+[5/10] Building CXX object CMakeFiles/tinygltf.dir/generated/deps/tinygltf_impl.cpp.o
+[6/10] Linking CXX static library lib/libtinygltf.a
+[7/10] Generating CXX dyndep file tests/CMakeFiles/RuntimeContractTestObjs.dir/CXX.dd
+[8/10] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp.o
+[9/10] Linking CXX static library lib/libExtrinsicRuntime.a
+[10/10] Linking CXX executable bin/IntrinsicRuntimeContractTests

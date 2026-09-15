@@ -5,10 +5,10 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "codex-overnight"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-09-15T03:04:29Z"
 contract_schema: 1
 contracts: [runtime.render-diagnostics-locality]
 ---
@@ -29,7 +29,7 @@ stop new implementation by 07:15, local commits only. Begin after BUG-196 is
 retired, sealed, claim-released and no writer/build remains. Standing source
 sharing authorization applies. BUILD-007/C92 retain matched compilation timing.
 
-Claude read all 3,556 lines of
+Claude read all 3,555 lines of
 `src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp`, its private
 EditorFeatures header and three nested headers, and the mutation header.
 Graphics diagnostic names are currently supplied by Renderer's re-exports:
@@ -60,23 +60,23 @@ interfaces checked by RuntimeDiagnostics. Do not imply that existing CTest
 forbidden-module lists already cover Models.cpp's Renderer edge.
 
 ## Required changes
-- [ ] Replace the renderer facade import with both direct diagnostic owners.
-- [ ] Remove the unused mutation-template include without changing any body.
-- [ ] Bind before/after source hashes and actual rebuilt compiler dependencies.
+- [x] Replace the renderer facade import with both direct diagnostic owners.
+- [x] Remove the unused mutation-template include without changing any body.
+- [x] Bind before/after source hashes and actual rebuilt compiler dependencies.
 
 ## Tests
-- [ ] Record baseline/final body and other-production hashes; run existing compiler-boundary tool against Models.cpp with Renderer forbidden after rebuild.
-- [ ] Focused editor/model and locality checks, full CPU, focused ASan and UBSan pass.
-- [ ] Promoted-Vulkan runtime target compiles; no GPU execution claim.
+- [x] Record baseline/final body and other-production hashes; run existing compiler-boundary tool against Models.cpp with Renderer forbidden after rebuild.
+- [x] Focused editor/model and locality checks, full CPU, focused ASan and UBSan pass.
+- [x] Promoted-Vulkan runtime target compiles; no GPU execution claim.
 
 ## Docs
-- [ ] Update the existing runtime diagnostic-owner paragraph without overstating permanent CTest coverage.
-- [ ] Record fixed-source Claude review, relevant receipts, retirement and exact source seal.
+- [x] Update the existing runtime diagnostic-owner paragraph without overstating permanent CTest coverage.
+- [x] Record fixed-source Claude review, relevant receipts, retirement and exact source seal.
 
 ## Acceptance criteria
-- [ ] Only the existing Models.cpp preamble changes in production; Renderer leaves its rebuilt module closure and no body/header changes.
-- [ ] Direct imports resolve all diagnostic names and existing model/renderer behavior passes relevant verification.
-- [ ] Completed slice is reviewed, locally committed, retired and sealed without a timing or full-engine completion claim.
+- [x] Only the existing Models.cpp preamble changes in production; Renderer leaves its rebuilt module closure and no body/header changes.
+- [x] Direct imports resolve all diagnostic names and existing model/renderer behavior passes relevant verification.
+- [x] Completed slice is reviewed, locally committed, retired and sealed without a timing or full-engine completion claim.
 
 ## Verification
 ```bash
@@ -116,3 +116,34 @@ unordered_map alias receives its standard declaration transitively; this slice
 does not change that supply. Claude's bounded plan and root's compiler-graph
 cross-check are under `/tmp/intrinsic-overnight-20260915/bug196/`; the plan is
 `claude-next-summary.txt`. No code from that plan has been applied yet.
+
+## Completion — 2026-09-15
+- Endpoint: **Retired**, implementation-only diagnostic dependency cleanup.
+- Commit: implementation and retirement are in the enclosing local commit;
+  `tasks/evidence/RUNTIME-257/seal.yaml` binds the exact source revision.
+- Models.cpp imports RenderDiagnostics and RenderCommandRouter directly and
+  drops its unused private mutation header. Its size changes from 3,555 to
+  3,554 lines; every body/declaration byte from extern C++ onward is unchanged.
+  All 876 other tracked production files, headers and build/test lists are
+  unchanged. No new production file, module, wrapper or interface.
+- The rebuilt compiler module map changes from 196 to 176 entries: Renderer and
+  19 associated modules leave, none enter. This is a structural dependency
+  reduction, not a compile-time benchmark. The explicit compiler-boundary check
+  passes; its pre-change forbidden-Renderer failure remains optional evidence.
+- Claude independently approved the fixed source subject to verification.
+  All gates passed: 235 focused native editor/locality cases, 4,636 full CPU
+  cases plus one expected unsanitized GLFW/LSan control skip, 202 focused ASan
+  cases and 202 focused UBSan cases. Promoted-Vulkan runtime compiled. No GPU
+  execution or full sanitizer-suite claim. Structural checks pass.
+- Root confirmed the architecture paragraph's upstream CTest reference and
+  distinguished public-interface CTest coverage from this implementation's
+  per-change compiler check. Actual import ownership and body hashes are bound
+  in source review and structural-counts.json; no research claim is added.
+- Initial Claude CLI lacked Edit and stopped without changes. The corrected
+  scoped Edit run applied both files before reaching its summary turn cap;
+  root verified the exact patch and used a separate final reviewer. Neither
+  CLI limitation substitutes for build/test evidence.
+- Clean-workshop rows 1–3 pass (narrowed allowed imports, unchanged ownership and
+  public surfaces); 4–7 are not applicable (no frame/pass/protocol/maturity
+  change); row 8 passes, no exception. Existing failures, feature availability,
+  lifetimes and concurrency behavior are unchanged. BUILD-007/C92 own timing.

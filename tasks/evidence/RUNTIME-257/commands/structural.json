@@ -1,0 +1,22 @@
+{
+  "command": [
+    "bash",
+    "tools/ci/run_clean_workshop_review.sh",
+    ".",
+    "--strict"
+  ],
+  "command_display": "bash tools/ci/run_clean_workshop_review.sh . --strict",
+  "cwd": ".",
+  "duration_ms": 2420,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T03:13:20Z",
+  "label": "structural",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T03:13:17Z",
+  "stderr_path": "tasks/evidence/RUNTIME-257/commands/structural.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-257/commands/structural.stdout.log",
+  "stdout_sha256": "2e7e7b6394ec93906539d7a7e512d2fb9e3308672c083d5c560d2deac1f6dd75",
+  "task_id": "RUNTIME-257"
+}

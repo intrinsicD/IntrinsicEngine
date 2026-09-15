@@ -12603,5 +12603,5 @@ tree:
     - tasks/evidence/BUG-196/report.yaml
     - tasks/evidence/BUG-196/seal.yaml
     - tasks/evidence/BUG-196/backtest.json
-    - tasks/backlog/runtime/RUNTIME-257-workspace-model-diagnostic-dependencies.md
+    - tasks/done/RUNTIME-257-workspace-model-diagnostic-dependencies.md
     status: resolved

@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "/tmp/intrinsic-overnight-20260915/runtime257/proof.py",
+    "final"
+  ],
+  "command_display": "python3 /tmp/intrinsic-overnight-20260915/runtime257/proof.py final",
+  "cwd": ".",
+  "duration_ms": 79,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T03:08:52Z",
+  "label": "structural-counts",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T03:08:52Z",
+  "stderr_path": "tasks/evidence/RUNTIME-257/commands/structural-counts.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-257/commands/structural-counts.stdout.log",
+  "stdout_sha256": "1fd02baeeea83debdd25f665b3a71f52bda2fb9fbdb6796fa5767372a6a3f8b9",
+  "task_id": "RUNTIME-257"
+}

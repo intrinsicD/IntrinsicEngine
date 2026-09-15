@@ -1,0 +1,26 @@
+{
+  "command": [
+    "python3",
+    "tools/analysis/compile_hotspots.py",
+    "--build-dir",
+    "build/ci",
+    "--check-source",
+    "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp",
+    "--forbid-module",
+    "Extrinsic.Graphics.Renderer"
+  ],
+  "command_display": "python3 tools/analysis/compile_hotspots.py --build-dir build/ci --check-source src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp --forbid-module Extrinsic.Graphics.Renderer",
+  "cwd": ".",
+  "duration_ms": 297,
+  "exit_code": 2,
+  "finished_at": "2026-09-15T03:05:13Z",
+  "label": "baseline-boundary",
+  "required": false,
+  "schema_version": 1,
+  "started_at": "2026-09-15T03:05:13Z",
+  "stderr_path": "tasks/evidence/RUNTIME-257/commands/baseline-boundary.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-257/commands/baseline-boundary.stdout.log",
+  "stdout_sha256": "eb64f69c62660e31da03c57624b08300f1e7bf93c551290ac2505a95e72d84fd",
+  "task_id": "RUNTIME-257"
+}

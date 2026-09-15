@@ -166,7 +166,7 @@ ai_actions:
   - tasks/backlog/runtime/README.md
   - tasks/done/BUG-196-retirement-index-navigation-false-positive.md
   - tasks/evidence/BUG-196/report.yaml
-  - tasks/backlog/runtime/RUNTIME-257-workspace-model-diagnostic-dependencies.md
+  - tasks/done/RUNTIME-257-workspace-model-diagnostic-dependencies.md
 claims_touched: []
 key_context:
 - turn: 1

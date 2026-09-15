@@ -273,6 +273,14 @@ the prep pipeline, a concrete rendering system or an upload helper.
 `RenderCompilationLocality.EngineInterface` applies the same closure check to
 `Runtime.Engine.cppm`, additionally forbidding `Extrinsic.Runtime.Module`.
 
+The workspace-model implementation unit
+`Runtime.EditorWorkspaceSnapshots.Models.cpp` imports
+`Extrinsic.Graphics.RenderDiagnostics` for frame/GPU/command diagnostic records
+and `Extrinsic.Graphics.RenderCommandRouter` for `RenderCommandPassStatus`.
+The latter is not re-exported by the diagnostics owner. Its dependency boundary
+is checked per change with the compiler-boundary tool; the `RuntimeDiagnostics`
+CTest above covers the public contracts.
+
 Module granularity follows
 [ADR-0026](../adr/0026-runtime-module-scope-by-consumer-contract.md) only after
 ADR-0024 has established that a responsibility belongs in runtime composition.

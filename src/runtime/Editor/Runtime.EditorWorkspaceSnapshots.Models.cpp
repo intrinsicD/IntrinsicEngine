@@ -54,10 +54,11 @@ import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.CurrentRendererContractAdapter;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Graphics.RenderCommandRouter;
+import Extrinsic.Graphics.RenderDiagnostics;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.RenderingContract;
-import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.UvView;
 import Extrinsic.RHI.Profiler;
 import Extrinsic.RHI.QueueAffinity;
@@ -107,8 +108,6 @@ import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 
 #include "Editor/internal/Runtime.EditorFeatures.Internal.hpp"
-
-#include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
 
 extern "C++"
 {

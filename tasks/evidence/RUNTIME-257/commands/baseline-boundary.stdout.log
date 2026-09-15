@@ -1,0 +1,1 @@
+Forbidden module dependency: src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp -> Extrinsic.Graphics.Renderer

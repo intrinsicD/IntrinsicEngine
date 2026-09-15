@@ -1,0 +1,119 @@
+schema_version: 1
+task_id: RUNTIME-257
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-15T03:15:13Z'
+claim_eligible: false
+source:
+  base_ref: 88e4e9483
+  base_revision: 88e4e9483689370d4612d45170bada16a8af422b
+  head_revision: 88e4e9483689370d4612d45170bada16a8af422b
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 371302f9a4663402090fe4aee8f380424772eec986876f81cb8da22dc90fec46
+  - path: ara/trace/sessions/2026-09-15_001.yaml
+    sha256: 6d50a79c7e5f673916e99e893817d9b0783414d865f4ab023706874173ee3113
+  - path: docs/architecture/runtime.md
+    sha256: a1de978c847df754cb00148f6f987a57cd176d625f3f49748c0a172202a74ef7
+  - path: src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+    sha256: da6a40f7542190363462031027109ab9b02aa008567383937524a43afeb5fa8f
+  - path: tasks/SESSION-BRIEF.md
+    sha256: b7cc46325243e8621015404f2d9e714d0b389254f0db320992d286a00da1bb92
+  - path: tasks/backlog/runtime/RUNTIME-257-workspace-model-diagnostic-dependencies.md
+    sha256: null
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: d2a0e2549c5a3604ed706c3c2fafcc93f787f87aadb72c329b15963517f0d223
+  - path: tasks/done/RUNTIME-257-workspace-model-diagnostic-dependencies.md
+    sha256: 3a16b1f9b2842e11c07952f777e7fe583e6ebd523d7e5091ed8b8984c2133634
+  content_digest: 7cc5125de70cfc5f60833de9dd85f1bf5bf2539390408c990c3d1e9e1de5cca9
+touched:
+  paths:
+  - ara/trace/exploration_tree.yaml
+  - ara/trace/sessions/2026-09-15_001.yaml
+  - docs/architecture/runtime.md
+  - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/runtime/RUNTIME-257-workspace-model-diagnostic-dependencies.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-257-workspace-model-diagnostic-dependencies.md
+  layers:
+  - runtime
+  modules:
+  - Extrinsic.Runtime.EditorWorkspaceSnapshots
+extension_seam: Existing Graphics.RenderDiagnostics and Graphics.RenderCommandRouter directly own copied
+  diagnostic names; no new facade or helper
+future_change_plan: Keep diagnostic consumers on their owners; separately audit unused private model declarations
+  before deletion; BUILD-007 owns matched timing
+acceptance:
+- criterion: Only the existing Models.cpp preamble changes in production; Renderer leaves its rebuilt
+    module closure and no body/header changes.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/RUNTIME-257/structural-counts.json
+  - tasks/evidence/RUNTIME-257/commands/compiler-boundary.stdout.log
+  reason: null
+- criterion: Direct imports resolve all diagnostic names and existing model/renderer behavior passes relevant
+    verification.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/RUNTIME-257/source-review.txt
+  - tasks/evidence/RUNTIME-257/commands/full-cpu.stdout.log
+  - tasks/evidence/RUNTIME-257/commands/focused-ci-asan.stdout.log
+  - tasks/evidence/RUNTIME-257/commands/focused-ci-ubsan.stdout.log
+  - tasks/evidence/RUNTIME-257/commands/vulkan-runtime-build.json
+  reason: null
+- criterion: Completed slice is reviewed, locally committed, retired and sealed without a timing or full-engine
+    completion claim.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/done/RUNTIME-257-workspace-model-diagnostic-dependencies.md
+  - tasks/evidence/RUNTIME-257/seal.yaml
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-257/commands/baseline-boundary.json
+- receipt: tasks/evidence/RUNTIME-257/commands/build-ci-asan.json
+- receipt: tasks/evidence/RUNTIME-257/commands/build-ci-ubsan.json
+- receipt: tasks/evidence/RUNTIME-257/commands/compiler-boundary.json
+- receipt: tasks/evidence/RUNTIME-257/commands/configure-ci.json
+- receipt: tasks/evidence/RUNTIME-257/commands/focused-build.json
+- receipt: tasks/evidence/RUNTIME-257/commands/focused-ci-asan.json
+- receipt: tasks/evidence/RUNTIME-257/commands/focused-ci-ubsan.json
+- receipt: tasks/evidence/RUNTIME-257/commands/focused-ci.json
+- receipt: tasks/evidence/RUNTIME-257/commands/full-build.json
+- receipt: tasks/evidence/RUNTIME-257/commands/full-cpu.json
+- receipt: tasks/evidence/RUNTIME-257/commands/retirement-structural.json
+- receipt: tasks/evidence/RUNTIME-257/commands/structural-counts.json
+- receipt: tasks/evidence/RUNTIME-257/commands/structural.json
+- receipt: tasks/evidence/RUNTIME-257/commands/vulkan-runtime-build.json
+changed_public_contracts: []
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/RUNTIME-257-workspace-model-diagnostic-dependencies.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Module counts prove narrowed dependencies, not elapsed-time performance. Vulkan evidence is runtime
+  compilation only; sanitizer results are focused editor coverage.
+skipped_checks: []
+artifacts:
+- path: tasks/evidence/RUNTIME-257/source-review.txt
+  sha256: 7ff3fa2cdf948dec9451bcfc3b2598fb26eb1c694d91c6da24781e06640ed850
+  kind: file
+- path: tasks/evidence/RUNTIME-257/structural-counts.json
+  sha256: 607ce2cd43fdaa4a20fe0b809e160ca9b1df0646436966e5ef1e10577b5bbc2e
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
