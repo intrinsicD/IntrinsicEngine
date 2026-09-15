@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tests/regression/tooling/Test.SourceDocumentationAudit.py"
+  ],
+  "command_display": "python3 tests/regression/tooling/Test.SourceDocumentationAudit.py",
+  "cwd": ".",
+  "duration_ms": 312,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T02:53:31Z",
+  "label": "source-doc-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T02:53:30Z",
+  "stderr_path": "tasks/evidence/BUG-196/commands/source-doc-tests.stderr.log",
+  "stderr_sha256": "55bbb1fd1e9d3774ffd3bde5a8eee5b1bb09b167a0cc35df64f2e051af23c6bb",
+  "stdout_path": "tasks/evidence/BUG-196/commands/source-doc-tests.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUG-196"
+}

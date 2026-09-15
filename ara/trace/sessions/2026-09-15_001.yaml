@@ -150,7 +150,7 @@ ai_actions:
   - tasks/backlog/runtime/README.md
   - tasks/done/DOCS-007-runtime-backlog-current-state.md
   - tasks/evidence/DOCS-007/report.yaml
-  - tasks/backlog/bugs/BUG-196-retirement-index-navigation-false-positive.md
+  - tasks/done/BUG-196-retirement-index-navigation-false-positive.md
 claims_touched: []
 key_context:
 - turn: 1

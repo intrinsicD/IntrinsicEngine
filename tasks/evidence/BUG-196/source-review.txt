@@ -1,0 +1,20 @@
+## APPROVE
+
+Reviewed the final diff as presented; no tools run, so the test/backtest results are taken from your report rather than independently re-executed.
+
+**Change is narrow and correct**
+
+- `is_retirement_navigation` is exact-match on the two retirement roots and their direct `README.md`, plus the log by name. Both call sites replace the old `target.name == RETIREMENT_LOG_NAME` guard identically, so the widening is symmetric across the state-only and category paths and nothing else in either validator moved.
+- Fragment and trailing-slash forms collapse correctly: `normalize_target` strips `#...` before resolving, so `done/README.md#index`, `done/`, and `done` all land on the intended resolved path. The `navigation_block` fixture exercises all four shapes from two depths.
+- `tasks/backlog/runtime/README.md`: `../../done/README.md` and `../../archive/README.md` resolve correctly from `tasks/backlog/runtime/`, and neither trips `validate_link_states` (no task ID in `README.md`) nor `validate_category_indexes` (now allowed). The enclosing `## Related queues and documentation` heading does not match `HISTORY_HEADING_RE`, so this section is still actively checked rather than silently exempt — the link passes on the rule, not on an exemption.
+- The rejection tests now pin the boundary from the correct side: `done/NOTES.md` (direct non-README file), nested `README.md` under both roots, and nested directories, each across both validator paths. The duplicate-target count of 2 in the retired-task test pins that link *text* does not confer exemption.
+- `assertNoLifecycleProseFindings` is the right guard — it proves the navigation cases pass because the membership rule accepts them, not because the fixture happened to produce no lifecycle findings at all.
+
+**Remaining findings (both low, neither blocking)**
+
+1. `is_retirement_navigation` still matches `RETIREMENT-LOG.md` by filename at any depth, so `tasks/done/subdir/RETIREMENT-LOG.md` would be accepted by a state-only index. This is pre-existing behaviour preserved verbatim from the old guard, not a regression from this change, and the new nested-rejection test deliberately does not cover it. Worth a follow-up only if a second log file ever appears.
+2. `test_live_indexes_still_reject_noncanonical_navigation` asserts a count of 2 for `README.md` and membership for the other three, but not a total finding count, so an unexpected extra finding of a different shape could pass. The prose guard limits the blast radius; tightening to an exact total is optional.
+
+Neither the source-comment shortening nor the policy question needs revisiting — current-state phrasing is the correct reading of the source-documentation policy, and the comment as written still states the rule the constant enforces.
+
+Root: all three reviewed source hashes match the final files. Original four tests and existing helpers are byte-identical (backtest.json); all focused and structural gates pass. Shared narrow predicate replaces both existing log checks; lifecycle, normalization, fences and headings unchanged. No engine/build/config/policy change; no new dependency or research claim.

@@ -1,0 +1,68 @@
+...FFF...
+======================================================================
+FAIL: test_live_indexes_allow_canonical_retirement_navigation (<run_path>.CheckTaskStateLinksTests.test_live_indexes_allow_canonical_retirement_navigation) (entrypoint='state-only backlog index')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "tests/regression/tooling/Test.CheckTaskStateLinks.py", line 264, in test_live_indexes_allow_canonical_retirement_navigation
+    self.assertEqual(result.returncode, 0, result.stdout)
+AssertionError: 1 != 0 : [check_task_state_links] Root: /tmp/tmpdu5cmyp2
+[check_task_state_links] Indexed task IDs: 0
+[check_task_state_links] Mode: strict
+[check_task_state_links] Findings:
+  - tasks/backlog/README.md:3: state-only index links retired task done; move the entry to tasks/done/RETIREMENT-LOG.md or the category README
+  - tasks/backlog/README.md:3: state-only index links retired task done; move the entry to tasks/done/RETIREMENT-LOG.md or the category README
+  - tasks/backlog/README.md:3: state-only index links retired task archive; move the entry to tasks/done/RETIREMENT-LOG.md or the category README
+  - tasks/backlog/README.md:3: state-only index links retired task archive; move the entry to tasks/done/RETIREMENT-LOG.md or the category README
+  - tasks/backlog/README.md:3: state-only index links retired task README.md; move the entry to tasks/done/RETIREMENT-LOG.md or the category README
+  - tasks/backlog/README.md:3: state-only index links retired task README.md; move the entry to tasks/done/RETIREMENT-LOG.md or the category README
+  - tasks/backlog/README.md:3: state-only index links retired task README.md; move the entry to tasks/done/RETIREMENT-LOG.md or the category README
+  - tasks/backlog/README.md:3: state-only index links retired task README.md; move the entry to tasks/done/RETIREMENT-LOG.md or the category README
+[check_task_state_links] STRICT MODE: failing.
+
+
+======================================================================
+FAIL: test_live_indexes_allow_canonical_retirement_navigation (<run_path>.CheckTaskStateLinksTests.test_live_indexes_allow_canonical_retirement_navigation) (entrypoint='state-only active index')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "tests/regression/tooling/Test.CheckTaskStateLinks.py", line 264, in test_live_indexes_allow_canonical_retirement_navigation
+    self.assertEqual(result.returncode, 0, result.stdout)
+AssertionError: 1 != 0 : [check_task_state_links] Root: /tmp/tmpi9j7rfgn
+[check_task_state_links] Indexed task IDs: 0
+[check_task_state_links] Mode: strict
+[check_task_state_links] Findings:
+  - tasks/active/README.md:3: state-only index links retired task done; move the entry to tasks/done/RETIREMENT-LOG.md or the category README
+  - tasks/active/README.md:3: state-only index links retired task done; move the entry to tasks/done/RETIREMENT-LOG.md or the category README
+  - tasks/active/README.md:3: state-only index links retired task archive; move the entry to tasks/done/RETIREMENT-LOG.md or the category README
+  - tasks/active/README.md:3: state-only index links retired task archive; move the entry to tasks/done/RETIREMENT-LOG.md or the category README
+  - tasks/active/README.md:3: state-only index links retired task README.md; move the entry to tasks/done/RETIREMENT-LOG.md or the category README
+  - tasks/active/README.md:3: state-only index links retired task README.md; move the entry to tasks/done/RETIREMENT-LOG.md or the category README
+  - tasks/active/README.md:3: state-only index links retired task README.md; move the entry to tasks/done/RETIREMENT-LOG.md or the category README
+  - tasks/active/README.md:3: state-only index links retired task README.md; move the entry to tasks/done/RETIREMENT-LOG.md or the category README
+[check_task_state_links] STRICT MODE: failing.
+
+
+======================================================================
+FAIL: test_live_indexes_allow_canonical_retirement_navigation (<run_path>.CheckTaskStateLinksTests.test_live_indexes_allow_canonical_retirement_navigation) (entrypoint='category index')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "tests/regression/tooling/Test.CheckTaskStateLinks.py", line 264, in test_live_indexes_allow_canonical_retirement_navigation
+    self.assertEqual(result.returncode, 0, result.stdout)
+AssertionError: 1 != 0 : [check_task_state_links] Root: /tmp/tmp0c8fguic
+[check_task_state_links] Indexed task IDs: 0
+[check_task_state_links] Mode: strict
+[check_task_state_links] Findings:
+  - tasks/backlog/runtime/README.md:5: category index links retired task done outside a history-marked heading; move the entry under a history section (e.g. '## Retired') or cite it as plain text
+  - tasks/backlog/runtime/README.md:5: category index links retired task done outside a history-marked heading; move the entry under a history section (e.g. '## Retired') or cite it as plain text
+  - tasks/backlog/runtime/README.md:5: category index links retired task archive outside a history-marked heading; move the entry under a history section (e.g. '## Retired') or cite it as plain text
+  - tasks/backlog/runtime/README.md:5: category index links retired task archive outside a history-marked heading; move the entry under a history section (e.g. '## Retired') or cite it as plain text
+  - tasks/backlog/runtime/README.md:5: category index links retired task README.md outside a history-marked heading; move the entry under a history section (e.g. '## Retired') or cite it as plain text
+  - tasks/backlog/runtime/README.md:5: category index links retired task README.md outside a history-marked heading; move the entry under a history section (e.g. '## Retired') or cite it as plain text
+  - tasks/backlog/runtime/README.md:5: category index links retired task README.md outside a history-marked heading; move the entry under a history section (e.g. '## Retired') or cite it as plain text
+  - tasks/backlog/runtime/README.md:5: category index links retired task README.md outside a history-marked heading; move the entry under a history section (e.g. '## Retired') or cite it as plain text
+[check_task_state_links] STRICT MODE: failing.
+
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.315s
+
+FAILED (failures=3)

@@ -5,10 +5,10 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "codex-overnight"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-09-15T02:47:36Z"
 contract_schema: 1
 contracts: [repo.source-documentation]
 ---
@@ -54,21 +54,21 @@ path, heading and existing task-state behavior. Restore clickable done/archive
 index links in the short runtime README and run both validators together.
 
 ## Required changes
-- [ ] Distinguish canonical retirement navigation from actual task membership.
-- [ ] Cover both validator paths and preserve real retired-task rejection.
-- [ ] Restore concise clickable runtime index navigation without history sections.
+- [x] Distinguish canonical retirement navigation from actual task membership.
+- [x] Cover both validator paths and preserve real retired-task rejection.
+- [x] Restore concise clickable runtime index navigation without history sections.
 
 ## Tests
-- [ ] Reproduce current false positive in focused tooling tests before the fix.
-- [ ] Focused tooling tests, strict task-state/doc/task checks and scoped README audit pass.
+- [x] Reproduce current false positive in focused tooling tests before the fix.
+- [x] Focused tooling tests, strict task-state/doc/task checks and scoped README audit pass.
 
 ## Docs
-- [ ] Record Claude review, failure/fix evidence, completion and exact source seal.
+- [x] Record Claude review, failure/fix evidence, completion and exact source seal.
 
 ## Acceptance criteria
-- [ ] Canonical index navigation passes while actual retired task entries still fail in live lists.
-- [ ] Current README navigation satisfies both source-documentation and task-state contracts.
-- [ ] Reviewed fix is locally committed, retired and sealed with no engine or policy change.
+- [x] Canonical index navigation passes while actual retired task entries still fail in live lists.
+- [x] Current README navigation satisfies both source-documentation and task-state contracts.
+- [x] Reviewed fix is locally committed, retired and sealed with no engine or policy change.
 
 ## Verification
 ```bash
@@ -111,3 +111,30 @@ reproduction must fail for the intended navigation finding; final tests and both
 existing validators must pass before retirement. Use existing Python tooling,
 with no C++ rebuild or new package dependency. CLI plan review is retained under
 `/tmp/intrinsic-overnight-20260915/docs007/claude-plan-bug196.txt`.
+
+## Completion — 2026-09-15
+- Endpoint: **Retired**, narrow tooling correctness repair.
+- Commit: implementation and retirement are in the enclosing local commit;
+  `tasks/evidence/BUG-196/seal.yaml` identifies the exact sealed source.
+- One private Python predicate is reused by both index checks. Only the exact
+  done/archive roots and direct README indexes gain navigation treatment; the
+  existing name-based retirement-log exception stays intact. Task IDs, path
+  normalization, fences, headings and lifecycle status checks are unchanged.
+- Both retirement index links in the current runtime README are clickable.
+  No history heading, bypass marker, policy or engine/build source changed.
+- Claude implemented and independently approved the final three-file surface.
+  Root shortened redundant comments and verified byte-identical original tests.
+  A direct NOTES.md rejection case closes the useful low-severity review note;
+  both restored index files exist and pass strict link checks.
+  Repeated fixture setup was consolidated into data-driven cases.
+- Initial baseline: 11 tests with exactly three intended navigation failures.
+  Final focused suite: seven methods pass; final tests against the old checker
+  reproduce exactly three navigation subcase failures with no other failures
+  or fixture errors. Real records/fragments, misleading labels, nested indexes
+  and nested directories remain rejected by both index validators.
+- Nine source-documentation regression tests and strict task/state/doc/root/test
+  layout checks pass. The README audit has zero objective errors and the same
+  six manually reviewed current-navigation heuristic notes as DOCS-007.
+- C++/sanitizer/GPU builds are not applicable to this Python/README-only change.
+  No performance, runtime parity or feature-completion claim; existing owners
+  retain remaining compiler-cache, GPU, saliency and product work.

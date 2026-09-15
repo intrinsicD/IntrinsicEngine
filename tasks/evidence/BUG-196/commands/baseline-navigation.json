@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tests/regression/tooling/Test.CheckTaskStateLinks.py"
+  ],
+  "command_display": "python3 tests/regression/tooling/Test.CheckTaskStateLinks.py",
+  "cwd": ".",
+  "duration_ms": 349,
+  "exit_code": 1,
+  "finished_at": "2026-09-15T02:50:04Z",
+  "label": "baseline-navigation",
+  "required": false,
+  "schema_version": 1,
+  "started_at": "2026-09-15T02:50:04Z",
+  "stderr_path": "tasks/evidence/BUG-196/commands/baseline-navigation.stderr.log",
+  "stderr_sha256": "b65b4aff6b1e2bf394b2509188b7bb05ccfab44b5b30c28141aa9110276d4697",
+  "stdout_path": "tasks/evidence/BUG-196/commands/baseline-navigation.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUG-196"
+}

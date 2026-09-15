@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "/tmp/intrinsic-overnight-20260915/bug196/backtest.py"
+  ],
+  "command_display": "python3 /tmp/intrinsic-overnight-20260915/bug196/backtest.py",
+  "cwd": ".",
+  "duration_ms": 372,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T02:54:30Z",
+  "label": "baseline-backtest",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T02:54:29Z",
+  "stderr_path": "tasks/evidence/BUG-196/commands/baseline-backtest.stderr.log",
+  "stderr_sha256": "2e830f97801580be1457ae7ccbe0adec6f2918c183117113980e7a2e2d5849b8",
+  "stdout_path": "tasks/evidence/BUG-196/commands/baseline-backtest.stdout.log",
+  "stdout_sha256": "d98bcff31848a2ba49ea882893dc4cd6ae165aae8eed1f1089c9369ad1802366",
+  "task_id": "BUG-196"
+}

@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-c",
+    "set -e; python3 tools/agents/check_task_state_links.py --root . --strict; python3 tools/docs/check_doc_links.py --root . --strict; python3 tools/agents/check_task_policy.py --root . --strict; python3 tools/repo/check_root_hygiene.py --root .; python3 tools/repo/check_test_layout.py --root . --strict; python3 tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py --root . --path tasks/backlog/runtime/README.md --summary; git diff --check"
+  ],
+  "command_display": "bash -c 'set -e; python3 tools/agents/check_task_state_links.py --root . --strict; python3 tools/docs/check_doc_links.py --root . --strict; python3 tools/agents/check_task_policy.py --root . --strict; python3 tools/repo/check_root_hygiene.py --root .; python3 tools/repo/check_test_layout.py --root . --strict; python3 tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py --root . --path tasks/backlog/runtime/README.md --summary; git diff --check'",
+  "cwd": ".",
+  "duration_ms": 2778,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T02:53:33Z",
+  "label": "structural",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T02:53:31Z",
+  "stderr_path": "tasks/evidence/BUG-196/commands/structural.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-196/commands/structural.stdout.log",
+  "stdout_sha256": "973d63c5a81c5966eff910ba89e3ceaa1eee5f363c34bdce42096589d1a87304",
+  "task_id": "BUG-196"
+}

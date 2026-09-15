@@ -1,0 +1,118 @@
+schema_version: 1
+task_id: BUG-196
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-15T02:58:46Z'
+claim_eligible: false
+source:
+  base_ref: 0c3ea837b
+  base_revision: 0c3ea837b7db3c45f0a8bbe3ccdb89f37706a2e5
+  head_revision: 0c3ea837b7db3c45f0a8bbe3ccdb89f37706a2e5
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 018d2e5ec3ac4b2375c48bc3f8f51e2f4bbec4fd00b3a0c50fc6b4a3e4dad2a3
+  - path: ara/trace/sessions/2026-09-15_001.yaml
+    sha256: 23150438ea52ebcd1f34cb87edba74cc15da689ce0d6a33d61584d94fc2c8ce2
+  - path: tasks/SESSION-BRIEF.md
+    sha256: b7cc46325243e8621015404f2d9e714d0b389254f0db320992d286a00da1bb92
+  - path: tasks/backlog/bugs/BUG-196-retirement-index-navigation-false-positive.md
+    sha256: null
+  - path: tasks/backlog/runtime/README.md
+    sha256: 29ccd288c2ccf21dfd465420f4b6a2e4563b2629ad3cc3705485053879a88ca1
+  - path: tasks/done/BUG-196-retirement-index-navigation-false-positive.md
+    sha256: b6c1cf14d447783666275e789f3129bdc9683ca012e9e3dfab8096a6e257ec5b
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: a83946d87c09919058f2dc1857a621f737bc7c5f9247e7d48c74b46d89ff48e5
+  - path: tests/regression/tooling/Test.CheckTaskStateLinks.py
+    sha256: b87002f954e97c7e4dce0d31f00eb5b1aeab6426f0bbe9454cac1f80054d3f8c
+  - path: tools/agents/check_task_state_links.py
+    sha256: 96961fb50302d93be570086198050582a8a78ccba854ac1825341f44ec2d4525
+  content_digest: dc966ffce46ec20bc7b2568303432e5a95acb6dfcc65e6205de7031c131aa881
+touched:
+  paths:
+  - ara/trace/exploration_tree.yaml
+  - ara/trace/sessions/2026-09-15_001.yaml
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/BUG-196-retirement-index-navigation-false-positive.md
+  - tasks/backlog/runtime/README.md
+  - tasks/done/BUG-196-retirement-index-navigation-false-positive.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/regression/tooling/Test.CheckTaskStateLinks.py
+  - tools/agents/check_task_state_links.py
+  layers:
+  - tasks
+  - tools
+  modules: []
+extension_seam: Existing Python task-state checker and unittest fixtures; one exact navigation predicate
+  shared by two validators
+future_change_plan: Keep canonical retirement navigation distinct from task membership; retain existing
+  log semantics and current task discovery
+acceptance:
+- criterion: Canonical index navigation passes while actual retired task entries still fail in live lists.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/BUG-196/commands/reviewed-tooling-tests.stderr.log
+  - tasks/evidence/BUG-196/backtest.json
+  reason: null
+- criterion: Current README navigation satisfies both source-documentation and task-state contracts.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/backlog/runtime/README.md
+  - tasks/evidence/BUG-196/commands/retirement-structural.stdout.log
+  reason: null
+- criterion: Reviewed fix is locally committed, retired and sealed with no engine or policy change.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/done/BUG-196-retirement-index-navigation-false-positive.md
+  - tasks/evidence/BUG-196/source-review.txt
+  - tasks/evidence/BUG-196/seal.yaml
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-196/commands/baseline-backtest.json
+- receipt: tasks/evidence/BUG-196/commands/baseline-navigation.json
+- receipt: tasks/evidence/BUG-196/commands/retirement-structural.json
+- receipt: tasks/evidence/BUG-196/commands/reviewed-baseline-backtest.json
+- receipt: tasks/evidence/BUG-196/commands/reviewed-tooling-tests.json
+- receipt: tasks/evidence/BUG-196/commands/source-doc-tests.json
+- receipt: tasks/evidence/BUG-196/commands/structural.json
+- receipt: tasks/evidence/BUG-196/commands/tooling-tests.json
+changed_public_contracts: []
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-196-retirement-index-navigation-false-positive.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: true
+residual_risks:
+- Pre-existing name-based retirement-log exception is preserved intentionally; this change adds only exact
+  root/index navigation
+skipped_checks:
+- check: cpp-build
+  reason: Only Python tooling, regression fixtures and README navigation changed
+- check: asan-ubsan
+  reason: No C++ memory, ownership or numeric behavior changed
+- check: gpu-vulkan
+  reason: No renderer, shader, graphics resource or backend behavior changed
+- check: benchmark
+  reason: No performance claim; BUILD-007 owns matched timing
+artifacts:
+- path: tasks/evidence/BUG-196/source-review.txt
+  sha256: 87df137ffdecdb5cd6c091f60e348a522e6ab6797db4275265f7cc078c9f963b
+  kind: file
+- path: tasks/evidence/BUG-196/backtest.json
+  sha256: f0643050142e3e14b3a1ad0ca254a72a7879ce6648be6918b8a0aa6088972663
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true

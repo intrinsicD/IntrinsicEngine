@@ -46,7 +46,6 @@ picking backlog work; theme priorities and rationale live in
 
 ## Theme H — Agentic workflow hardening
 
-- unblocked: `BUG-196` — Retirement navigation is misclassified as task membership (tasks/backlog/bugs/BUG-196-retirement-index-navigation-false-positive.md)
 - blocked by `CI-012`: `BUILD-005` — Define hermetic toolchain and action identity (tasks/backlog/process/BUILD-005-hermetic-toolchain-action-identity.md)
 - blocked by `CI-013`: `BUILD-006` — Run a C++23-module build and cache backend bake-off (tasks/backlog/process/BUILD-006-cxx23-module-build-backend-bakeoff.md)
 - unblocked: `CI-012` — Compile a versioned verification evidence graph (tasks/backlog/process/CI-012-versioned-verification-evidence-graph.md)

@@ -1,0 +1,18 @@
+{
+  "baseline": "0c3ea837b",
+  "final_test_sha256": "b87002f954e97c7e4dce0d31f00eb5b1aeab6426f0bbe9454cac1f80054d3f8c",
+  "baseline_checker_sha256": "b330ab19db968f167fcda943d0d412d7f149846450b9172a7c2aa34bf7aa94f0",
+  "current_checker_sha256": "96961fb50302d93be570086198050582a8a78ccba854ac1825341f44ec2d4525",
+  "original_functions_byte_identical": [
+    "write_task",
+    "run_checker",
+    "test_ci_docs_enforces_task_state_and_docs_sync_strictly",
+    "test_link_to_wrong_lifecycle_directory_fails",
+    "test_stale_lifecycle_prose_near_task_id_fails",
+    "test_historical_done_link_with_done_claim_passes"
+  ],
+  "tests_run": 7,
+  "expected_navigation_subcase_failures": 3,
+  "other_failures": 0,
+  "fixture_errors": 0
+}

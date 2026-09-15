@@ -1,0 +1,14 @@
+Validated 371 task file(s); findings: 0; mode: strict.
+[check_task_maturity_followups] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_maturity_followups] Open task files scanned: 106
+[check_task_maturity_followups] No maturity follow-up findings.
+Task policy check complete. findings=0 mode=strict.
+[check_task_state_links] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_state_links] Indexed task IDs: 1007
+[check_task_state_links] Mode: strict
+[check_task_state_links] No task-state link findings.
+[check_doc_links] Root: /home/alex/Documents/IntrinsicEngine
+[check_doc_links] Checked relative links: 4054
+[check_doc_links] Mode: strict
+[check_doc_links] No broken relative links found.
+check_ara_claims: OK (93 claims)

@@ -50,5 +50,6 @@ extraction and presentation. The canonical architecture index is
 [`docs/architecture/index.md`](../../../docs/architecture/index.md).
 
 For completed work, the [retirement log](../../done/RETIREMENT-LOG.md) links
-retired task records. The directory indexes are `tasks/done/README.md` and
-`tasks/archive/README.md`.
+retired task records. The directory indexes are
+[`tasks/done/README.md`](../../done/README.md) and
+[`tasks/archive/README.md`](../../archive/README.md).

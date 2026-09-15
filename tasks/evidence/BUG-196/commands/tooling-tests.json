@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tests/regression/tooling/Test.CheckTaskStateLinks.py"
+  ],
+  "command_display": "python3 tests/regression/tooling/Test.CheckTaskStateLinks.py",
+  "cwd": ".",
+  "duration_ms": 350,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T02:53:30Z",
+  "label": "tooling-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T02:53:30Z",
+  "stderr_path": "tasks/evidence/BUG-196/commands/tooling-tests.stderr.log",
+  "stderr_sha256": "42f5f02d30573244fcb241c47a91d16348a6fcf2303ca2f4b394bad5e870907e",
+  "stdout_path": "tasks/evidence/BUG-196/commands/tooling-tests.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUG-196"
+}

@@ -247,10 +247,8 @@ def validate_status_claims(
     return findings
 
 
-# Session-start index files must describe current state only: retired-task
-# history belongs in tasks/done/RETIREMENT-LOG.md, not in member lists. Any
-# link into tasks/done/ or tasks/archive/ from these files (other than to the
-# retirement log itself) is regrowth of the pre-PROC-003 history clutter.
+# Session-start indexes list current tasks. Links to canonical retirement
+# navigation are allowed, but retired records belong in the retirement log.
 STATE_ONLY_INDEX_FILES = (
     Path("tasks/active/README.md"),
     Path("tasks/backlog/README.md"),
@@ -276,6 +274,17 @@ ATX_HEADING_RE = re.compile(r"^(#{1,6})(?:\s|$)")
 RETIREMENT_LOG_NAME = "RETIREMENT-LOG.md"
 
 
+def is_retirement_navigation(target: Path, tasks_root: Path) -> bool:
+    """Allow the log and exact retirement roots/indexes, not nested task lists."""
+    if target.name == RETIREMENT_LOG_NAME:
+        return True
+    retirement_roots = (tasks_root / "done", tasks_root / "archive")
+    return any(
+        target == retirement_root or target == retirement_root / "README.md"
+        for retirement_root in retirement_roots
+    )
+
+
 def validate_state_only_indexes(
     md_file: Path,
     content: str,
@@ -298,7 +307,7 @@ def validate_state_only_indexes(
         if is_ignored_link(raw_link):
             continue
         target = normalize_target(md_file, raw_link)
-        if target.name == RETIREMENT_LOG_NAME:
+        if is_retirement_navigation(target, tasks_root):
             continue
         if target.is_relative_to(done_root) or target.is_relative_to(archive_root):
             line = line_number_for_offset(content_wo_code, match.start())
@@ -358,7 +367,7 @@ def validate_category_indexes(
             if is_ignored_link(raw_link):
                 continue
             target = normalize_target(md_file, raw_link)
-            if target.name == RETIREMENT_LOG_NAME:
+            if is_retirement_navigation(target, tasks_root):
                 continue
             if target.is_relative_to(done_root) or target.is_relative_to(archive_root):
                 findings.append(
