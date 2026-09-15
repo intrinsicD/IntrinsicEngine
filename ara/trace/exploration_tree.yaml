@@ -12751,3 +12751,33 @@ tree:
     - tasks/evidence/RUNTIME-261/source-review.txt
     - tasks/done/RUNTIME-262-workspace-model-recipe-owner.md
     status: resolved
+
+  - id: N583
+    type: experiment
+    title: Finish recipe-owner and payload cleanup; reconcile the overnight source
+    provenance: ai-executed
+    timestamp: '2026-09-15T07:08:12+02:00'
+    result: RUNTIME262 source faa9e513c/seal e24d92cd4 replaces RenderExtraction import with direct VisualizationRecipes
+      and clarifies architecture owner scope; lines/imports unchanged, actual compiler closure161to148. RUNTIME263
+      source bea097009/seal de21780da deletes exactly GeometryPayload,ModelTexturePayload,PointCloudConsolidationModule
+      imports;3457to3454 lines,60to57imports,148to120 compiler modules. Every other byte and876other productionfiles
+      preserved for each source slice. Full five-interface/four-header namespace/reexport/config proof includes
+      four StableToken overloads,five codec functions and scoped-enum ToString resolution. Claude implemented
+      and independently approved each fixed source; root corrected minor reviewer inventory/count/toolchain
+      wording in evidence without source changes. All gates pass:250focusednative,4636fullCPU plus oneexpectedskip,217ASan,217UBSan,Vulkanruntimecompilation,structural;
+      finalvalidation0errors105existingwarnings,claimsreleased. Aggregate Claude review examined shared codecs/defaults,token
+      parser equivalence,recipe editing,tinygltf regeneration,frame-phase test premises and shared path validation;
+      approved with no source blocker. Retained filename-based retirement-log exception is explicit BUG196
+      behavior, not newly introduced; optional regrowth guards and literal generated-body test are not current
+      defects. All32 reviewed source/test/tool paths still match hashes. Against29d75ebe7,16completedtasks,518added1068removed=550netfewerproduction/buildlines,fourproductionfilesremoved;
+      Models moduleclosure196to120. No matched timing,GPU execution,fullsanitizersuite or wholeenginecompletion
+      claim. No new implementation after final slice. N569 and final08:00handoff remainopen; no new research
+      claim or staging promotion.
+    evidence:
+    - tasks/done/RUNTIME-262-workspace-model-recipe-owner.md
+    - tasks/evidence/RUNTIME-262/seal.yaml
+    - tasks/done/RUNTIME-263-workspace-model-payload-consolidation-imports.md
+    - tasks/evidence/RUNTIME-263/seal.yaml
+    - tasks/evidence/RUNTIME-263/overnight-review.txt
+    - tasks/evidence/RUNTIME-263/overnight-reconciliation.json
+    status: resolved

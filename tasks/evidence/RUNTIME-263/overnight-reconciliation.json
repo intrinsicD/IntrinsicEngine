@@ -1,0 +1,170 @@
+{
+  "baseline": "29d75ebe7",
+  "current_source": "bea0970090b7104a341ed123e2608847cc433417",
+  "tasks": [
+    {
+      "task": "RUNTIME-252",
+      "done_path": "tasks/done/RUNTIME-252-direct-shared-config-codecs.md",
+      "sealed_source": "29d823f99c8e9215a79530ba193bf49d5b8ccd78",
+      "source_exists": true
+    },
+    {
+      "task": "RUNTIME-253",
+      "done_path": "tasks/done/RUNTIME-253-feature-config-section-reuse.md",
+      "sealed_source": "b20c68f921cf36f5df49c4458903a9ff61522183",
+      "source_exists": true
+    },
+    {
+      "task": "RUNTIME-254",
+      "done_path": "tasks/done/RUNTIME-254-render-extraction-private-dependencies.md",
+      "sealed_source": "9a7c3f0c03093322147bdd991cfa38a581ea417f",
+      "source_exists": true
+    },
+    {
+      "task": "RUNTIME-255",
+      "done_path": "tasks/done/RUNTIME-255-render-recipe-token-owner.md",
+      "sealed_source": "9504741c6211ad5c8bb1ae6f423bd9c1b4c80ffa",
+      "source_exists": true
+    },
+    {
+      "task": "RUNTIME-256",
+      "done_path": "tasks/done/RUNTIME-256-render-recipe-extraction-dependencies.md",
+      "sealed_source": "ecdb859ad1f75fd699dda5df4a5901ba080e49b4",
+      "source_exists": true
+    },
+    {
+      "task": "RUNTIME-257",
+      "done_path": "tasks/done/RUNTIME-257-workspace-model-diagnostic-dependencies.md",
+      "sealed_source": "c53d30544928810dab1b2574b29c537e9265b75f",
+      "source_exists": true
+    },
+    {
+      "task": "RUNTIME-258",
+      "done_path": "tasks/done/RUNTIME-258-unused-workspace-model-declarations.md",
+      "sealed_source": "a9dd86071fe6a4169923992dfd8c6c9f339dd3f1",
+      "source_exists": true
+    },
+    {
+      "task": "RUNTIME-259",
+      "done_path": "tasks/done/RUNTIME-259-workspace-model-unused-imports.md",
+      "sealed_source": "a0620c9f99a9fc27023778a9eddacacc8408f371",
+      "source_exists": true
+    },
+    {
+      "task": "RUNTIME-260",
+      "done_path": "tasks/done/RUNTIME-260-workspace-model-graphics-imports.md",
+      "sealed_source": "f72000b8662f5e0c2e652a11eb8e3c343a3a89de",
+      "source_exists": true
+    },
+    {
+      "task": "RUNTIME-261",
+      "done_path": "tasks/done/RUNTIME-261-workspace-model-runtime-imports.md",
+      "sealed_source": "143e8f97cc9e033232e9ca5863e2866167ba4f6b",
+      "source_exists": true
+    },
+    {
+      "task": "RUNTIME-262",
+      "done_path": "tasks/done/RUNTIME-262-workspace-model-recipe-owner.md",
+      "sealed_source": "faa9e513c8a43650ddf8a6b511e1956d522997dc",
+      "source_exists": true
+    },
+    {
+      "task": "RUNTIME-263",
+      "done_path": "tasks/done/RUNTIME-263-workspace-model-payload-consolidation-imports.md",
+      "sealed_source": "bea0970090b7104a341ed123e2608847cc433417",
+      "source_exists": true
+    },
+    {
+      "task": "BUG-134",
+      "done_path": "tasks/done/BUG-134-imgui-adapter-panel-draw-list-intermittent.md",
+      "sealed_source": "a3f9e8bf687c18ae68cad771d23f8677e2a4ba11",
+      "source_exists": true
+    },
+    {
+      "task": "BUG-196",
+      "done_path": "tasks/done/BUG-196-retirement-index-navigation-false-positive.md",
+      "sealed_source": "df93c9fe3fb512973e04bbc01c112edbcdce80d9",
+      "source_exists": true
+    },
+    {
+      "task": "DOCS-007",
+      "done_path": "tasks/done/DOCS-007-runtime-backlog-current-state.md",
+      "sealed_source": "4d2135f87e46c7fe65718d02ef4dc2e666b61001",
+      "source_exists": true
+    },
+    {
+      "task": "BUILD-008",
+      "done_path": "tasks/done/BUILD-008-preserve-unchanged-tinygltf-generation.md",
+      "sealed_source": "6d669bfe3ceff6f823cc76c7d541d3f894265675",
+      "source_exists": true
+    }
+  ],
+  "production_build_lines": {
+    "added": 518,
+    "removed": 1068,
+    "net_removed": 550
+  },
+  "deleted_production_files": [
+    "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cppm",
+    "src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cpp",
+    "src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cpp",
+    "src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cpp"
+  ],
+  "Models_compiler_modules": {
+    "pre_RUNTIME257": 196,
+    "final_RUNTIME263": 120
+  },
+  "limitations": [
+    "No matched compile timing; BUILD-007/C92 open",
+    "Focused ASan/UBSan only; latest Vulkan evidence compilation only",
+    "No saliency-display or whole-engine completion claim",
+    "Source commits local only"
+  ],
+  "all_reviewed_source_hashes_still_match": true,
+  "reviewed_source_sha256": {
+    "cmake/Dependencies.cmake": "8d2062249de6a0bf1d88cbe0911c81c44e04df5c8829418e33a77ff26b33a070",
+    "src/graphics/renderer/Graphics.RenderRecipeConfig.cpp": "794040673c6d87756647bfb2326f02716db993ec49e498235f6fe7d83d1f27b0",
+    "src/graphics/renderer/Graphics.RenderingContract.cpp": "baad878e7ec92f36b1ec19f55b5e23fa8d784a4337b97c69c338b6203b0bf13d",
+    "src/graphics/renderer/Graphics.RenderingContract.cppm": "59209eaaca99dfe3caa0d6f12e7e3334eef040170ad53c49b1510f4ab83b05a8",
+    "src/runtime/CMakeLists.txt": "00164529daef5cc77dfd30f86e40634df273d72a043b38ee548621095a7269b3",
+    "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp": "dd46c9aaf4fac329e6129533b0001f51fd2f9788367d49e2aa3b1522abd81b43",
+    "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cppm": "deleted",
+    "src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.cpp": "7346b4a6d39365804e06e499a167b067b5b4583a860f928e66d9b1820ffae112",
+    "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp": "c358968bbf98bc6495a213bdc664d23ae3f5864123d42b86d9fe3248caab7645",
+    "src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cpp": "deleted",
+    "src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cppm": "18f48dfeff684c843effae93d3b9833a0f7f823d9e14240b8e1b836dc7ba9a6f",
+    "src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp": "b3e0c37cdc1fd912ab6c14b0f2c5c9080d4cf23ec9fa67a9a301df258d064ceb",
+    "src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm": "a2ab9f33bcda9ec562cea0055e76dac94853d01e4da614c1291f352f907cd815",
+    "src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cpp": "deleted",
+    "src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cppm": "9103fd286ac666c8fbb02a4cb806c53869662b91193e4032a50d9db97eaca3fc",
+    "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp": "63a1e066e1ee97337bb18a550d7303def5e83e640c8725541a2cdd2a94adf2dc",
+    "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm": "db096a516d6ebb48878bd4472e14934a56868108ea355b4ca4a890ceb2de8a7f",
+    "src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cpp": "deleted",
+    "src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm": "9b1bbf948150fc8678869057a044b1be2523d72c06f8244e4ed2439fb1acc7ca",
+    "src/runtime/Rendering/Runtime.RenderExtraction.Internal.cpp": "767f2cb2e463e1a5c0dcaef7d080a2c9b9643c2d93cea0201548aed1b6c32378",
+    "src/runtime/Rendering/Runtime.RenderExtraction.Recipes.cpp": "b644265560bfe27a662661c5296dae70c31389703260c71d379ccc24e074ebf5",
+    "tests/CMakeLists.txt": "e27d4115411c26951815b343a14c9abbcb9484f8848a98ea1634f4c15866b9cc",
+    "tests/contract/graphics/Test.RenderRecipeConfig.cpp": "083cd225c4fbe5aa60711e08dbe5a3a311f85341e25322fa3c8ed754659c3692",
+    "tests/contract/graphics/Test.RenderingContract.cpp": "5e5e34095c1e6562ad70218f559582979aa31e4fbef0c9b3ee25dbe17328517d",
+    "tests/contract/runtime/Test.ImGuiAdapter.cpp": "d33e50fe9b83f5e3ac000592b561edf57a2468dea1553322591d02eef3212f16",
+    "tests/contract/runtime/Test.SandboxEditorModels.cpp": "bcf1185705ef6b792eb6eba6f6e1dcb26de7f5c9ce834be4bcb405e0ada957b7",
+    "tests/integration/runtime/Test.SandboxConfigSections.cpp": "648023ab1ba210de0e88d37b0856487b05704470d414dff2474d96ba3e2d5bf8",
+    "tests/integration/runtime/Test.SandboxEditorPresentation.cpp": "3671ecba3d900662e895e9b10f30deca3bec26099f5f2835f897dc0eaf56f791",
+    "tests/regression/tooling/Test.BackendConfigureDeterminism.py": "a0cc3cf8a9bbb87ee7d1a1be07445ecbae6a64c949fe21c772b273fe4a669b05",
+    "tests/regression/tooling/Test.CheckTaskStateLinks.py": "b87002f954e97c7e4dce0d31f00eb5b1aeab6426f0bbe9454cac1f80054d3f8c",
+    "tools/agents/check_task_state_links.py": "96961fb50302d93be570086198050582a8a78ccba854ac1825341f44ec2d4525",
+    "tools/agents/skills/intrinsicengine-reuse/references/owner-routes.md": "a42b55ce336111654a9a325bb01e2917190df3d3d1f05ff3d3f8f534e5bdc9c7"
+  },
+  "aggregate_review": "tasks/evidence/RUNTIME-263/overnight-review.txt",
+  "verification": {
+    "focused_native": 250,
+    "full_cpu_passed": 4636,
+    "full_cpu_expected_skipped": 1,
+    "focused_asan": 217,
+    "focused_ubsan": 217,
+    "vulkan": "runtime compilation only",
+    "workflow_evidence_errors": 0,
+    "workflow_evidence_existing_warnings": 105
+  },
+  "task_count": 16
+}

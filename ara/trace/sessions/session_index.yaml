@@ -590,8 +590,8 @@ sessions:
 
 - id: 2026-09-15_001
   date: '2026-09-15'
-  summary: "RUNTIME-261 retired, committed and sealed: six import lines removed, actual compiler closure171to161, bodies unchanged. Claude caught and re-reviewed a corrected export-audit omission. RUNTIME262 direct recipe-owner substitution is prepared; overnight continues until08:00Berlin."
-  turn_count: 15
-  events_count: 15
+  summary: "RUNTIME-262 and RUNTIME-263 retired and sealed; final combined Claude review approved. Overnight total:16 tasks,550 fewer production/build lines,four removed production files. Final08:00 Berlin check remains scheduled."
+  turn_count: 16
+  events_count: 16
   claims_touched: []
   open_threads: 10

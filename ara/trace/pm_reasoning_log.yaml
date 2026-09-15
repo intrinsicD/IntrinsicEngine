@@ -2442,3 +2442,16 @@ entries:
       state from build. EngineConfigControl already supplies activation types.'
     - No new research claim/observation needed for ordinary cleanup. Preserve pending observations and BUILD007/C92;
       N569 staysopen until deadline or justifiedstop.
+
+  - turn: 2026-09-15_001#16
+    notes:
+    - Record16 completed tasks as implementation history, not whole-engine convergence. Four deleted production
+      files and550netfewer production/build lines are exact baseline diff observations. Models196to120modules
+      is one translation-unit dependency count, not a compile-time speedup.
+    - Current gate counts are250native,4636CPU plus oneexpectedskip,217ASan,217UBSan; Vulkan compiled only.
+      Preserve BUILD007/C92 and unrelated cache/GPU/saliency/product limitations.
+    - Aggregate review found no blocker. Retained retirement-log basename exception matches explicit BUG196
+      scope; optional future-regrowth guards and generated-source literal assertions do not justify late speculative
+      changes.
+    - No new research claim or staged observation is needed for ordinary refactoring. Existing staged topics
+      have no new closure signal; N569 remainsopen until the scheduled final morning handoff.

@@ -1,0 +1,44 @@
+## APPROVE
+
+I verified the called-out risk areas against the working tree (read-only; no builds, no edits). No blocker found.
+
+**Shared JSON codec linking / defaults.** `Runtime.FeatureConfigCodecs.Detail.cpp:1-25` is now an ordinary TU that imports the five family modules and defines their codecs in `Extrinsic::Runtime`. The declarations in each `.cppm` sit inside `extern "C++" { }` within the exported namespace, so they are attached to the global module and an ordinary TU may define them — the same pattern already used at `Runtime.EditorWorkspaceSnapshots.Models.cpp:90`. Defaults (`onChanged = {}`) remain only on the interface declarations, exactly as before the forwarder deletion; the definitions never repeat them, so no redefinition and no lost default. `SectionValidatorFn` is a C++-linkage function pointer matching the validators' declared type. `src/runtime/CMakeLists.txt:167` still compiles the TU as a plain private source, which is what `Test.SandboxEditorPresentation` now asserts. No remaining reference to `Extrinsic.Runtime.Private.FeatureConfigCodecs` outside the new negative test in `tests/CMakeLists.txt`. `MakeConfiguredKMeansRequest` (both overloads) and the Get/Set/registration bodies are behavior-identical to the deleted forwarders, including `std::move(properties)` and the Valid-only Get gate.
+
+**Five token owners / parser equivalence.** Every spelling in the new `ToString` overloads (`Graphics.RenderingContract.cpp:194+`) is literal-for-literal identical to both the deleted `DebugNameFor*` helpers and the former parser literals; the pre-existing `RendererCapability`/`RenderOutputKind` spellings (`:160-192`) also match what `ParseRendererCapability`/`ParseRenderOutputKind` previously compared against. All seven enums are `enum class : std::uint8_t`, so the new overloads introduce no ambiguity and `static_cast<X>(200)` in the fallback test is a valid (not UB) enum value. Parser accept-sets are unchanged, including `Unknown` staying acceptable for `BindingSourceDomain`/`BindingValueType`.
+
+**Render-recipe edit helpers.** `Runtime.RenderRecipeEditingOperations.cpp` now routes all five label sites through `Graphics::ToString`, matching the already-existing `ToString` use at lines 46 and 102; `std::string{string_view}` is direct-init, so the explicit constructor is fine. `FindRecipeSlot`'s const/mutable pair is intact and matches the owner-routes claim.
+
+**tinygltf configure.** `file(CONFIGURE)` needs 3.18; the project requires 3.28. The bracket argument's leading newline is dropped, so the emitted bytes are identical to the old `file(WRITE)` output; `@ONLY` has nothing to substitute and `NEWLINE_STYLE UNIX` matches the previous explicit `\n`. configure_file semantics give the unchanged-mtime and corruption-repair behavior the new determinism assertions require.
+
+**Scheduler/frame-phase test premise.** Each premise in the rewritten `Test.ImGuiAdapter` holds against `Runtime.ImGuiAdapter.cpp`: `BeginFrame` zeroes `LastEditorCallbackMicros` (:440) and touches no render/copy/end timings; `BuildEditorFrame` sets it (:531-538); `EndFrame` zeroes and then fills render/copy/end (:547-572) and never touches callback timing. The diagnostics are now copied per phase rather than aliased through the live `const&` returned by `GetDiagnostics()`. The dropped `LastEndFrameMicros >= LastEditorCallbackMicros` assertion was not an invariant (the callback is not nested in `EndFrame`); the replacements are stronger and use equality, so no timing flakiness is introduced.
+
+**Tool validator path precision.** `is_retirement_navigation` compares resolved paths against exactly `tasks/{done,archive}` and their `README.md`; `root` is resolved at `:403` and `normalize_target` strips fragments and resolves, so the comparison is consistent and nested paths (`done/subdir/README.md`, `archive/2026/`) still fail, matching the new tests.
+
+### Genuine gaps (non-blocking)
+- `ConfigCompilationLocality` covers only CurvatureSegmentation and PointCloudConsolidation — the other three families have no remaining `.cpp`, and the shared codec TU is deliberately ungated, so nothing structurally prevents a future family TU from re-importing siblings.
+- `check_task_state_links.py:279` still allows `RETIREMENT-LOG.md` **by filename anywhere**, so a nested `tasks/archive/2026/RETIREMENT-LOG.md` link bypasses the otherwise exact-path rule. Pre-existing, but the new tests pin nested READMEs/directories and not this case, so the tightened precision is partial.
+- `EditorCompilationLocality.WorkspaceSnapshots` checks `Runtime.EditorWorkspaceSnapshots.cppm` / `.Public.cpp`, not `.Models.cpp`. The `Extrinsic.Runtime.RenderExtraction` removal in `.Models.cpp` is therefore compiler-verified but not guarded against regrowth.
+- `Test.BackendConfigureDeterminism` asserts the generated tinygltf source is *stable* and *repaired*, but never asserts its expected content; a wrong-but-stable change to `Dependencies.cmake` would still pass.
+
+Outstanding items I did not and could not verify: the running RUNTIME-263 gates, BUILD-007 clean-source timings, and anything requiring a build or GPU.
+
+Root disposition after aggregate review:
+- All 32 reviewed production/test/tool paths still match the fixed hash manifest.
+  RUNTIME-263 gates subsequently passed: 250 focused native, 4,636 full CPU
+  cases plus one expected GLFW/LSan skip, 217 ASan, 217 UBSan, Vulkan runtime
+  compilation and strict structural checks. Evidence validation: zero errors,
+  105 existing warnings. No timing or GPU execution claim.
+- The retirement-log filename exception is pre-existing and explicitly retained
+  by BUG-196's settled plan and completion record. This is not a regression in
+  the shared predicate. Changing it would be a separate policy-hardening task;
+  no unexpected change is folded into this cleanup. Exact roots/README rules
+  apply to the newly added navigation cases, not to that retained exception.
+- Future-family and Models.cpp import-regrowth guards are optional follow-up
+  coverage, not present broken code. Current changes have actual producer map
+  evidence and exact source preservation. The architecture paragraph explicitly
+  distinguishes per-change Models.cpp checks from the public CTest contract.
+- The tinygltf determinism test targets regeneration and repair behavior. Its
+  byte-equivalence proof for this change is separately recorded under BUILD-008;
+  duplicating generated implementation text into a test is unnecessary here.
+- Aggregate review is supplementary to each task's fixed-source review; it
+  does not replace sealed task evidence. No blocker or source repair identified.
