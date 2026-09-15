@@ -1,0 +1,12 @@
+schema_version: 1
+task_id: RUNTIME-252
+sealed_revision: 29d823f99c8e9215a79530ba193bf49d5b8ccd78
+source_content_digest: 5bfc0fcc0c80f7754f24b8f2a72ef86332b72a25f8b725b897296aeeb5232e74
+report_sha256: 7bb0cd802ad5cdf7926e52ca09780c0a6754773756d308526ddc11f594d06671
+records:
+- path: tasks/evidence/RUNTIME-252/handoff.jsonl
+  sha256: 45becf5c9453a3e37f5176fadeb8adb00d460619c8cce3f34a623a8b111a55e1
+- path: tasks/evidence/RUNTIME-252/reviews.jsonl
+  sha256: 1c36b01c904eeda45df39dde7421d1b002a5a3e662fa43ce76a987d967d51c8f
+reason: Bind completed report to the independently reviewed retirement commit.
+generated_by: tools/agents/workflow_evidence.py
