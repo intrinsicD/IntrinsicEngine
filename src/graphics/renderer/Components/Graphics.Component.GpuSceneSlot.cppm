@@ -1,4 +1,4 @@
-// Canonical GPU scene handles and per-renderable residency records for lifecycle sidecars.
+// Per-renderable residency records and named buffer metadata for lifecycle sidecars.
 module;
 
 #include <cstdint>
@@ -9,16 +9,8 @@ module;
 export module Extrinsic.Graphics.Component.GpuSceneSlot;
 
 import Extrinsic.Asset.Registry;
-import Extrinsic.Core.StrongHandle;
+import Extrinsic.Graphics.SceneHandles;
 import Extrinsic.RHI.Handles;
-
-export namespace Extrinsic::Graphics
-{
-    struct GpuInstanceTag;
-    struct GpuGeometryTag;
-    using GpuInstanceHandle = Core::StrongHandle<GpuInstanceTag>;
-    using GpuGeometryHandle = Core::StrongHandle<GpuGeometryTag>;
-}
 
 export namespace Extrinsic::Graphics::Components
 {

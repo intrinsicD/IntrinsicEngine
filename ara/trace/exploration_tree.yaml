@@ -12906,3 +12906,13 @@ tree:
     alternatives: [Retain duplicate aliases or add a re-export shim, change GpuWorld attachment to break LightSystem dependencies without a separate review, maintain two mutable buffer maps, add a wrapper instead of reusing the existing entry owner]
     evidence: [tasks/done/GRAPHICS-141-scene-service-dependencies.md, tasks/done/GRAPHICS-142-named-buffer-single-owner.md, src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cppm, src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cpp, tests/unit/graphics/Test.Graphics.GpuSceneSlot.cpp, tests/CMakeLists.txt]
     status: resolved
+
+  - id: N594
+    type: decision
+    title: Separate stable GPU scene identities from mutable residency storage
+    provenance: ai-executed
+    timestamp: "2026-09-15T16:52:05+02:00"
+    choice: Reuse StrongHandle and move the two existing graphics tags and aliases into one declaration-only SceneHandles owner. Seven compiler interface closures no longer depend on GpuSceneSlot maps. Preserve RenderWorld and debug-upload Asset.Registry dependencies required by VisualizationPackets texture AssetIds; correct the initial overbroad exclusion proposal. Claude reviews planning and the final fixed diff. Full ci build and reconciliation, 182 focused and 4662 CPU passes plus one expected skip, and a fresh cache-off Clang 20 graphics producer with eight boundary checks pass. Retire GRAPHICS-143 without timing, GPU or sanitizer claims.
+    alternatives: [Keep stable identities coupled to mutable buffer maps, split AssetId across unrelated consumers while leaving map coupling, change GpuWorld attachment without removing storage coupling, duplicate aliases or add compatibility re-exports]
+    evidence: [tasks/done/GRAPHICS-143-scene-handle-locality.md, src/graphics/renderer/Graphics.SceneHandles.cppm, src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cppm, tests/CMakeLists.txt, docs/architecture/graphics.md]
+    status: resolved

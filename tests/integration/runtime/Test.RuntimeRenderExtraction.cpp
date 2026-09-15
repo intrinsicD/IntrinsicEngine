@@ -28,6 +28,7 @@ import Extrinsic.ECS.Component.Light;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
+import Extrinsic.Graphics.SceneHandles;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.Renderer;

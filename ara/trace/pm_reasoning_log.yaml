@@ -2512,3 +2512,10 @@ entries:
     - Compiler feedback proves actual owner imports were needed after duplicate alias removal. Retain present value-type owners and the LightSystem/GpuWorld relationship instead of silently expanding into another attachment or module split.
     - The second slice changes CPU map storage; its exact applied source/test patch was independently reviewed. One existing map now owns names, handles and metadata. Fresh Clang 20 evidence applies to the preceding dependency slice, while the final combined source has full Clang 23 CPU evidence only.
     - Existing staged topics retain their named owners and flags; neither cleanup settles broader compilation, backend, method or product hypotheses. Update session last_turn from the actual current epilogue timestamp without assuming YAML quoting style.
+
+  - turn: 2026-09-15_001#24
+    notes:
+    - Record N594 as ordinary refactoring history. Compiler closures prove a storage boundary, not elapsed compilation improvement. No new claim or staged observation, and no broader hypothesis closure.
+    - Preserve the independently required asset identity path in visualization snapshots. A flat dependency count can remain unchanged while the volatile residency-map dependency disappears; do not misrepresent those two interfaces as asset-free.
+    - Fixed source/test diff matches the final Claude review. CPU evidence is canonical Clang 23; fresh Clang 20 evidence covers graphics producers and dependency guards only. No runtime GPU or sanitizer execution is represented.
+    - Existing staged topics retain their owners and flags. This task retirement supplies no new user endorsement or closure signal for broader performance, architecture, method or product hypotheses.

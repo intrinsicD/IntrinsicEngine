@@ -2539,6 +2539,9 @@ Concretely:
   backbuffer-import declaration, the `Pass.Present` command contract,
   and render-graph rejection of non-present writes to the imported
   backbuffer.
+- `Graphics.SceneHandles` owns the typed instance and geometry identities used
+  by snapshots, GpuWorld and residency sidecars. It imports only
+  `Core.StrongHandle`; `Component.GpuSceneSlot` owns mutable residency metadata.
 - `GpuWorld` owns retained GPU-scene pools and exposes generation-checked
   lifetime diagnostics for instance/geometry slots, deferred reuse windows,
   retained-buffer pressure, overflow, stale handles, invalid handles, and

@@ -7,7 +7,7 @@
 #include <gtest/gtest.h>
 #include <glm/glm.hpp>
 
-import Extrinsic.Graphics.Component.GpuSceneSlot;
+import Extrinsic.Graphics.SceneHandles;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Descriptors;

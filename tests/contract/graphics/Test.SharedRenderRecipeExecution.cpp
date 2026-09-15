@@ -7,7 +7,7 @@
 #include <glm/glm.hpp>
 
 import Extrinsic.Graphics.CurrentRendererContractAdapter;
-import Extrinsic.Graphics.Component.GpuSceneSlot;
+import Extrinsic.Graphics.SceneHandles;
 import Extrinsic.Graphics.LightSystem;
 import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Graphics.RenderWorld;

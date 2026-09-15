@@ -17,6 +17,7 @@ import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
+import Extrinsic.Graphics.SceneHandles;
 export import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.WorldHandle;

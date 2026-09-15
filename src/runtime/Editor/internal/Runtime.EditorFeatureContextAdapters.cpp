@@ -34,7 +34,7 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Graphics.Component.GpuSceneSlot;
+import Extrinsic.Graphics.SceneHandles;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.UvView;

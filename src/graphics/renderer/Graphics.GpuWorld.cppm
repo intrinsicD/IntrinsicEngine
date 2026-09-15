@@ -11,7 +11,7 @@ module;
 
 export module Extrinsic.Graphics.GpuWorld;
 
-import Extrinsic.Graphics.Component.GpuSceneSlot;
+import Extrinsic.Graphics.SceneHandles;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;

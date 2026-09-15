@@ -15,7 +15,7 @@ Root scanned: `src`
 | `geometry` | 116 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 74 |
+| `graphics/renderer` | 75 |
 | `graphics/rhi` | 18 |
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
@@ -275,6 +275,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.RenderWorld` | `src/graphics/renderer/Graphics.RenderWorld.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Renderer` | `src/graphics/renderer/Graphics.Renderer.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.RenderingContract` | `src/graphics/renderer/Graphics.RenderingContract.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.SceneHandles` | `src/graphics/renderer/Graphics.SceneHandles.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.SelectionSystem` | `src/graphics/renderer/Graphics.SelectionSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.ShadowSystem` | `src/graphics/renderer/Graphics.ShadowSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.SharedRenderRecipeExecution` | `src/graphics/renderer/Graphics.SharedRenderRecipeExecution.cppm` | `graphics/renderer` |
@@ -444,4 +445,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **417**
+Total modules: **418**

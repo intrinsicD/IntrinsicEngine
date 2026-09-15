@@ -10,7 +10,7 @@ module;
 
 export module Extrinsic.Graphics.TransformSyncSystem;
 
-import Extrinsic.Graphics.Component.GpuSceneSlot;
+import Extrinsic.Graphics.SceneHandles;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.RHI.Types;
 

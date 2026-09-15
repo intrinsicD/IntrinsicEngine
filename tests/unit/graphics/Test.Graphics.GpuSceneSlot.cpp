@@ -4,6 +4,7 @@
 
 import Extrinsic.Asset.Registry;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
+import Extrinsic.Graphics.SceneHandles;
 import Extrinsic.RHI.Handles;
 
 using namespace Extrinsic;

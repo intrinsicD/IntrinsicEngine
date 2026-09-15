@@ -14,6 +14,7 @@ module;
 module Extrinsic.Graphics.GpuWorld;
 
 import Extrinsic.Core.StrongHandle;
+import Extrinsic.Graphics.SceneHandles;
 import Extrinsic.RHI.Device;
 
 import Extrinsic.RHI.CommandContext;

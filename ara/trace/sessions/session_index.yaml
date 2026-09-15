@@ -590,8 +590,8 @@ sessions:
 
 - id: 2026-09-15_001
   date: '2026-09-15'
-  summary: "Canonical GPU scene handles and one named-buffer map replace redundant declarations and storage. Claude reviewed both iterations; final full ci build, 139 focused and 4658 CPU passes plus one skip. No elapsed build-time claim."
-  turn_count: 23
-  events_count: 29
+  summary: "Scene identities separated from residency storage; seven interface closures exclude GpuSceneSlot. Claude reviewed; 182 focused and 4662 CPU passes plus one expected skip, fresh Clang 20 graphics build and eight guards pass. No elapsed build-time claim."
+  turn_count: 24
+  events_count: 30
   claims_touched: [C94, C95, C96]
   open_threads: 10

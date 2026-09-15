@@ -48,8 +48,10 @@ Graphics is organized into explicit sublayers:
   service APIs. Compiler-boundary tests guard these interface dependencies.
 - GpuWorld and transient-debug uploads use the same device borrow; GpuWorld
   also borrows its command context. RenderWorld and LightSystem therefore do
-  not inherit those APIs. GpuSceneSlot is the sole owner of the GPU instance
-  and geometry handle aliases; consumers import that owner when naming handles.
+  not inherit those APIs. `Graphics.SceneHandles` owns GPU instance and geometry
+  identities using `Core.StrongHandle`; handle consumers import that small owner
+  without pulling in residency maps or the asset registry. GpuSceneSlot imports
+  those identities and owns per-renderable residency metadata.
   Its named-buffer entries are the sole lookup storage: `Find` and `FindEntry`
   read the same handle/metadata record, keyed by one stored name.
 - `RHI::NullCommandContext` supplies the inert command surface for the Null

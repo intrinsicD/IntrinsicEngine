@@ -10,7 +10,7 @@ export module Extrinsic.Graphics.RenderWorld;
 
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.Graphics.CameraSnapshots;
-import Extrinsic.Graphics.Component.GpuSceneSlot;
+import Extrinsic.Graphics.SceneHandles;
 import Extrinsic.Graphics.LightSystem;
 import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.RHI.Types;

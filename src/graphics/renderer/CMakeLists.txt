@@ -22,6 +22,7 @@ target_sources(${target_name}
         Graphics.Renderer.cppm
         Graphics.RenderFrameInput.cppm
         Graphics.RenderWorld.cppm
+        Graphics.SceneHandles.cppm
         Graphics.GpuTransfer.cppm
         Graphics.GeometryResidency.cppm
         Graphics.GpuWorld.cppm

@@ -367,15 +367,41 @@ foreach(_helper IN ITEMS ComputeParallelPrimitives GpuTransfer
         PROPERTIES LABELS "contract;build;graphics" TIMEOUT 30)
 endforeach()
 
-# Scene snapshots and debug uploads must not inherit device command APIs.
+# Scene snapshots and debug uploads must not inherit device APIs or residency storage.
 foreach(_scene IN ITEMS GpuWorld RenderWorld LightSystem TransientDebugUploadHelper)
+    # RenderWorld and its debug uploads carry visualization texture AssetIds.
+    set(_scene_asset_exclusion)
+    if(_scene STREQUAL "GpuWorld" OR _scene STREQUAL "LightSystem")
+        list(APPEND _scene_asset_exclusion --forbid-module Extrinsic.Asset.Registry)
+    endif()
     intrinsic_add_module_boundary_test(RenderCompilationLocality.${_scene}ServiceBorrows
             --check-source src/graphics/renderer/Graphics.${_scene}.cppm
             --forbid-module Extrinsic.RHI.Device
-            --forbid-module Extrinsic.RHI.CommandContext)
+            --forbid-module Extrinsic.RHI.CommandContext
+            --forbid-module Extrinsic.Graphics.Component.GpuSceneSlot
+            ${_scene_asset_exclusion})
     set_tests_properties(RenderCompilationLocality.${_scene}ServiceBorrows
         PROPERTIES LABELS "contract;build;graphics" TIMEOUT 30)
 endforeach()
+
+# Handle-only scene interfaces must not inherit mutable residency or asset storage.
+foreach(_scene IN ITEMS TransformSyncSystem UvView GeometryResidency)
+    intrinsic_add_module_boundary_test(RenderCompilationLocality.${_scene}NoResidencyStorage
+            --check-source src/graphics/renderer/Graphics.${_scene}.cppm
+            --forbid-module Extrinsic.Graphics.Component.GpuSceneSlot
+            --forbid-module Extrinsic.Asset.Registry)
+    set_tests_properties(RenderCompilationLocality.${_scene}NoResidencyStorage
+        PROPERTIES LABELS "contract;build;graphics" TIMEOUT 30)
+endforeach()
+# Scene identity must remain independent of RHI resource identity and storage.
+intrinsic_add_module_boundary_test(RenderCompilationLocality.SceneHandles
+        --check-source src/graphics/renderer/Graphics.SceneHandles.cppm
+        --forbid-module Extrinsic.Graphics.Component.GpuSceneSlot
+        --forbid-module Extrinsic.Asset.Registry
+        --forbid-module Extrinsic.Graphics.GpuWorld
+        --forbid-module Extrinsic.RHI.Handles)
+set_tests_properties(RenderCompilationLocality.SceneHandles
+    PROPERTIES LABELS "contract;build;graphics" TIMEOUT 30)
 
 # Renderer clients need its public contracts, not implementation-owned helpers.
 intrinsic_add_module_boundary_test(RenderCompilationLocality.RendererInterface

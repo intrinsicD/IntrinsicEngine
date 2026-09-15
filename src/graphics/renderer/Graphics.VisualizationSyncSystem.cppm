@@ -1,3 +1,4 @@
+// Synchronizes extracted visualization properties and material overrides with GPU scene storage.
 module;
 
 #include <cstdint>
@@ -13,6 +14,7 @@ import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
+import Extrinsic.Graphics.SceneHandles;
 import Extrinsic.Graphics.Component.Material;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
