@@ -14,6 +14,8 @@ Tests are organized by taxonomy-owned roots:
 configured Clang/CMake module graph after their runtime and contract-test
 producers are built. They use `tools/analysis/compile_hotspots.py`; its parser
 and failure-path fixtures live in `regression/tooling/Test.CompileHotspots.py`.
+Register these checks with `intrinsic_add_module_boundary_test` in
+`CMakeLists.txt`, supplying the source and forbidden-module arguments there.
 The unrelated cohort includes numerical adapters, scene/visualization/recipe
 commands, workspace model builders, context adapters and method test producers.
 The two point families are independently checked against each other and against

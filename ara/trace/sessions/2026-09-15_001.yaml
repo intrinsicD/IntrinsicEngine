@@ -2,9 +2,9 @@ session:
   id: 2026-09-15_001
   date: '2026-09-15'
   started: '2026-09-15T00:37:12+02:00'
-  last_turn: "2026-09-15T13:49:36+02:00"
-  turn_count: 20
-  summary: "Renderer cleanup removes 222 production lines; the measured graphics interface edit omits one expensive producer. Claude reviewed; full CPU passes and GRAPHICS-138 retires. Timings remain descriptive, broader compile work stays open."
+  last_turn: "2026-09-15T14:35:59+02:00"
+  turn_count: 21
+  summary: "Resource-manager device borrows and compiler-test registration share existing mechanisms. Claude reviewed; 4645 CPU passes plus one skip, fresh Clang 20 RHI build and all 50 boundary tests pass. No timing claim."
 events_logged:
 - turn: 1
   type: experiment
@@ -173,6 +173,13 @@ events_logged:
   routing: crystallized
   provenance: ai-executed
   summary: Record C96 as descriptive local observations only, no generalized timing or memory claim.
+
+- turn: 21
+  type: decision
+  id: N591
+  routing: direct
+  provenance: ai-executed
+  summary: Retain four resource-manager device borrows and one shared compiler-boundary registration owner; no measured timing or GPU claim.
 
 ai_actions:
 - turn: 1
@@ -368,6 +375,11 @@ ai_actions:
   provenance: ai-executed
   files_changed: [src/graphics/renderer/Graphics.Renderer.cppm, src/graphics/renderer/Graphics.Renderer.cpp, src/graphics/renderer/Graphics.RenderSubsystemRegistry.cppm, src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp, tests/CMakeLists.txt, ara/evidence/tables/graphics138_renderer_compile_measurement.md, tasks/done/GRAPHICS-138-renderer-compile-surface.md]
 
+- turn: 21
+  action: Reused existing IDevice linkage in four interfaces, added transitive guards, resolved Claude reviews, completed ci and fresh Clang 20 RHI builds, ran 167 focused and 4645 CPU cases with one expected skip, then consolidated 46 CMake registration sites. Complete 4747-test command/property inventory is identical and all 50 boundary cases pass after a no-work build.
+  provenance: ai-executed
+  files_changed: [src/graphics/rhi/RHI.BufferManager.cppm, src/graphics/rhi/RHI.TextureManager.cppm, src/graphics/rhi/RHI.SamplerManager.cppm, src/graphics/rhi/RHI.PipelineManager.cppm, tests/CMakeLists.txt, tests/README.md, tasks/done/GRAPHICS-139-resource-manager-device-borrows.md]
+
 claims_touched:
 - id: C94
   action: crystallized
@@ -432,6 +444,9 @@ key_context:
 - turn: 20
   excerpt: User requested continued duplication and compilation cleanup with Claude through planning, implementation, review, tests and fixes; existing source-sharing authorization applies. No main merge requested.
 
+- turn: 21
+  excerpt: User requested continued duplicate-code and compilation cleanup with Claude, through planning, implementation, review, tests and fixes. Existing source-sharing authorization applies; no main merge requested.
+
 open_threads:
 - The broader C92 processing-family hypothesis still needs a selected baseline and repeated family-edit measurements; BUILD-006 separately owns backend/cache comparisons.
 - BUG-193 owns unexplained GPU pacing variability and WLOP watchdog margin; BUG-189/191/192 closed only finite-work
@@ -450,7 +465,7 @@ open_threads:
   CPU and Vulkan probes select the scalar; exact Display status, acceleration and Appearance behavior remain needed.'
 - BUG-195 owns disk-headroom preflight and evidence-write recovery; completed backend verification does not close
   that tooling work.
-- GRAPHICS-138 is complete. The renderer implementation remains about 13 seconds in the bounded interface-touch probe; further splitting needs a concrete dependency/cost justification. BUILD-006 retains separate backend/cache comparisons.
+- GRAPHICS-138 is complete. The renderer implementation remains about 13 seconds in the bounded interface-touch probe; further splitting needs a concrete dependency/cost justification. BUILD-006 retains separate backend/cache comparisons. GRAPHICS-139 is complete; other pointer-only graphics interfaces remain candidates for consumer/contract review.
 
 ai_suggestions_pending:
 - Existing staged topics retain their open owners and flags; this ordinary refactor supplies no new closure signal.

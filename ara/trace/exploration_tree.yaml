@@ -12876,3 +12876,13 @@ tree:
     alternatives: [Add another facade or Pimpl, retain forwarding-only accessors, infer broad build speedup from two local observations]
     evidence: [O229, N589, ara/evidence/tables/graphics138_renderer_compile_measurement.md, tasks/done/GRAPHICS-138-renderer-compile-surface.md]
     status: resolved
+
+  - id: N591
+    type: decision
+    title: Reuse device borrows and compilation-boundary test registration
+    provenance: ai-executed
+    timestamp: '2026-09-15T14:35:59+02:00'
+    choice: Keep the four RHI resource-manager implementations and ownership unchanged while replacing complete device imports with the established globally attached declaration. Retire GRAPHICS-139 in b0cd030fd. Then share 46 compiler-test registration call sites through one local CMake function, removing 85 repeated lines; exact full CTest inventory equality preserves 4747 commands/properties and all 50 boundary tests pass. Claude reviewed both fixed changes; source-review documentation findings and call-site versus test-count wording are resolved.
+    alternatives: [Add another device facade or header, delete the established manager lifetime seam, copy a compiler-test registration prefix again, infer elapsed performance from dependency counts]
+    evidence: [tasks/done/GRAPHICS-139-resource-manager-device-borrows.md, src/graphics/rhi/RHI.BufferManager.cppm, src/graphics/rhi/RHI.TextureManager.cppm, src/graphics/rhi/RHI.SamplerManager.cppm, src/graphics/rhi/RHI.PipelineManager.cppm, tests/CMakeLists.txt, tests/README.md]
+    status: resolved

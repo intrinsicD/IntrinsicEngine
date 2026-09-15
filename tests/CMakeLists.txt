@@ -16,9 +16,14 @@ endif()
 # The compiled family and common capture owners must stay independent of session
 # composition and other method contracts. Inspect the configured Clang/CMake graph.
 find_program(INTRINSIC_TEST_PYTHON_EXECUTABLE NAMES python3 REQUIRED)
-add_test(NAME ProcessingCompilationLocality.Family
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+
+function(intrinsic_add_module_boundary_test name)
+    add_test(NAME "${name}"
+        COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
+            ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+            ${ARGN})
+endfunction()
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Family
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cppm
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointFieldOperations.cppm
@@ -39,9 +44,7 @@ add_test(NAME ProcessingCompilationLocality.Family
         --forbid-module Extrinsic.Runtime.MeshFieldOperations
         --forbid-module Extrinsic.Runtime.MeshTopologyOperations
         --forbid-module Extrinsic.Runtime.Private.EditorWorkspaceAttachment)
-add_test(NAME ProcessingCompilationLocality.PointAnalysis
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointAnalysis
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cppm
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cppm
@@ -64,9 +67,7 @@ add_test(NAME ProcessingCompilationLocality.PointAnalysis
         --forbid-module Extrinsic.Runtime.MeshFieldOperations
         --forbid-module Extrinsic.Runtime.MeshTopologyOperations
         --forbid-module Extrinsic.Runtime.Private.EditorWorkspaceAttachment)
-add_test(NAME ProcessingCompilationLocality.UnrelatedAdapters
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.UnrelatedAdapters
         --check-source src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Public.cpp
         --check-source src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp
         --check-source src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Public.cpp
@@ -83,9 +84,7 @@ add_test(NAME ProcessingCompilationLocality.UnrelatedAdapters
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations
         --forbid-module Extrinsic.Runtime.MeshFieldOperations
         --forbid-module Extrinsic.Runtime.MeshTopologyOperations)
-add_test(NAME ProcessingCompilationLocality.PointAnalysisTests
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointAnalysisTests
         --check-source tests/contract/runtime/Test.DensityWeightOperations.cpp
         --check-source tests/contract/runtime/Test.KeypointAnalysisOperations.cpp
         --check-source tests/contract/runtime/Test.OutlierAnalysis.cpp
@@ -94,9 +93,7 @@ add_test(NAME ProcessingCompilationLocality.PointAnalysisTests
         --forbid-module Extrinsic.Runtime.PointSetOperations
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations)
-add_test(NAME ProcessingCompilationLocality.Normals
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Normals
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cppm
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cpp
         --check-source src/runtime/Editor/Operations/Runtime.NormalOperations.cppm
@@ -116,18 +113,14 @@ add_test(NAME ProcessingCompilationLocality.Normals
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations
         --forbid-module Extrinsic.Runtime.Private.EditorWorkspaceAttachment)
-add_test(NAME ProcessingCompilationLocality.NormalTests
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.NormalTests
         --check-source tests/contract/runtime/Test.NormalEstimation.cpp
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointSetOperations
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations)
-add_test(NAME ProcessingCompilationLocality.MeshSupport
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshSupport
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.cpp
         --forbid-module Extrinsic.Runtime.GeometryProcessingOperations
@@ -146,9 +139,7 @@ add_test(NAME ProcessingCompilationLocality.MeshSupport
 # The point-set family reads point properties and connectivity tags only. A full
 # halfedge-mesh or mesh-soup edge here means a mesh-snapshot dependency crept back
 # in through a shared helper header.
-add_test(NAME ProcessingCompilationLocality.PointSet
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointSet
         --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Bilateral.cpp
@@ -166,9 +157,7 @@ add_test(NAME ProcessingCompilationLocality.PointSet
         --forbid-module Extrinsic.Runtime.MeshTopologyOperations
         --forbid-module Extrinsic.Runtime.EditorWorkspaceSnapshots
         --forbid-module Extrinsic.Runtime.Private.EditorWorkspaceAttachment)
-add_test(NAME ProcessingCompilationLocality.PointConstruction
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointConstruction
         --check-source src/runtime/Editor/Operations/Runtime.PointConstructionOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Construction.cpp
         --forbid-module Extrinsic.Runtime.GeometryProcessingOperations
@@ -186,9 +175,7 @@ add_test(NAME ProcessingCompilationLocality.PointConstruction
 # The service family is the only processing owner that may see the queued
 # clustering/consolidation services; it still stays out of every sibling
 # family, the discovery owner and session composition.
-add_test(NAME ProcessingCompilationLocality.PointCloudService
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointCloudService
         --check-source src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cpp
         --forbid-module Extrinsic.Runtime.GeometryProcessingOperations
@@ -205,9 +192,7 @@ add_test(NAME ProcessingCompilationLocality.PointCloudService
         --forbid-module Extrinsic.Runtime.Private.EditorWorkspaceAttachment)
 # Cross-cutting discovery answers which algorithms and domains apply; it
 # must not acquire a back edge onto any method family's results or config.
-add_test(NAME ProcessingCompilationLocality.Discovery
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Discovery
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
         --forbid-module Extrinsic.Runtime.NormalOperations
@@ -222,25 +207,19 @@ add_test(NAME ProcessingCompilationLocality.Discovery
         --forbid-module Extrinsic.Runtime.MeshTopologyOperations
         --forbid-module Extrinsic.Runtime.EditorWorkspaceSnapshots
         --forbid-module Extrinsic.Runtime.Private.EditorWorkspaceAttachment)
-add_test(NAME ProcessingCompilationLocality.PointSetTests
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointSetTests
         --check-source tests/contract/runtime/Test.BilateralFilterOperations.cpp
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations)
-add_test(NAME ProcessingCompilationLocality.PointConstructionTests
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointConstructionTests
         --check-source tests/contract/runtime/Test.PointConstructionOperations.cpp
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations
         --forbid-module Extrinsic.Runtime.PointSetOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations)
-add_test(NAME ProcessingCompilationLocality.Registration
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Registration
         --check-source src/runtime/Editor/Operations/Runtime.RegistrationOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.RegistrationOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Registration.cpp
@@ -256,9 +235,7 @@ add_test(NAME ProcessingCompilationLocality.Registration
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations
         --forbid-module Extrinsic.Runtime.Private.EditorWorkspaceAttachment)
-add_test(NAME ProcessingCompilationLocality.Parameterization
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Parameterization
         --check-source src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Uv.cpp
@@ -274,9 +251,7 @@ add_test(NAME ProcessingCompilationLocality.Parameterization
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations
         --forbid-module Extrinsic.Runtime.Private.EditorWorkspaceAttachment)
-add_test(NAME ProcessingCompilationLocality.MeshField
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshField
         --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Curvature.cpp
@@ -293,9 +268,7 @@ add_test(NAME ProcessingCompilationLocality.MeshField
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations
         --forbid-module Extrinsic.Runtime.Private.EditorWorkspaceAttachment)
-add_test(NAME ProcessingCompilationLocality.MeshTopology
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshTopology
         --check-source src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.Topology.cpp
@@ -311,9 +284,7 @@ add_test(NAME ProcessingCompilationLocality.MeshTopology
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations
         --forbid-module Extrinsic.Runtime.Private.EditorWorkspaceAttachment)
-add_test(NAME ProcessingCompilationLocality.MeshFieldTests
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshFieldTests
         --check-source tests/contract/runtime/Test.GeodesicsOperations.cpp
         --forbid-module Extrinsic.Runtime.GeometryProcessingOperations
         --forbid-module Extrinsic.Runtime.NormalOperations
@@ -325,9 +296,7 @@ add_test(NAME ProcessingCompilationLocality.MeshFieldTests
         --forbid-module Extrinsic.Runtime.PointSetOperations
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations)
-add_test(NAME ProcessingCompilationLocality.RegistrationTests
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.RegistrationTests
         --check-source tests/contract/runtime/Test.RegistrationDomains.cpp
         --forbid-module Extrinsic.Runtime.GeometryProcessingOperations
         --forbid-module Extrinsic.Runtime.NormalOperations
@@ -348,9 +317,7 @@ set_tests_properties(ProcessingCompilationLocality.Family ProcessingCompilationL
 # overrides only. A renderer, subsystem-registry, prep-pipeline, concrete
 # rendering system or upload-helper edge here means a record moved back onto an
 # executing renderer surface.
-add_test(NAME RenderCompilationLocality.RuntimeDiagnostics
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(RenderCompilationLocality.RuntimeDiagnostics
         --check-source src/graphics/renderer/Graphics.RenderDiagnostics.cppm
         --check-source src/runtime/Kernel/Runtime.FramePacingDiagnostics.cppm
         --check-source src/runtime/Config/Runtime.RenderRecipeActivation.cppm
@@ -374,9 +341,7 @@ set_tests_properties(RenderCompilationLocality.RuntimeDiagnostics
 
 # Resource managers borrow the device; only their implementations import its API.
 foreach(_manager IN ITEMS BufferManager TextureManager SamplerManager PipelineManager)
-    add_test(NAME RenderCompilationLocality.${_manager}DeviceBorrow
-        COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-            ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+    intrinsic_add_module_boundary_test(RenderCompilationLocality.${_manager}DeviceBorrow
             --check-source src/graphics/rhi/RHI.${_manager}.cppm
             --forbid-module Extrinsic.RHI.Device)
     set_tests_properties(RenderCompilationLocality.${_manager}DeviceBorrow
@@ -384,9 +349,7 @@ foreach(_manager IN ITEMS BufferManager TextureManager SamplerManager PipelineMa
 endforeach()
 
 # Renderer clients need its public contracts, not implementation-owned helpers.
-add_test(NAME RenderCompilationLocality.RendererInterface
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(RenderCompilationLocality.RendererInterface
         --check-source src/graphics/renderer/Graphics.Renderer.cppm
         --forbid-module Extrinsic.Graphics.ForwardSystem
         --forbid-module Extrinsic.Graphics.DeferredSystem
@@ -402,9 +365,7 @@ set_tests_properties(RenderCompilationLocality.RendererInterface
 # runtime-module-composition edge here means Engine's interface started pulling
 # an implementation surface back into every caller's compile closure; the actual
 # rendering and module-composition callers import those modules themselves.
-add_test(NAME RenderCompilationLocality.EngineInterface
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(RenderCompilationLocality.EngineInterface
         --check-source src/runtime/Kernel/Runtime.Engine.cppm
         --forbid-module Extrinsic.Graphics.Renderer
         --forbid-module Extrinsic.Runtime.Module
@@ -424,9 +385,7 @@ set_tests_properties(RenderCompilationLocality.EngineInterface
     PROPERTIES LABELS "contract;build;runtime;graphics" TIMEOUT 30)
 
 # Extraction exposes renderer borrows; the implementation owns rendering calls.
-add_test(NAME RenderCompilationLocality.Extraction
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(RenderCompilationLocality.Extraction
         --check-source src/runtime/Rendering/Runtime.RenderExtraction.cppm
         --forbid-module Extrinsic.Graphics.Renderer
         --forbid-module Extrinsic.Graphics.MaterialSystem)
@@ -439,9 +398,7 @@ set_tests_properties(RenderCompilationLocality.Extraction
 # recording or composition surface moved back into every query caller's compile
 # closure. Editor/processing families and direct workspace users legitimately
 # keep their own RHI edges and import those modules themselves.
-add_test(NAME SpatialCompilationLocality.QueryInterface
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(SpatialCompilationLocality.QueryInterface
         --check-source src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm
         --forbid-module Extrinsic.Graphics.PointLBVH
         --forbid-module Extrinsic.Runtime.WorldRegistry
@@ -455,27 +412,19 @@ set_tests_properties(SpatialCompilationLocality.QueryInterface
 # identity only. `Extrinsic.Core.Hash` owns that token; a `Core.FrameGraph` edge
 # here means erased identity went back to reaching the ECS execution graph, its
 # task-graph backend and scheduler. Real graph users keep their own edge.
-add_test(NAME KernelCompilationLocality.Commands
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(KernelCompilationLocality.Commands
         --check-source src/runtime/Kernel/Runtime.CommandBus.cppm
         --forbid-module Extrinsic.Core.FrameGraph)
-add_test(NAME KernelCompilationLocality.Events
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(KernelCompilationLocality.Events
         --check-source src/runtime/Kernel/Runtime.KernelEvents.cppm
         --forbid-module Extrinsic.Core.FrameGraph)
-add_test(NAME KernelCompilationLocality.Services
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(KernelCompilationLocality.Services
         --check-source src/runtime/Kernel/Runtime.ServiceRegistry.cppm
         --forbid-module Extrinsic.Core.FrameGraph)
 # CPU job declarations additionally borrow `RHI::ICommandContext` by reference.
 # Any RHI edge here means GPU command recording moved back into every job
 # caller's compile closure; participants that record commands import the owner.
-add_test(NAME KernelCompilationLocality.Jobs
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(KernelCompilationLocality.Jobs
         --check-source src/runtime/Kernel/Runtime.JobService.cppm
         --forbid-module Extrinsic.Core.FrameGraph
         --forbid-module Extrinsic.RHI.CommandContext
@@ -487,9 +436,7 @@ set_tests_properties(KernelCompilationLocality.Commands KernelCompilationLocalit
     PROPERTIES LABELS "contract;build;runtime" TIMEOUT 30)
 
 # Model leases and renderer integration stay inside the implementation.
-add_test(NAME AssetCompilationLocality.ModelMaterialization
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(AssetCompilationLocality.ModelMaterialization
         --check-source src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cppm
         --forbid-module Extrinsic.Graphics.Renderer
         --forbid-module Extrinsic.Graphics.MaterialSystem)
@@ -498,9 +445,7 @@ set_tests_properties(AssetCompilationLocality.ModelMaterialization
 
 # Texture-bake composition stays inside its existing implementation. Check both
 # its public producer and the editor interfaces that consume bake records.
-add_test(NAME EditorCompilationLocality.TextureBake
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(EditorCompilationLocality.TextureBake
         --check-source src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cppm
         --forbid-module Extrinsic.Graphics.Renderer
         --forbid-module Extrinsic.Graphics.GpuAssetCache
@@ -509,25 +454,19 @@ add_test(NAME EditorCompilationLocality.TextureBake
         --forbid-module Extrinsic.ECS.Scene.Registry
         --forbid-module Extrinsic.RHI.Device
         --forbid-module Extrinsic.Runtime.EditorCommandHistory)
-add_test(NAME EditorCompilationLocality.Visualization
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(EditorCompilationLocality.Visualization
         --check-source src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.cppm
         --forbid-module Extrinsic.Graphics.Renderer
         --forbid-module Extrinsic.Graphics.GpuAssetCache
         --forbid-module Extrinsic.Runtime.RenderExtraction)
-add_test(NAME EditorCompilationLocality.WorkspaceSnapshots
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(EditorCompilationLocality.WorkspaceSnapshots
         --check-source src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm
         --forbid-module Extrinsic.Graphics.Renderer
         --forbid-module Extrinsic.Graphics.GpuAssetCache
         --forbid-module Extrinsic.Runtime.RenderExtraction)
 # Editor interfaces, frames and session wiring consume service/types APIs.
 # The operation implementation still imports module-owned consolidation preflight.
-add_test(NAME EditorCompilationLocality.PointCloudServices
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(EditorCompilationLocality.PointCloudServices
         --check-source src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.Frame.cpp
         --check-source src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp
@@ -538,9 +477,7 @@ set_tests_properties(EditorCompilationLocality.PointCloudServices
     PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
 
 # Borrowing device/cache pointers must not import their complete APIs or kernels.
-add_test(NAME EditorCompilationLocality.ProcessingServiceBorrows
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(EditorCompilationLocality.ProcessingServiceBorrows
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cppm
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
         --check-source src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm
@@ -557,9 +494,7 @@ foreach(_intrinsic_config_family IN ITEMS CurvatureSegmentation PointCloudConsol
     else()
         set(_intrinsic_other_config_family CurvatureSegmentation)
     endif()
-    add_test(NAME ConfigCompilationLocality.${_intrinsic_config_family}
-        COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-            ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+    intrinsic_add_module_boundary_test(ConfigCompilationLocality.${_intrinsic_config_family}
             --check-source src/runtime/Modules/${_intrinsic_config_family}/Runtime.${_intrinsic_config_family}Config.cpp
             # Reject reintroducing the former forwarding module.
             --forbid-module Extrinsic.Runtime.Private.FeatureConfigCodecs
@@ -572,9 +507,7 @@ foreach(_intrinsic_config_family IN ITEMS CurvatureSegmentation PointCloudConsol
 endforeach()
 
 # Snapshot query preparation uses the narrow context adapter, not concrete services.
-add_test(NAME EditorCompilationLocality.WorkspaceSnapshotQueries
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(EditorCompilationLocality.WorkspaceSnapshotQueries
         --check-source src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp
         --forbid-module Extrinsic.Graphics.Renderer
         --forbid-module Extrinsic.Graphics.GpuAssetCache
@@ -586,9 +519,7 @@ add_test(NAME EditorCompilationLocality.WorkspaceSnapshotQueries
 set_tests_properties(EditorCompilationLocality.WorkspaceSnapshotQueries
     PROPERTIES LABELS "contract;build;runtime" TIMEOUT 30)
 
-add_test(NAME EditorCompilationLocality.WorkspaceAttachment
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(EditorCompilationLocality.WorkspaceAttachment
         --check-source src/runtime/Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm
         --forbid-module Extrinsic.Graphics.Renderer
         --forbid-module Extrinsic.Graphics.GpuAssetCache
@@ -621,9 +552,7 @@ set(_intrinsic_editor_processing_family_frame_checks
 set(_intrinsic_editor_processing_frame_checks
     ${_intrinsic_editor_processing_family_frame_checks}
     --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Frame.cpp)
-add_test(NAME EditorCompilationLocality.PreparedConsumers
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(EditorCompilationLocality.PreparedConsumers
         ${_intrinsic_editor_processing_frame_checks}
         --check-source src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Public.cpp
         --check-source src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp
@@ -631,9 +560,7 @@ add_test(NAME EditorCompilationLocality.PreparedConsumers
         --check-source src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp
         --check-source src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.Public.cpp
         --forbid-module Extrinsic.Runtime.EditorWorkspaceSnapshots)
-add_test(NAME EditorCompilationLocality.ProcessingFrames
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(EditorCompilationLocality.ProcessingFrames
         ${_intrinsic_editor_processing_frame_checks}
         --forbid-module Extrinsic.Runtime.SceneEditingOperations
         --forbid-module Extrinsic.Runtime.VisualizationEditingOperations
@@ -649,9 +576,7 @@ set(_intrinsic_editor_command_frame_checks
         --check-source src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Public.cpp
         --check-source src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.Public.cpp
 )
-add_test(NAME EditorCompilationLocality.CommandFrames
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(EditorCompilationLocality.CommandFrames
         ${_intrinsic_editor_command_frame_checks}
         --forbid-module Extrinsic.Runtime.EditorProcessing
         --forbid-module Extrinsic.Runtime.GeometryProcessingOperations
@@ -660,27 +585,19 @@ add_test(NAME EditorCompilationLocality.CommandFrames
         --forbid-module Extrinsic.Runtime.PointCloudConsolidationModule
         --forbid-module Extrinsic.Runtime.EditorWorkspaceSnapshots)
 # Each leaf also stays clear of its sibling features.
-add_test(NAME EditorCompilationLocality.SceneFrame
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(EditorCompilationLocality.SceneFrame
         --check-source src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Public.cpp
         --forbid-module Extrinsic.Runtime.VisualizationEditingOperations
         --forbid-module Extrinsic.Runtime.RenderRecipeEditingOperations)
-add_test(NAME EditorCompilationLocality.VisualizationFrame
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(EditorCompilationLocality.VisualizationFrame
         --check-source src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Public.cpp
         --forbid-module Extrinsic.Runtime.SceneEditingOperations
         --forbid-module Extrinsic.Runtime.RenderRecipeEditingOperations)
-add_test(NAME EditorCompilationLocality.RenderRecipeFrame
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(EditorCompilationLocality.RenderRecipeFrame
         --check-source src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.Public.cpp
         --forbid-module Extrinsic.Runtime.SceneEditingOperations
         --forbid-module Extrinsic.Runtime.VisualizationEditingOperations)
-add_test(NAME EditorCompilationLocality.Actions
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(EditorCompilationLocality.Actions
         --check-source src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp
         --check-source src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp
         --forbid-module Extrinsic.Runtime.EditorProcessing
@@ -692,9 +609,7 @@ add_test(NAME EditorCompilationLocality.Actions
         --forbid-module Extrinsic.Runtime.ClusteringModule
         --forbid-module Extrinsic.Runtime.PointCloudConsolidationModule
         --forbid-module Extrinsic.Runtime.EditorWorkspaceSnapshots)
-add_test(NAME EditorCompilationLocality.ProcessingFamilies
-    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
-        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+intrinsic_add_module_boundary_test(EditorCompilationLocality.ProcessingFamilies
         ${_intrinsic_editor_processing_family_frame_checks}
         --forbid-module Extrinsic.Runtime.GeometryProcessingOperations)
 set_tests_properties(EditorCompilationLocality.TextureBake EditorCompilationLocality.Visualization

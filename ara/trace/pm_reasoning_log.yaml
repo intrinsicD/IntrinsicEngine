@@ -2491,3 +2491,10 @@ entries:
     - Claude's final reporting findings are resolved by separating one omitted critical-path producer from seven removed renderer-interface dependencies; clean producer count remains 266. Do not attribute combined-patch timings specifically to getter deletion or sell RSS noise.
     - Ordinary source simplification stays in task/review evidence; 222 fewer production lines introduces no new production file. Full CPU and focused tests passed before measurement; dependency identities and production bytes stayed unchanged, so no redundant full rerun is represented.
     - Existing staged topics have no new closure signal from this renderer work; preserve their named owners and flags. C92, BUILD-006, runtime/GPU verification gaps and product convergence remain open.
+
+  - turn: 2026-09-15_001#21
+    notes:
+    - Record N591 as ordinary implementation/refactoring history, with no new claim or staged observation. Interface dependency counts are structural facts, not elapsed-time measurements; C92 and broader compilation hypotheses remain open.
+    - The four interfaces add four synopsis lines and no production file; the separate CMake cleanup removes 85 lines across 46 call sites registering 50 tests. Do not describe these as 46 tests or as a measured engine-speed gain.
+    - Full Clang 23 suite passed before the CMake-only change. Complete CTest command/order/property equality and a no-work IntrinsicTests build justify focused re-execution of all 50 affected guards instead of repeating the unchanged full suite. Fresh Clang 20 verifies RHI producers only; no GPU/sanitizer runtime evidence added.
+    - Existing staged research topics retain their owners and flags; this ordinary refactor supplies no new closure signal. Preserve unrelated renderer, cache, product and runtime gaps.
