@@ -1,0 +1,51 @@
+{
+  "source_revision": "ca164c10cf20d1b037ac2c116194c1839ec6bb3d",
+  "cpu_preset": "ci, unsanitized Clang23",
+  "full_cpu": {
+    "selected": 4665,
+    "passed": 4664,
+    "failed": 0,
+    "skipped": 1,
+    "wall_seconds": 153.51,
+    "expected_skip": "GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl"
+  },
+  "focused": {
+    "selected": 271,
+    "passed": 271,
+    "note": "Before the final narrow import-policy assertion refinement; final policy and all tests run in full CPU gate."
+  },
+  "minimum_compiler": {
+    "version": 20,
+    "fresh": true,
+    "ccache": false,
+    "backend": "Null/headless",
+    "compiled": [
+      "ExtrinsicSandboxEditor plus all engine prerequisites",
+      "RuntimeContractTestObjs Test.SandboxEditorModels.cpp object"
+    ],
+    "test_execution": false
+  },
+  "gpu_execution": false,
+  "sanitizer_execution": false,
+  "logs": {
+    "configure": "configure.log",
+    "full_build": "build-final.log",
+    "final_policy_rebuild": "build-reviewed-policy.log",
+    "focused": "focused-tests-final.log",
+    "full_cpu": "full-cpu.log",
+    "minimum_compiler_build": "clang20-build.log",
+    "minimum_compiler_contract_compilation": "clang20-model-contract-build.log",
+    "minimum_compiler_boundaries": "clang20-boundary-corrected.log",
+    "private_import_negative_controls": "private-edge-negative-controls.json",
+    "restored_import_policy": "private-edge-restored.log",
+    "structural": "clean-workshop.log",
+    "test_layout": "test-layout.log",
+    "source_documentation": "source-doc-audit.log"
+  },
+  "negative_controls": {
+    "extra_private_import": 8,
+    "reexport_private_names": 8,
+    "restored": 0
+  },
+  "no_cpp_changes_after_verification": true
+}

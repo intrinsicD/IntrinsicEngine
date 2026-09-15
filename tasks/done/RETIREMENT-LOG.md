@@ -7,6 +7,23 @@ relative to `tasks/done/`, which sits at the same depth as `tasks/active/`,
 so blocks moved from the old active-README history work verbatim.
 
 
+## 2026-09-16 — RUNTIME-268: snapshot standard-declaration ownership
+
+Retired [RUNTIME-268](RUNTIME-268-workspace-snapshot-bmi-serialization.md) at
+CPUContracted, its refactor endpoint. Implementation `ca164c10c` keeps the standard
+record types and ownership while one small declaration module avoids repeated
+serialization. One added module/file; +23 C++ lines plus one CMake entry.
+
+Claude reviewed the source, runner and results. C99 binds all ten retained local
+samples: snapshot-plus-owner median 15.183 → 1.646 seconds; selected runtime
+subtotal 42.715 → 29.120 seconds. Consumer ranges overlap; no whole-engine, runtime
+or general speedup claim. Canonical full CPU: 4,664 passes, zero failures, one
+expected skip. Focused 271 passes; fresh cache-off Clang20 compiles the Sandbox
+editor/engine closure and contract object. Additional import and re-export faults
+are rejected. [Report and raw evidence](../../ara/evidence/tables/runtime268_snapshot_std_measurement.md).
+RUNTIME-267 and GRAPHICS-144 retain their own scoped measurements and implementation.
+
+
 ## 2026-09-15 — RUNTIME-266: scene-registry borrows
 
 Retired [RUNTIME-266](RUNTIME-266-editor-snapshot-consumer-locality.md) at

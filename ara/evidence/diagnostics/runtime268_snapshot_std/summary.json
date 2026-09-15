@@ -1,0 +1,735 @@
+{
+  "benchmark_id": "build.workspace_snapshot_std.v1",
+  "claim_eligible": false,
+  "scope": "Serial focused producer replay; all candidate declaration-owner cost included. No full-build or statistical/runtime claim.",
+  "samples": [
+    {
+      "attempt": "01-before-1",
+      "arm": "before",
+      "source": "4fa241cc250113d7d1b5cc8bbd0b54e9c82f6aed",
+      "times_s": {
+        "snapshot": 15.747763289953582,
+        "snapshot.Public": 2.998746401979588,
+        "snapshot.Models": 7.117572803981602,
+        "Runtime.EditorFeatureContextAdapters": 9.112122607999481,
+        "Runtime.EditorWorkspaceSession": 9.312043095007539,
+        "Sandbox.PanelSupport": 9.395759401959367,
+        "runtime_producers": 44.28824819892179,
+        "runtime_and_consumer": 53.68400760088116,
+        "snapshot_with_owner": 15.747763289953582
+      },
+      "bmi_bytes": {
+        "snapshot.pcm": 28482868
+      },
+      "rss_bytes": {
+        "snapshot": 1970098176,
+        "snapshot.Public": 1225052160,
+        "snapshot.Models": 1772060672,
+        "Runtime.EditorFeatureContextAdapters": 2310283264,
+        "Runtime.EditorWorkspaceSession": 2849587200,
+        "Sandbox.PanelSupport": 2409365504
+      },
+      "bmi_total_bytes": 28482868
+    },
+    {
+      "attempt": "02-after-1",
+      "arm": "after",
+      "source": "ca164c10cf20d1b037ac2c116194c1839ec6bb3d",
+      "times_s": {
+        "snapshot.Std": 0.9703252230538055,
+        "snapshot": 0.7393900100141764,
+        "snapshot.Public": 3.012767523061484,
+        "snapshot.Models": 7.095341261010617,
+        "Runtime.EditorFeatureContextAdapters": 8.890462105046026,
+        "Runtime.EditorWorkspaceSession": 8.997871684958227,
+        "Sandbox.PanelSupport": 9.194291290012188,
+        "runtime_producers": 29.706157807144336,
+        "runtime_and_consumer": 38.900449097156525,
+        "snapshot_with_owner": 1.709715233067982
+      },
+      "bmi_bytes": {
+        "snapshot.pcm": 567292,
+        "std.pcm": 9611384
+      },
+      "rss_bytes": {
+        "snapshot.Std": 213762048,
+        "snapshot": 883048448,
+        "snapshot.Public": 1213784064,
+        "snapshot.Models": 1751322624,
+        "Runtime.EditorFeatureContextAdapters": 2294681600,
+        "Runtime.EditorWorkspaceSession": 2834714624,
+        "Sandbox.PanelSupport": 2393337856
+      },
+      "bmi_total_bytes": 10178676
+    },
+    {
+      "attempt": "03-after-2",
+      "arm": "after",
+      "source": "ca164c10cf20d1b037ac2c116194c1839ec6bb3d",
+      "times_s": {
+        "snapshot.Std": 0.9403711019549519,
+        "snapshot": 0.7059561420464888,
+        "snapshot.Public": 2.9295778069645166,
+        "snapshot.Models": 6.852917802985758,
+        "Runtime.EditorFeatureContextAdapters": 8.72330340091139,
+        "Runtime.EditorWorkspaceSession": 8.967595865949988,
+        "Sandbox.PanelSupport": 9.086580508970656,
+        "runtime_producers": 29.119722120813094,
+        "runtime_and_consumer": 38.20630262978375,
+        "snapshot_with_owner": 1.6463272440014407
+      },
+      "bmi_bytes": {
+        "snapshot.pcm": 567292,
+        "std.pcm": 9611384
+      },
+      "rss_bytes": {
+        "snapshot.Std": 213897216,
+        "snapshot": 883097600,
+        "snapshot.Public": 1213804544,
+        "snapshot.Models": 1750257664,
+        "Runtime.EditorFeatureContextAdapters": 2292264960,
+        "Runtime.EditorWorkspaceSession": 2834001920,
+        "Sandbox.PanelSupport": 2394046464
+      },
+      "bmi_total_bytes": 10178676
+    },
+    {
+      "attempt": "04-before-2",
+      "arm": "before",
+      "source": "4fa241cc250113d7d1b5cc8bbd0b54e9c82f6aed",
+      "times_s": {
+        "snapshot": 15.182756569003686,
+        "snapshot.Public": 2.888251884956844,
+        "snapshot.Models": 6.912433453951962,
+        "Runtime.EditorFeatureContextAdapters": 8.752510649035685,
+        "Runtime.EditorWorkspaceSession": 8.979435691959225,
+        "Sandbox.PanelSupport": 9.047255518031307,
+        "runtime_producers": 42.7153882489074,
+        "runtime_and_consumer": 51.76264376693871,
+        "snapshot_with_owner": 15.182756569003686
+      },
+      "bmi_bytes": {
+        "snapshot.pcm": 28482868
+      },
+      "rss_bytes": {
+        "snapshot": 1970081792,
+        "snapshot.Public": 1226166272,
+        "snapshot.Models": 1772220416,
+        "Runtime.EditorFeatureContextAdapters": 2311213056,
+        "Runtime.EditorWorkspaceSession": 2850750464,
+        "Sandbox.PanelSupport": 2409791488
+      },
+      "bmi_total_bytes": 28482868
+    },
+    {
+      "attempt": "05-before-3",
+      "arm": "before",
+      "source": "4fa241cc250113d7d1b5cc8bbd0b54e9c82f6aed",
+      "times_s": {
+        "snapshot": 15.060458361986093,
+        "snapshot.Public": 2.9051528519485146,
+        "snapshot.Models": 6.831429257057607,
+        "Runtime.EditorFeatureContextAdapters": 8.777306997100823,
+        "Runtime.EditorWorkspaceSession": 9.019150389940478,
+        "Sandbox.PanelSupport": 9.05371936201118,
+        "runtime_producers": 42.593497858033516,
+        "runtime_and_consumer": 51.647217220044695,
+        "snapshot_with_owner": 15.060458361986093
+      },
+      "bmi_bytes": {
+        "snapshot.pcm": 28482868
+      },
+      "rss_bytes": {
+        "snapshot": 1969819648,
+        "snapshot.Public": 1225330688,
+        "snapshot.Models": 1772367872,
+        "Runtime.EditorFeatureContextAdapters": 2310234112,
+        "Runtime.EditorWorkspaceSession": 2850746368,
+        "Sandbox.PanelSupport": 2411798528
+      },
+      "bmi_total_bytes": 28482868
+    },
+    {
+      "attempt": "06-after-3",
+      "arm": "after",
+      "source": "ca164c10cf20d1b037ac2c116194c1839ec6bb3d",
+      "times_s": {
+        "snapshot.Std": 0.9347021130379289,
+        "snapshot": 0.7021442099940032,
+        "snapshot.Public": 2.8990658950060606,
+        "snapshot.Models": 6.833742685965262,
+        "Runtime.EditorFeatureContextAdapters": 8.720772294094786,
+        "Runtime.EditorWorkspaceSession": 8.979158759000711,
+        "Sandbox.PanelSupport": 9.383683343068697,
+        "runtime_producers": 29.069585957098752,
+        "runtime_and_consumer": 38.45326930016745,
+        "snapshot_with_owner": 1.6368463230319321
+      },
+      "bmi_bytes": {
+        "snapshot.pcm": 567292,
+        "std.pcm": 9611384
+      },
+      "rss_bytes": {
+        "snapshot.Std": 213602304,
+        "snapshot": 882999296,
+        "snapshot.Public": 1212878848,
+        "snapshot.Models": 1751101440,
+        "Runtime.EditorFeatureContextAdapters": 2293907456,
+        "Runtime.EditorWorkspaceSession": 2832449536,
+        "Sandbox.PanelSupport": 2393419776
+      },
+      "bmi_total_bytes": 10178676
+    },
+    {
+      "attempt": "07-after-4",
+      "arm": "after",
+      "source": "ca164c10cf20d1b037ac2c116194c1839ec6bb3d",
+      "times_s": {
+        "snapshot.Std": 0.9376271769870073,
+        "snapshot": 0.7037165840156376,
+        "snapshot.Public": 2.9330191710032523,
+        "snapshot.Models": 6.862966976012103,
+        "Runtime.EditorFeatureContextAdapters": 8.740093027008697,
+        "Runtime.EditorWorkspaceSession": 8.980731530929916,
+        "Sandbox.PanelSupport": 9.158088625990786,
+        "runtime_producers": 29.158154465956613,
+        "runtime_and_consumer": 38.3162430919474,
+        "snapshot_with_owner": 1.641343761002645
+      },
+      "bmi_bytes": {
+        "snapshot.pcm": 567292,
+        "std.pcm": 9611384
+      },
+      "rss_bytes": {
+        "snapshot.Std": 213704704,
+        "snapshot": 883150848,
+        "snapshot.Public": 1213906944,
+        "snapshot.Models": 1751281664,
+        "Runtime.EditorFeatureContextAdapters": 2293276672,
+        "Runtime.EditorWorkspaceSession": 2834759680,
+        "Sandbox.PanelSupport": 2394226688
+      },
+      "bmi_total_bytes": 10178676
+    },
+    {
+      "attempt": "08-before-4",
+      "arm": "before",
+      "source": "4fa241cc250113d7d1b5cc8bbd0b54e9c82f6aed",
+      "times_s": {
+        "snapshot": 15.137667962932028,
+        "snapshot.Public": 2.887591000064276,
+        "snapshot.Models": 6.899128730059601,
+        "Runtime.EditorFeatureContextAdapters": 8.750083036953583,
+        "Runtime.EditorWorkspaceSession": 8.964235818944871,
+        "Sandbox.PanelSupport": 9.080473714042455,
+        "runtime_producers": 42.63870654895436,
+        "runtime_and_consumer": 51.719180262996815,
+        "snapshot_with_owner": 15.137667962932028
+      },
+      "bmi_bytes": {
+        "snapshot.pcm": 28482868
+      },
+      "rss_bytes": {
+        "snapshot": 1970479104,
+        "snapshot.Public": 1225043968,
+        "snapshot.Models": 1772027904,
+        "Runtime.EditorFeatureContextAdapters": 2309693440,
+        "Runtime.EditorWorkspaceSession": 2851262464,
+        "Sandbox.PanelSupport": 2409734144
+      },
+      "bmi_total_bytes": 28482868
+    },
+    {
+      "attempt": "09-before-5",
+      "arm": "before",
+      "source": "4fa241cc250113d7d1b5cc8bbd0b54e9c82f6aed",
+      "times_s": {
+        "snapshot": 15.498036692035384,
+        "snapshot.Public": 2.97478464897722,
+        "snapshot.Models": 7.085187966004014,
+        "Runtime.EditorFeatureContextAdapters": 9.014516477938741,
+        "Runtime.EditorWorkspaceSession": 9.2902455360163,
+        "Sandbox.PanelSupport": 9.144928705063649,
+        "runtime_producers": 43.86277132097166,
+        "runtime_and_consumer": 53.00770002603531,
+        "snapshot_with_owner": 15.498036692035384
+      },
+      "bmi_bytes": {
+        "snapshot.pcm": 28482868
+      },
+      "rss_bytes": {
+        "snapshot": 1970606080,
+        "snapshot.Public": 1225027584,
+        "snapshot.Models": 1771589632,
+        "Runtime.EditorFeatureContextAdapters": 2310344704,
+        "Runtime.EditorWorkspaceSession": 2851680256,
+        "Sandbox.PanelSupport": 2410958848
+      },
+      "bmi_total_bytes": 28482868
+    },
+    {
+      "attempt": "10-after-5",
+      "arm": "after",
+      "source": "ca164c10cf20d1b037ac2c116194c1839ec6bb3d",
+      "times_s": {
+        "snapshot.Std": 0.9481913959607482,
+        "snapshot": 0.7071281470125541,
+        "snapshot.Public": 2.912070094025694,
+        "snapshot.Models": 6.876283035962842,
+        "Runtime.EditorFeatureContextAdapters": 8.668501332052983,
+        "Runtime.EditorWorkspaceSession": 8.99421671696473,
+        "Sandbox.PanelSupport": 9.13371196994558,
+        "runtime_producers": 29.10639072197955,
+        "runtime_and_consumer": 38.24010269192513,
+        "snapshot_with_owner": 1.6553195429733023
+      },
+      "bmi_bytes": {
+        "snapshot.pcm": 567292,
+        "std.pcm": 9611384
+      },
+      "rss_bytes": {
+        "snapshot.Std": 213590016,
+        "snapshot": 882880512,
+        "snapshot.Public": 1213665280,
+        "snapshot.Models": 1751506944,
+        "Runtime.EditorFeatureContextAdapters": 2294276096,
+        "Runtime.EditorWorkspaceSession": 2833743872,
+        "Sandbox.PanelSupport": 2394046464
+      },
+      "bmi_total_bytes": 10178676
+    }
+  ],
+  "times_s": {
+    "before": {
+      "snapshot": {
+        "samples": [
+          15.747763289953582,
+          15.182756569003686,
+          15.060458361986093,
+          15.137667962932028,
+          15.498036692035384
+        ],
+        "median": 15.182756569003686,
+        "min": 15.060458361986093,
+        "max": 15.747763289953582
+      },
+      "snapshot.Public": {
+        "samples": [
+          2.998746401979588,
+          2.888251884956844,
+          2.9051528519485146,
+          2.887591000064276,
+          2.97478464897722
+        ],
+        "median": 2.9051528519485146,
+        "min": 2.887591000064276,
+        "max": 2.998746401979588
+      },
+      "snapshot.Models": {
+        "samples": [
+          7.117572803981602,
+          6.912433453951962,
+          6.831429257057607,
+          6.899128730059601,
+          7.085187966004014
+        ],
+        "median": 6.912433453951962,
+        "min": 6.831429257057607,
+        "max": 7.117572803981602
+      },
+      "Runtime.EditorFeatureContextAdapters": {
+        "samples": [
+          9.112122607999481,
+          8.752510649035685,
+          8.777306997100823,
+          8.750083036953583,
+          9.014516477938741
+        ],
+        "median": 8.777306997100823,
+        "min": 8.750083036953583,
+        "max": 9.112122607999481
+      },
+      "Runtime.EditorWorkspaceSession": {
+        "samples": [
+          9.312043095007539,
+          8.979435691959225,
+          9.019150389940478,
+          8.964235818944871,
+          9.2902455360163
+        ],
+        "median": 9.019150389940478,
+        "min": 8.964235818944871,
+        "max": 9.312043095007539
+      },
+      "Sandbox.PanelSupport": {
+        "samples": [
+          9.395759401959367,
+          9.047255518031307,
+          9.05371936201118,
+          9.080473714042455,
+          9.144928705063649
+        ],
+        "median": 9.080473714042455,
+        "min": 9.047255518031307,
+        "max": 9.395759401959367
+      },
+      "runtime_producers": {
+        "samples": [
+          44.28824819892179,
+          42.7153882489074,
+          42.593497858033516,
+          42.63870654895436,
+          43.86277132097166
+        ],
+        "median": 42.7153882489074,
+        "min": 42.593497858033516,
+        "max": 44.28824819892179
+      },
+      "runtime_and_consumer": {
+        "samples": [
+          53.68400760088116,
+          51.76264376693871,
+          51.647217220044695,
+          51.719180262996815,
+          53.00770002603531
+        ],
+        "median": 51.76264376693871,
+        "min": 51.647217220044695,
+        "max": 53.68400760088116
+      },
+      "snapshot_with_owner": {
+        "samples": [
+          15.747763289953582,
+          15.182756569003686,
+          15.060458361986093,
+          15.137667962932028,
+          15.498036692035384
+        ],
+        "median": 15.182756569003686,
+        "min": 15.060458361986093,
+        "max": 15.747763289953582
+      }
+    },
+    "after": {
+      "snapshot.Std": {
+        "samples": [
+          0.9703252230538055,
+          0.9403711019549519,
+          0.9347021130379289,
+          0.9376271769870073,
+          0.9481913959607482
+        ],
+        "median": 0.9403711019549519,
+        "min": 0.9347021130379289,
+        "max": 0.9703252230538055
+      },
+      "snapshot": {
+        "samples": [
+          0.7393900100141764,
+          0.7059561420464888,
+          0.7021442099940032,
+          0.7037165840156376,
+          0.7071281470125541
+        ],
+        "median": 0.7059561420464888,
+        "min": 0.7021442099940032,
+        "max": 0.7393900100141764
+      },
+      "snapshot.Public": {
+        "samples": [
+          3.012767523061484,
+          2.9295778069645166,
+          2.8990658950060606,
+          2.9330191710032523,
+          2.912070094025694
+        ],
+        "median": 2.9295778069645166,
+        "min": 2.8990658950060606,
+        "max": 3.012767523061484
+      },
+      "snapshot.Models": {
+        "samples": [
+          7.095341261010617,
+          6.852917802985758,
+          6.833742685965262,
+          6.862966976012103,
+          6.876283035962842
+        ],
+        "median": 6.862966976012103,
+        "min": 6.833742685965262,
+        "max": 7.095341261010617
+      },
+      "Runtime.EditorFeatureContextAdapters": {
+        "samples": [
+          8.890462105046026,
+          8.72330340091139,
+          8.720772294094786,
+          8.740093027008697,
+          8.668501332052983
+        ],
+        "median": 8.72330340091139,
+        "min": 8.668501332052983,
+        "max": 8.890462105046026
+      },
+      "Runtime.EditorWorkspaceSession": {
+        "samples": [
+          8.997871684958227,
+          8.967595865949988,
+          8.979158759000711,
+          8.980731530929916,
+          8.99421671696473
+        ],
+        "median": 8.980731530929916,
+        "min": 8.967595865949988,
+        "max": 8.997871684958227
+      },
+      "Sandbox.PanelSupport": {
+        "samples": [
+          9.194291290012188,
+          9.086580508970656,
+          9.383683343068697,
+          9.158088625990786,
+          9.13371196994558
+        ],
+        "median": 9.158088625990786,
+        "min": 9.086580508970656,
+        "max": 9.383683343068697
+      },
+      "runtime_producers": {
+        "samples": [
+          29.706157807144336,
+          29.119722120813094,
+          29.069585957098752,
+          29.158154465956613,
+          29.10639072197955
+        ],
+        "median": 29.119722120813094,
+        "min": 29.069585957098752,
+        "max": 29.706157807144336
+      },
+      "runtime_and_consumer": {
+        "samples": [
+          38.900449097156525,
+          38.20630262978375,
+          38.45326930016745,
+          38.3162430919474,
+          38.24010269192513
+        ],
+        "median": 38.3162430919474,
+        "min": 38.20630262978375,
+        "max": 38.900449097156525
+      },
+      "snapshot_with_owner": {
+        "samples": [
+          1.709715233067982,
+          1.6463272440014407,
+          1.6368463230319321,
+          1.641343761002645,
+          1.6553195429733023
+        ],
+        "median": 1.6463272440014407,
+        "min": 1.6368463230319321,
+        "max": 1.709715233067982
+      }
+    }
+  },
+  "bmi_bytes": {
+    "before": {
+      "samples": [
+        28482868,
+        28482868,
+        28482868,
+        28482868,
+        28482868
+      ],
+      "median": 28482868,
+      "min": 28482868,
+      "max": 28482868
+    },
+    "after": {
+      "samples": [
+        10178676,
+        10178676,
+        10178676,
+        10178676,
+        10178676
+      ],
+      "median": 10178676,
+      "min": 10178676,
+      "max": 10178676
+    }
+  },
+  "rss_bytes": {
+    "before": {
+      "snapshot": {
+        "samples": [
+          1970098176,
+          1970081792,
+          1969819648,
+          1970479104,
+          1970606080
+        ],
+        "median": 1970098176,
+        "min": 1969819648,
+        "max": 1970606080
+      },
+      "snapshot.Public": {
+        "samples": [
+          1225052160,
+          1226166272,
+          1225330688,
+          1225043968,
+          1225027584
+        ],
+        "median": 1225052160,
+        "min": 1225027584,
+        "max": 1226166272
+      },
+      "snapshot.Models": {
+        "samples": [
+          1772060672,
+          1772220416,
+          1772367872,
+          1772027904,
+          1771589632
+        ],
+        "median": 1772060672,
+        "min": 1771589632,
+        "max": 1772367872
+      },
+      "Runtime.EditorFeatureContextAdapters": {
+        "samples": [
+          2310283264,
+          2311213056,
+          2310234112,
+          2309693440,
+          2310344704
+        ],
+        "median": 2310283264,
+        "min": 2309693440,
+        "max": 2311213056
+      },
+      "Runtime.EditorWorkspaceSession": {
+        "samples": [
+          2849587200,
+          2850750464,
+          2850746368,
+          2851262464,
+          2851680256
+        ],
+        "median": 2850750464,
+        "min": 2849587200,
+        "max": 2851680256
+      },
+      "Sandbox.PanelSupport": {
+        "samples": [
+          2409365504,
+          2409791488,
+          2411798528,
+          2409734144,
+          2410958848
+        ],
+        "median": 2409791488,
+        "min": 2409365504,
+        "max": 2411798528
+      }
+    },
+    "after": {
+      "snapshot.Std": {
+        "samples": [
+          213762048,
+          213897216,
+          213602304,
+          213704704,
+          213590016
+        ],
+        "median": 213704704,
+        "min": 213590016,
+        "max": 213897216
+      },
+      "snapshot": {
+        "samples": [
+          883048448,
+          883097600,
+          882999296,
+          883150848,
+          882880512
+        ],
+        "median": 883048448,
+        "min": 882880512,
+        "max": 883150848
+      },
+      "snapshot.Public": {
+        "samples": [
+          1213784064,
+          1213804544,
+          1212878848,
+          1213906944,
+          1213665280
+        ],
+        "median": 1213784064,
+        "min": 1212878848,
+        "max": 1213906944
+      },
+      "snapshot.Models": {
+        "samples": [
+          1751322624,
+          1750257664,
+          1751101440,
+          1751281664,
+          1751506944
+        ],
+        "median": 1751281664,
+        "min": 1750257664,
+        "max": 1751506944
+      },
+      "Runtime.EditorFeatureContextAdapters": {
+        "samples": [
+          2294681600,
+          2292264960,
+          2293907456,
+          2293276672,
+          2294276096
+        ],
+        "median": 2293907456,
+        "min": 2292264960,
+        "max": 2294681600
+      },
+      "Runtime.EditorWorkspaceSession": {
+        "samples": [
+          2834714624,
+          2834001920,
+          2832449536,
+          2834759680,
+          2833743872
+        ],
+        "median": 2834001920,
+        "min": 2832449536,
+        "max": 2834759680
+      },
+      "Sandbox.PanelSupport": {
+        "samples": [
+          2393337856,
+          2394046464,
+          2393419776,
+          2394226688,
+          2394046464
+        ],
+        "median": 2394046464,
+        "min": 2393337856,
+        "max": 2394226688
+      }
+    }
+  },
+  "median_time_reduction_percent": {
+    "snapshot": 95.35027688260686,
+    "snapshot.Public": -0.8407459524761407,
+    "snapshot.Models": 0.7156159732948808,
+    "Runtime.EditorFeatureContextAdapters": 0.6152638412587064,
+    "Runtime.EditorWorkspaceSession": 0.42596982364783154,
+    "Sandbox.PanelSupport": -0.8547451861272704,
+    "runtime_producers": 31.828497142226176,
+    "runtime_and_consumer": 25.9770361334976,
+    "snapshot_with_owner": 89.15659856285588
+  }
+}

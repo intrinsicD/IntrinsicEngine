@@ -70,17 +70,17 @@ Research remains paused behind REVIEW-004 except explicit operator direction and
 ## Compilation and reuse follow-ups
 
 These operator-requested tasks continue from the improved engine, without
-reopening the completed cleanup slices. Run BUILD-009 first for the three
-compile-locality implementations; RUNTIME-267 follows RUNTIME-266 for shared
-session files. UI-037 and GRAPHICS-105 are independently ready. The task
-front-matter owns prerequisite state.
+reopening completed cleanup slices. BUILD-009, RUNTIME-266 and RUNTIME-268
+are complete. RUNTIME-267 and GRAPHICS-144 must freeze fresh immediate-before
+sources for their own comparisons. UI-037 and GRAPHICS-105 are independently
+ready. Task front-matter owns prerequisite state.
 
 | Area | Task |
 | --- | --- |
 | Fresh compile baseline and remaining hotspot ranking | [BUILD-009](../done/BUILD-009-current-source-compile-baseline.md) |
 | Editor snapshot/context consumers | [RUNTIME-266](../done/RUNTIME-266-editor-snapshot-consumer-locality.md) |
 | Processing config dependency chain | [RUNTIME-267](runtime/RUNTIME-267-processing-config-consumer-locality.md) |
-| Snapshot BMI serialization (diagnostic follow-up) | [RUNTIME-268](../active/RUNTIME-268-workspace-snapshot-bmi-serialization.md) |
+| Snapshot BMI serialization (diagnostic follow-up) | [RUNTIME-268](../done/RUNTIME-268-workspace-snapshot-bmi-serialization.md) |
 | Renderer surface and implementation dependencies | [GRAPHICS-144](rendering/GRAPHICS-144-renderer-consumer-locality.md) |
 | Shared action readiness and disabled reasons | [UI-037](ui/UI-037-linear-domain-action-readiness-tooltips.md) |
 | Material/visualization authority consolidation | [GRAPHICS-105](rendering/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md) |

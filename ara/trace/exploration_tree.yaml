@@ -12976,3 +12976,56 @@ tree:
     - tasks/done/RUNTIME-266-editor-snapshot-consumer-locality.md
     - tasks/backlog/runtime/RUNTIME-268-workspace-snapshot-bmi-serialization.md
     status: resolved
+
+  - id: N599
+    type: dead_end
+    title: Reject record splitting and unsafe standard-declaration prototypes
+    provenance: ai-executed
+    timestamp: '2026-09-16T00:38:04+02:00'
+    hypothesis: Small record groups, empty-initializer removal, namespace changes or pointer-only standard members might remove
+      the isolated snapshot serialization cost.
+    failure_mode: Disjoint group controls remain expensive; standard-type cost depends on the imported engine graph. A shared
+      textual prelude still serializes the merged declarations. Namespace-std additions and implementation-partition reachability
+      are rejected before the final implementation.
+    lesson: Keep record ownership and standard type identity; isolate standard header declarations in a necessarily reachable
+      module interface only after measuring the actual interaction. These are task-specific diagnostic controls, not general
+      no-split or cross-engine claims.
+    evidence:
+    - ara/evidence/tables/runtime268_snapshot_std_measurement.md
+    status: resolved
+
+  - id: N600
+    type: experiment
+    title: Measure snapshot compilation with the added declaration owner charged
+    provenance: ai-executed
+    timestamp: '2026-09-16T00:38:04+02:00'
+    result: Ten successful focused serial Clang23 samples, five per exact arm in ABBAABBAAB. Snapshot-plus-owner median 15.183
+      to 1.646 seconds; selected runtime subtotal 42.715 to 29.120. Real Sandbox consumer ranges overlap. All results claim_eligible
+      false. Source flags, frozen prerequisite identities and absence of stale transitive snapshot imports checked; initial
+      preflight failure precedes any compiler command and is retained.
+    evidence:
+    - O232
+    - ara/evidence/tables/runtime268_snapshot_std_measurement.md
+    - ara/evidence/diagnostics/runtime268_snapshot_std/evidence-index.json
+    status: resolved
+
+  - id: N601
+    type: decision
+    title: Keep and retire the narrow snapshot declaration ownership change
+    provenance: ai-executed
+    timestamp: '2026-09-16T00:38:04+02:00'
+    choice: Retain ca164c10c and retire RUNTIME-268. One added 21-line module plus net two lines in existing C++ owners and
+      one CMake entry. Same standard types, aggregates and value ownership; equality now defaults in the existing Public implementation.
+      Claude source and results reviews resolved. Canonical full CPU 4664 passes plus one expected skip; fresh cache-off Clang20
+      compiles Sandbox editor/engine and contract object. Keep RUNTIME-267 and GRAPHICS-144 open with fresh-baseline requirements.
+    alternatives:
+    - Split records or add Pimpl without addressing serialization
+    - Re-export standard operators or add names to namespace std
+    - Count primary-only savings without the new owner
+    - Generalize focused timings to whole-engine build or runtime performance
+    evidence:
+    - O232
+    - N600
+    - tasks/done/RUNTIME-268-workspace-snapshot-bmi-serialization.md
+    - ara/evidence/tables/runtime268_snapshot_std_measurement.md
+    status: resolved

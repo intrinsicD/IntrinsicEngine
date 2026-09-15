@@ -33,9 +33,9 @@ session rebuild chain without duplicating configuration, validation or service o
 - Follow `docs/architecture/sandbox-editor-feature-boundaries.md`. Preserve
   validation/apply parity, defaults and round-trips, selected property domains,
   backend reporting, subscriptions and stale/expired-command guards.
-  RUNTIME-266 owns broad snapshot/context changes and must finish first for the
-  shared session files. Freeze a new immediate-before config baseline on that
-  integrated source; BUILD-009 timings are context, not the comparison arm.
+  RUNTIME-266 and RUNTIME-268 completed the broad snapshot/context changes.
+  Freeze a new immediate-before config baseline on their integrated source;
+  BUILD-009 timings are context, not the comparison arm.
   UI-037 retains readiness behavior ownership.
 
 ## Acceptance criteria
@@ -73,5 +73,6 @@ Freeze this task's immediate-before source before attributing its own changes.
 
 RUNTIME-266 is complete at `08728e2e1`: the registry import cut is retained and
 fully verified; its noisy two-sample timings imply no stable speedup. RUNTIME-268
-owns the separately diagnosed snapshot serialization footprint. Coordinate shared
-context/session edits and freeze a fresh config baseline for this task.
+is complete at `ca164c10c`: preserve the standard-declaration owner and exact
+snapshot types. Its focused compile comparison does not measure this config
+rebuild chain. Freeze a fresh config baseline for this task.

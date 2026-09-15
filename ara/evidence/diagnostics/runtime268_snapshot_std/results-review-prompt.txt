@@ -1,0 +1,491 @@
+Read-only fixed-packet final results audit for RUNTIME-268. You previously reviewed the source and runner; no tools/edits. Check arithmetic, comparability, overclaims, variance and source/feature limitations. Respond concisely with blockers or required wording fixes. The final source has canonical complete build/full CPU verification and fresh Clang20 compilation, and no source changed afterward. Your previous runner review findings were applied: byte-identical common commands verified, actual after maps captured, explicit sequence, single-interface output assertion, no stale transitive snapshot imports from 232 frozen BMIs verified through clang module-file-info, guarded flags/paths, checksums before/after every attempt, correct sum accounting and 5/5 assertion. One preflight rejected exact CMake '-x c++-module' before any compiler invocation; retained separately, allowed only for interface units, runner/protocol rehashed before the successful cohort. There were no timed failures/discards. Do not mistake prototype measurements for the verified candidate.
+
+DRAFT REPORT
+# RUNTIME-268 — Shared standard declarations for workspace snapshots
+
+## Decision and measured scope
+
+Keep the narrow declaration-owner change. In this retained local five-sample-per-arm
+comparison, the median snapshot-plus-owner compilation changes from **15.183
+to 1.646 seconds (89.2% lower)**. The affected runtime producer
+subtotal changes from **42.715 to 29.120 seconds**.
+The real Sandbox consumer's ranges overlap; its small median difference establishes
+no consumer improvement or regression. These are focused serial compile-command
+observations, not whole-engine, parallel-build, runtime or cross-host results.
+All ten canonical records remain `claim_eligible: false`; C99 records only this
+bounded local observation.
+
+`build.workspace_snapshot_std.v1`, exact sources `4fa241cc2` → `ca164c10c`;
+manifest committed at `01e92cdf6`. ABBAABBAAB, five samples per arm, Clang23 Debug
+canonical ci flags, one compiler at a time, fixed detached source/output paths,
+cache/launchers/tracing off. The candidate pays for the added standard-owner
+compilation before compiling the same six files. Configure, scanning, linking,
+tests and all other compilation are excluded. Runtime plus consumer totals are
+sums of per-command walls; outer instrumentation time is separate.
+
+All six common commands match byte-for-byte before path projection. The after maps
+are captured from actual CMake output and differ only by the added standard owner.
+232 frozen prerequisite BMI hashes and the 1,728-file package fingerprint are
+checked before/after every sample. Compiler-inspected module metadata verifies
+that none of the frozen prerequisites (other than the unused old snapshot copy)
+imports the snapshot, including transitively. Every sampled consumer uses the
+newly emitted snapshot BMI and, in the candidate, the newly emitted standard BMI.
+
+Prerequisites originate from ci with Vulkan/GLFW configured, distinct from earlier
+Null/headless timed cohorts; there is no GPU execution. Inputs are pre-read, but
+normal desktop filesystem/compiler first-use caches, CPU affinity, governor and
+turbo are uncontrolled. No competing builds/tests ran during sampling. Every
+measured sample is retained, including the slow first baseline. No statistical
+significance, publication-grade eligibility or stable future speedup is asserted.
+
+## Timing observations
+
+Seconds, median [minimum–maximum]. The combined snapshot row charges the new owner;
+the primary-only row is shown for attribution, not as the headline saving.
+
+| Producer or subtotal | Before | After |
+|---|---:|---:|
+| Snapshot + added standard owner | 15.183 [15.060–15.748] | 1.646 [1.637–1.710] |
+| Snapshot primary only | 15.183 [15.060–15.748] | 0.706 [0.702–0.739] |
+| Snapshot Public implementation | 2.905 [2.888–2.999] | 2.930 [2.899–3.013] |
+| Snapshot Models implementation | 6.912 [6.831–7.118] | 6.863 [6.834–7.095] |
+| Context adapters | 8.777 [8.750–9.112] | 8.723 [8.669–8.890] |
+| Workspace session | 9.019 [8.964–9.312] | 8.981 [8.968–8.998] |
+| Sandbox PanelSupport consumer | 9.080 [9.047–9.396] | 9.158 [9.087–9.384] |
+| Runtime subtotal, including new owner | 42.715 [42.593–44.288] | 29.120 [29.070–29.706] |
+| Runtime + consumer sum | 51.763 [51.647–53.684] | 38.316 [38.206–38.900] |
+
+The candidate's standard owner alone is 0.940 [0.935–0.970] seconds.
+
+| Attempt | Snapshot + owner | Runtime subtotal | Sandbox consumer |
+|---|---:|---:|---:|
+| 01-before-1 | 15.748 | 44.288 | 9.396 |
+| 02-after-1 | 1.710 | 29.706 | 9.194 |
+| 03-after-2 | 1.646 | 29.120 | 9.087 |
+| 04-before-2 | 15.183 | 42.715 | 9.047 |
+| 05-before-3 | 15.060 | 42.593 | 9.054 |
+| 06-after-3 | 1.637 | 29.070 | 9.384 |
+| 07-after-4 | 1.641 | 29.158 | 9.158 |
+| 08-before-4 | 15.138 | 42.639 | 9.080 |
+| 09-before-5 | 15.498 | 43.863 | 9.145 |
+| 10-after-5 | 1.655 | 29.106 | 9.134 |
+
+Changed BMI storage totals 28,482,868 → 10,178,676 bytes (snapshot versus snapshot **plus** new owner; constant within each arm). This is emitted storage for these changed modules, not the whole prerequisite cache, peak process memory or engine runtime memory. Per-command maximum single-process RSS and user/system CPU records are retained in the results.
+
+## What changed
+
+Keep the existing snapshot records and value ownership. A 21-line runtime-local
+module compiles the five standard-library headers independently of the editor
+import graph and exposes six using-declarations in an engine namespace. The
+snapshot interface imports those declarations; they name the original standard
+types. There are no replacement containers, duplicate records, constructors,
+Pimpl allocations, compatibility wrappers or new target-link edges.
+
+Cache-key equality is defaulted out of line in the existing Public implementation
+unit, where the ordinary headers make its standard comparison operators visible.
+It is no longer implicitly inline/constexpr; no in-tree constant-expression user
+exists. A runtime cost from that change has not been measured. The new module's
+CMake fileset is public for BMI metadata propagation; its C++ helper names are
+not re-exported through the snapshot interface. The source import policy checks
+that exact edge and rejects re-exporting it or adding an arbitrary private edge.
+
+Source accounting: one added module/file, **+23 C++ production lines**, plus one
+CMake source-list entry (**+24 under src/**); 419 module inventory entries. This
+reduces repeated compiler work rather than production line count. Splitting the
+records or changing their ownership would add more engine complexity without
+addressing the isolated mechanism.
+
+## Why this boundary
+
+The preserved exact-original-source diagnostic (`duplicate-declarations`) records
+15.131 seconds outer wall, 15.062 ExecuteCompiler, 13.333 WriteAST and a
+28,482,752-byte BMI. It enables the duplication-warning flag, emits no warnings,
+and has one compiler job. Trace categories overlap; they must not be summed.
+A control retaining every direct import and global-fragment include, but replacing
+own declarations with a trivial export, takes 1.477 seconds and emits 1,510,328
+bytes. This is an isolation control, not a feature-equivalent implementation.
+
+Every disjoint record group remains expensive (roughly 15.1–15.5 seconds in these
+single diagnostic runs). Removing empty member initializers, moving equality
+alone, changing namespaces and using a pointer to string do not remove that cost.
+A transform-only record is cheap; mentioning string/vector with the whole import
+graph is expensive. The same string with no engine imports takes 1.022 seconds;
+single-import controls vary substantially. This rejects the initial explanation
+of an irreducible standard-type cost: the declaration/import interaction matters.
+Debugger samples land in ASTWriter references and unresolved lookup serialization;
+bitcode statistics put 85.6% of the original BMI in DECLTYPES.
+
+A separate standard-header declaration owner resolves the measured interaction.
+Retaining those same headers textually in the primary interface as well as
+importing the owner remains expensive, so a shared textual prelude is insufficient.
+This is consistent with [Clang's module guidance on reducing duplicated header declarations](https://clang.llvm.org/docs/StandardCPlusPlusModules.html#reduce-duplications).
+No compiler-wide BMI flag changes: reduced BMIs were already enabled on Clang23.
+
+Rejected prototypes added declarations to namespace std or relied on optional
+implementation-partition reachability; neither shipped. Their timings are excluded
+from the final comparison. The final independent module interface uses ordinary
+using-declarations in SnapshotStd, and fresh Clang20 compilation verifies the
+minimum-supported compiler and affected consumer graph.
+
+## Verification and review
+
+Canonical ci configure and complete IntrinsicTests build pass on Clang23.
+The full CPU gate selects 4,665 tests: **4,664 pass, zero fail, one expected
+ASan-only leak-control skip** (153.51 seconds). The earlier focused gate has
+271 passes; final import-policy refinements are included in the full CPU run.
+The added contract test checks aggregate initialization, exact standard types and
+factory signature, copied string independence and cache-key comparisons.
+
+A fresh cache-off Clang20 Null/headless build compiles the Sandbox editor and
+its engine closure, plus the snapshot model contract object. Snapshot/standard-owner
+compiler dependency checks retain the registry/device/spatial-cache exclusions.
+This is Clang20 compilation evidence, not Clang20 test execution. There is no
+GPU or sanitizer execution claim. Negative source controls make the import-policy
+test fail for an extra private import and a re-export; restoring the exact source
+and timestamps passes it. No production source changed after these checks.
+
+Claude reviewed the plan, diagnostic interpretation, discarded prototypes, fixed
+source, import policy, timing runner and final results. Review corrections include
+minimum-compiler/reachability verification, out-of-line equality, the precise import
+exception, real after-command validation, frozen-BMI transitive-import checks,
+output safety, sample accounting and narrowly scoped claims. Early review hypotheses
+that diagnostics disproved are retained as superseded, not supporting conclusions.
+
+## Reproduction and custody
+
+The task-specific runner is archived with its SHA-256 and frozen protocol; it
+reuses the canonical dependency-fingerprint, result-sealing and validation helpers.
+To reproduce, recreate both exact commits and canonical ci prerequisites with the
+recorded compiler/dependencies, capture the six common commands and after-owner
+command/maps, freeze their BMI closure, validate that none of those prerequisites
+imports the snapshot, and replay the recorded protocol in owned output paths.
+Absolute scratch/build paths in archived commands describe this run; the archive
+is not a portable prebuilt SDK. Prerequisite binaries are deliberately not checked
+in; identities and the checked import graph are retained.
+
+The initial runner preflight rejected CMake's valid `-x c++-module` response-file
+line before any compiler invocation. Its directory, log, runner and original
+protocol are retained separately. The correction admits only that exact line for
+module-interface producers; the runner hash/protocol was frozen again before the
+ten successful samples. No timed sample was discarded or repaired.
+
+An earlier debugger probe reused the initial `real` diagnostic trace path. The
+replacement is explicitly named `real.debugger.trace.json`; the original summary
+is not paired with it. The independent `duplicate-declarations` trace/summary is
+the report's full-source phase evidence. All diagnostic controls, failures and
+rejected prototypes remain separate from the matched benchmark population.
+
+RUNTIME-268 closes at CPUContracted, the intended refactor endpoint. RUNTIME-267
+still owns configuration dependencies and GRAPHICS-144 the renderer. The renderer
+may have a similar declaration-serialization issue, but that requires its own
+trace, layer-correct reuse design and matched measurements before adoption.
+
+## Evidence
+
+[Manifest](../../../benchmarks/ci/manifests/workspace_snapshot_std.yaml) ·
+[All samples, ranges and recalculation](../diagnostics/runtime268_snapshot_std/summary.json) ·
+[Source/protocol/archive index](../diagnostics/runtime268_snapshot_std/evidence-index.json) ·
+[Verification](../diagnostics/runtime268_snapshot_std/verification.json) ·
+[Claude results review](../diagnostics/runtime268_snapshot_std/results-review.txt) ·
+[Raw traces, commands, controls, logs and scripts](../diagnostics/runtime268_snapshot_std/raw-evidence.tar.gz).
+
+RAW SAMPLE ROWS
+[
+  {
+    "attempt": "01-before-1",
+    "arm": "before",
+    "source": "4fa241cc250113d7d1b5cc8bbd0b54e9c82f6aed",
+    "times_s": {
+      "snapshot": 15.747763289953582,
+      "snapshot.Public": 2.998746401979588,
+      "snapshot.Models": 7.117572803981602,
+      "Runtime.EditorFeatureContextAdapters": 9.112122607999481,
+      "Runtime.EditorWorkspaceSession": 9.312043095007539,
+      "Sandbox.PanelSupport": 9.395759401959367,
+      "runtime_producers": 44.28824819892179,
+      "runtime_and_consumer": 53.68400760088116,
+      "snapshot_with_owner": 15.747763289953582
+    },
+    "bmi_bytes": {
+      "snapshot.pcm": 28482868
+    },
+    "rss_bytes": {
+      "snapshot": 1970098176,
+      "snapshot.Public": 1225052160,
+      "snapshot.Models": 1772060672,
+      "Runtime.EditorFeatureContextAdapters": 2310283264,
+      "Runtime.EditorWorkspaceSession": 2849587200,
+      "Sandbox.PanelSupport": 2409365504
+    },
+    "bmi_total_bytes": 28482868
+  },
+  {
+    "attempt": "02-after-1",
+    "arm": "after",
+    "source": "ca164c10cf20d1b037ac2c116194c1839ec6bb3d",
+    "times_s": {
+      "snapshot.Std": 0.9703252230538055,
+      "snapshot": 0.7393900100141764,
+      "snapshot.Public": 3.012767523061484,
+      "snapshot.Models": 7.095341261010617,
+      "Runtime.EditorFeatureContextAdapters": 8.890462105046026,
+      "Runtime.EditorWorkspaceSession": 8.997871684958227,
+      "Sandbox.PanelSupport": 9.194291290012188,
+      "runtime_producers": 29.706157807144336,
+      "runtime_and_consumer": 38.900449097156525,
+      "snapshot_with_owner": 1.709715233067982
+    },
+    "bmi_bytes": {
+      "snapshot.pcm": 567292,
+      "std.pcm": 9611384
+    },
+    "rss_bytes": {
+      "snapshot.Std": 213762048,
+      "snapshot": 883048448,
+      "snapshot.Public": 1213784064,
+      "snapshot.Models": 1751322624,
+      "Runtime.EditorFeatureContextAdapters": 2294681600,
+      "Runtime.EditorWorkspaceSession": 2834714624,
+      "Sandbox.PanelSupport": 2393337856
+    },
+    "bmi_total_bytes": 10178676
+  },
+  {
+    "attempt": "03-after-2",
+    "arm": "after",
+    "source": "ca164c10cf20d1b037ac2c116194c1839ec6bb3d",
+    "times_s": {
+      "snapshot.Std": 0.9403711019549519,
+      "snapshot": 0.7059561420464888,
+      "snapshot.Public": 2.9295778069645166,
+      "snapshot.Models": 6.852917802985758,
+      "Runtime.EditorFeatureContextAdapters": 8.72330340091139,
+      "Runtime.EditorWorkspaceSession": 8.967595865949988,
+      "Sandbox.PanelSupport": 9.086580508970656,
+      "runtime_producers": 29.119722120813094,
+      "runtime_and_consumer": 38.20630262978375,
+      "snapshot_with_owner": 1.6463272440014407
+    },
+    "bmi_bytes": {
+      "snapshot.pcm": 567292,
+      "std.pcm": 9611384
+    },
+    "rss_bytes": {
+      "snapshot.Std": 213897216,
+      "snapshot": 883097600,
+      "snapshot.Public": 1213804544,
+      "snapshot.Models": 1750257664,
+      "Runtime.EditorFeatureContextAdapters": 2292264960,
+      "Runtime.EditorWorkspaceSession": 2834001920,
+      "Sandbox.PanelSupport": 2394046464
+    },
+    "bmi_total_bytes": 10178676
+  },
+  {
+    "attempt": "04-before-2",
+    "arm": "before",
+    "source": "4fa241cc250113d7d1b5cc8bbd0b54e9c82f6aed",
+    "times_s": {
+      "snapshot": 15.182756569003686,
+      "snapshot.Public": 2.888251884956844,
+      "snapshot.Models": 6.912433453951962,
+      "Runtime.EditorFeatureContextAdapters": 8.752510649035685,
+      "Runtime.EditorWorkspaceSession": 8.979435691959225,
+      "Sandbox.PanelSupport": 9.047255518031307,
+      "runtime_producers": 42.7153882489074,
+      "runtime_and_consumer": 51.76264376693871,
+      "snapshot_with_owner": 15.182756569003686
+    },
+    "bmi_bytes": {
+      "snapshot.pcm": 28482868
+    },
+    "rss_bytes": {
+      "snapshot": 1970081792,
+      "snapshot.Public": 1226166272,
+      "snapshot.Models": 1772220416,
+      "Runtime.EditorFeatureContextAdapters": 2311213056,
+      "Runtime.EditorWorkspaceSession": 2850750464,
+      "Sandbox.PanelSupport": 2409791488
+    },
+    "bmi_total_bytes": 28482868
+  },
+  {
+    "attempt": "05-before-3",
+    "arm": "before",
+    "source": "4fa241cc250113d7d1b5cc8bbd0b54e9c82f6aed",
+    "times_s": {
+      "snapshot": 15.060458361986093,
+      "snapshot.Public": 2.9051528519485146,
+      "snapshot.Models": 6.831429257057607,
+      "Runtime.EditorFeatureContextAdapters": 8.777306997100823,
+      "Runtime.EditorWorkspaceSession": 9.019150389940478,
+      "Sandbox.PanelSupport": 9.05371936201118,
+      "runtime_producers": 42.593497858033516,
+      "runtime_and_consumer": 51.647217220044695,
+      "snapshot_with_owner": 15.060458361986093
+    },
+    "bmi_bytes": {
+      "snapshot.pcm": 28482868
+    },
+    "rss_bytes": {
+      "snapshot": 1969819648,
+      "snapshot.Public": 1225330688,
+      "snapshot.Models": 1772367872,
+      "Runtime.EditorFeatureContextAdapters": 2310234112,
+      "Runtime.EditorWorkspaceSession": 2850746368,
+      "Sandbox.PanelSupport": 2411798528
+    },
+    "bmi_total_bytes": 28482868
+  },
+  {
+    "attempt": "06-after-3",
+    "arm": "after",
+    "source": "ca164c10cf20d1b037ac2c116194c1839ec6bb3d",
+    "times_s": {
+      "snapshot.Std": 0.9347021130379289,
+      "snapshot": 0.7021442099940032,
+      "snapshot.Public": 2.8990658950060606,
+      "snapshot.Models": 6.833742685965262,
+      "Runtime.EditorFeatureContextAdapters": 8.720772294094786,
+      "Runtime.EditorWorkspaceSession": 8.979158759000711,
+      "Sandbox.PanelSupport": 9.383683343068697,
+      "runtime_producers": 29.069585957098752,
+      "runtime_and_consumer": 38.45326930016745,
+      "snapshot_with_owner": 1.6368463230319321
+    },
+    "bmi_bytes": {
+      "snapshot.pcm": 567292,
+      "std.pcm": 9611384
+    },
+    "rss_bytes": {
+      "snapshot.Std": 213602304,
+      "snapshot": 882999296,
+      "snapshot.Public": 1212878848,
+      "snapshot.Models": 1751101440,
+      "Runtime.EditorFeatureContextAdapters": 2293907456,
+      "Runtime.EditorWorkspaceSession": 2832449536,
+      "Sandbox.PanelSupport": 2393419776
+    },
+    "bmi_total_bytes": 10178676
+  },
+  {
+    "attempt": "07-after-4",
+    "arm": "after",
+    "source": "ca164c10cf20d1b037ac2c116194c1839ec6bb3d",
+    "times_s": {
+      "snapshot.Std": 0.9376271769870073,
+      "snapshot": 0.7037165840156376,
+      "snapshot.Public": 2.9330191710032523,
+      "snapshot.Models": 6.862966976012103,
+      "Runtime.EditorFeatureContextAdapters": 8.740093027008697,
+      "Runtime.EditorWorkspaceSession": 8.980731530929916,
+      "Sandbox.PanelSupport": 9.158088625990786,
+      "runtime_producers": 29.158154465956613,
+      "runtime_and_consumer": 38.3162430919474,
+      "snapshot_with_owner": 1.641343761002645
+    },
+    "bmi_bytes": {
+      "snapshot.pcm": 567292,
+      "std.pcm": 9611384
+    },
+    "rss_bytes": {
+      "snapshot.Std": 213704704,
+      "snapshot": 883150848,
+      "snapshot.Public": 1213906944,
+      "snapshot.Models": 1751281664,
+      "Runtime.EditorFeatureContextAdapters": 2293276672,
+      "Runtime.EditorWorkspaceSession": 2834759680,
+      "Sandbox.PanelSupport": 2394226688
+    },
+    "bmi_total_bytes": 10178676
+  },
+  {
+    "attempt": "08-before-4",
+    "arm": "before",
+    "source": "4fa241cc250113d7d1b5cc8bbd0b54e9c82f6aed",
+    "times_s": {
+      "snapshot": 15.137667962932028,
+      "snapshot.Public": 2.887591000064276,
+      "snapshot.Models": 6.899128730059601,
+      "Runtime.EditorFeatureContextAdapters": 8.750083036953583,
+      "Runtime.EditorWorkspaceSession": 8.964235818944871,
+      "Sandbox.PanelSupport": 9.080473714042455,
+      "runtime_producers": 42.63870654895436,
+      "runtime_and_consumer": 51.719180262996815,
+      "snapshot_with_owner": 15.137667962932028
+    },
+    "bmi_bytes": {
+      "snapshot.pcm": 28482868
+    },
+    "rss_bytes": {
+      "snapshot": 1970479104,
+      "snapshot.Public": 1225043968,
+      "snapshot.Models": 1772027904,
+      "Runtime.EditorFeatureContextAdapters": 2309693440,
+      "Runtime.EditorWorkspaceSession": 2851262464,
+      "Sandbox.PanelSupport": 2409734144
+    },
+    "bmi_total_bytes": 28482868
+  },
+  {
+    "attempt": "09-before-5",
+    "arm": "before",
+    "source": "4fa241cc250113d7d1b5cc8bbd0b54e9c82f6aed",
+    "times_s": {
+      "snapshot": 15.498036692035384,
+      "snapshot.Public": 2.97478464897722,
+      "snapshot.Models": 7.085187966004014,
+      "Runtime.EditorFeatureContextAdapters": 9.014516477938741,
+      "Runtime.EditorWorkspaceSession": 9.2902455360163,
+      "Sandbox.PanelSupport": 9.144928705063649,
+      "runtime_producers": 43.86277132097166,
+      "runtime_and_consumer": 53.00770002603531,
+      "snapshot_with_owner": 15.498036692035384
+    },
+    "bmi_bytes": {
+      "snapshot.pcm": 28482868
+    },
+    "rss_bytes": {
+      "snapshot": 1970606080,
+      "snapshot.Public": 1225027584,
+      "snapshot.Models": 1771589632,
+      "Runtime.EditorFeatureContextAdapters": 2310344704,
+      "Runtime.EditorWorkspaceSession": 2851680256,
+      "Sandbox.PanelSupport": 2410958848
+    },
+    "bmi_total_bytes": 28482868
+  },
+  {
+    "attempt": "10-after-5",
+    "arm": "after",
+    "source": "ca164c10cf20d1b037ac2c116194c1839ec6bb3d",
+    "times_s": {
+      "snapshot.Std": 0.9481913959607482,
+      "snapshot": 0.7071281470125541,
+      "snapshot.Public": 2.912070094025694,
+      "snapshot.Models": 6.876283035962842,
+      "Runtime.EditorFeatureContextAdapters": 8.668501332052983,
+      "Runtime.EditorWorkspaceSession": 8.99421671696473,
+      "Sandbox.PanelSupport": 9.13371196994558,
+      "runtime_producers": 29.10639072197955,
+      "runtime_and_consumer": 38.24010269192513,
+      "snapshot_with_owner": 1.6553195429733023
+    },
+    "bmi_bytes": {
+      "snapshot.pcm": 567292,
+      "std.pcm": 9611384
+    },
+    "rss_bytes": {
+      "snapshot.Std": 213590016,
+      "snapshot": 882880512,
+      "snapshot.Public": 1213665280,
+      "snapshot.Models": 1751506944,
+      "Runtime.EditorFeatureContextAdapters": 2294276096,
+      "Runtime.EditorWorkspaceSession": 2833743872,
+      "Sandbox.PanelSupport": 2394046464
+    },
+    "bmi_total_bytes": 10178676
+  }
+]
+COMPUTED MEDIAN REDUCTIONS
+{"snapshot": 95.35027688260686, "snapshot.Public": -0.8407459524761407, "snapshot.Models": 0.7156159732948808, "Runtime.EditorFeatureContextAdapters": 0.6152638412587064, "Runtime.EditorWorkspaceSession": 0.42596982364783154, "Sandbox.PanelSupport": -0.8547451861272704, "runtime_producers": 31.828497142226176, "runtime_and_consumer": 25.9770361334976, "snapshot_with_owner": 89.15659856285588}

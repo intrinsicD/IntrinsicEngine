@@ -1,0 +1,5 @@
+{
+  "initial_real_trace": "The debugger experiment reused the initial real diagnostic output paths. Its trace is now retained as real.debugger.trace.json; initial real.summary.json and GNU time record remain the original run. Do not pair that initial summary with the overwritten trace.",
+  "report_baseline_trace": "Use the separate duplicate-declarations.trace.json/summary.json pair for retained full-source phase evidence. It uses the exact original source with an extra compiler warning flag; no warnings were emitted. Diagnostic timings are not the focused benchmark cohort.",
+  "prototype_policy": "Implementation-partition and namespace-std prototypes are rejected, not feature-equivalent performance evidence."
+}

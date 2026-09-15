@@ -1,0 +1,19 @@
+## Audit result: no blockers. Three wording fixes.
+
+**Arithmetic — verified clean.** I recomputed every median and range in both tables from the raw rows: all 9 timing rows, the owner row (0.940 [0.935–0.970]), and the per-attempt table match. Percentages check: 1 − 1.6463/15.1828 = 89.16% → "89.2%" ✓. Per-sample sums are internally consistent (e.g. 02: 0.9703+0.7394+3.0128+7.0953+8.8905+8.9979 = 29.7062 = `runtime_producers`; +9.1943 = 38.9004). BMI: 567,292 + 9,611,384 = 10,178,676 ✓. Test gate: 4,664 + 1 = 4,665 ✓. Interleave decodes to ABBAABBAAB with A=before ✓.
+
+**Required fixes**
+
+1. **Subtotals are medians of per-sample sums, not sums of the column.** The after column's listed medians sum to 29.143, but the subtotal row reads 29.120 (before: 42.699 vs 42.715). Nothing is wrong, but a reader recomputing will find a 23 ms mismatch. Add to the table caption: *"Subtotal rows are medians of each sample's summed walls; they do not equal the sum of the per-command medians."* Same caveat covers the `Runtime + consumer sum` row.
+
+2. **21 vs 23 lines.** "A 21-line runtime-local module" against "**+23 C++ production lines**". Reconcile explicitly (e.g. 21 non-blank lines, +23 lines added) or the source accounting looks like a second, disagreeing count.
+
+3. **Diagnostic BMI 28,482,752 vs benchmark 28,482,868.** The 116-byte gap between the `duplicate-declarations` diagnostic BMI and the measured before-arm BMI is unexplained in the text and reads as an inconsistency. One clause noting the diagnostic runs with the duplication-warning flag and is therefore not byte-identical to the benchmark compile is enough.
+
+**Comparability / overclaim checks — no changes needed**
+
+- Consumer handled correctly: Sandbox after-median is *higher* (9.158 vs 9.080, −0.85%) and the arms' ranges overlap heavily; the draft's "establishes no consumer improvement or regression" is the right reading and is not contradicted anywhere else.
+- Order effect is real (the first before sample is the max in every before column, 44.288 s) but is disclosed, retained, and cannot flip a 15.18→1.65 s result. Before-arm spread ~4.6%, after-arm snapshot spread ~4.4% on a 1.6 s base — far smaller than the effect.
+- n=5/arm with no significance, eligibility, or cross-host claim; `claim_eligible: false` on all ten; scope exclusions (configure/scan/link/tests, parallelism, runtime) are stated. Uncontrolled governor/turbo/affinity disclosed.
+- Prototype timings (std-namespace, implementation-partition reachability) are explicitly excluded; the 1.477 s and 1.022 s figures are labeled isolation controls, not feature-equivalent. Clang20 is scoped to compilation, not test execution. Out-of-line equality cost is stated as unmeasured rather than assumed zero. The GRAPHICS-144 renderer note is correctly conditional.
+- BMI storage paragraph correctly disclaims peak RSS / whole-cache / runtime memory.

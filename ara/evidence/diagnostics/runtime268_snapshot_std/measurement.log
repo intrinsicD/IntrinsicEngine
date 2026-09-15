@@ -1,0 +1,21 @@
+START 01-before-1
+COMPLETE 01-before-1 runtime 44.288 consumer 9.396
+START 02-after-1
+COMPLETE 02-after-1 runtime 29.706 consumer 9.194
+START 03-after-2
+COMPLETE 03-after-2 runtime 29.12 consumer 9.087
+START 04-before-2
+COMPLETE 04-before-2 runtime 42.715 consumer 9.047
+START 05-before-3
+COMPLETE 05-before-3 runtime 42.593 consumer 9.054
+START 06-after-3
+COMPLETE 06-after-3 runtime 29.07 consumer 9.384
+START 07-after-4
+COMPLETE 07-after-4 runtime 29.158 consumer 9.158
+START 08-before-4
+COMPLETE 08-before-4 runtime 42.639 consumer 9.08
+START 09-before-5
+COMPLETE 09-before-5 runtime 43.863 consumer 9.145
+START 10-after-5
+COMPLETE 10-after-5 runtime 29.106 consumer 9.134
+All ten focused samples complete.

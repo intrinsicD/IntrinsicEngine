@@ -1,0 +1,8 @@
+{
+  "frozen_at": "2026-09-15T22:25:04.652702+00:00",
+  "verified_source": "ca164c10cf20d1b037ac2c116194c1839ec6bb3d",
+  "manifest_sha256": "0f1b6fdf2b7e5cfda0f085bed07b38525a78403205c2542b46e27ed6ef4132ac",
+  "runner_sha256": "1e0b7fd7659c48b5bfc389ff7ad9a5752de7f6f2cfbe79df6c32c6d100549786",
+  "no_measurements_started": true,
+  "correction": "Preserve exact CMake -x c++-module line only for interface producers. Initial preflight failed before any compiler command; population and runner retained separately. No sampled timing discarded."
+}

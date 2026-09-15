@@ -1,0 +1,58 @@
+{
+  "checks": [
+    {
+      "command": [
+        "python3",
+        "tools/agents/check_task_policy.py",
+        "--root",
+        ".",
+        "--strict"
+      ],
+      "exit_code": 0,
+      "output": "Validated 393 task file(s); findings: 0; mode: strict.\n[check_task_maturity_followups] Root: /home/alex/Documents/IntrinsicEngine\n[check_task_maturity_followups] Open task files scanned: 107\n[check_task_maturity_followups] No maturity follow-up findings.\nTask policy check complete. findings=0 mode=strict.\n"
+    },
+    {
+      "command": [
+        "python3",
+        "tools/agents/generate_session_brief.py",
+        "--check"
+      ],
+      "exit_code": 0,
+      "output": "tasks/SESSION-BRIEF.md is up to date.\n"
+    },
+    {
+      "command": [
+        "python3",
+        "tools/agents/check_ara_claims.py",
+        "--root",
+        ".",
+        "--strict"
+      ],
+      "exit_code": 0,
+      "output": "check_ara_claims: OK (99 claims)\n"
+    },
+    {
+      "command": [
+        "python3",
+        "tools/docs/check_doc_links.py",
+        "--root",
+        ".",
+        "--strict"
+      ],
+      "exit_code": 0,
+      "output": "[check_doc_links] Root: /home/alex/Documents/IntrinsicEngine\n[check_doc_links] Checked relative links: 3722\n[check_doc_links] Mode: strict\n[check_doc_links] No broken relative links found.\n"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "output": ""
+    }
+  ],
+  "task_retirement_format_correction": "Added required Commit reference label before the successful strict run.",
+  "inventory_regenerated": true,
+  "cpp_unchanged_since_verified_commit": "ca164c10cf20d1b037ac2c116194c1839ec6bb3d"
+}

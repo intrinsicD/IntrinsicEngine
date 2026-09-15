@@ -42,25 +42,25 @@ serialization, then make the smallest beneficial ownership/export change.
   source baseline after any intervening changes.
 
 ## Acceptance criteria
-- [ ] Reproduce the real snapshot trace with exact source, compiler, flags and
+- [x] Reproduce the real snapshot trace with exact source, compiler, flags and
       dependency identities; capture outer wall/CPU time, all compiler jobs,
       WriteAST timing and BMI bytes. Separate diagnostic probes from benchmarks.
-- [ ] Use declaration-group controls to locate the dominant serialized footprint;
+- [x] Use declaration-group controls to locate the dominant serialized footprint;
       include a control retaining the original imports and global fragment.
       Record what each control removes and why it does not prove feature parity.
-- [ ] Review the selected smallest change with Claude and existing owners before
+- [x] Review the selected smallest change with Claude and existing owners before
       adding a boundary. Preserve all capabilities; reject a split/allocation or
       wider common module that just moves or duplicates serialization work.
-- [ ] Freeze a matched focused benchmark before timing; use at least five samples
+- [x] Freeze a matched focused benchmark before timing; use at least five samples
       per arm in a balanced order, retaining slow samples and recording host noise.
       Reuse current tooling and avoid repeating whole clean builds when a focused
       producer/importer experiment answers the question. No stable speedup claim
       from the earlier two-sample noisy cohort.
-- [ ] Implement/review/test/fix the beneficial change, or record a measured
+- [x] Implement/review/test/fix the beneficial change, or record a measured
       no-change verdict. Preserve compiler-boundary guards and run focused/full
       CPU tests; verify new attachment/ownership surfaces with fresh cache-off
       minimum-supported Clang and all affected in-tree consumers.
-- [ ] Synchronize the canonical editor-boundary documentation and module inventory;
+- [x] Synchronize the canonical editor-boundary documentation and module inventory;
       retire with exact source, trace, benchmark and verification evidence.
 
 ## Verification
@@ -134,3 +134,22 @@ python3 tools/docs/check_doc_links.py --root .
 | 6: recipe dependencies | n/a | No recipe change. |
 | 7: maturity | pass | CPUContracted refactor endpoint; no backend capability promotion. |
 | 8: exceptions | pass | No layering exception; the exact private declaration edge is guarded. |
+
+## Completion — 2026-09-16
+Retired at CPUContracted, the intended compile-locality refactor endpoint.
+Commit reference: implementation `ca164c10c`; frozen manifest `01e92cdf6`; this retirement/evidence
+commit records the reviewed result. No further backend maturity is implied.
+
+[Report, all ten local samples and raw evidence](../../ara/evidence/tables/runtime268_snapshot_std_measurement.md)
+record the final five-sample-per-arm comparison. Including the new owner, snapshot
+compilation median changes from 15.183 to 1.646 seconds; the runtime producer
+subtotal changes from 42.715 to 29.120 seconds. Consumer ranges overlap; no consumer,
+whole-engine or runtime speedup is established. C99 records the bounded observation.
+All ten results remain claim_eligible:false. The initial preflight failed before
+any compiler invocation and is retained separately; no timed sample was discarded.
+
+Claude's final audit verified arithmetic and found no blockers. Corrected reporting
+of medians of per-sample sums, the +21/+5/-3 production-line accounting, and the
+separate diagnostic/benchmark BMI identities. RUNTIME-267 and GRAPHICS-144 remain
+open with current-source measurement requirements. No second implementation was
+added to this slice.

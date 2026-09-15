@@ -3944,3 +3944,20 @@ observations:
     promoted_to: logic/claims.md:C98
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O232
+    timestamp: '2026-09-16T00:38:04+02:00'
+    provenance: ai-executed
+    content: The retained five-sample-per-arm local focused comparison changes snapshot-plus-owner median compilation from 15.183
+      to 1.646 seconds and selected runtime subtotal from 42.715 to 29.120 seconds. Consumer ranges overlap; changed BMI storage
+      is 28482868 to 10178676 bytes including the new owner.
+    context: Exact sources 4fa241cc2 and ca164c10c, fixed dependencies and ABBAABBAAB serial Clang23 commands. All ten results
+      remain claim_eligible false. N601 retains the verified implementation and report; no whole-build, statistical, runtime
+      or GPU claim.
+    potential_type: claim
+    bound_to:
+    - N600
+    promoted: true
+    promoted_to: logic/claims.md:C99
+    crystallized_via: artifact-commitment
+    stale: false

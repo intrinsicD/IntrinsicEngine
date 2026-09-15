@@ -2537,3 +2537,14 @@ entries:
       Clang 23, while fresh Clang 20 proves compilation and metadata boundaries only. No GPU or sanitizer runtime evidence added.
     - Existing staged observations retain their owners and flags; these task retirements do not settle broader compilation or product hypotheses.
       Record RUNTIME-268 as a concrete follow-up instead of declaring editor compilation complete.
+
+  - turn: 2026-09-16_001#1
+    notes:
+    - Record rejected controls/prototypes as a bounded dead-end history, not a general claim that splitting never helps. Keep
+      the overwritten diagnostic trace separate from the valid original-source phase record.
+    - Crystallize O232/C99 only through N601 artifact commitment. All ten local results remain claim_eligible false; added owner
+      costs and medians of per-sample sums are explicit. No inferred user affirmation, whole-build speedup or runtime/GPU conclusion.
+    - Added production source is 23 C++ lines plus one CMake line; this reduces repeated compiler serialization rather than
+      line count. Clang20 evidence is compilation only; CPU tests execute under canonical Clang23.
+    - Existing open research topics remain referenced; no abandonment or new closure signal is inferred for their broader architecture/product/method
+      hypotheses. Preserve their existing stale flags.

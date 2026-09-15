@@ -1,0 +1,11 @@
+{
+  "archived_evidence_verified": true,
+  "clean_source_worktree_removed": "/dev/shm/intrinsic-runtime268/source",
+  "owned_scratch_removed": [
+    "/dev/shm/intrinsic-runtime268",
+    "/dev/shm/intrinsic-runtime268-clang20"
+  ],
+  "root_build_preserved": true,
+  "other_tmpfs_paths_preserved": true,
+  "prebuilt_prerequisites_archived": false
+}

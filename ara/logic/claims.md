@@ -2243,3 +2243,14 @@
 - **Dependencies**: []
 - **Tags**: compilation, C++23 modules, snapshot serialization, matched local observations, diagnostic control
 - **From staging**: O231
+
+## C99: Bounded snapshot standard-declaration compile observations
+- **Statement**: RUNTIME-268's retained local Clang23 ABBAABBAAB cohort, five samples per exact source arm, changes median snapshot compilation including the added standard-declaration owner from 15.183 to 1.646 seconds (89.2% lower). The five selected runtime producers plus the candidate owner change from a 42.715 to 29.120 second median subtotal. The actual Sandbox consumer ranges overlap (9.047–9.396 before, 9.087–9.384 after), establishing no consumer improvement or regression. Changed BMI storage is 28,482,868 to 10,178,676 bytes, including the new owner.
+- **Status**: supported — descriptive local focused serial compilation only; all ten canonical results remain claim_eligible:false. No whole/parallel build, statistical/general, publication-qualified, cross-host/compiler, runtime/GPU or aggregate-memory conclusion. Subtotals are medians of per-sample sums, not sums of individual medians.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Recalculation from the ten retained results disagrees with the stated medians/ranges/bytes, candidate ownership cost is omitted, or source/compiler/flag/dependency checks reveal unmatched inputs or a frozen prerequisite importing the obsolete snapshot. The pre-compiler preflight failure and rejected diagnostic prototypes must remain outside the successful timing population.
+- **Proof**: [ara/evidence/tables/runtime268_snapshot_std_measurement.md, ara/evidence/diagnostics/runtime268_snapshot_std/summary.json, ara/evidence/diagnostics/runtime268_snapshot_std/evidence-index.json, ara/evidence/diagnostics/runtime268_snapshot_std/raw-evidence.tar.gz, ara/evidence/diagnostics/runtime268_snapshot_std/verification.json, benchmarks/ci/manifests/workspace_snapshot_std.yaml, tasks/done/RUNTIME-268-workspace-snapshot-bmi-serialization.md]
+- **Dependencies**: []
+- **Tags**: compilation, C++23 modules, snapshot serialization, matched local observations, added owner charged
+- **From staging**: O232

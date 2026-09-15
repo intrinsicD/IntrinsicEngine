@@ -83,3 +83,14 @@ does not establish a benefit. This is a planning lead, not a measured change.
 BUILD-009 is complete. Use its [matched source comparison](../../../ara/evidence/tables/build009_current_compile_measurement.md)
 and retained producer/critical-path records; the old BUILD-007 costs are historical.
 Freeze this task's immediate-before source before attributing its own changes.
+
+## Snapshot serialization lead — 2026-09-16
+RUNTIME-268's verified source `ca164c10c` keeps its records intact but imports
+standard declarations from a small runtime-local module, avoiding expensive
+merged-header serialization in the broad snapshot interface. Trace the current
+renderer first: source splitting, Pimpl and a shared textual prelude need not
+address that mechanism. Graphics must not import the runtime helper. Compare
+existing lower-layer ownership and the cost of any proposed declaration owner,
+including its producer and real consumers, before selecting an analogous change.
+[RUNTIME-268 evidence](../../../ara/evidence/tables/runtime268_snapshot_std_measurement.md)
+is a diagnostic lead, not a measured renderer improvement.

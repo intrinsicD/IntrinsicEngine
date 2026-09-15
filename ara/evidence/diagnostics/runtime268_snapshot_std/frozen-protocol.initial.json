@@ -1,0 +1,8 @@
+{
+  "frozen_at": "2026-09-15T22:20:27.022169+00:00",
+  "verified_source": "ca164c10cf20d1b037ac2c116194c1839ec6bb3d",
+  "manifest_sha256": "0f1b6fdf2b7e5cfda0f085bed07b38525a78403205c2542b46e27ed6ef4132ac",
+  "runner_sha256": "73a3d18e214cd5fb93dc7d63239dab47c78cb97d631aea9d46e39cd52e970aa0",
+  "no_measurements_started": true,
+  "review": "runner-review.txt; actual common commands/maps, frozen-BMI import graph, flag/output safety and sample accounting guarded before timing"
+}
