@@ -12107,7 +12107,7 @@ tree:
     - build/analysis/runtime246-workspace-bindings-2026-09-14/verification-summary.json
     - build/analysis/runtime246-workspace-bindings-2026-09-14/reviewed-source.diff
     - build/analysis/runtime246-workspace-bindings-2026-09-14/claude-review.txt
-    - tasks/backlog/process/BUILD-007-engine-compile-time-reconciliation.md
+    - tasks/done/BUILD-007-engine-compile-time-reconciliation.md
     - tasks/backlog/bugs/BUG-193-gpu-pacing-and-watchdog-margin.md
     status: resolved
 
@@ -12517,7 +12517,7 @@ tree:
     - tasks/evidence/RUNTIME-255/seal.yaml
     - tasks/evidence/RUNTIME-255/structural-counts.json
     - tasks/done/RUNTIME-256-render-recipe-extraction-dependencies.md
-    - tasks/backlog/process/BUILD-007-engine-compile-time-reconciliation.md
+    - tasks/done/BUILD-007-engine-compile-time-reconciliation.md
     status: resolved
 
   - id: N575
@@ -12804,4 +12804,26 @@ tree:
     - tasks/evidence/RUNTIME-263/overnight-review.txt
     - tasks/evidence/RUNTIME-263/seal.yaml
     - tasks/evidence/RUNTIME-262/seal.yaml
+    status: resolved
+
+  - id: N585
+    type: experiment
+    title: Measure the overnight compile improvements with matched source revisions
+    provenance: ai-executed
+    timestamp: '2026-09-15T09:38:50+02:00'
+    result: Completed six retained samples, three per clean source revision, using the frozen headless Debug
+      engine-library protocol. Median clean build 365.524 to 348.332 seconds; workspace implementation 13.246
+      to 7.252; recipe implementation 3.253 to 1.856; config interface 37.018 to 33.584 with 19 to 13 compiler
+      invocations; reconfigure plus build 4.229 to 0.578. Full-build peak single-process RSS is essentially
+      unchanged. Claude approved; root resolved presentation nits and independently recomputed CPU totals.
+      All six repaired canonical results validate, preserving original invalid-label records and the excluded
+      incomplete harness population. Post-run ci targets are current; 70 focused CTest, 24 hotspot and 15
+      result-validator cases pass. Retire only selected BUILD-007; broader C92, BUILD-006 and product work
+      remain open. No engine source change or remote push.
+    evidence:
+    - ara/evidence/tables/build007_overnight_compile_measurement.md
+    - ara/evidence/diagnostics/build007_20260915/evidence-index.json
+    - ara/evidence/diagnostics/build007_20260915/verification.json
+    - benchmarks/ci/manifests/engine_compile_iteration_overnight.yaml
+    - tasks/done/BUILD-007-engine-compile-time-reconciliation.md
     status: resolved

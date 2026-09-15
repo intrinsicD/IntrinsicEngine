@@ -20,18 +20,25 @@ This task compares engine source. BUILD-006 separately compares build backends
 and cache behavior while keeping engine source fixed.
 
 ## Acceptance criteria
-- [ ] Select real baseline/current source identities and preserve equivalent features.
-- [ ] Reuse the existing compile-hotspot and benchmark tooling; declare stable IDs,
+- [x] Select real baseline/current source identities and preserve equivalent features.
+- [x] Reuse the existing compile-hotspot and benchmark tooling; declare stable IDs,
   manifests and explicit cache/toolchain/source identities before timed runs.
-- [ ] Repeat full reconciliation and representative implementation/interface edits
+- [x] Repeat full reconciliation and representative implementation/interface edits
   under matched conditions without competing builds or timed tests.
-- [ ] Compare dominant producers, critical path, memory and wall time; retain null
+- [x] Compare dominant producers, critical path, memory and wall time; retain null
   or negative results and update C92 only when eligible evidence supports it.
 
 ## Verification
 ```bash
+CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 cmake --preset ci
+CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests IntrinsicRuntimeContractTests --parallel 4
+ctest --test-dir build/ci --output-on-failure -R 'CompilationLocality|^(RenderingContract|RenderRecipeConfig|SandboxEditorUi.RenderRecipe|EngineConfigControl|RenderRecipeActivation)' --no-tests=error --timeout 60
+python3 tests/regression/tooling/Test.CompileHotspots.py
+python3 tests/regression/tooling/Test_BenchmarkResultValidator.py
 python3 tools/benchmark/validate_benchmark_manifests.py
-python3 tools/benchmark/validate_benchmark_results.py
+python3 tools/benchmark/validate_benchmark_results.py --root ara/evidence/diagnostics/build007_20260915/results --manifests-root benchmarks --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
 python3 tools/agents/check_ara_claims.py --root . --strict
 ```
 Read the benchmark skill before designing measurements. Preserve BUG-178 cache
@@ -98,3 +105,29 @@ it contributes no retained comparison sample. Restrict compiler log windows to
 build commands, preserve configure timing separately, and start a fresh six-sample
 population with the same frozen manifest/order. Original logs and the corrected
 runner revisions remain available; no failed attempt is overwritten.
+
+## Completed — 2026-09-15
+Commit reference: the enclosing local commit containing this retirement and its evidence.
+
+All four acceptance criteria are complete for the explicitly selected overnight
+comparison. Three retained samples per clean source revision establish descriptive
+local results; the broader C92 processing-family hypothesis remains unchanged.
+See [the measured comparison](../../ara/evidence/tables/build007_overnight_compile_measurement.md)
+and [the evidence inventory](../../ara/evidence/diagnostics/build007_20260915/evidence-index.json).
+The report includes full/no-op/implementation/interface/reconfigure results,
+compiler counts, CPU work, dependency paths, peak single-process RSS, dominant
+producers, all ranges and measured increases.
+
+Claude approved the resulting comparison and the post-run metadata-validation
+fix. All six canonical successor records pass strict validation; originals and
+the incomplete harness attempt remain in the evidence archive. No re-execution
+is inferred from the metadata repair. The runner now uses the existing canonical
+external-build category and validates sealed records before writing them.
+
+Post-measurement verification: configure `ci`, build
+`IntrinsicGraphicsContractCpuTests` and `IntrinsicRuntimeContractTests` (already
+current), then run 70 focused compilation-locality/config/editor CTest cases;
+24 hotspot and 15 benchmark-result-validator Python tests pass. Exact commands,
+outputs and review dispositions are bound in the evidence bundle. No engine
+source change, new sanitizer/GPU claim or remote push. Implementation, evidence
+and retirement are in the enclosing local commit.

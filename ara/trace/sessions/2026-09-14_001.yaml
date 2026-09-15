@@ -179,7 +179,7 @@ ai_actions:
   - tests/contract/runtime/Test.SandboxEditorModels.cpp
   - tasks/done/RUNTIME-246-workspace-context-binding-consolidation.md
   - tasks/done/RETIREMENT-LOG.md
-  - tasks/backlog/process/BUILD-007-engine-compile-time-reconciliation.md
+  - tasks/done/BUILD-007-engine-compile-time-reconciliation.md
   - tasks/backlog/bugs/BUG-193-gpu-pacing-and-watchdog-margin.md
 - turn: 5
   action: Claude planned, implemented temporary production copies and reviewed fixed source plus the one-line

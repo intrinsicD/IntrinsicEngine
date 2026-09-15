@@ -3878,3 +3878,21 @@ observations:
     promoted_to: logic/claims.md:C93
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O227
+    timestamp: '2026-09-15T09:38:50+02:00'
+    provenance: ai-executed
+    content: "The selected overnight cleanup produced a 4.7% lower median clean engine-library build time\
+      \ and 41.6\u201345.2% lower medians for three implementation rebuild probes in the local six-sample\
+      \ cohort. Interface fan-out falls from 19 to 13 compiler invocations, but its dependency path barely\
+      \ changes. Full-build peak single-process memory remains essentially unchanged. These are descriptive\
+      \ measurements with claim_eligible false."
+    context: 'N585: exact before/after source commits, one frozen four-job Clang23 Null/headless Debug protocol;
+      original attempts and metadata repairs retained.'
+    potential_type: claim
+    bound_to:
+    - N585
+    promoted: true
+    promoted_to: logic/claims.md:C94
+    crystallized_via: empirical-resolution
+    stale: false

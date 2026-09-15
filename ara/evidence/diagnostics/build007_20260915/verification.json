@@ -1,0 +1,265 @@
+{
+  "measurement_process_exit_code": 0,
+  "schema_valid_canonical_results": 6,
+  "local_ci_tests": {
+    "selected": 70,
+    "passed": 70,
+    "failed": 0,
+    "skipped": 0
+  },
+  "python_tests": {
+    "compile_hotspots": 24,
+    "benchmark_result_validator": 15
+  },
+  "commands": [
+    {
+      "name": "ci-configure",
+      "command": [
+        "cmake",
+        "--preset",
+        "ci"
+      ],
+      "exit_code": 0,
+      "seconds": 0.8606961440527812,
+      "log": "ci-configure.log",
+      "timed_benchmark": false
+    },
+    {
+      "name": "ci-build",
+      "command": [
+        "cmake",
+        "--build",
+        "--preset",
+        "ci",
+        "--target",
+        "IntrinsicGraphicsContractCpuTests",
+        "IntrinsicRuntimeContractTests",
+        "--parallel",
+        "4"
+      ],
+      "exit_code": 0,
+      "seconds": 0.10936134902294725,
+      "log": "ci-build.log",
+      "timed_benchmark": false
+    },
+    {
+      "name": "ci-focused",
+      "command": [
+        "ctest",
+        "--test-dir",
+        "build/ci",
+        "--output-on-failure",
+        "-R",
+        "CompilationLocality|^(RenderingContract|RenderRecipeConfig|SandboxEditorUi.RenderRecipe|EngineConfigControl|RenderRecipeActivation)",
+        "--no-tests=error",
+        "--timeout",
+        "60"
+      ],
+      "exit_code": 0,
+      "seconds": 13.783957813982852,
+      "log": "ci-focused.log",
+      "timed_benchmark": false
+    },
+    {
+      "name": "hotspot-tests",
+      "command": [
+        "python3",
+        "tests/regression/tooling/Test.CompileHotspots.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.09436793497297913,
+      "log": "hotspot-tests.log",
+      "timed_benchmark": false
+    },
+    {
+      "name": "result-validator-tests",
+      "command": [
+        "python3",
+        "tests/regression/tooling/Test_BenchmarkResultValidator.py"
+      ],
+      "exit_code": 0,
+      "seconds": 1.1052394059952348,
+      "log": "result-validator-tests.log",
+      "timed_benchmark": false
+    }
+  ],
+  "review": {
+    "verdict": "APPROVE",
+    "cpu_seconds_recomputed_from_raw_execution_receipts": {
+      "clean": {
+        "before": [
+          1370.6999999999998,
+          1370.51,
+          1371.07
+        ],
+        "after": [
+          1344.22,
+          1341.1,
+          1342.1799999999998
+        ]
+      },
+      "noop": {
+        "before": [
+          0.060000000000000005,
+          0.060000000000000005,
+          0.07
+        ],
+        "after": [
+          0.060000000000000005,
+          0.06999999999999999,
+          0.060000000000000005
+        ]
+      },
+      "workspace_impl": {
+        "before": [
+          13.229999999999999,
+          13.270000000000001,
+          13.19
+        ],
+        "after": [
+          7.220000000000001,
+          7.260000000000001,
+          7.239999999999999
+        ]
+      },
+      "recipes_impl": {
+        "before": [
+          3.24,
+          3.2399999999999998,
+          3.25
+        ],
+        "after": [
+          1.84,
+          1.83,
+          1.86
+        ]
+      },
+      "config_impl": {
+        "before": [
+          0.7,
+          0.71,
+          0.72
+        ],
+        "after": [
+          0.39,
+          0.41000000000000003,
+          0.41000000000000003
+        ]
+      },
+      "config_interface": {
+        "before": [
+          86.80000000000001,
+          87.19,
+          87.33999999999999
+        ],
+        "after": [
+          67.42,
+          67.28,
+          66.81
+        ]
+      },
+      "reconfigure": {
+        "before": [
+          3.71,
+          3.69,
+          3.69
+        ],
+        "after": [
+          0.060000000000000005,
+          0.060000000000000005,
+          0.060000000000000005
+        ]
+      }
+    },
+    "nits": [
+      {
+        "number": 1,
+        "resolution": "All six repaired records passed the canonical strict validator. The envelope binds the unchanged manifest/source; it has no checksum over its complete result content. Metadata-only successors preserve metrics, source and manifest exactly."
+      },
+      {
+        "number": 2,
+        "resolution": "3035832320 / 1048576 = 2895.1953125 MiB, correctly rounded to 2895.20."
+      },
+      {
+        "number": 3,
+        "resolution": "Show dependency-path medians to three decimal places so 7175 ms is unambiguously 7.175 s."
+      },
+      {
+        "number": 4,
+        "resolution": "Keep consistent millisecond display precision; full raw samples and exact values remain in summary.json. Rounded median matching rounded maximum is expected."
+      },
+      {
+        "number": 5,
+        "resolution": "The table is already sorted descending by after median: 18.784,15.416,14.638,12.882,12.262,11.924,... . No reordering needed."
+      },
+      {
+        "number": 6,
+        "resolution": "Retaining raw execution evidence before schema validation is deliberate. Invalid canonical metadata raises ValueError and prevents the COMPLETE marker; it cannot be reported as a completed sample."
+      }
+    ],
+    "review_gap": "Claude did not receive CPU fields in its compact raw input. Root separately recomputed all CPU sums and medians directly from the retained execution receipts and checked them against the summary."
+  },
+  "limits": [
+    "No engine source changes during measurement work. Existing ci preset native targets were already current; CTest and Python checks ran after the timed cohort.",
+    "No new full CPU, sanitizer, Sandbox or GPU execution was performed in this measurement session. Prior overnight correctness evidence is linked separately in the report."
+  ],
+  "cleanup": {
+    "temporary_worktree_removed": true,
+    "temporary_build_removed": true,
+    "existing_main_build_trees_preserved": true
+  },
+  "documentation_corrections": [
+    "Add explicit commit-reference field to the completed micro task.",
+    "Replace the retired task link in the backlog index with the current BUILD-006 entry and update moved task references."
+  ],
+  "structural_checks": [
+    {
+      "name": "manifests",
+      "command": "python3 tools/benchmark/validate_benchmark_manifests.py",
+      "exit_code": 0,
+      "output": "Benchmark manifest validation passed for 92 file(s).\n"
+    },
+    {
+      "name": "results",
+      "command": "python3 tools/benchmark/validate_benchmark_results.py --root ara/evidence/diagnostics/build007_20260915/results --manifests-root benchmarks --strict",
+      "exit_code": 0,
+      "output": "Benchmark result JSON validation passed for 6 file(s), 1 stable benchmark ID(s), and 6 append-only run/attempt identity tuple(s).\n"
+    },
+    {
+      "name": "tasks",
+      "command": "python3 tools/agents/check_task_policy.py --root . --strict",
+      "exit_code": 0,
+      "output": "Validated 379 task file(s); findings: 0; mode: strict.\n[check_task_maturity_followups] Root: /home/alex/Documents/IntrinsicEngine\n[check_task_maturity_followups] Open task files scanned: 105\n[check_task_maturity_followups] No maturity follow-up findings.\nTask policy check complete. findings=0 mode=strict.\n"
+    },
+    {
+      "name": "links",
+      "command": "python3 tools/docs/check_doc_links.py --root . --strict",
+      "exit_code": 0,
+      "output": "[check_doc_links] Root: /home/alex/Documents/IntrinsicEngine\n[check_doc_links] Checked relative links: 4074\n[check_doc_links] Mode: strict\n[check_doc_links] No broken relative links found.\n"
+    },
+    {
+      "name": "claims",
+      "command": "python3 tools/agents/check_ara_claims.py --root . --strict",
+      "exit_code": 0,
+      "output": "check_ara_claims: OK (94 claims)\n"
+    },
+    {
+      "name": "hygiene",
+      "command": "python3 tools/repo/check_root_hygiene.py --root .",
+      "exit_code": 0,
+      "output": "[check_root_hygiene] Root: /home/alex/Documents/IntrinsicEngine\n[check_root_hygiene] Root markdown files:\n  - AGENTS.md: allowed\n  - CLAUDE.md: allowed\n  - README.md: allowed\n[check_root_hygiene] Root allowlist: /home/alex/Documents/IntrinsicEngine/tools/repo/root_allowlist.yaml\n[check_root_hygiene] Allowed repository entries present:\n  - .claude/\n  - .codex/\n  - .github/\n  - .gitignore\n  - .mcp.json\n  - AGENTS.md\n  - CLAUDE.md\n  - CMakeLists.txt\n  - CMakePresets.json\n  - README.md\n  - ara/\n  - assets/\n  - benchmarks/\n  - cmake/\n  - docs/\n  - lsan.supp\n  - methods/\n  - research/\n  - src/\n  - tasks/\n  - tests/\n  - tools/\n  - vcpkg-configuration.json\n  - vcpkg.json\n[check_root_hygiene] Ignored named local entries:\n  - .agents/\n  - .idea/\n  - .ruff_cache/\n  - build/\n  - cmake-build-debug/\n  - experimental/\n  - external/\n[check_root_hygiene] Root entries match repository-owned policy.\n"
+    },
+    {
+      "name": "layering",
+      "command": "python3 tools/repo/check_layering.py --root src --strict",
+      "exit_code": 0,
+      "output": "[check_layering] Scan root: /home/alex/Documents/IntrinsicEngine/src\n[check_layering] Files scanned: 859\n[check_layering] References scanned: 8527 import/include, 84 CMake link\n[check_layering] Allowlist entries: 0\n[check_layering] Allowlisted violations: 0\n[check_layering] No layering violations found.\n"
+    },
+    {
+      "name": "test-layout",
+      "command": "python3 tools/repo/check_test_layout.py --root . --strict",
+      "exit_code": 0,
+      "output": "test layout check complete. findings=0 mode=strict\n"
+    }
+  ]
+}

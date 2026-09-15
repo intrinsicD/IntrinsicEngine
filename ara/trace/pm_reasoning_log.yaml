@@ -2466,3 +2466,14 @@ entries:
       and BUILD007/C92; remove only the finishedovernightentry from open_threads.
     - The three interimstatus-only heartbeats produced no substantivechanges and did not allocate duplicate
       epilogues. N584 is the next recorded event after N583; taskcompletion counts stay16.
+
+  - turn: 2026-09-15_001#18
+    notes:
+    - Record N585 for the new measurement request; do not reopen completed N569 or the paused overnight automation.
+    - Crystallize only O227 into C94 as bounded descriptive local measurement facts. Exact source identities
+      and six records do not make these publication-qualified or cross-host performance evidence; every result
+      remains claim_eligible false.
+    - Preserve the excluded harness population and metadata-only successor lineage. Existing staged observations
+      and broader C92 have no new closure signal.
+    - Retire BUILD-007 only for its explicitly selected overnight comparison. Engine runtime/GPU speed and
+      all earlier family migrations were not measured.

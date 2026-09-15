@@ -24,6 +24,7 @@ import compile_hotspots as hotspots
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "tools/benchmark"))
 from seal_benchmark_results import canonicalize  # noqa: E402
+from validate_benchmark_results import validate_result_data  # noqa: E402
 
 
 def write_json(path: Path, value: object) -> None:
@@ -249,10 +250,11 @@ def main() -> None:
             rss[scenario] = record["max_single_process_rss_kib"] * 1024
             print(f"  PASS {scenario}: {record['wall_ms'] / 1000:.3f}s, {len(rows)} compiler invocations", flush=True)
         raw = {"benchmark_id": manifest["benchmark_id"], "method": manifest["method"],
-               "dataset": manifest["dataset"], "backend": "clang23_ninja_cpu", "commit": revision,
+               "dataset": manifest["dataset"], "backend": "external_baseline", "commit": revision,
                "status": "passed", "metrics": {"build_time_ms": timings,
                "configure_time_ms": configure_times, "memory_peak_bytes": rss, "sample_count": 1},
                "diagnostics": {"arm": arm, "position": position, "sample": counters[arm],
+                               "toolchain_backend": params["compiler"],
                                "scenarios": details, "source_clean_before_after": True}}
         write_json(directory / "raw-result.json", raw)
         sealed = canonicalize(raw, manifest_path=manifest_path, manifest=manifest,
@@ -262,7 +264,12 @@ def main() -> None:
                               snapshot_sha256=None, diff_sha256=None)
         results = output / "results"
         results.mkdir(exist_ok=True)
-        write_json(results / f"{directory.name}.json", sealed)
+        destination = results / f"{directory.name}.json"
+        _, errors = validate_result_data(sealed, destination,
+            {manifest["benchmark_id"]: (manifest_path, manifest)}, REPO / "benchmarks")
+        if errors:
+            raise ValueError("; ".join(errors))
+        write_json(destination, sealed)
         print(f"COMPLETE {directory.name}", flush=True)
 
 

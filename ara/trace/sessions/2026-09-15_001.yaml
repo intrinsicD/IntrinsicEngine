@@ -2,9 +2,9 @@ session:
   id: 2026-09-15_001
   date: '2026-09-15'
   started: '2026-09-15T00:37:12+02:00'
-  last_turn: '2026-09-15T08:02:30+02:00'
-  turn_count: 17
-  summary: "Overnight run closed after08:00Berlin:16tasks complete,all reviewed source unchanged,automation paused.550netfewerproduction/buildlines,fourfilesremoved; matchedcompiletiming and broader engine work remainopen."
+  last_turn: '2026-09-15T09:38:50+02:00'
+  turn_count: 18
+  summary: "Measured overnight cleanup: clean engine build 4.7% shorter, selected implementation rebuilds 41.6–45.2% shorter; six local samples, Claude review and focused verification. BUILD-007 retired; broader C92 remains open."
 events_logged:
 - turn: 1
   type: experiment
@@ -117,6 +117,19 @@ events_logged:
   provenance: ai-executed
   summary: Deadline reached,source unchanged,no activework; paused heartbeat and closed boundedovernightdecision
     with broaderopenwork preserved.
+- turn: 18
+  type: experiment
+  id: N585
+  routing: direct
+  provenance: ai-executed
+  summary: Matched local before/after compile measurements, bounded interpretation, preserved rejected attempts,
+    reviewed metadata fix and task retirement.
+- turn: 18
+  type: observation
+  id: O227
+  routing: crystallized
+  provenance: ai-executed
+  summary: Bounded six-sample local observations committed as C94; broader C92 is unchanged.
 ai_actions:
 - turn: 1
   action: Claude implemented five production files; root reviewed, added lifetime/statistics and compiler-boundary
@@ -188,7 +201,7 @@ ai_actions:
   - tasks/done/RUNTIME-255-render-recipe-token-owner.md
   - tasks/evidence/RUNTIME-255/report.yaml
   - tasks/done/RUNTIME-256-render-recipe-extraction-dependencies.md
-  - tasks/backlog/process/BUILD-007-engine-compile-time-reconciliation.md
+  - tasks/done/BUILD-007-engine-compile-time-reconciliation.md
 - turn: 8
   action: Claude implemented and independently reviewed the one-file preamble change; root verified source/compiler maps, CPU/sanitizer/Vulkan compilation, corrected the documentation wrap, retired/sealed RUNTIME-256 and prepared DOCS-007 from actual task locations.
   provenance: ai-executed
@@ -290,7 +303,21 @@ ai_actions:
   - ara/trace/pm_reasoning_log.yaml
   - ara/trace/sessions/2026-09-15_001.yaml
   - ara/trace/sessions/session_index.yaml
-claims_touched: []
+- turn: 18
+  action: Added the small canonical-tool-reusing measurement runner and manifest, measured both source revisions,
+    reviewed and corrected harness metadata, preserved raw evidence and verified the report.
+  provenance: ai-executed
+  files_changed:
+  - tools/analysis/benchmark_compile_iteration.py
+  - benchmarks/ci/manifests/engine_compile_iteration_overnight.yaml
+  - tests/regression/tooling/Test.CompileHotspots.py
+  - ara/evidence/tables/build007_overnight_compile_measurement.md
+  - ara/evidence/diagnostics/build007_20260915
+  - tasks/done/BUILD-007-engine-compile-time-reconciliation.md
+claims_touched:
+- id: C94
+  action: crystallized
+  turn: 18
 key_context:
 - turn: 1
   excerpt: User requested continued duplication and compilation cleanup with Claude through plan, implementation,
@@ -334,9 +361,11 @@ key_context:
 - turn: 17
   excerpt: User authorized bounded cleanup with Claude until08:00Berlin. End atdeadline,report completedwork
     honestly and conserveusage; no remote push.
+- turn: 18
+  excerpt: 'User: Please measure the improvements. This is a new interactive measurement request after the
+    completed overnight deadline, not another overnight cleanup iteration.'
 open_threads:
-- BUILD-007 owns matched clean-source engine compile reconciliation; BUILD-006 separately owns backend/cache comparisons.
-  C92 remains a hypothesis.
+- The broader C92 processing-family hypothesis still needs a selected baseline and repeated family-edit measurements; BUILD-006 separately owns backend/cache comparisons.
 - BUG-193 owns unexplained GPU pacing variability and WLOP watchdog margin; BUG-189/191/192 closed only finite-work
   fixture budget corrections.
 - BUG-178 compiler-cache ICE, BUG-188 sandbox sanitizer discovery and BUG-180 leak-enabled GPU process retention

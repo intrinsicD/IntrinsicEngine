@@ -15,7 +15,7 @@ map.
 
 ## Tasks
 
-- [BUILD-007 — Matched engine compile-time reconciliation](BUILD-007-engine-compile-time-reconciliation.md): compare engine source under matched conditions; separate from the BUILD-006 backend/cache bakeoff.
+- [BUILD-006 — C++23 module build-backend comparison](BUILD-006-cxx23-module-build-backend-bakeoff.md): compare build backends and cache behavior with engine source held fixed.
 
 The verification redesign is bound by the
 [`verification-evidence-architecture.md`](../../../docs/architecture/verification-evidence-architecture.md)

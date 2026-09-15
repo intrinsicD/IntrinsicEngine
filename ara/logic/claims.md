@@ -2188,3 +2188,14 @@
 - **Dependencies**: [A47]
 - **Tags**: centroid PCA, keypoints, Vulkan compute, bounded parity, no performance claim
 - **From staging**: O226
+
+## C94: Bounded overnight compile-time measurements
+- **Statement**: In the retained 2026-09-15 local cohort (three measurements per exact source revision), the overnight cleanup changes median Debug Null/headless engine-library build time from 365.524 to 348.332 seconds. Workspace, recipe and config implementation rebuild medians fall by 45.2%, 42.9% and 41.6%; config-interface rebuilds change from 37.018 to 33.584 seconds with 19 to 13 compiler invocations. Reconfigure plus resulting build changes from 4.229 to 0.578 seconds. Full-build peak single-process RSS is essentially unchanged.
+- **Status**: supported — descriptive local measurements only, with all six results claim_eligible:false. The exact source/target/toolchain/cache conditions and all sample ranges are bound below. No publication-qualified, cross-host, Sandbox/test-suite, runtime/GPU or broader C92 performance conclusion.
+- **Provenance**: ai-executed
+- **Crystallized via**: empirical-resolution
+- **Falsification criteria**: Recalculation from the preserved six execution/result records disagrees with the stated medians or counts, or source/toolchain/dependency/target checks reveal unmatched conditions. These recorded observations do not predict a future host's speedup. Original rejected and repaired records must remain distinguishable from new execution.
+- **Proof**: [ara/evidence/tables/build007_overnight_compile_measurement.md, ara/evidence/diagnostics/build007_20260915/evidence-index.json, ara/evidence/diagnostics/build007_20260915/summary.json, ara/evidence/diagnostics/build007_20260915/raw-evidence.tar.gz, benchmarks/ci/manifests/engine_compile_iteration_overnight.yaml, tasks/done/BUILD-007-engine-compile-time-reconciliation.md]
+- **Dependencies**: []
+- **Tags**: compilation, C++23 modules, matched local measurements, CPU build, limited performance observation
+- **From staging**: O227

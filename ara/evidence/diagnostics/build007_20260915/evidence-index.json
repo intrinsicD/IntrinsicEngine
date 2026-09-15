@@ -1,0 +1,100 @@
+{
+  "benchmark_id": "build.engine_compile_iteration.overnight.v1",
+  "samples": [
+    {
+      "attempt": "01-before-1",
+      "arm": "before",
+      "original_sha256": "bacc3a353cdcb0fa28f6d61478b6fe9b57b1d665d492791d90f7d01602ab5267",
+      "canonical_sha256": "6b8afd6d641632d6146a8eda2c10f6a3940b44dd2f41fd8291950ab38f1db6e7"
+    },
+    {
+      "attempt": "02-after-1",
+      "arm": "after",
+      "original_sha256": "f02513c366e8c4e13bde780cb51bd7ec38b2cfc0190bac292acdcbaf6ab12b90",
+      "canonical_sha256": "1b777095a6ef47f2542a5cc138ccd3fe460bffaa6f4cc12acd310673f9171eea"
+    },
+    {
+      "attempt": "03-after-2",
+      "arm": "after",
+      "original_sha256": "bbbaddf8098df5aa5c2f13a3fbe04a81e3368709dba02314ffa598d98a878158",
+      "canonical_sha256": "04eee345557aebf46f55fc41fb81b1a2e3b44a51a29d72684dff0c1f1180aa7a"
+    },
+    {
+      "attempt": "04-before-2",
+      "arm": "before",
+      "original_sha256": "50e6a504c7c386a80e6292957ebe476aaea83876da6852db2a6b4556b97dc50f",
+      "canonical_sha256": "e5586115da923355422552e87b0f50dd979e3d1a82690f94f6d27e0410bd44ef"
+    },
+    {
+      "attempt": "05-before-3",
+      "arm": "before",
+      "original_sha256": "6093a65581ee2d8b92155006d5bf300b4009195911a6887157a82137c1393914",
+      "canonical_sha256": "97c19cd75b75a7cf41fa90bf6dd8ec46c193f82546d9019343a65e2f5539e141"
+    },
+    {
+      "attempt": "06-after-3",
+      "arm": "after",
+      "original_sha256": "d95dcf122b1fcfee721ec69b9a68f6ace872bc0f848831ec6450571b08e3fee3",
+      "canonical_sha256": "c9d0fd596abab004c8922aac98281e46c57583a9ad7a76b70cee5a92220f89b2"
+    }
+  ],
+  "sample_counts": {
+    "before": 3,
+    "after": 3
+  },
+  "shared_sources_with_identical_compiler_commands": 775,
+  "identical_dependencies_all_six": {
+    "sha256": "c4757bfe9697434ccb95f844ebb16ef69472ea227658f0b2c1e74522adaebddf",
+    "file_count": 1728
+  },
+  "measurement_tooling": {
+    "commit": "dffa9bcd5191297655005b7825052c265522c5eb",
+    "files": {
+      "tools/analysis/benchmark_compile_iteration.py": "dedb0a455f5a29864cdc0633937405ead3bac93a4f65838610aab282e3e8ad8c",
+      "tools/analysis/compile_hotspots.py": "deac44f7fb172b9bdea36968e4c3d79f63c280e3fde587ac4035f4e0bf77e40d",
+      "tools/benchmark/seal_benchmark_results.py": "ff20f2d2c3c8466d3217224bd16a4d2045579f7c84b3a2fd5e3043d567d4e092",
+      "tools/benchmark/validate_benchmark_results.py": "ef39f1de1e752cfb8b3feca5bf807e01f2a925265f729dfa64408f21d3433185",
+      "benchmarks/ci/manifests/engine_compile_iteration_overnight.yaml": "74f5a000ef88ae5afc8b568da7846bd6dbc85c3d66055c0323dc398f38d21b37"
+    }
+  },
+  "claim_eligible": false,
+  "scope": "Descriptive matched local Debug Null/headless engine-library compilation only; three samples per source.",
+  "raw_archive": {
+    "path": "raw-evidence.tar.gz",
+    "sha256": "1a8ab3b04abd643081e20d7bd17cc6a277bf66ccc2360c54c581a8fffd8e9b3c",
+    "bytes": 7807619,
+    "contents": [
+      "claude-followup.txt",
+      "claude-plan.txt",
+      "claude-results.txt",
+      "claude-review.txt",
+      "cohort-20260915",
+      "cohort-20260915-r2",
+      "cohort-r2.log",
+      "comparability.json",
+      "failed-attempt-ninja-log",
+      "failed-attempt.json",
+      "measured-runner.py",
+      "measurement-tooling.json",
+      "pilot-CMakeCache.txt",
+      "pilot-build.log",
+      "pilot-compile_commands.json",
+      "pilot-configure.log",
+      "pilot-critical-path.json",
+      "pilot-interface-build.log",
+      "pilot-interface.after.log",
+      "pilot-interface.before.log",
+      "pilot-interface.hotspots.json",
+      "pilot-interface.window.log",
+      "pilot-ninja_log",
+      "pilot-noop.log",
+      "repair_metadata.py",
+      "review-facts.json",
+      "review-resolution.json",
+      "summarize.py",
+      "verification"
+    ]
+  },
+  "verification_sha256": "ebbf1015670dac15277c30723667211f4545f315b2a1928adb77dd418ac04722",
+  "report_sha256": "7af579a815839283e66aef1f2ef6698a16691bd2cba375df5e1f1eaa44dbfefd"
+}

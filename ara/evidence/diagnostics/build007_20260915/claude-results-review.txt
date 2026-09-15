@@ -1,0 +1,48 @@
+## Verdict: APPROVE
+
+I recomputed every median, range, percentage, and unit conversion from the six raw records. The arithmetic is sound and the interpretation is appropriately hedged.
+
+### Arithmetic verification (all checked against n=3 per arm)
+
+**Wall time** — all medians, min/max, and reductions match:
+
+| Scenario | Recomputed before/after (s) | Reduction | Report |
+| --- | --- | ---: | :---: |
+| Clean | 365.524 / 348.332 | 4.70% | ✓ |
+| No-op | 0.0744 / 0.0728 | 2.19% | ✓ |
+| Workspace impl | 13.246 / 7.252 | 45.25% | ✓ |
+| Recipes impl | 3.253 / 1.856 | 42.94% | ✓ |
+| Config impl | 0.7217 / 0.4217 | 41.56% | ✓ |
+| Config interface | 37.018 / 33.584 | 9.28% | ✓ |
+| Reconfigure + build | 4.229 / 0.578 | 86.34% | ✓ |
+
+The reconfigure row correctly sums `configure_time_ms.reconfigure + build_time_ms.reconfigure` **per sample** and then takes the median (4254.38 / 4229.45 / 4222.89 → 4229.45), not the sum of separate medians. That is the right operation and matches the stated "includes both configuration and its resulting build." Initial configure (7.169 / 7.094) also checks out, and is correctly kept out of the clean-build rows.
+
+**Invocation counts** are identical across all three samples in each arm (779→775, 19→13, 1→0, 1→1), so "in every sample" is accurate. 779 − 775 = 4 matches the four `before_only_sources` and the "four files" removed in the diff; `after_only_sources` is empty and the dependency SHA-256/file count are byte-identical across arms, so the two arms differ only in the intended source delta.
+
+**Dependency path medians** all match (72.13/53.24, 13.17/7.17, 3.18/1.78, 0.65/0.34, 33.79/33.51).
+
+**Memory** — bytes→MiB at 1048576 all match to 0.01 except one (see nits).
+
+### Interpretation — no blockers
+
+- Critical-path 72.13→53.24 (−26%) vastly exceeds the 4.7% wall reduction at four jobs. The report pre-empts exactly this by stating the path excludes scheduler/resource waiting and is not a wall-time prediction at unlimited parallelism. Correct and necessary caveat.
+- RSS is correctly scoped as GNU time's max **single-process** RSS, not concurrent build footprint. The clean-build 2897.99→2897.90 non-change alongside workspace-impl 2766.55→1699.44 is internally consistent and correctly explained ("dominated by other files") — the removed peak simply isn't the global peak.
+- Config-interface CPU 87.19→67.28 with a flat dependency path (33.79→33.51) is the expected signature of removing parallel work off the chain; the report says exactly that.
+- The 2.2% no-op "improvement" is 1.6 ms and is explicitly disclaimed rather than claimed. Good.
+- Scope (target closure, excluded tests/Sandbox/Vulkan, no runtime/GPU inference), custody, alternation B,A,A,B,B,A matching `attempt_id` order, and `claim_eligible: false` on all six are all consistent with the records and with n=3 descriptive treatment.
+
+CPU-seconds columns are not derivable from the six raw records supplied (no CPU field); I could not independently verify those five pairs. Not a blocker — noting the verification gap.
+
+### Metadata repair and driver diff
+
+The repair is genuinely metadata-only: `deepcopy`, asserts the pre-state backend, asserts `metrics` and `source` are unchanged post-mutation, records `original_attempt_id`, `toolchain_backend`, `supersedes`, and an explicit no-execution note. Originals are retained, and the destination-exists guard makes reruns idempotent. The driver change mirrors it for future runs and preserves compiler identity in diagnostics, so the canonical-category switch doesn't lose information. No metric-producing code path is touched — the timing loop, scenario records, and `canonicalize` call are untouched, so there is no code regression affecting these or future measurements.
+
+### Nits
+
+1. **Re-seal the repaired records.** The script mutates `backend` *after* `canonicalize()` produced the sealed record, without recanonicalizing. If the sealed envelope carries any digest or checksum over its own content, the repaired files now carry a stale one — which would undercut "only the repaired records are the schema-valid canonical results." Worth confirming the repaired set passes `validate_result_data` (the same check the driver now applies) before final closure.
+2. **Config-interface after-RSS**: 3035832320 B = 2895.19 MiB, report says 2895.20. Off by 0.01; conclusion unaffected.
+3. **Workspace-impl after dependency path**: 7175 ms shown as 7.17 s (half rounds down); 7.18 is the more conventional rendering.
+4. **Config impl after**: median 0.422 equals the displayed max 0.422 at three decimals (421.730 vs 422.078). Correct, but reads as a degenerate range — a fourth decimal or a note would help.
+5. The "largest remaining producers" table isn't sorted by the after-column (RenderExtraction.Internal at 12.262 sits above three larger rows); sorting by the after value would make "remaining" read more directly.
+6. `raw-result.json` is written before validation, so a validation failure leaves a raw file with no sealed counterpart. Likely intentional for diagnosis — just be sure the failure is loud enough not to be mistaken for a completed sample.
