@@ -12886,3 +12886,13 @@ tree:
     alternatives: [Add another device facade or header, delete the established manager lifetime seam, copy a compiler-test registration prefix again, infer elapsed performance from dependency counts]
     evidence: [tasks/done/GRAPHICS-139-resource-manager-device-borrows.md, src/graphics/rhi/RHI.BufferManager.cppm, src/graphics/rhi/RHI.TextureManager.cppm, src/graphics/rhi/RHI.SamplerManager.cppm, src/graphics/rhi/RHI.PipelineManager.cppm, tests/CMakeLists.txt, tests/README.md]
     status: resolved
+
+  - id: N592
+    type: decision
+    title: Narrow graphics service imports while retaining value-type owners
+    provenance: ai-executed
+    timestamp: '2026-09-15T15:13:24+02:00'
+    choice: Reuse borrowed IDevice declarations in eight graphics interfaces and ICommandContext declarations in two point workspaces. Compiler feedback corrected the source-review assumption that MemoryAccess belonged to Descriptors; retain CommandContext in scan/reduction and transfer interfaces, and directly import Device in the runtime Keypoints caller. Remove four unused standard includes and historical overlay prose, preserving fixture limitations and lifetimes. Retire GRAPHICS-140 after Claude review, complete ci build, 185 focused and 4653 CPU passes with one expected skip, and fresh cache-disabled Clang 20 graphics build and boundary checks.
+    alternatives: [Split MemoryAccess into another module without a demonstrated need, add a service facade or shared declaration header, assume source review alone proves consumer reachability, claim timing improvement from dependency counts]
+    evidence: [tasks/done/GRAPHICS-140-graphics-service-borrows.md, src/graphics/renderer/Graphics.PointLBVH.cppm, src/graphics/renderer/Graphics.ComputeParallelPrimitives.cppm, src/graphics/renderer/Graphics.GpuTransfer.cppm, src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp, tests/CMakeLists.txt]
+    status: resolved

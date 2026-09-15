@@ -1,3 +1,4 @@
+// Owns copied ImGui frame data and font resources for renderer consumption.
 module;
 
 #include <cstddef>
@@ -9,11 +10,12 @@ module;
 export module Extrinsic.Graphics.ImGuiOverlaySystem;
 
 import Extrinsic.RHI.Bindless;
-import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.SamplerManager;
 import Extrinsic.RHI.TextureManager;
+
+extern "C++" { namespace Extrinsic::RHI { class IDevice; } }
 
 export namespace Extrinsic::Graphics
 {

@@ -22,6 +22,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Graphics.PointKeypoints;
+import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.KernelEvents;

@@ -1,17 +1,18 @@
+// CPU reference primitives and GPU recording contracts for shared scan and reduction work.
 module;
 
 #include <cstdint>
 #include <span>
-#include <string>
 #include <vector>
 
 export module Extrinsic.Graphics.ComputeParallelPrimitives;
 
-import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Descriptors;
-import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
+
+extern "C++" { namespace Extrinsic::RHI { class IDevice; } }
 
 export namespace Extrinsic::Graphics
 {

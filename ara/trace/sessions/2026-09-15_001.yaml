@@ -3,8 +3,8 @@ session:
   date: '2026-09-15'
   started: '2026-09-15T00:37:12+02:00'
   last_turn: "2026-09-15T14:35:59+02:00"
-  turn_count: 21
-  summary: "Resource-manager device borrows and compiler-test registration share existing mechanisms. Claude reviewed; 4645 CPU passes plus one skip, fresh Clang 20 RHI build and all 50 boundary tests pass. No timing claim."
+  turn_count: 22
+  summary: "Eight graphics interfaces reuse borrowed device declarations with narrower dependencies and unchanged algorithm bodies. Claude reviewed; 4653 CPU passes plus one skip, 185 focused passes and fresh Clang 20 graphics verification. No timing claim."
 events_logged:
 - turn: 1
   type: experiment
@@ -180,6 +180,13 @@ events_logged:
   routing: direct
   provenance: ai-executed
   summary: Retain four resource-manager device borrows and one shared compiler-boundary registration owner; no measured timing or GPU claim.
+
+- turn: 22
+  type: decision
+  id: N592
+  routing: direct
+  provenance: ai-executed
+  summary: Retain eight graphics device borrows with required MemoryAccess ownership intact; no timing or GPU runtime claim.
 
 ai_actions:
 - turn: 1
@@ -380,6 +387,11 @@ ai_actions:
   provenance: ai-executed
   files_changed: [src/graphics/rhi/RHI.BufferManager.cppm, src/graphics/rhi/RHI.TextureManager.cppm, src/graphics/rhi/RHI.SamplerManager.cppm, src/graphics/rhi/RHI.PipelineManager.cppm, tests/CMakeLists.txt, tests/README.md, tasks/done/GRAPHICS-139-resource-manager-device-borrows.md]
 
+- turn: 22
+  action: Narrowed eight graphics interfaces, corrected the MemoryAccess owner and runtime Keypoints import after compiler feedback, removed unused includes and historical prose, resolved Claude review, passed full ci build and CPU tests plus fresh Clang 20 graphics verification, and retired GRAPHICS-140. Production source delta is minus 55 lines, primarily comments; no new production module or file.
+  provenance: ai-executed
+  files_changed: [src/graphics/renderer/Graphics.PointLBVH.cppm, src/graphics/renderer/Graphics.PointKeypoints.cppm, src/graphics/renderer/Graphics.ComputeParallelPrimitives.cppm, src/graphics/renderer/Graphics.GpuTransfer.cppm, src/graphics/renderer/Graphics.VisualizationPropertyBufferResidency.cppm, src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cppm, src/graphics/renderer/Graphics.ImGuiOverlaySystem.cppm, src/graphics/renderer/Graphics.ImGuiUploadHelper.cppm, src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp, tests/CMakeLists.txt, tasks/done/GRAPHICS-140-graphics-service-borrows.md]
+
 claims_touched:
 - id: C94
   action: crystallized
@@ -447,6 +459,9 @@ key_context:
 - turn: 21
   excerpt: User requested continued duplicate-code and compilation cleanup with Claude, through planning, implementation, review, tests and fixes. Existing source-sharing authorization applies; no main merge requested.
 
+- turn: 22
+  excerpt: User requested continued duplicate-code and compilation cleanup with Claude through planning, implementation, review, tests and fixes. Source-sharing authorization persists; no main merge requested.
+
 open_threads:
 - The broader C92 processing-family hypothesis still needs a selected baseline and repeated family-edit measurements; BUILD-006 separately owns backend/cache comparisons.
 - BUG-193 owns unexplained GPU pacing variability and WLOP watchdog margin; BUG-189/191/192 closed only finite-work
@@ -465,7 +480,7 @@ open_threads:
   CPU and Vulkan probes select the scalar; exact Display status, acceleration and Appearance behavior remain needed.'
 - BUG-195 owns disk-headroom preflight and evidence-write recovery; completed backend verification does not close
   that tooling work.
-- GRAPHICS-138 is complete. The renderer implementation remains about 13 seconds in the bounded interface-touch probe; further splitting needs a concrete dependency/cost justification. BUILD-006 retains separate backend/cache comparisons. GRAPHICS-139 is complete; other pointer-only graphics interfaces remain candidates for consumer/contract review.
+- GRAPHICS-138 is complete. The renderer implementation remains about 13 seconds in the bounded interface-touch probe; further splitting needs a concrete dependency/cost justification. BUILD-006 retains separate backend/cache comparisons. GRAPHICS-139 and GRAPHICS-140 are complete; RenderWorld/GpuWorld dependencies and upload-sharing candidates still need consumer and behavior review.
 
 ai_suggestions_pending:
 - Existing staged topics retain their open owners and flags; this ordinary refactor supplies no new closure signal.

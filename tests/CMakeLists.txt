@@ -348,6 +348,25 @@ foreach(_manager IN ITEMS BufferManager TextureManager SamplerManager PipelineMa
         PROPERTIES LABELS "contract;build;graphics" TIMEOUT 30)
 endforeach()
 
+# Compute and upload contracts borrow services without exposing their full APIs.
+foreach(_helper IN ITEMS PointLBVH PointKeypoints)
+    intrinsic_add_module_boundary_test(RenderCompilationLocality.${_helper}ServiceBorrows
+            --check-source src/graphics/renderer/Graphics.${_helper}.cppm
+            --forbid-module Extrinsic.RHI.Device
+            --forbid-module Extrinsic.RHI.CommandContext)
+    set_tests_properties(RenderCompilationLocality.${_helper}ServiceBorrows
+        PROPERTIES LABELS "contract;build;graphics" TIMEOUT 30)
+endforeach()
+foreach(_helper IN ITEMS ComputeParallelPrimitives GpuTransfer
+                         VisualizationPropertyBufferResidency VisualizationOverlayUploadHelper
+                         ImGuiOverlaySystem ImGuiUploadHelper)
+    intrinsic_add_module_boundary_test(RenderCompilationLocality.${_helper}ServiceBorrows
+            --check-source src/graphics/renderer/Graphics.${_helper}.cppm
+            --forbid-module Extrinsic.RHI.Device)
+    set_tests_properties(RenderCompilationLocality.${_helper}ServiceBorrows
+        PROPERTIES LABELS "contract;build;graphics" TIMEOUT 30)
+endforeach()
+
 # Renderer clients need its public contracts, not implementation-owned helpers.
 intrinsic_add_module_boundary_test(RenderCompilationLocality.RendererInterface
         --check-source src/graphics/renderer/Graphics.Renderer.cppm

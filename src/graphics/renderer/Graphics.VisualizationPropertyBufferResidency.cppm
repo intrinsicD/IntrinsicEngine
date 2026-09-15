@@ -1,7 +1,7 @@
+// Retains GPU property buffers for visualization packets across frame slots.
 module;
 
 #include <cstdint>
-#include <memory>
 #include <optional>
 #include <span>
 #include <string>
@@ -13,7 +13,8 @@ export module Extrinsic.Graphics.VisualizationPropertyBufferResidency;
 
 import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.RHI.BufferManager;
-import Extrinsic.RHI.Device;
+
+extern "C++" { namespace Extrinsic::RHI { class IDevice; } }
 
 export namespace Extrinsic::Graphics
 {

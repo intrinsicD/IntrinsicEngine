@@ -39,6 +39,13 @@ Graphics is organized into explicit sublayers:
 - The four RHI resource-manager interfaces borrow `IDevice` through its existing
   C++ linkage declaration. Their implementation units import `RHI.Device`; a
   manager constructor declaration does not expose device submission dependencies.
+- PointLBVH and PointKeypoints likewise borrow `IDevice` and `ICommandContext`.
+  ComputeParallelPrimitives and GpuTransfer borrow `IDevice`, retaining the
+  CommandContext import for its `MemoryAccess` value type. Visualization property
+  residency and overlay uploads, ImGuiOverlaySystem and ImGuiUploadHelper borrow
+  `IDevice`.
+  Their interfaces retain value-type owners; implementations import the full
+  service APIs. Compiler-boundary tests guard these interface dependencies.
 - `RHI::NullCommandContext` supplies the inert command surface for the Null
   backend and CPU-only compute execution; recording test doubles keep their
   own implementations.

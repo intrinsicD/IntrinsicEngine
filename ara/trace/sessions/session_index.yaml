@@ -590,8 +590,8 @@ sessions:
 
 - id: 2026-09-15_001
   date: '2026-09-15'
-  summary: "Resource-manager device borrows and compiler-test registration share existing mechanisms. Claude reviewed; 4645 CPU passes plus one skip, fresh Clang 20 RHI build and all 50 boundary tests pass. No timing claim."
-  turn_count: 21
-  events_count: 27
+  summary: "Eight graphics interfaces reuse borrowed device declarations with narrower dependencies and unchanged algorithm bodies. Claude reviewed; 4653 CPU passes plus one skip, 185 focused passes and fresh Clang 20 graphics verification. No timing claim."
+  turn_count: 22
+  events_count: 28
   claims_touched: [C94, C95, C96]
   open_threads: 10

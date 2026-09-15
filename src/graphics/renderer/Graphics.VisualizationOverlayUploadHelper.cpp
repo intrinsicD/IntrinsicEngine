@@ -10,6 +10,8 @@ module;
 
 module Extrinsic.Graphics.VisualizationOverlayUploadHelper;
 
+import Extrinsic.RHI.Device;
+
 import Extrinsic.Graphics.TransientDebugUploadHelper;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;

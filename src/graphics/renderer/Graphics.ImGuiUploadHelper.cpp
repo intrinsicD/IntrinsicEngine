@@ -9,6 +9,8 @@ module;
 
 module Extrinsic.Graphics.ImGuiUploadHelper;
 
+import Extrinsic.RHI.Device;
+
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
 

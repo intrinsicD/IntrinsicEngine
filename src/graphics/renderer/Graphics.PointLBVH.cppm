@@ -3,9 +3,9 @@ module;
 #include <cstdint>
 #include <memory>
 export module Extrinsic.Graphics.PointLBVH;
-import Extrinsic.RHI.Device;
-import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Handles;
+
+extern "C++" { namespace Extrinsic::RHI { class IDevice; class ICommandContext; } }
 
 export namespace Extrinsic::Graphics
 {

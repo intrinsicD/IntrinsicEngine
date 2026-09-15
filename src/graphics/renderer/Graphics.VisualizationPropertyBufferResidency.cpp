@@ -9,6 +9,8 @@ module;
 
 module Extrinsic.Graphics.VisualizationPropertyBufferResidency;
 
+import Extrinsic.RHI.Device;
+
 import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;

@@ -7,6 +7,9 @@ module;
 #include <memory>
 #include <string>
 module Extrinsic.Graphics.PointLBVH;
+
+import Extrinsic.RHI.Device;
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Types;

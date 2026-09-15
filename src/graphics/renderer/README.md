@@ -2038,7 +2038,9 @@ Concretely:
   gate: Null or non-operational devices report `DeviceUnavailable` with
   `CpuFallbackRecommended`, missing recorder dependencies report `InvalidInput`,
   and invalid buffer/pipeline/BDA resources fail as `InvalidGpuResource`. The
-  module imports RHI device/handle/barrier/descriptor/buffer-manager types but
+  interface imports RHI value and buffer-manager types, including
+  CommandContext for `MemoryAccess`, and borrows the device; its implementation
+  imports the complete Device API. The module
   exposes no Vulkan handles, ECS, runtime, platform, or asset-service ownership.
   See
   [`docs/architecture/compute-parallel-primitives.md`](../../../docs/architecture/compute-parallel-primitives.md).

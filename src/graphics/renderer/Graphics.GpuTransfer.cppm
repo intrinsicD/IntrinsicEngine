@@ -1,3 +1,4 @@
+// Batched GPU uploads and owned readback results across the graphics/RHI boundary.
 module;
 
 #include <cstddef>
@@ -8,13 +9,14 @@ module;
 
 export module Extrinsic.Graphics.GpuTransfer;
 
-import Extrinsic.RHI.BufferTransfer;
 import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.BufferTransfer;
 import Extrinsic.RHI.Descriptors;
-import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.TransferQueue;
+
+extern "C++" { namespace Extrinsic::RHI { class IDevice; } }
 
 export namespace Extrinsic::Graphics
 {

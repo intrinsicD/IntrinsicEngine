@@ -2,7 +2,6 @@
 module;
 
 #include <cstdint>
-#include <memory>
 #include <optional>
 #include <span>
 #include <vector>
@@ -11,49 +10,13 @@ export module Extrinsic.Graphics.VisualizationOverlayUploadHelper;
 
 import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.RHI.BufferManager;
-import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 
-// GRAPHICS-078 Slices B + C — per-frame host-visible upload helper for
-// the visualization overlay pass. The helper packs sanitized
-// `VectorFieldOverlayPacket` (Slice B) and `IsolineOverlayPacket`
-// (Slice C) spans into per-lane host-visible vertex buffers that
-// survive across frames (geometric growth on demand) and reports per-
-// lane upload results so the executor's
-// `RecordVisualizationOverlayPass(...)` helper can record deterministic
-// `BindPipeline + PushConstants + Draw(N, 1, 0, 0)` shapes.
-//
-// Mirrors `Extrinsic.Graphics.TransientDebugUploadHelper` exactly,
-// substituting visualization lanes for transient-debug lanes:
-//   - Slice B wires the vector-field lane (one glyph = one line
-//     segment = two packed vertices).
-//   - Slice C wires the isoline lane (each iso value contributes a
-//     `LineList` deterministic placeholder segment of two packed vertices
-//     until a source-buffer expansion path lands).
-// All lanes share the `position(vec3) + packed RGBA8 color(uint32)`
-// 16-byte packed-vertex layout consumed by the matching
-// `assets/shaders/visualization_*.{vert,frag}` shader pairs.
-//
-// Backend policy: per `GRAPHICS-014Q` and the task non-goals, the
-// helper must not retain GPU resources on `GpuWorld`, must not expose
-// itself through RHI or renderer module surfaces (only the
-// `IRenderer`-internal `Pass.VisualizationOverlay` consumes the upload
-// result), and must not route through the retained line/point cull
-// buckets. The concrete helper is declared in the renderer module so CPU
-// contract tests can exercise its buffer-partitioning contract directly. It
-// is functional through `BufferManager` + `IDevice::WriteBuffer(...)`.
-// GRAPHICS-078E adds
-// deterministic fixture positions for pixel-readback parity; source-BDA
-// expansion into actual per-glyph / per-isoline world-space endpoints remains
-// future method-specific work.
+extern "C++" { namespace Extrinsic::RHI { class IDevice; } }
 
 export namespace Extrinsic::Graphics
 {
-    // GRAPHICS-078 Slice B — vector-field lane upload result. Mirrors
-    // the transient-debug lane upload result: vertex buffer handle +
-    // BDA + per-frame `Uploaded` flag. `VertexCount = 2 * sum of
-    // ElementCount` across all packets (one glyph = one line segment
-    // = two vertices).
+    // Each glyph contributes two packed vertices.
     struct VisualizationVectorFieldUploadResult
     {
         RHI::BufferHandle VertexBuffer{};
@@ -64,14 +27,8 @@ export namespace Extrinsic::Graphics
         bool              Overflow{false};
     };
 
-    // GRAPHICS-078 Slice C — isoline lane upload result. Mirrors the
-    // vector-field upload result shape. On the CPU/null contract path,
-    // each iso value contributes a single placeholder line segment
-    // (two packed vertices) so the pass can issue
-    // `Draw(2 * IsoValueCount, 1, 0, 0)` per packet via `LineList`
-    // topology. GRAPHICS-078E makes those placeholder segments deterministic
-    // so opt-in Vulkan pixel-readback can sample the isoline lane; actual
-    // scalar-field-derived polyline expansion remains future work.
+    // Each iso value contributes a deterministic fixture segment, not a
+    // scalar-field-derived polyline.
     struct VisualizationIsolineUploadResult
     {
         RHI::BufferHandle VertexBuffer{};
@@ -82,35 +39,9 @@ export namespace Extrinsic::Graphics
         bool              Overflow{false};
     };
 
-    // Renderer-owned upload helper. Pairs `RHI::BufferManager` with
-    // the device's `WriteBuffer(...)` path: per frame the helper resets
-    // its bookkeeping, the renderer calls `UploadVectorFields(...)`
-    // once per draw stream, the helper ensures the per-lane host-
-    // visible vertex buffer has capacity for the requested vertex count
-    // (geometric growth ×2 up to the per-lane cap), copies the packed
-    // `position(vec3) + packed RGBA8 color(uint32)` vertices through
-    // `device.WriteBuffer(...)`, and returns the per-lane vertex
-    // buffer handle + BDA the pass uses for `BindPipeline +
-    // PushConstants(BDA + FirstVertex) + Draw(N, 1, 0, 0)` per packet
-    // (N = 2 * ElementCount for vector-field glyphs).
-    //
-    // CPU/null contract note: the helper does not have CPU access to
-    // the source `PositionBufferBDA` / `VectorBufferBDA` payloads
-    // (those are GPU pointers), so it writes deterministic placeholder
-    // positions and the packet's packed color into each packed vertex.
-    // GRAPHICS-078E validates those placeholders with opt-in Vulkan
-    // pixel-readback; actual source-BDA expansion remains future work.
-    //
-    // Buffer recycling: one growing buffer is reused per lane and per
-    // frame-in-flight slot. `GetBufferAllocationCount()` returns the
-    // cumulative number of underlying `BufferManager::Create(...)`
-    // calls across all lanes/slots. Recycling contract tests pin this after
-    // slot warm-up across N frames with constant payload.
-    // Lifetime contract: constructed from `RHI::IDevice& + RHI::BufferManager&`;
-    // the device and manager pointers are non-null for the helper's lifetime
-    // (the renderer owns both and resets the helper before the manager in
-    // `Shutdown()`). The `Upload*` methods therefore only guard the device's
-    // operational state and the empty-input case, not the member pointers.
+    // Uploads fixture positions: source position/vector BDAs are not CPU-readable.
+    // Each lane retains one growing buffer per frame slot. Device and manager
+    // must outlive the helper; the renderer resets it before manager shutdown.
     class VisualizationOverlayUploadHelper
     {
     public:

@@ -9,6 +9,8 @@ module;
 
 module Extrinsic.Graphics.ImGuiOverlaySystem;
 
+import Extrinsic.RHI.Device;
+
 namespace Extrinsic::Graphics
 {
     struct ImGuiOverlaySystem::Impl

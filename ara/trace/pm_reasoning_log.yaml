@@ -2498,3 +2498,10 @@ entries:
     - The four interfaces add four synopsis lines and no production file; the separate CMake cleanup removes 85 lines across 46 call sites registering 50 tests. Do not describe these as 46 tests or as a measured engine-speed gain.
     - Full Clang 23 suite passed before the CMake-only change. Complete CTest command/order/property equality and a no-work IntrinsicTests build justify focused re-execution of all 50 affected guards instead of repeating the unchanged full suite. Fresh Clang 20 verifies RHI producers only; no GPU/sanitizer runtime evidence added.
     - Existing staged research topics retain their owners and flags; this ordinary refactor supplies no new closure signal. Preserve unrelated renderer, cache, product and runtime gaps.
+
+  - turn: 2026-09-15_001#22
+    notes:
+    - Record N592 as ordinary refactoring history only. Dependency counts and source-line counts do not establish elapsed build improvement; no new claim, observation or broader-hypothesis closure follows.
+    - Retain CommandContext for MemoryAccess instead of inventing another type owner. Compiler feedback and completed whole-tree compilation resolve actual reachability failures; do not fabricate the nonexistent test paths named by the final source review.
+    - Fresh Clang 20 evidence covers graphics producers and boundary metadata only. Full CPU and focused runs use canonical Clang 23; no GPU or sanitizer runtime is represented.
+    - Existing staged topics retain their open owners and flags. No new closure signal or user endorsement applies to broader compilation, method, architecture or product hypotheses.

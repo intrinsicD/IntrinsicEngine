@@ -1,7 +1,7 @@
+// Uploads ImGui draw lists into retained per-frame vertex and index buffers.
 module;
 
 #include <cstdint>
-#include <memory>
 #include <optional>
 #include <span>
 #include <vector>
@@ -11,16 +11,9 @@ export module Extrinsic.Graphics.ImGuiUploadHelper;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.BufferManager;
-import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 
-// GRAPHICS-079 Slice C / GRAPHICS-110 — per-frame host-visible upload helper
-// for the canonical ImGui overlay pass. The helper mirrors the renderer-owned
-// transient-debug / visualization-overlay helpers: it owns growing vertex/index
-// upload storage per frame-in-flight slot, copies submitted
-// `ImGuiOverlayFrame` payloads through `IDevice::WriteBuffer(...)`, and
-// returns per-draw-list offsets so `Pass.ImGui` can record deterministic
-// `BindIndexBuffer + SetScissor + PushConstants + DrawIndexed` blocks.
+extern "C++" { namespace Extrinsic::RHI { class IDevice; } }
 
 export namespace Extrinsic::Graphics
 {
