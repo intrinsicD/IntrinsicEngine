@@ -1,0 +1,87 @@
+{
+  "baseline_revision": "545ff867a",
+  "files_sha256": {
+    "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp": "cd36243a67e35904191f4d73e884636ba6e9bcbb0d0e581cbdf1b025743dc603",
+    "src/runtime/Editor/internal/Runtime.EditorFeatures.Internal.hpp": "d50ff6000032cc34a795775c09e6e574989812a472f81cfed13c2ece05bf38e5",
+    "src/runtime/Editor/internal/Runtime.EditorGeometryHelpers.hpp": "28ea111a6c4804dfd716c63f2e39c57e3e59987b71c466510c73bbe1a9449947",
+    "src/runtime/Editor/internal/Runtime.EditorFeatureCommands.Internal.hpp": "e9212d20569b30349c127e98b81662276f323626c7ac9dfdf6400d8161b18c99",
+    "src/runtime/Editor/internal/Runtime.EditorFeatureProperties.Internal.hpp": "eb7a0803e598c47ad8894c54b8767cdfdebef2779707986772f614e2125dd788"
+  },
+  "owner_interfaces_sha256": {
+    "src/assets/Asset.GeometryPayload.cppm": "fccdae0fdb7fe22e753e1d51e1826233435ec08f9e1b6811ba5c31e7c2d09bd1",
+    "src/assets/Asset.ModelTexturePayload.cppm": "d62ea8fab76eddcc2526bc1578340970892fd915fa14817ee2bf32f1baaf7cb4",
+    "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm": "ee3ee8104a155af20585ebbbe810b1f136b7b82a3cc01bea87b6123de71b72e4",
+    "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cppm": "4a14e29db27c8d502f1c38a484ce22d1ceaed81f12bc08c720264035bdbfe74d",
+    "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm": "db096a516d6ebb48878bd4472e14934a56868108ea355b4ca4a890ceb2de8a7f"
+  },
+  "manual_namespace_export_inventory": {
+    "GeometryPayload": [
+      "IsGeometryPayloadKind",
+      "AssetPayloadTypeIdOf",
+      "AssetGeometryPayload"
+    ],
+    "ModelTexturePayload": [
+      "kInvalidAssetModelIndex",
+      "AssetTexturePixelFormat",
+      "AssetTextureColorSpace",
+      "AssetTextureSourceKind",
+      "AssetModelResourceKind",
+      "AssetModelResourceStatus",
+      "AssetTexture2DMetadata",
+      "AssetTexture2DPayload",
+      "AssetModelTextureReference",
+      "AssetModelMaterialPayload",
+      "AssetModelPrimitivePayload",
+      "AssetModelNodePayload",
+      "AssetModelExternalResourceDiagnostic",
+      "AssetModelScenePayload",
+      "IsSupportedTextureImportFormat",
+      "IsSupportedModelSceneImportFormat",
+      "IsAssetModelSceneGeometryKind",
+      "BytesPerPixel",
+      "ComponentCountFor",
+      "ValidateAssetTexture2DPayload",
+      "ValidateAssetModelScenePayload",
+      "DebugNameForAssetTexturePixelFormat",
+      "DebugNameForAssetTextureColorSpace",
+      "DebugNameForAssetModelResourceStatus"
+    ],
+    "PointCloudConsolidationModule": [
+      "PointCloudConsolidationGpuState",
+      "IsValidPointCloudConsolidationPropertyRefs",
+      "ResolvePointCloudConsolidationAvailability",
+      "PointCloudConsolidationService",
+      "PointCloudConsolidationModule"
+    ],
+    "PointCloudConsolidationTypes": [
+      "PointCloudConsolidationRunStatus",
+      "PointCloudConsolidationPropertyRefs",
+      "MakePointCloudConsolidationPropertyRefs",
+      "PointCloudConsolidationAvailability",
+      "PointCloudConsolidationRequest",
+      "PointCloudConsolidationResult",
+      "PointCloudConsolidationModuleStats"
+    ],
+    "PointCloudConsolidationConfig": [
+      "kPointCloudConsolidationConfigSectionName",
+      "kPointCloudConsolidationConfigSectionSchemaId",
+      "kPointCloudConsolidationConfigSectionSchemaVersion",
+      "PointCloudConsolidationStrategy",
+      "PointCloudConsolidationBackend",
+      "PointCloudConsolidationNormalSource",
+      "PointCloudConsolidationSupportRadiusMode",
+      "PointCloudConsolidationConfig",
+      "StableToken",
+      "SerializePointCloudConsolidationConfig",
+      "ValidatePointCloudConsolidationConfigSection",
+      "GetPointCloudConsolidationConfig",
+      "SetPointCloudConsolidationConfig",
+      "MakePointCloudConsolidationConfigSectionRegistration"
+    ]
+  },
+  "zero_name_references_excluding_imports": true,
+  "overloads": "Config has four StableToken overloads on its four scoped enums, with zero call-name references. Types has ToString(PointCloudConsolidationRunStatus); both bare calls take GeometryPresentationSlotSemantic/SourceKind with retained exact overloads. Distinct scoped enums cannot convert to consolidation status. No namespace operators in these interfaces; member assignments are not free operators.",
+  "reexports": "Payload modules have none. ConsolidationModule reexports Types and GeometryAvailability; Types reexports Config and GeometryAvailability. Availability remains directly imported; complete Config surface above unused.",
+  "retained_owners": "AssetPayloadKind and DebugNameForAssetPayloadKind belong to retained Asset.ImportRouter. Local AppendDiagnostics uses Runtime diagnostic vectors. Required AssetWorkflow/SceneDocument event owners, AssetWorkflowRecipePolicies, GeometryPresentation/Availability, TextureBakeModule, VisualizationEditingOperations and VisualizationRecipes remain. Sibling ContextAdapters owns a real IsGeometryPayloadKind caller; untouched.",
+  "scope": "Three import deletions only; no other source bytes changed. This manual inventory includes namespace functions and template/type/constant names; member identifiers and scoped enumerators are encapsulated by their unused owner types."
+}

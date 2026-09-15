@@ -1,0 +1,37 @@
+## Verdict: APPROVE
+
+Source-level review only (no on-disk inspection); gate results are still pending and I'm not asserting anything about them.
+
+### Symbol coverage against the three removed owners
+
+**`Extrinsic.Asset.GeometryPayload`** — exports `IsGeometryPayloadKind`, `AssetPayloadTypeIdOf<T>`, `AssetGeometryPayload` (with its member templates `Make`/`Read`). None of the three names, nor any construction/`.Read()`/`.Make()` expression on a payload object, appears anywhere in the supplied TU. The only `Assets::` names used are `AssetPayloadKind` (header field `PendingAssetImportPayloadKind`, `FileImportPrerequisiteEvaluation::ResolvedPayloadKind`) and `A::DebugNameForAssetPayloadKind` in `BuildFileImportModel` — both owned by the retained `Extrinsic.Asset.ImportRouter`. Correct owner retained.
+
+**`Extrinsic.Asset.ModelTexturePayload`** — none of the 25 exported names (constants, six scoped enums, nine payload structs, the `IsSupported*`/`BytesPerPixel`/`ComponentCountFor`/`Validate*`/`DebugNameFor*` functions) is referenced. The near-miss `ComponentCountForPropertyCatalogKind` is a local static taking `Geometry::PropertyValueKind`, not `ComponentCountFor(AssetTexturePixelFormat)`; there is no unqualified `ComponentCountFor` call to make ADL relevant. `AssetImportMeshEnrichmentState` is not in this interface and belongs to a retained asset-workflow owner.
+
+**`Extrinsic.Runtime.PointCloudConsolidationModule`** — this is the only removal with a re-export chain, and it is the one that matters:
+- Module re-exports `PointCloudConsolidationTypes` and `GeometryAvailability`; Types re-exports `Config` and `GeometryAvailability`.
+- `GeometryAvailability` is still imported directly (line present in the retained list), so `GeometryEntityAvailability`, `GeometryRenderLane`, `GeometryPropertyRef`, `GeometryPropertyResolution{,Status}`, `GeometryPropertyValueKindFilter`, `GeometryElementDomain`, `BuildGeometryAvailability`, `ResolveGeometryProperty`, `ResolveGeometryElementCount`, `ResolveRenderLaneAvailability` — all heavily used here — keep a direct owner. No reliance on the transitive path.
+- Neither `PointCloudConsolidationService`/`Module`/`GpuState`, nor the Types surface, nor the Config surface (including all four scoped enums, the constants, the five `extern "C++"` config functions `SerializePointCloudConsolidationConfig`, `ValidatePointCloudConsolidationConfigSection`, `Get/SetPointCloudConsolidationConfig`, `MakePointCloudConsolidationConfigSectionRegistration`) is named. The engine-config names actually used (`Core::Config::EngineConfigDiagnostic`, `EngineConfigLoadResult`, `EngineConfig`) come from the directly imported `Core.Config.Engine`/`EngineLoad`, not through Config's re-export.
+
+### Overload resolution
+
+The two bare calls are `ToString(slot.Semantic)` and `ToString(slot.SourceKind)` in `AppendBoundSlotRows`. Both arguments are `Extrinsic::Runtime` scoped enums (`GeometryPresentationSlotSemantic`, `GeometryPresentationSourceKind`) whose exact overloads are exported by the directly imported `Extrinsic.Runtime.GeometryPresentation`, and ADL on the argument type reaches that namespace independently of the `using namespace Extrinsic::Runtime` in `EditorFeatureDetail`. The removed candidate was `ToString(PointCloudConsolidationRunStatus)`; a distinct scoped enum has no implicit conversion to it, so it was never viable — dropping it can only shrink a candidate set that already had an exact match, and cannot introduce ambiguity or silently re-target. The four `StableToken` overloads have zero call sites, so their loss is inert. No namespace-scope operators are declared in any of the three interfaces (member assignment/comparison in the payload/config structs are not free operators), so no operator lookup is perturbed.
+
+### Reachability / completeness
+
+Nothing here names an incomplete type from a removed owner. For types still used through retained owners (e.g. whatever `EditorGeometryProcessingModel` or `EditorCommon` aggregate members those owners declare), completeness follows from interface-dependency reachability of the declaring module's own imports, which is unaffected by deleting imports in a consumer implementation unit; only name lookup shrinks, and no removed name is looked up.
+
+### Header closure
+
+The three internal headers are included after the import block and declare their prerequisites in comments: geometry-helpers needs EditorCommon/command-history/ECS registry+transform; commands needs SceneEditingOperations, `Asset.ImportRouter`, `Core.Error`, `Graphics.Component.RenderGeometry`; properties needs VisualizationEditingOperations, EditorCommon, EditorJobProjection, GeometryAvailability, VertexAttributeBinding, VertexChannelBindings, GeometrySources, Geometry.Properties. Every one of those is still imported; none lists a removed module. The GMF still supplies `<functional>`, `<chrono>`, `<array>`, `<optional>`, `<string(_view)>`, `<vector>`, `<cstddef>`, `<cstdint>` and `entt/entity/registry.hpp` required by those headers and by the `try_get`/`all_of`/`view` uses.
+
+### Scope and behavior
+
+The diff is exactly three `import` deletions in one file, both hunks contiguous with unchanged context; the supplied complete source shows no other edit — the `extern "C++"` block, the anonymous-namespace helpers, the two-declaration/two-definition `BuildEditorWorkspaceSnapshotFromBindings` pair, and the four `Extrinsic::Runtime` entry points are byte-identical in structure to what the audit describes, and 3457→3454 by `splitlines()` matches three removed lines with no other delta. Import removal affects only lookup, not codegen: no behavior, no ODR/visibility change for the exported `BuildEditorWorkspaceSnapshot{,Request}`, `BuildEditorInspectorModel`, `BuildEditorDomainWindowModel`, and no change to the internal-linkage helpers. The sibling `ContextAdapters` TU's real `IsGeometryPayloadKind` caller is unaffected — imports are per-TU.
+
+No blocker found. One standing caveat: this approves the source only; the build/test gates are still running, so the clang-20/BMI-level confirmation that nothing depended on the dropped transitive closure remains outstanding.
+
+Root review corrections: ModelTexturePayload has24 namespace names: one constant, five scoped enums, eight structs and ten functions, not the reviewer25/six/nine. The complete exact-name inventory in owner-audit.json is authoritative. The reviewer only-Assets-names sentence applies to the candidate payload-related uses and is not an exhaustive inventory of retained asset-service/registry names. Verification uses supported Clang23, not the closing review phrase clang20. This source review does not establish object-code identity; actual compiler and behavioral gates provide the stated evidence.
+
+
+Root closure: fixed source matches exactly three expected import deletions; every other byte and 876 other production files unchanged. splitlines() gives3457to3454lines and60to57imports; the Read tool reports a trailing empty line separately. Actual compiler closure148to120 removes28modules with no additions. Complete namespace/config/reexport/overload audit is recorded.250focusednative,4636fullCPU plus expectedskip,217ASan,217UBSan and Vulkanruntimecompile pass. No timing, GPU execution or full sanitizer-suite claim.

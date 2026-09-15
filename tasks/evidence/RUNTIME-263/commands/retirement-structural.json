@@ -1,0 +1,22 @@
+{
+  "command": [
+    "bash",
+    "tools/ci/run_clean_workshop_review.sh",
+    ".",
+    "--strict"
+  ],
+  "command_display": "bash tools/ci/run_clean_workshop_review.sh . --strict",
+  "cwd": ".",
+  "duration_ms": 2449,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T05:03:30Z",
+  "label": "retirement-structural",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T05:03:28Z",
+  "stderr_path": "tasks/evidence/RUNTIME-263/commands/retirement-structural.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-263/commands/retirement-structural.stdout.log",
+  "stdout_sha256": "2a5a23c89ca778843b591d6d14fffa3fab8554cc51424100c1bf19bb23c97938",
+  "task_id": "RUNTIME-263"
+}

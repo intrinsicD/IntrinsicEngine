@@ -1,0 +1,29 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-ubsan",
+    "--output-on-failure",
+    "-R",
+    "^(SandboxEditorUi|SandboxEditorWorkspaceContext|SandboxEditorSessionLifecycle|VisualizationRecipes)",
+    "--no-tests=error",
+    "--timeout",
+    "60",
+    "--parallel",
+    "1"
+  ],
+  "command_display": "ctest --test-dir build/ci-ubsan --output-on-failure -R '^(SandboxEditorUi|SandboxEditorWorkspaceContext|SandboxEditorSessionLifecycle|VisualizationRecipes)' --no-tests=error --timeout 60 --parallel 1",
+  "cwd": ".",
+  "duration_ms": 11445,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T05:02:41Z",
+  "label": "focused-ci-ubsan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T05:02:30Z",
+  "stderr_path": "tasks/evidence/RUNTIME-263/commands/focused-ci-ubsan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-263/commands/focused-ci-ubsan.stdout.log",
+  "stdout_sha256": "ff4d1915c1b17003609570ec8182df78eae3a9893e63ee440f52debea2b14b8d",
+  "task_id": "RUNTIME-263"
+}

@@ -5,6 +5,10 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
+owner: "codex-overnight"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-09-15T04:57:51Z"
 contract_schema: 1
 contracts: [runtime.render-diagnostics-locality]
 ---
@@ -77,23 +81,23 @@ Use existing supported Clang23 preset trees and the real Models.cpp producer.
 Existing architecture stays accurate; task/evidence records the result.
 
 ## Required changes
-- [ ] Bind baseline source/map and complete own-export/reexport/config/template/private-header proof.
-- [ ] Have Claude delete only the three proven import lines; preserve every other byte and production file.
-- [ ] Verify actual compiler closure, restore a needed candidate rather than adding a workaround, and stop implementation after this slice.
+- [x] Bind baseline source/map and complete own-export/reexport/config/template/private-header proof.
+- [x] Have Claude delete only the three proven import lines; preserve every other byte and production file.
+- [x] Verify actual compiler closure, restore a needed candidate rather than adding a workaround, and stop implementation after this slice.
 
 ## Tests
-- [ ] Existing ci producer build and focused editor/recipe/locality tests pass.
-- [ ] IntrinsicTests build and full supported CPU suite pass.
-- [ ] Focused editor/recipe ASan/UBSan and promoted-Vulkan runtime compilation pass.
+- [x] Existing ci producer build and focused editor/recipe/locality tests pass.
+- [x] IntrinsicTests build and full supported CPU suite pass.
+- [x] Focused editor/recipe ASan/UBSan and promoted-Vulkan runtime compilation pass.
 
 ## Docs
-- [ ] Record fixed-source Claude review and verification evidence; no architecture change beyond existing accurate owners.
-- [ ] Retire, locally commit/seal and update task brief/index before morning reconciliation.
+- [x] Record fixed-source Claude review and verification evidence; no architecture change beyond existing accurate owners.
+- [x] Retire, locally commit/seal and update task brief/index before morning reconciliation.
 
 ## Acceptance criteria
-- [ ] Only proven unused import lines change in Models.cpp; all other bytes and production files stay identical.
-- [ ] Required asset, geometry and editor owners remain, with passing actual compiler/native/sanitizer/build evidence and honest dependency counts.
-- [ ] Fixed diff is Claude-reviewed, locally committed, retired and sealed without timing, GPU execution or whole-engine completion claims.
+- [x] Only proven unused import lines change in Models.cpp; all other bytes and production files stay identical.
+- [x] Required asset, geometry and editor owners remain, with passing actual compiler/native/sanitizer/build evidence and honest dependency counts.
+- [x] Fixed diff is Claude-reviewed, locally committed, retired and sealed without timing, GPU execution or whole-engine completion claims.
 
 ## Verification
 ```bash
@@ -120,3 +124,37 @@ new compiled trees. No test that merely asserts deleted source text is needed.
 - Incomplete re-export/config/namespace-function enumeration or treating ToString name matches as automatically safe/unsafe.
 - Changes to layers, test selectors, backend/cache identities, persisted data or user-facing behavior.
 - Pushing, starting implementation after 07:15 Berlin or opening another implementation slice before the morning report.
+
+## Completion — 2026-09-15
+- Endpoint: **Retired**, final overnight implementation slice.
+- Commit: implementation and retirement are in the enclosing local commit;
+  `tasks/evidence/RUNTIME-263/seal.yaml` binds the exact source revision.
+- Exactly three import lines removed: Asset.GeometryPayload,
+  Asset.ModelTexturePayload and Runtime.PointCloudConsolidationModule.
+  Models.cpp decreases from 3,457 to 3,454 lines and 60 to 57 direct imports.
+  Every other byte and all 876 other tracked production files are unchanged.
+- Actual rebuilt compiler closure decreases from 148 to 120 modules, with
+  28 removals and no additions. The removed consolidation facade carried
+  unrelated primitive/spatial-query and memory dependencies into this unit.
+  No elapsed-time improvement is claimed; BUILD-007/C92 retain matched timing.
+- Complete five-interface and four-recursive-header audit includes namespace
+  functions, templates, constants, the transitive config's four StableToken
+  overloads and five codec functions. AssetPayloadKind/debug naming retain
+  their ImportRouter owner. Both bare ToString calls retain exact
+  GeometryPresentation scoped-enum overloads; consolidation status is not
+  convertible. GeometryAvailability stays directly imported. Sibling asset
+  payload consumers and their imports remain untouched.
+- Claude implemented only the selected deletions and independently reviewed
+  the supplied fixed full source/interfaces/headers. Root verified the exact
+  expected bytes and actual compiler map. Reader line-count convention differs
+  by its trailing empty line; SHA-bound source and splitlines counts agree.
+- All gates pass: 250 focused native editor, recipe and locality cases,
+  4,636 full CPU cases plus one expected GLFW/LSan skip, 217 focused ASan and
+  217 focused UBSan cases, promoted-Vulkan runtime compilation, source proof
+  and strict structural checks. No new tests that only mirror deleted source.
+  Vulkan compilation is not GPU execution; sanitizer coverage is focused.
+- Clean-workshop rows 1–3 and 8 pass (canonical owners, unchanged layers/public
+  boundaries, no exception); rows 4–7 do not apply (no frame/pass/protocol/
+  maturity change). No new module, file, helper, wrapper or compatibility path.
+  Existing architecture description remains accurate. No new implementation
+  slice follows this before the morning reconciliation and report.

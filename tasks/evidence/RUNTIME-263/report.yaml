@@ -1,0 +1,114 @@
+schema_version: 1
+task_id: RUNTIME-263
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-15T05:03:32Z'
+claim_eligible: false
+source:
+  base_ref: 545ff867a
+  base_revision: 545ff867a75a93cd3a292d0d312031b6f78c1787
+  head_revision: 545ff867a75a93cd3a292d0d312031b6f78c1787
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+    sha256: c358968bbf98bc6495a213bdc664d23ae3f5864123d42b86d9fe3248caab7645
+  - path: tasks/SESSION-BRIEF.md
+    sha256: b7cc46325243e8621015404f2d9e714d0b389254f0db320992d286a00da1bb92
+  - path: tasks/backlog/runtime/RUNTIME-263-workspace-model-payload-consolidation-imports.md
+    sha256: null
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 3bf400e095a8ddcc305602b6cafd136e5b9e61ecbce13a3ed2af872d0b8df987
+  - path: tasks/done/RUNTIME-263-workspace-model-payload-consolidation-imports.md
+    sha256: 090a3d3fcf6ad1caa38e39112419f46e380250add4d0cc9b0953cd31f4b8ec33
+  content_digest: fba90c0d8f418ade6b90aeda2c1de99eee86675a7d075b26f8dfdc784fbf0bb8
+touched:
+  paths:
+  - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/runtime/RUNTIME-263-workspace-model-payload-consolidation-imports.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-263-workspace-model-payload-consolidation-imports.md
+  layers:
+  - runtime
+  modules:
+  - Extrinsic.Runtime.EditorWorkspaceSnapshots
+extension_seam: Retain existing asset and geometry owners; remove unused payload and consolidation surfaces
+future_change_plan: No further implementation before morning report; BUILD-007 retains matched compile
+  measurement
+acceptance:
+- criterion: Only proven unused import lines change in Models.cpp; all other bytes and production files
+    stay identical.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/RUNTIME-263/structural-counts.json
+  - tasks/evidence/RUNTIME-263/owner-audit.json
+  reason: null
+- criterion: Required asset, geometry and editor owners remain, with passing actual compiler/native/sanitizer/build
+    evidence and honest dependency counts.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/RUNTIME-263/commands/full-cpu.stdout.log
+  - tasks/evidence/RUNTIME-263/commands/focused-ci-asan.stdout.log
+  - tasks/evidence/RUNTIME-263/commands/focused-ci-ubsan.stdout.log
+  - tasks/evidence/RUNTIME-263/commands/vulkan-runtime-build.json
+  reason: null
+- criterion: Fixed diff is Claude-reviewed, locally committed, retired and sealed without timing, GPU
+    execution or whole-engine completion claims.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/done/RUNTIME-263-workspace-model-payload-consolidation-imports.md
+  - tasks/evidence/RUNTIME-263/source-review.txt
+  - tasks/evidence/RUNTIME-263/seal.yaml
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-263/commands/build-ci-asan.json
+- receipt: tasks/evidence/RUNTIME-263/commands/build-ci-ubsan.json
+- receipt: tasks/evidence/RUNTIME-263/commands/compiler-boundary.json
+- receipt: tasks/evidence/RUNTIME-263/commands/configure-ci.json
+- receipt: tasks/evidence/RUNTIME-263/commands/focused-build.json
+- receipt: tasks/evidence/RUNTIME-263/commands/focused-ci-asan.json
+- receipt: tasks/evidence/RUNTIME-263/commands/focused-ci-ubsan.json
+- receipt: tasks/evidence/RUNTIME-263/commands/focused-ci.json
+- receipt: tasks/evidence/RUNTIME-263/commands/full-build.json
+- receipt: tasks/evidence/RUNTIME-263/commands/full-cpu.json
+- receipt: tasks/evidence/RUNTIME-263/commands/retirement-structural.json
+- receipt: tasks/evidence/RUNTIME-263/commands/structural-counts.json
+- receipt: tasks/evidence/RUNTIME-263/commands/structural.json
+- receipt: tasks/evidence/RUNTIME-263/commands/vulkan-runtime-build.json
+changed_public_contracts: []
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/RUNTIME-263-workspace-model-payload-consolidation-imports.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: true
+residual_risks:
+- No timing or object-byte identity claim. Vulkan evidence is runtime compilation only; sanitizer coverage
+  is focused editor and recipe testing.
+skipped_checks: []
+artifacts:
+- path: tasks/evidence/RUNTIME-263/source-review.txt
+  sha256: 4cd0fb2f130a1465dc1a69000a05579673a63f4103cbf2ff7d12f1a882fece32
+  kind: file
+- path: tasks/evidence/RUNTIME-263/structural-counts.json
+  sha256: 674bc4dc4b6735408a9b36a24166b6880af70c321527367d2de3d95eb2bd4076
+  kind: file
+- path: tasks/evidence/RUNTIME-263/owner-audit.json
+  sha256: 09f686bdc6a775a3a0d11ed8e04821977ae2ffbbe7e55b9e61b5a2b9cf0c75f5
+  kind: file
+- path: tasks/evidence/RUNTIME-263/plan-review.txt
+  sha256: 4a79047141d4a0f0e73c07598a5e3d2b5aaa724ce60a9dbcad060d267bafcf2f
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true

@@ -1,0 +1,56 @@
+## Audit result — all three imports are removable; proof below
+
+I made no edits, ran no builds, and touched nothing outside reading. Source stays frozen.
+
+### 1. `Extrinsic.Asset.GeometryPayload` — REMOVE (proved)
+
+Complete namespace-level export inventory of `src/assets/Asset.GeometryPayload.cppm` (single `export namespace Extrinsic::Assets`, no `export import`, no `extern "C++"` block, no operators):
+
+| kind | name |
+|---|---|
+| function (inline) | `IsGeometryPayloadKind(AssetPayloadKind)` |
+| function template | `AssetPayloadTypeIdOf<T>()` |
+| type | `AssetGeometryPayload` (members `PayloadKind/TypeId/Payload/DebugTypeName`, `IsValid`, static template `Make`, template `Read`) |
+
+- It imports `Asset.ImportRouter`, `Asset.Registry`, `Asset.TypePool`, `Core.Error` **without `export`** → it re-exports nothing.
+- Grep of the whole `src/runtime/Editor` tree for every one of those names yields exactly one hit, and it is a **sibling** unit: `internal/Runtime.EditorFeatureContextAdapters.cpp:1847` (`Assets::IsGeometryPayloadKind`). Sibling keeps its own import; untouched.
+- Body/headers: zero occurrences in `Models.cpp` (3458 lines read in full) and in all four private headers (`Runtime.EditorFeatures.Internal.hpp` → `EditorGeometryHelpers.hpp`, `EditorFeatureCommands.Internal.hpp`, `EditorFeatureProperties.Internal.hpp`, all read in full).
+- **`AssetPayloadKind` owner verified, not assumed**: `src/assets/Asset.ImportRouter.cppm:20` declares `enum class AssetPayloadKind`, and `:110` declares `DebugNameForAssetPayloadKind`. `Extrinsic.Asset.ImportRouter` is retained (line 31). This covers `EditorFeatureBindings::PendingAssetImportPayloadKind`, `FileImportPrerequisiteEvaluation::ResolvedPayloadKind`, and the bare-through-alias call `A::DebugNameForAssetPayloadKind(...)` at line 2649. The `A` alias is `Extrinsic::Assets`, so the name is unqualified w.r.t. the module that owns it — resolved by owner, not by namespace-absence.
+- ADL/overload: this module contributes no `ToString`, no operators, and its two functions are not named here; qualified `A::` lookup sees the ImportRouter declarations regardless.
+
+### 2. `Extrinsic.Asset.ModelTexturePayload` — REMOVE (proved)
+
+Complete export inventory (single `export namespace Extrinsic::Assets`, no `export import`):
+constant `kInvalidAssetModelIndex`; enums `AssetTexturePixelFormat`, `AssetTextureColorSpace`, `AssetTextureSourceKind`, `AssetModelResourceKind`, `AssetModelResourceStatus`; types `AssetTexture2DMetadata`, `AssetTexture2DPayload`, `AssetModelTextureReference`, `AssetModelMaterialPayload`, `AssetModelPrimitivePayload`, `AssetModelNodePayload`, `AssetModelExternalResourceDiagnostic`, `AssetModelScenePayload`; functions `IsSupportedTextureImportFormat`, `IsSupportedModelSceneImportFormat`, `IsAssetModelSceneGeometryKind`, `BytesPerPixel`, `ComponentCountFor`, `ValidateAssetTexture2DPayload`, `ValidateAssetModelScenePayload`, `DebugNameForAssetTexturePixelFormat`, `DebugNameForAssetTextureColorSpace`, `DebugNameForAssetModelResourceStatus`. No operators, no `ToString`.
+
+- Zero hits for any of these names across `src/runtime/Editor` (including `Operations/Runtime.VisualizationEditingOperations.cppm`, which owns `EditorTextureBakeControlsModel`). Zero in body and the four headers.
+- Texture-bake usage here is `BuildEditorTextureBakeControlsModel` + `MakeEditorVisualizationEditingContext` (owners `Runtime.VisualizationEditingOperations` / private header, both retained) and `TextureBakeService*` held pointer-only in the bindings (`Runtime.TextureBakeModule`, retained). No payload type is named or copied in this TU.
+- It imports `Core.Error`, `Asset.GeometryPayload`, `Asset.ImportRouter` non-exported → removing it removes no third-party visibility other than its own names.
+
+### 3. `Extrinsic.Runtime.PointCloudConsolidationModule` — REMOVE (previous hold now resolved)
+
+Own exports (`export namespace Extrinsic::Runtime`): fwd class `PointCloudConsolidationGpuState`; functions `IsValidPointCloudConsolidationPropertyRefs`, `ResolvePointCloudConsolidationAvailability`; classes `PointCloudConsolidationService`, `PointCloudConsolidationModule`. (Their `m_*` members and the `friend` are private implementation inventory — listed conservatively, not treated as usable exports.)
+
+Re-export closure, walked explicitly:
+- `export import Extrinsic.Runtime.PointCloudConsolidationTypes` → exports enum `PointCloudConsolidationRunStatus`; **function `ToString(PointCloudConsolidationRunStatus)`**; `MakePointCloudConsolidationPropertyRefs`; types `PointCloudConsolidationPropertyRefs`, `PointCloudConsolidationAvailability`, `PointCloudConsolidationRequest`, `PointCloudConsolidationResult` (incl. member `Succeeded`), `PointCloudConsolidationModuleStats`. No operators.
+- `export import Extrinsic.Runtime.GeometryAvailability` (from both the module and Types) — **already directly imported at line 63**, owner of `GeometryEntityAvailability`, `GeometryPropertyRef`, `GeometryElementDomain`, `GeometryRenderLane`, `ResolveRenderLaneAvailability`, `BuildGeometryAvailability`, `ResolveGeometryProperty`, `ResolveGeometryElementCount`, `GeometryPropertyValueKindFilter` (verified: `src/runtime/GeometryIntegration/Runtime.GeometryAvailability.cppm`). It is additionally re-exported by the retained `Runtime.GeometryPresentation` (line 17 of that interface).
+- Types `export import Extrinsic.Runtime.PointCloudConsolidationConfig` → `PointCloudConsolidationBackend` etc.; none of its names appear in body or headers.
+- All other imports of the module (`Core.Error`, `RHI.Device`, `CommandBus`, `EditorCommandHistory`, `JobService`, `KernelEvents`, `ModuleLifecycle`, `WorldHandle`, `WorldRegistry`, `SpatialIndexCache`, `Geometry.PointCloud.Consolidation`) are **non-exported** → no visibility contribution.
+
+**`ToString` collision proof.** The only two bare `ToString` calls are `Models.cpp:1560` `ToString(slot.Semantic)` and `:1580` `ToString(slot.SourceKind)`. `slot` is `EditorGeometryPresentationSlotModel`, whose `Semantic`/`SourceKind` are copied from `GeometryPresentationSlotSnapshot` (`Runtime.GeometryPresentation`, retained at line 66). That module declares exact-type overloads `ToString(GeometryPresentationSlotSemantic)` and `ToString(GeometryPresentationSourceKind)` (`Runtime.GeometryPresentation.cppm:253-256`). The removed candidate `ToString(PointCloudConsolidationRunStatus)` takes an unrelated scoped enum with no implicit conversion from either argument → **non-viable candidate**; deleting a non-viable candidate cannot change resolution, and the retained overloads are exact matches. Removal is therefore neutral for both call sites.
+
+Local `AppendDiagnostics` (line 1042) operates on `std::vector<EditorDiagnostic>` from the Runtime editor diagnostic surface only — unaffected by all three removals.
+
+### Retained owners that must stay (do not touch)
+`Extrinsic.Asset.ImportRouter` (AssetPayloadKind, DebugNameForAssetPayloadKind), `Extrinsic.Runtime.AssetWorkflowRecipePolicies` (`AssetImportMeshEnrichmentState`, verified at `Runtime.AssetWorkflowRecipePolicies.cppm:27`), `Extrinsic.Runtime.GeometryAvailability`, `Extrinsic.Runtime.GeometryPresentation`, `Extrinsic.Runtime.TextureBakeModule`, `Extrinsic.Runtime.VisualizationEditingOperations`, plus `AssetWorkflowModule`/`SceneDocumentModule` and every other current import/header.
+
+### Remaining unknowns
+1. Whether any *indirect* complete-type requirement (e.g. a member of `RuntimeAssetImportQueueEntry` or a bakes-related model typed by an `Assets::` payload) currently relies on reachability supplied by these imports rather than by another transitive path. Name-level evidence says no, but reachability is a compiler-level property and is what the compile check settles.
+2. Whether any retained import re-exports the removed modules (would make removal a no-op rather than a regression — harmless either way).
+
+### Verification plan (compiler, not heuristics)
+Existing Clang-23 preset trees; the actual producer of this TU via `IntrinsicRuntimeContractTests`; full CPU build plus focused native / ASan / UBSan / Vulkan runtime compile of the editor target. Direct deletions need not remove transitive modules. No BMI-change or timing claim is made.
+
+### Recommendation given the 07:15 hard stop
+All three are defensible as one slice. If only a minimal slice fits, take the two asset payload imports first (zero named symbols anywhere in the TU, no overload-set interaction at all); `PointCloudConsolidationModule` is the only one with a real (but proven non-viable) overload-set participant and is the natural second slice if the compile budget runs short.
+Root corrections: baseline has 3457 lines. Full config namespace surface is enumerated separately in owner-audit.json; no etc or prefix-only function enumeration. Actual compiler closure is measured after build.

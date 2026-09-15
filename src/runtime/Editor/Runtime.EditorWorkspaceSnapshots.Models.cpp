@@ -29,8 +29,6 @@ module Extrinsic.Runtime.EditorWorkspaceSnapshots;
 
 import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Asset.ImportRouter;
-import Extrinsic.Asset.GeometryPayload;
-import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
@@ -79,7 +77,6 @@ import Geometry.Properties;
 import Extrinsic.Asset.Service;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.SpatialIndexCache;
-import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorJobProjection;
