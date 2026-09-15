@@ -12575,3 +12575,33 @@ tree:
     - tasks/evidence/DOCS-007/link-coverage.json
     - tasks/done/BUG-196-retirement-index-navigation-false-positive.md
     status: resolved
+
+  - id: N577
+    type: experiment
+    title: Repair retirement navigation and identify direct diagnostic owners
+    provenance: ai-executed
+    timestamp: '2026-09-15T05:01:55+02:00'
+    result: Claude added regression fixtures, reproduced three canonical-navigation failures,
+      and implemented one exact-path predicate reused by the two task-index checks. Root verified
+      all original test/helper bodies unchanged, shortened redundant comments and added the useful
+      review case for a direct non-README document. Canonical roots and direct README indexes now
+      pass; real task links, task fragments, misleading labels, nested indexes/directories and other
+      direct documents remain rejected. Existing name-based retirement-log exemption is unchanged.
+      Final seven tooling methods and nine source-documentation methods pass; the final tests run
+      against the old checker reproduce exactly three navigation subcase failures and no other
+      failure or fixture error. Strict structural checks pass; runtime index links are restored.
+      No C++/GPU rebuild or runtime claim. BUG-196 retired in df93c9fe3 and sealed in ce9d3da15;
+      evidence validates with zero errors and 105 warnings including four explicit tooling-only
+      skips. Claim released, all writers/builds stopped. Claude's initial discovery hit its turn cap;
+      a bounded no-tools synthesis of the collected source evidence produced the next narrow plan.
+      Root confirmed Models.cpp reaches Renderer only through its direct import. RUNTIME-257 will
+      import RenderDiagnostics/RenderCommandRouter directly and remove an unused mutation header,
+      preserving all body/header bytes; no next implementation has occurred. Other unused-looking
+      imports/body declarations need separate owner/consumer proof. N569 and BUILD-007 remain open.
+    evidence:
+    - tasks/done/BUG-196-retirement-index-navigation-false-positive.md
+    - tasks/evidence/BUG-196/report.yaml
+    - tasks/evidence/BUG-196/seal.yaml
+    - tasks/evidence/BUG-196/backtest.json
+    - tasks/backlog/runtime/RUNTIME-257-workspace-model-diagnostic-dependencies.md
+    status: resolved

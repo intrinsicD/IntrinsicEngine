@@ -590,8 +590,8 @@ sessions:
 
 - id: 2026-09-15_001
   date: '2026-09-15'
-  summary: DOCS-007 current runtime backlog index is verified, committed and sealed; BUG-196 has a Claude-reviewed plan to distinguish retirement navigation from task membership. Overnight continuation remains active until 08:00 Berlin; no timing or new runtime claim.
-  turn_count: 9
-  events_count: 9
+  summary: BUG-196 retirement-navigation validation is verified, committed and sealed; RUNTIME-257 has a Claude-reviewed narrow diagnostic-owner/import plan. Overnight continuation remains active until 08:00 Berlin; BUILD-007/C92 timing remains open.
+  turn_count: 10
+  events_count: 10
   claims_touched: []
   open_threads: 10

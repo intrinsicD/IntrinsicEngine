@@ -2373,3 +2373,10 @@ entries:
     - Separate BUG-196's real navigation false-positive from the new task note's missing Context heading; preserve both raw failures and the passing final gate. The permitted log/plain-path workaround keeps current discovery usable.
     - BUG-196 now has a settled Claude-reviewed predicate/test plan, not implementation. Preserve exact canonical roots and existing log behavior; no broad policy bypass or new history section.
     - Existing 32 pending observations retain owners/flags with no new closure signal. N569 and overnight continuation remain open until the deadline or a justified stop.
+
+  - turn: 2026-09-15_001#10
+    notes:
+    - Record N577 as tooling repair, exact source review and validation facts. No research claim or staged observation; tooling-only checks add no C++/GPU or timing evidence.
+    - Preserve the expected baseline failure and successful final-test backtest. The added direct NOTES.md case addresses the useful review gap; existing log semantics and current-state source comments are intentional.
+    - RUNTIME-257 is prepared only. Renderer is a re-exporter of used diagnostic types, not simply an unused headline import; the replacement names both actual owners. Other candidate removals remain unproved and out of scope.
+    - Existing staged topics retain their open owners and flags. No broader claim closes; N569 and overnight continuation remain open until the deadline or a justified stop.
