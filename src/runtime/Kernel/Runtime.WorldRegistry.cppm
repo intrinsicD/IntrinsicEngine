@@ -13,10 +13,11 @@ module;
 export module Extrinsic.Runtime.WorldRegistry;
 
 import Extrinsic.Core.Error;
-import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.WorldHandle;
+
+extern "C++" { namespace Extrinsic::ECS::Scene { class Registry; } }
 
 namespace Extrinsic::Runtime
 {

@@ -4,6 +4,8 @@ module;
 
 module Extrinsic.ECS.Scene.Registry;
 
+extern "C++"
+{
 namespace Extrinsic::ECS::Scene
 {
     EntityHandle Registry::Create()
@@ -26,4 +28,5 @@ namespace Extrinsic::ECS::Scene
     {
         m_Registry.clear();
     }
+}
 }

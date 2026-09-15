@@ -105,6 +105,16 @@ processing, discovery and snapshot interfaces against compiler dependencies for
 both owners and the LBVH implementation. Context storage, config callbacks and
 prepared-frame lifetime remain unchanged.
 
+Scene-facing interfaces borrow `ECS::Scene::Registry` the same way. Its sole
+definition in `ECS.Scene.Registry` has C++ linkage and still owns EnTT storage
+by value. Command history, processing, selection/refinement, scene serialization,
+scene/visualization editing and world management declare only the borrowed type.
+`WorldRegistry` constructs and destroys its existing owning pointer out of line.
+Concrete registry users import the owner; snapshot/context interfaces do not
+deserialize the full registry API. `EditorCompilationLocality.SceneRegistryBorrows`
+guards all ten interfaces and their workspace-snapshot consumer. This changes
+compilation dependencies, not scene ownership, context lifetime or command behavior.
+
 The session and public snapshot-query preparation share
 `MakeEditorWorkspaceSnapshotContext`, compiled in the existing context-adapter
 unit and declared through the private attachment interface. It combines the

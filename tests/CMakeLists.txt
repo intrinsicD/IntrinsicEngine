@@ -542,6 +542,23 @@ intrinsic_add_module_boundary_test(EditorCompilationLocality.ProcessingServiceBo
 set_tests_properties(EditorCompilationLocality.ProcessingServiceBorrows
     PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
 
+# Scene contexts borrow the canonical registry; EnTT storage belongs to concrete users.
+intrinsic_add_module_boundary_test(EditorCompilationLocality.SceneRegistryBorrows
+        --check-source src/runtime/Editor/Runtime.EditorCommandHistory.cppm
+        --check-source src/runtime/Editor/Runtime.EditorProcessing.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+        --check-source src/runtime/GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.SceneEditingOperations.cppm
+        --check-source src/runtime/Scene/Runtime.SceneSerialization.cppm
+        --check-source src/runtime/Scene/Runtime.SelectionController.cppm
+        --check-source src/runtime/Scene/Runtime.StableEntityLookup.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.cppm
+        --check-source src/runtime/Kernel/Runtime.WorldRegistry.cppm
+        --check-source src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm
+        --forbid-module Extrinsic.ECS.Scene.Registry)
+set_tests_properties(EditorCompilationLocality.SceneRegistryBorrows
+    PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
+
 # Feature conversion/token implementations do not depend on unrelated config families.
 foreach(_intrinsic_config_family IN ITEMS CurvatureSegmentation PointCloudConsolidation)
     if(_intrinsic_config_family STREQUAL "CurvatureSegmentation")

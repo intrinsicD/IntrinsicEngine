@@ -12,6 +12,8 @@ module;
 
 module Extrinsic.Runtime.StableEntityLookup;
 
+import Extrinsic.ECS.Scene.Registry;
+
 import Extrinsic.ECS.Component.StableId;
 
 namespace Extrinsic::Runtime

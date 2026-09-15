@@ -13,6 +13,8 @@ module;
 
 module Extrinsic.Runtime.EditorCommandHistory;
 
+import Extrinsic.ECS.Scene.Registry;
+
 import Extrinsic.ECS.Hierarchy.Structure;
 
 namespace Extrinsic::Runtime

@@ -15,12 +15,13 @@ export import Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.EditorCommon;
 export import Extrinsic.Runtime.SelectionController;
 import Extrinsic.ECS.Scene.Handle;
-import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.JobService;
 import Geometry.Properties;
+
+extern "C++" { namespace Extrinsic::ECS::Scene { class Registry; } }
 
 export namespace Extrinsic::Runtime
 {

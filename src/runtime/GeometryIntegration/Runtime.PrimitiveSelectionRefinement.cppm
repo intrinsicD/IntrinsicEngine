@@ -1,3 +1,4 @@
+// Runtime refinement of GPU selection hints against authoritative CPU geometry.
 module;
 
 #include <cstdint>
@@ -9,8 +10,9 @@ module;
 export module Extrinsic.Runtime.PrimitiveSelectionRefinement;
 
 import Extrinsic.ECS.Components.GeometrySources;
-import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.SelectionSystem;
+
+extern "C++" { namespace Extrinsic::ECS::Scene { class Registry; } }
 
 export namespace Extrinsic::Runtime
 {

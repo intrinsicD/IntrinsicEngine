@@ -7,7 +7,6 @@ module;
 export module Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Core.Config.EngineLoad;
-import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -15,6 +14,7 @@ import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.EngineConfigControl;
 // These services are borrowed only; their existing owners expose matching C++ linkage.
 extern "C++" {
+    namespace Extrinsic::ECS::Scene { class Registry; }
     namespace Extrinsic::RHI { class IDevice; }
     namespace Extrinsic::Runtime {
         class SpatialIndexCache;

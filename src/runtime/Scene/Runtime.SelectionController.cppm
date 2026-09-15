@@ -13,11 +13,12 @@ module;
 export module Extrinsic.Runtime.SelectionController;
 
 import Extrinsic.ECS.Scene.Handle;
-import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.StableEntityLookup;
 export import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
+
+extern "C++" { namespace Extrinsic::ECS::Scene { class Registry; } }
 
 export namespace Extrinsic::Runtime
 {

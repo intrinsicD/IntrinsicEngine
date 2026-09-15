@@ -1,3 +1,4 @@
+// Scene command records and undo/redo state shared by editor operations.
 module;
 
 #include <cstddef>
@@ -11,8 +12,9 @@ module;
 export module Extrinsic.Runtime.EditorCommandHistory;
 
 import Extrinsic.ECS.Scene.Handle;
-import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.SelectionController;
+
+extern "C++" { namespace Extrinsic::ECS::Scene { class Registry; } }
 
 export namespace Extrinsic::Runtime
 {

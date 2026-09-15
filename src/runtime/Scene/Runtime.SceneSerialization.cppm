@@ -1,3 +1,4 @@
+// Scene document serialization and IO with explicit completeness diagnostics.
 module;
 
 #include <cstdint>
@@ -8,7 +9,8 @@ export module Extrinsic.Runtime.SceneSerialization;
 
 import Extrinsic.Core.Error;
 import Extrinsic.Core.IOBackend;
-import Extrinsic.ECS.Scene.Registry;
+
+extern "C++" { namespace Extrinsic::ECS::Scene { class Registry; } }
 
 export namespace Extrinsic::Runtime
 {

@@ -5,6 +5,8 @@ module;
 #include <string>
 #include <unordered_set>
 module Extrinsic.Runtime.SelectionController;
+
+import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 namespace Extrinsic::Runtime
 {

@@ -37,15 +37,15 @@ compile cost while retaining one canonical implementation of every record and ad
   own immediate-before config baseline after this change lands.
 
 ## Acceptance criteria
-- [ ] Use BUILD-009's current graph to select and document a bounded consumer
+- [x] Use BUILD-009's current graph to select and document a bounded consumer
       group and exact expensive dependency; distinguish serialization from body work.
-- [ ] Implement the smallest beneficial change with Claude plan/fixed-diff review;
+- [x] Implement the smallest beneficial change with Claude plan/fixed-diff review;
       retain caching, attachment/detach behavior, command validity and all current
       UI/config/agent workflows. No backward-compatibility wrappers are needed.
-- [ ] Guard the selected dependency boundary using the existing compiler-test
+- [x] Guard the selected dependency boundary using the existing compiler-test
       helper; original metadata fails and final metadata passes. Preserve all
       existing boundaries and exercise expired-frame/query consumers.
-- [ ] Run focused and full CPU verification. If named-module attachment changes,
+- [x] Run focused and full CPU verification. If named-module attachment changes,
       rebuild all in-tree users and verify affected producers with fresh cache-off
       minimum-supported Clang; declare any GPU/sanitizer evidence separately.
 - [ ] Use the existing benchmark runner for matched before/after snapshot and
@@ -80,8 +80,8 @@ python3 tools/docs/check_doc_links.py --root .
   unused GeometrySources import from the scene-editing interface. No new
   wrapper, source file, allocation or alternate record definition is needed.
 - The original compiler metadata rejects the proposed boundary for all eleven
-  checked consumers. Final compilation, fixed-diff review, minimum-Clang proof,
-  correctness verification and matched measurement remain pending. Reject the
+  checked consumers. Canonical compilation, fixed-diff review and CPU verification now pass;
+  minimum-Clang proof also passes; matched measurement remains pending. Reject the
   patch if it does not improve the selected compile boundary.
 - Fixed-diff review found no blocking linkage/lifetime defect. Resolve its
   completeness questions through source inspection: concrete scene serialization,
@@ -96,3 +96,23 @@ python3 tools/docs/check_doc_links.py --root .
 BUILD-009 is complete. Use its [matched source comparison](../../ara/evidence/tables/build009_current_compile_measurement.md)
 and retained producer/critical-path records; the old BUILD-007 costs are historical.
 Freeze this task's immediate-before source before attributing its own changes.
+
+## Verification progress
+- Canonical `ci` configure and complete IntrinsicTests rebuild pass on Clang23.
+  Focused: 408 passes. Full CPU gate: 4,663 passes, zero failures, one expected
+  ASan-only leak-control skip (4,664 selected; 141.31 seconds).
+- New compiler guard passes for all eleven producers; all existing compiler
+  boundaries pass in the focused/full gates. Before graph: 92 dependencies;
+  after: 91, with exactly `ECS.Scene.Registry` removed. No timing inference yet.
+- Minimum Clang20 uses a fresh cache-off Null/headless build. Enable test
+  configuration to expose the Sandbox editor-library target in headless mode;
+  build that library and its full engine prerequisites. Earlier executable and
+  tests-disabled app-target requests selected no target and compiled nothing.
+- Reuse the existing timing runner and BUILD-009 settings for two samples per
+  arm in ABBA order: clean, no-op, workspace implementation, snapshot interface,
+  scene-editing interface. Freeze the after revision following verification.
+
+- Fresh cache-off Clang20 `ExtrinsicSandboxEditor` build passes, including all
+  engine prerequisites and app editor modules. All eleven new boundary producers
+  pass against that fresh compiler metadata. No Clang20 tests or GPU execution
+  are claimed; CPU runtime verification above uses canonical Clang23.

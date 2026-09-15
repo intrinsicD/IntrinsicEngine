@@ -1,3 +1,4 @@
+// Owns scene entity storage and exposes its lifecycle and explicit component access.
 module;
 
 #include <entt/entity/registry.hpp>
@@ -17,7 +18,11 @@ namespace Extrinsic::ECS::Scene
     // Thread model: single-threaded. Create/Destroy/Clear and any iteration
     // through Raw() must run on the same thread. Async producers that need
     // to mutate the registry must route through a main-thread queue.
-    export class Registry
+    // Global attachment lets pointer/reference consumers borrow the sole owner
+    // without importing EnTT storage. Complete-type users import this module.
+    export extern "C++"
+    {
+    class Registry
     {
     public:
         Registry() = default;
@@ -41,4 +46,5 @@ namespace Extrinsic::ECS::Scene
     private:
         entt::registry m_Registry;
     };
+    }
 }

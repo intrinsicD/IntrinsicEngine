@@ -12,6 +12,8 @@ module;
 
 module Extrinsic.Runtime.SelectionController;
 
+import Extrinsic.ECS.Scene.Registry;
+
 import Extrinsic.ECS.Components.Selection;
 
 namespace Extrinsic::Runtime

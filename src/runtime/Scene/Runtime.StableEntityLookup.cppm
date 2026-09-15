@@ -1,3 +1,4 @@
+// Scene-local stable identity lookup and ECS change subscriptions for runtime consumers.
 module;
 
 #include <cstddef>
@@ -12,7 +13,8 @@ export module Extrinsic.Runtime.StableEntityLookup;
 
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Scene.Handle;
-import Extrinsic.ECS.Scene.Registry;
+
+extern "C++" { namespace Extrinsic::ECS::Scene { class Registry; } }
 
 export namespace Extrinsic::Runtime
 {

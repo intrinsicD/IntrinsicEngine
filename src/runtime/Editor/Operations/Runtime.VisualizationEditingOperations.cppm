@@ -19,7 +19,6 @@ export module Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Error;
 import Extrinsic.ECS.Components.GeometrySources;
-import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
@@ -37,6 +36,8 @@ import Extrinsic.Runtime.VisualizationRecipes;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.Properties;
 import Geometry.UvAtlas;
+
+extern "C++" { namespace Extrinsic::ECS::Scene { class Registry; } }
 
 namespace Extrinsic::Runtime
 {
