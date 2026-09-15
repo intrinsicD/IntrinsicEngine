@@ -2,9 +2,9 @@ session:
   id: 2026-09-15_001
   date: '2026-09-15'
   started: '2026-09-15T00:37:12+02:00'
-  last_turn: '2026-09-15T01:34:53+02:00'
-  turn_count: 2
-  summary: RUNTIME-251 verified and retired; bounded overnight continuation scheduled through 08:00 Berlin. RUNTIME-252 implementation is under build/review; no completion or timing claim yet.
+  last_turn: '2026-09-15T02:04:41+02:00'
+  turn_count: 3
+  summary: RUNTIME-252 retired in 29d823f99 and sealed in c96ebd721; full CPU and focused ASan/UBSan pass. RUNTIME-253 is night-ready; overnight cleanup continues until 08:00 Berlin, without a timing claim.
 events_logged:
 - turn: 1
   type: experiment
@@ -20,6 +20,12 @@ events_logged:
   provenance: user
   summary: Bounded overnight continuation scheduled; first codec cleanup implemented but verification remains in
     progress.
+- turn: 3
+  type: experiment
+  id: N570
+  routing: direct
+  provenance: ai-executed
+  summary: Direct shared config codecs verified, independently reviewed, locally committed and sealed; next reuse slice prepared.
 ai_actions:
 - turn: 1
   action: Claude implemented five production files; root reviewed, added lifetime/statistics and compiler-boundary
@@ -42,6 +48,16 @@ ai_actions:
   - src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
   - tests/CMakeLists.txt
   - tasks/active/RUNTIME-252-direct-shared-config-codecs.md
+- turn: 3
+  action: Completed CPU and sanitizer gates, addressed Claude's compiler-guard gap, retired and sealed RUNTIME-252,
+    released its claim, prepared the settled RUNTIME-253 task and updated the finite continuation prompt.
+  provenance: ai-executed
+  files_changed:
+  - tests/CMakeLists.txt
+  - tasks/done/RUNTIME-252-direct-shared-config-codecs.md
+  - tasks/evidence/RUNTIME-252/report.yaml
+  - tasks/evidence/RUNTIME-252/seal.yaml
+  - tasks/backlog/runtime/RUNTIME-253-feature-config-section-reuse.md
 claims_touched: []
 key_context:
 - turn: 1
@@ -49,8 +65,10 @@ key_context:
     review, tests and fixes. Standing source-sharing and local commit authorization applies.
 - turn: 2
   excerpt: User requested repeating the cleanup until morning 08:00; deadline is 2026-09-15 in Europe/Berlin.
+- turn: 3
+  excerpt: Automatic continuation of the user-authorized cleanup until 08:00; no new scope decision or performance endorsement inferred.
 open_threads:
-- Overnight continuation and RUNTIME-252 remain in progress; complete verification and reviewed retirement before further slices, then report by 08:00.
+- Overnight cleanup remains active until 08:00; RUNTIME-252 is retired and sealed. Start the night-ready RUNTIME-253 section-helper slice after claiming clean main; stop new implementation by 07:15.
 - BUILD-007 owns matched clean-source engine compile reconciliation; BUILD-006 separately owns backend/cache comparisons.
   C92 remains a hypothesis.
 - BUG-193 owns unexplained GPU pacing variability and WLOP watchdog margin; BUG-189/191/192 closed only finite-work

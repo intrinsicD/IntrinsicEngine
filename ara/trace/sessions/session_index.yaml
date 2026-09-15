@@ -590,9 +590,8 @@ sessions:
 
 - id: 2026-09-15_001
   date: '2026-09-15'
-  summary: RUNTIME-251 verified and retired; bounded overnight continuation scheduled through 08:00 Berlin. RUNTIME-252
-    implementation is under build/review; no completion or timing claim yet.
-  turn_count: 2
-  events_count: 2
+  summary: RUNTIME-252 retired in 29d823f99 and sealed in c96ebd721; full CPU and focused ASan/UBSan pass. RUNTIME-253 is night-ready; overnight cleanup continues until 08:00 Berlin, without a timing claim.
+  turn_count: 3
+  events_count: 3
   claims_touched: []
   open_threads: 10

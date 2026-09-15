@@ -2328,3 +2328,9 @@ entries:
     notes:
     - Record the user deadline and scheduled continuation as N569. RUNTIME-252 is provisional; source counts and unchanged-body checks are not completed verification or timing evidence.
     - No new claim or observation; existing staged topics retain their owners and flags. The next continuation must finish the owned build/review, not duplicate it.
+
+  - turn: 2026-09-15_001#3
+    notes:
+    - Direct-route N570 as verified implementation and workflow facts; no new observation/claim. Line and dependency counts do not settle C92 or BUILD-007.
+    - Retain the pre-seal validation failure as workflow ordering evidence; the sealed result is clean. Claude's useful guard finding was fixed and rechecked without repeating unaffected C++ tests.
+    - Keep N569 open until the morning deadline; RUNTIME-253 is prepared, not implemented. Existing staged topics retain their open owners and flags, without new closure signals.

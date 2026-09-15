@@ -12383,3 +12383,25 @@ tree:
     - AGENTS.md
     - src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
     status: open
+
+  - id: N570
+    type: experiment
+    title: Retire direct shared config codecs and prepare section-mechanism reuse
+    provenance: ai-executed
+    timestamp: '2026-09-15T02:04:41+02:00'
+    result: RUNTIME-252 removes four production files and 400 production/build lines; retained config implementation
+      dependencies fall from 39 to 17 and 39 to 6. Shared parsers and normalized codec bodies are preserved.
+      Canonical Clang 23 build passes; full CPU has 4628 passes and one expected unsanitized leak-control skip.
+      Isolated ASan and UBSan each pass 253 focused tests. Claude approved source and final evidence;
+      its reciprocal config-import guard gap was fixed and all six strengthened checks pass across the three
+      registries. Pre-commit evidence validation required the pending historical seal; after retirement commit
+      29d823f99 and seal commit c96ebd721 it reports zero errors and 97 existing warning dispositions.
+      Claim released. RUNTIME-253 has a settled three-helper plan with baseline regression checks; implementation
+      has not started. Automation remains active through 08:00 Berlin. No matched timing claim or C92 closure.
+    evidence:
+    - tasks/done/RUNTIME-252-direct-shared-config-codecs.md
+    - tasks/evidence/RUNTIME-252/report.yaml
+    - tasks/evidence/RUNTIME-252/seal.yaml
+    - tasks/evidence/RUNTIME-252/reviews.jsonl
+    - tasks/backlog/runtime/RUNTIME-253-feature-config-section-reuse.md
+    status: resolved
