@@ -2346,3 +2346,9 @@ entries:
     - Record N572 as test diagnosis, mutation and verified implementation facts; no research claim or new staged observation. Existing 32 pending observations retain their current owners/flags and lack a new closure signal.
     - Distinguish the deterministic invocation-count mutation failure from its clock-resolution-dependent retention symptom; production timers were not changed. Preserve both original recurring failures and final passing gates.
     - Keep N569 open until the deadline. RUNTIME-254 is planned, not implemented; direct MaterialSystem import removal does not remove its lease-owned transitive dependency. C92 and BUILD-007 remain open.
+
+  - turn: 2026-09-15_001#6
+    notes:
+    - Record N573 as verified code/dependency facts and planning, not performance evidence; C92/BUILD-007 remain open. No new claim or staged observation; existing 32 pending topics keep their owners and flags.
+    - Preserve actual graph scope (MaterialSystem still transitive) and correct Claude's name-visibility speculation using the successful build. The private change adds no public API.
+    - Retain the corrected Unknown acceptance decision in RUNTIME-255 and the rejection of a weak prepared-frame helper. Discovery turn-cap recovery is not unfinished implementation; RUNTIME-255 remains planned, while the timed overnight loop stays active.

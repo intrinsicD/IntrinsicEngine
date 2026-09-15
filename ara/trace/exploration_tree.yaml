@@ -12457,3 +12457,31 @@ tree:
     - tasks/evidence/BUG-134/restored-source.json
     - tasks/done/RUNTIME-254-render-extraction-private-dependencies.md
     status: resolved
+
+  - id: N573
+    type: experiment
+    title: Narrow private render compilation dependencies and prepare shared recipe tokens
+    provenance: ai-executed
+    timestamp: '2026-09-15T03:11:35+02:00'
+    result: Claude made three preamble changes in the existing render-extraction private partition;
+      root verified exact substitutions and unchanged State/declaration and sibling source hashes.
+      Production source shrinks 344 to 341 lines; configured compiler dependencies fall 92 to 62,
+      with MaterialSystem still required transitively by the owned material lease. No timing claim.
+      Claude approved; full CPU passes 4632 cases plus one expected unsanitized leak-control skip;
+      focused native, ASan and UBSan each pass 69 cases, and promoted-Vulkan runtime compilation passes.
+      Retirement preflight caught a missing Commit field marker; corrected with raw failure retained.
+      RUNTIME-254 retired in 9a7c3f0c0 and sealed in 94862a63a; evidence validates with zero errors
+      and 97 historical warnings. Claim released and no writer/build remains active.
+      Read-only next-slice discovery hit its turn cap, then completed via a fixed-transcript synthesis.
+      Root verified 31 identical enum/token pairs; Claude withdrew an incorrect blanket Unknown
+      rejection condition after seeing two existing parsers explicitly accept it. Corrected RUNTIME-255
+      plan uses five compiled ToString overloads at the enum owner and preserves exact candidate sets.
+      Prepared-frame template consolidation rejected as added indirection for insufficient benefit.
+      RUNTIME-255 is planned only; BUILD-007/C92 and the overnight deadline remain open.
+    evidence:
+    - tasks/done/RUNTIME-254-render-extraction-private-dependencies.md
+    - tasks/evidence/RUNTIME-254/report.yaml
+    - tasks/evidence/RUNTIME-254/seal.yaml
+    - tasks/evidence/RUNTIME-254/structural-counts.json
+    - tasks/backlog/runtime/RUNTIME-255-render-recipe-token-owner.md
+    status: resolved
