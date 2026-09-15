@@ -1,0 +1,123 @@
+schema_version: 1
+task_id: RUNTIME-262
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-15T04:50:57Z'
+claim_eligible: false
+source:
+  base_ref: f03144c17
+  base_revision: f03144c175013167fda8ff86fe30f8ab7ad5ae92
+  head_revision: f03144c175013167fda8ff86fe30f8ab7ad5ae92
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 6a745327ba396fe5ef9ea559bade38d94a230345a7e996db6a10f834d08d64cb
+  - path: ara/trace/sessions/2026-09-15_001.yaml
+    sha256: 63573ef008bc971c7f4aad3cda007136fd4bbce8c494261e71836f14fe6bb9a8
+  - path: docs/architecture/runtime.md
+    sha256: d2146286e37f6637e34d4555eaf3904e692d8c6ae22d36be4b4d09ea73332b0b
+  - path: src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+    sha256: cd36243a67e35904191f4d73e884636ba6e9bcbb0d0e581cbdf1b025743dc603
+  - path: tasks/SESSION-BRIEF.md
+    sha256: b7cc46325243e8621015404f2d9e714d0b389254f0db320992d286a00da1bb92
+  - path: tasks/backlog/runtime/RUNTIME-262-workspace-model-recipe-owner.md
+    sha256: null
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 94c960deda82fd8429b212af00011722da746628b2c11ebdff22de2d25b99587
+  - path: tasks/done/RUNTIME-262-workspace-model-recipe-owner.md
+    sha256: d3b95da26b2f0ef0fe863c49dcfdb34bab37e8adf1a6d31f196067c1d32813c5
+  content_digest: f904da007d6c931bfbd073569c66d5c8f2dfc2171afaef75c7fcbf5bb5adc11c
+touched:
+  paths:
+  - ara/trace/exploration_tree.yaml
+  - ara/trace/sessions/2026-09-15_001.yaml
+  - docs/architecture/runtime.md
+  - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/runtime/RUNTIME-262-workspace-model-recipe-owner.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-262-workspace-model-recipe-owner.md
+  layers:
+  - runtime
+  modules:
+  - Extrinsic.Runtime.EditorWorkspaceSnapshots
+extension_seam: Use existing VisualizationRecipes directly instead of the extraction facade reexport
+future_change_plan: Any remaining import cleanup needs full own/reexport/header proof before the implementation
+  cutoff; BUILD007 retains matched timing
+acceptance:
+- criterion: Production change is exactly the one-line owner substitution; all other bytes/files and existing
+    feature behavior remain unchanged.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/RUNTIME-262/structural-counts.json
+  - tasks/evidence/RUNTIME-262/owner-audit.json
+  reason: null
+- criterion: Recipe, availability and activation record names retain their proven owners; actual compiler/native/sanitizer/build
+    gates pass with honest dependency counts.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/RUNTIME-262/commands/full-cpu.stdout.log
+  - tasks/evidence/RUNTIME-262/commands/focused-ci-asan.stdout.log
+  - tasks/evidence/RUNTIME-262/commands/focused-ci-ubsan.stdout.log
+  - tasks/evidence/RUNTIME-262/commands/vulkan-runtime-build.json
+  reason: null
+- criterion: Code/docs diff is Claude-reviewed, locally committed, retired and sealed without timing,
+    GPU execution or whole-engine completion claims.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/done/RUNTIME-262-workspace-model-recipe-owner.md
+  - tasks/evidence/RUNTIME-262/source-review.txt
+  - tasks/evidence/RUNTIME-262/seal.yaml
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-262/commands/build-ci-asan.json
+- receipt: tasks/evidence/RUNTIME-262/commands/build-ci-ubsan.json
+- receipt: tasks/evidence/RUNTIME-262/commands/compiler-boundary.json
+- receipt: tasks/evidence/RUNTIME-262/commands/configure-ci.json
+- receipt: tasks/evidence/RUNTIME-262/commands/focused-build.json
+- receipt: tasks/evidence/RUNTIME-262/commands/focused-ci-asan.json
+- receipt: tasks/evidence/RUNTIME-262/commands/focused-ci-ubsan.json
+- receipt: tasks/evidence/RUNTIME-262/commands/focused-ci.json
+- receipt: tasks/evidence/RUNTIME-262/commands/full-build.json
+- receipt: tasks/evidence/RUNTIME-262/commands/full-cpu.json
+- receipt: tasks/evidence/RUNTIME-262/commands/retirement-structural.json
+- receipt: tasks/evidence/RUNTIME-262/commands/structural-counts.json
+- receipt: tasks/evidence/RUNTIME-262/commands/structural.json
+- receipt: tasks/evidence/RUNTIME-262/commands/vulkan-runtime-build.json
+changed_public_contracts: []
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/RUNTIME-262-workspace-model-recipe-owner.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- No timing or object-byte identity claim. Vulkan evidence is runtime compilation only; sanitizer coverage
+  is focused editor and recipe testing.
+skipped_checks: []
+artifacts:
+- path: tasks/evidence/RUNTIME-262/source-review.txt
+  sha256: 4ca48cf55550116b6b60c98503b95d516cfb2a18140269b7110b2a3c06d7511a
+  kind: file
+- path: tasks/evidence/RUNTIME-262/structural-counts.json
+  sha256: dac99638433f313eb5fc161646ec6515dc09b8dd46aff87fea0db93f43e85807
+  kind: file
+- path: tasks/evidence/RUNTIME-262/owner-audit.json
+  sha256: 45dd43ffe2c1816faeb23a445f91e5ab7d0c84fe78a0d70fda47770c65088a02
+  kind: file
+- path: tasks/evidence/RUNTIME-262/plan-review.txt
+  sha256: 1e95e1f3ee679a8cfea76afdd9e7108c3830552afecf9cfa3a60773faad2171b
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true

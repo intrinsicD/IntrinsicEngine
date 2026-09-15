@@ -1,0 +1,24 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "VCPKG_FORCE_SYSTEM_BINARIES=1",
+    "cmake",
+    "--preset",
+    "ci"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 cmake --preset ci",
+  "cwd": ".",
+  "duration_ms": 845,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T04:44:12Z",
+  "label": "configure-ci",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T04:44:11Z",
+  "stderr_path": "tasks/evidence/RUNTIME-262/commands/configure-ci.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-262/commands/configure-ci.stdout.log",
+  "stdout_sha256": "43b4b73e8d91c9d8c9e7c79cf90b969b22bc1671614c50f86ab95dd78b62add0",
+  "task_id": "RUNTIME-262"
+}

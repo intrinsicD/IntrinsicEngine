@@ -277,8 +277,10 @@ The workspace-model implementation unit
 `Runtime.EditorWorkspaceSnapshots.Models.cpp` imports
 `Extrinsic.Graphics.RenderDiagnostics` for frame/GPU/command diagnostic records
 and `Extrinsic.Graphics.RenderCommandRouter` for `RenderCommandPassStatus`.
-The latter is not re-exported by the diagnostics owner. Its dependency boundary
-is checked per change with the compiler-boundary tool; the `RuntimeDiagnostics`
+The latter is not re-exported by the diagnostics owner. The same unit imports
+`Extrinsic.Runtime.VisualizationRecipes` directly for the visualization recipe
+records it names. This implementation's dependency boundary is checked per
+change with the compiler-boundary tool; the `RuntimeDiagnostics`
 CTest above covers the public contracts.
 
 Module granularity follows

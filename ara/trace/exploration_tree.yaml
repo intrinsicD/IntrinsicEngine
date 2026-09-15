@@ -12749,5 +12749,5 @@ tree:
     - tasks/evidence/RUNTIME-261/structural-counts.json
     - tasks/evidence/RUNTIME-261/initial-review.txt
     - tasks/evidence/RUNTIME-261/source-review.txt
-    - tasks/backlog/runtime/RUNTIME-262-workspace-model-recipe-owner.md
+    - tasks/done/RUNTIME-262-workspace-model-recipe-owner.md
     status: resolved

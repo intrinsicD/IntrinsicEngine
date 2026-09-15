@@ -1,0 +1,40 @@
+{
+  "hash_provenance": "pre-change source atf03144c17; four recursive headers remain unchanged",
+  "files_sha256": {
+    "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp": "05733f0d9aa62a55fd8a539f7e41cbce985743e5beb2e72d164bfaef1a98cbed",
+    "src/runtime/Editor/internal/Runtime.EditorFeatures.Internal.hpp": "d50ff6000032cc34a795775c09e6e574989812a472f81cfed13c2ece05bf38e5",
+    "src/runtime/Editor/internal/Runtime.EditorGeometryHelpers.hpp": "28ea111a6c4804dfd716c63f2e39c57e3e59987b71c466510c73bbe1a9449947",
+    "src/runtime/Editor/internal/Runtime.EditorFeatureCommands.Internal.hpp": "e9212d20569b30349c127e98b81662276f323626c7ac9dfdf6400d8161b18c99",
+    "src/runtime/Editor/internal/Runtime.EditorFeatureProperties.Internal.hpp": "eb7a0803e598c47ad8894c54b8767cdfdebef2779707986772f614e2125dd788"
+  },
+  "owner_interface_sha256": {
+    "src/runtime/Rendering/Runtime.RenderExtraction.cppm": "6034c56ee84a60cd253f1b6ef8c57b97eec322552726e832d5852ba0a44e4250",
+    "src/runtime/Visualization/Runtime.VisualizationRecipes.cppm": "176ec48b9a39fa62ea1f663b8f67eae45e65f0cfaf664b1031bcef8edc41d1ec",
+    "src/runtime/Config/Runtime.EngineConfigControl.cppm": "8bc69a849f94202efe3f88f9e30fbfb69ab2e6ca3caf7213fd53c707025d5849",
+    "src/runtime/Config/Runtime.RenderRecipeActivation.cppm": "1ce25f9a54f740d50c348c62a23476588c69765817f6c39cb6f5b487af9c3647"
+  },
+  "manually_enumerated_extraction_public_types_including_nested": [
+    "RuntimeRenderableAssetObservationStatus",
+    "RuntimeRenderableAssetGenerationObservation",
+    "RuntimeRenderableAssetAcknowledgmentResult",
+    "RuntimeRenderExtractionStats",
+    "RuntimeSceneInteractionRenderSnapshot",
+    "RenderExtractionCache",
+    "RenderableSidecarView",
+    "GpuRenderLaneAvailability",
+    "GpuRenderableAvailabilityView"
+  ],
+  "manually_enumerated_extraction_namespace_functions": [
+    "MirrorRenderWorldPoolDiagnostics",
+    "ObserveRenderableAssetGeneration",
+    "AcknowledgeRenderableAssetRebind"
+  ],
+  "extraction_own_names_matches": 0,
+  "recipe_name_matches": {
+    "VisualizationRecipe": 2,
+    "GetVisualizationRecipeKind": 1
+  },
+  "reexports_preserved": "GeometryAvailability remains directly imported; VisualizationRecipes direct import replaces its existing RenderExtraction reexport. Required recipe overload visibility is unchanged, unused extraction declarations disappear.",
+  "activation_owner": "EngineConfigControl explicitly reexports RenderRecipeActivation for RuntimeRenderRecipeState/RuntimeRenderRecipeApplyResult in private bindings. No new activation import required.",
+  "scope": "One import substitution and one architecture sentence; all other production bytes remain unchanged. No object-byte identity or timing claim; actual closure measured after build."
+}

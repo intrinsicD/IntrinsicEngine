@@ -1,0 +1,57 @@
+## Decision
+
+**Single one-line replacement at `src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp:68`.** No added import for `Extrinsic.Runtime.RenderRecipeActivation` — it is already supplied by a pinned re-export.
+
+```diff
+--- a/src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
++++ b/src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+@@ -68,1 +68,1 @@
+-import Extrinsic.Runtime.RenderExtraction;
++import Extrinsic.Runtime.VisualizationRecipes;
+```
+
+Import count stays 60 (substitution, not deletion); every other byte, including the `module;` preamble, header block, and lines 30–67 / 69–91, is unchanged. No new module, header, wrapper, forward declaration, or export change.
+
+## Ownership proof
+
+**What `Extrinsic.Runtime.RenderExtraction` can contribute to this TU** (`src/runtime/Rendering/Runtime.RenderExtraction.cppm`) is exactly three things:
+
+1. Its own `export namespace Extrinsic::Runtime` block (lines 27–480): `RuntimeRenderableAssetObservationStatus`, `RuntimeRenderableAssetGenerationObservation`, `RuntimeRenderableAssetAcknowledgmentResult`, `RuntimeRenderExtractionStats`, `RuntimeSceneInteractionRenderSnapshot`, `MirrorRenderWorldPoolDiagnostics`, `ObserveRenderableAssetGeneration`, `AcknowledgeRenderableAssetRebind`, and `class RenderExtractionCache` with its nested `RenderableSidecarView`, `GpuRenderLaneAvailability`, `GpuRenderableAvailabilityView` and all members (`ExtractAndSubmit`, `TickGeometryResidency`, `Set/Clear/GetVisualizationRecipe`, `GetVisualizationRecipeRevision`, `FindGpuRenderableAvailability`, `Find*ForTest`, material-binding setters). It exports **no** `ToString` overload and no other free function.
+2. `export import Extrinsic.Runtime.GeometryAvailability` (line 20).
+3. `export import Extrinsic.Runtime.VisualizationRecipes` (line 23).
+
+Its remaining imports (`ECS.Scene.Registry`, `Asset.Registry`, `Graphics.GpuAssetCache`, `GpuWorld`, `Material`, `RenderWorld`, `Component.GpuSceneSlot`, `RenderWorldPool`, `WorldHandle`) are **plain, non-exported** imports and therefore contribute zero visibility to this TU — removing them cannot regress anything.
+
+**Body/recursive-header use (category 1 = zero).** Searching `Models.cpp` plus the textually included `Editor/internal/Runtime.EditorFeatures.Internal.hpp` → `Runtime.EditorGeometryHelpers.hpp`, `Runtime.EditorFeatureCommands.Internal.hpp`, `Runtime.EditorFeatureProperties.Internal.hpp` for every name in category 1 yields **no hits anywhere in the TU**. The only hits in `src/runtime/Editor` are in the sibling TU `internal/Runtime.EditorFeatureContextAdapters.cpp` (lines 1611, 1651, 1679, 1791, 2098, 2105, 2110, 2180), which keeps its own `RenderExtraction` import and is untouched.
+
+**Category 2 already pinned.** `import Extrinsic.Runtime.GeometryAvailability;` is retained at line 63; `BuildGeometryAvailability` (both overloads) and `GeometryEntityAvailability` are declared in `src/runtime/GeometryIntegration/Runtime.GeometryAvailability.cppm:98,102,74`, so the uses at Models.cpp:566, 619, 2217, 3082, 3349 are satisfied directly, not via re-export.
+
+**Category 3 is the only real need, and `VisualizationRecipes` is its direct owner.** Body uses: `FromVisualizationRecipe(const VisualizationRecipe&)` (907–908), `GetVisualizationRecipeKind(recipe)` (912), `std::optional<VisualizationRecipe>` named explicitly at 3103–3106. All are declared in `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` (`struct VisualizationRecipe` 169, `enum class VisualizationRecipeKind` 174, `GetVisualizationRecipeKind` 186). Since the TU *names* `VisualizationRecipe` as a declared type and calls the free function, reachability-through-`EditorVisualizationRecipeCommandSurface` is not sufficient — name visibility is required, so ADL is not load-bearing and no unqualified-lookup gamble is taken.
+
+The replacement is not redundant: `Extrinsic.Runtime.VisualizationEditingOperations` (line 89), which defines `EditorVisualizationRecipeCommandSurface` (`Runtime.VisualizationEditingOperations.cppm:384`, with `GetRecipe` returning `std::optional<VisualizationRecipe>`) and `EditorVisualizationRecipeModel` (431), imports `Extrinsic.Runtime.VisualizationRecipes` **non-exported** at its line 36. No other retained import re-exports it. Today `RenderExtraction` is the sole supplier, which is exactly why the direct import must take its place.
+
+[ROOT CORRECTION: used recipe/availability visibility is preserved; unused extraction names leave. This is neither a superset nor a widened recipe overload set.]
+
+**Visibility is a superset, not a change.** Post-diff the TU sees `GeometryAvailability` (direct line 63, plus `VisualizationRecipes:20 export import`) and all of `VisualizationRecipes`, and loses only category-1 names that the TU provably never mentions. `RenderExtraction` exports no `ToString`, so the `ToString` calls on `GeometryPresentation` enums (owner pinned at line 66) and the `VisualizationRecipes` overloads (189, 225) are unaffected; overload-set composition strictly widens toward the recipe overloads that were already visible via re-export.
+
+## `RuntimeRenderRecipeState` / `RuntimeRenderRecipeApplyResult` — no new import
+
+Owner is `Extrinsic.Runtime.RenderRecipeActivation` (`src/runtime/Config/Runtime.RenderRecipeActivation.cppm:38, 53`). They are used in the private header `Runtime.EditorFeatures.Internal.hpp:58` (`const RuntimeRenderRecipeState*`) and `:67` (`std::function<RuntimeRenderRecipeApplyResult(const Graphics::RenderRecipeConfigLoadResult&)>`).
+
+They are already supplied by **`Extrinsic.Runtime.EngineConfigControl`** (Models.cpp line 62, pinned), which does `export import Extrinsic.Runtime.RenderRecipeActivation;` at `Runtime.EngineConfigControl.cppm:10` and itself names both types in its exported interface (50, 98, 104, 108, 113, 144). The header is included after the import block, so module-level visibility covers it. Note `Runtime.RenderRecipeEditingOperations.cppm:21` imports the module *non-exported*, so it is not the supplier — `EngineConfigControl` is. Adding a direct `RenderRecipeActivation` import would be speculative and is deliberately **not** proposed; it is also out of scope under the "no other import change" constraint.
+
+## Remaining unknowns
+
+- Actual final closure/import count is not claimed. Whether the rendering facade stays transitively reachable through other pinned imports is left to the compiler module map; this change removes only one direct edge.
+- BMI-edge effect: the TU's dependency shifts from `Extrinsic.Runtime.RenderExtraction` to `Extrinsic.Runtime.VisualizationRecipes`, which is already a prerequisite of the former and already in `ExtrinsicRuntime` — no target-graph or link change, no new BMI/interface work. Rebuild fan-out direction is a compiler-map observation, not asserted here.
+- Not re-verified in this read-only pass: that no non-Editor TU relies on `Models.cpp` for indirect visibility (module TUs cannot, so this is a formality).
+
+## Verification (not run — read-only pass)
+
+[ROOT CORRECTION: use actual Models.cpp producer via IntrinsicRuntimeContractTests, not the recipe test source as that producer. Run the exact task gates. Vulkan compilation is not operational GPU evidence; do not require object-byte equality or treat debug/dependency differences as a defect.]
+
+1. Native supported clang-23 tree: build `ExtrinsicRuntime` and `IntrinsicRuntimeContractTests`; the implementation producer already exists (`tests/contract/runtime/Test.VisualizationRecipes.cpp` in `RuntimeContractTestObjs`) and `Extrinsic.Runtime.VisualizationRecipes` is an established BMI in the existing trees. Run the editor-workspace-snapshot and visualization-recipe contract tests.
+2. Focused sanitizer: `build/ci-asan` and `build/ci-ubsan` limited to the runtime contract suite — this is a preamble-only change, so the bar is "no new diagnostics," not new coverage.
+3. Vulkan runtime tree (`build/ci-vulkan`) for the Operational editor workspace path, since the recipe surface is the only behavioral neighborhood touched.
+
+Expect byte-identical object semantics; any diff other than module-dependency metadata would indicate the visibility analysis above is wrong.

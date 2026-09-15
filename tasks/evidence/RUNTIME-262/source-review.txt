@@ -1,0 +1,47 @@
+I'll verify the claimed invariants against the working tree rather than take the audit at face value.
+
+`★ Insight ─────────────────────────────────────`
+The substitution is only safe if `VisualizationRecipes` reaches this TU *solely* through the removed `export import` in `RenderExtraction`. `VisualizationEditingOperations` imports it non-exported, so the direct import is genuinely load-bearing — that's the claim worth checking on disk.
+`─────────────────────────────────────────────────`
+
+Let me verify.
+
+---
+
+**Verification performed** (against the provided fixed source + the stated hashes):
+
+**1. Diff shape — holds.**
+`Runtime.EditorWorkspaceSnapshots.Models.cpp`: one `-`/`+` pair, identical import count, identical position in the import block. `docs/architecture/runtime.md`: one paragraph, +2 net lines, no other hunks. No other production file appears in the diff.
+
+**2. Name closure — holds, and the inventory is complete.**
+Manually re-derived the exported surface of `Runtime.RenderExtraction.cppm` from the shown interface: 6 top-level types (`RuntimeRenderableAssetObservationStatus`, `…GenerationObservation`, `…AcknowledgmentResult`, `RuntimeRenderExtractionStats`, `RuntimeSceneInteractionRenderSnapshot`, `RenderExtractionCache`), 3 nested (`RenderableSidecarView`, `GpuRenderLaneAvailability`, `GpuRenderableAvailabilityView`), 3 namespace-scope functions (`MirrorRenderWorldPoolDiagnostics`, `ObserveRenderableAssetGeneration`, `AcknowledgeRenderableAssetRebind`). That is exactly the audit's enumeration — no prefix-guessing gap. The `Graphics::IRenderer` forward declaration sits outside any `export` block and is not part of the removed surface.
+
+**3. Re-export preservation — holds.**
+- `GeometryAvailability`: the TU already imports `Extrinsic.Runtime.GeometryAvailability` directly (preamble line present), so losing `RenderExtraction`'s `export import` of it changes nothing. `VisualizationRecipes` also re-exports it, so the name has two live owners, not zero.
+- `VisualizationRecipe` / `GetVisualizationRecipeKind`: used at body lines ~912 and ~3103 (`FromVisualizationRecipe`, `GetRecipe` result). `Runtime.VisualizationEditingOperations` imports `VisualizationRecipes` **non-exported**, so it does not supply these names transitively — the new direct import is required, not redundant. This is a substitution of owner, not a widening.
+- `context.VisualizationRecipes` is the `EditorVisualizationRecipeCommandSurface` member from the editor bindings header, unrelated to the module name; no shadowing hazard introduced.
+
+**4. Activation names — holds.**
+`RuntimeRenderRecipeState` and `RuntimeRenderRecipeApplyResult` are used in `EditorFeatureBindings`. `Runtime.EngineConfigControl.cppm` carries `export import Extrinsic.Runtime.RenderRecipeActivation;`, and the TU imports `EngineConfigControl`. No new activation import is owed, and none was added.
+
+**5. Docs — holds.**
+The added sentence names `Extrinsic.Runtime.VisualizationRecipes` as a direct import with its reason. The antecedent repair is real: `Its dependency boundary` (which read as `RenderCommandRouter`'s) → `This implementation's dependency boundary`. The `RuntimeDiagnostics` CTest sentence is preserved verbatim and still scoped to public contracts, keeping it distinct from the per-change compiler-boundary check. The `RenderCommandRouter` non-re-export statement is untouched.
+
+**6. Scope discipline — holds.**
+The four recursive internal headers are asserted unchanged by hash and none of their declarations reference any `RenderExtraction`-owned name, so the include closure is unaffected. No object-byte, timing, or GPU-execution claim is made anywhere in the artifact.
+
+---
+
+## APPROVE
+
+No blockers.
+
+Two non-blocking notes, neither requiring a change:
+
+- The audit's `"scope"` field correctly declines an object-identity claim, but the change is not inert at the BMI level: the TU's import closure loses `Extrinsic.Runtime.RenderExtraction` and its transitive `RenderWorldPool`, `GpuAssetCache`, `GpuWorld`, `Material`, `RenderWorld`, `Component.GpuSceneSlot`, `Asset.Registry`, `ECS.Scene.Registry`. `Asset.Registry` and `ECS.Scene.Registry` are separately imported by the TU, so they survive; the graphics-side five do not. That is the intended effect, and it means the focused build is a genuine gate, not a formality — a missed use would surface there.
+- Conditional on results: the four gates you list (focused editor + VisualizationRecipes, full CPU, ASan/UBSan, Vulkan-runtime compile) are sufficient for this change class, since a name-visibility regression is a compile error, not a runtime one. I am recording no result for any of them — they were stated as in-flight and I did not observe output. If the focused build fails on a name I enumerated as unused, that falsifies item 2 above and the approval should be revisited.
+
+Root review clarification: this was a review of the supplied fixed source, not an on-disk tool inspection. GeometryAvailability has one canonical owner and two retained visibility paths; the reviewer phrase two live owners does not imply duplicate ownership. The actual compiler map in structural-counts.json, not predicted dependency comments, determines the removed modules.
+
+
+Root closure: all named gates pass. Source equals baseline with only RenderExtraction import replaced by VisualizationRecipes; all other bytes/876other productionfiles unchanged. Line count3457 and imports60 unchanged; actual compiler closure161to148 removes extraction and twelve rendering/resource-management dependencies. Availability stays directly imported; activation types retain EngineConfigControl reexport. The existing docs paragraph states direct recipe ownership and implementation-boundary scope accurately.250focusednative/4636fullCPU plus expectedskip,217ASan,217UBSan and Vulkanruntimecompile pass. No timing/object-byte/GPUexecution/fullsanitizersuite claim.

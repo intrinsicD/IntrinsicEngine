@@ -5,6 +5,10 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
+owner: "codex-overnight"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-09-15T04:42:43Z"
 contract_schema: 1
 contracts: [runtime.render-diagnostics-locality]
 ---
@@ -67,23 +71,23 @@ or overstating the public RuntimeDiagnostics CTest coverage. No README history
 or generated module-inventory change is needed for a private .cpp import.
 
 ## Required changes
-- [ ] Bind baseline source/map and complete own-export/reexport/private-header ownership proof.
-- [ ] Have Claude replace only the one import line and update the existing architecture paragraph as scoped.
-- [ ] Verify every remaining byte and other production file; record actual dependency change.
+- [x] Bind baseline source/map and complete own-export/reexport/private-header ownership proof.
+- [x] Have Claude replace only the one import line and update the existing architecture paragraph as scoped.
+- [x] Verify every remaining byte and other production file; record actual dependency change.
 
 ## Tests
-- [ ] Existing ci producer build, focused editor/locality and VisualizationRecipes cases pass.
-- [ ] IntrinsicTests build and full supported CPU suite pass.
-- [ ] Focused editor plus VisualizationRecipes cases pass under ASan/UBSan; promoted-Vulkan runtime compiles.
+- [x] Existing ci producer build, focused editor/locality and VisualizationRecipes cases pass.
+- [x] IntrinsicTests build and full supported CPU suite pass.
+- [x] Focused editor plus VisualizationRecipes cases pass under ASan/UBSan; promoted-Vulkan runtime compiles.
 
 ## Docs
-- [ ] Update the existing Models.cpp owner paragraph and preserve accurate coverage wording.
-- [ ] Record fixed-source Claude review, receipts, retirement, local commit/seal and task brief/index updates.
+- [x] Update the existing Models.cpp owner paragraph and preserve accurate coverage wording.
+- [x] Record fixed-source Claude review, receipts, retirement, local commit/seal and task brief/index updates.
 
 ## Acceptance criteria
-- [ ] Production change is exactly the one-line owner substitution; all other bytes/files and existing feature behavior remain unchanged.
-- [ ] Recipe, availability and activation record names retain their proven owners; actual compiler/native/sanitizer/build gates pass with honest dependency counts.
-- [ ] Code/docs diff is Claude-reviewed, locally committed, retired and sealed without timing, GPU execution or whole-engine completion claims.
+- [x] Production change is exactly the one-line owner substitution; all other bytes/files and existing feature behavior remain unchanged.
+- [x] Recipe, availability and activation record names retain their proven owners; actual compiler/native/sanitizer/build gates pass with honest dependency counts.
+- [x] Code/docs diff is Claude-reviewed, locally committed, retired and sealed without timing, GPU execution or whole-engine completion claims.
 
 ## Verification
 ```bash
@@ -110,3 +114,36 @@ new compiled trees. No test that merely asserts deleted source text is needed.
 - Treating plain imports as re-exports or assuming all transitive extraction dependencies disappear.
 - Requiring object bytes to match, claiming GPU execution from compilation, changing test selectors to avoid failures or changing backend/cache identities.
 - Pushing or starting implementation after the deadline reserve begins.
+
+## Completion — 2026-09-15
+- Endpoint: **Retired**, direct visualization-recipe ownership in Models.cpp.
+- Commit: implementation and retirement are in the enclosing local commit;
+  `tasks/evidence/RUNTIME-262/seal.yaml` binds the exact source revision.
+- One import substitution: RenderExtraction to VisualizationRecipes. Source
+  stays at 3,457 lines and 60 direct imports; every other byte and all 876
+  other tracked production files are unchanged. No body/header, public API,
+  export, target, new helper/file or sibling-unit change.
+- Actual rebuilt compiler closure decreases from 161 to 148 modules. The
+  extraction facade and twelve rendering/resource-management dependencies
+  leave, including GpuWorld, GpuAssetCache, RenderWorld, Material, LightSystem
+  and resource managers. No elapsed-time or object-byte identity claim.
+- The body explicitly uses VisualizationRecipe/GetVisualizationRecipeKind
+  from their direct owner. Extraction's own types and three namespace-level
+  functions have no references in the complete body/four private headers.
+  GeometryAvailability stays direct; EngineConfigControl still re-exports
+  RenderRecipeActivation for the private binding record types. No speculative
+  activation import or change to required recipe overload visibility.
+- The existing architecture paragraph now records direct recipe ownership.
+  Root clarified that the per-change dependency check applies to this
+  implementation, retaining the distinction from public RuntimeDiagnostics
+  CTest coverage. Claude independently reviewed the fixed code/docs diff.
+- All gates pass: exact source/compiler proof, 250 focused native editor,
+  recipe and locality cases, 4,636 full CPU cases plus one expected GLFW/LSan
+  control skip, 217 focused ASan and 217 focused UBSan cases, promoted-Vulkan
+  runtime compilation and strict structural checks. The focused selectors
+  include all 15 existing VisualizationRecipes cases; no new tests were needed.
+  Vulkan compilation is not GPU execution; sanitizer coverage is not full-suite.
+- Clean-workshop rows 1–3 and 8 pass (canonical owners, unchanged layers and
+  public boundaries, no exception); rows 4–7 do not apply (no frame/pass/
+  protocol/maturity change). BUILD-007/C92, remaining cleanup and Framework24
+  convergence stay open.

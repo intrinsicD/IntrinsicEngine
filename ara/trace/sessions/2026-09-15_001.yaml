@@ -254,7 +254,7 @@ ai_actions:
   - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
   - tasks/done/RUNTIME-261-workspace-model-runtime-imports.md
   - tasks/evidence/RUNTIME-261/owner-audit.json
-  - tasks/backlog/runtime/RUNTIME-262-workspace-model-recipe-owner.md
+  - tasks/done/RUNTIME-262-workspace-model-recipe-owner.md
 claims_touched: []
 key_context:
 - turn: 1
