@@ -1,0 +1,61 @@
+benchmark_id: build.workspace_snapshot_std.v1
+method: build.engine_compile_iteration
+dataset: intrinsicengine.workspace_snapshot_std_2026_09_16
+params:
+  intent: performance
+  source_revisions:
+    before: 4fa241cc250113d7d1b5cc8bbd0b54e9c82f6aed
+    after: ca164c10cf20d1b037ac2c116194c1839ec6bb3d
+  sample_order:
+  - before
+  - after
+  - after
+  - before
+  - before
+  - after
+  - after
+  - before
+  - before
+  - after
+  measured_iterations: 5
+  warmup_iterations: 0
+  warmup_scope: Diagnostic/verification runs precede this frozen cohort and are retained separately. Pre-read
+    identical frozen prerequisite BMIs and package contents before every sample; no discarded measured
+    samples or cold-cache claim.
+  scope: Serial compile-command replay of the snapshot interface, Public and Models implementations, workspace
+    session and context adapter, plus the genuine Sandbox.PanelSupport.cpp consumer. Candidate also builds
+    its new standard-declaration owner before the snapshot. Excludes configure, scanning, linking, scheduling,
+    tests and all other translation units; no whole-build or runtime claim.
+  compiler: /usr/bin/clang++-23
+  build_type: Debug
+  jobs: 1
+  flags: Actual canonical ci compile-command flags and module maps captured for each arm; common command
+    lines must match exactly. Project source/include paths are projected to one fixed clean detached worktree;
+    ENGINE_ROOT_DIR and preinstalled external/system headers stay unchanged. No launchers, tracing or
+    side-effect-producing flags. Explicit module maps use frozen prerequisites and newly emitted snapshot/standard-owner
+    BMIs.
+  prerequisite_identity: All existing prerequisite BMI hashes and vcpkg file/content/link/mode fingerprint
+    must match before and after every sample. Only snapshot and new standard-owner BMIs are rebuilt. Record
+    all projected commands and source hashes.
+  build_storage: Owned /dev/shm/intrinsic-runtime268 source and focused output directories; fixed paths
+    in both arms. Remove only previous focused object/PCM outputs between samples.
+  configure_identity: Prerequisites originate from the canonical unsanitized ci configuration on this
+    host, with Vulkan and GLFW configured. No GPU execution occurs. This is distinct from the earlier
+    Null/headless clean-library cohorts.
+  operating_system_cache: Input pre-read; no cache flush. Both arms run on the same normal desktop with
+    no competing build/test work during timing.
+  host_noise: No CPU affinity/governor/turbo control. Retain every slow sample and load-average observations;
+    descriptive local comparison, not statistical or cross-host evidence. Compiler/library first-use effects
+    are not discarded; the normal desktop cache remains uncontrolled.
+  memory_measurement: GNU time maximum single-process RSS, not aggregate memory or tmpfs use. Per-command
+    user/system CPU seconds and emitted BMI bytes stay in diagnostics.
+  summary: Report every sample and median/min/max. Charge the new declaration owner to the candidate.
+    Report runtime subtotal and genuine Sandbox consumer separately, with total_time as the sum of per-command
+    elapsed records; outer sequence instrumentation stays in diagnostics. No whole-build or runtime performance
+    claim.
+metrics:
+- build_time_ms
+- total_time_ms
+- memory_peak_bytes
+- sample_count
+thresholds: {}
