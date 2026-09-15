@@ -4,6 +4,12 @@ Static analysis and performance analysis tooling.
 
 ## Current scripts
 
+- `tools/analysis/benchmark_compile_iteration.py`: runs a manifest-defined,
+  alternating source comparison in a detached worktree and disposable build
+  directory. It reuses the hotspot parser and result sealer, preserves each
+  command's log window, and reports dependency-path timings and single-process
+  memory. See `benchmarks/ci/manifests/engine_compile_iteration_overnight.yaml`.
+
 - `tools/analysis/compile_hotspots.py`: normalizes the latest Ninja records
   into physical compiler invocations, resolves their sources through the
   configured `compile_commands.json`, and optionally checks stable edge

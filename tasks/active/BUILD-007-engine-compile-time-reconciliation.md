@@ -6,7 +6,7 @@ template: micro
 workflow_schema: 1
 workflow_profile: micro
 evidence: not_applicable
-evidence_skip_reason: Interactive cleanup and follow-up tracking; no new performance or capability claim.
+evidence_skip_reason: Interactive measurement; benchmark manifests/results carry source identity, without unattended workflow custody.
 contract_schema: 1
 contracts: [repo.task-contract-discovery]
 ---
@@ -55,3 +55,36 @@ headroom before allocating another tree. Existing preset dependency paths are
 source-relative. Run timing without competing verification builds or tests;
 ordinary cleanup build receipts and historical unmatched timings are not evidence
 of improvement. No timed comparison was started during RUNTIME-255.
+
+## Selected comparison — 2026-09-15
+The user requests measurement of the completed overnight improvements. Compare
+`29d75ebe7` with `07a8b2914`, not all earlier simplification. Keep C92's broader
+processing-family hypothesis separate. The frozen manifest is
+`benchmarks/ci/manifests/engine_compile_iteration_overnight.yaml`.
+
+Reuse `compile_hotspots` for source/physical-compiler attribution and the existing
+schema-v2 sealer. A small serial driver owns only isolated source checkout,
+command timing, log windows and sample orchestration. Its two focused regression
+methods guard log contamination and parallel dependency-path accounting.
+
+Use one detached source worktree and one disposable RAM-backed build tree;
+existing checkout/build trees are untouched. Supported Clang23, Debug, Null/
+headless, no sanitizers or compiler launcher, four jobs, identical preinstalled
+vcpkg packages. Measure the ExtrinsicRuntime dependency closure (engine libraries),
+not tests, Sandbox or Vulkan execution. One discarded baseline pilot establishes
+resource footprint and probe validity; six samples use before/after/after/before/
+before/after order, with identical input pre-reading. Cold build artifacts and
+warm OS caches are distinct; no cold-filesystem claim.
+
+Scenarios: clean build, settled no-op, timestamp-only invalidation of workspace,
+recipe and config implementations, config-interface invalidation with measured
+importer fan-out, and reconfigure plus resulting build. Source bytes stay at the
+exact clean commit. Configure cost is separate. Record wall time, CPU time,
+maximum single-process RSS (not simultaneous memory), physical compiler counts,
+dominant sources, and the weighted Ninja dependency path including scans/archives.
+Reject contaminated log windows or unmatched non-meta dependency outputs.
+
+Report all three samples, medians/ranges and null/negative differences. Results
+are descriptive local measurements, not publication-grade performance claims;
+`claim_eligible` remains false. Claude reviews the protocol and fixed driver and
+will review the resulting comparison. No overnight claim/work-graph machinery.

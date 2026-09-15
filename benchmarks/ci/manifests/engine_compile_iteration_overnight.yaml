@@ -1,0 +1,47 @@
+benchmark_id: build.engine_compile_iteration.overnight.v1
+method: build.engine_compile_iteration
+dataset: intrinsicengine.source.overnight_2026_09_15
+params:
+  intent: performance
+  source_revisions:
+    before: 29d75ebe7a9aa427d58c00764b3ba284f4dab0e3
+    after: 07a8b29147ccd642fcf827c6a6361ba3e1c29f13
+  sample_order: [before, after, after, before, before, after]
+  measured_iterations: 3
+  warmup_iterations: 1
+  warmup_scope: discarded baseline pilot; identical input pre-read before every measured sample
+  preset: ci
+  target: ExtrinsicRuntime
+  compiler: /usr/bin/clang++-23
+  jobs: 4
+  minimum_interface_importers: 1
+  configure_options:
+    - -DEXTRINSIC_BACKEND=Null
+    - -DINTRINSIC_PLATFORM_BACKEND=Null
+    - -DINTRINSIC_HEADLESS_NO_GLFW=ON
+    - -DINTRINSIC_BUILD_TESTS=OFF
+    - -DINTRINSIC_BUILD_BENCHMARKS=OFF
+    - -DINTRINSIC_ENABLE_CCACHE=OFF
+    - -DCMAKE_CXX_COMPILER_LAUNCHER=
+    - -DCMAKE_C_COMPILER_LAUNCHER=
+  scenarios:
+    clean: null
+    noop: null
+    workspace_impl: src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+    recipes_impl: src/runtime/Rendering/Runtime.RenderExtraction.Recipes.cpp
+    config_impl: src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp
+    config_interface: src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm
+    reconfigure: null
+  invalidation: mtime only; source bytes remain at the exact clean commit; require observed importer fan-out
+  build_storage: one disposable tmpfs directory; fresh artifacts per full-build sample
+  dependency_state: identical preinstalled vcpkg packages, no package installation during sampling
+  operating_system_cache: input pre-read, no cache flushing, no cold-filesystem claim
+  memory_measurement: GNU time maximum single-process RSS, not aggregate concurrent memory
+  critical_path: Ninja target DAG weighted by unfiltered per-invocation timings; unmatched meta-edges reported
+  summary: per-scenario median and min/max; retain all six samples and negative results
+metrics:
+  - build_time_ms
+  - configure_time_ms
+  - memory_peak_bytes
+  - sample_count
+thresholds: {}

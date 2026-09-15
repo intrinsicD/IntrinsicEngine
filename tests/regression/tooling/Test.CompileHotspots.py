@@ -15,6 +15,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "tools" / "analysis"))
 
 import compile_hotspots  # noqa: E402
+import benchmark_compile_iteration as bench  # noqa: E402
 
 
 class CompileHotspotFixture:
@@ -856,6 +857,38 @@ class CompileHotspotTests(unittest.TestCase):
                     self.assertIn("duplicate baseline physical edge", failures[0])
                     self.assertIn(edge["edge_id"], failures[0])
                     self.assertIn("resolves the same edge as", failures[0])
+
+
+class CompileIterationMeasurementTests(unittest.TestCase):
+    def test_log_window_excludes_old_commands_and_rejects_compaction(self):
+        old = b"# ninja log v5\n0\t20\t0\told.o\ta\n"
+        new = b"20\t30\t0\tnew.o\tb\n"
+        self.assertEqual(bench.log_window(old, old + new), b"# ninja log v5\n" + new)
+        self.assertEqual(bench.log_window(old, old), b"# ninja log v5\n")
+        with self.assertRaises(ValueError):
+            bench.log_window(old, b"# ninja log v5\n" + new)
+
+    def test_parallel_work_is_not_added_to_the_dependency_critical_path(self):
+        graph = '''digraph ninja {
+"a" [label="a.o"]
+"b" [label="b.o"]
+"r" [label="LINK", shape=ellipse]
+"out" [label="lib.a"]
+"a" -> "r"
+"b" -> "r"
+"r" -> "out"
+}'''
+        log = b"# ninja log v5\n0\t20\t0\ta.o\ta\n0\t30\t0\tb.o\tb\n30\t35\t0\tlib.a\tc\n"
+        # Extra multi-output sinks may be unlabelled in Ninja's target subgraph.
+        graph = graph.replace('"r" -> "out"', '"r" -> "out"\n"r" -> "ancillary"')
+        result = bench.critical_path(graph, log)
+        self.assertEqual(result["duration_ms"], 35)
+        self.assertEqual([p["output"] for p in result["timed_path"]], ["b.o", "lib.a"])
+        with self.assertRaises(ValueError):
+            bench.critical_path(graph, log + b"0\t100\t0\tmissing.o\td\n")
+        with self.assertRaises(ValueError):
+            bench.critical_path(graph.replace('"r" -> "out"', '"r" -> "out"\n"out" -> "a"'), log)
+
 
 
 if __name__ == "__main__":
