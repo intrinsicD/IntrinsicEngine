@@ -1064,19 +1064,7 @@ TEST(SandboxEditorPresentation,
                 << entry.path() << ": " << retiredPrefix;
         }
 
-        std::string privateImports = source;
-        if (entry.path() == runtimeRoot / "Editor/Runtime.EditorWorkspaceSnapshots.cppm")
-        {
-            // Only this declaration owner is allowed through the public snapshot surface.
-            constexpr std::string_view standardOwner =
-                "import Extrinsic.Runtime.Private.EditorSnapshotStd;";
-            const auto ownerImport = privateImports.find(standardOwner);
-            EXPECT_NE(ownerImport, std::string::npos) << entry.path();
-            EXPECT_EQ(source.find("export " + std::string{standardOwner}), std::string::npos);
-            if (ownerImport != std::string::npos)
-                privateImports.erase(ownerImport, standardOwner.size());
-        }
-        if (privateImports.find("import Extrinsic.Runtime.Private.") == std::string::npos)
+        if (source.find("import Extrinsic.Runtime.Private.") == std::string::npos)
             continue;
         EXPECT_NE(std::ranges::find(allowedPrivateImporters, entry.path().filename().string()),
                   allowedPrivateImporters.end())

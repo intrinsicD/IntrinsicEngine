@@ -39,6 +39,7 @@ target_sources(${target_name}
         Core.Memory.LinearArena.cppm
         Core.Memory.ScopeStack.cppm
         Core.Memory.Polymorphic.cppm
+        Core.Std.cppm
         Core.StrongHandle.cppm
         Core.Tasks.cppm
         Core.Tasks.CounterEvent.cppm

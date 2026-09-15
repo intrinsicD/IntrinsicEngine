@@ -81,7 +81,7 @@ ready. Task front-matter owns prerequisite state.
 | Editor snapshot/context consumers | [RUNTIME-266](../done/RUNTIME-266-editor-snapshot-consumer-locality.md) |
 | Processing config dependency chain | [RUNTIME-267](runtime/RUNTIME-267-processing-config-consumer-locality.md) |
 | Snapshot BMI serialization (diagnostic follow-up) | [RUNTIME-268](../done/RUNTIME-268-workspace-snapshot-bmi-serialization.md) |
-| Renderer surface and implementation dependencies | [GRAPHICS-144](rendering/GRAPHICS-144-renderer-consumer-locality.md) |
+| Renderer surface and implementation dependencies | [GRAPHICS-144](../active/GRAPHICS-144-renderer-consumer-locality.md) |
 | Shared action readiness and disabled reasons | [UI-037](ui/UI-037-linear-domain-action-readiness-tooltips.md) |
 | Material/visualization authority consolidation | [GRAPHICS-105](rendering/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md) |
 | Stale shaders after material-authority decisions | [LEGACY-043](rendering/LEGACY-043-retire-stale-multiset-shaders.md) |

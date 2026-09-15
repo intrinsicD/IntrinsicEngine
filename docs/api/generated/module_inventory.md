@@ -10,7 +10,7 @@ Root scanned: `src`
 |---|---:|
 | `app` | 7 |
 | `assets` | 11 |
-| `core` | 40 |
+| `core` | 41 |
 | `ecs` | 27 |
 | `geometry` | 116 |
 | `graphics/assets` | 1 |
@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 98 |
+| `runtime` | 97 |
 
 ## Modules
 
@@ -78,6 +78,7 @@ Root scanned: `src`
 | `Extrinsic.Core.Process` | `src/core/Core.Process.cppm` | `core` |
 | `Extrinsic.Core.ResourcePool` | `src/core/Core.ResourcePool.cppm` | `core` |
 | `Extrinsic.Core.RingBuffer` | `src/core/Core.RingBuffer.cppm` | `core` |
+| `Extrinsic.Core.Std` | `src/core/Core.Std.cppm` | `core` |
 | `Extrinsic.Core.StrongHandle` | `src/core/Core.StrongHandle.cppm` | `core` |
 | `Extrinsic.Core.Tasks.CounterEvent` | `src/core/Core.Tasks.CounterEvent.cppm` | `core` |
 | `Extrinsic.Core.Tasks:Internal` | `src/core/Core.Tasks.Internal.cppm` | `core` |
@@ -385,7 +386,6 @@ Root scanned: `src`
 | `Extrinsic.Runtime.EditorWorkspaceAttachment` | `src/runtime/Editor/Runtime.EditorWorkspaceAttachment.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorWorkspaceSnapshots` | `src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm` | `runtime` |
 | `Extrinsic.Runtime.Private.EditorWorkspaceAttachment` | `src/runtime/Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm` | `runtime` |
-| `Extrinsic.Runtime.Private.EditorSnapshotStd` | `src/runtime/Editor/internal/Runtime.EditorWorkspaceSnapshots.Std.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeometryAvailability` | `src/runtime/GeometryIntegration/Runtime.GeometryAvailability.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeometryPlanBuilders` | `src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeometryPresentation` | `src/runtime/GeometryIntegration/Runtime.GeometryPresentation.cppm` | `runtime` |

@@ -76,3 +76,14 @@ fully verified; its noisy two-sample timings imply no stable speedup. RUNTIME-26
 is complete at `ca164c10c`: preserve the standard-declaration owner and exact
 snapshot types. Its focused compile comparison does not measure this config
 rebuild chain. Freeze a fresh config baseline for this task.
+
+## Ownership audit — 2026-09-16
+The post-268 config closure still includes the session because it owns typed
+completion results containing config values. Its two subscriptions, cache
+invalidation and epoch/unsubscribe ordering form one lifecycle; an opaque owner
+would add allocation and forwarding. Domain and mesh panels also inherit the
+config through PanelSupport's by-value family frame and consolidation helper
+records. A header split alone cannot remove that frame's type dependency.
+Changing it to a borrow of the current temporary Prepare*Frame arguments would
+dangle. Resolve a concrete storage/lifetime design before claiming that split
+isolates consumers. No implementation or no-change closure is claimed by this audit.

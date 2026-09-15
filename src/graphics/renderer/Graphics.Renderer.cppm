@@ -5,15 +5,12 @@
 module;
 
 #include <cstdint>
-#include <functional>
-#include <memory>
-#include <optional>
-#include <span>
-#include <string>
 
-#include <glm/glm.hpp>
+#include <glm/fwd.hpp>
 
 export module Extrinsic.Graphics.Renderer;
+
+import Extrinsic.Core.Std;
 
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.CommandContext;
@@ -61,7 +58,7 @@ import Extrinsic.Graphics.SpatialDebugVisualizers;
 namespace Extrinsic::Graphics
 {
     export using RuntimeFrameCommandHook =
-        std::function<void(RHI::ICommandContext&)>;
+        Core::Std::function<void(RHI::ICommandContext&)>;
 
     export struct RuntimeFrameCommandHookHandle
     {
@@ -73,23 +70,27 @@ namespace Extrinsic::Graphics
             RuntimeFrameCommandHookHandle) noexcept = default;
     };
 
+    // SpatialDebugAabb's required owner supplies the vec3 definition. The forward
+    // header supplies its name; span still requires a complete element type here.
+    static_assert(sizeof(glm::vec3) > 0);
+
     export struct RuntimeRenderSnapshotBatch
     {
-        std::span<const TransformSyncRecord>     Transforms{};
-        std::span<const LightSnapshot>           Lights{};
-        std::span<const VisualizationSyncRecord> Visualizations{};
-        std::span<const VisualizationPropertyBufferUploadDescriptor> VisualizationPropertyBuffers{};
-        std::span<const VisualizationAttributeBufferPacket> VisualizationAttributeBuffers{};
-        std::span<const ScalarAttributePacket>              VisualizationScalars{};
-        std::span<const ColorAttributePacket>               VisualizationColors{};
-        std::span<const VectorFieldOverlayPacket>           VisualizationVectorFields{};
-        std::span<const IsolineOverlayPacket>               VisualizationIsolines{};
-        std::span<const HtexPatchPreviewAtlasPacket>        VisualizationHtexAtlases{};
-        std::span<const FragmentBakeAtlasPacket>            VisualizationFragmentBakeAtlases{};
-        std::span<const DebugLinePacket>         DebugLines{};
-        std::span<const DebugPointPacket>        DebugPoints{};
-        std::span<const DebugTrianglePacket>     DebugTriangles{};
-        std::span<const TransformGizmoRenderPacket> TransformGizmos{};
+        Core::Std::span<const TransformSyncRecord>     Transforms{};
+        Core::Std::span<const LightSnapshot>           Lights{};
+        Core::Std::span<const VisualizationSyncRecord> Visualizations{};
+        Core::Std::span<const VisualizationPropertyBufferUploadDescriptor> VisualizationPropertyBuffers{};
+        Core::Std::span<const VisualizationAttributeBufferPacket> VisualizationAttributeBuffers{};
+        Core::Std::span<const ScalarAttributePacket>              VisualizationScalars{};
+        Core::Std::span<const ColorAttributePacket>               VisualizationColors{};
+        Core::Std::span<const VectorFieldOverlayPacket>           VisualizationVectorFields{};
+        Core::Std::span<const IsolineOverlayPacket>               VisualizationIsolines{};
+        Core::Std::span<const HtexPatchPreviewAtlasPacket>        VisualizationHtexAtlases{};
+        Core::Std::span<const FragmentBakeAtlasPacket>            VisualizationFragmentBakeAtlases{};
+        Core::Std::span<const DebugLinePacket>         DebugLines{};
+        Core::Std::span<const DebugPointPacket>        DebugPoints{};
+        Core::Std::span<const DebugTrianglePacket>     DebugTriangles{};
+        Core::Std::span<const TransformGizmoRenderPacket> TransformGizmos{};
 
         // Spatial-debug snapshot spans. Consumers that build wireframe
         // packets feed these into
@@ -101,12 +102,12 @@ namespace Extrinsic::Graphics
         // a feature that owns a concrete spatial-debug record (for example
         // `RUNTIME-189`) fills them directly rather than through a generic
         // adapter registry.
-        std::span<const SpatialDebugAabb>          SpatialDebugBounds{};
-        std::span<const SpatialDebugHierarchyNode> SpatialDebugHierarchyNodes{};
-        std::span<const SpatialDebugSplitPlane>    SpatialDebugSplitPlanes{};
-        std::span<const glm::vec3>                 SpatialDebugConvexHullVertices{};
-        std::span<const SpatialDebugWireEdge>      SpatialDebugConvexHullEdges{};
-        std::span<const glm::vec3>                 SpatialDebugPointMarkers{};
+        Core::Std::span<const SpatialDebugAabb>          SpatialDebugBounds{};
+        Core::Std::span<const SpatialDebugHierarchyNode> SpatialDebugHierarchyNodes{};
+        Core::Std::span<const SpatialDebugSplitPlane>    SpatialDebugSplitPlanes{};
+        Core::Std::span<const glm::vec3>                 SpatialDebugConvexHullVertices{};
+        Core::Std::span<const SpatialDebugWireEdge>      SpatialDebugConvexHullEdges{};
+        Core::Std::span<const glm::vec3>                 SpatialDebugPointMarkers{};
 
         // RUNTIME-089 Slice B — runtime/editor selection snapshot identity,
         // aggregated by `RenderExtractionCache::ExtractAndSubmit` from the
@@ -117,7 +118,7 @@ namespace Extrinsic::Graphics
         // identity-only fields (selected ids, hovered id, has-hovered) are
         // filled here; the outline styling on `SelectionSnapshot` keeps its
         // recipe defaults. Default-empty when no controller is wired.
-        std::span<const std::uint32_t> SelectionSelectedStableIds{};
+        Core::Std::span<const std::uint32_t> SelectionSelectedStableIds{};
         std::uint32_t                  SelectionHoveredStableId{0u};
         bool                           SelectionHasHovered{false};
     };
@@ -284,7 +285,7 @@ namespace Extrinsic::Graphics
         // byte-identical republish across InitializeOperationalPassResources()
         // and RebuildOperationalResources(). `nullopt` means `id` is unmapped:
         // `RHI::PipelineDesc` has no invalid state a returned value could carry.
-        [[nodiscard]] virtual std::optional<RHI::PipelineDesc> GetPipelineDesc(
+        [[nodiscard]] virtual Core::Std::optional<RHI::PipelineDesc> GetPipelineDesc(
             RendererPipelineId id) const noexcept = 0;
 
         // GRAPHICS-074 (Slice D.1) — accessor for the renderer-owned host-
@@ -337,9 +338,9 @@ namespace Extrinsic::Graphics
         // disables from config/UI/agent lanes. Applying an override can only
         // turn off optional feature gates at the default-recipe build site.
         virtual void SetActiveFrameRecipeOverride(
-            std::optional<FrameRecipeOverride> recipeOverride) = 0;
+            Core::Std::optional<FrameRecipeOverride> recipeOverride) = 0;
         virtual void ClearActiveFrameRecipeOverride() noexcept = 0;
-        [[nodiscard]] virtual const std::optional<FrameRecipeOverride>&
+        [[nodiscard]] virtual const Core::Std::optional<FrameRecipeOverride>&
         GetActiveFrameRecipeOverride() const noexcept = 0;
 
         // GRAPHICS-076E — opt-in backbuffer-to-host readback wiring for the
@@ -387,9 +388,9 @@ namespace Extrinsic::Graphics
         // cannot keep the pass live across frames where the world has
         // turned the overlay off); callers should treat
         // `RequestedResourceName` as the durable field they control.
-        virtual void SetDebugViewRequestedResourceName(std::string name) = 0;
+        virtual void SetDebugViewRequestedResourceName(Core::Std::string name) = 0;
 
-        [[nodiscard]] virtual std::string GetDebugViewRequestedResourceName() const = 0;
+        [[nodiscard]] virtual Core::Std::string GetDebugViewRequestedResourceName() const = 0;
 
         // GRAPHICS-122 — copied runtime/editor request for the single retained
         // UV-space target. Appended to minimise polymorphic slot churn.
@@ -400,5 +401,5 @@ namespace Extrinsic::Graphics
     };
     }
 
-    export std::unique_ptr<IRenderer> CreateRenderer();
+    export Core::Std::unique_ptr<IRenderer> CreateRenderer();
 }

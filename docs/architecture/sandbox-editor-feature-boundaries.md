@@ -85,9 +85,9 @@ sixteen operation units that compose from context alone no longer do. Units
 needing `EditorWorkspaceSnapshotStats` take it from `Runtime.EditorCommon`.
 
 The snapshot interface takes its container, string, optional and shared-pointer
-names from `Extrinsic.Runtime.Private.EditorSnapshotStd`. That small module
+names from `Extrinsic.Core.Std`. That small module
 interface includes the standard headers without editor dependencies and exposes
-using-declarations in `SnapshotStd`; it adds no declarations to `std` and defines
+using-declarations in `Core::Std`; it adds no declarations to `std` and defines
 no replacement types. The primary snapshot interface imports it without
 re-exporting those helper names. CMake publishes its module dependency metadata
 because consumers need the referenced BMI. Scalar standard headers stay local.
@@ -98,6 +98,8 @@ retain their original types, aggregate initialization and value ownership.
 This scoped header-ownership boundary avoids serializing merged standard-header
 declarations again in the broad snapshot interface; it is not a general-purpose
 container facade or a reason to migrate every interface without measurement.
+The renderer uses the same declaration owner; no runtime-private module import
+exception is needed for this shared lower-layer surface.
 
 The private attachment interface also owns `EditorFeatureResultBindings`, a
 pointer-only record of family sinks/results, the UV surface and a family-owned

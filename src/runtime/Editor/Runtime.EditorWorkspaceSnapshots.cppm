@@ -7,7 +7,7 @@ module;
 
 export module Extrinsic.Runtime.EditorWorkspaceSnapshots;
 
-import Extrinsic.Runtime.Private.EditorSnapshotStd;
+import Extrinsic.Core.Std;
 
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.EditorCommon;
@@ -48,7 +48,7 @@ export namespace Extrinsic::Runtime
         EditorBoundRenderStateModel BoundState{};
         EditorTextureBakeControlsModel TextureBake{};
         EditorGeometryProcessingCapabilities Processing{};
-        SnapshotStd::vector<EditorDiagnostic> Diagnostics{};
+        Core::Std::vector<EditorDiagnostic> Diagnostics{};
     };
     struct EditorDomainWindowModel
     {
@@ -75,7 +75,7 @@ export namespace Extrinsic::Runtime
         EditorTextureBakeControlsModel TextureBake{};
         EditorGeometryProcessingModel Processing{};
         EditorPrimitiveDetailModel Primitive{};
-        SnapshotStd::vector<EditorDiagnostic> Diagnostics{};
+        Core::Std::vector<EditorDiagnostic> Diagnostics{};
     };
     enum class EditorSelectedModelCacheSection : std::uint8_t
     {
@@ -98,7 +98,7 @@ export namespace Extrinsic::Runtime
         EditorVisualizationTarget VisualizationTarget{
             EditorVisualizationTarget::Entity};
         std::uint32_t PrimaryStableId{0u};
-        SnapshotStd::vector<std::uint32_t> SelectedStableIds{};
+        Core::Std::vector<std::uint32_t> SelectedStableIds{};
         std::uint64_t SelectionGeneration{0u};
         std::uint64_t PrimitiveSelectionGeneration{0u};
         ECS::Components::GeometrySources::Domain SelectedDomain{
@@ -158,9 +158,9 @@ export namespace Extrinsic::Runtime
     extern "C++" {
     struct EditorSelectedModelCache
     {
-        SnapshotStd::array<EditorSelectedAnalysisCacheEntry, 4u>
+        Core::Std::array<EditorSelectedAnalysisCacheEntry, 4u>
             SelectedAnalysis{};
-        SnapshotStd::array<EditorVisualizationModelCacheEntry, 4u>
+        Core::Std::array<EditorVisualizationModelCacheEntry, 4u>
             Visualization{};
         EditorSelectedModelCacheStats Counters{};
 
@@ -184,7 +184,7 @@ export namespace Extrinsic::Runtime
     };
     struct EditorWorkspaceSnapshot
     {
-        SnapshotStd::vector<EditorEntityRow> Hierarchy{};
+        Core::Std::vector<EditorEntityRow> Hierarchy{};
         EditorInspectorModel         Inspector{};
         EditorSelectionModel         Selection{};
         EditorDocumentModel          Document{};
@@ -196,7 +196,7 @@ export namespace Extrinsic::Runtime
         EditorCameraRenderModel      CameraRender{};
         EditorVisualizationModel     Visualization{};
         EditorWorkspaceSnapshotStats        ModelBuildStats{};
-        SnapshotStd::vector<EditorDiagnostic> Diagnostics{};
+        Core::Std::vector<EditorDiagnostic> Diagnostics{};
     };
     struct EditorWorkspaceSnapshotContext
     {
@@ -216,10 +216,10 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] bool IsBound() const noexcept;
 
     private:
-        SnapshotStd::shared_ptr<const EditorWorkspaceSnapshotContext> m_Context{};
+        Core::Std::shared_ptr<const EditorWorkspaceSnapshotContext> m_Context{};
 
         explicit EditorWorkspaceSnapshotQueries(
-            SnapshotStd::shared_ptr<const EditorWorkspaceSnapshotContext> context);
+            Core::Std::shared_ptr<const EditorWorkspaceSnapshotContext> context);
         friend struct EditorWorkspaceSnapshotQueriesAccess;
         friend EditorWorkspaceSnapshotQueries
         BindEditorWorkspaceSnapshotQueries(
@@ -238,11 +238,11 @@ export namespace Extrinsic::Runtime
     // An explicit entity binds all model sections without changing scene selection; zero means no entity.
     [[nodiscard]] EditorInspectorModel BuildEditorInspectorModel(
         const EditorWorkspaceSnapshotContext& context,
-        SnapshotStd::optional<std::uint32_t> entity = SnapshotStd::nullopt);
+        Core::Std::optional<std::uint32_t> entity = Core::Std::nullopt);
     [[nodiscard]] EditorDomainWindowModel BuildEditorDomainWindowModel(
         const EditorWorkspaceSnapshotContext& context,
         EditorDomainWindowKind kind,
-        SnapshotStd::optional<std::uint32_t> entity = SnapshotStd::nullopt);
+        Core::Std::optional<std::uint32_t> entity = Core::Std::nullopt);
     [[nodiscard]] EditorWorkspaceSnapshot BuildEditorWorkspaceSnapshot(
         const EditorWorkspaceSnapshotQueries& queries);
     [[nodiscard]] EditorWorkspaceSnapshot BuildEditorWorkspaceSnapshot(
@@ -251,12 +251,12 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] EditorInspectorModel BuildEditorInspectorModel(
         const EditorWorkspaceSnapshotQueries& queries,
         EditorWorkspaceSnapshotStats* modelBuildStats = nullptr,
-        SnapshotStd::optional<std::uint32_t> entity = SnapshotStd::nullopt);
+        Core::Std::optional<std::uint32_t> entity = Core::Std::nullopt);
     [[nodiscard]] EditorDomainWindowModel BuildEditorDomainWindowModel(
         const EditorWorkspaceSnapshotQueries& queries,
         EditorDomainWindowKind kind,
         EditorWorkspaceSnapshotStats* modelBuildStats = nullptr,
-        SnapshotStd::optional<std::uint32_t> entity = SnapshotStd::nullopt);
+        Core::Std::optional<std::uint32_t> entity = Core::Std::nullopt);
 
     struct EditorWorkspaceSnapshotPreparedFrame
     {
@@ -264,12 +264,12 @@ export namespace Extrinsic::Runtime
         EditorWorkspaceSnapshotQueries SnapshotQueries{};
     };
 
-    [[nodiscard]] SnapshotStd::optional<EditorWorkspaceSnapshotPreparedFrame>
+    [[nodiscard]] Core::Std::optional<EditorWorkspaceSnapshotPreparedFrame>
     PrepareEditorWorkspaceSnapshotFrame(
         const EditorWorkspaceAttachment& attachment,
         const EditorWorkspaceSnapshotRequest& request = {},
-        SnapshotStd::string pendingAssetImportPath = {},
+        Core::Std::string pendingAssetImportPath = {},
         EditorAssetPayloadKind pendingAssetImportPayloadKind =
             EditorAssetPayloadKind::Unknown,
-        SnapshotStd::string pendingSceneFilePath = {});
+        Core::Std::string pendingSceneFilePath = {});
 }

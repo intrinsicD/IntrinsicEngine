@@ -7,6 +7,7 @@
 #include <expected>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -15,6 +16,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -1302,6 +1304,14 @@ TEST(RendererFrameLifecycle, PlacedTransientAliasingFallsBackWhenMemoryBlocksUna
 
 TEST(RendererFrameLifecycle, RuntimeFrameCommandHooksRunInsideExecuteFrameCommandContext)
 {
+    static_assert(std::is_same_v<decltype(Extrinsic::Graphics::CreateRenderer()),
+        std::unique_ptr<Extrinsic::Graphics::IRenderer>>);
+    static_assert(std::is_same_v<Extrinsic::Graphics::RuntimeFrameCommandHook,
+        std::function<void(Extrinsic::RHI::ICommandContext&)>>);
+    static_assert(std::is_same_v<decltype(
+        Extrinsic::Graphics::RuntimeRenderSnapshotBatch::SpatialDebugPointMarkers),
+        std::span<const glm::vec3>>);
+
     Extrinsic::Tests::MockDevice device;
     device.NextFrame = Extrinsic::RHI::FrameHandle{.FrameIndex = 2u, .SwapchainImageIndex = 0u};
     device.BackbufferHandle = Extrinsic::RHI::TextureHandle{88u, 1u};

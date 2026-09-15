@@ -80,6 +80,16 @@ Graphics is organized into explicit sublayers:
 
 ## Renderer/RHI frame lifecycle
 
+The renderer interface imports its standard-library type declarations from
+`Extrinsic.Core.Std`, shared with the workspace snapshot interface. The names
+refer to the original standard types; the owner has no engine imports and adds
+no container wrapper or runtime allocation. GLM's forward header supplies the
+`vec3` name used in borrowed spans. The required spatial-debug owner exports
+records containing complete vec3 values; a renderer assertion verifies completeness
+before forming its spans. Concrete math and standard headers stay in
+implementation/consumer units that need them. Existing subsystem dependencies
+and rendering state ownership remain unchanged.
+
 - `IRenderer::BeginFrame()` delegates acquisition to `RHI::IDevice::BeginFrame()` and resets transient renderer frame state. It does not clear retained runtime snapshot storage; `SubmitRuntimeSnapshots(..., storageSlot)` clears and rewrites only the selected slot so pipelined render-N-1 spans remain valid while extraction-N writes another slot.
 - `IRenderer::ExecuteFrame()` imports the frame backbuffer from `RHI::IDevice::GetBackbufferHandle(frame)` when building the default frame recipe, then brackets render-graph barrier/command recording with `ICommandContext::Begin()` / `End()` on the frame graphics context. `IRenderer::RegisterRuntimeFrameCommandHook(...)` lets runtime append explicitly owned GPU work inside that same open command context through a multi-subscriber registry; graphics owns the invocation point, callbacks run in registration order, callbacks must not retain the borrowed context, and runtime must not create a second swapchain present for compute-only work.
 - The default renderer records the canonical `CullingPass` command sequence through `CullingSystem` only when the injected device is operational and culling output is available. Stub/null devices still compile and execute the backend-independent graph but skip routed command bodies so the default CPU gate remains Vulkan-free.

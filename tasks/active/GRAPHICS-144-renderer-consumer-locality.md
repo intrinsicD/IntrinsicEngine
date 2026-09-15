@@ -8,7 +8,7 @@ workflow_profile: micro
 evidence: not_applicable
 evidence_skip_reason: Interactive task; unattended workflow completion reports are exempt, but this task owns its benchmark manifests, results and source identities alongside review and test evidence.
 contract_schema: 1
-contracts: [repo.source-documentation]
+contracts: [repo.source-documentation, runtime.editor-prepared-frame-locality]
 ---
 # GRAPHICS-144 — Reduce remaining renderer interface and implementation dependencies
 
@@ -47,8 +47,11 @@ consumer contracts and less repeated work while preserving rendering capabilitie
       compatibility wrappers or public subsystem forwarding. Record source/file
       and ownership deltas, including any justified new private boundary.
 - [ ] Reuse the compiler-boundary test helper and retain existing guards;
-      demonstrate the selected forbidden dependency on original metadata and its
-      absence afterward. Preserve real material/UV/extraction consumers.
+      demonstrate the selected regression mechanism on the original source and
+      its removal afterward. For an import cut use original/final compiler
+      metadata; for serialization use paired phase/BMI diagnostics and matched
+      producer/consumer timing including the new owner. Preserve real material,
+      UV and extraction consumers.
 - [ ] Pass focused and full CPU checks. Verify changed module attachment with
       fresh cache-off minimum-supported Clang; if GPU resource lifetime or upload
       behavior changes, run the affected promoted Vulkan tests under ci-vulkan.
@@ -80,7 +83,7 @@ a new UV contract split; a split that leaves the same transitive dependencies
 does not establish a benefit. This is a planning lead, not a measured change.
 
 ## Refreshed baseline
-BUILD-009 is complete. Use its [matched source comparison](../../../ara/evidence/tables/build009_current_compile_measurement.md)
+BUILD-009 is complete. Use its [matched source comparison](../../ara/evidence/tables/build009_current_compile_measurement.md)
 and retained producer/critical-path records; the old BUILD-007 costs are historical.
 Freeze this task's immediate-before source before attributing its own changes.
 
@@ -92,5 +95,51 @@ renderer first: source splitting, Pimpl and a shared textual prelude need not
 address that mechanism. Graphics must not import the runtime helper. Compare
 existing lower-layer ownership and the cost of any proposed declaration owner,
 including its producer and real consumers, before selecting an analogous change.
-[RUNTIME-268 evidence](../../../ara/evidence/tables/runtime268_snapshot_std_measurement.md)
+[RUNTIME-268 evidence](../../ara/evidence/tables/runtime268_snapshot_std_measurement.md)
 is a diagnostic lead, not a measured renderer improvement.
+
+## Selected slice — 2026-09-16
+- Explicit operator continuation; baseline `dc606482a`, one root writer on
+  `codex/editor-compile-locality`, Claude reviews fixed packets.
+- Original renderer trace records serialization as its dominant phase. Test
+  reusing the existing snapshot standard-declaration owner in Core for these two
+  actual consumers. Add only function/span/unique_ptr needs; retain the existing
+  standard type identities and all renderer state in its implementation.
+- A graphics-local duplicate would add a second helper. Compare the shared owner's
+  own compilation and real consumers; do not migrate unrelated modules or add a
+  general prelude policy. Core gains only standard includes, not an engine edge.
+- Existing forbidden-module guards remain. This slice targets serialization work,
+  not elimination of renderer's required subsystem dependencies; acceptance proof
+  follows that selected mechanism instead of inventing a forbidden import.
+- RUNTIME-267 discovery found by-value config/result/session ownership. Its panel
+  header split alone cannot remove an embedded frame definition without changing
+  ownership. Keep that task open; avoid adding a per-session facade here.
+
+- GLM reuse: only vec3 is named by the renderer interface, so test the existing
+  `<glm/fwd.hpp>` rather than compiling its full umbrella header. Other modules
+  already use that header; concrete consumers retain their GLM definitions.
+- Claude's plan supports the mechanism but asks to charge the early Core producer
+  and all consumers. All five renderer standard type spellings are routed,
+  including existing string/optional names; no CTAD expressions are changed.
+
+## Source review and verification — 2026-09-16
+- Reused the declaration owner rather than duplicating it: one source/module moved
+  from runtime to core; module count remains 419. No new allocation, forwarding,
+  interface members or subsystem state; standard type identities remain unchanged.
+- Claude raised the complete-element requirement for `span<const glm::vec3>`.
+  The required SpatialDebugVisualizers interface exports a by-value vec3 record,
+  making its definition reachable; the forward header supplies the name. A
+  `sizeof(glm::vec3)` assertion checks this before the spans. Claude reviewed this
+  resolution. Both compiler builds below include that final assertion.
+- Canonical ci configured; full IntrinsicTests build passed. Focused CPU 444/444
+  passed (35.19 s); full CPU 4,664 passed, zero failures, one ASan-only skip out of
+  4,665 selected (141.22 s). Existing real hook execution, UV/material/extraction,
+  snapshot records and compiler-boundary checks remain intact.
+- Fresh cache-off Clang 20 Null/headless ExtrinsicSandboxEditor closure passed;
+  final reconciliation also compiled renderer lifecycle and snapshot model test
+  objects. This is minimum-compiler build evidence, not Clang 20 test execution.
+- Strict layering/task/test-layout, root hygiene and documentation links passed.
+  Source documentation audit found zero objective errors; 23 review flags were
+  inspected, retaining existing lifecycle/ownership comments outside this slice.
+- Matched graphics target and snapshot-owner measurements remain required before
+  retirement. No speedup is claimed from the preliminary single traces.
