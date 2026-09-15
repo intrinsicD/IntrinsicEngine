@@ -548,8 +548,11 @@ lookups and updates access that state in their existing implementation units;
 shared extraction, residency and shutdown algorithms remain private state
 methods. Visualization recipes and their encoding batch are a value member
 of that state. The public interface borrows `IRenderer` through its globally
-attached declaration; rendering implementation imports stay in the `.cpp`
-units. `RenderCompilationLocality.Extraction` checks this compiler boundary.
+attached declaration. Its private declaration partition likewise needs only
+renderer and EnTT declarations; executing `.cpp` units import the renderer and
+include the full registry. The partition retains the material-system dependency
+through its owned material lease. `RenderCompilationLocality.Extraction` checks
+the public interface's compiler boundary.
 
 `Extrinsic.Runtime.EditorPropertyWidgets` keeps scalar-property selector and
 finite-sample histogram models CPU-testable while its ImGui/ImPlot draw code and

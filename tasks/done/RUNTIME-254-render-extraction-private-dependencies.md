@@ -5,10 +5,10 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "codex-overnight"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-09-15T00:52:50Z"
 contract_schema: 1
 contracts: []
 contract_review: "Reviewed the catalog: this removes unnecessary private compile dependencies without changing an exported module, ownership, method/data/control contract or reusable workflow. Existing renderer-borrow architecture and compiler-boundary checks remain authoritative."
@@ -63,23 +63,23 @@ The fixed source packet and review are retained temporarily under
    architecture paragraph, retire and seal evidence. No measured timing claim.
 
 ## Required changes
-- [ ] Private partition borrows Renderer/EnTT types with only required declarations.
-- [ ] State/layout/declarations and all implementation bodies are byte-identical.
-- [ ] No new production file or abstraction; real material lease ownership retained.
+- [x] Private partition borrows Renderer/EnTT types with only required declarations.
+- [x] State/layout/declarations and all implementation bodies are byte-identical.
+- [x] No new production file or abstraction; real material lease ownership retained.
 
 ## Tests
-- [ ] Baseline/final compiler maps show Renderer leaves the private closure; record counts honestly.
-- [ ] Existing extraction/frame tests and full CPU gate pass; focused ASan/UBSan pass.
-- [ ] Promoted-Vulkan runtime compilation passes; no GPU execution change or capability claim.
+- [x] Baseline/final compiler maps show Renderer leaves the private closure; record counts honestly.
+- [x] Existing extraction/frame tests and full CPU gate pass; focused ASan/UBSan pass.
+- [x] Promoted-Vulkan runtime compilation passes; no GPU execution change or capability claim.
 
 ## Docs
-- [ ] Clarify the private declaration partition in the existing runtime architecture paragraph.
-- [ ] Record reviewed source/counts/gates and retire the note with sealed evidence.
+- [x] Clarify the private declaration partition in the existing runtime architecture paragraph.
+- [x] Record reviewed source/counts/gates and retire the note with sealed evidence.
 
 ## Acceptance criteria
-- [ ] Required dependency edges narrowed with unchanged declarations and behavior.
-- [ ] Claude-reviewed final source passes compiler-boundary and existing verification.
-- [ ] Completed slice locally committed, retired and sealed without a speedup claim.
+- [x] Required dependency edges narrowed with unchanged declarations and behavior.
+- [x] Claude-reviewed final source passes compiler-boundary and existing verification.
+- [x] Completed slice locally committed, retired and sealed without a speedup claim.
 
 ## Verification
 ```bash
@@ -109,3 +109,35 @@ BUILD-007/C92 retain matched compile timing. No benchmark or GPU capability clai
 - Weakening existing compiler guards, tests, labels or genuine material ownership.
 - Public/global type identity, State layout, method semantics or rendering changes.
 - New wrappers, Pimpl, source files, broad test splits or compatibility machinery.
+
+## Completion — 2026-09-15
+- Endpoint: **Retired**, private compile-dependency cleanup.
+- Commit: implementation and retirement are in the enclosing local commit;
+  `tasks/evidence/RUNTIME-254/seal.yaml` names the exact sealed revision.
+- One production file: 344 to 341 physical lines (four removed, one added).
+  Exact baseline/current comparison permits only the intended three preamble
+  replacements. Every declaration/State byte and all three executing sibling
+  sources plus the primary interface are unchanged. No added production file.
+- Clang's private-partition module map shrinks from 92 to 62 dependencies;
+  Renderer and 29 associated modules leave it. MaterialSystem remains through
+  the owned material lease. No new dependency, same lifetime/type ownership.
+- Claude approved the fixed diff. The compiled primary declaration is globally
+  attached via `extern "C++"` in module purview; no repeated forward declaration
+  or transitive GPU-handle fix was needed. Both focused producer builds passed.
+- Final full CPU: 4,632 passed, one expected unsanitized GLFW/LSan control skip.
+  Focused extraction/frame tests: 69/69 on native, ASan and UBSan. The promoted
+  Vulkan runtime target compiled successfully; no new GPU execution claim.
+- Structural checks pass. Clean-workshop rows 1–3 pass (allowed imports, unchanged
+  links/public ownership); 4–7 are not applicable (no pass, recipe, rendering
+  behavior or maturity promotion); 8 passes with no new exceptions. Config/UI/
+  agent semantics, State lifetime, threading and failure paths are unchanged.
+- `tasks/evidence/RUNTIME-254/structural-counts.json` binds source/body hashes and
+  exact before/after module lists. The expected pre-change forbidden-Renderer
+  failure remains an optional baseline receipt; the final boundary gate passes.
+- This is a dependency reduction, not measured compile-time improvement.
+  BUILD-007 and C92 still own matched timing; no test or benchmark claim added.
+
+Retirement preflight initially rejected the completion note because its commit
+reference lacked the required `Commit:` field marker. The marker is corrected;
+source and passing C++ gates are unchanged. The raw receipt is retained, and the
+final retirement structural check is the completion gate.

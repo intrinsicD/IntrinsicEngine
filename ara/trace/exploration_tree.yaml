@@ -12455,5 +12455,5 @@ tree:
     - tasks/evidence/BUG-134/seal.yaml
     - tasks/evidence/BUG-134/commands/mutation-regression.json
     - tasks/evidence/BUG-134/restored-source.json
-    - tasks/backlog/runtime/RUNTIME-254-render-extraction-private-dependencies.md
+    - tasks/done/RUNTIME-254-render-extraction-private-dependencies.md
     status: resolved

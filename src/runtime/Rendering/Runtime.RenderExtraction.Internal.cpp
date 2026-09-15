@@ -9,8 +9,7 @@ module;
 #include <unordered_set>
 #include <vector>
 
-#include <entt/entity/entity.hpp>
-#include <entt/entity/registry.hpp>
+#include <entt/entity/fwd.hpp>
 #include <glm/glm.hpp>
 
 module Extrinsic.Runtime.RenderExtraction:Internal;
@@ -21,10 +20,8 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Component.ProceduralGeometryRef;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.GeometryResidency;
-import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Material;
-import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.TransformSyncSystem;
 import Extrinsic.Graphics.LightSystem;

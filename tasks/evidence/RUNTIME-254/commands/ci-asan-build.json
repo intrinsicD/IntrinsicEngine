@@ -1,0 +1,29 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "VCPKG_FORCE_SYSTEM_BINARIES=1",
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-asan",
+    "--target",
+    "IntrinsicRuntimeContractTests",
+    "IntrinsicRuntimeGraphicsCpuTests",
+    "-j2"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 cmake --build --preset ci-asan --target IntrinsicRuntimeContractTests IntrinsicRuntimeGraphicsCpuTests -j2",
+  "cwd": ".",
+  "duration_ms": 43273,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T00:58:25Z",
+  "label": "ci-asan-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T00:57:42Z",
+  "stderr_path": "tasks/evidence/RUNTIME-254/commands/ci-asan-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-254/commands/ci-asan-build.stdout.log",
+  "stdout_sha256": "12b118f67a1b13f69cf8a9f005bb43b20af5ae907482e5e9d2a9df8ac2dcdfa1",
+  "task_id": "RUNTIME-254"
+}

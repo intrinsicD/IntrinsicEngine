@@ -1,0 +1,29 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "VCPKG_FORCE_SYSTEM_BINARIES=1",
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicRuntimeContractTests",
+    "IntrinsicRuntimeGraphicsCpuTests",
+    "-j2"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicRuntimeGraphicsCpuTests -j2",
+  "cwd": ".",
+  "duration_ms": 25748,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T00:54:40Z",
+  "label": "focused-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T00:54:14Z",
+  "stderr_path": "tasks/evidence/RUNTIME-254/commands/focused-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-254/commands/focused-build.stdout.log",
+  "stdout_sha256": "d5f03adb56a221af77fd843a1691c94c1309bd35c044598200c6fd1f823d9fb9",
+  "task_id": "RUNTIME-254"
+}

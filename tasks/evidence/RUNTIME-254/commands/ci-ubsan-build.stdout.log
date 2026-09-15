@@ -1,0 +1,14 @@
+[0/2] Re-checking globbed directories...
+[1/8] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Rendering/Runtime.RenderExtraction.Internal.cpp for CXX dependencies
+[2/8] Generating CXX dyndep file src/runtime/CMakeFiles/ExtrinsicRuntime.dir/CXX.dd
+[3/11] Generating CXX dyndep file tests/CMakeFiles/RuntimeContractTestObjs.dir/CXX.dd
+[4/11] Generating CXX dyndep file tests/CMakeFiles/RuntimeGraphicsCpuTestObjs.dir/CXX.dd
+[5/13] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderExtraction.Internal.cpp.o
+[6/13] Building CXX object tests/CMakeFiles/RuntimeGraphicsCpuTestObjs.dir/integration/runtime/Test.RuntimeRenderExtraction.cpp.o
+[7/13] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderExtraction.cpp.o
+[8/13] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderExtraction.Recipes.cpp.o
+[9/13] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderExtraction.Geometry.cpp.o
+[10/13] Linking CXX static library lib/libExtrinsicRuntime.a
+[11/13] Linking CXX executable bin/IntrinsicRuntimeContractTests
+[12/13] Building CXX object tests/CMakeFiles/RuntimeGraphicsCpuTestObjs.dir/integration/runtime/Test.RuntimeSandboxAcceptance.cpp.o
+[13/13] Linking CXX executable bin/IntrinsicRuntimeGraphicsCpuTests

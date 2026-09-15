@@ -1,0 +1,120 @@
+schema_version: 1
+task_id: RUNTIME-254
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-15T01:08:16Z'
+claim_eligible: false
+source:
+  base_ref: 38ff6396d
+  base_revision: 38ff6396d65826cc61e21591b9e6e2ab648372b1
+  head_revision: 38ff6396d65826cc61e21591b9e6e2ab648372b1
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/trace/exploration_tree.yaml
+    sha256: a67e5c8e9297f819b3f57aefe4f7b7c381491a3b0bf9e2b6b7e5095c123c88b7
+  - path: docs/architecture/runtime.md
+    sha256: 7e6e8eae7a92eaf101b0e6973491d048094daeda9a5466fcd266e232a5bb3855
+  - path: src/runtime/Rendering/Runtime.RenderExtraction.Internal.cpp
+    sha256: 767f2cb2e463e1a5c0dcaef7d080a2c9b9643c2d93cea0201548aed1b6c32378
+  - path: tasks/SESSION-BRIEF.md
+    sha256: b7cc46325243e8621015404f2d9e714d0b389254f0db320992d286a00da1bb92
+  - path: tasks/backlog/runtime/RUNTIME-254-render-extraction-private-dependencies.md
+    sha256: null
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: a8e445356c467605f785a5f137248876f7138bbf6a90eb2ddca906d2c06e9d52
+  - path: tasks/done/RUNTIME-254-render-extraction-private-dependencies.md
+    sha256: e8d8f8738828aced97236fd9999d3118ab965884b82ca98c9e44b64e5ac92fd1
+  content_digest: 5e225eddf40ccdfde414b483d332e54b73e286533b03239815a559baa563c3b0
+touched:
+  paths:
+  - ara/trace/exploration_tree.yaml
+  - docs/architecture/runtime.md
+  - src/runtime/Rendering/Runtime.RenderExtraction.Internal.cpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/runtime/RUNTIME-254-render-extraction-private-dependencies.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-254-render-extraction-private-dependencies.md
+  layers:
+  - runtime
+  modules:
+  - Extrinsic.Runtime.RenderExtraction
+extension_seam: Existing private declaration partition borrows renderer and registry types
+future_change_plan: Keep full implementation dependencies in executing sibling units; retain lease-owned
+  material-system dependency
+acceptance:
+- criterion: Required dependency edges narrowed with unchanged declarations and behavior.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/RUNTIME-254/structural-counts.json
+  - tasks/evidence/RUNTIME-254/commands/boundary.json
+  reason: null
+- criterion: Claude-reviewed final source passes compiler-boundary and existing verification.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/RUNTIME-254/source-review.txt
+  - tasks/evidence/RUNTIME-254/commands/full-cpu.json
+  - tasks/evidence/RUNTIME-254/commands/ci-asan-focused.json
+  - tasks/evidence/RUNTIME-254/commands/ci-ubsan-focused.json
+  - tasks/evidence/RUNTIME-254/commands/ci-vulkan-runtime-build.json
+  reason: null
+- criterion: Completed slice locally committed, retired and sealed without a speedup claim.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/RUNTIME-254/commands/retirement-structural.json
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-254/commands/baseline-boundary.json
+- receipt: tasks/evidence/RUNTIME-254/commands/boundary.json
+- receipt: tasks/evidence/RUNTIME-254/commands/ci-asan-build.json
+- receipt: tasks/evidence/RUNTIME-254/commands/ci-asan-focused.json
+- receipt: tasks/evidence/RUNTIME-254/commands/ci-ubsan-build.json
+- receipt: tasks/evidence/RUNTIME-254/commands/ci-ubsan-focused.json
+- receipt: tasks/evidence/RUNTIME-254/commands/ci-vulkan-runtime-build.json
+- receipt: tasks/evidence/RUNTIME-254/commands/configure-ci.json
+- receipt: tasks/evidence/RUNTIME-254/commands/focused-build.json
+- receipt: tasks/evidence/RUNTIME-254/commands/focused-ci.json
+- receipt: tasks/evidence/RUNTIME-254/commands/full-cpu-build.json
+- receipt: tasks/evidence/RUNTIME-254/commands/full-cpu.json
+- receipt: tasks/evidence/RUNTIME-254/commands/retirement-structural.json
+- receipt: tasks/evidence/RUNTIME-254/commands/structural.json
+changed_public_contracts:
+- No public surface, State layout, lifetime or behavior change
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/RUNTIME-254-render-extraction-private-dependencies.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Private compiler dependencies reduced, not timed speedup. Focused sanitizer coverage and Vulkan compilation
+  only; no GPU execution or capability claim.
+skipped_checks: []
+artifacts:
+- path: tasks/evidence/RUNTIME-254/structural-counts.json
+  sha256: 9d0add41d77c36e8f6b11fa69638cf13e0d6dbc79106d70f2195dfbc85f98d46
+  kind: file
+- path: tasks/evidence/RUNTIME-254/source-review.txt
+  sha256: fd7a018347c414cab92c2e4f18d62b98e9d474cd1e2ee55b1530f854b8d78825
+  kind: file
+- path: tasks/evidence/RUNTIME-254/commands/final-structural.json
+  sha256: 28f7fbd62267412405cfbce16f3a44b7c3772eb5d9b884158f5dff66f91e3113
+  kind: file
+- path: tasks/evidence/RUNTIME-254/commands/final-structural.stdout.log
+  sha256: c91ccb3f0b9227ed6da24add2314bdc9911222fe82e6f617654a051e7b23e819
+  kind: file
+- path: tasks/evidence/RUNTIME-254/commands/final-structural.stderr.log
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true

@@ -1,0 +1,16 @@
+[0/2] Re-checking globbed directories...
+[1/12] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Rendering/Runtime.RenderExtraction.Internal.cpp for CXX dependencies
+[2/12] Scanning /home/alex/Documents/IntrinsicEngine/build/ci/generated/deps/tinygltf_impl.cpp for CXX dependencies
+[3/12] Generating CXX dyndep file CMakeFiles/tinygltf.dir/CXX.dd
+[4/12] Generating CXX dyndep file src/runtime/CMakeFiles/ExtrinsicRuntime.dir/CXX.dd
+[5/15] Building CXX object CMakeFiles/tinygltf.dir/generated/deps/tinygltf_impl.cpp.o
+[6/15] Linking CXX static library lib/libtinygltf.a
+[7/15] Generating CXX dyndep file tests/CMakeFiles/RuntimeContractTestObjs.dir/CXX.dd
+[8/15] Generating CXX dyndep file tests/CMakeFiles/RuntimeGraphicsCpuTestObjs.dir/CXX.dd
+[9/15] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderExtraction.Internal.cpp.o
+[10/15] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderExtraction.Recipes.cpp.o
+[11/15] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderExtraction.Geometry.cpp.o
+[12/15] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderExtraction.cpp.o
+[13/15] Linking CXX static library lib/libExtrinsicRuntime.a
+[14/15] Linking CXX executable bin/IntrinsicRuntimeGraphicsCpuTests
+[15/15] Linking CXX executable bin/IntrinsicRuntimeContractTests

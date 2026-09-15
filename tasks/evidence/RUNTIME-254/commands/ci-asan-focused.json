@@ -1,0 +1,29 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-asan",
+    "--output-on-failure",
+    "-R",
+    "^(RenderExtraction|RuntimeRenderExtraction|RuntimeFrameLoop|RenderWorldPool|RuntimeDeviceSelection)",
+    "--no-tests=error",
+    "--timeout",
+    "60",
+    "--parallel",
+    "1"
+  ],
+  "command_display": "ctest --test-dir build/ci-asan --output-on-failure -R '^(RenderExtraction|RuntimeRenderExtraction|RuntimeFrameLoop|RenderWorldPool|RuntimeDeviceSelection)' --no-tests=error --timeout 60 --parallel 1",
+  "cwd": ".",
+  "duration_ms": 14301,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T00:58:40Z",
+  "label": "ci-asan-focused",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T00:58:25Z",
+  "stderr_path": "tasks/evidence/RUNTIME-254/commands/ci-asan-focused.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-254/commands/ci-asan-focused.stdout.log",
+  "stdout_sha256": "94931b4c4cb11d85c47ea51fa95499960a3ff028cba467a293930b164df1cd28",
+  "task_id": "RUNTIME-254"
+}
