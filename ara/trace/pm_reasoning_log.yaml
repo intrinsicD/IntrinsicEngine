@@ -2519,3 +2519,10 @@ entries:
     - Preserve the independently required asset identity path in visualization snapshots. A flat dependency count can remain unchanged while the volatile residency-map dependency disappears; do not misrepresent those two interfaces as asset-free.
     - Fixed source/test diff matches the final Claude review. CPU evidence is canonical Clang 23; fresh Clang 20 evidence covers graphics producers and dependency guards only. No runtime GPU or sanitizer execution is represented.
     - Existing staged topics retain their owners and flags. This task retirement supplies no new user endorsement or closure signal for broader performance, architecture, method or product hypotheses.
+
+  - turn: 2026-09-15_001#25
+    notes:
+    - Record N595 as task-planning history prompted explicitly by the user. The preceding read-only status recap produced no research event; no implementation, benchmark result or claim is added here.
+    - Reuse four existing backlog owners and create only missing source-measurement/editor/config/renderer notes. Shared-file ordering and immediate-before baselines keep future slices independently reviewable.
+    - Clarify rather than remove the interactive micro exemption. This task owns its benchmark artifacts; only unattended completion reports are exempt. Preserve separate BUILD-006 prerequisites and all existing capability contracts.
+    - Existing staged observations and research claims retain their owners, status and flags; creating tasks supplies no evidence or closure for their substantive hypotheses.

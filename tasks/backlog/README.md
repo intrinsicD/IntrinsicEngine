@@ -67,6 +67,25 @@ The process backlog owns the proposed verification graph, receipt/cache and cuto
 
 Research remains paused behind REVIEW-004 except explicit operator direction and named product dependencies such as METHOD-015. Preserve frozen positive/negative evidence; dependency retirement alone is not scientific adoption evidence.
 
+## Compilation and reuse follow-ups
+
+These operator-requested tasks continue from the improved engine, without
+reopening the completed cleanup slices. Run BUILD-009 first for the three
+compile-locality implementations; RUNTIME-267 follows RUNTIME-266 for shared
+session files. UI-037 and GRAPHICS-105 are independently ready. The task
+front-matter owns prerequisite state.
+
+| Area | Task |
+| --- | --- |
+| Fresh compile baseline and remaining hotspot ranking | [BUILD-009](process/BUILD-009-current-source-compile-baseline.md) |
+| Editor snapshot/context consumers | [RUNTIME-266](runtime/RUNTIME-266-editor-snapshot-consumer-locality.md) |
+| Processing config dependency chain | [RUNTIME-267](runtime/RUNTIME-267-processing-config-consumer-locality.md) |
+| Renderer surface and implementation dependencies | [GRAPHICS-144](rendering/GRAPHICS-144-renderer-consumer-locality.md) |
+| Shared action readiness and disabled reasons | [UI-037](ui/UI-037-linear-domain-action-readiness-tooltips.md) |
+| Material/visualization authority consolidation | [GRAPHICS-105](rendering/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md) |
+| Stale shaders after material-authority decisions | [LEGACY-043](rendering/LEGACY-043-retire-stale-multiset-shaders.md) |
+| Build/cache backend comparison | [BUILD-006](process/BUILD-006-cxx23-module-build-backend-bakeoff.md) |
+
 ## Cross-domain dependency anchors
 
 Use task front-matter and SESSION-BRIEF as the single dependency inventory.

@@ -27,6 +27,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `GRAPHICS-126` — Bandwidth-priced frame-recipe trace model (tasks/backlog/rendering/GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md)
 - blocked by `GRAPHICS-137`: `GRAPHICS-136` — Rename `Pipeline*` to `GraphicsState*` at the RHI boundary (tasks/backlog/rendering/GRAPHICS-136-rename-pipeline-to-graphics-state-rhi-boundary.md)
 - unblocked: `GRAPHICS-137` — Shader-object realization spike (ADR-0028 killing experiment) (tasks/backlog/rendering/GRAPHICS-137-shader-object-realization-spike.md)
+- blocked by `BUILD-009`: `GRAPHICS-144` — Reduce remaining renderer interface and implementation dependencies (tasks/backlog/rendering/GRAPHICS-144-renderer-consumer-locality.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
@@ -34,6 +35,8 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `ASSETIO-010`: `ASSETIO-011` — Semantic Sandbox File / Import workflow matrix (tasks/backlog/assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md)
 - blocked by `GRAPHICS-105`: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
+- blocked by `BUILD-009`: `RUNTIME-266` — Narrow remaining editor snapshot consumers (tasks/backlog/runtime/RUNTIME-266-editor-snapshot-consumer-locality.md)
+- blocked by `RUNTIME-266`: `RUNTIME-267` — Isolate processing config edits from unrelated editor consumers (tasks/backlog/runtime/RUNTIME-267-processing-config-consumer-locality.md)
 - unblocked: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)
 
 ## Theme G — Active bugs
@@ -47,6 +50,7 @@ picking backlog work; theme priorities and rationale live in
 
 - blocked by `CI-012`: `BUILD-005` — Define hermetic toolchain and action identity (tasks/backlog/process/BUILD-005-hermetic-toolchain-action-identity.md)
 - blocked by `CI-013`: `BUILD-006` — Run a C++23-module build and cache backend bake-off (tasks/backlog/process/BUILD-006-cxx23-module-build-backend-bakeoff.md)
+- unblocked: `BUILD-009` — Remeasure current engine compile costs (tasks/backlog/process/BUILD-009-current-source-compile-baseline.md)
 - unblocked: `CI-012` — Compile a versioned verification evidence graph (tasks/backlog/process/CI-012-versioned-verification-evidence-graph.md)
 - blocked by `CI-012`: `CI-013` — Add unified verifier profiles and receipts (tasks/backlog/process/CI-013-unified-verifier-profiles-and-receipts.md)
 - blocked by `CI-012`: `CI-014` — Derive the static build and contract impact graph (tasks/backlog/process/CI-014-static-build-contract-impact-graph.md)

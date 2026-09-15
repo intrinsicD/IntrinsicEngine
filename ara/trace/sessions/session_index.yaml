@@ -590,8 +590,8 @@ sessions:
 
 - id: 2026-09-15_001
   date: '2026-09-15'
-  summary: "Scene identities separated from residency storage; seven interface closures exclude GpuSceneSlot. Claude reviewed; 182 focused and 4662 CPU passes plus one expected skip, fresh Clang 20 graphics build and eight guards pass. No elapsed build-time claim."
-  turn_count: 24
-  events_count: 30
+  summary: "Created BUILD-009, RUNTIME-266/267 and GRAPHICS-144 for remaining compile work; retained UI-037, GRAPHICS-105, LEGACY-043 and BUILD-006 with current scope. Claude reviewed; task/dependency/doc checks pass. Planning only."
+  turn_count: 25
+  events_count: 31
   claims_touched: [C94, C95, C96]
   open_threads: 10

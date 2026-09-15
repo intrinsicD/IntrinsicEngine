@@ -12916,3 +12916,13 @@ tree:
     alternatives: [Keep stable identities coupled to mutable buffer maps, split AssetId across unrelated consumers while leaving map coupling, change GpuWorld attachment without removing storage coupling, duplicate aliases or add compatibility re-exports]
     evidence: [tasks/done/GRAPHICS-143-scene-handle-locality.md, src/graphics/renderer/Graphics.SceneHandles.cppm, src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cppm, tests/CMakeLists.txt, docs/architecture/graphics.md]
     status: resolved
+
+  - id: N595
+    type: decision
+    title: Give each remaining compile and reuse item an explicit task owner
+    provenance: user
+    timestamp: "2026-09-15T20:39:04+02:00"
+    choice: Create BUILD-009 for current-source measurement, RUNTIME-266 for remaining snapshot consumers, RUNTIME-267 for the config chain, and GRAPHICS-144 for renderer dependency costs. Keep existing readiness, visualization, shader-retirement and backend owners instead of duplicating their tasks. Encode BUILD-009 before compile implementation, then RUNTIME-266 before RUNTIME-267 for shared session files. Each source change still needs its immediate matched baseline; micro workflow exemption never exempts benchmark source/result evidence. Claude review and strict task/link/doc checks pass. No implementation or new timing result is produced.
+    alternatives: [Reopen completed bounded refactors, duplicate existing readiness or visualization tasks, treat historical timings as current, create another build backend task, claim benchmark completion from a planning note]
+    evidence: [tasks/backlog/README.md, tasks/backlog/process/BUILD-009-current-source-compile-baseline.md, tasks/backlog/runtime/RUNTIME-266-editor-snapshot-consumer-locality.md, tasks/backlog/runtime/RUNTIME-267-processing-config-consumer-locality.md, tasks/backlog/rendering/GRAPHICS-144-renderer-consumer-locality.md, tasks/SESSION-BRIEF.md]
+    status: resolved

@@ -32,6 +32,11 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence, runtim
   answered from existing copied metadata or cached results.
 
 ## Context
+- Continuation after RUNTIME-264/265: retain canonical service Types owners,
+  shared context adapters and family-owned prepared frames. This task remains
+  the owner of readiness/reason consolidation; RUNTIME-266/267 only narrow
+  compilation dependencies. UI-037 is independently actionable and does not
+  wait for BUILD-009 measurements.
 - Owner/layers: runtime feature owners own selection/domain/config/capability
   validation and expose copied readiness with their operation snapshots;
   family-owned runtime prepared frames carry those values to

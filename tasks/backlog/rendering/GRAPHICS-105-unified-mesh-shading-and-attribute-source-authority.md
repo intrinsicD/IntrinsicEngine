@@ -48,6 +48,12 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence]
   authority task.
 
 ## Context
+- Continuation after GRAPHICS-138–143: `VisualizationSyncSystem::OverrideLeases`,
+  `BuildScalarFieldParams` and `BuildPerElementParams` still exist. Their removal
+  belongs here, preserving the canonical scene handles, single named-buffer map
+  and current rendering capabilities. GRAPHICS-144 owns compiler dependencies
+  only. This task is independently actionable; LEGACY-043 follows its explicit
+  decision about the surviving deferred shader contract.
 - Owner/layer: `graphics` for the material shading-model + per-channel attribute-source metadata and the unified shader resolution; `runtime` for uniform default-lit material assignment across import routes, extraction, and mesh-only gating; `app`/editor for the UI selector.
 - The architectural smell — **two lit/unlit authorities** historically existed:
   1. `Graphics::Components::VisualizationConfig::ColorSource::UniformColor` explicitly set `MaterialFlags::Unlit` (`Graphics.Component.VisualizationConfig.cppm:60-68`, resolved in `Graphics.VisualizationSyncSystem.cpp`). The `main` commit `3485151` worked around this for the **direct import** route by switching it to `ColorSource::Material`; BUG-052 removed the visualization-mode-to-unlit coupling for uniform, scalar, and per-element SciVis overrides.

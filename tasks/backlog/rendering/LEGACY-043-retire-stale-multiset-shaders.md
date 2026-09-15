@@ -22,7 +22,7 @@ contracts:
   use retired multi-descriptor-set or non-heap fixed-`set = 0` layouts (plus
   their paired fragments), which no renderer pass references and which cannot
   form promoted pipelines against the Vulkan device's single-set global
-  layout — and stop compiling them on every build.
+  layout — and stop including them in clean or shader-invalidated builds.
 
 ## Non-goals
 - No changes to the active binding model (single bindless heap at
@@ -34,6 +34,9 @@ contracts:
 - No shader feature work, no new pipelines.
 
 ## Context
+- The compiler-locality work through GRAPHICS-143 did not remove these shader
+  sources. Preserve the GRAPHICS-105 dependency and its deferred-shader decision;
+  GRAPHICS-144 is a separate renderer dependency task, not a shader retirement.
 - Owning subsystem/layer: `graphics` shader assets
   (`assets/shaders/`), with doc references in
   `src/graphics/renderer/README.md`.
@@ -63,8 +66,9 @@ contracts:
   consolidates its contract into the surviving default deferred path; if
   `GRAPHICS-105` retains it, this task must retain it too.
 - `cmake/CompileShaders.cmake` uses `file(GLOB_RECURSE)` over
-  `assets/shaders/`, so every stale source is compiled to `.spv` and
-  emitted into the runtime shader directory on every build.
+  `assets/shaders/`, so stale sources remain build inputs and produce `.spv`
+  outputs on clean builds or when their source/shared shader includes change.
+  Settled incremental builds reuse up-to-date outputs.
 - The implementer must re-verify the stale list at execution time
   (`grep -r <name> src/`) before deleting — shader path references are
   string-built via `Core::Filesystem::GetShaderPath`, and substring

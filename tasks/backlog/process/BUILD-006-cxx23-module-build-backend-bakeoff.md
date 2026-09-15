@@ -30,6 +30,11 @@ contracts:
 - No permanent dual-backend maintenance and no engine source optimization.
 
 ## Context
+- BUILD-009 refreshes engine-source measurements and is independent of this
+  backend comparison. Reuse its current source/scenario evidence when available,
+  without making it an additional prerequisite or treating source dependency
+  improvements as cache/backend results. CI-013, CI-014 and BUILD-005 remain
+  this task's actual prerequisites.
 - BUILD-007 already measured engine source compile-locality changes. Reuse
   its measurement tooling and baseline provenance where applicable; those
   results do not compare build/cache backends or satisfy this task. Measure
