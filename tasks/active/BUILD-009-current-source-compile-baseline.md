@@ -74,3 +74,40 @@ python3 tools/agents/check_ara_claims.py --root . --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 ```
+
+## Execution plan — 2026-09-15
+- Compare post-overnight `07a8b29147ccd642fcf827c6a6361ba3e1c29f13` with
+  implementation checkpoint `45d5a4f1fc0c7e51172a0e4a0edbca2f675448ea`.
+  Task-only HEAD `ea1d39507` has the same engine source as the latter.
+- Frozen follow-up manifest: three samples per arm in BAABBA order (before,
+  after, after, before, before, after), zero discarded warmup pilots, identical
+  source/dependency pre-read. Eight scenarios: clean, no-op, workspace/renderer/
+  config implementations, then config/snapshot/renderer interfaces.
+- Reuse the existing runner unchanged; Clang 23 Debug ci, Null/headless,
+  ExtrinsicRuntime closure, four jobs, caches/launchers disabled. No package
+  installation; installed dependency hashes must remain identical after every
+  configure/build. Do not run other compilers or tests during timing.
+- Owned source worktree: `/tmp/intrinsic-build009/source`; owned disposable
+  build: `/dev/shm/intrinsic-build009`. Preflight finds roughly 3.5 GiB disk,
+  20 GiB tmpfs and 47 GiB available host memory; tracked source is about 343 MiB.
+  Record exact storage/memory state in the run bundle; peak process RSS does
+  not count tmpfs storage. Preserve unrelated worktrees/builds.
+- Outputs first go to an append-only temporary population, then validated
+  portable results and a report enter the repository. No current speedup,
+  statistical guarantee, GPU or sanitizer claim is inferred from this plan.
+
+## Plan review resolutions
+- Claude reviewed the fixed manifest and existing runner. Pin C, C++ and matching
+  scanner paths explicitly; both arms use Clang 23. Preflight successfully hashes
+  the borrowed ignored dependency root, so no copy or traversal failure occurs.
+- A synthetic nested-metric seal validates without being retained as measurement
+  evidence. Existing tooling tests pass (26 hotspot, 15 result-validator cases).
+  Exact task-head/checkpoint diff contains only task and trace files.
+- Initial configure is the only configure-time metric by design; reconfigure was
+  already measured by BUILD-007/008. Retain the reusable runner's other scenarios.
+  Report actual compiler-unit counts and per-probe invalidation, retaining the
+  minimal one-importer validity floor rather than requiring a positive benefit.
+- Record normal desktop noise, lack of affinity/governor control and matched
+  storage; local descriptive results imply no statistical/cross-host guarantee.
+  Final owned build cleanup occurs after complete evidence capture; unrelated
+  trees and any failed population remain intact.

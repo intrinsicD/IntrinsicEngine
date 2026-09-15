@@ -6,7 +6,6 @@ its dependencies, conditional gates, scope and verification.
 
 ## Tasks
 
-- [BUILD-009 — Remeasure current engine compile costs](BUILD-009-current-source-compile-baseline.md)
 - [BUILD-005 — Define hermetic toolchain and action identity](BUILD-005-hermetic-toolchain-action-identity.md)
 - [BUILD-006 — Run a C++23-module build and cache backend bake-off](BUILD-006-cxx23-module-build-backend-bakeoff.md)
 - [CI-012 — Compile a versioned verification evidence graph](CI-012-versioned-verification-evidence-graph.md)

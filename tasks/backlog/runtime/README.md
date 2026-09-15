@@ -45,7 +45,7 @@ and their paired UI or method work are recorded there, not here.
 - [RUNTIME-266 — Narrow remaining editor snapshot consumers](RUNTIME-266-editor-snapshot-consumer-locality.md)
 - [RUNTIME-267 — Isolate processing config edits from unrelated editor consumers](RUNTIME-267-processing-config-consumer-locality.md)
 
-Start with [BUILD-009's refreshed baseline](../process/BUILD-009-current-source-compile-baseline.md),
+Start with [BUILD-009's refreshed baseline](../../active/BUILD-009-current-source-compile-baseline.md),
 then RUNTIME-266 before RUNTIME-267 because they share session files. Both
 preserve the completed RUNTIME-264/265 ownership improvements.
 

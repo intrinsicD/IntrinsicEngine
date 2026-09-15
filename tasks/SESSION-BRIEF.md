@@ -9,6 +9,7 @@ picking backlog work; theme priorities and rationale live in
 ## Active tasks
 
 - `BUG-194` — Large-mesh property display and geodesic controls (tasks/active/BUG-194-large-mesh-property-display.md)
+- `BUILD-009` — Remeasure current engine compile costs (tasks/active/BUILD-009-current-source-compile-baseline.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
 - `METHOD-044` — Feature-aware patches and distortion-aware atlas merging (tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md)
@@ -50,7 +51,6 @@ picking backlog work; theme priorities and rationale live in
 
 - blocked by `CI-012`: `BUILD-005` — Define hermetic toolchain and action identity (tasks/backlog/process/BUILD-005-hermetic-toolchain-action-identity.md)
 - blocked by `CI-013`: `BUILD-006` — Run a C++23-module build and cache backend bake-off (tasks/backlog/process/BUILD-006-cxx23-module-build-backend-bakeoff.md)
-- unblocked: `BUILD-009` — Remeasure current engine compile costs (tasks/backlog/process/BUILD-009-current-source-compile-baseline.md)
 - unblocked: `CI-012` — Compile a versioned verification evidence graph (tasks/backlog/process/CI-012-versioned-verification-evidence-graph.md)
 - blocked by `CI-012`: `CI-013` — Add unified verifier profiles and receipts (tasks/backlog/process/CI-013-unified-verifier-profiles-and-receipts.md)
 - blocked by `CI-012`: `CI-014` — Derive the static build and contract impact graph (tasks/backlog/process/CI-014-static-build-contract-impact-graph.md)
