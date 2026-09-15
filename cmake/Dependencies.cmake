@@ -147,12 +147,17 @@ if(NOT TARGET tinygltf)
     set(_intrinsic_tinygltf_impl_dir "${CMAKE_BINARY_DIR}/generated/deps")
     set(_intrinsic_tinygltf_impl "${_intrinsic_tinygltf_impl_dir}/tinygltf_impl.cpp")
     file(MAKE_DIRECTORY "${_intrinsic_tinygltf_impl_dir}")
-    file(WRITE "${_intrinsic_tinygltf_impl}"
-        "#define TINYGLTF_NOEXCEPTION\n"
-        "#define TINYGLTF_IMPLEMENTATION\n"
-        "#define STB_IMAGE_IMPLEMENTATION\n"
-        "#define STB_IMAGE_WRITE_IMPLEMENTATION\n"
-        "#include <tiny_gltf.h>\n"
+    file(CONFIGURE
+        OUTPUT "${_intrinsic_tinygltf_impl}"
+        CONTENT [=[
+#define TINYGLTF_NOEXCEPTION
+#define TINYGLTF_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <tiny_gltf.h>
+]=]
+        @ONLY
+        NEWLINE_STYLE UNIX
     )
 
     add_library(tinygltf STATIC "${_intrinsic_tinygltf_impl}")

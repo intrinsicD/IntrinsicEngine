@@ -1,0 +1,13 @@
+F
+======================================================================
+FAIL: test_backend_configure_graph_is_history_independent (__main__.BackendConfigureDeterminismTests.test_backend_configure_graph_is_history_independent)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/alex/Documents/IntrinsicEngine/tests/regression/tooling/Test.BackendConfigureDeterminism.py", line 300, in test_backend_configure_graph_is_history_independent
+    self.assertEqual(
+AssertionError: 1789443939368627544 != 1789443940201712801 : null-headless: unchanged reconfigure rewrote the generated tinygltf source and dirtied its timestamp
+
+----------------------------------------------------------------------
+Ran 1 test in 8.534s
+
+FAILED (failures=1)

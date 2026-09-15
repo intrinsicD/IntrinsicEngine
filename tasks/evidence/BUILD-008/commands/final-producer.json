@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "/tmp/intrinsic-overnight-20260915/build008/probe.py",
+    "final"
+  ],
+  "command_display": "python3 /tmp/intrinsic-overnight-20260915/build008/probe.py final",
+  "cwd": ".",
+  "duration_ms": 1195,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T03:50:15Z",
+  "label": "final-producer",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T03:50:14Z",
+  "stderr_path": "tasks/evidence/BUILD-008/commands/final-producer.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUILD-008/commands/final-producer.stdout.log",
+  "stdout_sha256": "66f10585612a7b1eb93c89c1253c39c395ab258e087046afada0578dfaa3b9d6",
+  "task_id": "BUILD-008"
+}

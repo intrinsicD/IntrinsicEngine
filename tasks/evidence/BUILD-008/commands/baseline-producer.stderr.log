@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/tmp/intrinsic-overnight-20260915/build008/probe.py", line 26, in <module>
+    assert 'tinygltf_impl.cpp.o' in dryrun and 'Building CXX object' in dryrun,dryrun
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ninja explain: output /home/alex/Documents/IntrinsicEngine/build/ci/CMakeFiles/VerifyGlobs.cmake_force of phony edge with no inputs doesn't exist
+ninja explain: /home/alex/Documents/IntrinsicEngine/build/ci/CMakeFiles/VerifyGlobs.cmake_force is dirty
+ninja explain: /home/alex/Documents/IntrinsicEngine/build/ci/CMakeFiles/cmake.verify_globs is dirty
+[0/2] Re-checking globbed directories...
+[1/2] Re-running CMake...
+

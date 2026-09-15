@@ -12662,5 +12662,5 @@ tree:
     - tasks/evidence/RUNTIME-258/report.yaml
     - tasks/evidence/RUNTIME-258/seal.yaml
     - tasks/evidence/RUNTIME-258/structural-counts.json
-    - tasks/backlog/process/BUILD-008-preserve-unchanged-tinygltf-generation.md
+    - tasks/done/BUILD-008-preserve-unchanged-tinygltf-generation.md
     status: resolved

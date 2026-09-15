@@ -223,6 +223,12 @@ inventories. If they differ, do not treat the warm tree as valid evidence:
 run `python3 tests/regression/tooling/Test.BackendConfigureDeterminism.py` and
 fix the first consumer/default-order defect instead of preserving the cache.
 
+`cmake/Dependencies.cmake` generates `generated/deps/tinygltf_impl.cpp` with
+`file(CONFIGURE)`, preserving its bytes and modification time during unchanged
+configuration while regenerating missing or corrupted output. The determinism
+test checks bytes and mtime for each tested backend identity and verifies
+output repair during the backend transition.
+
 For repeat local builds, use a filesystem binary cache:
 
 ```bash

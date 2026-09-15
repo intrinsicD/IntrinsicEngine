@@ -1,0 +1,19 @@
+Confirmed unchanged bytes/flags but new mtime schedules tinygltf scan/compile/link
+ninja explain: output /home/alex/Documents/IntrinsicEngine/build/ci/CMakeFiles/VerifyGlobs.cmake_force of phony edge with no inputs doesn't exist
+ninja explain: /home/alex/Documents/IntrinsicEngine/build/ci/CMakeFiles/VerifyGlobs.cmake_force is dirty
+ninja explain: /home/alex/Documents/IntrinsicEngine/build/ci/CMakeFiles/cmake.verify_globs is dirty
+[0/2] Re-checking globbed directories...
+ninja explain: output CMakeFiles/tinygltf.dir/generated/deps/tinygltf_impl.cpp.o.ddi older than most recent input /home/alex/Documents/IntrinsicEngine/build/ci/generated/deps/tinygltf_impl.cpp (1789442679398416792 vs 1789443881890598406)
+ninja explain: CMakeFiles/tinygltf.dir/generated/deps/tinygltf_impl.cpp.o.ddi is dirty
+ninja explain: output CMakeFiles/tinygltf.dir/generated/deps/tinygltf_impl.cpp.o older than most recent input /home/alex/Documents/IntrinsicEngine/build/ci/generated/deps/tinygltf_impl.cpp (1789442683194384503 vs 1789443881890598406)
+ninja explain: CMakeFiles/tinygltf.dir/generated/deps/tinygltf_impl.cpp.o is dirty
+ninja explain: lib/libtinygltf.a is dirty
+[1/4] Scanning /home/alex/Documents/IntrinsicEngine/build/ci/generated/deps/tinygltf_impl.cpp for CXX dependencies
+[2/4] Generating CXX dyndep file CMakeFiles/tinygltf.dir/CXX.dd
+ninja explain: loading dyndep file 'CMakeFiles/tinygltf.dir/CXX.dd'
+ninja explain: output CMakeFiles/tinygltf.dir/generated/deps/tinygltf_impl.cpp.o older than most recent input /home/alex/Documents/IntrinsicEngine/build/ci/generated/deps/tinygltf_impl.cpp (1789442683194384503 vs 1789443881890598406)
+ninja explain: CMakeFiles/tinygltf.dir/generated/deps/tinygltf_impl.cpp.o is dirty
+ninja explain: lib/libtinygltf.a is dirty
+[3/4] Building CXX object CMakeFiles/tinygltf.dir/generated/deps/tinygltf_impl.cpp.o
+[4/4] Linking CXX static library lib/libtinygltf.a
+

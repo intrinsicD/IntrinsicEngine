@@ -205,6 +205,22 @@ def _ctest_inventory(build_dir: Path) -> tuple[str, ...]:
     return tuple(sorted(test["name"] for test in payload["tests"]))
 
 
+def _generated_source_path(build_dir: Path) -> Path:
+    return build_dir / "generated" / "deps" / "tinygltf_impl.cpp"
+
+
+def _generated_source_sample(build_dir: Path) -> tuple[bytes, int]:
+    """Return the generated tinygltf source bytes and its modification time.
+
+    Kept out of Inventory: these samples are only comparable within one tree.
+    """
+
+    path = _generated_source_path(build_dir)
+    if not path.is_file():
+        raise AssertionError(f"generated dependency source is missing: {path}")
+    return path.read_bytes(), path.stat().st_mtime_ns
+
+
 def _snapshot(build_dir: Path) -> Inventory:
     cache = _read_cache(build_dir)
     missing = [key for key in CACHE_IDENTITY_KEYS if key not in cache]
@@ -259,12 +275,35 @@ class BackendConfigureDeterminismTests(unittest.TestCase):
                     msg=f"unexpected {configuration.name} configure identity",
                 )
 
+                generated_before, generated_mtime_before = _generated_source_sample(
+                    first_tree
+                )
+
                 _configure(first_tree, configuration, fresh=False)
+                generated_after, generated_mtime_after = _generated_source_sample(
+                    first_tree
+                )
                 same_tree_reconfigure = _snapshot(first_tree)
                 self.assert_inventory_equal(
                     first_fresh,
                     same_tree_reconfigure,
                     context=f"{configuration.name}: fresh vs reconfigure",
+                )
+                self.assertEqual(
+                    generated_before,
+                    generated_after,
+                    msg=(
+                        f"{configuration.name}: unchanged reconfigure altered the "
+                        "generated tinygltf source content"
+                    ),
+                )
+                self.assertEqual(
+                    generated_mtime_before,
+                    generated_mtime_after,
+                    msg=(
+                        f"{configuration.name}: unchanged reconfigure rewrote the "
+                        "generated tinygltf source and dirtied its timestamp"
+                    ),
                 )
 
                 _configure(second_tree, configuration, fresh=True)
@@ -291,8 +330,19 @@ class BackendConfigureDeterminismTests(unittest.TestCase):
 
             changed_tree = root / f"{NULL_HEADLESS.name}-first"
             null_inventory = stable[NULL_HEADLESS.name]
+            good_generated_source, _ = _generated_source_sample(changed_tree)
+            _generated_source_path(changed_tree).write_bytes(
+                b"#error deliberately corrupted generated tinygltf source\n"
+            )
             _configure(changed_tree, VULKAN_GLFW, fresh=False)
+            repaired_generated_source, _ = _generated_source_sample(changed_tree)
             changed_inventory = _snapshot(changed_tree)
+
+            self.assertEqual(
+                good_generated_source,
+                repaired_generated_source,
+                msg="configure did not restore the corrupted generated tinygltf source",
+            )
 
             self.assertNotEqual(null_inventory.identity, changed_inventory.identity)
             changed_components = [

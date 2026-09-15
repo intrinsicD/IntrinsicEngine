@@ -1,0 +1,16 @@
+[0/2] Re-checking globbed directories...
+[1/15] Linking CXX executable bin/IntrinsicRuntimeIntegrationTests
+[2/15] Linking CXX executable bin/IntrinsicKMeansGpuBenchmarkSmoke
+[3/15] Linking CXX executable bin/IntrinsicLopFamilyGpuBenchmarkSmoke
+[4/15] Linking CXX executable bin/IntrinsicPointLBVHGpuTests
+[5/15] Linking CXX executable bin/IntrinsicRuntimeContractSlowTests
+[6/15] Linking CXX executable bin/IntrinsicRuntimePhysicsModuleTests
+[7/15] Linking CXX executable bin/IntrinsicRuntimeContractTests
+[8/15] Linking CXX executable bin/IntrinsicSandboxEditorIntegrationTests
+[9/15] Linking CXX executable bin/IntrinsicGraphicsVulkanSmokeTests
+[10/15] Linking CXX executable bin/IntrinsicRuntimeProgressivePoissonResultGpuSmokeTests
+[11/15] Linking CXX executable bin/IntrinsicRuntimeGpuResultReadbackSmokeTests
+[12/15] Linking CXX executable bin/IntrinsicRuntimeClusteringServiceGpuSmokeTests
+[13/15] Linking CXX executable bin/IntrinsicRuntimePointCloudConsolidationGpuParityTests
+[14/15] Linking CXX executable bin/IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests
+[15/15] Linking CXX executable bin/IntrinsicRuntimeGraphicsCpuTests

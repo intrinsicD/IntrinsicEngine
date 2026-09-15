@@ -1,0 +1,28 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "VCPKG_FORCE_SYSTEM_BINARIES=1",
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "tinygltf",
+    "-j2"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 cmake --build --preset ci --target tinygltf -j2",
+  "cwd": ".",
+  "duration_ms": 40,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T03:50:14Z",
+  "label": "reconcile-producer",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T03:50:14Z",
+  "stderr_path": "tasks/evidence/BUILD-008/commands/reconcile-producer.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUILD-008/commands/reconcile-producer.stdout.log",
+  "stdout_sha256": "c2ed93ffd93c840755c0e91392ae593b1b52de9b7aaf6c208123feaceb1dde2e",
+  "task_id": "BUILD-008"
+}

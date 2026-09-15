@@ -1,0 +1,23 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "VCPKG_FORCE_SYSTEM_BINARIES=1",
+    "python3",
+    "tests/regression/tooling/Test.BackendConfigureDeterminism.py"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 python3 tests/regression/tooling/Test.BackendConfigureDeterminism.py",
+  "cwd": ".",
+  "duration_ms": 8570,
+  "exit_code": 1,
+  "finished_at": "2026-09-15T03:45:40Z",
+  "label": "baseline-configure-regression",
+  "required": false,
+  "schema_version": 1,
+  "started_at": "2026-09-15T03:45:31Z",
+  "stderr_path": "tasks/evidence/BUILD-008/commands/baseline-configure-regression.stderr.log",
+  "stderr_sha256": "623a361f0ffb448f174400a2e634a461e635cf043fafa0b54d72431f8db6d14d",
+  "stdout_path": "tasks/evidence/BUILD-008/commands/baseline-configure-regression.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUILD-008"
+}

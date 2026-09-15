@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "/tmp/intrinsic-overnight-20260915/build008/probe.py",
+    "baseline"
+  ],
+  "command_display": "python3 /tmp/intrinsic-overnight-20260915/build008/probe.py baseline",
+  "cwd": ".",
+  "duration_ms": 1080,
+  "exit_code": 1,
+  "finished_at": "2026-09-15T03:43:02Z",
+  "label": "baseline-producer",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T03:43:01Z",
+  "stderr_path": "tasks/evidence/BUILD-008/commands/baseline-producer.stderr.log",
+  "stderr_sha256": "2ff5f6e772a32eb5c45fa343fe22eb7a0031de088f97162436bb8d6ed7a9ee11",
+  "stdout_path": "tasks/evidence/BUILD-008/commands/baseline-producer.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUILD-008"
+}

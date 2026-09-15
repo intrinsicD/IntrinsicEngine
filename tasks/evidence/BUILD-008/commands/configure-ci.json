@@ -1,0 +1,24 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "VCPKG_FORCE_SYSTEM_BINARIES=1",
+    "cmake",
+    "--preset",
+    "ci"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 cmake --preset ci",
+  "cwd": ".",
+  "duration_ms": 857,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T03:49:23Z",
+  "label": "configure-ci",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T03:49:22Z",
+  "stderr_path": "tasks/evidence/BUILD-008/commands/configure-ci.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUILD-008/commands/configure-ci.stdout.log",
+  "stdout_sha256": "7d14138eebd0589c3d2bb3ae76f2ef2e343ced52765b715162015db6c6b296b6",
+  "task_id": "BUILD-008"
+}

@@ -201,7 +201,7 @@ ai_actions:
   - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
   - tasks/done/RUNTIME-258-unused-workspace-model-declarations.md
   - tasks/evidence/RUNTIME-258/report.yaml
-  - tasks/backlog/process/BUILD-008-preserve-unchanged-tinygltf-generation.md
+  - tasks/done/BUILD-008-preserve-unchanged-tinygltf-generation.md
 claims_touched: []
 key_context:
 - turn: 1

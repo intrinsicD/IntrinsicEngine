@@ -1,0 +1,133 @@
+schema_version: 1
+task_id: BUILD-008
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-15T03:55:25Z'
+claim_eligible: false
+source:
+  base_ref: 3c054947f
+  base_revision: 3c054947f1638837e9af3131b33574e78cf581e3
+  head_revision: 3c054947f1638837e9af3131b33574e78cf581e3
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 46e43b1931d74004b81a53dd54ca96092808aee268cdbe479a52dc0b3181569e
+  - path: ara/trace/sessions/2026-09-15_001.yaml
+    sha256: aab1c9870a49838f6a824f73a65cd85e091287757d2ab659ea5eeb3d9ec30e07
+  - path: cmake/Dependencies.cmake
+    sha256: 8d2062249de6a0bf1d88cbe0911c81c44e04df5c8829418e33a77ff26b33a070
+  - path: docs/build-troubleshooting.md
+    sha256: cac3737544c253d3e464776125a562154bfad77622a077e7beb0aaeec4553906
+  - path: tasks/SESSION-BRIEF.md
+    sha256: b7cc46325243e8621015404f2d9e714d0b389254f0db320992d286a00da1bb92
+  - path: tasks/backlog/process/BUILD-008-preserve-unchanged-tinygltf-generation.md
+    sha256: null
+  - path: tasks/done/BUILD-008-preserve-unchanged-tinygltf-generation.md
+    sha256: 5abe83351dad6e304fb85f332a0f49c4d4fbac5c0e28d1d133fec3975d2ddfec
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: cb3c3f501908976e45771d66c211113d6f89d844edb7072592d5ae0bad73df29
+  - path: tests/regression/tooling/Test.BackendConfigureDeterminism.py
+    sha256: a0cc3cf8a9bbb87ee7d1a1be07445ecbae6a64c949fe21c772b273fe4a669b05
+  content_digest: 3a4f5b6b838e3710c0601fb4e3459fdc491c82a3b577ad0a532b041b436c7a1d
+touched:
+  paths:
+  - ara/trace/exploration_tree.yaml
+  - ara/trace/sessions/2026-09-15_001.yaml
+  - cmake/Dependencies.cmake
+  - docs/build-troubleshooting.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/process/BUILD-008-preserve-unchanged-tinygltf-generation.md
+  - tasks/done/BUILD-008-preserve-unchanged-tinygltf-generation.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/regression/tooling/Test.BackendConfigureDeterminism.py
+  layers:
+  - build
+  modules:
+  - tinygltf generation
+extension_seam: Reuse native CMake file(CONFIGURE) and existing backend configure-determinism steps
+future_change_plan: BUILD-007 retains matched timing; other generation or import cleanup requires separate
+  evidence
+acceptance:
+- criterion: Unchanged reconfiguration preserves tinygltf source bytes and mtime; changed/missing output
+    regenerates and the existing producer is idle after reconciliation.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/BUILD-008/baseline-producer.json
+  - tasks/evidence/BUILD-008/final-producer.json
+  - tasks/evidence/BUILD-008/commands/configure-regression.json
+  reason: null
+- criterion: Existing backend graph invariants and full CPU/build verification pass with unchanged generated
+    C++ content, flags and dependency ownership.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/BUILD-008/source-identity.json
+  - tasks/evidence/BUILD-008/commands/full-cpu.stdout.log
+  - tasks/evidence/BUILD-008/commands/vulkan-runtime-build.json
+  reason: null
+- criterion: The reviewed three-file change is locally committed, retired and sealed; no extra production/helper
+    file or timing claim.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/done/BUILD-008-preserve-unchanged-tinygltf-generation.md
+  - tasks/evidence/BUILD-008/source-review.txt
+  - tasks/evidence/BUILD-008/seal.yaml
+  reason: null
+commands:
+- receipt: tasks/evidence/BUILD-008/commands/baseline-actual-producer.json
+- receipt: tasks/evidence/BUILD-008/commands/baseline-configure-regression.json
+- receipt: tasks/evidence/BUILD-008/commands/configure-ci.json
+- receipt: tasks/evidence/BUILD-008/commands/configure-regression.json
+- receipt: tasks/evidence/BUILD-008/commands/final-producer.json
+- receipt: tasks/evidence/BUILD-008/commands/full-build.json
+- receipt: tasks/evidence/BUILD-008/commands/full-cpu.json
+- receipt: tasks/evidence/BUILD-008/commands/reconcile-producer.json
+- receipt: tasks/evidence/BUILD-008/commands/retirement-structural.json
+- receipt: tasks/evidence/BUILD-008/commands/structural.json
+- receipt: tasks/evidence/BUILD-008/commands/vulkan-runtime-build.json
+changed_public_contracts: []
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUILD-008-preserve-unchanged-tinygltf-generation.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Initial dry-run probe failed on CMake regeneration before producer traversal; corrected actual-producer
+  baseline and final pass. Expected old-generator mtime failure preserved. No timing or new sanitizer
+  claim; generated C++/flags unchanged. Vulkan evidence is compilation only.
+skipped_checks: []
+artifacts:
+- path: tasks/evidence/BUILD-008/source-review.txt
+  sha256: 59bc0eb34cae6ff2868dcf3428ff3e186a682777640445d0e6e22f0bc0425a33
+  kind: file
+- path: tasks/evidence/BUILD-008/source-identity.json
+  sha256: 53d29e6fc0bcbd6871e9630cb02ddc51e13ee1b9b932be995cda74150c170871
+  kind: file
+- path: tasks/evidence/BUILD-008/baseline-producer.json
+  sha256: 981dad570b05d9f767c00aaddca925ff68368ecaec4f18a916cd8d09d178fcf2
+  kind: file
+- path: tasks/evidence/BUILD-008/final-producer.json
+  sha256: 4745e4f8c7ffcab5c0301f6a182cfffe0125d96dd567a9e950461decc3189d32
+  kind: file
+- path: tasks/evidence/BUILD-008/commands/baseline-producer.json
+  sha256: d33e76ae0142a0ae332f2e24d387ab619e2a251129bc3268828f916117bfeb9d
+  kind: file
+- path: tasks/evidence/BUILD-008/commands/baseline-producer.stdout.log
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  kind: file
+- path: tasks/evidence/BUILD-008/commands/baseline-producer.stderr.log
+  sha256: 2ff5f6e772a32eb5c45fa343fe22eb7a0031de088f97162436bb8d6ed7a9ee11
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true

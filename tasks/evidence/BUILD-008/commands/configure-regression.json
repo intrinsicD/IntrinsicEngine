@@ -1,0 +1,23 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "VCPKG_FORCE_SYSTEM_BINARIES=1",
+    "python3",
+    "tests/regression/tooling/Test.BackendConfigureDeterminism.py"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 python3 tests/regression/tooling/Test.BackendConfigureDeterminism.py",
+  "cwd": ".",
+  "duration_ms": 51364,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T03:50:14Z",
+  "label": "configure-regression",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T03:49:23Z",
+  "stderr_path": "tasks/evidence/BUILD-008/commands/configure-regression.stderr.log",
+  "stderr_sha256": "e1600765895e1c1890a84cd7dddf1e7dd8ae5a2ab128bdd131b7fed8560fa9a1",
+  "stdout_path": "tasks/evidence/BUILD-008/commands/configure-regression.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUILD-008"
+}
