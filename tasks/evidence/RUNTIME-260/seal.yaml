@@ -1,0 +1,9 @@
+schema_version: 1
+task_id: RUNTIME-260
+sealed_revision: f72000b8662f5e0c2e652a11eb8e3c343a3a89de
+source_content_digest: e8fdc1891d6a0ff22e034a4e1f92f6fcdc8e53b31af9d646552d2f6b310cf226
+report_sha256: 2e731f0af14e6c76ceb3429efd219812167f8886f9a4374d1a282f7e2891f06a
+records: []
+reason: Bind exact five-line import deletion, canonical lookup proof, independent Claude review, full
+  CPU/focused sanitizer and Vulkan runtime build gates
+generated_by: tools/agents/workflow_evidence.py
