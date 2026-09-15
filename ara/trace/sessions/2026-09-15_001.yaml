@@ -2,9 +2,9 @@ session:
   id: 2026-09-15_001
   date: '2026-09-15'
   started: '2026-09-15T00:37:12+02:00'
-  last_turn: '2026-09-15T05:01:55+02:00'
-  turn_count: 10
-  summary: BUG-196 retirement-navigation validation is verified, committed and sealed; RUNTIME-257 has a Claude-reviewed narrow diagnostic-owner/import plan. Overnight continuation remains active until 08:00 Berlin; BUILD-007/C92 timing remains open.
+  last_turn: '2026-09-15T05:19:24+02:00'
+  turn_count: 11
+  summary: RUNTIME-257 workspace diagnostic imports are verified, committed and sealed; RUNTIME-258 has a Claude-reviewed 78-line unused-declaration cleanup plan. Overnight continuation remains active until 08:00 Berlin; matched timing remains open.
 events_logged:
 - turn: 1
   type: experiment
@@ -68,6 +68,13 @@ events_logged:
   routing: direct
   provenance: ai-executed
   summary: Shared navigation checker fixed and verified; existing task rejection preserved; next diagnostic-owner cleanup prepared with Claude.
+- turn: 11
+  type: experiment
+  id: N578
+  routing: direct
+  provenance: ai-executed
+  summary: Workspace diagnostic dependency closure reduced 196 to 176 with unchanged bodies and passing
+    gates; task sealed and 78-line dead-copy cleanup prepared.
 ai_actions:
 - turn: 1
   action: Claude implemented five production files; root reviewed, added lifetime/statistics and compiler-boundary
@@ -167,6 +174,17 @@ ai_actions:
   - tasks/done/BUG-196-retirement-index-navigation-false-positive.md
   - tasks/evidence/BUG-196/report.yaml
   - tasks/done/RUNTIME-257-workspace-model-diagnostic-dependencies.md
+- turn: 11
+  action: Claude implemented and reviewed direct diagnostic imports; root verified exact source, passed
+    all native/sanitizer/build gates and retired/sealed RUNTIME-257. Settled RUNTIME-258 from private non-use
+    and canonical-owner proof.
+  provenance: ai-executed
+  files_changed:
+  - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+  - docs/architecture/runtime.md
+  - tasks/done/RUNTIME-257-workspace-model-diagnostic-dependencies.md
+  - tasks/evidence/RUNTIME-257/report.yaml
+  - tasks/backlog/runtime/RUNTIME-258-unused-workspace-model-declarations.md
 claims_touched: []
 key_context:
 - turn: 1
@@ -190,8 +208,11 @@ key_context:
   excerpt: Continue the authorized cleanup with Claude until 08:00, preserve current task discovery and historical records, fix real validation findings without weakening gates, and retire completed work.
 - turn: 10
   excerpt: Continue the authorized cleanup with Claude until 08:00, preserve features and strong validation, retire finished work and narrow source dependencies only after checking their real owners.
+- turn: 11
+  excerpt: Continue the authorized cleanup with Claude until 08:00, preserve features and strong verification,
+    retire completed slices and resolve existing owners before deleting duplicate or apparently unused code.
 open_threads:
-- Overnight cleanup remains active until 08:00; RUNTIME-252/253/254/255/256, BUG-134/196 and DOCS-007 are retired and sealed. Next is settled RUNTIME-257 workspace diagnostic imports; stop new implementation by 07:15.
+- Overnight cleanup remains active until 08:00; RUNTIME-252/253/254/255/256/257, BUG-134/196 and DOCS-007 are retired and sealed. Next is settled RUNTIME-258 unused workspace declarations; stop new implementation by 07:15.
 - BUILD-007 owns matched clean-source engine compile reconciliation; BUILD-006 separately owns backend/cache comparisons.
   C92 remains a hypothesis.
 - BUG-193 owns unexplained GPU pacing variability and WLOP watchdog margin; BUG-189/191/192 closed only finite-work

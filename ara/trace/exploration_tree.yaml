@@ -12605,3 +12605,33 @@ tree:
     - tasks/evidence/BUG-196/backtest.json
     - tasks/done/RUNTIME-257-workspace-model-diagnostic-dependencies.md
     status: resolved
+
+  - id: N578
+    type: experiment
+    title: Narrow workspace model diagnostic dependencies and prove dead declaration copies
+    provenance: ai-executed
+    timestamp: '2026-09-15T05:19:24+02:00'
+    result: 'Claude replaced the Renderer facade import with RenderDiagnostics and RenderCommandRouter and
+      removed an unused private mutation-template include. Root confirmed all body bytes unchanged, 877 tracked
+      production files compared and only Models.cpp modified. Source lines changed 3555 to 3554 and compiler
+      dependencies 196 to 176, with Renderer plus 19 associated modules removed and none added. This is structural
+      evidence, not a timing result. Claude independently approved the fixed source, conditional on gates
+      which then all passed: 235 focused native, 4636 full CPU plus one expected GLFW/LSan control skip, 202
+      focused ASan and 202 focused UBSan cases; promoted-Vulkan runtime compiled. Structural checks passed.
+      The architecture paragraph accurately distinguishes public-interface CTest coverage from this implementation
+      check. RUNTIME-257 retired in c53d30544 and sealed in a28476027; final evidence validates with zero
+      errors and 105 historical warnings. Claim released and all writers/builds stopped. Initial CLI had no
+      Edit tool and made no changes; a corrected scoped Edit run completed before its summary turn cap, with
+      root verification and independent review afterward. Claude identified ten unused anonymous-namespace
+      declaration copies in four blocks. Root confirmed exact-name non-use and a 78-line deletion plan, and
+      found the job-envelope rationale already present at the live PointFields owner. RUNTIME-258 is prepared,
+      not implemented. Other imports and executing code remain outside that slice. A read-only CMake inspection
+      also found unconditional tinygltf implementation generation matching the observed recompile after configure;
+      it remains unscoped for follow-up. N569 and BUILD-007/C92 remain open.'
+    evidence:
+    - tasks/done/RUNTIME-257-workspace-model-diagnostic-dependencies.md
+    - tasks/evidence/RUNTIME-257/report.yaml
+    - tasks/evidence/RUNTIME-257/seal.yaml
+    - tasks/evidence/RUNTIME-257/structural-counts.json
+    - tasks/backlog/runtime/RUNTIME-258-unused-workspace-model-declarations.md
+    status: resolved

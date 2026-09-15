@@ -590,8 +590,8 @@ sessions:
 
 - id: 2026-09-15_001
   date: '2026-09-15'
-  summary: BUG-196 retirement-navigation validation is verified, committed and sealed; RUNTIME-257 has a Claude-reviewed narrow diagnostic-owner/import plan. Overnight continuation remains active until 08:00 Berlin; BUILD-007/C92 timing remains open.
-  turn_count: 10
-  events_count: 10
+  summary: RUNTIME-257 workspace diagnostic imports are verified, committed and sealed; RUNTIME-258 has a Claude-reviewed 78-line unused-declaration cleanup plan. Overnight continuation remains active until 08:00 Berlin; matched timing remains open.
+  turn_count: 11
+  events_count: 11
   claims_touched: []
   open_threads: 10

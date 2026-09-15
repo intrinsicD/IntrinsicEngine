@@ -2380,3 +2380,14 @@ entries:
     - Preserve the expected baseline failure and successful final-test backtest. The added direct NOTES.md case addresses the useful review gap; existing log semantics and current-state source comments are intentional.
     - RUNTIME-257 is prepared only. Renderer is a re-exporter of used diagnostic types, not simply an unused headline import; the replacement names both actual owners. Other candidate removals remain unproved and out of scope.
     - Existing staged topics retain their open owners and flags. No broader claim closes; N569 and overnight continuation remain open until the deadline or a justified stop.
+
+  - turn: 2026-09-15_001#11
+    notes:
+    - Record N578 as exact dependency/source and verification facts; no timing, GPU execution or full sanitizer-suite
+      claim. Existing C92/BUILD-007 and staged observations retain their owners and flags.
+    - Distinguish CLI capability/turn-cap limits from source failures; no edits in the first run, exact completed
+      diff from the second, independent approval and all required gates afterward.
+    - 'RUNTIME-258 is planned only: ten unreferenced private declarations, 78 lines, with canonical live owners
+      unchanged. Correct the false concern about lost job-envelope rationale through the existing owner comment.'
+    - The tinygltf generation observation needs a scoped follow-up and reproducible no-op configuration evidence
+      before a fix or performance conclusion. N569 and overnight continuation remain open.
