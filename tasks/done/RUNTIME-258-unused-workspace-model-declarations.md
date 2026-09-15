@@ -5,10 +5,10 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "codex-overnight"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-09-15T03:21:26Z"
 contract_schema: 1
 contracts: []
 contract_review: "Reviewed the catalog: removal of unreferenced anonymous-namespace declarations only, with unchanged live owners, imports, headers, public API, method/data contracts, config and executing behavior. No new or changed reusable contract."
@@ -63,22 +63,22 @@ Every remaining byte, including the complete preamble, must match the expected
 four-block deletion. There is no need for an abstraction or absence-only test.
 
 ## Required changes
-- [ ] Delete exactly the ten unused declarations in four verified blocks.
-- [ ] Prove the resulting file equals the baseline minus those blocks; all other production files and public surfaces unchanged.
+- [x] Delete exactly the ten unused declarations in four verified blocks.
+- [x] Prove the resulting file equals the baseline minus those blocks; all other production files and public surfaces unchanged.
 
 ## Tests
-- [ ] Verify exact-name non-use and source deletion proof; preserve all live owners.
-- [ ] Focused editor/model/command tests, full CPU and focused ASan/UBSan pass.
-- [ ] Promoted-Vulkan runtime target compiles; no GPU execution claim.
+- [x] Verify exact-name non-use and source deletion proof; preserve all live owners.
+- [x] Focused editor/model/command tests, full CPU and focused ASan/UBSan pass.
+- [x] Promoted-Vulkan runtime target compiles; no GPU execution claim.
 
 ## Docs
-- [ ] Record the canonical-owner audit, fixed-source Claude review and completed verification in this task/evidence.
-- [ ] Retire with an exact local source seal. Existing architecture remains accurate; no README/history narrative or new source comment is needed.
+- [x] Record the canonical-owner audit, fixed-source Claude review and completed verification in this task/evidence.
+- [x] Retire with an exact local source seal. Existing architecture remains accurate; no README/history narrative or new source comment is needed.
 
 ## Acceptance criteria
-- [ ] Exactly 78 unused production lines are removed from one existing implementation; all remaining bytes and live owners preserved.
-- [ ] Reviewed source passes relevant native, sanitizer and build verification with no feature/API loss.
-- [ ] Completed slice is locally committed, retired and sealed without a performance or whole-engine completion claim.
+- [x] Exactly 78 unused production lines are removed from one existing implementation; all remaining bytes and live owners preserved.
+- [x] Reviewed source passes relevant native, sanitizer and build verification with no feature/API loss.
+- [x] Completed slice is locally committed, retired and sealed without a performance or whole-engine completion claim.
 
 ## Verification
 ```bash
@@ -105,3 +105,31 @@ and compilation boundaries. Preserve prior Renderer removal; no new timing run.
 - Editing canonical live owners, source headers, module interfaces or test/build lists.
 - Adding helper frameworks, compatibility paths or tests that only assert names are absent.
 - Weakening gates, claiming matched timing, pushing or exceeding the deadline.
+
+## Completion — 2026-09-15
+- Endpoint: **Retired**, unused private declaration removal.
+- Commit: implementation and retirement are in the enclosing local commit;
+  `tasks/evidence/RUNTIME-258/seal.yaml` binds the exact source revision.
+- Delete exactly ten unused declarations in four blocks from Models.cpp:
+  78 lines removed, 3,554 to 3,476. The file equals the baseline minus those
+  blocks; every remaining byte, the preamble and all 876 other tracked
+  production files are unchanged. No new file, helper, interface or test.
+- Canonical live declarations stay with visualization/scene actions, context
+  adapters, PointFields.hpp and the workspace session. The diagnostic-only
+  job-envelope rationale already exists at the live owner and is preserved.
+  Eight structs, one alias and an uninstantiated template are removed; no
+  executing function body, initialization or public surface changes.
+- Claude implemented with four surgical edits and independently approved the
+  fixed diff, conditional on the gates which all passed: 235 focused native
+  editor/locality cases, 4,636 full CPU cases plus one expected unsanitized
+  GLFW/LSan control skip, 202 focused ASan and 202 focused UBSan cases.
+  Promoted-Vulkan runtime compiled; no GPU execution or full sanitizer claim.
+- Root verified the presentation source-guard assumption with the full CPU
+  suite. Compiler dependencies remain 176 and Renderer remains absent.
+  Structural checks pass; all byte/non-use evidence is bound by source review
+  and structural-counts.json. No matched timing or research claim.
+- Existing architecture remains accurate. The only removed source comment
+  belonged to the dead job-result copy; no source-history narrative was added.
+  Clean-workshop rows 1–3 and 8 pass (unchanged layering, owners and public
+  boundaries, no exception); 4–7 do not apply (no frame/pass/protocol/maturity
+  change). BUILD-007/C92 and remaining engine/product work stay open.

@@ -250,15 +250,6 @@ namespace {
                 : EditorVisualizationConfigModel{};
         }
 
-        struct EditorVisualizationMutationIdentity
-        {
-            ECS::Scene::Registry* Scene{nullptr};
-            WorldHandle World{};
-            std::uint32_t StableEntityId{0u};
-            EditorVisualizationTarget Target{
-                EditorVisualizationTarget::Entity};
-        };
-
         [[nodiscard]] EditorVisualizationTarget
         VisualizationTargetForWindowKind(
             const EditorDomainWindowKind kind) noexcept
@@ -736,14 +727,6 @@ namespace {
             return nullptr;
         }
 
-        struct VertexChannelBindingMutationIdentity
-        {
-            ECS::Scene::Registry* Scene{nullptr};
-            WorldHandle World{};
-            std::uint32_t StableEntityId{0u};
-            VertexChannel Channel{VertexChannel::Custom};
-        };
-
         [[nodiscard]] EditorVertexChannelBindingTargetModel
         BuildVertexChannelBindingTargetModel(
             const entt::registry& raw,
@@ -984,48 +967,6 @@ namespace {
             return "Unknown";
         }
 
-        struct EditorRenderHintState
-        {
-            std::optional<G::RenderSurface> Surface{};
-            std::optional<G::RenderEdges> Edges{};
-            std::optional<G::RenderPoints> Points{};
-        };
-
-        template <typename T, typename SameFn>
-        [[nodiscard]] bool SameOptionalRenderComponent(
-            const std::optional<T>& lhs,
-            const std::optional<T>& rhs,
-            SameFn same)
-        {
-            if (lhs.has_value() != rhs.has_value())
-                return false;
-            if (!lhs.has_value())
-                return true;
-            return same(*lhs, *rhs);
-        }
-
-        struct EditorRenderHintMutationIdentity
-        {
-            ECS::Scene::Registry* Scene{nullptr};
-            WorldHandle World{};
-            std::uint32_t StableEntityId{0u};
-        };
-
-        // RUNTIME-194 Slice B5d: result payload for this file's editor jobs.
-        // The computed result already reaches the main thread in the shared job
-        // state the worker fills, so the envelope carries only the diagnostic
-        // the retired `DerivedJobOutput` exposed — and exists at all because an
-        // empty envelope is how `JobService` reports a dropped job.
-        struct EditorJobResult
-        {
-            std::string Diagnostic{};
-        };
-
-        using EditorJobIdentityIndex =
-            std::unordered_map<JobToken,
-                               EditorJobIdentity,
-                               Core::StrongHandleHash<JobTokenTag>>;
-
         [[nodiscard]] GeometryPropertyValueKindFilter DefaultExpectedValueKindForSlot(
             const GeometryPresentationSlotSemantic semantic) noexcept
         {
@@ -1099,25 +1040,6 @@ namespace {
                 .DisabledReason = option.DisabledReason,
             };
         }
-
-        struct GeometryPresentationEditorState
-        {
-            GeometryPresentationRecipe Recipe{};
-            GeometryPresentationRuntimeState Runtime{};
-        };
-
-        struct GeometryPresentationMutationIdentity
-        {
-            ECS::Scene::Registry* Scene{nullptr};
-            WorldHandle World{};
-            std::uint32_t StableEntityId{0u};
-        };
-
-        struct GeometryPresentationSlotLookup
-        {
-            GeometryPresentationBindingRecipe* Presentation{nullptr};
-            GeometryPresentationSlotRecipe* Slot{nullptr};
-        };
 
         [[nodiscard]] EditorDiagnostic MakeDiagnostic(
             const EditorDiagnosticCode code,

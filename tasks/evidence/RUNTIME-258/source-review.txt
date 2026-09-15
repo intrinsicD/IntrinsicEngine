@@ -1,0 +1,50 @@
+## APPROVE — conditional on the in-flight gates
+
+I re-derived the claims from the fixed source rather than accepting the summary. Verdict is APPROVE for the change as presented; the only outstanding item is the gate runs, which I explicitly do **not** treat as passed.
+
+### 1. Scope — matches the stated slice exactly
+
+The diff is deletion-only, four hunks, no additions, no context rewrites, single file.
+
+| Hunk header | old/new | removed | Block | Range |
+|---|---|---|---|---|
+| `-250,15 +250,6` | 15→6 | 9 | A | 253–261 |
+| `-736,14 +727,6` | 14→6 | 8 | B | 739–746 |
+| `-984,48 +967,6` | 48→6 | 42 | C | 987–1028 |
+| `-1100,25 +1041,6` | 25→6 | 19 | D | 1103–1121 |
+
+Total 78 ✓. The cumulative offsets are internally consistent (736−727 = 9; 984−967 = 17 = 9+8; 1100−1041 = 59 = 17+42), so the hunks are a single coherent application against one baseline — no interleaved edit slipped in. Each hunk's new-side count is 6 = 3+3 context, i.e. pure removal. I counted the `-` lines in blocks A/B/C/D individually: 9/8/42/19, matching the headers line-for-line, so the audit's `deletion_blocks` and the diff describe the same edit.
+
+Declaration tally per block: A=1, B=1, C=5 (`EditorRenderHintState`, `SameOptionalRenderComponent`, `EditorRenderHintMutationIdentity`, `EditorJobResult`, `EditorJobIdentityIndex`), D=3 → exactly ten. Nothing outside anonymous-namespace declarations is touched; no function body, no `import`, no `#include`, no header, no test, no new helper.
+
+Preamble and namespace closure are unchanged — the diff contains no hunk in either region, and the supplied baseline preamble/closure confirm the module declaration, import block and `} // namespace`/export-boundary are untouched.
+
+### 2. Unused-declaration proof — sound
+
+Each of the ten names has exactly one token occurrence in baseline Models.cpp, and every one of those occurrences falls inside a removed block. One occurrence = the declaration itself, therefore zero uses in the TU. Since the TU is standalone (nothing `#include`s the `.cpp`) and the entities are in an anonymous namespace inside a module implementation unit, they are internal-linkage/module-local and unreachable from any other TU by construction — no cross-TU reference is possible even in principle. That closes the proof without needing a repo-wide grep.
+
+Behavior neutrality holds for the specific kinds deleted: nine are type declarations (eight structs, one alias) and one is an **uninstantiated** function template.
+- No object, reference, or static of these types exists in the TU → no dynamic-init ordering change.
+- No function in the TU takes or returns them → they contribute no ADL candidates and no overload-set members. The single function template has zero calls, so no overload resolution anywhere can shift.
+- An uninstantiated template emits nothing; an alias introduces no entity. Nothing is odr-used → no symbol leaves the object file.
+- All removals are *uses* of names, never providers, so the deletion can only reduce dependency, never strand a declaration. The untouched import block is therefore trivially still sufficient; leaving now-redundant imports in place is the correct conservative direction for this slice.
+
+### 3. Canonical owners — no runtime or API loss
+
+Every deleted name has a live owner elsewhere holding a *distinct* internal-linkage entity per TU, so these deletions cannot reach them: the visualization/render-hint/presentation identities in `Operations/Runtime.VisualizationEditingOperations.Actions.cpp` and `Operations/Runtime.SceneEditingOperations.Actions.cpp`, `SameOptionalRenderComponent` in `internal/Runtime.EditorFeatureContextAdapters.cpp`, `EditorJobResult` in `Operations/Runtime.GeometryProcessingOperations.PointFields.hpp`, `EditorJobIdentityIndex` in `internal/Runtime.EditorWorkspaceSession.cpp`.
+
+Public surface: nothing deleted was exported — the module implementation unit exports nothing, and all ten sit inside `namespace {`. The exported `BuildEditorInspectorModelFromBindings` / `BuildEditorWorkspaceSnapshotFromBindings` definitions after the namespace close are untouched. No behavior, no ABI, no module interface change.
+
+The earlier caveat about block C discarding the RUNTIME-194 Slice B5d rationale is resolved: `PointFields.hpp` already carries the equivalent "diagnostic-only envelope / empty envelope is how `JobService` reports a dropped job" comment on the canonical `EditorJobResult`. No doc move is needed, and this slice correctly stays out of other files.
+
+### 4. Carried-forward assumptions (not blockers)
+
+1. **Guard test.** The claim that no test string-matches any of the ten names, and that `tests/integration/runtime/Test.SandboxEditorPresentation.cpp:847` only asserts non-emptiness plus unrelated symbol/import substrings, comes from the prior discovery grep and is not re-derivable from the fixed source I was given. It is the one path by which a text-reading guard could fail on a pure declaration removal. The running suite covers it; I flag it as the single assumption I could not independently re-verify here.
+2. **Hashes.** `da6a40f7…` (baseline) and `7460553b…` (result) are recorded provenance; I did not compute them.
+3. **Audit doc.** `docs/reports/2026-09-08-code-reuse-audit.md:808` names the `EditorRenderHintState` duplication. It is a historical report, so the deletion resolves rather than contradicts the finding. Optional follow-up, out of scope here.
+
+### 5. Gates
+
+Native/full CPU, sanitizer and Vulkan runtime gates are in flight. I make **no claim that any has passed** and no timing claim. Approval is on scope, proof and correctness; land only once those gates report green, and treat any failure in the presentation guard test as the first thing to inspect per assumption 1.
+
+Root closure: all named gates now pass. Final source hash matches the fixed review packet and the exact four-block deletion proof. The presentation source guard is covered by the passing full CPU suite. All 876 other tracked production files and all remaining bytes are unchanged; 78 lines removed, 3554 to 3476, compiler dependencies remain 176. Canonical live owners and the existing job-envelope rationale remain intact. No public API, executing behavior, import, build list or performance claim changed.

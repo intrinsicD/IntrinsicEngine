@@ -12633,5 +12633,5 @@ tree:
     - tasks/evidence/RUNTIME-257/report.yaml
     - tasks/evidence/RUNTIME-257/seal.yaml
     - tasks/evidence/RUNTIME-257/structural-counts.json
-    - tasks/backlog/runtime/RUNTIME-258-unused-workspace-model-declarations.md
+    - tasks/done/RUNTIME-258-unused-workspace-model-declarations.md
     status: resolved

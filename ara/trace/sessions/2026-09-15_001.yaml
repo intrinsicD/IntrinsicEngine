@@ -184,7 +184,7 @@ ai_actions:
   - docs/architecture/runtime.md
   - tasks/done/RUNTIME-257-workspace-model-diagnostic-dependencies.md
   - tasks/evidence/RUNTIME-257/report.yaml
-  - tasks/backlog/runtime/RUNTIME-258-unused-workspace-model-declarations.md
+  - tasks/done/RUNTIME-258-unused-workspace-model-declarations.md
 claims_touched: []
 key_context:
 - turn: 1

@@ -1,0 +1,114 @@
+schema_version: 1
+task_id: RUNTIME-258
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-15T03:31:33Z'
+claim_eligible: false
+source:
+  base_ref: '411328188'
+  base_revision: 4113281889d8e9b0f7ceafd503fa7a9eceabde9c
+  head_revision: 4113281889d8e9b0f7ceafd503fa7a9eceabde9c
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/trace/exploration_tree.yaml
+    sha256: a8057679ca82f078eb3c05da9b264c7e1a074fc1dcf9fe6225ba518ade843ffd
+  - path: ara/trace/sessions/2026-09-15_001.yaml
+    sha256: 5e55c6ac149879b462d34131cb51ca762fde777f8eda5b368e2c1d5f25099a34
+  - path: src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+    sha256: 7460553b7883008557408c87368af7234d225f0bd1f1994e3848bb663650546c
+  - path: tasks/SESSION-BRIEF.md
+    sha256: b7cc46325243e8621015404f2d9e714d0b389254f0db320992d286a00da1bb92
+  - path: tasks/backlog/runtime/RUNTIME-258-unused-workspace-model-declarations.md
+    sha256: null
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: e0bc7cbfb6e25bf71ef47f9abcc7572c803bc9ec25763c6b13967322378d6262
+  - path: tasks/done/RUNTIME-258-unused-workspace-model-declarations.md
+    sha256: c2df9bef07ec3f2baa3c724af4aee2a1edab6f3f211b4db80a09ae4f8012099c
+  content_digest: 7580ba874d8ac4db6ffe2e9ae7e76dc7168168fc85012b72eeae6d0ac678719a
+touched:
+  paths:
+  - ara/trace/exploration_tree.yaml
+  - ara/trace/sessions/2026-09-15_001.yaml
+  - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/runtime/RUNTIME-258-unused-workspace-model-declarations.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-258-unused-workspace-model-declarations.md
+  layers:
+  - runtime
+  modules:
+  - Extrinsic.Runtime.EditorWorkspaceSnapshots
+extension_seam: Delete unused copies; retain the existing live action, context-adapter, point-field and
+  workspace-session owners
+future_change_plan: Audit remaining import owners separately; BUILD-007 retains matched compile timing;
+  no additional deletion inferred from this slice
+acceptance:
+- criterion: Exactly 78 unused production lines are removed from one existing implementation; all remaining
+    bytes and live owners preserved.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/RUNTIME-258/structural-counts.json
+  - tasks/evidence/RUNTIME-258/source-review.txt
+  reason: null
+- criterion: Reviewed source passes relevant native, sanitizer and build verification with no feature/API
+    loss.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/RUNTIME-258/commands/full-cpu.stdout.log
+  - tasks/evidence/RUNTIME-258/commands/focused-ci-asan.stdout.log
+  - tasks/evidence/RUNTIME-258/commands/focused-ci-ubsan.stdout.log
+  - tasks/evidence/RUNTIME-258/commands/vulkan-runtime-build.json
+  reason: null
+- criterion: Completed slice is locally committed, retired and sealed without a performance or whole-engine
+    completion claim.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/done/RUNTIME-258-unused-workspace-model-declarations.md
+  - tasks/evidence/RUNTIME-258/seal.yaml
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-258/commands/build-ci-asan.json
+- receipt: tasks/evidence/RUNTIME-258/commands/build-ci-ubsan.json
+- receipt: tasks/evidence/RUNTIME-258/commands/compiler-boundary.json
+- receipt: tasks/evidence/RUNTIME-258/commands/configure-ci.json
+- receipt: tasks/evidence/RUNTIME-258/commands/focused-build.json
+- receipt: tasks/evidence/RUNTIME-258/commands/focused-ci-asan.json
+- receipt: tasks/evidence/RUNTIME-258/commands/focused-ci-ubsan.json
+- receipt: tasks/evidence/RUNTIME-258/commands/focused-ci.json
+- receipt: tasks/evidence/RUNTIME-258/commands/full-build.json
+- receipt: tasks/evidence/RUNTIME-258/commands/full-cpu.json
+- receipt: tasks/evidence/RUNTIME-258/commands/retirement-structural.json
+- receipt: tasks/evidence/RUNTIME-258/commands/structural-counts.json
+- receipt: tasks/evidence/RUNTIME-258/commands/structural.json
+- receipt: tasks/evidence/RUNTIME-258/commands/vulkan-runtime-build.json
+changed_public_contracts: []
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/RUNTIME-258-unused-workspace-model-declarations.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: true
+residual_risks:
+- No timing claim; dependencies unchanged. Vulkan evidence is runtime compilation only and sanitizer coverage
+  is focused editor testing.
+skipped_checks: []
+artifacts:
+- path: tasks/evidence/RUNTIME-258/source-review.txt
+  sha256: 0aaaad2552ce47dcbfdb9b35ccc63883d539a97ac697d0820b0d067658675001
+  kind: file
+- path: tasks/evidence/RUNTIME-258/structural-counts.json
+  sha256: b7001ea1ef42061b15203a93e1a4f5b72d243e83df3a634ef4058035626aaf21
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
