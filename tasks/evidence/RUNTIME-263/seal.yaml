@@ -1,0 +1,9 @@
+schema_version: 1
+task_id: RUNTIME-263
+sealed_revision: bea0970090b7104a341ed123e2608847cc433417
+source_content_digest: fba90c0d8f418ade6b90aeda2c1de99eee86675a7d075b26f8dfdc784fbf0bb8
+report_sha256: 60ffc37504d1441e0a9996d0b2360822dc8ef342b14e5b46290cb0ccd8806acf
+records: []
+reason: Bind exact final overnight three-import deletion and fixed-source Claude review to passing compiler,
+  editor, CPU, focused sanitizer and Vulkan build evidence
+generated_by: tools/agents/workflow_evidence.py
