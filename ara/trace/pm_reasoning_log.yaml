@@ -2416,3 +2416,16 @@ entries:
       uses before deletion, and the actual supported compiler map determines dependency effect.
     - No new research claim or observation is warranted for ordinary refactoring. Preserve pending observation
       flags and N569 until deadline or justified stop.
+
+  - turn: 2026-09-15_001#14
+    notes:
+    - Record structural counts and passing tests only; no elapsed-time,GPUexecution or fullsanitizer claim.
+      Six of RUNTIME259 eight and four of RUNTIME260 five imports remain transitively reachable.
+    - 'Keep independent reviewer mistakes distinguishable from actual fixes: RUNTIME259 malformed diff claim
+      was false; original hash was baseline, not post-change. Root fixed evidence labeling/coverage and superseded
+      guidance without altering source.'
+    - RUNTIME261 is prepared only. Explicitly check reexported ClusteringTypes ToString overloads against
+      GeometryPresentation scoped-enum call arguments. Preserve required asset/scene event owners and unproven
+      facade paths.
+    - No new research claim or observation needed. Preserve pending observations and BUILD007/C92; N569 and
+      heartbeat remainopen until deadline or justifiedstop.

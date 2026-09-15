@@ -12691,3 +12691,34 @@ tree:
     - tasks/evidence/BUILD-008/final-producer.json
     - tasks/done/RUNTIME-259-workspace-model-unused-imports.md
     status: resolved
+
+  - id: N581
+    type: experiment
+    title: Remove unused workspace import surfaces in two verified slices
+    provenance: ai-executed
+    timestamp: '2026-09-15T06:22:57+02:00'
+    result: RUNTIME259 removed eight exact unused import lines, Models3476to3468,79to71directimports; actual
+      compiler map176to172 removesUvView,PipelineManager,EditorUiHost,EditorWindowRegistry while six deleted
+      imports remain transitive. Root corrected a commentary miscount and recorded exact identities. Claude
+      approved conditional on gates; root annotated superseded plan guidance, added explicit serialization
+      record checks and baseline/post hash labels. Alleged malformed diff header was a reviewer misread, verified
+      against original generated diff; no source fix needed. Sourcea0620c9f9/seal475728f13, final validation0errors105warnings,claimreleased.
+      RUNTIME260 removed five graphics import lines,3468to3463,71to66directimports; actual map172to171 removes
+      onlyCurrentRendererContractAdapter, other four remain transitive. Root and Claude verified ToString
+      uses GeometryPresentation enums and AppendDiagnostics uses the TU-local Runtime diagnostic vectors;
+      all other exports/types/constants absent outside imports. No sourcebody/header/sibling/publicAPI changes;
+      all remaining bytes and876other productionfiles unchanged for each slice. Each passed235focusednative,4636fullCPUplusoneexpectedGLFW/LSanskip,202ASan,202UBSan,Vulkanruntimecompilation
+      and structural gates. Claude independently approved RUNTIME260 with no fixes; sourcef72000b86/seal394d63b84,
+      validation0errors105warnings,claimreleased. No timing,GPUexecution or fullsanitizersuite claim. RUNTIME261
+      prepared for six unused runtime imports; root added explicit ClusteringTypes ToString overload reasoning
+      and kept event/reexport owners and unproven consolidation facade. All writers/builds stopped; BUILD007/C92
+      and N569 remainopen.
+    evidence:
+    - tasks/done/RUNTIME-259-workspace-model-unused-imports.md
+    - tasks/evidence/RUNTIME-259/seal.yaml
+    - tasks/evidence/RUNTIME-259/structural-counts.json
+    - tasks/done/RUNTIME-260-workspace-model-graphics-imports.md
+    - tasks/evidence/RUNTIME-260/seal.yaml
+    - tasks/evidence/RUNTIME-260/structural-counts.json
+    - tasks/backlog/runtime/RUNTIME-261-workspace-model-runtime-imports.md
+    status: resolved
