@@ -1,3 +1,4 @@
+// Retained geometry publication and retirement records shared by graphics and runtime.
 module;
 
 #include <cstddef>
@@ -10,6 +11,7 @@ module;
 
 export module Extrinsic.Graphics.GeometryResidency;
 
+import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Types;

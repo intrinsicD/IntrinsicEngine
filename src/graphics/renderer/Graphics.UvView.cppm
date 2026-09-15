@@ -1,3 +1,4 @@
+// UV view controls and draw packets for renderer-owned texture-coordinate inspection.
 module;
 
 #include <cstdint>
@@ -7,6 +8,7 @@ module;
 
 export module Extrinsic.Graphics.UvView;
 
+import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.BufferManager;

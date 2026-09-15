@@ -20,6 +20,7 @@
 #include "RuntimeTestModule.hpp"
 
 import Extrinsic.Backends.Vulkan;
+import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Backend.Glfw;

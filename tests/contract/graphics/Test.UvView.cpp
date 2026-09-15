@@ -11,6 +11,7 @@
 #include <gtest/gtest.h>
 #include <glm/glm.hpp>
 
+import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.UvView;
 import Extrinsic.RHI.Bindless;

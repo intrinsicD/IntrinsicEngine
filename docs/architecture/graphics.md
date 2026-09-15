@@ -46,6 +46,10 @@ Graphics is organized into explicit sublayers:
   `IDevice`.
   Their interfaces retain value-type owners; implementations import the full
   service APIs. Compiler-boundary tests guard these interface dependencies.
+- GpuWorld and transient-debug uploads use the same device borrow; GpuWorld
+  also borrows its command context. RenderWorld and LightSystem therefore do
+  not inherit those APIs. GpuSceneSlot is the sole owner of the GPU instance
+  and geometry handle aliases; consumers import that owner when naming handles.
 - `RHI::NullCommandContext` supplies the inert command surface for the Null
   backend and CPU-only compute execution; recording test doubles keep their
   own implementations.

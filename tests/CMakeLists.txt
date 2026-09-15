@@ -367,6 +367,16 @@ foreach(_helper IN ITEMS ComputeParallelPrimitives GpuTransfer
         PROPERTIES LABELS "contract;build;graphics" TIMEOUT 30)
 endforeach()
 
+# Scene snapshots and debug uploads must not inherit device command APIs.
+foreach(_scene IN ITEMS GpuWorld RenderWorld LightSystem TransientDebugUploadHelper)
+    intrinsic_add_module_boundary_test(RenderCompilationLocality.${_scene}ServiceBorrows
+            --check-source src/graphics/renderer/Graphics.${_scene}.cppm
+            --forbid-module Extrinsic.RHI.Device
+            --forbid-module Extrinsic.RHI.CommandContext)
+    set_tests_properties(RenderCompilationLocality.${_scene}ServiceBorrows
+        PROPERTIES LABELS "contract;build;graphics" TIMEOUT 30)
+endforeach()
+
 # Renderer clients need its public contracts, not implementation-owned helpers.
 intrinsic_add_module_boundary_test(RenderCompilationLocality.RendererInterface
         --check-source src/graphics/renderer/Graphics.Renderer.cppm

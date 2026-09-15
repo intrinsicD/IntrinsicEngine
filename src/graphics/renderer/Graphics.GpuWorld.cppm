@@ -11,20 +11,16 @@ module;
 
 export module Extrinsic.Graphics.GpuWorld;
 
-import Extrinsic.Core.StrongHandle;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.RHI.BufferManager;
-import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
-import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Types;
 
+extern "C++" { namespace Extrinsic::RHI { class IDevice; class ICommandContext; } }
+
 export namespace Extrinsic::Graphics
 {
-    using GpuInstanceHandle = Core::StrongHandle<GpuInstanceTag>;
-    using GpuGeometryHandle = Core::StrongHandle<GpuGeometryTag>;
-
     // Same nonzero, least-significant-byte-first FNV-1a identity as retained
     // surface indices, including an empty stream. Zero denotes an absent channel.
     [[nodiscard]] std::uint64_t FingerprintSurfaceIndices(

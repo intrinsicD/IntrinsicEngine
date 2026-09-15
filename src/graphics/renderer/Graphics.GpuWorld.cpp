@@ -13,6 +13,9 @@ module;
 
 module Extrinsic.Graphics.GpuWorld;
 
+import Extrinsic.Core.StrongHandle;
+import Extrinsic.RHI.Device;
+
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.Graphics.GpuTransfer;

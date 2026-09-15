@@ -1,3 +1,4 @@
+// Immutable render packets and borrowed frame spans for extraction and rendering.
 module;
 
 #include <cstdint>
@@ -9,23 +10,10 @@ export module Extrinsic.Graphics.RenderWorld;
 
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.Graphics.CameraSnapshots;
-import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.Graphics.LightSystem;
 import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.RHI.Types;
-
-// ============================================================
-// RenderWorld — immutable extracted render state for one frame.
-//
-// Produced by IRenderer::ExtractRenderWorld(RenderFrameInput).
-// Consumed (read-only) by PrepareFrame, ExecuteFrame, EndFrame.
-// Lifetime: created per-frame, destroyed before the next
-// BeginFrame call.  No mutable references to ECS or asset state
-// survive inside this type.
-//
-// Currently a minimal skeleton; grows as GpuWorld, draw-packet
-// lists, light environment, and picking snapshots are wired in.
-// ============================================================
 
 namespace Extrinsic::Graphics
 {
@@ -210,8 +198,5 @@ namespace Extrinsic::Graphics
         /// maintenance queries (deferred deletion, transfer GC).
         std::uint64_t LastCompletedGpuValue{0};
 
-        // Future expansion slots (zero-cost when unused):
-        //   std::span<const DrawPacket>  DrawPackets{};
-        //   DebugViewSnapshot            DebugView{};
     };
 }

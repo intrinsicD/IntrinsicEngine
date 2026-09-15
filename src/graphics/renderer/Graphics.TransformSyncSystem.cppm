@@ -1,7 +1,4 @@
-//
-// Created by alex on 22.04.26.
-//
-
+// Applies extracted transform records to GPU scene instances without live ECS access.
 module;
 
 #include <cstddef>
@@ -13,6 +10,7 @@ module;
 
 export module Extrinsic.Graphics.TransformSyncSystem;
 
+import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.RHI.Types;
 
