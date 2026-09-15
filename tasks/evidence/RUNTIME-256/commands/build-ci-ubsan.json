@@ -1,0 +1,29 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "VCPKG_FORCE_SYSTEM_BINARIES=1",
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-ubsan",
+    "--target",
+    "IntrinsicRuntimeContractTests",
+    "IntrinsicRuntimeGraphicsCpuTests",
+    "-j2"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 cmake --build --preset ci-ubsan --target IntrinsicRuntimeContractTests IntrinsicRuntimeGraphicsCpuTests -j2",
+  "cwd": ".",
+  "duration_ms": 28497,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T02:14:10Z",
+  "label": "build-ci-ubsan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T02:13:42Z",
+  "stderr_path": "tasks/evidence/RUNTIME-256/commands/build-ci-ubsan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-256/commands/build-ci-ubsan.stdout.log",
+  "stdout_sha256": "635a75e13923ba85ce0bd4768a221a57f69c08944f30ad97dc489454b230ff01",
+  "task_id": "RUNTIME-256"
+}

@@ -1,0 +1,118 @@
+schema_version: 1
+task_id: RUNTIME-256
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-15T02:20:28Z'
+claim_eligible: false
+source:
+  base_ref: 3a8e6ff8a
+  base_revision: 3a8e6ff8a6cd5bab40559d7f528206703686fe83
+  head_revision: 3a8e6ff8a6cd5bab40559d7f528206703686fe83
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 3a782d046d45c0ea12aa22e50b6a2abce08dc3a87869fc9c3058b3b0f9b5f6e0
+  - path: ara/trace/sessions/2026-09-15_001.yaml
+    sha256: 692f8e46ba1db848af7a68bc093d690a585a5d06e7ba1d03aced07ac8a9cc29e
+  - path: docs/architecture/runtime.md
+    sha256: 71cc4a9a48b2c8d9cc0eaf0db3dc515c5c5587ea8dfae64aeca0213062a35a51
+  - path: src/runtime/Rendering/Runtime.RenderExtraction.Recipes.cpp
+    sha256: b644265560bfe27a662661c5296dae70c31389703260c71d379ccc24e074ebf5
+  - path: tasks/SESSION-BRIEF.md
+    sha256: b7cc46325243e8621015404f2d9e714d0b389254f0db320992d286a00da1bb92
+  - path: tasks/backlog/runtime/RUNTIME-256-render-recipe-extraction-dependencies.md
+    sha256: null
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 3fb6f6d040141c0441acd6ce4ac69a3c1236229860973dc298f631626f5b7407
+  - path: tasks/done/RUNTIME-256-render-recipe-extraction-dependencies.md
+    sha256: 68774017c4064245438c8c0cf637eaec4c1c1901290ed7b1438a34daab294a9e
+  content_digest: a1c27ad09c7f4c991df23a544a587766c4440b8c835661e10e446aa358a5064b
+touched:
+  paths:
+  - ara/trace/exploration_tree.yaml
+  - ara/trace/sessions/2026-09-15_001.yaml
+  - docs/architecture/runtime.md
+  - src/runtime/Rendering/Runtime.RenderExtraction.Recipes.cpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/runtime/RUNTIME-256-render-recipe-extraction-dependencies.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-256-render-recipe-extraction-dependencies.md
+  layers:
+  - runtime
+  modules:
+  - Extrinsic.Runtime.RenderExtraction
+extension_seam: Existing private State methods and recipe encoding owners; no new surface or file
+future_change_plan: Keep each executing unit dependent on the owners its named types and operations require;
+  retain the single private State definition
+acceptance:
+- criterion: One implementation preamble is narrowed without body or public-surface changes.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/RUNTIME-256/structural-counts.json
+  - src/runtime/Rendering/Runtime.RenderExtraction.Recipes.cpp
+  reason: null
+- criterion: Fixed-source review and relevant native/sanitizer/build gates pass.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/RUNTIME-256/source-review.txt
+  - tasks/evidence/RUNTIME-256/commands/full-cpu.stdout.log
+  - tasks/evidence/RUNTIME-256/commands/focused-ci-asan.stdout.log
+  - tasks/evidence/RUNTIME-256/commands/focused-ci-ubsan.stdout.log
+  - tasks/evidence/RUNTIME-256/commands/vulkan-runtime-build.json
+  reason: null
+- criterion: Completed slice is locally committed, retired and sealed; no new production file or timing
+    claim.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/done/RUNTIME-256-render-recipe-extraction-dependencies.md
+  - tasks/evidence/RUNTIME-256/seal.yaml
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-256/commands/baseline-forbidden-renderer.json
+- receipt: tasks/evidence/RUNTIME-256/commands/build-ci-asan.json
+- receipt: tasks/evidence/RUNTIME-256/commands/build-ci-ubsan.json
+- receipt: tasks/evidence/RUNTIME-256/commands/compiler-boundary.json
+- receipt: tasks/evidence/RUNTIME-256/commands/configure-ci.json
+- receipt: tasks/evidence/RUNTIME-256/commands/focused-build.json
+- receipt: tasks/evidence/RUNTIME-256/commands/focused-ci-asan.json
+- receipt: tasks/evidence/RUNTIME-256/commands/focused-ci-ubsan.json
+- receipt: tasks/evidence/RUNTIME-256/commands/focused-ci.json
+- receipt: tasks/evidence/RUNTIME-256/commands/full-build.json
+- receipt: tasks/evidence/RUNTIME-256/commands/full-cpu.json
+- receipt: tasks/evidence/RUNTIME-256/commands/retirement-structural.json
+- receipt: tasks/evidence/RUNTIME-256/commands/structural.json
+- receipt: tasks/evidence/RUNTIME-256/commands/vulkan-runtime-build.json
+changed_public_contracts: []
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/RUNTIME-256-render-recipe-extraction-dependencies.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Structural dependency reduction only; BUILD-007/C92 retain matched timing. Full sanitizer/GPU execution
+  suites not repeated; focused sanitizer and promoted runtime compile evidence are separate.
+skipped_checks: []
+artifacts:
+- path: tasks/evidence/RUNTIME-256/structural-counts.json
+  sha256: 9ea7ab52d86c31e49b3147da3d4a1ddffd7d91f109c2fd60b476304c4c4881e4
+  kind: file
+- path: tasks/evidence/RUNTIME-256/source-review.txt
+  sha256: 27e82f454d9976d0c88db63644eddb7dcd4690ebd178d0a1f44c1d9b74eed77c
+  kind: file
+- path: tasks/evidence/RUNTIME-256/review-disposition.txt
+  sha256: 189a1d30b14d569607067fcc406b41b063f933c6b81e55ac33c2393264020994
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true

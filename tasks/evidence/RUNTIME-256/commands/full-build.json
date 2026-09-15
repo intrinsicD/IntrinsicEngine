@@ -1,0 +1,28 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "VCPKG_FORCE_SYSTEM_BINARIES=1",
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicTests",
+    "-j4"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 VCPKG_FORCE_SYSTEM_BINARIES=1 cmake --build --preset ci --target IntrinsicTests -j4",
+  "cwd": ".",
+  "duration_ms": 7523,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T02:10:46Z",
+  "label": "full-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T02:10:38Z",
+  "stderr_path": "tasks/evidence/RUNTIME-256/commands/full-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-256/commands/full-build.stdout.log",
+  "stdout_sha256": "d91513ac9a82dfe761c414330a8c8e828cad13edd4529e000907a8f93e5d1d83",
+  "task_id": "RUNTIME-256"
+}

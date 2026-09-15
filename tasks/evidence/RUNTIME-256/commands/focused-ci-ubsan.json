@@ -1,0 +1,29 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-ubsan",
+    "--output-on-failure",
+    "-R",
+    "^(RenderExtraction|RuntimeRenderExtraction|RuntimeFrameLoop|RenderWorldPool|RuntimeDeviceSelection)",
+    "--no-tests=error",
+    "--timeout",
+    "60",
+    "--parallel",
+    "1"
+  ],
+  "command_display": "ctest --test-dir build/ci-ubsan --output-on-failure -R '^(RenderExtraction|RuntimeRenderExtraction|RuntimeFrameLoop|RenderWorldPool|RuntimeDeviceSelection)' --no-tests=error --timeout 60 --parallel 1",
+  "cwd": ".",
+  "duration_ms": 6028,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T02:14:17Z",
+  "label": "focused-ci-ubsan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T02:14:11Z",
+  "stderr_path": "tasks/evidence/RUNTIME-256/commands/focused-ci-ubsan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-256/commands/focused-ci-ubsan.stdout.log",
+  "stdout_sha256": "e14482c73d42d2289f90e540e88b7401b866d71a4575df355cffe033ac4f5403",
+  "task_id": "RUNTIME-256"
+}

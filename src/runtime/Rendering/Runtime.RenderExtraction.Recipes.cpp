@@ -1,46 +1,21 @@
 module;
 
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <limits>
-#include <memory>
 #include <optional>
 #include <span>
-#include <unordered_map>
-#include <unordered_set>
+#include <string>
 #include <utility>
 #include <vector>
-
-#include <entt/entity/entity.hpp>
-#include <entt/entity/registry.hpp>
-#include <glm/glm.hpp>
 
 module Extrinsic.Runtime.RenderExtraction;
 
 import :Internal;
-import Extrinsic.ECS.Scene.Registry;
-import Extrinsic.ECS.Components.GeometrySources;
-import Extrinsic.ECS.Component.ProceduralGeometryRef;
-import Extrinsic.Graphics.GpuAssetCache;
-import Extrinsic.Graphics.Renderer;
-import Extrinsic.Graphics.GpuWorld;
-import Extrinsic.Graphics.Material;
-import Extrinsic.Graphics.MaterialSystem;
-import Extrinsic.Graphics.RenderWorld;
-import Extrinsic.Graphics.TransformSyncSystem;
-import Extrinsic.Graphics.LightSystem;
-import Extrinsic.Graphics.VisualizationSyncSystem;
 import Extrinsic.Graphics.VisualizationPackets;
-import Extrinsic.Graphics.Component.GpuSceneSlot;
-import Extrinsic.Graphics.Component.Material;
-import Extrinsic.Graphics.Component.RenderGeometry;
-import Extrinsic.Graphics.Component.VisualizationConfig;
-import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.GeometryAvailability;
-import Extrinsic.Runtime.GeometryPlanBuilders;
-import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.VisualizationRecipes;
-import Extrinsic.Runtime.WorldHandle;
 
 namespace Extrinsic::Runtime
 {

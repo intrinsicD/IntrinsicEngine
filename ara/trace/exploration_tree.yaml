@@ -12513,6 +12513,6 @@ tree:
     - tasks/evidence/RUNTIME-255/report.yaml
     - tasks/evidence/RUNTIME-255/seal.yaml
     - tasks/evidence/RUNTIME-255/structural-counts.json
-    - tasks/backlog/runtime/RUNTIME-256-render-recipe-extraction-dependencies.md
+    - tasks/done/RUNTIME-256-render-recipe-extraction-dependencies.md
     - tasks/backlog/process/BUILD-007-engine-compile-time-reconciliation.md
     status: resolved

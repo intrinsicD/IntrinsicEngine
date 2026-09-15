@@ -120,7 +120,7 @@ ai_actions:
   - src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.cpp
   - tasks/done/RUNTIME-255-render-recipe-token-owner.md
   - tasks/evidence/RUNTIME-255/report.yaml
-  - tasks/backlog/runtime/RUNTIME-256-render-recipe-extraction-dependencies.md
+  - tasks/done/RUNTIME-256-render-recipe-extraction-dependencies.md
   - tasks/backlog/process/BUILD-007-engine-compile-time-reconciliation.md
 claims_touched: []
 key_context:

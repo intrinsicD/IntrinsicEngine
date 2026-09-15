@@ -549,8 +549,11 @@ shared extraction, residency and shutdown algorithms remain private state
 methods. Visualization recipes and their encoding batch are a value member
 of that state. The public interface borrows `IRenderer` through its globally
 attached declaration. Its private declaration partition likewise needs only
-renderer and EnTT declarations; executing `.cpp` units import the renderer and
-include the full registry. The partition retains the material-system dependency
+renderer and EnTT declarations. The main and geometry extraction units import
+the renderer and full registry where they execute those operations. Recipe
+encoding imports its packet, geometry-availability and recipe owners directly;
+it needs neither the renderer interface nor full EnTT/GLM headers. The partition
+retains the material-system dependency
 through its owned material lease. `RenderCompilationLocality.Extraction` checks
 the public interface's compiler boundary.
 

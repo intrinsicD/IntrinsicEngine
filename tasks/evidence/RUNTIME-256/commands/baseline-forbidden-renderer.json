@@ -1,0 +1,26 @@
+{
+  "command": [
+    "python3",
+    "tools/analysis/compile_hotspots.py",
+    "--build-dir",
+    "build/ci",
+    "--check-source",
+    "src/runtime/Rendering/Runtime.RenderExtraction.Recipes.cpp",
+    "--forbid-module",
+    "Extrinsic.Graphics.Renderer"
+  ],
+  "command_display": "python3 tools/analysis/compile_hotspots.py --build-dir build/ci --check-source src/runtime/Rendering/Runtime.RenderExtraction.Recipes.cpp --forbid-module Extrinsic.Graphics.Renderer",
+  "cwd": ".",
+  "duration_ms": 296,
+  "exit_code": 2,
+  "finished_at": "2026-09-15T02:07:36Z",
+  "label": "baseline-forbidden-renderer",
+  "required": false,
+  "schema_version": 1,
+  "started_at": "2026-09-15T02:07:35Z",
+  "stderr_path": "tasks/evidence/RUNTIME-256/commands/baseline-forbidden-renderer.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-256/commands/baseline-forbidden-renderer.stdout.log",
+  "stdout_sha256": "a0ea9a0a13e379d265bd6ef3585ad98c5637032ae72c5dfcf97c35a851c2d4df",
+  "task_id": "RUNTIME-256"
+}

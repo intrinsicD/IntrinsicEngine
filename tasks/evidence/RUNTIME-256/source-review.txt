@@ -1,0 +1,27 @@
+## Independent review — RUNTIME-256
+
+**Verdict: APPROVE** (two non-blocking notes below.)
+
+### Verified
+
+**Byte-identity.** `body_sha256` is `4d4fcc74…017fa` in both baseline and current — unchanged. Line accounting closes exactly: 20 import lines + 6 include lines (`<memory>`, `<unordered_map>`, `<unordered_set>`, both entt headers, `glm/glm.hpp`) + 1 now-redundant blank separator = 27 removed, 2 added (`<cstddef>`, `<string>`), net −25; 313 − 25 = 288. ✓ Only the preamble of one `.cpp` changed; no new production files; no API, interface, or body edits; no timing claim.
+
+**Name reachability against the supplied full source.** Every qualified/unqualified name resolves under the retained set:
+- `VisualizationEncodingBatch/Result/Diagnostics`, `VisualizationRecipe`, `VisualizationRecipeStatus`, `EncodeVisualizationRecipe` ← `Runtime.VisualizationRecipes`.
+- `Graphics::VisualizationAttributeDomain`, `ScalarAttributePacket`, `ColorAttributePacket`, `IsolineOverlayPacket` ← `Graphics.VisualizationPackets`.
+- `GeometryEntityAvailability` ← `Runtime.GeometryAvailability`.
+- `RenderExtractionCache::State`, `m_VisualizationState`, `RuntimeRenderExtractionStats` ← `:Internal`.
+- Explicitly spelled std names each have a retained header: `std::byte`/`std::size_t` → new `<cstddef>` (previously transitive only — correct to add), `std::string` → new `<string>` (`const std::string& sourceKey`), `std::memcpy` → `<cstring>`, `std::move` → `<utility>`, `std::numeric_limits` → `<limits>`, `std::span`/`std::vector`/`std::optional`/`std::nullopt`/`<cstdint>` retained.
+
+**Removals justified.** No entt or glm name appears in the body; no `std::unordered_map`/`unordered_set`/`unique_ptr` is *spelled*. `Recipes.insert_or_assign/erase/find/end`, `it->second`, `batch.Clear()`, `Batch.Append()` and `m_State->`/`*m_State` are member accesses on types whose definitions are decl-reachable through the imported interface/partition ([module.global.frag]p4), which does not require the container or smart-pointer header in this TU. Header removal is therefore sound, not merely currently-compiling.
+
+State remains shared; no ownership or lifetime surface touched.
+
+### Notes (non-blocking)
+
+1. **Doc claim scope.** "The main and geometry extraction units import the renderer and full registry" narrows the baseline's "executing `.cpp` units". If any other executing unit in this module (e.g. residency/shutdown) also imports the renderer, the sentence is under-inclusive. Not verifiable from the supplied material — please confirm the unit list before sealing.
+2. **Doc line wrap.** The added line ending "…full EnTT/GLM headers. The partition retains the material-system dependency" runs well past the ~76-column wrap used throughout `runtime.md`. Rewrap for consistency.
+
+Structural data's `removed_direct_imports: 20` matches my count of the diff; use 20.
+
+Closure verdict correctly deferred to the rebuilt compiler map rather than inferred from direct imports; `compiler_map_status: awaiting rebuild` must resolve before sealing.
