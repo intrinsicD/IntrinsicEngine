@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/workflow_evidence.py",
+    "validate",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/agents/workflow_evidence.py validate --root .",
+  "cwd": ".",
+  "duration_ms": 13162,
+  "exit_code": 1,
+  "finished_at": "2026-09-15T02:01:23Z",
+  "label": "report-preflight-missing-fields",
+  "required": false,
+  "schema_version": 1,
+  "started_at": "2026-09-15T02:01:10Z",
+  "stderr_path": "tasks/evidence/RUNTIME-255/commands/report-preflight-missing-fields.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-255/commands/report-preflight-missing-fields.stdout.log",
+  "stdout_sha256": "58ded5a04e7246cbe3351f1dc924c5bdad2a0a73208b0862af8dc1d438169783",
+  "task_id": "RUNTIME-255"
+}

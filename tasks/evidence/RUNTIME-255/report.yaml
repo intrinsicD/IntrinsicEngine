@@ -68,8 +68,11 @@ touched:
   - Extrinsic.Graphics.RenderRecipeConfig
   - Extrinsic.Graphics.RenderingContract
   - Extrinsic.Runtime.RenderRecipeEditingOperations
-extension_seam: null
-future_change_plan: null
+extension_seam: Existing Graphics.RenderingContract compiled ToString overloads serve the recipe editor
+  and explicit config parser candidates; no new module or generic parser API.
+future_change_plan: For a new enum token, update its owner ToString and literal-driven tests; change each
+  explicit parser accepted set only intentionally. Keep implementation-only dependencies out of public
+  declarations.
 acceptance:
 - criterion: Canonical token ownership reused without changing any accepted config or displayed label.
   task_checked: true
@@ -108,6 +111,7 @@ commands:
 - receipt: tasks/evidence/RUNTIME-255/commands/full-cpu.json
 - receipt: tasks/evidence/RUNTIME-255/commands/retirement-structural.json
 - receipt: tasks/evidence/RUNTIME-255/commands/source-documentation.json
+- receipt: tasks/evidence/RUNTIME-255/commands/report-preflight-missing-fields.json
 changed_public_contracts:
 - Five additive compiled ToString overloads; exact existing tokens, parser candidate sets and UI labels
   retained
@@ -121,6 +125,9 @@ docs_sync:
 residual_risks:
 - No measured compile-time improvement; full sanitizer/GPU suites not repeated for this string-only change.
   BUILD-007/C92 remain open.
+- Initial sealed-report validation caught missing extension_seam and future_change_plan metadata. Optional
+  reproduced failure is retained; both fields corrected with reviewed source and passing C++ gates unchanged.
+  Final seal/validation supersede that metadata failure.
 skipped_checks: []
 artifacts:
 - path: tasks/evidence/RUNTIME-255/structural-counts.json
