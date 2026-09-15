@@ -1,0 +1,8 @@
+schema_version: 1
+task_id: RUNTIME-256
+sealed_revision: ecdb859ad1f75fd699dda5df4a5901ba080e49b4
+source_content_digest: a1c27ad09c7f4c991df23a544a587766c4440b8c835661e10e446aa358a5064b
+report_sha256: e1f6ad1110dcc52d3085e0fafecc0241dc664aeea635aeabe4cf437ba0f85d0c
+records: []
+reason: Bind verified preamble-only cleanup and Claude source review to the exact local retirement commit
+generated_by: tools/agents/workflow_evidence.py
