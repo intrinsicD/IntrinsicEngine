@@ -1,12 +1,13 @@
 schema_version: 1
 task_id: RUNTIME-255
-sealed_revision: ad6fef4b586415f5e1809e45a89075f66badc31c
+sealed_revision: 9504741c6211ad5c8bb1ae6f423bd9c1b4c80ffa
 source_content_digest: dc0644e4bf7330f38a12015d49c55e4b7992e6bffac9eade3fc1531330549f52
-report_sha256: c05747a7ac46a95e211feedc4ed279c1cdf19eaea56a9c76f33c1de722233549
+report_sha256: a6d93f6acaf6ca657a581bddbd635ac9bd385ae6091e1d17f6e8783232dfbcad
 records:
 - path: tasks/evidence/RUNTIME-255/handoff.jsonl
   sha256: 4e693c765629d9663a2c47f4b9b972431f290fc7057a0642edb76b188a098079
 - path: tasks/evidence/RUNTIME-255/reviews.jsonl
   sha256: a512ccc17b13f43da14511c6ce26ec63deeabfcd0c7ba245bd343f948dcf539d
-reason: Bind independently reviewed dc0644e4 source and completed gates to the local retirement commit
+reason: Replace the initial seal after the metadata-only correction; reviewed dc0644e4 source and passing
+  C++ gates unchanged. Prior seal preserved in Git.
 generated_by: tools/agents/workflow_evidence.py
