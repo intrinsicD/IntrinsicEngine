@@ -12516,3 +12516,32 @@ tree:
     - tasks/done/RUNTIME-256-render-recipe-extraction-dependencies.md
     - tasks/backlog/process/BUILD-007-engine-compile-time-reconciliation.md
     status: resolved
+
+  - id: N575
+    type: experiment
+    title: Remove copied recipe extraction dependencies and settle current backlog discovery
+    provenance: ai-executed
+    timestamp: '2026-09-15T04:22:21+02:00'
+    result: Claude replaced only the recipe-extraction implementation preamble. Root verified exact
+      body bytes and unchanged other production files; source shrinks 313 to 288 lines, with 20 direct
+      imports and unused headers removed while cstddef/string are included directly. Compiler closure
+      falls 93 to 63 modules, removing Renderer and 29 associated modules without adding dependencies.
+      Claude independently approved all named-type reachability; root confirmed the actual CMake unit
+      list and fixed the architecture paragraph wrapping. No declaration, API, State or behavior change.
+      Full CPU passes 4636 cases plus one expected GLFW/LSan control skip; native, ASan and UBSan each
+      pass 69 focused cases; the promoted-Vulkan runtime target compiles. No GPU execution, full
+      sanitizer-suite or timing claim. RUNTIME-256 retired in ecdb859ad and sealed in 9909176c4;
+      final evidence validates with zero errors and 97 historical warnings. Claim released, all writers
+      and builds stopped. The optional pre-change forbidden-Renderer failure remains bound evidence.
+      DOCS-007 is prepared with Claude to replace 1209 lines of runtime backlog history/stale gates
+      with current task discovery. Root accepted narrower current-queue and canonical-index links,
+      no task counts/ADR inventory/deferred roadmap, and a short link to existing historical owners.
+      The first draft remains unapplied; retired prerequisites are not treated as open. No next source
+      implementation or README rewrite is claimed. BUILD-007/C92 and overnight deadline remain open.
+    evidence:
+    - tasks/done/RUNTIME-256-render-recipe-extraction-dependencies.md
+    - tasks/evidence/RUNTIME-256/report.yaml
+    - tasks/evidence/RUNTIME-256/seal.yaml
+    - tasks/evidence/RUNTIME-256/structural-counts.json
+    - tasks/backlog/process/DOCS-007-runtime-backlog-current-state.md
+    status: resolved

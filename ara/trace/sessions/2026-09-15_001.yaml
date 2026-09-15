@@ -2,9 +2,9 @@ session:
   id: 2026-09-15_001
   date: '2026-09-15'
   started: '2026-09-15T00:37:12+02:00'
-  last_turn: '2026-09-15T04:04:01+02:00'
-  turn_count: 7
-  summary: RUNTIME-255 recipe token reuse is verified, committed and sealed; RUNTIME-256 implementation-import cleanup is prepared with Claude. BUILD-007 has measurement constraints; stale backlog-index gates were identified. Overnight continuation remains active until 08:00 Berlin; no timing claim.
+  last_turn: '2026-09-15T04:22:21+02:00'
+  turn_count: 8
+  summary: RUNTIME-256 recipe-extraction import cleanup is verified, committed and sealed; DOCS-007 has a corrected Claude-reviewed current-backlog plan. Overnight continuation remains active until 08:00 Berlin; BUILD-007/C92 timing remains open.
 events_logged:
 - turn: 1
   type: experiment
@@ -50,6 +50,12 @@ events_logged:
   routing: direct
   provenance: ai-executed
   summary: Shared recipe enum tokens verified and sealed; report metadata corrected, next import cleanup prepared, and stale backlog gates identified.
+- turn: 8
+  type: experiment
+  id: N575
+  routing: direct
+  provenance: ai-executed
+  summary: Recipe-extraction dependencies reduced 93 to 63 with unchanged bodies and passing gates; task sealed and current backlog cleanup prepared.
 ai_actions:
 - turn: 1
   action: Claude implemented five production files; root reviewed, added lifetime/statistics and compiler-boundary
@@ -122,6 +128,15 @@ ai_actions:
   - tasks/evidence/RUNTIME-255/report.yaml
   - tasks/done/RUNTIME-256-render-recipe-extraction-dependencies.md
   - tasks/backlog/process/BUILD-007-engine-compile-time-reconciliation.md
+- turn: 8
+  action: Claude implemented and independently reviewed the one-file preamble change; root verified source/compiler maps, CPU/sanitizer/Vulkan compilation, corrected the documentation wrap, retired/sealed RUNTIME-256 and prepared DOCS-007 from actual task locations.
+  provenance: ai-executed
+  files_changed:
+  - src/runtime/Rendering/Runtime.RenderExtraction.Recipes.cpp
+  - docs/architecture/runtime.md
+  - tasks/done/RUNTIME-256-render-recipe-extraction-dependencies.md
+  - tasks/evidence/RUNTIME-256/report.yaml
+  - tasks/backlog/process/DOCS-007-runtime-backlog-current-state.md
 claims_touched: []
 key_context:
 - turn: 1
@@ -139,8 +154,10 @@ key_context:
   excerpt: Continue the authorized cleanup with Claude, preserve features and parser acceptance, retire completed tasks and stop by 08:00 Berlin.
 - turn: 7
   excerpt: Continue the user-authorized overnight cleanup with Claude until 08:00; preserve features and exact accepted tokens, retire finished slices and distinguish structural simplification from measured performance.
+- turn: 8
+  excerpt: Continue the authorized overnight cleanup with Claude, preserve features and exact source evidence, retire completed tasks, and improve discovery without repeating closed-work narratives.
 open_threads:
-- Overnight cleanup remains active until 08:00; RUNTIME-252/253/254/255 and BUG-134 are retired and sealed. Next is settled RUNTIME-256 recipe-extraction imports; a stale backlog-index rewrite remains proposed. Stop new implementation by 07:15.
+- Overnight cleanup remains active until 08:00; RUNTIME-252/253/254/255/256 and BUG-134 are retired and sealed. Next is settled DOCS-007 current runtime backlog discovery. Stop new implementation by 07:15.
 - BUILD-007 owns matched clean-source engine compile reconciliation; BUILD-006 separately owns backend/cache comparisons.
   C92 remains a hypothesis.
 - BUG-193 owns unexplained GPU pacing variability and WLOP watchdog margin; BUG-189/191/192 closed only finite-work

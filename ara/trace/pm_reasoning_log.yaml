@@ -2359,3 +2359,10 @@ entries:
     - Retain the report-field validation failure and metadata-only reseal separately from the unchanged passing C++ source. Final independent review binds the same source digest.
     - Correct Claude's absence-based import and retirement-log guesses through actual source/task paths. RUNTIME-256 is prepared, README rewrite is pending; neither is claimed complete.
     - Existing 32 staged observations retain their owners and flags with no new closure signal. Keep N569 and the overnight thread open until the deadline or an explicit justified stop.
+
+  - turn: 2026-09-15_001#8
+    notes:
+    - Record N575 as exact source/dependency and verification facts, not a timing claim. C92/BUILD-007 remain open; no new claim or staged observation.
+    - Distinguish 20 direct imports from 30 removed compiler dependencies, and promoted runtime compilation from GPU execution. Keep the optional baseline failure and complete passing gates bound to the sealed source.
+    - DOCS-007 is planned only. Accept Claude's narrower current-index structure and verified task-location corrections; existing completed records remain intact.
+    - Existing 32 pending observations retain their owners/flags without a new closure signal. N569 and the overnight thread remain open until the deadline or a justified stop.

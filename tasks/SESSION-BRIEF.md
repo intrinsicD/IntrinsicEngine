@@ -57,6 +57,7 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `CI-013`: `CI-018` — Admit hybrid impact-based verification selection (tasks/backlog/process/CI-018-hybrid-impact-selection-admission.md)
 - blocked by `BUILD-006`: `CI-019` — Make CI thin and run full confidence once per merge group (tasks/backlog/process/CI-019-thin-ci-merge-queue-topology.md)
 - blocked by `CI-019`: `CI-020` — Cut over verification and retire legacy policy (tasks/backlog/process/CI-020-verification-cutover-and-legacy-retirement.md)
+- unblocked: `DOCS-007` — Make runtime backlog discovery current and concise (tasks/backlog/process/DOCS-007-runtime-backlog-current-state.md)
 - blocked by `CI-013`: `PROC-031` — Bind agent workflow to unified verification receipts (tasks/backlog/process/PROC-031-agent-verification-receipts.md)
 
 ## Theme I — Research method implementation (paused except explicit P0 dependencies)
