@@ -2,9 +2,9 @@ session:
   id: 2026-09-15_001
   date: '2026-09-15'
   started: '2026-09-15T00:37:12+02:00'
-  last_turn: '2026-09-15T03:11:35+02:00'
-  turn_count: 6
-  summary: RUNTIME-254 private renderer dependency cleanup is verified, committed and sealed; RUNTIME-255 canonical recipe token reuse has a corrected Claude-approved plan. Overnight continuation remains active until 08:00 Berlin; no timing claim.
+  last_turn: '2026-09-15T04:04:01+02:00'
+  turn_count: 7
+  summary: RUNTIME-255 recipe token reuse is verified, committed and sealed; RUNTIME-256 implementation-import cleanup is prepared with Claude. BUILD-007 has measurement constraints; stale backlog-index gates were identified. Overnight continuation remains active until 08:00 Berlin; no timing claim.
 events_logged:
 - turn: 1
   type: experiment
@@ -44,6 +44,12 @@ events_logged:
   routing: direct
   provenance: ai-executed
   summary: Private compiler map reduced 92 to 62 with unchanged bodies and passing gates; task sealed, next token reuse plan corrected and prepared.
+- turn: 7
+  type: experiment
+  id: N574
+  routing: direct
+  provenance: ai-executed
+  summary: Shared recipe enum tokens verified and sealed; report metadata corrected, next import cleanup prepared, and stale backlog gates identified.
 ai_actions:
 - turn: 1
   action: Claude implemented five production files; root reviewed, added lifetime/statistics and compiler-boundary
@@ -104,6 +110,18 @@ ai_actions:
   - tasks/done/RUNTIME-254-render-extraction-private-dependencies.md
   - tasks/evidence/RUNTIME-254/report.yaml
   - tasks/done/RUNTIME-255-render-recipe-token-owner.md
+- turn: 7
+  action: Claude implemented and reviewed token reuse; root completed contract tests, verified native/ASan/UBSan gates, retired and sealed RUNTIME-255, fixed report metadata, released the claim and prepared the next dependency task and benchmark constraints.
+  provenance: ai-executed
+  files_changed:
+  - src/graphics/renderer/Graphics.RenderingContract.cppm
+  - src/graphics/renderer/Graphics.RenderingContract.cpp
+  - src/graphics/renderer/Graphics.RenderRecipeConfig.cpp
+  - src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.cpp
+  - tasks/done/RUNTIME-255-render-recipe-token-owner.md
+  - tasks/evidence/RUNTIME-255/report.yaml
+  - tasks/backlog/runtime/RUNTIME-256-render-recipe-extraction-dependencies.md
+  - tasks/backlog/process/BUILD-007-engine-compile-time-reconciliation.md
 claims_touched: []
 key_context:
 - turn: 1
@@ -119,8 +137,10 @@ key_context:
   excerpt: Automatic overnight continuation; retire completed work, preserve exact evidence and features, continue with Claude until the 08:00 Berlin deadline.
 - turn: 6
   excerpt: Continue the authorized cleanup with Claude, preserve features and parser acceptance, retire completed tasks and stop by 08:00 Berlin.
+- turn: 7
+  excerpt: Continue the user-authorized overnight cleanup with Claude until 08:00; preserve features and exact accepted tokens, retire finished slices and distinguish structural simplification from measured performance.
 open_threads:
-- Overnight cleanup remains active until 08:00; RUNTIME-252/253/254 and BUG-134 are retired and sealed. Next is settled high-risk RUNTIME-255 recipe enum token reuse; stop new implementation by 07:15.
+- Overnight cleanup remains active until 08:00; RUNTIME-252/253/254/255 and BUG-134 are retired and sealed. Next is settled RUNTIME-256 recipe-extraction imports; a stale backlog-index rewrite remains proposed. Stop new implementation by 07:15.
 - BUILD-007 owns matched clean-source engine compile reconciliation; BUILD-006 separately owns backend/cache comparisons.
   C92 remains a hypothesis.
 - BUG-193 owns unexplained GPU pacing variability and WLOP watchdog margin; BUG-189/191/192 closed only finite-work

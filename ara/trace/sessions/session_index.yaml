@@ -590,8 +590,8 @@ sessions:
 
 - id: 2026-09-15_001
   date: '2026-09-15'
-  summary: RUNTIME-254 private renderer dependency cleanup is verified, committed and sealed; RUNTIME-255 canonical recipe token reuse has a corrected Claude-approved plan. Overnight continuation remains active until 08:00 Berlin; no timing claim.
-  turn_count: 6
-  events_count: 6
+  summary: RUNTIME-255 recipe token reuse is verified, committed and sealed; RUNTIME-256 implementation-import cleanup is prepared with Claude. BUILD-007 has measurement constraints; stale backlog-index gates were identified. Overnight continuation remains active until 08:00 Berlin; no timing claim.
+  turn_count: 7
+  events_count: 7
   claims_touched: []
   open_threads: 10

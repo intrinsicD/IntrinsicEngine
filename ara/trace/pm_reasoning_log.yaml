@@ -2352,3 +2352,10 @@ entries:
     - Record N573 as verified code/dependency facts and planning, not performance evidence; C92/BUILD-007 remain open. No new claim or staged observation; existing 32 pending topics keep their owners and flags.
     - Preserve actual graph scope (MaterialSystem still transitive) and correct Claude's name-visibility speculation using the successful build. The private change adds no public API.
     - Retain the corrected Unknown acceptance decision in RUNTIME-255 and the rejection of a weak prepared-frame helper. Discovery turn-cap recovery is not unfinished implementation; RUNTIME-255 remains planned, while the timed overnight loop stays active.
+
+  - turn: 2026-09-15_001#7
+    notes:
+    - Record N574 as source reuse, verification and workflow facts; no new research claim or observation. C92/BUILD-007 remain open; dependency/token/source counts are not timing evidence.
+    - Retain the report-field validation failure and metadata-only reseal separately from the unchanged passing C++ source. Final independent review binds the same source digest.
+    - Correct Claude's absence-based import and retirement-log guesses through actual source/task paths. RUNTIME-256 is prepared, README rewrite is pending; neither is claimed complete.
+    - Existing 32 staged observations retain their owners and flags with no new closure signal. Keep N569 and the overnight thread open until the deadline or an explicit justified stop.

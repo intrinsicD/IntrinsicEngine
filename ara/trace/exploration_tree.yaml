@@ -12485,3 +12485,34 @@ tree:
     - tasks/evidence/RUNTIME-254/structural-counts.json
     - tasks/done/RUNTIME-255-render-recipe-token-owner.md
     status: resolved
+
+  - id: N574
+    type: experiment
+    title: Share recipe enum spelling owners and prepare the next import cleanup
+    provenance: ai-executed
+    timestamp: '2026-09-15T04:04:01+02:00'
+    result: Claude implemented the bounded token-owner consolidation; after two implementation
+      tool caps root completed the tests, removed duplicate fixtures and preserved all seven parser
+      candidate lists through exact 49-literal substitutions. Five compiled owner overloads replace
+      five runtime-local switches; four existing production files shrink 3441 to 3435 lines with
+      zero new production files/modules. No measured compile-time or runtime-speed claim.
+      Native full CPU passes 4636 cases plus one expected GLFW/LSan control skip; focused native,
+      ASan and UBSan each pass 27 cases. Claude independently approved source and final fixed digest.
+      RUNTIME-255 implementation is ad6fef4b5. Initial report validation caught two missing high-risk
+      metadata fields; corrected in 9504741c6, with prior failure retained and final seal ffefca8fb.
+      Reviewed source stayed unchanged. Final evidence validation has zero errors and 97 historical
+      warnings; claim released and all writers/builds stopped before preparing the next task.
+      RUNTIME-256 has a Claude-reviewed preamble-only recipe-extraction plan; its proposed 313 to
+      288 line source preserves every body byte, but no implementation or dependency result is claimed.
+      Broader editor/extraction-import guesses were not accepted without full symbol evidence.
+      A read-only README proposal exposed retired prerequisites still described as open; rewrite
+      remains pending and must use actual task locations. BUILD-007 now records source-isolation,
+      tool-reuse and disk-headroom constraints; no timed comparison started. Overnight loop stays open.
+    evidence:
+    - tasks/done/RUNTIME-255-render-recipe-token-owner.md
+    - tasks/evidence/RUNTIME-255/report.yaml
+    - tasks/evidence/RUNTIME-255/seal.yaml
+    - tasks/evidence/RUNTIME-255/structural-counts.json
+    - tasks/backlog/runtime/RUNTIME-256-render-recipe-extraction-dependencies.md
+    - tasks/backlog/process/BUILD-007-engine-compile-time-reconciliation.md
+    status: resolved
