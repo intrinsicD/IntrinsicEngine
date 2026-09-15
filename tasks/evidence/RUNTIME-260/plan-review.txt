@@ -1,0 +1,64 @@
+## Verdict
+
+**All five are removable.** 71 → 66 direct imports. No new owners, no forward declarations, no facade needed.
+
+This is the strongest possible form of the removal set — not "no `Graphics::` tokens," but a closed argument over every exported entity of each candidate.
+
+## Proof
+
+**1. No re-exports.** None of the five interfaces contains `export import`. Each is `export module …;` plus plain `import`. So each candidate contributes exactly its own exported declarations and nothing else:
+- `Graphics.CameraSnapshots.cppm:7` (imports `Core.Geometry2D` plainly)
+- `Graphics.RenderFrameInput.cppm:3` (imports `Core.Geometry2D`, `CameraSnapshots` plainly)
+- `Graphics.CurrentRendererContractAdapter.cppm:8` (imports `RenderFrameInput`, `RenderingContract`, `RenderWorld` plainly)
+- `Graphics.RenderingContract.cppm:11`, `Graphics.GpuAssetCache.cppm:8`
+
+**2. Type/constant names — zero occurrences in the body.** Grepped the full export list of all five (`FrustumPlane*`, `CameraViewInput`, `CameraViewSnapshot`, `PickPixelRequest`, `TemporalJitter*`, `TemporalCameraViewSnapshot`, `RenderFrameInput`, `kCurrentRenderer*`, `CurrentRendererSnapshotOptions/OutputOptions/Contract`, all 18 RenderingContract enums, all 10 RenderingContract structs, all `GpuAsset*`/`GpuBuffer*`/`GpuTexture*`/`GpuProduced*`): **no hits** in `Runtime.EditorWorkspaceSnapshots.Models.cpp`. The only `BindingSet` token is `VertexChannelBindingSet` (lines 702, 742, 1788) — `Runtime.VertexChannelBindings`, retained.
+
+**3. The ADL gap, closed properly.** An ADL call can only bind to a candidate's free function if that function's *name token* appears at the call site. So I enumerated every namespace-scope function each candidate exports and grepped each name:
+
+| Candidate | Exported namespace-scope functions | Hits in body |
+|---|---|---|
+| CameraSnapshots | `ComputeTemporalJitterSample`, `ApplyTemporalJitterProjectionOverride`, `BuildCameraViewSnapshot`, `BuildTemporalCameraViewSnapshot` | 0 |
+| RenderFrameInput | *none* (single struct) | — |
+| CurrentRendererContractAdapter | 9 × `MakeCurrentRenderer*`, `ValidateCurrentRendererContract` | 0 |
+| GpuAssetCache | *none* — `export namespace` block at :67–259 is types + one class; only `operator` is the deleted member `GpuAssetCache& operator=` (:198) | — |
+| RenderingContract | 14 × `ToString`, `HasErrors`, `IsCompatible`, `CountBySeverity`, `HasDiagnostic`, `AppendDiagnostics`, `MergeDiagnostics`, 6 × `Validate*`, `ClassifyRenderArtifactLifecycle`, 2 × `FindRecipeSlot` | only `ToString`, `AppendDiagnostics` — both resolved below |
+
+**4. No namespace-scope operators** in any of the five — so no token-free ADL/implicit-operator path. This is what makes the argument `auto`-proof: an `auto` variable holding a reachable-but-invisible Graphics type can still be member-accessed and copied under reachability, and can only reach a candidate's *function* through a name that must appear in source.
+
+**5. The two `ToString` sites.** `Models.cpp:1571` `ToString(slot.Semantic)` and `:1591` `ToString(slot.SourceKind)`, in `AppendBoundSlotRows` (:1559). `slot` is `EditorGeometryPresentationSlotModel` (`Runtime.VisualizationEditingOperations.cppm:200`), whose fields are `GeometryPresentationSlotSemantic Semantic` (:205) and `GeometryPresentationSourceKind SourceKind` (:206) — both `Extrinsic::Runtime` enums. Associated namespace is `Extrinsic::Runtime` only; `Runtime.GeometryPresentation` is directly imported at :74 and stays. Independent corroboration: RenderingContract exports `ToString(BindingSourceDomain)` but **no** `ToString(BindingSemanticRole)` — if :1571 were binding into Graphics it would already not compile.
+
+**6. `AppendDiagnostics`.** `Models.cpp:1053` is a file-local overload on `std::vector<EditorDiagnostic>`; both calls (:3385, :3412) pass `model.Diagnostics` / `model.Processing.Diagnostics`, associating `Extrinsic::Runtime` + `std` only. `Graphics::AppendDiagnostics(RenderingContractValidationResult&, …)` is not in the candidate set today and is not reached.
+
+**7. Private header closure.** `Models.cpp:102` includes `Editor/internal/Runtime.EditorFeatures.Internal.hpp`, which recursively pulls GeometryHelpers / FeatureCommands / FeatureProperties. Grepping all four `.hpp` for the complete candidate export list returns **zero hits**. Their Graphics usage is only retained owners: `Graphics::RenderGraphFrameStats` (:55), `Graphics::RenderRecipeConfigContext` (:56), `Graphics::RenderRecipeConfigLoadResult` (:64, :67), `Graphics::Components::Render{Surface,Edges,Points}`. `CameraViewport` (:38) is `Core::Extent2D` from `Core.Geometry2D` (:38 import), **not** CameraSnapshots.
+
+**8. Interface unit.** `Runtime.EditorWorkspaceSnapshots.cppm:15–22` imports 8 modules, all ECS/Runtime, none of the five, and none via `export import`. So the implicit interface import contributes no Graphics visibility, and the −5 is a real reduction in the TU's visible set rather than a metric-only change.
+
+**9. Retained `Graphics::` usage is fully owned elsewhere:** `RenderCommandPassStatus` (:2785–2793), `RenderGraphGpuProfile*` (:2800–2870), `RenderGraphFrameStats` (:2957), `RenderGraphCommandPassStats` (:3001) → RenderDiagnostics / RenderCommandRouter; `namespace G = Extrinsic::Graphics::Components` (:112) → Graphics.Component.{VisualizationConfig,RenderGeometry}. All retained.
+
+## Explicitly unmeasured
+
+I did not compile, so the **closure effect is a hypothesis, not a measurement**. Prediction: RenderingContract, RenderFrameInput and CameraSnapshots almost certainly stay in the 172-module closure — `RenderRecipeConfig` (retained, :58) pulls the contract chain, and `RenderFrameInput` imports `CameraSnapshots`. `CurrentRendererContractAdapter` and `GpuAssetCache` are the only plausible actual drops, and possibly neither. **Expect 172 → 170..172.** This removal is defensible as direct-edge reduction and overload-set hygiene, not as a closure win — don't write a closure-reduction claim into the next task before measuring.
+
+## Traps
+
+1. **Reachability ≠ visibility, and that's fine here** — but it means the change is invisible to the 235 focused tests as behavior. The only failure mode is a compile error, so the build *is* the test.
+2. **Sibling TU `internal/Runtime.EditorWorkspaceSession.cpp` genuinely uses all four renderer candidates** (:36–40, `Graphics::RenderFrameInput` :776, `Graphics::CameraViewInput` :778, `Graphics::MakeCurrentRenderer*` :781–785). Do not touch it. Implementation units of the same module do not share import sets — unless someone enables a unity/jumbo build, which would fuse them and break this. Worth a one-line note in the task.
+3. **`AppendDiagnostics` name is shared** with a RenderingContract export. Removing the import shrinks the overload set (good), but record in the task why that's safe, or a future reviewer will re-litigate it.
+4. **`Runtime.EditorFeatureContextAdapters.cpp` imports `Graphics.GpuAssetCache` (:38) and uses it.** Different TU, unaffected — but it means a naive repo-wide "GpuAssetCache is unused by Editor" claim is false. Scope the claim to this file.
+5. `Geometry.Graph` (:88) and `ECS.Components.GeometrySourcesPopulate` (:45) stay pinned as instructed; untouched.
+
+## Verification
+
+[ROOT CORRECTION: no BMI/interface changes; use IntrinsicRuntimeContractTests and actual Models.cpp implementation producer from existing supported preset compile_commands. Follow RUNTIME-260 commands; no separate bisection commits or broader edits without a narrowed review.]
+
+Existing supported trees only, real `compile_commands.json` producer:
+1. Clang 23 CI config: rebuild `Extrinsic.Runtime.EditorWorkspaceSnapshots` BMI + all dependents — this is the actual proof of the visibility argument.
+2. asan and ubsan trees: full rebuild of the same target set.
+3. vulkan tree: rebuild (it exercises the RenderDiagnostics/RenderCommandRouter paths that must survive).
+4. Re-run the focused 235; then full CPU suite.
+5. Re-extract the module closure from the same build to replace the hypothesis in §"unmeasured" with a number.
+
+One bisection note if it fails: remove in two commits — `{GpuAssetCache, CurrentRendererContractAdapter}` first (zero shared identifiers with anything in the body), then `{CameraSnapshots, RenderFrameInput, RenderingContract}` (the group where a surprise would come from an overload-set shift). That isolates a failure to the ADL half without re-running the whole audit.
+
+Root: exact exported type/function inventory is in owner-audit.json; do not rely on approximate enum/struct counts in the prose. Structural closure effect remains unmeasured until the final rebuilt map.

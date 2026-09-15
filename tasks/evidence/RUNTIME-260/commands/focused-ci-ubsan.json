@@ -1,0 +1,29 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-ubsan",
+    "--output-on-failure",
+    "-R",
+    "^(SandboxEditorUi|SandboxEditorWorkspaceContext|SandboxEditorSessionLifecycle)",
+    "--no-tests=error",
+    "--timeout",
+    "60",
+    "--parallel",
+    "1"
+  ],
+  "command_display": "ctest --test-dir build/ci-ubsan --output-on-failure -R '^(SandboxEditorUi|SandboxEditorWorkspaceContext|SandboxEditorSessionLifecycle)' --no-tests=error --timeout 60 --parallel 1",
+  "cwd": ".",
+  "duration_ms": 11176,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T04:19:26Z",
+  "label": "focused-ci-ubsan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T04:19:15Z",
+  "stderr_path": "tasks/evidence/RUNTIME-260/commands/focused-ci-ubsan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-260/commands/focused-ci-ubsan.stdout.log",
+  "stdout_sha256": "d62a832c1592c5b2b97d4fd622a2074006ad32bdc89cbd0e40a9b49e8655a536",
+  "task_id": "RUNTIME-260"
+}

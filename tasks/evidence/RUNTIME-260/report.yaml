@@ -1,0 +1,109 @@
+schema_version: 1
+task_id: RUNTIME-260
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-15T04:20:32Z'
+claim_eligible: false
+source:
+  base_ref: 475728f13
+  base_revision: 475728f132a194e234a74d1acc4f0c59b51899b8
+  head_revision: 475728f132a194e234a74d1acc4f0c59b51899b8
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+    sha256: 3700bd0d5b99806f4452d89be20a26341bc561c0eb485a003a17f36fa5258224
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 9f30b825d2f2044aa768805331c2e89678f4a679ecd4e6729af460aaf8594fc1
+  - path: tasks/done/RUNTIME-260-workspace-model-graphics-imports.md
+    sha256: 5c1cb157e2e040cd4f98fc00d5f645f302c68a816a97864f2e67ce8da2864789
+  content_digest: e8fdc1891d6a0ff22e034a4e1f92f6fcdc8e53b31af9d646552d2f6b310cf226
+touched:
+  paths:
+  - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-260-workspace-model-graphics-imports.md
+  layers:
+  - runtime
+  modules:
+  - Extrinsic.Runtime.EditorWorkspaceSnapshots
+extension_seam: Retain actual diagnostic/component/config owners while deleting unused direct graphics
+  imports
+future_change_plan: Remaining runtime facades require their own full exported-name/header proof; BUILD007
+  retains matched timing
+acceptance:
+- criterion: Only proven unused import lines change in Models.cpp; all remaining bytes and other production
+    files stay identical.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/RUNTIME-260/structural-counts.json
+  - tasks/evidence/RUNTIME-260/owner-audit.json
+  reason: null
+- criterion: Canonical owners remain and actual compiler/native/sanitizer/build evidence passes with honest
+    dependency counts.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/evidence/RUNTIME-260/commands/full-cpu.stdout.log
+  - tasks/evidence/RUNTIME-260/commands/focused-ci-asan.stdout.log
+  - tasks/evidence/RUNTIME-260/commands/focused-ci-ubsan.stdout.log
+  - tasks/evidence/RUNTIME-260/commands/vulkan-runtime-build.json
+  reason: null
+- criterion: Fixed diff is Claude-reviewed, locally committed, retired and sealed without timing, GPU
+    execution or whole-engine completion claims.
+  task_checked: true
+  disposition: satisfied
+  evidence:
+  - tasks/done/RUNTIME-260-workspace-model-graphics-imports.md
+  - tasks/evidence/RUNTIME-260/source-review.txt
+  - tasks/evidence/RUNTIME-260/seal.yaml
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-260/commands/build-ci-asan.json
+- receipt: tasks/evidence/RUNTIME-260/commands/build-ci-ubsan.json
+- receipt: tasks/evidence/RUNTIME-260/commands/compiler-boundary.json
+- receipt: tasks/evidence/RUNTIME-260/commands/configure-ci.json
+- receipt: tasks/evidence/RUNTIME-260/commands/focused-build.json
+- receipt: tasks/evidence/RUNTIME-260/commands/focused-ci-asan.json
+- receipt: tasks/evidence/RUNTIME-260/commands/focused-ci-ubsan.json
+- receipt: tasks/evidence/RUNTIME-260/commands/focused-ci.json
+- receipt: tasks/evidence/RUNTIME-260/commands/full-build.json
+- receipt: tasks/evidence/RUNTIME-260/commands/full-cpu.json
+- receipt: tasks/evidence/RUNTIME-260/commands/retirement-structural.json
+- receipt: tasks/evidence/RUNTIME-260/commands/structural-counts.json
+- receipt: tasks/evidence/RUNTIME-260/commands/structural.json
+- receipt: tasks/evidence/RUNTIME-260/commands/vulkan-runtime-build.json
+changed_public_contracts: []
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/RUNTIME-260-workspace-model-graphics-imports.md
+  session_brief_present: true
+  canonical_docs_changed: false
+  skill_mirrors_checked: true
+residual_risks:
+- No timing claim; four of five removed imports remain transitively reachable. Vulkan evidence is compilation
+  only and sanitizer evidence is focused editor testing.
+skipped_checks: []
+artifacts:
+- path: tasks/evidence/RUNTIME-260/source-review.txt
+  sha256: d24710fb03723c8ec32d2dcaa7110838accb0c9eb937e8be7193c0ad11d7df87
+  kind: file
+- path: tasks/evidence/RUNTIME-260/structural-counts.json
+  sha256: 740753bc89b91b5238cfc853565a3d3a18cc790d10fc7127969e245797af0c95
+  kind: file
+- path: tasks/evidence/RUNTIME-260/owner-audit.json
+  sha256: a200b255843d0d598d30c7f80c7ca6b91444cefb89b340bf82226f4770f61eac
+  kind: file
+- path: tasks/evidence/RUNTIME-260/plan-review.txt
+  sha256: 103a3035fde97eb6bbe271e58be44e8257977eddf65be37fbf5aa0aa4f5c4de4
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true

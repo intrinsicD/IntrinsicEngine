@@ -1,0 +1,161 @@
+{
+  "hash_provenance": "pre-change source at475728f13; headers unchanged",
+  "files_sha256": {
+    "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp": "6621f1532d4d38e9c19da2dd20278a217ea1cda9432f8b911d053c9a6d582518",
+    "src/runtime/Editor/internal/Runtime.EditorFeatures.Internal.hpp": "d50ff6000032cc34a795775c09e6e574989812a472f81cfed13c2ece05bf38e5",
+    "src/runtime/Editor/internal/Runtime.EditorGeometryHelpers.hpp": "28ea111a6c4804dfd716c63f2e39c57e3e59987b71c466510c73bbe1a9449947",
+    "src/runtime/Editor/internal/Runtime.EditorFeatureCommands.Internal.hpp": "e9212d20569b30349c127e98b81662276f323626c7ac9dfdf6400d8161b18c99",
+    "src/runtime/Editor/internal/Runtime.EditorFeatureProperties.Internal.hpp": "eb7a0803e598c47ad8894c54b8767cdfdebef2779707986772f614e2125dd788"
+  },
+  "candidate_interface_sha256": {
+    "src/graphics/renderer/Graphics.CameraSnapshots.cppm": "301e388b8e8c96b3cfab29754ae5f492591f42acd9fe382cd5b9265408cf748c",
+    "src/graphics/renderer/Graphics.CurrentRendererContractAdapter.cppm": "9ed0fe70462c7607a5decdf3d8c59b1623a8d086656870909c0f4832ffc63ae3",
+    "src/graphics/assets/Graphics.GpuAssetCache.cppm": "900a8a9ff29c80c7ed98a33b6d5216b263f1887319b27d3fa7fff9aed51930b5",
+    "src/graphics/renderer/Graphics.RenderFrameInput.cppm": "7c44daca818e820125745a1785e1a0c6873c87312c5f32cdf7b9c24c53544a02",
+    "src/graphics/renderer/Graphics.RenderingContract.cppm": "59209eaaca99dfe3caa0d6f12e7e3334eef040170ad53c49b1510f4ab83b05a8"
+  },
+  "candidate_exports": {
+    "src/graphics/renderer/Graphics.CameraSnapshots.cppm": {
+      "explicit_exported_free_functions": [
+        "ApplyTemporalJitterProjectionOverride",
+        "BuildCameraViewSnapshot",
+        "BuildTemporalCameraViewSnapshot",
+        "ComputeTemporalJitterSample"
+      ],
+      "declared_type_names": [
+        "CameraViewInput",
+        "CameraViewSnapshot",
+        "FrustumPlaneIndex",
+        "FrustumPlaneSnapshot",
+        "PickPixelRequest",
+        "TemporalCameraViewSnapshot",
+        "TemporalJitterSample"
+      ],
+      "declared_constants": [
+        "kTemporalJitterSequenceLength"
+      ]
+    },
+    "src/graphics/renderer/Graphics.CurrentRendererContractAdapter.cppm": {
+      "explicit_exported_free_functions": [
+        "MakeCurrentRendererBindingSet",
+        "MakeCurrentRendererContract",
+        "MakeCurrentRendererDescriptor",
+        "MakeCurrentRendererRecipeDescriptor",
+        "MakeCurrentRendererSnapshotEnvelope",
+        "MakeCurrentRendererViewOutputRecipe",
+        "ValidateCurrentRendererContract"
+      ],
+      "declared_type_names": [
+        "CurrentRendererContract",
+        "CurrentRendererOutputOptions",
+        "CurrentRendererSnapshotOptions"
+      ],
+      "declared_constants": [
+        "kCurrentRendererContractId",
+        "kCurrentRendererDefaultRecipeId",
+        "kCurrentRendererDefaultSnapshotId",
+        "kCurrentRendererDefaultViewRecipeId",
+        "kCurrentRendererSnapshotProducerId"
+      ]
+    },
+    "src/graphics/assets/Graphics.GpuAssetCache.cppm": {
+      "explicit_exported_free_functions": [],
+      "declared_type_names": [
+        "GpuAssetCache",
+        "GpuAssetCacheDiagnostics",
+        "GpuAssetFallbackReason",
+        "GpuAssetKind",
+        "GpuAssetResolvedView",
+        "GpuAssetState",
+        "GpuAssetView",
+        "GpuBufferRequest",
+        "GpuProducedTexturePendingView",
+        "GpuProducedTextureRequest",
+        "GpuTextureFallbackDesc",
+        "GpuTextureRequest",
+        "Impl"
+      ],
+      "declared_constants": []
+    },
+    "src/graphics/renderer/Graphics.RenderFrameInput.cppm": {
+      "explicit_exported_free_functions": [],
+      "declared_type_names": [
+        "RenderFrameInput"
+      ],
+      "declared_constants": []
+    },
+    "src/graphics/renderer/Graphics.RenderingContract.cppm": {
+      "explicit_exported_free_functions": [
+        "AppendDiagnostics",
+        "ClassifyRenderArtifactLifecycle",
+        "CountBySeverity",
+        "FindRecipeSlot",
+        "HasDiagnostic",
+        "HasErrors",
+        "IsCompatible",
+        "MergeDiagnostics",
+        "ToString",
+        "ValidateBindingSet",
+        "ValidateRenderArtifactMetadata",
+        "ValidateRenderRecipeDescriptor",
+        "ValidateRendererDescriptor",
+        "ValidateRenderingContract",
+        "ValidateSnapshotEnvelope",
+        "ValidateViewOutputRecipe"
+      ],
+      "declared_type_names": [
+        "BindingColorSpace",
+        "BindingIntent",
+        "BindingRequirement",
+        "BindingSemanticRole",
+        "BindingSet",
+        "BindingSourceDomain",
+        "BindingValueType",
+        "InteractionMode",
+        "OutputTargetKind",
+        "RecipeExtensionSlotDescriptor",
+        "RecipeSlotKind",
+        "RenderArtifactLifecycleClass",
+        "RenderArtifactLifetime",
+        "RenderArtifactMetadata",
+        "RenderArtifactStatus",
+        "RenderDataCategory",
+        "RenderOutputKind",
+        "RenderRecipeDescriptor",
+        "RendererCapability",
+        "RendererDescriptor",
+        "RendererOutputDescriptor",
+        "RendererPurpose",
+        "RendererUpdateMode",
+        "RenderingContractDiagnostic",
+        "RenderingContractDiagnosticCode",
+        "RenderingContractDiagnosticSeverity",
+        "RenderingContractValidationResult",
+        "RenderingFallbackPolicy",
+        "SnapshotEnvelope",
+        "SnapshotKind",
+        "SnapshotLifetimePolicy",
+        "SnapshotScope",
+        "SnapshotValidationState",
+        "ViewKind",
+        "ViewOutputDescriptor",
+        "ViewOutputRecipeDescriptor"
+      ],
+      "declared_constants": []
+    }
+  },
+  "exact_name_hits": {
+    "src/graphics/renderer/Graphics.CameraSnapshots.cppm": {},
+    "src/graphics/renderer/Graphics.CurrentRendererContractAdapter.cppm": {},
+    "src/graphics/assets/Graphics.GpuAssetCache.cppm": {},
+    "src/graphics/renderer/Graphics.RenderFrameInput.cppm": {},
+    "src/graphics/renderer/Graphics.RenderingContract.cppm": {
+      "AppendDiagnostics": 3,
+      "ToString": 2
+    }
+  },
+  "shared_name_resolution": "ToString: both slot.Semantic/SourceKind are Runtime GeometryPresentation enums with retained direct overload owner. AppendDiagnostics: TU-local vector<EditorDiagnostic> function and both calls use Runtime vectors; Graphics overload accepts RenderingContractValidationResult and is not viable.",
+  "scope": "Only Models.cpp imports; sibling session/context-adapter units use these modules and stay untouched. No candidate reexports; only operator declaration is deleted GpuAssetCache member assignment; no namespace operator path.",
+  "name_search_scope": "Complete Models.cpp and four recursive headers, excluding import declarations themselves",
+  "constant_audit": "Enumerated constexpr declarations from the five interfaces; no constant name appears outside imports in Models.cpp or its recursive headers."
+}

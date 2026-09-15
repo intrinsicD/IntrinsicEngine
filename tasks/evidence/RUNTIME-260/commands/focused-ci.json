@@ -1,0 +1,29 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^(SandboxEditorUi|SandboxEditorWorkspaceContext|SandboxEditorSessionLifecycle|EditorCompilationLocality|ProcessingCompilationLocality|RenderCompilationLocality.RuntimeDiagnostics)",
+    "--no-tests=error",
+    "--timeout",
+    "60",
+    "--parallel",
+    "1"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^(SandboxEditorUi|SandboxEditorWorkspaceContext|SandboxEditorSessionLifecycle|EditorCompilationLocality|ProcessingCompilationLocality|RenderCompilationLocality.RuntimeDiagnostics)' --no-tests=error --timeout 60 --parallel 1",
+  "cwd": ".",
+  "duration_ms": 14583,
+  "exit_code": 0,
+  "finished_at": "2026-09-15T04:15:58Z",
+  "label": "focused-ci",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-15T04:15:43Z",
+  "stderr_path": "tasks/evidence/RUNTIME-260/commands/focused-ci.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-260/commands/focused-ci.stdout.log",
+  "stdout_sha256": "d1720fe4b0f2eebddddececd225ecfc1aa911940fae6d09e9355cf5f0cce00ce",
+  "task_id": "RUNTIME-260"
+}

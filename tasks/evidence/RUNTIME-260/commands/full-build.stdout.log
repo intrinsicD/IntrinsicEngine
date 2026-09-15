@@ -1,0 +1,30 @@
+[0/2] Re-checking globbed directories...
+[1/29] Generating CXX dyndep file benchmarks/CMakeFiles/IntrinsicKMeansGpuBenchmarkSmoke.dir/CXX.dd
+[2/29] Generating CXX dyndep file benchmarks/CMakeFiles/IntrinsicLopFamilyGpuBenchmarkSmoke.dir/CXX.dd
+[3/29] Generating CXX dyndep file tests/CMakeFiles/RuntimeContractSlowTestObjs.dir/CXX.dd
+[4/29] Generating CXX dyndep file src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/CXX.dd
+[5/29] Generating CXX dyndep file tests/CMakeFiles/RuntimePhysicsModuleTestObjs.dir/CXX.dd
+[6/29] Generating CXX dyndep file tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/CXX.dd
+[7/29] Generating CXX dyndep file tests/CMakeFiles/PointLBVHGpuTestObjs.dir/CXX.dd
+[8/29] Generating CXX dyndep file tests/CMakeFiles/GraphicsVulkanSmokeTestObjs.dir/CXX.dd
+[9/29] Generating CXX dyndep file tests/CMakeFiles/RuntimeSandboxAcceptanceGpuSmokeTestObjs.dir/CXX.dd
+[10/29] Generating CXX dyndep file tests/CMakeFiles/RuntimeClusteringServiceGpuSmokeTestObjs.dir/CXX.dd
+[11/29] Generating CXX dyndep file tests/CMakeFiles/RuntimePointCloudConsolidationGpuParityTestObjs.dir/CXX.dd
+[12/29] Generating CXX dyndep file tests/CMakeFiles/RuntimeProgressivePoissonResultGpuSmokeTestObjs.dir/CXX.dd
+[13/29] Generating CXX dyndep file tests/CMakeFiles/RuntimeGraphicsCpuTestObjs.dir/CXX.dd
+[14/29] Generating CXX dyndep file tests/CMakeFiles/RuntimeIntegrationCpuTestObjs.dir/CXX.dd
+[15/29] Generating CXX dyndep file tests/CMakeFiles/RuntimeGpuResultReadbackSmokeTestObjs.dir/CXX.dd
+[16/29] Linking CXX executable bin/IntrinsicRuntimeIntegrationTests
+[17/29] Linking CXX executable bin/IntrinsicKMeansGpuBenchmarkSmoke
+[18/29] Linking CXX executable bin/IntrinsicLopFamilyGpuBenchmarkSmoke
+[19/29] Linking CXX executable bin/IntrinsicRuntimeContractSlowTests
+[20/29] Linking CXX executable bin/IntrinsicPointLBVHGpuTests
+[21/29] Linking CXX executable bin/IntrinsicRuntimePhysicsModuleTests
+[22/29] Linking CXX executable bin/IntrinsicGraphicsVulkanSmokeTests
+[23/29] Linking CXX executable bin/IntrinsicSandboxEditorIntegrationTests
+[24/29] Linking CXX executable bin/IntrinsicRuntimeClusteringServiceGpuSmokeTests
+[25/29] Linking CXX executable bin/IntrinsicRuntimeProgressivePoissonResultGpuSmokeTests
+[26/29] Linking CXX executable bin/IntrinsicRuntimeGpuResultReadbackSmokeTests
+[27/29] Linking CXX executable bin/IntrinsicRuntimePointCloudConsolidationGpuParityTests
+[28/29] Linking CXX executable bin/IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests
+[29/29] Linking CXX executable bin/IntrinsicRuntimeGraphicsCpuTests

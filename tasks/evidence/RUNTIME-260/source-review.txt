@@ -1,0 +1,23 @@
+**APPROVE** — conditional on the running gates, with no blockers found in the supplied evidence.
+
+**Scope/diff**
+- Diff is exactly five `import` lines removed from `Runtime.EditorWorkspaceSnapshots.Models.cpp`; no other bytes, no header edits, no sibling TU edits, no public interface change. Consistent with the stated cmp-against-baseline result (owner-asserted; I could not independently recompute `3700bd0d…` — no tools).
+
+**Name/lookup correctness**
+- `ToString`: both call sites in the body context pass `slot.Semantic` (`GeometryPresentationSlotSemantic`) and `slot.SourceKind` (`GeometryPresentationSourceKind`), both `Extrinsic::Runtime` enums whose overload owner (`Runtime.GeometryPresentation`) is retained. The enclosing scope is `Extrinsic::Runtime::EditorFeatureDetail`, so ordinary unqualified lookup reaches the Runtime overloads through the enclosing namespace; the `Graphics::ToString` set was only ever reachable by ADL on Graphics enums, which are not involved. Removing `RenderingContract` cannot change the selected overload.
+- `AppendDiagnostics`: the TU-local definition in the anonymous namespace inside `EditorFeatureDetail` hides any outer/imported name — unqualified lookup stops at the innermost enclosing scope containing a declaration, so the Graphics overload was never a candidate. ADL on `std::vector<EditorDiagnostic>` associates `std` and `Extrinsic::Runtime` only, not `Extrinsic::Graphics`. Both calls pass Runtime vectors; the Graphics overload (`RenderingContractValidationResult&`) is non-viable anyway. Safe.
+- No other exported free function, type, or variable from the five removed interfaces appears in the searched text (full Models.cpp plus the four recursively included private headers, excluding the import declarations themselves).
+
+**Header/ownership**
+- The four private headers are textually included after the import block and reference only retained modules (`Graphics::RenderGraphFrameStats`, `Graphics::RenderRecipeConfigContext`, `Graphics::Components::Render*`, `RHI::IDevice`, `RenderArtifactRegistry`). Nothing in them needs a declaration from the removed five.
+- No candidate reexports and no namespace-scope operator declarations among the removed interfaces; the only operator is a deleted `GpuAssetCache` member assignment, which is not on any lookup path here.
+- Removal is confined to this TU's import list, so sibling units that legitimately use these modules are unaffected.
+
+**Noted, not blocking**
+1. Types from the removed modules (e.g. `CameraViewInput`, `RenderFrameInput`) remain *reachable* through retained imports such as `Runtime.RenderExtraction`, so any use that does not name them stays valid; the deletion is only correct because no name from those interfaces is written. That property is what the name search establishes, and it is the single thing the gates must confirm.
+2. `hash_provenance` records the pre-change source at `475728f13` as intentional; post-change verification rests on the separate `POST_CHANGE_SOURCE_SHA256` and the root `cmp`.
+3. I make no claim about all five imports leaving the transitive closure, nor any build-time effect.
+
+Gate requirement stands as stated: full CPU build, focused ASan/UBSan, and Vulkan runtime compile must actually pass before sealing; this approval does not presume their result.
+
+Root closure: all named gates pass. Complete source equals baseline minus exactly five import lines, every remaining byte and all876other tracked production files unchanged. Both ToString argument types retain Runtime GeometryPresentation overloads; AppendDiagnostics uses the local vector<EditorDiagnostic> function. Export/header inventory confirms no other name use, no candidate reexports or namespace operators. Direct imports71to66; actual compiler closure172to171 removes only CurrentRendererContractAdapter. Other four removed direct imports remain transitively reachable; no timing claim. Native235focused/4636fullCPU plus oneexpectedskip,202ASan,202UBSan and Vulkanruntimecompile pass. No GPUexecution/fullsanitizersuite claim. No new helper/interface or changed sibling unit.
