@@ -147,7 +147,8 @@ namespace Extrinsic::RHI
         bool IsPlaced = false;
     };
 
-    export class IDevice
+    // Pointer-only clients can name the device without importing its full API.
+    export extern "C++" class IDevice
     {
     public:
         virtual ~IDevice() = default;

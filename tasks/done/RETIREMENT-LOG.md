@@ -21,7 +21,7 @@ and old-owner test findings; 96 focused cases and the full CPU gate passed
 (4,639 passed, one expected ASan-only skip). Strict structural checks passed.
 No new timing, sanitizer or GPU claim is made. Remaining editor snapshot/config
 and renderer compilation work is tracked by
-[RUNTIME-265](../backlog/runtime/RUNTIME-265-editor-snapshot-compile-surface.md) and
+[RUNTIME-265](../active/RUNTIME-265-editor-snapshot-compile-surface.md) and
 [GRAPHICS-138](../backlog/rendering/GRAPHICS-138-renderer-compile-surface.md).
 
 

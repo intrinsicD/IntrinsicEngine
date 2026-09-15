@@ -5,6 +5,9 @@ uses, missing query capabilities, ownership decisions and linked open tasks.
 
 The Sandbox composes `Runtime.SpatialIndexCache`, a concrete runtime module
 that registers itself as a service. It owns lazy entity point indices.
+The class and its implementation retain matching C++ linkage so context records
+can borrow it by pointer without importing the cache or LBVH API. Consumers that
+invoke queries import the owning module; no second service or storage owner exists.
 Geometry components contain CPU geometry; GPU buffers and device lifetimes
 belong to the runtime cache and graphics workspace, outside ECS components.
 

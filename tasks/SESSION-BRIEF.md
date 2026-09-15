@@ -13,6 +13,7 @@ picking backlog work; theme priorities and rationale live in
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
 - `METHOD-044` — Feature-aware patches and distortion-aware atlas merging (tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md)
 - `METHOD-045` — Preserve baseline regions while constructing UV charts (tasks/active/METHOD-045-baseline-preserving-atlas-cuts.md)
+- `RUNTIME-265` — Narrow the editor snapshot and config dependency chain (tasks/active/RUNTIME-265-editor-snapshot-compile-surface.md)
 - `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
 
 ## Theme B — Rendering modernization
@@ -118,7 +119,6 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `BENCH-001`: `REVIEW-004` — Framework24 product-convergence audit (tasks/backlog/architecture/REVIEW-004-framework24-product-convergence-audit.md)
 - unblocked: `RUNTIME-218` — Nothing in the scene is ever lit: add default lighting and light authoring (tasks/backlog/runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md)
 - unblocked: `RUNTIME-222` — Model-space point radius rendering (tasks/backlog/runtime/RUNTIME-222-model-space-point-radius-rendering.md)
-- unblocked: `RUNTIME-265` — Narrow the editor snapshot and config dependency chain (tasks/backlog/runtime/RUNTIME-265-editor-snapshot-compile-surface.md)
 - unblocked: `UI-046` — Sandbox cannot export geometry at all (tasks/backlog/ui/UI-046-sandbox-geometry-export.md)
 - unblocked: `UI-047` — File paths must be hand-typed into a raw text field (tasks/backlog/ui/UI-047-file-chooser-for-import-and-scene-paths.md)
 - unblocked: `UI-048` — Editor opens empty, hides file operations under View, and never remembers layout (tasks/backlog/ui/UI-048-first-run-workspace-and-layout-persistence.md)

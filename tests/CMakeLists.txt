@@ -512,6 +512,19 @@ add_test(NAME EditorCompilationLocality.PointCloudServices
 set_tests_properties(EditorCompilationLocality.PointCloudServices
     PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
 
+# Borrowing device/cache pointers must not import their complete APIs or kernels.
+add_test(NAME EditorCompilationLocality.ProcessingServiceBorrows
+    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
+        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+        --check-source src/runtime/Editor/Runtime.EditorProcessing.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+        --check-source src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm
+        --forbid-module Extrinsic.RHI.Device
+        --forbid-module Extrinsic.Runtime.SpatialIndexCache
+        --forbid-module Geometry.PointLBVH)
+set_tests_properties(EditorCompilationLocality.ProcessingServiceBorrows
+    PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
+
 # Feature conversion/token implementations do not depend on unrelated config families.
 foreach(_intrinsic_config_family IN ITEMS CurvatureSegmentation PointCloudConsolidation)
     if(_intrinsic_config_family STREQUAL "CurvatureSegmentation")

@@ -93,6 +93,8 @@ namespace Extrinsic::Runtime
             return result;
         }
     } // namespace
+    extern "C++"
+    {
     struct SpatialIndexCache::Impl
     {
         struct Entry
@@ -640,4 +642,5 @@ namespace Extrinsic::Runtime
     {
         return m_Impl->Stats;
     }
+    } // extern "C++"
 } // namespace Extrinsic::Runtime

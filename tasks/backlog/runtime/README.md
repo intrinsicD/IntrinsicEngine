@@ -35,7 +35,6 @@ The canonical property-domain contract for method integration is
   owns default scene lighting and editor light authoring.
 - [`RUNTIME-222` — Model-space point radius rendering](RUNTIME-222-model-space-point-radius-rendering.md)
   owns published radius-property binding and camera projection in model-space units.
-- [RUNTIME-265 — Narrow the editor snapshot and config dependency chain](RUNTIME-265-editor-snapshot-compile-surface.md)
 
 Each task file states its own goal, non-goals, prerequisites, and verification
 commands. Read those notes before scheduling: dependencies between local tasks

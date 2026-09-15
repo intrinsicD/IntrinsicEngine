@@ -8,6 +8,7 @@ module;
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <span>
 #include <vector>
 export module Extrinsic.Runtime.SpatialIndexCache;
@@ -81,7 +82,7 @@ export namespace Extrinsic::Runtime
         std::string Diagnostic{};
     };
     // This concrete service is also its runtime module; there is no forwarding service layer.
-    class SpatialIndexCache final : public IRuntimeModule
+    extern "C++" class SpatialIndexCache final : public IRuntimeModule
     {
       public:
         SpatialIndexCache();

@@ -8,14 +8,19 @@ export module Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.ECS.Scene.Registry;
-import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.EngineConfigControl;
-extern "C++" { namespace Extrinsic::Runtime { struct EditorProcessingCommandsAccess; } }
+// These services are borrowed only; their existing owners expose matching C++ linkage.
+extern "C++" {
+    namespace Extrinsic::RHI { class IDevice; }
+    namespace Extrinsic::Runtime {
+        class SpatialIndexCache;
+        struct EditorProcessingCommandsAccess;
+    }
+}
 export namespace Extrinsic::Runtime
 {
     // C++ language linkage so the private attachment interface can borrow the

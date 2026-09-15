@@ -13,6 +13,10 @@ This directory contains the `RHI` module/files.
 - `RHI.Profiler.cppm` / `.cpp`
 - `RHI.QueueAffinity.cppm`
 
+`IDevice` stays defined in `RHI.Device`. Its C++ linkage lets pointer-only clients
+forward declare it without importing the complete resource/submission interface.
+Clients that invoke methods or derive a backend import the owning module.
+
 ## Queue affinity
 
 - `RHI.QueueAffinity.cppm` declares the backend-neutral queue vocabulary

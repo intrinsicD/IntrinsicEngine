@@ -95,6 +95,16 @@ guards and config/job callbacks are installed; the snapshot builder and eleven
 processing-frame leaves and workspace query preparation reuse it. Command handles
 copy it into owned storage.
 
+`EditorProcessing` borrows `RHI::IDevice` and `SpatialIndexCache` through forward
+declarations with matching C++ linkage. Their sole class definitions remain in
+`RHI.Device` and `Runtime.SpatialIndexCache`; the spatial cache implementation,
+including its private storage, compiles at that owner. Processing-context and
+snapshot interfaces need neither complete API. Consumers that call either service
+import its owner. `EditorCompilationLocality.ProcessingServiceBorrows` checks the
+processing, discovery and snapshot interfaces against compiler dependencies for
+both owners and the LBVH implementation. Context storage, config callbacks and
+prepared-frame lifetime remain unchanged.
+
 The session and public snapshot-query preparation share
 `MakeEditorWorkspaceSnapshotContext`, compiled in the existing context-adapter
 unit and declared through the private attachment interface. It combines the
