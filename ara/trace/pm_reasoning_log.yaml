@@ -2391,3 +2391,17 @@ entries:
       unchanged. Correct the false concern about lost job-envelope rationale through the existing owner comment.'
     - The tinygltf generation observation needs a scoped follow-up and reproducible no-op configuration evidence
       before a fix or performance conclusion. N569 and overnight continuation remain open.
+
+  - turn: 2026-09-15_001#12
+    notes:
+    - Record N579 as exact deletion, ownership and verification facts. No elapsed-time improvement, GPU execution
+      or full sanitizer-suite claim; existing C92/BUILD-007 and pending observations retain their owners and
+      flags.
+    - Distinguish the removed uninstantiated template body from unchanged executing functions. The full CPU
+      suite closes the presentation source-guard concern and the live owner already preserves the job-envelope
+      rationale.
+    - BUILD-008 is prepared only. Native CMake feature behavior is proven in a small probe, but actual engine
+      producer invalidation and the before/after regression remain required before a fix can close. Reuse
+      existing configure steps and native generation, not a new framework.
+    - No new research claim or observation is needed for this ordinary implementation work. N569 and overnight
+      continuation remain open until the deadline or a justified stop.

@@ -12635,3 +12635,32 @@ tree:
     - tasks/evidence/RUNTIME-257/structural-counts.json
     - tasks/done/RUNTIME-258-unused-workspace-model-declarations.md
     status: resolved
+
+  - id: N579
+    type: experiment
+    title: Delete unused workspace declaration copies and prepare content-stable generation
+    provenance: ai-executed
+    timestamp: '2026-09-15T05:36:02+02:00'
+    result: 'Claude deleted exactly ten unused anonymous-namespace declarations in four blocks, 78 lines,
+      reducing Models.cpp from 3554 to 3476 lines. Root verified the entire result equals the baseline minus
+      those blocks, all remaining bytes and all 876 other tracked production files unchanged, and compiler
+      dependencies remain 176 with Renderer absent. Canonical live owners and the existing diagnostic-only
+      job-envelope rationale remain intact. Independent Claude review approved subject to gates which all
+      passed: 235 focused native, 4636 full CPU plus one expected GLFW/LSan control skip, 202 focused ASan
+      and 202 focused UBSan cases, promoted-Vulkan runtime compilation and structural checks. The full CPU
+      gate covers the source-reading presentation guard. RUNTIME-258 retired in a9dd86071 and sealed in 2a1e243a7;
+      evidence validates with zero errors and 105 historical warnings. Claim released, all writers/builds
+      stopped. No timing, GPU execution or whole-engine completion claim. Claude reviewed a separate tinygltf
+      generation fix using native file(CONFIGURE), reusing existing same-tree configure and backend-transition
+      test steps for stable bytes/mtime and corruption repair. Root verified CMake 3.28.3 accepts NEWLINE_STYLE
+      UNIX, preserves deliberately old timestamps for identical content and repairs corrupted content in a
+      standalone probe. BUILD-008 is prepared only; engine Ninja invalidation reproduction and generator edits
+      remain pending. No new template or custom generator helper is needed. BUILD-007/C92 and N569 remain
+      open.'
+    evidence:
+    - tasks/done/RUNTIME-258-unused-workspace-model-declarations.md
+    - tasks/evidence/RUNTIME-258/report.yaml
+    - tasks/evidence/RUNTIME-258/seal.yaml
+    - tasks/evidence/RUNTIME-258/structural-counts.json
+    - tasks/backlog/process/BUILD-008-preserve-unchanged-tinygltf-generation.md
+    status: resolved

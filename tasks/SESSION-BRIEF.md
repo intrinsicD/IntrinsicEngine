@@ -48,6 +48,7 @@ picking backlog work; theme priorities and rationale live in
 
 - blocked by `CI-012`: `BUILD-005` — Define hermetic toolchain and action identity (tasks/backlog/process/BUILD-005-hermetic-toolchain-action-identity.md)
 - blocked by `CI-013`: `BUILD-006` — Run a C++23-module build and cache backend bake-off (tasks/backlog/process/BUILD-006-cxx23-module-build-backend-bakeoff.md)
+- unblocked: `BUILD-008` — Preserve unchanged generated tinygltf source (tasks/backlog/process/BUILD-008-preserve-unchanged-tinygltf-generation.md)
 - unblocked: `CI-012` — Compile a versioned verification evidence graph (tasks/backlog/process/CI-012-versioned-verification-evidence-graph.md)
 - blocked by `CI-012`: `CI-013` — Add unified verifier profiles and receipts (tasks/backlog/process/CI-013-unified-verifier-profiles-and-receipts.md)
 - blocked by `CI-012`: `CI-014` — Derive the static build and contract impact graph (tasks/backlog/process/CI-014-static-build-contract-impact-graph.md)

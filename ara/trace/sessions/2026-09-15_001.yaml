@@ -2,9 +2,9 @@ session:
   id: 2026-09-15_001
   date: '2026-09-15'
   started: '2026-09-15T00:37:12+02:00'
-  last_turn: '2026-09-15T05:19:24+02:00'
-  turn_count: 11
-  summary: RUNTIME-257 workspace diagnostic imports are verified, committed and sealed; RUNTIME-258 has a Claude-reviewed 78-line unused-declaration cleanup plan. Overnight continuation remains active until 08:00 Berlin; matched timing remains open.
+  last_turn: '2026-09-15T05:36:02+02:00'
+  turn_count: 12
+  summary: RUNTIME-258 unused workspace declarations are removed, verified, committed and sealed; BUILD-008 has a Claude-reviewed generated-source stability plan. Overnight continuation remains active until 08:00 Berlin; matched timing remains open.
 events_logged:
 - turn: 1
   type: experiment
@@ -75,6 +75,13 @@ events_logged:
   provenance: ai-executed
   summary: Workspace diagnostic dependency closure reduced 196 to 176 with unchanged bodies and passing
     gates; task sealed and 78-line dead-copy cleanup prepared.
+- turn: 12
+  type: experiment
+  id: N579
+  routing: direct
+  provenance: ai-executed
+  summary: Ten unused declaration copies removed, exact 78-line deletion and full gates verified; task sealed
+    and generated-source stability repair prepared.
 ai_actions:
 - turn: 1
   action: Claude implemented five production files; root reviewed, added lifetime/statistics and compiler-boundary
@@ -185,6 +192,16 @@ ai_actions:
   - tasks/done/RUNTIME-257-workspace-model-diagnostic-dependencies.md
   - tasks/evidence/RUNTIME-257/report.yaml
   - tasks/done/RUNTIME-258-unused-workspace-model-declarations.md
+- turn: 12
+  action: Claude implemented and reviewed four deletions; root verified exact remaining source/live owners,
+    passed native/sanitizer/build gates and retired/sealed RUNTIME-258. Prepared BUILD-008 using existing
+    CMake and configure-test owners plus a native capability probe.
+  provenance: ai-executed
+  files_changed:
+  - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+  - tasks/done/RUNTIME-258-unused-workspace-model-declarations.md
+  - tasks/evidence/RUNTIME-258/report.yaml
+  - tasks/backlog/process/BUILD-008-preserve-unchanged-tinygltf-generation.md
 claims_touched: []
 key_context:
 - turn: 1
@@ -211,8 +228,11 @@ key_context:
 - turn: 11
   excerpt: Continue the authorized cleanup with Claude until 08:00, preserve features and strong verification,
     retire completed slices and resolve existing owners before deleting duplicate or apparently unused code.
+- turn: 12
+  excerpt: Continue the authorized cleanup with Claude until 08:00; preserve features and canonical live
+    code, retire completed work, and test concrete build invalidation before claiming improved compilation.
 open_threads:
-- Overnight cleanup remains active until 08:00; RUNTIME-252/253/254/255/256/257, BUG-134/196 and DOCS-007 are retired and sealed. Next is settled RUNTIME-258 unused workspace declarations; stop new implementation by 07:15.
+- Overnight cleanup remains active until 08:00; RUNTIME-252/253/254/255/256/257/258, BUG-134/196 and DOCS-007 are retired and sealed. Next is settled BUILD-008 tinygltf generation stability; stop new implementation by 07:15.
 - BUILD-007 owns matched clean-source engine compile reconciliation; BUILD-006 separately owns backend/cache comparisons.
   C92 remains a hypothesis.
 - BUG-193 owns unexplained GPU pacing variability and WLOP watchdog margin; BUG-189/191/192 closed only finite-work
