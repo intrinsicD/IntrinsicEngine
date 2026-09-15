@@ -2366,3 +2366,10 @@ entries:
     - Distinguish 20 direct imports from 30 removed compiler dependencies, and promoted runtime compilation from GPU execution. Keep the optional baseline failure and complete passing gates bound to the sealed source.
     - DOCS-007 is planned only. Accept Claude's narrower current-index structure and verified task-location corrections; existing completed records remain intact.
     - Existing 32 pending observations retain their owners/flags without a new closure signal. N569 and the overnight thread remain open until the deadline or a justified stop.
+
+  - turn: 2026-09-15_001#9
+    notes:
+    - Record N576 as current documentation, preservation and validation facts. No research claim or staged observation; docs-only checks do not add runtime evidence or settle C92/BUILD-007.
+    - Separate BUG-196's real navigation false-positive from the new task note's missing Context heading; preserve both raw failures and the passing final gate. The permitted log/plain-path workaround keeps current discovery usable.
+    - BUG-196 now has a settled Claude-reviewed predicate/test plan, not implementation. Preserve exact canonical roots and existing log behavior; no broad policy bypass or new history section.
+    - Existing 32 pending observations retain owners/flags with no new closure signal. N569 and overnight continuation remain open until the deadline or a justified stop.

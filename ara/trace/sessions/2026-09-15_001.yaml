@@ -2,9 +2,9 @@ session:
   id: 2026-09-15_001
   date: '2026-09-15'
   started: '2026-09-15T00:37:12+02:00'
-  last_turn: '2026-09-15T04:22:21+02:00'
-  turn_count: 8
-  summary: RUNTIME-256 recipe-extraction import cleanup is verified, committed and sealed; DOCS-007 has a corrected Claude-reviewed current-backlog plan. Overnight continuation remains active until 08:00 Berlin; BUILD-007/C92 timing remains open.
+  last_turn: '2026-09-15T04:42:04+02:00'
+  turn_count: 9
+  summary: DOCS-007 current runtime backlog index is verified, committed and sealed; BUG-196 has a Claude-reviewed plan to distinguish retirement navigation from task membership. Overnight continuation remains active until 08:00 Berlin; no timing or new runtime claim.
 events_logged:
 - turn: 1
   type: experiment
@@ -56,6 +56,12 @@ events_logged:
   routing: direct
   provenance: ai-executed
   summary: Recipe-extraction dependencies reduced 93 to 63 with unchanged bodies and passing gates; task sealed and current backlog cleanup prepared.
+- turn: 9
+  type: experiment
+  id: N576
+  routing: direct
+  provenance: ai-executed
+  summary: Runtime backlog index reduced 1209 to 54 lines with open links/history preserved; validator false-positive tracked and next repair planned with Claude.
 ai_actions:
 - turn: 1
   action: Claude implemented five production files; root reviewed, added lifetime/statistics and compiler-boundary
@@ -137,6 +143,14 @@ ai_actions:
   - tasks/done/RUNTIME-256-render-recipe-extraction-dependencies.md
   - tasks/evidence/RUNTIME-256/report.yaml
   - tasks/done/DOCS-007-runtime-backlog-current-state.md
+- turn: 9
+  action: Claude rewrote and independently reviewed current backlog discovery; root verified links/historical hashes, diagnosed BUG-196, retained failed checks, fixed task metadata, passed final structural gates, retired/sealed DOCS-007 and settled the next checker repair.
+  provenance: ai-executed
+  files_changed:
+  - tasks/backlog/runtime/README.md
+  - tasks/done/DOCS-007-runtime-backlog-current-state.md
+  - tasks/evidence/DOCS-007/report.yaml
+  - tasks/backlog/bugs/BUG-196-retirement-index-navigation-false-positive.md
 claims_touched: []
 key_context:
 - turn: 1
@@ -156,8 +170,10 @@ key_context:
   excerpt: Continue the user-authorized overnight cleanup with Claude until 08:00; preserve features and exact accepted tokens, retire finished slices and distinguish structural simplification from measured performance.
 - turn: 8
   excerpt: Continue the authorized overnight cleanup with Claude, preserve features and exact source evidence, retire completed tasks, and improve discovery without repeating closed-work narratives.
+- turn: 9
+  excerpt: Continue the authorized cleanup with Claude until 08:00, preserve current task discovery and historical records, fix real validation findings without weakening gates, and retire completed work.
 open_threads:
-- Overnight cleanup remains active until 08:00; RUNTIME-252/253/254/255/256 and BUG-134 are retired and sealed. Next is settled DOCS-007 current runtime backlog discovery. Stop new implementation by 07:15.
+- Overnight cleanup remains active until 08:00; RUNTIME-252/253/254/255/256, BUG-134 and DOCS-007 are retired and sealed. Next is settled BUG-196 retirement-navigation validation; stop new implementation by 07:15.
 - BUILD-007 owns matched clean-source engine compile reconciliation; BUILD-006 separately owns backend/cache comparisons.
   C92 remains a hypothesis.
 - BUG-193 owns unexplained GPU pacing variability and WLOP watchdog margin; BUG-189/191/192 closed only finite-work

@@ -80,11 +80,34 @@ python3 tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_s
 python3 tools/agents/workflow_evidence.py validate --root .
 ```
 Use the test file's actual invocation if inspection requires one. No C++ or GPU
-rebuild: only Python validation and current README navigation change. Plan review
-with Claude remains required before implementation; this note is a diagnosed
-follow-up, not a completed or automatically approved patch.
+rebuild: only Python validation and current README navigation change. The
+corrected plan below was reviewed with Claude before implementation; this remains
+prepared work, not a completed fix.
 
 ## Forbidden changes
 - Allowing arbitrary retired task links in live lists to make the gate green.
 - Adding compatibility/history sections or bypass markers to the runtime README.
 - Editing existing retired task records or unrelated source files.
+
+## Settled plan — Claude review, 2026-09-15
+Claude approved one module-level `is_retirement_navigation(target, tasks_root)`
+predicate beside the existing retirement-log constant, used by both current
+index checks. Preserve the existing name-based RETIREMENT_LOG_NAME exemption.
+Add only the exact done/archive roots and their direct README.md paths, using
+the same resolved-root assumptions as the existing callers. No change to
+`validate_link_states` is needed: navigation paths do not carry task IDs.
+
+Reuse the existing fixture helpers. Add positive cases for both roots with and
+without trailing slash, direct README indexes and README fragments in top-level
+live and category indexes. Keep actual retired-task links, nested README paths,
+and misleading link text rejected; a fragment on an actual task must still fail.
+Do not add a heading containing `verified` or other history terms, since the
+existing history-heading matcher would exempt that section. Restore navigation
+inside the current Related queues and documentation paragraph. The optional
+methods-queue link may be omitted; no further README restructuring is needed.
+
+Root accepts these refinements within the user-authorized cleanup. Baseline
+reproduction must fail for the intended navigation finding; final tests and both
+existing validators must pass before retirement. Use existing Python tooling,
+with no C++ rebuild or new package dependency. CLI plan review is retained under
+`/tmp/intrinsic-overnight-20260915/docs007/claude-plan-bug196.txt`.

@@ -590,8 +590,8 @@ sessions:
 
 - id: 2026-09-15_001
   date: '2026-09-15'
-  summary: RUNTIME-256 recipe-extraction import cleanup is verified, committed and sealed; DOCS-007 has a corrected Claude-reviewed current-backlog plan. Overnight continuation remains active until 08:00 Berlin; BUILD-007/C92 timing remains open.
-  turn_count: 8
-  events_count: 8
+  summary: DOCS-007 current runtime backlog index is verified, committed and sealed; BUG-196 has a Claude-reviewed plan to distinguish retirement navigation from task membership. Overnight continuation remains active until 08:00 Berlin; no timing or new runtime claim.
+  turn_count: 9
+  events_count: 9
   claims_touched: []
   open_threads: 10

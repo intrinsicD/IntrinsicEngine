@@ -12545,3 +12545,33 @@ tree:
     - tasks/evidence/RUNTIME-256/structural-counts.json
     - tasks/done/DOCS-007-runtime-backlog-current-state.md
     status: resolved
+
+  - id: N576
+    type: experiment
+    title: Replace stale backlog history with current discovery and diagnose navigation validation
+    provenance: ai-executed
+    timestamp: '2026-09-15T04:42:04+02:00'
+    result: Claude rewrote the runtime backlog README; root clarified task ownership and checked
+      exact task goals and link identities. The document shrinks 1209 to 54 lines, retaining 8 required
+      open targets and 5 local tasks while 127 linked historical task records retain exact hashes.
+      No executable, build or tool source changed. Source-documentation audit drops from 11 objective
+      errors/359 review notes to 0 errors/6 manually accepted notes for live task links and brief
+      history navigation. No new runtime evidence or performance claim.
+      Strict task-state validation misclassified done/archive README navigation as retired task
+      membership. DOCS-007 uses the permitted retirement-log link and plain index paths pending
+      BUG-196; no validator was weakened. A later preflight caught the new bug note's missing Context
+      heading, which root corrected. Both failed receipts remain immutable artifacts and final
+      structural checks pass. Claude approved the exact 54-line text and the bounded workaround.
+      DOCS-007 retired in 4d2135f87 and sealed in e6ce2b506; evidence validation reports zero errors
+      and 101 warnings, including 4 explicit docs-only verification skips. Claim released; no writer
+      or build remains active. BUG-196's corrected narrow shared navigation predicate and positive/
+      negative fixture plan were approved with Claude, but no checker code has changed yet.
+      Existing history-heading behavior and real retired-task rejection must remain intact.
+      Broader editor-import guesses remain unapproved; BUILD-007/C92 and overnight deadline stay open.
+    evidence:
+    - tasks/done/DOCS-007-runtime-backlog-current-state.md
+    - tasks/evidence/DOCS-007/report.yaml
+    - tasks/evidence/DOCS-007/seal.yaml
+    - tasks/evidence/DOCS-007/link-coverage.json
+    - tasks/backlog/bugs/BUG-196-retirement-index-navigation-false-positive.md
+    status: resolved
