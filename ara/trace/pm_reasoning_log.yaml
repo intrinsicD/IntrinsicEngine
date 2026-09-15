@@ -2405,3 +2405,14 @@ entries:
       existing configure steps and native generation, not a new framework.
     - No new research claim or observation is needed for this ordinary implementation work. N569 and overnight
       continuation remain open until the deadline or a justified stop.
+
+  - turn: 2026-09-15_001#13
+    notes:
+    - Record avoided producer work only; no elapsed-time speedup, GPU execution or new sanitizer claim. BUILD007/C92
+      retains matched measurements.
+    - Initial dry-run probe failed before producer traversal and remains artifact-bound; actual-producer replacement
+      passes. Intended old-generator regression is preserved as optional baseline.
+    - RUNTIME259 is prepared only; source proof must include recursive headers, reexports and unqualified/ADL
+      uses before deletion, and the actual supported compiler map determines dependency effect.
+    - No new research claim or observation is warranted for ordinary refactoring. Preserve pending observation
+      flags and N569 until deadline or justified stop.

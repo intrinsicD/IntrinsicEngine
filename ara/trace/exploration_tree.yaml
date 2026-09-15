@@ -12664,3 +12664,30 @@ tree:
     - tasks/evidence/RUNTIME-258/structural-counts.json
     - tasks/done/BUILD-008-preserve-unchanged-tinygltf-generation.md
     status: resolved
+
+  - id: N580
+    type: experiment
+    title: Preserve unchanged tinygltf generation and prepare bounded workspace import cleanup
+    provenance: ai-executed
+    timestamp: '2026-09-15T05:58:23+02:00'
+    result: Native CMake file(CONFIGURE) replaces the unconditional tinygltf generated-source write. Existing
+      backend configure test now checks bytes/mtime around all three existing same-tree reconfigurations and
+      repairs corruption during its existing backend transition, with no extra configure or new test/helper/template
+      file. Old generator fails the intended mtime assertion; final test passes. Corrected actual-producer
+      baseline proves scan/compile/link work caused by timestamp despite identical bytes/flags; final reconciled
+      actual build reports no work to do. Initial dry-run probe failure remains immutable as diagnosed artifacts,
+      with passing replacement required. No engine source changed and compile/link command hashes match. Claude
+      independently approved; full ci build,4636 CPU cases plus one expected GLFW/LSan control skip,Vulkan
+      runtime compilation and structural checks pass. No new sanitizer run or elapsed-time claim; latest RUNTIME258
+      focused evidence remains separate. Source6d669bfe3,seal b9e3ccb83; final evidence validation0errors105historical
+      warnings; claim released. Claude proposed eight unused Models.cpp imports; root prepared RUNTIME259
+      with recursive-header/export/ADL proof, unchanged bodies, actual compiler closure and existing supported
+      Clang23 gates. Root rejected unverified ci-clang20/nonexistent module target advice and conditional
+      Geometry.Graph removal. RUNTIME259 is prepared only. BUILD007/C92 and overnight N569 remain open.
+    evidence:
+    - tasks/done/BUILD-008-preserve-unchanged-tinygltf-generation.md
+    - tasks/evidence/BUILD-008/report.yaml
+    - tasks/evidence/BUILD-008/seal.yaml
+    - tasks/evidence/BUILD-008/final-producer.json
+    - tasks/backlog/runtime/RUNTIME-259-workspace-model-unused-imports.md
+    status: resolved
