@@ -1968,3 +1968,85 @@ TEST(SandboxProcessingPanels, GeodesicsRetriesDraftAndKeepsRejectedEntityReset)
     h.Engine->Run();
     EXPECT_TRUE(completed);
 }
+
+
+TEST(SandboxProcessingPanels, TopologyAdmissionKeepsBlockedActionsVisibleAndRunsValidCommands)
+{
+    for (const bool simplify : {false, true})
+    {
+        SCOPED_TRACE(simplify ? "simplify" : "denoise");
+        PanelHarness h;
+        auto& scene = h.Scene();
+        const auto entity = scene.Create();
+        PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+        const char* title = simplify ? "Mesh / Processing / Simplify" : "Mesh / Processing / Denoise";
+        const char* label = simplify ? "Simplify##MeshSimplify" : "Denoise##MeshDenoise";
+        ASSERT_TRUE(h.Shell.SetEditorWindowOpen(
+            simplify ? "mesh.processing.simplify" : "mesh.processing.denoise", true));
+        std::optional<R::EditorCommandStatus> status;
+        std::string message;
+        const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+            .Id = "test.topology_admission", .MenuPath = {"View"}, .Title = "Topology admission observer",
+            .OpenByDefault = true,
+            .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
+                const auto copy = [&](const auto& result) {
+                    if (result) { status = result->Status; message = result->Message; }
+                };
+                if (simplify) copy(context.MeshTopology.Results.LastMeshSimplifyResult);
+                else copy(context.MeshTopology.Results.LastMeshDenoiseResult);
+            }});
+        int frames = 0, step = 0;
+        std::uint64_t jobsBefore = 0u;
+        bool completed = false;
+        h.Driver->OnFrame = [&](R::Engine& engine) {
+            if (++frames > 400) { ADD_FAILURE() << "Topology control did not finish"; engine.RequestExit(); return; }
+            auto* window = ImGui::FindWindowByName(title);
+            if (!window) return;
+            ImGui::SetWindowSize(window, {900, 1500});
+            ImGui::SetWindowPos(window, {0, 0});
+            ++step;
+            const auto run = [&] { ImGui::ActivateItemByID(window->GetID(label)); };
+            if (step == 3)
+            {
+                jobsBefore = engine.Jobs().Stats().SubmittedJobs;
+                ImGui::GetCurrentContext()->LogBuffer.clear();
+                ImGui::LogToBuffer();
+                ImGui::GetCurrentContext()->LogWindow = nullptr;
+                run();
+            }
+            if (step == 6)
+            {
+                // The button itself was submitted even without a chosen entity.
+                EXPECT_NE(std::string_view{ImGui::GetCurrentContext()->LogBuffer.c_str()}.find(
+                    simplify ? "[ Simplify ]" : "[ Denoise ]"), std::string_view::npos);
+                ImGui::LogFinish();
+                EXPECT_FALSE(status);
+                EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
+                EXPECT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+            }
+            if (simplify && step >= 7 && step <= 12)
+                EditScalarControl(window, "Target faces##MeshSimplify", step - 7, "0");
+            if (step == 14) run();
+            if (simplify && step == 17)
+            {
+                EXPECT_FALSE(status); // A selected mesh alone is not sufficient.
+                EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
+            }
+            if (simplify && step >= 18 && step <= 23)
+                EditScalarControl(window, "Target faces##MeshSimplify", step - 18, "2");
+            if (simplify && step == 25) run();
+            if (step > (simplify ? 27 : 16) && status && *status != R::EditorCommandStatus::Pending)
+            {
+                EXPECT_TRUE(*status == R::EditorCommandStatus::Applied ||
+                            *status == R::EditorCommandStatus::NoChange) << message;
+                EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore + 1u);
+                completed = true;
+                engine.RequestExit();
+            }
+        };
+        h.Engine->Run();
+        if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
+        EXPECT_TRUE(completed);
+        EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
+    }
+}

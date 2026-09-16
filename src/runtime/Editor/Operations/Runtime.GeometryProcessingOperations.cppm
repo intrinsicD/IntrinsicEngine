@@ -170,7 +170,6 @@ export namespace Extrinsic::Runtime
         EditorGeometryProcessingCapabilities Capabilities{};
         std::vector<EditorGeometryProcessingEntry> Entries{};
         std::vector<EditorGeometryProcessingDomain> KMeansDomains{};
-        bool MeshDenoiseAvailable{false};
         bool MeshCurvatureAvailable{false};
         bool MeshCurvatureDirectionsAvailable{false};
         bool CurvatureSegmentationAvailable{false};
@@ -184,7 +183,6 @@ export namespace Extrinsic::Runtime
         bool MeshSubdivideCatmullClarkAvailable{false};
         bool MeshSubdivideSqrt3Available{false};
         bool MeshSubdivideLoopFeatureEdgesAvailable{false};
-        bool MeshSimplifyAvailable{false};
         bool MeshVertexNormalsAvailable{false};
         bool GraphVertexNormalsAvailable{false};
         bool PointCloudVertexNormalsAvailable{false};

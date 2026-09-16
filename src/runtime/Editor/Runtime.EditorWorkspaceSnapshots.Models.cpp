@@ -2234,12 +2234,6 @@ namespace {
       ResolveEditorGeometryProcessingEntries(model.Capabilities);
             model.KMeansDomains =
       GetAvailableEditorKMeansDomains(*context.Scene, *selected);
-            model.MeshDenoiseAvailable =
-                context.MeshDenoiseKernelAvailable &&
-                model.Capabilities.HasEditableSurfaceMesh &&
-                HasAnyEditorGeometryProcessingDomain(
-                    model.Capabilities.Domains,
-                    EditorGeometryProcessingDomain::MeshVertices);
             model.MeshCurvatureAvailable =
                 context.MeshCurvatureKernelAvailable &&
                 model.Capabilities.HasEditableSurfaceMesh &&
@@ -2292,12 +2286,6 @@ namespace {
             model.MeshSubdivideLoopFeatureEdgesAvailable =
                 model.MeshSubdivideLoopAvailable &&
                 context.MeshSubdivideLoopFeatureEdgesAvailable;
-            model.MeshSimplifyAvailable =
-                context.MeshSimplifyKernelAvailable &&
-                model.Capabilities.HasEditableSurfaceMesh &&
-                HasAnyEditorGeometryProcessingDomain(
-                    model.Capabilities.Domains,
-                    EditorGeometryProcessingDomain::MeshVertices);
             model.MeshVertexNormalsAvailable =
                 model.Capabilities.HasEditableSurfaceMesh &&
                 HasAnyEditorGeometryProcessingDomain(

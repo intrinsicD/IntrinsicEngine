@@ -571,3 +571,58 @@ Verified checkpoint:
 - UI-037 remains open for remaining action/backend controls and full numerical
   readiness. No module inventory change, compile-time measurement, sanitizer
   execution or Vulkan runtime claim in this slice.
+
+
+## Denoise/simplify admission reuse — plan
+
+- Operator-directed continuation of processing reuse and compilation-locality work.
+  Denoise/simplify command validation is the canonical owner of scene, parameter,
+  kernel and entity checks. Move those checks into private typed overloads in the
+  existing compiled family owner and share them with typed admission previews.
+  Reuse `ValidateMeshSoupSourceMetadata` for cheap source checks, and the existing
+  shared action button/tooltip. Preserve each command's diagnostic priority.
+- Panels build one request for preview and execution; remove hidden actions,
+  simplify's duplicate stop predicate, and the two redundant common-model flags.
+  No new file, module, config lane or dependency; no measured compilation claim.
+- Preview certifies admission only. Full-buffer finite/connectivity checks and
+  deleted-slot feasibility still occur in the source builder; complete cached
+  numerical readiness and remesh/subdivide options remain open.
+
+
+## Denoise/simplify admission reuse — verified checkpoint
+
+- Typed previews and apply share their existing scene/parameter/kernel/entity
+  validation, including per-command reason priority and denoise-specific failure
+  status. Preview reuses source metadata checks from the mesh builder. Panels
+  use the exact previewed command and shared disabled-reason button; missing
+  inputs no longer hide the action, and simplify has no app-owned stop predicate.
+  Deleted the two common-model availability fields and their derivations.
+- Claude reviewed the plan, diff and supporting source. Confirmed editable-surface
+  capability means the same provenance/component presence, with no separate
+  shared/read-only gate. Every metadata rejection supplies a diagnostic; no
+  speculative fallback was added. Ready-default tests cover denoise's existing
+  positive epsilon. Source access reads pointers, counts and property handles.
+- New runtime tests cover validation priority/reason parity, missing scene/entity,
+  kernel/parameter rejection, metadata changes, stale targets, and non-mutating
+  admission over non-finite data with fail-closed execution. Actual widgets cover
+  visible blocked actions, no submission without an entity or simplify stop
+  criterion, then one queued job and terminal delivery for each method.
+- Fixed four overlooked legacy model assertions during the first build. Corrected
+  the new non-finite test's invented failure-enum expectation: the two existing
+  execution paths reject by different routes, so it asserts no success, unchanged
+  invalid input and no history entry. Final focused run: 28 passes (1.09 s).
+- Canonical `ci` configure / `IntrinsicTests` build / full CPU selector pass:
+  **4,685 passes, one expected ASan-only GLFW lifecycle skip, zero failures**
+  (4,686 selected; 137.39 s). Layering, test layout, task policy/state links,
+  docs links/sync, skill freshness, session brief, root hygiene and diff checks
+  pass. Module inventory regenerated unchanged. Source documentation audit has
+  zero objective errors; existing broad README/interface review hints are outside
+  the changed paragraphs/declarations.
+- Scope/layering/tests/docs sweep and automated workshop checks pass. Manual
+  workshop rows 1–3 pass; renderer/pass/recipe rows 4–6 are unchanged; row 7 is
+  partial task progress; row 8 has no exception. No new module, source file,
+  dependency or service. Production C++ is **27 lines larger** overall to expose
+  missing previews while removing duplicated model/UI decisions. No compilation
+  improvement measurement, sanitizer execution or Vulkan runtime claim.
+- UI-037 stays active: remesh/subdivide options, the remaining action/backend
+  inventory and full cached numerical/deleted-slot readiness still need work.

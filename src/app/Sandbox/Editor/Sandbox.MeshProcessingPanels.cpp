@@ -721,18 +721,9 @@ namespace Extrinsic::Sandbox::Editor
         const Runtime::EditorDomainWindowModel& model,
         const SandboxEditorContext& context)
     {
-        const Runtime::EditorGeometryProcessingModel& processing =
-            model.Processing;
         if (context.MeshTopology.Results.LastMeshDenoiseResult.has_value())
             Denoise.LastResult = *context.MeshTopology.Results.LastMeshDenoiseResult;
         ImGui::SeparatorText("Denoise");
-        if (!processing.MeshDenoiseAvailable)
-        {
-            ImGui::TextDisabled(
-                "Mesh denoise is unavailable for this selection.");
-            return;
-        }
-
         Denoise.Stage = std::clamp(
             Denoise.Stage, 0,
             static_cast<std::int32_t>(kMeshDenoiseStages.size() - 1u));
@@ -781,24 +772,27 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::Checkbox(
             "Preserve boundary##MeshDenoise", &Denoise.PreserveBoundary);
 
-        if (ImGui::Button("Denoise##MeshDenoise"))
+        const Runtime::EditorMeshDenoiseCommand command{
+            .StableEntityId = model.SelectedStableId,
+            .Stage = stage,
+            .NormalIterations = static_cast<std::uint32_t>(
+                Denoise.NormalIterations),
+            .VertexIterations = static_cast<std::uint32_t>(
+                Denoise.VertexIterations),
+            .SigmaSpatial = static_cast<double>(
+                Denoise.SigmaSpatial),
+            .SigmaRange = static_cast<double>(Denoise.SigmaRange),
+            .PreserveBoundary = Denoise.PreserveBoundary,
+        };
+        const auto readiness = Runtime::PreviewEditorMeshDenoiseCommand(
+            context.MeshTopology.Commands, command);
+        if (DrawProcessingActionButton("Denoise##MeshDenoise", readiness))
         {
             PublishCommandResult(
                 Denoise.LastResult,
                 Runtime::ApplyEditorMeshDenoiseCommand(
                     context.MeshTopology.Commands,
-                    Runtime::EditorMeshDenoiseCommand{
-                        .StableEntityId = model.SelectedStableId,
-                        .Stage = stage,
-                        .NormalIterations = static_cast<std::uint32_t>(
-                            Denoise.NormalIterations),
-                        .VertexIterations = static_cast<std::uint32_t>(
-                            Denoise.VertexIterations),
-                        .SigmaSpatial = static_cast<double>(
-                            Denoise.SigmaSpatial),
-                        .SigmaRange = static_cast<double>(Denoise.SigmaRange),
-                        .PreserveBoundary = Denoise.PreserveBoundary,
-                    },
+                    command,
                     context.MeshTopology.ResultSinks.MeshDenoise),
                 context.MeshTopology.ResultSinks.MeshDenoise);
         }
@@ -1647,18 +1641,9 @@ namespace Extrinsic::Sandbox::Editor
         const Runtime::EditorDomainWindowModel& model,
         const SandboxEditorContext& context)
     {
-        const Runtime::EditorGeometryProcessingModel& processing =
-            model.Processing;
         if (context.MeshTopology.Results.LastMeshSimplifyResult.has_value())
             Simplify.LastResult = *context.MeshTopology.Results.LastMeshSimplifyResult;
         ImGui::SeparatorText("Simplify");
-        if (!processing.MeshSimplifyAvailable)
-        {
-            ImGui::TextDisabled(
-                "Mesh simplification is unavailable for this selection.");
-            return;
-        }
-
         Simplify.Metric = std::clamp(
             Simplify.Metric, 0,
             static_cast<std::int32_t>(kMeshSimplifyMetrics.size() - 1u));
@@ -1726,40 +1711,37 @@ namespace Extrinsic::Sandbox::Editor
         if (!faQem)
             ImGui::EndDisabled();
 
-        const bool canRun =
-            Simplify.TargetFaces > 0 || Simplify.MaxError > 0.0f;
-        if (!canRun)
-            ImGui::BeginDisabled();
-        if (ImGui::Button("Simplify##MeshSimplify"))
+        const Runtime::EditorMeshSimplifyCommand command{
+            .StableEntityId = model.SelectedStableId,
+            .Metric = metric,
+            .TargetFaces = static_cast<std::size_t>(
+                Simplify.TargetFaces),
+            .MaxError = static_cast<double>(Simplify.MaxError),
+            .PreserveBoundary = Simplify.PreserveBoundary,
+            .FeatureAngleThresholdDegrees = static_cast<double>(
+                Simplify.FeatureAngleThresholdDegrees),
+            .NormalWeight = static_cast<double>(
+                Simplify.NormalWeight),
+            .BoundaryWeight = static_cast<double>(
+                Simplify.BoundaryWeight),
+            .CurvatureWeight = static_cast<double>(
+                Simplify.CurvatureWeight),
+            .PreserveSharpFeatures =
+                Simplify.PreserveSharpFeatures,
+            .PreserveUvSeams = Simplify.PreserveUvSeams,
+        };
+        const auto readiness = Runtime::PreviewEditorMeshSimplifyCommand(
+            context.MeshTopology.Commands, command);
+        if (DrawProcessingActionButton("Simplify##MeshSimplify", readiness))
         {
             PublishCommandResult(
                 Simplify.LastResult,
                 Runtime::ApplyEditorMeshSimplifyCommand(
                     context.MeshTopology.Commands,
-                    Runtime::EditorMeshSimplifyCommand{
-                        .StableEntityId = model.SelectedStableId,
-                        .Metric = metric,
-                        .TargetFaces = static_cast<std::size_t>(
-                            Simplify.TargetFaces),
-                        .MaxError = static_cast<double>(Simplify.MaxError),
-                        .PreserveBoundary = Simplify.PreserveBoundary,
-                        .FeatureAngleThresholdDegrees = static_cast<double>(
-                            Simplify.FeatureAngleThresholdDegrees),
-                        .NormalWeight = static_cast<double>(
-                            Simplify.NormalWeight),
-                        .BoundaryWeight = static_cast<double>(
-                            Simplify.BoundaryWeight),
-                        .CurvatureWeight = static_cast<double>(
-                            Simplify.CurvatureWeight),
-                        .PreserveSharpFeatures =
-                            Simplify.PreserveSharpFeatures,
-                        .PreserveUvSeams = Simplify.PreserveUvSeams,
-                    },
+                    command,
                     context.MeshTopology.ResultSinks.MeshSimplify),
                 context.MeshTopology.ResultSinks.MeshSimplify);
         }
-        if (!canRun)
-            ImGui::EndDisabled();
 
         const auto& result = Simplify.LastResult;
         if (!result.has_value())

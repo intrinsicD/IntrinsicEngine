@@ -85,6 +85,7 @@ import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.MeshTopologyOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SceneSerialization;
@@ -2306,7 +2307,8 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
         Runtime::BuildEditorDomainWindowModel(
             context,
             Runtime::EditorDomainWindowKind::Mesh);
-    EXPECT_TRUE(meshModel.Processing.MeshDenoiseAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshDenoiseCommand(
+        context, {.StableEntityId = meshModel.SelectedStableId}).Enabled);
     EXPECT_TRUE(meshModel.Processing.MeshCurvatureAvailable);
     EXPECT_TRUE(meshModel.Processing.MeshCurvatureDirectionsAvailable);
     EXPECT_TRUE(meshModel.Processing.MeshRemeshAvailable);
@@ -2319,7 +2321,8 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     EXPECT_TRUE(meshModel.Processing.MeshSubdivideCatmullClarkAvailable);
     EXPECT_TRUE(meshModel.Processing.MeshSubdivideSqrt3Available);
     EXPECT_TRUE(meshModel.Processing.MeshSubdivideLoopFeatureEdgesAvailable);
-    EXPECT_TRUE(meshModel.Processing.MeshSimplifyAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshSimplifyCommand(
+        context, {.StableEntityId = meshModel.SelectedStableId, .TargetFaces = 1u}).Enabled);
     EXPECT_TRUE(meshModel.Processing.MeshVertexNormalsAvailable);
     EXPECT_TRUE(meshModel.Processing.ProgressivePoissonAvailable);
     EXPECT_TRUE(
@@ -2362,7 +2365,8 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
         Runtime::BuildEditorDomainWindowModel(
             context,
             Runtime::EditorDomainWindowKind::Graph);
-    EXPECT_FALSE(graphModel.Processing.MeshDenoiseAvailable);
+    EXPECT_FALSE(Runtime::PreviewEditorMeshDenoiseCommand(
+        context, {.StableEntityId = graphModel.SelectedStableId}).Enabled);
     EXPECT_FALSE(graphModel.Processing.MeshCurvatureAvailable);
     EXPECT_FALSE(graphModel.Processing.MeshCurvatureDirectionsAvailable);
     EXPECT_FALSE(graphModel.Processing.MeshVertexNormalsAvailable);
@@ -2410,7 +2414,8 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
         Runtime::BuildEditorDomainWindowModel(
             context,
             Runtime::EditorDomainWindowKind::PointCloud);
-    EXPECT_FALSE(cloudModel.Processing.MeshDenoiseAvailable);
+    EXPECT_FALSE(Runtime::PreviewEditorMeshDenoiseCommand(
+        context, {.StableEntityId = cloudModel.SelectedStableId}).Enabled);
     EXPECT_FALSE(cloudModel.Processing.MeshCurvatureAvailable);
     EXPECT_FALSE(cloudModel.Processing.MeshCurvatureDirectionsAvailable);
     EXPECT_FALSE(cloudModel.Processing.MeshVertexNormalsAvailable);

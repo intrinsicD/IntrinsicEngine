@@ -906,6 +906,11 @@ in unrelated sections remains usable. Progressive Poisson and parameterization u
 this same apply owner and `RuntimeEngineConfigApplyResult`, passing typed configs
 directly. Parameterization validates typed enums before serializing its section. Family-specific readiness
 records and controls outside the shared config-backed path remain distinct.
+Denoise and simplify expose typed admission previews that share command parameter,
+kernel and entity checks and the mesh source-metadata validator. They perform no
+geometry copies or full-buffer scans; execution still validates numerical values
+and connectivity. Their availability is owned by the topology family rather than
+stored separately in the common editor model.
 
 `UI-021` makes `Extrinsic.Runtime.GeometryAvailability` the shared availability
 policy for those editor models and commands. Domain windows, visualization

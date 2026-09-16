@@ -2158,11 +2158,155 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 handle);
         }
 
+        [[nodiscard]] std::optional<ECS::EntityHandle> ResolveMeshCommandTarget(
+            const EditorProcessingContext& context,
+            const EditorMeshDenoiseCommand& command,
+            EditorMeshDenoiseResult& result)
+        {
+            if (context.Scene == nullptr)
+            {
+                result.Status = EditorCommandStatus::MissingScene;
+                result.DenoiseStatus = Smooth::DenoiseStatus::EmptyMesh;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message = "Scene registry is unavailable for mesh denoise.";
+                return std::nullopt;
+            }
+            if (!context.MeshDenoiseKernelAvailable)
+            {
+                result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                result.DenoiseStatus = Smooth::DenoiseStatus::InvalidParams;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message       = "Geometry.Smoothing mesh denoiser is unavailable in this "
+                                       "runtime configuration.";
+                return std::nullopt;
+            }
+
+            const bool validStage =
+                std::find(kMeshDenoiseStages.begin(),
+                          kMeshDenoiseStages.end(),
+                          command.Stage) != kMeshDenoiseStages.end();
+            if (!validStage ||
+                command.NormalIterations == 0u ||
+                command.VertexIterations == 0u ||
+                !std::isfinite(command.SigmaSpatial) ||
+                !std::isfinite(command.SigmaRange) ||
+                command.SigmaSpatial < 0.0 ||
+                command.SigmaRange < 0.0 ||
+                !IsPositiveFinite(command.DegenerateNormalLengthEpsilon))
+            {
+                result.Status =
+                    EditorCommandStatus::InvalidProcessingParameters;
+                result.DenoiseStatus = Smooth::DenoiseStatus::InvalidParams;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message       = "Mesh denoise requires a valid stage, positive iteration "
+                                       "counts, non-negative finite sigma values, and a positive "
+                                       "finite degeneracy epsilon.";
+                return std::nullopt;
+            }
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, command.StableEntityId);
+            if (!entity.has_value())
+            {
+                result.Status = EditorCommandStatus::StaleEntity;
+                result.DenoiseStatus = Smooth::DenoiseStatus::EmptyMesh;
+                result.Error = Core::ErrorCode::ResourceNotFound;
+                result.Message =
+                    "Mesh denoise target entity is stale or no longer live.";
+                return std::nullopt;
+            }
+
+            return entity;
+        }
+
+        [[nodiscard]] std::optional<ECS::EntityHandle> ResolveMeshCommandTarget(
+            const EditorProcessingContext& context,
+            const EditorMeshSimplifyCommand& command,
+            EditorMeshSimplifyResult& result)
+        {
+            if (context.Scene == nullptr)
+            {
+                result.Status = EditorCommandStatus::MissingScene;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message = "Scene registry is unavailable for mesh simplify.";
+                return std::nullopt;
+            }
+            const bool hasStopCriterion =
+                command.TargetFaces > 0u || command.MaxError > 0.0;
+            if (!ValidMeshSimplifyMetric(command.Metric) ||
+                !hasStopCriterion ||
+                command.NormalWeight < 0.0 ||
+                command.BoundaryWeight < 0.0 ||
+                command.CurvatureWeight < 0.0 ||
+                command.FeatureAngleThresholdDegrees < 0.0 ||
+                command.FeatureAngleThresholdDegrees > 180.0)
+            {
+                result.Status =
+                    EditorCommandStatus::InvalidProcessingParameters;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message = "Mesh simplify requires a valid metric, a positive target "
+                                 "face count or maximum error, non-negative weights, and a "
+                                 "feature angle within [0, 180].";
+                return std::nullopt;
+            }
+            if (!context.MeshSimplifyKernelAvailable)
+            {
+                result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Geometry.Simplification is unavailable in this runtime configuration.";
+                return std::nullopt;
+            }
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, command.StableEntityId);
+            if (!entity.has_value())
+            {
+                result.Status = EditorCommandStatus::StaleEntity;
+                result.Error = Core::ErrorCode::ResourceNotFound;
+                result.Message =
+                    "Mesh simplify target entity is stale or no longer live.";
+                return std::nullopt;
+            }
+
+            return entity;
+        }
+
+        // Cheap admission only: the source builder still checks numerical and
+        // connectivity validity at execution, before any mutation or job submission.
+        template <typename Result, typename Command>
+        [[nodiscard]] ActionReadiness PreviewMeshCommand(
+            const EditorProcessingCommands& commands, const Command& command)
+        {
+            const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
+            Result result{};
+            const auto entity = ResolveMeshCommandTarget(context, command, result);
+            if (!entity) return {false, std::move(result.Message)};
+            std::string diagnostic;
+            const auto status = ValidateMeshSoupSourceMetadata(
+                GS::BuildConstView(context.Scene->Raw(), *entity), diagnostic);
+            return {status == EditorCommandStatus::Applied, std::move(diagnostic)};
+        }
+
 } // namespace Extrinsic::Runtime::MeshTopologyDetail
 
 namespace Extrinsic::Runtime
 {
     using namespace MeshTopologyDetail;
+
+    ActionReadiness PreviewEditorMeshDenoiseCommand(
+        const EditorProcessingCommands& commands, const EditorMeshDenoiseCommand& command)
+    {
+        return PreviewMeshCommand<EditorMeshDenoiseResult>(commands, command);
+    }
+
+    ActionReadiness PreviewEditorMeshSimplifyCommand(
+        const EditorProcessingCommands& commands, const EditorMeshSimplifyCommand& command)
+    {
+        return PreviewMeshCommand<EditorMeshSimplifyResult>(commands, command);
+    }
 
     EditorMeshDenoiseResult
 ApplyEditorMeshDenoiseCommand(
@@ -2175,59 +2319,9 @@ ApplyEditorMeshDenoiseCommand(
         EditorMeshDenoiseResult result =
             MakeMeshDenoiseBaseResult(command);
 
-        if (context.Scene == nullptr)
-        {
-            result.Status = EditorCommandStatus::MissingScene;
-            result.DenoiseStatus = Smooth::DenoiseStatus::EmptyMesh;
-            result.Error = Core::ErrorCode::InvalidState;
-            result.Message = "Scene registry is unavailable for mesh denoise.";
-            return result;
-        }
-        if (!context.MeshDenoiseKernelAvailable)
-        {
-            result.Status = EditorCommandStatus::GeometryProcessingFailed;
-            result.DenoiseStatus = Smooth::DenoiseStatus::InvalidParams;
-            result.Error = Core::ErrorCode::InvalidState;
-            result.Message       = "Geometry.Smoothing mesh denoiser is unavailable in this "
-                                   "runtime configuration.";
-            return result;
-        }
-
-        const bool validStage =
-            std::find(kMeshDenoiseStages.begin(),
-                      kMeshDenoiseStages.end(),
-                      command.Stage) != kMeshDenoiseStages.end();
-        if (!validStage ||
-            command.NormalIterations == 0u ||
-            command.VertexIterations == 0u ||
-            !std::isfinite(command.SigmaSpatial) ||
-            !std::isfinite(command.SigmaRange) ||
-            command.SigmaSpatial < 0.0 ||
-            command.SigmaRange < 0.0 ||
-            !IsPositiveFinite(command.DegenerateNormalLengthEpsilon))
-        {
-            result.Status =
-                EditorCommandStatus::InvalidProcessingParameters;
-            result.DenoiseStatus = Smooth::DenoiseStatus::InvalidParams;
-            result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message       = "Mesh denoise requires a valid stage, positive iteration "
-                                   "counts, non-negative finite sigma values, and a positive "
-                                   "finite degeneracy epsilon.";
-            return result;
-        }
-
+        const auto entity = ResolveMeshCommandTarget(context, command, result);
+        if (!entity) return result;
         entt::registry& raw = context.Scene->Raw();
-        const std::optional<ECS::EntityHandle> entity =
-            ResolveStableEntity(raw, command.StableEntityId);
-        if (!entity.has_value())
-        {
-            result.Status = EditorCommandStatus::StaleEntity;
-            result.DenoiseStatus = Smooth::DenoiseStatus::EmptyMesh;
-            result.Error = Core::ErrorCode::ResourceNotFound;
-            result.Message =
-                "Mesh denoise target entity is stale or no longer live.";
-            return result;
-        }
 
         const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
         MeshDenoiseSourceResult source =
@@ -2627,51 +2721,9 @@ ApplyEditorMeshSimplifyCommand(
         EditorMeshSimplifyResult result =
             MakeMeshSimplifyBaseResult(command);
 
-        if (context.Scene == nullptr)
-        {
-            result.Status = EditorCommandStatus::MissingScene;
-            result.Error = Core::ErrorCode::InvalidState;
-            result.Message = "Scene registry is unavailable for mesh simplify.";
-            return result;
-        }
-        const bool hasStopCriterion =
-            command.TargetFaces > 0u || command.MaxError > 0.0;
-        if (!ValidMeshSimplifyMetric(command.Metric) ||
-            !hasStopCriterion ||
-            command.NormalWeight < 0.0 ||
-            command.BoundaryWeight < 0.0 ||
-            command.CurvatureWeight < 0.0 ||
-            command.FeatureAngleThresholdDegrees < 0.0 ||
-            command.FeatureAngleThresholdDegrees > 180.0)
-        {
-            result.Status =
-                EditorCommandStatus::InvalidProcessingParameters;
-            result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message = "Mesh simplify requires a valid metric, a positive target "
-                             "face count or maximum error, non-negative weights, and a "
-                             "feature angle within [0, 180].";
-            return result;
-        }
-        if (!context.MeshSimplifyKernelAvailable)
-        {
-            result.Status = EditorCommandStatus::GeometryProcessingFailed;
-            result.Error = Core::ErrorCode::InvalidState;
-            result.Message =
-                "Geometry.Simplification is unavailable in this runtime configuration.";
-            return result;
-        }
-
+        const auto entity = ResolveMeshCommandTarget(context, command, result);
+        if (!entity) return result;
         entt::registry& raw = context.Scene->Raw();
-        const std::optional<ECS::EntityHandle> entity =
-            ResolveStableEntity(raw, command.StableEntityId);
-        if (!entity.has_value())
-        {
-            result.Status = EditorCommandStatus::StaleEntity;
-            result.Error = Core::ErrorCode::ResourceNotFound;
-            result.Message =
-                "Mesh simplify target entity is stale or no longer live.";
-            return result;
-        }
 
         const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
         MeshTopologySourceResult source =

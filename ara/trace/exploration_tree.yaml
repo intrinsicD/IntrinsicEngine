@@ -13423,3 +13423,28 @@ tree:
     - tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
     - tests/CMakeLists.txt
     status: resolved
+
+  - id: N621
+    type: decision
+    title: Reuse command admission for denoise and simplify controls
+    provenance: ai-executed
+    timestamp: '2026-09-16T19:42:29+02:00'
+    choice: Share existing scene, parameter, kernel and entity validation in private typed runtime overloads; previews
+      reuse canonical source metadata checks. Panels use one request for preview and execution and the shared disabled-reason
+      button. Remove duplicate common-model flags and simplify stop predicate. Claude reviewed plan, diff and source
+      proof. Final 28 focused tests and 4685 CPU passes plus one expected skip; no timing claim. UI-037 remains open
+      for remaining controls and cached numerical readiness.
+    alternatives:
+    - Keep common-model availability flags and panel-owned validation
+    - Add a broad readiness service rather than reuse family command validators
+    evidence:
+    - src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.Topology.cpp
+    - src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cppm
+    - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+    - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+    - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+    - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+    - tests/contract/runtime/Test.SandboxEditorModels.cpp
+    - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
+    - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
+    status: resolved

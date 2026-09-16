@@ -297,6 +297,13 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] EditorMeshTopologyPreparedFrame
     PrepareEditorMeshTopologyFrame(const EditorWorkspaceAttachment&);
 
+    // Admission checks use parameter/capability/source metadata only; execution
+    // still validates full geometry and topology before publishing a result.
+    [[nodiscard]] ActionReadiness PreviewEditorMeshDenoiseCommand(
+        const EditorProcessingCommands&, const EditorMeshDenoiseCommand&);
+    [[nodiscard]] ActionReadiness PreviewEditorMeshSimplifyCommand(
+        const EditorProcessingCommands&, const EditorMeshSimplifyCommand&);
+
     // Immediate outcomes return directly. Only a newly queued job delivers a
     // terminal callback, while attached. Duplicate Pending requests add no callback.
     [[nodiscard]] EditorMeshDenoiseResult ApplyEditorMeshDenoiseCommand(

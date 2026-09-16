@@ -2692,3 +2692,14 @@ entries:
     - Claude found fragile JSON string surgery and withdrew a uniqueness concern after inspecting the existing assertion.
       The shared fixture builder initially missed a closing bracket; six decode tests failed. Corrected it, passed all
       33 imports and reran the full CPU gate clean. Four Vulkan readbacks use unchanged fixtures and final production code.
+
+  - turn: 2026-09-16_001#17
+    notes:
+    - N621 records ordinary implementation and verification; no new research/performance claim or observation promotion.
+      Existing staged topics retain their owners and flags.
+    - Preserved per-command priority and typed failures. Claude source review ruled out a separate editability restriction
+      and confirmed metadata-only access with complete rejection diagnostics. No speculative fallback or duplicate
+      validator.
+    - Initial build found four stale model assertions; new non-finite test assumed the wrong failure enum. Updated
+      in-tree consumers and asserted fail-closed unchanged inputs/no history, then passed focused and full CPU gates.
+      Production C++ grows 27 lines to expose missing previews; no compile-speed, sanitizer or Vulkan claim.

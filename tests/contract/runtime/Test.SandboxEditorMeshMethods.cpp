@@ -927,12 +927,110 @@ TEST(SandboxEditorUi, MeshDenoiseCommandPublishesPositionsAndSupportsUndoRedo)
         Runtime::BuildEditorDomainWindowModel(
             context,
             Runtime::EditorDomainWindowKind::Mesh);
-    // The shared model still answers whether the operation is offered here;
-    // the outcome itself belongs to the mesh-topology family frame.
-    EXPECT_TRUE(model.Processing.MeshDenoiseAvailable);
+    // Admission and results belong to the mesh-topology family.
+    EXPECT_TRUE(Runtime::PreviewEditorMeshDenoiseCommand(
+        context, {.StableEntityId = model.SelectedStableId}).Enabled);
     EXPECT_TRUE(result.Succeeded());
     EXPECT_EQ(result.WrittenCount, 4u);
 }
+TEST(SandboxEditorUi, MeshTopologyAdmissionSharesCommandValidation)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    auto context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    const auto mesh = MakeSelectable(registry, "TopologyAdmission");
+    AddDenoiseTetraMeshSource(registry, mesh);
+    const auto id = Runtime::SelectionController::ToStableEntityId(mesh);
+    const auto before = MeshVertexPositions(registry, mesh);
+    const Runtime::EditorMeshDenoiseCommand denoise{.StableEntityId = id};
+    const Runtime::EditorMeshSimplifyCommand simplify{.StableEntityId = id, .TargetFaces = 1u};
+
+    const auto rejected = [&](auto command, auto preview, auto apply, auto status)
+    {
+        const auto readiness = preview(context, command);
+        EXPECT_FALSE(readiness.Enabled);
+        EXPECT_FALSE(readiness.DisabledReason.empty());
+        const auto result = apply(context, command, {});
+        EXPECT_EQ(result.Status, status);
+        EXPECT_EQ(readiness.DisabledReason, result.Message);
+        ExpectPositionsExactlyEqual(MeshVertexPositions(registry, mesh), before);
+        EXPECT_FALSE(history.IsDirty());
+    };
+    const auto rejectDenoise = [&](const auto& command, auto status) {
+        rejected(command, Runtime::PreviewEditorMeshDenoiseCommand,
+                 Runtime::ApplyEditorMeshDenoiseCommand, status);
+    };
+    const auto rejectSimplify = [&](const auto& command, auto status) {
+        rejected(command, Runtime::PreviewEditorMeshSimplifyCommand,
+                 Runtime::ApplyEditorMeshSimplifyCommand, status);
+    };
+    using Status = Runtime::EditorCommandStatus;
+    context.Scene = nullptr;
+    rejectDenoise(denoise, Status::MissingScene);
+    rejectSimplify(simplify, Status::MissingScene);
+    context.Scene = &registry;
+    auto invalidDenoise = denoise;
+    invalidDenoise.NormalIterations = 0u;
+    auto invalidSimplify = simplify;
+    invalidSimplify.TargetFaces = 0u;
+    context.MeshDenoiseKernelAvailable = false;
+    context.MeshSimplifyKernelAvailable = false;
+    // Preserve the existing per-command priority when multiple checks fail.
+    rejectDenoise(invalidDenoise, Status::GeometryProcessingFailed);
+    rejectSimplify(invalidSimplify, Status::InvalidProcessingParameters);
+    rejectSimplify(simplify, Status::GeometryProcessingFailed);
+    context.MeshDenoiseKernelAvailable = true;
+    context.MeshSimplifyKernelAvailable = true;
+    rejectDenoise(invalidDenoise, Status::InvalidProcessingParameters);
+    invalidDenoise = denoise;
+    invalidDenoise.SigmaRange = std::numeric_limits<double>::quiet_NaN();
+    rejectDenoise(invalidDenoise, Status::InvalidProcessingParameters);
+    rejectDenoise(Runtime::EditorMeshDenoiseCommand{}, Status::StaleEntity);
+    rejectSimplify(Runtime::EditorMeshSimplifyCommand{.TargetFaces = 1u}, Status::StaleEntity);
+
+    for (int i = 0; i < 3; ++i)
+    {
+        EXPECT_TRUE(Runtime::PreviewEditorMeshDenoiseCommand(context, denoise).Enabled);
+        EXPECT_TRUE(Runtime::PreviewEditorMeshSimplifyCommand(context, simplify).Enabled);
+    }
+    ExpectPositionsExactlyEqual(MeshVertexPositions(registry, mesh), before);
+    EXPECT_FALSE(history.IsDirty());
+
+    // Metadata-only admission deliberately does not certify finite values.
+    auto nonfinite = before;
+    nonfinite.front().x = std::numeric_limits<float>::quiet_NaN();
+    SetPositions(registry.Raw().get<GS::Vertices>(mesh), nonfinite);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshDenoiseCommand(context, denoise).Enabled);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshSimplifyCommand(context, simplify).Enabled);
+    // Kernels/publication own their typed failure; admission must not mutate or
+    // normalize the invalid value merely to inspect readiness.
+    EXPECT_FALSE(Runtime::ApplyEditorMeshDenoiseCommand(context, denoise).Succeeded());
+    EXPECT_FALSE(Runtime::ApplyEditorMeshSimplifyCommand(context, simplify).Succeeded());
+    EXPECT_TRUE(std::isnan(MeshVertexPositions(registry, mesh).front().x));
+    EXPECT_FALSE(history.IsDirty());
+    SetPositions(registry.Raw().get<GS::Vertices>(mesh), before);
+
+    // A source change invalidates admission immediately, without cached readiness.
+    registry.Raw().remove<GS::Faces>(mesh);
+    const auto missingDenoise = Runtime::PreviewEditorMeshDenoiseCommand(context, denoise);
+    const auto missingSimplify = Runtime::PreviewEditorMeshSimplifyCommand(context, simplify);
+    EXPECT_FALSE(missingDenoise.Enabled);
+    EXPECT_FALSE(missingDenoise.DisabledReason.empty());
+    EXPECT_FALSE(missingSimplify.Enabled);
+    EXPECT_FALSE(missingSimplify.DisabledReason.empty());
+    EXPECT_EQ(Runtime::ApplyEditorMeshDenoiseCommand(context, denoise).Status,
+              Status::UnsupportedGeometryDomain);
+    EXPECT_EQ(Runtime::ApplyEditorMeshSimplifyCommand(context, simplify).Status,
+              Status::UnsupportedGeometryDomain);
+    registry.Destroy(mesh);
+    EXPECT_FALSE(Runtime::PreviewEditorMeshDenoiseCommand(context, denoise).Enabled);
+    EXPECT_EQ(Runtime::ApplyEditorMeshDenoiseCommand(context, denoise).Status, Status::StaleEntity);
+    EXPECT_FALSE(Runtime::PreviewEditorMeshSimplifyCommand(context, simplify).Enabled);
+    EXPECT_EQ(Runtime::ApplyEditorMeshSimplifyCommand(context, simplify).Status, Status::StaleEntity);
+}
+
 TEST(SandboxEditorUi, MeshDenoiseReportsNoChangeWhenEveryVertexIsPinned)
 {
     ECS::Scene::Registry registry;
@@ -1215,7 +1313,8 @@ TEST(SandboxEditorUi, MeshDenoiseCommandFailsClosedForInvalidTargetsAndUnavailab
         Runtime::BuildEditorDomainWindowModel(
             context,
             Runtime::EditorDomainWindowKind::Mesh);
-    EXPECT_FALSE(unavailableModel.Processing.MeshDenoiseAvailable);
+    EXPECT_FALSE(Runtime::PreviewEditorMeshDenoiseCommand(
+        context, {.StableEntityId = unavailableModel.SelectedStableId}).Enabled);
 }
 TEST(SandboxEditorUi, MeshCurvatureCommandPublishesCanonicalPropertiesAndSupportsUndoRedo)
 {
@@ -2560,7 +2659,8 @@ TEST(SandboxEditorUi, MeshSimplifyCommandReducesFaceCountAndSupportsUndoRedo)
         Runtime::BuildEditorDomainWindowModel(
             context,
             Runtime::EditorDomainWindowKind::Mesh);
-    EXPECT_TRUE(model.Processing.MeshSimplifyAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshSimplifyCommand(
+        context, {.StableEntityId = model.SelectedStableId, .TargetFaces = 1u}).Enabled);
     EXPECT_TRUE(simplified.Succeeded());
     EXPECT_GT(simplified.OutputFaceCount, 0u);
 
@@ -3732,10 +3832,12 @@ TEST(SandboxEditorUi,
     EXPECT_FALSE(
         model.Processing.DirectMeshEnrichmentDiagnostic.empty());
     EXPECT_FALSE(model.Processing.Entries.empty());
-    EXPECT_TRUE(model.Processing.MeshDenoiseAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshDenoiseCommand(
+        context, {.StableEntityId = model.SelectedStableId}).Enabled);
     EXPECT_TRUE(model.Processing.MeshRemeshAvailable);
     EXPECT_TRUE(model.Processing.MeshSubdivideAvailable);
-    EXPECT_TRUE(model.Processing.MeshSimplifyAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshSimplifyCommand(
+        context, {.StableEntityId = model.SelectedStableId, .TargetFaces = 1u}).Enabled);
     EXPECT_TRUE(model.Processing.MeshVertexNormalsAvailable);
 
     engine.Shutdown();
@@ -3888,11 +3990,13 @@ TEST(SandboxEditorUi, DirectMeshEnrichmentPendingPreservesGeometryReadiness)
         pendingModel.Processing.DirectMeshEnrichmentDiagnostic.empty());
     EXPECT_FALSE(pendingModel.Processing.Entries.empty());
     EXPECT_FALSE(pendingModel.Processing.KMeansDomains.empty());
-    EXPECT_TRUE(pendingModel.Processing.MeshDenoiseAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshDenoiseCommand(
+        context, {.StableEntityId = pendingModel.SelectedStableId}).Enabled);
     EXPECT_TRUE(pendingModel.Processing.MeshCurvatureAvailable);
     EXPECT_TRUE(pendingModel.Processing.MeshRemeshAvailable);
     EXPECT_TRUE(pendingModel.Processing.MeshSubdivideAvailable);
-    EXPECT_TRUE(pendingModel.Processing.MeshSimplifyAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshSimplifyCommand(
+        context, {.StableEntityId = pendingModel.SelectedStableId, .TargetFaces = 1u}).Enabled);
     EXPECT_TRUE(pendingModel.Processing.MeshVertexNormalsAvailable);
     EXPECT_TRUE(pendingModel.Processing.ProgressivePoissonAvailable);
 
@@ -3901,7 +4005,8 @@ TEST(SandboxEditorUi, DirectMeshEnrichmentPendingPreservesGeometryReadiness)
     const auto unavailableKernelModel = Runtime::BuildEditorDomainWindowModel(
         unavailableKernelContext, Runtime::EditorDomainWindowKind::Mesh);
     EXPECT_FALSE(unavailableKernelModel.Processing.MeshCurvatureAvailable);
-    EXPECT_TRUE(unavailableKernelModel.Processing.MeshDenoiseAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshDenoiseCommand(
+        unavailableKernelContext, {.StableEntityId = unavailableKernelModel.SelectedStableId}).Enabled);
 
     Runtime::JobToken enrichmentJob{};
     for (const Runtime::JobSnapshot& job : jobs.SnapshotAll())
@@ -3946,11 +4051,13 @@ TEST(SandboxEditorUi, DirectMeshEnrichmentPendingPreservesGeometryReadiness)
         readyModel.Processing.DirectMeshEnrichmentDiagnostic.empty());
     EXPECT_FALSE(readyModel.Processing.Entries.empty());
     EXPECT_FALSE(readyModel.Processing.KMeansDomains.empty());
-    EXPECT_TRUE(readyModel.Processing.MeshDenoiseAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshDenoiseCommand(
+        context, {.StableEntityId = readyModel.SelectedStableId}).Enabled);
     EXPECT_TRUE(readyModel.Processing.MeshCurvatureAvailable);
     EXPECT_TRUE(readyModel.Processing.MeshRemeshAvailable);
     EXPECT_TRUE(readyModel.Processing.MeshSubdivideAvailable);
-    EXPECT_TRUE(readyModel.Processing.MeshSimplifyAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshSimplifyCommand(
+        context, {.StableEntityId = readyModel.SelectedStableId, .TargetFaces = 1u}).Enabled);
     EXPECT_TRUE(readyModel.Processing.MeshVertexNormalsAvailable);
     EXPECT_TRUE(readyModel.Processing.ProgressivePoissonAvailable);
 
