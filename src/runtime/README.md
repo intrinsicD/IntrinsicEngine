@@ -221,6 +221,13 @@ whose entity span excludes the structural nodes. Its finite focus target
 encloses all primitive world bounds, so the sandbox defaults select the first
 primitive and focus once only after every renderable/selectable leaf exists.
 
+Missing materials use the same extraction-owned `StandardPBR` defaults for
+direct meshes and model-scene leaves. `RenderExtractionCache::State::EnsureRenderable`
+allocates an independent lit material lease per renderable; model materialization
+does not allocate a second missing-material default or publish unused GPU slot
+copies. Authored material records still retain their separate texture-resolution
+leases pending the remaining GRAPHICS-105 consolidation.
+
 ### Sandbox Editor Async Method Jobs
 
 Editor buttons that run heavyweight geometry or method work submit typed

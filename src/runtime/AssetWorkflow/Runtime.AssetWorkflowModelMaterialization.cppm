@@ -86,8 +86,6 @@ export namespace Extrinsic::Runtime
         std::uint64_t LastUvAtlasWidth{0};
         std::uint64_t LastUvAtlasHeight{0};
         std::uint64_t MaterialInstancesCreated{0};
-        std::uint64_t DefaultLitMaterialInstancesCreated{0};
-        std::uint64_t MaterialLessPrimitivesAssignedDefaultLit{0};
         std::uint64_t MaterialTextureBindingsResolved{0};
         std::uint64_t MaterialTextureBindingFailures{0};
         std::uint64_t MaterialTextureBindingUploadDeferrals{0};
@@ -104,8 +102,6 @@ export namespace Extrinsic::Runtime
     {
         std::uint32_t MaterialIndex{Assets::kInvalidAssetModelIndex};
         Graphics::MaterialTextureAssetBindings TextureBindings{};
-        std::uint32_t MaterialSlot{Graphics::kDefaultMaterialSlotIndex};
-        bool HasMaterialSlot{false};
         bool TextureBindingsResolved{false};
     };
 
@@ -116,8 +112,6 @@ export namespace Extrinsic::Runtime
         std::uint32_t PrimitiveIndex{Assets::kInvalidAssetModelIndex};
         std::uint32_t GeometryPayloadIndex{Assets::kInvalidAssetModelIndex};
         std::uint32_t MaterialIndex{Assets::kInvalidAssetModelIndex};
-        std::uint32_t MaterialSlot{Graphics::kDefaultMaterialSlotIndex};
-        bool HasMaterialSlot{false};
     };
 
     struct AssetWorkflowModelNodeRecord

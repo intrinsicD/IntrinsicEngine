@@ -17,7 +17,7 @@ workflow_profile: micro
 evidence: not_applicable
 evidence_skip_reason: interactive refactoring; evidence is the diff, tests, and review
 contract_schema: 1
-contracts: [geometry.element-domain-sources, geometry.property-coherence]
+contracts: [geometry.element-domain-sources, geometry.property-coherence, repo.source-documentation]
 ---
 # GRAPHICS-105 — Unified mesh shading-model + per-attribute source authority
 
@@ -113,8 +113,9 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence]
 - Engine config: only engine-wide defaults/policies, if added by a slice, use preview/validate-then-apply and file round-trip. Per-renderable edits are not duplicated into global config.
 
 ## Required changes
-- [ ] Finish material `ShadingModel { Lit, Unlit }` as the sole ordinary-surface lighting authority: map `KHR_materials_unlit`, migrate remaining `MaterialFlags::Unlit` writers, remove transitional shader/type branches, and keep slot 0's explicit error material distinct from the missing-material default.
-- [ ] Resolve imported mesh material policy through one shared runtime helper for direct and model-scene routes: preserve authored material data, otherwise allocate a default **lit** material instance.
+- [ ] Finish material `ShadingModel { Lit, Unlit }` as the sole ordinary-surface lighting authority: map `KHR_materials_unlit` and align promoted forward/deferred receivers. The redundant Unlit flag is removed; keep slot 0's explicit error material distinct from the missing-material default.
+- [x] Allocate missing-material defaults through the existing render-extraction owner for both direct and model-scene routes, with an independent **lit** instance per renderable.
+- [ ] Complete authored-material policy through that effective runtime owner, preserving authored factors and bindings while removing redundant import-owned material leases.
 - [ ] Make the per-renderable material lease plus stable-id-keyed `MaterialTextureAssetBindings` the effective appearance authority. Merging a generated normal `AssetId` must preserve the other slots and must not mutate another renderable that shares the authored material.
 - [ ] Complete the `Normal` `AttributeSource { VertexAttribute, Texture }` path: runtime/material resolution publishes `Texture` plus a valid bindless normal only for the exact ready object-space asset generation; both promoted forward and deferred shaders sample/decode that effective texture and otherwise use the required vertex normal.
 - [ ] Route source-choice and generated-texture readiness changes through a standing runtime reaction/kernel event that invalidates the affected extraction/material state. Preserve exact identity/generation checks, stale completion rejection, and frame-ready/deferred-retire behavior.
@@ -135,7 +136,7 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence]
 
 ## Tests
 - [ ] CPU/null contract: material `ShadingModel` is the only lit/unlit authority — an imported mesh with a lit material shades regardless of `VisualizationConfig`, and `Unlit` only results from explicit shading-model.
-- [ ] CPU/null contract: default **lit** material assigned identically through both the direct and model-scene import routes (one helper, one result).
+- [x] CPU/null contract: default **lit** material assigned identically through both the direct and model-scene import routes (one owner, independent leases).
 - [ ] CPU/null contract: two renderables sharing one authored material receive independent effective material leases/bindings; changing or completing the normal bake for one leaves the other's source, slots, and generations unchanged.
 - [ ] CPU/null contract: normal `AttributeSource` resolution — `Texture` with an absent/fallback/stale/non-ready generation uses the vertex normal; the exact `Ready` object-space texture is used; `VertexAttribute` ignores a bound texture.
 - [ ] CPU/null contract: readiness/source events dirty only the affected stable render id, stale completions cannot publish, and rebinding preserves unrelated albedo/metallic-roughness/emissive slots.
@@ -219,11 +220,11 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' --time
   out of scope.
 
 ## Slice plan
-- **Slice A (CPUContracted).** Add material `ShadingModel` as the single lit/unlit authority; route the unified shader to honor it; assign a default **lit** material uniformly across both import routes via one helper (subsuming RUNTIME-128 + `3485151`); demote `VisualizationConfig` lit/unlit role for imports. Defers attribute-source and UI to later slices.
+- **Slice A (CPUContracted).** Add material `ShadingModel` as the single lit/unlit authority; route the unified shader to honor it; use the existing extraction owner for default **lit** materials across both import routes; demote `VisualizationConfig` lit/unlit role for imports. Defers attribute-source and UI to later slices.
   - **A1 — landed (this slice).** `Graphics::ShadingModel{Lit,Unlit}` added to `MaterialParams` (default `Lit`) and `GpuMaterialSlot.ShadingModel` (former `_pad0`, layout-preserving) + GLSL mirror/constants; `PackSlot` writes it; the forward surface shader's lit/unlit gate now keys on `ShadingModel` (legacy `MaterialFlags::Unlit` kept as a transitional alias) and the `DefaultDebugSurface` type-branch is removed from the gate; slot-0 default and RUNTIME-128's default-lit material set `ShadingModel` explicitly. Tests: material-system round-trip + default-slot `Unlit`, shader-source contract. **Historical slice-time verification: build/CPU gate was blocked by vcpkg egress.**
-  - **A2 — remaining.** Map glTF `KHR_materials_unlit` → `ShadingModel::Unlit` at import; one shared `ResolveImportedMeshMaterial` helper across both routes; migrate the remaining `MaterialFlags::Unlit` writers off the flag. Folded into the scivis-collapse slice below since they share the `VisualizationSyncSystem` surface.
+  - **A2 — remaining.** Map glTF `KHR_materials_unlit` → `ShadingModel::Unlit` at import and consolidate authored material factors/bindings into the effective per-renderable state. Missing-material allocation already uses extraction alone, and the obsolete Unlit flag has been removed.
 - **Slice B (CPUContracted) — landed.** Added `Graphics::AttributeSource{VertexAttribute,Texture}` + `MaterialChannel` + `Set/GetChannelSource`, and `MaterialParams::ChannelSourceBits` → `GpuMaterialSlot.ChannelSourceBits` (former `_pad1`, layout-preserving) + GLSL mirror, constants, and the `GpuMaterialChannelSource` accessor. Both promoted `ResolveSurfaceNormal` paths (forward `default_debug_surface.frag`, deferred `gbuffer.frag`) now gate the Normal texture lane on the per-channel source (legacy `ObjectSpaceNormalMap` flag kept as transitional alias; default `VertexAttribute` preserves behavior). The producer (`ResolveTextureAssetBindings`) sets the Normal channel source = Texture wherever it sets the object-space flag. Tests: channel-source round-trip, producer mirrors flag↔source, shader-source contract in both promoted paths. **Historical slice-time verification: build/CPU gate was blocked by vcpkg egress.** Keeps non-Normal source semantics out of the UI/acceptance scope and defers the normal controls to Slice E.
-- **Slice C (CPUContracted).** Finish the single-authority cleanup: shared imported-material policy, `KHR_materials_unlit`, retirement of transitional lit/unlit writers/branches, and collapse of visualization override-material synthesis after retained visualization-mode contracts pass.
+- **Slice C (CPUContracted), partial.** Visualization material synthesis and the duplicate Unlit flag are removed; missing-material defaults have one owner. Authored material policy, `KHR_materials_unlit` and the shared forward/deferred authority remain.
 - **Slice D (CPUContracted).** Make the normal binding explicitly per-renderable; preserve unrelated slots, prove shared-authored-material isolation, exact-generation fallback, standing readiness invalidation, stale rejection, and mesh/domain/UV gating.
 - **Slice E (CPUContracted).** Extend the stable-id
   `GeometryPresentationRecipe` operation/snapshot plus app-owned controls. Show
@@ -295,10 +296,11 @@ The unified surface frag (forward `default_debug_surface.frag` + deferred
    Remove material-type and visualization-to-material flag coupling.
 
 ### Producers (populate data in one place each)
-- One shared `ResolveImportedMeshMaterial` helper assigns a real base material
-  for **every** mesh import route (folds in RUNTIME-128's `EnsureDefaultLitMaterial`
-  and the `3485151` direct-import fix): lit `StandardPBR` by default, `Unlit`
-  only when the asset says so (`KHR_materials_unlit`).
+- The existing `RenderExtractionCache::State::EnsureRenderable` owns base-material
+  allocation for every import route. Missing materials use lit `StandardPBR`;
+  the remaining authored-material work must feed this effective per-renderable
+  state, with `Unlit` only when explicitly authored (`KHR_materials_unlit`).
+  No separate imported-material allocation helper is needed.
 - Runtime creates/retains an effective material lease per renderable, applies
   authored defaults, then merges that stable render id's texture bindings.
 - Requested normal source defaults to `VertexAttribute`. A request may remain
@@ -330,8 +332,8 @@ Delete/collapse, with the single data path replacing each:
 
 - [ ] **Import material policy consolidation** — direct meshes already choose
   `ColorSource::Material` in `ImportedMeshVisualization()`; graph/point imports
-  use `ImportedGeometryVisualization()`. Reconcile the real material assignment
-  in render extraction with model-scene `EnsureDefaultLitMaterial`, preserving
+  use `ImportedGeometryVisualization()`. Missing-material defaults now use
+  extraction alone; consolidate the remaining authored-material allocation, preserving
   authored values and explicit missing-material defaults. Do not reintroduce
   visualization-to-lighting coupling or treat the direct mesh default as unfixed.
 - [x] **Override-material synthesis** in `VisualizationSyncSystem` for
@@ -507,3 +509,78 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R '(Defau
 Local logs and fixed Claude plan/review/resolution packets:
 `/tmp/intrinsic-graphics105-material-authority/`. GRAPHICS-105 remains open for
 the broader import/material-source contracts; LEGACY-043 remains gated.
+
+
+## 2026-09-16 — Extraction-owned defaults for every import route
+
+Operator continuation of duplicate-code/compilation cleanup with Claude.
+Canonical-owner discovery: `RenderExtractionCache::State::EnsureRenderable`
+already allocates every effective default material. The model materializer's
+`EnsureDefaultLitMaterial` allocates another lease whose primitive-record slot
+has no draw consumer. Remove that lease/slot/boolean, the parameter builder,
+allocation helper and default-only counters. Delete unused slot copies in both
+primitive and authored-material records; retain the authored leases and texture
+resolution because that broader integration still needs its own proof. Reuse the
+existing extraction owner, with no additional helper, map, module or wrapper.
+A second import-owned default would require an actual independent draw consumer.
+
+The rendered default remains `MaterialParams{}` (white, roughness 0.5, Lit), not
+the unused import parameters (gray, roughness 1.0). Claude confirmed this distinction;
+its concerns about other consumers and counters were checked by repository search:
+primitive records serve entity completion/destruction, while the remaining generic
+material-instance counter still measures authored allocations. The constant-name
+lookup reuses the material module already imported by extraction. No new edge.
+
+Regression-first check: synchronous and queued material-less instanced glTF plus
+a direct OBJ retain correct default parameters and independent renderable leases.
+Before removal, only six live-material count assertions fail: one extra import
+lease in each route at import, after extraction, and after extraction clear.
+The existing rendered-parameter and independence checks pass. Preserve authored
+presentation recipes, texture readiness/reload, normal/UV processing, selection,
+focus and invalid-handle slot 0. Full authored-material handoff consolidation
+remains open; this slice does not establish compile-time improvement.
+
+Review/validation checkpoint:
+- Claude reviewed the plan, fixed diff and resolution. Fixed its useful test
+  findings by pinning queued/synchronous extraction counts and verifying the
+  edited material before checking untouched peers. Existing includes, handle
+  equality and authored-lease retention in `Impl::Records` resolve its conditional
+  concerns; the final review has no confirmed unresolved defect.
+- Canonical `ci` configure and full `IntrinsicTests` build passed with Clang 23.
+  Full exclusion-only CPU gate: 4,677 passed, one expected ASan-only lifecycle
+  skip, 138.58 seconds. After the final test-only strengthening, rebuilt the
+  affected target and reran all 32 import contracts: passed in 3.06 seconds.
+  That focused selection intentionally includes the existing finite-work
+  enrichment/shutdown test labeled `slow` (0.35 seconds).
+- Promoted `ci-vulkan` configure/build and four import readback tests passed
+  under ASan+UBSan, no skips, 40.18 seconds: off-origin OBJ visibility,
+  model-scene visibility/picking, model replacement, and imported object-space
+  normal baking/binding.
+- Strict layering, task policy/state links, test layout, docs links/sync,
+  root hygiene, skill mirrors and clean-workshop checks passed; module inventory
+  regeneration produced no content diff.
+- Manual architecture/workshop sweep: imports, target links and downward type
+  ownership pass (rows 1–3). No renderer members/passes/recipe edges changed
+  (rows 4–6 n/a); no maturity closure or exception (rows 7–8 n/a). The sole
+  effective lease remains per-renderable, render-thread-owned and released by
+  extraction; shader layouts, asset-generation guards and failure defaults are
+  unchanged.
+
+Production delta: 95 net lines removed across three existing source/interface
+files, no new production file or helper. Required/default-allocation and CPU-test
+rows are closed; the old proposed helper and already-deleted Unlit migrations
+were removed from the remaining-work wording. Authored-material integration,
+`KHR_materials_unlit`, the common forward/deferred authority and normal-source
+readiness/config/UI work remain open; LEGACY-043 remains gated.
+
+```bash
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --build --preset ci --target IntrinsicRuntimeContractTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^RuntimeAssetImportFormatCoverage\.' --no-tests=error --timeout 60
+cmake --build --preset ci-vulkan --target IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests -j2
+ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R '^RuntimeSandboxAcceptanceGpuSmoke\.(ImportedOffOriginObjTriangleAutoFramesAtCenter|ImportedModelSceneIsVisibleAndClickPickable|ImportedModelSceneReplacementIsVisibleAndClickPickable|ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice)$' --no-tests=error --timeout 120 --parallel 1
+```
+
+Local regression/build/test logs and bounded Claude packets:
+`/tmp/intrinsic-graphics105-import-defaults/`.

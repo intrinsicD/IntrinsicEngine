@@ -842,7 +842,7 @@ namespace Extrinsic::Runtime
         }
         sidecar.GpuSlot.SetInstanceHandle(sidecar.Instance);
 
-        const Graphics::MaterialTypeHandle standardType = renderer.GetMaterialSystem().FindType("StandardPBR");
+        const Graphics::MaterialTypeHandle standardType = renderer.GetMaterialSystem().FindType(Graphics::kMaterialTypeName_StandardPBR);
         if (standardType.IsValid())
         {
             sidecar.Material.Lease = renderer.GetMaterialSystem().CreateInstance(standardType, Graphics::MaterialParams{});

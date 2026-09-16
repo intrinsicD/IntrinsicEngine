@@ -1306,6 +1306,11 @@ namespace
         InitializeAssetImportEngine(engine);
         InstallSandboxDefaultRuntimePolicies(engine);
 
+        auto& materials = engine.GetRenderer().GetMaterialSystem();
+        auto& extraction = RequiredEngineService<Runtime::RenderExtractionCache>(engine);
+        const auto initialMaterialCount = materials.GetLiveInstanceCount();
+        ASSERT_EQ(extraction.GetTrackedRenderableCount(), 0u);
+
         auto recordingController =
             std::make_unique<RecordingImportCameraController>();
         RecordingImportCameraController* recorder = recordingController.get();
@@ -1367,6 +1372,12 @@ namespace
                   Assets::AssetPayloadKind::ModelScene);
         EXPECT_TRUE(importResult->MaterializedModelScene);
         EXPECT_EQ(importResult->PrimitiveEntitiesCreated, 2u);
+        // The queued route completes a frame; the synchronous route has not
+        // extracted yet. Neither may retain an import-owned default material.
+        const auto initiallyExtracted = queued ? 2u : 0u;
+        EXPECT_EQ(extraction.GetTrackedRenderableCount(), initiallyExtracted);
+        EXPECT_EQ(materials.GetLiveInstanceCount(),
+                  initialMaterialCount + initiallyExtracted);
 
         ECS::Scene::Registry& activeScene =
             *engine.Worlds().Get(engine.ActiveWorld());
@@ -1509,6 +1520,53 @@ namespace
                 originalEntities);
             EXPECT_EQ(recorder->FocusCalls, 2u);
         }
+
+        TempAssetFile directMeshFile(
+            stem + ".obj",
+            "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
+        auto direct = pipeline.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+            .Path = directMeshFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
+        ASSERT_TRUE(direct.has_value()) << static_cast<int>(direct.error());
+        const auto entities = FindEntitiesWithDomain(activeScene, GS::Domain::Mesh);
+        // Two material-less glTF instances plus one direct OBJ share this owner.
+        ASSERT_EQ(entities.size(), 3u);
+        const auto extracted = extraction.ExtractAndSubmit(
+            activeScene, engine.GetRenderer(),
+            &RequiredEngineService<Graphics::GpuAssetCache>(engine));
+        EXPECT_EQ(extracted.CandidateRenderableCount, 3u);
+        EXPECT_EQ(materials.GetLiveInstanceCount(), initialMaterialCount + 3u);
+
+        const Graphics::MaterialParams defaults{};
+        std::vector<Graphics::MaterialHandle> handles;
+        for (const auto entity : entities)
+        {
+            const auto sidecar = extraction.FindRenderableSidecarForTest(
+                Runtime::StableEntityLookup::ToRenderId(entity));
+            ASSERT_TRUE(sidecar.has_value());
+            ASSERT_TRUE(sidecar->HasMaterialLease);
+            EXPECT_NE(sidecar->MaterialSlot, Graphics::kDefaultMaterialSlotIndex);
+            EXPECT_EQ(sidecar->MaterialSlot, materials.GetMaterialSlot(sidecar->MaterialHandle));
+            EXPECT_EQ(std::find(handles.begin(), handles.end(), sidecar->MaterialHandle), handles.end());
+            handles.push_back(sidecar->MaterialHandle);
+            const auto params = materials.GetParams(sidecar->MaterialHandle);
+            EXPECT_EQ(params.Shading, Graphics::ShadingModel::Lit);
+            EXPECT_EQ(params.Flags, defaults.Flags);
+            EXPECT_EQ(params.BaseColorFactor, defaults.BaseColorFactor);
+            EXPECT_FLOAT_EQ(params.MetallicFactor, defaults.MetallicFactor);
+            EXPECT_FLOAT_EQ(params.RoughnessFactor, defaults.RoughnessFactor);
+        }
+        auto edited = defaults;
+        edited.RoughnessFactor = 0.125f;
+        materials.SetParams(handles.front(), edited);
+        EXPECT_FLOAT_EQ(materials.GetParams(handles.front()).RoughnessFactor, edited.RoughnessFactor);
+        EXPECT_FLOAT_EQ(materials.GetParams(handles[1]).RoughnessFactor, defaults.RoughnessFactor);
+        EXPECT_FLOAT_EQ(materials.GetParams(handles[2]).RoughnessFactor, defaults.RoughnessFactor);
+        // The imported scene still exists: no import-owned lease may outlive
+        // extraction's material state.
+        extraction.ClearSceneState(engine.GetRenderer());
+        EXPECT_EQ(materials.GetLiveInstanceCount(), initialMaterialCount);
 
         engine.Shutdown();
     }

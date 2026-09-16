@@ -2652,3 +2652,12 @@ entries:
       valid upload. CPU/GLSL ID agreement and explicit slot-0 Unlit behavior have contract/readback coverage.
     - Five production files lose 95 net lines including stale comments; narrower GLM includes are not measured
       compile-time evidence. GRAPHICS-105 and its broader material-source contracts remain open, with LEGACY-043 gated.
+
+  - turn: 2026-09-16_001#13
+    notes:
+    - N617 records a bounded implementation choice and regression/test evidence, not a new research or performance
+      claim. No observation promotion or new closure signal for broader O93; preserve existing owners and flags.
+    - The missing-material regression failed only on one excess lease per route before deletion. Rendered defaults
+      already came from extraction and must not change to match unused import values. Authored leases remain tracked.
+    - Claude's exact-count and edit-readback findings were fixed and the final affected import suite rerun after the
+      full CPU gate. Four actual Vulkan readbacks support this bounded change, not whole-task maturity or compile speed.

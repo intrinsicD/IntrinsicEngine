@@ -13334,3 +13334,27 @@ tree:
     - tests/unit/graphics/Test.Graphics.MaterialSystem.cpp
     - tests/contract/graphics/Test.RendererFrameLifecycle.cpp
     status: resolved
+
+  - id: N617
+    type: decision
+    title: Use extraction alone for missing-material import defaults
+    provenance: ai-executed
+    timestamp: '2026-09-16T14:47:00+02:00'
+    choice: Delete the model materializer's unused default-material lease, duplicate parameter builder,
+      counters and slot copies. Retain the effective per-renderable extraction owner and its actual default factors;
+      authored leases and texture resolution remain separate open GRAPHICS-105 work. Regression-first tests showed
+      exactly one extra lease in both synchronous and queued material-less model imports; deletion removes it.
+      Claude reviewed plan, diff and resolution; strengthen exact extraction counts and verify material edits.
+      Full CPU 4677 passes plus one expected skip, final 32 import contracts and four ASan+UBSan Vulkan readbacks pass.
+      Three production files lose 95 net lines; no new helper, compile timing claim or whole-task retirement.
+    alternatives:
+    - Add a shared default-material helper while keeping both allocation owners
+    - Change the rendered default factors to match the unused import-owned material
+    evidence:
+    - tasks/active/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md
+    - src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp
+    - src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cppm
+    - src/runtime/Rendering/Runtime.RenderExtraction.cpp
+    - tests/contract/runtime/Test.AssetImportFormatCoverage.cpp
+    - tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
+    status: resolved
