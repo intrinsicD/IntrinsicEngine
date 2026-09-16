@@ -13176,3 +13176,25 @@ tree:
     - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
     - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
     status: resolved
+
+  - id: N610
+    type: decision
+    title: Reuse processing execution while preserving explicit operation and trajectory requests
+    provenance: ai-executed
+    timestamp: '2026-09-16T11:31:38+02:00'
+    choice: Continue UI-037 through a private apply-before-execute helper shared by existing controls, construction,
+      outliers and ICP. Fix ignored ICP config rejection and shared processing fallback that lost requested edits;
+      preserve unrelated fallback through the existing pure section updater. Claude reviewed plan and fixes; final
+      CPU 4670 passed plus one expected skip. Two existing production implementation files, +1 net line, no new
+      modules or compile-time claim. UI-037 remains active.
+    alternatives:
+    - Retain duplicated apply/execute/publish logic and stale-error lockouts
+    - Reject all whole-document fallback, including unrelated sections
+    - Add section metadata plumbing or parse diagnostic subject strings
+    evidence:
+    - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
+    - src/runtime/Editor/Runtime.EditorProcessing.cpp
+    - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+    - tests/contract/runtime/Test.NormalEstimation.cpp
+    - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
+    status: resolved

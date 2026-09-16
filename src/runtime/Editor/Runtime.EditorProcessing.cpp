@@ -94,6 +94,15 @@ namespace Extrinsic::Runtime
         result.LoadResult = context.PreviewEngineConfigDocument(
             Core::Config::SerializeEngineConfig(candidate), sourceId);
         if (!Core::Config::IsConfigUsable(result.LoadResult)) return result;
+        if (result.LoadResult.State == Core::Config::EngineConfigState::FallbackApplied)
+        {
+            // Reapply the pure section update to detect edits lost to file-load
+            // fallback, while tolerating fallback in unrelated sections.
+            auto accepted = result.LoadResult.Preview.Config;
+            update(accepted);
+            if (accepted.AppSections != result.LoadResult.Preview.Config.AppSections)
+                return result;
+        }
         return context.ApplyEngineConfigHotSubset(result.LoadResult);
     }
 }

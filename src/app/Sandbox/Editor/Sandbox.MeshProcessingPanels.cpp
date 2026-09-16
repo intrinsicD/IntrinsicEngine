@@ -144,6 +144,16 @@ namespace Extrinsic::Sandbox::Editor
                 sink(std::move(result));
         }
 
+        template <typename State, typename Request, typename Apply, typename Execute, typename Sink>
+        void ApplyProcessingExecution(State& state, const Request& request,
+            Apply apply, Execute execute, const Sink& sink, const char* rejected)
+        {
+            const bool applied = apply(request).Succeeded();
+            state.ConfigDiagnostic = applied ? "" : rejected;
+            if (applied)
+                PublishCommandResult(state.LastResult, execute(), sink);
+        }
+
         template <typename State, typename Preview, typename Apply, typename Execute, typename Sink>
         void DrawProcessingExecution(const Runtime::EditorProcessingCommands& commands, State& state, bool changed,
             Preview preview, Apply apply, Execute execute, const Sink& sink,
@@ -157,12 +167,7 @@ namespace Extrinsic::Sandbox::Editor
                 commands, {method.Ready, method.Diagnostic});
             if (!readiness.Enabled) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
             if (DrawProcessingActionButton(button, readiness))
-            {
-                const bool applied = apply(state.Draft).Succeeded();
-                state.ConfigDiagnostic = applied ? "" : executionRejected;
-                if (applied)
-                    PublishCommandResult(state.LastResult, execute(), sink);
-            }
+                ApplyProcessingExecution(state, state.Draft, apply, execute, sink, executionRejected);
         }
 
         void ShowCurvatureSegmentationVisualization(
@@ -2103,25 +2108,24 @@ namespace Extrinsic::Sandbox::Editor
         }
         if(!Outliers.ConfigDiagnostic.empty())ImGui::TextWrapped("%s",Outliers.ConfigDiagnostic.c_str());
         auto analyze=config;analyze.Operation=Runtime::OutlierAnalysisOperation::Analyze;
-        const auto readiness=Runtime::PreviewEditorOutlierAnalysisCommand(context.PointAnalysis.Commands,analyze);
-        if(!readiness.Ready)ImGui::TextWrapped("%s",readiness.Diagnostic.c_str());
-        const auto execute=[&](Runtime::OutlierAnalysisConfig request){
-            const auto applied=Runtime::ApplyEditorOutlierAnalysisConfig(context.PointAnalysis.Commands,request);
-            if(applied.Succeeded())
-                PublishCommandResult(Outliers.LastResult,Runtime::ApplyEditorConfiguredOutlierAnalysis(context.PointAnalysis.Commands, context.PointAnalysis.ResultSinks.OutlierAnalysis),context.PointAnalysis.ResultSinks.OutlierAnalysis);
-            else Outliers.ConfigDiagnostic="Outlier config was rejected.";
+        const auto preview = Runtime::PreviewEditorOutlierAnalysisCommand(context.PointAnalysis.Commands, analyze);
+        const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
+            context.PointAnalysis.Commands, {preview.Ready, preview.Diagnostic});
+        if (!readiness.Enabled) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
+        const auto execute = [&](const Runtime::OutlierAnalysisConfig& request) {
+            ApplyProcessingExecution(Outliers, request,
+                [&](const auto& value) { return Runtime::ApplyEditorOutlierAnalysisConfig(context.PointAnalysis.Commands, value); },
+                [&] { return Runtime::ApplyEditorConfiguredOutlierAnalysis(context.PointAnalysis.Commands, context.PointAnalysis.ResultSinks.OutlierAnalysis); },
+                context.PointAnalysis.ResultSinks.OutlierAnalysis, "Outlier config was rejected.");
         };
-        ImGui::BeginDisabled(!context.ProcessingConfigCommandsAvailable || !readiness.Ready || !Outliers.ConfigDiagnostic.empty());
-        if(ImGui::Button("Detect outliers"))execute(analyze);
-        ImGui::EndDisabled();
+        if (DrawProcessingActionButton("Detect outliers", readiness)) execute(analyze);
         ImGui::TextWrapped("Detection writes a mask (1 = outlier) and a score. Geometry stays in source order.");
-        auto remove=config;remove.Operation=Runtime::OutlierAnalysisOperation::RemoveMarked;
-        const auto removal=Runtime::PreviewEditorOutlierAnalysisCommand(context.PointAnalysis.Commands,remove);
-        ImGui::BeginDisabled(!context.ProcessingConfigCommandsAvailable || !removal.Ready || !Outliers.ConfigDiagnostic.empty());
-        if(ImGui::Button("Remove marked points"))execute(remove);
-        ImGui::EndDisabled();
-        if(!removal.Ready && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-            ImGui::SetTooltip("%s",removal.Diagnostic.c_str());
+        auto remove = config;
+        remove.Operation = Runtime::OutlierAnalysisOperation::RemoveMarked;
+        const auto removal = Runtime::PreviewEditorOutlierAnalysisCommand(context.PointAnalysis.Commands, remove);
+        const auto removalReadiness = Runtime::ResolveEditorProcessingActionReadiness(
+            context.PointAnalysis.Commands, {removal.Ready, removal.Diagnostic});
+        if (DrawProcessingActionButton("Remove marked points", removalReadiness)) execute(remove);
         ImGui::TextWrapped("Removal compacts point clouds and supports Undo. Detect again after changing positions or the mask.");
         auto mask=config.Mask,
              score=config.Score;
@@ -2569,18 +2573,10 @@ namespace Extrinsic::Sandbox::Editor
         if (!action.Enabled)
             ImGui::TextWrapped("%s", action.DisabledReason.c_str());
         if (DrawProcessingActionButton("Construct", action))
-        {
-            const auto applied = Runtime::ApplyEditorPointConstructionConfig(
-                context.PointConstruction.Commands, readiness.Resolved);
-            Construction.ConfigDiagnostic = applied.Succeeded() ? "" : "Construction config was rejected.";
-            if (applied.Succeeded())
-                PublishCommandResult(
-                    Construction.LastResult,
-                    Runtime::ApplyEditorConfiguredPointConstruction(
-                        context.PointConstruction.Commands,
-                        context.PointConstruction.ResultSinks.PointConstruction),
-                    context.PointConstruction.ResultSinks.PointConstruction);
-        }
+            ApplyProcessingExecution(Construction, readiness.Resolved,
+                [&](const auto& value) { return Runtime::ApplyEditorPointConstructionConfig(context.PointConstruction.Commands, value); },
+                [&] { return Runtime::ApplyEditorConfiguredPointConstruction(context.PointConstruction.Commands, context.PointConstruction.ResultSinks.PointConstruction); },
+                context.PointConstruction.ResultSinks.PointConstruction, "Construction config was rejected.");
         if (Construction.LastResult)
         {
             const auto& result = *Construction.LastResult;
@@ -2800,25 +2796,21 @@ namespace Extrinsic::Sandbox::Editor
         if (changed)
         {
             const auto applied = Runtime::ApplyEditorRegistrationConfig(context.Registration.Commands, config);
-            Registration.ConfigDiagnostic = applied.Status == Runtime::RuntimeEngineConfigApplyStatus::Rejected
-                ? "Registration controls were rejected by config validation." : "";
+            Registration.ConfigDiagnostic = applied.Succeeded()
+                ? "" : "Registration controls were rejected by config validation.";
         }
         if (!Registration.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Registration.ConfigDiagnostic.c_str());
-        const auto readiness = Runtime::PreviewEditorRegistrationCommand(context.Registration.Commands, config);
-        if (!readiness.Ready) ImGui::TextWrapped("%s", readiness.Diagnostic.c_str());
-        ImGui::BeginDisabled(!context.ProcessingConfigCommandsAvailable || !Registration.ConfigDiagnostic.empty() || !readiness.Ready);
-        const bool runFinal = ImGui::Button("Run ICP##ICP");
-        if (runFinal)
-        {
-            config.TrajectoryStep = config.MaxIterations;
-            (void)Runtime::ApplyEditorRegistrationConfig(context.Registration.Commands, config);
-        }
-        if (runFinal || (applyTrajectory && readiness.Ready && Registration.ConfigDiagnostic.empty()))
-            PublishCommandResult(Registration.LastResult,
-                Runtime::ApplyEditorConfiguredRegistrationCommand(
-                    context.Registration.Commands, context.Registration.ResultSinks.Registration),
-                context.Registration.ResultSinks.Registration);
-        ImGui::EndDisabled();
+        const auto preview = Runtime::PreviewEditorRegistrationCommand(context.Registration.Commands, config);
+        const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
+            context.Registration.Commands, {preview.Ready, preview.Diagnostic});
+        if (!readiness.Enabled) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
+        const bool runFinal = DrawProcessingActionButton("Run ICP##ICP", readiness);
+        if (runFinal) config.TrajectoryStep = config.MaxIterations;
+        if (runFinal || (applyTrajectory && readiness.Enabled))
+            ApplyProcessingExecution(Registration, config,
+                [&](const auto& value) { return Runtime::ApplyEditorRegistrationConfig(context.Registration.Commands, value); },
+                [&] { return Runtime::ApplyEditorConfiguredRegistrationCommand(context.Registration.Commands, context.Registration.ResultSinks.Registration); },
+                context.Registration.ResultSinks.Registration, "Registration config was rejected.");
 
         if (!Registration.LastResult.has_value())
         {

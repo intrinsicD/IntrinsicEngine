@@ -199,8 +199,10 @@ preflight and undoable property publication. Its position input and face/edge
 output names are editable, and each output has a Show button. Automatic display
 uses the configured region and feature colors on the surface and edge overlay.
 Normal estimation, density/spacing, keypoint/descriptor analysis, density weights
-and bilateral filtering share the draft/apply/run control. Construction uses the
-same runtime readiness and button while preserving its normalized request.
+and bilateral filtering share the draft/apply/run control. Construction, outlier
+detection/removal and ICP reuse its apply-before-execute mechanism and the runtime
+readiness button. Construction preserves its normalized request; outlier actions
+set their respective operation; ICP preserves final-pose and trajectory-step triggers.
 Unavailable buttons remain visible; the shared tooltip uses
 `ForTooltip | AllowWhenDisabled` with the runtime reason. A successful config
 retry clears its prior error; UI and agent callers use the same runtime config

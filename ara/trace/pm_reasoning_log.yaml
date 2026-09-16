@@ -2590,3 +2590,11 @@ entries:
       retain construction/ICP/outlier distinctions and +26 net production lines.
     - Earlier staged observations retain owners and stale flags; this ordinary refactor supplies no new closure
       or abandonment signal.
+
+  - turn: 2026-09-16_001#6
+    notes:
+    - N610 records this implementation decision and verification, not a new scientific or performance claim; no
+      staging promotion.
+    - Claude identified overly coarse whole-config fallback rejection. Reuse the existing pure app-section updater
+      to detect only lost requested edits; preserve separate outlier/ICP triggers and keep UI-037 active.
+    - Unrelated staged observations retain their owners and stale flags; no new closure or abandonment signal.

@@ -33,6 +33,7 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Components.Selection;
@@ -40,6 +41,7 @@ import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.EngineConfigControl;
@@ -93,9 +95,9 @@ namespace
         Editor::MeshProcessingPanels Panels;
         Editor::MethodPanels Methods;
 
-        PanelHarness()
+        explicit PanelHarness(Config::EngineConfigSectionRegistry sections =
+            Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry())
         {
-            auto sections = Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry();
             Config::EngineConfig config{};
             Config::PopulateEngineConfigSectionDefaults(config, sections);
             config.Simulation.WorkerThreadCount = 1u;
@@ -108,6 +110,7 @@ namespace
                 config, std::move(driver));
             Engine->EmplaceModule<R::EngineConfigControl>(std::move(sections));
             Engine->EmplaceModule<R::SceneInteractionModule>();
+            Engine->EmplaceModule<R::AsyncWorkModule>();
             Engine->EmplaceModule<R::EditorUiModule>();
             Engine->Initialize();
             Shell.Attach(Engine->Worlds(), Engine->Services());
@@ -135,6 +138,49 @@ namespace
                     Config::SerializeEngineConfig(config))).Succeeded();
         }
     };
+
+    Config::EngineConfigSectionRegistry RejectableConfigRegistry(
+        std::string_view section, const bool& reject, unsigned& rejections)
+    {
+        Config::EngineConfigSectionRegistry registry;
+        const auto defaults = Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry();
+        for (auto entry : defaults.Entries())
+        {
+            if (entry.DefaultSection.Name == section)
+            {
+                entry.Validate = [validate = entry.Validate, &reject, &rejections](auto payload, auto reference, auto subject) {
+                    auto result = validate(payload, reference, subject);
+                    if (reject)
+                    {
+                        ++rejections;
+                        result.State = Config::EngineConfigState::Invalid;
+                        result.Diagnostics.push_back({.Code = Config::EngineConfigDiagnosticCode::InvalidValue,
+                            .Subject = std::string{subject}, .Message = "Test config rejection"});
+                    }
+                    return result;
+                };
+            }
+            EXPECT_TRUE(registry.Register(std::move(entry)));
+        }
+        return registry;
+    }
+
+    void EditScalarControl(ImGuiWindow* window, const char* label, int step, const char* value)
+    {
+        if (step == 0)
+        {
+            ImGui::FocusWindow(window);
+            ImGui::ActivateItemByID(window->GetID(label));
+            ImGui::GetCurrentContext()->NavNextActivateFlags = ImGuiActivateFlags_PreferInput;
+        }
+        if (step == 2)
+        {
+            EXPECT_EQ(ImGui::GetActiveID(), window->GetID(label));
+            ImGui::GetIO().AddInputCharactersUTF8(value);
+        }
+        if (step == 4) ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter, true);
+        if (step == 5) ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter, false);
+    }
 
     constexpr std::array kInputWindows{
         "view.normal_estimation", "view.outlier_analysis", "view.keypoint_analysis",
@@ -1007,27 +1053,12 @@ TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePu
             ImGui::SetWindowSize(window, {750, 1400});
             ImGui::SetWindowPos(window, {0, 0});
             ++step;
-            const auto editParameter = [&](int begin, const char* value) {
-                if (step == begin)
-                {
-                    ImGui::FocusWindow(window);
-                    ImGui::ActivateItemByID(window->GetID(methods[method].Parameter));
-                    ImGui::GetCurrentContext()->NavNextActivateFlags = ImGuiActivateFlags_PreferInput;
-                }
-                if (step == begin + 2)
-                {
-                    EXPECT_EQ(ImGui::GetActiveID(), window->GetID(methods[method].Parameter));
-                    ImGui::GetIO().AddInputCharactersUTF8(value);
-                }
-                if (step == begin + 4) ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter, true);
-                if (step == begin + 5) ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter, false);
-            };
             if (step == 2)
             {
                 jobsBefore = engine.Jobs().Stats().SubmittedJobs;
                 acceptedConfig = Config::SerializeEngineConfig(h.Control().GetEngineConfigControlState().ActiveConfig);
             }
-            editParameter(3, "-1");
+            EditScalarControl(window, methods[method].Parameter, step - 3, "-1");
             if (step == 10) ImGui::ActivateItemByID(window->GetID(methods[method].Run));
             if (step == 13)
             {
@@ -1036,7 +1067,7 @@ TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePu
                 EXPECT_EQ(Config::SerializeEngineConfig(h.Control().GetEngineConfigControlState().ActiveConfig),
                           acceptedConfig) << "Rejected controls must leave the accepted configuration intact";
             }
-            editParameter(14, "2");
+            EditScalarControl(window, methods[method].Parameter, step - 14, "2");
             if (step == 21) EXPECT_TRUE(h.Apply(missingInputConfig));
             if (step == 24) ImGui::ActivateItemByID(window->GetID(methods[method].Run));
             if (step == 27)
@@ -1062,6 +1093,228 @@ TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePu
         h.Engine->Run();
         EXPECT_TRUE(completed);
     }
+}
+
+TEST(SandboxProcessingPanels, OutlierActionsApplyTheirOwnRequestAndRetryRejectedConfig)
+{
+    bool reject = false;
+    unsigned rejections = 0;
+    PanelHarness h(RejectableConfigRegistry(R::kOutlierAnalysisConfigSectionName, reject, rejections));
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::PointCloudPoint);
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    auto& props = scene.Raw().get<GS::Vertices>(entity).Properties;
+    props.Get<glm::vec3>("v:position")[8] = {100, 100, 100};
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto outliers = *R::GetOutlierAnalysisConfig(config);
+    outliers.StableEntityId = R::SelectionController::ToStableEntityId(entity);
+    outliers.Method = R::OutlierAnalysisMethod::Radius;
+    outliers.Radius = 1.1f; outliers.MinimumNeighbors = 1;
+    R::SetOutlierAnalysisConfig(config, outliers);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.outlier_analysis", true));
+    std::optional<R::EditorOutlierAnalysisResult> result;
+    const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id = "test.outlier_execution", .MenuPath = {"View"}, .Title = "Outlier execution observer",
+        .OpenByDefault = true,
+        .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
+            result = context.PointAnalysis.Results.LastOutlierAnalysisResult;
+        }});
+    int frame = 0, step = 0, phase = 0;
+    std::uint64_t jobsBefore = 0;
+    bool completed = false;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frame > 400) { ADD_FAILURE() << "Outlier panel did not complete"; engine.RequestExit(); return; }
+        auto* window = ImGui::FindWindowByName("Outlier Analysis");
+        if (!window) return;
+        ImGui::SetWindowSize(window, {750, 1400});
+        ImGui::SetWindowPos(window, {0, 0});
+        ++step;
+        const auto click = [&](const char* label) { ImGui::ActivateItemByID(window->GetID(label)); };
+        const auto active = [&] { return *R::GetOutlierAnalysisConfig(h.Control().GetEngineConfigControlState().ActiveConfig); };
+        if (phase == 0)
+        {
+            if (step == 2) jobsBefore = engine.Jobs().Stats().SubmittedJobs;
+            if (step == 3) click("Remove marked points");
+            if (step == 6)
+            {
+                EXPECT_FALSE(result);
+                EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
+                EXPECT_EQ(props.Size(), 9u);
+                rejections = 0; reject = true;
+            }
+            EditScalarControl(window, "Radius", step - 6, "1.25");
+            if (step == 14) click("Detect outliers");
+            if (step == 18)
+            {
+                EXPECT_GT(rejections, 0u);
+                EXPECT_FALSE(result);
+                EXPECT_FALSE(props.Exists(outliers.Mask.Name));
+                EXPECT_EQ(active().Radius, outliers.Radius);
+                EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
+                reject = false;
+                click("Detect outliers");
+                phase = 1; step = 0;
+            }
+        }
+        else if (phase == 1 && result && result->Succeeded())
+        {
+            EXPECT_EQ(result->Operation, R::OutlierAnalysisOperation::Analyze);
+            EXPECT_EQ(result->RejectedCount, 1u);
+            EXPECT_EQ(active().Operation, R::OutlierAnalysisOperation::Analyze);
+            EXPECT_EQ(props.Size(), 9u);
+            rejections = 0; reject = true;
+            click("Remove marked points");
+            phase = 2; step = 0;
+        }
+        else if (phase == 2 && step == 4)
+        {
+            EXPECT_GT(rejections, 0u);
+            EXPECT_EQ(props.Size(), 9u);
+            EXPECT_EQ(result->Operation, R::OutlierAnalysisOperation::Analyze);
+            EXPECT_EQ(active().Operation, R::OutlierAnalysisOperation::Analyze);
+            reject = false;
+            click("Remove marked points");
+            phase = 3; step = 0;
+        }
+        else if (phase == 3 && result && result->Operation == R::OutlierAnalysisOperation::RemoveMarked)
+        {
+            EXPECT_TRUE(result->Succeeded()) << result->Message;
+            EXPECT_EQ(props.Size(), 8u);
+            EXPECT_EQ(active().Operation, R::OutlierAnalysisOperation::RemoveMarked);
+            click("Detect outliers");
+            phase = 4; step = 0;
+        }
+        else if (phase == 4 && result && result->Succeeded() && result->Operation == R::OutlierAnalysisOperation::Analyze)
+        {
+            EXPECT_EQ(active().Operation, R::OutlierAnalysisOperation::Analyze);
+            EXPECT_EQ(result->LiveCount, 8u);
+            EXPECT_EQ(props.Size(), 8u);
+            completed = true;
+            engine.RequestExit();
+        }
+    };
+    h.Engine->Run();
+    EXPECT_TRUE(completed);
+    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
+}
+
+TEST(SandboxProcessingPanels, RegistrationRetriesConfigBeforeRunningAndPreservesTrajectoryChoice)
+{
+    bool reject = false;
+    unsigned rejections = 0;
+    PanelHarness h(RejectableConfigRegistry(R::kRegistrationConfigSectionName, reject, rejections));
+    auto& scene = h.Scene();
+    const auto source = scene.Create(), target = scene.Create();
+    using Transform = Extrinsic::ECS::Components::Transform::Component;
+    for (const auto entity : {source, target})
+    {
+        PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::PointCloudPoint);
+        scene.Raw().emplace<Transform>(entity);
+    }
+    scene.Raw().get<Transform>(target).Position = {0.25f, 0.1f, 0.2f};
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, source));
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto registration = *R::GetRegistrationConfig(config);
+    registration.SourceStableEntityId = R::SelectionController::ToStableEntityId(source);
+    registration.TargetStableEntityId = R::SelectionController::ToStableEntityId(target);
+    registration.TrajectoryStep = 1;
+    registration.InlierRatio = 1;
+    R::SetRegistrationConfig(config, registration);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.registration", true));
+    std::optional<R::EditorRegistrationResult> result;
+    const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id = "test.registration_execution", .MenuPath = {"View"}, .Title = "Registration execution observer",
+        .OpenByDefault = true,
+        .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
+            result = context.Registration.Results.LastRegistrationResult;
+        }});
+    int frame = 0, step = 0, phase = 0;
+    std::uint64_t jobsBefore = 0;
+    bool completed = false;
+    glm::vec3 finalPosition{};
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frame > 400) { ADD_FAILURE() << "ICP panel did not complete"; engine.RequestExit(); return; }
+        auto* window = ImGui::FindWindowByName("ICP Registration");
+        if (!window) return;
+        ImGui::SetWindowSize(window, {750, 1400});
+        ImGui::SetWindowPos(window, {0, 0});
+        ++step;
+        const auto run = [&] { ImGui::ActivateItemByID(window->GetID("Run ICP##ICP")); };
+        const auto active = [&] { return *R::GetRegistrationConfig(h.Control().GetEngineConfigControlState().ActiveConfig); };
+        if (phase == 0)
+        {
+            if (step == 2) jobsBefore = engine.Jobs().Stats().SubmittedJobs;
+            if (step == 2) EXPECT_TRUE(h.Apply(config));
+            if (step == 3) { rejections = 0; reject = true; run(); }
+            if (step == 7)
+            {
+                EXPECT_GT(rejections, 0u);
+                EXPECT_FALSE(result);
+                EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
+                EXPECT_EQ(active().TrajectoryStep, 1u);
+                EXPECT_EQ(scene.Raw().get<Transform>(source).Position, glm::vec3(0));
+                reject = false;
+                run();
+                phase = 1; step = 0;
+            }
+        }
+        else if (phase == 1 && result && result->Succeeded())
+        {
+            EXPECT_TRUE(result->HasResult);
+            EXPECT_GT(result->AppliedStep, 0u);
+            EXPECT_EQ(result->AppliedStep, std::min(std::size_t(registration.MaxIterations), result->TrajectoryLength));
+            EXPECT_EQ(active().TrajectoryStep, registration.MaxIterations);
+            finalPosition = scene.Raw().get<Transform>(source).Position;
+            EXPECT_NE(finalPosition, glm::vec3(0));
+            jobsBefore = engine.Jobs().Stats().SubmittedJobs;
+            phase = 2; step = 0;
+        }
+        else if (phase == 2)
+        {
+            EditScalarControl(window, "Apply trajectory step (0 = start)##ICP", step - 3, "0");
+            if (step > 9 && result && result->Succeeded() && result->AppliedStep == 0)
+            {
+                EXPECT_EQ(active().TrajectoryStep, 0u);
+                EXPECT_EQ(scene.Raw().get<Transform>(source).Position, finalPosition);
+                EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore + 1);
+                jobsBefore = engine.Jobs().Stats().SubmittedJobs;
+                phase = 3; step = 0;
+            }
+        }
+        else if (phase == 3)
+        {
+            EditScalarControl(window, "Max iterations##ICP", step - 3, "0");
+            if (step == 10) run();
+            if (step == 14)
+            {
+                EXPECT_EQ(active().MaxIterations, registration.MaxIterations);
+                EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
+                registration.SourcePositions.Name = "missing_positions";
+                R::SetRegistrationConfig(config, registration);
+                EXPECT_TRUE(h.Apply(config));
+                phase = 4; step = 0;
+            }
+        }
+        else if (phase == 4)
+        {
+            EditScalarControl(window, "Apply trajectory step (0 = start)##ICP", step - 3, "0");
+            if (step == 14)
+            {
+                EXPECT_EQ(active().TrajectoryStep, 0u);
+                EXPECT_EQ(active().SourcePositions.Name, "missing_positions");
+                EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
+                EXPECT_EQ(scene.Raw().get<Transform>(source).Position, finalPosition);
+                completed = true;
+                engine.RequestExit();
+            }
+        }
+    };
+    h.Engine->Run();
+    EXPECT_TRUE(completed);
+    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
 }
 
 TEST(SandboxProcessingPanels, UvAtlasAdoptionTracksNewExtentsAndPreservesManualSizing)

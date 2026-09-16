@@ -261,3 +261,56 @@ ctest --test-dir build/ci --output-on-failure -R 'NormalEstimation|SandboxProces
 ```
 The original full-inventory test selector remains the later task-closure gate;
 this checkpoint does not represent every action/backend or complete the task.
+
+### Verified execution slice — 2026-09-16
+Baseline `93cf136aa`, same operator direction and sole-writer/Claude review policy.
+Reuse decision: `DrawProcessingExecution`, construction, outlier and ICP duplicate
+apply-config / record error / execute / publish. Extract only that mechanism to a
+private template in the existing panel implementation. Construction keeps its
+resolved request; outlier Analyze/RemoveMarked keep separate canonical previews;
+ICP keeps final-pose versus trajectory-edit triggers. Reuse the existing runtime
+readiness/button for both outlier actions and ICP. Rejecting click-time config must
+not run previously accepted settings; programmatic trajectory triggers must obey
+live readiness too. No new module, file, import, service, validator or state owner.
+Keep family previews and asynchronous command validation unchanged. Add real-panel
+coverage using the existing harness, including injected config validation rejection,
+retry, trajectory step versus final pose, and removal provenance. A separate helper
+surface would only be justified by an actual caller outside this implementation.
+
+The injected section-rejection test exposed a shared-owner gap: the file parser
+retains a rejected section with `FallbackApplied`, which the typed processing
+apply previously accepted. At `ApplyEditorProcessingConfig`, reapply the existing
+pure section updater to the fallback preview and reject if it changes the accepted
+sections: that means the preview lost requested edits. Unrelated section fallback
+remains usable, and identical requested/accepted settings remain a valid no-change.
+This avoids diagnostic-string parsing and new section metadata/signature fan-out;
+Claude's review caught the overly broad initial `Valid`-only guard. A direct
+shared-owner test and both actual panels cover section fallback. The real-panel harness
+now composes AsyncWorkModule so job-count assertions observe submitted work.
+
+- Canonical `ci` configure, focused builds and final `IntrinsicTests` build pass.
+  Final full CPU gate: 4,670 passed, one expected ASan-only lifecycle skip,
+  zero failures among 4,671 selected (139.28 s). No GPU/sanitizer execution or
+  compile-speed claim. Compiler locality guards remain green.
+- New real-panel tests prove no publication or queued work after lost config
+  edits, successful retries, separate Analyze/RemoveMarked requests, re-detection
+  after removal, ICP final pose versus zero-step, invalid iteration rejection
+  and unavailable-input trajectory blocking. Existing runtime contracts retain
+  domain, stale-input, publication and undo coverage. The shared scalar edit
+  test driver replaces duplicate ImGui input sequencing in the existing test.
+- Claude plan/source/fix review completed. Corrected unrelated-fallback handling;
+  verified that only Valid/FallbackApplied are usable loader states, that every
+  updater sets app sections, and that removal assigns the existing PropertySet.
+  No speculative future-state machinery or weakened exact-once job assertion.
+- Scope/layering/tests/docs sweep and structural gates pass. Two existing
+  production implementation files: +1 net physical line (-8 panel, +9 runtime),
+  including the lost-edit guard. No new production files, modules, imports,
+  public surfaces or CMake entries; no inventory change required.
+- UI-037 remains active: family readiness records, mesh/UV/bake/Poisson/K-Means,
+  backend/variant options and metadata/cache-based preflight inventory still
+  need completion. Do not infer whole-task Operational closure from this slice.
+
+Focused regression selector:
+```bash
+ctest --test-dir build/ci --output-on-failure -R '^NormalEstimationConfig.RoundTripAndSharedPreviewApplyRun$|^SandboxProcessingPanels\.(OutlierActionsApplyTheirOwnRequestAndRetryRejectedConfig|RegistrationRetriesConfigBeforeRunningAndPreservesTrajectoryChoice|ReusedExecutionPanelsRejectInvalidRequestsBeforePublishing)$' --no-tests=error --timeout 60
+```

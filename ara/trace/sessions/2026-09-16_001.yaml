@@ -2,11 +2,11 @@ session:
   id: 2026-09-16_001
   date: '2026-09-16'
   started: '2026-09-16T00:38:04+02:00'
-  last_turn: '2026-09-16T11:04:35+02:00'
-  turn_count: 5
-  summary: Retired RUNTIME-268, GRAPHICS-144/145 and RUNTIME-267 with bounded compile evidence; began UI-037 config-backed
-    readiness/button consolidation with Claude review and full CPU verification. The broader readiness inventory
-    and independent material/shader/cache work remain open.
+  last_turn: '2026-09-16T11:31:38+02:00'
+  turn_count: 6
+  summary: Retired RUNTIME-268, GRAPHICS-144/145 and RUNTIME-267 with bounded compile evidence; continued UI-037
+    readiness/button and execution reuse with Claude review and full CPU verification. Outlier/ICP config retries
+    and lost-edit fallback are covered; broader readiness, material/shader/cache work remain open.
 events_logged:
 - turn: 1
   type: dead_end
@@ -98,6 +98,12 @@ events_logged:
   routing: direct
   provenance: ai-executed
   summary: Keep bounded config readiness/button reuse; UI-037 remains active.
+- turn: 6
+  type: decision
+  id: N610
+  routing: direct
+  provenance: ai-executed
+  summary: Keep execution reuse and scoped lost-config-edit rejection; UI-037 stays active.
 ai_actions:
 - turn: 1
   action: Diagnosed standard-header/import serialization, implemented one declaration owner, fixed review findings,
@@ -150,6 +156,16 @@ ai_actions:
   - src/runtime/Editor/Runtime.EditorProcessing.cpp
   - src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp
   - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
+- turn: 6
+  action: Consolidated processing execution, adopted outlier/ICP shared readiness, fixed config fallback after
+    test reproduction and Claude review, strengthened actual queued-panel coverage, and passed final full CPU
+    verification.
+  provenance: ai-executed
+  files_changed:
+  - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
+  - src/runtime/Editor/Runtime.EditorProcessing.cpp
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+  - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
 claims_touched:
 - id: C99
   action: crystallized
@@ -179,6 +195,9 @@ key_context:
 - turn: 5
   excerpt: User requests continuing open reuse/compilation tasks with Claude through plan, implementation, review,
     tests and fixes. First UI-037 slice selected; remaining inventory is explicit.
+- turn: 6
+  excerpt: User requests continuing open duplication/compile-time tasks with Claude. Continued UI-037 explicit
+    execution paths and rejection handling; no new timing benchmark or whole-task closure.
 open_threads:
 - The broader C92 processing-family hypothesis still needs a selected baseline and repeated family-edit measurements;
   BUILD-006 separately owns backend/cache comparisons.
@@ -199,8 +218,8 @@ open_threads:
 - BUG-195 owns disk-headroom preflight and evidence-write recovery; completed backend verification does not close
   that tooling work.
 - RUNTIME-268, GRAPHICS-144, GRAPHICS-145 and RUNTIME-267 are complete with bounded measured evidence. Mandatory
-  config/session dependencies remain. UI-037 is active with its first config-backed control slice verified;
-  mesh/UV/bake, family readiness and ICP/outlier/backend coverage remain. GRAPHICS-105 is ready; LEGACY-043 follows it, and
+  config/session dependencies remain. UI-037 is active with shared controls and outlier/ICP execution verified;
+  mesh/UV/bake, family readiness, backend/variant and metadata/cache preflight coverage remain. GRAPHICS-105 is ready; LEGACY-043 follows it, and
   BUILD-006 retains its prerequisites.
 ai_suggestions_pending:
 - Do not generalize the snapshot technique across engine layers without measuring the actual producer and consumer

@@ -422,6 +422,33 @@ TEST(NormalEstimationConfig, RoundTripAndSharedPreviewApplyRun)
     ASSERT_TRUE(R::ApplyEditorConfiguredNormalEstimation(commands).Succeeded());
     EXPECT_EQ(previews, 1);
     EXPECT_EQ(applies, 1);
+    auto fallback = context;
+    fallback.PreviewEngineConfigDocument = [&](const auto&, const auto&) {
+        C::EngineConfigLoadResult result;
+        result.State = C::EngineConfigState::FallbackApplied;
+        result.Preview.Config = state.ActiveConfig;
+        return result;
+    };
+    auto changedConfig = config;
+    changedConfig.KNeighbors = config.KNeighbors + 1;
+    const auto rejectedFallback = R::ApplyEditorNormalEstimationConfig(
+        R::BindEditorProcessingCommands(fallback), changedConfig);
+    EXPECT_FALSE(rejectedFallback.Succeeded());
+    EXPECT_EQ(rejectedFallback.LoadResult.State, C::EngineConfigState::FallbackApplied);
+    EXPECT_EQ(applies, 1);
+    EXPECT_EQ(R::GetNormalEstimationConfig(state.ActiveConfig)->KNeighbors, config.KNeighbors);
+    fallback.PreviewEngineConfigDocument = [&](const auto& document, const auto& origin) {
+        auto result = C::PreviewEngineConfig(document, state.ActiveConfig, {origin, &registry});
+        result.State = C::EngineConfigState::FallbackApplied;
+        result.Diagnostics.push_back({.State = C::EngineConfigState::FallbackApplied,
+            .Severity = C::EngineConfigDiagnosticSeverity::Warning,
+            .Subject = "unrelated.section", .Message = "Unrelated fallback retained its reference"});
+        return result;
+    };
+    EXPECT_TRUE(R::ApplyEditorNormalEstimationConfig(
+        R::BindEditorProcessingCommands(fallback), changedConfig).Succeeded());
+    EXPECT_EQ(applies, 2);
+    EXPECT_EQ(R::GetNormalEstimationConfig(state.ActiveConfig)->KNeighbors, changedConfig.KNeighbors);
     for (auto payload : {R"({"method":"automatic"})", R"({"backend":"vulkan"})", R"({"k_neighbors":0})",
                          R"({"minimum_neighbors":-1})", R"({"orientation":2})", R"({"weighting":5})",
                          R"({"use_radius":true,"radius":0})", R"({"radius":1e100})", R"({"unknown":1})",
@@ -438,7 +465,7 @@ TEST(NormalEstimationConfig, RoundTripAndSharedPreviewApplyRun)
               unavailable.DisabledReason);
     config.KNeighbors = 12;
     EXPECT_FALSE(R::ApplyEditorNormalEstimationConfig(expiring, config).Succeeded());
-    EXPECT_EQ(applies, 1);
+    EXPECT_EQ(applies, 2);
 }
 
 TEST(NormalEstimation, NamedOutputUsesSharedVectorVisualizationRecipe)

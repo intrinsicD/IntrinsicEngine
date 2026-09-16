@@ -893,7 +893,9 @@ exports a visualization-component adapter.
 with the live config lane, using the same availability predicate as config apply.
 Unavailable config commands take reason priority; otherwise method diagnostics
 remain authoritative. This preview executes no config callbacks or property scans;
-commands still validate current inputs at apply time. Family-specific readiness
+commands still validate current inputs at apply time. Typed processing config
+apply rejects file-load fallback that loses the requested section edits; fallback
+in unrelated sections remains usable. Family-specific readiness
 records and controls outside the shared config-backed path remain distinct.
 
 `UI-021` makes `Extrinsic.Runtime.GeometryAvailability` the shared availability
