@@ -7,6 +7,21 @@ relative to `tasks/done/`, which sits at the same depth as `tasks/active/`,
 so blocks moved from the old active-README history work verbatim.
 
 
+## 2026-09-16 — RUNTIME-267 and BUG-199: config editor locality
+
+Retired [RUNTIME-267](RUNTIME-267-processing-config-consumer-locality.md) at
+CPUContracted: shell-owned prepared frame, draw-scoped context borrow and existing
+method implementation owner remove three unrelated config importers. Canonical full
+CPU and fresh Clang20 caller compilation pass. Six matched editor-target samples
+observe 34.245 → 27.372 s median locally; receiver cost and non-improving controls
+remain explicit in the [report](../../ara/evidence/tables/runtime267_processing_config_measurement.md).
+One private header, +34 C++ lines; no new module/state owner or broader speed claim.
+[BUG-199](BUG-199-compile-benchmark-cmake-glob-output.md) repairs shared CMake glob
+metadata accounting, with regression tests and both rejected attempts retained.
+Source `6fb0807f4`, harness fix `a1124cf17`; accompanying evidence commit closes the
+record. UI/material/shader/cache work remains independent.
+
+
 ## 2026-09-16 — BUG-198: stale compile-backlog links
 
 Retired [BUG-198](BUG-198-compile-backlog-retired-links.md) as a documentation

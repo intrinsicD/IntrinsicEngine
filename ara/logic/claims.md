@@ -2276,3 +2276,14 @@
 - **Dependencies**: []
 - **Tags**: compilation, C++23 modules, renderer frontend, standard-library reuse, local matched observations
 - **From staging**: O234
+
+## C102: Bounded processing config editor rebuild observations
+- **Statement**: RUNTIME-267's local Clang23 Debug Null/headless ABBAAB cohort, three samples per exact source arm, changes settled config-interface edit plus editor-target archives median from 34.245 to 27.372 seconds (20.1% lower), with 19 to 16 compiler invocations. Before range is 34.225–34.349 seconds; after is 27.244–27.408. Exactly DomainPanels, MeshProcessingPanels and PanelSupport leave the rebuild; no added sources. Receiving MethodPanels median rises 8.132 to 8.238 seconds (+1.3%), included in target timing. All 1,138 configured compiler commands match; clean source and package identities are checked.
+- **Status**: supported — descriptive local warm-input incremental observations only; all six canonical records remain claim_eligible:false. No clean-build, whole-engine, runtime/GPU, memory, cross-host/compiler, statistical/general or publication-qualified conclusion. Implementation/no-op ranges overlap; neither improves. Clang20 evidence is compilation only; execution is canonical Clang23 CPU.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Recalculation disagrees with medians/counts, receiving-helper compile cost is omitted, source/command/package identities do not match, setup compilations leak into timed windows, or missing consumers change functionality. Both rejected attempts must remain separate from all six retained corrected samples. Prior runtime-only targets cannot be combined.
+- **Proof**: [ara/evidence/tables/runtime267_processing_config_measurement.md, ara/evidence/diagnostics/runtime267_processing_config/summary.json, ara/evidence/diagnostics/runtime267_processing_config/verification.json, ara/evidence/diagnostics/runtime267_processing_config/evidence-index.json, ara/evidence/diagnostics/runtime267_processing_config/raw-evidence.tar.gz, benchmarks/ci/manifests/processing_config_editor.yaml, tasks/done/RUNTIME-267-processing-config-consumer-locality.md]
+- **Dependencies**: []
+- **Tags**: compilation, C++23 modules, editor dependencies, prepared-frame lifetime, local matched observations
+- **From staging**: O235

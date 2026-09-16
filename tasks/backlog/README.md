@@ -71,13 +71,11 @@ Research remains paused behind REVIEW-004 except explicit operator direction and
 
 These operator-requested tasks continue from the improved engine, without
 reopening completed cleanup slices. BUILD-009, RUNTIME-266, RUNTIME-268,
-GRAPHICS-144 and GRAPHICS-145 are complete. RUNTIME-267 must freeze fresh
-immediate-before sources for its own comparison. UI-037 and GRAPHICS-105 are independently
+GRAPHICS-144, GRAPHICS-145 and RUNTIME-267 are complete. UI-037 and GRAPHICS-105 are independently
 ready. Task front-matter owns prerequisite state.
 
 | Area | Task |
 | --- | --- |
-| Processing config dependency chain | [RUNTIME-267](../active/RUNTIME-267-processing-config-consumer-locality.md) |
 | Shared action readiness and disabled reasons | [UI-037](ui/UI-037-linear-domain-action-readiness-tooltips.md) |
 | Material/visualization authority consolidation | [GRAPHICS-105](rendering/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md) |
 | Stale shaders after material-authority decisions | [LEGACY-043](rendering/LEGACY-043-retire-stale-multiset-shaders.md) |

@@ -13,7 +13,6 @@ picking backlog work; theme priorities and rationale live in
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
 - `METHOD-044` — Feature-aware patches and distortion-aware atlas merging (tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md)
 - `METHOD-045` — Preserve baseline regions while constructing UV charts (tasks/active/METHOD-045-baseline-preserving-atlas-cuts.md)
-- `RUNTIME-267` — Isolate processing config edits from unrelated editor consumers (tasks/active/RUNTIME-267-processing-config-consumer-locality.md)
 - `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
 
 ## Theme B — Rendering modernization
@@ -33,7 +32,6 @@ picking backlog work; theme priorities and rationale live in
 
 - unblocked: `ASSETIO-010` — Async model companion preflight (tasks/backlog/assets/ASSETIO-010-async-model-companion-preflight.md)
 - blocked by `ASSETIO-010`: `ASSETIO-011` — Semantic Sandbox File / Import workflow matrix (tasks/backlog/assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md)
-- unblocked: `BUG-199` — Recognize CMake glob-check metadata in compile measurements (tasks/backlog/bugs/BUG-199-compile-benchmark-cmake-glob-output.md)
 - blocked by `GRAPHICS-105`: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)

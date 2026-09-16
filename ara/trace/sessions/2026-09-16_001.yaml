@@ -2,11 +2,11 @@ session:
   id: 2026-09-16_001
   date: '2026-09-16'
   started: '2026-09-16T00:38:04+02:00'
-  last_turn: '2026-09-16T09:09:16+02:00'
-  turn_count: 3
-  summary: Retired RUNTIME-268, GRAPHICS-144 and GRAPHICS-145 with bounded matched compile evidence and Claude review.
-    Renderer implementation rebuild median now 9.474 seconds in its local comparison; RUNTIME-267 and independent
-    UI/material/cache tasks remain open.
+  last_turn: '2026-09-16T10:27:25+02:00'
+  turn_count: 4
+  summary: Retired RUNTIME-268, GRAPHICS-144, GRAPHICS-145 and RUNTIME-267 with bounded compile measurements and
+    Claude review. Config-interface editor rebuild median 34.245 to 27.372 seconds locally; UI/material/shader/cache
+    tasks retain their independent scope.
 events_logged:
 - turn: 1
   type: dead_end
@@ -74,6 +74,24 @@ events_logged:
   routing: crystallized
   provenance: ai-executed
   summary: C101 records only the retained local rebuild comparison; N606 supplies artifact commitment.
+- turn: 4
+  type: experiment
+  id: N607
+  routing: direct
+  provenance: ai-executed
+  summary: Measure config edit fanout and real editor-target walls in six retained samples.
+- turn: 4
+  type: decision
+  id: N608
+  routing: direct
+  provenance: ai-executed
+  summary: Retain canonical frame ownership/borrow and retire RUNTIME-267 plus BUG-199.
+- turn: 4
+  type: observation
+  id: O235
+  routing: crystallized
+  provenance: ai-executed
+  summary: C102 records local incremental observations through N608 artifact commitment.
 ai_actions:
 - turn: 1
   action: Diagnosed standard-header/import serialization, implemented one declaration owner, fixed review findings,
@@ -107,6 +125,16 @@ ai_actions:
   - benchmarks/ci/manifests/renderer_frontend.yaml
   - tasks/done/GRAPHICS-145-renderer-implementation-frontend-cost.md
   - ara/evidence/tables/graphics145_renderer_frontend_measurement.md
+- turn: 4
+  action: Isolated three app consumers, resolved Claude reviews, verified full CPU and fresh minimum compiler,
+    fixed CMake metadata accounting, measured six samples and retired tasks with retained evidence.
+  provenance: ai-executed
+  files_changed:
+  - src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp
+  - src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cppm
+  - benchmarks/ci/manifests/processing_config_editor.yaml
+  - tasks/done/RUNTIME-267-processing-config-consumer-locality.md
+  - ara/evidence/tables/runtime267_processing_config_measurement.md
 claims_touched:
 - id: C99
   action: crystallized
@@ -117,6 +145,9 @@ claims_touched:
 - id: C101
   action: crystallized
   turn: 3
+- id: C102
+  action: crystallized
+  turn: 4
 key_context:
 - turn: 1
   excerpt: User requested continuing open compilation/reuse tasks with Claude through planning, implementation,
@@ -127,6 +158,9 @@ key_context:
 - turn: 3
   excerpt: User requests continuing open compile/reuse tasks with Claude through planning, implementation, review,
     testing and fixes. Standing sharing/commit/push authorization persists; no main merge.
+- turn: 4
+  excerpt: 'User requests continued compile/reuse tasks with Claude: plan, implement, review, test and fix. Standing
+    source-sharing/commit/push authorization persists; no main merge.'
 open_threads:
 - The broader C92 processing-family hypothesis still needs a selected baseline and repeated family-edit measurements;
   BUILD-006 separately owns backend/cache comparisons.
@@ -146,9 +180,9 @@ open_threads:
   CPU and Vulkan probes select the scalar; exact Display status, acceleration and Appearance behavior remain needed.'
 - BUG-195 owns disk-headroom preflight and evidence-write recovery; completed backend verification does not close
   that tooling work.
-- RUNTIME-268, GRAPHICS-144 and GRAPHICS-145 are complete with bounded measured evidence. RUNTIME-267 config/frame
-  ownership remains open. UI-037 and GRAPHICS-105 are ready; LEGACY-043 follows GRAPHICS-105, and BUILD-006 retains
-  its prerequisites.
+- RUNTIME-268, GRAPHICS-144, GRAPHICS-145 and RUNTIME-267 are complete with bounded measured evidence. Mandatory
+  config/session dependencies remain. UI-037 and GRAPHICS-105 are ready; LEGACY-043 follows GRAPHICS-105, and
+  BUILD-006 retains its prerequisites.
 ai_suggestions_pending:
 - Do not generalize the snapshot technique across engine layers without measuring the actual producer and consumer
   graph. Existing staged topics retain their owners and flags.

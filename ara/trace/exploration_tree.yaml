@@ -13118,3 +13118,39 @@ tree:
     - tasks/done/GRAPHICS-145-renderer-implementation-frontend-cost.md
     - ara/evidence/tables/graphics145_renderer_frontend_measurement.md
     status: resolved
+
+  - id: N607
+    type: experiment
+    title: Measure processing config edits against the actual editor target
+    provenance: ai-executed
+    timestamp: '2026-09-16T10:27:25+02:00'
+    result: Local exact-source ABBAAB editor-target config-interface rebuild median 34.245 to 27.372 seconds (20.1%
+      lower), with 19 to 16 compilers. Receiver MethodPanels median 8.132 to 8.238 seconds (+1.3%). Implementation/no-op
+      ranges overlap; no improvement claimed. All six results claim_eligible:false. All 1138 commands match; exactly
+      three unrelated app consumers leave the rebuild. Frozen helper repair recognizes CMake glob metadata without
+      removing wall overhead.
+    evidence:
+    - O235
+    - ara/evidence/tables/runtime267_processing_config_measurement.md
+    - ara/evidence/diagnostics/runtime267_processing_config/evidence-index.json
+    status: resolved
+  - id: N608
+    type: decision
+    title: Keep shell-owned family frame borrowing and retire RUNTIME-267
+    provenance: ai-executed
+    timestamp: '2026-09-16T10:27:25+02:00'
+    choice: Retain source 6fb0807f4 after Claude plan/source/protocol/results review, full CPU 4666 passed plus
+      one expected skip, 158 focused cases and nine strengthened tests. Fresh Clang20 compiled runtime/editor closure
+      plus all three caller objects. One private header, +34 net C++ lines, no new compiled unit/module/state owner.
+      Existing typed session/config dependencies remain; no facade. BUG-199 repairs shared measurement metadata
+      accounting.
+    alternatives:
+    - Hide mandatory by-value config/results behind a new facade
+    - Borrow a temporary prepared frame
+    - Claim whole-engine or clean-build gains from a local incremental target comparison
+    evidence:
+    - O235
+    - N607
+    - tasks/done/RUNTIME-267-processing-config-consumer-locality.md
+    - ara/evidence/tables/runtime267_processing_config_measurement.md
+    status: resolved

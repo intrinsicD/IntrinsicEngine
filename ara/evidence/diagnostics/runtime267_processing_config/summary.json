@@ -1,0 +1,789 @@
+{
+  "benchmark_id": "build.engine_compile_iteration.processing_config_editor.v1",
+  "source_revisions": {
+    "before": "be40663918749417275b06fb8268a00310688f7d",
+    "after": "6fb0807f49a8d660d820470e82613c1ad1a9c424"
+  },
+  "freeze": {
+    "frozen_at": "2026-09-16T08:17:16.505829+00:00",
+    "source_revisions": {
+      "before": "be40663918749417275b06fb8268a00310688f7d",
+      "after": "6fb0807f49a8d660d820470e82613c1ad1a9c424"
+    },
+    "manifest_sha256": "547aec8e82f4565ccada5f8048fa66190a554076c431b3ba6682a4d680487031",
+    "runner_sha256": "d09ad9c34a5780a9794a2c448b01b05e4eb715eb0acd555c95193e9398d565b0",
+    "helper_sha256": "5e67b87969e0d2d2f454a5c84bf22465aee3ad41f88888a158112e952732ddad",
+    "timed_population_absent_at_freeze": true,
+    "rejected_attempts": [
+      "measurement-rejected-setup (target omitted, no timing)",
+      "measurement-rejected-glob-accounting (one noop, zero config probes; preserved)"
+    ],
+    "reused_build": "Owned initial baseline prerequisites only; no fresh-build claim. Setup forces every changed producer stale and checks compilation."
+  },
+  "samples": [
+    {
+      "attempt": "01-before-1",
+      "arm": "before",
+      "build_time_ms": {
+        "noop": 88.13415502663702,
+        "config_impl": 431.0323130339384,
+        "config_interface": 34224.58723804448
+      },
+      "memory_peak_bytes": {
+        "noop": 26230784,
+        "config_impl": 408018944,
+        "config_interface": 2799443968
+      },
+      "compiler_invocations": {
+        "noop": 0,
+        "config_impl": 1,
+        "config_interface": 19
+      },
+      "critical_path_ms": {
+        "noop": 0,
+        "config_impl": 341,
+        "config_interface": 24026
+      },
+      "producer_durations_ms": {
+        "noop": {},
+        "config_impl": {
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp": 122
+        },
+        "config_interface": {
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm": 447,
+          "src/app/Sandbox/Sandbox.ConfigSections.cppm": 70,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp": 133,
+          "src/app/Sandbox/Sandbox.ConfigSections.cpp": 417,
+          "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp": 4339,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cppm": 4428,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cpp": 881,
+          "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cppm": 7104,
+          "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.Frame.cpp": 1560,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm": 9028,
+          "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp": 10130,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp": 8843,
+          "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp": 11034,
+          "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp": 10897,
+          "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cpp": 1844,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp": 3174,
+          "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp": 8184,
+          "src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp": 10032,
+          "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp": 9449
+        }
+      }
+    },
+    {
+      "attempt": "02-after-1",
+      "arm": "after",
+      "build_time_ms": {
+        "noop": 91.29932301584631,
+        "config_impl": 440.8932270016521,
+        "config_interface": 27408.242627978325
+      },
+      "memory_peak_bytes": {
+        "noop": 26243072,
+        "config_impl": 408154112,
+        "config_interface": 2797907968
+      },
+      "compiler_invocations": {
+        "noop": 0,
+        "config_impl": 1,
+        "config_interface": 16
+      },
+      "critical_path_ms": {
+        "noop": 0,
+        "config_impl": 351,
+        "config_interface": 23204
+      },
+      "producer_durations_ms": {
+        "noop": {},
+        "config_impl": {
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp": 123
+        },
+        "config_interface": {
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm": 451,
+          "src/app/Sandbox/Sandbox.ConfigSections.cppm": 76,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp": 138,
+          "src/app/Sandbox/Sandbox.ConfigSections.cpp": 417,
+          "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp": 4387,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cppm": 4455,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cpp": 892,
+          "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cppm": 7121,
+          "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.Frame.cpp": 1586,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm": 9040,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp": 3156,
+          "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cpp": 1861,
+          "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp": 10142,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp": 8855,
+          "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp": 11087,
+          "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp": 8261
+        }
+      }
+    },
+    {
+      "attempt": "03-after-2",
+      "arm": "after",
+      "build_time_ms": {
+        "noop": 89.54262104816735,
+        "config_impl": 432.39398300647736,
+        "config_interface": 27243.98343102075
+      },
+      "memory_peak_bytes": {
+        "noop": 26226688,
+        "config_impl": 407973888,
+        "config_interface": 2799677440
+      },
+      "compiler_invocations": {
+        "noop": 0,
+        "config_impl": 1,
+        "config_interface": 16
+      },
+      "critical_path_ms": {
+        "noop": 0,
+        "config_impl": 339,
+        "config_interface": 23151
+      },
+      "producer_durations_ms": {
+        "noop": {},
+        "config_impl": {
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp": 124
+        },
+        "config_interface": {
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm": 453,
+          "src/app/Sandbox/Sandbox.ConfigSections.cppm": 69,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp": 131,
+          "src/app/Sandbox/Sandbox.ConfigSections.cpp": 417,
+          "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp": 4364,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cppm": 4451,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cpp": 895,
+          "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cppm": 7110,
+          "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.Frame.cpp": 1584,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm": 8945,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp": 3106,
+          "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cpp": 1873,
+          "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp": 10066,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp": 8942,
+          "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp": 11048,
+          "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp": 8237
+        }
+      }
+    },
+    {
+      "attempt": "04-before-2",
+      "arm": "before",
+      "build_time_ms": {
+        "noop": 90.66721005365252,
+        "config_impl": 424.8801419744268,
+        "config_interface": 34244.82653697487
+      },
+      "memory_peak_bytes": {
+        "noop": 26103808,
+        "config_impl": 407846912,
+        "config_interface": 2799837184
+      },
+      "compiler_invocations": {
+        "noop": 0,
+        "config_impl": 1,
+        "config_interface": 19
+      },
+      "critical_path_ms": {
+        "noop": 0,
+        "config_impl": 338,
+        "config_interface": 24030
+      },
+      "producer_durations_ms": {
+        "noop": {},
+        "config_impl": {
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp": 123
+        },
+        "config_interface": {
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm": 450,
+          "src/app/Sandbox/Sandbox.ConfigSections.cppm": 70,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp": 132,
+          "src/app/Sandbox/Sandbox.ConfigSections.cpp": 420,
+          "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp": 4359,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cppm": 4450,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cpp": 889,
+          "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cppm": 7111,
+          "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.Frame.cpp": 1586,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm": 8966,
+          "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp": 10071,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp": 8915,
+          "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp": 10949,
+          "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp": 10730,
+          "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cpp": 1844,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp": 3204,
+          "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp": 8132,
+          "src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp": 10067,
+          "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp": 9423
+        }
+      }
+    },
+    {
+      "attempt": "05-before-3",
+      "arm": "before",
+      "build_time_ms": {
+        "noop": 87.67784293740988,
+        "config_impl": 420.56410189252347,
+        "config_interface": 34349.18648493476
+      },
+      "memory_peak_bytes": {
+        "noop": 26247168,
+        "config_impl": 407961600,
+        "config_interface": 2799751168
+      },
+      "compiler_invocations": {
+        "noop": 0,
+        "config_impl": 1,
+        "config_interface": 19
+      },
+      "critical_path_ms": {
+        "noop": 0,
+        "config_impl": 331,
+        "config_interface": 24064
+      },
+      "producer_durations_ms": {
+        "noop": {},
+        "config_impl": {
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp": 123
+        },
+        "config_interface": {
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm": 448,
+          "src/app/Sandbox/Sandbox.ConfigSections.cppm": 70,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp": 131,
+          "src/app/Sandbox/Sandbox.ConfigSections.cpp": 418,
+          "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp": 4363,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cppm": 4446,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cpp": 885,
+          "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cppm": 7106,
+          "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.Frame.cpp": 1582,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm": 8993,
+          "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp": 10099,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp": 8958,
+          "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp": 11084,
+          "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp": 10777,
+          "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cpp": 1868,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp": 3171,
+          "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp": 8101,
+          "src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp": 10085,
+          "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp": 9456
+        }
+      }
+    },
+    {
+      "attempt": "06-after-3",
+      "arm": "after",
+      "build_time_ms": {
+        "noop": 92.57198998238891,
+        "config_impl": 428.51290304679424,
+        "config_interface": 27372.31944000814
+      },
+      "memory_peak_bytes": {
+        "noop": 26218496,
+        "config_impl": 408244224,
+        "config_interface": 2798223360
+      },
+      "compiler_invocations": {
+        "noop": 0,
+        "config_impl": 1,
+        "config_interface": 16
+      },
+      "critical_path_ms": {
+        "noop": 0,
+        "config_impl": 338,
+        "config_interface": 23104
+      },
+      "producer_durations_ms": {
+        "noop": {},
+        "config_impl": {
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp": 123
+        },
+        "config_interface": {
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm": 455,
+          "src/app/Sandbox/Sandbox.ConfigSections.cppm": 71,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp": 132,
+          "src/app/Sandbox/Sandbox.ConfigSections.cpp": 417,
+          "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp": 4374,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cppm": 4459,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cpp": 885,
+          "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cppm": 7103,
+          "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.Frame.cpp": 1590,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm": 9074,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp": 3131,
+          "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cpp": 1829,
+          "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp": 10057,
+          "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp": 8848,
+          "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp": 10927,
+          "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp": 8238
+        }
+      }
+    }
+  ],
+  "config_interface_removed_sources": [
+    "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp",
+    "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp",
+    "src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp"
+  ],
+  "config_interface_added_sources": [],
+  "compiler_commands_sha256": "3f864e1491caac737cd8f0a577a4a4ccac112677d7e4a419ce7576c22a0c4faf",
+  "compiler_commands_count": 1138,
+  "arms": {
+    "before": {
+      "build_time_ms": {
+        "noop": {
+          "median": 88.13415502663702,
+          "min": 87.67784293740988,
+          "max": 90.66721005365252,
+          "samples": [
+            88.13415502663702,
+            90.66721005365252,
+            87.67784293740988
+          ]
+        },
+        "config_impl": {
+          "median": 424.8801419744268,
+          "min": 420.56410189252347,
+          "max": 431.0323130339384,
+          "samples": [
+            431.0323130339384,
+            424.8801419744268,
+            420.56410189252347
+          ]
+        },
+        "config_interface": {
+          "median": 34244.82653697487,
+          "min": 34224.58723804448,
+          "max": 34349.18648493476,
+          "samples": [
+            34224.58723804448,
+            34244.82653697487,
+            34349.18648493476
+          ]
+        }
+      },
+      "memory_peak_bytes": {
+        "noop": {
+          "median": 26230784,
+          "min": 26103808,
+          "max": 26247168,
+          "samples": [
+            26230784,
+            26103808,
+            26247168
+          ]
+        },
+        "config_impl": {
+          "median": 407961600,
+          "min": 407846912,
+          "max": 408018944,
+          "samples": [
+            408018944,
+            407846912,
+            407961600
+          ]
+        },
+        "config_interface": {
+          "median": 2799751168,
+          "min": 2799443968,
+          "max": 2799837184,
+          "samples": [
+            2799443968,
+            2799837184,
+            2799751168
+          ]
+        }
+      },
+      "compiler_invocations": {
+        "noop": {
+          "median": 0,
+          "min": 0,
+          "max": 0,
+          "samples": [
+            0,
+            0,
+            0
+          ]
+        },
+        "config_impl": {
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "samples": [
+            1,
+            1,
+            1
+          ]
+        },
+        "config_interface": {
+          "median": 19,
+          "min": 19,
+          "max": 19,
+          "samples": [
+            19,
+            19,
+            19
+          ]
+        }
+      },
+      "critical_path_ms": {
+        "noop": {
+          "median": 0,
+          "min": 0,
+          "max": 0,
+          "samples": [
+            0,
+            0,
+            0
+          ]
+        },
+        "config_impl": {
+          "median": 338,
+          "min": 331,
+          "max": 341,
+          "samples": [
+            341,
+            338,
+            331
+          ]
+        },
+        "config_interface": {
+          "median": 24030,
+          "min": 24026,
+          "max": 24064,
+          "samples": [
+            24026,
+            24030,
+            24064
+          ]
+        }
+      },
+      "config_interface_producers": {
+        "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp": {
+          "median": 10777,
+          "min": 10730,
+          "max": 10897
+        },
+        "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp": {
+          "median": 11034,
+          "min": 10949,
+          "max": 11084
+        },
+        "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp": {
+          "median": 9449,
+          "min": 9423,
+          "max": 9456
+        },
+        "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp": {
+          "median": 8132,
+          "min": 8101,
+          "max": 8184
+        },
+        "src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp": {
+          "median": 10067,
+          "min": 10032,
+          "max": 10085
+        },
+        "src/app/Sandbox/Sandbox.ConfigSections.cpp": {
+          "median": 418,
+          "min": 417,
+          "max": 420
+        },
+        "src/app/Sandbox/Sandbox.ConfigSections.cppm": {
+          "median": 70,
+          "min": 70,
+          "max": 70
+        },
+        "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp": {
+          "median": 4359,
+          "min": 4339,
+          "max": 4363
+        },
+        "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.Frame.cpp": {
+          "median": 1582,
+          "min": 1560,
+          "max": 1586
+        },
+        "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cpp": {
+          "median": 1844,
+          "min": 1844,
+          "max": 1868
+        },
+        "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cppm": {
+          "median": 7106,
+          "min": 7104,
+          "max": 7111
+        },
+        "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp": {
+          "median": 10099,
+          "min": 10071,
+          "max": 10130
+        },
+        "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp": {
+          "median": 132,
+          "min": 131,
+          "max": 133
+        },
+        "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm": {
+          "median": 448,
+          "min": 447,
+          "max": 450
+        },
+        "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp": {
+          "median": 3174,
+          "min": 3171,
+          "max": 3204
+        },
+        "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp": {
+          "median": 8915,
+          "min": 8843,
+          "max": 8958
+        },
+        "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm": {
+          "median": 8993,
+          "min": 8966,
+          "max": 9028
+        },
+        "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cpp": {
+          "median": 885,
+          "min": 881,
+          "max": 889
+        },
+        "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cppm": {
+          "median": 4446,
+          "min": 4428,
+          "max": 4450
+        }
+      }
+    },
+    "after": {
+      "build_time_ms": {
+        "noop": {
+          "median": 91.29932301584631,
+          "min": 89.54262104816735,
+          "max": 92.57198998238891,
+          "samples": [
+            91.29932301584631,
+            89.54262104816735,
+            92.57198998238891
+          ]
+        },
+        "config_impl": {
+          "median": 432.39398300647736,
+          "min": 428.51290304679424,
+          "max": 440.8932270016521,
+          "samples": [
+            440.8932270016521,
+            432.39398300647736,
+            428.51290304679424
+          ]
+        },
+        "config_interface": {
+          "median": 27372.31944000814,
+          "min": 27243.98343102075,
+          "max": 27408.242627978325,
+          "samples": [
+            27408.242627978325,
+            27243.98343102075,
+            27372.31944000814
+          ]
+        }
+      },
+      "memory_peak_bytes": {
+        "noop": {
+          "median": 26226688,
+          "min": 26218496,
+          "max": 26243072,
+          "samples": [
+            26243072,
+            26226688,
+            26218496
+          ]
+        },
+        "config_impl": {
+          "median": 408154112,
+          "min": 407973888,
+          "max": 408244224,
+          "samples": [
+            408154112,
+            407973888,
+            408244224
+          ]
+        },
+        "config_interface": {
+          "median": 2798223360,
+          "min": 2797907968,
+          "max": 2799677440,
+          "samples": [
+            2797907968,
+            2799677440,
+            2798223360
+          ]
+        }
+      },
+      "compiler_invocations": {
+        "noop": {
+          "median": 0,
+          "min": 0,
+          "max": 0,
+          "samples": [
+            0,
+            0,
+            0
+          ]
+        },
+        "config_impl": {
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "samples": [
+            1,
+            1,
+            1
+          ]
+        },
+        "config_interface": {
+          "median": 16,
+          "min": 16,
+          "max": 16,
+          "samples": [
+            16,
+            16,
+            16
+          ]
+        }
+      },
+      "critical_path_ms": {
+        "noop": {
+          "median": 0,
+          "min": 0,
+          "max": 0,
+          "samples": [
+            0,
+            0,
+            0
+          ]
+        },
+        "config_impl": {
+          "median": 339,
+          "min": 338,
+          "max": 351,
+          "samples": [
+            351,
+            339,
+            338
+          ]
+        },
+        "config_interface": {
+          "median": 23151,
+          "min": 23104,
+          "max": 23204,
+          "samples": [
+            23204,
+            23151,
+            23104
+          ]
+        }
+      },
+      "config_interface_producers": {
+        "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp": {
+          "median": 11048,
+          "min": 10927,
+          "max": 11087
+        },
+        "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp": {
+          "median": 8238,
+          "min": 8237,
+          "max": 8261
+        },
+        "src/app/Sandbox/Sandbox.ConfigSections.cpp": {
+          "median": 417,
+          "min": 417,
+          "max": 417
+        },
+        "src/app/Sandbox/Sandbox.ConfigSections.cppm": {
+          "median": 71,
+          "min": 69,
+          "max": 76
+        },
+        "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp": {
+          "median": 4374,
+          "min": 4364,
+          "max": 4387
+        },
+        "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.Frame.cpp": {
+          "median": 1586,
+          "min": 1584,
+          "max": 1590
+        },
+        "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cpp": {
+          "median": 1861,
+          "min": 1829,
+          "max": 1873
+        },
+        "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cppm": {
+          "median": 7110,
+          "min": 7103,
+          "max": 7121
+        },
+        "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp": {
+          "median": 10066,
+          "min": 10057,
+          "max": 10142
+        },
+        "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp": {
+          "median": 132,
+          "min": 131,
+          "max": 138
+        },
+        "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm": {
+          "median": 453,
+          "min": 451,
+          "max": 455
+        },
+        "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp": {
+          "median": 3131,
+          "min": 3106,
+          "max": 3156
+        },
+        "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp": {
+          "median": 8855,
+          "min": 8848,
+          "max": 8942
+        },
+        "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm": {
+          "median": 9040,
+          "min": 8945,
+          "max": 9074
+        },
+        "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cpp": {
+          "median": 892,
+          "min": 885,
+          "max": 895
+        },
+        "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cppm": {
+          "median": 4455,
+          "min": 4451,
+          "max": 4459
+        }
+      }
+    }
+  },
+  "protocol": {
+    "manifest_sha256": "547aec8e82f4565ccada5f8048fa66190a554076c431b3ba6682a4d680487031",
+    "runner_sha256": "d09ad9c34a5780a9794a2c448b01b05e4eb715eb0acd555c95193e9398d565b0",
+    "source": "/dev/shm/intrinsic-runtime267-measurement/source",
+    "build": "/dev/shm/intrinsic-runtime267-measurement/build",
+    "packages": {
+      "sha256": "0ecb7332b14479eabffbc061dba9d94492bfb494a936e9be5bf2caf384e97c54",
+      "file_count": 1728
+    },
+    "compiler": "Ubuntu clang version 23.0.0 (++20260614081921+80b1dddb5a24-1~exp1~20260614202044.1664)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/lib/llvm-23/bin\n",
+    "cpu": "11th Gen Intel(R) Core(TM) i9-11900KF @ 3.50GHz",
+    "scope": "Settled actual editor target after untimed source reconciliation; no fresh build timing."
+  },
+  "median_reduction_percent": {
+    "noop": -3.5913068982764695,
+    "config_impl": -1.7684613352682454,
+    "config_interface": 20.068745536048592
+  }
+}

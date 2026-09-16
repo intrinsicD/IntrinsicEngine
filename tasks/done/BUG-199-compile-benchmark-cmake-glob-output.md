@@ -22,10 +22,19 @@ Observed during RUNTIME-267's first no-op measurement, after untimed baseline co
 ## Acceptance criteria
 - [x] Recognize the exact CMakeFiles/cmake.verify_globs path suffix, absolute or relative; retain it in unmapped_meta_outputs and keep full build wall timing.
 - [x] Regression-test both spellings and reject a similarly named unrelated output.
-- [ ] Complete the corrected matched measurement and Claude review, retaining the rejected attempt.
+- [x] Complete the corrected matched measurement and Claude review, retaining the rejected attempt.
 
 ## Verification
 ```bash
 python3 tests/regression/tooling/Test.CompileHotspots.py
 ```
 26 tests pass. The accounting helper is shared with the canonical compile runner; do not fork it into a task-local implementation.
+
+## Completion — 2026-09-16
+Retired as a tested harness repair, with no engine maturity change. Fix commit:
+`a1124cf17`; 26 tooling tests and all six corrected benchmark records pass.
+Claude found no concrete defect. Full build wall still includes glob checking;
+unexplained non-meta outputs still fail. The original failure and reviewed fix
+are retained in RUNTIME-267's
+[raw evidence](../../ara/evidence/diagnostics/runtime267_processing_config/raw-evidence.tar.gz).
+No deferred work.

@@ -1,0 +1,182 @@
+[
+  {
+    "name": "tasks",
+    "command": [
+      "python3",
+      "tools/agents/check_task_policy.py",
+      "--root",
+      ".",
+      "--strict"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "lifecycle",
+    "command": [
+      "python3",
+      "tools/agents/check_task_state_links.py",
+      "--root",
+      ".",
+      "--strict"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "maturity",
+    "command": [
+      "python3",
+      "tools/agents/check_task_maturity_followups.py",
+      "--root",
+      ".",
+      "--strict"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "links",
+    "command": [
+      "python3",
+      "tools/docs/check_doc_links.py",
+      "--root",
+      ".",
+      "--strict"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "layering",
+    "command": [
+      "python3",
+      "tools/repo/check_layering.py",
+      "--root",
+      "src",
+      "--strict"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "test-layout",
+    "command": [
+      "python3",
+      "tools/repo/check_test_layout.py",
+      "--root",
+      ".",
+      "--strict"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "root",
+    "command": [
+      "python3",
+      "tools/repo/check_root_hygiene.py",
+      "--root",
+      "."
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "skills",
+    "command": [
+      "python3",
+      "tools/agents/sync_skills.py",
+      "--check"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "manifests",
+    "command": [
+      "python3",
+      "tools/benchmark/validate_benchmark_manifests.py"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "results",
+    "command": [
+      "python3",
+      "tools/benchmark/validate_benchmark_results.py",
+      "--root",
+      "/tmp/intrinsic-runtime267/measurement/results",
+      "--strict"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "claims",
+    "command": [
+      "python3",
+      "tools/agents/check_ara_claims.py",
+      "--root",
+      ".",
+      "--strict"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "harness",
+    "command": [
+      "python3",
+      "tests/regression/tooling/Test.CompileHotspots.py"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "diff",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "docs-sync",
+    "command": [
+      "python3",
+      "tools/docs/check_docs_sync.py",
+      "--root",
+      ".",
+      "--files",
+      "ara/evidence/diagnostics/runtime267_processing_config/evidence-index.json",
+      "ara/evidence/diagnostics/runtime267_processing_config/raw-evidence.tar.gz",
+      "ara/evidence/diagnostics/runtime267_processing_config/results-review-resolutions.md",
+      "ara/evidence/diagnostics/runtime267_processing_config/results-review.txt",
+      "ara/evidence/diagnostics/runtime267_processing_config/summary.json",
+      "ara/evidence/diagnostics/runtime267_processing_config/verification.json",
+      "ara/evidence/tables/runtime267_processing_config_measurement.md",
+      "ara/logic/claims.md",
+      "ara/staging/observations.yaml",
+      "ara/trace/exploration_tree.yaml",
+      "ara/trace/pm_reasoning_log.yaml",
+      "ara/trace/sessions/2026-09-16_001.yaml",
+      "ara/trace/sessions/session_index.yaml",
+      "benchmarks/ci/manifests/processing_config_editor.yaml",
+      "docs/architecture/sandbox-editor-feature-boundaries.md",
+      "src/app/Sandbox/CMakeLists.txt",
+      "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp",
+      "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp",
+      "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp",
+      "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp",
+      "src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp",
+      "src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp",
+      "src/app/Sandbox/Editor/Sandbox.PointCloudConsolidationPanel.hpp",
+      "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cppm",
+      "tasks/SESSION-BRIEF.md",
+      "tasks/backlog/README.md",
+      "tasks/backlog/runtime/README.md",
+      "tasks/backlog/runtime/RUNTIME-267-processing-config-consumer-locality.md",
+      "tasks/done/BUG-199-compile-benchmark-cmake-glob-output.md",
+      "tasks/done/RETIREMENT-LOG.md",
+      "tasks/done/RUNTIME-267-processing-config-consumer-locality.md",
+      "tests/CMakeLists.txt",
+      "tests/integration/runtime/Test.SandboxEditorPresentation.cpp",
+      "tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp",
+      "tests/regression/tooling/Test.CompileHotspots.py",
+      "tools/analysis/benchmark_compile_iteration.py",
+      "--strict"
+    ],
+    "exit_code": 0
+  }
+]

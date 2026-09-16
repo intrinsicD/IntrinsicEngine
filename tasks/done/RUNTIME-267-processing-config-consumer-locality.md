@@ -39,20 +39,20 @@ session rebuild chain without duplicating configuration, validation or service o
   UI-037 retains readiness behavior ownership.
 
 ## Acceptance criteria
-- [ ] Identify exact remaining config-dependent consumers from fresh compiler
+- [x] Identify exact remaining config-dependent consumers from fresh compiler
       metadata and classify mandatory by-value dependencies versus avoidable ones.
-- [ ] Implement a bounded ownership/import change using current canonical owners;
+- [x] Implement a bounded ownership/import change using current canonical owners;
       review the plan and fixed diff with Claude and resolve findings.
-- [ ] Extend existing compiler-boundary checks with baseline-negative/final-positive
+- [x] Extend existing compiler-boundary checks with baseline-negative/final-positive
       evidence. Preserve service binding/completion/detach tests, config-file
       round-trips and apply-time validation; no UI/agent feature loss.
-- [ ] Pass focused and full CPU gates; if module attachment changes, verify fresh
+- [x] Pass focused and full CPU gates; if module attachment changes, verify fresh
       cache-off minimum-supported Clang producers and all in-tree callers.
-- [ ] Rerun the exact consolidation-config implementation/interface scenarios
+- [x] Rerun the exact consolidation-config implementation/interface scenarios
       before and after on matched sources. Report actual compiler units and
       critical-path/elapsed results; retain a no-change verdict if all remaining
       dependencies are necessary or a proposed split adds cost.
-- [ ] Synchronize canonical editor-boundary docs and changed module inventory;
+- [x] Synchronize canonical editor-boundary docs and changed module inventory;
       retire with the comparison and explicit remaining gaps.
 
 ## Verification
@@ -134,3 +134,18 @@ isolates consumers. No implementation or no-change closure is claimed by this au
 - Claude reviewed plan/fixed diff/complete linkage and guard context; findings
   resolved against source. Matched config editor-target comparison remains
   necessary before retirement.
+
+## Completion — 2026-09-16
+Retired at CPUContracted, the intended compile-refactor endpoint. Source commit:
+`6fb0807f49a8d660d820470e82613c1ad1a9c424`; accompanying evidence/retirement commit
+binds the six retained samples and Claude reviews. See the
+[matched comparison](../../ara/evidence/tables/runtime267_processing_config_measurement.md):
+local config-interface editor-target median 34.245 → 27.372 s (20.1% lower),
+19 → 16 compilers. Receiving MethodPanels cost rises 8.132 → 8.238 s; included
+in target timing. Implementation/no-op ranges overlap; no improvement claimed.
+All records remain claim_eligible:false; C102 records only these bounded observations.
+Full CPU and fresh minimum-compiler evidence are recorded above. No deferred work
+inside this bounded task. Mandatory typed config/session consumers remain;
+UI-037, GRAPHICS-105, LEGACY-043 and BUILD-006 retain their independent scopes.
+BUG-199 fixes the observed CMake metadata-accounting defect; both rejected attempts
+remain archived, outside the six accepted samples. No GPU/sanitizer execution claim.

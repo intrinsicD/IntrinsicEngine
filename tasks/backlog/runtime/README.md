@@ -42,11 +42,9 @@ and their paired UI or method work are recorded there, not here.
 
 ## Compilation locality
 
-- [RUNTIME-267 — Isolate processing config edits from unrelated editor consumers](../../active/RUNTIME-267-processing-config-consumer-locality.md)
-
-RUNTIME-267 continues from the completed BUILD-009 baseline and RUNTIME-266/268
-work. Freeze a fresh immediate-before baseline and preserve the existing config
-and prepared-frame ownership contracts.
+BUILD-009 and RUNTIME-266/267/268 are complete. Existing config and prepared-frame
+ownership contracts remain authoritative; further changes require a measured
+consumer need. Current cross-cutting work is listed in the root backlog.
 
 ## Related queues and documentation
 

@@ -1,0 +1,11 @@
+**Arithmetic: clean.** All three reduction percentages recompute exactly from the reported medians (config_interface 6872.51/34244.83 = 20.0687% → "20.1%" ✓; noop −3.591% ✓; config_impl −1.768% ✓). Every median/min/max matches its three-sample set for both arms, wall and critical path. Invocation counts (19→16) match the three removed sources.
+
+**Reporting defects (minor):**
+
+1. **Arm order label is wrong.** Stated "ABBAAB"; the attempt sequence is 01-before, 02-after, 03-after, 04-before, 05-before, 06-after = **BAABBA**. Still a valid 3-per-arm counterbalance with equal mirror structure, so the interleaving argument survives, but the written label doesn't describe the data.
+
+2. **`receiving_method_producer` regression is undisclosed in the conclusion.** MethodPanels.cpp rose 8132 → 8238 ms median (+1.3%), and the after-arm range [8237, 8261] is fully disjoint from the before range [8101, 8184] — i.e. it is the one per-object measurement that does *not* overlap in the regressing direction. That is the expected cost of the moved helpers, but the conclusion reports only the aggregate win and the three removed units. It should be stated explicitly, since the whole point of the refactor is relocating work into that unit.
+
+**Scope: consistent.** The conclusion is bounded to the local config-interface editor-target rebuild median and unit-count removal; it correctly withholds implementation/noop improvement (both ranges overlap — config_impl [420.6, 431.0] vs [428.5, 440.9] overlap only at 428.5–431.0, but they do overlap), and withholds clean/memory/runtime/GPU/statistical claims. Critical path moved only 24030 → 23151 (3.7%) against a 20.1% wall move; that asymmetry is consistent with removing three ~8 s objects under 4 jobs, and the wall-vs-DAG distinction plus the glob-work caveat are already stated. `claim_eligible: false` throughout matches the absence of any promoted claim, and "no execution claim" matches compile-only Clang20 evidence.
+
+Fix the arm-order string and add the producer-unit regression to the reported result; nothing else blocks.

@@ -3994,3 +3994,20 @@ observations:
     promoted_to: logic/claims.md:C101
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O235
+    timestamp: '2026-09-16T10:27:25+02:00'
+    provenance: ai-executed
+    content: Local exact-source ABBAAB editor-target config-interface rebuild median 34.245 to 27.372 seconds (20.1%
+      lower), with 19 to 16 compilers. Receiver MethodPanels median 8.132 to 8.238 seconds (+1.3%). Implementation/no-op
+      ranges overlap; no improvement claimed. All six results claim_eligible:false.
+    context: RUNTIME-267 source be4066391 to 6fb0807f4, Clang23 Debug Null/headless four jobs, cache off, same paths/commands,
+      source and package identities verified. Retained rejected setup/accounting attempts are outside the six samples.
+      N608 commits the bounded source/report.
+    potential_type: claim
+    bound_to:
+    - N607
+    promoted: true
+    promoted_to: logic/claims.md:C102
+    crystallized_via: artifact-commitment
+    stale: false

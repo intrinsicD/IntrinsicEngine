@@ -1,0 +1,110 @@
+{
+  "source_revision": "6fb0807f49a8d660d820470e82613c1ad1a9c424",
+  "baseline_revision": "be40663918749417275b06fb8268a00310688f7d",
+  "canonical_ci_configure": "passed",
+  "IntrinsicTests_build": "passed; final source reconciled",
+  "compiler": "Clang23, canonical ci Debug",
+  "full_cpu": {
+    "selected": 4667,
+    "passed": 4666,
+    "failed": 0,
+    "skipped": 1,
+    "skip": "GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl requires ASan",
+    "elapsed_seconds": 150.51
+  },
+  "focused_cpu": {
+    "passed": 158,
+    "failed": 0,
+    "elapsed_seconds": 14.33
+  },
+  "strengthened_test_subset": {
+    "passed": 9,
+    "failed": 0,
+    "elapsed_seconds": 0.51,
+    "reason": "Add assertion that unattached-context test request is valid before rejection; production source unchanged after full suite."
+  },
+  "minimum_compiler": "Fresh cache-off Clang20 Null/headless ExtrinsicSandboxEditor runtime/editor closure and all 3 caller test objects passed; final no-op. No Clang20 test execution claim.",
+  "gpu_sanitizer": "No GPU or sanitizer execution claimed; runtime GPU algorithms unchanged.",
+  "boundary": {
+    "before": "three actual Clang producers reach consolidation Config",
+    "after": "all three actual producers forbid Config and PointCloudServiceOperations",
+    "files": [
+      "Sandbox.DomainPanels.cpp",
+      "Sandbox.MeshProcessingPanels.cpp",
+      "Sandbox.PanelSupport.cpp"
+    ]
+  },
+  "source_accounting": {
+    "files": [
+      {
+        "file": "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp",
+        "before": 1764,
+        "after": 1762,
+        "delta": -2
+      },
+      {
+        "file": "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp",
+        "before": 3309,
+        "after": 3313,
+        "delta": 4
+      },
+      {
+        "file": "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp",
+        "before": 3062,
+        "after": 3060,
+        "delta": -2
+      },
+      {
+        "file": "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp",
+        "before": 3372,
+        "after": 3562,
+        "delta": 190
+      },
+      {
+        "file": "src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp",
+        "before": 1013,
+        "after": 842,
+        "delta": -171
+      },
+      {
+        "file": "src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp",
+        "before": 475,
+        "after": 382,
+        "delta": -93
+      },
+      {
+        "file": "src/app/Sandbox/Editor/Sandbox.PointCloudConsolidationPanel.hpp",
+        "before": 0,
+        "after": 108,
+        "delta": 108
+      },
+      {
+        "file": "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cppm",
+        "before": 94,
+        "after": 94,
+        "delta": 0
+      }
+    ],
+    "net_lines": 34,
+    "new_production_files": 1,
+    "new_modules": 0
+  },
+  "new_cmake_header_entry": 1,
+  "module_count": 419,
+  "clean_workshop": {
+    "1": "pass: layer imports valid",
+    "2": "pass: target link edges unchanged",
+    "3": "pass: no higher layer public types",
+    "4": "n/a: renderer unchanged",
+    "5": "n/a: no new pass",
+    "6": "n/a: recipe unchanged",
+    "7": "pass: CPUContracted compilation refactor endpoint",
+    "8": "pass: no new exception/shim"
+  },
+  "sweep": {
+    "scope": "One config dependency chain; no algorithms/config schema/backend behavior changes.",
+    "ownership": "Existing shell prepared storage owns frame; context borrows for draw only. Epoch guard and null default preserved.",
+    "tests": "Actual metadata guards and runtime/app lifecycle/action contracts, full CPU and fresh compiler.",
+    "docs": "Canonical editor boundaries updated; module inventory refreshed with no serialized change; task tracks matched benchmark."
+  }
+}
