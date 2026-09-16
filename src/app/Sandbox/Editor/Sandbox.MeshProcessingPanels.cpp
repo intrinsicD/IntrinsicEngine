@@ -1331,18 +1331,9 @@ namespace Extrinsic::Sandbox::Editor
         const Runtime::EditorDomainWindowModel& model,
         const SandboxEditorContext& context)
     {
-        const Runtime::EditorGeometryProcessingModel& processing =
-            model.Processing;
         if (context.MeshTopology.Results.LastMeshRemeshResult.has_value())
             Remesh.LastResult = *context.MeshTopology.Results.LastMeshRemeshResult;
         ImGui::SeparatorText("Remesh");
-        if (!processing.MeshRemeshAvailable)
-        {
-            ImGui::TextDisabled(
-                "Mesh remesh is unavailable for this selection.");
-            return;
-        }
-
         Remesh.Mode = std::clamp(
             Remesh.Mode, 0,
             static_cast<std::int32_t>(kMeshRemeshModes.size() - 1u));
@@ -1350,127 +1341,75 @@ namespace Extrinsic::Sandbox::Editor
             Remesh.SizingLaw, 0,
             static_cast<std::int32_t>(kMeshRemeshSizingLaws.size() - 1u));
         Remesh.Iterations = std::clamp(Remesh.Iterations, 1, 64);
-        Remesh.TargetEdgeLength =
-            std::clamp(Remesh.TargetEdgeLength, 0.0f, 1.0e6f);
+        Remesh.TargetEdgeLength = std::clamp(Remesh.TargetEdgeLength, 0.0f, 1.0e6f);
 
-        const Runtime::EditorMeshRemeshMode mode =
-            FromIndex(kMeshRemeshModes, Remesh.Mode);
-        if (ImGui::BeginCombo(
-                "Mode##MeshRemesh",
-                Runtime::DebugNameForEditorMeshRemeshMode(mode)))
+        // Probe options independently of unrelated draft settings so a blocked
+        // combination does not prevent choosing a supported alternative.
+        const auto preview = [&](const Runtime::EditorMeshRemeshCommand& command) {
+            return Runtime::PreviewEditorMeshRemeshCommand(context.MeshTopology.Commands, command);
+        };
+        if (ImGui::BeginCombo("Mode##MeshRemesh",
+                Runtime::DebugNameForEditorMeshRemeshMode(FromIndex(kMeshRemeshModes, Remesh.Mode))))
         {
             for (std::size_t i = 0u; i < kMeshRemeshModes.size(); ++i)
             {
                 const auto option = kMeshRemeshModes[i];
-                const bool available =
-                    option == Runtime::EditorMeshRemeshMode::Uniform
-                    ? processing.MeshRemeshUniformAvailable
-                    : processing.MeshRemeshAdaptiveAvailable;
-                if (!available)
-                    ImGui::BeginDisabled();
-                const bool selected =
-                    Remesh.Mode == static_cast<std::int32_t>(i);
-                if (ImGui::Selectable(
-                        Runtime::DebugNameForEditorMeshRemeshMode(option),
-                        selected))
-                {
+                const auto readiness = preview({.StableEntityId = model.SelectedStableId, .Mode = option});
+                ImGui::BeginDisabled(!readiness.Enabled);
+                const bool selected = Remesh.Mode == static_cast<std::int32_t>(i);
+                if (ImGui::Selectable(Runtime::DebugNameForEditorMeshRemeshMode(option), selected))
                     Remesh.Mode = static_cast<std::int32_t>(i);
-                }
-                if (selected)
-                    ImGui::SetItemDefaultFocus();
-                if (!available)
-                    ImGui::EndDisabled();
+                if (selected) ImGui::SetItemDefaultFocus();
+                ImGui::EndDisabled();
+                DrawDisabledReasonTooltip(readiness.DisabledReason);
             }
             ImGui::EndCombo();
         }
-        ImGui::DragInt(
-            "Iterations##MeshRemesh", &Remesh.Iterations, 1.0f, 1, 64);
-        ImGui::DragFloat(
-            "Target edge length##MeshRemesh", &Remesh.TargetEdgeLength,
-            0.01f, 0.0f, 1.0e6f);
+        ImGui::DragInt("Iterations##MeshRemesh", &Remesh.Iterations, 1.0f, 1, 64);
+        ImGui::DragFloat("Target edge length##MeshRemesh", &Remesh.TargetEdgeLength, 0.01f, 0.0f, 1.0e6f);
 
-        const bool adaptive =
-            mode == Runtime::EditorMeshRemeshMode::Adaptive;
-        if (!adaptive)
-            ImGui::BeginDisabled();
-        const Runtime::EditorMeshRemeshSizingLaw sizingLaw =
-            FromIndex(kMeshRemeshSizingLaws, Remesh.SizingLaw);
-        if (ImGui::BeginCombo(
-                "Sizing law##MeshRemesh",
-                Runtime::DebugNameForEditorMeshRemeshSizingLaw(
-                    sizingLaw)))
+        const auto mode = FromIndex(kMeshRemeshModes, Remesh.Mode);
+        if (ImGui::BeginCombo("Sizing law##MeshRemesh",
+                Runtime::DebugNameForEditorMeshRemeshSizingLaw(FromIndex(kMeshRemeshSizingLaws, Remesh.SizingLaw))))
         {
             for (std::size_t i = 0u; i < kMeshRemeshSizingLaws.size(); ++i)
             {
                 const auto option = kMeshRemeshSizingLaws[i];
-                const bool available =
-                    option != Runtime::EditorMeshRemeshSizingLaw::
-                                  ErrorBoundedTaubin ||
-                    processing.MeshRemeshErrorBoundedSizingAvailable;
-                if (!available)
-                    ImGui::BeginDisabled();
-                const bool selected =
-                    Remesh.SizingLaw == static_cast<std::int32_t>(i);
-                if (ImGui::Selectable(
-                        Runtime::DebugNameForEditorMeshRemeshSizingLaw(
-                            option),
-                        selected))
-                {
+                const auto readiness = preview({.StableEntityId = model.SelectedStableId,
+                    .Mode = mode, .SizingLaw = option});
+                ImGui::BeginDisabled(!readiness.Enabled);
+                const bool selected = Remesh.SizingLaw == static_cast<std::int32_t>(i);
+                if (ImGui::Selectable(Runtime::DebugNameForEditorMeshRemeshSizingLaw(option), selected))
                     Remesh.SizingLaw = static_cast<std::int32_t>(i);
-                }
-                if (selected)
-                    ImGui::SetItemDefaultFocus();
-                if (!available)
-                    ImGui::EndDisabled();
+                if (selected) ImGui::SetItemDefaultFocus();
+                ImGui::EndDisabled();
+                DrawDisabledReasonTooltip(readiness.DisabledReason);
             }
             ImGui::EndCombo();
         }
-        if (!adaptive)
-            ImGui::EndDisabled();
+        ImGui::TextDisabled("Sizing law applies to adaptive remeshing.");
+        const auto projection = preview({.StableEntityId = model.SelectedStableId,
+            .Mode = mode, .ProjectToSurface = !Remesh.ProjectToSurface});
+        ImGui::BeginDisabled(!projection.Enabled);
+        ImGui::Checkbox("Project to surface##MeshRemesh", &Remesh.ProjectToSurface);
+        ImGui::EndDisabled();
+        DrawDisabledReasonTooltip(projection.DisabledReason);
 
-        if (!processing.MeshRemeshProjectToSurfaceAvailable)
-            ImGui::BeginDisabled();
-        ImGui::Checkbox(
-            "Project to surface##MeshRemesh", &Remesh.ProjectToSurface);
-        if (!processing.MeshRemeshProjectToSurfaceAvailable)
-            ImGui::EndDisabled();
-
-        const bool modeAvailable =
-            mode == Runtime::EditorMeshRemeshMode::Uniform
-            ? processing.MeshRemeshUniformAvailable
-            : processing.MeshRemeshAdaptiveAvailable;
-        const bool sizingAvailable =
-            sizingLaw != Runtime::EditorMeshRemeshSizingLaw::
-                             ErrorBoundedTaubin ||
-            processing.MeshRemeshErrorBoundedSizingAvailable;
-        const bool projectionAvailable =
-            !Remesh.ProjectToSurface ||
-            processing.MeshRemeshProjectToSurfaceAvailable;
-        const bool canRun =
-            modeAvailable && sizingAvailable && projectionAvailable;
-        if (!canRun)
-            ImGui::BeginDisabled();
-        if (ImGui::Button("Remesh##MeshRemesh"))
+        const Runtime::EditorMeshRemeshCommand command{
+            .StableEntityId = model.SelectedStableId,
+            .Mode = mode,
+            .SizingLaw = FromIndex(kMeshRemeshSizingLaws, Remesh.SizingLaw),
+            .Iterations = static_cast<std::uint32_t>(Remesh.Iterations),
+            .TargetEdgeLength = static_cast<double>(Remesh.TargetEdgeLength),
+            .ProjectToSurface = Remesh.ProjectToSurface,
+        };
+        if (DrawProcessingActionButton("Remesh##MeshRemesh", preview(command)))
         {
-            PublishCommandResult(
-                Remesh.LastResult,
-                Runtime::ApplyEditorMeshRemeshCommand(
-                    context.MeshTopology.Commands,
-                    Runtime::EditorMeshRemeshCommand{
-                        .StableEntityId = model.SelectedStableId,
-                        .Mode = mode,
-                        .SizingLaw = sizingLaw,
-                        .Iterations = static_cast<std::uint32_t>(
-                            Remesh.Iterations),
-                        .TargetEdgeLength = static_cast<double>(
-                            Remesh.TargetEdgeLength),
-                        .ProjectToSurface = Remesh.ProjectToSurface,
-                    },
-                    context.MeshTopology.ResultSinks.MeshRemesh),
+            PublishCommandResult(Remesh.LastResult,
+                Runtime::ApplyEditorMeshRemeshCommand(context.MeshTopology.Commands,
+                    command, context.MeshTopology.ResultSinks.MeshRemesh),
                 context.MeshTopology.ResultSinks.MeshRemesh);
         }
-        if (!canRun)
-            ImGui::EndDisabled();
 
         const auto& result = Remesh.LastResult;
         if (!result.has_value())
@@ -1509,104 +1448,57 @@ namespace Extrinsic::Sandbox::Editor
         const Runtime::EditorDomainWindowModel& model,
         const SandboxEditorContext& context)
     {
-        const Runtime::EditorGeometryProcessingModel& processing =
-            model.Processing;
         if (context.MeshTopology.Results.LastMeshSubdivideResult.has_value())
             Subdivide.LastResult = *context.MeshTopology.Results.LastMeshSubdivideResult;
         ImGui::SeparatorText("Subdivide");
-        if (!processing.MeshSubdivideAvailable)
-        {
-            ImGui::TextDisabled(
-                "Mesh subdivision is unavailable for this selection.");
-            return;
-        }
-
         Subdivide.Operator = std::clamp(
             Subdivide.Operator, 0,
             static_cast<std::int32_t>(kMeshSubdivideOperators.size() - 1u));
         Subdivide.Iterations = std::clamp(Subdivide.Iterations, 1, 10);
-        const Runtime::EditorMeshSubdivideOperator op =
-            FromIndex(kMeshSubdivideOperators, Subdivide.Operator);
-        if (ImGui::BeginCombo(
-                "Operator##MeshSubdivide",
-                Runtime::DebugNameForEditorMeshSubdivideOperator(op)))
+        const auto preview = [&](const Runtime::EditorMeshSubdivideCommand& command) {
+            return Runtime::PreviewEditorMeshSubdivideCommand(context.MeshTopology.Commands, command);
+        };
+        if (ImGui::BeginCombo("Operator##MeshSubdivide",
+                Runtime::DebugNameForEditorMeshSubdivideOperator(FromIndex(kMeshSubdivideOperators, Subdivide.Operator))))
         {
             for (std::size_t i = 0u; i < kMeshSubdivideOperators.size(); ++i)
             {
                 const auto option = kMeshSubdivideOperators[i];
-                const bool available =
-                    option == Runtime::EditorMeshSubdivideOperator::Loop
-                    ? processing.MeshSubdivideLoopAvailable
-                    : option == Runtime::EditorMeshSubdivideOperator::
-                                    CatmullClark
-                          ? processing.MeshSubdivideCatmullClarkAvailable
-                          : processing.MeshSubdivideSqrt3Available;
-                if (!available)
-                    ImGui::BeginDisabled();
-                const bool selected =
-                    Subdivide.Operator == static_cast<std::int32_t>(i);
-                if (ImGui::Selectable(
-                        Runtime::DebugNameForEditorMeshSubdivideOperator(
-                            option),
-                        selected))
-                {
+                const auto readiness = preview({.StableEntityId = model.SelectedStableId, .Operator = option});
+                ImGui::BeginDisabled(!readiness.Enabled);
+                const bool selected = Subdivide.Operator == static_cast<std::int32_t>(i);
+                if (ImGui::Selectable(Runtime::DebugNameForEditorMeshSubdivideOperator(option), selected))
                     Subdivide.Operator = static_cast<std::int32_t>(i);
-                }
-                if (selected)
-                    ImGui::SetItemDefaultFocus();
-                if (!available)
-                    ImGui::EndDisabled();
+                if (selected) ImGui::SetItemDefaultFocus();
+                ImGui::EndDisabled();
+                DrawDisabledReasonTooltip(readiness.DisabledReason);
             }
             ImGui::EndCombo();
         }
-        ImGui::DragInt(
-            "Iterations##MeshSubdivide", &Subdivide.Iterations,
-            1.0f, 1, 10);
-        const bool loop =
-            op == Runtime::EditorMeshSubdivideOperator::Loop;
-        if (!loop)
+        ImGui::DragInt("Iterations##MeshSubdivide", &Subdivide.Iterations, 1.0f, 1, 10);
+        const auto op = FromIndex(kMeshSubdivideOperators, Subdivide.Operator);
+        if (op != Runtime::EditorMeshSubdivideOperator::Loop)
             Subdivide.PreserveLoopFeatures = false;
-        const bool featureToggleAvailable =
-            loop && processing.MeshSubdivideLoopFeatureEdgesAvailable;
-        if (!featureToggleAvailable)
-            ImGui::BeginDisabled();
-        ImGui::Checkbox(
-            "Preserve Loop features##MeshSubdivide",
-            &Subdivide.PreserveLoopFeatures);
-        if (!featureToggleAvailable)
-            ImGui::EndDisabled();
+        const auto feature = preview({.StableEntityId = model.SelectedStableId,
+            .Operator = op, .PreserveLoopFeatureEdges = !Subdivide.PreserveLoopFeatures});
+        ImGui::BeginDisabled(!feature.Enabled);
+        ImGui::Checkbox("Preserve Loop features##MeshSubdivide", &Subdivide.PreserveLoopFeatures);
+        ImGui::EndDisabled();
+        DrawDisabledReasonTooltip(feature.DisabledReason);
 
-        const bool operatorAvailable =
-            op == Runtime::EditorMeshSubdivideOperator::Loop
-            ? processing.MeshSubdivideLoopAvailable
-            : op == Runtime::EditorMeshSubdivideOperator::CatmullClark
-                  ? processing.MeshSubdivideCatmullClarkAvailable
-                  : processing.MeshSubdivideSqrt3Available;
-        const bool canRun =
-            operatorAvailable &&
-            (!Subdivide.PreserveLoopFeatures ||
-             processing.MeshSubdivideLoopFeatureEdgesAvailable);
-        if (!canRun)
-            ImGui::BeginDisabled();
-        if (ImGui::Button("Subdivide##MeshSubdivide"))
+        const Runtime::EditorMeshSubdivideCommand command{
+            .StableEntityId = model.SelectedStableId,
+            .Operator = op,
+            .Iterations = static_cast<std::uint32_t>(Subdivide.Iterations),
+            .PreserveLoopFeatureEdges = Subdivide.PreserveLoopFeatures,
+        };
+        if (DrawProcessingActionButton("Subdivide##MeshSubdivide", preview(command)))
         {
-            PublishCommandResult(
-                Subdivide.LastResult,
-                Runtime::ApplyEditorMeshSubdivideCommand(
-                    context.MeshTopology.Commands,
-                    Runtime::EditorMeshSubdivideCommand{
-                        .StableEntityId = model.SelectedStableId,
-                        .Operator = op,
-                        .Iterations = static_cast<std::uint32_t>(
-                            Subdivide.Iterations),
-                        .PreserveLoopFeatureEdges =
-                            Subdivide.PreserveLoopFeatures,
-                    },
-                    context.MeshTopology.ResultSinks.MeshSubdivide),
+            PublishCommandResult(Subdivide.LastResult,
+                Runtime::ApplyEditorMeshSubdivideCommand(context.MeshTopology.Commands,
+                    command, context.MeshTopology.ResultSinks.MeshSubdivide),
                 context.MeshTopology.ResultSinks.MeshSubdivide);
         }
-        if (!canRun)
-            ImGui::EndDisabled();
 
         const auto& result = Subdivide.LastResult;
         if (!result.has_value())

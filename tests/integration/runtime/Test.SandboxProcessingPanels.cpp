@@ -1972,17 +1972,20 @@ TEST(SandboxProcessingPanels, GeodesicsRetriesDraftAndKeepsRejectedEntityReset)
 
 TEST(SandboxProcessingPanels, TopologyAdmissionKeepsBlockedActionsVisibleAndRunsValidCommands)
 {
-    for (const bool simplify : {false, true})
+    const std::array<std::pair<const char*, const char*>, 4> methods{{
+        {"Denoise", "mesh.processing.denoise"}, {"Simplify", "mesh.processing.simplify"},
+        {"Remesh", "mesh.processing.remesh"}, {"Subdivide", "mesh.processing.subdivide"}}};
+    for (const auto& [name, windowId] : methods)
     {
-        SCOPED_TRACE(simplify ? "simplify" : "denoise");
+        SCOPED_TRACE(name);
+        const bool simplify = std::string_view{name} == "Simplify";
         PanelHarness h;
         auto& scene = h.Scene();
         const auto entity = scene.Create();
         PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
-        const char* title = simplify ? "Mesh / Processing / Simplify" : "Mesh / Processing / Denoise";
-        const char* label = simplify ? "Simplify##MeshSimplify" : "Denoise##MeshDenoise";
-        ASSERT_TRUE(h.Shell.SetEditorWindowOpen(
-            simplify ? "mesh.processing.simplify" : "mesh.processing.denoise", true));
+        const std::string title = std::string{"Mesh / Processing / "} + name;
+        const std::string label = std::string{name} + "##Mesh" + name;
+        ASSERT_TRUE(h.Shell.SetEditorWindowOpen(windowId, true));
         std::optional<R::EditorCommandStatus> status;
         std::string message;
         const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
@@ -1993,6 +1996,8 @@ TEST(SandboxProcessingPanels, TopologyAdmissionKeepsBlockedActionsVisibleAndRuns
                     if (result) { status = result->Status; message = result->Message; }
                 };
                 if (simplify) copy(context.MeshTopology.Results.LastMeshSimplifyResult);
+                else if (std::string_view{name} == "Remesh") copy(context.MeshTopology.Results.LastMeshRemeshResult);
+                else if (std::string_view{name} == "Subdivide") copy(context.MeshTopology.Results.LastMeshSubdivideResult);
                 else copy(context.MeshTopology.Results.LastMeshDenoiseResult);
             }});
         int frames = 0, step = 0;
@@ -2000,12 +2005,12 @@ TEST(SandboxProcessingPanels, TopologyAdmissionKeepsBlockedActionsVisibleAndRuns
         bool completed = false;
         h.Driver->OnFrame = [&](R::Engine& engine) {
             if (++frames > 400) { ADD_FAILURE() << "Topology control did not finish"; engine.RequestExit(); return; }
-            auto* window = ImGui::FindWindowByName(title);
+            auto* window = ImGui::FindWindowByName(title.c_str());
             if (!window) return;
             ImGui::SetWindowSize(window, {900, 1500});
             ImGui::SetWindowPos(window, {0, 0});
             ++step;
-            const auto run = [&] { ImGui::ActivateItemByID(window->GetID(label)); };
+            const auto run = [&] { ImGui::ActivateItemByID(window->GetID(label.c_str())); };
             if (step == 3)
             {
                 jobsBefore = engine.Jobs().Stats().SubmittedJobs;
@@ -2018,7 +2023,7 @@ TEST(SandboxProcessingPanels, TopologyAdmissionKeepsBlockedActionsVisibleAndRuns
             {
                 // The button itself was submitted even without a chosen entity.
                 EXPECT_NE(std::string_view{ImGui::GetCurrentContext()->LogBuffer.c_str()}.find(
-                    simplify ? "[ Simplify ]" : "[ Denoise ]"), std::string_view::npos);
+                    std::string{"[ "} + name + " ]"), std::string_view::npos);
                 ImGui::LogFinish();
                 EXPECT_FALSE(status);
                 EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
@@ -2043,6 +2048,98 @@ TEST(SandboxProcessingPanels, TopologyAdmissionKeepsBlockedActionsVisibleAndRuns
                 completed = true;
                 engine.RequestExit();
             }
+        };
+        h.Engine->Run();
+        if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
+        EXPECT_TRUE(completed);
+        EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
+    }
+}
+
+
+TEST(SandboxProcessingPanels, TopologyVariantWidgetsReachCommandsAndClearLoopOnlyFeatures)
+{
+    for (const bool remesh : {true, false})
+    {
+        SCOPED_TRACE(remesh ? "remesh" : "subdivide");
+        PanelHarness h;
+        auto& scene = h.Scene();
+        const auto entity = scene.Create();
+        PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+        ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+        ASSERT_TRUE(h.Shell.SetEditorWindowOpen(
+            remesh ? "mesh.processing.remesh" : "mesh.processing.subdivide", true));
+        std::optional<R::EditorMeshRemeshResult> remeshResult;
+        std::optional<R::EditorMeshSubdivideResult> subdivideResult;
+        const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+            .Id = "test.topology_variants", .MenuPath = {"View"}, .Title = "Topology variants observer",
+            .OpenByDefault = true,
+            .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
+                remeshResult = context.MeshTopology.Results.LastMeshRemeshResult;
+                subdivideResult = context.MeshTopology.Results.LastMeshSubdivideResult;
+            }});
+        int step = 0, frames = 0;
+        bool completed = false;
+        h.Driver->OnFrame = [&](R::Engine& engine) {
+            if (++frames > 400) { ADD_FAILURE() << "Topology variants did not finish"; engine.RequestExit(); return; }
+            auto* window = ImGui::FindWindowByName(remesh ? "Mesh / Processing / Remesh" : "Mesh / Processing / Subdivide");
+            if (!window) return;
+            ImGui::SetWindowSize(window, {900, 1500});
+            ImGui::SetWindowPos(window, {0, 0});
+            ++step;
+            const auto click = [&](const char* label) { ImGui::ActivateItemByID(window->GetID(label)); };
+            const auto choose = [&](const char* label) {
+                auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+                ASSERT_FALSE(popups.empty());
+                ASSERT_NE(popups.back().Window, nullptr);
+                ImGui::ActivateItemByID(popups.back().Window->GetID(label));
+            };
+            if (step == 3)
+            {
+                if (!remesh)
+                {
+                    ImGui::GetCurrentContext()->LogBuffer.clear();
+                    ImGui::LogToBuffer();
+                    ImGui::GetCurrentContext()->LogWindow = nullptr;
+                }
+                click(remesh ? "Project to surface##MeshRemesh" : "Preserve Loop features##MeshSubdivide");
+            }
+            if (step == 6)
+            {
+                if (!remesh)
+                {
+                    EXPECT_NE(std::string_view{ImGui::GetCurrentContext()->LogBuffer.c_str()}.find(
+                        "[x] Preserve Loop features"), std::string_view::npos);
+                    ImGui::LogFinish();
+                }
+                click(remesh ? "Mode##MeshRemesh" : "Operator##MeshSubdivide");
+            }
+            if (step == 8) choose(remesh
+                ? R::DebugNameForEditorMeshRemeshMode(R::EditorMeshRemeshMode::Adaptive)
+                : R::DebugNameForEditorMeshSubdivideOperator(R::EditorMeshSubdivideOperator::CatmullClark));
+            if (remesh && step == 11) click("Sizing law##MeshRemesh");
+            if (remesh && step == 13) choose(R::DebugNameForEditorMeshRemeshSizingLaw(
+                R::EditorMeshRemeshSizingLaw::ErrorBoundedTaubin));
+            if (step == 16) click(remesh ? "Remesh##MeshRemesh" : "Subdivide##MeshSubdivide");
+            if (step <= 18) return;
+            if (remesh)
+            {
+                if (!remeshResult || remeshResult->Status == R::EditorCommandStatus::Pending) return;
+                EXPECT_TRUE(remeshResult->Succeeded() || remeshResult->Status == R::EditorCommandStatus::NoChange)
+                    << remeshResult->Message;
+                EXPECT_EQ(remeshResult->Mode, R::EditorMeshRemeshMode::Adaptive);
+                EXPECT_EQ(remeshResult->SizingLaw, R::EditorMeshRemeshSizingLaw::ErrorBoundedTaubin);
+                EXPECT_TRUE(remeshResult->ProjectToSurface);
+            }
+            else
+            {
+                if (!subdivideResult || subdivideResult->Status == R::EditorCommandStatus::Pending) return;
+                EXPECT_TRUE(subdivideResult->Succeeded()) << subdivideResult->Message;
+                EXPECT_EQ(subdivideResult->Operator, R::EditorMeshSubdivideOperator::CatmullClark);
+                EXPECT_FALSE(subdivideResult->PreserveLoopFeatureEdges);
+            }
+            completed = true;
+            engine.RequestExit();
         };
         h.Engine->Run();
         if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();

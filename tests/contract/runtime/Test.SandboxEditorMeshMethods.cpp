@@ -1031,6 +1031,134 @@ TEST(SandboxEditorUi, MeshTopologyAdmissionSharesCommandValidation)
     EXPECT_EQ(Runtime::ApplyEditorMeshSimplifyCommand(context, simplify).Status, Status::StaleEntity);
 }
 
+TEST(SandboxEditorUi, MeshTopologyOptionAdmissionSharesValidationAndPermitsRecovery)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    auto context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    const auto mesh = MakeSelectable(registry, "TopologyOptions");
+    AddDenoiseTetraMeshSource(registry, mesh);
+    const auto id = Runtime::SelectionController::ToStableEntityId(mesh);
+    const auto before = MeshVertexPositions(registry, mesh);
+    const auto counts = SourceMeshCounts(registry, mesh);
+    using Context = Intrinsic::Tests::EditorFeatureTestContext;
+    using Status = Runtime::EditorCommandStatus;
+    const auto checkRejected = [&](const auto& command, auto preview, auto apply, Status expected) {
+        const auto readiness = preview(context, command);
+        EXPECT_FALSE(readiness.Enabled);
+        EXPECT_FALSE(readiness.DisabledReason.empty());
+        const auto result = apply(context, command, {});
+        EXPECT_EQ(result.Status, expected);
+        EXPECT_EQ(result.Message, readiness.DisabledReason);
+        EXPECT_FALSE(history.IsDirty());
+        ExpectPositionsExactlyEqual(MeshVertexPositions(registry, mesh), before);
+        ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), counts);
+    };
+    const auto rejectRemesh = [&](const auto& command, Status expected) {
+        checkRejected(command, Runtime::PreviewEditorMeshRemeshCommand,
+                      Runtime::ApplyEditorMeshRemeshCommand, expected);
+    };
+    const auto rejectSubdivide = [&](const auto& command, Status expected) {
+        checkRejected(command, Runtime::PreviewEditorMeshSubdivideCommand,
+                      Runtime::ApplyEditorMeshSubdivideCommand, expected);
+    };
+    struct RemeshCase { Runtime::EditorMeshRemeshCommand Command; bool Context::*Capability; };
+    const std::array remeshCases{
+        RemeshCase{{.StableEntityId = id}, &Context::MeshRemeshUniformKernelAvailable},
+        RemeshCase{{.StableEntityId = id, .Mode = Runtime::EditorMeshRemeshMode::Adaptive},
+                   &Context::MeshRemeshAdaptiveKernelAvailable},
+        RemeshCase{{.StableEntityId = id, .ProjectToSurface = true}, &Context::MeshRemeshProjectToSurfaceAvailable},
+        RemeshCase{{.StableEntityId = id, .Mode = Runtime::EditorMeshRemeshMode::Adaptive,
+                    .SizingLaw = Runtime::EditorMeshRemeshSizingLaw::ErrorBoundedTaubin},
+                   &Context::MeshRemeshErrorBoundedSizingAvailable}};
+    for (const auto& test : remeshCases)
+    {
+        EXPECT_TRUE(Runtime::PreviewEditorMeshRemeshCommand(context, test.Command).Enabled);
+        context.*test.Capability = false;
+        rejectRemesh(test.Command, Status::GeometryProcessingFailed);
+        auto invalid = test.Command;
+        invalid.Iterations = 0u;
+        rejectRemesh(invalid, Status::InvalidProcessingParameters);
+        context.*test.Capability = true;
+    }
+    struct SubdivideCase { Runtime::EditorMeshSubdivideCommand Command; bool Context::*Capability; };
+    const std::array subdivideCases{
+        SubdivideCase{{.StableEntityId = id}, &Context::MeshSubdivideLoopKernelAvailable},
+        SubdivideCase{{.StableEntityId = id, .Operator = Runtime::EditorMeshSubdivideOperator::CatmullClark},
+                      &Context::MeshSubdivideCatmullClarkKernelAvailable},
+        SubdivideCase{{.StableEntityId = id, .Operator = Runtime::EditorMeshSubdivideOperator::Sqrt3},
+                      &Context::MeshSubdivideSqrt3KernelAvailable},
+        SubdivideCase{{.StableEntityId = id, .PreserveLoopFeatureEdges = true},
+                      &Context::MeshSubdivideLoopFeatureEdgesAvailable}};
+    for (const auto& test : subdivideCases)
+    {
+        EXPECT_TRUE(Runtime::PreviewEditorMeshSubdivideCommand(context, test.Command).Enabled);
+        context.*test.Capability = false;
+        rejectSubdivide(test.Command, Status::GeometryProcessingFailed);
+        auto invalid = test.Command;
+        invalid.Iterations = 0u;
+        rejectSubdivide(invalid, Status::InvalidProcessingParameters);
+        context.*test.Capability = true;
+    }
+    const Runtime::EditorMeshRemeshCommand remesh{.StableEntityId = id};
+    const Runtime::EditorMeshSubdivideCommand subdivide{.StableEntityId = id};
+    context.Scene = nullptr;
+    rejectRemesh(remesh, Status::MissingScene);
+    rejectSubdivide(subdivide, Status::MissingScene);
+    context.Scene = &registry;
+    rejectRemesh(Runtime::EditorMeshRemeshCommand{}, Status::StaleEntity);
+    rejectSubdivide(Runtime::EditorMeshSubdivideCommand{}, Status::StaleEntity);
+    rejectSubdivide(Runtime::EditorMeshSubdivideCommand{
+        .StableEntityId = id, .Operator = Runtime::EditorMeshSubdivideOperator::Sqrt3,
+        .PreserveLoopFeatureEdges = true}, Status::InvalidProcessingParameters);
+
+    // An unsupported enabled feature can be turned off without disabling the
+    // whole method, and unavailable optional kernels do not mask alternatives.
+    context.MeshRemeshProjectToSurfaceAvailable = false;
+    context.MeshRemeshAdaptiveKernelAvailable = false;
+    context.MeshSubdivideLoopFeatureEdgesAvailable = false;
+    context.MeshSubdivideSqrt3KernelAvailable = false;
+    EXPECT_TRUE(Runtime::PreviewEditorMeshRemeshCommand(context, remesh).Enabled);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshSubdivideCommand(context, subdivide).Enabled);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshSubdivideCommand(context, {
+        .StableEntityId = id, .Operator = Runtime::EditorMeshSubdivideOperator::CatmullClark}).Enabled);
+    registry.Raw().remove<GS::Faces>(mesh);
+    for (const auto& readiness : {Runtime::PreviewEditorMeshRemeshCommand(context, remesh),
+                                 Runtime::PreviewEditorMeshSubdivideCommand(context, subdivide)})
+    {
+        EXPECT_FALSE(readiness.Enabled);
+        EXPECT_FALSE(readiness.DisabledReason.empty());
+    }
+    EXPECT_EQ(Runtime::ApplyEditorMeshRemeshCommand(context, remesh).Status, Status::UnsupportedGeometryDomain);
+    EXPECT_EQ(Runtime::ApplyEditorMeshSubdivideCommand(context, subdivide).Status, Status::UnsupportedGeometryDomain);
+}
+
+TEST(SandboxEditorUi, UniformRemeshDoesNotRequireAdaptiveSizingCapability)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    auto context = MakeContext(registry, selection);
+    const auto mesh = MakeSelectable(registry, "UniformWithoutAdaptiveSizing");
+    AddIcosahedronMeshSource(registry, mesh);
+    Runtime::EditorMeshRemeshCommand command{
+        .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
+        .SizingLaw = Runtime::EditorMeshRemeshSizingLaw::ErrorBoundedTaubin,
+        .TargetEdgeLength = 0.8};
+    context.MeshRemeshErrorBoundedSizingAvailable = false;
+    EXPECT_TRUE(Runtime::PreviewEditorMeshRemeshCommand(context, command).Enabled);
+    const auto result = Runtime::ApplyEditorMeshRemeshCommand(context, command);
+    EXPECT_TRUE(result.Succeeded() || result.Status == Runtime::EditorCommandStatus::NoChange) << result.Message;
+    command.Mode = Runtime::EditorMeshRemeshMode::Adaptive;
+    const auto blocked = Runtime::PreviewEditorMeshRemeshCommand(context, command);
+    EXPECT_FALSE(blocked.Enabled);
+    EXPECT_FALSE(blocked.DisabledReason.empty());
+    const auto rejected = Runtime::ApplyEditorMeshRemeshCommand(context, command);
+    EXPECT_EQ(rejected.Status, Runtime::EditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_EQ(rejected.Message, blocked.DisabledReason);
+}
+
 TEST(SandboxEditorUi, MeshDenoiseReportsNoChangeWhenEveryVertexIsPinned)
 {
     ECS::Scene::Registry registry;
@@ -2213,7 +2341,8 @@ TEST(SandboxEditorUi, MeshRemeshCommandReplacesTopologyAndSupportsUndoRedo)
         Runtime::BuildEditorDomainWindowModel(
             context,
             Runtime::EditorDomainWindowKind::Mesh);
-    EXPECT_TRUE(model.Processing.MeshRemeshAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshRemeshCommand(
+        context, {.StableEntityId = model.SelectedStableId}).Enabled);
     EXPECT_TRUE(uniform.Succeeded());
     EXPECT_GT(uniform.OutputFaceCount, 0u);
 
@@ -2367,7 +2496,8 @@ TEST(SandboxEditorUi, MeshSubdivideCommandReplacesTopologyForAllOperatorsAndSupp
         Runtime::BuildEditorDomainWindowModel(
             context,
             Runtime::EditorDomainWindowKind::Mesh);
-    EXPECT_TRUE(model.Processing.MeshSubdivideAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshSubdivideCommand(
+        context, {.StableEntityId = model.SelectedStableId}).Enabled);
     EXPECT_TRUE(loop.Succeeded());
     EXPECT_GT(loop.OutputFaceCount, 0u);
 
@@ -3608,13 +3738,16 @@ TEST(SandboxEditorUi, MeshTopologyProcessingCommandsFailClosedForInvalidTargetsA
         Runtime::BuildEditorDomainWindowModel(
             context,
             Runtime::EditorDomainWindowKind::Mesh);
-    EXPECT_FALSE(unavailableModel.Processing.MeshRemeshAvailable);
-    EXPECT_FALSE(unavailableModel.Processing.MeshRemeshUniformAvailable);
-    EXPECT_FALSE(unavailableModel.Processing.MeshRemeshAdaptiveAvailable);
-    EXPECT_FALSE(unavailableModel.Processing.MeshSubdivideAvailable);
-    EXPECT_FALSE(unavailableModel.Processing.MeshSubdivideLoopAvailable);
-    EXPECT_FALSE(unavailableModel.Processing.MeshSubdivideCatmullClarkAvailable);
-    EXPECT_FALSE(unavailableModel.Processing.MeshSubdivideSqrt3Available);
+    EXPECT_FALSE(Runtime::PreviewEditorMeshRemeshCommand(
+        context, {.StableEntityId = unavailableModel.SelectedStableId}).Enabled);
+    EXPECT_FALSE(Runtime::PreviewEditorMeshRemeshCommand(
+        context, {.StableEntityId = unavailableModel.SelectedStableId, .Mode = Runtime::EditorMeshRemeshMode::Adaptive}).Enabled);
+    EXPECT_FALSE(Runtime::PreviewEditorMeshSubdivideCommand(
+        context, {.StableEntityId = unavailableModel.SelectedStableId}).Enabled);
+    EXPECT_FALSE(Runtime::PreviewEditorMeshSubdivideCommand(
+        context, {.StableEntityId = unavailableModel.SelectedStableId, .Operator = Runtime::EditorMeshSubdivideOperator::CatmullClark}).Enabled);
+    EXPECT_FALSE(Runtime::PreviewEditorMeshSubdivideCommand(
+        context, {.StableEntityId = unavailableModel.SelectedStableId, .Operator = Runtime::EditorMeshSubdivideOperator::Sqrt3}).Enabled);
 }
 TEST(SandboxEditorUi,
      DirectMeshPostProcessDiscardsCompletionAfterGeometryEdit)
@@ -3834,8 +3967,10 @@ TEST(SandboxEditorUi,
     EXPECT_FALSE(model.Processing.Entries.empty());
     EXPECT_TRUE(Runtime::PreviewEditorMeshDenoiseCommand(
         context, {.StableEntityId = model.SelectedStableId}).Enabled);
-    EXPECT_TRUE(model.Processing.MeshRemeshAvailable);
-    EXPECT_TRUE(model.Processing.MeshSubdivideAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshRemeshCommand(
+        context, {.StableEntityId = model.SelectedStableId}).Enabled);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshSubdivideCommand(
+        context, {.StableEntityId = model.SelectedStableId}).Enabled);
     EXPECT_TRUE(Runtime::PreviewEditorMeshSimplifyCommand(
         context, {.StableEntityId = model.SelectedStableId, .TargetFaces = 1u}).Enabled);
     EXPECT_TRUE(model.Processing.MeshVertexNormalsAvailable);
@@ -3993,8 +4128,10 @@ TEST(SandboxEditorUi, DirectMeshEnrichmentPendingPreservesGeometryReadiness)
     EXPECT_TRUE(Runtime::PreviewEditorMeshDenoiseCommand(
         context, {.StableEntityId = pendingModel.SelectedStableId}).Enabled);
     EXPECT_TRUE(pendingModel.Processing.MeshCurvatureAvailable);
-    EXPECT_TRUE(pendingModel.Processing.MeshRemeshAvailable);
-    EXPECT_TRUE(pendingModel.Processing.MeshSubdivideAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshRemeshCommand(
+        context, {.StableEntityId = pendingModel.SelectedStableId}).Enabled);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshSubdivideCommand(
+        context, {.StableEntityId = pendingModel.SelectedStableId}).Enabled);
     EXPECT_TRUE(Runtime::PreviewEditorMeshSimplifyCommand(
         context, {.StableEntityId = pendingModel.SelectedStableId, .TargetFaces = 1u}).Enabled);
     EXPECT_TRUE(pendingModel.Processing.MeshVertexNormalsAvailable);
@@ -4054,8 +4191,10 @@ TEST(SandboxEditorUi, DirectMeshEnrichmentPendingPreservesGeometryReadiness)
     EXPECT_TRUE(Runtime::PreviewEditorMeshDenoiseCommand(
         context, {.StableEntityId = readyModel.SelectedStableId}).Enabled);
     EXPECT_TRUE(readyModel.Processing.MeshCurvatureAvailable);
-    EXPECT_TRUE(readyModel.Processing.MeshRemeshAvailable);
-    EXPECT_TRUE(readyModel.Processing.MeshSubdivideAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshRemeshCommand(
+        context, {.StableEntityId = readyModel.SelectedStableId}).Enabled);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshSubdivideCommand(
+        context, {.StableEntityId = readyModel.SelectedStableId}).Enabled);
     EXPECT_TRUE(Runtime::PreviewEditorMeshSimplifyCommand(
         context, {.StableEntityId = readyModel.SelectedStableId, .TargetFaces = 1u}).Enabled);
     EXPECT_TRUE(readyModel.Processing.MeshVertexNormalsAvailable);

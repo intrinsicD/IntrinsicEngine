@@ -2274,6 +2274,182 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             return entity;
         }
 
+        [[nodiscard]] std::optional<ECS::EntityHandle> ResolveMeshCommandTarget(
+            const EditorProcessingContext& context,
+            const EditorMeshRemeshCommand& command,
+            EditorMeshRemeshResult& result)
+        {
+            if (context.Scene == nullptr)
+            {
+                result.Status = EditorCommandStatus::MissingScene;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message = "Scene registry is unavailable for mesh remesh.";
+                return std::nullopt;
+            }
+            if (!ValidMeshRemeshMode(command.Mode) ||
+                !ValidMeshRemeshSizingLaw(command.SizingLaw) ||
+                command.Iterations == 0u ||
+                !std::isfinite(command.TargetEdgeLength) ||
+                command.TargetEdgeLength < 0.0 ||
+                !IsPositiveFinite(command.Lambda) ||
+                !std::isfinite(command.CurvatureAdaptation) ||
+                command.CurvatureAdaptation < 0.0 ||
+                !std::isfinite(command.MaxReferenceProjectionDistance) ||
+                command.MaxReferenceProjectionDistance < 0.0 ||
+                (command.ProjectToSurface && command.ReferenceProjectionK == 0u) ||
+                (command.SizingLaw ==
+                     EditorMeshRemeshSizingLaw::ErrorBoundedTaubin &&
+                 !IsPositiveFinite(command.ApproximationError)))
+            {
+                result.Status =
+                    EditorCommandStatus::InvalidProcessingParameters;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message = "Mesh remesh requires a valid mode, sizing law, positive "
+                                 "iteration count, finite non-negative target length, "
+                                 "positive lambda, and valid projection/sizing parameters.";
+                return std::nullopt;
+            }
+            if (command.Mode == EditorMeshRemeshMode::Uniform &&
+                !context.MeshRemeshUniformKernelAvailable)
+            {
+                result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message = "Geometry.Remeshing uniform remesher is unavailable in "
+                                 "this runtime configuration.";
+                return std::nullopt;
+            }
+            if (command.Mode == EditorMeshRemeshMode::Adaptive &&
+                !context.MeshRemeshAdaptiveKernelAvailable)
+            {
+                result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message = "Geometry.HalfedgeMesh.AdaptiveRemeshing is unavailable "
+                                 "in this runtime configuration.";
+                return std::nullopt;
+            }
+            if (command.ProjectToSurface &&
+                !context.MeshRemeshProjectToSurfaceAvailable)
+            {
+                result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message = "Mesh remesh project-to-surface is unavailable in this "
+                                 "runtime configuration.";
+                return std::nullopt;
+            }
+            if (command.Mode == EditorMeshRemeshMode::Adaptive &&
+                command.SizingLaw == EditorMeshRemeshSizingLaw::ErrorBoundedTaubin &&
+                !context.MeshRemeshErrorBoundedSizingAvailable)
+            {
+                result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message = "Mesh remesh error-bounded Taubin sizing is unavailable "
+                                 "in this runtime configuration.";
+                return std::nullopt;
+            }
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, command.StableEntityId);
+            if (!entity.has_value())
+            {
+                result.Status = EditorCommandStatus::StaleEntity;
+                result.Error = Core::ErrorCode::ResourceNotFound;
+                result.Message =
+                    "Mesh remesh target entity is stale or no longer live.";
+                return std::nullopt;
+            }
+
+            return entity;
+        }
+
+        [[nodiscard]] std::optional<ECS::EntityHandle> ResolveMeshCommandTarget(
+            const EditorProcessingContext& context,
+            const EditorMeshSubdivideCommand& command,
+            EditorMeshSubdivideResult& result)
+        {
+            if (context.Scene == nullptr)
+            {
+                result.Status = EditorCommandStatus::MissingScene;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message = "Scene registry is unavailable for mesh subdivide.";
+                return std::nullopt;
+            }
+            if (!ValidMeshSubdivideOperator(command.Operator) ||
+                command.Iterations == 0u ||
+                (command.PreserveLoopFeatureEdges &&
+                 command.FeatureEdgePropertyName.empty()))
+            {
+                result.Status =
+                    EditorCommandStatus::InvalidProcessingParameters;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message = "Mesh subdivide requires a valid operator, positive "
+                                 "iteration count, and a feature-edge property name when "
+                                 "feature preservation is enabled.";
+                return std::nullopt;
+            }
+            if (command.Operator == EditorMeshSubdivideOperator::Loop &&
+                !context.MeshSubdivideLoopKernelAvailable)
+            {
+                result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message = "Geometry.Subdivision Loop subdivision is unavailable in "
+                                 "this runtime configuration.";
+                return std::nullopt;
+            }
+            if (command.Operator ==
+                    EditorMeshSubdivideOperator::CatmullClark &&
+                !context.MeshSubdivideCatmullClarkKernelAvailable)
+            {
+                result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message = "Geometry.CatmullClark subdivision is unavailable in this "
+                                 "runtime configuration.";
+                return std::nullopt;
+            }
+            if (command.Operator == EditorMeshSubdivideOperator::Sqrt3 &&
+                !context.MeshSubdivideSqrt3KernelAvailable)
+            {
+                result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message = "Geometry.HalfedgeMesh.SubdivisionSqrt3 is unavailable in "
+                                 "this runtime configuration.";
+                return std::nullopt;
+            }
+            if (command.PreserveLoopFeatureEdges &&
+                command.Operator != EditorMeshSubdivideOperator::Loop)
+            {
+                result.Status =
+                    EditorCommandStatus::InvalidProcessingParameters;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message = "Loop feature-edge preservation can only be used with the "
+                                 "Loop subdivision operator.";
+                return std::nullopt;
+            }
+            if (command.PreserveLoopFeatureEdges &&
+                !context.MeshSubdivideLoopFeatureEdgesAvailable)
+            {
+                result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message = "Loop subdivision feature-edge preservation is "
+                                 "unavailable in this runtime configuration.";
+                return std::nullopt;
+            }
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, command.StableEntityId);
+            if (!entity.has_value())
+            {
+                result.Status = EditorCommandStatus::StaleEntity;
+                result.Error = Core::ErrorCode::ResourceNotFound;
+                result.Message =
+                    "Mesh subdivide target entity is stale or no longer live.";
+                return std::nullopt;
+            }
+
+            return entity;
+        }
+
         // Cheap admission only: the source builder still checks numerical and
         // connectivity validity at execution, before any mutation or job submission.
         template <typename Result, typename Command>
@@ -2295,6 +2471,18 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
 namespace Extrinsic::Runtime
 {
     using namespace MeshTopologyDetail;
+
+    ActionReadiness PreviewEditorMeshRemeshCommand(
+        const EditorProcessingCommands& commands, const EditorMeshRemeshCommand& command)
+    {
+        return PreviewMeshCommand<EditorMeshRemeshResult>(commands, command);
+    }
+
+    ActionReadiness PreviewEditorMeshSubdivideCommand(
+        const EditorProcessingCommands& commands, const EditorMeshSubdivideCommand& command)
+    {
+        return PreviewMeshCommand<EditorMeshSubdivideResult>(commands, command);
+    }
 
     ActionReadiness PreviewEditorMeshDenoiseCommand(
         const EditorProcessingCommands& commands, const EditorMeshDenoiseCommand& command)
@@ -2405,85 +2593,9 @@ ApplyEditorMeshRemeshCommand(
         EditorMeshRemeshResult result =
             MakeMeshRemeshBaseResult(command);
 
-        if (context.Scene == nullptr)
-        {
-            result.Status = EditorCommandStatus::MissingScene;
-            result.Error = Core::ErrorCode::InvalidState;
-            result.Message = "Scene registry is unavailable for mesh remesh.";
-            return result;
-        }
-        if (!ValidMeshRemeshMode(command.Mode) ||
-            !ValidMeshRemeshSizingLaw(command.SizingLaw) ||
-            command.Iterations == 0u ||
-            !std::isfinite(command.TargetEdgeLength) ||
-            command.TargetEdgeLength < 0.0 ||
-            !IsPositiveFinite(command.Lambda) ||
-            !std::isfinite(command.CurvatureAdaptation) ||
-            command.CurvatureAdaptation < 0.0 ||
-            !std::isfinite(command.MaxReferenceProjectionDistance) ||
-            command.MaxReferenceProjectionDistance < 0.0 ||
-            (command.ProjectToSurface && command.ReferenceProjectionK == 0u) ||
-            (command.SizingLaw ==
-                 EditorMeshRemeshSizingLaw::ErrorBoundedTaubin &&
-             !IsPositiveFinite(command.ApproximationError)))
-        {
-            result.Status =
-                EditorCommandStatus::InvalidProcessingParameters;
-            result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message = "Mesh remesh requires a valid mode, sizing law, positive "
-                             "iteration count, finite non-negative target length, "
-                             "positive lambda, and valid projection/sizing parameters.";
-            return result;
-        }
-        if (command.Mode == EditorMeshRemeshMode::Uniform &&
-            !context.MeshRemeshUniformKernelAvailable)
-        {
-            result.Status = EditorCommandStatus::GeometryProcessingFailed;
-            result.Error = Core::ErrorCode::InvalidState;
-            result.Message = "Geometry.Remeshing uniform remesher is unavailable in "
-                             "this runtime configuration.";
-            return result;
-        }
-        if (command.Mode == EditorMeshRemeshMode::Adaptive &&
-            !context.MeshRemeshAdaptiveKernelAvailable)
-        {
-            result.Status = EditorCommandStatus::GeometryProcessingFailed;
-            result.Error = Core::ErrorCode::InvalidState;
-            result.Message = "Geometry.HalfedgeMesh.AdaptiveRemeshing is unavailable "
-                             "in this runtime configuration.";
-            return result;
-        }
-        if (command.ProjectToSurface &&
-            !context.MeshRemeshProjectToSurfaceAvailable)
-        {
-            result.Status = EditorCommandStatus::GeometryProcessingFailed;
-            result.Error = Core::ErrorCode::InvalidState;
-            result.Message = "Mesh remesh project-to-surface is unavailable in this "
-                             "runtime configuration.";
-            return result;
-        }
-        if (command.SizingLaw ==
-                EditorMeshRemeshSizingLaw::ErrorBoundedTaubin &&
-            !context.MeshRemeshErrorBoundedSizingAvailable)
-        {
-            result.Status = EditorCommandStatus::GeometryProcessingFailed;
-            result.Error = Core::ErrorCode::InvalidState;
-            result.Message = "Mesh remesh error-bounded Taubin sizing is unavailable "
-                             "in this runtime configuration.";
-            return result;
-        }
-
+        const auto entity = ResolveMeshCommandTarget(context, command, result);
+        if (!entity) return result;
         entt::registry& raw = context.Scene->Raw();
-        const std::optional<ECS::EntityHandle> entity =
-            ResolveStableEntity(raw, command.StableEntityId);
-        if (!entity.has_value())
-        {
-            result.Status = EditorCommandStatus::StaleEntity;
-            result.Error = Core::ErrorCode::ResourceNotFound;
-            result.Message =
-                "Mesh remesh target entity is stale or no longer live.";
-            return result;
-        }
 
         const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
         MeshTopologySourceResult source =
@@ -2567,85 +2679,9 @@ ApplyEditorMeshSubdivideCommand(
         EditorMeshSubdivideResult result =
             MakeMeshSubdivideBaseResult(command);
 
-        if (context.Scene == nullptr)
-        {
-            result.Status = EditorCommandStatus::MissingScene;
-            result.Error = Core::ErrorCode::InvalidState;
-            result.Message = "Scene registry is unavailable for mesh subdivide.";
-            return result;
-        }
-        if (!ValidMeshSubdivideOperator(command.Operator) ||
-            command.Iterations == 0u ||
-            (command.PreserveLoopFeatureEdges &&
-             command.FeatureEdgePropertyName.empty()))
-        {
-            result.Status =
-                EditorCommandStatus::InvalidProcessingParameters;
-            result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message = "Mesh subdivide requires a valid operator, positive "
-                             "iteration count, and a feature-edge property name when "
-                             "feature preservation is enabled.";
-            return result;
-        }
-        if (command.Operator == EditorMeshSubdivideOperator::Loop &&
-            !context.MeshSubdivideLoopKernelAvailable)
-        {
-            result.Status = EditorCommandStatus::GeometryProcessingFailed;
-            result.Error = Core::ErrorCode::InvalidState;
-            result.Message = "Geometry.Subdivision Loop subdivision is unavailable in "
-                             "this runtime configuration.";
-            return result;
-        }
-        if (command.Operator ==
-                EditorMeshSubdivideOperator::CatmullClark &&
-            !context.MeshSubdivideCatmullClarkKernelAvailable)
-        {
-            result.Status = EditorCommandStatus::GeometryProcessingFailed;
-            result.Error = Core::ErrorCode::InvalidState;
-            result.Message = "Geometry.CatmullClark subdivision is unavailable in this "
-                             "runtime configuration.";
-            return result;
-        }
-        if (command.Operator == EditorMeshSubdivideOperator::Sqrt3 &&
-            !context.MeshSubdivideSqrt3KernelAvailable)
-        {
-            result.Status = EditorCommandStatus::GeometryProcessingFailed;
-            result.Error = Core::ErrorCode::InvalidState;
-            result.Message = "Geometry.HalfedgeMesh.SubdivisionSqrt3 is unavailable in "
-                             "this runtime configuration.";
-            return result;
-        }
-        if (command.PreserveLoopFeatureEdges &&
-            command.Operator != EditorMeshSubdivideOperator::Loop)
-        {
-            result.Status =
-                EditorCommandStatus::InvalidProcessingParameters;
-            result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message = "Loop feature-edge preservation can only be used with the "
-                             "Loop subdivision operator.";
-            return result;
-        }
-        if (command.PreserveLoopFeatureEdges &&
-            !context.MeshSubdivideLoopFeatureEdgesAvailable)
-        {
-            result.Status = EditorCommandStatus::GeometryProcessingFailed;
-            result.Error = Core::ErrorCode::InvalidState;
-            result.Message = "Loop subdivision feature-edge preservation is "
-                             "unavailable in this runtime configuration.";
-            return result;
-        }
-
+        const auto entity = ResolveMeshCommandTarget(context, command, result);
+        if (!entity) return result;
         entt::registry& raw = context.Scene->Raw();
-        const std::optional<ECS::EntityHandle> entity =
-            ResolveStableEntity(raw, command.StableEntityId);
-        if (!entity.has_value())
-        {
-            result.Status = EditorCommandStatus::StaleEntity;
-            result.Error = Core::ErrorCode::ResourceNotFound;
-            result.Message =
-                "Mesh subdivide target entity is stale or no longer live.";
-            return result;
-        }
 
         const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
         MeshTopologySourceResult source =

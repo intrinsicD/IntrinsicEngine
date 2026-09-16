@@ -2703,3 +2703,14 @@ entries:
     - Initial build found four stale model assertions; new non-finite test assumed the wrong failure enum. Updated
       in-tree consumers and asserted fail-closed unchanged inputs/no history, then passed focused and full CPU gates.
       Production C++ grows 27 lines to expose missing previews; no compile-speed, sanitizer or Vulkan claim.
+
+  - turn: 2026-09-16_001#18
+    notes:
+    - N622 is ordinary implementation and verification, not a research result; no new claims or observation promotions.
+      Broader staged topics keep their named owners and flags.
+    - Adopted Claude current-mode sizing probe finding. Default command values and flag-conditional capability checks
+      disproved two speculative follow-up findings; no new wrappers/constants/automatic repair. Live tests prove non-default
+      variant routing and actual Loop flag clearing.
+    - All 44 focused and 4688 full CPU cases plus one expected skip pass. Production C++ shrinks 109 lines with no
+      new module or dependency; this is no timing, sanitizer or Vulkan claim. UI-037 still owns remaining families
+      and full numerical readiness.

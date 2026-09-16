@@ -626,3 +626,64 @@ Verified checkpoint:
   improvement measurement, sanitizer execution or Vulkan runtime claim.
 - UI-037 stays active: remesh/subdivide options, the remaining action/backend
   inventory and full cached numerical/deleted-slot readiness still need work.
+
+
+## Remesh/subdivide admission and options — plan
+
+- Continue operator-directed cleanup with the existing topology-family preview
+  mechanism. Share the command's validation through two more private typed
+  overloads; remove ten common-model availability fields and their derivations.
+  Run uses one complete request; option probes use valid default requests with
+  only the candidate variant, so unrelated draft errors cannot trap editing.
+- Options and toggles reuse runtime reasons and the existing tooltip. Probe the
+  toggled checkbox value to allow recovery from unsupported enabled features.
+  Read mode/operator after widgets; preserve the existing clear-on-leaving-Loop
+  feature policy. Adaptive sizing may be preselected while uniform is active.
+- Correct the uniform remesher's unrelated error-bounded sizing capability gate:
+  only adaptive mode consumes that capability. Keep parameter rules, including
+  valid enum/approximation values, and all numerical/kernel/publication checks.
+  No new algorithm, config lane, file, module, service or compatibility path.
+  Full cached numerical/deleted-slot readiness remains outside this slice.
+
+
+## Remesh/subdivide admission and options — verified checkpoint
+
+- All four topology methods now share the existing compiled family admission
+  pattern. Remesh/subdivide preview and apply reuse their original validation
+  order and failures; no copy of command rules lives in the panel. Deleted ten
+  shared-model availability flags and their derivations. Main Run validates the
+  full request, while option probes remain independent of unrelated draft errors.
+- Remesh mode/sizing/projection and subdivision operator/Loop-feature controls
+  obtain disabled reasons from runtime and use the existing tooltip. Numeric
+  controls stay editable. Read mode/operator after edits and probe the proposed
+  checkbox value; unsupported enabled features can be turned off when their
+  method is available. Preserve existing clear-on-leaving-Loop semantics.
+- Corrected uniform remeshing's unrelated adaptive-sizing capability gate. A
+  valid uniform request remains runnable if error-bounded adaptive sizing is
+  unavailable; adaptive requests still reject with their canonical reason.
+  Sizing can be preselected and is explicitly labeled as adaptive-only.
+- Claude reviewed plan, diff, fix and source proof. Adopted current-mode sizing
+  probing so the combo and Run agree. The reviewer withdrew invalid-default and
+  OFF-rejection concerns after checking actual initializers/predicates; compiler
+  verification also disproved an overload ambiguity. No speculative fallback,
+  extra default constant, automatic state repair or generic option framework.
+- Runtime tests cover every remesh/subdivide capability flag, default candidate
+  validity, exact preview/apply rejection reasons, priority, metadata changes,
+  missing scene/entity, recovery and the uniform/adaptive guard distinction.
+  Real widgets cover all four blocked/queued actions plus adaptive/error-bounded
+  projection and Catmull-Clark routing. Logged checked Loop preservation before
+  switching proves the cleared result is not just its initial false default.
+- Final focused run: 44 passes. Canonical `ci` configure / `IntrinsicTests`
+  build / exclusion-only CPU gate: **4,688 passes, one expected ASan-only GLFW
+  lifecycle skip, zero failures** (4,689 selected; 141.44 s). Layering, layout,
+  task policy/state links, docs links/sync, skills, session brief, root hygiene
+  and diff checks pass. Module inventory regenerated unchanged. Source-doc audit
+  reports zero objective errors; existing broad review hints remain outside scope.
+- Scope/layering/tests/docs and automated workshop sweep pass. Manual rows 1–3
+  pass, 4–6 unchanged, 7 records partial progress, 8 has no exception. Production
+  C++ shrinks by **109 lines** across five existing files; no new file/module,
+  dependency, service or compatibility layer. No compilation-speed measurement
+  or sanitizer/Vulkan runtime claim.
+- UI-037 remains active for other families/options and full cached numerical,
+  topology and deleted-slot readiness. This is admission and control reuse, not
+  whole-task Operational closure.

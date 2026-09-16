@@ -2311,16 +2311,22 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
         context, {.StableEntityId = meshModel.SelectedStableId}).Enabled);
     EXPECT_TRUE(meshModel.Processing.MeshCurvatureAvailable);
     EXPECT_TRUE(meshModel.Processing.MeshCurvatureDirectionsAvailable);
-    EXPECT_TRUE(meshModel.Processing.MeshRemeshAvailable);
-    EXPECT_TRUE(meshModel.Processing.MeshRemeshUniformAvailable);
-    EXPECT_TRUE(meshModel.Processing.MeshRemeshAdaptiveAvailable);
-    EXPECT_TRUE(meshModel.Processing.MeshRemeshProjectToSurfaceAvailable);
-    EXPECT_TRUE(meshModel.Processing.MeshRemeshErrorBoundedSizingAvailable);
-    EXPECT_TRUE(meshModel.Processing.MeshSubdivideAvailable);
-    EXPECT_TRUE(meshModel.Processing.MeshSubdivideLoopAvailable);
-    EXPECT_TRUE(meshModel.Processing.MeshSubdivideCatmullClarkAvailable);
-    EXPECT_TRUE(meshModel.Processing.MeshSubdivideSqrt3Available);
-    EXPECT_TRUE(meshModel.Processing.MeshSubdivideLoopFeatureEdgesAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshRemeshCommand(
+        context, {.StableEntityId = meshModel.SelectedStableId}).Enabled);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshRemeshCommand(
+        context, {.StableEntityId = meshModel.SelectedStableId, .Mode = Runtime::EditorMeshRemeshMode::Adaptive}).Enabled);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshRemeshCommand(
+        context, {.StableEntityId = meshModel.SelectedStableId, .ProjectToSurface = true}).Enabled);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshRemeshCommand(
+        context, {.StableEntityId = meshModel.SelectedStableId, .Mode = Runtime::EditorMeshRemeshMode::Adaptive, .SizingLaw = Runtime::EditorMeshRemeshSizingLaw::ErrorBoundedTaubin}).Enabled);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshSubdivideCommand(
+        context, {.StableEntityId = meshModel.SelectedStableId}).Enabled);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshSubdivideCommand(
+        context, {.StableEntityId = meshModel.SelectedStableId, .Operator = Runtime::EditorMeshSubdivideOperator::CatmullClark}).Enabled);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshSubdivideCommand(
+        context, {.StableEntityId = meshModel.SelectedStableId, .Operator = Runtime::EditorMeshSubdivideOperator::Sqrt3}).Enabled);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshSubdivideCommand(
+        context, {.StableEntityId = meshModel.SelectedStableId, .PreserveLoopFeatureEdges = true}).Enabled);
     EXPECT_TRUE(Runtime::PreviewEditorMeshSimplifyCommand(
         context, {.StableEntityId = meshModel.SelectedStableId, .TargetFaces = 1u}).Enabled);
     EXPECT_TRUE(meshModel.Processing.MeshVertexNormalsAvailable);

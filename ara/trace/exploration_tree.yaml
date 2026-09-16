@@ -13448,3 +13448,29 @@ tree:
     - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
     - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
     status: resolved
+
+  - id: N622
+    type: decision
+    title: Consolidate remesh and subdivision admission and option controls
+    provenance: ai-executed
+    timestamp: '2026-09-16T20:19:11+02:00'
+    choice: Reuse the topology-family command validators and metadata preview for remesh/subdivide; remove ten common-model
+      availability flags and panel-owned Run predicates. Probe independent valid options and proposed checkbox transitions.
+      Correct uniform remeshing being blocked by unavailable adaptive sizing. Claude reviewed plan, diff and fixes,
+      withdrawing speculative default/OFF concerns after source proof. Final 44 focused tests and 4688 CPU passes
+      plus one expected skip. Remove 109 production lines, no compile-speed claim; full numerical readiness remains
+      open.
+    alternatives:
+    - Retain common-model flags alongside typed family command validation
+    - Build a second option capability API or automatically reset unsupported values
+    evidence:
+    - src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.Topology.cpp
+    - src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cppm
+    - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+    - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+    - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+    - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+    - tests/contract/runtime/Test.SandboxEditorModels.cpp
+    - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
+    - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
+    status: resolved

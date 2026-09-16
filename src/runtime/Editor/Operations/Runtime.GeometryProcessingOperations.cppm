@@ -173,16 +173,6 @@ export namespace Extrinsic::Runtime
         bool MeshCurvatureAvailable{false};
         bool MeshCurvatureDirectionsAvailable{false};
         bool CurvatureSegmentationAvailable{false};
-        bool MeshRemeshAvailable{false};
-        bool MeshRemeshUniformAvailable{false};
-        bool MeshRemeshAdaptiveAvailable{false};
-        bool MeshRemeshProjectToSurfaceAvailable{false};
-        bool MeshRemeshErrorBoundedSizingAvailable{false};
-        bool MeshSubdivideAvailable{false};
-        bool MeshSubdivideLoopAvailable{false};
-        bool MeshSubdivideCatmullClarkAvailable{false};
-        bool MeshSubdivideSqrt3Available{false};
-        bool MeshSubdivideLoopFeatureEdgesAvailable{false};
         bool MeshVertexNormalsAvailable{false};
         bool GraphVertexNormalsAvailable{false};
         bool PointCloudVertexNormalsAvailable{false};

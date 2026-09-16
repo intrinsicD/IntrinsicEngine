@@ -301,6 +301,10 @@ export namespace Extrinsic::Runtime
     // still validates full geometry and topology before publishing a result.
     [[nodiscard]] ActionReadiness PreviewEditorMeshDenoiseCommand(
         const EditorProcessingCommands&, const EditorMeshDenoiseCommand&);
+    [[nodiscard]] ActionReadiness PreviewEditorMeshRemeshCommand(
+        const EditorProcessingCommands&, const EditorMeshRemeshCommand&);
+    [[nodiscard]] ActionReadiness PreviewEditorMeshSubdivideCommand(
+        const EditorProcessingCommands&, const EditorMeshSubdivideCommand&);
     [[nodiscard]] ActionReadiness PreviewEditorMeshSimplifyCommand(
         const EditorProcessingCommands&, const EditorMeshSimplifyCommand&);
 

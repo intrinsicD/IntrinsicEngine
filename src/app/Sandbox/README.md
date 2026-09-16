@@ -207,9 +207,12 @@ Unavailable buttons remain visible; the shared tooltip uses
 `ForTooltip | AllowWhenDisabled` with the runtime reason. A successful config
 retry clears its prior error; UI and agent callers use the same runtime config
 validation, and every Run reapplies before execution.
-Denoise and simplify build one typed request for both runtime admission and
-execution. Their actions remain visible when blocked and use the same disabled
-reason tooltip; simplify's stop condition is validated by runtime.
+All four mesh topology controls build one typed request for runtime admission and
+execution. Blocked actions and remesh/subdivide options use the shared runtime-reason
+tooltip. Option checks are independent of unrelated draft errors, and checkbox
+checks use the proposed toggle value so unsupported features can be switched off.
+Adaptive sizing can be preselected while uniform remeshing is active; it affects
+only adaptive remeshing. Simplify's stop condition is validated by runtime.
 
 Progressive Poisson uses the shared typed config apply result; manual and debounced
 runs both reapply before execution and clear pending auto-run on rejection.

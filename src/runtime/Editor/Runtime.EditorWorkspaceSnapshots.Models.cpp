@@ -2255,37 +2255,6 @@ namespace {
                 HasAnyEditorGeometryProcessingDomain(
                     model.Capabilities.Domains,
                     EditorGeometryProcessingDomain::MeshFaces);
-            model.MeshRemeshUniformAvailable =
-                context.MeshRemeshUniformKernelAvailable &&
-                model.Capabilities.HasEditableSurfaceMesh;
-            model.MeshRemeshAdaptiveAvailable =
-                context.MeshRemeshAdaptiveKernelAvailable &&
-                model.Capabilities.HasEditableSurfaceMesh;
-            model.MeshRemeshAvailable =
-                model.MeshRemeshUniformAvailable ||
-                model.MeshRemeshAdaptiveAvailable;
-            model.MeshRemeshProjectToSurfaceAvailable =
-                model.MeshRemeshAvailable &&
-                context.MeshRemeshProjectToSurfaceAvailable;
-            model.MeshRemeshErrorBoundedSizingAvailable =
-                model.MeshRemeshAdaptiveAvailable &&
-                context.MeshRemeshErrorBoundedSizingAvailable;
-            model.MeshSubdivideLoopAvailable =
-                context.MeshSubdivideLoopKernelAvailable &&
-                model.Capabilities.HasEditableSurfaceMesh;
-            model.MeshSubdivideCatmullClarkAvailable =
-                context.MeshSubdivideCatmullClarkKernelAvailable &&
-                model.Capabilities.HasEditableSurfaceMesh;
-            model.MeshSubdivideSqrt3Available =
-                context.MeshSubdivideSqrt3KernelAvailable &&
-                model.Capabilities.HasEditableSurfaceMesh;
-            model.MeshSubdivideAvailable =
-                model.MeshSubdivideLoopAvailable ||
-                model.MeshSubdivideCatmullClarkAvailable ||
-                model.MeshSubdivideSqrt3Available;
-            model.MeshSubdivideLoopFeatureEdgesAvailable =
-                model.MeshSubdivideLoopAvailable &&
-                context.MeshSubdivideLoopFeatureEdgesAvailable;
             model.MeshVertexNormalsAvailable =
                 model.Capabilities.HasEditableSurfaceMesh &&
                 HasAnyEditorGeometryProcessingDomain(
