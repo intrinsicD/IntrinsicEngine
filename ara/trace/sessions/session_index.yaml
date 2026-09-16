@@ -600,10 +600,12 @@ sessions:
 
 - id: 2026-09-16_001
   date: '2026-09-16'
-  summary: Retired RUNTIME-268 after Claude review, full CPU and fresh Clang20 compilation; five-sample-per-arm focused comparison
-    charges the new declaration owner and retains narrower scope than a whole-engine build.
-  turn_count: 1
-  events_count: 4
+  summary: Retired RUNTIME-268 and GRAPHICS-144 with bounded matched compilation evidence, Claude review, CPU tests
+    and minimum-compiler builds. Shared declaration ownership now serves snapshots and renderer; GRAPHICS-145 and
+    RUNTIME-267 retain remaining implementation/config work.
+  turn_count: 2
+  events_count: 8
   claims_touched:
   - C99
+  - C100
   open_threads: 10

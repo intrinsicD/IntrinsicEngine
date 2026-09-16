@@ -1,0 +1,27 @@
+## PASS, with two corrections and stated limits
+
+### Recomputation (all checks done against the sample JSON)
+
+Every median, min, and max in both tables reproduces exactly from the ten records:
+
+- Clean 79.403 [79.140–79.622] → 71.319 [71.089–74.158], −10.18% ✓
+- Interface edit 24.523 [24.336–25.229] → 14.071 [13.894–15.648], −42.62% ✓
+- Impl edit 12.938 [12.782–13.280] → 12.929 [12.853–14.344], −0.07%, ranges overlap ✓ (correctly not claimed)
+- No-op 0.033 [0.032–0.042] → 0.035 [0.032–0.037] ✓ (overlapping; correctly not framed as a regression)
+- Owner 0.966 [0.957–0.991] → 1.029 [1.027–1.031]; snapshot 0.723 → 0.724; pair 1.690 [1.680–1.725] → 1.753 [1.748–1.762] ✓
+
+The pair row is confirmed to be the median of per-sample sums, not the sum of medians (e.g. the before median 1690.03 comes from sample 04, whose components are 967.56 + 722.47 — not from the 966.44/722.93 medians). The stated caveat is correct.
+
+Arm order A-B-B-A-A-B-B-A-A-B matches the attempt list. Invocation counts 267→268 are consistent with the added `Core.Std` and a removed owner that sits outside the graphics target; the 776 common-command figure is a different (configure-level) population and is not conflated with it. Ten before/ten after, all `claim_eligible: false`.
+
+### Corrections
+
+1. **BMI byte mismatch, section "Source change and alternatives" vs snapshot samples.** The report says the new owner "independently emits 10,729,460 bytes in its single diagnostic," but every after-arm snapshot record reports `std_owner.pcm` = 10,729,716 — a 256-byte difference. This is almost certainly the diagnostic's different flag set versus the runtime-owner flags used in the control, but as written a reader comparing the two sections sees two sizes for the same artifact. Add one clause naming the flag difference, or cite both figures.
+
+2. **Sample 10-after-5 is an unflagged joint outlier.** It is the after-arm maximum in *all four* graphics scenarios simultaneously (74.158 / 14.344 / 15.648, and the widest after ranges come solely from it). Correctly retained and not discarded, but the report attributes after-arm range width to nothing in particular. State explicitly that one sample drives every after-arm maximum and that the medians are unaffected by it — otherwise the range spans look like arm-level variance rather than a single noisy run.
+
+### Limits worth keeping visible (as already written, no change needed)
+
+Five samples per arm, no significance testing, one host, no CPU pinning or governor control; compile-time only, no runtime/GPU/sanitizer execution; the two cohorts use different configurations (Null/headless vs Vulkan/GLFW-configured prerequisites) and must not be summed — all four of these are already stated in the draft.
+
+No other discrepancies found between the prose, the tables, and the records.

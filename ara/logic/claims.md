@@ -2254,3 +2254,14 @@
 - **Dependencies**: []
 - **Tags**: compilation, C++23 modules, snapshot serialization, matched local observations, added owner charged
 - **From staging**: O232
+
+## C100: Bounded shared renderer/snapshot declaration compilation observations
+- **Statement**: GRAPHICS-144's retained local Clang23 graphics-target cohort, five samples per exact source arm, changes clean-build median from 79.403 to 71.319 seconds (10.2% lower) and settled renderer-interface edit plus implementation consumer from 24.523 to 14.071 seconds (42.6% lower). Clean compiler units increase 267 to 268; interface edits retain two units. Implementation-only ranges overlap. A separate controlled serial snapshot-owner/interface cohort changes pair median from 1.690 to 1.753 seconds, while snapshot-interface ranges overlap. Every clean graphics candidate pays the shared owner; the cohorts must not be summed.
+- **Status**: supported — descriptive local compilation observations only; all twenty canonical records remain claim_eligible:false. No whole-engine build, runtime/GPU, aggregate-memory, statistical/general, publication-qualified or cross-host/compiler conclusion. The slower final candidate is retained.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Recalculation of retained samples disagrees with the medians/counts, added owner cost is omitted, source/compiler/flag/dependency identities are unmatched, or a focused replay prerequisite imports an obsolete owner or consumer. Single traces, separate BMI artifacts and controlled-owner flags must remain distinguishable from the complete graphics-target cohort.
+- **Proof**: [ara/evidence/tables/graphics144_shared_std_measurement.md, ara/evidence/diagnostics/graphics144_shared_std/summary.json, ara/evidence/diagnostics/graphics144_shared_std/evidence-index.json, ara/evidence/diagnostics/graphics144_shared_std/verification.json, ara/evidence/diagnostics/graphics144_shared_std/raw-evidence.tar.gz, benchmarks/ci/manifests/graphics_standard_declarations.yaml, benchmarks/ci/manifests/snapshot_shared_std.yaml, tasks/done/GRAPHICS-144-renderer-consumer-locality.md]
+- **Dependencies**: []
+- **Tags**: compilation, C++23 modules, renderer serialization, shared standard declarations, local matched observations
+- **From staging**: O233

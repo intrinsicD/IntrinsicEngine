@@ -3961,3 +3961,19 @@ observations:
     promoted_to: logic/claims.md:C99
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O233
+    timestamp: '2026-09-16T02:03:43+02:00'
+    provenance: ai-executed
+    content: 'Retained local graphics-target medians: clean 79.403 to 71.319 seconds; renderer-interface edit 24.523
+      to 14.071 seconds, new owner charged. Implementation-only and snapshot-interface ranges overlap. Controlled
+      owner+snapshot pair 1.690 to 1.753 seconds. All 20 results claim_eligible:false.'
+    context: Exact dc606482a to 5537a4dda, two ABBAABBAAB cohorts, identical common commands/package hashes and frozen
+      prerequisite input checks. Final candidate slower and retained. No whole-engine/runtime/GPU/general claim.
+    potential_type: claim
+    bound_to:
+    - N603
+    promoted: true
+    promoted_to: logic/claims.md:C100
+    crystallized_via: artifact-commitment
+    stale: false

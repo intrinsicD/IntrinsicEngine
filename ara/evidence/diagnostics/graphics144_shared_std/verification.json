@@ -1,0 +1,55 @@
+{
+  "source_revision": "5537a4dda505959e6e818713963ce43ad7805c90",
+  "baseline_revision": "dc606482aecec0f0412b06b7a811a62835e98438",
+  "ci_configure": "passed",
+  "IntrinsicTests_final_build": "passed",
+  "compiler": "Clang23, ci Debug; unchanged toolchain options",
+  "focused_cpu": {
+    "passed": 444,
+    "failed": 0,
+    "elapsed_seconds": 35.19,
+    "selector": "CompilationLocality|Renderer|RenderWorld|GpuWorld|GeometryResidency|Visualization|ImGui|UvView|SnapshotRecordsKeepStandardTypesAndAggregateInitialization|SandboxEditorPresentation"
+  },
+  "full_cpu": {
+    "selected": 4665,
+    "passed": 4664,
+    "failed": 0,
+    "skipped": 1,
+    "skip": "GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl requires ASan",
+    "elapsed_seconds": 141.22
+  },
+  "minimum_compiler": "Fresh cache-off Clang20 Null/headless ExtrinsicSandboxEditor full closure; final assertion-aware reconciliation also compiles RendererFrameLifecycle and SandboxEditorModels test objects. No Clang20 test execution claim.",
+  "module_inventory_count": 419,
+  "source_delta": {
+    "cpp_lines_added_net": 6,
+    "src_lines_added_net_including_cmake": 6,
+    "net_module_count_change": 0,
+    "new_declaration_owner_lines": 26,
+    "removed_runtime_owner_lines": 21,
+    "renderer_lines_added_net": 1
+  },
+  "public_surface": "Same original standard types, record fields, value initialization and renderer method signatures. No new allocation, forwarding, state or target-link edge. Core helper names not reexported by consumers.",
+  "gpu_or_sanitizer_execution_claim": false,
+  "canonical_results_validated": 20,
+  "checks": [
+    "strict layering",
+    "strict task policy",
+    "test layout",
+    "root hygiene",
+    "documentation links",
+    "source documentation audit: 0 objective errors, 23 review flags manually inspected",
+    "module inventory regeneration"
+  ],
+  "claude_review": "Fixed-packet planning, source, complete-type reachability, protocol and results review. Valid findings addressed; captured commands/metadata distinguish false hypotheticals. See retained resolutions and raw packets.",
+  "clean_workshop": {
+    "1_layer_imports": "pass: Std owner has standard includes only; graphics/runtime import permitted Core",
+    "2_target_links": "pass: same libraries, no new target edge",
+    "3_public_types": "pass: unchanged original standard type identities verified by real consumer contracts",
+    "4_renderer_ownership": "pass: all runtime state remains in implementation",
+    "5_pass_identity": "not applicable, unchanged",
+    "6_recipe_dependencies": "not applicable, unchanged",
+    "7_maturity": "CPUContracted refactor endpoint, no backend promotion",
+    "8_exceptions": "pass: no layer exception; removed exact snapshot private-import exception"
+  },
+  "timing_scope": "Graphics library target: compile/scan/link in clean and real edits; separate serial snapshot owner/interface replay. No whole-engine/runtime/GPU/general speedup claim. All canonical records claim_eligible=false."
+}

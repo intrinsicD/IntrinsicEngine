@@ -1,0 +1,126 @@
+{
+  "source_revision": "5537a4dda505959e6e818713963ce43ad7805c90",
+  "baseline_revision": "dc606482aecec0f0412b06b7a811a62835e98438",
+  "files": {
+    "diagnostic-summary.json": {
+      "sha256": "802ba096793d812a3fc56e38a2ed88ab3806ebd4a7b07690aa26cf59fdedf727",
+      "bytes": 29923
+    },
+    "premeasurement-freeze.json": {
+      "sha256": "afe59c2feb6c65345dcbdcd0917b9e58598cfa33eb85d3c8397cb84149a2c087",
+      "bytes": 753
+    },
+    "protocol-resolutions.md": {
+      "sha256": "57b0e210c2893188384b0f35ce7a389a4d226ea245ed659884c46d37eb4e28b3",
+      "bytes": 1583
+    },
+    "raw-evidence.tar.gz": {
+      "sha256": "013bea0b721f71d183a7569d6153dedc618d25f7a282c22ce35a53aea36b5547",
+      "bytes": 3723994
+    },
+    "results-resolutions.md": {
+      "sha256": "990f5e7224a0a591048e70d92c85e1939817337bd6e8705bcc387f5d50f4fbf3",
+      "bytes": 692
+    },
+    "results-review.txt": {
+      "sha256": "cc3832970ea059163ca9ddf8967454ffaf72bbb596d1c53dbe9eb97a1ac4ef1a",
+      "bytes": 2883
+    },
+    "summary.json": {
+      "sha256": "d925570528d5d83c9e50421c690b98f429c2d1571bc5a37ced34ea0018b37bca",
+      "bytes": 175956
+    },
+    "verification.json": {
+      "sha256": "cb72fb2c6562ac6761c89b1c955c31c4e81c869f7887321757c54f9b4042b274",
+      "bytes": 3006
+    },
+    "final-checks.txt": {
+      "sha256": "53a64208e1edbbd018d86a3fa1fca0a308b89f3041243547c3a037f9dbc80a0f",
+      "bytes": 3221
+    }
+  },
+  "canonical_results_in_archive": {
+    "measurement/results/01-before-1.json": {
+      "sha256": "ba92513ed7cc91be6ae55d973eaafa178b9f22ed227f8ac9618d9a162c6e72e2",
+      "bytes": 34414
+    },
+    "measurement/results/02-after-1.json": {
+      "sha256": "24fb682fbb5aeb8b5b749269182d3f189504c14fc0fd62c6cd4f706d34213983",
+      "bytes": 34503
+    },
+    "measurement/results/03-after-2.json": {
+      "sha256": "f4be8b91ce499ba8afe27c8118ecedf0f4ddf75c2be5a75d663812789a3a65a6",
+      "bytes": 34498
+    },
+    "measurement/results/04-before-2.json": {
+      "sha256": "a6057e48ba9b041210dcaf37e637974381c6edb056738f73bb03c65114ca5963",
+      "bytes": 34454
+    },
+    "measurement/results/05-before-3.json": {
+      "sha256": "fa49835c84ab8341bd4a7b05d858270a80066433e81b13cb6da845d0bb520b4c",
+      "bytes": 34553
+    },
+    "measurement/results/06-after-3.json": {
+      "sha256": "e465efbcd40809d7bdf0e1fd39881e1ba812f85b6e0887b1d349fc26ca5b61c9",
+      "bytes": 34493
+    },
+    "measurement/results/07-after-4.json": {
+      "sha256": "0509d5c23c655cd73592c2288f9ee651a1dae00d2dac5d1e5aad8f7200f652ab",
+      "bytes": 34476
+    },
+    "measurement/results/08-before-4.json": {
+      "sha256": "176c40c10a91c9835639eeb0625a9114087ae51a7e9fe9537c82a207d6f0cfc7",
+      "bytes": 34455
+    },
+    "measurement/results/09-before-5.json": {
+      "sha256": "4f42bf324c96941827166feb3de10c9c4f185eaa9056d0bef9eb382173a88f4b",
+      "bytes": 34504
+    },
+    "measurement/results/10-after-5.json": {
+      "sha256": "ebac4da4c6f4661c5353f4fa386ed03761403d426918f14bf2505fb891fca251",
+      "bytes": 34406
+    },
+    "snapshot-control/results/01-before-1.json": {
+      "sha256": "ea01adce66a1aa49dc763a9fc77796af01bf31f8036f016ecc7bdf030395dca6",
+      "bytes": 9769
+    },
+    "snapshot-control/results/02-after-1.json": {
+      "sha256": "79d095d662b0b8c846bff8e397ad18f67bf0e71233f77c48e9346abf3dd539e3",
+      "bytes": 9674
+    },
+    "snapshot-control/results/03-after-2.json": {
+      "sha256": "e7c9fcd6d163791a35652eec8e7dd110a993bc4b4ba2a7ec1b0f6014eca7e234",
+      "bytes": 9674
+    },
+    "snapshot-control/results/04-before-2.json": {
+      "sha256": "9ec28ae475b7abc65001d6fd0f5821ab7d4b77e1954eeb2f3f562c3174241919",
+      "bytes": 9766
+    },
+    "snapshot-control/results/05-before-3.json": {
+      "sha256": "77e0fcd8e10db5e68626d2ba1bbc19fe4328bbe683b9182b46fff9862107e8df",
+      "bytes": 9765
+    },
+    "snapshot-control/results/06-after-3.json": {
+      "sha256": "8308537350037719ed74032263fa7c1dc70cbae007a86ea3196e518c7eea8da0",
+      "bytes": 9669
+    },
+    "snapshot-control/results/07-after-4.json": {
+      "sha256": "59d64221a34dab8a8232336d043a676f1ddd3c0fda868203e55c52643a2bc4e1",
+      "bytes": 9669
+    },
+    "snapshot-control/results/08-before-4.json": {
+      "sha256": "33ae4e45eed71033060a58ec744d956f5f9e19dfcd4733ab2dd31479f9441dbb",
+      "bytes": 9770
+    },
+    "snapshot-control/results/09-before-5.json": {
+      "sha256": "c95adc38652a02f54c21b3c763c810f104093c98e8ae99d0863665372d0b9cd7",
+      "bytes": 9770
+    },
+    "snapshot-control/results/10-after-5.json": {
+      "sha256": "369a86633168af04d71de5af40c077ab861e268a1de75b1c236a33188e487cd1",
+      "bytes": 9668
+    }
+  },
+  "reproduction": "Recreate exact commits/toolchain/packages; run recorded graphics runner at same source/build paths. For focused replay recapture commands and build/hash unchanged prerequisite BMI closure and all recorded input files, then run archived saved runner. No prebuilt binaries included.",
+  "sample_custody": "No failed or discarded timed samples; two protocol freezes before timing retained. Diagnostic partial variants are separate from matched populations."
+}

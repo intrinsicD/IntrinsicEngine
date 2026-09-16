@@ -7,6 +7,26 @@ relative to `tasks/done/`, which sits at the same depth as `tasks/active/`,
 so blocks moved from the old active-README history work verbatim.
 
 
+## 2026-09-16 — GRAPHICS-144: shared renderer/snapshot declarations
+
+Retired [GRAPHICS-144](GRAPHICS-144-renderer-consumer-locality.md) at CPUContracted.
+Verified source `5537a4dda` moves the existing standard-declaration owner to Core,
+shares it with the renderer and narrows the renderer's GLM include. No new state,
+allocation, forwarding or net module; +6 production C++ lines. Private snapshot
+import exception removed; standard type identities and rendering behavior retained.
+
+Claude reviewed source, completeness proof, protocol and all results. Two retained
+five-sample-per-arm cohorts: clean graphics target median 79.403 → 71.319 seconds;
+renderer-interface edit 24.523 → 14.071 seconds. Implementation and snapshot-interface
+ranges overlap. Isolated snapshot owner+interface costs 1.690 → 1.753 seconds.
+All 20 records remain claim_eligible:false; no whole-engine/runtime/GPU claim.
+Full CPU: 4,664 passes, one expected skip; 444 focused passes; fresh Clang 20
+editor closure plus
+final contract objects compile. [Report and raw evidence](../../ara/evidence/tables/graphics144_shared_std_measurement.md).
+GRAPHICS-145 owns the separately traced implementation frontend cost; RUNTIME-267
+remains open. Independent UI/material/cache tasks retain their scope.
+
+
 ## 2026-09-16 — RUNTIME-268: snapshot standard-declaration ownership
 
 Retired [RUNTIME-268](RUNTIME-268-workspace-snapshot-bmi-serialization.md) at

@@ -1,0 +1,7155 @@
+{
+  "snapshot-control": {
+    "benchmark_id": "build.engine_compile_iteration.snapshot_shared_std.v1",
+    "samples": [
+      {
+        "attempt_id": "01-before-1",
+        "arm": "before",
+        "revision": "dc606482aecec0f0412b06b7a811a62835e98438",
+        "wall_ms": {
+          "std_owner": 957.3431109311059,
+          "snapshot_interface": 722.928705974482,
+          "owner_and_snapshot": 1680.271816905588
+        },
+        "memory_peak_bytes": {
+          "std_owner": 213749760,
+          "snapshot_interface": 882888704
+        },
+        "bmi_bytes": {
+          "snapshot_interface.pcm": 567296,
+          "std_owner.pcm": 9611384
+        }
+      },
+      {
+        "attempt_id": "02-after-1",
+        "arm": "after",
+        "revision": "5537a4dda505959e6e818713963ce43ad7805c90",
+        "wall_ms": {
+          "std_owner": 1031.297876033932,
+          "snapshot_interface": 726.9277749583125,
+          "owner_and_snapshot": 1758.2256509922445
+        },
+        "memory_peak_bytes": {
+          "std_owner": 223178752,
+          "snapshot_interface": 883273728
+        },
+        "bmi_bytes": {
+          "snapshot_interface.pcm": 567536,
+          "std_owner.pcm": 10729716
+        }
+      },
+      {
+        "attempt_id": "03-after-2",
+        "arm": "after",
+        "revision": "5537a4dda505959e6e818713963ce43ad7805c90",
+        "wall_ms": {
+          "std_owner": 1028.8592129945755,
+          "snapshot_interface": 733.0613359808922,
+          "owner_and_snapshot": 1761.9205489754677
+        },
+        "memory_peak_bytes": {
+          "std_owner": 223604736,
+          "snapshot_interface": 884215808
+        },
+        "bmi_bytes": {
+          "snapshot_interface.pcm": 567536,
+          "std_owner.pcm": 10729716
+        }
+      },
+      {
+        "attempt_id": "04-before-2",
+        "arm": "before",
+        "revision": "dc606482aecec0f0412b06b7a811a62835e98438",
+        "wall_ms": {
+          "std_owner": 967.5561550538987,
+          "snapshot_interface": 722.4704939872026,
+          "owner_and_snapshot": 1690.0266490411013
+        },
+        "memory_peak_bytes": {
+          "std_owner": 213504000,
+          "snapshot_interface": 881074176
+        },
+        "bmi_bytes": {
+          "snapshot_interface.pcm": 567296,
+          "std_owner.pcm": 9611384
+        }
+      },
+      {
+        "attempt_id": "05-before-3",
+        "arm": "before",
+        "revision": "dc606482aecec0f0412b06b7a811a62835e98438",
+        "wall_ms": {
+          "std_owner": 990.9536759369075,
+          "snapshot_interface": 733.6513149784878,
+          "owner_and_snapshot": 1724.6049909153953
+        },
+        "memory_peak_bytes": {
+          "std_owner": 212996096,
+          "snapshot_interface": 882483200
+        },
+        "bmi_bytes": {
+          "snapshot_interface.pcm": 567296,
+          "std_owner.pcm": 9611384
+        }
+      },
+      {
+        "attempt_id": "06-after-3",
+        "arm": "after",
+        "revision": "5537a4dda505959e6e818713963ce43ad7805c90",
+        "wall_ms": {
+          "std_owner": 1026.8661939771846,
+          "snapshot_interface": 720.966188935563,
+          "owner_and_snapshot": 1747.8323829127476
+        },
+        "memory_peak_bytes": {
+          "std_owner": 223166464,
+          "snapshot_interface": 883527680
+        },
+        "bmi_bytes": {
+          "snapshot_interface.pcm": 567536,
+          "std_owner.pcm": 10729716
+        }
+      },
+      {
+        "attempt_id": "07-after-4",
+        "arm": "after",
+        "revision": "5537a4dda505959e6e818713963ce43ad7805c90",
+        "wall_ms": {
+          "std_owner": 1028.2121689524502,
+          "snapshot_interface": 723.137689055875,
+          "owner_and_snapshot": 1751.349858008325
+        },
+        "memory_peak_bytes": {
+          "std_owner": 223440896,
+          "snapshot_interface": 884105216
+        },
+        "bmi_bytes": {
+          "snapshot_interface.pcm": 567536,
+          "std_owner.pcm": 10729716
+        }
+      },
+      {
+        "attempt_id": "08-before-4",
+        "arm": "before",
+        "revision": "dc606482aecec0f0412b06b7a811a62835e98438",
+        "wall_ms": {
+          "std_owner": 966.4391949772835,
+          "snapshot_interface": 734.0615900466219,
+          "owner_and_snapshot": 1700.5007850239053
+        },
+        "memory_peak_bytes": {
+          "std_owner": 213585920,
+          "snapshot_interface": 883040256
+        },
+        "bmi_bytes": {
+          "snapshot_interface.pcm": 567296,
+          "std_owner.pcm": 9611384
+        }
+      },
+      {
+        "attempt_id": "09-before-5",
+        "arm": "before",
+        "revision": "dc606482aecec0f0412b06b7a811a62835e98438",
+        "wall_ms": {
+          "std_owner": 962.8048620652407,
+          "snapshot_interface": 722.8180359816179,
+          "owner_and_snapshot": 1685.6228980468586
+        },
+        "memory_peak_bytes": {
+          "std_owner": 213848064,
+          "snapshot_interface": 881041408
+        },
+        "bmi_bytes": {
+          "snapshot_interface.pcm": 567296,
+          "std_owner.pcm": 9611384
+        }
+      },
+      {
+        "attempt_id": "10-after-5",
+        "arm": "after",
+        "revision": "5537a4dda505959e6e818713963ce43ad7805c90",
+        "wall_ms": {
+          "std_owner": 1029.517431044951,
+          "snapshot_interface": 723.5993160866201,
+          "owner_and_snapshot": 1753.1167471315712
+        },
+        "memory_peak_bytes": {
+          "std_owner": 223305728,
+          "snapshot_interface": 883703808
+        },
+        "bmi_bytes": {
+          "snapshot_interface.pcm": 567536,
+          "std_owner.pcm": 10729716
+        }
+      }
+    ],
+    "timings": {
+      "std_owner": {
+        "before": {
+          "median_ms": 966.4391949772835,
+          "min_ms": 957.3431109311059,
+          "max_ms": 990.9536759369075
+        },
+        "after": {
+          "median_ms": 1028.8592129945755,
+          "min_ms": 1026.8661939771846,
+          "max_ms": 1031.297876033932
+        },
+        "median_change_percent": 6.45876309049731
+      },
+      "snapshot_interface": {
+        "before": {
+          "median_ms": 722.928705974482,
+          "min_ms": 722.4704939872026,
+          "max_ms": 734.0615900466219
+        },
+        "after": {
+          "median_ms": 723.5993160866201,
+          "min_ms": 720.966188935563,
+          "max_ms": 733.0613359808922
+        },
+        "median_change_percent": 0.09276296633347059
+      },
+      "owner_and_snapshot": {
+        "before": {
+          "median_ms": 1690.0266490411013,
+          "min_ms": 1680.271816905588,
+          "max_ms": 1724.6049909153953
+        },
+        "after": {
+          "median_ms": 1753.1167471315712,
+          "min_ms": 1747.8323829127476,
+          "max_ms": 1761.9205489754677
+        },
+        "median_change_percent": 3.7330830331146814
+      }
+    },
+    "claim_eligible": false
+  },
+  "measurement": {
+    "benchmark_id": "build.engine_compile_iteration.graphics_std.v1",
+    "samples": [
+      {
+        "attempt_id": "01-before-1",
+        "arm": "before",
+        "revision": "dc606482aecec0f0412b06b7a811a62835e98438",
+        "wall_ms": {
+          "clean": 79402.85710792523,
+          "noop": 32.76389907114208,
+          "renderer_impl": 12937.904395046644,
+          "renderer_interface": 24336.361107998528
+        },
+        "memory_peak_bytes": {
+          "clean": 1822007296,
+          "noop": 18296832,
+          "renderer_impl": 1820864512,
+          "renderer_interface": 1820274688
+        },
+        "compiler_invocations": {
+          "clean": 267,
+          "noop": 0,
+          "renderer_impl": 1,
+          "renderer_interface": 2
+        },
+        "critical_path_ms": {
+          "clean": 39370,
+          "noop": 0,
+          "renderer_impl": 12899,
+          "renderer_interface": 24298
+        },
+        "configure_ms": {
+          "initial": 6544.879207038321
+        }
+      },
+      {
+        "attempt_id": "02-after-1",
+        "arm": "after",
+        "revision": "5537a4dda505959e6e818713963ce43ad7805c90",
+        "wall_ms": {
+          "clean": 71116.80260300636,
+          "noop": 35.49426095560193,
+          "renderer_impl": 12885.753567912616,
+          "renderer_interface": 13893.85980903171
+        },
+        "memory_peak_bytes": {
+          "clean": 1798557696,
+          "noop": 18481152,
+          "renderer_impl": 1800957952,
+          "renderer_interface": 1801101312
+        },
+        "compiler_invocations": {
+          "clean": 268,
+          "noop": 0,
+          "renderer_impl": 1,
+          "renderer_interface": 2
+        },
+        "critical_path_ms": {
+          "clean": 32626,
+          "noop": 0,
+          "renderer_impl": 12850,
+          "renderer_interface": 13860
+        },
+        "configure_ms": {
+          "initial": 6562.0781619800255
+        }
+      },
+      {
+        "attempt_id": "03-after-2",
+        "arm": "after",
+        "revision": "5537a4dda505959e6e818713963ce43ad7805c90",
+        "wall_ms": {
+          "clean": 71089.18906992767,
+          "noop": 31.737874960526824,
+          "renderer_impl": 12853.298616944812,
+          "renderer_interface": 14091.424913029186
+        },
+        "memory_peak_bytes": {
+          "clean": 1798623232,
+          "noop": 18382848,
+          "renderer_impl": 1801482240,
+          "renderer_interface": 1800785920
+        },
+        "compiler_invocations": {
+          "clean": 268,
+          "noop": 0,
+          "renderer_impl": 1,
+          "renderer_interface": 2
+        },
+        "critical_path_ms": {
+          "clean": 32557,
+          "noop": 0,
+          "renderer_impl": 12820,
+          "renderer_interface": 14054
+        },
+        "configure_ms": {
+          "initial": 6675.359686953016
+        }
+      },
+      {
+        "attempt_id": "04-before-2",
+        "arm": "before",
+        "revision": "dc606482aecec0f0412b06b7a811a62835e98438",
+        "wall_ms": {
+          "clean": 79140.40246303193,
+          "noop": 32.97165792901069,
+          "renderer_impl": 12781.502839992754,
+          "renderer_interface": 25229.290905059315
+        },
+        "memory_peak_bytes": {
+          "clean": 1821855744,
+          "noop": 18300928,
+          "renderer_impl": 1820577792,
+          "renderer_interface": 1820815360
+        },
+        "compiler_invocations": {
+          "clean": 267,
+          "noop": 0,
+          "renderer_impl": 1,
+          "renderer_interface": 2
+        },
+        "critical_path_ms": {
+          "clean": 39441,
+          "noop": 0,
+          "renderer_impl": 12747,
+          "renderer_interface": 25185
+        },
+        "configure_ms": {
+          "initial": 6968.089512083679
+        }
+      },
+      {
+        "attempt_id": "05-before-3",
+        "arm": "before",
+        "revision": "dc606482aecec0f0412b06b7a811a62835e98438",
+        "wall_ms": {
+          "clean": 79621.81174603757,
+          "noop": 35.19512095954269,
+          "renderer_impl": 12951.32743997965,
+          "renderer_interface": 24522.53251406364
+        },
+        "memory_peak_bytes": {
+          "clean": 1822420992,
+          "noop": 18448384,
+          "renderer_impl": 1821954048,
+          "renderer_interface": 1820856320
+        },
+        "compiler_invocations": {
+          "clean": 267,
+          "noop": 0,
+          "renderer_impl": 1,
+          "renderer_interface": 2
+        },
+        "critical_path_ms": {
+          "clean": 39357,
+          "noop": 0,
+          "renderer_impl": 12915,
+          "renderer_interface": 24488
+        },
+        "configure_ms": {
+          "initial": 6781.238405033946
+        }
+      },
+      {
+        "attempt_id": "06-after-3",
+        "arm": "after",
+        "revision": "5537a4dda505959e6e818713963ce43ad7805c90",
+        "wall_ms": {
+          "clean": 71319.04025096446,
+          "noop": 36.558370920829475,
+          "renderer_impl": 13079.973572050221,
+          "renderer_interface": 14070.913007948548
+        },
+        "memory_peak_bytes": {
+          "clean": 1798000640,
+          "noop": 18333696,
+          "renderer_impl": 1800278016,
+          "renderer_interface": 1801093120
+        },
+        "compiler_invocations": {
+          "clean": 268,
+          "noop": 0,
+          "renderer_impl": 1,
+          "renderer_interface": 2
+        },
+        "critical_path_ms": {
+          "clean": 32829,
+          "noop": 0,
+          "renderer_impl": 13046,
+          "renderer_interface": 14035
+        },
+        "configure_ms": {
+          "initial": 7043.76767296344
+        }
+      },
+      {
+        "attempt_id": "07-after-4",
+        "arm": "after",
+        "revision": "5537a4dda505959e6e818713963ce43ad7805c90",
+        "wall_ms": {
+          "clean": 71441.60142994951,
+          "noop": 36.423085955902934,
+          "renderer_impl": 12928.52863902226,
+          "renderer_interface": 13977.881497936323
+        },
+        "memory_peak_bytes": {
+          "clean": 1798270976,
+          "noop": 18649088,
+          "renderer_impl": 1800716288,
+          "renderer_interface": 1800560640
+        },
+        "compiler_invocations": {
+          "clean": 268,
+          "noop": 0,
+          "renderer_impl": 1,
+          "renderer_interface": 2
+        },
+        "critical_path_ms": {
+          "clean": 32898,
+          "noop": 0,
+          "renderer_impl": 12895,
+          "renderer_interface": 13942
+        },
+        "configure_ms": {
+          "initial": 6850.834524957463
+        }
+      },
+      {
+        "attempt_id": "08-before-4",
+        "arm": "before",
+        "revision": "dc606482aecec0f0412b06b7a811a62835e98438",
+        "wall_ms": {
+          "clean": 79234.00902398862,
+          "noop": 41.98346193879843,
+          "renderer_impl": 12795.417024986818,
+          "renderer_interface": 24481.302832020447
+        },
+        "memory_peak_bytes": {
+          "clean": 1821995008,
+          "noop": 18481152,
+          "renderer_impl": 1820815360,
+          "renderer_interface": 1822281728
+        },
+        "compiler_invocations": {
+          "clean": 267,
+          "noop": 0,
+          "renderer_impl": 1,
+          "renderer_interface": 2
+        },
+        "critical_path_ms": {
+          "clean": 39261,
+          "noop": 0,
+          "renderer_impl": 12747,
+          "renderer_interface": 24446
+        },
+        "configure_ms": {
+          "initial": 6836.904221912846
+        }
+      },
+      {
+        "attempt_id": "09-before-5",
+        "arm": "before",
+        "revision": "dc606482aecec0f0412b06b7a811a62835e98438",
+        "wall_ms": {
+          "clean": 79441.62455003243,
+          "noop": 32.10341103840619,
+          "renderer_impl": 13280.422146082856,
+          "renderer_interface": 24540.055715013295
+        },
+        "memory_peak_bytes": {
+          "clean": 1821941760,
+          "noop": 18255872,
+          "renderer_impl": 1820860416,
+          "renderer_interface": 1822076928
+        },
+        "compiler_invocations": {
+          "clean": 267,
+          "noop": 0,
+          "renderer_impl": 1,
+          "renderer_interface": 2
+        },
+        "critical_path_ms": {
+          "clean": 39530,
+          "noop": 0,
+          "renderer_impl": 13246,
+          "renderer_interface": 24505
+        },
+        "configure_ms": {
+          "initial": 6706.427566008642
+        }
+      },
+      {
+        "attempt_id": "10-after-5",
+        "arm": "after",
+        "revision": "5537a4dda505959e6e818713963ce43ad7805c90",
+        "wall_ms": {
+          "clean": 74157.90129394736,
+          "noop": 34.652658039703965,
+          "renderer_impl": 14343.805538024753,
+          "renderer_interface": 15647.765767993405
+        },
+        "memory_peak_bytes": {
+          "clean": 1798127616,
+          "noop": 18161664,
+          "renderer_impl": 1800343552,
+          "renderer_interface": 1799409664
+        },
+        "compiler_invocations": {
+          "clean": 268,
+          "noop": 0,
+          "renderer_impl": 1,
+          "renderer_interface": 2
+        },
+        "critical_path_ms": {
+          "clean": 34251,
+          "noop": 0,
+          "renderer_impl": 14307,
+          "renderer_interface": 15612
+        },
+        "configure_ms": {
+          "initial": 6731.24768899288
+        }
+      }
+    ],
+    "timings": {
+      "clean": {
+        "before": {
+          "median_ms": 79402.85710792523,
+          "min_ms": 79140.40246303193,
+          "max_ms": 79621.81174603757
+        },
+        "after": {
+          "median_ms": 71319.04025096446,
+          "min_ms": 71089.18906992767,
+          "max_ms": 74157.90129394736
+        },
+        "median_change_percent": -10.18076320096789
+      },
+      "noop": {
+        "before": {
+          "median_ms": 32.97165792901069,
+          "min_ms": 32.10341103840619,
+          "max_ms": 41.98346193879843
+        },
+        "after": {
+          "median_ms": 35.49426095560193,
+          "min_ms": 31.737874960526824,
+          "max_ms": 36.558370920829475
+        },
+        "median_change_percent": 7.650822509509547
+      },
+      "renderer_impl": {
+        "before": {
+          "median_ms": 12937.904395046644,
+          "min_ms": 12781.502839992754,
+          "max_ms": 13280.422146082856
+        },
+        "after": {
+          "median_ms": 12928.52863902226,
+          "min_ms": 12853.298616944812,
+          "max_ms": 14343.805538024753
+        },
+        "median_change_percent": -0.0724673466281911
+      },
+      "renderer_interface": {
+        "before": {
+          "median_ms": 24522.53251406364,
+          "min_ms": 24336.361107998528,
+          "max_ms": 25229.290905059315
+        },
+        "after": {
+          "median_ms": 14070.913007948548,
+          "min_ms": 13893.85980903171,
+          "max_ms": 15647.765767993405
+        },
+        "median_change_percent": -42.62047364040033
+      }
+    },
+    "claim_eligible": false,
+    "common_command_count": 776,
+    "commands_added": [
+      "/dev/shm/intrinsic-graphics144/source/src/core/Core.Std.cppm"
+    ],
+    "commands_removed": [
+      "/dev/shm/intrinsic-graphics144/source/src/runtime/Editor/internal/Runtime.EditorWorkspaceSnapshots.Std.cppm"
+    ],
+    "source_sets": {
+      "before": {
+        "clean": [
+          "src/assets/Asset.EventBus.cpp",
+          "src/assets/Asset.EventBus.cppm",
+          "src/assets/Asset.GeometryPayload.cppm",
+          "src/assets/Asset.ImportRouter.cpp",
+          "src/assets/Asset.ImportRouter.cppm",
+          "src/assets/Asset.LoadPipeline.cpp",
+          "src/assets/Asset.LoadPipeline.cppm",
+          "src/assets/Asset.ModelTexturePayload.cpp",
+          "src/assets/Asset.ModelTexturePayload.cppm",
+          "src/assets/Asset.OperationStatus.cppm",
+          "src/assets/Asset.PathIndex.cpp",
+          "src/assets/Asset.PathIndex.cppm",
+          "src/assets/Asset.PayloadStore.cpp",
+          "src/assets/Asset.PayloadStore.cppm",
+          "src/assets/Asset.Registry.cpp",
+          "src/assets/Asset.Registry.cppm",
+          "src/assets/Asset.Service.cpp",
+          "src/assets/Asset.Service.cppm",
+          "src/assets/Asset.TypePool.cppm",
+          "src/core/Core.BoundedHeap.cppm",
+          "src/core/Core.CallbackRegistry.cppm",
+          "src/core/Core.Config.Engine.cppm",
+          "src/core/Core.Config.EngineLoad.cpp",
+          "src/core/Core.Config.EngineLoad.cppm",
+          "src/core/Core.Config.Render.cppm",
+          "src/core/Core.Config.Simulation.cppm",
+          "src/core/Core.Config.Window.cppm",
+          "src/core/Core.Dag.Scheduler.Compiler.cppm",
+          "src/core/Core.Dag.Scheduler.DomainGraph.cppm",
+          "src/core/Core.Dag.Scheduler.Hazards.cpp",
+          "src/core/Core.Dag.Scheduler.Hazards.cppm",
+          "src/core/Core.Dag.Scheduler.Policy.cppm",
+          "src/core/Core.Dag.Scheduler.Types.cppm",
+          "src/core/Core.Dag.Scheduler.cpp",
+          "src/core/Core.Dag.Scheduler.cppm",
+          "src/core/Core.Dag.TaskGraph.cpp",
+          "src/core/Core.Dag.TaskGraph.cppm",
+          "src/core/Core.Error.cppm",
+          "src/core/Core.Filesystem.PathResolver.cpp",
+          "src/core/Core.Filesystem.PathResolver.cppm",
+          "src/core/Core.Filesystem.cpp",
+          "src/core/Core.Filesystem.cppm",
+          "src/core/Core.FrameClock.cppm",
+          "src/core/Core.FrameGraph.cpp",
+          "src/core/Core.FrameGraph.cppm",
+          "src/core/Core.Geometry2D.cppm",
+          "src/core/Core.HandleLease.cppm",
+          "src/core/Core.Hash.cppm",
+          "src/core/Core.IOBackend.cpp",
+          "src/core/Core.IOBackend.cppm",
+          "src/core/Core.IndexedHeap.cppm",
+          "src/core/Core.LockFreeQueue.cppm",
+          "src/core/Core.Logging.cpp",
+          "src/core/Core.Logging.cppm",
+          "src/core/Core.Memory.Common.cppm",
+          "src/core/Core.Memory.LinearArena.cpp",
+          "src/core/Core.Memory.LinearArena.cppm",
+          "src/core/Core.Memory.Polymorphic.cpp",
+          "src/core/Core.Memory.Polymorphic.cppm",
+          "src/core/Core.Memory.ScopeStack.cpp",
+          "src/core/Core.Memory.ScopeStack.cppm",
+          "src/core/Core.Memory.cppm",
+          "src/core/Core.Process.cpp",
+          "src/core/Core.Process.cppm",
+          "src/core/Core.ResourcePool.cppm",
+          "src/core/Core.RingBuffer.cppm",
+          "src/core/Core.StrongHandle.cppm",
+          "src/core/Core.Tasks.CounterEvent.cpp",
+          "src/core/Core.Tasks.CounterEvent.cppm",
+          "src/core/Core.Tasks.Dispatch.cpp",
+          "src/core/Core.Tasks.Internal.cpp",
+          "src/core/Core.Tasks.Internal.cppm",
+          "src/core/Core.Tasks.Job.cpp",
+          "src/core/Core.Tasks.Lifecycle.cpp",
+          "src/core/Core.Tasks.LocalTask.cpp",
+          "src/core/Core.Tasks.LocalTask.cppm",
+          "src/core/Core.Tasks.Stats.cpp",
+          "src/core/Core.Tasks.WaitToken.cpp",
+          "src/core/Core.Tasks.Worker.cpp",
+          "src/core/Core.Tasks.cppm",
+          "src/core/Core.Telemetry.cpp",
+          "src/core/Core.Telemetry.cppm",
+          "src/graphics/assets/Graphics.GpuAssetCache.cpp",
+          "src/graphics/assets/Graphics.GpuAssetCache.cppm",
+          "src/graphics/framegraph/Graphics.RenderGraph.Barriers.cpp",
+          "src/graphics/framegraph/Graphics.RenderGraph.Barriers.cppm",
+          "src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp",
+          "src/graphics/framegraph/Graphics.RenderGraph.Compiler.cppm",
+          "src/graphics/framegraph/Graphics.RenderGraph.Executor.cpp",
+          "src/graphics/framegraph/Graphics.RenderGraph.Executor.cppm",
+          "src/graphics/framegraph/Graphics.RenderGraph.Pass.cppm",
+          "src/graphics/framegraph/Graphics.RenderGraph.Resources.cppm",
+          "src/graphics/framegraph/Graphics.RenderGraph.TransientAllocator.cpp",
+          "src/graphics/framegraph/Graphics.RenderGraph.TransientAllocator.cppm",
+          "src/graphics/framegraph/Graphics.RenderGraph.cpp",
+          "src/graphics/framegraph/Graphics.RenderGraph.cppm",
+          "src/graphics/renderer/Backends/Null/Backends.Null.Bindless.cpp",
+          "src/graphics/renderer/Backends/Null/Backends.Null.Profiler.cpp",
+          "src/graphics/renderer/Backends/Null/Backends.Null.Transfer.cpp",
+          "src/graphics/renderer/Backends/Null/Backends.Null.cpp",
+          "src/graphics/renderer/Backends/Null/Backends.Null.cppm",
+          "src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cpp",
+          "src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cppm",
+          "src/graphics/renderer/Components/Graphics.Component.Material.cppm",
+          "src/graphics/renderer/Components/Graphics.Component.RenderGeometry.cppm",
+          "src/graphics/renderer/Components/Graphics.Component.VisualizationConfig.cppm",
+          "src/graphics/renderer/Graphics.CameraSnapshots.cpp",
+          "src/graphics/renderer/Graphics.CameraSnapshots.cppm",
+          "src/graphics/renderer/Graphics.Colormap.cppm",
+          "src/graphics/renderer/Graphics.ColormapSystem.cpp",
+          "src/graphics/renderer/Graphics.ColormapSystem.cppm",
+          "src/graphics/renderer/Graphics.ComputeParallelPrimitives.cpp",
+          "src/graphics/renderer/Graphics.ComputeParallelPrimitives.cppm",
+          "src/graphics/renderer/Graphics.CullingSystem.cpp",
+          "src/graphics/renderer/Graphics.CullingSystem.cppm",
+          "src/graphics/renderer/Graphics.CurrentRendererContractAdapter.cpp",
+          "src/graphics/renderer/Graphics.CurrentRendererContractAdapter.cppm",
+          "src/graphics/renderer/Graphics.DebugViewSystem.cpp",
+          "src/graphics/renderer/Graphics.DebugViewSystem.cppm",
+          "src/graphics/renderer/Graphics.DeferredSystem.cpp",
+          "src/graphics/renderer/Graphics.DeferredSystem.cppm",
+          "src/graphics/renderer/Graphics.ForwardSystem.cpp",
+          "src/graphics/renderer/Graphics.ForwardSystem.cppm",
+          "src/graphics/renderer/Graphics.FrameRecipe.cpp",
+          "src/graphics/renderer/Graphics.FrameRecipe.cppm",
+          "src/graphics/renderer/Graphics.GeometryResidency.cpp",
+          "src/graphics/renderer/Graphics.GeometryResidency.cppm",
+          "src/graphics/renderer/Graphics.GpuScene.cpp",
+          "src/graphics/renderer/Graphics.GpuScene.cppm",
+          "src/graphics/renderer/Graphics.GpuTransfer.cpp",
+          "src/graphics/renderer/Graphics.GpuTransfer.cppm",
+          "src/graphics/renderer/Graphics.GpuWorld.cpp",
+          "src/graphics/renderer/Graphics.GpuWorld.cppm",
+          "src/graphics/renderer/Graphics.HZB.cpp",
+          "src/graphics/renderer/Graphics.HZB.cppm",
+          "src/graphics/renderer/Graphics.ImGuiOverlaySystem.cpp",
+          "src/graphics/renderer/Graphics.ImGuiOverlaySystem.cppm",
+          "src/graphics/renderer/Graphics.ImGuiUploadHelper.cpp",
+          "src/graphics/renderer/Graphics.ImGuiUploadHelper.cppm",
+          "src/graphics/renderer/Graphics.LightClusters.cpp",
+          "src/graphics/renderer/Graphics.LightClusters.cppm",
+          "src/graphics/renderer/Graphics.LightSystem.cpp",
+          "src/graphics/renderer/Graphics.LightSystem.cppm",
+          "src/graphics/renderer/Graphics.Material.cppm",
+          "src/graphics/renderer/Graphics.MaterialSystem.cpp",
+          "src/graphics/renderer/Graphics.MaterialSystem.cppm",
+          "src/graphics/renderer/Graphics.PointKeypoints.cpp",
+          "src/graphics/renderer/Graphics.PointKeypoints.cppm",
+          "src/graphics/renderer/Graphics.PointLBVH.cpp",
+          "src/graphics/renderer/Graphics.PointLBVH.cppm",
+          "src/graphics/renderer/Graphics.PostProcessSystem.cpp",
+          "src/graphics/renderer/Graphics.PostProcessSystem.cppm",
+          "src/graphics/renderer/Graphics.PropertyTextureBake.cpp",
+          "src/graphics/renderer/Graphics.PropertyTextureBake.cppm",
+          "src/graphics/renderer/Graphics.Reconstruction.cpp",
+          "src/graphics/renderer/Graphics.Reconstruction.cppm",
+          "src/graphics/renderer/Graphics.RenderCommandRouter.cpp",
+          "src/graphics/renderer/Graphics.RenderCommandRouter.cppm",
+          "src/graphics/renderer/Graphics.RenderDiagnostics.cppm",
+          "src/graphics/renderer/Graphics.RenderFrameInput.cppm",
+          "src/graphics/renderer/Graphics.RenderPrepPipeline.cpp",
+          "src/graphics/renderer/Graphics.RenderPrepPipeline.cppm",
+          "src/graphics/renderer/Graphics.RenderRecipeConfig.cpp",
+          "src/graphics/renderer/Graphics.RenderRecipeConfig.cppm",
+          "src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp",
+          "src/graphics/renderer/Graphics.RenderSubsystemRegistry.cppm",
+          "src/graphics/renderer/Graphics.RenderWorld.cppm",
+          "src/graphics/renderer/Graphics.Renderer.cpp",
+          "src/graphics/renderer/Graphics.Renderer.cppm",
+          "src/graphics/renderer/Graphics.RenderingContract.cpp",
+          "src/graphics/renderer/Graphics.RenderingContract.cppm",
+          "src/graphics/renderer/Graphics.SceneHandles.cppm",
+          "src/graphics/renderer/Graphics.SelectionSystem.cpp",
+          "src/graphics/renderer/Graphics.SelectionSystem.cppm",
+          "src/graphics/renderer/Graphics.ShadowSystem.cpp",
+          "src/graphics/renderer/Graphics.ShadowSystem.cppm",
+          "src/graphics/renderer/Graphics.SharedRenderRecipeExecution.cpp",
+          "src/graphics/renderer/Graphics.SharedRenderRecipeExecution.cppm",
+          "src/graphics/renderer/Graphics.SpatialDebugVisualizers.cpp",
+          "src/graphics/renderer/Graphics.SpatialDebugVisualizers.cppm",
+          "src/graphics/renderer/Graphics.TransformSyncSystem.cpp",
+          "src/graphics/renderer/Graphics.TransformSyncSystem.cppm",
+          "src/graphics/renderer/Graphics.TransientDebugUploadHelper.cpp",
+          "src/graphics/renderer/Graphics.TransientDebugUploadHelper.cppm",
+          "src/graphics/renderer/Graphics.UvView.cpp",
+          "src/graphics/renderer/Graphics.UvView.cppm",
+          "src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cpp",
+          "src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cppm",
+          "src/graphics/renderer/Graphics.VisualizationPackets.cpp",
+          "src/graphics/renderer/Graphics.VisualizationPackets.cppm",
+          "src/graphics/renderer/Graphics.VisualizationPropertyBufferResidency.cpp",
+          "src/graphics/renderer/Graphics.VisualizationPropertyBufferResidency.cppm",
+          "src/graphics/renderer/Graphics.VisualizationSyncSystem.cpp",
+          "src/graphics/renderer/Graphics.VisualizationSyncSystem.cppm",
+          "src/graphics/renderer/Passes/Pass.Culling.cpp",
+          "src/graphics/renderer/Passes/Pass.Culling.cppm",
+          "src/graphics/renderer/Passes/Pass.DebugView.cpp",
+          "src/graphics/renderer/Passes/Pass.DebugView.cppm",
+          "src/graphics/renderer/Passes/Pass.Deferred.GBuffers.cpp",
+          "src/graphics/renderer/Passes/Pass.Deferred.GBuffers.cppm",
+          "src/graphics/renderer/Passes/Pass.Deferred.Lighting.cpp",
+          "src/graphics/renderer/Passes/Pass.Deferred.Lighting.cppm",
+          "src/graphics/renderer/Passes/Pass.DepthPrepass.cpp",
+          "src/graphics/renderer/Passes/Pass.DepthPrepass.cppm",
+          "src/graphics/renderer/Passes/Pass.Forward.Line.cpp",
+          "src/graphics/renderer/Passes/Pass.Forward.Line.cppm",
+          "src/graphics/renderer/Passes/Pass.Forward.Point.cpp",
+          "src/graphics/renderer/Passes/Pass.Forward.Point.cppm",
+          "src/graphics/renderer/Passes/Pass.Forward.Surface.cpp",
+          "src/graphics/renderer/Passes/Pass.Forward.Surface.cppm",
+          "src/graphics/renderer/Passes/Pass.ImGui.cpp",
+          "src/graphics/renderer/Passes/Pass.ImGui.cppm",
+          "src/graphics/renderer/Passes/Pass.PostProcess.Bloom.cpp",
+          "src/graphics/renderer/Passes/Pass.PostProcess.Bloom.cppm",
+          "src/graphics/renderer/Passes/Pass.PostProcess.FXAA.cpp",
+          "src/graphics/renderer/Passes/Pass.PostProcess.FXAA.cppm",
+          "src/graphics/renderer/Passes/Pass.PostProcess.Histogram.cpp",
+          "src/graphics/renderer/Passes/Pass.PostProcess.Histogram.cppm",
+          "src/graphics/renderer/Passes/Pass.PostProcess.SMAA.cpp",
+          "src/graphics/renderer/Passes/Pass.PostProcess.SMAA.cppm",
+          "src/graphics/renderer/Passes/Pass.PostProcess.ToneMap.cpp",
+          "src/graphics/renderer/Passes/Pass.PostProcess.ToneMap.cppm",
+          "src/graphics/renderer/Passes/Pass.Present.cpp",
+          "src/graphics/renderer/Passes/Pass.Present.cppm",
+          "src/graphics/renderer/Passes/Pass.Selection.EdgeId.cpp",
+          "src/graphics/renderer/Passes/Pass.Selection.EdgeId.cppm",
+          "src/graphics/renderer/Passes/Pass.Selection.EntityId.cpp",
+          "src/graphics/renderer/Passes/Pass.Selection.EntityId.cppm",
+          "src/graphics/renderer/Passes/Pass.Selection.FaceId.cpp",
+          "src/graphics/renderer/Passes/Pass.Selection.FaceId.cppm",
+          "src/graphics/renderer/Passes/Pass.Selection.Outline.cpp",
+          "src/graphics/renderer/Passes/Pass.Selection.Outline.cppm",
+          "src/graphics/renderer/Passes/Pass.Selection.PointId.cpp",
+          "src/graphics/renderer/Passes/Pass.Selection.PointId.cppm",
+          "src/graphics/renderer/Passes/Pass.Shadows.cpp",
+          "src/graphics/renderer/Passes/Pass.Shadows.cppm",
+          "src/graphics/renderer/Passes/Pass.TransientDebug.Surface.cpp",
+          "src/graphics/renderer/Passes/Pass.TransientDebug.Surface.cppm",
+          "src/graphics/renderer/Passes/Pass.VisualizationOverlay.cpp",
+          "src/graphics/renderer/Passes/Pass.VisualizationOverlay.cppm",
+          "src/graphics/rhi/RHI.Bindless.cppm",
+          "src/graphics/rhi/RHI.BufferManager.cpp",
+          "src/graphics/rhi/RHI.BufferManager.cppm",
+          "src/graphics/rhi/RHI.BufferTransfer.cpp",
+          "src/graphics/rhi/RHI.BufferTransfer.cppm",
+          "src/graphics/rhi/RHI.BufferView.cppm",
+          "src/graphics/rhi/RHI.CommandContext.cpp",
+          "src/graphics/rhi/RHI.CommandContext.cppm",
+          "src/graphics/rhi/RHI.Descriptors.cppm",
+          "src/graphics/rhi/RHI.Device.cpp",
+          "src/graphics/rhi/RHI.Device.cppm",
+          "src/graphics/rhi/RHI.FrameHandle.cppm",
+          "src/graphics/rhi/RHI.Handles.cppm",
+          "src/graphics/rhi/RHI.PipelineManager.cpp",
+          "src/graphics/rhi/RHI.PipelineManager.cppm",
+          "src/graphics/rhi/RHI.Profiler.cpp",
+          "src/graphics/rhi/RHI.Profiler.cppm",
+          "src/graphics/rhi/RHI.QueueAffinity.cppm",
+          "src/graphics/rhi/RHI.SamplerManager.cpp",
+          "src/graphics/rhi/RHI.SamplerManager.cppm",
+          "src/graphics/rhi/RHI.TextureManager.cpp",
+          "src/graphics/rhi/RHI.TextureManager.cppm",
+          "src/graphics/rhi/RHI.TextureUpload.cpp",
+          "src/graphics/rhi/RHI.TextureUpload.cppm",
+          "src/graphics/rhi/RHI.Transfer.cppm",
+          "src/graphics/rhi/RHI.TransferQueue.cppm",
+          "src/graphics/rhi/RHI.Types.cppm"
+        ],
+        "noop": [],
+        "renderer_impl": [
+          "src/graphics/renderer/Graphics.Renderer.cpp"
+        ],
+        "renderer_interface": [
+          "src/graphics/renderer/Graphics.Renderer.cpp",
+          "src/graphics/renderer/Graphics.Renderer.cppm"
+        ]
+      },
+      "after": {
+        "clean": [
+          "src/assets/Asset.EventBus.cpp",
+          "src/assets/Asset.EventBus.cppm",
+          "src/assets/Asset.GeometryPayload.cppm",
+          "src/assets/Asset.ImportRouter.cpp",
+          "src/assets/Asset.ImportRouter.cppm",
+          "src/assets/Asset.LoadPipeline.cpp",
+          "src/assets/Asset.LoadPipeline.cppm",
+          "src/assets/Asset.ModelTexturePayload.cpp",
+          "src/assets/Asset.ModelTexturePayload.cppm",
+          "src/assets/Asset.OperationStatus.cppm",
+          "src/assets/Asset.PathIndex.cpp",
+          "src/assets/Asset.PathIndex.cppm",
+          "src/assets/Asset.PayloadStore.cpp",
+          "src/assets/Asset.PayloadStore.cppm",
+          "src/assets/Asset.Registry.cpp",
+          "src/assets/Asset.Registry.cppm",
+          "src/assets/Asset.Service.cpp",
+          "src/assets/Asset.Service.cppm",
+          "src/assets/Asset.TypePool.cppm",
+          "src/core/Core.BoundedHeap.cppm",
+          "src/core/Core.CallbackRegistry.cppm",
+          "src/core/Core.Config.Engine.cppm",
+          "src/core/Core.Config.EngineLoad.cpp",
+          "src/core/Core.Config.EngineLoad.cppm",
+          "src/core/Core.Config.Render.cppm",
+          "src/core/Core.Config.Simulation.cppm",
+          "src/core/Core.Config.Window.cppm",
+          "src/core/Core.Dag.Scheduler.Compiler.cppm",
+          "src/core/Core.Dag.Scheduler.DomainGraph.cppm",
+          "src/core/Core.Dag.Scheduler.Hazards.cpp",
+          "src/core/Core.Dag.Scheduler.Hazards.cppm",
+          "src/core/Core.Dag.Scheduler.Policy.cppm",
+          "src/core/Core.Dag.Scheduler.Types.cppm",
+          "src/core/Core.Dag.Scheduler.cpp",
+          "src/core/Core.Dag.Scheduler.cppm",
+          "src/core/Core.Dag.TaskGraph.cpp",
+          "src/core/Core.Dag.TaskGraph.cppm",
+          "src/core/Core.Error.cppm",
+          "src/core/Core.Filesystem.PathResolver.cpp",
+          "src/core/Core.Filesystem.PathResolver.cppm",
+          "src/core/Core.Filesystem.cpp",
+          "src/core/Core.Filesystem.cppm",
+          "src/core/Core.FrameClock.cppm",
+          "src/core/Core.FrameGraph.cpp",
+          "src/core/Core.FrameGraph.cppm",
+          "src/core/Core.Geometry2D.cppm",
+          "src/core/Core.HandleLease.cppm",
+          "src/core/Core.Hash.cppm",
+          "src/core/Core.IOBackend.cpp",
+          "src/core/Core.IOBackend.cppm",
+          "src/core/Core.IndexedHeap.cppm",
+          "src/core/Core.LockFreeQueue.cppm",
+          "src/core/Core.Logging.cpp",
+          "src/core/Core.Logging.cppm",
+          "src/core/Core.Memory.Common.cppm",
+          "src/core/Core.Memory.LinearArena.cpp",
+          "src/core/Core.Memory.LinearArena.cppm",
+          "src/core/Core.Memory.Polymorphic.cpp",
+          "src/core/Core.Memory.Polymorphic.cppm",
+          "src/core/Core.Memory.ScopeStack.cpp",
+          "src/core/Core.Memory.ScopeStack.cppm",
+          "src/core/Core.Memory.cppm",
+          "src/core/Core.Process.cpp",
+          "src/core/Core.Process.cppm",
+          "src/core/Core.ResourcePool.cppm",
+          "src/core/Core.RingBuffer.cppm",
+          "src/core/Core.Std.cppm",
+          "src/core/Core.StrongHandle.cppm",
+          "src/core/Core.Tasks.CounterEvent.cpp",
+          "src/core/Core.Tasks.CounterEvent.cppm",
+          "src/core/Core.Tasks.Dispatch.cpp",
+          "src/core/Core.Tasks.Internal.cpp",
+          "src/core/Core.Tasks.Internal.cppm",
+          "src/core/Core.Tasks.Job.cpp",
+          "src/core/Core.Tasks.Lifecycle.cpp",
+          "src/core/Core.Tasks.LocalTask.cpp",
+          "src/core/Core.Tasks.LocalTask.cppm",
+          "src/core/Core.Tasks.Stats.cpp",
+          "src/core/Core.Tasks.WaitToken.cpp",
+          "src/core/Core.Tasks.Worker.cpp",
+          "src/core/Core.Tasks.cppm",
+          "src/core/Core.Telemetry.cpp",
+          "src/core/Core.Telemetry.cppm",
+          "src/graphics/assets/Graphics.GpuAssetCache.cpp",
+          "src/graphics/assets/Graphics.GpuAssetCache.cppm",
+          "src/graphics/framegraph/Graphics.RenderGraph.Barriers.cpp",
+          "src/graphics/framegraph/Graphics.RenderGraph.Barriers.cppm",
+          "src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp",
+          "src/graphics/framegraph/Graphics.RenderGraph.Compiler.cppm",
+          "src/graphics/framegraph/Graphics.RenderGraph.Executor.cpp",
+          "src/graphics/framegraph/Graphics.RenderGraph.Executor.cppm",
+          "src/graphics/framegraph/Graphics.RenderGraph.Pass.cppm",
+          "src/graphics/framegraph/Graphics.RenderGraph.Resources.cppm",
+          "src/graphics/framegraph/Graphics.RenderGraph.TransientAllocator.cpp",
+          "src/graphics/framegraph/Graphics.RenderGraph.TransientAllocator.cppm",
+          "src/graphics/framegraph/Graphics.RenderGraph.cpp",
+          "src/graphics/framegraph/Graphics.RenderGraph.cppm",
+          "src/graphics/renderer/Backends/Null/Backends.Null.Bindless.cpp",
+          "src/graphics/renderer/Backends/Null/Backends.Null.Profiler.cpp",
+          "src/graphics/renderer/Backends/Null/Backends.Null.Transfer.cpp",
+          "src/graphics/renderer/Backends/Null/Backends.Null.cpp",
+          "src/graphics/renderer/Backends/Null/Backends.Null.cppm",
+          "src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cpp",
+          "src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cppm",
+          "src/graphics/renderer/Components/Graphics.Component.Material.cppm",
+          "src/graphics/renderer/Components/Graphics.Component.RenderGeometry.cppm",
+          "src/graphics/renderer/Components/Graphics.Component.VisualizationConfig.cppm",
+          "src/graphics/renderer/Graphics.CameraSnapshots.cpp",
+          "src/graphics/renderer/Graphics.CameraSnapshots.cppm",
+          "src/graphics/renderer/Graphics.Colormap.cppm",
+          "src/graphics/renderer/Graphics.ColormapSystem.cpp",
+          "src/graphics/renderer/Graphics.ColormapSystem.cppm",
+          "src/graphics/renderer/Graphics.ComputeParallelPrimitives.cpp",
+          "src/graphics/renderer/Graphics.ComputeParallelPrimitives.cppm",
+          "src/graphics/renderer/Graphics.CullingSystem.cpp",
+          "src/graphics/renderer/Graphics.CullingSystem.cppm",
+          "src/graphics/renderer/Graphics.CurrentRendererContractAdapter.cpp",
+          "src/graphics/renderer/Graphics.CurrentRendererContractAdapter.cppm",
+          "src/graphics/renderer/Graphics.DebugViewSystem.cpp",
+          "src/graphics/renderer/Graphics.DebugViewSystem.cppm",
+          "src/graphics/renderer/Graphics.DeferredSystem.cpp",
+          "src/graphics/renderer/Graphics.DeferredSystem.cppm",
+          "src/graphics/renderer/Graphics.ForwardSystem.cpp",
+          "src/graphics/renderer/Graphics.ForwardSystem.cppm",
+          "src/graphics/renderer/Graphics.FrameRecipe.cpp",
+          "src/graphics/renderer/Graphics.FrameRecipe.cppm",
+          "src/graphics/renderer/Graphics.GeometryResidency.cpp",
+          "src/graphics/renderer/Graphics.GeometryResidency.cppm",
+          "src/graphics/renderer/Graphics.GpuScene.cpp",
+          "src/graphics/renderer/Graphics.GpuScene.cppm",
+          "src/graphics/renderer/Graphics.GpuTransfer.cpp",
+          "src/graphics/renderer/Graphics.GpuTransfer.cppm",
+          "src/graphics/renderer/Graphics.GpuWorld.cpp",
+          "src/graphics/renderer/Graphics.GpuWorld.cppm",
+          "src/graphics/renderer/Graphics.HZB.cpp",
+          "src/graphics/renderer/Graphics.HZB.cppm",
+          "src/graphics/renderer/Graphics.ImGuiOverlaySystem.cpp",
+          "src/graphics/renderer/Graphics.ImGuiOverlaySystem.cppm",
+          "src/graphics/renderer/Graphics.ImGuiUploadHelper.cpp",
+          "src/graphics/renderer/Graphics.ImGuiUploadHelper.cppm",
+          "src/graphics/renderer/Graphics.LightClusters.cpp",
+          "src/graphics/renderer/Graphics.LightClusters.cppm",
+          "src/graphics/renderer/Graphics.LightSystem.cpp",
+          "src/graphics/renderer/Graphics.LightSystem.cppm",
+          "src/graphics/renderer/Graphics.Material.cppm",
+          "src/graphics/renderer/Graphics.MaterialSystem.cpp",
+          "src/graphics/renderer/Graphics.MaterialSystem.cppm",
+          "src/graphics/renderer/Graphics.PointKeypoints.cpp",
+          "src/graphics/renderer/Graphics.PointKeypoints.cppm",
+          "src/graphics/renderer/Graphics.PointLBVH.cpp",
+          "src/graphics/renderer/Graphics.PointLBVH.cppm",
+          "src/graphics/renderer/Graphics.PostProcessSystem.cpp",
+          "src/graphics/renderer/Graphics.PostProcessSystem.cppm",
+          "src/graphics/renderer/Graphics.PropertyTextureBake.cpp",
+          "src/graphics/renderer/Graphics.PropertyTextureBake.cppm",
+          "src/graphics/renderer/Graphics.Reconstruction.cpp",
+          "src/graphics/renderer/Graphics.Reconstruction.cppm",
+          "src/graphics/renderer/Graphics.RenderCommandRouter.cpp",
+          "src/graphics/renderer/Graphics.RenderCommandRouter.cppm",
+          "src/graphics/renderer/Graphics.RenderDiagnostics.cppm",
+          "src/graphics/renderer/Graphics.RenderFrameInput.cppm",
+          "src/graphics/renderer/Graphics.RenderPrepPipeline.cpp",
+          "src/graphics/renderer/Graphics.RenderPrepPipeline.cppm",
+          "src/graphics/renderer/Graphics.RenderRecipeConfig.cpp",
+          "src/graphics/renderer/Graphics.RenderRecipeConfig.cppm",
+          "src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp",
+          "src/graphics/renderer/Graphics.RenderSubsystemRegistry.cppm",
+          "src/graphics/renderer/Graphics.RenderWorld.cppm",
+          "src/graphics/renderer/Graphics.Renderer.cpp",
+          "src/graphics/renderer/Graphics.Renderer.cppm",
+          "src/graphics/renderer/Graphics.RenderingContract.cpp",
+          "src/graphics/renderer/Graphics.RenderingContract.cppm",
+          "src/graphics/renderer/Graphics.SceneHandles.cppm",
+          "src/graphics/renderer/Graphics.SelectionSystem.cpp",
+          "src/graphics/renderer/Graphics.SelectionSystem.cppm",
+          "src/graphics/renderer/Graphics.ShadowSystem.cpp",
+          "src/graphics/renderer/Graphics.ShadowSystem.cppm",
+          "src/graphics/renderer/Graphics.SharedRenderRecipeExecution.cpp",
+          "src/graphics/renderer/Graphics.SharedRenderRecipeExecution.cppm",
+          "src/graphics/renderer/Graphics.SpatialDebugVisualizers.cpp",
+          "src/graphics/renderer/Graphics.SpatialDebugVisualizers.cppm",
+          "src/graphics/renderer/Graphics.TransformSyncSystem.cpp",
+          "src/graphics/renderer/Graphics.TransformSyncSystem.cppm",
+          "src/graphics/renderer/Graphics.TransientDebugUploadHelper.cpp",
+          "src/graphics/renderer/Graphics.TransientDebugUploadHelper.cppm",
+          "src/graphics/renderer/Graphics.UvView.cpp",
+          "src/graphics/renderer/Graphics.UvView.cppm",
+          "src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cpp",
+          "src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cppm",
+          "src/graphics/renderer/Graphics.VisualizationPackets.cpp",
+          "src/graphics/renderer/Graphics.VisualizationPackets.cppm",
+          "src/graphics/renderer/Graphics.VisualizationPropertyBufferResidency.cpp",
+          "src/graphics/renderer/Graphics.VisualizationPropertyBufferResidency.cppm",
+          "src/graphics/renderer/Graphics.VisualizationSyncSystem.cpp",
+          "src/graphics/renderer/Graphics.VisualizationSyncSystem.cppm",
+          "src/graphics/renderer/Passes/Pass.Culling.cpp",
+          "src/graphics/renderer/Passes/Pass.Culling.cppm",
+          "src/graphics/renderer/Passes/Pass.DebugView.cpp",
+          "src/graphics/renderer/Passes/Pass.DebugView.cppm",
+          "src/graphics/renderer/Passes/Pass.Deferred.GBuffers.cpp",
+          "src/graphics/renderer/Passes/Pass.Deferred.GBuffers.cppm",
+          "src/graphics/renderer/Passes/Pass.Deferred.Lighting.cpp",
+          "src/graphics/renderer/Passes/Pass.Deferred.Lighting.cppm",
+          "src/graphics/renderer/Passes/Pass.DepthPrepass.cpp",
+          "src/graphics/renderer/Passes/Pass.DepthPrepass.cppm",
+          "src/graphics/renderer/Passes/Pass.Forward.Line.cpp",
+          "src/graphics/renderer/Passes/Pass.Forward.Line.cppm",
+          "src/graphics/renderer/Passes/Pass.Forward.Point.cpp",
+          "src/graphics/renderer/Passes/Pass.Forward.Point.cppm",
+          "src/graphics/renderer/Passes/Pass.Forward.Surface.cpp",
+          "src/graphics/renderer/Passes/Pass.Forward.Surface.cppm",
+          "src/graphics/renderer/Passes/Pass.ImGui.cpp",
+          "src/graphics/renderer/Passes/Pass.ImGui.cppm",
+          "src/graphics/renderer/Passes/Pass.PostProcess.Bloom.cpp",
+          "src/graphics/renderer/Passes/Pass.PostProcess.Bloom.cppm",
+          "src/graphics/renderer/Passes/Pass.PostProcess.FXAA.cpp",
+          "src/graphics/renderer/Passes/Pass.PostProcess.FXAA.cppm",
+          "src/graphics/renderer/Passes/Pass.PostProcess.Histogram.cpp",
+          "src/graphics/renderer/Passes/Pass.PostProcess.Histogram.cppm",
+          "src/graphics/renderer/Passes/Pass.PostProcess.SMAA.cpp",
+          "src/graphics/renderer/Passes/Pass.PostProcess.SMAA.cppm",
+          "src/graphics/renderer/Passes/Pass.PostProcess.ToneMap.cpp",
+          "src/graphics/renderer/Passes/Pass.PostProcess.ToneMap.cppm",
+          "src/graphics/renderer/Passes/Pass.Present.cpp",
+          "src/graphics/renderer/Passes/Pass.Present.cppm",
+          "src/graphics/renderer/Passes/Pass.Selection.EdgeId.cpp",
+          "src/graphics/renderer/Passes/Pass.Selection.EdgeId.cppm",
+          "src/graphics/renderer/Passes/Pass.Selection.EntityId.cpp",
+          "src/graphics/renderer/Passes/Pass.Selection.EntityId.cppm",
+          "src/graphics/renderer/Passes/Pass.Selection.FaceId.cpp",
+          "src/graphics/renderer/Passes/Pass.Selection.FaceId.cppm",
+          "src/graphics/renderer/Passes/Pass.Selection.Outline.cpp",
+          "src/graphics/renderer/Passes/Pass.Selection.Outline.cppm",
+          "src/graphics/renderer/Passes/Pass.Selection.PointId.cpp",
+          "src/graphics/renderer/Passes/Pass.Selection.PointId.cppm",
+          "src/graphics/renderer/Passes/Pass.Shadows.cpp",
+          "src/graphics/renderer/Passes/Pass.Shadows.cppm",
+          "src/graphics/renderer/Passes/Pass.TransientDebug.Surface.cpp",
+          "src/graphics/renderer/Passes/Pass.TransientDebug.Surface.cppm",
+          "src/graphics/renderer/Passes/Pass.VisualizationOverlay.cpp",
+          "src/graphics/renderer/Passes/Pass.VisualizationOverlay.cppm",
+          "src/graphics/rhi/RHI.Bindless.cppm",
+          "src/graphics/rhi/RHI.BufferManager.cpp",
+          "src/graphics/rhi/RHI.BufferManager.cppm",
+          "src/graphics/rhi/RHI.BufferTransfer.cpp",
+          "src/graphics/rhi/RHI.BufferTransfer.cppm",
+          "src/graphics/rhi/RHI.BufferView.cppm",
+          "src/graphics/rhi/RHI.CommandContext.cpp",
+          "src/graphics/rhi/RHI.CommandContext.cppm",
+          "src/graphics/rhi/RHI.Descriptors.cppm",
+          "src/graphics/rhi/RHI.Device.cpp",
+          "src/graphics/rhi/RHI.Device.cppm",
+          "src/graphics/rhi/RHI.FrameHandle.cppm",
+          "src/graphics/rhi/RHI.Handles.cppm",
+          "src/graphics/rhi/RHI.PipelineManager.cpp",
+          "src/graphics/rhi/RHI.PipelineManager.cppm",
+          "src/graphics/rhi/RHI.Profiler.cpp",
+          "src/graphics/rhi/RHI.Profiler.cppm",
+          "src/graphics/rhi/RHI.QueueAffinity.cppm",
+          "src/graphics/rhi/RHI.SamplerManager.cpp",
+          "src/graphics/rhi/RHI.SamplerManager.cppm",
+          "src/graphics/rhi/RHI.TextureManager.cpp",
+          "src/graphics/rhi/RHI.TextureManager.cppm",
+          "src/graphics/rhi/RHI.TextureUpload.cpp",
+          "src/graphics/rhi/RHI.TextureUpload.cppm",
+          "src/graphics/rhi/RHI.Transfer.cppm",
+          "src/graphics/rhi/RHI.TransferQueue.cppm",
+          "src/graphics/rhi/RHI.Types.cppm"
+        ],
+        "noop": [],
+        "renderer_impl": [
+          "src/graphics/renderer/Graphics.Renderer.cpp"
+        ],
+        "renderer_interface": [
+          "src/graphics/renderer/Graphics.Renderer.cpp",
+          "src/graphics/renderer/Graphics.Renderer.cppm"
+        ]
+      }
+    },
+    "producer_timings_ms": {
+      "clean": {
+        "src/graphics/renderer/Graphics.Renderer.cpp": {
+          "before": {
+            "median": 12728,
+            "samples": [
+              12768,
+              12651,
+              12728,
+              12686,
+              12746
+            ]
+          },
+          "after": {
+            "median": 12977,
+            "samples": [
+              12969,
+              12864,
+              12977,
+              13044,
+              14296
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.Renderer.cppm": {
+          "before": {
+            "median": 12227,
+            "samples": [
+              12268,
+              12227,
+              12154,
+              12189,
+              12386
+            ]
+          },
+          "after": {
+            "median": 1229,
+            "samples": [
+              1224,
+              1221,
+              1242,
+              1229,
+              1328
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.RenderPrepPipeline.cppm": {
+          "before": {
+            "median": 5381,
+            "samples": [
+              5364,
+              5370,
+              5381,
+              5454,
+              5602
+            ]
+          },
+          "after": {
+            "median": 5353,
+            "samples": [
+              5331,
+              5350,
+              5418,
+              5353,
+              5510
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.VisualizationSyncSystem.cppm": {
+          "before": {
+            "median": 3481,
+            "samples": [
+              3446,
+              3561,
+              3481,
+              3477,
+              3506
+            ]
+          },
+          "after": {
+            "median": 3488,
+            "samples": [
+              3482,
+              3501,
+              3486,
+              3508,
+              3488
+            ]
+          }
+        },
+        "src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp": {
+          "before": {
+            "median": 3315,
+            "samples": [
+              3315,
+              3316,
+              3306,
+              3297,
+              3381
+            ]
+          },
+          "after": {
+            "median": 3317,
+            "samples": [
+              3320,
+              3277,
+              3291,
+              3317,
+              3664
+            ]
+          }
+        },
+        "src/core/Core.Config.EngineLoad.cpp": {
+          "before": {
+            "median": 3126,
+            "samples": [
+              3172,
+              3099,
+              3194,
+              3126,
+              3123
+            ]
+          },
+          "after": {
+            "median": 3128,
+            "samples": [
+              3112,
+              3102,
+              3132,
+              3128,
+              3224
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.DebugViewSystem.cppm": {
+          "before": {
+            "median": 3108,
+            "samples": [
+              3123,
+              3083,
+              3085,
+              3108,
+              3167
+            ]
+          },
+          "after": {
+            "median": 3064,
+            "samples": [
+              3037,
+              3046,
+              3064,
+              3074,
+              3344
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.CullingSystem.cppm": {
+          "before": {
+            "median": 2824,
+            "samples": [
+              2784,
+              2823,
+              2824,
+              2849,
+              2825
+            ]
+          },
+          "after": {
+            "median": 2827,
+            "samples": [
+              2823,
+              2827,
+              2820,
+              2893,
+              2853
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.ShadowSystem.cppm": {
+          "before": {
+            "median": 2533,
+            "samples": [
+              2520,
+              2524,
+              2564,
+              2533,
+              2542
+            ]
+          },
+          "after": {
+            "median": 2545,
+            "samples": [
+              2538,
+              2529,
+              2545,
+              2558,
+              2548
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.MaterialSystem.cppm": {
+          "before": {
+            "median": 2558,
+            "samples": [
+              2516,
+              2558,
+              2552,
+              2558,
+              2561
+            ]
+          },
+          "after": {
+            "median": 2566,
+            "samples": [
+              2562,
+              2546,
+              2566,
+              2611,
+              2585
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.ColormapSystem.cppm": {
+          "before": {
+            "median": 2523,
+            "samples": [
+              2512,
+              2541,
+              2571,
+              2523,
+              2518
+            ]
+          },
+          "after": {
+            "median": 2531,
+            "samples": [
+              2509,
+              2512,
+              2531,
+              2548,
+              2555
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.UvView.cppm": {
+          "before": {
+            "median": 2489,
+            "samples": [
+              2477,
+              2606,
+              2489,
+              2509,
+              2482
+            ]
+          },
+          "after": {
+            "median": 2504,
+            "samples": [
+              2480,
+              2493,
+              2525,
+              2539,
+              2504
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.Reconstruction.cppm": {
+          "before": {
+            "median": 2495,
+            "samples": [
+              2473,
+              2485,
+              2524,
+              2495,
+              2496
+            ]
+          },
+          "after": {
+            "median": 2499,
+            "samples": [
+              2497,
+              2499,
+              2500,
+              2514,
+              2493
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.RenderRecipeConfig.cpp": {
+          "before": {
+            "median": 2439,
+            "samples": [
+              2439,
+              2430,
+              2497,
+              2441,
+              2428
+            ]
+          },
+          "after": {
+            "median": 2452,
+            "samples": [
+              2468,
+              2446,
+              2426,
+              2452,
+              2522
+            ]
+          }
+        },
+        "src/core/Core.Dag.TaskGraph.cpp": {
+          "before": {
+            "median": 2332,
+            "samples": [
+              2351,
+              2318,
+              2365,
+              2332,
+              2310
+            ]
+          },
+          "after": {
+            "median": 2329,
+            "samples": [
+              2327,
+              2329,
+              2338,
+              2329,
+              2495
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.RenderSubsystemRegistry.cppm": {
+          "before": {
+            "median": 2294,
+            "samples": [
+              2294,
+              2285,
+              2312,
+              2285,
+              2449
+            ]
+          },
+          "after": {
+            "median": 2305,
+            "samples": [
+              2297,
+              2282,
+              2318,
+              2307,
+              2305
+            ]
+          }
+        },
+        "src/graphics/framegraph/Graphics.RenderGraph.cpp": {
+          "before": {
+            "median": 2252,
+            "samples": [
+              2242,
+              2242,
+              2252,
+              2269,
+              2307
+            ]
+          },
+          "after": {
+            "median": 2243,
+            "samples": [
+              2232,
+              2243,
+              2258,
+              2229,
+              2375
+            ]
+          }
+        },
+        "src/core/Core.FrameGraph.cppm": {
+          "before": {
+            "median": 2130,
+            "samples": [
+              2158,
+              2120,
+              2170,
+              2130,
+              2116
+            ]
+          },
+          "after": {
+            "median": 2133,
+            "samples": [
+              2128,
+              2127,
+              2135,
+              2133,
+              2275
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.PostProcessSystem.cppm": {
+          "before": {
+            "median": 2037,
+            "samples": [
+              2016,
+              2041,
+              2039,
+              2037,
+              2027
+            ]
+          },
+          "after": {
+            "median": 2015,
+            "samples": [
+              2015,
+              2009,
+              2034,
+              2033,
+              2006
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.LightSystem.cppm": {
+          "before": {
+            "median": 2010,
+            "samples": [
+              2010,
+              2008,
+              2009,
+              2026,
+              2023
+            ]
+          },
+          "after": {
+            "median": 2033,
+            "samples": [
+              2018,
+              2034,
+              2033,
+              2049,
+              2030
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.TransformSyncSystem.cppm": {
+          "before": {
+            "median": 2012,
+            "samples": [
+              2007,
+              2012,
+              2000,
+              2019,
+              2020
+            ]
+          },
+          "after": {
+            "median": 2022,
+            "samples": [
+              1992,
+              1996,
+              2044,
+              2034,
+              2022
+            ]
+          }
+        },
+        "src/core/Core.Tasks.Internal.cpp": {
+          "before": {
+            "median": 1966,
+            "samples": [
+              1979,
+              1958,
+              2003,
+              1966,
+              1965
+            ]
+          },
+          "after": {
+            "median": 1985,
+            "samples": [
+              1968,
+              1985,
+              1987,
+              1964,
+              2135
+            ]
+          }
+        },
+        "src/assets/Asset.Service.cppm": {
+          "before": {
+            "median": 1932,
+            "samples": [
+              1954,
+              1932,
+              1980,
+              1923,
+              1919
+            ]
+          },
+          "after": {
+            "median": 1934,
+            "samples": [
+              1938,
+              1929,
+              1922,
+              1934,
+              1953
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.HZB.cppm": {
+          "before": {
+            "median": 1877,
+            "samples": [
+              1877,
+              1872,
+              1917,
+              1892,
+              1860
+            ]
+          },
+          "after": {
+            "median": 1883,
+            "samples": [
+              1860,
+              1883,
+              1878,
+              1896,
+              1900
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.GpuWorld.cppm": {
+          "before": {
+            "median": 1871,
+            "samples": [
+              1871,
+              1876,
+              1912,
+              1865,
+              1857
+            ]
+          },
+          "after": {
+            "median": 1861,
+            "samples": [
+              1890,
+              1857,
+              1851,
+              1861,
+              1901
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.SharedRenderRecipeExecution.cppm": {
+          "before": {
+            "median": 1893,
+            "samples": [
+              1870,
+              1879,
+              1893,
+              1911,
+              1897
+            ]
+          },
+          "after": {
+            "median": 1888,
+            "samples": [
+              1876,
+              1891,
+              1886,
+              1896,
+              1888
+            ]
+          }
+        },
+        "src/graphics/framegraph/Graphics.RenderGraph.cppm": {
+          "before": {
+            "median": 1855,
+            "samples": [
+              1846,
+              1851,
+              1855,
+              1865,
+              1961
+            ]
+          },
+          "after": {
+            "median": 1868,
+            "samples": [
+              1856,
+              1850,
+              1868,
+              1870,
+              1878
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.GpuScene.cppm": {
+          "before": {
+            "median": 1791,
+            "samples": [
+              1781,
+              1774,
+              1791,
+              1794,
+              1817
+            ]
+          },
+          "after": {
+            "median": 1778,
+            "samples": [
+              1768,
+              1778,
+              1783,
+              1774,
+              1789
+            ]
+          }
+        },
+        "src/core/Core.Telemetry.cpp": {
+          "before": {
+            "median": 1739,
+            "samples": [
+              1749,
+              1711,
+              1739,
+              1733,
+              1741
+            ]
+          },
+          "after": {
+            "median": 1753,
+            "samples": [
+              1756,
+              1701,
+              1753,
+              1737,
+              1832
+            ]
+          }
+        },
+        "src/core/Core.Tasks.Internal.cppm": {
+          "before": {
+            "median": 1707,
+            "samples": [
+              1746,
+              1695,
+              1757,
+              1707,
+              1696
+            ]
+          },
+          "after": {
+            "median": 1714,
+            "samples": [
+              1724,
+              1714,
+              1685,
+              1704,
+              1865
+            ]
+          }
+        },
+        "src/core/Core.Dag.TaskGraph.cppm": {
+          "before": {
+            "median": 1715,
+            "samples": [
+              1713,
+              1692,
+              1731,
+              1715,
+              1723
+            ]
+          },
+          "after": {
+            "median": 1708,
+            "samples": [
+              1715,
+              1708,
+              1708,
+              1693,
+              1843
+            ]
+          }
+        },
+        "src/graphics/renderer/Components/Graphics.Component.Material.cppm": {
+          "before": {
+            "median": 1705,
+            "samples": [
+              1705,
+              1814,
+              1707,
+              1699,
+              1693
+            ]
+          },
+          "after": {
+            "median": 1704,
+            "samples": [
+              1690,
+              1709,
+              1704,
+              1719,
+              1702
+            ]
+          }
+        },
+        "src/graphics/assets/Graphics.GpuAssetCache.cppm": {
+          "before": {
+            "median": 1677,
+            "samples": [
+              1673,
+              1652,
+              1688,
+              1690,
+              1677
+            ]
+          },
+          "after": {
+            "median": 1657,
+            "samples": [
+              1641,
+              1653,
+              1671,
+              1668,
+              1657
+            ]
+          }
+        },
+        "src/assets/Asset.LoadPipeline.cppm": {
+          "before": {
+            "median": 1653,
+            "samples": [
+              1661,
+              1642,
+              1679,
+              1653,
+              1645
+            ]
+          },
+          "after": {
+            "median": 1667,
+            "samples": [
+              1638,
+              1683,
+              1649,
+              1667,
+              1691
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.GpuWorld.cpp": {
+          "before": {
+            "median": 1667,
+            "samples": [
+              1651,
+              1637,
+              1686,
+              1667,
+              1679
+            ]
+          },
+          "after": {
+            "median": 1643,
+            "samples": [
+              1638,
+              1638,
+              1654,
+              1643,
+              1651
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.FrameRecipe.cppm": {
+          "before": {
+            "median": 1650,
+            "samples": [
+              1637,
+              1652,
+              1656,
+              1650,
+              1634
+            ]
+          },
+          "after": {
+            "median": 1644,
+            "samples": [
+              1632,
+              1644,
+              1648,
+              1633,
+              1668
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.CullingSystem.cpp": {
+          "before": {
+            "median": 1637,
+            "samples": [
+              1622,
+              1633,
+              1637,
+              1649,
+              1642
+            ]
+          },
+          "after": {
+            "median": 1640,
+            "samples": [
+              1627,
+              1638,
+              1640,
+              1667,
+              1663
+            ]
+          }
+        },
+        "src/graphics/renderer/Backends/Null/Backends.Null.cppm": {
+          "before": {
+            "median": 1622,
+            "samples": [
+              1621,
+              1622,
+              1628,
+              1619,
+              1642
+            ]
+          },
+          "after": {
+            "median": 1632,
+            "samples": [
+              1622,
+              1628,
+              1635,
+              1636,
+              1632
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.VisualizationSyncSystem.cpp": {
+          "before": {
+            "median": 1619,
+            "samples": [
+              1611,
+              1641,
+              1619,
+              1618,
+              1744
+            ]
+          },
+          "after": {
+            "median": 1633,
+            "samples": [
+              1644,
+              1626,
+              1628,
+              1636,
+              1633
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.Device.cppm": {
+          "before": {
+            "median": 1610,
+            "samples": [
+              1606,
+              1591,
+              1610,
+              1625,
+              1613
+            ]
+          },
+          "after": {
+            "median": 1602,
+            "samples": [
+              1584,
+              1579,
+              1603,
+              1608,
+              1602
+            ]
+          }
+        },
+        "src/core/Core.Filesystem.cppm": {
+          "before": {
+            "median": 1573,
+            "samples": [
+              1602,
+              1568,
+              1600,
+              1569,
+              1573
+            ]
+          },
+          "after": {
+            "median": 1569,
+            "samples": [
+              1562,
+              1587,
+              1569,
+              1557,
+              1697
+            ]
+          }
+        },
+        "src/core/Core.Memory.LinearArena.cpp": {
+          "before": {
+            "median": 1526,
+            "samples": [
+              1559,
+              1512,
+              1572,
+              1526,
+              1516
+            ]
+          },
+          "after": {
+            "median": 1530,
+            "samples": [
+              1530,
+              1516,
+              1520,
+              1532,
+              1676
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.MaterialSystem.cpp": {
+          "before": {
+            "median": 1554,
+            "samples": [
+              1551,
+              1554,
+              1555,
+              1546,
+              1561
+            ]
+          },
+          "after": {
+            "median": 1564,
+            "samples": [
+              1541,
+              1562,
+              1564,
+              1567,
+              1573
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.GeometryResidency.cppm": {
+          "before": {
+            "median": 1549,
+            "samples": [
+              1549,
+              1546,
+              1588,
+              1580,
+              1547
+            ]
+          },
+          "after": {
+            "median": 1555,
+            "samples": [
+              1556,
+              1544,
+              1540,
+              1555,
+              1555
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.SpatialDebugVisualizers.cppm": {
+          "before": {
+            "median": 1571,
+            "samples": [
+              1544,
+              1543,
+              1581,
+              1573,
+              1571
+            ]
+          },
+          "after": {
+            "median": 1550,
+            "samples": [
+              1544,
+              1550,
+              1560,
+              1566,
+              1547
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.GpuTransfer.cppm": {
+          "before": {
+            "median": 1536,
+            "samples": [
+              1529,
+              1527,
+              1567,
+              1536,
+              1562
+            ]
+          },
+          "after": {
+            "median": 1545,
+            "samples": [
+              1569,
+              1533,
+              1546,
+              1545,
+              1544
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.RenderWorld.cppm": {
+          "before": {
+            "median": 1533,
+            "samples": [
+              1512,
+              1515,
+              1533,
+              1552,
+              1537
+            ]
+          },
+          "after": {
+            "median": 1527,
+            "samples": [
+              1527,
+              1509,
+              1540,
+              1549,
+              1525
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.TransientDebugUploadHelper.cppm": {
+          "before": {
+            "median": 1496,
+            "samples": [
+              1499,
+              1489,
+              1505,
+              1496,
+              1492
+            ]
+          },
+          "after": {
+            "median": 1498,
+            "samples": [
+              1489,
+              1488,
+              1528,
+              1498,
+              1514
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.ImGuiOverlaySystem.cppm": {
+          "before": {
+            "median": 1484,
+            "samples": [
+              1477,
+              1484,
+              1474,
+              1495,
+              1485
+            ]
+          },
+          "after": {
+            "median": 1487,
+            "samples": [
+              1475,
+              1482,
+              1509,
+              1522,
+              1487
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.FrameRecipe.cpp": {
+          "before": {
+            "median": 1461,
+            "samples": [
+              1461,
+              1425,
+              1441,
+              1473,
+              1464
+            ]
+          },
+          "after": {
+            "median": 1435,
+            "samples": [
+              1431,
+              1435,
+              1461,
+              1435,
+              1533
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.RenderPrepPipeline.cpp": {
+          "before": {
+            "median": 1453,
+            "samples": [
+              1461,
+              1453,
+              1424,
+              1429,
+              1473
+            ]
+          },
+          "after": {
+            "median": 1443,
+            "samples": [
+              1437,
+              1440,
+              1443,
+              1458,
+              1565
+            ]
+          }
+        },
+        "src/core/Core.Filesystem.cpp": {
+          "before": {
+            "median": 1444,
+            "samples": [
+              1460,
+              1431,
+              1462,
+              1441,
+              1444
+            ]
+          },
+          "after": {
+            "median": 1420,
+            "samples": [
+              1418,
+              1423,
+              1420,
+              1419,
+              1594
+            ]
+          }
+        },
+        "src/core/Core.Dag.Scheduler.cpp": {
+          "before": {
+            "median": 1441,
+            "samples": [
+              1457,
+              1421,
+              1448,
+              1431,
+              1441
+            ]
+          },
+          "after": {
+            "median": 1425,
+            "samples": [
+              1418,
+              1415,
+              1453,
+              1425,
+              1564
+            ]
+          }
+        },
+        "src/core/Core.Dag.Scheduler.cppm": {
+          "before": {
+            "median": 1401,
+            "samples": [
+              1401,
+              1408,
+              1448,
+              1391,
+              1396
+            ]
+          },
+          "after": {
+            "median": 1400,
+            "samples": [
+              1403,
+              1393,
+              1400,
+              1390,
+              1523
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.RenderDiagnostics.cppm": {
+          "before": {
+            "median": 1360,
+            "samples": [
+              1360,
+              1345,
+              1371,
+              1402,
+              1351
+            ]
+          },
+          "after": {
+            "median": 1356,
+            "samples": [
+              1350,
+              1356,
+              1361,
+              1344,
+              1424
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.PostProcessSystem.cpp": {
+          "before": {
+            "median": 1347,
+            "samples": [
+              1346,
+              1347,
+              1379,
+              1350,
+              1336
+            ]
+          },
+          "after": {
+            "median": 1360,
+            "samples": [
+              1350,
+              1352,
+              1360,
+              1368,
+              1363
+            ]
+          }
+        },
+        "src/core/Core.Telemetry.cppm": {
+          "before": {
+            "median": 1329,
+            "samples": [
+              1343,
+              1326,
+              1346,
+              1329,
+              1324
+            ]
+          },
+          "after": {
+            "median": 1332,
+            "samples": [
+              1333,
+              1317,
+              1323,
+              1332,
+              1332
+            ]
+          }
+        },
+        "src/graphics/renderer/Backends/Null/Backends.Null.cpp": {
+          "before": {
+            "median": 1347,
+            "samples": [
+              1335,
+              1375,
+              1347,
+              1347,
+              1349
+            ]
+          },
+          "after": {
+            "median": 1350,
+            "samples": [
+              1347,
+              1343,
+              1352,
+              1350,
+              1353
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.PipelineManager.cppm": {
+          "before": {
+            "median": 1303,
+            "samples": [
+              1328,
+              1303,
+              1321,
+              1291,
+              1297
+            ]
+          },
+          "after": {
+            "median": 1305,
+            "samples": [
+              1305,
+              1311,
+              1303,
+              1314,
+              1304
+            ]
+          }
+        },
+        "src/core/Core.Filesystem.PathResolver.cppm": {
+          "before": {
+            "median": 1324,
+            "samples": [
+              1324,
+              1325,
+              1339,
+              1318,
+              1301
+            ]
+          },
+          "after": {
+            "median": 1315,
+            "samples": [
+              1315,
+              1302,
+              1306,
+              1315,
+              1376
+            ]
+          }
+        },
+        "src/core/Core.Tasks.CounterEvent.cppm": {
+          "before": {
+            "median": 1276,
+            "samples": [
+              1285,
+              1276,
+              1282,
+              1257,
+              1267
+            ]
+          },
+          "after": {
+            "median": 1279,
+            "samples": [
+              1279,
+              1293,
+              1254,
+              1256,
+              1395
+            ]
+          }
+        },
+        "src/core/Core.Tasks.Lifecycle.cpp": {
+          "before": {
+            "median": 1277,
+            "samples": [
+              1277,
+              1250,
+              1283,
+              1284,
+              1260
+            ]
+          },
+          "after": {
+            "median": 1265,
+            "samples": [
+              1250,
+              1281,
+              1265,
+              1256,
+              1380
+            ]
+          }
+        },
+        "src/assets/Asset.Service.cpp": {
+          "before": {
+            "median": 1267,
+            "samples": [
+              1277,
+              1262,
+              1290,
+              1262,
+              1267
+            ]
+          },
+          "after": {
+            "median": 1262,
+            "samples": [
+              1262,
+              1256,
+              1256,
+              1276,
+              1263
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.CommandContext.cppm": {
+          "before": {
+            "median": 1248,
+            "samples": [
+              1266,
+              1234,
+              1270,
+              1239,
+              1248
+            ]
+          },
+          "after": {
+            "median": 1237,
+            "samples": [
+              1237,
+              1228,
+              1268,
+              1237,
+              1235
+            ]
+          }
+        },
+        "src/core/Core.FrameClock.cppm": {
+          "before": {
+            "median": 1254,
+            "samples": [
+              1254,
+              1237,
+              1265,
+              1268,
+              1232
+            ]
+          },
+          "after": {
+            "median": 1241,
+            "samples": [
+              1241,
+              1239,
+              1249,
+              1238,
+              1242
+            ]
+          }
+        },
+        "src/core/Core.Dag.Scheduler.DomainGraph.cppm": {
+          "before": {
+            "median": 1228,
+            "samples": [
+              1247,
+              1220,
+              1229,
+              1228,
+              1213
+            ]
+          },
+          "after": {
+            "median": 1222,
+            "samples": [
+              1214,
+              1215,
+              1225,
+              1222,
+              1340
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.UvView.cpp": {
+          "before": {
+            "median": 1260,
+            "samples": [
+              1241,
+              1302,
+              1272,
+              1260,
+              1256
+            ]
+          },
+          "after": {
+            "median": 1255,
+            "samples": [
+              1250,
+              1260,
+              1245,
+              1255,
+              1256
+            ]
+          }
+        },
+        "src/core/Core.Tasks.cppm": {
+          "before": {
+            "median": 1222,
+            "samples": [
+              1230,
+              1205,
+              1265,
+              1218,
+              1222
+            ]
+          },
+          "after": {
+            "median": 1214,
+            "samples": [
+              1232,
+              1211,
+              1214,
+              1204,
+              1336
+            ]
+          }
+        },
+        "src/core/Core.Memory.LinearArena.cppm": {
+          "before": {
+            "median": 1216,
+            "samples": [
+              1228,
+              1216,
+              1238,
+              1202,
+              1202
+            ]
+          },
+          "after": {
+            "median": 1209,
+            "samples": [
+              1194,
+              1193,
+              1209,
+              1215,
+              1311
+            ]
+          }
+        },
+        "src/core/Core.Process.cppm": {
+          "before": {
+            "median": 1214,
+            "samples": [
+              1214,
+              1206,
+              1227,
+              1247,
+              1208
+            ]
+          },
+          "after": {
+            "median": 1207,
+            "samples": [
+              1214,
+              1207,
+              1221,
+              1204,
+              1206
+            ]
+          }
+        },
+        "src/core/Core.Memory.ScopeStack.cppm": {
+          "before": {
+            "median": 1208,
+            "samples": [
+              1208,
+              1195,
+              1229,
+              1213,
+              1192
+            ]
+          },
+          "after": {
+            "median": 1200,
+            "samples": [
+              1192,
+              1205,
+              1200,
+              1198,
+              1318
+            ]
+          }
+        },
+        "src/assets/Asset.GeometryPayload.cppm": {
+          "before": {
+            "median": 1190,
+            "samples": [
+              1190,
+              1191,
+              1192,
+              1176,
+              1178
+            ]
+          },
+          "after": {
+            "median": 1190,
+            "samples": [
+              1192,
+              1190,
+              1172,
+              1172,
+              1193
+            ]
+          }
+        },
+        "src/assets/Asset.LoadPipeline.cpp": {
+          "before": {
+            "median": 1184,
+            "samples": [
+              1184,
+              1184,
+              1189,
+              1188,
+              1173
+            ]
+          },
+          "after": {
+            "median": 1184,
+            "samples": [
+              1182,
+              1185,
+              1178,
+              1184,
+              1195
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.TextureManager.cppm": {
+          "before": {
+            "median": 1167,
+            "samples": [
+              1179,
+              1150,
+              1168,
+              1167,
+              1158
+            ]
+          },
+          "after": {
+            "median": 1151,
+            "samples": [
+              1161,
+              1162,
+              1145,
+              1146,
+              1151
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.SamplerManager.cppm": {
+          "before": {
+            "median": 1167,
+            "samples": [
+              1179,
+              1151,
+              1171,
+              1167,
+              1167
+            ]
+          },
+          "after": {
+            "median": 1154,
+            "samples": [
+              1154,
+              1154,
+              1152,
+              1155,
+              1172
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.Reconstruction.cpp": {
+          "before": {
+            "median": 1190,
+            "samples": [
+              1178,
+              1188,
+              1197,
+              1190,
+              1193
+            ]
+          },
+          "after": {
+            "median": 1182,
+            "samples": [
+              1169,
+              1181,
+              1182,
+              1205,
+              1190
+            ]
+          }
+        },
+        "src/assets/Asset.PayloadStore.cppm": {
+          "before": {
+            "median": 1170,
+            "samples": [
+              1170,
+              1124,
+              1193,
+              1166,
+              1171
+            ]
+          },
+          "after": {
+            "median": 1157,
+            "samples": [
+              1153,
+              1175,
+              1160,
+              1157,
+              1137
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.BufferManager.cppm": {
+          "before": {
+            "median": 1148,
+            "samples": [
+              1159,
+              1147,
+              1162,
+              1148,
+              1141
+            ]
+          },
+          "after": {
+            "median": 1140,
+            "samples": [
+              1144,
+              1139,
+              1139,
+              1140,
+              1143
+            ]
+          }
+        },
+        "src/assets/Asset.PathIndex.cppm": {
+          "before": {
+            "median": 1149,
+            "samples": [
+              1158,
+              1108,
+              1155,
+              1149,
+              1141
+            ]
+          },
+          "after": {
+            "median": 1129,
+            "samples": [
+              1112,
+              1123,
+              1129,
+              1134,
+              1203
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.LightSystem.cpp": {
+          "before": {
+            "median": 1148,
+            "samples": [
+              1141,
+              1132,
+              1149,
+              1148,
+              1152
+            ]
+          },
+          "after": {
+            "median": 1138,
+            "samples": [
+              1135,
+              1138,
+              1144,
+              1151,
+              1133
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.ColormapSystem.cpp": {
+          "before": {
+            "median": 1096,
+            "samples": [
+              1101,
+              1086,
+              1101,
+              1096,
+              1085
+            ]
+          },
+          "after": {
+            "median": 1090,
+            "samples": [
+              1090,
+              1087,
+              1090,
+              1128,
+              1099
+            ]
+          }
+        },
+        "src/core/Core.IOBackend.cpp": {
+          "before": {
+            "median": 1098,
+            "samples": [
+              1098,
+              1092,
+              1128,
+              1116,
+              1092
+            ]
+          },
+          "after": {
+            "median": 1097,
+            "samples": [
+              1088,
+              1097,
+              1114,
+              1093,
+              1098
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.ShadowSystem.cpp": {
+          "before": {
+            "median": 1095,
+            "samples": [
+              1092,
+              1095,
+              1090,
+              1111,
+              1106
+            ]
+          },
+          "after": {
+            "median": 1098,
+            "samples": [
+              1098,
+              1081,
+              1094,
+              1099,
+              1099
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.TransformSyncSystem.cpp": {
+          "before": {
+            "median": 1098,
+            "samples": [
+              1090,
+              1135,
+              1095,
+              1101,
+              1098
+            ]
+          },
+          "after": {
+            "median": 1106,
+            "samples": [
+              1108,
+              1106,
+              1114,
+              1099,
+              1092
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.GeometryResidency.cpp": {
+          "before": {
+            "median": 1087,
+            "samples": [
+              1083,
+              1105,
+              1087,
+              1089,
+              1086
+            ]
+          },
+          "after": {
+            "median": 1093,
+            "samples": [
+              1093,
+              1093,
+              1088,
+              1125,
+              1101
+            ]
+          }
+        },
+        "src/graphics/assets/Graphics.GpuAssetCache.cpp": {
+          "before": {
+            "median": 1072,
+            "samples": [
+              1081,
+              1049,
+              1083,
+              1072,
+              1061
+            ]
+          },
+          "after": {
+            "median": 1050,
+            "samples": [
+              1050,
+              1052,
+              1006,
+              1006,
+              1059
+            ]
+          }
+        },
+        "src/graphics/framegraph/Graphics.RenderGraph.Executor.cpp": {
+          "before": {
+            "median": 1066,
+            "samples": [
+              1080,
+              1060,
+              1066,
+              1052,
+              1124
+            ]
+          },
+          "after": {
+            "median": 1041,
+            "samples": [
+              1038,
+              1036,
+              1048,
+              1041,
+              1141
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.SharedRenderRecipeExecution.cpp": {
+          "before": {
+            "median": 1093,
+            "samples": [
+              1079,
+              1095,
+              1093,
+              1098,
+              1093
+            ]
+          },
+          "after": {
+            "median": 1083,
+            "samples": [
+              1083,
+              1075,
+              1077,
+              1083,
+              1089
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.PointLBVH.cppm": {
+          "before": {
+            "median": 1059,
+            "samples": [
+              1066,
+              1058,
+              1077,
+              1059,
+              1056
+            ]
+          },
+          "after": {
+            "median": 1056,
+            "samples": [
+              1053,
+              1051,
+              1060,
+              1056,
+              1078
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.PointKeypoints.cppm": {
+          "before": {
+            "median": 1060,
+            "samples": [
+              1058,
+              1058,
+              1076,
+              1068,
+              1060
+            ]
+          },
+          "after": {
+            "median": 1062,
+            "samples": [
+              1061,
+              1062,
+              1070,
+              1065,
+              1055
+            ]
+          }
+        },
+        "src/core/Core.Filesystem.PathResolver.cpp": {
+          "before": {
+            "median": 1045,
+            "samples": [
+              1050,
+              1045,
+              1066,
+              1032,
+              1028
+            ]
+          },
+          "after": {
+            "median": 1035,
+            "samples": [
+              1034,
+              1040,
+              1035,
+              1033,
+              1129
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.DebugViewSystem.cpp": {
+          "before": {
+            "median": 1054,
+            "samples": [
+              1048,
+              1054,
+              1061,
+              1053,
+              1082
+            ]
+          },
+          "after": {
+            "median": 1027,
+            "samples": [
+              1051,
+              1027,
+              1023,
+              1023,
+              1147
+            ]
+          }
+        },
+        "src/graphics/renderer/Backends/Null/Backends.Null.Profiler.cpp": {
+          "before": {
+            "median": 1052,
+            "samples": [
+              1029,
+              1075,
+              1052,
+              1044,
+              1059
+            ]
+          },
+          "after": {
+            "median": 1048,
+            "samples": [
+              1050,
+              1070,
+              1038,
+              1038,
+              1048
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.DeferredSystem.cppm": {
+          "before": {
+            "median": 1016,
+            "samples": [
+              1016,
+              1020,
+              1010,
+              1018,
+              1015
+            ]
+          },
+          "after": {
+            "median": 1008,
+            "samples": [
+              1007,
+              1001,
+              1008,
+              1010,
+              1019
+            ]
+          }
+        },
+        "src/graphics/renderer/Backends/Null/Backends.Null.Bindless.cpp": {
+          "before": {
+            "median": 1003,
+            "samples": [
+              1014,
+              1010,
+              1001,
+              998,
+              1003
+            ]
+          },
+          "after": {
+            "median": 1010,
+            "samples": [
+              1026,
+              1010,
+              1011,
+              1001,
+              1010
+            ]
+          }
+        },
+        "src/core/Core.Tasks.WaitToken.cpp": {
+          "before": {
+            "median": 1004,
+            "samples": [
+              1009,
+              1004,
+              1004,
+              988,
+              998
+            ]
+          },
+          "after": {
+            "median": 991,
+            "samples": [
+              984,
+              989,
+              1024,
+              991,
+              1089
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.PipelineManager.cpp": {
+          "before": {
+            "median": 985,
+            "samples": [
+              1006,
+              985,
+              988,
+              977,
+              959
+            ]
+          },
+          "after": {
+            "median": 990,
+            "samples": [
+              988,
+              990,
+              1006,
+              1006,
+              989
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.GpuTransfer.cpp": {
+          "before": {
+            "median": 1021,
+            "samples": [
+              1002,
+              1019,
+              1049,
+              1021,
+              1023
+            ]
+          },
+          "after": {
+            "median": 1024,
+            "samples": [
+              1017,
+              1024,
+              1024,
+              1016,
+              1050
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.SelectionSystem.cppm": {
+          "before": {
+            "median": 1030,
+            "samples": [
+              1001,
+              1001,
+              1034,
+              1031,
+              1030
+            ]
+          },
+          "after": {
+            "median": 1002,
+            "samples": [
+              996,
+              1002,
+              1002,
+              1008,
+              1017
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.ForwardSystem.cppm": {
+          "before": {
+            "median": 1008,
+            "samples": [
+              998,
+              1005,
+              1008,
+              1022,
+              1017
+            ]
+          },
+          "after": {
+            "median": 1009,
+            "samples": [
+              991,
+              1015,
+              1009,
+              1006,
+              1012
+            ]
+          }
+        },
+        "src/core/Core.LockFreeQueue.cppm": {
+          "before": {
+            "median": 991,
+            "samples": [
+              995,
+              983,
+              1001,
+              988,
+              991
+            ]
+          },
+          "after": {
+            "median": 987,
+            "samples": [
+              977,
+              995,
+              984,
+              987,
+              989
+            ]
+          }
+        },
+        "src/core/Core.Tasks.LocalTask.cppm": {
+          "before": {
+            "median": 991,
+            "samples": [
+              991,
+              976,
+              1007,
+              992,
+              985
+            ]
+          },
+          "after": {
+            "median": 986,
+            "samples": [
+              985,
+              986,
+              1005,
+              979,
+              1084
+            ]
+          }
+        },
+        "src/core/Core.Logging.cppm": {
+          "before": {
+            "median": 948,
+            "samples": [
+              966,
+              943,
+              972,
+              943,
+              948
+            ]
+          },
+          "after": {
+            "median": 946,
+            "samples": [
+              935,
+              946,
+              947,
+              937,
+              952
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.VisualizationPackets.cppm": {
+          "before": {
+            "median": 970,
+            "samples": [
+              963,
+              962,
+              987,
+              970,
+              980
+            ]
+          },
+          "after": {
+            "median": 976,
+            "samples": [
+              972,
+              976,
+              967,
+              977,
+              976
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.ImGuiOverlaySystem.cpp": {
+          "before": {
+            "median": 968,
+            "samples": [
+              962,
+              968,
+              968,
+              995,
+              981
+            ]
+          },
+          "after": {
+            "median": 979,
+            "samples": [
+              976,
+              979,
+              989,
+              990,
+              975
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.SamplerManager.cpp": {
+          "before": {
+            "median": 908,
+            "samples": [
+              940,
+              908,
+              930,
+              906,
+              900
+            ]
+          },
+          "after": {
+            "median": 915,
+            "samples": [
+              909,
+              915,
+              924,
+              915,
+              907
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.CurrentRendererContractAdapter.cppm": {
+          "before": {
+            "median": 931,
+            "samples": [
+              931,
+              930,
+              922,
+              944,
+              946
+            ]
+          },
+          "after": {
+            "median": 934,
+            "samples": [
+              930,
+              918,
+              934,
+              938,
+              936
+            ]
+          }
+        },
+        "src/core/Core.Logging.cpp": {
+          "before": {
+            "median": 924,
+            "samples": [
+              929,
+              923,
+              955,
+              924,
+              920
+            ]
+          },
+          "after": {
+            "median": 928,
+            "samples": [
+              928,
+              923,
+              932,
+              923,
+              934
+            ]
+          }
+        },
+        "src/core/Core.Process.cpp": {
+          "before": {
+            "median": 914,
+            "samples": [
+              926,
+              902,
+              926,
+              914,
+              900
+            ]
+          },
+          "after": {
+            "median": 899,
+            "samples": [
+              888,
+              899,
+              896,
+              900,
+              967
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.GpuScene.cpp": {
+          "before": {
+            "median": 908,
+            "samples": [
+              902,
+              906,
+              910,
+              908,
+              912
+            ]
+          },
+          "after": {
+            "median": 908,
+            "samples": [
+              906,
+              905,
+              932,
+              915,
+              908
+            ]
+          }
+        },
+        "src/core/Core.Tasks.Worker.cpp": {
+          "before": {
+            "median": 889,
+            "samples": [
+              898,
+              876,
+              892,
+              889,
+              883
+            ]
+          },
+          "after": {
+            "median": 877,
+            "samples": [
+              872,
+              876,
+              877,
+              877,
+              951
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.TextureManager.cpp": {
+          "before": {
+            "median": 864,
+            "samples": [
+              898,
+              861,
+              869,
+              852,
+              864
+            ]
+          },
+          "after": {
+            "median": 866,
+            "samples": [
+              858,
+              877,
+              866,
+              861,
+              882
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.Material.cppm": {
+          "before": {
+            "median": 896,
+            "samples": [
+              896,
+              896,
+              927,
+              904,
+              896
+            ]
+          },
+          "after": {
+            "median": 911,
+            "samples": [
+              926,
+              913,
+              911,
+              906,
+              898
+            ]
+          }
+        },
+        "src/core/Core.Tasks.Job.cpp": {
+          "before": {
+            "median": 874,
+            "samples": [
+              887,
+              874,
+              896,
+              869,
+              866
+            ]
+          },
+          "after": {
+            "median": 874,
+            "samples": [
+              874,
+              871,
+              882,
+              868,
+              959
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.BufferManager.cpp": {
+          "before": {
+            "median": 871,
+            "samples": [
+              887,
+              871,
+              870,
+              855,
+              871
+            ]
+          },
+          "after": {
+            "median": 860,
+            "samples": [
+              860,
+              861,
+              856,
+              860,
+              870
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.RenderCommandRouter.cppm": {
+          "before": {
+            "median": 880,
+            "samples": [
+              870,
+              880,
+              882,
+              884,
+              878
+            ]
+          },
+          "after": {
+            "median": 880,
+            "samples": [
+              882,
+              881,
+              871,
+              879,
+              880
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.SpatialDebugVisualizers.cpp": {
+          "before": {
+            "median": 876,
+            "samples": [
+              859,
+              882,
+              874,
+              882,
+              876
+            ]
+          },
+          "after": {
+            "median": 865,
+            "samples": [
+              858,
+              864,
+              865,
+              871,
+              865
+            ]
+          }
+        },
+        "src/assets/Asset.PathIndex.cpp": {
+          "before": {
+            "median": 838,
+            "samples": [
+              857,
+              826,
+              843,
+              832,
+              838
+            ]
+          },
+          "after": {
+            "median": 835,
+            "samples": [
+              835,
+              848,
+              817,
+              817,
+              875
+            ]
+          }
+        },
+        "src/core/Core.Tasks.LocalTask.cpp": {
+          "before": {
+            "median": 852,
+            "samples": [
+              852,
+              850,
+              856,
+              852,
+              850
+            ]
+          },
+          "after": {
+            "median": 859,
+            "samples": [
+              857,
+              866,
+              857,
+              859,
+              927
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.HZB.cpp": {
+          "before": {
+            "median": 860,
+            "samples": [
+              850,
+              861,
+              860,
+              880,
+              857
+            ]
+          },
+          "after": {
+            "median": 856,
+            "samples": [
+              857,
+              852,
+              852,
+              861,
+              856
+            ]
+          }
+        },
+        "src/graphics/renderer/Components/Graphics.Component.VisualizationConfig.cppm": {
+          "before": {
+            "median": 832,
+            "samples": [
+              833,
+              830,
+              828,
+              837,
+              832
+            ]
+          },
+          "after": {
+            "median": 827,
+            "samples": [
+              827,
+              826,
+              822,
+              837,
+              831
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.TransientDebugUploadHelper.cpp": {
+          "before": {
+            "median": 831,
+            "samples": [
+              814,
+              884,
+              831,
+              831,
+              830
+            ]
+          },
+          "after": {
+            "median": 822,
+            "samples": [
+              818,
+              819,
+              822,
+              830,
+              822
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cpp": {
+          "before": {
+            "median": 817,
+            "samples": [
+              814,
+              871,
+              817,
+              822,
+              813
+            ]
+          },
+          "after": {
+            "median": 810,
+            "samples": [
+              813,
+              804,
+              810,
+              827,
+              810
+            ]
+          }
+        },
+        "src/core/Core.FrameGraph.cpp": {
+          "before": {
+            "median": 804,
+            "samples": [
+              813,
+              824,
+              804,
+              799,
+              797
+            ]
+          },
+          "after": {
+            "median": 804,
+            "samples": [
+              804,
+              807,
+              809,
+              804,
+              798
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.PointLBVH.cpp": {
+          "before": {
+            "median": 807,
+            "samples": [
+              806,
+              807,
+              820,
+              807,
+              833
+            ]
+          },
+          "after": {
+            "median": 813,
+            "samples": [
+              816,
+              813,
+              806,
+              825,
+              810
+            ]
+          }
+        },
+        "src/graphics/framegraph/Graphics.RenderGraph.Compiler.cppm": {
+          "before": {
+            "median": 799,
+            "samples": [
+              802,
+              842,
+              799,
+              798,
+              795
+            ]
+          },
+          "after": {
+            "median": 801,
+            "samples": [
+              802,
+              814,
+              796,
+              799,
+              801
+            ]
+          }
+        },
+        "src/assets/Asset.PayloadStore.cpp": {
+          "before": {
+            "median": 796,
+            "samples": [
+              800,
+              796,
+              798,
+              784,
+              794
+            ]
+          },
+          "after": {
+            "median": 791,
+            "samples": [
+              801,
+              791,
+              791,
+              790,
+              795
+            ]
+          }
+        },
+        "src/core/Core.Tasks.Dispatch.cpp": {
+          "before": {
+            "median": 773,
+            "samples": [
+              785,
+              773,
+              788,
+              766,
+              771
+            ]
+          },
+          "after": {
+            "median": 773,
+            "samples": [
+              772,
+              772,
+              773,
+              790,
+              846
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.PointKeypoints.cpp": {
+          "before": {
+            "median": 792,
+            "samples": [
+              785,
+              786,
+              808,
+              792,
+              824
+            ]
+          },
+          "after": {
+            "median": 796,
+            "samples": [
+              796,
+              798,
+              798,
+              795,
+              794
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.TransientDebug.Surface.cppm": {
+          "before": {
+            "median": 748,
+            "samples": [
+              777,
+              745,
+              748,
+              742,
+              757
+            ]
+          },
+          "after": {
+            "median": 747,
+            "samples": [
+              736,
+              742,
+              747,
+              750,
+              813
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.LightClusters.cpp": {
+          "before": {
+            "median": 755,
+            "samples": [
+              757,
+              751,
+              750,
+              757,
+              755
+            ]
+          },
+          "after": {
+            "median": 757,
+            "samples": [
+              753,
+              762,
+              757,
+              752,
+              761
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.VisualizationPropertyBufferResidency.cppm": {
+          "before": {
+            "median": 761,
+            "samples": [
+              755,
+              761,
+              765,
+              766,
+              756
+            ]
+          },
+          "after": {
+            "median": 758,
+            "samples": [
+              758,
+              753,
+              756,
+              765,
+              769
+            ]
+          }
+        },
+        "src/graphics/renderer/Backends/Null/Backends.Null.Transfer.cpp": {
+          "before": {
+            "median": 755,
+            "samples": [
+              755,
+              819,
+              752,
+              755,
+              753
+            ]
+          },
+          "after": {
+            "median": 759,
+            "samples": [
+              762,
+              778,
+              758,
+              752,
+              759
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.CurrentRendererContractAdapter.cpp": {
+          "before": {
+            "median": 705,
+            "samples": [
+              710,
+              701,
+              702,
+              705,
+              720
+            ]
+          },
+          "after": {
+            "median": 699,
+            "samples": [
+              699,
+              699,
+              696,
+              710,
+              711
+            ]
+          }
+        },
+        "src/graphics/framegraph/Graphics.RenderGraph.Pass.cppm": {
+          "before": {
+            "median": 705,
+            "samples": [
+              705,
+              698,
+              709,
+              706,
+              702
+            ]
+          },
+          "after": {
+            "median": 702,
+            "samples": [
+              702,
+              699,
+              709,
+              702,
+              710
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.SelectionSystem.cpp": {
+          "before": {
+            "median": 695,
+            "samples": [
+              698,
+              689,
+              687,
+              695,
+              705
+            ]
+          },
+          "after": {
+            "median": 688,
+            "samples": [
+              680,
+              684,
+              691,
+              688,
+              695
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp": {
+          "before": {
+            "median": 682,
+            "samples": [
+              685,
+              681,
+              688,
+              678,
+              682
+            ]
+          },
+          "after": {
+            "median": 679,
+            "samples": [
+              675,
+              684,
+              678,
+              681,
+              679
+            ]
+          }
+        },
+        "src/core/Core.Tasks.CounterEvent.cpp": {
+          "before": {
+            "median": 681,
+            "samples": [
+              681,
+              676,
+              683,
+              671,
+              681
+            ]
+          },
+          "after": {
+            "median": 676,
+            "samples": [
+              678,
+              667,
+              672,
+              676,
+              749
+            ]
+          }
+        },
+        "src/graphics/renderer/Components/Graphics.Component.RenderGeometry.cppm": {
+          "before": {
+            "median": 679,
+            "samples": [
+              679,
+              718,
+              673,
+              669,
+              683
+            ]
+          },
+          "after": {
+            "median": 667,
+            "samples": [
+              666,
+              666,
+              667,
+              683,
+              677
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.VisualizationPropertyBufferResidency.cpp": {
+          "before": {
+            "median": 654,
+            "samples": [
+              651,
+              651,
+              674,
+              667,
+              654
+            ]
+          },
+          "after": {
+            "median": 666,
+            "samples": [
+              663,
+              657,
+              666,
+              702,
+              668
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.ComputeParallelPrimitives.cpp": {
+          "before": {
+            "median": 639,
+            "samples": [
+              630,
+              637,
+              650,
+              641,
+              639
+            ]
+          },
+          "after": {
+            "median": 640,
+            "samples": [
+              643,
+              645,
+              640,
+              639,
+              638
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.ForwardSystem.cpp": {
+          "before": {
+            "median": 626,
+            "samples": [
+              621,
+              618,
+              627,
+              628,
+              626
+            ]
+          },
+          "after": {
+            "median": 625,
+            "samples": [
+              616,
+              625,
+              627,
+              627,
+              622
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.DeferredSystem.cpp": {
+          "before": {
+            "median": 619,
+            "samples": [
+              620,
+              625,
+              618,
+              619,
+              610
+            ]
+          },
+          "after": {
+            "median": 613,
+            "samples": [
+              610,
+              614,
+              613,
+              618,
+              608
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.Profiler.cppm": {
+          "before": {
+            "median": 609,
+            "samples": [
+              616,
+              608,
+              619,
+              609,
+              606
+            ]
+          },
+          "after": {
+            "median": 612,
+            "samples": [
+              607,
+              608,
+              616,
+              612,
+              614
+            ]
+          }
+        },
+        "src/graphics/framegraph/Graphics.RenderGraph.Executor.cppm": {
+          "before": {
+            "median": 610,
+            "samples": [
+              607,
+              607,
+              613,
+              610,
+              630
+            ]
+          },
+          "after": {
+            "median": 611,
+            "samples": [
+              611,
+              611,
+              611,
+              608,
+              614
+            ]
+          }
+        },
+        "src/assets/Asset.ModelTexturePayload.cppm": {
+          "before": {
+            "median": 591,
+            "samples": [
+              602,
+              570,
+              593,
+              589,
+              591
+            ]
+          },
+          "after": {
+            "median": 570,
+            "samples": [
+              564,
+              570,
+              591,
+              593,
+              569
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.VisualizationOverlay.cppm": {
+          "before": {
+            "median": 593,
+            "samples": [
+              593,
+              598,
+              591,
+              583,
+              605
+            ]
+          },
+          "after": {
+            "median": 584,
+            "samples": [
+              578,
+              582,
+              600,
+              584,
+              648
+            ]
+          }
+        },
+        "src/core/Core.Config.EngineLoad.cppm": {
+          "before": {
+            "median": 587,
+            "samples": [
+              587,
+              580,
+              596,
+              590,
+              582
+            ]
+          },
+          "after": {
+            "median": 577,
+            "samples": [
+              572,
+              584,
+              586,
+              577,
+              576
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.ImGuiUploadHelper.cpp": {
+          "before": {
+            "median": 566,
+            "samples": [
+              561,
+              566,
+              584,
+              565,
+              581
+            ]
+          },
+          "after": {
+            "median": 565,
+            "samples": [
+              561,
+              565,
+              571,
+              565,
+              576
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.CameraSnapshots.cppm": {
+          "before": {
+            "median": 541,
+            "samples": [
+              545,
+              537,
+              549,
+              538,
+              541
+            ]
+          },
+          "after": {
+            "median": 547,
+            "samples": [
+              549,
+              551,
+              542,
+              547,
+              539
+            ]
+          }
+        },
+        "src/assets/Asset.EventBus.cpp": {
+          "before": {
+            "median": 541,
+            "samples": [
+              541,
+              532,
+              558,
+              541,
+              533
+            ]
+          },
+          "after": {
+            "median": 534,
+            "samples": [
+              529,
+              535,
+              533,
+              534,
+              573
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.Types.cppm": {
+          "before": {
+            "median": 541,
+            "samples": [
+              541,
+              542,
+              548,
+              541,
+              536
+            ]
+          },
+          "after": {
+            "median": 544,
+            "samples": [
+              540,
+              544,
+              545,
+              538,
+              545
+            ]
+          }
+        },
+        "src/assets/Asset.EventBus.cppm": {
+          "before": {
+            "median": 524,
+            "samples": [
+              528,
+              521,
+              526,
+              524,
+              516
+            ]
+          },
+          "after": {
+            "median": 523,
+            "samples": [
+              519,
+              518,
+              524,
+              523,
+              556
+            ]
+          }
+        },
+        "src/assets/Asset.ModelTexturePayload.cpp": {
+          "before": {
+            "median": 520,
+            "samples": [
+              525,
+              527,
+              519,
+              520,
+              508
+            ]
+          },
+          "after": {
+            "median": 519,
+            "samples": [
+              519,
+              551,
+              514,
+              510,
+              534
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.LightClusters.cppm": {
+          "before": {
+            "median": 526,
+            "samples": [
+              524,
+              526,
+              527,
+              531,
+              525
+            ]
+          },
+          "after": {
+            "median": 527,
+            "samples": [
+              522,
+              529,
+              527,
+              530,
+              525
+            ]
+          }
+        },
+        "src/core/Core.Config.Engine.cppm": {
+          "before": {
+            "median": 519,
+            "samples": [
+              519,
+              516,
+              531,
+              538,
+              512
+            ]
+          },
+          "after": {
+            "median": 513,
+            "samples": [
+              513,
+              512,
+              513,
+              507,
+              520
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.CameraSnapshots.cpp": {
+          "before": {
+            "median": 507,
+            "samples": [
+              516,
+              507,
+              514,
+              503,
+              501
+            ]
+          },
+          "after": {
+            "median": 507,
+            "samples": [
+              507,
+              508,
+              506,
+              507,
+              503
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.VisualizationPackets.cpp": {
+          "before": {
+            "median": 517,
+            "samples": [
+              513,
+              511,
+              544,
+              520,
+              517
+            ]
+          },
+          "after": {
+            "median": 516,
+            "samples": [
+              516,
+              516,
+              514,
+              523,
+              532
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.RenderingContract.cpp": {
+          "before": {
+            "median": 495,
+            "samples": [
+              495,
+              493,
+              498,
+              493,
+              496
+            ]
+          },
+          "after": {
+            "median": 492,
+            "samples": [
+              491,
+              492,
+              488,
+              493,
+              500
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.ImGuiUploadHelper.cppm": {
+          "before": {
+            "median": 498,
+            "samples": [
+              494,
+              494,
+              503,
+              498,
+              501
+            ]
+          },
+          "after": {
+            "median": 502,
+            "samples": [
+              497,
+              495,
+              505,
+              504,
+              502
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.PropertyTextureBake.cppm": {
+          "before": {
+            "median": 472,
+            "samples": [
+              471,
+              472,
+              489,
+              476,
+              472
+            ]
+          },
+          "after": {
+            "median": 474,
+            "samples": [
+              474,
+              472,
+              477,
+              477,
+              472
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.ComputeParallelPrimitives.cppm": {
+          "before": {
+            "median": 436,
+            "samples": [
+              448,
+              434,
+              448,
+              436,
+              432
+            ]
+          },
+          "after": {
+            "median": 433,
+            "samples": [
+              433,
+              433,
+              435,
+              435,
+              433
+            ]
+          }
+        },
+        "src/core/Core.CallbackRegistry.cppm": {
+          "before": {
+            "median": 440,
+            "samples": [
+              445,
+              431,
+              443,
+              440,
+              436
+            ]
+          },
+          "after": {
+            "median": 435,
+            "samples": [
+              435,
+              432,
+              434,
+              435,
+              463
+            ]
+          }
+        },
+        "src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cppm": {
+          "before": {
+            "median": 448,
+            "samples": [
+              445,
+              446,
+              448,
+              454,
+              448
+            ]
+          },
+          "after": {
+            "median": 452,
+            "samples": [
+              450,
+              452,
+              470,
+              457,
+              446
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cppm": {
+          "before": {
+            "median": 438,
+            "samples": [
+              443,
+              435,
+              435,
+              443,
+              438
+            ]
+          },
+          "after": {
+            "median": 438,
+            "samples": [
+              441,
+              437,
+              448,
+              434,
+              438
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.TransferQueue.cppm": {
+          "before": {
+            "median": 440,
+            "samples": [
+              440,
+              430,
+              448,
+              440,
+              427
+            ]
+          },
+          "after": {
+            "median": 434,
+            "samples": [
+              436,
+              437,
+              434,
+              430,
+              432
+            ]
+          }
+        },
+        "src/core/Core.Dag.Scheduler.Hazards.cpp": {
+          "before": {
+            "median": 433,
+            "samples": [
+              433,
+              424,
+              437,
+              428,
+              433
+            ]
+          },
+          "after": {
+            "median": 428,
+            "samples": [
+              420,
+              424,
+              432,
+              428,
+              464
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.RenderRecipeConfig.cppm": {
+          "before": {
+            "median": 434,
+            "samples": [
+              428,
+              430,
+              437,
+              434,
+              445
+            ]
+          },
+          "after": {
+            "median": 434,
+            "samples": [
+              428,
+              430,
+              434,
+              434,
+              435
+            ]
+          }
+        },
+        "src/core/Core.Dag.Scheduler.Types.cppm": {
+          "before": {
+            "median": 379,
+            "samples": [
+              388,
+              380,
+              379,
+              373,
+              374
+            ]
+          },
+          "after": {
+            "median": 372,
+            "samples": [
+              373,
+              372,
+              372,
+              369,
+              402
+            ]
+          }
+        },
+        "src/core/Core.IOBackend.cppm": {
+          "before": {
+            "median": 383,
+            "samples": [
+              383,
+              376,
+              382,
+              396,
+              383
+            ]
+          },
+          "after": {
+            "median": 378,
+            "samples": [
+              377,
+              377,
+              378,
+              383,
+              381
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.RenderingContract.cppm": {
+          "before": {
+            "median": 384,
+            "samples": [
+              383,
+              387,
+              388,
+              384,
+              382
+            ]
+          },
+          "after": {
+            "median": 388,
+            "samples": [
+              389,
+              392,
+              387,
+              388,
+              384
+            ]
+          }
+        },
+        "src/graphics/framegraph/Graphics.RenderGraph.Barriers.cpp": {
+          "before": {
+            "median": 383,
+            "samples": [
+              381,
+              383,
+              384,
+              382,
+              386
+            ]
+          },
+          "after": {
+            "median": 382,
+            "samples": [
+              381,
+              381,
+              382,
+              389,
+              422
+            ]
+          }
+        },
+        "src/core/Core.Memory.Polymorphic.cppm": {
+          "before": {
+            "median": 363,
+            "samples": [
+              373,
+              362,
+              363,
+              368,
+              358
+            ]
+          },
+          "after": {
+            "median": 365,
+            "samples": [
+              365,
+              365,
+              367,
+              362,
+              402
+            ]
+          }
+        },
+        "src/assets/Asset.ImportRouter.cpp": {
+          "before": {
+            "median": 370,
+            "samples": [
+              373,
+              370,
+              371,
+              369,
+              367
+            ]
+          },
+          "after": {
+            "median": 367,
+            "samples": [
+              366,
+              363,
+              367,
+              375,
+              398
+            ]
+          }
+        },
+        "src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cpp": {
+          "before": {
+            "median": 372,
+            "samples": [
+              373,
+              369,
+              372,
+              377,
+              372
+            ]
+          },
+          "after": {
+            "median": 371,
+            "samples": [
+              370,
+              365,
+              371,
+              378,
+              372
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.BufferTransfer.cpp": {
+          "before": {
+            "median": 370,
+            "samples": [
+              367,
+              374,
+              374,
+              367,
+              370
+            ]
+          },
+          "after": {
+            "median": 371,
+            "samples": [
+              371,
+              373,
+              368,
+              370,
+              372
+            ]
+          }
+        },
+        "src/graphics/framegraph/Graphics.RenderGraph.Resources.cppm": {
+          "before": {
+            "median": 362,
+            "samples": [
+              360,
+              362,
+              366,
+              364,
+              360
+            ]
+          },
+          "after": {
+            "median": 362,
+            "samples": [
+              362,
+              361,
+              371,
+              364,
+              362
+            ]
+          }
+        },
+        "src/assets/Asset.ImportRouter.cppm": {
+          "before": {
+            "median": 358,
+            "samples": [
+              358,
+              368,
+              363,
+              356,
+              358
+            ]
+          },
+          "after": {
+            "median": 366,
+            "samples": [
+              366,
+              367,
+              362,
+              366,
+              399
+            ]
+          }
+        },
+        "src/assets/Asset.Registry.cppm": {
+          "before": {
+            "median": 329,
+            "samples": [
+              339,
+              329,
+              329,
+              322,
+              323
+            ]
+          },
+          "after": {
+            "median": 330,
+            "samples": [
+              336,
+              330,
+              323,
+              330,
+              361
+            ]
+          }
+        },
+        "src/graphics/framegraph/Graphics.RenderGraph.TransientAllocator.cpp": {
+          "before": {
+            "median": 338,
+            "samples": [
+              339,
+              337,
+              334,
+              338,
+              338
+            ]
+          },
+          "after": {
+            "median": 340,
+            "samples": [
+              334,
+              336,
+              340,
+              343,
+              373
+            ]
+          }
+        },
+        "src/core/Core.ResourcePool.cppm": {
+          "before": {
+            "median": 333,
+            "samples": [
+              331,
+              333,
+              338,
+              335,
+              333
+            ]
+          },
+          "after": {
+            "median": 332,
+            "samples": [
+              330,
+              332,
+              332,
+              333,
+              340
+            ]
+          }
+        },
+        "src/assets/Asset.Registry.cpp": {
+          "before": {
+            "median": 310,
+            "samples": [
+              317,
+              308,
+              311,
+              305,
+              310
+            ]
+          },
+          "after": {
+            "median": 309,
+            "samples": [
+              308,
+              309,
+              312,
+              309,
+              343
+            ]
+          }
+        },
+        "src/core/Core.Hash.cppm": {
+          "before": {
+            "median": 313,
+            "samples": [
+              313,
+              311,
+              315,
+              315,
+              310
+            ]
+          },
+          "after": {
+            "median": 314,
+            "samples": [
+              314,
+              310,
+              316,
+              315,
+              313
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.PropertyTextureBake.cpp": {
+          "before": {
+            "median": 310,
+            "samples": [
+              306,
+              310,
+              310,
+              300,
+              313
+            ]
+          },
+          "after": {
+            "median": 304,
+            "samples": [
+              304,
+              304,
+              304,
+              303,
+              339
+            ]
+          }
+        },
+        "src/core/Core.StrongHandle.cppm": {
+          "before": {
+            "median": 292,
+            "samples": [
+              296,
+              294,
+              292,
+              285,
+              286
+            ]
+          },
+          "after": {
+            "median": 286,
+            "samples": [
+              282,
+              280,
+              289,
+              286,
+              306
+            ]
+          }
+        },
+        "src/core/Core.Dag.Scheduler.Hazards.cppm": {
+          "before": {
+            "median": 282,
+            "samples": [
+              290,
+              282,
+              285,
+              281,
+              282
+            ]
+          },
+          "after": {
+            "median": 282,
+            "samples": [
+              282,
+              286,
+              281,
+              279,
+              303
+            ]
+          }
+        },
+        "src/core/Core.IndexedHeap.cppm": {
+          "before": {
+            "median": 289,
+            "samples": [
+              288,
+              282,
+              290,
+              289,
+              289
+            ]
+          },
+          "after": {
+            "median": 284,
+            "samples": [
+              284,
+              284,
+              284,
+              289,
+              286
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.RenderCommandRouter.cpp": {
+          "before": {
+            "median": 282,
+            "samples": [
+              283,
+              282,
+              282,
+              279,
+              284
+            ]
+          },
+          "after": {
+            "median": 283,
+            "samples": [
+              281,
+              283,
+              285,
+              278,
+              287
+            ]
+          }
+        },
+        "src/core/Core.Config.Render.cppm": {
+          "before": {
+            "median": 274,
+            "samples": [
+              280,
+              274,
+              278,
+              273,
+              268
+            ]
+          },
+          "after": {
+            "median": 272,
+            "samples": [
+              271,
+              268,
+              275,
+              272,
+              275
+            ]
+          }
+        },
+        "src/core/Core.Dag.Scheduler.Compiler.cppm": {
+          "before": {
+            "median": 276,
+            "samples": [
+              277,
+              276,
+              283,
+              270,
+              273
+            ]
+          },
+          "after": {
+            "median": 278,
+            "samples": [
+              276,
+              279,
+              278,
+              271,
+              303
+            ]
+          }
+        },
+        "src/core/Core.Config.Window.cppm": {
+          "before": {
+            "median": 273,
+            "samples": [
+              274,
+              267,
+              274,
+              273,
+              269
+            ]
+          },
+          "after": {
+            "median": 269,
+            "samples": [
+              271,
+              267,
+              269,
+              277,
+              268
+            ]
+          }
+        },
+        "src/graphics/framegraph/Graphics.RenderGraph.TransientAllocator.cppm": {
+          "before": {
+            "median": 278,
+            "samples": [
+              274,
+              278,
+              278,
+              279,
+              276
+            ]
+          },
+          "after": {
+            "median": 279,
+            "samples": [
+              278,
+              275,
+              279,
+              280,
+              281
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.Descriptors.cppm": {
+          "before": {
+            "median": 273,
+            "samples": [
+              273,
+              285,
+              280,
+              270,
+              271
+            ]
+          },
+          "after": {
+            "median": 280,
+            "samples": [
+              282,
+              280,
+              277,
+              278,
+              283
+            ]
+          }
+        },
+        "src/core/Core.BoundedHeap.cppm": {
+          "before": {
+            "median": 264,
+            "samples": [
+              270,
+              259,
+              265,
+              264,
+              262
+            ]
+          },
+          "after": {
+            "median": 261,
+            "samples": [
+              260,
+              260,
+              261,
+              266,
+              261
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.Profiler.cpp": {
+          "before": {
+            "median": 271,
+            "samples": [
+              270,
+              267,
+              280,
+              271,
+              273
+            ]
+          },
+          "after": {
+            "median": 269,
+            "samples": [
+              266,
+              266,
+              272,
+              272,
+              269
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.BufferTransfer.cppm": {
+          "before": {
+            "median": 263,
+            "samples": [
+              263,
+              265,
+              263,
+              262,
+              259
+            ]
+          },
+          "after": {
+            "median": 263,
+            "samples": [
+              262,
+              265,
+              265,
+              262,
+              263
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.TextureUpload.cppm": {
+          "before": {
+            "median": 257,
+            "samples": [
+              257,
+              257,
+              260,
+              253,
+              258
+            ]
+          },
+          "after": {
+            "median": 260,
+            "samples": [
+              256,
+              260,
+              260,
+              255,
+              264
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.ImGui.cpp": {
+          "before": {
+            "median": 242,
+            "samples": [
+              242,
+              242,
+              240,
+              242,
+              244
+            ]
+          },
+          "after": {
+            "median": 242,
+            "samples": [
+              234,
+              242,
+              242,
+              241,
+              242
+            ]
+          }
+        },
+        "src/graphics/framegraph/Graphics.RenderGraph.Barriers.cppm": {
+          "before": {
+            "median": 231,
+            "samples": [
+              231,
+              234,
+              235,
+              231,
+              231
+            ]
+          },
+          "after": {
+            "median": 230,
+            "samples": [
+              231,
+              228,
+              230,
+              230,
+              230
+            ]
+          }
+        },
+        "src/core/Core.Tasks.Stats.cpp": {
+          "before": {
+            "median": 226,
+            "samples": [
+              226,
+              225,
+              225,
+              233,
+              226
+            ]
+          },
+          "after": {
+            "median": 224,
+            "samples": [
+              223,
+              224,
+              228,
+              223,
+              245
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Selection.Outline.cpp": {
+          "before": {
+            "median": 225,
+            "samples": [
+              224,
+              227,
+              225,
+              226,
+              224
+            ]
+          },
+          "after": {
+            "median": 225,
+            "samples": [
+              225,
+              225,
+              227,
+              225,
+              226
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.TextureUpload.cpp": {
+          "before": {
+            "median": 218,
+            "samples": [
+              213,
+              206,
+              222,
+              218,
+              218
+            ]
+          },
+          "after": {
+            "median": 213,
+            "samples": [
+              213,
+              208,
+              214,
+              214,
+              207
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.TransientDebug.Surface.cpp": {
+          "before": {
+            "median": 201,
+            "samples": [
+              201,
+              201,
+              202,
+              200,
+              202
+            ]
+          },
+          "after": {
+            "median": 204,
+            "samples": [
+              204,
+              200,
+              203,
+              206,
+              219
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.VisualizationOverlay.cpp": {
+          "before": {
+            "median": 184,
+            "samples": [
+              183,
+              182,
+              185,
+              184,
+              186
+            ]
+          },
+          "after": {
+            "median": 188,
+            "samples": [
+              183,
+              186,
+              189,
+              188,
+              198
+            ]
+          }
+        },
+        "src/core/Core.RingBuffer.cppm": {
+          "before": {
+            "median": 144,
+            "samples": [
+              149,
+              142,
+              144,
+              153,
+              141
+            ]
+          },
+          "after": {
+            "median": 141,
+            "samples": [
+              141,
+              145,
+              141,
+              141,
+              143
+            ]
+          }
+        },
+        "src/core/Core.Error.cppm": {
+          "before": {
+            "median": 147,
+            "samples": [
+              148,
+              145,
+              147,
+              161,
+              144
+            ]
+          },
+          "after": {
+            "median": 144,
+            "samples": [
+              144,
+              144,
+              145,
+              147,
+              143
+            ]
+          }
+        },
+        "src/core/Core.Memory.Common.cppm": {
+          "before": {
+            "median": 147,
+            "samples": [
+              146,
+              148,
+              147,
+              148,
+              145
+            ]
+          },
+          "after": {
+            "median": 147,
+            "samples": [
+              147,
+              147,
+              147,
+              146,
+              156
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.Bindless.cppm": {
+          "before": {
+            "median": 108,
+            "samples": [
+              110,
+              109,
+              107,
+              108,
+              105
+            ]
+          },
+          "after": {
+            "median": 104,
+            "samples": [
+              105,
+              104,
+              104,
+              104,
+              105
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.DebugView.cpp": {
+          "before": {
+            "median": 91,
+            "samples": [
+              91,
+              94,
+              91,
+              91,
+              95
+            ]
+          },
+          "after": {
+            "median": 92,
+            "samples": [
+              90,
+              90,
+              92,
+              92,
+              99
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.Device.cpp": {
+          "before": {
+            "median": 57,
+            "samples": [
+              58,
+              56,
+              61,
+              57,
+              57
+            ]
+          },
+          "after": {
+            "median": 57,
+            "samples": [
+              56,
+              57,
+              57,
+              58,
+              58
+            ]
+          }
+        },
+        "src/core/Core.Memory.Polymorphic.cpp": {
+          "before": {
+            "median": 56,
+            "samples": [
+              57,
+              55,
+              58,
+              55,
+              56
+            ]
+          },
+          "after": {
+            "median": 56,
+            "samples": [
+              55,
+              55,
+              56,
+              56,
+              63
+            ]
+          }
+        },
+        "src/core/Core.Memory.ScopeStack.cpp": {
+          "before": {
+            "median": 54,
+            "samples": [
+              53,
+              55,
+              54,
+              54,
+              54
+            ]
+          },
+          "after": {
+            "median": 53,
+            "samples": [
+              52,
+              51,
+              53,
+              53,
+              57
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.DebugView.cppm": {
+          "before": {
+            "median": 52,
+            "samples": [
+              52,
+              51,
+              52,
+              50,
+              53
+            ]
+          },
+          "after": {
+            "median": 51,
+            "samples": [
+              51,
+              51,
+              52,
+              51,
+              55
+            ]
+          }
+        },
+        "src/core/Core.HandleLease.cppm": {
+          "before": {
+            "median": 49,
+            "samples": [
+              50,
+              49,
+              50,
+              49,
+              49
+            ]
+          },
+          "after": {
+            "median": 49,
+            "samples": [
+              47,
+              49,
+              50,
+              49,
+              49
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Shadows.cppm": {
+          "before": {
+            "median": 48,
+            "samples": [
+              48,
+              47,
+              48,
+              48,
+              48
+            ]
+          },
+          "after": {
+            "median": 48,
+            "samples": [
+              48,
+              48,
+              49,
+              48,
+              49
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Shadows.cpp": {
+          "before": {
+            "median": 47,
+            "samples": [
+              46,
+              47,
+              47,
+              47,
+              47
+            ]
+          },
+          "after": {
+            "median": 47,
+            "samples": [
+              47,
+              48,
+              47,
+              48,
+              47
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Deferred.GBuffers.cppm": {
+          "before": {
+            "median": 44,
+            "samples": [
+              44,
+              43,
+              43,
+              44,
+              45
+            ]
+          },
+          "after": {
+            "median": 44,
+            "samples": [
+              44,
+              43,
+              45,
+              43,
+              44
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Forward.Line.cppm": {
+          "before": {
+            "median": 44,
+            "samples": [
+              44,
+              44,
+              45,
+              43,
+              46
+            ]
+          },
+          "after": {
+            "median": 45,
+            "samples": [
+              45,
+              44,
+              45,
+              45,
+              46
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Forward.Surface.cppm": {
+          "before": {
+            "median": 44,
+            "samples": [
+              44,
+              45,
+              44,
+              43,
+              47
+            ]
+          },
+          "after": {
+            "median": 45,
+            "samples": [
+              45,
+              45,
+              45,
+              44,
+              44
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Selection.EdgeId.cppm": {
+          "before": {
+            "median": 44,
+            "samples": [
+              44,
+              47,
+              44,
+              44,
+              46
+            ]
+          },
+          "after": {
+            "median": 44,
+            "samples": [
+              43,
+              43,
+              44,
+              45,
+              44
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Selection.EdgeId.cpp": {
+          "before": {
+            "median": 43,
+            "samples": [
+              44,
+              44,
+              43,
+              43,
+              43
+            ]
+          },
+          "after": {
+            "median": 43,
+            "samples": [
+              41,
+              41,
+              44,
+              44,
+              43
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Selection.FaceId.cpp": {
+          "before": {
+            "median": 44,
+            "samples": [
+              44,
+              44,
+              42,
+              44,
+              44
+            ]
+          },
+          "after": {
+            "median": 44,
+            "samples": [
+              42,
+              42,
+              45,
+              44,
+              44
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Deferred.Lighting.cppm": {
+          "before": {
+            "median": 44,
+            "samples": [
+              43,
+              44,
+              44,
+              42,
+              44
+            ]
+          },
+          "after": {
+            "median": 44,
+            "samples": [
+              43,
+              45,
+              43,
+              44,
+              44
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Deferred.Lighting.cpp": {
+          "before": {
+            "median": 43,
+            "samples": [
+              43,
+              44,
+              43,
+              43,
+              44
+            ]
+          },
+          "after": {
+            "median": 45,
+            "samples": [
+              45,
+              45,
+              45,
+              44,
+              45
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Forward.Point.cppm": {
+          "before": {
+            "median": 44,
+            "samples": [
+              43,
+              44,
+              44,
+              44,
+              45
+            ]
+          },
+          "after": {
+            "median": 44,
+            "samples": [
+              44,
+              44,
+              44,
+              44,
+              45
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Forward.Line.cpp": {
+          "before": {
+            "median": 43,
+            "samples": [
+              43,
+              43,
+              43,
+              43,
+              44
+            ]
+          },
+          "after": {
+            "median": 43,
+            "samples": [
+              44,
+              43,
+              44,
+              43,
+              43
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Forward.Point.cpp": {
+          "before": {
+            "median": 43,
+            "samples": [
+              43,
+              44,
+              43,
+              43,
+              45
+            ]
+          },
+          "after": {
+            "median": 44,
+            "samples": [
+              43,
+              44,
+              44,
+              43,
+              44
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Forward.Surface.cpp": {
+          "before": {
+            "median": 43,
+            "samples": [
+              43,
+              43,
+              44,
+              43,
+              45
+            ]
+          },
+          "after": {
+            "median": 44,
+            "samples": [
+              44,
+              44,
+              45,
+              44,
+              43
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Selection.EntityId.cppm": {
+          "before": {
+            "median": 44,
+            "samples": [
+              43,
+              46,
+              43,
+              44,
+              44
+            ]
+          },
+          "after": {
+            "median": 44,
+            "samples": [
+              43,
+              44,
+              45,
+              45,
+              43
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Selection.FaceId.cppm": {
+          "before": {
+            "median": 44,
+            "samples": [
+              43,
+              45,
+              43,
+              44,
+              45
+            ]
+          },
+          "after": {
+            "median": 44,
+            "samples": [
+              43,
+              43,
+              45,
+              45,
+              44
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Selection.Outline.cppm": {
+          "before": {
+            "median": 43,
+            "samples": [
+              43,
+              44,
+              43,
+              42,
+              44
+            ]
+          },
+          "after": {
+            "median": 43,
+            "samples": [
+              42,
+              43,
+              44,
+              43,
+              43
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Selection.PointId.cppm": {
+          "before": {
+            "median": 43,
+            "samples": [
+              43,
+              43,
+              43,
+              43,
+              44
+            ]
+          },
+          "after": {
+            "median": 44,
+            "samples": [
+              44,
+              44,
+              44,
+              44,
+              44
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Deferred.GBuffers.cpp": {
+          "before": {
+            "median": 43,
+            "samples": [
+              42,
+              42,
+              44,
+              43,
+              44
+            ]
+          },
+          "after": {
+            "median": 44,
+            "samples": [
+              45,
+              44,
+              44,
+              44,
+              44
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.PostProcess.Bloom.cpp": {
+          "before": {
+            "median": 40,
+            "samples": [
+              42,
+              40,
+              39,
+              42,
+              40
+            ]
+          },
+          "after": {
+            "median": 40,
+            "samples": [
+              39,
+              40,
+              40,
+              42,
+              41
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Selection.EntityId.cpp": {
+          "before": {
+            "median": 44,
+            "samples": [
+              42,
+              44,
+              43,
+              44,
+              45
+            ]
+          },
+          "after": {
+            "median": 44,
+            "samples": [
+              42,
+              42,
+              44,
+              45,
+              44
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Selection.PointId.cpp": {
+          "before": {
+            "median": 42,
+            "samples": [
+              42,
+              43,
+              43,
+              42,
+              42
+            ]
+          },
+          "after": {
+            "median": 43,
+            "samples": [
+              43,
+              43,
+              43,
+              42,
+              42
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.Transfer.cppm": {
+          "before": {
+            "median": 41,
+            "samples": [
+              41,
+              41,
+              40,
+              41,
+              40
+            ]
+          },
+          "after": {
+            "median": 41,
+            "samples": [
+              41,
+              40,
+              41,
+              41,
+              42
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.PostProcess.Bloom.cppm": {
+          "before": {
+            "median": 43,
+            "samples": [
+              41,
+              43,
+              43,
+              43,
+              43
+            ]
+          },
+          "after": {
+            "median": 42,
+            "samples": [
+              41,
+              42,
+              43,
+              44,
+              41
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.PostProcess.Histogram.cppm": {
+          "before": {
+            "median": 40,
+            "samples": [
+              40,
+              40,
+              40,
+              40,
+              41
+            ]
+          },
+          "after": {
+            "median": 41,
+            "samples": [
+              41,
+              42,
+              41,
+              40,
+              42
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.PostProcess.Histogram.cpp": {
+          "before": {
+            "median": 39,
+            "samples": [
+              40,
+              39,
+              38,
+              39,
+              40
+            ]
+          },
+          "after": {
+            "median": 40,
+            "samples": [
+              40,
+              40,
+              41,
+              40,
+              39
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.PostProcess.SMAA.cppm": {
+          "before": {
+            "median": 41,
+            "samples": [
+              40,
+              43,
+              41,
+              40,
+              42
+            ]
+          },
+          "after": {
+            "median": 41,
+            "samples": [
+              41,
+              41,
+              41,
+              41,
+              41
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.PostProcess.ToneMap.cppm": {
+          "before": {
+            "median": 41,
+            "samples": [
+              40,
+              42,
+              40,
+              41,
+              41
+            ]
+          },
+          "after": {
+            "median": 41,
+            "samples": [
+              39,
+              38,
+              41,
+              41,
+              41
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.DepthPrepass.cpp": {
+          "before": {
+            "median": 39,
+            "samples": [
+              39,
+              40,
+              40,
+              39,
+              39
+            ]
+          },
+          "after": {
+            "median": 40,
+            "samples": [
+              40,
+              40,
+              41,
+              39,
+              40
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.PostProcess.FXAA.cppm": {
+          "before": {
+            "median": 39,
+            "samples": [
+              39,
+              38,
+              39,
+              40,
+              40
+            ]
+          },
+          "after": {
+            "median": 39,
+            "samples": [
+              39,
+              39,
+              39,
+              39,
+              39
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.PostProcess.SMAA.cpp": {
+          "before": {
+            "median": 39,
+            "samples": [
+              39,
+              39,
+              39,
+              38,
+              39
+            ]
+          },
+          "after": {
+            "median": 39,
+            "samples": [
+              38,
+              39,
+              39,
+              40,
+              39
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Culling.cppm": {
+          "before": {
+            "median": 38,
+            "samples": [
+              38,
+              38,
+              39,
+              37,
+              37
+            ]
+          },
+          "after": {
+            "median": 37,
+            "samples": [
+              37,
+              37,
+              37,
+              37,
+              38
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Culling.cpp": {
+          "before": {
+            "median": 35,
+            "samples": [
+              35,
+              36,
+              35,
+              35,
+              37
+            ]
+          },
+          "after": {
+            "median": 36,
+            "samples": [
+              35,
+              35,
+              36,
+              36,
+              36
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.DepthPrepass.cppm": {
+          "before": {
+            "median": 35,
+            "samples": [
+              35,
+              35,
+              36,
+              35,
+              35
+            ]
+          },
+          "after": {
+            "median": 36,
+            "samples": [
+              36,
+              35,
+              36,
+              35,
+              36
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.ImGui.cppm": {
+          "before": {
+            "median": 35,
+            "samples": [
+              35,
+              35,
+              35,
+              35,
+              37
+            ]
+          },
+          "after": {
+            "median": 35,
+            "samples": [
+              35,
+              33,
+              36,
+              36,
+              35
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.PostProcess.ToneMap.cpp": {
+          "before": {
+            "median": 36,
+            "samples": [
+              35,
+              34,
+              36,
+              36,
+              36
+            ]
+          },
+          "after": {
+            "median": 36,
+            "samples": [
+              36,
+              36,
+              35,
+              36,
+              37
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.PostProcess.FXAA.cpp": {
+          "before": {
+            "median": 35,
+            "samples": [
+              34,
+              35,
+              35,
+              35,
+              35
+            ]
+          },
+          "after": {
+            "median": 34,
+            "samples": [
+              34,
+              36,
+              35,
+              34,
+              34
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.CommandContext.cpp": {
+          "before": {
+            "median": 25,
+            "samples": [
+              26,
+              25,
+              25,
+              25,
+              25
+            ]
+          },
+          "after": {
+            "median": 25,
+            "samples": [
+              25,
+              25,
+              24,
+              25,
+              26
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Present.cppm": {
+          "before": {
+            "median": 22,
+            "samples": [
+              22,
+              21,
+              21,
+              23,
+              22
+            ]
+          },
+          "after": {
+            "median": 21,
+            "samples": [
+              21,
+              22,
+              22,
+              21,
+              21
+            ]
+          }
+        },
+        "src/core/Core.Dag.Scheduler.Policy.cppm": {
+          "before": {
+            "median": 20,
+            "samples": [
+              21,
+              20,
+              20,
+              20,
+              19
+            ]
+          },
+          "after": {
+            "median": 20,
+            "samples": [
+              20,
+              20,
+              21,
+              20,
+              21
+            ]
+          }
+        },
+        "src/assets/Asset.OperationStatus.cppm": {
+          "before": {
+            "median": 21,
+            "samples": [
+              21,
+              21,
+              20,
+              21,
+              21
+            ]
+          },
+          "after": {
+            "median": 20,
+            "samples": [
+              20,
+              21,
+              20,
+              20,
+              23
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.BufferView.cppm": {
+          "before": {
+            "median": 21,
+            "samples": [
+              21,
+              21,
+              21,
+              21,
+              21
+            ]
+          },
+          "after": {
+            "median": 21,
+            "samples": [
+              21,
+              21,
+              21,
+              21,
+              22
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.RenderFrameInput.cppm": {
+          "before": {
+            "median": 22,
+            "samples": [
+              21,
+              21,
+              22,
+              22,
+              22
+            ]
+          },
+          "after": {
+            "median": 22,
+            "samples": [
+              21,
+              22,
+              22,
+              22,
+              21
+            ]
+          }
+        },
+        "src/graphics/renderer/Passes/Pass.Present.cpp": {
+          "before": {
+            "median": 22,
+            "samples": [
+              21,
+              23,
+              22,
+              22,
+              22
+            ]
+          },
+          "after": {
+            "median": 21,
+            "samples": [
+              21,
+              21,
+              23,
+              21,
+              22
+            ]
+          }
+        },
+        "src/core/Core.Geometry2D.cppm": {
+          "before": {
+            "median": 19,
+            "samples": [
+              20,
+              20,
+              19,
+              19,
+              19
+            ]
+          },
+          "after": {
+            "median": 19,
+            "samples": [
+              19,
+              19,
+              19,
+              19,
+              19
+            ]
+          }
+        },
+        "src/assets/Asset.TypePool.cppm": {
+          "before": {
+            "median": 19,
+            "samples": [
+              20,
+              19,
+              20,
+              19,
+              19
+            ]
+          },
+          "after": {
+            "median": 19,
+            "samples": [
+              19,
+              19,
+              19,
+              19,
+              21
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.FrameHandle.cppm": {
+          "before": {
+            "median": 20,
+            "samples": [
+              20,
+              20,
+              19,
+              20,
+              20
+            ]
+          },
+          "after": {
+            "median": 19,
+            "samples": [
+              19,
+              19,
+              19,
+              19,
+              20
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.Colormap.cppm": {
+          "before": {
+            "median": 20,
+            "samples": [
+              20,
+              20,
+              20,
+              20,
+              19
+            ]
+          },
+          "after": {
+            "median": 19,
+            "samples": [
+              19,
+              20,
+              19,
+              19,
+              19
+            ]
+          }
+        },
+        "src/core/Core.Config.Simulation.cppm": {
+          "before": {
+            "median": 17,
+            "samples": [
+              19,
+              17,
+              17,
+              18,
+              17
+            ]
+          },
+          "after": {
+            "median": 17,
+            "samples": [
+              17,
+              17,
+              17,
+              17,
+              17
+            ]
+          }
+        },
+        "src/core/Core.Memory.cppm": {
+          "before": {
+            "median": 19,
+            "samples": [
+              19,
+              18,
+              19,
+              18,
+              19
+            ]
+          },
+          "after": {
+            "median": 19,
+            "samples": [
+              19,
+              18,
+              19,
+              18,
+              20
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.QueueAffinity.cppm": {
+          "before": {
+            "median": 20,
+            "samples": [
+              19,
+              19,
+              20,
+              20,
+              20
+            ]
+          },
+          "after": {
+            "median": 20,
+            "samples": [
+              19,
+              19,
+              20,
+              20,
+              21
+            ]
+          }
+        },
+        "src/graphics/rhi/RHI.Handles.cppm": {
+          "before": {
+            "median": 18,
+            "samples": [
+              18,
+              17,
+              18,
+              17,
+              18
+            ]
+          },
+          "after": {
+            "median": 17,
+            "samples": [
+              18,
+              17,
+              18,
+              17,
+              17
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.SceneHandles.cppm": {
+          "before": {
+            "median": 18,
+            "samples": [
+              17,
+              18,
+              18,
+              18,
+              17
+            ]
+          },
+          "after": {
+            "median": 18,
+            "samples": [
+              18,
+              18,
+              18,
+              18,
+              18
+            ]
+          }
+        },
+        "src/core/Core.Std.cppm": {
+          "after": {
+            "median": 1098,
+            "samples": [
+              1093,
+              1098,
+              1119,
+              1096,
+              1191
+            ]
+          }
+        }
+      },
+      "renderer_impl": {
+        "src/graphics/renderer/Graphics.Renderer.cpp": {
+          "before": {
+            "median": 12789,
+            "samples": [
+              12789,
+              12632,
+              12799,
+              12634,
+              13128
+            ]
+          },
+          "after": {
+            "median": 12784,
+            "samples": [
+              12738,
+              12708,
+              12931,
+              12784,
+              14188
+            ]
+          }
+        }
+      },
+      "renderer_interface": {
+        "src/graphics/renderer/Graphics.Renderer.cpp": {
+          "before": {
+            "median": 12665,
+            "samples": [
+              12554,
+              13063,
+              12628,
+              12665,
+              12714
+            ]
+          },
+          "after": {
+            "median": 12854,
+            "samples": [
+              12692,
+              12889,
+              12854,
+              12761,
+              14321
+            ]
+          }
+        },
+        "src/graphics/renderer/Graphics.Renderer.cppm": {
+          "before": {
+            "median": 11683,
+            "samples": [
+              11636,
+              12014,
+              11751,
+              11674,
+              11683
+            ]
+          },
+          "after": {
+            "median": 1095,
+            "samples": [
+              1091,
+              1092,
+              1095,
+              1104,
+              1208
+            ]
+          }
+        }
+      }
+    }
+  },
+  "dependencies_before_during_after": {
+    "sha256": "0ecb7332b14479eabffbc061dba9d94492bfb494a936e9be5bf2caf384e97c54",
+    "file_count": 1728
+  },
+  "freeze": {
+    "frozen_at": "2026-09-15T23:36:14.543254+00:00",
+    "source_revisions": {
+      "before": "dc606482aecec0f0412b06b7a811a62835e98438",
+      "after": "5537a4dda505959e6e818713963ce43ad7805c90"
+    },
+    "sha256": {
+      "benchmarks/ci/manifests/graphics_standard_declarations.yaml": "bb384dbe34c5933b6624757cb46dcac8d8fecf731dda5b80af91e88dee374c62",
+      "benchmarks/ci/manifests/snapshot_shared_std.yaml": "10be23d10dda510a27e76c6f2f3f9e2addf625ac178d21d885242f92d6016bfa",
+      "tools/analysis/benchmark_compile_iteration.py": "256fa3e5d4b85bda3b244328aa70904f5f0bbd7eb295db1e687132523561e423",
+      "/tmp/intrinsic-graphics144/snapshot-control.py": "edfeb7e8ec7ba25020fee94456ee60916e7707b1a29f6b8ea996ae92740fefe8"
+    },
+    "timed_population_exists": false
+  }
+}

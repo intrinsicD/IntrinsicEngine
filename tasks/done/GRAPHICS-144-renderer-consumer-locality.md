@@ -41,25 +41,25 @@ consumer contracts and less repeated work while preserving rendering capabilitie
   does not absorb those independent changes.
 
 ## Acceptance criteria
-- [ ] Audit current interface types, private state, imports and consumers;
+- [x] Audit current interface types, private state, imports and consumers;
       select a bounded cost-backed change and compare simpler alternatives with Claude.
-- [ ] Implement without feature loss, new live-ECS/AssetService dependencies,
+- [x] Implement without feature loss, new live-ECS/AssetService dependencies,
       compatibility wrappers or public subsystem forwarding. Record source/file
       and ownership deltas, including any justified new private boundary.
-- [ ] Reuse the compiler-boundary test helper and retain existing guards;
+- [x] Reuse the compiler-boundary test helper and retain existing guards;
       demonstrate the selected regression mechanism on the original source and
       its removal afterward. For an import cut use original/final compiler
       metadata; for serialization use paired phase/BMI diagnostics and matched
       producer/consumer timing including the new owner. Preserve real material,
       UV and extraction consumers.
-- [ ] Pass focused and full CPU checks. Verify changed module attachment with
+- [x] Pass focused and full CPU checks. Verify changed module attachment with
       fresh cache-off minimum-supported Clang; if GPU resource lifetime or upload
       behavior changes, run the affected promoted Vulkan tests under ci-vulkan.
-- [ ] Compare matched renderer implementation/interface edit probes and the
+- [x] Compare matched renderer implementation/interface edit probes and the
       graphics-library target with the existing runner. Keep negative results;
       reject extra complexity without benefit or record an evidence-backed
       no-change verdict. Do not extrapolate target timings to the whole engine.
-- [ ] Resolve Claude's fixed-diff review, synchronize graphics documentation and
+- [x] Resolve Claude's fixed-diff review, synchronize graphics documentation and
       changed inventory, and retire with exact source/test/measurement evidence.
 
 ## Verification
@@ -143,3 +143,36 @@ is a diagnostic lead, not a measured renderer improvement.
   inspected, retaining existing lifecycle/ownership comments outside this slice.
 - Matched graphics target and snapshot-owner measurements remain required before
   retirement. No speedup is claimed from the preliminary single traces.
+
+
+## Completion — 2026-09-16
+Retired at CPUContracted, the intended compile-locality refactor endpoint.
+Commit reference: implementation `5537a4dda`; manifest checkpoints `7061e4e8a` and `70fb1222c`;
+this evidence/retirement commit binds the accepted result.
+
+[Report, all twenty records and raw evidence](../../ara/evidence/tables/graphics144_shared_std_measurement.md)
+retain two five-sample-per-arm cohorts. Clean graphics-library median changes
+79.403 → 71.319 seconds; renderer-interface edit plus implementation consumer
+24.523 → 14.071 seconds. All candidates pay the added Core.Std producer in the
+clean graphics target. Implementation-only ranges overlap. Isolated snapshot
+owner+interface changes 1.690 → 1.753 seconds; the snapshot interface itself has
+overlapping ranges. No whole-engine, runtime or general speedup claim; every
+canonical result remains claim_eligible:false. No timed sample was discarded.
+
+Claude accepted the results; clarify different owner BMI artifacts and retain the
+slow final candidate. Correct the reviewer's all-four-scenarios wording: it is the
+maximum of the three compilation scenarios, not no-op. All commands/dependencies
+and stable source populations passed final checks; phase controls show why either
+include change alone leaves more serialization work.
+
+Clean-workshop rows 1–4 and 8 pass: standard-only Core ownership, no target-link
+addition, original public std types, unchanged renderer implementation state,
+removed private-import exception. Rows 5–6 unchanged; row 7 is the CPUContracted
+refactor endpoint. Source delta is +6 C++ lines and zero net files/modules, 419
+modules. This is reduced repeated compilation, not a source-line reduction.
+
+[GRAPHICS-145](../backlog/rendering/GRAPHICS-145-renderer-implementation-frontend-cost.md)
+owns the remaining implementation frontend/template cost, supported by a separate
+final-source trace. RUNTIME-267 still owns config/frame value ownership; do not
+replace its embedded prepared frame with dangling references. UI-037, GRAPHICS-105,
+LEGACY-043 and BUILD-006 retain their independent scope.

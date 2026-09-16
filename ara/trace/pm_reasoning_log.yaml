@@ -2548,3 +2548,14 @@ entries:
       line count. Clang20 evidence is compilation only; CPU tests execute under canonical Clang23.
     - Existing open research topics remain referenced; no abandonment or new closure signal is inferred for their broader architecture/product/method
       hypotheses. Preserve their existing stale flags.
+
+  - turn: 2026-09-16_001#2
+    notes:
+    - Crystallize O233/C100 through the retained implementation/report decision N604, not inferred user endorsement.
+      All 20 local records remain claim_eligible:false and two independent scopes cannot be summed.
+    - Record the small isolated owner cost and overlapping implementation/snapshot ranges. Separate diagnostic BMI
+      sizes and trace phases; retain last candidate, reject unmeasured noise causation.
+    - 'No source-line reduction: net 6 C++ lines, zero new modules. Fresh Clang 20 is compile evidence; CPU tests run canonical Clang 23.
+      GRAPHICS-145 owns remaining frontend work; RUNTIME-267 ownership audit did not implement a facade.'
+    - Existing staged topics remain referenced by ongoing owners and open threads; no new closure or abandonment signal
+      for unrelated method, architecture or broader C92 hypotheses. Preserve existing stale flags.

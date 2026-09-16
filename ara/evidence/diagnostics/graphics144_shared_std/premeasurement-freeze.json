@@ -1,0 +1,14 @@
+{
+  "frozen_at": "2026-09-15T23:36:14.543254+00:00",
+  "source_revisions": {
+    "before": "dc606482aecec0f0412b06b7a811a62835e98438",
+    "after": "5537a4dda505959e6e818713963ce43ad7805c90"
+  },
+  "sha256": {
+    "benchmarks/ci/manifests/graphics_standard_declarations.yaml": "bb384dbe34c5933b6624757cb46dcac8d8fecf731dda5b80af91e88dee374c62",
+    "benchmarks/ci/manifests/snapshot_shared_std.yaml": "10be23d10dda510a27e76c6f2f3f9e2addf625ac178d21d885242f92d6016bfa",
+    "tools/analysis/benchmark_compile_iteration.py": "256fa3e5d4b85bda3b244328aa70904f5f0bbd7eb295db1e687132523561e423",
+    "/tmp/intrinsic-graphics144/snapshot-control.py": "edfeb7e8ec7ba25020fee94456ee60916e7707b1a29f6b8ea996ae92740fefe8"
+  },
+  "timed_population_exists": false
+}

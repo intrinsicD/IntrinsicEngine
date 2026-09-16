@@ -13029,3 +13029,55 @@ tree:
     - tasks/done/RUNTIME-268-workspace-snapshot-bmi-serialization.md
     - ara/evidence/tables/runtime268_snapshot_std_measurement.md
     status: resolved
+
+  - id: N602
+    type: decision
+    title: Keep config ownership intact while selecting renderer serialization work
+    provenance: ai-executed
+    timestamp: '2026-09-16T02:03:43+02:00'
+    choice: 'RUNTIME-267 stays open: request/result config values and embedded prepared frames require complete types.
+      Replacing fields with references to construction temporaries would dangle; a session facade adds ownership and
+      forwarding without removing the underlying contract. Select the measured renderer serialization slice instead.'
+    alternatives:
+    - Treat simulated Claude tool calls as repository evidence
+    - Remove an embedded frame definition without moving its actual ownership
+    - Add opaque ownership solely to hide one config dependency
+    evidence:
+    - tasks/backlog/runtime/RUNTIME-267-processing-config-consumer-locality.md
+    - ara/evidence/tables/graphics144_shared_std_measurement.md
+    status: resolved
+  - id: N603
+    type: experiment
+    title: Measure shared standard declarations and GLM narrowing with owner cost charged
+    provenance: ai-executed
+    timestamp: '2026-09-16T02:03:43+02:00'
+    result: Two retained five-sample-per-arm cohorts. Graphics clean median 79.403 to 71.319 seconds, interface edit
+      24.523 to 14.071; 267 to 268 clean compiler units, unchanged 2 interface units. Snapshot controlled pair 1.690
+      to 1.753 seconds; implementation/snapshot-interface ranges overlap. All 20 canonical records claim_eligible:false.
+      Isolated partial variants retain more renderer serialization. Separate final implementation trace is frontend
+      dominated, assigned to GRAPHICS-145. No discarded sample or whole-engine/runtime claim.
+    evidence:
+    - O233
+    - ara/evidence/tables/graphics144_shared_std_measurement.md
+    - ara/evidence/diagnostics/graphics144_shared_std/evidence-index.json
+    status: resolved
+  - id: N604
+    type: decision
+    title: Retain shared Core standard declarations and retire GRAPHICS-144
+    provenance: ai-executed
+    timestamp: '2026-09-16T02:03:43+02:00'
+    choice: 'Keep verified 5537a4dda: move one declaration owner, original std types and renderer state unchanged,
+      net 6 C++ lines and zero new modules. Claude source/protocol/results findings resolved. Canonical CPU 4664 passes,
+      one expected skip, 444 focused passes, fresh Clang 20 editor closure and final contract objects compile. Retire
+      GRAPHICS-144 and record GRAPHICS-145; RUNTIME-267 and independent UI/material/cache tasks remain open.'
+    alternatives:
+    - Duplicate the runtime Std helper in graphics
+    - Count interface-only savings without added producer cost
+    - Drop the slower last sample or add the two independent cohort totals
+    - Assume file splitting resolves the remaining template/frontend cost
+    evidence:
+    - O233
+    - N603
+    - ara/evidence/tables/graphics144_shared_std_measurement.md
+    - tasks/done/GRAPHICS-144-renderer-consumer-locality.md
+    status: resolved
