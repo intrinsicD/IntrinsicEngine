@@ -434,13 +434,7 @@ TEST(SandboxEditorUi, ProgressivePoissonCommandPublishesPointPropertiesAndVisual
     EXPECT_EQ(vis.ScalarDomain, G::VisualizationConfig::Domain::Vertex);
     EXPECT_EQ(vis.ScalarFieldName, "v:poisson_rank");
 
-    // Availability is a model fact; the run outcome belongs to the point-set
-    // family frame, so the model no longer republishes it.
-    const Runtime::EditorDomainWindowModel model =
-        Runtime::BuildEditorDomainWindowModel(
-            context,
-            Runtime::EditorDomainWindowKind::PointCloud);
-    EXPECT_TRUE(model.Processing.ProgressivePoissonAvailable);
+
 }
 
 TEST(SandboxEditorUi,
@@ -3408,6 +3402,7 @@ TEST(SandboxEditorUi, ProgressivePoissonBindsMeshFaceSamplesAndNamedOutputsWithU
         }
         Extrinsic::Tests::EditorJobHarness jobs;
         if (queued) jobs.Attach(context);
+        EXPECT_TRUE(Runtime::PreviewEditorProgressivePoissonCommand(context, command).Enabled);
         const auto result = Runtime::ApplyEditorProgressivePoissonCommand(context, command);
         if (queued)
         {
@@ -3423,4 +3418,72 @@ TEST(SandboxEditorUi, ProgressivePoissonBindsMeshFaceSamplesAndNamedOutputsWithU
         ASSERT_TRUE(history.Redo().Succeeded());
         EXPECT_TRUE(registry.Raw().get<GS::Faces>(mesh).Properties.Exists(command.Config.Level.Name));
     }
+}
+
+TEST(SandboxEditorUi, ProgressivePoissonAdmissionSharesTypedValidation)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    auto context = MakeContext(registry, selection);
+    const auto cloud = MakeSelectable(registry, "Admission");
+    AddPointCloudSource(registry, cloud, 3u);
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
+                 {{0.f, 0.f, 0.f}, {1.f, 0.f, 0.f}, {0.f, 1.f, 0.f}});
+    const Runtime::EditorProgressivePoissonCommand valid{
+        .StableEntityId = Runtime::SelectionController::ToStableEntityId(cloud)};
+    ASSERT_TRUE(Runtime::PreviewEditorProgressivePoissonCommand(context, valid).Enabled);
+    const auto rejected = [&](const auto& command, Runtime::EditorCommandStatus status) {
+        const auto preview = Runtime::PreviewEditorProgressivePoissonCommand(context, command);
+        const auto result = Runtime::ApplyEditorProgressivePoissonCommand(context, command);
+        EXPECT_FALSE(preview.Enabled);
+        EXPECT_FALSE(preview.DisabledReason.empty());
+        EXPECT_EQ(preview.DisabledReason, result.Message);
+        EXPECT_EQ(result.Status, status);
+    };
+    auto command = valid;
+    command.Config.Dimension = 1u;
+    command.StableEntityId = 0u;
+    rejected(command, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    command = valid;
+    command.StableEntityId = 0u;
+    rejected(command, Runtime::EditorCommandStatus::StaleEntity);
+    auto* scene = context.Scene;
+    context.Scene = nullptr;
+    rejected(command, Runtime::EditorCommandStatus::MissingScene);
+    context.Scene = scene;
+    command = valid;
+    command.Config.Positions.Domain = Runtime::GeometryElementDomain::MeshFace;
+    rejected(command, Runtime::EditorCommandStatus::UnsupportedGeometryDomain);
+
+    using Config = Runtime::ProgressivePoissonPlaygroundConfig;
+    const std::array<void(*)(Config&), 8> invalidBindings{{
+        [](Config& c) { c.Level.Name.clear(); },
+        [](Config& c) { c.Rank.Name = c.Level.Name; },
+        [](Config& c) { c.PrefixVisible.Name = c.Positions.Name; },
+        [](Config& c) { c.Level.Name = "v:deleted"; },
+        [](Config& c) { c.Level.Name.push_back('\0'); },
+        [](Config& c) { c.Level.Domain = Runtime::GeometryElementDomain::MeshFace; },
+        [](Config& c) { c.Level.ValueKind = Geometry::PropertyValueKind::Vec3; },
+        [](Config& c) { c.Positions.ValueKind = Geometry::PropertyValueKind::Float; },
+    }};
+    for (std::size_t i = 0; i < invalidBindings.size(); ++i)
+    {
+        SCOPED_TRACE(i);
+        command = valid;
+        invalidBindings[i](command.Config);
+        EXPECT_FALSE(Runtime::IsValidProgressivePoissonPropertyBindings(command.Config));
+        EXPECT_FALSE(Runtime::ValidateProgressivePoissonConfigSection(
+            Runtime::SerializeProgressivePoissonPlaygroundConfig(command.Config), {}, "test").Usable());
+        rejected(command, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    }
+    // File loading retains its numeric fallback policy; typed commands retain
+    // the reference kernel's positive-value rules and method-side clamping.
+    command = valid;
+    command.Config.GridWidth = 4097u;
+    const auto section = Runtime::ValidateProgressivePoissonConfigSection(
+        Runtime::SerializeProgressivePoissonPlaygroundConfig(command.Config), {}, "test");
+    EXPECT_TRUE(section.Usable());
+    EXPECT_EQ(section.State, Core::Config::EngineConfigState::FallbackApplied);
+    EXPECT_TRUE(Runtime::PreviewEditorProgressivePoissonCommand(context, command).Enabled);
+    EXPECT_TRUE(Runtime::ApplyEditorProgressivePoissonCommand(context, command).Succeeded());
 }

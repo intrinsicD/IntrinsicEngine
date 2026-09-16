@@ -1197,6 +1197,82 @@ namespace Extrinsic::Runtime
                 ? std::optional{config.Positions.Domain} : std::nullopt;
         }
 
+        struct ProgressivePoissonInput
+        {
+            ECS::EntityHandle Entity;
+            GeometryElementDomain Domain;
+            const Geometry::PropertySet* Properties;
+        };
+
+        [[nodiscard]] std::optional<ProgressivePoissonInput> ResolveProgressivePoissonInput(
+            const EditorProcessingContext& context, const EditorProgressivePoissonCommand& command,
+            EditorProgressivePoissonResult& result)
+        {
+            if (context.Scene == nullptr)
+            {
+                result = MakeProgressivePoissonResult(
+                    EditorCommandStatus::MissingScene,
+                    command.Config.Channel,
+                    Core::ErrorCode::InvalidState,
+                    "Progressive Poisson sampling requires an attached scene.");
+                return std::nullopt;
+            }
+            if (!IsValidProgressivePoissonConfig(command.Config))
+            {
+                result = MakeProgressivePoissonResult(
+                    EditorCommandStatus::InvalidProcessingParameters, command.Config.Channel,
+                    Core::ErrorCode::InvalidArgument,
+                    "Progressive Poisson sampling requires dimension 2 or 3, positive "
+                    "grid/max-level/hash settings, and finite radius alpha.");
+                return std::nullopt;
+            }
+
+            if (!IsValidProgressivePoissonPropertyBindings(command.Config))
+            {
+                result = MakeProgressivePoissonResult(EditorCommandStatus::InvalidProcessingParameters, command.Config.Channel,
+                    Core::ErrorCode::InvalidArgument, "Invalid Progressive Poisson property bindings.");
+                return std::nullopt;
+            }
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, command.StableEntityId);
+            if (!entity.has_value())
+            {
+                result = MakeProgressivePoissonResult(
+                    EditorCommandStatus::StaleEntity,
+                    command.Config.Channel,
+                    Core::ErrorCode::ResourceNotFound,
+                    "Progressive Poisson target entity is stale or no longer live.");
+                return std::nullopt;
+            }
+
+            const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
+            const GeometryEntityAvailability availability =
+                BuildGeometryAvailability(view);
+            const std::optional<GeometryElementDomain> vertexDomain =
+                ResolveProgressivePoissonInputDomain(availability, command.Config);
+            if (!vertexDomain.has_value())
+            {
+                result = MakeProgressivePoissonResult(
+                    EditorCommandStatus::UnsupportedGeometryDomain, command.Config.Channel,
+                    Core::ErrorCode::InvalidArgument,
+                    "Progressive Poisson sampling requires a supported position-property element domain.");
+                return std::nullopt;
+            }
+            const auto* properties = ResolveGeometryPropertySet(availability, *vertexDomain);
+            const auto positions = properties->Get<glm::vec3>(command.Config.Positions.Name);
+            if (!positions || positions.Vector().empty() ||
+                positions.Vector().size() != properties->Size())
+            {
+                result = MakeProgressivePoissonResult(
+                    EditorCommandStatus::InvalidProcessingParameters, command.Config.Channel,
+                    Core::ErrorCode::InvalidArgument,
+                    "Progressive Poisson sampling requires a non-empty vec3 position property at source cardinality.");
+                return std::nullopt;
+            }
+            return ProgressivePoissonInput{*entity, *vertexDomain, properties};
+        }
+
         [[nodiscard]] const char* ProgressivePoissonOutputName(
             const ProgressivePoissonPlaygroundConfig& config) noexcept
         {
@@ -1588,6 +1664,15 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
+    ActionReadiness PreviewEditorProgressivePoissonCommand(
+        const EditorProcessingCommands& commands, const EditorProgressivePoissonCommand& command)
+    {
+        EditorProgressivePoissonResult result{};
+        const auto input = ResolveProgressivePoissonInput(
+            EditorProcessingCommandsAccess::Resolve(commands), command, result);
+        return {input.has_value(), std::move(result.Message)};
+    }
+
     EditorProgressivePoissonResult
     ApplyEditorProgressivePoissonCommand(
         const EditorProcessingCommands& commands,
@@ -1595,63 +1680,19 @@ namespace Extrinsic::Runtime
         std::function<void(EditorProgressivePoissonResult)> onComplete)
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        if (context.Scene == nullptr)
-        {
-            return MakeProgressivePoissonResult(
-                EditorCommandStatus::MissingScene,
-                command.Config.Channel,
-                Core::ErrorCode::InvalidState,
-                "Progressive Poisson sampling requires an attached scene.");
-        }
-        if (!IsValidProgressivePoissonConfig(command.Config))
-        {
-            return MakeProgressivePoissonResult(
-                EditorCommandStatus::InvalidProcessingParameters, command.Config.Channel,
-                Core::ErrorCode::InvalidArgument,
-                "Progressive Poisson sampling requires dimension 2 or 3, positive "
-                "grid/max-level/hash settings, and finite radius alpha.");
-        }
-
-        if (!ValidateProgressivePoissonConfigSection(SerializeProgressivePoissonPlaygroundConfig(command.Config), {}, kProgressivePoissonConfigSectionName).Usable())
-            return MakeProgressivePoissonResult(EditorCommandStatus::InvalidProcessingParameters, command.Config.Channel,
-                Core::ErrorCode::InvalidArgument, "Invalid Progressive Poisson property bindings.");
-        entt::registry& raw = context.Scene->Raw();
-        const std::optional<ECS::EntityHandle> entity =
-            ResolveStableEntity(raw, command.StableEntityId);
-        if (!entity.has_value())
-        {
-            return MakeProgressivePoissonResult(
-                EditorCommandStatus::StaleEntity,
-                command.Config.Channel,
-                Core::ErrorCode::ResourceNotFound,
-                "Progressive Poisson target entity is stale or no longer live.");
-        }
-
-        const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
-        const GeometryEntityAvailability availability =
-            BuildGeometryAvailability(view);
-        const std::optional<GeometryElementDomain> vertexDomain =
-            ResolveProgressivePoissonInputDomain(availability, command.Config);
-        if (!vertexDomain.has_value())
-        {
-            return MakeProgressivePoissonResult(
-                EditorCommandStatus::UnsupportedGeometryDomain, command.Config.Channel,
-                Core::ErrorCode::InvalidArgument,
-                "Progressive Poisson sampling requires mesh, graph, or point-cloud "
-                "Vertices GeometrySources.");
-        }
+        EditorProgressivePoissonResult admissionResult{};
+        const auto input = ResolveProgressivePoissonInput(context, command, admissionResult);
+        if (!input) return admissionResult;
         const ProgressivePoissonEntityState beforeState =
-            CaptureProgressivePoissonEntityState(raw, *entity);
-        const auto* inputProperties = ResolveGeometryPropertySet(availability, *vertexDomain);
-        std::optional<std::vector<glm::vec3>> positions = inputProperties
-            ? CollectFiniteGeometryPositions(*inputProperties, command.Config.Positions.Name) : std::nullopt;
-        if (!positions.has_value())
+            CaptureProgressivePoissonEntityState(context.Scene->Raw(), input->Entity);
+        std::optional<std::vector<glm::vec3>> positions =
+            CollectFiniteGeometryPositions(*input->Properties, command.Config.Positions.Name);
+        if (!positions)
         {
             return MakeProgressivePoissonResult(
                 EditorCommandStatus::InvalidProcessingParameters, command.Config.Channel,
                 Core::ErrorCode::InvalidArgument,
-                "Progressive Poisson sampling requires a non-empty finite v:position "
-                "property at source cardinality.");
+                "Progressive Poisson sampling requires every selected position value to be finite.");
         }
 
         if (context.JobCommands.Available())
@@ -1667,7 +1708,7 @@ namespace Extrinsic::Runtime
             return SubmitProgressivePoissonCpuDerivedJob(
                 context,
                 command,
-                *vertexDomain,
+                input->Domain,
                 std::move(*positions),
                 beforeState,
                 pointCount,
@@ -1676,7 +1717,7 @@ namespace Extrinsic::Runtime
         }
 
         ProgressivePoissonEntityState afterState = beforeState;
-        if (ProgressivePoissonProperties(afterState, *vertexDomain) == nullptr)
+        if (ProgressivePoissonProperties(afterState, input->Domain) == nullptr)
         {
             return MakeProgressivePoissonResult(
                 EditorCommandStatus::UnsupportedGeometryDomain,
@@ -1689,13 +1730,13 @@ namespace Extrinsic::Runtime
                 std::span<const glm::vec3>{
                     positions->data(),
                     positions->size()},
-                *ProgressivePoissonProperties(afterState, *vertexDomain),
+                *ProgressivePoissonProperties(afterState, input->Domain),
                 command.Config,
                 context.Device);
         if (!result.Succeeded())
             return result;
 
-        ApplyProgressivePoissonVisualization(afterState, command.Config, *vertexDomain);
+        ApplyProgressivePoissonVisualization(afterState, command.Config, input->Domain);
         const EditorCommandStatus publishStatus =
             CommitProgressivePoissonMutation(
                 context,

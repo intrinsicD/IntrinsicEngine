@@ -562,15 +562,12 @@ namespace Extrinsic::Sandbox::Editor
             bool Dirty{false};
         };
 
-        struct ProgressivePoissonState
+        struct ProgressivePoissonState : ProcessingDraftState<
+            Runtime::ProgressivePoissonPlaygroundConfig, Runtime::EditorProgressivePoissonResult>
         {
             ProcessingEntityInput Input{};
-            std::optional<Runtime::EditorProgressivePoissonResult>
-                LastResult{};
             std::optional<Runtime::RuntimeEngineConfigApplyResult>
                 LastConfigResult{};
-            Runtime::ProgressivePoissonPlaygroundConfig Bindings{};
-            std::string VisualizationDiagnostic{};
             std::int32_t Dimension{3};
             std::int32_t GridWidth{4};
             std::int32_t MaxLevels{16};
@@ -2023,16 +2020,7 @@ namespace Extrinsic::Sandbox::Editor
                 // The header already includes processing diagnostics; render
                 // them only once.
                 DrawDomainWindowHeader(model);
-                if (!DomainWindowReady(model) ||
-                    !model.Processing.HasSelectedEntity)
-                {
-                    ImGui::TextDisabled(
-                        "Select a matching domain entity to inspect processing affordances.");
-                }
-                else
-                {
-                    DrawProgressivePoissonControls(model, context);
-                }
+                DrawProgressivePoissonControls(model, context);
             }
             ImGui::End();
         }
@@ -2041,7 +2029,6 @@ namespace Extrinsic::Sandbox::Editor
             ProgressivePoissonState& state,
             const Runtime::ProgressivePoissonPlaygroundConfig& config)
         {
-            state.Bindings = config;
             state.Dimension = static_cast<std::int32_t>(config.Dimension);
             state.GridWidth = static_cast<std::int32_t>(config.GridWidth);
             state.MaxLevels = static_cast<std::int32_t>(config.MaxLevels);
@@ -2092,11 +2079,11 @@ namespace Extrinsic::Sandbox::Editor
                 .AutoRunOnEdit = ProgressivePoisson.AutoRunOnEdit,
                 .DebounceSeconds = static_cast<double>(
                     ProgressivePoisson.DebounceSeconds),
-                .Positions = ProgressivePoisson.Bindings.Positions,
-                .Level = ProgressivePoisson.Bindings.Level,
-                .Rank = ProgressivePoisson.Bindings.Rank,
-                .SplatRadius = ProgressivePoisson.Bindings.SplatRadius,
-                .PrefixVisible = ProgressivePoisson.Bindings.PrefixVisible,
+                .Positions = ProgressivePoisson.Draft.Positions,
+                .Level = ProgressivePoisson.Draft.Level,
+                .Rank = ProgressivePoisson.Draft.Rank,
+                .SplatRadius = ProgressivePoisson.Draft.SplatRadius,
+                .PrefixVisible = ProgressivePoisson.Draft.PrefixVisible,
             };
         }
 
@@ -2104,24 +2091,10 @@ namespace Extrinsic::Sandbox::Editor
             const Runtime::EditorDomainWindowModel& model,
             const SandboxEditorContext& context)
         {
-            const Runtime::EditorGeometryProcessingModel& processing =
-                model.Processing;
             ImGui::SeparatorText("Progressive Poisson");
             ImGui::TextWrapped(
-                "Orders the selected entity's existing finite Vertices; "
+                "Orders the selected position property's finite samples; "
                 "source topology and cardinality are preserved.");
-            const bool available = processing.ProgressivePoissonAvailable;
-            if (!available)
-            {
-                const std::string_view disabledReason =
-                    processing.ProgressivePoissonDisabledReason.empty()
-                        ? "Progressive Poisson is unavailable for this selection."
-                        : std::string_view{
-                              processing.ProgressivePoissonDisabledReason};
-                DrawProgressivePoissonDisabledRun(disabledReason);
-                return;
-            }
-
             const std::optional<Runtime::ProgressivePoissonPlaygroundConfig>
                 activeConfig =
                     Runtime::GetEditorProgressivePoissonConfig(context.PointSet.Commands);
@@ -2140,23 +2113,25 @@ namespace Extrinsic::Sandbox::Editor
                 ProgressivePoisson.LastResult =
                     *context.PointSet.Results.LastProgressivePoissonResult;
             }
-            SyncProgressivePoissonState(ProgressivePoisson, *activeConfig);
+            if (ProgressivePoisson.Synchronize(*activeConfig,
+                    Runtime::SerializeProgressivePoissonPlaygroundConfig(*activeConfig)))
+                SyncProgressivePoissonState(ProgressivePoisson, *activeConfig);
 
             ProgressivePoisson.Dimension =
                 ProgressivePoisson.Dimension <= 2 ? 2 : 3;
             bool configChanged = false;
             ImGui::SeparatorText("Input properties");
-            if (ImGui::BeginCombo("Positions##ProgressivePoisson", ProgressivePoisson.Bindings.Positions.Name.c_str()))
+            if (ImGui::BeginCombo("Positions##ProgressivePoisson", ProgressivePoisson.Draft.Positions.Name.c_str()))
             {
                 for (const auto& row : model.PropertyCatalog.Rows)
                 {
                     if (!IsPointSetVec3Property(row)) continue;
                     const auto label = PointSetPropertyLabel(row);
-                    if (ImGui::Selectable(label.c_str(), row.Descriptor == ProgressivePoisson.Bindings.Positions))
+                    if (ImGui::Selectable(label.c_str(), row.Descriptor == ProgressivePoisson.Draft.Positions))
                     {
-                        ProgressivePoisson.Bindings.Positions = row.Descriptor;
-                        for (auto* output : {&ProgressivePoisson.Bindings.Level, &ProgressivePoisson.Bindings.Rank,
-                                             &ProgressivePoisson.Bindings.SplatRadius, &ProgressivePoisson.Bindings.PrefixVisible})
+                        ProgressivePoisson.Draft.Positions = row.Descriptor;
+                        for (auto* output : {&ProgressivePoisson.Draft.Level, &ProgressivePoisson.Draft.Rank,
+                                             &ProgressivePoisson.Draft.SplatRadius, &ProgressivePoisson.Draft.PrefixVisible})
                             output->Domain = row.Descriptor.Domain;
                         configChanged = true;
                     }
@@ -2164,10 +2139,10 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::EndCombo();
             }
             ImGui::SeparatorText("Output properties");
-            configChanged |= DrawProcessingPropertyName("Level##ProgressivePoisson", ProgressivePoisson.Bindings.Level.Name);
-            configChanged |= DrawProcessingPropertyName("Rank##ProgressivePoisson", ProgressivePoisson.Bindings.Rank.Name);
-            configChanged |= DrawProcessingPropertyName("SplatRadius##ProgressivePoisson", ProgressivePoisson.Bindings.SplatRadius.Name);
-            configChanged |= DrawProcessingPropertyName("PrefixVisible##ProgressivePoisson", ProgressivePoisson.Bindings.PrefixVisible.Name);
+            configChanged |= DrawProcessingPropertyName("Level##ProgressivePoisson", ProgressivePoisson.Draft.Level.Name);
+            configChanged |= DrawProcessingPropertyName("Rank##ProgressivePoisson", ProgressivePoisson.Draft.Rank.Name);
+            configChanged |= DrawProcessingPropertyName("SplatRadius##ProgressivePoisson", ProgressivePoisson.Draft.SplatRadius.Name);
+            configChanged |= DrawProcessingPropertyName("PrefixVisible##ProgressivePoisson", ProgressivePoisson.Draft.PrefixVisible.Name);
 
             if (ImGui::BeginCombo(
                     "Dimension##ProgressivePoisson",
@@ -2375,10 +2350,14 @@ namespace Extrinsic::Sandbox::Editor
             DrawProgressivePoissonTooltip(
                 "Request CPU reference or Vulkan compute; result status reports the actual backend and any CPU fallback reason.");
 
+            const Runtime::EditorProgressivePoissonCommand command{
+                .StableEntityId = model.SelectedStableId,
+                .Config = BuildProgressivePoissonConfig(),
+            };
             const auto applyConfig = [&]()
             {
                 return Runtime::ApplyEditorProgressivePoissonConfig(
-                    context.PointSet.Commands, BuildProgressivePoissonConfig());
+                    context.PointSet.Commands, command.Config);
             };
             const auto runSampler = [&]()
             {
@@ -2389,10 +2368,7 @@ namespace Extrinsic::Sandbox::Editor
                 Runtime::EditorProgressivePoissonResult result =
                     Runtime::ApplyEditorProgressivePoissonCommand(
                         context.PointSet.Commands,
-                        Runtime::EditorProgressivePoissonCommand{
-                            .StableEntityId = model.SelectedStableId,
-                            .Config = BuildProgressivePoissonConfig(),
-                        },
+                        command,
                         context.PointSet.ResultSinks.ProgressivePoisson);
                 ProgressivePoisson.LastResult = result;
                 if (context.PointSet.ResultSinks.ProgressivePoisson)
@@ -2421,7 +2397,8 @@ namespace Extrinsic::Sandbox::Editor
             }
 
             const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
-                context.PointSet.Commands, {true, {}});
+                context.PointSet.Commands,
+                Runtime::PreviewEditorProgressivePoissonCommand(context.PointSet.Commands, command));
             if (DrawProcessingActionButton("Run Progressive Poisson##ProgressivePoisson", readiness))
                 runSampler();
 
@@ -2445,8 +2422,8 @@ namespace Extrinsic::Sandbox::Editor
             }
 
             ImGui::SeparatorText("Display output properties");
-            for (const auto* output : {&ProgressivePoisson.Bindings.Level, &ProgressivePoisson.Bindings.Rank,
-                                       &ProgressivePoisson.Bindings.SplatRadius, &ProgressivePoisson.Bindings.PrefixVisible})
+            for (const auto* output : {&ProgressivePoisson.Draft.Level, &ProgressivePoisson.Draft.Rank,
+                                       &ProgressivePoisson.Draft.SplatRadius, &ProgressivePoisson.Draft.PrefixVisible})
                 DrawProcessingPropertyShowButton(context, model.SelectedStableId, *output, ProgressivePoisson.VisualizationDiagnostic);
             if (!ProgressivePoisson.VisualizationDiagnostic.empty()) ImGui::Text("Display: %s", ProgressivePoisson.VisualizationDiagnostic.c_str());
             if (ProgressivePoisson.LastConfigResult.has_value() &&

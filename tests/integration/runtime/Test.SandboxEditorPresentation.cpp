@@ -775,8 +775,7 @@ TEST(SandboxEditorProgressivePoisson,
     ASSERT_FALSE(source.empty());
 
     for (const std::string_view required :
-         {"processing.ProgressivePoissonAvailable",
-          "processing.ProgressivePoissonDisabledReason",
+         {"PreviewEditorProgressivePoissonCommand",
           "DrawProcessingActionButton(\"Run Progressive Poisson##ProgressivePoisson\",",
           "ProgressivePoissonPlaygroundChannel::Rank",
           "ProgressivePoissonPlaygroundChannel::Level",

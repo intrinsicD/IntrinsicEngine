@@ -13474,3 +13474,29 @@ tree:
     - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
     - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
     status: resolved
+
+  - id: N623
+    type: decision
+    title: Share Progressive Poisson admission and preserve rejected editor drafts
+    provenance: ai-executed
+    timestamp: '2026-09-16T21:12:26+02:00'
+    choice: Share typed command admission and config binding validation; remove common-model Poisson flags and hard-coded
+      default-position scan. Keep controls visible and reuse shared draft synchronization after Claude identified
+      rejected edits being overwritten. Runtime and actual widget regressions pass, including custom inputs and unchanged
+      retry. Final 4690 CPU passes plus one expected skip. Remove 37 production C++ lines; no new timing or GPU claim.
+      UI-037 remains open.
+    alternatives:
+    - Keep duplicated model availability and a full position scan
+    - Add panel-owned validation or a separate draft retry mechanism
+    evidence:
+    - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
+    - src/runtime/Editor/Operations/Runtime.PointSetOperations.cppm
+    - src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+    - src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm
+    - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+    - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+    - tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+    - tests/contract/runtime/Test.SandboxEditorModels.cpp
+    - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
+    - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
+    status: resolved

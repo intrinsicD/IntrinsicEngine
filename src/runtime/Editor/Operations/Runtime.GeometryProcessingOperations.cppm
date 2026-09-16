@@ -176,8 +176,6 @@ export namespace Extrinsic::Runtime
         bool MeshVertexNormalsAvailable{false};
         bool GraphVertexNormalsAvailable{false};
         bool PointCloudVertexNormalsAvailable{false};
-        bool ProgressivePoissonAvailable{false};
-        std::string ProgressivePoissonDisabledReason{};
         std::vector<EditorDiagnostic> Diagnostics{};
     };
 

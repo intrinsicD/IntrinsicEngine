@@ -687,3 +687,72 @@ Verified checkpoint:
 - UI-037 remains active for other families/options and full cached numerical,
   topology and deleted-slot readiness. This is admission and control reuse, not
   whole-task Operational closure.
+
+
+## Progressive Poisson admission — plan
+
+- Continue operator-directed duplication/compile-locality work outside the standing
+  convergence selection priority. Replace the common-model Poisson readiness
+  fields and hard-coded `v:position` scan with a typed family-owned preview.
+- Reuse the command's numeric, scene/entity/domain validation and typed property
+  access. Extract property-binding validation in the existing compiled config
+  codec owner for parser, preview and apply; avoid a JSON roundtrip in admission.
+  Preserve codec numeric fallback, method parameter rules and backend fallback.
+- Keep input controls visible so missing default positions can be replaced by a
+  compatible custom binding. Manual and debounced runs use the same current
+  request and preview. Full finite validation remains at execution; generation-
+  cached numerical readiness is still an open UI-037 follow-up.
+- No new module, file, service, wrapper or compatibility path. Existing config,
+  queue/publication/history and disabled-tooltip owners remain authoritative.
+  Verify runtime rejection parity, custom domains and real chooser/run behavior;
+  review the fixed diff with Claude and run focused plus full CPU checks.
+
+
+## Progressive Poisson admission and draft reuse — verified checkpoint
+
+- Preview and apply now share scene, method-parameter, typed binding,
+  entity/domain and property-metadata admission in the existing point-set owner.
+  Config parsing and typed commands share one compiled binding predicate.
+  Removed the common-model availability/reason fields, default `v:position`
+  provenance switch and full position-buffer scan (73 model-builder lines).
+  Numerical validation still fails closed before any execution or submission.
+- Input controls stay visible without a selection or default position property.
+  Run and auto-run use the same current request and runtime readiness. Custom
+  compatible property domains remain selectable; backend fallback, publication,
+  history, config retry and terminal callback paths are preserved.
+- Claude reviewed the plan, fixed diff and supporting definitions. Numeric codec
+  warnings remain usable fallbacks; typed command rules still permit method-side
+  clamping. The reviewer withdrew speculative null/lifetime/unused-helper
+  blockers after checking the canonical resolver, const capture and remaining
+  caller. No redundant defensive paths were added.
+- The actual widget regression exposed a second outer window gate hiding controls
+  without selection; removed it. Claude's final pass identified rejected drafts
+  being overwritten each frame. Reused `ProcessingDraftState` and removed the
+  panel's duplicate binding/result/visualization storage. Rejected edits survive
+  retry; accepted external config changes refresh the widgets. Claude accepted
+  this fix. Immediate Pending display plus one queued terminal callback is the
+  existing API contract; the manual/debounced test covers failed auto-run without
+  recurring retries.
+- Runtime coverage verifies preview/apply rejection-reason parity, missing scene,
+  stale entity, invalid parameters/bindings, type/cardinality/empty sources,
+  deferred finite checks, retained config fallback and direct/queued face inputs.
+  Actual widgets verify visible blocked actions, missing default positions,
+  rejected custom-property selection and successful retry without re-editing.
+  The first build's missing method-owner imports in two test files were fixed.
+  Final focused runs: 32 runtime/source-presentation cases and three UI cases
+  (34 distinct tests), all pass.
+- Canonical `ci` configure / `IntrinsicTests` build / full exclusion-only CPU gate:
+  **4,690 passes, one expected ASan-only GLFW lifecycle skip, zero failures**
+  (4,691 selected; 151.53 s). An earlier full run was stopped to fix the reviewed
+  draft defect; only the complete final run is verification evidence. Layering,
+  test layout, task policy/state links, docs links/sync, skill freshness, session
+  brief, root hygiene and diff checks pass. Inventory regenerated unchanged;
+  source-doc audit reports zero objective errors and 145 existing broad hints.
+- Scope/layering/tests/docs and workshop sweep pass. Manual rows 1–3 pass, 4–6
+  unchanged, 7 records partial task progress, 8 has no exception. Production C++
+  shrinks by **37 lines** across seven existing files. No new source file/module,
+  dependency, service or compatibility layer; no measured compile-time speedup
+  or sanitizer/Vulkan runtime claim.
+- UI-037 stays active. Remaining candidates include curvature/segmentation
+  admission, unused shared-model normal/direction flags, other family/backend
+  options and generation-cached full numerical/deleted-slot readiness.

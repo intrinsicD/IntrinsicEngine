@@ -2,10 +2,10 @@ session:
   id: 2026-09-16_001
   date: '2026-09-16'
   started: '2026-09-16T00:38:04+02:00'
-  last_turn: '2026-09-16T20:19:11+02:00'
-  turn_count: 18
+  last_turn: '2026-09-16T21:12:26+02:00'
+  turn_count: 19
   summary: Retired RUNTIME-268, GRAPHICS-144/145 and RUNTIME-267 with bounded compile evidence; continued UI-037
-    execution/readiness reuse including segmentation drafts, topology computation, BUG-200 completion repair and topology admission/options, plus GRAPHICS-105 visualization/material/import-ownership consolidation with Claude.
+    execution/readiness reuse including segmentation drafts, topology computation, BUG-200 completion repair and topology admission/options and Poisson admission/drafts, plus GRAPHICS-105 visualization/material/import-ownership consolidation with Claude.
     Full CPU and selected Vulkan tests pass; authored-material, readiness and cache work remain open.
 events_logged:
 - turn: 1
@@ -180,6 +180,14 @@ events_logged:
   provenance: ai-executed
   summary: Share remesh/subdivide admission and options; remove ten model flags and fix uniform sizing capability
     gate
+- turn: 19
+  type: decision
+  id: N623
+  routing: direct
+  provenance: ai-executed
+  summary: Share Poisson admission/config binding rules; remove shared-model scan and fix hidden controls plus rejected
+    draft loss
+
 ai_actions:
 - turn: 1
   action: Diagnosed standard-header/import serialization, implemented one declaration owner, fixed review findings,
@@ -395,6 +403,25 @@ ai_actions:
   - tests/contract/runtime/Test.SandboxEditorModels.cpp
   - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
   - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
+- turn: 19
+  action: Reused point-set and config owners for typed Poisson admission, removed model availability and full position
+    scan, and kept input controls visible. Adopted shared draft state to preserve rejected edits after Claude review.
+    Fixed missed test imports and outer selection gate exposed by real widgets. Final 34 distinct focused tests
+    and 4690 CPU passes plus one expected skip; structural checks pass. Production C++ shrinks 37 lines; no benchmark
+    claim or task retirement.
+  provenance: ai-executed
+  files_changed:
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
+  - src/runtime/Editor/Operations/Runtime.PointSetOperations.cppm
+  - src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+  - src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm
+  - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+  - tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+  - tests/contract/runtime/Test.SandboxEditorModels.cpp
+  - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
+  - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
+
 claims_touched:
 - id: C99
   action: crystallized
@@ -469,6 +496,11 @@ key_context:
   excerpt: User requested continued compilation/duplication cleanup with Claude through planning, implementation,
     review, testing and fixes. Continued UI-037 remesh/subdivide admission and option control reuse; full numerical
     readiness remains open.
+- turn: 19
+  excerpt: User requested continued open duplication/compilation tasks with Claude through planning, implementation,
+    review, testing and fixes. Continued UI-037 Poisson admission and draft reuse; other families and full numerical
+    readiness remain open.
+
 open_threads:
 - The broader C92 processing-family hypothesis still needs a selected baseline and repeated family-edit measurements;
   BUILD-006 separately owns backend/cache comparisons.
@@ -490,7 +522,7 @@ open_threads:
   that tooling work.
 - RUNTIME-268, GRAPHICS-144, GRAPHICS-145 and RUNTIME-267 are complete with bounded measured evidence. Mandatory
   config/session dependencies remain. UI-037 is active with shared controls, outlier/ICP, Progressive Poisson and
-  parameterization and mesh-field config/execution including segmentation drafts, shared topology computation and BUG-200 repair plus UV and all topology admission plus remesh/subdivide options verified;
+  parameterization and mesh-field config/execution including segmentation drafts, shared topology computation and BUG-200 repair plus UV and all topology admission plus remesh/subdivide options and Poisson metadata admission/draft retry verified;
   full numerical UV readiness, mesh/bake, family readiness, backend/variant and metadata/cache preflight coverage remain. GRAPHICS-105 is active with overlay material duplication, retired SciVis metadata, lighting alias and unused import-owned default/authored allocations removed; authored factor/texture projection and normal-source work remain. LEGACY-043 follows it, and
   BUILD-006 retains its prerequisites.
 ai_suggestions_pending:

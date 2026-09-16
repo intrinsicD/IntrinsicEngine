@@ -1675,16 +1675,7 @@ namespace Extrinsic::Runtime
             ReadPropertyRef(context, *object, "rank_property", config.Rank, true);
             ReadPropertyRef(context, *object, "splat_radius_property", config.SplatRadius, true);
             ReadPropertyRef(context, *object, "prefix_visible_property", config.PrefixVisible, true);
-            const std::array refs{&config.Positions, &config.Level, &config.Rank, &config.SplatRadius, &config.PrefixVisible};
-            bool valid = true;
-            for (std::size_t i = 0; i < refs.size(); ++i)
-            {
-                valid &= refs[i]->HasName() && refs[i]->Name.find('\0') == std::string::npos &&
-                    !refs[i]->Name.ends_with(":deleted");
-                if (i != 0) valid &= refs[i]->Domain == GeometryElementDomain::Unknown || refs[i]->Domain == config.Positions.Domain;
-                for (std::size_t j = 0; j < i; ++j) valid &= refs[i]->Name != refs[j]->Name;
-            }
-            if (!valid && context.Result)
+            if (!IsValidProgressivePoissonPropertyBindings(config) && context.Result)
             {
                 context.Result->State = Core::Config::EngineConfigState::Invalid;
                 context.Result->Diagnostics.push_back({.Code=Core::Config::EngineConfigDiagnosticCode::InvalidValue,
@@ -2228,6 +2219,29 @@ namespace Extrinsic::Runtime
              config.HardDihedralThresholdDegrees},
             {"patch_complexity_cost", config.PatchComplexityCost},
         }).dump();
+    }
+
+    bool IsValidProgressivePoissonPropertyBindings(
+        const ProgressivePoissonPlaygroundConfig& config) noexcept
+    {
+        const std::array refs{&config.Positions, &config.Level, &config.Rank,
+                              &config.SplatRadius, &config.PrefixVisible};
+        for (std::size_t i = 0; i < refs.size(); ++i)
+        {
+            const auto& ref = *refs[i];
+            if (!ref.HasName() || ref.Name.find('\0') != std::string::npos ||
+                ref.Name.ends_with(":deleted") ||
+                ref.Domain > GeometryElementDomain::PointCloudPoint ||
+                ref.ValueKind != (i == 0 ? Geometry::PropertyValueKind::Vec3
+                                        : Geometry::PropertyValueKind::Float))
+                return false;
+            if (i != 0 && ref.Domain != GeometryElementDomain::Unknown &&
+                ref.Domain != config.Positions.Domain)
+                return false;
+            for (std::size_t j = 0; j < i; ++j)
+                if (ref.Name == refs[j]->Name) return false;
+        }
+        return true;
     }
 
     std::string SerializeProgressivePoissonPlaygroundConfig(

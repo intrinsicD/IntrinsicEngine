@@ -127,6 +127,9 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::optional<BilateralFilterConfig> GetEditorBilateralFilterConfig(const EditorProcessingCommands&);
     [[nodiscard]] EditorBilateralFilterResult ApplyEditorConfiguredBilateralFilter(const EditorProcessingCommands&, std::function<void(EditorBilateralFilterResult)> onComplete = {});
 
+    // Admission uses metadata only; apply checks finite values before submission.
+    [[nodiscard]] ActionReadiness PreviewEditorProgressivePoissonCommand(
+        const EditorProcessingCommands&, const EditorProgressivePoissonCommand&);
     [[nodiscard]] EditorProgressivePoissonResult ApplyEditorProgressivePoissonCommand(
         const EditorProcessingCommands&, const EditorProgressivePoissonCommand&,
         std::function<void(EditorProgressivePoissonResult)> onComplete = {});

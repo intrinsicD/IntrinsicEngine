@@ -92,6 +92,7 @@ import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.MeshTopologyOperations;
+import Extrinsic.Runtime.PointSetOperations;
 import Extrinsic.Runtime.ParameterizationOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
@@ -4135,7 +4136,8 @@ TEST(SandboxEditorUi, DirectMeshEnrichmentPendingPreservesGeometryReadiness)
     EXPECT_TRUE(Runtime::PreviewEditorMeshSimplifyCommand(
         context, {.StableEntityId = pendingModel.SelectedStableId, .TargetFaces = 1u}).Enabled);
     EXPECT_TRUE(pendingModel.Processing.MeshVertexNormalsAvailable);
-    EXPECT_TRUE(pendingModel.Processing.ProgressivePoissonAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorProgressivePoissonCommand(
+        context, {.StableEntityId = pendingModel.SelectedStableId}).Enabled);
 
     auto unavailableKernelContext = context;
     unavailableKernelContext.MeshCurvatureKernelAvailable = false;
@@ -4198,7 +4200,8 @@ TEST(SandboxEditorUi, DirectMeshEnrichmentPendingPreservesGeometryReadiness)
     EXPECT_TRUE(Runtime::PreviewEditorMeshSimplifyCommand(
         context, {.StableEntityId = readyModel.SelectedStableId, .TargetFaces = 1u}).Enabled);
     EXPECT_TRUE(readyModel.Processing.MeshVertexNormalsAvailable);
-    EXPECT_TRUE(readyModel.Processing.ProgressivePoissonAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorProgressivePoissonCommand(
+        context, {.StableEntityId = readyModel.SelectedStableId}).Enabled);
 
     engine.Shutdown();
 }

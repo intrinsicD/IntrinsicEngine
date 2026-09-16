@@ -2147,3 +2147,109 @@ TEST(SandboxProcessingPanels, TopologyVariantWidgetsReachCommandsAndClearLoopOnl
         EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
     }
 }
+
+TEST(SandboxProcessingPanels, ProgressivePoissonKeepsInputChooserVisibleAndRetriesRejectedBinding)
+{
+    bool reject = false;
+    unsigned rejections = 0;
+    PanelHarness h(RejectableConfigRegistry(R::kProgressivePoissonConfigSectionName, reject, rejections));
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::PointCloudPoint);
+    auto& props = scene.Raw().get<GS::Vertices>(entity).Properties;
+    auto positions = props.Get<glm::vec3>("v:position");
+    auto custom = props.GetOrAdd<glm::vec3>("p:samples", {});
+    custom.Vector() = positions.Vector();
+    props.Remove(positions);
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto poisson = *R::GetProgressivePoissonPlaygroundConfig(config);
+    poisson.AutoRunOnEdit = false;
+    R::SetProgressivePoissonPlaygroundConfig(config, poisson);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("pointcloud.processing.progressive_poisson", true));
+    std::optional<R::EditorProgressivePoissonResult> result;
+    const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id = "test.poisson_admission", .MenuPath = {"View"}, .Title = "Poisson admission observer",
+        .OpenByDefault = true,
+        .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
+            result = context.PointSet.Results.LastProgressivePoissonResult;
+        }});
+    int frame = 0, step = 0;
+    std::uint64_t jobsBefore = 0;
+    bool completed = false;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frame > 400) { ADD_FAILURE() << "Poisson custom input did not finish"; engine.RequestExit(); return; }
+        auto* window = ImGui::FindWindowByName("PointCloud / Processing / Progressive Poisson");
+        if (!window) return;
+        ImGui::SetWindowSize(window, {850, 1500});
+        ImGui::SetWindowPos(window, {0, 0});
+        ++step;
+        const auto click = [&](const char* label) { ImGui::ActivateItemByID(window->GetID(label)); };
+        if (step == 3)
+        {
+            jobsBefore = engine.Jobs().Stats().SubmittedJobs;
+            ImGui::GetCurrentContext()->LogBuffer.clear();
+            ImGui::LogToBuffer();
+            ImGui::GetCurrentContext()->LogWindow = nullptr;
+            click("Run Progressive Poisson##ProgressivePoisson");
+        }
+        if (step == 6)
+        {
+            const std::string_view log{ImGui::GetCurrentContext()->LogBuffer.c_str()};
+            EXPECT_NE(log.find("Positions"), std::string_view::npos);
+            EXPECT_NE(log.find("Run Progressive Poisson"), std::string_view::npos);
+            ImGui::LogFinish();
+            EXPECT_FALSE(result);
+            EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
+            EXPECT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+        }
+        if (step == 9) click("Run Progressive Poisson##ProgressivePoisson");
+        if (step == 12)
+        {
+            EXPECT_FALSE(result); // Missing default input, but the chooser remains usable.
+            EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
+            reject = true;
+            click("Positions##ProgressivePoisson");
+        }
+        if (step == 14)
+        {
+            auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+            ASSERT_FALSE(popups.empty());
+            ASSERT_NE(popups.back().Window, nullptr);
+            const std::string label = std::string{R::DebugNameForEditorPropertyCatalogDomain(
+                R::EditorPropertyCatalogDomain::PointCloudPoints)} + " / p:samples (" +
+                std::to_string(props.Size()) + ")";
+            ImGui::ActivateItemByID(popups.back().Window->GetID(label.c_str()));
+        }
+        if (step == 17)
+        {
+            const auto active = R::GetProgressivePoissonPlaygroundConfig(
+                h.Control().GetEngineConfigControlState().ActiveConfig);
+            ASSERT_TRUE(active);
+            EXPECT_EQ(active->Positions.Name, "v:position");
+            EXPECT_GT(rejections, 0u);
+            EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
+            reject = false;
+            // Retry without editing: the local binding must survive rejection.
+            click("Run Progressive Poisson##ProgressivePoisson");
+        }
+        if (step > 19 && result && result->Status != R::EditorCommandStatus::Pending)
+        {
+            EXPECT_TRUE(result->Succeeded()) << result->Message;
+            const auto active = R::GetProgressivePoissonPlaygroundConfig(
+                h.Control().GetEngineConfigControlState().ActiveConfig);
+            ASSERT_TRUE(active);
+            EXPECT_EQ(active->Positions.Name, "p:samples");
+            EXPECT_EQ(active->Positions.Domain, R::GeometryElementDomain::PointCloudPoint);
+            EXPECT_TRUE(props.Exists(poisson.Level.Name));
+            EXPECT_FALSE(props.Exists("v:position"));
+            EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore + 1u);
+            completed = true;
+            engine.RequestExit();
+        }
+    };
+    h.Engine->Run();
+    if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
+    EXPECT_TRUE(completed);
+    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
+}

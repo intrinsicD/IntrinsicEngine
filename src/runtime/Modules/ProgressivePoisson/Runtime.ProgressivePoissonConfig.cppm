@@ -65,6 +65,9 @@ export namespace Extrinsic::Runtime
     // JSON dependency once for every feature family.
     extern "C++"
     {
+        [[nodiscard]] bool IsValidProgressivePoissonPropertyBindings(
+            const ProgressivePoissonPlaygroundConfig& config) noexcept;
+
         [[nodiscard]] std::string SerializeProgressivePoissonPlaygroundConfig(
             const ProgressivePoissonPlaygroundConfig& config);
 

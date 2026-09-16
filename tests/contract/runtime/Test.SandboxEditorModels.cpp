@@ -86,6 +86,7 @@ import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.MeshTopologyOperations;
+import Extrinsic.Runtime.PointSetOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SceneSerialization;
@@ -2330,9 +2331,8 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     EXPECT_TRUE(Runtime::PreviewEditorMeshSimplifyCommand(
         context, {.StableEntityId = meshModel.SelectedStableId, .TargetFaces = 1u}).Enabled);
     EXPECT_TRUE(meshModel.Processing.MeshVertexNormalsAvailable);
-    EXPECT_TRUE(meshModel.Processing.ProgressivePoissonAvailable);
-    EXPECT_TRUE(
-        meshModel.Processing.ProgressivePoissonDisabledReason.empty());
+    EXPECT_TRUE(Runtime::PreviewEditorProgressivePoissonCommand(
+        context, {.StableEntityId = meshModel.SelectedStableId}).Enabled);
     EXPECT_FALSE(meshModel.Processing.GraphVertexNormalsAvailable);
     EXPECT_FALSE(meshModel.Processing.PointCloudVertexNormalsAvailable);
 
@@ -2376,9 +2376,8 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     EXPECT_FALSE(graphModel.Processing.MeshCurvatureAvailable);
     EXPECT_FALSE(graphModel.Processing.MeshCurvatureDirectionsAvailable);
     EXPECT_FALSE(graphModel.Processing.MeshVertexNormalsAvailable);
-    EXPECT_TRUE(graphModel.Processing.ProgressivePoissonAvailable);
-    EXPECT_TRUE(
-        graphModel.Processing.ProgressivePoissonDisabledReason.empty());
+    EXPECT_TRUE(Runtime::PreviewEditorProgressivePoissonCommand(
+        context, {.StableEntityId = graphModel.SelectedStableId}).Enabled);
     EXPECT_TRUE(graphModel.Processing.GraphVertexNormalsAvailable);
     EXPECT_FALSE(graphModel.Processing.PointCloudVertexNormalsAvailable);
 
@@ -2427,9 +2426,8 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     EXPECT_FALSE(cloudModel.Processing.MeshVertexNormalsAvailable);
     EXPECT_FALSE(cloudModel.Processing.GraphVertexNormalsAvailable);
     EXPECT_TRUE(cloudModel.Processing.PointCloudVertexNormalsAvailable);
-    EXPECT_TRUE(cloudModel.Processing.ProgressivePoissonAvailable);
-    EXPECT_TRUE(
-        cloudModel.Processing.ProgressivePoissonDisabledReason.empty());
+    EXPECT_TRUE(Runtime::PreviewEditorProgressivePoissonCommand(
+        context, {.StableEntityId = cloudModel.SelectedStableId}).Enabled);
 
     const ECS::EntityHandle empty = MakeSelectable(registry, "Empty");
     const Runtime::EditorGeometryProcessingCapabilities emptyCaps =
@@ -2441,80 +2439,44 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
                     .empty());
 }
 
-TEST(SandboxEditorProgressivePoisson,
-     CopiedReadinessExplainsInvalidVertexPositions)
+TEST(SandboxEditorProgressivePoisson, AdmissionUsesMetadataAndExecutionChecksFiniteValues)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
-    Intrinsic::Tests::EditorFeatureTestContext context =
-        MakeContext(registry, selection);
-
-    const auto buildCloudModel =
-        [&](const ECS::EntityHandle entity)
-        {
-            EXPECT_TRUE(selection.SetSelectedEntity(registry, entity));
-            return Runtime::BuildEditorDomainWindowModel(
-                context,
-                Runtime::EditorDomainWindowKind::PointCloud);
-        };
-
-    const ECS::EntityHandle missing =
-        MakeSelectable(registry, "Missing positions");
-    AddPointCloudSource(registry, missing, 3u);
-    const Runtime::EditorDomainWindowModel missingModel =
-        buildCloudModel(missing);
-    EXPECT_FALSE(missingModel.Processing.ProgressivePoissonAvailable);
-    EXPECT_EQ(
-        missingModel.Processing.ProgressivePoissonDisabledReason,
-        "Progressive Poisson requires the v:position vertex property.");
-
-    const ECS::EntityHandle wrongType =
-        MakeSelectable(registry, "Wrong position type");
-    AddPointCloudSource(registry, wrongType, 3u);
-    auto wrongPositions =
-        registry.Raw()
-            .get<GS::Vertices>(wrongType)
-            .Properties.GetOrAdd<float>(
-                std::string{PN::kPosition},
-                0.0f);
-    wrongPositions.Vector() = {0.0f, 1.0f, 2.0f};
-    const Runtime::EditorDomainWindowModel wrongTypeModel =
-        buildCloudModel(wrongType);
-    EXPECT_FALSE(wrongTypeModel.Processing.ProgressivePoissonAvailable);
-    EXPECT_EQ(
-        wrongTypeModel.Processing.ProgressivePoissonDisabledReason,
-        "Progressive Poisson requires v:position to contain vec3 values.");
-
-    const ECS::EntityHandle nonFinite =
-        MakeSelectable(registry, "Non-finite positions");
-    AddPointCloudSource(registry, nonFinite, 2u);
-    SetPositions(
-        registry.Raw().get<GS::Vertices>(nonFinite),
-        {
-            {0.0f, 0.0f, 0.0f},
-            {std::numeric_limits<float>::infinity(), 1.0f, 2.0f},
-        });
-    const Runtime::EditorDomainWindowModel nonFiniteModel =
-        buildCloudModel(nonFinite);
-    EXPECT_FALSE(nonFiniteModel.Processing.ProgressivePoissonAvailable);
-    EXPECT_EQ(
-        nonFiniteModel.Processing.ProgressivePoissonDisabledReason,
-        "Progressive Poisson requires every v:position value to be finite.");
-
-    const ECS::EntityHandle empty =
-        MakeSelectable(registry, "Empty positions");
-    AddPointCloudSource(registry, empty, 0u);
-    (void)registry.Raw()
-        .get<GS::Vertices>(empty)
-        .Properties.GetOrAdd<glm::vec3>(
-            std::string{PN::kPosition},
-            glm::vec3{0.0f});
-    const Runtime::EditorDomainWindowModel emptyModel =
-        buildCloudModel(empty);
-    EXPECT_FALSE(emptyModel.Processing.ProgressivePoissonAvailable);
-    EXPECT_EQ(
-        emptyModel.Processing.ProgressivePoissonDisabledReason,
-        "Progressive Poisson requires at least one vertex position.");
+    auto context = MakeContext(registry, selection);
+    const auto cloud = MakeSelectable(registry, "Position metadata");
+    AddPointCloudSource(registry, cloud, 2u);
+    auto& properties = registry.Raw().get<GS::Vertices>(cloud).Properties;
+    const Runtime::EditorProgressivePoissonCommand command{
+        .StableEntityId = Runtime::SelectionController::ToStableEntityId(cloud)};
+    const auto checkRejected = [&] {
+        const auto preview = Runtime::PreviewEditorProgressivePoissonCommand(context, command);
+        const auto result = Runtime::ApplyEditorProgressivePoissonCommand(context, command);
+        EXPECT_FALSE(preview.Enabled);
+        EXPECT_FALSE(preview.DisabledReason.empty());
+        EXPECT_EQ(preview.DisabledReason, result.Message);
+        EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+        EXPECT_FALSE(properties.Exists(command.Config.Level.Name));
+    };
+    checkRejected(); // Missing property.
+    auto wrongType = properties.GetOrAdd<float>(std::string{PN::kPosition}, 0.f);
+    checkRejected(); // Wrong value kind.
+    properties.Remove(wrongType);
+    auto positions = properties.GetOrAdd<glm::vec3>(std::string{PN::kPosition}, {});
+    positions.Vector().resize(1u);
+    checkRejected(); // Corrupt source cardinality.
+    properties.Resize(0u);
+    checkRejected(); // Empty source.
+    properties.Resize(2u);
+    positions.Vector()[1].x = std::numeric_limits<float>::infinity();
+    // Admission does not scan values, copy geometry or publish properties.
+    EXPECT_TRUE(Runtime::PreviewEditorProgressivePoissonCommand(context, command).Enabled);
+    EXPECT_FALSE(properties.Exists(command.Config.Level.Name));
+    const auto result = Runtime::ApplyEditorProgressivePoissonCommand(context, command);
+    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_NE(result.Message.find("finite"), std::string::npos);
+    EXPECT_FALSE(properties.Exists(command.Config.Level.Name));
+    EXPECT_TRUE(std::isinf(positions.Vector()[1].x));
 }
 
 TEST(SandboxEditorUi, VisualizationModelEnumeratesPromotedGeometryProperties)

@@ -525,6 +525,7 @@ config/apply/run operation. `Extrinsic.Runtime.PointSetOperations` exports
 `EditorProgressivePoissonCommand`,
 `EditorProgressivePoissonResult`,
 `DebugNameForProgressivePoissonChannel(...)` and
+`PreviewEditorProgressivePoissonCommand(...)` and
 `ApplyEditorProgressivePoissonCommand(...)`; the command carries the canonical
 `ProgressivePoissonPlaygroundConfig` from `Extrinsic.Runtime.ProgressivePoissonConfig`
 rather than an editor-side copy. That config keeps `double` hash-load/radius-alpha
@@ -536,7 +537,14 @@ to mesh vertices, graph nodes, or point-cloud points. The config stores the
 position binding and the four named scalar outputs. It performs
 no surface sampling, source reordering, provenance rewrite, or entity-domain
 replacement. The command publishes source-cardinality float properties on the input domain.
-Default output names are:
+Admission and apply share numeric, typed-binding and entity/domain checks.
+Admission reads only property type and cardinality metadata; execution checks
+finite values before job submission or mutation. The shared editor model does
+not scan default vertex positions for this method, and the input chooser remains
+available when the current binding is missing. Config parsing and typed admission
+share the compiled property-binding predicate. The panel reuses shared draft
+synchronization so rejected edits survive for retry; an external accepted config
+change refreshes the controls. Default output names are:
 
 - `v:poisson_level`
 - `v:poisson_rank`
