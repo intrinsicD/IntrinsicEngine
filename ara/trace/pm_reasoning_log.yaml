@@ -2559,3 +2559,16 @@ entries:
       GRAPHICS-145 owns remaining frontend work; RUNTIME-267 ownership audit did not implement a facade.'
     - Existing staged topics remain referenced by ongoing owners and open threads; no new closure or abandonment signal
       for unrelated method, architecture or broader C92 hypotheses. Preserve existing stale flags.
+
+  - turn: 2026-09-16_001#3
+    notes:
+    - Crystallize O234/C101 through N606 artifact commitment, not user endorsement. Five samples per arm support only
+      the bounded observed settled rebuild comparison; no cleaner broader performance claim.
+    - Keep one untimed setup and diagnostic controls outside timing; all exact-source samples retained. Report the
+      higher no-op median without attributing it to the maximum or proven noise. Explicit A=before/B=after resolves
+      reviewer notation error.
+    - 'Production delta +11 lines and no new helper/file/module: compile work reduction, not code-size reduction.
+      Canonical Clang23 CPU evidence only; unchanged attachment does not require a fresh Clang20 build. No GPU/sanitizer
+      execution claim.'
+    - Existing staged topics keep their named owners and stale flags. This task closure supplies no abandonment or
+      promotion signal for broader C92, method, architecture or product hypotheses.

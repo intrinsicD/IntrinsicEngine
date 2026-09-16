@@ -1,0 +1,9 @@
+{
+  "before_revision": "07a872ac9d87fe6e1491d12f38906539779b74b4",
+  "source": "src/graphics/renderer/Graphics.Renderer.cpp",
+  "before_sha256": "0ee7f443cd51dc301a0d5d4c48e2a854f69c06e17a6ff86bfc2a2b714e2d630b",
+  "after_sha256": "c9a8d9fb051a8db22ca47df491df4e6d49ebd4e7ae41968c5c7d60e7a89349ef",
+  "before_lines": 10957,
+  "after_lines": 10968,
+  "no_interface_build_or_test_changes": true
+}

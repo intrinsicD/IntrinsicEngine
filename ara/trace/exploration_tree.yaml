@@ -13081,3 +13081,40 @@ tree:
     - ara/evidence/tables/graphics144_shared_std_measurement.md
     - tasks/done/GRAPHICS-144-renderer-consumer-locality.md
     status: resolved
+
+  - id: N605
+    type: experiment
+    title: Measure simpler renderer span and sort construction against settled target rebuilds
+    provenance: ai-executed
+    timestamp: '2026-09-16T09:09:16+02:00'
+    result: 'Exact-source Clang23 Debug Null/headless ABBAABBAAB cohort, five samples per arm: renderer edit plus
+      graphics archive median 12.896 to 9.474 seconds (26.5% lower); before range 12.793–12.968, after 9.441–9.616.
+      One compiler per edit, zero per no-op; 777 commands, 158 prerequisite BMI hashes and packages identical. All
+      ten results claim_eligible:false. No-op after median 1.77 ms higher with overlapping ranges; no cause established.
+      Single trace controls are separate diagnostics.'
+    evidence:
+    - O234
+    - ara/evidence/tables/graphics145_renderer_frontend_measurement.md
+    - ara/evidence/diagnostics/graphics145_renderer_frontend/evidence-index.json
+    status: resolved
+  - id: N606
+    type: decision
+    title: Keep the existing standard-library path and retire GRAPHICS-145
+    provenance: ai-executed
+    timestamp: '2026-09-16T09:09:16+02:00'
+    choice: 'Retain verified implementation 51bdc9b65: pointer/count construction of named vector lvalues and two
+      iterator sorts preserve span types, lifetimes and comparator semantics. No new helper/module/interface/state,
+      +11 source lines. Claude plan/source/protocol/results reviews resolved; canonical full CPU 4664 passed plus
+      one expected skip and 347 focused passed. Freeze f73dcbd39 and all ten records bind task retirement at CPUContracted.
+      RUNTIME-267 and independent UI/material/cache tasks remain open.'
+    alternatives:
+    - Add a generic span adapter or split files before measuring expression-level cost
+    - Treat diagnostic controls as matched benchmark results
+    - Infer whole-engine, clean-build, runtime or GPU improvement
+    - Adopt reviewer letter inversion or claim one maximum determines the no-op median
+    evidence:
+    - O234
+    - N605
+    - tasks/done/GRAPHICS-145-renderer-implementation-frontend-cost.md
+    - ara/evidence/tables/graphics145_renderer_frontend_measurement.md
+    status: resolved

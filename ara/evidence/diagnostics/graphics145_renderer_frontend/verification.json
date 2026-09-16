@@ -1,0 +1,49 @@
+{
+  "source_revision": "51bdc9b6562e831707ce09fb1dbea9940a5d709c",
+  "baseline_revision": "07a872ac9d87fe6e1491d12f38906539779b74b4",
+  "ci_configure": "passed",
+  "IntrinsicTests_build": "passed, 46 build actions",
+  "compiler": "Clang23, canonical ci Debug",
+  "focused_cpu": {
+    "passed": 347,
+    "failed": 0,
+    "elapsed_seconds": 30.51,
+    "selector": "Renderer|RenderWorld|Visualization|CompilationLocality|Profiler|OwnershipTransfer"
+  },
+  "full_cpu": {
+    "selected": 4665,
+    "passed": 4664,
+    "failed": 0,
+    "skipped": 1,
+    "skip": "GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl requires ASan",
+    "elapsed_seconds": 140.2
+  },
+  "unexecuted": "No GPU, sanitizer, or fresh minimum-compiler run; no module attachment or GPU lifetime change.",
+  "source_delta": {
+    "cpp_lines_added_net": 11,
+    "new_production_files": 0,
+    "new_modules": 0,
+    "interface_build_test_changes": false
+  },
+  "source_review": "Claude fixed source packet, no semantic blocker; inspected six concrete span-taking signatures and both unchanged comparators; resolutions retained.",
+  "layering": "strict passed, no violations",
+  "source_task_policy": "strict passed",
+  "source_doc_links": "strict passed",
+  "clean_workshop": {
+    "1": "pass: imports unchanged; strict layering passed",
+    "2": "pass: CMake links unchanged",
+    "3": "pass: no public interface change",
+    "4": "pass: no members, state or seams added",
+    "5": "n/a: no new pass",
+    "6": "n/a: recipe unchanged",
+    "7": "pass: CPUContracted compile refactor is intended endpoint",
+    "8": "pass: no exceptions or shims added"
+  },
+  "four_point_sweep": {
+    "scope": "Only renderer vector/span and sort construction; docs/benchmark bind evidence.",
+    "layering": "No import or CMake changes.",
+    "tests": "Existing snapshot lifetime, barriers, placement, queue, profiler and visualization coverage passed; no new behavior or mirror tests.",
+    "docs": "Task and measured report; no architecture/API/inventory change."
+  },
+  "final_structural_checks": "All passed; strict lifecycle-link failure repaired in BUG-198, original log retained; EOF whitespace corrected and diff check repeated."
+}

@@ -34,16 +34,16 @@ an operator-directed compile/reuse follow-up outside the standing product focus.
 - RUNTIME-267, UI-037, GRAPHICS-105 and BUILD-006 retain their independent scope.
 
 ## Acceptance criteria
-- [ ] Freeze current immediate-before source; reproduce the implementation trace and
+- [x] Freeze current immediate-before source; reproduce the implementation trace and
       rank concrete costly expressions/functions without summing nested phase totals.
-- [ ] Review a small alternative with Claude and reuse existing owners. Reject a
+- [x] Review a small alternative with Claude and reuse existing owners. Reject a
       source split or abstraction that merely repeats parsing or moves the same work.
-- [ ] Implement a beneficial bounded change or retain a measured no-change verdict;
+- [x] Implement a beneficial bounded change or retain a measured no-change verdict;
       verify affected semantics and preserve current renderer/compiler-boundary tests.
-- [ ] Freeze matched implementation and genuine importer/target measurements before
+- [x] Freeze matched implementation and genuine importer/target measurements before
       timing; retain all samples, compiler flags/dependency identities and negative
       results. Do not extrapolate isolated producer costs to whole-engine builds.
-- [ ] Pass relevant focused/full CPU checks; use fresh minimum-supported Clang if
+- [x] Pass relevant focused/full CPU checks; use fresh minimum-supported Clang if
       module attachment changes. Resolve review, synchronize docs and retire with
       exact source/measurement evidence. GPU behavior changes require their own gate.
 
@@ -97,3 +97,26 @@ python3 tools/docs/check_doc_links.py --root . --strict
   modules or files. This slice reduces compile work, not source line count.
 - Final source trace: frontend 9.050 s, constraints 1.585 s, backend 0.886 s.
   These overlapping, single-run phases are diagnostics, not the matched cohort.
+
+## Completion — 2026-09-16
+Retired at CPUContracted, the intended endpoint for this compile refactor.
+Commit reference: verified implementation `51bdc9b65`, manifest freeze `f73dcbd39`;
+the evidence/retirement commit binds the accepted results.
+
+[Report and all raw evidence](../../ara/evidence/tables/graphics145_renderer_frontend_measurement.md)
+retain all ten matched settled graphics-target rebuilds, five per arm: median
+12.896 → 9.474 seconds (26.5% lower), including the real archive link. Before
+range 12.793–12.968 s; after 9.441–9.616 s. One compiler invocation per edit,
+none per no-op; all 777 commands, 158 prerequisite BMI hashes and dependency
+packages unchanged. No clean-build, whole-engine, runtime/GPU or statistical
+claim. All records remain claim_eligible:false; the no-op ranges overlap.
+
+Claude reviewed plan/source/protocol/results; root resolved findings and validated
+all ten results. Keep the original A=before/B=after order, and report the 1.77 ms
+higher no-op median without attributing it to the largest sample or asserting a
+cause. No source change followed the verified implementation commit.
+
+Clean-workshop rows 1–4 and 8 pass (unchanged imports/API/owners, no new state or
+exceptions); rows 5–6 are inapplicable and row 7 is this CPUContracted endpoint.
+The +11 source lines add no helper/file/module. RUNTIME-267, UI-037, GRAPHICS-105,
+LEGACY-043 and BUILD-006 retain their own open scope and prerequisites.

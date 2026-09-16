@@ -7,6 +7,31 @@ relative to `tasks/done/`, which sits at the same depth as `tasks/active/`,
 so blocks moved from the old active-README history work verbatim.
 
 
+## 2026-09-16 — BUG-198: stale compile-backlog links
+
+Retired [BUG-198](BUG-198-compile-backlog-retired-links.md) as a documentation
+repair. Strict lifecycle checking exposed retired compile-task links in open
+root/runtime indexes. Remove the links, retain completion history, and correct
+the runtime sequencing note. No gate changes or engine maturity claim.
+
+
+## 2026-09-16 — GRAPHICS-145: renderer frontend constraint work
+
+Retired [GRAPHICS-145](GRAPHICS-145-renderer-implementation-frontend-cost.md) at
+CPUContracted. Verified source `51bdc9b65` reuses pointer/count spans and two
+iterator sorts with unchanged comparator, constness and storage semantics. No
+new helper/interface/module/state; +11 C++ lines. Claude reviewed plan, source,
+protocol and final results; all ten samples and review resolutions are retained.
+
+Settled graphics-target implementation rebuild median 12.896 → 9.474 seconds
+(26.5% lower; before 12.793–12.968 s, after 9.441–9.616 s), including archive
+linking. One renderer compile per edit; unchanged prerequisites and commands.
+No whole-engine, clean-build, runtime/GPU or statistical claim; ten canonical
+records remain claim_eligible:false. Full CPU 4,664 passes, one expected skip;
+347 focused passes. [Report and raw evidence](../../ara/evidence/tables/graphics145_renderer_frontend_measurement.md).
+RUNTIME-267 and independent UI/material/cache tasks remain open.
+
+
 ## 2026-09-16 — GRAPHICS-144: shared renderer/snapshot declarations
 
 Retired [GRAPHICS-144](GRAPHICS-144-renderer-consumer-locality.md) at CPUContracted.

@@ -1,0 +1,148 @@
+[
+  {
+    "command": [
+      "python3",
+      "tools/agents/check_task_policy.py",
+      "--root",
+      ".",
+      "--strict"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "python3",
+      "tools/agents/check_task_state_links.py",
+      "--root",
+      ".",
+      "--strict"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "python3",
+      "tools/docs/check_doc_links.py",
+      "--root",
+      ".",
+      "--strict"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "python3",
+      "tools/repo/check_layering.py",
+      "--root",
+      "src",
+      "--strict"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "python3",
+      "tools/repo/check_test_layout.py",
+      "--root",
+      ".",
+      "--strict"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "python3",
+      "tools/repo/check_root_hygiene.py",
+      "--root",
+      "."
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "python3",
+      "tools/agents/sync_skills.py",
+      "--check"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "python3",
+      "tools/benchmark/validate_benchmark_manifests.py"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "python3",
+      "tools/benchmark/validate_benchmark_results.py",
+      "--root",
+      "/tmp/intrinsic-graphics145/measurement/results",
+      "--manifests-root",
+      "benchmarks",
+      "--strict"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "python3",
+      "tools/agents/check_ara_claims.py",
+      "--root",
+      ".",
+      "--strict"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit_code": 0,
+    "initial_exit_code": 2,
+    "correction": "Removed extra EOF blank line; repeated git diff --check passed."
+  },
+  {
+    "command": [
+      "python3",
+      "tools/docs/check_docs_sync.py",
+      "--root",
+      ".",
+      "--files",
+      "ara/evidence/diagnostics/graphics145_renderer_frontend/diagnostic-summary.json",
+      "ara/evidence/diagnostics/graphics145_renderer_frontend/evidence-index.json",
+      "ara/evidence/diagnostics/graphics145_renderer_frontend/first-final-checks.txt",
+      "ara/evidence/diagnostics/graphics145_renderer_frontend/freeze.json",
+      "ara/evidence/diagnostics/graphics145_renderer_frontend/raw-evidence.tar.gz",
+      "ara/evidence/diagnostics/graphics145_renderer_frontend/results-resolutions.md",
+      "ara/evidence/diagnostics/graphics145_renderer_frontend/results-review.txt",
+      "ara/evidence/diagnostics/graphics145_renderer_frontend/review-resolutions.md",
+      "ara/evidence/diagnostics/graphics145_renderer_frontend/source-identity.json",
+      "ara/evidence/diagnostics/graphics145_renderer_frontend/summary.json",
+      "ara/evidence/diagnostics/graphics145_renderer_frontend/verification.json",
+      "ara/evidence/tables/graphics145_renderer_frontend_measurement.md",
+      "ara/logic/claims.md",
+      "ara/staging/observations.yaml",
+      "ara/trace/exploration_tree.yaml",
+      "ara/trace/pm_reasoning_log.yaml",
+      "ara/trace/sessions/2026-09-16_001.yaml",
+      "ara/trace/sessions/session_index.yaml",
+      "benchmarks/ci/manifests/renderer_frontend.yaml",
+      "src/graphics/renderer/Graphics.Renderer.cpp",
+      "tasks/SESSION-BRIEF.md",
+      "tasks/backlog/README.md",
+      "tasks/backlog/rendering/GRAPHICS-145-renderer-implementation-frontend-cost.md",
+      "tasks/backlog/rendering/README.md",
+      "tasks/backlog/runtime/README.md",
+      "tasks/done/BUG-198-compile-backlog-retired-links.md",
+      "tasks/done/GRAPHICS-144-renderer-consumer-locality.md",
+      "tasks/done/GRAPHICS-145-renderer-implementation-frontend-cost.md",
+      "tasks/done/RETIREMENT-LOG.md",
+      "--strict"
+    ],
+    "exit_code": 0
+  }
+]

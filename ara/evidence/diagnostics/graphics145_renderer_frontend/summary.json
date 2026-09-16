@@ -1,0 +1,395 @@
+{
+  "benchmark_id": "build.engine_compile_iteration.renderer_frontend.v1",
+  "source_revisions": {
+    "before": "07a872ac9d87fe6e1491d12f38906539779b74b4",
+    "after": "51bdc9b6562e831707ce09fb1dbea9940a5d709c"
+  },
+  "freeze": {
+    "frozen_at": "2026-09-16T06:59:52.302159+00:00",
+    "checkpoint": "f73dcbd39dae904224efda1b797746c3541ebe94",
+    "source_revisions": {
+      "before": "07a872ac9d87fe6e1491d12f38906539779b74b4",
+      "after": "51bdc9b6562e831707ce09fb1dbea9940a5d709c"
+    },
+    "manifest_sha256": "4570a81d76b7d3286623c87aa52689092345042da9a399b427f19eb937d3bc3b",
+    "runner_sha256": "5c61571b2bacf71d7623074de09c1ab43f4af7538ca10ed6d55993c467823f49",
+    "timed_population_absent_at_freeze": true
+  },
+  "samples": [
+    {
+      "attempt": "01-before-1",
+      "arm": "before",
+      "source_sha256": "0ee7f443cd51dc301a0d5d4c48e2a854f69c06e17a6ff86bfc2a2b714e2d630b",
+      "build_time_ms": {
+        "implementation_edit": 12929.976193001494,
+        "renderer_compiler": 12785,
+        "noop": 31.76949394401163
+      },
+      "memory_peak_bytes": {
+        "implementation_edit": 1800388608,
+        "noop": 18391040
+      },
+      "critical_path_ms": {
+        "implementation_edit": 12895,
+        "noop": 0
+      }
+    },
+    {
+      "attempt": "02-after-1",
+      "arm": "after",
+      "source_sha256": "c9a8d9fb051a8db22ca47df491df4e6d49ebd4e7ae41968c5c7d60e7a89349ef",
+      "build_time_ms": {
+        "implementation_edit": 9528.280531987548,
+        "renderer_compiler": 9373,
+        "noop": 33.670944976620376
+      },
+      "memory_peak_bytes": {
+        "implementation_edit": 1709154304,
+        "noop": 18030592
+      },
+      "critical_path_ms": {
+        "implementation_edit": 9490,
+        "noop": 0
+      }
+    },
+    {
+      "attempt": "03-after-2",
+      "arm": "after",
+      "source_sha256": "c9a8d9fb051a8db22ca47df491df4e6d49ebd4e7ae41968c5c7d60e7a89349ef",
+      "build_time_ms": {
+        "implementation_edit": 9463.81605300121,
+        "renderer_compiler": 9320,
+        "noop": 32.022470026277006
+      },
+      "memory_peak_bytes": {
+        "implementation_edit": 1708654592,
+        "noop": 18374656
+      },
+      "critical_path_ms": {
+        "implementation_edit": 9432,
+        "noop": 0
+      }
+    },
+    {
+      "attempt": "04-before-2",
+      "arm": "before",
+      "source_sha256": "0ee7f443cd51dc301a0d5d4c48e2a854f69c06e17a6ff86bfc2a2b714e2d630b",
+      "build_time_ms": {
+        "implementation_edit": 12968.161244993098,
+        "renderer_compiler": 12820,
+        "noop": 31.900063971988857
+      },
+      "memory_peak_bytes": {
+        "implementation_edit": 1800142848,
+        "noop": 18464768
+      },
+      "critical_path_ms": {
+        "implementation_edit": 12931,
+        "noop": 0
+      }
+    },
+    {
+      "attempt": "05-before-3",
+      "arm": "before",
+      "source_sha256": "0ee7f443cd51dc301a0d5d4c48e2a854f69c06e17a6ff86bfc2a2b714e2d630b",
+      "build_time_ms": {
+        "implementation_edit": 12793.37674798444,
+        "renderer_compiler": 12647,
+        "noop": 31.408561044372618
+      },
+      "memory_peak_bytes": {
+        "implementation_edit": 1800622080,
+        "noop": 18599936
+      },
+      "critical_path_ms": {
+        "implementation_edit": 12759,
+        "noop": 0
+      }
+    },
+    {
+      "attempt": "06-after-3",
+      "arm": "after",
+      "source_sha256": "c9a8d9fb051a8db22ca47df491df4e6d49ebd4e7ae41968c5c7d60e7a89349ef",
+      "build_time_ms": {
+        "implementation_edit": 9440.89095108211,
+        "renderer_compiler": 9293,
+        "noop": 32.443334930576384
+      },
+      "memory_peak_bytes": {
+        "implementation_edit": 1709158400,
+        "noop": 18231296
+      },
+      "critical_path_ms": {
+        "implementation_edit": 9405,
+        "noop": 0
+      }
+    },
+    {
+      "attempt": "07-after-4",
+      "arm": "after",
+      "source_sha256": "c9a8d9fb051a8db22ca47df491df4e6d49ebd4e7ae41968c5c7d60e7a89349ef",
+      "build_time_ms": {
+        "implementation_edit": 9473.86952699162,
+        "renderer_compiler": 9330,
+        "noop": 36.899261991493404
+      },
+      "memory_peak_bytes": {
+        "implementation_edit": 1708097536,
+        "noop": 18526208
+      },
+      "critical_path_ms": {
+        "implementation_edit": 9441,
+        "noop": 0
+      }
+    },
+    {
+      "attempt": "08-before-4",
+      "arm": "before",
+      "source_sha256": "0ee7f443cd51dc301a0d5d4c48e2a854f69c06e17a6ff86bfc2a2b714e2d630b",
+      "build_time_ms": {
+        "implementation_edit": 12896.441516000777,
+        "renderer_compiler": 12753,
+        "noop": 33.13348698429763
+      },
+      "memory_peak_bytes": {
+        "implementation_edit": 1800663040,
+        "noop": 18546688
+      },
+      "critical_path_ms": {
+        "implementation_edit": 12864,
+        "noop": 0
+      }
+    },
+    {
+      "attempt": "09-before-5",
+      "arm": "before",
+      "source_sha256": "0ee7f443cd51dc301a0d5d4c48e2a854f69c06e17a6ff86bfc2a2b714e2d630b",
+      "build_time_ms": {
+        "implementation_edit": 12891.14108204376,
+        "renderer_compiler": 12741,
+        "noop": 32.11464697960764
+      },
+      "memory_peak_bytes": {
+        "implementation_edit": 1801179136,
+        "noop": 18132992
+      },
+      "critical_path_ms": {
+        "implementation_edit": 12854,
+        "noop": 0
+      }
+    },
+    {
+      "attempt": "10-after-5",
+      "arm": "after",
+      "source_sha256": "c9a8d9fb051a8db22ca47df491df4e6d49ebd4e7ae41968c5c7d60e7a89349ef",
+      "build_time_ms": {
+        "implementation_edit": 9615.676010027528,
+        "renderer_compiler": 9464,
+        "noop": 33.717222046107054
+      },
+      "memory_peak_bytes": {
+        "implementation_edit": 1708036096,
+        "noop": 18161664
+      },
+      "critical_path_ms": {
+        "implementation_edit": 9577,
+        "noop": 0
+      }
+    }
+  ],
+  "frozen_bmi_count": 158,
+  "compile_commands_count": 777,
+  "cpu_model": "11th Gen Intel(R) Core(TM) i9-11900KF @ 3.50GHz",
+  "compiler": "Ubuntu clang version 23.0.0 (++20260614081921+80b1dddb5a24-1~exp1~20260614202044.1664)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/lib/llvm-23/bin\n",
+  "arms": {
+    "before": {
+      "build_time_ms": {
+        "implementation_edit": {
+          "median": 12896.441516000777,
+          "min": 12793.37674798444,
+          "max": 12968.161244993098,
+          "samples": [
+            12929.976193001494,
+            12968.161244993098,
+            12793.37674798444,
+            12896.441516000777,
+            12891.14108204376
+          ]
+        },
+        "renderer_compiler": {
+          "median": 12753,
+          "min": 12647,
+          "max": 12820,
+          "samples": [
+            12785,
+            12820,
+            12647,
+            12753,
+            12741
+          ]
+        },
+        "noop": {
+          "median": 31.900063971988857,
+          "min": 31.408561044372618,
+          "max": 33.13348698429763,
+          "samples": [
+            31.76949394401163,
+            31.900063971988857,
+            31.408561044372618,
+            33.13348698429763,
+            32.11464697960764
+          ]
+        }
+      },
+      "memory_peak_bytes": {
+        "implementation_edit": {
+          "median": 1800622080,
+          "min": 1800142848,
+          "max": 1801179136,
+          "samples": [
+            1800388608,
+            1800142848,
+            1800622080,
+            1800663040,
+            1801179136
+          ]
+        },
+        "noop": {
+          "median": 18464768,
+          "min": 18132992,
+          "max": 18599936,
+          "samples": [
+            18391040,
+            18464768,
+            18599936,
+            18546688,
+            18132992
+          ]
+        }
+      },
+      "critical_path_ms": {
+        "implementation_edit": {
+          "median": 12864,
+          "min": 12759,
+          "max": 12931,
+          "samples": [
+            12895,
+            12931,
+            12759,
+            12864,
+            12854
+          ]
+        },
+        "noop": {
+          "median": 0,
+          "min": 0,
+          "max": 0,
+          "samples": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    "after": {
+      "build_time_ms": {
+        "implementation_edit": {
+          "median": 9473.86952699162,
+          "min": 9440.89095108211,
+          "max": 9615.676010027528,
+          "samples": [
+            9528.280531987548,
+            9463.81605300121,
+            9440.89095108211,
+            9473.86952699162,
+            9615.676010027528
+          ]
+        },
+        "renderer_compiler": {
+          "median": 9330,
+          "min": 9293,
+          "max": 9464,
+          "samples": [
+            9373,
+            9320,
+            9293,
+            9330,
+            9464
+          ]
+        },
+        "noop": {
+          "median": 33.670944976620376,
+          "min": 32.022470026277006,
+          "max": 36.899261991493404,
+          "samples": [
+            33.670944976620376,
+            32.022470026277006,
+            32.443334930576384,
+            36.899261991493404,
+            33.717222046107054
+          ]
+        }
+      },
+      "memory_peak_bytes": {
+        "implementation_edit": {
+          "median": 1708654592,
+          "min": 1708036096,
+          "max": 1709158400,
+          "samples": [
+            1709154304,
+            1708654592,
+            1709158400,
+            1708097536,
+            1708036096
+          ]
+        },
+        "noop": {
+          "median": 18231296,
+          "min": 18030592,
+          "max": 18526208,
+          "samples": [
+            18030592,
+            18374656,
+            18231296,
+            18526208,
+            18161664
+          ]
+        }
+      },
+      "critical_path_ms": {
+        "implementation_edit": {
+          "median": 9441,
+          "min": 9405,
+          "max": 9577,
+          "samples": [
+            9490,
+            9432,
+            9405,
+            9441,
+            9577
+          ]
+        },
+        "noop": {
+          "median": 0,
+          "min": 0,
+          "max": 0,
+          "samples": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    }
+  },
+  "median_reduction_percent": {
+    "implementation_edit": 26.538886597227062,
+    "renderer_compiler": 26.840743354504827,
+    "noop": -5.551339979087544
+  }
+}

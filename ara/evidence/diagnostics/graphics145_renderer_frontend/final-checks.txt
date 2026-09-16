@@ -1,0 +1,99 @@
+$ python3 tools/agents/check_task_policy.py --root . --strict
+Validated 395 task file(s); findings: 0; mode: strict.
+[check_task_maturity_followups] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_maturity_followups] Open task files scanned: 106
+[check_task_maturity_followups] No maturity follow-up findings.
+Task policy check complete. findings=0 mode=strict.
+
+$ python3 tools/agents/check_task_state_links.py --root . --strict
+[check_task_state_links] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_state_links] Indexed task IDs: 1031
+[check_task_state_links] Mode: strict
+[check_task_state_links] No task-state link findings.
+
+$ python3 tools/docs/check_doc_links.py --root . --strict
+[check_doc_links] Root: /home/alex/Documents/IntrinsicEngine
+[check_doc_links] Checked relative links: 3738
+[check_doc_links] Mode: strict
+[check_doc_links] No broken relative links found.
+
+$ python3 tools/repo/check_layering.py --root src --strict
+[check_layering] Scan root: /home/alex/Documents/IntrinsicEngine/src
+[check_layering] Files scanned: 862
+[check_layering] References scanned: 8532 import/include, 84 CMake link
+[check_layering] Allowlist entries: 0
+[check_layering] Allowlisted violations: 0
+[check_layering] No layering violations found.
+
+$ python3 tools/repo/check_test_layout.py --root . --strict
+test layout check complete. findings=0 mode=strict
+
+$ python3 tools/repo/check_root_hygiene.py --root .
+[check_root_hygiene] Root: /home/alex/Documents/IntrinsicEngine
+[check_root_hygiene] Root markdown files:
+  - AGENTS.md: allowed
+  - CLAUDE.md: allowed
+  - README.md: allowed
+[check_root_hygiene] Root allowlist: /home/alex/Documents/IntrinsicEngine/tools/repo/root_allowlist.yaml
+[check_root_hygiene] Allowed repository entries present:
+  - .claude/
+  - .codex/
+  - .github/
+  - .gitignore
+  - .mcp.json
+  - AGENTS.md
+  - CLAUDE.md
+  - CMakeLists.txt
+  - CMakePresets.json
+  - README.md
+  - ara/
+  - assets/
+  - benchmarks/
+  - cmake/
+  - docs/
+  - lsan.supp
+  - methods/
+  - research/
+  - src/
+  - tasks/
+  - tests/
+  - tools/
+  - vcpkg-configuration.json
+  - vcpkg.json
+[check_root_hygiene] Ignored named local entries:
+  - .agents/
+  - .idea/
+  - .ruff_cache/
+  - build/
+  - cmake-build-debug/
+  - experimental/
+  - external/
+[check_root_hygiene] Root entries match repository-owned policy.
+
+$ python3 tools/agents/sync_skills.py --check
+Skill mirror sync complete. mode=check files=13 surfaces=3.
+
+$ python3 tools/benchmark/validate_benchmark_manifests.py
+Benchmark manifest validation passed for 100 file(s).
+
+$ python3 tools/benchmark/validate_benchmark_results.py --root /tmp/intrinsic-graphics145/measurement/results --manifests-root benchmarks --strict
+Benchmark result JSON validation passed for 10 file(s), 1 stable benchmark ID(s), and 10 append-only run/attempt identity tuple(s).
+
+$ python3 tools/agents/check_ara_claims.py --root . --strict
+check_ara_claims: OK (101 claims)
+
+$ git diff --check
+tasks/backlog/runtime/README.md:64: new blank line at EOF.
+
+$ python3 tools/docs/check_docs_sync.py --root . --files ara/evidence/diagnostics/graphics145_renderer_frontend/diagnostic-summary.json ara/evidence/diagnostics/graphics145_renderer_frontend/evidence-index.json ara/evidence/diagnostics/graphics145_renderer_frontend/first-final-checks.txt ara/evidence/diagnostics/graphics145_renderer_frontend/freeze.json ara/evidence/diagnostics/graphics145_renderer_frontend/raw-evidence.tar.gz ara/evidence/diagnostics/graphics145_renderer_frontend/results-resolutions.md ara/evidence/diagnostics/graphics145_renderer_frontend/results-review.txt ara/evidence/diagnostics/graphics145_renderer_frontend/review-resolutions.md ara/evidence/diagnostics/graphics145_renderer_frontend/source-identity.json ara/evidence/diagnostics/graphics145_renderer_frontend/summary.json ara/evidence/diagnostics/graphics145_renderer_frontend/verification.json ara/evidence/tables/graphics145_renderer_frontend_measurement.md ara/logic/claims.md ara/staging/observations.yaml ara/trace/exploration_tree.yaml ara/trace/pm_reasoning_log.yaml ara/trace/sessions/2026-09-16_001.yaml ara/trace/sessions/session_index.yaml benchmarks/ci/manifests/renderer_frontend.yaml src/graphics/renderer/Graphics.Renderer.cpp tasks/SESSION-BRIEF.md tasks/backlog/README.md tasks/backlog/rendering/GRAPHICS-145-renderer-implementation-frontend-cost.md tasks/backlog/rendering/README.md tasks/backlog/runtime/README.md tasks/done/BUG-198-compile-backlog-retired-links.md tasks/done/GRAPHICS-144-renderer-consumer-locality.md tasks/done/GRAPHICS-145-renderer-implementation-frontend-cost.md tasks/done/RETIREMENT-LOG.md --strict
+[check_docs_sync] Root: /home/alex/Documents/IntrinsicEngine
+[check_docs_sync] Rules: tools/docs/docs_sync_rules.yaml
+[check_docs_sync] Changed files source: --files
+[check_docs_sync] Changed files count: 29
+[check_docs_sync] Triggered rules: 2
+[check_docs_sync] Docs sync rules satisfied.
+
+
+Corrected extra EOF blank line in runtime backlog; git diff --check repeated: passed (exit 0).
+
+Final staged diff check also removed a trailing blank line in the retained first-check log. Full change from baseline passes git diff --check.

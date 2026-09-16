@@ -2265,3 +2265,14 @@
 - **Dependencies**: []
 - **Tags**: compilation, C++23 modules, renderer serialization, shared standard declarations, local matched observations
 - **From staging**: O233
+
+## C101: Bounded renderer implementation rebuild observations
+- **Statement**: GRAPHICS-145's retained local Clang23 Debug Null/headless cohort, five samples per exact source arm, changes settled renderer implementation edit plus graphics-archive median from 12.896 to 9.474 seconds (26.5% lower). Before range is 12.793–12.968 seconds; after is 9.441–9.616. The same invocation's renderer compiler median changes 12.753 to 9.330 seconds. Every edit compiles one source; no-op compiles none. All 777 configured commands, 158 prerequisite BMI hashes and package fingerprint remain unchanged.
+- **Status**: supported — descriptive local warm-input incremental build observations only; all ten canonical records remain claim_eligible:false. No whole-engine, clean-build, importer-fanout, runtime/GPU, aggregate-memory, statistical/general, publication-qualified or cross-host/compiler conclusion. No-op ranges overlap; its after median is 1.77 ms higher with no established cause.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Recalculation from the ten retained records disagrees with the medians, ranges or counts; exact source/command/prerequisite/dependency checks reveal unmatched inputs; or target walls omit actual compilation/linking. Untimed setup and single diagnostic controls must remain outside the matched cohort, and previous GRAPHICS-144 gains must not be counted again.
+- **Proof**: [ara/evidence/tables/graphics145_renderer_frontend_measurement.md, ara/evidence/diagnostics/graphics145_renderer_frontend/summary.json, ara/evidence/diagnostics/graphics145_renderer_frontend/evidence-index.json, ara/evidence/diagnostics/graphics145_renderer_frontend/verification.json, ara/evidence/diagnostics/graphics145_renderer_frontend/raw-evidence.tar.gz, benchmarks/ci/manifests/renderer_frontend.yaml, tasks/done/GRAPHICS-145-renderer-implementation-frontend-cost.md]
+- **Dependencies**: []
+- **Tags**: compilation, C++23 modules, renderer frontend, standard-library reuse, local matched observations
+- **From staging**: O234

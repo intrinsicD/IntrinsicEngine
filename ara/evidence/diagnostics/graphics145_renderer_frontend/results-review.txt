@@ -1,0 +1,33 @@
+## Verdict
+
+**Ship, with two text corrections.** No release blocker. Every quantitative claim in the draft reproduces from the ten-sample data; the defects are prose-level.
+
+## Recomputation (all 10 samples, none excluded)
+
+| Metric | Before median | After median | Reduction |
+|---|---:|---:|---:|
+| Target wall | 12896.442 ms | 9473.870 ms | 26.539% |
+| Renderer compiler | 12753 ms | 9330 ms | 26.841% |
+| No-op | 31.900 ms | 33.671 ms | **−5.55%** |
+
+Sorted arms confirm each median is the true middle value (before wall: 12793.377 / 12891.141 / **12896.442** / 12929.976 / 12968.161; after wall: 9440.891 / 9463.816 / **9473.870** / 9528.281 / 9615.676). Min/max in both tables match exactly at the stated 3-decimal precision, including the no-op row (before [0.0314–0.0331], after [0.0320–0.0369]). The headline "12.896 → 9.474 seconds (26.5% lower)" is correct.
+
+Separation claim verified: max after wall 9615.676 < min before wall 12793.377; max after compiler 9464 < min before compiler 12647. "Every after sample is below every before sample" holds for both timed arms.
+
+Counts verified: 777 compile commands, 158 frozen BMIs, 5 samples per arm, `claim_eligible: false` on the canonical record, freeze at 06:59:52Z preceding the first sample start at 07:01:13Z with `timed_population_absent_at_freeze: true`. Source line count 10,957 in the before record matches the stated 10,957 → 10,968 growth. Test arithmetic (4,664 passed + 1 skip = 4,665 selected) is consistent.
+
+## Findings
+
+**1. Sample order string is wrong (correction, not a blocker).** The draft says "ABBAABBAAB samples." The manifest `sample_order` and the attempt table both give before, after, after, before, before, after, after, before, before, after — i.e. **BAABBAABBA**. The letters are inverted. The actual balance and interleaving are fine; only the prose label is wrong. Fix the string.
+
+**2. No-op direction is unstated.** The draft says "No-op ranges overlap" and "no memory or no-op speedup is claimed," which is honest but omits that the after no-op median is nominally **5.6% slower** (31.900 → 33.671 ms), driven largely by the 36.899 ms outlier in 07-after-4. With overlapping ranges and a ~2 ms absolute delta this is noise, but a reader recomputing from `median_reduction_percent` will find a negative number the prose never acknowledges. Add one clause: no-op medians differ by ~2 ms in the unfavourable direction and the ranges overlap; no no-op claim either way.
+
+## Scope check
+
+The declared scope — local, warm-input, settled incremental rebuild of `ExtrinsicGraphics` including archive link, single host, five samples per arm, no statistical claim — matches the manifest `scope`/`validity`/`host_noise` text and the measured artifacts. Exclusions (clean build, whole engine, importer fanout, runtime, GPU, cross-host) are stated in all three of report, manifest and record. The diagnostic phase table is correctly fenced as unmatched single-run traces from a differently configured (Vulkan/GLFW) compile line, with an explicit instruction not to sum or combine with target walls; that is the right handling and I would not upgrade those rows. Clang 23 as the selected compiler is consistent throughout; the minimum-Clang question is correctly declared inapplicable.
+
+Optional, not required: memory is the one metric with clean separation (before ~1.800 GB, after ~1.708 GB, non-overlapping, ~5%) that the draft deliberately declines to claim. Staying silent is defensible given it is max single-process RSS rather than aggregate; if you want the conservative version, state the observation and the reason it is not a memory claim.
+
+## Limitations of this audit
+
+Read-only and arithmetic-only. I recomputed medians, extrema, reduction percentages, ordering and counts from the supplied summary and the single canonical record; I did not open the archive, re-run anything, or inspect the other nine records, the source diff, the runner, or the manifest file on disk. Claims resting on artifacts not shown here — BMI byte equality, compile-command identity, package fingerprints, libstdc++14 sort delegation, log/archive completeness, and the retained review packets — are accepted as asserted, not independently confirmed.

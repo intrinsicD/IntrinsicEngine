@@ -3977,3 +3977,20 @@ observations:
     promoted_to: logic/claims.md:C100
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O234
+    timestamp: '2026-09-16T09:09:16+02:00'
+    provenance: ai-executed
+    content: The ten retained settled graphics-target rebuilds change local median renderer implementation edit plus
+      archive time from 12.896 to 9.474 seconds (26.5% lower). Every after rebuild is below every before rebuild;
+      compiler invocation count remains one. No-op ranges overlap and all records remain claim_eligible:false.
+    context: Exact 07a872ac9 to 51bdc9b65, premeasurement freeze f73dcbd39, cache-off Clang23, fixed commands and
+      prerequisite/package hashes. Warm-input local cohort only. N606 commits to the retained source/report; no whole-engine,
+      clean-build, runtime/GPU or statistical inference.
+    potential_type: claim
+    bound_to:
+    - N605
+    promoted: true
+    promoted_to: logic/claims.md:C101
+    crystallized_via: artifact-commitment
+    stale: false

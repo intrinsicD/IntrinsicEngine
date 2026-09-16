@@ -44,9 +44,9 @@ and their paired UI or method work are recorded there, not here.
 
 - [RUNTIME-267 — Isolate processing config edits from unrelated editor consumers](RUNTIME-267-processing-config-consumer-locality.md)
 
-Start with [BUILD-009's refreshed baseline](../../done/BUILD-009-current-source-compile-baseline.md),
-then RUNTIME-266 before RUNTIME-267 because they share session files. Both
-preserve the completed RUNTIME-264/265 ownership improvements.
+RUNTIME-267 continues from the completed BUILD-009 baseline and RUNTIME-266/268
+work. Freeze a fresh immediate-before baseline and preserve the existing config
+and prepared-frame ownership contracts.
 
 ## Related queues and documentation
 
@@ -61,5 +61,3 @@ For completed work, the [retirement log](../../done/RETIREMENT-LOG.md) links
 retired task records. The directory indexes are
 [`tasks/done/README.md`](../../done/README.md) and
 [`tasks/archive/README.md`](../../archive/README.md).
-
-- [RUNTIME-268 — Reduce workspace snapshot BMI serialization](../../done/RUNTIME-268-workspace-snapshot-bmi-serialization.md)

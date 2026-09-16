@@ -600,12 +600,13 @@ sessions:
 
 - id: 2026-09-16_001
   date: '2026-09-16'
-  summary: Retired RUNTIME-268 and GRAPHICS-144 with bounded matched compilation evidence, Claude review, CPU tests
-    and minimum-compiler builds. Shared declaration ownership now serves snapshots and renderer; GRAPHICS-145 and
-    RUNTIME-267 retain remaining implementation/config work.
-  turn_count: 2
-  events_count: 8
+  summary: Retired RUNTIME-268, GRAPHICS-144 and GRAPHICS-145 with bounded matched compile evidence and Claude review.
+    Renderer implementation rebuild median now 9.474 seconds in its local comparison; RUNTIME-267 and independent
+    UI/material/cache tasks remain open.
+  turn_count: 3
+  events_count: 11
   claims_touched:
   - C99
   - C100
+  - C101
   open_threads: 10

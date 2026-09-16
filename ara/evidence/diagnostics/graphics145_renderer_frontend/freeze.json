@@ -1,0 +1,11 @@
+{
+  "frozen_at": "2026-09-16T06:59:52.302159+00:00",
+  "checkpoint": "f73dcbd39dae904224efda1b797746c3541ebe94",
+  "source_revisions": {
+    "before": "07a872ac9d87fe6e1491d12f38906539779b74b4",
+    "after": "51bdc9b6562e831707ce09fb1dbea9940a5d709c"
+  },
+  "manifest_sha256": "4570a81d76b7d3286623c87aa52689092345042da9a399b427f19eb937d3bc3b",
+  "runner_sha256": "5c61571b2bacf71d7623074de09c1ab43f4af7538ca10ed6d55993c467823f49",
+  "timed_population_absent_at_freeze": true
+}

@@ -70,19 +70,14 @@ Research remains paused behind REVIEW-004 except explicit operator direction and
 ## Compilation and reuse follow-ups
 
 These operator-requested tasks continue from the improved engine, without
-reopening completed cleanup slices. BUILD-009, RUNTIME-266, RUNTIME-268
-and GRAPHICS-144 are complete. RUNTIME-267 and GRAPHICS-145 must freeze fresh
-immediate-before sources for their own comparisons. UI-037 and GRAPHICS-105 are independently
+reopening completed cleanup slices. BUILD-009, RUNTIME-266, RUNTIME-268,
+GRAPHICS-144 and GRAPHICS-145 are complete. RUNTIME-267 must freeze fresh
+immediate-before sources for its own comparison. UI-037 and GRAPHICS-105 are independently
 ready. Task front-matter owns prerequisite state.
 
 | Area | Task |
 | --- | --- |
-| Fresh compile baseline and remaining hotspot ranking | [BUILD-009](../done/BUILD-009-current-source-compile-baseline.md) |
-| Editor snapshot/context consumers | [RUNTIME-266](../done/RUNTIME-266-editor-snapshot-consumer-locality.md) |
 | Processing config dependency chain | [RUNTIME-267](runtime/RUNTIME-267-processing-config-consumer-locality.md) |
-| Snapshot BMI serialization (diagnostic follow-up) | [RUNTIME-268](../done/RUNTIME-268-workspace-snapshot-bmi-serialization.md) |
-| Renderer declaration serialization | [GRAPHICS-144](../done/GRAPHICS-144-renderer-consumer-locality.md) |
-| Remaining renderer implementation frontend cost | [GRAPHICS-145](../active/GRAPHICS-145-renderer-implementation-frontend-cost.md) |
 | Shared action readiness and disabled reasons | [UI-037](ui/UI-037-linear-domain-action-readiness-tooltips.md) |
 | Material/visualization authority consolidation | [GRAPHICS-105](rendering/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md) |
 | Stale shaders after material-authority decisions | [LEGACY-043](rendering/LEGACY-043-retire-stale-multiset-shaders.md) |

@@ -2,11 +2,11 @@ session:
   id: 2026-09-16_001
   date: '2026-09-16'
   started: '2026-09-16T00:38:04+02:00'
-  last_turn: '2026-09-16T02:03:43+02:00'
-  turn_count: 2
-  summary: Retired RUNTIME-268 and GRAPHICS-144 with bounded matched compilation evidence, Claude review, CPU tests
-    and minimum-compiler builds. Shared declaration ownership now serves snapshots and renderer; GRAPHICS-145 and
-    RUNTIME-267 retain remaining implementation/config work.
+  last_turn: '2026-09-16T09:09:16+02:00'
+  turn_count: 3
+  summary: Retired RUNTIME-268, GRAPHICS-144 and GRAPHICS-145 with bounded matched compile evidence and Claude review.
+    Renderer implementation rebuild median now 9.474 seconds in its local comparison; RUNTIME-267 and independent
+    UI/material/cache tasks remain open.
 events_logged:
 - turn: 1
   type: dead_end
@@ -56,6 +56,24 @@ events_logged:
   routing: crystallized
   provenance: ai-executed
   summary: C100 binds the bounded observations through N604 artifact commitment; no broader performance inference.
+- turn: 3
+  type: experiment
+  id: N605
+  routing: direct
+  provenance: ai-executed
+  summary: Measure simpler renderer span and sort construction against settled target rebuilds
+- turn: 3
+  type: decision
+  id: N606
+  routing: direct
+  provenance: ai-executed
+  summary: Keep the existing standard-library path and retire GRAPHICS-145
+- turn: 3
+  type: observation
+  id: O234
+  routing: crystallized
+  provenance: ai-executed
+  summary: C101 records only the retained local rebuild comparison; N606 supplies artifact commitment.
 ai_actions:
 - turn: 1
   action: Diagnosed standard-header/import serialization, implemented one declaration owner, fixed review findings,
@@ -79,6 +97,16 @@ ai_actions:
   - ara/evidence/tables/graphics144_shared_std_measurement.md
   - tasks/done/GRAPHICS-144-renderer-consumer-locality.md
   - tasks/backlog/rendering/GRAPHICS-145-renderer-implementation-frontend-cost.md
+- turn: 3
+  action: Diagnosed expression-level frontend costs, reused standard-library constructors/sorts, resolved Claude
+    reviews, passed canonical build and CPU tests, froze/measured all ten samples, archived evidence and retired
+    GRAPHICS-145.
+  provenance: ai-executed
+  files_changed:
+  - src/graphics/renderer/Graphics.Renderer.cpp
+  - benchmarks/ci/manifests/renderer_frontend.yaml
+  - tasks/done/GRAPHICS-145-renderer-implementation-frontend-cost.md
+  - ara/evidence/tables/graphics145_renderer_frontend_measurement.md
 claims_touched:
 - id: C99
   action: crystallized
@@ -86,6 +114,9 @@ claims_touched:
 - id: C100
   action: crystallized
   turn: 2
+- id: C101
+  action: crystallized
+  turn: 3
 key_context:
 - turn: 1
   excerpt: User requested continuing open compilation/reuse tasks with Claude through planning, implementation,
@@ -93,6 +124,9 @@ key_context:
 - turn: 2
   excerpt: User requests continued open compilation/reuse work with Claude through plan, implementation, review,
     tests and fixes. Standing sharing/commit/push authorization retained; no main merge.
+- turn: 3
+  excerpt: User requests continuing open compile/reuse tasks with Claude through planning, implementation, review,
+    testing and fixes. Standing sharing/commit/push authorization persists; no main merge.
 open_threads:
 - The broader C92 processing-family hypothesis still needs a selected baseline and repeated family-edit measurements;
   BUILD-006 separately owns backend/cache comparisons.
@@ -112,9 +146,9 @@ open_threads:
   CPU and Vulkan probes select the scalar; exact Display status, acceleration and Appearance behavior remain needed.'
 - BUG-195 owns disk-headroom preflight and evidence-write recovery; completed backend verification does not close
   that tooling work.
-- RUNTIME-268 and GRAPHICS-144 are complete with bounded measured evidence. GRAPHICS-145 owns remaining renderer
-  implementation frontend cost; RUNTIME-267 config/frame ownership remains open. UI-037 and GRAPHICS-105 remain
-  ready, LEGACY-043 follows GRAPHICS-105; BUILD-006 retains its prerequisites.
+- RUNTIME-268, GRAPHICS-144 and GRAPHICS-145 are complete with bounded measured evidence. RUNTIME-267 config/frame
+  ownership remains open. UI-037 and GRAPHICS-105 are ready; LEGACY-043 follows GRAPHICS-105, and BUILD-006 retains
+  its prerequisites.
 ai_suggestions_pending:
-- Do not generalize the snapshot technique across engine layers without measuring the actual producer and consumer graph.
-  Existing staged topics retain their owners and flags.
+- Do not generalize the snapshot technique across engine layers without measuring the actual producer and consumer
+  graph. Existing staged topics retain their owners and flags.
