@@ -1,0 +1,30 @@
+benchmark_id: build.engine_compile_iteration.renderer_frontend.v1
+method: build.engine_compile_iteration
+dataset: intrinsicengine.renderer_frontend_2026_09_16
+params:
+  intent: performance
+  source_revisions:
+    before: 07a872ac9d87fe6e1491d12f38906539779b74b4
+    after: 51bdc9b6562e831707ce09fb1dbea9940a5d709c
+  sample_order: [before, after, after, before, before, after, after, before, before, after]
+  measured_iterations: 5
+  warmup_iterations: 0
+  setup: One untimed baseline graphics-target build creates settled immutable prerequisites; no timed sample is discarded. Each sample touches only the renderer implementation before a real target rebuild, then runs a no-op.
+  scope: Settled ExtrinsicGraphics rebuild including renderer compilation and archive linking. No clean-build, whole-engine, importer-fanout, runtime, GPU, cross-host or statistical claim.
+  compiler: /usr/bin/clang++-23
+  jobs: 4
+  configure_options:
+  - -DEXTRINSIC_BACKEND=Null
+  - -DINTRINSIC_PLATFORM_BACKEND=Null
+  - -DINTRINSIC_HEADLESS_NO_GLFW=ON
+  - -DINTRINSIC_BUILD_TESTS=OFF
+  - -DINTRINSIC_BUILD_BENCHMARKS=OFF
+  - -DINTRINSIC_ENABLE_CCACHE=OFF
+  - -DCMAKE_CXX_COMPILER_LAUNCHER=
+  - -DCMAKE_C_COMPILER_LAUNCHER=
+  validity: Exact clean commits differ only in Graphics.Renderer.cpp among production/build inputs; require all compile commands identical, all prerequisite BMI bytes and dependency packages unchanged before/after every build, exactly one expected compiler invocation plus archive link, and no compiled artifacts on no-op. No scanning/link time omitted from target wall.
+  source_paths: One detached source worktree and one task-owned tmpfs build throughout both arms.
+  host_noise: Compiler caches disabled; inputs pre-read during hashing. Normal desktop; no affinity/governor/turbo/filesystem-cache control or competing build/test jobs. Retain every sample.
+  metrics_detail: build_time_ms includes implementation_edit target wall, renderer_compiler from the same Ninja invocation, and noop wall. GNU time maximum single-process RSS, not aggregate memory. Phase traces are separate diagnostics.
+metrics: [build_time_ms, memory_peak_bytes, sample_count]
+thresholds: {}
