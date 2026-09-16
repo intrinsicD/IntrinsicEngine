@@ -1260,8 +1260,6 @@ namespace {
             if (!model.IsMesh)
             {
                 model.Provenance = "unavailable";
-                model.UvRegenerationDisabledReason =
-                    "UV diagnostics require a selected mesh";
                 return model;
             }
 
@@ -1269,7 +1267,6 @@ namespace {
             model.FaceCount = view.FacesAlive();
             model.BackendId = "xatlas";
             model.Provenance = "missing";
-            model.UvRegenerationAvailable = true;
 
             if (view.VertexSource == nullptr)
                 return model;

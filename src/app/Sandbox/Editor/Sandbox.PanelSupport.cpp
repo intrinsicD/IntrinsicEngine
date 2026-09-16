@@ -409,9 +409,6 @@ namespace Extrinsic::Sandbox::Editor
                     model.Uv.VertexCount);
         if (!model.Uv.LastFailure.empty())
             ImGui::TextDisabled("%s", model.Uv.LastFailure.c_str());
-        if (!model.Uv.UvRegenerationAvailable)
-            ImGui::TextDisabled("%s",
-                                model.Uv.UvRegenerationDisabledReason.c_str());
 
         ImGui::Checkbox("Force regenerate", &uvForceRegenerate);
         ImGui::SameLine();
@@ -421,13 +418,17 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::InputFloat("Texels per unit", &uvTexelsPerUnit, 0.0f, 0.0f, "%.3f");
         clampAtlasParameters();
 
-        const bool canRegenerateUvs =
-            model.Uv.UvRegenerationAvailable &&
-            context != nullptr &&
-            model.SelectedStableId != 0u;
-        if (!canRegenerateUvs)
-            ImGui::BeginDisabled();
-        if (ImGui::Button("Regenerate UVs") && canRegenerateUvs)
+        const EditorUvRegenerationCommand command{
+            .StableEntityId = model.SelectedStableId,
+            .PreserveValidAuthoredUvs = uvPreserveAuthored,
+            .ForceRegenerate = uvForceRegenerate,
+            .Resolution = static_cast<std::uint32_t>(uvResolution),
+            .Padding = static_cast<std::uint32_t>(uvPadding),
+            .TexelsPerUnit = uvTexelsPerUnit,
+        };
+        const auto readiness = PreviewEditorUvRegenerationCommand(
+            context != nullptr ? context->Parameterization.Commands : EditorProcessingCommands{}, command);
+        if (DrawProcessingActionButton("Regenerate UVs", readiness))
         {
             lastExtentAdoption.reset();
             if (context->Parameterization.ResultSinks.DismissUvRegenerationResult)
@@ -437,14 +438,7 @@ namespace Extrinsic::Sandbox::Editor
             // the parameterization results snapshot on a later frame.
             lastResult = ApplyEditorUvRegenerationCommand(
                 context->Parameterization.Commands,
-                EditorUvRegenerationCommand{
-                    .StableEntityId = model.SelectedStableId,
-                    .PreserveValidAuthoredUvs = uvPreserveAuthored,
-                    .ForceRegenerate = uvForceRegenerate,
-                    .Resolution = static_cast<std::uint32_t>(uvResolution),
-                    .Padding = static_cast<std::uint32_t>(uvPadding),
-                    .TexelsPerUnit = uvTexelsPerUnit,
-                },
+                command,
                 context->Parameterization.ResultSinks.UvRegeneration);
         }
         if (lastResult.has_value())
@@ -465,8 +459,6 @@ namespace Extrinsic::Sandbox::Editor
                 lastExtentAdoption = *lastResult;
             }
         }
-        if (!canRegenerateUvs)
-            ImGui::EndDisabled();
         DrawUvRegenerationStatus(model.Uv, lastResult);
         // Drawn after every reader above: dismissal clears the panel copy, the
         // once-per-result extent latch, and the session slot that would

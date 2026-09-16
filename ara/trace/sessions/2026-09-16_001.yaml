@@ -2,11 +2,11 @@ session:
   id: 2026-09-16_001
   date: '2026-09-16'
   started: '2026-09-16T00:38:04+02:00'
-  last_turn: '2026-09-16T12:08:10+02:00'
-  turn_count: 8
+  last_turn: '2026-09-16T12:27:37+02:00'
+  turn_count: 9
   summary: Retired RUNTIME-268, GRAPHICS-144/145 and RUNTIME-267 with bounded compile evidence; continued UI-037
     readiness/button and execution reuse with Claude review and full CPU verification. Outlier/ICP, Progressive
-    Poisson and parameterization config rejection/retries are covered; broader readiness, material/shader/cache work remain open.
+    Poisson and parameterization config rejection/retries plus UV admission are covered; full readiness, material/shader/cache work remain open.
 events_logged:
 - turn: 1
   type: dead_end
@@ -116,6 +116,13 @@ events_logged:
   routing: direct
   provenance: ai-executed
   summary: Consolidate parameterization config apply and remove redundant app request construction.
+- turn: 9
+  type: decision
+  id: N613
+  routing: direct
+  provenance: ai-executed
+  summary: Share metadata-only UV admission and reject duplicate jobs before preparation; preserve numerical command
+    validation and keep UI-037 open.
 ai_actions:
 - turn: 1
   action: Diagnosed standard-header/import serialization, implemented one declaration owner, fixed review findings,
@@ -200,6 +207,17 @@ ai_actions:
   - src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp
   - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
   - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
+- turn: 9
+  action: Reused soup metadata validation and the shared action control, removed redundant availability fields,
+    resolved Claude review, fixed the new ImGui test window and passed focused plus full CPU verification.
+  provenance: ai-executed
+  files_changed:
+  - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Uv.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.cpp
+  - src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp
+  - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+  - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
 claims_touched:
 - id: C99
   action: crystallized
@@ -238,6 +256,9 @@ key_context:
 - turn: 8
   excerpt: User requested continued work with Claude through planning, implementation, review, tests and fixes.
     Continued UI-037 parameterization config reuse; broader readiness task remains open and no timing claim added.
+- turn: 9
+  excerpt: User requested continuing with Claude through planning, implementation, review, tests and fixes. Continued
+    UI-037 UV admission; no whole-task retirement or timing claim.
 open_threads:
 - The broader C92 processing-family hypothesis still needs a selected baseline and repeated family-edit measurements;
   BUILD-006 separately owns backend/cache comparisons.
@@ -259,8 +280,8 @@ open_threads:
   that tooling work.
 - RUNTIME-268, GRAPHICS-144, GRAPHICS-145 and RUNTIME-267 are complete with bounded measured evidence. Mandatory
   config/session dependencies remain. UI-037 is active with shared controls, outlier/ICP, Progressive Poisson and
-  parameterization config/execution verified;
-  mesh/UV/bake, family readiness, backend/variant and metadata/cache preflight coverage remain. GRAPHICS-105 is ready; LEGACY-043 follows it, and
+  parameterization config/execution and UV admission verified;
+  full numerical UV readiness, mesh/bake, family readiness, backend/variant and metadata/cache preflight coverage remain. GRAPHICS-105 is ready; LEGACY-043 follows it, and
   BUILD-006 retains its prerequisites.
 ai_suggestions_pending:
 - Do not generalize the snapshot technique across engine layers without measuring the actual producer and consumer

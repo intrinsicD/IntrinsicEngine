@@ -671,13 +671,13 @@ TEST(SandboxEditorPresentation, UvRegenerationHasOneImplementationBothPanelsDriv
           "context->Parameterization.Commands",
           "context->Parameterization.ResultSinks.UvRegeneration",
           "DismissUvRegenerationResult()",
-          "ImGui::Button(\"Regenerate UVs\")",
+          "DrawProcessingActionButton(\"Regenerate UVs\", readiness)",
           "lastExtentAdoption = *lastResult;"})
     {
         EXPECT_NE(shared.find(required), std::string::npos) << required;
     }
 
-    const auto submit = shared.find("if (ImGui::Button(\"Regenerate UVs\")");
+    const auto submit = shared.find("if (DrawProcessingActionButton(\"Regenerate UVs\", readiness)");
     ASSERT_NE(submit, std::string::npos);
     EXPECT_LT(shared.find("DismissUvRegenerationResult();", submit),
               shared.find("ApplyEditorUvRegenerationCommand(", submit))

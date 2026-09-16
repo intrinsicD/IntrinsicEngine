@@ -39,12 +39,11 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence, runtim
   validation and expose copied readiness with their operation snapshots;
   family-owned runtime prepared frames carry those values to
   `src/app/Sandbox/Editor/`, which owns only ImGui presentation. The dependency remains `app -> runtime`.
-- Existing operations already expose ad-hoc availability/reason pairs, such
-  as `UvRegenerationAvailable` / `UvRegenerationDisabledReason`.
-  `Sandbox.PanelSupport.hpp` already supplies `DrawDisabledReasonTooltip`.
+- UV regeneration now exposes typed admission readiness; other operations still
+  carry separate availability fields. `Sandbox.PanelSupport.hpp` supplies the
+  shared `DrawProcessingActionButton` and `DrawDisabledReasonTooltip`.
   Unify the remaining readiness representation and cover the full action
-  inventory; do not recreate that helper or move family logic into a shared
-  editor workspace interface.
+  inventory without moving family logic into a shared editor workspace interface.
 - The readiness inventory covers mesh processing actions (denoise, curvature, remesh, subdivide, simplify, and recompute normals), selected-mesh UV regeneration, texture bake, point/graph/mesh normal generation where offered, point-cloud outlier removal, K-Means, Progressive Poisson, ICP, and parameterization.
 - ICP readiness requires two distinct compatible entities/property sources,
   not point-cloud provenance. Reuse the canonical property/topology preflight
@@ -406,3 +405,59 @@ Verified checkpoint:
 - Scope/layering/tests/docs sweep passes. Clean-workshop rows 1–3 and 8 pass;
   renderer/pass/recipe rows 4–6 unchanged; row 7 records this bounded slice with
   UI-037 still active. No new ownership layer or compatibility path.
+
+## UV regeneration admission slice — plan
+
+- Continue the operator-directed reuse/readiness work. Replace the app's mesh-only
+  availability pair with a typed runtime preview and the existing shared action
+  button/tooltip. Keep the command and preview on one validation path.
+- Reuse discovery: `BuildMeshSoupFromGeometrySources` owns source metadata and
+  topology validation; extract its metadata-only prefix in the existing private
+  MeshSupport implementation. Reuse the UV job identity and pending result before
+  mesh preparation so duplicate requests do not repeat source copies. Keep queued
+  result delivery, attachment guards, undo and stale-source publication checks.
+- Right-sizing: one typed preview in the existing parameterization owner, no new
+  files, modules, services, config lane or broad editor dependencies. Delete the
+  obsolete availability pair from `EditorCommon`. No compile-time claim.
+- This slice covers cheap admission checks only. Full finite/topology feasibility
+  remains command-time validation; generation-keyed expensive readiness is still
+  open under this task, and preview documentation must make that boundary clear.
+
+## UV regeneration admission slice — implementation/review checkpoint
+
+- Preview and apply now share session/parameter/entity/source-metadata checks and
+  the UV job identity. Both bake controls use one command and the shared action
+  button/disabled tooltip. The obsolete common-model availability fields are gone.
+  Invalid finite/non-negative texel density is rejected for direct callers too.
+- `ValidateMeshSoupSourceMetadata` extracts the existing builder prefix and
+  returns status plus diagnostic, preserving the builder's non-empty-mesh success
+  contract. Preview performs no mesh construction or buffer walk. Duplicate jobs
+  return `Pending` before mesh snapshots and add no result callback; original
+  synchronous fallback and terminal publication/undo guards remain.
+- Claude reviewed the plan and fixed diff. Adopted the status/diagnostic-only
+  helper and retained the original `JobCommands.Available()` dedup boundary.
+  Verified `<cmath>` and removed all old-field readers. A final review concern
+  that a sticky failed first-click result could make the new UI test pass was
+  rejected: its explicit no-result, success, job-count and publication assertions
+  fail that scenario. Do not reset the result merely to hide a failed assertion.
+- Focused canonical-ci run: all 32 selected UV, shared-button and real processing
+  panel tests pass. The new UI test initially omitted its own ImGui window;
+  fixed its callback with Begin/End and reran. Contracts cover preview/apply
+  rejection parity, expired handles, metadata-only admission, async dedup before
+  topology traversal, one terminal delivery, and readiness restored at completion.
+  The real control test proves disabled activation submits nothing and an enabled
+  request publishes UVs and adopts the returned atlas extent.
+- Scope/architecture review: app remains a runtime consumer; metadata helpers
+  remain private compiled runtime code, no new dependency edge/file/module/service
+  or config lane. Production code grows by 45 lines across seven existing files
+  to expose the missing preview and share its validation. This is readiness and
+  reuse work, not a measured code-size or compilation-time reduction.
+- UI-037 remains active: complete numerical/topology readiness and the remaining
+  action/backend inventory still need closure. This preview deliberately does
+  not certify full-buffer numerical feasibility.
+- Final verification: `cmake --preset ci`, full `IntrinsicTests` build, and the
+  canonical exclusion-only CPU gate: **4,674 passed, one expected ASan-only GLFW
+  lifecycle skip**, zero failures (4,675 selected; 139.92 s). Layering, test layout,
+  task validation/policy/state links, docs links/sync, root hygiene and skill
+  freshness pass; module inventory regenerated unchanged. No sanitizer or Vulkan
+  runtime execution was claimed for this CPU/UI slice.

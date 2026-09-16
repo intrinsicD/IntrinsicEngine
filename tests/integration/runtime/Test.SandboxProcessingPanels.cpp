@@ -1575,3 +1575,65 @@ TEST(SandboxProcessingPanels, UvAtlasAdoptionTracksNewExtentsAndPreservesManualS
     EXPECT_EQ(checks, 3);
     EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
 }
+
+TEST(SandboxProcessingPanels, UvRegenerationControlBlocksUnavailableAndPublishesQueuedResult)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+    R::EditorTextureBakeControlsModel model;
+    std::optional<R::EditorUvRegenerationCommandResult> result, adoption;
+    std::int32_t bakeWidth = 1024, bakeHeight = 1024, bakePadding = 0, resolution = 64, padding = 2;
+    float density = 0.f;
+    bool force = true, preserve = false;
+    const Editor::SandboxUvRegenerationControls controls{
+        &result, &adoption, &bakeWidth, &bakeHeight, &bakePadding,
+        &resolution, &padding, &density, &force, &preserve};
+    const auto windowHandle = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id = "test.uv_regeneration", .MenuPath = {"View"}, .Title = "UV controls test",
+        .OpenByDefault = true,
+        .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
+            if (context.Parameterization.Results.LastUvRegenerationResult)
+                result = context.Parameterization.Results.LastUvRegenerationResult;
+            if (ImGui::Begin("UV controls test"))
+                Editor::DrawSandboxUvRegenerationControls(model, &context, controls);
+            ImGui::End();
+        }});
+    int frames = 0, step = 0;
+    std::uint64_t jobsBefore = 0u;
+    bool completed = false;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frames > 400) { ADD_FAILURE() << "UV controls did not complete"; engine.RequestExit(); return; }
+        auto* window = ImGui::FindWindowByName("UV controls test");
+        if (!window) return;
+        ImGui::SetWindowSize(window, {700, 700});
+        ImGui::SetWindowPos(window, {0, 0});
+        ++step;
+        if (step == 2) jobsBefore = engine.Jobs().Stats().SubmittedJobs;
+        if (step == 3) ImGui::ActivateItemByID(window->GetID("Regenerate UVs"));
+        if (step == 6)
+        {
+            EXPECT_FALSE(result);
+            EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
+            model.SelectedStableId = R::SelectionController::ToStableEntityId(entity);
+            ImGui::ActivateItemByID(window->GetID("Regenerate UVs"));
+        }
+        if (step > 8 && result && result->Status != R::EditorCommandStatus::Pending)
+        {
+            EXPECT_TRUE(result->Succeeded()) << result->Diagnostic;
+            EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore + 1u);
+            EXPECT_EQ(bakeWidth, static_cast<std::int32_t>(result->AtlasWidth));
+            EXPECT_EQ(bakeHeight, static_cast<std::int32_t>(result->AtlasHeight));
+            EXPECT_EQ(bakePadding, padding);
+            EXPECT_TRUE(adoption);
+            EXPECT_TRUE(scene.Raw().get<GS::Vertices>(entity).Properties.Exists("v:texcoord") ||
+                        scene.Raw().get<GS::Halfedges>(entity).Properties.Exists("h:texcoord"));
+            completed = true;
+            engine.RequestExit();
+        }
+    };
+    h.Engine->Run();
+    EXPECT_TRUE(completed);
+    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(windowHandle));
+}

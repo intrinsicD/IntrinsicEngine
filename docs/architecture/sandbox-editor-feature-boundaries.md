@@ -248,6 +248,15 @@ ICP trajectory application and construction retain their distinct request sequen
 algorithm controls and statistics remain explicit; compatible Show actions use
 `ShowProcessingProperty`, while face-normal display retains its face-lane path.
 
+UV regeneration's shared control builds one request for
+`PreviewEditorUvRegenerationCommand` and apply. Both use the same session,
+parameter, mesh-source metadata and active-job admission checks; the preview
+never builds or copies a mesh. The private `ValidateMeshSoupSourceMetadata`
+also gates soup construction. Full finite/topology validation remains at
+submission, so admission readiness does not certify numerical feasibility.
+Duplicate requests return the existing pending job before mesh preparation,
+without adding a result callback. This command does not require config controls.
+
 The session retains separate typed result values: density/spacing live in
 `EditorPointFieldResultsSnapshot`, weights/keypoints/outliers live in
 `EditorPointAnalysisResultsSnapshot`, normals live in `EditorNormalResultsSnapshot`,

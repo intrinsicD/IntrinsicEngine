@@ -36,6 +36,11 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             }
         };
 
+        // Checks property presence/cardinality without traversing or copying buffers.
+        [[nodiscard]] EditorCommandStatus ValidateMeshSoupSourceMetadata(
+            const GS::ConstSourceView& view, std::string& diagnostic,
+            std::string_view positionProperty = GS::PropertyNames::kPosition);
+
         [[nodiscard]] MeshSoupFromGeometrySourcesResult BuildMeshSoupFromGeometrySources(
             const GS::ConstSourceView& view,
             std::string_view positionProperty = GS::PropertyNames::kPosition);

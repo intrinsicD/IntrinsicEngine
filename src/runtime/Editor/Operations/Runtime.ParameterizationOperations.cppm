@@ -221,6 +221,11 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::string_view
     StableTokenForEditorParameterizationStrategy(EditorParameterizationStrategy strategy) noexcept;
 
+    // Cheap admission preview: session, parameters, source metadata and active jobs.
+    // Finite values and complete topology are validated when the command prepares its mesh.
+    [[nodiscard]] ActionReadiness PreviewEditorUvRegenerationCommand(
+        const EditorProcessingCommands&, const EditorUvRegenerationCommand&);
+
     // Immediate outcomes return directly. Only a newly queued job delivers a
     // terminal callback, while attached. Duplicate Pending requests add no callback.
     [[nodiscard]] EditorUvRegenerationCommandResult ApplyEditorUvRegenerationCommand(

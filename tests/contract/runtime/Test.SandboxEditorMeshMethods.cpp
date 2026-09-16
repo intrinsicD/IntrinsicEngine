@@ -4244,6 +4244,75 @@ TEST(SandboxEditorUi, OneOperationsFailureIsAbsentFromTheSharedProcessingModel)
     }
 }
 
+TEST(SandboxEditorUi, UvRegenerationAdmissionMatchesCommandRejections)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    auto context = MakeContext(registry, selection);
+    const auto mesh = MakeSelectable(registry, "UvAdmission");
+    AddTriangleMeshSource(registry, mesh);
+    Runtime::EditorUvRegenerationCommand command{
+        .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
+        .Resolution = 64u, .Padding = 2u};
+    const auto reject = [&](const auto& commands, const auto& request, const auto status) {
+        const auto preview = Runtime::PreviewEditorUvRegenerationCommand(commands, request);
+        const auto applied = Runtime::ApplyEditorUvRegenerationCommand(commands, request);
+        EXPECT_FALSE(preview.Enabled);
+        EXPECT_FALSE(preview.DisabledReason.empty());
+        EXPECT_EQ(applied.Status, status);
+        EXPECT_EQ(applied.Diagnostic, preview.DisabledReason);
+    };
+    reject(Runtime::EditorProcessingCommands{}, command, Runtime::EditorCommandStatus::MissingScene);
+    auto invalid = command;
+    invalid.StableEntityId = 0u;
+    reject(context, invalid, Runtime::EditorCommandStatus::StaleEntity);
+    invalid = command; invalid.Resolution = 0u;
+    reject(context, invalid, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    invalid = command; invalid.Padding = invalid.Resolution;
+    reject(context, invalid, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    invalid = command; invalid.BackendName = "unavailable";
+    reject(context, invalid, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    for (float density : {-1.f, std::numeric_limits<float>::quiet_NaN(),
+                          std::numeric_limits<float>::infinity()})
+    {
+        invalid = command; invalid.TexelsPerUnit = density;
+        reject(context, invalid, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    }
+    invalid = command;
+    invalid.StableEntityId = Runtime::SelectionController::ToStableEntityId(
+        MakeSelectable(registry, "NotAMesh"));
+    reject(context, invalid, Runtime::EditorCommandStatus::UnsupportedGeometryDomain);
+    auto& props = registry.Raw().get<GS::Halfedges>(mesh).Properties;
+    auto next = props.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeNext);
+    const auto saved = next.Vector();
+    next.Vector().clear();
+    reject(context, command, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    next.Vector() = saved;
+    // Without a submit lane, synchronous execution must ignore active-job queries.
+    unsigned activeQueries = 0u;
+    context.JobCommands.FindActive = [&](const auto&) -> std::optional<Runtime::EditorJobRecord> {
+        ++activeQueries;
+        return std::nullopt;
+    };
+    EXPECT_TRUE(Runtime::PreviewEditorUvRegenerationCommand(context, command).Enabled);
+    EXPECT_EQ(activeQueries, 0u);
+    bool attached = true;
+    context.AttachmentActive = [&] { return attached; };
+    const Runtime::EditorProcessingCommands commands = context;
+    EXPECT_TRUE(Runtime::PreviewEditorUvRegenerationCommand(commands, command).Enabled);
+    attached = false;
+    reject(commands, command, Runtime::EditorCommandStatus::MissingScene);
+
+    // Admission deliberately reads metadata only; command-time validation still
+    // rejects non-finite buffers instead of scanning them every UI frame.
+    registry.Raw().get<GS::Vertices>(mesh).Properties.Get<glm::vec3>("v:position")[0].x =
+        std::numeric_limits<float>::quiet_NaN();
+    attached = true;
+    EXPECT_TRUE(Runtime::PreviewEditorUvRegenerationCommand(commands, command).Enabled);
+    EXPECT_EQ(Runtime::ApplyEditorUvRegenerationCommand(commands, command).Status,
+              Runtime::EditorCommandStatus::InvalidProcessingParameters);
+}
+
 TEST(SandboxEditorUi, UvRegenerationThatReproducesStoredUvsReportsNoChange)
 {
     ECS::Scene::Registry registry;
@@ -4540,7 +4609,8 @@ TEST(SandboxEditorUi, UvRegenerationCommandRepairsSelectedMeshTexcoords)
     const Runtime::EditorWorkspaceSnapshot before =
         Runtime::BuildEditorWorkspaceSnapshot(context);
     ASSERT_TRUE(before.Inspector.TextureBake.HasSelectedEntity);
-    EXPECT_TRUE(before.Inspector.TextureBake.Uv.UvRegenerationAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorUvRegenerationCommand(context, {
+        .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh)}).Enabled);
     EXPECT_TRUE(before.Inspector.TextureBake.Uv.HasTexcoords);
     EXPECT_TRUE(before.Inspector.TextureBake.Uv.TexcoordCountMatchesVertices);
     EXPECT_FALSE(before.Inspector.TextureBake.Uv.TexcoordsFinite);
@@ -4803,16 +4873,30 @@ TEST(SandboxEditorUi, UvRegenerationDuplicateSubmitUsesExistingActiveJob)
         .Padding = 2u,
     };
 
+    EXPECT_TRUE(Runtime::PreviewEditorUvRegenerationCommand(context, command).Enabled);
+    unsigned deliveries = 0u, duplicateDeliveries = 0u;
     const Runtime::EditorUvRegenerationCommandResult first =
-        Runtime::ApplyEditorUvRegenerationCommand(context, command);
+        Runtime::ApplyEditorUvRegenerationCommand(context, command, [&](auto) { ++deliveries; });
     ASSERT_EQ(first.Status, Runtime::EditorCommandStatus::Pending);
 
     Runtime::EditorJobQueueSnapshot queued =
         jobs.Snapshot();
     ASSERT_EQ(queued.Entries.size(), 1u);
 
+    // A pending request does not traverse/copy topology or register another sink.
+    auto next = registry.Raw().get<GS::Halfedges>(mesh).Properties.Get<std::uint32_t>(
+        GS::PropertyNames::kHalfedgeNext);
+    const auto savedNext = next[0];
+    next[0] = std::numeric_limits<std::uint32_t>::max();
+    const auto busy = Runtime::PreviewEditorUvRegenerationCommand(context, command);
+    EXPECT_FALSE(busy.Enabled);
     const Runtime::EditorUvRegenerationCommandResult duplicate =
-        Runtime::ApplyEditorUvRegenerationCommand(context, command);
+        Runtime::ApplyEditorUvRegenerationCommand(context, command, [&](auto) { ++duplicateDeliveries; });
+    EXPECT_EQ(busy.DisabledReason, duplicate.Diagnostic);
+    next[0] = savedNext;
+    auto invalid = command; invalid.Resolution = 0u;
+    EXPECT_EQ(Runtime::ApplyEditorUvRegenerationCommand(context, invalid).Status,
+              Runtime::EditorCommandStatus::InvalidProcessingParameters);
     EXPECT_EQ(duplicate.Status, Runtime::EditorCommandStatus::Pending);
     EXPECT_NE(duplicate.Diagnostic.find("already has an active"),
               std::string::npos);
@@ -4820,6 +4904,9 @@ TEST(SandboxEditorUi, UvRegenerationDuplicateSubmitUsesExistingActiveJob)
     EXPECT_EQ(jobs.Snapshot().Entries.size(), 1u);
 
     ASSERT_TRUE(jobs.DrainUntilTerminal());
+    EXPECT_EQ(deliveries, 1u);
+    EXPECT_EQ(duplicateDeliveries, 0u);
+    EXPECT_TRUE(Runtime::PreviewEditorUvRegenerationCommand(context, command).Enabled);
 
     Runtime::EditorJobQueueSnapshot complete =
         jobs.Snapshot();
@@ -5073,8 +5160,10 @@ TEST(SandboxEditorUi, TextureBakeControlsReportUvSourcesAndRequireRuntimeModule)
     EXPECT_TRUE(bake.Uv.TexcoordsFinite);
     EXPECT_FALSE(bake.HasRuntimeBakeCommand);
     EXPECT_FALSE(bake.CanBake);
-    EXPECT_TRUE(bake.Uv.UvRegenerationAvailable);
-    EXPECT_TRUE(bake.Uv.UvRegenerationDisabledReason.empty());
+    const auto uvReadiness = Runtime::PreviewEditorUvRegenerationCommand(context, {
+        .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh)});
+    EXPECT_TRUE(uvReadiness.Enabled);
+    EXPECT_TRUE(uvReadiness.DisabledReason.empty());
 
     const Runtime::EditorTextureBakeSourceRow* paint =
         FindTextureBakeSource(bake, "v:paint");

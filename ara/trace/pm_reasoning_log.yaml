@@ -2616,3 +2616,12 @@ entries:
       plain-text bounded final verdict; no claimed tool execution from that response.
     - Earlier staged topics remain referenced by their owners and open threads; this slice supplies no new closure
       or abandonment signal. Preserve their flags and retain UI-037 remaining inventory.
+
+  - turn: 2026-09-16_001#9
+    notes:
+    - N613 records an ordinary implementation/reuse decision and CPU verification only; no performance claim, staging
+      promotion or whole-task closure. Preserve older owners and flags.
+    - UV preview is admission only, not full numerical feasibility. Additional source lines expose a missing preview
+      without new modules or files; no compile-time improvement inferred.
+    - Reviewed Claude findings against source and failing assertions; retain synchronous job-lane gating. Fixed the
+      new test callback window before rerunning. Broader O93 and unrelated staged topics remain open.

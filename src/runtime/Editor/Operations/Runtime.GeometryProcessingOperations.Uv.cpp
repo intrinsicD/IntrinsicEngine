@@ -891,10 +891,10 @@ using namespace GeometryProcessingDetail::MeshSupport;
     // compare it, while `ValidateUvRegenerationCpuJobApply` rechecks source and
     // metadata staleness immediately before apply.
     [[nodiscard]] EditorJobIdentity MakeUvRegenerationCpuJobIdentity(
-        const EditorUvRegenerationCpuJobState& state)
+        const std::uint32_t stableEntityId)
     {
         return EditorJobIdentity{
-            .EntityId = state.StableEntityId,
+            .EntityId = stableEntityId,
             .Scope = EditorJobScope::MeshSurface,
             .OutputSemantic = GeometryPresentationSlotSemantic::Albedo,
             .OutputName = std::string{kUvRegenerationJobOutputName},
@@ -953,19 +953,8 @@ using namespace GeometryProcessingDetail::MeshSupport;
         const std::shared_ptr<EditorUvRegenerationCpuJobState>& state)
     {
         const EditorJobIdentity identity =
-            MakeUvRegenerationCpuJobIdentity(*state);
+            MakeUvRegenerationCpuJobIdentity(state->StableEntityId);
         JobDesc desc = MakeUvRegenerationCpuJobDesc(context, state);
-        if (const std::optional<EditorJobRecord> active =
-                FindActiveEditorJob(context, identity))
-        {
-            // A duplicate request adds no second terminal delivery.
-            state->Sink = {};
-            EditorUvRegenerationCommandResult pending =
-                MakePendingUvRegenerationResult(active->Token);
-            pending.Diagnostic =
-                BuildActiveDerivedJobMessage("UV regeneration CPU", *active);
-            return pending;
-        }
 
         const JobToken handle = context.JobCommands.Submit(
             std::move(desc),
@@ -985,10 +974,10 @@ using namespace GeometryProcessingDetail::MeshSupport;
 
     namespace
     {
-    [[nodiscard]] EditorUvRegenerationCommandResult ApplyUvRegenerationChecked(
+    [[nodiscard]] EditorUvRegenerationCommandResult ValidateUvRegenerationRequest(
         const EditorProcessingContext& context,
         const EditorUvRegenerationCommand& command,
-        std::function<void(EditorUvRegenerationCommandResult)> onComplete)
+        GS::ConstSourceView& view)
     {
         if (context.Scene == nullptr)
         {
@@ -1004,6 +993,13 @@ using namespace GeometryProcessingDetail::MeshSupport;
                 Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput,
                 "UV regeneration requires a positive resolution and padding smaller "
                 "than the atlas.");
+        }
+        if (!std::isfinite(command.TexelsPerUnit) || command.TexelsPerUnit < 0.0f)
+        {
+            return MakeUvRegenerationResult(
+                EditorCommandStatus::InvalidProcessingParameters,
+                Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput,
+                "UV regeneration requires a finite non-negative texel density.");
         }
         if (!command.BackendName.empty() && command.BackendName != "xatlas")
         {
@@ -1021,10 +1017,40 @@ using namespace GeometryProcessingDetail::MeshSupport;
             return MakeUvRegenerationResult(
                 EditorCommandStatus::StaleEntity,
                 Geometry::UvAtlas::UvAtlasStatus::EmptyInput,
-                "UV regeneration target entity is stale or no longer live.");
+                "Select a live mesh entity for UV regeneration.");
         }
 
-        const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
+        view = GS::BuildConstView(raw, *entity);
+        std::string diagnostic;
+        const auto sourceStatus = ValidateMeshSoupSourceMetadata(view, diagnostic);
+        if (sourceStatus != EditorCommandStatus::Applied)
+            return MakeUvRegenerationResult(
+                sourceStatus, Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput,
+                "UV regeneration cannot use the selected entity: " + diagnostic);
+
+        if (const auto active = context.JobCommands.Available()
+                ? FindActiveEditorJob(context, MakeUvRegenerationCpuJobIdentity(command.StableEntityId))
+                : std::nullopt)
+        {
+            auto pending = MakePendingUvRegenerationResult(active->Token);
+            pending.Diagnostic = BuildActiveDerivedJobMessage("UV regeneration CPU", *active);
+            return pending;
+        }
+        return MakeUvRegenerationResult(
+            EditorCommandStatus::Applied, Geometry::UvAtlas::UvAtlasStatus::Success, {});
+    }
+
+    [[nodiscard]] EditorUvRegenerationCommandResult ApplyUvRegenerationChecked(
+        const EditorProcessingContext& context,
+        const EditorUvRegenerationCommand& command,
+        std::function<void(EditorUvRegenerationCommandResult)> onComplete)
+    {
+        GS::ConstSourceView view{};
+        auto admission = ValidateUvRegenerationRequest(context, command, view);
+        if (!admission.Succeeded())
+            return admission;
+        entt::registry& raw = context.Scene->Raw();
+        const auto entity = ResolveStableEntity(raw, command.StableEntityId);
         MeshSoupFromGeometrySourcesResult soup =
             BuildMeshSoupFromGeometrySources(view);
         if (!soup.Succeeded())
@@ -1117,6 +1143,15 @@ using namespace GeometryProcessingDetail::MeshSupport;
         return CommitUvRegenerationCpuJobResult(context, *state);
     }
     } // namespace
+
+    ActionReadiness PreviewEditorUvRegenerationCommand(
+        const EditorProcessingCommands& commands, const EditorUvRegenerationCommand& command)
+    {
+        GS::ConstSourceView view{};
+        auto result = ValidateUvRegenerationRequest(
+            EditorProcessingCommandsAccess::Resolve(commands), command, view);
+        return {result.Succeeded(), std::move(result.Diagnostic)};
+    }
 
     EditorUvRegenerationCommandResult ApplyEditorUvRegenerationCommand(
         const EditorProcessingCommands& commands, const EditorUvRegenerationCommand& command,

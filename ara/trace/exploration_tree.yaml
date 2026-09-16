@@ -13244,3 +13244,26 @@ tree:
     - tests/integration/runtime/Test.SandboxParameterizationPanel.cpp
     - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
     status: resolved
+
+  - id: N613
+    type: decision
+    title: Share UV regeneration admission checks and reject duplicate jobs before mesh preparation
+    provenance: ai-executed
+    timestamp: '2026-09-16T12:27:37+02:00'
+    choice: Continue UI-037 with typed metadata-only UV readiness shared with apply and the common action button.
+      Extract existing soup metadata checks, remove common-model availability fields, validate texel density, and
+      preserve synchronous fallback and callback semantics. Claude plan/diff reviews informed corrections. Focused
+      32 and full CPU 4674 passed plus one expected skip. Seven existing production files gain 45 lines; no new file/module
+      or compile-time claim. Full numerical readiness and UI-037 inventory remain open.
+    alternatives:
+    - Keep app-only mesh availability separate from command validation
+    - Build or copy mesh buffers in per-frame readiness
+    - Add a new service or broad editor dependency for one preview
+    evidence:
+    - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
+    - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Uv.cpp
+    - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.cpp
+    - src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp
+    - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+    - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
+    status: resolved

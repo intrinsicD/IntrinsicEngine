@@ -51,11 +51,11 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
         using EditorFeatureDetail::MixSignature;
         using EditorFeatureDetail::MixSignatureString;
 
-        [[nodiscard]] MeshSoupFromGeometrySourcesResult BuildMeshSoupFromGeometrySources(
-            const GS::ConstSourceView& view,
+        [[nodiscard]] EditorCommandStatus ValidateMeshSoupSourceMetadata(
+            const GS::ConstSourceView& view, std::string& diagnostic,
             std::string_view positionProperty)
         {
-            MeshSoupFromGeometrySourcesResult result{};
+            diagnostic.clear();
             const GS::SourceAvailability availability =
                 GS::BuildSourceAvailability(view);
             if (availability.ProvenanceDomain != GS::Domain::Mesh ||
@@ -66,24 +66,21 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
                 // Every geometry-operation family that rebuilds a triangle soup
                 // shares this gate, so the wording names only the source
                 // defect. The calling family prefixes its own operation name.
-                result.Status = EditorCommandStatus::UnsupportedGeometryDomain;
-                result.Diagnostic = "selected entity has no mesh GeometrySources";
-                return result;
+                diagnostic = "selected entity has no mesh GeometrySources";
+                return EditorCommandStatus::UnsupportedGeometryDomain;
             }
 
             const auto positions = view.VertexSource->Properties.Get<glm::vec3>(positionProperty);
             if (!positions || positions.Vector().empty())
             {
-                result.Status = EditorCommandStatus::InvalidProcessingParameters;
-                result.Diagnostic = "selected mesh has no vertex position property";
-                return result;
+                diagnostic = "selected mesh has no vertex position property";
+                return EditorCommandStatus::InvalidProcessingParameters;
             }
             if (positions.Vector().size() >
                 static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()))
             {
-                result.Status = EditorCommandStatus::InvalidProcessingParameters;
-                result.Diagnostic = "selected mesh has too many vertices to index";
-                return result;
+                diagnostic = "selected mesh has too many vertices to index";
+                return EditorCommandStatus::InvalidProcessingParameters;
             }
 
             const auto toVertices =
@@ -103,10 +100,26 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
                 toVertices.Vector().size() != halfedgeFaces.Vector().size() ||
                 faceHalfedges.Vector().empty())
             {
-                result.Status = EditorCommandStatus::InvalidProcessingParameters;
-                result.Diagnostic = "selected mesh has invalid halfedge/face topology";
-                return result;
+                diagnostic = "selected mesh has invalid halfedge/face topology";
+                return EditorCommandStatus::InvalidProcessingParameters;
             }
+
+            return EditorCommandStatus::Applied;
+        }
+
+        [[nodiscard]] MeshSoupFromGeometrySourcesResult BuildMeshSoupFromGeometrySources(
+            const GS::ConstSourceView& view,
+            std::string_view positionProperty)
+        {
+            MeshSoupFromGeometrySourcesResult result{};
+            result.Status = ValidateMeshSoupSourceMetadata(view, result.Diagnostic, positionProperty);
+            if (!result.Succeeded())
+                return result;
+            const auto positions = view.VertexSource->Properties.Get<glm::vec3>(positionProperty);
+            const auto toVertices = view.HalfedgeSource->Properties.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeToVertex);
+            const auto nextHalfedges = view.HalfedgeSource->Properties.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeNext);
+            const auto halfedgeFaces = view.HalfedgeSource->Properties.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeFace);
+            const auto faceHalfedges = view.FaceSource->Properties.Get<std::uint32_t>(GS::PropertyNames::kFaceHalfedge);
 
             for (const glm::vec3 position : positions.Vector())
                 (void)result.Mesh.AddVertex(position);
