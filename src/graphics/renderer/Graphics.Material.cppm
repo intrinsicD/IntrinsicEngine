@@ -1,8 +1,9 @@
+// Material descriptors and shader-facing parameters shared by allocation and rendering.
 module;
 
 #include <cstdint>
 #include <cstddef>
-#include <glm/glm.hpp>
+#include <glm/vec4.hpp>
 #include <string>
 #include <vector>
 
@@ -111,48 +112,18 @@ export namespace Extrinsic::Graphics
     // Shaders branch on GpuMaterialSlot::MaterialTypeID.
     // -----------------------------------------------------------------
     inline constexpr std::uint32_t kMaterialTypeID_StandardPBR         = 0u;
-    inline constexpr std::uint32_t kMaterialTypeID_SciVis              = 1u;
-    inline constexpr std::uint32_t kMaterialTypeID_DefaultDebugSurface = 2u;
-    inline constexpr std::uint32_t kMaterialTypeID_DefaultDebugUVs     = 3u;
+    inline constexpr std::uint32_t kMaterialTypeID_DefaultDebugSurface = 1u;
+    inline constexpr std::uint32_t kMaterialTypeID_DefaultDebugUVs     = 2u;
 
     // Built-in type registration names — referenced by MaterialSystem::Initialize()
-    // and by subsystems that look up the registered handles (e.g. VisualizationSyncSystem).
+    // and by callers that look up the registered handles.
     inline constexpr const char* kMaterialTypeName_StandardPBR         = "StandardPBR";
-    inline constexpr const char* kMaterialTypeName_SciVis              = "SciVis";
     inline constexpr const char* kMaterialTypeName_DefaultDebugSurface = "Material.DefaultDebugSurface";
     inline constexpr const char* kMaterialTypeName_DefaultDebugUVs     = "Material.DefaultDebugUVs";
 
     // Slot 0 carries the canonical missing-material fallback so any
     // invalid MaterialHandle resolves to a visible purple debug surface.
     inline constexpr float kDefaultDebugSurfaceBaseColor[4]{0.55f, 0.20f, 0.85f, 1.0f};
-
-    // -----------------------------------------------------------------
-    // SciVis material — CustomData layout documentation
-    // -----------------------------------------------------------------
-    // When MaterialTypeID == kMaterialTypeID_SciVis, the four CustomData
-    // vec4 slots are used as follows (values stored via std::bit_cast<float>
-    // from uint32_t where noted):
-    //
-    //   CustomData[0]:
-    //     [0] colormapBindlessIndex  -- uint32 via bit_cast
-    //     [1] domain                  -- 0=vertex,1=edge,2=face via bit_cast
-    //     [2] rangeMin                -- float
-    //     [3] rangeMax                -- float
-    //
-    //   CustomData[1]:
-    //     [0] isolineCount            -- uint32 via bit_cast (0 = none)
-    //     [1] packedIsolineColor      -- RGBA8 uint32 via bit_cast
-    //     [2] isolineWidth            -- float (screen-space pixels)
-    //     [3] binCount                -- uint32 via bit_cast (0 = continuous)
-    //
-    //   CustomData[2]:
-    //     Reserved for non-address visual constants.
-    //     Per-entity attribute pointers and mode selection live in
-    //     RHI::GpuEntityConfig (GpuWorld-owned), not in material slots.
-    //
-    //   CustomData[3]:             -- reserved
-    //
-    // -----------------------------------------------------------------
 
     // -----------------------------------------------------------------
     // Typed handles
@@ -172,7 +143,6 @@ export namespace Extrinsic::Graphics
         AlphaMask     = 1 << 0,  // discard fragments below AlphaCutoff
         AlphaBlend    = 1 << 1,  // order-independent transparency
         DoubleSided   = 1 << 2,  // disable backface culling
-        Unlit         = 1 << 3,  // skip lighting entirely
         EmissiveOnly  = 1 << 4,  // treat EmissiveID as the colour source
         ObjectSpaceNormalMap = 1 << 5, // NormalID decodes as object-space normal data
         ScalarAlbedoTexture = 1 << 6, // AlbedoID stores raw scalar data sampled through a colormap
@@ -195,9 +165,8 @@ export namespace Extrinsic::Graphics
     // -----------------------------------------------------------------
     // ShadingModel — the single authority for whether lighting runs.
     // Stored in GpuMaterialSlot::ShadingModel. `Unlit` is an explicit
-    // opt-in (e.g. glTF KHR_materials_unlit, scivis overlays), never a
-    // missing-data fallback. The legacy MaterialFlags::Unlit bit is kept
-    // as a transitional alias until its writers migrate here.
+    // opt-in. Visualization modes do not change it; the invalid-handle
+    // debug material at slot 0 explicitly selects Unlit.
     // -----------------------------------------------------------------
     enum class ShadingModel : std::uint32_t
     {

@@ -601,10 +601,10 @@ sessions:
 - id: 2026-09-16_001
   date: '2026-09-16'
   summary: Retired RUNTIME-268, GRAPHICS-144/145 and RUNTIME-267 with bounded compile evidence; continued UI-037
-    execution/readiness reuse and GRAPHICS-105 visualization material consolidation with Claude. Full CPU and
-    selected Vulkan tests pass; broader readiness, material-source and cache work remain open.
-  turn_count: 11
-  events_count: 21
+    execution/readiness reuse and GRAPHICS-105 visualization/material metadata consolidation with Claude. Full CPU
+    and selected Vulkan tests pass; broader readiness, material-source and cache work remain open.
+  turn_count: 12
+  events_count: 22
   claims_touched:
   - C99
   - C100

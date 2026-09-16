@@ -13310,3 +13310,27 @@ tree:
     - tests/contract/graphics/Test.RenderPrepPipeline.cpp
     - tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
     status: resolved
+
+  - id: N616
+    type: decision
+    title: Remove retired visualization material metadata and duplicate lighting flag
+    provenance: ai-executed
+    timestamp: '2026-09-16T14:08:00+02:00'
+    choice: Continue GRAPHICS-105 by removing the unused SciVis registration and layout documentation,
+      compacting three built-in type IDs in CPU and GLSL together, and retaining ShadingModel as the sole
+      forward-surface lighting authority. Narrow material GLM includes to vec4 and correct stale owner comments.
+      Claude reviewed plan, fixed diff and resolution; relax the packed upload assertion to a sufficient byte count.
+      Focused 125, full CPU 4677 passes plus one expected skip, and eight ASan+UBSan Vulkan readbacks pass.
+      Five existing production files lose 95 net lines including comments; no compile timing claim or task closure.
+    alternatives:
+    - Keep the unused material type and redundant Unlit flag as compatibility aliases
+    - Broaden this slice into live normal-source flags or retained shader removal before their contracts close
+    evidence:
+    - tasks/active/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md
+    - src/graphics/renderer/Graphics.Material.cppm
+    - src/graphics/renderer/Graphics.MaterialSystem.cpp
+    - assets/shaders/common/gpu_scene.glsl
+    - assets/shaders/forward/default_debug_surface.frag
+    - tests/unit/graphics/Test.Graphics.MaterialSystem.cpp
+    - tests/contract/graphics/Test.RendererFrameLifecycle.cpp
+    status: resolved

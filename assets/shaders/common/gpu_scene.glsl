@@ -23,18 +23,14 @@ const uint GpuCullPhase_Phase2 = 1u;
 const uint GpuCullFlag_HZBStaleSkip = 1u << 0;
 const uint GpuCullFlag_SelectionBucketOcclusionExempt = 1u << 1;
 const uint GpuMaterialType_StandardPBR = 0u;
-const uint GpuMaterialType_SciVis = 1u;
-const uint GpuMaterialType_DefaultDebugSurface = 2u;
-const uint GpuMaterialType_DefaultDebugUVs = 3u;
-const uint GpuMaterialFlag_Unlit = 1u << 3;
+const uint GpuMaterialType_DefaultDebugSurface = 1u;
+const uint GpuMaterialType_DefaultDebugUVs = 2u;
 const uint GpuMaterialFlag_ObjectSpaceNormalMap = 1u << 5;
 const uint GpuMaterialFlag_ScalarAlbedoTexture = 1u << 6;
 const uint GpuMaterialFlag_ScalarRoughnessTexture = 1u << 7;
 const uint GpuMaterialFlag_ScalarMetallicTexture = 1u << 8;
 const uint GpuMaterialFlag_WorldSpaceNormalMap = 1u << 9;
-// Single lit/unlit authority (GpuMaterialSlot.ShadingModel). The legacy
-// GpuMaterialFlag_Unlit bit is honored as a transitional alias until its
-// remaining writers migrate to ShadingModel.
+// Single lit/unlit authority (GpuMaterialSlot.ShadingModel).
 const uint GpuShadingModel_Lit = 0u;
 const uint GpuShadingModel_Unlit = 1u;
 // Per-channel attribute source (GpuMaterialSlot.ChannelSourceBits) + channel

@@ -2613,8 +2613,8 @@ Concretely:
   material at slot 0 (`Extrinsic::Graphics::kDefaultMaterialSlotIndex`),
   registered by `MaterialSystem::Initialize()` as
   `"Material.DefaultDebugSurface"` with
-  `MaterialTypeID = kMaterialTypeID_DefaultDebugSurface = 2u`,
-  `MaterialFlags::Unlit`, and a deterministic non-black `BaseColorFactor`
+  `MaterialTypeID = kMaterialTypeID_DefaultDebugSurface = 1u`,
+  `ShadingModel::Unlit`, and a deterministic non-black `BaseColorFactor`
   (`{0.55, 0.20, 0.85, 1.0}`). The shader pair lives at
   `assets/shaders/forward/default_debug_surface.vert/frag` and is
   authored against the same BDA-only contract as `depth_prepass.vert`:
@@ -2663,9 +2663,9 @@ Concretely:
   [`GRAPHICS-031A`](../../../tasks/archive/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md):
   the shaders are authored at
   `assets/shaders/forward/default_debug_surface.vert/frag`,
-  `MaterialSystem::Initialize()` registers the four built-in types
-  StandardPBR/SciVis/DefaultDebugSurface/DefaultDebugUVs and packs slot 0 with
-  `kDefaultDebugSurfaceBaseColor` and `MaterialFlags::Unlit`, and the
+  `MaterialSystem::Initialize()` registers the three built-in types
+  StandardPBR/DefaultDebugSurface/DefaultDebugUVs and packs slot 0 with
+  `kDefaultDebugSurfaceBaseColor` and `ShadingModel::Unlit`, and the
   renderer caches a `m_DefaultDebugSurfacePipelineLease` built from a
   byte-identical `BuildDefaultDebugSurfacePipelineDesc()` whose
   `VertexShaderPath` / `FragmentShaderPath` are pre-resolved via
@@ -2697,7 +2697,7 @@ Concretely:
   cleared only when their slot is rewritten so pipelined render-N-1 spans remain
   stable), and
   GRAPHICS-088 adds `Material.DefaultDebugUVs` as an opt-in material type
-  (`MaterialTypeID = kMaterialTypeID_DefaultDebugUVs = 3u`) that renders a
+  (`MaterialTypeID = kMaterialTypeID_DefaultDebugUVs = 2u`) that renders a
   checker from the same resolved `fragUv` lane used by albedo/normal sampling.
   It does not reserve a global fallback slot or add a pass; callers create a
   normal material instance of that type when they want UV inspection.

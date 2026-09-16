@@ -1,19 +1,18 @@
 module;
 
+#include <algorithm>
 #include <atomic>
 #include <cassert>
 #include <cstdint>
-#include <cstring>
 #include <deque>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <glm/vec4.hpp>
 
 module Extrinsic.Graphics.MaterialSystem;
 
@@ -292,8 +291,8 @@ namespace Extrinsic::Graphics
         assert(ok && "MaterialSystem: initial SSBO allocation failed");
 
         // Register the built-in types in a fixed order so the well-known
-        // TypeIDs (StandardPBR=0, SciVis=1, DefaultDebugSurface=2,
-        // DefaultDebugUVs=3) are reserved before subsystem registration runs.
+        // TypeIDs (StandardPBR=0, DefaultDebugSurface=1, DefaultDebugUVs=2)
+        // are reserved before subsystem registration runs.
         const auto registerBuiltIn = [&](std::string_view name,
                                          std::vector<CustomParamDesc> customParams,
                                          std::uint32_t expectedTypeID)
@@ -307,14 +306,6 @@ namespace Extrinsic::Graphics
         };
 
         registerBuiltIn(kMaterialTypeName_StandardPBR, {}, kMaterialTypeID_StandardPBR);
-        registerBuiltIn(kMaterialTypeName_SciVis,
-            {
-                {"ColormapAndDomain",  "colourmap bindless idx, domain, rangeMin, rangeMax"},
-                {"IsolinesAndBins",    "isolineCount, packedColor, isolineWidth, binCount"},
-                {"ScalarBDA",          "BDA lo/hi, elementCount, colorSourceMode"},
-                {"Reserved",           "reserved for future use"},
-            },
-            kMaterialTypeID_SciVis);
         registerBuiltIn(kMaterialTypeName_DefaultDebugSurface, {}, kMaterialTypeID_DefaultDebugSurface);
         registerBuiltIn(kMaterialTypeName_DefaultDebugUVs, {}, kMaterialTypeID_DefaultDebugUVs);
 
@@ -329,7 +320,6 @@ namespace Extrinsic::Graphics
             kDefaultDebugSurfaceBaseColor[2],
             kDefaultDebugSurfaceBaseColor[3],
         };
-        defaultParams.Flags = MaterialFlags::Unlit;
         defaultParams.Shading = ShadingModel::Unlit;
 
         m_Impl->Meta.emplace_back();

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <cstring>
 #include <array>
 #include <cstddef>
 #include <span>
@@ -136,8 +137,8 @@ TEST(GraphicsMaterialSystem, DefaultAndStaleMaterialSlotsResolveToFallbackWithDi
     const auto diagnostics = materials.GetDiagnostics();
     EXPECT_EQ(diagnostics.FallbackSlotResolveCount, 1u);
     EXPECT_EQ(diagnostics.LiveInstanceCount, 2u); // slot 0 default + one instance
-    // StandardPBR + SciVis + DefaultDebugSurface + DefaultDebugUVs.
-    EXPECT_EQ(diagnostics.RegisteredTypeCount, 4u);
+    // StandardPBR + DefaultDebugSurface + DefaultDebugUVs.
+    EXPECT_EQ(diagnostics.RegisteredTypeCount, 3u);
     EXPECT_GE(diagnostics.Capacity, 2u);
 
     lease.Reset();
@@ -166,8 +167,8 @@ TEST(GraphicsMaterialSystem, RejectsIncompatibleMaterialTypeLayoutsDeterministic
     EXPECT_EQ(diagnostics.IncompatibleLayoutCount, 1u);
     EXPECT_EQ(diagnostics.DuplicateTypeNameCount, 1u);
     EXPECT_EQ(diagnostics.InvalidCreateTypeCount, 1u);
-    // StandardPBR + SciVis + DefaultDebugSurface + DefaultDebugUVs.
-    EXPECT_EQ(diagnostics.RegisteredTypeCount, 4u);
+    // StandardPBR + DefaultDebugSurface + DefaultDebugUVs.
+    EXPECT_EQ(diagnostics.RegisteredTypeCount, 3u);
 
     materials.Shutdown();
 }
@@ -650,15 +651,33 @@ TEST(GraphicsMaterialSystem, RegistersDefaultDebugSurfaceWithStableTypeId)
     ASSERT_TRUE(standard.IsValid());
     EXPECT_EQ(standard.Index, Graphics::kMaterialTypeID_StandardPBR);
 
-    const auto sciVis = materials.FindType(Graphics::kMaterialTypeName_SciVis);
-    ASSERT_TRUE(sciVis.IsValid());
-    EXPECT_EQ(sciVis.Index, Graphics::kMaterialTypeID_SciVis);
-
     const auto debugUvs =
         materials.FindType(Graphics::kMaterialTypeName_DefaultDebugUVs);
     ASSERT_TRUE(debugUvs.IsValid());
     EXPECT_EQ(debugUvs.Index, Graphics::kMaterialTypeID_DefaultDebugUVs);
+    EXPECT_EQ(materials.GetRegisteredTypeCount(), 3u);
 
+    // Check what the shader receives, including the permanent invalid-handle slot.
+    auto uvMaterial = materials.CreateInstance(debugUvs, {});
+    ASSERT_TRUE(uvMaterial.IsValid());
+    ASSERT_EQ(materials.GetMaterialSlot(uvMaterial.GetHandle()), 1u);
+    device.BufferWrites.clear();
+    materials.SyncGpuBuffer();
+    ASSERT_EQ(device.BufferWrites.size(), 1u);
+    const auto& upload = device.BufferWrites.front();
+    ASSERT_EQ(upload.Handle, materials.GetBuffer());
+    ASSERT_EQ(upload.Offset, 0u);
+    std::array<RHI::GpuMaterialSlot, 2> packed{};
+    ASSERT_GE(upload.Data.size(), sizeof(packed));
+    std::memcpy(packed.data(), upload.Data.data(), sizeof(packed));
+    EXPECT_EQ(packed[0].MaterialTypeID, Graphics::kMaterialTypeID_DefaultDebugSurface);
+    EXPECT_EQ(packed[0].ShadingModel, static_cast<std::uint32_t>(Graphics::ShadingModel::Unlit));
+    EXPECT_EQ(packed[0].Flags, 0u);
+    EXPECT_EQ(packed[1].MaterialTypeID, Graphics::kMaterialTypeID_DefaultDebugUVs);
+    EXPECT_EQ(packed[1].ShadingModel, static_cast<std::uint32_t>(Graphics::ShadingModel::Lit));
+    EXPECT_EQ(packed[1].Flags, 0u);
+
+    uvMaterial.Reset();
     materials.Shutdown();
 }
 
@@ -675,7 +694,7 @@ TEST(GraphicsMaterialSystem, DefaultSlotCarriesDefaultDebugSurfaceParams)
     EXPECT_FLOAT_EQ(params.BaseColorFactor.y, Graphics::kDefaultDebugSurfaceBaseColor[1]);
     EXPECT_FLOAT_EQ(params.BaseColorFactor.z, Graphics::kDefaultDebugSurfaceBaseColor[2]);
     EXPECT_FLOAT_EQ(params.BaseColorFactor.w, Graphics::kDefaultDebugSurfaceBaseColor[3]);
-    EXPECT_TRUE(Graphics::HasFlag(params.Flags, Graphics::MaterialFlags::Unlit));
+    EXPECT_EQ(params.Flags, Graphics::MaterialFlags::None);
     // ShadingModel is the single lit/unlit authority; slot 0 is explicitly Unlit.
     EXPECT_EQ(params.Shading, Graphics::ShadingModel::Unlit);
 

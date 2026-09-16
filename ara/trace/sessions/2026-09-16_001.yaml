@@ -2,11 +2,11 @@ session:
   id: 2026-09-16_001
   date: '2026-09-16'
   started: '2026-09-16T00:38:04+02:00'
-  last_turn: '2026-09-16T13:46:46+02:00'
-  turn_count: 11
+  last_turn: '2026-09-16T14:08:00+02:00'
+  turn_count: 12
   summary: Retired RUNTIME-268, GRAPHICS-144/145 and RUNTIME-267 with bounded compile evidence; continued UI-037
-    execution/readiness reuse and GRAPHICS-105 visualization material consolidation with Claude. Full CPU and
-    selected Vulkan tests pass; broader readiness, material-source and cache work remain open.
+    execution/readiness reuse and GRAPHICS-105 visualization/material metadata consolidation with Claude. Full CPU
+    and selected Vulkan tests pass; broader readiness, material-source and cache work remain open.
 events_logged:
 - turn: 1
   type: dead_end
@@ -137,6 +137,12 @@ events_logged:
   provenance: ai-executed
   summary: Remove visualization override materials and duplicate render-prep upload using the existing entity config path.
 
+- turn: 12
+  type: decision
+  id: N616
+  routing: direct
+  provenance: ai-executed
+  summary: Remove retired SciVis material metadata and lighting alias; keep three CPU/GLSL IDs synchronized.
 ai_actions:
 - turn: 1
   action: Diagnosed standard-header/import serialization, implemented one declaration owner, fixed review findings,
@@ -253,6 +259,21 @@ ai_actions:
   - tests/contract/graphics/Test.MinimalTriangleAcceptance.cpp
   - tests/contract/graphics/Test.RenderPrepPipeline.cpp
 
+- turn: 12
+  action: Removed unused material registration/layout and Unlit flag; narrowed GLM headers and corrected source docs.
+    Extended packed GPU upload and CPU/GLSL ID contracts. Claude plan/diff/resolution review complete;
+    focused 125, full CPU 4677 passes plus one expected skip, and eight ASan+UBSan Vulkan readbacks pass.
+    Strict structural/docs checks pass; 95 net production lines removed including comments, no timing claim.
+  provenance: ai-executed
+  files_changed:
+  - src/graphics/renderer/Graphics.Material.cppm
+  - src/graphics/renderer/Graphics.MaterialSystem.cpp
+  - src/graphics/renderer/Graphics.MaterialSystem.cppm
+  - assets/shaders/common/gpu_scene.glsl
+  - assets/shaders/forward/default_debug_surface.frag
+  - tests/unit/graphics/Test.Graphics.MaterialSystem.cpp
+  - tests/contract/graphics/Test.RendererFrameLifecycle.cpp
+  - tasks/active/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md
 claims_touched:
 - id: C99
   action: crystallized
@@ -301,6 +322,10 @@ key_context:
   excerpt: User requested continued open duplicate-code and compilation cleanup with Claude through planning, implementation,
     review, tests and fixes. Selected GRAPHICS-105 overlay material duplication; no new compile-time claim or whole-task closure.
 
+- turn: 12
+  excerpt: User requested continuing open duplicate-code and compilation work with Claude through planning,
+    implementation, review, tests and fixes. Continued GRAPHICS-105 metadata/lighting cleanup; broader task remains open.
+
 open_threads:
 - The broader C92 processing-family hypothesis still needs a selected baseline and repeated family-edit measurements;
   BUILD-006 separately owns backend/cache comparisons.
@@ -323,7 +348,7 @@ open_threads:
 - RUNTIME-268, GRAPHICS-144, GRAPHICS-145 and RUNTIME-267 are complete with bounded measured evidence. Mandatory
   config/session dependencies remain. UI-037 is active with shared controls, outlier/ICP, Progressive Poisson and
   parameterization and mesh-field config/execution plus UV admission verified;
-  full numerical UV readiness, mesh/bake, family readiness, backend/variant and metadata/cache preflight coverage remain. GRAPHICS-105 is active with overlay material duplication removed; broader material-source work remains. LEGACY-043 follows it, and
+  full numerical UV readiness, mesh/bake, family readiness, backend/variant and metadata/cache preflight coverage remain. GRAPHICS-105 is active with overlay material duplication, retired SciVis metadata and lighting alias removed; broader material-source work remains. LEGACY-043 follows it, and
   BUILD-006 retains its prerequisites.
 ai_suggestions_pending:
 - Do not generalize the snapshot technique across engine layers without measuring the actual producer and consumer

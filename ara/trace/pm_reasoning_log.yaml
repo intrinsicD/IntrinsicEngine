@@ -2643,3 +2643,12 @@ entries:
       test-only include and lease teardown defects were corrected before final CPU and GPU verification.
     - Production line reduction does not establish compile-time improvement. GRAPHICS-105 stays active for the remaining
       material-source contracts and LEGACY-043 stays gated; seven selected Vulkan passes are not whole-engine GPU closure.
+
+  - turn: 2026-09-16_001#12
+    notes:
+    - N616 records a bounded implementation decision and actual verification, not a research/performance claim.
+      No new staging promotion; preserve unrelated observations and their owners/flags, including broader O93.
+    - Claude's conditional findings were resolved against full source; the packed upload test now accepts a larger
+      valid upload. CPU/GLSL ID agreement and explicit slot-0 Unlit behavior have contract/readback coverage.
+    - Five production files lose 95 net lines including stale comments; narrower GLM includes are not measured
+      compile-time evidence. GRAPHICS-105 and its broader material-source contracts remain open, with LEGACY-043 gated.

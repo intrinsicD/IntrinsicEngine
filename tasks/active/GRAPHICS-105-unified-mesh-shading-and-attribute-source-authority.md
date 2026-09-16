@@ -60,8 +60,8 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence]
   - `Graphics::MaterialChannel` describes shader-facing PBR appearance channels and their effective material slots.
   - `Graphics::Components::VisualizationConfig` describes scientific/debug presentation such as scalar fields, colormaps, and per-element color.
   A single generic enum must not blur these contracts. Mesh drawing still requires positions plus topology/indices; texcoords are optional until a selected texture source needs them.
-- Existing building blocks to reuse: `MaterialFlags` (`Unlit`,
-  `ObjectSpaceNormalMap`), the structural `VertexChannel` resolver,
+- Existing building blocks to reuse: `ShadingModel`, `MaterialFlags`
+  (`ObjectSpaceNormalMap`), the structural `VertexChannel` resolver,
   `RUNTIME-192` canonical property references, the independently owned unified
   `TextureBakeModule` (`RUNTIME-191`), the general presentation recipe
   (`RUNTIME-193`), common residency (`RUNTIME-197`), visualization recipes
@@ -328,20 +328,22 @@ The unified surface frag (forward `default_debug_surface.frag` + deferred
 
 Delete/collapse, with the single data path replacing each:
 
-- [ ] **Import-as-UniformColor default** — `ImportedGeometryVisualization()` /
-  `ImportedMeshVisualization()` in
-  `src/runtime/AssetWorkflow/Runtime.AssetWorkflowRecipePolicies.cpp`. Replace with `ResolveImportedMeshMaterial`. This removes the
-  `3485151` workaround by subsumption.
-- [ ] **Override-material synthesis** in `VisualizationSyncSystem` for
+- [ ] **Import material policy consolidation** — direct meshes already choose
+  `ColorSource::Material` in `ImportedMeshVisualization()`; graph/point imports
+  use `ImportedGeometryVisualization()`. Reconcile the real material assignment
+  in render extraction with model-scene `EnsureDefaultLitMaterial`, preserving
+  authored values and explicit missing-material defaults. Do not reintroduce
+  visualization-to-lighting coupling or treat the direct mesh default as unfixed.
+- [x] **Override-material synthesis** in `VisualizationSyncSystem` for
   `UniformColor` (`BuildUniformColorParams`,
   `src/graphics/renderer/Graphics.VisualizationSyncSystem.cpp`) and the per-entity
   `EnsureOverrideLease`/`OverrideLeases`/`EffectiveSlot`-per-frame machinery
   in that same implementation. The scivis data path (`GpuEntityConfig`) already
   exists; the synthesized SciVis material is redundant.
-- [ ] **Scivis override materials** — `BuildScalarFieldParams`/`BuildPerElementParams`
+- [x] **Scivis override materials** — `BuildScalarFieldParams`/`BuildPerElementParams`
   in `Graphics.VisualizationSyncSystem.cpp`. KEEP the visualization *capability* via
   `GpuEntityConfig` data; remove the material synthesis. (Design decision below.)
-- [ ] **Obsolete `MaterialFlags::Unlit` bit** — remove the redundant flag
+- [x] **Obsolete `MaterialFlags::Unlit` bit** — removed the redundant flag
   write in `Graphics.MaterialSystem.cpp` and the bit declaration. The slot-0
   material already sets `ShadingModel::Unlit`; preserve that genuine invalid-
   handle indicator. Visualization synthesis has no remaining Unlit writes.
@@ -411,8 +413,7 @@ uniform-color shader resolver returns `cfg.UniformColor` directly, preserving
 its independence from base tint. Production delta: 255 net lines removed in
 eight existing files; no new production file or module.
 
-Next authority work remains the redundant SciVis type/layout metadata,
-transitional Unlit flags, import policy consolidation, and the normal-source
+Remaining authority work includes import policy consolidation and the normal-source
 per-renderable/config/UI/readiness contracts listed above. This slice does not
 retire GRAPHICS-105 or unblock LEGACY-043 prematurely.
 
@@ -443,3 +444,66 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R '(Visua
 
 Session logs and bounded Claude review packets:
 `/tmp/intrinsic-graphics105-overrides/` (local working artifacts).
+
+## 2026-09-16 — Remove retired material metadata and lighting alias
+
+Operator continuation of compilation/reuse cleanup. Canonical-owner search found
+no remaining producer or receiver for the `SciVis` material type: visualization
+is already carried by `GpuEntityConfig`. Remove its registration and custom
+layout description, and compact built-in IDs in CPU/GLSL together. Also remove
+`MaterialFlags::Unlit`, whose sole writer duplicates slot 0's existing
+`ShadingModel::Unlit`, and the forward shader's alternate flag test. Other flag
+bit values and the 128-byte slot layout remain unchanged. No compatibility
+transition is needed under the operator's API/scene-format decision.
+
+Narrow the material interface and implementation GLM umbrella include to the
+actual `vec4` dependency. Correct stale public owner comments that described
+white slot 0 and a per-material descriptor set. No new helper/module/owner.
+Normal-space flags and the line/point render classification flag have live
+consumers and are preserved; normal-source/import policy remains open.
+
+Claude reviewed the plan. Checks will cover all three registered IDs/counts,
+actual uploaded slot 0/UV material type and shading fields, CPU/GLSL agreement,
+existing material/visualization contracts, full CPU and relevant Vulkan readback.
+This slice makes no compile-time speedup claim.
+
+Review checkpoint: Claude's final review found no confirmed correctness defect.
+The packed-slot test accepts any upload large enough to contain the two slots;
+remaining conditional include/accessor concerns were resolved against complete
+source and the removed-symbol search. Existing shader contract tests now bind
+all built-in type IDs and both shading values to their CPU declarations. No
+new dependency edge, resource owner, frame pass or compatibility shim was added.
+Source delta is 95 fewer physical production lines in five existing files,
+including removal of stale source-documentation examples; this is not a timing
+measurement. The task's completed synthesis inventory and actual remaining
+import-policy wording were reconciled with the current code.
+
+Validation checkpoint:
+- Canonical `ci` and promoted `ci-vulkan` configure/build passed with Clang 23.
+  The final CPU build includes the upload-size assertion correction.
+- Focused material/renderer contracts: 125 passed.
+- Full exclusion-only CPU gate: 4,677 passed, one expected ASan-only lifecycle
+  skip (4,678 selected), 139.88 seconds.
+- Eight selected Vulkan readbacks passed under ASan+UBSan, no skips, 54.26
+  seconds: default recipe/debug view, sandbox default surface, vertex color,
+  mesh line/point lanes, scalar colormap/surface/isolines, and imported
+  object-space normal texture binding.
+- Strict layering, task policy/state links, test layout, documentation
+  links/sync, root hygiene, skill mirrors and clean-workshop checks passed.
+  Module inventory regeneration produced no content change.
+- Architecture/workshop sweep: layer imports, CMake links and exported types
+  pass (rows 1–3); no renderer member/subsystem, pass or recipe change (rows
+  4–6 n/a), no maturity closure or temporary exception (rows 7–8 n/a). Slot
+  ownership/lifetime and shader push-constant layouts are unchanged. CPU and
+  GLSL built-in IDs changed together and have explicit contract coverage.
+
+```bash
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --build --preset ci-vulkan --target IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests IntrinsicGraphicsVulkanSmokeTests -j2
+ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R '(DefaultRecipeSurfaceGpuSmoke\.(RecipeSelector|ReferenceTriangleDebugViewReadback)|RuntimeSandboxAcceptanceGpuSmoke\.(ExtrinsicSandboxDefaultConfigPresentsReferenceTriangleAtFrameCenter|ReferenceTriangle|ImportedObjectSpaceNormalBake))' --no-tests=error --timeout 120 --parallel 1
+```
+
+Local logs and fixed Claude plan/review/resolution packets:
+`/tmp/intrinsic-graphics105-material-authority/`. GRAPHICS-105 remains open for
+the broader import/material-source contracts; LEGACY-043 remains gated.

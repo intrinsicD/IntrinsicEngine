@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -27,6 +28,7 @@ import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.Core.Tasks;
 import Extrinsic.Core.Telemetry;
 import Extrinsic.Graphics.CameraSnapshots;
+import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.CurrentRendererContractAdapter;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.FrameRecipe;
@@ -2699,6 +2701,18 @@ TEST(RendererFrameLifecycle, ForwardSurfacePipelineSurvivesOperationalRebuild)
               std::string::npos);
     EXPECT_NE(retainedGBufferFragment.find("DecodePropertyTextureNormal"),
               std::string::npos);
+    const std::string gpuScene = ReadShaderSource("common/gpu_scene.glsl");
+    for (const auto& [name, value] : std::array{
+             std::pair{"GpuMaterialType_StandardPBR", Extrinsic::Graphics::kMaterialTypeID_StandardPBR},
+             std::pair{"GpuMaterialType_DefaultDebugSurface", Extrinsic::Graphics::kMaterialTypeID_DefaultDebugSurface},
+             std::pair{"GpuMaterialType_DefaultDebugUVs", Extrinsic::Graphics::kMaterialTypeID_DefaultDebugUVs},
+             std::pair{"GpuShadingModel_Lit", static_cast<std::uint32_t>(Extrinsic::Graphics::ShadingModel::Lit)},
+             std::pair{"GpuShadingModel_Unlit", static_cast<std::uint32_t>(Extrinsic::Graphics::ShadingModel::Unlit)}})
+    {
+        EXPECT_NE(gpuScene.find(std::string{"const uint "} + name + " = " +
+                               std::to_string(value) + "u;"), std::string::npos)
+            << "CPU/shader material ABI mismatch for " << name;
+    }
     EXPECT_NE(surfaceFragment.find("GpuMaterialType_DefaultDebugUVs"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("DebugUvChecker(fragUv)"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("normalShade"), std::string::npos);

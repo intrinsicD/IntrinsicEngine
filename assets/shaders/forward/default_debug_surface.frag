@@ -17,7 +17,7 @@
 // Reads the material slot from the per-instance index forwarded by the vertex
 // shader, samples supported material textures through resolved UVs, and uses
 // the packed vertex normal as the lighting normal. Slot 0 carries the
-// recorded `Material.DefaultDebugSurface` params (`MaterialFlags::Unlit`,
+// recorded `Material.DefaultDebugSurface` params (`ShadingModel::Unlit`,
 // purple `BaseColorFactor`) so any invalid material handle resolves to a
 // visible missing-material surface.
 
@@ -76,10 +76,7 @@ void main() {
     const vec3 sampledNormal =
         ResolveSurfaceNormal(scene, mat, fragInstanceSlot, fragWorldNormal, fragUv);
 
-    // ShadingModel is the single lit/unlit authority; the legacy Unlit flag
-    // is honored as a transitional alias until its writers migrate (GRAPHICS-105).
-    if (mat.ShadingModel == GpuShadingModel_Unlit ||
-        (mat.Flags & GpuMaterialFlag_Unlit) != 0u) {
+    if (mat.ShadingModel == GpuShadingModel_Unlit) {
         outColor = baseColor;
         return;
     }

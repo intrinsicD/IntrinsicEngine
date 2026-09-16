@@ -169,13 +169,13 @@ The promoted GPU scene is organized around these canonical buffers:
   populated from runtime-extracted CPU material descriptions or asset IDs.
   Slot `0` (`kDefaultMaterialSlotIndex`) is the default/fallback material; per
   `GRAPHICS-031`, that slot is registered as `"Material.DefaultDebugSurface"`
-  with `MaterialTypeID = kMaterialTypeID_DefaultDebugSurface = 2u`,
-  `MaterialFlags::Unlit`, deterministic non-black `BaseColorFactor`, and is
+  with `MaterialTypeID = kMaterialTypeID_DefaultDebugSurface = 1u`,
+  `ShadingModel::Unlit`, deterministic non-black `BaseColorFactor`, and is
   the substitution target when a runtime-submitted snapshot record carries an
   unset or invalid material slot. Layout version `1` is a 128-byte
   `RHI::GpuMaterialSlot` with four custom `vec4` slots plus four bindless
   texture references (`Albedo`, `Normal`, `MetallicRoughness`, `Emissive`).
-  `Material.DefaultDebugUVs` is an additive material type (`MaterialTypeID = 3`)
+  `Material.DefaultDebugUVs` is an additive material type (`MaterialTypeID = 2`)
   that uses the normal surface pass and shader layout to draw a checker from
   the resolved mesh UV lane; it is not a fallback slot and does not alter slot
   `0` substitution semantics.

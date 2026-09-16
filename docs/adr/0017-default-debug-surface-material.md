@@ -28,8 +28,8 @@ This ADR captures the slot-0 material definition (registration name, type ID, fl
 
 Slot 0 is registered as `"Material.DefaultDebugSurface"` with:
 
-- `MaterialTypeID = kMaterialTypeID_DefaultDebugSurface = 2u`.
-- `MaterialFlags::Unlit`.
+- `MaterialTypeID = kMaterialTypeID_DefaultDebugSurface = 1u`.
+- `ShadingModel::Unlit`.
 - Deterministic non-black `BaseColorFactor = { 0.55, 0.20, 0.85, 1.0 }` (a visible purple).
 
 The slot is pre-populated by `MaterialSystem::Initialize()` and **republished byte-identical** by `MaterialSystem::RebuildGpuResources()` so the slot-0 contents survive operational transitions ([ADR-0005](0005-vulkan-operational-readiness-gate.md), [ADR-0004](0004-vulkan-backend-bringup-and-fallback.md) `RebuildOperationalResources` seam) without re-authoring.
@@ -86,7 +86,7 @@ Follow-up debug-material variants attach as additional `MaterialTypeDesc` regist
 - `Material.DefaultDebug<Variant>`.
 - `kDefaultDebug<Variant>MaterialSlotIndex` only when a global slot is required.
 
-Anticipated variants: `Wireframe`, `Line`, `Point`, `Normals`, `Depth`, `InstanceId`. They share the same descriptor layout family. `GRAPHICS-088` implements the UV checker variant as `Material.DefaultDebugUVs`, a registered material type (`MaterialTypeID = 3`) that callers opt into by creating a material instance; it deliberately does not reserve a global fallback slot because it is an inspection mode rather than a substitution target.
+Anticipated variants: `Wireframe`, `Line`, `Point`, `Normals`, `Depth`, `InstanceId`. They share the same descriptor layout family. `GRAPHICS-088` implements the UV checker variant as `Material.DefaultDebugUVs`, a registered material type (`MaterialTypeID = 2`) that callers opt into by creating a material instance; it deliberately does not reserve a global fallback slot because it is an inspection mode rather than a substitution target.
 
 These variants are identified but **not opened** by `GRAPHICS-031`. Each variant lands under its own follow-up task ID when needed.
 

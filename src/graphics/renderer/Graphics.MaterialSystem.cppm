@@ -1,3 +1,4 @@
+// Owns material leases and the GPU material buffer consumed through the scene table.
 module;
 
 #include <cstdint>
@@ -17,59 +18,11 @@ import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.Material;
 
-// ============================================================
-// MaterialSystem
-// ============================================================
-// Manages all material types and instances for GPU rendering.
-//
-// GPU layout:
-//   One persistent SSBO (set 3, binding 0) holding an array of
-//   GpuMaterialSlot (128 bytes each).  GpuInstanceData::MaterialSlot
-//   is an index into this array.  The CPU side mirrors the SSBO in
-//   a std::vector that is uploaded once per frame when dirty.
-//
-//   Slot 0 is the engine default material (opaque white PBR).
-//   It is pre-populated at Initialize() and never freed.
-//
-// Material types:
-//   Types are registered once (RegisterType).  Each type gets a
-//   unique MaterialTypeID stored in GpuMaterialSlot::MaterialTypeID.
-//   The shader reads this ID and branches to the correct shading
-//   model.  Type 0 = StandardPBR (registered automatically).
-//
-// Custom materials:
-//   Register a MaterialTypeDesc with up to 4 named CustomParam
-//   slots.  Fill them via MaterialParams::CustomData[0..3].
-//   The shader receives those values in GpuMaterialSlot::CustomData.
-//
-// Thread-safety:
-//   - RegisterType / CreateInstance / SetParams — render thread only.
-//   - SyncGpuBuffer — render thread only (once per frame).
-//   - GetMaterialSlot / GetTypeDesc — lock-free read after creation.
-//
-// Usage:
-//
-//   MaterialSystem matSys;
-//   matSys.Initialize(device, bufferMgr);
-//
-//   // Register a custom water type once at startup:
-//   auto waterType = matSys.RegisterType({"Water", {
-//       {"WaveAmplitude", "Wave height",    {0.1f,0,0,0}},
-//       {"WaveFrequency", "Wave tiling UV", {8.f,8.f,0,0}},
-//   }});
-//
-//   // Create an instance:
-//   MaterialParams p;
-//   p.BaseColorFactor = {0.0f, 0.3f, 0.8f, 1.0f};
-//   p.CustomData[0]   = {0.2f, 0,   0,    0};   // WaveAmplitude
-//   auto lease = matSys.CreateInstance(waterType, p);
-//
-//   // Each frame (before draw submission):
-//   matSys.SyncGpuBuffer();
-//
-//   // Bind: pass matSys.GetBuffer() to the descriptor set builder.
-//   // Pass matSys.GetMaterialSlot(lease.GetHandle()) in push constants.
-// ============================================================
+// Material types describe custom shader parameters; ShadingModel independently
+// selects lighting. Slot 0 is the permanent purple, unlit invalid-handle material.
+// GPU slots are reached through the scene-table BDA. SyncGpuBuffer uploads dirty
+// slots before rendering. Creation, mutation and upload are render-thread-only;
+// read-only slot/type queries require that their lifetime remains stable.
 
 export namespace Extrinsic::Graphics
 {

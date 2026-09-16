@@ -205,8 +205,6 @@ TEST(GraphicsMinimalAcceptance, Triangle_FirstImplementationContract)
     visSync.Sync(visualizationRecords, matSys, colorSys, world);
     const Graphics::MaterialParams retainedParams =
         matSys.GetParams(materialInstance.Lease.GetHandle());
-    EXPECT_FALSE(Graphics::HasFlag(retainedParams.Flags,
-                                   Graphics::MaterialFlags::Unlit));
     EXPECT_EQ(retainedParams.Shading, Graphics::ShadingModel::Lit);
     matSys.SyncGpuBuffer();
 
