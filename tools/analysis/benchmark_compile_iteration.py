@@ -95,7 +95,8 @@ def critical_path(dot: str, log: bytes) -> dict:
     unmatched = sorted(set(weights) - named)
     ancillary = {output for outputs in siblings.values() if outputs & named
                  for output in outputs - named}
-    meta = {p for p in unmatched if p == "build.ninja" or "VerifyGlobs.cmake_force" in p}
+    meta = {p for p in unmatched if p == "build.ninja" or "VerifyGlobs.cmake_force" in p
+            or Path(p).parts[-2:] == ("CMakeFiles", "cmake.verify_globs")}
     unexpected = set(unmatched) - ancillary - meta
     if unexpected:
         raise ValueError(f"Timed commands absent from target graph: {sorted(unexpected)}")

@@ -931,6 +931,14 @@ class CompileIterationMeasurementTests(unittest.TestCase):
         result = bench.critical_path(graph, log)
         self.assertEqual(result["duration_ms"], 35)
         self.assertEqual([p["output"] for p in result["timed_path"]], ["b.o", "lib.a"])
+        # CMake's glob check is build-system overhead outside the target DAG.
+        for output in ("CMakeFiles/cmake.verify_globs",
+                       "/tmp/build/CMakeFiles/cmake.verify_globs"):
+            checked = bench.critical_path(graph, log + f"0\t7\t0\t{output}\tglob\n".encode())
+            self.assertEqual(checked["duration_ms"], 35)
+            self.assertEqual(checked["unmapped_meta_outputs"], [output])
+        with self.assertRaises(ValueError):
+            bench.critical_path(graph, log + b"0\t7\t0\tother/cmake.verify_globs\tglob\n")
         with self.assertRaises(ValueError):
             bench.critical_path(graph, log + b"0\t100\t0\tmissing.o\td\n")
         with self.assertRaises(ValueError):
