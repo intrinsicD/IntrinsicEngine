@@ -2,11 +2,11 @@ session:
   id: 2026-09-16_001
   date: '2026-09-16'
   started: '2026-09-16T00:38:04+02:00'
-  last_turn: '2026-09-16T10:27:25+02:00'
-  turn_count: 4
-  summary: Retired RUNTIME-268, GRAPHICS-144, GRAPHICS-145 and RUNTIME-267 with bounded compile measurements and
-    Claude review. Config-interface editor rebuild median 34.245 to 27.372 seconds locally; UI/material/shader/cache
-    tasks retain their independent scope.
+  last_turn: '2026-09-16T11:04:35+02:00'
+  turn_count: 5
+  summary: Retired RUNTIME-268, GRAPHICS-144/145 and RUNTIME-267 with bounded compile evidence; began UI-037 config-backed
+    readiness/button consolidation with Claude review and full CPU verification. The broader readiness inventory
+    and independent material/shader/cache work remain open.
 events_logged:
 - turn: 1
   type: dead_end
@@ -92,6 +92,12 @@ events_logged:
   routing: crystallized
   provenance: ai-executed
   summary: C102 records local incremental observations through N608 artifact commitment.
+- turn: 5
+  type: decision
+  id: N609
+  routing: direct
+  provenance: ai-executed
+  summary: Keep bounded config readiness/button reuse; UI-037 remains active.
 ai_actions:
 - turn: 1
   action: Diagnosed standard-header/import serialization, implemented one declaration owner, fixed review findings,
@@ -135,6 +141,15 @@ ai_actions:
   - benchmarks/ci/manifests/processing_config_editor.yaml
   - tasks/done/RUNTIME-267-processing-config-consumer-locality.md
   - ara/evidence/tables/runtime267_processing_config_measurement.md
+- turn: 5
+  action: Reused runtime config availability and app execution/tooltip helpers, preserved normalized construction,
+    resolved Claude review, tested real hover/click and normal-panel execution, and passed full CPU verification.
+  provenance: ai-executed
+  files_changed:
+  - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
+  - src/runtime/Editor/Runtime.EditorProcessing.cpp
+  - src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp
+  - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
 claims_touched:
 - id: C99
   action: crystallized
@@ -161,6 +176,9 @@ key_context:
 - turn: 4
   excerpt: 'User requests continued compile/reuse tasks with Claude: plan, implement, review, test and fix. Standing
     source-sharing/commit/push authorization persists; no main merge.'
+- turn: 5
+  excerpt: User requests continuing open reuse/compilation tasks with Claude through plan, implementation, review,
+    tests and fixes. First UI-037 slice selected; remaining inventory is explicit.
 open_threads:
 - The broader C92 processing-family hypothesis still needs a selected baseline and repeated family-edit measurements;
   BUILD-006 separately owns backend/cache comparisons.
@@ -181,7 +199,8 @@ open_threads:
 - BUG-195 owns disk-headroom preflight and evidence-write recovery; completed backend verification does not close
   that tooling work.
 - RUNTIME-268, GRAPHICS-144, GRAPHICS-145 and RUNTIME-267 are complete with bounded measured evidence. Mandatory
-  config/session dependencies remain. UI-037 and GRAPHICS-105 are ready; LEGACY-043 follows GRAPHICS-105, and
+  config/session dependencies remain. UI-037 is active with its first config-backed control slice verified;
+  mesh/UV/bake, family readiness and ICP/outlier/backend coverage remain. GRAPHICS-105 is ready; LEGACY-043 follows it, and
   BUILD-006 retains its prerequisites.
 ai_suggestions_pending:
 - Do not generalize the snapshot technique across engine layers without measuring the actual producer and consumer

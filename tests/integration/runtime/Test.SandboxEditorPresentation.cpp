@@ -118,6 +118,52 @@ namespace
         return *service;
     }
 
+    struct ProcessingButtonGui
+    {
+        ImGuiContext* Previous{ImGui::GetCurrentContext()};
+        ImGuiContext* Context{ImGui::CreateContext()};
+        ImVec2 ButtonCenter{};
+
+        ProcessingButtonGui()
+        {
+            auto& io = ImGui::GetIO();
+            io.IniFilename = nullptr;
+            io.DisplaySize = {600, 400};
+            io.DeltaTime = 1.0f / 60.0f;
+            io.Fonts->AddFontDefault();
+            io.Fonts->Build();
+            // Control delay only here; the helper must itself allow disabled hover.
+            ImGui::GetStyle().HoverFlagsForTooltipMouse = ImGuiHoveredFlags_None;
+        }
+        ~ProcessingButtonGui()
+        {
+            if (Context->WithinFrameScope)
+                ImGui::EndFrame();
+            ImGui::DestroyContext(Context);
+            ImGui::SetCurrentContext(Previous);
+        }
+        bool Draw(const Runtime::ActionReadiness& readiness)
+        {
+            ImGui::NewFrame();
+            ImGui::SetNextWindowPos({10, 10});
+            ImGui::SetNextWindowSize({500, 200});
+            ImGui::Begin("Processing action test", nullptr,
+                ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoTitleBar);
+            Context->LogBuffer.clear();
+            ImGui::LogToBuffer();
+            const bool clicked = Editor::DrawProcessingActionButton("Run method", readiness);
+            const auto minimum = ImGui::GetItemRectMin(), maximum = ImGui::GetItemRectMax();
+            ButtonCenter = {(minimum.x + maximum.x) / 2, (minimum.y + maximum.y) / 2};
+            return clicked;
+        }
+        void End()
+        {
+            ImGui::LogFinish();
+            ImGui::End();
+            ImGui::Render();
+        }
+    };
+
     class OneFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
@@ -1905,4 +1951,74 @@ TEST(SandboxEditorPresentation, RegistrationInterfacesExcludeProcessingDependenc
         "src/runtime/Editor/internal/Runtime.EditorFeatures.Internal.hpp");
     EXPECT_EQ(helpers.find("class EditorWorkspaceSession"), std::string::npos);
     EXPECT_EQ(helpers.find("#include <entt/entity/registry.hpp>"), std::string::npos);
+}
+
+TEST(SandboxEditorPresentation, DisabledActionReasonTooltipAppearsAfterTwoFrames)
+{
+    ProcessingButtonGui gui;
+    const auto readiness = Runtime::ResolveEditorProcessingActionReadiness({}, {true, {}});
+    ASSERT_FALSE(readiness.Enabled);
+    ASSERT_FALSE(readiness.DisabledReason.empty());
+    EXPECT_FALSE(gui.Draw(readiness));
+    const auto button = gui.ButtonCenter;
+    EXPECT_FALSE(ActiveImGuiTooltipExists());
+    EXPECT_EQ(std::string{gui.Context->LogBuffer.c_str()}.find(readiness.DisabledReason), std::string::npos);
+    gui.End();
+
+    ImGui::GetIO().AddMousePosEvent(button.x, button.y);
+    EXPECT_FALSE(gui.Draw(readiness));
+    EXPECT_TRUE(ActiveImGuiTooltipExists());
+    EXPECT_NE(std::string{gui.Context->LogBuffer.c_str()}.find(readiness.DisabledReason), std::string::npos);
+    gui.End();
+}
+
+TEST(SandboxEditorPresentation, ProcessingActionButtonBlocksDisabledClicksAndEmitsEnabledConfigCommand)
+{
+    namespace Config = Extrinsic::Core::Config;
+    Config::EngineConfigSectionRegistry sections;
+    ASSERT_TRUE(sections.Register(Runtime::MakeNormalEstimationConfigSectionRegistration()));
+    Runtime::RuntimeEngineConfigControlState state;
+    Config::PopulateEngineConfigSectionDefaults(state.ActiveConfig, sections);
+    unsigned applied = 0;
+    Runtime::EditorProcessingContext context;
+    context.EngineConfigControlState = &state;
+    context.EngineConfigCommandsAvailable = true;
+    context.PreviewEngineConfigDocument = [&](const auto& document, const auto& origin) {
+        return Config::PreviewEngineConfig(document, state.ActiveConfig, {origin, &sections});
+    };
+    context.ApplyEngineConfigHotSubset = [&](const auto& preview) {
+        ++applied;
+        state.ActiveConfig = preview.Preview.Config;
+        return Runtime::RuntimeEngineConfigApplyResult{.Status = Runtime::RuntimeEngineConfigApplyStatus::Applied};
+    };
+    const auto commands = Runtime::BindEditorProcessingCommands(context);
+    Runtime::NormalEstimationConfig request;
+    request.KNeighbors = 12;
+    ProcessingButtonGui gui;
+    const auto disabled = Runtime::ResolveEditorProcessingActionReadiness({}, {true, {}});
+    const auto enabled = Runtime::ResolveEditorProcessingActionReadiness(commands, {true, {}});
+    ASSERT_TRUE(enabled.Enabled);
+    EXPECT_FALSE(gui.Draw(disabled));
+    const auto button = gui.ButtonCenter;
+    gui.End();
+    ImGui::GetIO().AddMousePosEvent(button.x, button.y);
+    const auto draw = [&](const auto& readiness) {
+        if (gui.Draw(readiness))
+            EXPECT_TRUE(Runtime::ApplyEditorNormalEstimationConfig(commands, request).Succeeded());
+        if (readiness.Enabled) EXPECT_FALSE(ActiveImGuiTooltipExists());
+        gui.End();
+    };
+    ImGui::GetIO().AddMouseButtonEvent(0, true);
+    draw(disabled);
+    ImGui::GetIO().AddMouseButtonEvent(0, false);
+    draw(disabled);
+    EXPECT_EQ(applied, 0u);
+    draw(enabled);
+    ImGui::GetIO().AddMouseButtonEvent(0, true);
+    draw(enabled);
+    ImGui::GetIO().AddMouseButtonEvent(0, false);
+    draw(enabled);
+    EXPECT_EQ(applied, 1u);
+    ASSERT_TRUE(Runtime::GetEditorNormalEstimationConfig(commands));
+    EXPECT_EQ(Runtime::GetEditorNormalEstimationConfig(commands)->KNeighbors, 12u);
 }

@@ -145,24 +145,24 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         template <typename State, typename Preview, typename Apply, typename Execute, typename Sink>
-        void DrawProcessingExecution(const SandboxEditorContext& context, State& state, bool changed,
+        void DrawProcessingExecution(const Runtime::EditorProcessingCommands& commands, State& state, bool changed,
             Preview preview, Apply apply, Execute execute, const Sink& sink,
             const char* button, const char* controlsRejected, const char* executionRejected)
         {
             if (changed)
                 state.ConfigDiagnostic = apply(state.Draft).Succeeded() ? "" : controlsRejected;
             if (!state.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", state.ConfigDiagnostic.c_str());
-            const auto readiness = preview(state.Draft);
-            if (!readiness.Ready) ImGui::TextWrapped("%s", readiness.Diagnostic.c_str());
-            ImGui::BeginDisabled(!context.ProcessingConfigCommandsAvailable || !readiness.Ready ||
-                                 !state.ConfigDiagnostic.empty());
-            if (ImGui::Button(button))
+            const auto method = preview(state.Draft);
+            const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
+                commands, {method.Ready, method.Diagnostic});
+            if (!readiness.Enabled) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
+            if (DrawProcessingActionButton(button, readiness))
             {
-                if (apply(state.Draft).Succeeded())
+                const bool applied = apply(state.Draft).Succeeded();
+                state.ConfigDiagnostic = applied ? "" : executionRejected;
+                if (applied)
                     PublishCommandResult(state.LastResult, execute(), sink);
-                else state.ConfigDiagnostic = executionRejected;
             }
-            ImGui::EndDisabled();
         }
 
         void ShowCurvatureSegmentationVisualization(
@@ -1919,8 +1919,8 @@ namespace Extrinsic::Sandbox::Editor
                     changed = true;
                 }
                 ImGui::EndDisabled();
-                if (!readiness.Ready && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-                    ImGui::SetTooltip("%s", readiness.Diagnostic.c_str());
+                if (!readiness.Ready)
+                    DrawDisabledReasonTooltip(readiness.Diagnostic);
             }
             ImGui::EndCombo();
         }
@@ -1987,25 +1987,12 @@ namespace Extrinsic::Sandbox::Editor
                                           &config.CollinearEigenvalueRatioEpsilon, 0, 0, "%.8g");
             ImGui::TreePop();
         }
-        if (changed)
-        {
-            const auto applied = Runtime::ApplyEditorNormalEstimationConfig(context.Normals.Commands, config);
-            Normals.ConfigDiagnostic =
-                applied.Succeeded() ? "" : "Controls were rejected by normal config validation.";
-        }
-        if (!Normals.ConfigDiagnostic.empty())
-            ImGui::TextWrapped("%s", Normals.ConfigDiagnostic.c_str());
-        const auto readiness =
-            Runtime::PreviewEditorNormalEstimationCommand(context.Normals.Commands, config);
-        if (!readiness.Ready)
-            ImGui::TextWrapped("%s", readiness.Diagnostic.c_str());
-        ImGui::BeginDisabled(!context.ProcessingConfigCommandsAvailable || !readiness.Ready ||
-                             !Normals.ConfigDiagnostic.empty());
-        if (ImGui::Button("Estimate normals"))
-            PublishCommandResult(Normals.LastResult,
-                                 Runtime::ApplyEditorConfiguredNormalEstimation(context.Normals.Commands, context.Normals.ResultSinks.NormalEstimation),
-                                 context.Normals.ResultSinks.NormalEstimation);
-        ImGui::EndDisabled();
+        DrawProcessingExecution(context.Normals.Commands, Normals, changed,
+            [&](const auto& request) { return Runtime::PreviewEditorNormalEstimationCommand(context.Normals.Commands, request); },
+            [&](const auto& request) { return Runtime::ApplyEditorNormalEstimationConfig(context.Normals.Commands, request); },
+            [&] { return Runtime::ApplyEditorConfiguredNormalEstimation(context.Normals.Commands, context.Normals.ResultSinks.NormalEstimation); },
+            context.Normals.ResultSinks.NormalEstimation, "Estimate normals",
+            "Controls were rejected by normal config validation.", "Normal config was rejected.");
         const auto outputProperty = config.Output;
         ImGui::SameLine();
         if (config.Method == Runtime::NormalEstimationMethod::MeshFaceNormals)
@@ -2208,7 +2195,7 @@ namespace Extrinsic::Sandbox::Editor
                 "Spacing, covariance, saliency and suppression run on Vulkan. Requires shader double precision.":
                 "Only neighborhood queries run on Vulkan; scale, covariance and suppression run on CPU.");
         }
-        DrawProcessingExecution(context, Keypoints, changed,
+        DrawProcessingExecution(context.PointAnalysis.Commands, Keypoints, changed,
             [&](const auto& request) { return Runtime::PreviewEditorKeypointAnalysisCommand(context.PointAnalysis.Commands, request); },
             [&](const auto& request) { return Runtime::ApplyEditorKeypointAnalysisConfig(context.PointAnalysis.Commands, request); },
             [&] { return Runtime::ApplyEditorConfiguredKeypointAnalysis(context.PointAnalysis.Commands, context.PointAnalysis.ResultSinks.KeypointAnalysis); },
@@ -2300,7 +2287,7 @@ namespace Extrinsic::Sandbox::Editor
             changed |= ImGui::InputScalar("Radius result capacity",ImGuiDataType_U32,&config.GpuRadiusCapacity);
             ImGui::TextWrapped("Uncapped radius support must fit the selected capacity (up to 1024). A neighbor cap within that capacity can use the exact lowest-ID prefix even in denser neighborhoods. Scale, SPFH and FPFH run on CPU.");
         }
-        DrawProcessingExecution(context, Descriptors, changed,
+        DrawProcessingExecution(context.PointAnalysis.Commands, Descriptors, changed,
             [&](const auto& request) { return Runtime::PreviewEditorDescriptorAnalysisCommand(context.PointAnalysis.Commands, request); },
             [&](const auto& request) { return Runtime::ApplyEditorDescriptorAnalysisConfig(context.PointAnalysis.Commands, request); },
             [&] { return Runtime::ApplyEditorConfiguredDescriptorAnalysis(context.PointAnalysis.Commands, context.PointAnalysis.ResultSinks.DescriptorAnalysis); },
@@ -2369,7 +2356,7 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::TextWrapped("Local Gaussian average over nearest candidates. Automatic bandwidth uses nearest-other spacing. Distances use the selected property coordinates.");
         if(config.Backend==Runtime::KernelDensityBackend::VulkanLBVH)
             changed |= ImGui::InputScalar("GPU query batch size",ImGuiDataType_U32,&config.GpuQueryBatchSize);
-        DrawProcessingExecution(context, Density, changed,
+        DrawProcessingExecution(context.PointFields.Commands, Density, changed,
             [&](const auto& c) { return Runtime::PreviewEditorKernelDensityCommand(context.PointFields.Commands, c); },
             [&](const auto& c) { return Runtime::ApplyEditorKernelDensityConfig(context.PointFields.Commands, c); },
             [&] { return Runtime::ApplyEditorConfiguredKernelDensity(context.PointFields.Commands, context.PointFields.ResultSinks.KernelDensity); },
@@ -2435,7 +2422,7 @@ namespace Extrinsic::Sandbox::Editor
             changed |= ImGui::InputScalar("GPU radius capacity",ImGuiDataType_U32,&config.GpuRadiusCapacity);
             ImGui::TextWrapped("Vulkan collects complete conservative radius candidates. Overflow leaves the previous output unchanged. Subnormal coordinate components are unsupported.");
         }
-        DrawProcessingExecution(context, DensityWeights, changed,
+        DrawProcessingExecution(context.PointAnalysis.Commands, DensityWeights, changed,
             [&](const auto& request) { return Runtime::PreviewEditorDensityWeightCommand(context.PointAnalysis.Commands, request); },
             [&](const auto& request) { return Runtime::ApplyEditorDensityWeightConfig(context.PointAnalysis.Commands, request); },
             [&] { return Runtime::ApplyEditorConfiguredDensityWeight(context.PointAnalysis.Commands, context.PointAnalysis.ResultSinks.DensityWeight); },
@@ -2577,14 +2564,15 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::TextWrapped("%s", Construction.ConfigDiagnostic.c_str());
         const auto readiness =
             Runtime::PreviewEditorPointConstructionCommand(context.PointConstruction.Commands, config);
-        if (!readiness.Ready)
-            ImGui::TextWrapped("%s", readiness.Diagnostic.c_str());
-        ImGui::BeginDisabled(!context.ProcessingConfigCommandsAvailable || !readiness.Ready ||
-                             !Construction.ConfigDiagnostic.empty());
-        if (ImGui::Button("Construct"))
+        const auto action = Runtime::ResolveEditorProcessingActionReadiness(
+            context.PointConstruction.Commands, {readiness.Ready, readiness.Diagnostic});
+        if (!action.Enabled)
+            ImGui::TextWrapped("%s", action.DisabledReason.c_str());
+        if (DrawProcessingActionButton("Construct", action))
         {
             const auto applied = Runtime::ApplyEditorPointConstructionConfig(
                 context.PointConstruction.Commands, readiness.Resolved);
+            Construction.ConfigDiagnostic = applied.Succeeded() ? "" : "Construction config was rejected.";
             if (applied.Succeeded())
                 PublishCommandResult(
                     Construction.LastResult,
@@ -2592,10 +2580,7 @@ namespace Extrinsic::Sandbox::Editor
                         context.PointConstruction.Commands,
                         context.PointConstruction.ResultSinks.PointConstruction),
                     context.PointConstruction.ResultSinks.PointConstruction);
-            else
-                Construction.ConfigDiagnostic = "Construction config was rejected.";
         }
-        ImGui::EndDisabled();
         if (Construction.LastResult)
         {
             const auto& result = *Construction.LastResult;
@@ -2648,7 +2633,7 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::TextWrapped("Radius = scale times mean retained neighbor distance. Nearest-other spacing is reported separately. Values use the selected property coordinates; coverage is not guaranteed.");
         if(config.Backend==Runtime::PointSpacingBackend::VulkanLBVH)
             changed |= ImGui::InputScalar("GPU query batch size",ImGuiDataType_U32,&config.GpuQueryBatchSize);
-        DrawProcessingExecution(context, Spacing, changed,
+        DrawProcessingExecution(context.PointFields.Commands, Spacing, changed,
             [&](const auto& c) { return Runtime::PreviewEditorPointSpacingCommand(context.PointFields.Commands, c); },
             [&](const auto& c) { return Runtime::ApplyEditorPointSpacingConfig(context.PointFields.Commands, c); },
             [&] { return Runtime::ApplyEditorConfiguredPointSpacing(context.PointFields.Commands, context.PointFields.ResultSinks.PointSpacing); },
@@ -2720,7 +2705,7 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::TextWrapped("Filters positions along fixed input normals. Each pass rebuilds neighborhoods; automatic spatial sigma is resolved once.");
         if(config.Backend==Runtime::BilateralFilterBackend::VulkanLBVH)
             changed |= ImGui::InputScalar("GPU query batch size",ImGuiDataType_U32,&config.GpuQueryBatchSize);
-        DrawProcessingExecution(context, Bilateral, changed,
+        DrawProcessingExecution(context.PointSet.Commands, Bilateral, changed,
             [&](const auto& request) { return Runtime::PreviewEditorBilateralFilterCommand(context.PointSet.Commands, request); },
             [&](const auto& request) { return Runtime::ApplyEditorBilateralFilterConfig(context.PointSet.Commands, request); },
             [&] { return Runtime::ApplyEditorConfiguredBilateralFilter(context.PointSet.Commands, context.PointSet.ResultSinks.BilateralFilter); },

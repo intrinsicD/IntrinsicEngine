@@ -118,6 +118,8 @@ namespace Extrinsic::Sandbox::Editor
     [[nodiscard]] bool DrawDismissLastResultButton(const char* label);
 
     void DrawDisabledReasonTooltip(std::string_view disabledReason);
+    [[nodiscard]] bool DrawProcessingActionButton(
+        const char* label, const Runtime::ActionReadiness& readiness);
 
     extern "C++"
     {

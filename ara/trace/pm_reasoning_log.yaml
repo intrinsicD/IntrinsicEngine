@@ -2581,3 +2581,12 @@ entries:
       regression, overlapping implementation/no-op ranges and exact ownership footprint.
     - Fresh Clang20 compilation is distinct from Clang23 CPU execution. Existing unrelated staged topics keep owners/stale
       flags; no abandonment or new closure signal. Explicit A=before resolves reviewer notation inversion.
+
+  - turn: 2026-09-16_001#5
+    notes:
+    - N609 records an implementation/reuse decision only. No benchmark or scientific claim was produced, so no observation
+      promotion or new claim row.
+    - UI-037 stays active; two-frame production-widget evidence is not whole-inventory Operational closure. Explicitly
+      retain construction/ICP/outlier distinctions and +26 net production lines.
+    - Earlier staged observations retain owners and stale flags; this ordinary refactor supplies no new closure
+      or abandonment signal.

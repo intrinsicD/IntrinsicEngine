@@ -534,6 +534,16 @@ namespace Extrinsic::Sandbox::Editor
         return ImGui::SmallButton(label);
     }
 
+    bool DrawProcessingActionButton(const char* const label, const ActionReadiness& readiness)
+    {
+        ImGui::BeginDisabled(!readiness.Enabled);
+        const bool clicked = ImGui::Button(label);
+        ImGui::EndDisabled();
+        if (!readiness.Enabled)
+            DrawDisabledReasonTooltip(readiness.DisabledReason);
+        return clicked;
+    }
+
     void DrawDisabledReasonTooltip(const std::string_view disabledReason)
     {
         constexpr ImGuiHoveredFlags hoverFlags =

@@ -13154,3 +13154,25 @@ tree:
     - tasks/done/RUNTIME-267-processing-config-consumer-locality.md
     - ara/evidence/tables/runtime267_processing_config_measurement.md
     status: resolved
+
+  - id: N609
+    type: decision
+    title: Share config-backed readiness and button presentation within existing owners
+    provenance: ai-executed
+    timestamp: '2026-09-16T11:04:35+02:00'
+    choice: 'Keep the first UI-037 slice: common ActionReadiness and live config predicate, seven shared execution
+      controls plus construction button reuse. Preserve construction normalization and leave ICP/outlier triggers
+      for their own work. Claude review resolved; full CPU 4668 passed plus one expected skip, production GUI hover/click
+      and actual normal-panel invalid-to-valid execution tests pass. +26 net production C++ lines, no new files/modules/import
+      edges; no compile-time measurement or whole-task maturity claim.'
+    alternatives:
+    - Duplicate config availability and disabled tooltip logic per panel
+    - Generalize ICP trajectory and outlier requests before preserving their distinct triggers
+    - Retire the full UI/backend readiness inventory after one bounded slice
+    evidence:
+    - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
+    - src/runtime/Editor/Runtime.EditorProcessing.cpp
+    - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+    - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+    - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
+    status: resolved

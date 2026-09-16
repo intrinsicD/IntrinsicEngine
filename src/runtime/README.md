@@ -888,6 +888,14 @@ replacing it; an intervening edit leaves ECS state and the undo/redo cursor
 unchanged. `EditorCommandHistory` stores only the generic record and no longer
 exports a visualization-component adapter.
 
+`Runtime.EditorProcessing::ActionReadiness` is a copied enabled/reason value.
+`ResolveEditorProcessingActionReadiness` combines a method's existing preflight
+with the live config lane, using the same availability predicate as config apply.
+Unavailable config commands take reason priority; otherwise method diagnostics
+remain authoritative. This preview executes no config callbacks or property scans;
+commands still validate current inputs at apply time. Family-specific readiness
+records and controls outside the shared config-backed path remain distinct.
+
 `UI-021` makes `Extrinsic.Runtime.GeometryAvailability` the shared availability
 policy for those editor models and commands. Domain windows, visualization
 targets, property catalogs, primitive-view toggles, render hints, K-Means

@@ -107,7 +107,7 @@ readiness block, and it was the gate being executed.
 | [`BUG-134`](../../tasks/done/BUG-134-imgui-adapter-panel-draw-list-intermittent.md) | nonblocking at this baseline | The task explicitly becomes a REVIEW-003 dependency only on recurrence. The fresh complete CPU gate passed without recurrence. |
 | [`PLATFORM-004`](../../tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md) | nonblocking | Planning-only alternative-backend seed; no speculative production abstraction or current correctness debt. |
 | [`LEGACY-043`](../../tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md) | nonblocking | Deferred deletion of inactive shader sources after `GRAPHICS-105`; the promoted pipeline does not load them, so they are not a live public seam or current architecture exception. |
-| [`UI-037`](../../tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md) | nonblocking | Future operational readiness/UX work that reuses current validated paths and explicitly forbids a global facade/service. |
+| [`UI-037`](../../tasks/active/UI-037-linear-domain-action-readiness-tooltips.md) | nonblocking | Future operational readiness/UX work that reuses current validated paths and explicitly forbids a global facade/service. |
 
 ## Right-sizing inventory
 

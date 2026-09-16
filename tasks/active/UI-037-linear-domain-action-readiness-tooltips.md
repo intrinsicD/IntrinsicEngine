@@ -3,12 +3,10 @@ id: UI-037
 theme: F
 depends_on: [BUG-093, BUG-096, RUNTIME-202]
 workflow_schema: 1
-workflow_profile: high-risk
-evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+template: micro
+workflow_profile: micro
+evidence: not_applicable
+evidence_skip_reason: Interactive staged implementation; fixed diffs, review, tests and task checkpoints retain verification without unattended custody.
 maturity_target: Operational
 contract_schema: 1
 contracts: [geometry.element-domain-sources, geometry.property-coherence, runtime.editor-prepared-frame-locality]
@@ -134,7 +132,7 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence, runtim
       readiness matches runtime preflight; no point-cloud-only restriction or
       point-to-point substitution is permitted.
 - [ ] Cover parameterization strategy prerequisites, UV regeneration, texture-bake property/device requirements, and unavailable GPU/backend options without invoking ImGui.
-- [ ] Add an app integration test named
+- [x] Add an app integration test named
       `SandboxEditorPresentation.DisabledActionReasonTooltipAppearsAfterTwoFrames`.
       Frame one establishes the disabled item's rectangle; frame two positions
       the mouse over it and asserts the tooltip window/text. The test must
@@ -149,9 +147,9 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence, runtim
       state.
 
 ## Docs
-- [ ] Update `src/runtime/README.md` with the readiness record, authoritative-validation reuse, deterministic reason policy, and the distinction between preview readiness and apply-time validation.
-- [ ] Update `src/app/Sandbox/README.md` with the linear disabled-control convention, `AllowWhenDisabled` hover behavior, and config/agent parity.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` if the exported runtime module surface changes.
+- [x] Update `src/runtime/README.md` with the readiness record, authoritative-validation reuse, deterministic reason policy, and the distinction between preview readiness and apply-time validation.
+- [x] Update `src/app/Sandbox/README.md` with the linear disabled-control convention, `AllowWhenDisabled` hover behavior, and config/agent parity.
+- [x] Regenerate `docs/api/generated/module_inventory.md` if the exported runtime module surface changes.
 
 ## Acceptance criteria
 - [ ] Mesh/UV/bake/normal/outlier/K-Means/Progressive-Poisson/ICP/parameterization controls remain visible in their linear workflow and cannot be invoked while their runtime readiness is disabled.
@@ -204,3 +202,62 @@ python3 tools/agents/check_task_policy.py --root . --strict
   test plus runtime contracts covering every listed action. No Vulkan-specific
   follow-up is owed because readiness and tooltip presentation are
   backend-neutral; backend availability remains an input to the model.
+
+## Interactive checkpoint — 2026-09-16
+Operator-directed compilation/reuse continuation on `codex/editor-compile-locality`,
+baseline `ede64a7dc`; root is the only writer, Claude reviews fixed packets under
+standing authorization. This is the first bounded implementation, not task closure.
+
+Reuse/size decision: config-backed controls already share `DrawProcessingExecution`
+and runtime method previews. Put the plain `ActionReadiness` in existing
+`Runtime.EditorProcessing`, combine the live config lane with those previews, and
+reuse one private config-availability predicate in preview and apply. Add the common
+button to existing PanelSupport; it invokes the existing tooltip function directly.
+No new module/file/state owner, geometry rule, async job or config schema.
+
+Adopt seven shared execution controls (normal estimation, keypoints, descriptors,
+density, density weights, spacing, bilateral filtering). Construction shares the
+readiness/button but retains its resolved request. Keep ICP's trajectory trigger and
+outlier Analyze/RemoveMarked separate pending their own inventory. Normal's local
+`config` is a reference to `Normals.Draft`; use the existing template and reapply
+that draft at click time. Preserve result sinks and immediate/queued semantics.
+Historical config errors remain display state, no longer an independent disabled
+predicate; a successful retry clears them. Method command validation still runs.
+
+Remaining: convert family snapshots/records to the common representation, cover
+mesh/UV/bake/Poisson/K-Means/ICP/outlier controls and every backend/variant, remove
+remaining action-hiding early returns, complete authoritative property/finite-cache
+readiness and the full table-driven inventory. Do not check off broad acceptance
+criteria or claim Operational from this first button/control slice.
+
+### Verified first slice
+- Canonical `ci` configure, focused targets and `IntrinsicTests` build pass.
+  Full exclusion-only CPU gate: 4,668 passed, one expected ASan-only lifecycle
+  skip, zero failures among 4,669 selected (140.86 s). No GPU/sanitizer execution
+  or compilation-speed claim. Existing compiler locality guards pass.
+- Real two-frame tooltip and disabled/enabled mouse-click tests pass through
+  the production button; disabled clicks emit no config command, enabled clicks
+  use the runtime normal-config apply path. Extend the existing real-panel test
+  to normals: invalid draft and missing inputs publish nothing; valid output
+  matches the direct runtime reference. Corrected its initial window-ID typo.
+- Runtime coverage checks every missing config-lane component, expiration,
+  stable reason priority, nonempty rejection text, and zero config callbacks
+  during readiness. Full method/property/config tests remain green.
+- Claude reviewed the plan and fixed source. Preserve construction normalization
+  and the distinct ICP/outlier triggers. Strengthen GUI logging isolation and
+  teardown; surrounding Resolve/using declarations and compiled tests refute
+  the review's null-guard/type-mismatch concerns. No new helper is a test-only seam.
+- Five existing production C++ files: +26 net physical lines; shared panel
+  implementation -15 lines, with shared readiness/button behavior added to the
+  existing owners. Zero new production files/modules, import edges or CMake entries.
+  Module inventory regenerated (419 modules, no content change).
+- Scope/layering/tests/docs sweep passes. Clean-workshop: rows 1–3 and 8 pass;
+  renderer/pass/recipe rows 4–6 are unchanged; row 7 records this verified slice
+  with UI-037 still active. No compatibility wrapper, new service or ownership layer.
+
+Focused reproduction after the canonical build:
+```bash
+ctest --test-dir build/ci --output-on-failure -R 'NormalEstimation|SandboxProcessingPanels|SandboxEditorPresentation|PointConstruction|ProcessingCompilationLocality|EditorCompilationLocality|SandboxEditorSessionLifecycle' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 120
+```
+The original full-inventory test selector remains the later task-closure gate;
+this checkpoint does not represent every action/backend or complete the task.

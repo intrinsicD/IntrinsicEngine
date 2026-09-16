@@ -153,7 +153,7 @@ Task links retain detailed acceptance criteria, source references and evidence.
 | [RUNTIME-212](../../tasks/backlog/runtime/RUNTIME-212-progressive-poisson-property-domain-publication.md) | Keep | Progressive Poisson property-domain publication. |
 | [RUNTIME-218](../../tasks/backlog/runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md) | Revised | Light authoring remains missing; update scene and extraction ownership references. |
 | [RUNTIME-222](../../tasks/backlog/runtime/RUNTIME-222-model-space-point-radius-rendering.md) | Revised | Model-space radius rendering remains; existing PointSizeBDA is only dormant transport. |
-| [UI-037](../../tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md) | Revised | Unify remaining readiness pairs through family frames and the existing tooltip helper. |
+| [UI-037](../../tasks/active/UI-037-linear-domain-action-readiness-tooltips.md) | Revised | Unify remaining readiness pairs through family frames and the existing tooltip helper. |
 | [UI-042](../../tasks/backlog/ui/UI-042-signed-heat-mesh-panel.md) | Revised | Signed Heat panel remains; reuse shared processing-panel support. |
 | [UI-043](../../tasks/backlog/ui/UI-043-kmeans-property-domain-panel.md) | Revised | K-Means domain panel remains blocked on RUNTIME-211; reuse shared panel support. |
 | [UI-044](../../tasks/backlog/ui/UI-044-progressive-poisson-property-domain-panel.md) | Revised | Poisson domain panel remains blocked on RUNTIME-212; reuse shared panel support. |

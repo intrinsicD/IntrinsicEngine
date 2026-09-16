@@ -381,7 +381,38 @@ TEST(NormalEstimationConfig, RoundTripAndSharedPreviewApplyRun)
         state.ActiveConfig = preview.Preview.Config;
         return R::RuntimeEngineConfigApplyResult{.Status = R::RuntimeEngineConfigApplyStatus::Applied};
     };
+    // Preview and apply share the config-lane predicate, including expired handles.
+    const auto unavailable = R::ResolveEditorProcessingActionReadiness({}, {false, "method blocked"});
+    ASSERT_FALSE(unavailable.Enabled);
+    ASSERT_FALSE(unavailable.DisabledReason.empty());
+    for (unsigned missing = 0; missing < 5; ++missing)
+    {
+        auto incomplete = context;
+        if (missing == 0) incomplete.EngineConfigControlState = nullptr;
+        if (missing == 1) incomplete.EngineConfigCommandsAvailable = false;
+        if (missing == 2) incomplete.PreviewEngineConfigDocument = {};
+        if (missing == 3) incomplete.ApplyEngineConfigHotSubset = {};
+        if (missing == 4) incomplete.AttachmentActive = [] { return false; };
+        const auto handle = R::BindEditorProcessingCommands(incomplete);
+        const auto action = R::ResolveEditorProcessingActionReadiness(handle, {true, {}});
+        EXPECT_FALSE(action.Enabled) << missing;
+        EXPECT_EQ(action.DisabledReason, unavailable.DisabledReason) << missing;
+        EXPECT_EQ(R::ResolveEditorProcessingActionReadiness(handle, {false, "method blocked"}).DisabledReason,
+                  unavailable.DisabledReason) << missing;
+        EXPECT_FALSE(R::ApplyEditorNormalEstimationConfig(handle, config).Succeeded()) << missing;
+    }
+    EXPECT_EQ(previews, 0u);
+    EXPECT_EQ(applies, 0u);
     auto commands = R::BindEditorProcessingCommands(context);
+    const auto ready = R::ResolveEditorProcessingActionReadiness(commands, {true, "obsolete reason"});
+    EXPECT_TRUE(ready.Enabled);
+    EXPECT_TRUE(ready.DisabledReason.empty());
+    const auto blocked = R::ResolveEditorProcessingActionReadiness(commands, {false, "Choose an input property."});
+    EXPECT_FALSE(blocked.Enabled);
+    EXPECT_EQ(blocked.DisabledReason, "Choose an input property.");
+    EXPECT_FALSE(R::ResolveEditorProcessingActionReadiness(commands, {}).DisabledReason.empty());
+    EXPECT_EQ(previews, 0u);
+    EXPECT_EQ(applies, 0u);
     ASSERT_TRUE(R::PreviewEditorNormalEstimationCommand(commands, config).Ready);
     EXPECT_FALSE(Properties(scene, entity, D::MeshFace).Exists("estimated"));
     ASSERT_TRUE(R::ApplyEditorNormalEstimationConfig(commands, config).Succeeded());
@@ -398,6 +429,15 @@ TEST(NormalEstimationConfig, RoundTripAndSharedPreviewApplyRun)
         EXPECT_FALSE(R::ValidateNormalEstimationConfigSection(payload, {}, "test").Usable()) << payload;
     config.KNeighbors = 0;
     EXPECT_FALSE(R::ApplyEditorNormalEstimationConfig(commands, config).Succeeded());
+    bool attached = true;
+    context.AttachmentActive = [&] { return attached; };
+    const auto expiring = R::BindEditorProcessingCommands(context);
+    EXPECT_TRUE(R::ResolveEditorProcessingActionReadiness(expiring, {true, {}}).Enabled);
+    attached = false;
+    EXPECT_EQ(R::ResolveEditorProcessingActionReadiness(expiring, {true, {}}).DisabledReason,
+              unavailable.DisabledReason);
+    config.KNeighbors = 12;
+    EXPECT_FALSE(R::ApplyEditorNormalEstimationConfig(expiring, config).Succeeded());
     EXPECT_EQ(applies, 1);
 }
 

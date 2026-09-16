@@ -915,7 +915,8 @@ TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePu
         Method{"view.keypoint_analysis", "ISS Keypoint Analysis", "Detect keypoints", "Salient radius (0 = automatic)"},
         Method{"view.descriptor_analysis", "FPFH Descriptor Analysis", "Compute FPFH descriptors", "Feature radius (0 = automatic)"},
         Method{"view.density_weights", "Compact Density Weights", "Compute compact weights", "Support radius"},
-        Method{"view.bilateral_filter", "Bilateral Point Filter", "Filter positions", "Normal sigma"}};
+        Method{"view.bilateral_filter", "Bilateral Point Filter", "Filter positions", "Normal sigma"},
+        Method{"view.normal_estimation", "Normal Estimation", "Estimate normals", "Radius##Normals"}};
     for (std::size_t method = 0; method < methods.size(); ++method)
     {
         SCOPED_TRACE(methods[method].Title);
@@ -968,7 +969,7 @@ TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePu
             c.Weights.Name = reference;
             ASSERT_TRUE(R::ApplyEditorDensityWeightCommand(R::BindEditorProcessingCommands(referenceContext), c).Succeeded());
         }
-        else
+        else if (method == 3)
         {
             auto c = *R::GetBilateralFilterConfig(config);
             c.StableEntityId = id; c.KNeighbors = 3; c.SpatialSigma = 1; c.NormalSigma = 2;
@@ -979,6 +980,18 @@ TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePu
             c.Positions.Name = "v:position";
             c.Output.Name = reference;
             ASSERT_TRUE(R::ApplyEditorBilateralFilterCommand(R::BindEditorProcessingCommands(referenceContext), c).Succeeded());
+        }
+        else
+        {
+            auto c = *R::GetNormalEstimationConfig(config);
+            c.StableEntityId = id; c.UseRadiusSearch = true; c.Radius = 2;
+            c.Output.Name = output;
+            R::SetNormalEstimationConfig(config, c);
+            c.Positions.Name = "missing_positions";
+            R::SetNormalEstimationConfig(missingInputConfig, c);
+            c.Positions.Name = "v:position";
+            c.Output.Name = reference;
+            ASSERT_TRUE(R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(referenceContext), c).Succeeded());
         }
         ASSERT_TRUE(h.Apply(config));
         ASSERT_TRUE(h.Shell.SetEditorWindowOpen(methods[method].Window, true));
@@ -1036,7 +1049,7 @@ TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePu
             if (step < 30) return;
             if (!props.Exists(output)) return;
             const auto& values = std::as_const(props);
-            if (method == 3)
+            if (method >= 3)
                 EXPECT_EQ(values.Get<glm::vec3>(output).Vector(), values.Get<glm::vec3>(reference).Vector());
             else
                 EXPECT_EQ(values.Get<float>(output).Vector(), values.Get<float>(reference).Vector());

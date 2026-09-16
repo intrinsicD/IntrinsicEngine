@@ -236,8 +236,15 @@ domain restriction where topology requires it, such as mesh face normals taking
 vertex positions. The panels update coupled input/output domains explicitly.
 `DrawProcessingExecution`, local to `MeshProcessingPanels.cpp`, owns the common
 edit/validate/reapply/run sequence for density, spacing, keypoints, descriptors,
-density weights and bilateral filtering. Outlier detection/removal, normal
-estimation and construction retain their different request sequences. Their
+density weights, bilateral filtering and normal estimation. Its Run button and
+construction's resolved-request button use `ActionReadiness` from existing
+`Runtime.EditorProcessing`: the live config lane takes priority, then the method
+preflight supplies its reason. Config preview/apply share their availability
+predicate. Historical config errors are display state; each click reapplies and
+revalidates, clears a successful retry's error, and only then executes.
+`DrawProcessingActionButton` reuses `DrawDisabledReasonTooltip` immediately after
+the disabled item; neither helper validates geometry. Outlier detection/removal,
+ICP trajectory application and construction retain their distinct request sequences. Their
 algorithm controls and statistics remain explicit; compatible Show actions use
 `ShowProcessingProperty`, while face-normal display retains its face-lane path.
 

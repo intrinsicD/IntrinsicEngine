@@ -64,6 +64,13 @@ export namespace Extrinsic::Runtime
         };
     }
 
+    // Copied presentation state; commands still validate current inputs at apply time.
+    struct ActionReadiness
+    {
+        bool Enabled{};
+        std::string DisabledReason{};
+    };
+
     class EditorProcessingCommands final
     {
     public:
@@ -80,6 +87,10 @@ export namespace Extrinsic::Runtime
     // gate their controls on it instead of discovering the rejection.
     [[nodiscard]] bool AreEditorProcessingConfigCommandsAvailable(
         const EditorProcessingCommands&) noexcept;
+    // Config-backed actions need both the live config lane and their method preflight.
+    // Missing config commands take priority; otherwise preserve the method's reason.
+    [[nodiscard]] ActionReadiness ResolveEditorProcessingActionReadiness(
+        const EditorProcessingCommands&, ActionReadiness method);
     // Live finite vec3 rows on every resolved element domain of the entity, with
     // each entry's property revision folded into the snapshot generation. Every
     // method whose point input accepts any such property shares this catalog;

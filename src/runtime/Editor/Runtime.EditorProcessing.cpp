@@ -23,6 +23,17 @@ import Geometry.Properties;
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 namespace Extrinsic::Runtime
 {
+    namespace
+    {
+        bool CanApplyProcessingConfig(const EditorProcessingContext& context) noexcept
+        {
+            return context.EngineConfigControlState != nullptr &&
+                   context.EngineConfigCommandsAvailable &&
+                   static_cast<bool>(context.PreviewEngineConfigDocument) &&
+                   static_cast<bool>(context.ApplyEngineConfigHotSubset);
+        }
+    }
+
     bool EditorProcessingCommands::IsBound() const noexcept
     {
         return m_Context && (!m_Context->AttachmentActive || m_Context->AttachmentActive());
@@ -42,10 +53,18 @@ namespace Extrinsic::Runtime
         const EditorProcessingCommands& commands) noexcept
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        return context.EngineConfigControlState != nullptr &&
-               context.EngineConfigCommandsAvailable &&
-               static_cast<bool>(context.PreviewEngineConfigDocument) &&
-               static_cast<bool>(context.ApplyEngineConfigHotSubset);
+        return CanApplyProcessingConfig(context);
+    }
+    ActionReadiness ResolveEditorProcessingActionReadiness(
+        const EditorProcessingCommands& commands, ActionReadiness method)
+    {
+        if (!AreEditorProcessingConfigCommandsAvailable(commands))
+            return {false, "Processing controls are unavailable. Open an active editor session."};
+        if (method.Enabled)
+            method.DisabledReason.clear();
+        else if (method.DisabledReason.empty())
+            method.DisabledReason = "Processing prerequisites are unavailable. Check the selected inputs and settings.";
+        return method;
     }
     GeometryPropertyCatalogSnapshot GetEditorPointInputCatalog(
         const EditorProcessingCommands& commands, std::uint32_t stableId)
@@ -68,8 +87,7 @@ namespace Extrinsic::Runtime
             return result;
         }
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        if (!context.EngineConfigControlState || !context.PreviewEngineConfigDocument ||
-            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
+        if (!CanApplyProcessingConfig(context))
             return result;
         auto candidate = context.EngineConfigControlState->ActiveConfig;
         update(candidate);

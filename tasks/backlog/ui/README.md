@@ -6,7 +6,7 @@ its dependencies, conditional gates, scope and verification.
 
 ## Tasks
 
-- [UI-037 — Linear domain-action readiness and disabled-reason tooltips](UI-037-linear-domain-action-readiness-tooltips.md)
+- [UI-037 — Linear domain-action readiness and disabled-reason tooltips](../../active/UI-037-linear-domain-action-readiness-tooltips.md)
 - [UI-042 — Signed Heat mesh method panel](UI-042-signed-heat-mesh-panel.md)
 - [UI-043 — K-Means property-domain panel](UI-043-kmeans-property-domain-panel.md)
 - [UI-044 — Progressive Poisson property-domain panel](UI-044-progressive-poisson-property-domain-panel.md)

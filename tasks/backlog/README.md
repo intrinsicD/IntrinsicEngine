@@ -76,7 +76,7 @@ ready. Task front-matter owns prerequisite state.
 
 | Area | Task |
 | --- | --- |
-| Shared action readiness and disabled reasons | [UI-037](ui/UI-037-linear-domain-action-readiness-tooltips.md) |
+| Shared action readiness and disabled reasons | [UI-037](../active/UI-037-linear-domain-action-readiness-tooltips.md) |
 | Material/visualization authority consolidation | [GRAPHICS-105](rendering/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md) |
 | Stale shaders after material-authority decisions | [LEGACY-043](rendering/LEGACY-043-retire-stale-multiset-shaders.md) |
 | Build/cache backend comparison | [BUILD-006](process/BUILD-006-cxx23-module-build-backend-bakeoff.md) |
