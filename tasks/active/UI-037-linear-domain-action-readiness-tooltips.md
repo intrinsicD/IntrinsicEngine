@@ -357,3 +357,52 @@ Verified checkpoint:
   renderer/pass/recipe rows 4–6 unchanged; row 7 records this bounded slice.
   UI-037 stays active for mesh/UV/bake, family readiness, backend/variant and
   metadata/cache preflight coverage. This is not whole-inventory closure.
+
+
+### Parameterization config slice — 2026-09-16
+Baseline `5d5c3fe39`, continuing the operator-directed compile/reuse work with
+one writer and fixed-packet Claude review. Reuse `ApplyEditorProcessingConfig`
+and its generic result for parameterization; remove the redundant status,
+command and nested-preview result, plus the app request-builder record/alias.
+Keep the typed pre-serialization validator (including inactive strategy fields)
+and source IDs; this is required because serialization normalizes invalid enums.
+The existing app action remains the single apply-before-execute owner. Preserve
+zero-entity rejection; let runtime own strategy validation. Use the existing
+readiness/button for config availability without claiming full method preflight.
+Add config-lane and real-panel rejection/retry coverage, keeping rejected drafts
+out of the solver. No new file, module, service, compatibility wrapper or method.
+Broader mesh/UV/bake readiness and cached geometry predicates remain open here.
+
+Verified checkpoint:
+- Replaced three public parameterization config wrapper types with the existing
+  typed config and shared apply result. Removed the app request-builder type,
+  builder, config alias and redundant strategy whitelist. Five existing production
+  C++ files lose 142 net physical lines; zero new files/modules/CMake entries and
+  one redundant direct interface import removed. No compile-time measurement.
+- Apply and Run use shared config readiness/buttons. Run retains its existing
+  selected-mesh predicate and apply-time validation; complete strategy/topology
+  readiness remains open. Invalid typed enums, including inactive strategy fields,
+  fail before serialization. Zero-entity actions fail before config mutation.
+- Config fallback cannot silently discard requested edits and execute accepted
+  settings. Rejected drafts stay editable/retryable. NoChange still executes;
+  success feedback and panel/default source IDs are preserved.
+- Claude reviewed the plan and fixed diff. Restored applied/unchanged UI feedback
+  from its valid finding; checked exact section constant, complete serialized
+  fields, runtime strategy switch, missing-entity button gating and tests against
+  remaining questions. Final bounded verdict finds no blocker.
+- Runtime tests cover missing/expired config lanes without callbacks, apply
+  rejection, lost-edit fallback, default/custom source IDs and NoChange. Replaced
+  the request-copy test with real config round-trip/no-side-effects coverage.
+  Actual ImGui controls prove rejected Apply and Run leave config/UV untouched,
+  retry without another edit succeeds, and a NoChange run restores changed UVs.
+- `cmake --preset ci` and focused targets pass under canonical Clang 23; all 32
+  focused parameterization cases pass. Final `IntrinsicTests` build and full CPU
+  selector pass: 4672 passes plus one expected ASan-only lifecycle skip, zero
+  failures, 140.39 s. No GPU or sanitizer runtime claim.
+- Layering, test layout, task policy/state links, docs links/sync, root hygiene,
+  skill mirrors and diff whitespace checks pass. Module inventory regenerated
+  (419 modules, no content change); touched header/module documentation has zero
+  errors, with existing lifetime/control-boundary comments retained.
+- Scope/layering/tests/docs sweep passes. Clean-workshop rows 1–3 and 8 pass;
+  renderer/pass/recipe rows 4–6 unchanged; row 7 records this bounded slice with
+  UI-037 still active. No new ownership layer or compatibility path.

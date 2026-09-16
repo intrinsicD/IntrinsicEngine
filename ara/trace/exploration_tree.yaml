@@ -13221,3 +13221,26 @@ tree:
     - tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
     - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
     status: resolved
+
+  - id: N612
+    type: decision
+    title: Consolidate parameterization config apply and delete redundant request construction
+    provenance: ai-executed
+    timestamp: '2026-09-16T12:08:10+02:00'
+    choice: Continue UI-037 by passing typed parameterization config through the shared apply owner/result, keeping
+      pre-serialization enum guards and removing the app request builder and duplicate strategy whitelist. Rejected
+      edits cannot execute previous accepted settings; NoChange still executes. Preserve success feedback after
+      Claude review. Canonical focused 32 cases and full CPU 4672 passes plus one expected skip are green. Five
+      existing production C++ files lose 142 lines; no new modules or compile-time claim. UI-037 stays active.
+    alternatives:
+    - Keep independent method config status, command and nested-preview result types
+    - Retain an app config/execute request wrapper and duplicate strategy validity owner
+    - Replace typed enum validation with serialization that normalizes unsupported values
+    evidence:
+    - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
+    - src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp
+    - src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp
+    - tests/contract/runtime/Test.ParameterizationOperations.cpp
+    - tests/integration/runtime/Test.SandboxParameterizationPanel.cpp
+    - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
+    status: resolved

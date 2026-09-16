@@ -249,7 +249,7 @@ namespace Extrinsic::Sandbox::Editor
     namespace
     {
         using ParameterizationPanelConfig =
-            SandboxParameterizationPanelConfig;
+            Runtime::ParameterizationConfig;
         using ParameterizationUvConfig =
             decltype(ParameterizationPanelConfig{}.Lscm.PinUv0);
         using ParameterizationLscmConfig =
@@ -611,10 +611,10 @@ namespace Extrinsic::Sandbox::Editor
         struct ParameterizationState
         {
             ProcessingEntityInput Input{};
-            SandboxParameterizationPanelConfig Draft{};
+            Runtime::ParameterizationConfig Draft{};
             bool Initialized{false};
             bool Dirty{false};
-            std::optional<Runtime::EditorParameterizationConfigResult>
+            std::optional<Runtime::RuntimeEngineConfigApplyResult>
                 LastConfigResult{};
             std::optional<Runtime::EditorParameterizationResult>
                 LastResult{};
@@ -2616,7 +2616,7 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         static bool DrawParameterizationStrategy(
-            SandboxParameterizationPanelConfig& config)
+            Runtime::ParameterizationConfig& config)
         {
             const auto options = SandboxParameterizationStrategyOptions();
             const auto selected = std::find_if(
@@ -2849,7 +2849,7 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         static bool DrawParameterizationConfigControls(
-            SandboxParameterizationPanelConfig& config)
+            Runtime::ParameterizationConfig& config)
         {
             ImGui::SeparatorText("UV view");
             bool changed = DrawParameterizationUvViewControls(config.View);
@@ -2991,24 +2991,17 @@ namespace Extrinsic::Sandbox::Editor
             if (Parameterization.Dirty)
                 ImGui::TextDisabled("Draft has unapplied changes.");
 
-            const bool configAvailable =
-                context.ProcessingConfigCommandsAvailable;
-            if (!configAvailable)
-                ImGui::BeginDisabled();
-            if (ImGui::Button("Apply configuration##Parameterization"))
+            const auto configReadiness = Runtime::ResolveEditorProcessingActionReadiness(
+                context.Parameterization.Commands, {true, {}});
+            if (DrawProcessingActionButton("Apply configuration##Parameterization", configReadiness))
             {
                 Parameterization.LastConfigResult =
-                    Runtime::ApplyEditorParameterizationConfigCommand(
-                        context.Parameterization.Commands,
-                        Runtime::EditorParameterizationConfigCommand{
-                            .Config = Parameterization.Draft,
-                            .SourceId = "sandbox.parameterization.panel",
-                        });
+                    Runtime::ApplyEditorParameterizationConfig(
+                        context.Parameterization.Commands, Parameterization.Draft,
+                        "sandbox.parameterization.panel");
                 if (Parameterization.LastConfigResult->Succeeded())
                     Parameterization.Dirty = false;
             }
-            if (!configAvailable)
-                ImGui::EndDisabled();
             ImGui::SameLine();
             if (ImGui::Button("Reload active##Parameterization"))
             {
@@ -3022,11 +3015,10 @@ namespace Extrinsic::Sandbox::Editor
                 }
             }
 
-            const bool canRun = configAvailable && model.HasSelectedEntity &&
-                                model.SelectedEntityIsMesh;
-            if (!canRun)
-                ImGui::BeginDisabled();
-            if (ImGui::Button("Parameterize selected mesh##Parameterization"))
+            const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
+                context.Parameterization.Commands,
+                {model.HasSelectedEntity && model.SelectedEntityIsMesh, model.Message});
+            if (DrawProcessingActionButton("Parameterize selected mesh##Parameterization", readiness))
             {
                 SandboxParameterizationPanelActionResult action =
                     ApplySandboxParameterizationPanelAction(
@@ -3039,8 +3031,6 @@ namespace Extrinsic::Sandbox::Editor
                 if (Parameterization.LastConfigResult->Succeeded())
                     Parameterization.Dirty = false;
             }
-            if (!canRun)
-                ImGui::EndDisabled();
 
             DrawProcessingPropertyShowButton(context, model.SelectedStableEntityId,
                 Parameterization.Draft.Texcoords, Parameterization.VisualizationDiagnostic);
@@ -3082,12 +3072,18 @@ namespace Extrinsic::Sandbox::Editor
                     history.UndoLabel.c_str());
             }
 
-            if (Parameterization.LastConfigResult.has_value() &&
-                !Parameterization.LastConfigResult->Message.empty())
+            if (Parameterization.LastConfigResult.has_value())
             {
-                ImGui::TextWrapped(
-                    "%s",
-                    Parameterization.LastConfigResult->Message.c_str());
+                const auto& applied = *Parameterization.LastConfigResult;
+                if (applied.Succeeded())
+                    ImGui::TextUnformatted(applied.Status == Runtime::RuntimeEngineConfigApplyStatus::NoChange
+                        ? "Parameterization config unchanged." : "Parameterization config applied.");
+                else
+                {
+                    ImGui::TextWrapped("Parameterization config was rejected.");
+                    for (const auto& diagnostic : applied.LoadResult.Diagnostics)
+                        ImGui::TextWrapped("%s", diagnostic.Message.c_str());
+                }
             }
             DrawParameterizationResult(Parameterization.LastResult);
             if (Parameterization.LastResult.has_value())

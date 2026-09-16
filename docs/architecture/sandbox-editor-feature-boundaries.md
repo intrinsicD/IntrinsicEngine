@@ -598,9 +598,9 @@ the removed `Runtime.SandboxEditorFacades` and
 | `SandboxEditorParameterizationStrategy` | `EditorParameterizationStrategy` | `Runtime.ParameterizationOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorParameterizationCommand` | `EditorParameterizationCommand` | `Runtime.ParameterizationOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorConfiguredParameterizationCommand` | `EditorConfiguredParameterizationCommand` | `Runtime.ParameterizationOperations.cppm` | feature-owned runtime contract |
-| `SandboxEditorParameterizationConfigStatus` | `EditorParameterizationConfigStatus` | `Runtime.ParameterizationOperations.cppm` | feature-owned runtime contract |
-| `SandboxEditorParameterizationConfigCommand` | `EditorParameterizationConfigCommand` | `Runtime.ParameterizationOperations.cppm` | feature-owned runtime contract |
-| `SandboxEditorParameterizationConfigResult` | `EditorParameterizationConfigResult` | `Runtime.ParameterizationOperations.cppm` | feature-owned runtime contract |
+| `SandboxEditorParameterizationConfigStatus` | `RuntimeEngineConfigApplyStatus` | `Runtime.EngineConfigControl.cppm` | shared config outcome |
+| `SandboxEditorParameterizationConfigCommand` | `ParameterizationConfig` | `Runtime.ParameterizationConfig.cppm` | typed config passed directly to the apply owner |
+| `SandboxEditorParameterizationConfigResult` | `RuntimeEngineConfigApplyResult` | `Runtime.EngineConfigControl.cppm` | shared config result; one preview/diagnostic payload |
 | `SandboxEditorParameterizationViewModel` | `EditorParameterizationViewModel` | `Runtime.ParameterizationOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorPreparedFrameView` | app-private `SandboxPreparedFrame` over five feature-owned `Editor*PreparedFrame` records | `Sandbox.EditorShell.cpp` plus the workspace/scene/geometry/visualization/render-recipe operation modules | app-private aggregate; no public all-feature prepared frame |
 | `SandboxEditorPreparedFrameVisitor` | — | deleted | direct app-owned calls to the five feature preparation functions; no replacement visitor |

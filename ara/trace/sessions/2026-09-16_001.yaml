@@ -2,11 +2,11 @@ session:
   id: 2026-09-16_001
   date: '2026-09-16'
   started: '2026-09-16T00:38:04+02:00'
-  last_turn: '2026-09-16T11:51:18+02:00'
-  turn_count: 7
+  last_turn: '2026-09-16T12:08:10+02:00'
+  turn_count: 8
   summary: Retired RUNTIME-268, GRAPHICS-144/145 and RUNTIME-267 with bounded compile evidence; continued UI-037
-    readiness/button and execution reuse with Claude review and full CPU verification. Outlier/ICP and
-    Progressive Poisson config rejection/retries are covered; broader readiness, material/shader/cache work remain open.
+    readiness/button and execution reuse with Claude review and full CPU verification. Outlier/ICP, Progressive
+    Poisson and parameterization config rejection/retries are covered; broader readiness, material/shader/cache work remain open.
 events_logged:
 - turn: 1
   type: dead_end
@@ -110,6 +110,12 @@ events_logged:
   routing: direct
   provenance: ai-executed
   summary: Reuse shared processing config for Progressive Poisson and verify manual/debounced rejection recovery.
+- turn: 8
+  type: decision
+  id: N612
+  routing: direct
+  provenance: ai-executed
+  summary: Consolidate parameterization config apply and remove redundant app request construction.
 ai_actions:
 - turn: 1
   action: Diagnosed standard-header/import serialization, implemented one declaration owner, fixed review findings,
@@ -182,6 +188,18 @@ ai_actions:
   - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
   - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
   - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
+- turn: 8
+  action: Reused shared config apply/result and readiness buttons, removed redundant request and strategy validation,
+    preserved typed enum guards and success feedback, resolved Claude review and verified actual panel rejection/retry
+    plus full CPU tests.
+  provenance: ai-executed
+  files_changed:
+  - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
+  - src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cppm
+  - src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp
+  - src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+  - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
 claims_touched:
 - id: C99
   action: crystallized
@@ -217,6 +235,9 @@ key_context:
 - turn: 7
   excerpt: User requests continued open duplication/compile-time tasks with Claude through plan, implementation,
     review, testing and fixes. Continued UI-037 Poisson config reuse; no compile-time measurement or whole-task closure.
+- turn: 8
+  excerpt: User requested continued work with Claude through planning, implementation, review, tests and fixes.
+    Continued UI-037 parameterization config reuse; broader readiness task remains open and no timing claim added.
 open_threads:
 - The broader C92 processing-family hypothesis still needs a selected baseline and repeated family-edit measurements;
   BUILD-006 separately owns backend/cache comparisons.
@@ -237,8 +258,8 @@ open_threads:
 - BUG-195 owns disk-headroom preflight and evidence-write recovery; completed backend verification does not close
   that tooling work.
 - RUNTIME-268, GRAPHICS-144, GRAPHICS-145 and RUNTIME-267 are complete with bounded measured evidence. Mandatory
-  config/session dependencies remain. UI-037 is active with shared controls, outlier/ICP and Progressive Poisson
-  execution verified;
+  config/session dependencies remain. UI-037 is active with shared controls, outlier/ICP, Progressive Poisson and
+  parameterization config/execution verified;
   mesh/UV/bake, family readiness, backend/variant and metadata/cache preflight coverage remain. GRAPHICS-105 is ready; LEGACY-043 follows it, and
   BUILD-006 retains its prerequisites.
 ai_suggestions_pending:

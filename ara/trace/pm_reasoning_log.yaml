@@ -2606,3 +2606,13 @@ entries:
     - Distinguish source-line reduction from unmeasured compile-time improvement. Full CPU evidence does not
       establish GPU or sanitizer execution; preserve exact rejection/retry semantics and quiet-harness job counts.
     - Unrelated staged observations retain their owners and stale flags; no new closure or abandonment signal.
+
+  - turn: 2026-09-16_001#8
+    notes:
+    - N612 is an ordinary implementation/reuse decision. No new claim, staging promotion or whole-readiness closure;
+      source-line reduction is distinct from unmeasured compile-time improvement.
+    - Claude review prompted restored success feedback; verify other conditional findings against exact constants,
+      complete serialization and existing tests. Disregard one malformed pseudo-tool review response and obtain a
+      plain-text bounded final verdict; no claimed tool execution from that response.
+    - Earlier staged topics remain referenced by their owners and open threads; this slice supplies no new closure
+      or abandonment signal. Preserve their flags and retain UI-037 remaining inventory.

@@ -19,7 +19,6 @@ export import Extrinsic.Runtime.EditorCommon;
 export import Extrinsic.Runtime.ParameterizationConfig;
 export import Geometry.Parameterization;
 export import Geometry.UvAtlas;
-import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
 
@@ -148,36 +147,6 @@ export namespace Extrinsic::Runtime
         }
     };
 
-    enum class EditorParameterizationConfigStatus : std::uint8_t
-    {
-        None = 0,
-        Applied,
-        NoChange,
-        MissingConfigControl,
-        PreviewRejected,
-        ApplyRejected,
-    };
-
-    struct EditorParameterizationConfigCommand
-    {
-        ParameterizationConfig Config{};
-        std::string SourceId{"sandbox.parameterization"};
-    };
-
-    struct EditorParameterizationConfigResult
-    {
-        EditorParameterizationConfigStatus Status{EditorParameterizationConfigStatus::None};
-        Core::Config::EngineConfigLoadResult Preview{};
-        RuntimeEngineConfigApplyResult Apply{};
-        std::string Message{};
-
-        [[nodiscard]] bool Succeeded() const noexcept
-        {
-            return Status == EditorParameterizationConfigStatus::Applied ||
-                   Status == EditorParameterizationConfigStatus::NoChange;
-        }
-    };
-
     struct EditorParameterizationViewModel
     {
         bool HasSelectedEntity{false};
@@ -263,8 +232,8 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] EditorParameterizationResult ApplyEditorConfiguredParameterizationCommand(
         const EditorProcessingCommands&, const EditorConfiguredParameterizationCommand&,
         std::function<void(EditorParameterizationResult)> onComplete = {});
-    [[nodiscard]] EditorParameterizationConfigResult ApplyEditorParameterizationConfigCommand(
-        const EditorProcessingCommands&, const EditorParameterizationConfigCommand&);
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorParameterizationConfig(
+        const EditorProcessingCommands&, const ParameterizationConfig&, std::string sourceId = {});
     [[nodiscard]] std::optional<ParameterizationConfig> GetEditorParameterizationConfig(
         const EditorProcessingCommands&) noexcept;
     // Omitted entity follows scene selection; an explicit entity also owns UV

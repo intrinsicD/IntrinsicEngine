@@ -1095,6 +1095,103 @@ TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePu
     }
 }
 
+TEST(SandboxProcessingPanels, ParameterizationRejectsLostDraftAndRetriesWithoutFurtherEdits)
+{
+    bool reject = false;
+    unsigned rejections = 0;
+    PanelHarness h(RejectableConfigRegistry(R::kParameterizationConfigSectionName, reject, rejections));
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    auto& props = scene.Raw().get<GS::Vertices>(entity).Properties;
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto parameters = *R::GetParameterizationConfig(config);
+    parameters.Texcoords.Name = "v:panel_uv";
+    parameters.Lscm.MaxSolverIterations = 1000;
+    R::SetParameterizationConfig(config, parameters);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("mesh.processing.parameterize_uv", true));
+    std::optional<R::EditorParameterizationResult> result;
+    const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id = "test.parameterization_execution", .MenuPath = {"View"}, .Title = "Parameterization observer",
+        .OpenByDefault = true,
+        .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
+            result = context.Parameterization.Results.LastParameterizationResult;
+        }});
+    int frames = 0, step = 0;
+    unsigned rejectedApplyCount = 0;
+    glm::vec2 firstUv{};
+    bool completed = false;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frames > 100) { ADD_FAILURE() << "Parameterization panel did not complete"; engine.RequestExit(); return; }
+        auto* parent = ImGui::FindWindowByName("Mesh / Processing / Parameterize (UV)");
+        if (!parent) return;
+        ImGui::SetWindowSize(parent, {1500, 1800});
+        ImGui::SetWindowPos(parent, {0, 0});
+        ImGuiWindow* window = nullptr;
+        for (auto* child : ImGui::GetCurrentContext()->Windows)
+            if (child->ParentWindow == parent && std::string_view{child->Name}.find("ParameterizationControls") != std::string_view::npos)
+            { window = child; break; }
+        if (!window) return;
+        ++step;
+        EditScalarControl(window, "Maximum iterations##Parameterization", step - 3, "1234");
+        const auto active = [&] { return *R::GetParameterizationConfig(h.Control().GetEngineConfigControlState().ActiveConfig); };
+        const auto run = [&] { ImGui::ActivateItemByID(window->GetID("Parameterize selected mesh##Parameterization")); };
+        if (step == 12)
+        {
+            EXPECT_EQ(active().Lscm.MaxSolverIterations, 1000u);
+            reject = true;
+            ImGui::ActivateItemByID(window->GetID("Apply configuration##Parameterization"));
+        }
+        if (step == 16)
+        {
+            EXPECT_GT(rejections, 0u);
+            rejectedApplyCount = rejections;
+            EXPECT_EQ(active().Lscm.MaxSolverIterations, 1000u);
+            EXPECT_FALSE(props.Exists(parameters.Texcoords.Name));
+            EXPECT_FALSE(result);
+            run();
+        }
+        if (step == 20)
+        {
+            EXPECT_GT(rejections, rejectedApplyCount);
+            EXPECT_EQ(active().Lscm.MaxSolverIterations, 1000u);
+            EXPECT_FALSE(props.Exists(parameters.Texcoords.Name));
+            EXPECT_FALSE(result);
+            reject = false;
+            run();
+        }
+        if (step == 24)
+        {
+            EXPECT_EQ(active().Lscm.MaxSolverIterations, 1234u);
+            EXPECT_TRUE(result && result->Succeeded()) << (result ? result->Message : "No result");
+            auto uv = props.Get<glm::vec2>(parameters.Texcoords.Name);
+            EXPECT_TRUE(uv);
+            if (!uv) { engine.RequestExit(); return; }
+            EXPECT_EQ(uv.Vector().size(), 9u);
+            firstUv = uv[0];
+            // Change only the output to prove a NoChange config still executes.
+            uv[0] = {123.f, 456.f};
+            run();
+        }
+        if (step == 28)
+        {
+            const auto uv = props.Get<glm::vec2>(parameters.Texcoords.Name);
+            EXPECT_TRUE(uv);
+            if (uv) EXPECT_EQ(uv[0], firstUv);
+            EXPECT_EQ(active().Lscm.MaxSolverIterations, 1234u);
+            EXPECT_TRUE(result && result->Succeeded());
+            EXPECT_FALSE(props.Exists("v:texcoord"));
+            completed = true;
+            engine.RequestExit();
+        }
+    };
+    h.Engine->Run();
+    EXPECT_TRUE(completed);
+    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
+}
+
 TEST(SandboxProcessingPanels, ProgressivePoissonManualAndDebouncedRunsShareConfigApply)
 {
     bool reject = false;

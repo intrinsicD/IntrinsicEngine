@@ -280,7 +280,7 @@ TEST(SandboxParameterizationPanel, RegistrationIsStableAndIdempotent)
     EXPECT_EQ(FindWindow(menu, "mesh.processing.parameterize_uv"), nullptr);
 }
 
-TEST(SandboxParameterizationPanel, StrategiesAndTypedRequestAreExact)
+TEST(SandboxParameterizationPanel, StrategiesAndTypedConfigRoundTripAreExact)
 {
     using Strategy = Runtime::ParameterizationStrategyKind;
     constexpr std::array expectedStrategies{
@@ -329,14 +329,14 @@ TEST(SandboxParameterizationPanel, StrategiesAndTypedRequestAreExact)
         Runtime::ParameterizationUvBackgroundMode::Texture;
     config.View.ShowDistortionHeatmap = true;
 
-    const auto request =
-        Editor::BuildSandboxParameterizationPanelApplyRequest(
-            91u,
-            config);
-    ASSERT_TRUE(request.has_value());
-    EXPECT_EQ(request->Execute.StableEntityId, 91u);
-    EXPECT_EQ(request->Config.SourceId, "sandbox.parameterization.panel");
-    const auto& copied = request->Config.Config;
+    ParameterizationPanelHarness harness;
+    const auto applied = Runtime::ApplyEditorParameterizationConfig(
+        harness.Context.Parameterization.Commands, config, "sandbox.parameterization.panel");
+    ASSERT_TRUE(applied.Succeeded());
+    EXPECT_EQ(applied.LoadResult.SourceId, "sandbox.parameterization.panel");
+    const auto active = Runtime::GetEditorParameterizationConfig(harness.Context.Parameterization.Commands);
+    ASSERT_TRUE(active.has_value());
+    const auto& copied = *active;
     EXPECT_EQ(copied.Strategy, config.Strategy);
     EXPECT_EQ(copied.Lscm.AutoPins, config.Lscm.AutoPins);
     EXPECT_EQ(copied.Lscm.PinVertex0, config.Lscm.PinVertex0);
@@ -370,17 +370,20 @@ TEST(SandboxParameterizationPanel, StrategiesAndTypedRequestAreExact)
     EXPECT_EQ(copied.View.ShowDistortionHeatmap,
               config.View.ShowDistortionHeatmap);
 
-    EXPECT_FALSE(
-        Editor::BuildSandboxParameterizationPanelApplyRequest(
-            0u,
-            config)
-            .has_value());
+    auto noEntityDraft = config;
+    noEntityDraft.View.ShowDistortionHeatmap = false;
+    const auto zeroEntity = Editor::ApplySandboxParameterizationPanelAction(harness.Context, 0u, noEntityDraft);
+    EXPECT_FALSE(zeroEntity.Config.Succeeded());
+    EXPECT_FALSE(zeroEntity.Execution.has_value());
     config.Strategy = static_cast<Strategy>(999u);
-    EXPECT_FALSE(
-        Editor::BuildSandboxParameterizationPanelApplyRequest(
-            91u,
-            config)
-            .has_value());
+    const auto invalid = Editor::ApplySandboxParameterizationPanelAction(
+        harness.Context, harness.StableEntityId, config);
+    EXPECT_FALSE(invalid.Config.Succeeded());
+    EXPECT_FALSE(invalid.Execution.has_value());
+    EXPECT_EQ(Runtime::SerializeParameterizationConfig(*Runtime::GetEditorParameterizationConfig(
+        harness.Context.Parameterization.Commands)), Runtime::SerializeParameterizationConfig(copied));
+    EXPECT_FALSE(harness.HasFiniteUvs());
+    EXPECT_FALSE(harness.History.CanUndo());
 }
 
 TEST(SandboxParameterizationPanel, ProjectionFitsAndFailsClosed)

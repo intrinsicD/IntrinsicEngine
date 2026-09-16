@@ -530,39 +530,81 @@ TEST(ParameterizationOperations, EditorConfigHelperUsesValidatedHotApplyLane)
     harness.Context.EngineConfigControlState =
         &control.GetEngineConfigControlState();
     harness.Context.EngineConfigCommandsAvailable = true;
+    int previewCalls = 0, applyCalls = 0;
     harness.Context.PreviewEngineConfigDocument =
-        [&control](const std::string& document, const std::string& sourceId)
+        [&](const std::string& document, const std::string& sourceId)
         {
+            ++previewCalls;
             return control.PreviewEngineConfigControlDocument(
                 document, sourceId);
         };
     harness.Context.ApplyEngineConfigHotSubset =
-        [&control](const Config::EngineConfigLoadResult& preview)
+        [&](const Config::EngineConfigLoadResult& preview)
         {
+            ++applyCalls;
             return control.ApplyEngineConfigHotSubset(
                 preview,
                 Runtime::RuntimeConfigControlSource::Editor);
         };
 
-    const Runtime::EditorParameterizationConfigResult result =
-        Runtime::ApplyEditorParameterizationConfigCommand(
+    const Runtime::RuntimeEngineConfigApplyResult result =
+        Runtime::ApplyEditorParameterizationConfig(
             harness.Context,
-            Runtime::EditorParameterizationConfigCommand{
-                .Config = MakeConfig(
-                    Runtime::ParameterizationStrategyKind::TutteUniform),
-            });
-    ASSERT_TRUE(result.Succeeded()) << result.Message;
+            MakeConfig(Runtime::ParameterizationStrategyKind::TutteUniform));
+    ASSERT_TRUE(result.Succeeded());
     EXPECT_EQ(result.Status,
-              Runtime::EditorParameterizationConfigStatus::Applied);
-    EXPECT_EQ(result.Apply.Source,
+              Runtime::RuntimeEngineConfigApplyStatus::Applied);
+    EXPECT_EQ(result.Source,
               Runtime::RuntimeConfigControlSource::Editor);
-    EXPECT_TRUE(result.Apply.SectionChanged(
+    EXPECT_TRUE(result.SectionChanged(
         Runtime::kParameterizationConfigSectionName));
     const auto config =
         Runtime::GetEditorParameterizationConfig(harness.Context);
     ASSERT_TRUE(config.has_value());
     EXPECT_EQ(config->Strategy,
               Runtime::ParameterizationStrategyKind::TutteUniform);
+    EXPECT_EQ(result.LoadResult.SourceId, Runtime::kParameterizationConfigSectionName);
+    const auto noChange = Runtime::ApplyEditorParameterizationConfig(harness.Context, *config, "test-parameterization");
+    EXPECT_TRUE(noChange.Succeeded());
+    EXPECT_EQ(noChange.Status, Runtime::RuntimeEngineConfigApplyStatus::NoChange);
+    EXPECT_EQ(noChange.LoadResult.SourceId, "test-parameterization");
+    for (unsigned missing = 0; missing < 5; ++missing)
+    {
+        auto unavailable = harness.Context;
+        if (missing == 0) unavailable.EngineConfigControlState = nullptr;
+        if (missing == 1) unavailable.EngineConfigCommandsAvailable = false;
+        if (missing == 2) unavailable.PreviewEngineConfigDocument = {};
+        if (missing == 3) unavailable.ApplyEngineConfigHotSubset = {};
+        if (missing == 4) unavailable.AttachmentActive = [] { return false; };
+        EXPECT_FALSE(Runtime::ApplyEditorParameterizationConfig(unavailable, *config).Succeeded());
+    }
+    EXPECT_EQ(previewCalls, 2);
+    EXPECT_EQ(applyCalls, 2);
+
+    auto rejectedApply = harness.Context;
+    rejectedApply.ApplyEngineConfigHotSubset = [](const auto& preview) {
+        return Runtime::RuntimeEngineConfigApplyResult{
+            .Status = Runtime::RuntimeEngineConfigApplyStatus::Rejected, .LoadResult = preview};
+    };
+    EXPECT_FALSE(Runtime::ApplyEditorParameterizationConfig(rejectedApply, *config).Succeeded());
+    EXPECT_EQ(previewCalls, 3);
+    EXPECT_EQ(applyCalls, 2);
+    auto lostEdit = harness.Context;
+    lostEdit.PreviewEngineConfigDocument = [&](const auto&, const auto&) {
+        Config::EngineConfigLoadResult fallback;
+        fallback.State = Config::EngineConfigState::FallbackApplied;
+        fallback.Preview.Config = control.GetEngineConfigControlState().ActiveConfig;
+        return fallback;
+    };
+    auto edited = *config;
+    edited.Lscm.MaxSolverIterations += 1;
+    const auto rejectedEdit = Runtime::ApplyEditorParameterizationConfig(lostEdit, edited);
+    EXPECT_EQ(rejectedEdit.Status, Runtime::RuntimeEngineConfigApplyStatus::Rejected);
+    EXPECT_EQ(rejectedEdit.LoadResult.State, Config::EngineConfigState::FallbackApplied);
+    EXPECT_EQ(applyCalls, 2);
+    EXPECT_EQ(Runtime::GetEditorParameterizationConfig(harness.Context)->Lscm.MaxSolverIterations,
+              config->Lscm.MaxSolverIterations);
+
 }
 
 TEST(ParameterizationOperations, ConfigSourcesProduceIdenticalStateAndUvs)
@@ -783,31 +825,27 @@ TEST(ParameterizationOperations, InvalidConfigEditDoesNotSerializeFallbackToken)
     Runtime::ParameterizationConfig invalid{};
     invalid.Strategy =
         static_cast<Runtime::ParameterizationStrategyKind>(999u);
-    const Runtime::EditorParameterizationConfigResult result =
-        Runtime::ApplyEditorParameterizationConfigCommand(
+    const Runtime::RuntimeEngineConfigApplyResult result =
+        Runtime::ApplyEditorParameterizationConfig(
             harness.Context,
-            Runtime::EditorParameterizationConfigCommand{
-                .Config = invalid,
-            });
+            invalid);
     EXPECT_FALSE(result.Succeeded());
     EXPECT_EQ(
         result.Status,
-        Runtime::EditorParameterizationConfigStatus::PreviewRejected);
+        Runtime::RuntimeEngineConfigApplyStatus::Rejected);
     EXPECT_FALSE(previewCalled);
 
     invalid = {};
     invalid.Harmonic.Boundary =
         static_cast<Runtime::ParameterizationBoundaryPolicy>(999u);
-    const Runtime::EditorParameterizationConfigResult inactiveResult =
-        Runtime::ApplyEditorParameterizationConfigCommand(
+    const Runtime::RuntimeEngineConfigApplyResult inactiveResult =
+        Runtime::ApplyEditorParameterizationConfig(
             harness.Context,
-            Runtime::EditorParameterizationConfigCommand{
-                .Config = invalid,
-            });
+            invalid);
     EXPECT_FALSE(inactiveResult.Succeeded());
     EXPECT_EQ(
         inactiveResult.Status,
-        Runtime::EditorParameterizationConfigStatus::PreviewRejected);
+        Runtime::RuntimeEngineConfigApplyStatus::Rejected);
     EXPECT_FALSE(previewCalled);
 }
 

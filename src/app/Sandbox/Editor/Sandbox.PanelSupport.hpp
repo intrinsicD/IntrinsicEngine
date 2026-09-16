@@ -281,9 +281,6 @@ namespace Extrinsic::Sandbox::Editor
         if (dismiss) dismiss(slot);
     }
 
-    using SandboxParameterizationPanelConfig = decltype(
-        Runtime::EditorParameterizationConfigCommand{}.Config);
-
     struct SandboxParameterizationStrategyOption
     {
         Runtime::EditorParameterizationStrategy Strategy{
@@ -295,20 +292,9 @@ namespace Extrinsic::Sandbox::Editor
     [[nodiscard]] std::array<SandboxParameterizationStrategyOption, 4u>
     SandboxParameterizationStrategyOptions() noexcept;
 
-    struct SandboxParameterizationPanelApplyRequest
-    {
-        Runtime::EditorParameterizationConfigCommand Config{};
-        Runtime::EditorConfiguredParameterizationCommand Execute{};
-    };
-
-    [[nodiscard]] std::optional<SandboxParameterizationPanelApplyRequest>
-    BuildSandboxParameterizationPanelApplyRequest(
-        std::uint32_t stableEntityId,
-        const SandboxParameterizationPanelConfig& config);
-
     struct SandboxParameterizationPanelActionResult
     {
-        Runtime::EditorParameterizationConfigResult Config{};
+        Runtime::RuntimeEngineConfigApplyResult Config{};
         std::optional<Runtime::EditorParameterizationResult> Execution{};
 
         [[nodiscard]] bool Succeeded() const noexcept
@@ -322,7 +308,7 @@ namespace Extrinsic::Sandbox::Editor
     ApplySandboxParameterizationPanelAction(
         const SandboxEditorContext& context,
         std::uint32_t stableEntityId,
-        const SandboxParameterizationPanelConfig& config);
+        const Runtime::ParameterizationConfig& config);
 
     struct SandboxParameterizationUvPane
     {

@@ -212,8 +212,10 @@ Progressive Poisson uses the shared typed config apply result; manual and deboun
 runs both reapply before execution and clear pending auto-run on rejection.
 It exposes its position, level, rank, radius, and prefix slots;
 Geodesics exposes editable distance/source-mask outputs; K-Means exposes typed
-position, label, and color slots. Parameterization exposes position/UV bindings,
-and its UV preview follows the configured output. Their Show buttons display
+position, label, and color slots. Parameterization exposes position/UV bindings;
+Apply and Run use the shared runtime config result and diagnostics. A rejected
+draft stays editable, and Run retries config acceptance before execution. Its UV
+preview follows the configured output. Their Show buttons display
 existing properties independently of method readiness. Consolidation provides
 Show buttons for its position and normal outputs. Boolean masks and UV vectors
 use the shared Appearance color encoder. METHOD-040 hides unused GMM controls and reports its own

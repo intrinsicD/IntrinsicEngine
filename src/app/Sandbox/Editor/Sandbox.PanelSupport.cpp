@@ -574,20 +574,6 @@ namespace Extrinsic::Sandbox::Editor
             return std::isfinite(value.x) && std::isfinite(value.y);
         }
 
-        [[nodiscard]] bool IsSupportedParameterizationStrategy(
-            const Runtime::EditorParameterizationStrategy strategy) noexcept
-        {
-            const auto options = SandboxParameterizationStrategyOptions();
-            return std::any_of(
-                options.begin(),
-                options.end(),
-                [strategy](const SandboxParameterizationStrategyOption& option)
-                {
-                    return option.Strategy == strategy &&
-                           !option.StableToken.empty();
-                });
-        }
-
         [[nodiscard]] const char* ParameterizationSolverStatusLabel(
             const ParameterizationSolverStatus status) noexcept
         {
@@ -630,62 +616,24 @@ namespace Extrinsic::Sandbox::Editor
         };
     }
 
-    std::optional<SandboxParameterizationPanelApplyRequest>
-    BuildSandboxParameterizationPanelApplyRequest(
-        const std::uint32_t stableEntityId,
-        const SandboxParameterizationPanelConfig& config)
-    {
-        if (stableEntityId == 0u ||
-            !IsSupportedParameterizationStrategy(config.Strategy) ||
-            Runtime::StableTokenForEditorParameterizationStrategy(
-                config.Strategy).empty())
-        {
-            return std::nullopt;
-        }
-        return SandboxParameterizationPanelApplyRequest{
-            .Config =
-                Runtime::EditorParameterizationConfigCommand{
-                    .Config = config,
-                    .SourceId = "sandbox.parameterization.panel",
-                },
-            .Execute =
-                Runtime::EditorConfiguredParameterizationCommand{
-                    .StableEntityId = stableEntityId,
-                },
-        };
-    }
-
     SandboxParameterizationPanelActionResult
     ApplySandboxParameterizationPanelAction(
         const SandboxEditorContext& context,
         const std::uint32_t stableEntityId,
-        const SandboxParameterizationPanelConfig& config)
+        const Runtime::ParameterizationConfig& config)
     {
-        const auto request = BuildSandboxParameterizationPanelApplyRequest(
-            stableEntityId,
-            config);
-        if (!request.has_value())
-        {
-            SandboxParameterizationPanelActionResult rejected{};
-            rejected.Config.Status =
-                Runtime::EditorParameterizationConfigStatus::PreviewRejected;
-            rejected.Config.Message =
-                "Parameterization panel request is invalid or unsupported.";
-            return rejected;
-        }
-
         SandboxParameterizationPanelActionResult result{};
-        result.Config = Runtime::ApplyEditorParameterizationConfigCommand(
-            context.Parameterization.Commands,
-            request->Config);
-        if (result.Config.Succeeded())
+        if (stableEntityId == 0u)
         {
-            result.Execution =
-                Runtime::ApplyEditorConfiguredParameterizationCommand(
-                    context.Parameterization.Commands,
-                    request->Execute,
-                    context.Parameterization.ResultSinks.Parameterization);
+            result.Config.Status = Runtime::RuntimeEngineConfigApplyStatus::Rejected;
+            return result;
         }
+        result.Config = Runtime::ApplyEditorParameterizationConfig(
+            context.Parameterization.Commands, config, "sandbox.parameterization.panel");
+        if (result.Config.Succeeded())
+            result.Execution = Runtime::ApplyEditorConfiguredParameterizationCommand(
+                context.Parameterization.Commands, {.StableEntityId = stableEntityId},
+                context.Parameterization.ResultSinks.Parameterization);
         return result;
     }
 

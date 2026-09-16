@@ -1358,66 +1358,25 @@ namespace Extrinsic::Runtime
             context, command, GuardEditorProcessingResult(context, std::move(onComplete)));
     }
 
-    EditorParameterizationConfigResult
-    ApplyEditorParameterizationConfigCommand(
-        const EditorProcessingCommands& commands,
-        const EditorParameterizationConfigCommand& command)
+    RuntimeEngineConfigApplyResult ApplyEditorParameterizationConfig(
+        const EditorProcessingCommands& commands, const ParameterizationConfig& config,
+        std::string sourceId)
     {
-        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        EditorParameterizationConfigResult result{};
-        if (context.EngineConfigControlState == nullptr ||
-            !context.PreviewEngineConfigDocument ||
-            !context.ApplyEngineConfigHotSubset ||
-            !context.EngineConfigCommandsAvailable)
+        // Reject invalid typed enum values before serialization substitutes valid tokens.
+        Core::Config::EngineConfigSectionValidationResult validation{};
+        if (IsSerializableParameterizationConfigValid(config))
+            validation = ValidateParameterizationConfigSection(
+                SerializeParameterizationConfig(config), {}, kParameterizationConfigSectionName);
+        else
         {
-            result.Status =
-                EditorParameterizationConfigStatus::MissingConfigControl;
-            result.Message =
-                "Parameterization config requires the engine config-control module.";
-            return result;
+            validation.State = Core::Config::EngineConfigState::Invalid;
+            validation.Diagnostics.push_back({.Code = Core::Config::EngineConfigDiagnosticCode::InvalidValue,
+                .Subject = std::string{kParameterizationConfigSectionName},
+                .Message = "Parameterization config is invalid or unsupported."});
         }
-        if (!IsSerializableParameterizationConfigValid(command.Config))
-        {
-            result.Status =
-                EditorParameterizationConfigStatus::PreviewRejected;
-            result.Message =
-                "Parameterization config is invalid or unsupported.";
-            return result;
-        }
-
-        Core::Config::EngineConfig candidate =
-            context.EngineConfigControlState->ActiveConfig;
-        SetParameterizationConfig(candidate, command.Config);
-        result.Preview = context.PreviewEngineConfigDocument(
-            Core::Config::SerializeEngineConfig(candidate),
-            command.SourceId.empty()
-                ? std::string{"sandbox.parameterization"}
-                : command.SourceId);
-        if (!Core::Config::IsConfigUsable(result.Preview))
-        {
-            result.Status =
-                EditorParameterizationConfigStatus::PreviewRejected;
-            result.Message = "Parameterization config preview was rejected.";
-            return result;
-        }
-
-        result.Apply = context.ApplyEngineConfigHotSubset(result.Preview);
-        if (!result.Apply.Succeeded())
-        {
-            result.Status =
-                EditorParameterizationConfigStatus::ApplyRejected;
-            result.Message = "Parameterization config hot-apply was rejected.";
-            return result;
-        }
-        result.Status =
-            result.Apply.Status == RuntimeEngineConfigApplyStatus::NoChange
-                ? EditorParameterizationConfigStatus::NoChange
-                : EditorParameterizationConfigStatus::Applied;
-        result.Message =
-            result.Status == EditorParameterizationConfigStatus::NoChange
-                ? "Parameterization config unchanged."
-                : "Parameterization config applied.";
-        return result;
+        return ApplyEditorProcessingConfig(commands, validation,
+            sourceId.empty() ? std::string{kParameterizationConfigSectionName} : sourceId,
+            [&](Core::Config::EngineConfig& candidate) { SetParameterizationConfig(candidate, config); });
     }
 
     std::optional<ParameterizationConfig>

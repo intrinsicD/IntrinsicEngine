@@ -895,9 +895,9 @@ Unavailable config commands take reason priority; otherwise method diagnostics
 remain authoritative. This preview executes no config callbacks or property scans;
 commands still validate current inputs at apply time. Typed processing config
 apply rejects file-load fallback that loses the requested section edits; fallback
-in unrelated sections remains usable. Progressive Poisson uses this same apply
-owner and `RuntimeEngineConfigApplyResult`, with its config passed directly rather
-than a separate config command/status/result record. Family-specific readiness
+in unrelated sections remains usable. Progressive Poisson and parameterization use
+this same apply owner and `RuntimeEngineConfigApplyResult`, passing typed configs
+directly. Parameterization validates typed enums before serializing its section. Family-specific readiness
 records and controls outside the shared config-backed path remain distinct.
 
 `UI-021` makes `Extrinsic.Runtime.GeometryAvailability` the shared availability
