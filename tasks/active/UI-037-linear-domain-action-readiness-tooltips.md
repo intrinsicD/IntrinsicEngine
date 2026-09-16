@@ -539,3 +539,35 @@ Verified checkpoint:
   final review edits; rebuilding and rerunning against fixed source resolved it.
   Layering, test layout, task policy/state links, docs links/sync, skill freshness,
   session brief, root hygiene and diff checks pass. No module inventory change.
+
+
+## Topology execution reuse checkpoint — 2026-09-16
+
+- Operator-directed processing cleanup: denoise, remesh, subdivide and simplify
+  now share four private typed computation functions between direct and queued
+  commands in `Runtime.MeshTopologyOperations.Topology.cpp`. Parameter mapping,
+  kernel dispatch, counters and failures have one implementation per operation.
+  Validation/source capture, UV preparation, stale/cancel guards, history and
+  result delivery retain their existing owners. No new production file, public
+  surface, dependency, algorithm or framework; 230 production lines removed.
+- Claude reviewed the plan, diff and fix. Preserved source-owned deleted-vertex
+  counts, exhaustive worker dispatch and subdivision's before/output ownership.
+  The proposed empty-failure fallback was unnecessary: every compute failure sets
+  a message; the observed empty result came from publication rejecting NoChange.
+  An attempted panel import removal was reverted after compilation proved the
+  common parameterization action-result declaration still requires it.
+- New direct/queued comparisons cover all operation modes, geometry/connectivity,
+  diagnostics/counters, NoChange, kernel failure, single delivery and undo/redo.
+  These tests found and fixed [BUG-200](../done/BUG-200-queued-denoise-nochange-completion.md):
+  queued denoise now publishes valid NoChange with the same explanation as direct
+  execution, unchanged geometry and no history entry. Existing failure/stale,
+  topology and UV/seam coverage remains in the focused suite.
+- The comparison helper reuses `EditorJobHarness` with one worker; its existing
+  callers retain their two-worker default. Focused operation suite: 30 passes.
+  Final canonical `ci` configure / `IntrinsicTests` build / exclusion-only CPU
+  gate: **4,682 passes, one expected ASan-only GLFW skip, zero failures** (4,683
+  selected; 143.67 s). Layering, test layout, task policy/state links, docs
+  links/sync, skill freshness, root hygiene and diff checks pass.
+- UI-037 remains open for remaining action/backend controls and full numerical
+  readiness. No module inventory change, compile-time measurement, sanitizer
+  execution or Vulkan runtime claim in this slice.

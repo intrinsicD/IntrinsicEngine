@@ -489,6 +489,90 @@ void ExpectColorsExactlyEqual(
         };
     }
 
+    template <typename Command, typename Apply, typename Check>
+    void ExpectDirectAndQueuedMeshCommand(Command command, Apply apply, Check check,
+        void (*populate)(ECS::Scene::Registry&, ECS::EntityHandle) = AddIcosahedronMeshSource,
+        Runtime::EditorCommandStatus expected = Runtime::EditorCommandStatus::Applied)
+    {
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        Runtime::EditorCommandHistory directHistory, queuedHistory;
+        auto directContext = MakeContext(registry, selection);
+        auto queuedContext = MakeContext(registry, selection);
+        directContext.CommandHistory = &directHistory;
+        queuedContext.CommandHistory = &queuedHistory;
+        Extrinsic::Tests::EditorJobHarness jobs{1u};
+        jobs.Attach(queuedContext);
+        const auto directEntity = MakeSelectable(registry, "Direct");
+        const auto queuedEntity = MakeSelectable(registry, "Queued");
+        populate(registry, directEntity);
+        populate(registry, queuedEntity);
+        const auto original = MeshVertexPositions(registry, directEntity);
+        const auto before = SourceMeshCounts(registry, directEntity);
+        command.StableEntityId = Runtime::SelectionController::ToStableEntityId(directEntity);
+        const auto direct = apply(directContext, command, {});
+        EXPECT_EQ(direct.Status, expected) << direct.Message;
+        command.StableEntityId = Runtime::SelectionController::ToStableEntityId(queuedEntity);
+        using Result = decltype(apply(queuedContext, command, {}));
+        std::optional<Result> delivered;
+        unsigned deliveries = 0;
+        const auto pending = apply(queuedContext, command, [&](Result result) {
+            ++deliveries;
+            delivered = std::move(result);
+        });
+        ASSERT_EQ(pending.Status, Runtime::EditorCommandStatus::Pending) << pending.Message;
+        ExpectPositionsExactlyEqual(MeshVertexPositions(registry, queuedEntity), original);
+        EXPECT_FALSE(queuedHistory.CanUndo());
+        ASSERT_TRUE(jobs.DrainUntilTerminal());
+        ASSERT_TRUE(delivered);
+        if (expected != Runtime::EditorCommandStatus::GeometryProcessingFailed)
+        {
+            const auto snapshot = jobs.Snapshot();
+            ASSERT_EQ(snapshot.Entries.size(), 1u);
+            EXPECT_EQ(snapshot.Entries.front().State, Runtime::JobState::Published);
+        }
+        EXPECT_EQ(deliveries, 1u);
+        EXPECT_EQ(delivered->Status, direct.Status);
+        EXPECT_EQ(delivered->Error, direct.Error);
+        EXPECT_EQ(delivered->Message, direct.Message);
+        check(direct, *delivered);
+        const auto compareGeometry = [&] {
+            ExpectMeshCountsEqual(SourceMeshCounts(registry, directEntity), SourceMeshCounts(registry, queuedEntity));
+            ExpectPositionsExactlyEqual(MeshVertexPositions(registry, directEntity), MeshVertexPositions(registry, queuedEntity));
+            for (const auto name : {PN::kHalfedgeToVertex, PN::kHalfedgeNext, PN::kHalfedgeFace})
+            {
+                const auto a = registry.Raw().get<GS::Halfedges>(directEntity).Properties.Get<std::uint32_t>(name);
+                const auto b = registry.Raw().get<GS::Halfedges>(queuedEntity).Properties.Get<std::uint32_t>(name);
+                ASSERT_TRUE(a && b);
+                EXPECT_EQ(a.Vector(), b.Vector()) << name;
+            }
+            const auto a = registry.Raw().get<GS::Faces>(directEntity).Properties.Get<std::uint32_t>(PN::kFaceHalfedge);
+            const auto b = registry.Raw().get<GS::Faces>(queuedEntity).Properties.Get<std::uint32_t>(PN::kFaceHalfedge);
+            ASSERT_TRUE(a && b);
+            EXPECT_EQ(a.Vector(), b.Vector());
+        };
+        compareGeometry();
+        const bool changed = expected == Runtime::EditorCommandStatus::Applied;
+        EXPECT_EQ(directHistory.CanUndo(), changed);
+        EXPECT_EQ(queuedHistory.CanUndo(), changed);
+        if (changed)
+        {
+            EXPECT_EQ(directHistory.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+            EXPECT_EQ(queuedHistory.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+            ExpectPositionsExactlyEqual(MeshVertexPositions(registry, directEntity), original);
+            ExpectMeshCountsEqual(SourceMeshCounts(registry, directEntity), before);
+            compareGeometry();
+            EXPECT_EQ(directHistory.Redo().Status, Runtime::EditorCommandHistoryStatus::Redone);
+            EXPECT_EQ(queuedHistory.Redo().Status, Runtime::EditorCommandHistoryStatus::Redone);
+            compareGeometry();
+        }
+        else
+        {
+            ExpectPositionsExactlyEqual(MeshVertexPositions(registry, directEntity), original);
+            ExpectMeshCountsEqual(SourceMeshCounts(registry, directEntity), before);
+        }
+    }
+
     class WaitForConditionApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
@@ -669,6 +753,99 @@ struct TmpFile
         return found;
     }
 
+}
+
+TEST(SandboxEditorUi, MeshDenoiseDirectAndQueuedComputeAgree)
+{
+    const auto counters = [](const auto& a, const auto& b) {
+        EXPECT_EQ(a.DenoiseStatus, b.DenoiseStatus);
+        EXPECT_EQ(a.NormalIterations, b.NormalIterations);
+        EXPECT_EQ(a.VertexIterations, b.VertexIterations);
+        EXPECT_EQ(a.VertexSlotCount, b.VertexSlotCount);
+        EXPECT_EQ(a.WrittenCount, b.WrittenCount);
+        EXPECT_EQ(a.SkippedDeletedVertexCount, b.SkippedDeletedVertexCount);
+        EXPECT_EQ(a.MovedVertexCount, b.MovedVertexCount);
+        EXPECT_EQ(a.ProcessedFaceCount, b.ProcessedFaceCount);
+        EXPECT_EQ(a.DegenerateFaceCount, b.DegenerateFaceCount);
+        EXPECT_EQ(a.NonFiniteFaceCount, b.NonFiniteFaceCount);
+        EXPECT_EQ(a.SkippedDeletedFaceCount, b.SkippedDeletedFaceCount);
+        EXPECT_EQ(a.PinnedBoundaryVertexCount, b.PinnedBoundaryVertexCount);
+        EXPECT_DOUBLE_EQ(a.SigmaSpatialUsed, b.SigmaSpatialUsed);
+        EXPECT_DOUBLE_EQ(a.SigmaRangeUsed, b.SigmaRangeUsed);
+    };
+    ExpectDirectAndQueuedMeshCommand(Runtime::EditorMeshDenoiseCommand{
+        .NormalIterations=2, .VertexIterations=3, .SigmaSpatial=0.7, .SigmaRange=0.4},
+        Runtime::ApplyEditorMeshDenoiseCommand, counters, AddDenoiseTetraMeshSource);
+    ExpectDirectAndQueuedMeshCommand(Runtime::EditorMeshDenoiseCommand{},
+        Runtime::ApplyEditorMeshDenoiseCommand, counters, AddTriangleMeshSource,
+        Runtime::EditorCommandStatus::NoChange);
+}
+
+TEST(SandboxEditorUi, MeshRemeshDirectAndQueuedComputeAgree)
+{
+    const auto counters = [](const auto& a, const auto& b) {
+        EXPECT_EQ(a.IterationsPerformed, b.IterationsPerformed);
+        EXPECT_EQ(a.InputVertexCount, b.InputVertexCount);
+        EXPECT_EQ(a.InputFaceCount, b.InputFaceCount);
+        EXPECT_EQ(a.OutputVertexCount, b.OutputVertexCount);
+        EXPECT_EQ(a.OutputFaceCount, b.OutputFaceCount);
+        EXPECT_EQ(a.SplitCount, b.SplitCount);
+        EXPECT_EQ(a.CollapseCount, b.CollapseCount);
+        EXPECT_EQ(a.FlipCount, b.FlipCount);
+        EXPECT_EQ(a.TexcoordOutcome, b.TexcoordOutcome);
+    };
+    for (const auto mode : {Runtime::EditorMeshRemeshMode::Uniform, Runtime::EditorMeshRemeshMode::Adaptive})
+        ExpectDirectAndQueuedMeshCommand(Runtime::EditorMeshRemeshCommand{
+            .Mode=mode, .TargetEdgeLength=0.7, .Lambda=0.35, .CurvatureAdaptation=0.6,
+            .PreserveBoundary=false, .ProjectToSurface=true, .ReferenceProjectionK=5},
+            Runtime::ApplyEditorMeshRemeshCommand, counters);
+    // Icosahedron edge length plus sub-float relaxation: no topology or position edit.
+    ExpectDirectAndQueuedMeshCommand(Runtime::EditorMeshRemeshCommand{
+        .TargetEdgeLength=1.0515, .Lambda=1.0e-12}, Runtime::ApplyEditorMeshRemeshCommand,
+        counters, AddIcosahedronMeshSource, Runtime::EditorCommandStatus::NoChange);
+}
+
+TEST(SandboxEditorUi, MeshSubdivideDirectAndQueuedComputeAgree)
+{
+    const auto counters = [](const auto& a, const auto& b) {
+        EXPECT_EQ(a.IterationsPerformed, b.IterationsPerformed);
+        EXPECT_EQ(a.InputVertexCount, b.InputVertexCount);
+        EXPECT_EQ(a.InputFaceCount, b.InputFaceCount);
+        EXPECT_EQ(a.OutputVertexCount, b.OutputVertexCount);
+        EXPECT_EQ(a.OutputFaceCount, b.OutputFaceCount);
+        EXPECT_EQ(a.TexcoordOutcome, b.TexcoordOutcome);
+    };
+    for (const auto op : {Runtime::EditorMeshSubdivideOperator::Loop,
+            Runtime::EditorMeshSubdivideOperator::CatmullClark, Runtime::EditorMeshSubdivideOperator::Sqrt3})
+        ExpectDirectAndQueuedMeshCommand(Runtime::EditorMeshSubdivideCommand{.Operator=op},
+            Runtime::ApplyEditorMeshSubdivideCommand, counters);
+    ExpectDirectAndQueuedMeshCommand(Runtime::EditorMeshSubdivideCommand{.MaxOutputFaces=1},
+        Runtime::ApplyEditorMeshSubdivideCommand, counters, AddIcosahedronMeshSource,
+        Runtime::EditorCommandStatus::GeometryProcessingFailed);
+}
+
+TEST(SandboxEditorUi, MeshSimplifyDirectAndQueuedComputeAgree)
+{
+    const auto counters = [](const auto& a, const auto& b) {
+        EXPECT_EQ(a.InputVertexCount, b.InputVertexCount);
+        EXPECT_EQ(a.InputFaceCount, b.InputFaceCount);
+        EXPECT_EQ(a.OutputVertexCount, b.OutputVertexCount);
+        EXPECT_EQ(a.OutputFaceCount, b.OutputFaceCount);
+        EXPECT_EQ(a.CollapseCount, b.CollapseCount);
+        EXPECT_DOUBLE_EQ(a.MaxCollapseError, b.MaxCollapseError);
+        EXPECT_EQ(a.CollapsesRejectedTopology, b.CollapsesRejectedTopology);
+        EXPECT_EQ(a.CollapsesRejectedQuality, b.CollapsesRejectedQuality);
+        EXPECT_EQ(a.SharpFeatureVerticesPinned, b.SharpFeatureVerticesPinned);
+        EXPECT_EQ(a.SeamVerticesPinned, b.SeamVerticesPinned);
+        EXPECT_EQ(a.TexcoordOutcome, b.TexcoordOutcome);
+    };
+    for (const auto metric : {Runtime::EditorMeshSimplifyMetric::ClassicalQEM, Runtime::EditorMeshSimplifyMetric::FA_QEM})
+        ExpectDirectAndQueuedMeshCommand(Runtime::EditorMeshSimplifyCommand{
+            .Metric=metric, .TargetFaces=12, .NormalWeight=0.25, .BoundaryWeight=2.0,
+            .CurvatureWeight=0.4, .PreserveSharpFeatures=false}, Runtime::ApplyEditorMeshSimplifyCommand, counters);
+    ExpectDirectAndQueuedMeshCommand(Runtime::EditorMeshSimplifyCommand{.TargetFaces=100},
+        Runtime::ApplyEditorMeshSimplifyCommand, counters, AddIcosahedronMeshSource,
+        Runtime::EditorCommandStatus::NoChange);
 }
 
 TEST(SandboxEditorUi, MeshDenoiseCommandPublishesPositionsAndSupportsUndoRedo)

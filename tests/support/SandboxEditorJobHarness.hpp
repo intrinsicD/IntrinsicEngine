@@ -33,6 +33,9 @@ namespace Extrinsic::Tests
     class EditorJobHarness
     {
     public:
+        explicit EditorJobHarness(const unsigned workerCount = 2u)
+            : m_Scheduler(workerCount) {}
+
         [[nodiscard]] Runtime::JobService& Jobs() noexcept { return m_Jobs; }
         [[nodiscard]] Runtime::KernelEventBus& Events() noexcept
         {
@@ -162,11 +165,11 @@ namespace Extrinsic::Tests
         class SchedulerScope final
         {
         public:
-            SchedulerScope()
+            explicit SchedulerScope(const unsigned workerCount)
             {
                 if (Core::Tasks::Scheduler::IsInitialized())
                     Core::Tasks::Scheduler::Shutdown();
-                Core::Tasks::Scheduler::Initialize(2);
+                Core::Tasks::Scheduler::Initialize(workerCount);
             }
 
             ~SchedulerScope()
@@ -185,6 +188,6 @@ namespace Extrinsic::Tests
                            Runtime::EditorJobIdentity,
                            Core::StrongHandleHash<Runtime::JobTokenTag>>
             m_Identities{};
-        SchedulerScope m_Scheduler{};
+        SchedulerScope m_Scheduler;
     };
 }

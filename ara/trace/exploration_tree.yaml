@@ -13378,3 +13378,24 @@ tree:
     - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
     - docs/architecture/sandbox-editor-feature-boundaries.md
     status: resolved
+
+  - id: N619
+    type: decision
+    title: Share private topology computation across direct and queued commands
+    provenance: ai-executed
+    timestamp: '2026-09-16T18:54:34+02:00'
+    choice: Reuse four typed compute functions for denoise, remesh, subdivision and simplification within the
+      existing implementation unit; preserve source capture, UV preparation, publication guards and history owners.
+      Claude reviewed plan, diff and fix. Direct/queued comparison exposed BUG-200; admit successful denoise NoChange
+      at publication so the existing diagnostic path runs. Remove 230 production lines without a new interface.
+      Canonical ci build and full CPU gate pass 4682 tests plus one expected skip; no compile timing claim.
+    alternatives:
+    - Keep duplicated kernel parameter mapping and diagnostics in scheduling-specific paths
+    - Introduce a generic operation framework across distinct method contracts
+    evidence:
+    - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
+    - tasks/done/BUG-200-queued-denoise-nochange-completion.md
+    - src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.Topology.cpp
+    - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+    - tests/support/SandboxEditorJobHarness.hpp
+    status: resolved

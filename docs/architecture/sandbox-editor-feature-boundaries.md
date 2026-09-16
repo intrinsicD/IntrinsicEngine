@@ -342,6 +342,10 @@ topology replacement. `Extrinsic.Runtime.MeshTopologyOperations` owns denoise,
 remesh, subdivide and simplify, which share one scratch-mesh source, one UV
 preservation/discard contract and one replacement commit; `EditorMeshTexcoordOutcome`
 belongs to that family because it reports what a replacement did to the UVs.
+Direct and queued commands share private typed computation functions in
+`Runtime.MeshTopologyOperations.Topology.cpp`; parameter mapping, kernel dispatch,
+counters and kernel failures have one implementation per operation. Source capture,
+UV handling, job guards and history publication remain with their existing callers.
 Host-declared mesh kernel availability is plain data on the shared
 `EditorProcessingContext`, not a capability registry: the mesh families gate their
 fail-closed branches on it and `EditorGeometryProcessingModel` projects the same

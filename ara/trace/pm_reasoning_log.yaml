@@ -2670,3 +2670,14 @@ entries:
       presentation; canonical read-back is intentional because the command executes from active configuration.
     - A provisional CPU run correctly rejected dependency metadata after final source edits; rebuilt and reran
       against fixed source. Final 4678 passes plus expected skip establish CPU behavior, not compile-speed gains.
+
+  - turn: 2026-09-16_001#15
+    notes:
+    - N619 records implementation reuse and a tested completion repair, not a new research/performance claim.
+      No closure signal for broader O93; existing staged owners and flags remain unchanged.
+    - Every compute failure already supplies a message; the observed empty result was publication rejecting
+      successful NoChange. Fix that guard rather than adding speculative failure fallbacks. BUG-200 retires.
+    - Preserved a required panel import after compiler feedback. Final full CPU gate used fixed rebuilt source;
+      4682 passes plus one expected skip do not establish compile-speed improvement or Vulkan/sanitizer behavior.
+    - Removed 7.07 GiB of disposable compiled outputs from an inactive retired-task ASan tree after checking ownership;
+      sources, configuration and evidence remain. BUG-195 still owns disk preflight/recovery, not closed by this cleanup.

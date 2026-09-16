@@ -334,6 +334,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             const Smooth::BilateralDenoiseResult& source,
             EditorMeshDenoiseResult& target)
         {
+            // SkippedDeletedVertexCount belongs to source capture, not the kernel result.
             target.NormalIterations =
                 static_cast<std::uint32_t>(
                     source.NormalIterationsPerformed);
@@ -1205,30 +1206,29 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 job.SimplifySink(std::move(result));
         }
 
-        [[nodiscard]] JobResultEnvelope RunMeshDenoiseCpuWorker(
-            const std::shared_ptr<EditorMeshCpuJobState>& state)
+        [[nodiscard]] bool ComputeMeshDenoise(
+            const EditorMeshDenoiseCommand& command,
+            Geometry::HalfedgeMesh::Mesh& mesh,
+            const std::vector<glm::vec3>& snapshotPositions,
+            const std::vector<bool>& deletedVertices,
+            EditorMeshDenoiseResult& result,
+            std::vector<glm::vec3>& outputPositions)
         {
             Smooth::BilateralDenoiseParams params{};
-            params.NormalIterations = state->DenoiseCommand.NormalIterations;
-            params.VertexIterations = state->DenoiseCommand.VertexIterations;
-            params.SigmaSpatial = state->DenoiseCommand.SigmaSpatial;
-            params.SigmaRange = state->DenoiseCommand.SigmaRange;
-            params.PreserveBoundary = state->DenoiseCommand.PreserveBoundary;
+            params.NormalIterations = command.NormalIterations;
+            params.VertexIterations = command.VertexIterations;
+            params.SigmaSpatial = command.SigmaSpatial;
+            params.SigmaRange = command.SigmaRange;
+            params.PreserveBoundary = command.PreserveBoundary;
             params.DegenerateNormalLengthEpsilon =
-                state->DenoiseCommand.DegenerateNormalLengthEpsilon;
+                command.DegenerateNormalLengthEpsilon;
 
             const Smooth::BilateralDenoiseResult denoise =
-                Smooth::DenoiseBilateral(state->Mesh, params);
-            EditorMeshDenoiseResult& result = state->DenoiseResult;
+                Smooth::DenoiseBilateral(mesh, params);
             result.DenoiseStatus = denoise.Status;
             result.Error = ErrorForDenoiseStatus(denoise.Status);
             CopyMeshDenoiseCounters(denoise, result);
-            result.VertexSlotCount = state->SnapshotPositions.size();
-            result.SkippedDeletedVertexCount =
-                static_cast<std::size_t>(
-                    std::count(state->DeletedVertices.begin(),
-                               state->DeletedVertices.end(),
-                               true));
+            result.VertexSlotCount = snapshotPositions.size();
             result.WrittenCount =
                 result.VertexSlotCount - result.SkippedDeletedVertexCount;
 
@@ -1239,15 +1239,12 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 result.Message = "Geometry.Smoothing denoise failed with ";
                 result.Message += std::string(Smooth::DebugName(denoise.Status));
                 result.Message += ".";
-                return JobResultEnvelope::Make<EditorJobResult>(
-                    EditorJobResult{
-                        .Diagnostic = result.Message,
-                    });
+                return false;
             }
 
             std::vector<glm::vec3> afterPositions =
-                ExtractMeshPositions(state->Mesh);
-            if (afterPositions.size() != state->SnapshotPositions.size() ||
+                ExtractMeshPositions(mesh);
+            if (afterPositions.size() != snapshotPositions.size() ||
                 !AllFiniteVec3(std::span<const glm::vec3>{
                     afterPositions.data(),
                     afterPositions.size()}))
@@ -1258,22 +1255,19 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message       = "Geometry.Smoothing denoise produced invalid or "
                                        "count-mismatched positions.";
-                return JobResultEnvelope::Make<EditorJobResult>(
-                    EditorJobResult{
-                        .Diagnostic = result.Message,
-                    });
+                return false;
             }
 
             std::size_t movedPublishedVertices = 0u;
             for (std::size_t i = 0u; i < afterPositions.size(); ++i)
             {
-                if (i < state->DeletedVertices.size() &&
-                    state->DeletedVertices[i])
+                if (i < deletedVertices.size() &&
+                    deletedVertices[i])
                 {
-                    afterPositions[i] = state->SnapshotPositions[i];
+                    afterPositions[i] = snapshotPositions[i];
                     continue;
                 }
-                if (afterPositions[i] != state->SnapshotPositions[i])
+                if (afterPositions[i] != snapshotPositions[i])
                     ++movedPublishedVertices;
             }
             result.MovedVertexCount = movedPublishedVertices;
@@ -1281,64 +1275,62 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 ? EditorCommandStatus::NoChange
                 : EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
-            state->DenoiseAfterPositions = std::move(afterPositions);
-            return JobResultEnvelope::Make<EditorJobResult>(
-                EditorJobResult{
-                    .Diagnostic = "Mesh denoise CPU result ready",
-                });
+            outputPositions = std::move(afterPositions);
+            return true;
         }
 
-        [[nodiscard]] JobResultEnvelope RunMeshRemeshCpuWorker(
-            const std::shared_ptr<EditorMeshCpuJobState>& state)
+        [[nodiscard]] bool ComputeMeshRemesh(
+            const EditorMeshRemeshCommand& command,
+            Geometry::HalfedgeMesh::Mesh& mesh,
+            EditorMeshRemeshResult& result)
         {
-            EditorMeshRemeshResult& result = state->RemeshResult;
-            result.InputVertexCount = state->Mesh.VertexCount();
-            result.InputFaceCount = state->Mesh.FaceCount();
+            result.InputVertexCount = mesh.VertexCount();
+            result.InputFaceCount = mesh.FaceCount();
 
             std::optional<Geometry::RemeshingOperationResult> remeshResult{};
-            if (state->RemeshCommand.Mode == EditorMeshRemeshMode::Uniform)
+            if (command.Mode == EditorMeshRemeshMode::Uniform)
             {
                 Remesh::RemeshingParams params{};
-                params.TargetLength = state->RemeshCommand.TargetEdgeLength;
-                params.Iterations = state->RemeshCommand.Iterations;
-                params.Lambda = state->RemeshCommand.Lambda;
+                params.TargetLength = command.TargetEdgeLength;
+                params.Iterations = command.Iterations;
+                params.Lambda = command.Lambda;
                 params.PreserveBoundary =
-                    state->RemeshCommand.PreserveBoundary;
+                    command.PreserveBoundary;
                 params.ProjectToSurface =
-                    state->RemeshCommand.ProjectToSurface;
+                    command.ProjectToSurface;
                 params.ReferenceProjectionK =
-                    state->RemeshCommand.ReferenceProjectionK;
+                    command.ReferenceProjectionK;
                 params.MaxReferenceProjectionDistance =
-                    state->RemeshCommand.MaxReferenceProjectionDistance;
-                remeshResult = Remesh::Remesh(state->Mesh, params);
+                    command.MaxReferenceProjectionDistance;
+                remeshResult = Remesh::Remesh(mesh, params);
             }
             else
             {
                 AdaptiveRemesh::AdaptiveRemeshingParams params{};
-                if (state->RemeshCommand.TargetEdgeLength > 0.0)
+                if (command.TargetEdgeLength > 0.0)
                 {
                     params.MinEdgeLength =
-                        state->RemeshCommand.TargetEdgeLength * 0.5;
+                        command.TargetEdgeLength * 0.5;
                     params.MaxEdgeLength =
-                        state->RemeshCommand.TargetEdgeLength * 2.0;
+                        command.TargetEdgeLength * 2.0;
                 }
                 params.CurvatureAdaptation =
-                    state->RemeshCommand.CurvatureAdaptation;
+                    command.CurvatureAdaptation;
                 params.Sizing =
-                    ToAdaptiveSizingLaw(state->RemeshCommand.SizingLaw);
+                    ToAdaptiveSizingLaw(command.SizingLaw);
                 params.ApproximationError =
-                    state->RemeshCommand.ApproximationError;
-                params.Iterations = state->RemeshCommand.Iterations;
-                params.Lambda = state->RemeshCommand.Lambda;
+                    command.ApproximationError;
+                params.Iterations = command.Iterations;
+                params.Lambda = command.Lambda;
                 params.PreserveBoundary =
-                    state->RemeshCommand.PreserveBoundary;
+                    command.PreserveBoundary;
                 params.EnableReferenceProjection =
-                    state->RemeshCommand.ProjectToSurface;
+                    command.ProjectToSurface;
                 params.ReferenceProjectionK =
-                    state->RemeshCommand.ReferenceProjectionK;
+                    command.ReferenceProjectionK;
                 params.MaxReferenceProjectionDistance =
-                    state->RemeshCommand.MaxReferenceProjectionDistance;
-                remeshResult = AdaptiveRemesh::AdaptiveRemesh(state->Mesh, params);
+                    command.MaxReferenceProjectionDistance;
+                remeshResult = AdaptiveRemesh::AdaptiveRemesh(mesh, params);
             }
 
             if (!remeshResult.has_value())
@@ -1348,48 +1340,42 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message =
                     "Geometry remeshing failed for the selected mesh and parameters.";
-                return JobResultEnvelope::Make<EditorJobResult>(
-                    EditorJobResult{
-                        .Diagnostic = result.Message,
-                    });
+                return false;
             }
 
-            if (state->Mesh.HasGarbage())
-                state->Mesh.GarbageCollection();
+            if (mesh.HasGarbage())
+                mesh.GarbageCollection();
             CopyRemeshCounters(*remeshResult, result);
-            result.OutputVertexCount = state->Mesh.VertexCount();
-            result.OutputFaceCount = state->Mesh.FaceCount();
+            result.OutputVertexCount = mesh.VertexCount();
+            result.OutputFaceCount = mesh.FaceCount();
             result.Status = EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
-            return JobResultEnvelope::Make<EditorJobResult>(
-                EditorJobResult{
-                    .Diagnostic = "Mesh remesh CPU result ready",
-                });
+            return true;
         }
 
-        [[nodiscard]] JobResultEnvelope RunMeshSubdivideCpuWorker(
-            const std::shared_ptr<EditorMeshCpuJobState>& state)
+        [[nodiscard]] bool ComputeMeshSubdivide(
+            const EditorMeshSubdivideCommand& command,
+            Geometry::HalfedgeMesh::Mesh& mesh,
+            EditorMeshSubdivideResult& result)
         {
-            EditorMeshSubdivideResult& result =
-                state->SubdivideResult;
-            result.InputVertexCount = state->Mesh.VertexCount();
-            result.InputFaceCount = state->Mesh.FaceCount();
+            result.InputVertexCount = mesh.VertexCount();
+            result.InputFaceCount = mesh.FaceCount();
 
             Geometry::HalfedgeMesh::Mesh output{};
-            if (state->SubdivideCommand.Operator ==
+            if (command.Operator ==
                 EditorMeshSubdivideOperator::Loop)
             {
                 LoopSubdivide::SubdivisionParams params{};
-                params.Iterations = state->SubdivideCommand.Iterations;
+                params.Iterations = command.Iterations;
                 params.MaxOutputFaces =
-                    state->SubdivideCommand.MaxOutputFaces;
+                    command.MaxOutputFaces;
                 params.PreserveFeatureEdges =
-                    state->SubdivideCommand.PreserveLoopFeatureEdges;
+                    command.PreserveLoopFeatureEdges;
                 params.FeatureEdgePropertyName =
-                    state->SubdivideCommand.FeatureEdgePropertyName;
+                    command.FeatureEdgePropertyName;
                 const std::optional<LoopSubdivide::SubdivisionResult>
                     subdivision =
-                        LoopSubdivide::Subdivide(state->Mesh, output, params);
+                        LoopSubdivide::Subdivide(mesh, output, params);
                 if (!subdivision.has_value())
                 {
                     result.Status =
@@ -1397,10 +1383,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                     result.Error = Core::ErrorCode::InvalidArgument;
                     result.Message = "Geometry.Subdivision Loop subdivision failed for the "
                                      "selected mesh and parameters.";
-                    return JobResultEnvelope::Make<EditorJobResult>(
-                        EditorJobResult{
-                            .Diagnostic = result.Message,
-                        });
+                    return false;
                 }
                 result.IterationsPerformed =
                     static_cast<std::uint32_t>(
@@ -1408,14 +1391,14 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 result.OutputVertexCount = subdivision->FinalVertexCount;
                 result.OutputFaceCount = subdivision->FinalFaceCount;
             }
-            else if (state->SubdivideCommand.Operator ==
+            else if (command.Operator ==
                      EditorMeshSubdivideOperator::CatmullClark)
             {
                 CatmullClark::SubdivisionParams params{};
-                params.Iterations = state->SubdivideCommand.Iterations;
+                params.Iterations = command.Iterations;
                 const std::optional<CatmullClark::SubdivisionResult>
                     subdivision =
-                        CatmullClark::Subdivide(state->Mesh, output, params);
+                        CatmullClark::Subdivide(mesh, output, params);
                 if (!subdivision.has_value())
                 {
                     result.Status =
@@ -1423,10 +1406,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                     result.Error = Core::ErrorCode::InvalidArgument;
                     result.Message = "Geometry.CatmullClark subdivision failed for the "
                                      "selected mesh and parameters.";
-                    return JobResultEnvelope::Make<EditorJobResult>(
-                        EditorJobResult{
-                            .Diagnostic = result.Message,
-                        });
+                    return false;
                 }
                 result.IterationsPerformed =
                     static_cast<std::uint32_t>(
@@ -1437,12 +1417,12 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             else
             {
                 Sqrt3Subdivide::Sqrt3Params params{};
-                params.Iterations = state->SubdivideCommand.Iterations;
+                params.Iterations = command.Iterations;
                 params.MaxOutputFaces =
-                    state->SubdivideCommand.MaxOutputFaces;
+                    command.MaxOutputFaces;
                 const std::optional<Sqrt3Subdivide::Sqrt3Result>
                     subdivision =
-                        Sqrt3Subdivide::Subdivide(state->Mesh, output, params);
+                        Sqrt3Subdivide::Subdivide(mesh, output, params);
                 if (!subdivision.has_value())
                 {
                     result.Status =
@@ -1450,10 +1430,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                     result.Error = Core::ErrorCode::InvalidArgument;
                     result.Message = "Geometry.HalfedgeMesh.SubdivisionSqrt3 failed for the "
                                      "selected mesh and parameters.";
-                    return JobResultEnvelope::Make<EditorJobResult>(
-                        EditorJobResult{
-                            .Diagnostic = result.Message,
-                        });
+                    return false;
                 }
                 result.IterationsPerformed =
                     static_cast<std::uint32_t>(
@@ -1468,44 +1445,42 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             result.OutputFaceCount = output.FaceCount();
             result.Status = EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
-            state->Mesh = std::move(output);
-            return JobResultEnvelope::Make<EditorJobResult>(
-                EditorJobResult{
-                    .Diagnostic = "Mesh subdivide CPU result ready",
-                });
+            mesh = std::move(output);
+            return true;
         }
 
-        [[nodiscard]] JobResultEnvelope RunMeshSimplifyCpuWorker(
-            const std::shared_ptr<EditorMeshCpuJobState>& state)
+        [[nodiscard]] bool ComputeMeshSimplify(
+            const EditorMeshSimplifyCommand& command,
+            Geometry::HalfedgeMesh::Mesh& mesh,
+            EditorMeshSimplifyResult& result)
         {
-            EditorMeshSimplifyResult& result = state->SimplifyResult;
-            result.InputVertexCount = state->Mesh.VertexCount();
-            result.InputFaceCount = state->Mesh.FaceCount();
+            result.InputVertexCount = mesh.VertexCount();
+            result.InputFaceCount = mesh.FaceCount();
 
             Simpl::Params params{};
             params.Metric =
-                state->SimplifyCommand.Metric ==
+                command.Metric ==
                         EditorMeshSimplifyMetric::FA_QEM
                     ? Simpl::Metric::FA_QEM
                     : Simpl::Metric::ClassicalQEM;
-            params.TargetFaces = state->SimplifyCommand.TargetFaces;
-            params.MaxError = state->SimplifyCommand.MaxError > 0.0
-                ? state->SimplifyCommand.MaxError
+            params.TargetFaces = command.TargetFaces;
+            params.MaxError = command.MaxError > 0.0
+                ? command.MaxError
                 : 1.0e30;
             params.PreserveBoundary =
-                state->SimplifyCommand.PreserveBoundary;
+                command.PreserveBoundary;
             params.FeatureAngleThresholdDegrees =
-                state->SimplifyCommand.FeatureAngleThresholdDegrees;
-            params.NormalWeight = state->SimplifyCommand.NormalWeight;
-            params.BoundaryWeight = state->SimplifyCommand.BoundaryWeight;
-            params.CurvatureWeight = state->SimplifyCommand.CurvatureWeight;
+                command.FeatureAngleThresholdDegrees;
+            params.NormalWeight = command.NormalWeight;
+            params.BoundaryWeight = command.BoundaryWeight;
+            params.CurvatureWeight = command.CurvatureWeight;
             params.PreserveSharpFeatures =
-                state->SimplifyCommand.PreserveSharpFeatures;
+                command.PreserveSharpFeatures;
             params.PreserveUvSeams =
-                state->SimplifyCommand.PreserveUvSeams;
+                command.PreserveUvSeams;
 
             const std::optional<Simpl::Result> simplification =
-                Simpl::Simplify(state->Mesh, params);
+                Simpl::Simplify(mesh, params);
             if (!simplification.has_value())
             {
                 result.Status =
@@ -1513,16 +1488,13 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message =
                     "Geometry.Simplification failed for the selected mesh and parameters.";
-                return JobResultEnvelope::Make<EditorJobResult>(
-                    EditorJobResult{
-                        .Diagnostic = result.Message,
-                    });
+                return false;
             }
 
-            if (state->Mesh.HasGarbage())
-                state->Mesh.GarbageCollection();
-            result.OutputVertexCount = state->Mesh.VertexCount();
-            result.OutputFaceCount = state->Mesh.FaceCount();
+            if (mesh.HasGarbage())
+                mesh.GarbageCollection();
+            result.OutputVertexCount = mesh.VertexCount();
+            result.OutputFaceCount = mesh.FaceCount();
             result.CollapseCount = simplification->CollapseCount;
             result.MaxCollapseError = simplification->MaxCollapseError;
             result.CollapsesRejectedTopology =
@@ -1534,10 +1506,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             result.SeamVerticesPinned = simplification->SeamVerticesPinned;
             result.Status = EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
-            return JobResultEnvelope::Make<EditorJobResult>(
-                EditorJobResult{
-                    .Diagnostic = "Mesh simplify CPU result ready",
-                });
+            return true;
         }
 
         [[nodiscard]] JobResultEnvelope RunMeshCpuWorker(
@@ -1546,13 +1515,31 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             switch (state->Kind)
             {
             case EditorMeshCpuJobKind::Denoise:
-                return RunMeshDenoiseCpuWorker(state);
+                return JobResultEnvelope::Make<EditorJobResult>(EditorJobResult{
+                    .Diagnostic = ComputeMeshDenoise(
+                        state->DenoiseCommand, state->Mesh,
+                        state->SnapshotPositions, state->DeletedVertices,
+                        state->DenoiseResult, state->DenoiseAfterPositions)
+                        ? "Mesh denoise CPU result ready"
+                        : state->DenoiseResult.Message});
             case EditorMeshCpuJobKind::Remesh:
-                return RunMeshRemeshCpuWorker(state);
+                return JobResultEnvelope::Make<EditorJobResult>(EditorJobResult{
+                    .Diagnostic = ComputeMeshRemesh(
+                        state->RemeshCommand, state->Mesh, state->RemeshResult)
+                        ? "Mesh remesh CPU result ready"
+                        : state->RemeshResult.Message});
             case EditorMeshCpuJobKind::Subdivide:
-                return RunMeshSubdivideCpuWorker(state);
+                return JobResultEnvelope::Make<EditorJobResult>(EditorJobResult{
+                    .Diagnostic = ComputeMeshSubdivide(
+                        state->SubdivideCommand, state->Mesh, state->SubdivideResult)
+                        ? "Mesh subdivide CPU result ready"
+                        : state->SubdivideResult.Message});
             case EditorMeshCpuJobKind::Simplify:
-                return RunMeshSimplifyCpuWorker(state);
+                return JobResultEnvelope::Make<EditorJobResult>(EditorJobResult{
+                    .Diagnostic = ComputeMeshSimplify(
+                        state->SimplifyCommand, state->Mesh, state->SimplifyResult)
+                        ? "Mesh simplify CPU result ready"
+                        : state->SimplifyResult.Message});
             }
             return JobResultEnvelope{};
         }
@@ -1562,7 +1549,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             EditorMeshCpuJobState& job)
         {
             EditorMeshDenoiseResult result = job.DenoiseResult;
-            if (!result.Succeeded())
+            if (!result.Succeeded() && result.Status != EditorCommandStatus::NoChange)
             {
                 PublishMeshDenoiseResultSink(job, result);
                 return Core::Err(ResultErrorOrUnknown(result.Error));
@@ -2276,62 +2263,12 @@ ApplyEditorMeshDenoiseCommand(
                 std::move(onComplete));
         }
 
-        Smooth::BilateralDenoiseParams params{};
-        params.NormalIterations = command.NormalIterations;
-        params.VertexIterations = command.VertexIterations;
-        params.SigmaSpatial = command.SigmaSpatial;
-        params.SigmaRange = command.SigmaRange;
-        params.PreserveBoundary = command.PreserveBoundary;
-        params.DegenerateNormalLengthEpsilon =
-            command.DegenerateNormalLengthEpsilon;
-
-        const Smooth::BilateralDenoiseResult denoise =
-            Smooth::DenoiseBilateral(source.Mesh, params);
-        result.DenoiseStatus = denoise.Status;
-        result.Error = ErrorForDenoiseStatus(denoise.Status);
-        CopyMeshDenoiseCounters(denoise, result);
-        result.VertexSlotCount = source.BeforePositions.size();
-        result.WrittenCount =
-            result.VertexSlotCount - result.SkippedDeletedVertexCount;
-
-        if (denoise.Status != Smooth::DenoiseStatus::Success)
-        {
-            result.Status = EditorCommandStatus::GeometryProcessingFailed;
-            result.Message = "Geometry.Smoothing denoise failed with ";
-            result.Message += std::string(Smooth::DebugName(denoise.Status));
-            result.Message += ".";
+        std::vector<glm::vec3> afterPositions;
+        if (!ComputeMeshDenoise(command, source.Mesh, source.BeforePositions,
+                source.DeletedVertices, result, afterPositions))
             return result;
-        }
 
-        std::vector<glm::vec3> afterPositions =
-            ExtractMeshPositions(source.Mesh);
-        if (afterPositions.size() != source.BeforePositions.size() ||
-            !AllFiniteVec3(std::span<const glm::vec3>{
-                afterPositions.data(),
-                afterPositions.size()}))
-        {
-            result.Status = EditorCommandStatus::GeometryProcessingFailed;
-            result.DenoiseStatus = Smooth::DenoiseStatus::NonFiniteInput;
-            result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message       = "Geometry.Smoothing denoise produced invalid or "
-                                   "count-mismatched positions.";
-            return result;
-        }
-
-        std::size_t movedPublishedVertices = 0u;
-        for (std::size_t i = 0u; i < afterPositions.size(); ++i)
-        {
-            if (i < source.DeletedVertices.size() && source.DeletedVertices[i])
-            {
-                afterPositions[i] = source.BeforePositions[i];
-                continue;
-            }
-            if (afterPositions[i] != source.BeforePositions[i])
-                ++movedPublishedVertices;
-        }
-        result.MovedVertexCount = movedPublishedVertices;
-
-        if (movedPublishedVertices == 0u)
+        if (result.MovedVertexCount == 0u)
         {
             // Nothing changed, so there is nothing to commit; publishing an
             // identity edit would also leave a useless undo entry.
@@ -2487,59 +2424,9 @@ ApplyEditorMeshRemeshCommand(
         }
         result.TexcoordOutcome = texcoordOutcome;
 
-        result.InputVertexCount = source.Mesh.VertexCount();
-        result.InputFaceCount = source.Mesh.FaceCount();
         Geometry::HalfedgeMesh::Mesh before = source.Mesh;
-
-        std::optional<Geometry::RemeshingOperationResult> remeshResult{};
-        if (command.Mode == EditorMeshRemeshMode::Uniform)
-        {
-            Remesh::RemeshingParams params{};
-            params.TargetLength = command.TargetEdgeLength;
-            params.Iterations = command.Iterations;
-            params.Lambda = command.Lambda;
-            params.PreserveBoundary = command.PreserveBoundary;
-            params.ProjectToSurface = command.ProjectToSurface;
-            params.ReferenceProjectionK = command.ReferenceProjectionK;
-            params.MaxReferenceProjectionDistance =
-                command.MaxReferenceProjectionDistance;
-            remeshResult = Remesh::Remesh(source.Mesh, params);
-        }
-        else
-        {
-            AdaptiveRemesh::AdaptiveRemeshingParams params{};
-            if (command.TargetEdgeLength > 0.0)
-            {
-                params.MinEdgeLength = command.TargetEdgeLength * 0.5;
-                params.MaxEdgeLength = command.TargetEdgeLength * 2.0;
-            }
-            params.CurvatureAdaptation = command.CurvatureAdaptation;
-            params.Sizing = ToAdaptiveSizingLaw(command.SizingLaw);
-            params.ApproximationError = command.ApproximationError;
-            params.Iterations = command.Iterations;
-            params.Lambda = command.Lambda;
-            params.PreserveBoundary = command.PreserveBoundary;
-            params.EnableReferenceProjection = command.ProjectToSurface;
-            params.ReferenceProjectionK = command.ReferenceProjectionK;
-            params.MaxReferenceProjectionDistance =
-                command.MaxReferenceProjectionDistance;
-            remeshResult = AdaptiveRemesh::AdaptiveRemesh(source.Mesh, params);
-        }
-
-        if (!remeshResult.has_value())
-        {
-            result.Status = EditorCommandStatus::GeometryProcessingFailed;
-            result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message =
-                "Geometry remeshing failed for the selected mesh and parameters.";
+        if (!ComputeMeshRemesh(command, source.Mesh, result))
             return result;
-        }
-
-        if (source.Mesh.HasGarbage())
-            source.Mesh.GarbageCollection();
-        CopyRemeshCounters(*remeshResult, result);
-        result.OutputVertexCount = source.Mesh.VertexCount();
-        result.OutputFaceCount = source.Mesh.FaceCount();
 
         if (SameMeshTopologyAndPositions(before, source.Mesh))
         {
@@ -2699,84 +2586,9 @@ ApplyEditorMeshSubdivideCommand(
         }
         result.TexcoordOutcome = texcoordOutcome;
 
-        result.InputVertexCount = source.Mesh.VertexCount();
-        result.InputFaceCount = source.Mesh.FaceCount();
         Geometry::HalfedgeMesh::Mesh before = source.Mesh;
-        Geometry::HalfedgeMesh::Mesh output{};
-
-        if (command.Operator == EditorMeshSubdivideOperator::Loop)
-        {
-            LoopSubdivide::SubdivisionParams params{};
-            params.Iterations = command.Iterations;
-            params.MaxOutputFaces = command.MaxOutputFaces;
-            params.PreserveFeatureEdges = command.PreserveLoopFeatureEdges;
-            params.FeatureEdgePropertyName = command.FeatureEdgePropertyName;
-            const std::optional<LoopSubdivide::SubdivisionResult>
-                subdivision = LoopSubdivide::Subdivide(source.Mesh, output, params);
-            if (!subdivision.has_value())
-            {
-                result.Status =
-                    EditorCommandStatus::GeometryProcessingFailed;
-                result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message = "Geometry.Subdivision Loop subdivision failed for the "
-                                 "selected mesh and parameters.";
-                return result;
-            }
-            result.IterationsPerformed =
-                static_cast<std::uint32_t>(
-                    subdivision->IterationsPerformed);
-            result.OutputVertexCount = subdivision->FinalVertexCount;
-            result.OutputFaceCount = subdivision->FinalFaceCount;
-        }
-        else if (command.Operator ==
-                 EditorMeshSubdivideOperator::CatmullClark)
-        {
-            CatmullClark::SubdivisionParams params{};
-            params.Iterations = command.Iterations;
-            const std::optional<CatmullClark::SubdivisionResult>
-                subdivision = CatmullClark::Subdivide(source.Mesh, output, params);
-            if (!subdivision.has_value())
-            {
-                result.Status =
-                    EditorCommandStatus::GeometryProcessingFailed;
-                result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message = "Geometry.CatmullClark subdivision failed for the "
-                                 "selected mesh and parameters.";
-                return result;
-            }
-            result.IterationsPerformed =
-                static_cast<std::uint32_t>(
-                    subdivision->IterationsPerformed);
-            result.OutputVertexCount = subdivision->FinalVertexCount;
-            result.OutputFaceCount = subdivision->FinalFaceCount;
-        }
-        else
-        {
-            Sqrt3Subdivide::Sqrt3Params params{};
-            params.Iterations = command.Iterations;
-            params.MaxOutputFaces = command.MaxOutputFaces;
-            const std::optional<Sqrt3Subdivide::Sqrt3Result>
-                subdivision = Sqrt3Subdivide::Subdivide(source.Mesh, output, params);
-            if (!subdivision.has_value())
-            {
-                result.Status =
-                    EditorCommandStatus::GeometryProcessingFailed;
-                result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message = "Geometry.HalfedgeMesh.SubdivisionSqrt3 failed for the "
-                                 "selected mesh and parameters.";
-                return result;
-            }
-            result.IterationsPerformed =
-                static_cast<std::uint32_t>(
-                    subdivision->IterationsPerformed);
-            result.OutputVertexCount = subdivision->FinalVertexCount;
-            result.OutputFaceCount = subdivision->FinalFaceCount;
-        }
-
-        if (output.HasGarbage())
-            output.GarbageCollection();
-        result.OutputVertexCount = output.VertexCount();
-        result.OutputFaceCount = output.FaceCount();
+        if (!ComputeMeshSubdivide(command, source.Mesh, result))
+            return result;
 
         // As in the subdivide job publisher, subdivision cannot both
         // run and leave the mesh unchanged, so there is no gate here.
@@ -2787,7 +2599,7 @@ ApplyEditorMeshSubdivideCommand(
                 "Subdivide mesh",
                 GeometryMetadataSignatureForEntity(raw, *entity),
                 std::move(before),
-                std::move(output));
+                std::move(source.Mesh));
         if (commitStatus != EditorCommandStatus::Applied)
         {
             result.Status = commitStatus;
@@ -2893,51 +2705,9 @@ ApplyEditorMeshSimplifyCommand(
         }
         result.TexcoordOutcome = texcoordOutcome;
 
-        result.InputVertexCount = source.Mesh.VertexCount();
-        result.InputFaceCount = source.Mesh.FaceCount();
         Geometry::HalfedgeMesh::Mesh before = source.Mesh;
-
-        Simpl::Params params{};
-        params.Metric =
-            command.Metric == EditorMeshSimplifyMetric::FA_QEM
-                ? Simpl::Metric::FA_QEM
-                : Simpl::Metric::ClassicalQEM;
-        params.TargetFaces = command.TargetFaces;
-        params.MaxError = command.MaxError > 0.0 ? command.MaxError : 1.0e30;
-        params.PreserveBoundary = command.PreserveBoundary;
-        params.FeatureAngleThresholdDegrees =
-            command.FeatureAngleThresholdDegrees;
-        params.NormalWeight = command.NormalWeight;
-        params.BoundaryWeight = command.BoundaryWeight;
-        params.CurvatureWeight = command.CurvatureWeight;
-        params.PreserveSharpFeatures = command.PreserveSharpFeatures;
-        params.PreserveUvSeams = command.PreserveUvSeams;
-
-        const std::optional<Simpl::Result> simplification =
-            Simpl::Simplify(source.Mesh, params);
-        if (!simplification.has_value())
-        {
-            result.Status =
-                EditorCommandStatus::GeometryProcessingFailed;
-            result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message =
-                "Geometry.Simplification failed for the selected mesh and parameters.";
+        if (!ComputeMeshSimplify(command, source.Mesh, result))
             return result;
-        }
-
-        if (source.Mesh.HasGarbage())
-            source.Mesh.GarbageCollection();
-        result.OutputVertexCount = source.Mesh.VertexCount();
-        result.OutputFaceCount = source.Mesh.FaceCount();
-        result.CollapseCount = simplification->CollapseCount;
-        result.MaxCollapseError = simplification->MaxCollapseError;
-        result.CollapsesRejectedTopology =
-            simplification->CollapsesRejectedTopology;
-        result.CollapsesRejectedQuality =
-            simplification->CollapsesRejectedQuality;
-        result.SharpFeatureVerticesPinned =
-            simplification->SharpFeatureVerticesPinned;
-        result.SeamVerticesPinned = simplification->SeamVerticesPinned;
 
         if (SameMeshTopologyAndPositions(before, source.Mesh))
         {
