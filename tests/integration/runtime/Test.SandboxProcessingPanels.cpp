@@ -2253,3 +2253,107 @@ TEST(SandboxProcessingPanels, ProgressivePoissonKeepsInputChooserVisibleAndRetri
     EXPECT_TRUE(completed);
     EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
 }
+
+TEST(SandboxProcessingPanels, MeshFieldAdmissionBlocksMissingInputsAndRunsChosenProperty)
+{
+    for (const bool segmentation : {false, true})
+    {
+        SCOPED_TRACE(segmentation);
+        PanelHarness h;
+        auto& scene = h.Scene();
+        const auto entity = scene.Create();
+        PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+        auto& vertices = scene.Raw().get<GS::Vertices>(entity).Properties;
+        auto positions = vertices.GetOrAdd<glm::vec3>("v:custom", {});
+        positions.Vector() = vertices.Get<glm::vec3>("v:position").Vector();
+        auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+        auto curvature = *R::GetMeshCurvatureConfig(config);
+        auto segments = *R::GetCurvatureSegmentationConfig(config);
+        curvature.Positions.Name = segments.Positions.Name = "v:missing";
+        segments.SelectionMode = R::CurvatureSegmentationSelectionMode::FixedCount;
+        segments.FixedComponentCount = 1u;
+        R::SetMeshCurvatureConfig(config, curvature);
+        R::SetCurvatureSegmentationConfig(config, segments);
+        ASSERT_TRUE(h.Apply(config));
+        ASSERT_TRUE(h.Shell.SetEditorWindowOpen(segmentation
+            ? "mesh.processing.segmentation" : "mesh.processing.curvature", true));
+        std::optional<R::EditorCommandStatus> status;
+        std::string message;
+        const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+            .Id = "test.mesh_field_admission", .MenuPath = {"View"}, .Title = "Mesh field admission observer",
+            .OpenByDefault = true,
+            .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
+                const auto copy = [&](const auto& result) {
+                    if (result) { status = result->Status; message = result->Message; }
+                };
+                if (!segmentation) copy(context.MeshFields.Results.LastMeshCurvatureResult);
+            }});
+        int frames = 0, step = 0;
+        std::uint64_t jobsBefore = 0;
+        bool completed = false;
+        h.Driver->OnFrame = [&](R::Engine& engine) {
+            if (++frames > 400) { ADD_FAILURE() << "Mesh field admission did not finish"; engine.RequestExit(); return; }
+            auto* window = ImGui::FindWindowByName(segmentation
+                ? "Mesh / Processing / Curvature Segmentation" : "Mesh / Processing / Curvature");
+            if (!window) return;
+            ImGui::SetWindowSize(window, {900, 2200});
+            ImGui::SetWindowPos(window, {0, 0});
+            ++step;
+            const char* button = segmentation ? "Run segmentation##CurvatureSegmentation" : "Compute##MeshCurvature";
+            const auto run = [&] { ImGui::ActivateItemByID(window->GetID(button)); };
+            if (step == 3)
+            {
+                jobsBefore = engine.Jobs().Stats().SubmittedJobs;
+                ImGui::GetCurrentContext()->LogBuffer.clear();
+                ImGui::LogToBuffer();
+                ImGui::GetCurrentContext()->LogWindow = nullptr;
+                run();
+            }
+            if (step == 6)
+            {
+                const std::string_view log{ImGui::GetCurrentContext()->LogBuffer.c_str()};
+                EXPECT_NE(log.find(segmentation ? "Run segmentation" : "Compute"), std::string_view::npos);
+                ImGui::LogFinish();
+                EXPECT_FALSE(status);
+                EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
+                EXPECT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+            }
+            if (step == 9) run();
+            if (step == 12)
+            {
+                EXPECT_FALSE(status); // A valid mesh with a missing named input cannot run.
+                EXPECT_FALSE(vertices.Exists(curvature.Mean.Name));
+                EXPECT_FALSE(scene.Raw().get<GS::Faces>(entity).Properties.Exists(segments.Regions.Name));
+                EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
+                ImGui::ActivateItemByID(window->GetID(segmentation ? "Positions##Segmentation" : "Positions##MeshCurvature"));
+            }
+            if (step == 14)
+            {
+                auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+                ASSERT_FALSE(popups.empty());
+                ASSERT_NE(popups.back().Window, nullptr);
+                ImGui::ActivateItemByID(popups.back().Window->GetID("v:custom"));
+            }
+            if (step == 17) run();
+            const bool published = segmentation
+                ? scene.Raw().get<GS::Faces>(entity).Properties.Exists(segments.Regions.Name)
+                : status && *status != R::EditorCommandStatus::Pending;
+            if (step > 19 && published)
+            {
+                if (!segmentation) EXPECT_EQ(*status, R::EditorCommandStatus::Applied) << message;
+                const auto& active = h.Control().GetEngineConfigControlState().ActiveConfig;
+                EXPECT_EQ(segmentation ? R::GetCurvatureSegmentationConfig(active)->Positions.Name
+                                       : R::GetMeshCurvatureConfig(active)->Positions.Name, "v:custom");
+                if (segmentation) EXPECT_TRUE(scene.Raw().get<GS::Faces>(entity).Properties.Exists(segments.Regions.Name));
+                else EXPECT_TRUE(vertices.Exists(curvature.Mean.Name));
+                EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore + (segmentation ? 0u : 1u));
+                completed = true;
+                engine.RequestExit();
+            }
+        };
+        h.Engine->Run();
+        if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
+        EXPECT_TRUE(completed);
+        EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
+    }
+}

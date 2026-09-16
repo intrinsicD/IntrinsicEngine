@@ -756,3 +756,75 @@ Verified checkpoint:
 - UI-037 stays active. Remaining candidates include curvature/segmentation
   admission, unused shared-model normal/direction flags, other family/backend
   options and generation-cached full numerical/deleted-slot readiness.
+
+
+## Curvature/segmentation admission and common-model cleanup — plan
+
+- Continue operator-directed duplication/compilation cleanup using the existing
+  mesh-field, mesh-source and config owners. Share scene/kernel/config/entity
+  admission through private typed overloads and expose two family previews.
+  Curvature config parsing and typed execution share binding validation without
+  a JSON roundtrip in preview; retain separate invalid output-mode diagnostics.
+- Reuse `ValidateMeshSoupSourceMetadata`; extract segmentation's face/edge
+  presence and endpoint-count checks for reconstruction and admission. These
+  metadata checks precede execution-time numerical/topology checks. Preserve
+  front-end reason priority, scalar direction fallback and publication/history.
+- Reuse the existing mesh reconstruction result for curvature instead of a
+  specialized copy that only renames fields. Keep curvature-specific diagnostics;
+  capture the vertex count before moving source positions into a queued job.
+- Panels preview the current request. Remove both method availability flags and
+  four unused normal/direction flags from the common model. Keep the underlying
+  runtime direction capability and actual normal-estimation preflight unchanged.
+- No new file, module, service, dependency or compatibility path. Verify runtime
+  rejection parity, typed/config binding agreement, metadata failures, custom
+  inputs and real blocked/recovered widgets with Claude and the CPU gate. Full
+  numerical/deleted-slot/output-conflict readiness remains follow-up work.
+
+
+## Curvature/segmentation admission and common-model cleanup — verified checkpoint
+
+- Added family-owned metadata previews for curvature and segmentation. Private
+  typed command resolvers now share scene/kernel/config/entity checks with Apply,
+  using the existing mesh-source metadata validator. Segmentation reconstruction
+  and admission share face/edge presence and endpoint-count validation. Curvature
+  config parsing and typed commands share binding rules without JSON in preview.
+- Deleted all six remaining method-specific availability flags and their model
+  derivations, including four unused normal/direction flags. Updated consumers to
+  use canonical previews; actual normal-estimation validation and runtime direction
+  capability remain unchanged. Scalar-only fallback retains explicit result and
+  output-property coverage. Panels preview the current input/output configuration.
+- Removed the specialized curvature reconstruction record that copied/renamed an
+  existing mesh-source result. Direct and queued execution now use that existing
+  record; curvature diagnostics remain explicit and vertex count is captured before
+  moving positions into the job. Segmentation retains its distinct face/edge maps.
+- Claude reviewed plan, fixed diff and source proof. Fixed its valid empty-selection
+  diagnostic finding in runtime, also caught by the unchanged real-widget test.
+  Preserved vertex-count diagnostics on early curvature metadata rejection. Exact
+  Encode and existing fallback tests disproved proposed serialization/coverage
+  defects; no extra guards, enum facade or duplicate panel predicates were added.
+  Final review has no blocking findings.
+- Runtime regressions cover failure priority/reason parity, missing scene/entity,
+  invalid config/output enums, typed/serialized binding agreement, missing/custom
+  positions, corrupt halfedge/edge counts, source removal, deferred finite checks
+  and scalar fallback. Real widgets cover both visible blocked actions and recovery
+  by choosing a custom property; existing config retry/draft and queued curvature
+  cases pass. Fixed a new test's nonexistent segmentation result-slot assumption:
+  inline segmentation is verified through published properties, without adding a
+  result channel. Final focused run: **27 passes** (1.47 s).
+- Canonical `ci` configure / `IntrinsicTests` build / exclusion-only full CPU gate:
+  **4,693 passes, one expected ASan-only GLFW lifecycle skip, zero failures**
+  (4,694 selected; 144.04 s). Layering, test layout, task policy/state links,
+  docs links/sync, skills, session brief, root hygiene and diff checks pass.
+  Module inventory regenerated unchanged. Source-doc audit reports zero objective
+  errors and 144 existing broad hints outside the touched declarations/paragraphs.
+- Scope/layering/tests/docs and automated workshop sweep pass. Manual rows 1–3
+  pass, 4–6 unchanged, 7 remains partial readiness coverage, 8 has no exception.
+  Production C++ is **six lines larger** overall across seven existing files:
+  new admission entry points replace duplicate state and reconstruction records.
+  No new production file/module, dependency, service or compatibility path. No measured
+  compilation-speed improvement or sanitizer/Vulkan execution claim; the changed
+  GPU-smoke assertion was compiled as part of the full target.
+- UI-037 remains active for other families (including K-Means), backend/variant
+  controls, bake readiness and cached numerical/topology/deleted-slot/publication
+  conflict checks. All method-specific availability flags are now absent from the
+  common processing model; this does not close whole-task numerical readiness.

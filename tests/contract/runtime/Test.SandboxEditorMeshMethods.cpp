@@ -1606,8 +1606,8 @@ TEST(SandboxEditorUi, MeshCurvatureCommandPublishesCanonicalPropertiesAndSupport
         Runtime::BuildEditorDomainWindowModel(
             context,
             Runtime::EditorDomainWindowKind::Mesh);
-    EXPECT_TRUE(model.Processing.MeshCurvatureAvailable);
-    EXPECT_TRUE(model.Processing.MeshCurvatureDirectionsAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshCurvatureCommand(
+        context, {.StableEntityId = model.SelectedStableId}).Enabled);
     EXPECT_TRUE(result.Succeeded());
     EXPECT_EQ(result.ScalarWrittenCount, 16u);
 }
@@ -2181,8 +2181,8 @@ TEST(SandboxEditorUi, MeshCurvatureCommandFallsBackToScalarOnlyWhenDirectionsUna
         Runtime::BuildEditorDomainWindowModel(
             context,
             Runtime::EditorDomainWindowKind::Mesh);
-    EXPECT_TRUE(model.Processing.MeshCurvatureAvailable);
-    EXPECT_FALSE(model.Processing.MeshCurvatureDirectionsAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshCurvatureCommand(
+        context, {.StableEntityId = model.SelectedStableId}).Enabled);
 }
 TEST(SandboxEditorUi, MeshCurvatureCommandFailsClosedForInvalidTargetsAndConflicts)
 {
@@ -3974,7 +3974,6 @@ TEST(SandboxEditorUi,
         context, {.StableEntityId = model.SelectedStableId}).Enabled);
     EXPECT_TRUE(Runtime::PreviewEditorMeshSimplifyCommand(
         context, {.StableEntityId = model.SelectedStableId, .TargetFaces = 1u}).Enabled);
-    EXPECT_TRUE(model.Processing.MeshVertexNormalsAvailable);
 
     engine.Shutdown();
 }
@@ -4128,14 +4127,14 @@ TEST(SandboxEditorUi, DirectMeshEnrichmentPendingPreservesGeometryReadiness)
     EXPECT_FALSE(pendingModel.Processing.KMeansDomains.empty());
     EXPECT_TRUE(Runtime::PreviewEditorMeshDenoiseCommand(
         context, {.StableEntityId = pendingModel.SelectedStableId}).Enabled);
-    EXPECT_TRUE(pendingModel.Processing.MeshCurvatureAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshCurvatureCommand(
+        context, {.StableEntityId = pendingModel.SelectedStableId}).Enabled);
     EXPECT_TRUE(Runtime::PreviewEditorMeshRemeshCommand(
         context, {.StableEntityId = pendingModel.SelectedStableId}).Enabled);
     EXPECT_TRUE(Runtime::PreviewEditorMeshSubdivideCommand(
         context, {.StableEntityId = pendingModel.SelectedStableId}).Enabled);
     EXPECT_TRUE(Runtime::PreviewEditorMeshSimplifyCommand(
         context, {.StableEntityId = pendingModel.SelectedStableId, .TargetFaces = 1u}).Enabled);
-    EXPECT_TRUE(pendingModel.Processing.MeshVertexNormalsAvailable);
     EXPECT_TRUE(Runtime::PreviewEditorProgressivePoissonCommand(
         context, {.StableEntityId = pendingModel.SelectedStableId}).Enabled);
 
@@ -4143,7 +4142,8 @@ TEST(SandboxEditorUi, DirectMeshEnrichmentPendingPreservesGeometryReadiness)
     unavailableKernelContext.MeshCurvatureKernelAvailable = false;
     const auto unavailableKernelModel = Runtime::BuildEditorDomainWindowModel(
         unavailableKernelContext, Runtime::EditorDomainWindowKind::Mesh);
-    EXPECT_FALSE(unavailableKernelModel.Processing.MeshCurvatureAvailable);
+    EXPECT_FALSE(Runtime::PreviewEditorMeshCurvatureCommand(
+        unavailableKernelContext, {.StableEntityId = unavailableKernelModel.SelectedStableId}).Enabled);
     EXPECT_TRUE(Runtime::PreviewEditorMeshDenoiseCommand(
         unavailableKernelContext, {.StableEntityId = unavailableKernelModel.SelectedStableId}).Enabled);
 
@@ -4192,14 +4192,14 @@ TEST(SandboxEditorUi, DirectMeshEnrichmentPendingPreservesGeometryReadiness)
     EXPECT_FALSE(readyModel.Processing.KMeansDomains.empty());
     EXPECT_TRUE(Runtime::PreviewEditorMeshDenoiseCommand(
         context, {.StableEntityId = readyModel.SelectedStableId}).Enabled);
-    EXPECT_TRUE(readyModel.Processing.MeshCurvatureAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshCurvatureCommand(
+        context, {.StableEntityId = readyModel.SelectedStableId}).Enabled);
     EXPECT_TRUE(Runtime::PreviewEditorMeshRemeshCommand(
         context, {.StableEntityId = readyModel.SelectedStableId}).Enabled);
     EXPECT_TRUE(Runtime::PreviewEditorMeshSubdivideCommand(
         context, {.StableEntityId = readyModel.SelectedStableId}).Enabled);
     EXPECT_TRUE(Runtime::PreviewEditorMeshSimplifyCommand(
         context, {.StableEntityId = readyModel.SelectedStableId, .TargetFaces = 1u}).Enabled);
-    EXPECT_TRUE(readyModel.Processing.MeshVertexNormalsAvailable);
     EXPECT_TRUE(Runtime::PreviewEditorProgressivePoissonCommand(
         context, {.StableEntityId = readyModel.SelectedStableId}).Enabled);
 
@@ -4244,7 +4244,8 @@ TEST(SandboxEditorUi, DirectMeshEnrichmentDiscardsCompletionAfterCurvaturePublic
     const auto pending = Runtime::BuildEditorDomainWindowModel(
         context, Runtime::EditorDomainWindowKind::Mesh);
     EXPECT_TRUE(pending.Processing.DirectMeshEnrichmentPending);
-    EXPECT_TRUE(pending.Processing.MeshCurvatureAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshCurvatureCommand(
+        context, {.StableEntityId = pending.SelectedStableId}).Enabled);
     const auto curvature = Runtime::ApplyEditorMeshCurvatureCommand(
         context,
         Runtime::EditorMeshCurvatureCommand{
@@ -4286,7 +4287,8 @@ TEST(SandboxEditorUi, DirectMeshEnrichmentDiscardsCompletionAfterCurvaturePublic
     EXPECT_FALSE(finalModel.Processing.DirectMeshEnrichmentPending);
     EXPECT_EQ(finalModel.Processing.DirectMeshEnrichmentStatus, Runtime::JobState::StaleDiscarded);
     EXPECT_FALSE(finalModel.Processing.DirectMeshEnrichmentDiagnostic.empty());
-    EXPECT_TRUE(finalModel.Processing.MeshCurvatureAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshCurvatureCommand(
+        context, {.StableEntityId = finalModel.SelectedStableId}).Enabled);
     EXPECT_EQ(selection.SelectedStableIds().size(), 1u);
     engine.Shutdown();
 }
@@ -4339,7 +4341,8 @@ TEST(SandboxEditorUi, DirectMeshEnrichmentCancellationPreservesGeometryAndReadin
     EXPECT_FALSE(model.Processing.DirectMeshEnrichmentPending);
     EXPECT_EQ(model.Processing.DirectMeshEnrichmentStatus, Runtime::JobState::Cancelled);
     EXPECT_FALSE(model.Processing.DirectMeshEnrichmentDiagnostic.empty());
-    EXPECT_TRUE(model.Processing.MeshCurvatureAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshCurvatureCommand(
+        context, {.StableEntityId = model.SelectedStableId}).Enabled);
     ExpectMeshCountsEqual(SourceMeshCounts(scene, *mesh), counts);
     ExpectPositionsExactlyEqual(MeshVertexPositions(scene, *mesh), positions);
     EXPECT_EQ(RequiredEngineService<Runtime::EditorCommandHistory>(engine)
@@ -5987,4 +5990,149 @@ TEST(SandboxEditorUi, DetachedQueuedMeshFamiliesDoNotReadFreedScenes)
         EXPECT_EQ(snapshot.Entries.front().State, Runtime::JobState::StaleDiscarded);
         EXPECT_EQ(deliveries, 0);
     }
+}
+
+TEST(SandboxEditorUi, MeshFieldAdmissionSharesValidationAndMetadata)
+{
+    for (const bool segmentation : {false, true})
+    {
+        SCOPED_TRACE(segmentation);
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        Runtime::EditorCommandHistory history;
+        auto context = MakeContext(registry, selection);
+        context.CommandHistory = &history;
+        const auto mesh = MakeSelectable(registry, "Mesh field admission");
+        AddDenoiseTetraMeshSource(registry, mesh);
+        const auto id = Runtime::SelectionController::ToStableEntityId(mesh);
+        Runtime::EditorMeshCurvatureCommand curvature{.StableEntityId = id};
+        Runtime::EditorCurvatureSegmentationCommand segments{.StableEntityId = id};
+        const auto preview = [&] {
+            return segmentation
+                ? Runtime::PreviewEditorCurvatureSegmentationCommand(context, segments)
+                : Runtime::PreviewEditorMeshCurvatureCommand(context, curvature);
+        };
+        const auto rejected = [&](Runtime::EditorCommandStatus expected) {
+            const auto readiness = preview();
+            EXPECT_FALSE(readiness.Enabled);
+            EXPECT_FALSE(readiness.DisabledReason.empty());
+            const auto verify = [&](const auto& result) {
+                EXPECT_EQ(result.Status, expected);
+                EXPECT_EQ(result.Message, readiness.DisabledReason);
+            };
+            if (segmentation) verify(Runtime::ApplyEditorCurvatureSegmentationCommand(context, segments));
+            else verify(Runtime::ApplyEditorMeshCurvatureCommand(context, curvature));
+            EXPECT_EQ(history.UndoCount(), 0u);
+        };
+        ASSERT_TRUE(preview().Enabled);
+        curvature.Output = static_cast<Runtime::EditorMeshCurvatureOutput>(255);
+        segments.Config.AutomaticMinComponents = 5u;
+        segments.Config.AutomaticMaxComponents = 2u;
+        context.MeshCurvatureKernelAvailable = context.CurvatureSegmentationKernelAvailable = false;
+        auto* scene = context.Scene;
+        context.Scene = nullptr;
+        rejected(Runtime::EditorCommandStatus::MissingScene);
+        context.Scene = scene;
+        rejected(Runtime::EditorCommandStatus::GeometryProcessingFailed); // Kernel precedes parameters.
+        context.MeshCurvatureKernelAvailable = context.CurvatureSegmentationKernelAvailable = true;
+        curvature.StableEntityId = segments.StableEntityId = 0u;
+        rejected(Runtime::EditorCommandStatus::InvalidProcessingParameters); // Parameters precede entity.
+        curvature = {.StableEntityId = 0u};
+        segments = {.StableEntityId = 0u};
+        rejected(Runtime::EditorCommandStatus::StaleEntity);
+        curvature.StableEntityId = segments.StableEntityId = id;
+        curvature.Positions.Name = segments.Config.Positions.Name = "v:custom";
+        rejected(Runtime::EditorCommandStatus::InvalidProcessingParameters);
+        auto& vertices = registry.Raw().get<GS::Vertices>(mesh).Properties;
+        auto custom = vertices.GetOrAdd<glm::vec3>("v:custom", {});
+        custom.Vector() = vertices.Get<glm::vec3>(PN::kPosition).Vector();
+        ASSERT_TRUE(preview().Enabled);
+        const auto firstPosition = custom.Vector().front();
+        custom.Vector().front().x = std::numeric_limits<float>::infinity();
+        EXPECT_TRUE(preview().Enabled); // Metadata admission does not scan positions.
+        if (segmentation)
+            EXPECT_FALSE(Runtime::ApplyEditorCurvatureSegmentationCommand(context, segments).Succeeded());
+        else
+            EXPECT_FALSE(Runtime::ApplyEditorMeshCurvatureCommand(context, curvature).Succeeded());
+        EXPECT_EQ(history.UndoCount(), 0u);
+        custom.Vector().front() = firstPosition;
+        if (segmentation)
+        {
+            auto& edges = registry.Raw().get<GS::Edges>(mesh).Properties;
+            auto v0 = edges.Get<std::uint32_t>(GS::PropertyNames::kEdgeV0);
+            const auto values = v0.Vector();
+            v0.Vector().pop_back();
+            rejected(Runtime::EditorCommandStatus::InvalidProcessingParameters);
+            v0.Vector() = values;
+            ASSERT_TRUE(preview().Enabled);
+            registry.Raw().remove<GS::Edges>(mesh);
+            rejected(Runtime::EditorCommandStatus::UnsupportedGeometryDomain);
+        }
+        else
+        {
+            auto& halfedges = registry.Raw().get<GS::Halfedges>(mesh).Properties;
+            auto next = halfedges.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeNext);
+            const auto values = next.Vector();
+            next.Vector().pop_back();
+            rejected(Runtime::EditorCommandStatus::InvalidProcessingParameters);
+            EXPECT_EQ(Runtime::ApplyEditorMeshCurvatureCommand(context, curvature).VertexSlotCount,
+                      custom.Vector().size());
+            next.Vector() = values;
+            ASSERT_TRUE(preview().Enabled);
+            context.MeshCurvatureDirectionsAvailable = false;
+            EXPECT_TRUE(preview().Enabled); // Existing scalar fallback remains available.
+            registry.Raw().remove<GS::Faces>(mesh);
+            rejected(Runtime::EditorCommandStatus::UnsupportedGeometryDomain);
+        }
+    }
+}
+
+TEST(SandboxEditorUi, MeshCurvatureTypedBindingsMatchConfigValidation)
+{
+    using Config = Runtime::MeshCurvatureConfig;
+    const std::array<void(*)(Config&), 9> invalid{{
+        [](Config& c) { c.Mean.Name.clear(); },
+        [](Config& c) { c.Mean.Name = "f:mean"; },
+        [](Config& c) { c.Direction2.Name = c.Direction1.Name; },
+        [](Config& c) { c.Mean.Name = c.Positions.Name; },
+        [](Config& c) { c.Positions.Name = "v:deleted"; },
+        [](Config& c) { c.Gaussian.Name.push_back('\0'); },
+        [](Config& c) { c.Mean.Domain = Runtime::GeometryElementDomain::MeshFace; },
+        [](Config& c) { c.Direction1.ValueKind = Geometry::PropertyValueKind::Double; },
+        [](Config& c) { c.Positions.ValueKind = Geometry::PropertyValueKind::Float; },
+    }};
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    auto context = MakeContext(registry, selection);
+    for (std::size_t i = 0; i < invalid.size(); ++i)
+    {
+        SCOPED_TRACE(i);
+        Config config;
+        invalid[i](config);
+        EXPECT_FALSE(Runtime::IsValidMeshCurvaturePropertyBindings(config));
+        EXPECT_FALSE(Runtime::ValidateMeshCurvatureConfigSection(
+            Runtime::SerializeMeshCurvatureConfig(config), {}, "test").Usable());
+        const auto readiness = Runtime::PreviewEditorMeshCurvatureCommand(context, config);
+        const auto result = Runtime::ApplyEditorMeshCurvatureCommand(context, config);
+        EXPECT_FALSE(readiness.Enabled);
+        EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+        EXPECT_EQ(readiness.DisabledReason, result.Message);
+    }
+    for (const unsigned value : {0u, 1u, 2u, 3u, 4u, 255u})
+    {
+        SCOPED_TRACE(value);
+        Config config;
+        config.Output = static_cast<Runtime::EditorMeshCurvatureOutput>(value);
+        EXPECT_EQ(Runtime::ValidateMeshCurvatureConfigSection(
+            Runtime::SerializeMeshCurvatureConfig(config), {}, "test").Usable(), value < 4u);
+        EXPECT_EQ(Runtime::ApplyEditorMeshCurvatureCommand(context, config).Status,
+            value < 4u ? Runtime::EditorCommandStatus::StaleEntity
+                       : Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    }
+    Config custom;
+    custom.Positions.Name = "v:custom_positions";
+    custom.Mean.Name = "v:custom_mean";
+    EXPECT_TRUE(Runtime::IsValidMeshCurvaturePropertyBindings(custom));
+    EXPECT_TRUE(Runtime::ValidateMeshCurvatureConfigSection(
+        Runtime::SerializeMeshCurvatureConfig(custom), {}, "test").Usable());
 }

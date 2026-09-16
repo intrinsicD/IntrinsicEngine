@@ -2723,5 +2723,18 @@ entries:
       existing shared draft state and proved rejected custom binding survives retry. Existing test covers auto-run
       rejection and explicit retry.
     - Initial test build missed family imports; live UI regression exposed the outer gate. Fixed both. Stopped the
-      first broad test run for the final reviewed draft fix and reran completely: 4690 CPU passes plus one expected
+      first broad test run for the final reviewed draft fix and reran completely with 4690 CPU passes plus one expected
       skip. Removed 37 production C++ lines with no new module/dependency, timing, sanitizer or Vulkan claim.
+
+  - turn: 2026-09-16_001#20
+    notes:
+    - N624 records ordinary refactoring and verification, not a research result. No claims or staged-observation promotions;
+      broader lifecycle, method/backend and performance topics retain owners and stale flags.
+    - Accepted Claude empty-selection diagnostic finding, independently exposed by an existing widget test. Correct
+      source Encode and scalar-fallback assertions disproved two speculative findings. Reused canonical reconstruction
+      and preserved counts before move and on metadata failure.
+    - Final 27 focused tests and 4693 CPU passes plus one expected skip; all structural checks pass. Production grows
+      six C++ lines for missing admission APIs while removing six flags and a redundant private record. No compile-time,
+      sanitizer or Vulkan claim.
+    - Prior turn punctuation edit made one unquoted trace scalar invalid YAML after its parse check. Repaired as BUG-201,
+      retired with historical source reproduction and final four-file parsing. No event meaning changed.

@@ -172,6 +172,13 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] EditorMeshFieldPreparedFrame
     PrepareEditorMeshFieldFrame(const EditorWorkspaceAttachment&);
 
+    // Admission checks configuration and source metadata. Execution still checks
+    // numerical values, connectivity and publication conflicts.
+    [[nodiscard]] ActionReadiness PreviewEditorMeshCurvatureCommand(
+        const EditorProcessingCommands&, const EditorMeshCurvatureCommand&);
+    [[nodiscard]] ActionReadiness PreviewEditorCurvatureSegmentationCommand(
+        const EditorProcessingCommands&, const EditorCurvatureSegmentationCommand&);
+
     // Immediate outcomes return directly. Only a newly queued job delivers a
     // terminal callback, while attached. Duplicate Pending requests add no callback.
     [[nodiscard]] EditorMeshCurvatureResult ApplyEditorMeshCurvatureCommand(

@@ -85,6 +85,7 @@ import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.MeshTopologyOperations;
 import Extrinsic.Runtime.PointSetOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
@@ -2310,8 +2311,8 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
             Runtime::EditorDomainWindowKind::Mesh);
     EXPECT_TRUE(Runtime::PreviewEditorMeshDenoiseCommand(
         context, {.StableEntityId = meshModel.SelectedStableId}).Enabled);
-    EXPECT_TRUE(meshModel.Processing.MeshCurvatureAvailable);
-    EXPECT_TRUE(meshModel.Processing.MeshCurvatureDirectionsAvailable);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshCurvatureCommand(
+        context, {.StableEntityId = meshModel.SelectedStableId}).Enabled);
     EXPECT_TRUE(Runtime::PreviewEditorMeshRemeshCommand(
         context, {.StableEntityId = meshModel.SelectedStableId}).Enabled);
     EXPECT_TRUE(Runtime::PreviewEditorMeshRemeshCommand(
@@ -2330,11 +2331,8 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
         context, {.StableEntityId = meshModel.SelectedStableId, .PreserveLoopFeatureEdges = true}).Enabled);
     EXPECT_TRUE(Runtime::PreviewEditorMeshSimplifyCommand(
         context, {.StableEntityId = meshModel.SelectedStableId, .TargetFaces = 1u}).Enabled);
-    EXPECT_TRUE(meshModel.Processing.MeshVertexNormalsAvailable);
     EXPECT_TRUE(Runtime::PreviewEditorProgressivePoissonCommand(
         context, {.StableEntityId = meshModel.SelectedStableId}).Enabled);
-    EXPECT_FALSE(meshModel.Processing.GraphVertexNormalsAvailable);
-    EXPECT_FALSE(meshModel.Processing.PointCloudVertexNormalsAvailable);
 
     const ECS::EntityHandle graph = MakeSelectable(registry, "Graph");
     AddGraphSource(registry, graph);
@@ -2373,13 +2371,10 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
             Runtime::EditorDomainWindowKind::Graph);
     EXPECT_FALSE(Runtime::PreviewEditorMeshDenoiseCommand(
         context, {.StableEntityId = graphModel.SelectedStableId}).Enabled);
-    EXPECT_FALSE(graphModel.Processing.MeshCurvatureAvailable);
-    EXPECT_FALSE(graphModel.Processing.MeshCurvatureDirectionsAvailable);
-    EXPECT_FALSE(graphModel.Processing.MeshVertexNormalsAvailable);
+    EXPECT_FALSE(Runtime::PreviewEditorMeshCurvatureCommand(
+        context, {.StableEntityId = graphModel.SelectedStableId}).Enabled);
     EXPECT_TRUE(Runtime::PreviewEditorProgressivePoissonCommand(
         context, {.StableEntityId = graphModel.SelectedStableId}).Enabled);
-    EXPECT_TRUE(graphModel.Processing.GraphVertexNormalsAvailable);
-    EXPECT_FALSE(graphModel.Processing.PointCloudVertexNormalsAvailable);
 
     const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
     AddPointCloudSource(registry, cloud, 5u);
@@ -2421,11 +2416,8 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
             Runtime::EditorDomainWindowKind::PointCloud);
     EXPECT_FALSE(Runtime::PreviewEditorMeshDenoiseCommand(
         context, {.StableEntityId = cloudModel.SelectedStableId}).Enabled);
-    EXPECT_FALSE(cloudModel.Processing.MeshCurvatureAvailable);
-    EXPECT_FALSE(cloudModel.Processing.MeshCurvatureDirectionsAvailable);
-    EXPECT_FALSE(cloudModel.Processing.MeshVertexNormalsAvailable);
-    EXPECT_FALSE(cloudModel.Processing.GraphVertexNormalsAvailable);
-    EXPECT_TRUE(cloudModel.Processing.PointCloudVertexNormalsAvailable);
+    EXPECT_FALSE(Runtime::PreviewEditorMeshCurvatureCommand(
+        context, {.StableEntityId = cloudModel.SelectedStableId}).Enabled);
     EXPECT_TRUE(Runtime::PreviewEditorProgressivePoissonCommand(
         context, {.StableEntityId = cloudModel.SelectedStableId}).Enabled);
 

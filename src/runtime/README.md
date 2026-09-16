@@ -921,6 +921,13 @@ and connectivity. Their availability is owned by the topology family rather than
 stored separately in the common editor model. Option probes use independent valid
 requests; execution validates the complete current request. Uniform remeshing does
 not require the adaptive error-bounded sizing capability.
+Curvature and segmentation also expose typed metadata admission from their
+mesh-field owner, sharing command validation and canonical mesh-source checks.
+Segmentation's endpoint counts are checked without traversal; reconstruction
+still validates finite geometry, connectivity and publication conflicts. Curvature
+config parsing and execution share typed binding rules. The common processing
+model carries domain capabilities and enrichment state, with no method-specific
+availability flags; normal-estimation readiness stays in its own family.
 
 `UI-021` makes `Extrinsic.Runtime.GeometryAvailability` the shared availability
 policy for those editor models and commands. Domain windows, visualization

@@ -113,6 +113,7 @@ import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SceneDocumentModule;
@@ -4301,7 +4302,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, DirectMeshEnrichmentPendingRendersGeometr
     const auto pending = RT::BuildEditorDomainWindowModel(context, RT::EditorDomainWindowKind::Mesh);
     EXPECT_TRUE(pending.Processing.DirectMeshEnrichmentPending)
         << "The final frame must precede the next completion drain.";
-    EXPECT_TRUE(pending.Processing.MeshCurvatureAvailable);
+    EXPECT_TRUE(RT::PreviewEditorMeshCurvatureCommand(
+        context, {.StableEntityId = pending.SelectedStableId}).Enabled);
     EXPECT_FALSE(pending.Processing.DirectMeshEnrichmentDiagnostic.empty());
 
     const auto center = ReadPixel(bytes, format, bytesPerPixel, extent, extent.Width / 2u, extent.Height / 2u);

@@ -853,7 +853,6 @@ namespace Extrinsic::Sandbox::Editor
         bool changed = DrawProcessingEntity("Entity##MeshCurvature", context,
             config.StableEntityId, Curvature.LastSelectedEntity, Runtime::EditorDomainWindowKind::Mesh);
         const auto& model = GetDomainWindowModel(context, Runtime::EditorDomainWindowKind::Mesh, config.StableEntityId);
-        const auto& processing = model.Processing;
         DrawProcessingCpuBackend();
         ImGui::SeparatorText("Input properties");
         changed |= DrawProcessingPropertyInput("Positions##MeshCurvature", model.PropertyCatalog, config.Positions);
@@ -881,7 +880,8 @@ namespace Extrinsic::Sandbox::Editor
         if (changed)
             Curvature.ConfigDiagnostic = apply(config).Succeeded() ? "" : "Invalid curvature property bindings.";
         const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
-            context.MeshFields.Commands, {processing.MeshCurvatureAvailable, "Select a mesh to compute curvature."});
+            context.MeshFields.Commands,
+            Runtime::PreviewEditorMeshCurvatureCommand(context.MeshFields.Commands, config));
         if (DrawProcessingActionButton("Compute##MeshCurvature", readiness))
             ApplyProcessingExecution(Curvature, config, apply,
                 [&] { return Runtime::ApplyEditorMeshCurvatureCommand(context.MeshFields.Commands, config,
@@ -891,8 +891,7 @@ namespace Extrinsic::Sandbox::Editor
         for (const auto* output : {&config.Mean, &config.Gaussian, &config.MinPrincipal,
                                   &config.MaxPrincipal, &config.Direction1, &config.Direction2})
             DrawProcessingPropertyShowButton(context, config.StableEntityId, *output, Curvature.VisualizationDiagnostic);
-        if (!processing.MeshCurvatureAvailable)
-            ImGui::TextDisabled("Select a mesh to compute curvature.");
+        if (!readiness.Enabled) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
         if (!Curvature.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Curvature.ConfigDiagnostic.c_str());
         if (!Curvature.VisualizationDiagnostic.empty()) ImGui::Text("Display: %s", Curvature.VisualizationDiagnostic.c_str());
         const auto& result = Curvature.LastResult;
@@ -1193,10 +1192,8 @@ namespace Extrinsic::Sandbox::Editor
             Segmentation.Dirty = false;
         }
 
-        const auto runReadiness = readiness({model.Processing.HasSelectedEntity && model.Processing.CurvatureSegmentationAvailable,
-            model.Processing.HasSelectedEntity
-                ? "Signed-curvature segmentation requires editable mesh faces and edges."
-                : "Choose a mesh entity to run segmentation."});
+        const auto runReadiness = readiness(Runtime::PreviewEditorCurvatureSegmentationCommand(
+            context.MeshFields.Commands, {.StableEntityId = model.SelectedStableId, .Config = config}));
         if (!runReadiness.Enabled) ImGui::TextWrapped("%s", runReadiness.DisabledReason.c_str());
         if (DrawProcessingActionButton("Run segmentation##CurvatureSegmentation", runReadiness))
         {

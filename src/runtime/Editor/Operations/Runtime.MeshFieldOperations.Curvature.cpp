@@ -71,58 +71,18 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                 EditorMeshCurvatureOutput::PrincipalDirections,
             }};
 
-        struct MeshCurvatureSourceResult
+        [[nodiscard]] MeshDenoiseSourceResult BuildHalfedgeMeshForCurvature(
+            const GS::ConstSourceView& view, const std::string_view positionProperty)
         {
-            Geometry::HalfedgeMesh::Mesh Mesh{};
-            std::vector<glm::vec3> SourcePositions{};
-            std::size_t VertexSlotCount{0u};
-            EditorCommandStatus Status{
-                EditorCommandStatus::NoChange};
-            Core::ErrorCode Error{Core::ErrorCode::Success};
-            std::string Diagnostic{};
-
-            [[nodiscard]] bool Succeeded() const noexcept
-            {
-                return Status == EditorCommandStatus::Applied;
-            }
-        };
-
-        [[nodiscard]] MeshCurvatureSourceResult BuildHalfedgeMeshForCurvature(
-            const GS::ConstSourceView& view,
-            const std::string_view positionProperty)
-        {
-            MeshDenoiseSourceResult source = BuildHalfedgeMeshForDenoise(view, positionProperty);
-            MeshCurvatureSourceResult result{};
-            result.VertexSlotCount = source.BeforePositions.size();
-            result.Status = source.Status;
-            result.Error = source.Error;
-            if (source.Succeeded())
-            {
-                result.Mesh = std::move(source.Mesh);
-                result.SourcePositions =
-                    std::move(source.BeforePositions);
-                result.Diagnostic.clear();
-            }
-            else if (source.Status ==
-                     EditorCommandStatus::UnsupportedGeometryDomain)
-            {
-                result.Diagnostic =
-                    "Mesh curvature requires selected mesh GeometrySources.";
-            }
-            else if (source.Status ==
-                     EditorCommandStatus::InvalidProcessingParameters)
-            {
-                result.Diagnostic = "Mesh curvature requires finite count-matched vertex "
+            auto source = BuildHalfedgeMeshForDenoise(view, positionProperty);
+            if (source.Status == EditorCommandStatus::UnsupportedGeometryDomain)
+                source.Diagnostic = "Mesh curvature requires selected mesh GeometrySources.";
+            else if (source.Status == EditorCommandStatus::InvalidProcessingParameters)
+                source.Diagnostic = "Mesh curvature requires finite count-matched vertex "
                                     "positions and valid mesh topology.";
-            }
-            else
-            {
-                result.Diagnostic = source.Diagnostic.empty()
-                                        ? "Mesh curvature could not build a halfedge mesh "
-                                          "from GeometrySources."
-                                        : source.Diagnostic;
-            }
-            return result;
+            else if (!source.Succeeded() && source.Diagnostic.empty())
+                source.Diagnostic = "Mesh curvature could not build a halfedge mesh from GeometrySources.";
+            return source;
         }
 
         struct MeshCurvaturePropertyState
@@ -737,19 +697,40 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                    static_cast<std::uint64_t>(upper);
         }
 
+        [[nodiscard]] EditorCommandStatus ValidateSegmentationSourceMetadata(
+            const GS::ConstSourceView& view, const std::string_view positionProperty,
+            std::string& diagnostic)
+        {
+            if (!view.EdgeSource || !view.FaceSource)
+            {
+                diagnostic = "Curvature segmentation requires mesh face and edge sources.";
+                return EditorCommandStatus::UnsupportedGeometryDomain;
+            }
+            const auto status = ValidateMeshSoupSourceMetadata(view, diagnostic, positionProperty);
+            if (status != EditorCommandStatus::Applied) return status;
+            const auto& edges = view.EdgeSource->Properties;
+            const auto v0 = edges.Get<std::uint32_t>(GS::PropertyNames::kEdgeV0);
+            const auto v1 = edges.Get<std::uint32_t>(GS::PropertyNames::kEdgeV1);
+            const auto deleted = edges.Get<bool>("e:deleted");
+            if (!v0 || !v1 || v0.Vector().size() != edges.Size() ||
+                v1.Vector().size() != edges.Size() ||
+                (deleted && deleted.Vector().size() != edges.Size()))
+            {
+                diagnostic = "Curvature segmentation requires count-matched canonical edge endpoints.";
+                return EditorCommandStatus::InvalidProcessingParameters;
+            }
+            return EditorCommandStatus::Applied;
+        }
+
         [[nodiscard]] MeshCurvatureSegmentationSourceResult
         BuildHalfedgeMeshForCurvatureSegmentation(
             const GS::ConstSourceView& view, const std::string_view positionProperty)
         {
             MeshCurvatureSegmentationSourceResult result{};
-            if (view.EdgeSource == nullptr ||
-                view.FaceSource == nullptr)
+            result.Status = ValidateSegmentationSourceMetadata(view, positionProperty, result.Diagnostic);
+            if (!result.Succeeded())
             {
-                result.Status =
-                    EditorCommandStatus::UnsupportedGeometryDomain;
                 result.Error = Core::ErrorCode::InvalidArgument;
-                result.Diagnostic =
-                    "Curvature segmentation requires mesh face and edge sources.";
                 return result;
             }
 
@@ -806,20 +787,6 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                     GS::PropertyNames::kEdgeV1);
             const auto sourceDeleted =
                 view.EdgeSource->Properties.Get<bool>("e:deleted");
-            if (!sourceV0 || !sourceV1 ||
-                sourceV0.Vector().size() != result.EdgeSlotCount ||
-                sourceV1.Vector().size() != result.EdgeSlotCount ||
-                (sourceDeleted &&
-                 sourceDeleted.Vector().size() != result.EdgeSlotCount))
-            {
-                result.Status =
-                    EditorCommandStatus::InvalidProcessingParameters;
-                result.Error = Core::ErrorCode::InvalidArgument;
-                result.Diagnostic =
-                    "Curvature segmentation requires count-matched canonical edge endpoints.";
-                return result;
-            }
-
             std::unordered_map<std::uint64_t, std::uint32_t>
                 sourceEdgeByVertices{};
             sourceEdgeByVertices.reserve(result.EdgeSlotCount);
@@ -1808,16 +1775,17 @@ namespace Extrinsic::Runtime::MeshFieldDetail
         SubmitMeshCurvatureCpuJob(
             const EditorProcessingContext& context,
             const EditorMeshCurvatureCommand& command,
-            MeshCurvatureSourceResult source,
+            MeshDenoiseSourceResult source,
             MeshCurvaturePropertyState before,
             const std::uint64_t geometryMetadataSignature,
             std::function<void(EditorMeshCurvatureResult)> onComplete)
         {
+            const auto vertexSlotCount = source.BeforePositions.size();
             auto state = std::make_shared<EditorMeshCurvatureJobState>();
             state->StableEntityId = command.StableEntityId;
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->SnapshotPositions =
-                std::move(source.SourcePositions);
+                std::move(source.BeforePositions);
             state->Mesh = std::move(source.Mesh);
             state->CurvatureBefore = std::move(before);
             state->CurvatureAfter = state->CurvatureBefore;
@@ -1825,7 +1793,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             state->CurvatureResult = MakeMeshCurvatureBaseResult(
                 command,
                 context.MeshCurvatureDirectionsAvailable);
-            state->CurvatureResult.VertexSlotCount = source.VertexSlotCount;
+            state->CurvatureResult.VertexSlotCount = vertexSlotCount;
 
             const EditorJobIdentity identity =
                 MakeMeshCurvatureJobIdentity(*state);
@@ -1838,7 +1806,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                     MakePendingMeshCurvatureResult(
                         command,
                         context.MeshCurvatureDirectionsAvailable,
-                        source.VertexSlotCount,
+                        vertexSlotCount,
                         active->Token);
                 pending.Message =
                     BuildActiveDerivedJobMessage("Mesh curvature CPU", *active);
@@ -1859,7 +1827,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                         context.MeshCurvatureDirectionsAvailable);
                 result.Status =
                     EditorCommandStatus::GeometryProcessingFailed;
-                result.VertexSlotCount = source.VertexSlotCount;
+                result.VertexSlotCount = vertexSlotCount;
                 result.Error = Core::ErrorCode::InvalidState;
                 result.Message         = "Mesh curvature CPU job submission was rejected by the "
                                          "runtime job lane.";
@@ -1869,8 +1837,130 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             return MakePendingMeshCurvatureResult(
                 command,
                 context.MeshCurvatureDirectionsAvailable,
-                source.VertexSlotCount,
+                vertexSlotCount,
                 handle);
+        }
+
+        [[nodiscard]] std::optional<ECS::EntityHandle> ResolveMeshFieldCommandTarget(
+            const EditorProcessingContext& context, const EditorMeshCurvatureCommand& command,
+            EditorMeshCurvatureResult& result)
+        {
+            if (context.Scene == nullptr)
+            {
+                result.Status = EditorCommandStatus::MissingScene;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message = "Scene registry is unavailable for mesh curvature.";
+                return std::nullopt;
+            }
+            if (!context.MeshCurvatureKernelAvailable)
+            {
+                result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message = "Geometry.Curvature mesh curvature is unavailable in this "
+                                 "runtime configuration.";
+                return std::nullopt;
+            }
+
+            const bool validOutput =
+                std::find(kMeshCurvatureOutputs.begin(),
+                          kMeshCurvatureOutputs.end(),
+                          command.Output) != kMeshCurvatureOutputs.end();
+            if (!validOutput)
+            {
+                result.Status =
+                    EditorCommandStatus::InvalidProcessingParameters;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message = "Mesh curvature requires a valid output mode.";
+                return std::nullopt;
+            }
+
+            if (!IsValidMeshCurvaturePropertyBindings(command))
+            {
+                result.Status = EditorCommandStatus::InvalidProcessingParameters;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message = "Curvature requires distinct typed mesh vertex input/output properties.";
+                return std::nullopt;
+            }
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, command.StableEntityId);
+            if (!entity.has_value())
+            {
+                result.Status = EditorCommandStatus::StaleEntity;
+                result.Error = Core::ErrorCode::ResourceNotFound;
+                result.Message = command.StableEntityId == 0u
+                    ? "Choose a mesh entity to compute curvature."
+                    : "Mesh curvature target entity is stale or no longer live.";
+                return std::nullopt;
+            }
+
+            const auto view = GS::BuildConstView(raw, *entity);
+            const auto status = ValidateMeshSoupSourceMetadata(view, result.Message, command.Positions.Name);
+            if (status != EditorCommandStatus::Applied)
+            {
+                if (status == EditorCommandStatus::InvalidProcessingParameters)
+                    if (const auto positions = view.VertexSource->Properties.Get<glm::vec3>(command.Positions.Name))
+                        result.VertexSlotCount = positions.Vector().size();
+                result.Status = status;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                return std::nullopt;
+            }
+            return entity;
+        }
+
+        [[nodiscard]] std::optional<ECS::EntityHandle> ResolveMeshFieldCommandTarget(
+            const EditorProcessingContext& context, const EditorCurvatureSegmentationCommand& command,
+            EditorCurvatureSegmentationResult& result)
+        {
+            if (context.Scene == nullptr)
+            {
+                result.Status = EditorCommandStatus::MissingScene;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Scene registry is unavailable for curvature segmentation.";
+                return std::nullopt;
+            }
+            if (!context.CurvatureSegmentationKernelAvailable)
+            {
+                result.Status =
+                    EditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Geometry curvature segmentation is unavailable in this runtime configuration.";
+                return std::nullopt;
+            }
+            if (!IsValidCurvatureSegmentationConfig(command.Config))
+            {
+                result.Status =
+                    EditorCommandStatus::InvalidProcessingParameters;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message =
+                    "Curvature segmentation config contains invalid ranges or a component-count interval with max < min.";
+                return std::nullopt;
+            }
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, command.StableEntityId);
+            if (!entity.has_value())
+            {
+                result.Status = EditorCommandStatus::StaleEntity;
+                result.Error = Core::ErrorCode::ResourceNotFound;
+                result.Message = command.StableEntityId == 0u
+                    ? "Choose a mesh entity to run segmentation."
+                    : "Curvature segmentation target entity is stale or no longer live.";
+                return std::nullopt;
+            }
+
+            const auto status = ValidateSegmentationSourceMetadata(GS::BuildConstView(raw, *entity), command.Config.Positions.Name, result.Message);
+            if (status != EditorCommandStatus::Applied)
+            {
+                result.Status = status;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                return std::nullopt;
+            }
+            return entity;
         }
 
 } // namespace Extrinsic::Runtime::MeshFieldDetail
@@ -1878,6 +1968,24 @@ namespace Extrinsic::Runtime::MeshFieldDetail
 namespace Extrinsic::Runtime
 {
     using namespace MeshFieldDetail;
+
+    ActionReadiness PreviewEditorMeshCurvatureCommand(
+        const EditorProcessingCommands& commands, const EditorMeshCurvatureCommand& command)
+    {
+        EditorMeshCurvatureResult result{};
+        const auto entity = ResolveMeshFieldCommandTarget(
+            EditorProcessingCommandsAccess::Resolve(commands), command, result);
+        return {entity.has_value(), std::move(result.Message)};
+    }
+
+    ActionReadiness PreviewEditorCurvatureSegmentationCommand(
+        const EditorProcessingCommands& commands, const EditorCurvatureSegmentationCommand& command)
+    {
+        EditorCurvatureSegmentationResult result{};
+        const auto entity = ResolveMeshFieldCommandTarget(
+            EditorProcessingCommandsAccess::Resolve(commands), command, result);
+        return {entity.has_value(), std::move(result.Message)};
+    }
 
     EditorMeshCurvatureResult
 ApplyEditorMeshCurvatureCommand(
@@ -1892,61 +2000,14 @@ ApplyEditorMeshCurvatureCommand(
                 command,
                 context.MeshCurvatureDirectionsAvailable);
 
-        if (context.Scene == nullptr)
-        {
-            result.Status = EditorCommandStatus::MissingScene;
-            result.Error = Core::ErrorCode::InvalidState;
-            result.Message = "Scene registry is unavailable for mesh curvature.";
-            return result;
-        }
-        if (!context.MeshCurvatureKernelAvailable)
-        {
-            result.Status = EditorCommandStatus::GeometryProcessingFailed;
-            result.Error = Core::ErrorCode::InvalidState;
-            result.Message = "Geometry.Curvature mesh curvature is unavailable in this "
-                             "runtime configuration.";
-            return result;
-        }
-
-        const bool validOutput =
-            std::find(kMeshCurvatureOutputs.begin(),
-                      kMeshCurvatureOutputs.end(),
-                      command.Output) != kMeshCurvatureOutputs.end();
-        if (!validOutput)
-        {
-            result.Status =
-                EditorCommandStatus::InvalidProcessingParameters;
-            result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message = "Mesh curvature requires a valid output mode.";
-            return result;
-        }
-
-        const auto bindings = ValidateMeshCurvatureConfigSection(
-            SerializeMeshCurvatureConfig(command), {}, kMeshCurvatureConfigSectionName);
-        if (!bindings.Usable())
-        {
-            result.Status = EditorCommandStatus::InvalidProcessingParameters;
-            result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message = "Curvature requires distinct typed mesh vertex input/output properties.";
-            return result;
-        }
-
+        const auto entity = ResolveMeshFieldCommandTarget(context, command, result);
+        if (!entity) return result;
         entt::registry& raw = context.Scene->Raw();
-        const std::optional<ECS::EntityHandle> entity =
-            ResolveStableEntity(raw, command.StableEntityId);
-        if (!entity.has_value())
-        {
-            result.Status = EditorCommandStatus::StaleEntity;
-            result.Error = Core::ErrorCode::ResourceNotFound;
-            result.Message =
-                "Mesh curvature target entity is stale or no longer live.";
-            return result;
-        }
 
         const GS::ConstSourceView constView = GS::BuildConstView(raw, *entity);
-        MeshCurvatureSourceResult source =
+        MeshDenoiseSourceResult source =
             BuildHalfedgeMeshForCurvature(constView, command.Positions.Name);
-        result.VertexSlotCount = source.VertexSlotCount;
+        result.VertexSlotCount = source.BeforePositions.size();
         if (!source.Succeeded())
         {
             result.Status = source.Status;
@@ -2091,7 +2152,7 @@ ApplyEditorMeshCurvatureCommand(
             CommitMeshCurvatureProperties(
                 context,
                 command.StableEntityId,
-                std::move(source.SourcePositions),
+                std::move(source.BeforePositions),
                 std::move(before),
                 std::move(after));
         if (commitStatus != EditorCommandStatus::Applied)
@@ -2125,44 +2186,9 @@ ApplyEditorMeshCurvatureCommand(
             .RequestedMethod = command.Config.Method,
             .ActualMethod = command.Config.Method,
         };
-        if (context.Scene == nullptr)
-        {
-            result.Status = EditorCommandStatus::MissingScene;
-            result.Error = Core::ErrorCode::InvalidState;
-            result.Message =
-                "Scene registry is unavailable for curvature segmentation.";
-            return result;
-        }
-        if (!context.CurvatureSegmentationKernelAvailable)
-        {
-            result.Status =
-                EditorCommandStatus::GeometryProcessingFailed;
-            result.Error = Core::ErrorCode::InvalidState;
-            result.Message =
-                "Geometry curvature segmentation is unavailable in this runtime configuration.";
-            return result;
-        }
-        if (!IsValidCurvatureSegmentationConfig(command.Config))
-        {
-            result.Status =
-                EditorCommandStatus::InvalidProcessingParameters;
-            result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message =
-                "Curvature segmentation config contains invalid ranges or a component-count interval with max < min.";
-            return result;
-        }
-
+        const auto entity = ResolveMeshFieldCommandTarget(context, command, result);
+        if (!entity) return result;
         entt::registry& raw = context.Scene->Raw();
-        const std::optional<ECS::EntityHandle> entity =
-            ResolveStableEntity(raw, command.StableEntityId);
-        if (!entity.has_value())
-        {
-            result.Status = EditorCommandStatus::StaleEntity;
-            result.Error = Core::ErrorCode::ResourceNotFound;
-            result.Message =
-                "Curvature segmentation target entity is stale or no longer live.";
-            return result;
-        }
 
         const GS::ConstSourceView constView =
             GS::BuildConstView(raw, *entity);

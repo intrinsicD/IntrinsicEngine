@@ -1,7 +1,6 @@
 module;
 #include <array>
 #include <limits>
-#include <set>
 #include <nlohmann/json.hpp>
 module Extrinsic.Runtime.MeshCurvatureConfig;
 namespace Extrinsic::Runtime
@@ -40,6 +39,23 @@ namespace Extrinsic::Runtime
                     .PayloadJson=SerializeMeshCurvatureConfig(config)};
         }
     }
+    bool IsValidMeshCurvaturePropertyBindings(const MeshCurvatureConfig& config) noexcept
+    {
+        const MeshCurvatureConfig defaults;
+        for (std::size_t i = 0; i < slots.size(); ++i)
+        {
+            const auto& ref = config.*slots[i].Member;
+            if (ref.Domain != GeometryElementDomain::MeshVertex ||
+                ref.ValueKind != (defaults.*slots[i].Member).ValueKind ||
+                !ref.Name.starts_with("v:") || ref.Name.size() < 3 ||
+                ref.Name.find('\0') != std::string::npos || ref.Name == "v:deleted" ||
+                (slots[i].Member != &MeshCurvatureConfig::Positions && ref.Name == "v:position"))
+                return false;
+            for (std::size_t j = 0; j < i; ++j)
+                if (ref.Name == (config.*slots[j].Member).Name) return false;
+        }
+        return true;
+    }
     std::string SerializeMeshCurvatureConfig(const MeshCurvatureConfig& config) { return Encode(config).dump(); }
     Core::Config::EngineConfigSectionValidationResult ValidateMeshCurvatureConfigSection(
         std::string_view payload, std::string_view, std::string_view subject)
@@ -62,18 +78,17 @@ namespace Extrinsic::Runtime
             !doc["output"].is_number_unsigned() || doc["output"].get<std::uint64_t>() > 3 ||
             !doc["publish_directions"].is_boolean())
             return reject("Invalid curvature entity, output mode or direction control.");
-        std::set<std::string> names;
+        MeshCurvatureConfig bindings;
         for (const auto& slot : slots)
         {
             const auto& ref = doc[slot.Key];
             if (!ref.is_object() || ref.size() != 3 || !ref.contains("domain") || ref["domain"] != ToString(GeometryElementDomain::MeshVertex) ||
                 !ref.contains("kind") || ref["kind"] != slot.Kind || !ref.contains("name") || !ref["name"].is_string())
                 return reject("Curvature requires typed mesh vertex bindings.");
-            const auto name = ref["name"].get<std::string>();
-            if (!name.starts_with("v:") || name.size() < 3 || name.find('\0') != std::string::npos ||
-                name == "v:deleted" || (slot.Member != &MeshCurvatureConfig::Positions && name == "v:position") || !names.insert(name).second)
-                return reject("Curvature property names must be distinct public vertex properties (v:...).");
+            (bindings.*slot.Member).Name = ref["name"].get<std::string>();
         }
+        if (!IsValidMeshCurvaturePropertyBindings(bindings))
+            return reject("Curvature property names must be distinct public vertex properties (v:...).");
         result.State=EngineConfigState::Valid;
         result.CanonicalPayloadJson=doc.dump();
         result.ParsedFieldCount=static_cast<std::uint32_t>(doc.size());

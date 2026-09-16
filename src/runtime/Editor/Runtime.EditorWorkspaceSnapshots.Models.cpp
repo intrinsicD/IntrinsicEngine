@@ -2229,40 +2229,6 @@ namespace {
       ResolveEditorGeometryProcessingEntries(model.Capabilities);
             model.KMeansDomains =
       GetAvailableEditorKMeansDomains(*context.Scene, *selected);
-            model.MeshCurvatureAvailable =
-                context.MeshCurvatureKernelAvailable &&
-                model.Capabilities.HasEditableSurfaceMesh &&
-                HasAnyEditorGeometryProcessingDomain(
-                    model.Capabilities.Domains,
-                    EditorGeometryProcessingDomain::MeshVertices);
-            model.MeshCurvatureDirectionsAvailable =
-                model.MeshCurvatureAvailable &&
-                context.MeshCurvatureDirectionsAvailable;
-            model.CurvatureSegmentationAvailable =
-                context.CurvatureSegmentationKernelAvailable &&
-                model.Capabilities.HasEditableSurfaceMesh &&
-                HasAnyEditorGeometryProcessingDomain(
-                    model.Capabilities.Domains,
-                    EditorGeometryProcessingDomain::MeshVertices) &&
-                HasAnyEditorGeometryProcessingDomain(
-                    model.Capabilities.Domains,
-                    EditorGeometryProcessingDomain::MeshEdges) &&
-                HasAnyEditorGeometryProcessingDomain(
-                    model.Capabilities.Domains,
-                    EditorGeometryProcessingDomain::MeshFaces);
-            model.MeshVertexNormalsAvailable =
-                model.Capabilities.HasEditableSurfaceMesh &&
-                HasAnyEditorGeometryProcessingDomain(
-                    model.Capabilities.Domains,
-                    EditorGeometryProcessingDomain::MeshVertices);
-            model.GraphVertexNormalsAvailable =
-                HasAnyEditorGeometryProcessingDomain(
-                    model.Capabilities.Domains,
-                    EditorGeometryProcessingDomain::GraphVertices);
-            model.PointCloudVertexNormalsAvailable =
-                HasAnyEditorGeometryProcessingDomain(
-                    model.Capabilities.Domains,
-                    EditorGeometryProcessingDomain::PointCloudPoints);
             // Operation-specific results live in their owning family's prepared
             // frame, not here. `model.Diagnostics` carries only whole-model facts
             // (no scene, no selection, unsupported domain), because

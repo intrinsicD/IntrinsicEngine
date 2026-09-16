@@ -13500,3 +13500,29 @@ tree:
     - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
     - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
     status: resolved
+
+  - id: N624
+    type: decision
+    title: Share mesh-field admission and retire duplicate model capabilities
+    provenance: ai-executed
+    timestamp: '2026-09-16T21:32:45+02:00'
+    choice: Share curvature/segmentation command and metadata checks with family previews; reuse compiled typed curvature
+      binding validation. Remove six remaining common-model availability flags and the duplicate curvature reconstruction
+      record. Preserve moved job counts, scalar fallback and actionable empty-selection reasons after Claude review.
+      Final 27 focused and 4693 CPU passes plus one expected skip. Six additional production C++ lines, no timing or
+      GPU claim. UI-037 remains open; BUG-201 trace syntax repair is retired.
+    alternatives:
+    - Keep per-method availability flags in the common model
+    - Keep a curvature-only copy of the existing reconstruction result
+    evidence:
+    - src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Curvature.cpp
+    - src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cppm
+    - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+    - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+    - src/runtime/Modules/Curvature/Runtime.MeshCurvatureConfig.cpp
+    - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+    - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+    - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
+    - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
+    - tasks/done/BUG-201-session-log-yaml-scalar.md
+    status: resolved

@@ -170,12 +170,6 @@ export namespace Extrinsic::Runtime
         EditorGeometryProcessingCapabilities Capabilities{};
         std::vector<EditorGeometryProcessingEntry> Entries{};
         std::vector<EditorGeometryProcessingDomain> KMeansDomains{};
-        bool MeshCurvatureAvailable{false};
-        bool MeshCurvatureDirectionsAvailable{false};
-        bool CurvatureSegmentationAvailable{false};
-        bool MeshVertexNormalsAvailable{false};
-        bool GraphVertexNormalsAvailable{false};
-        bool PointCloudVertexNormalsAvailable{false};
         std::vector<EditorDiagnostic> Diagnostics{};
     };
 

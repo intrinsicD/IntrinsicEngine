@@ -30,6 +30,7 @@ export namespace Extrinsic::Runtime
         GeometryPropertyRef Direction1{GeometryElementDomain::MeshVertex, "v:principal_dir1", Geometry::PropertyValueKind::Vec3};
         GeometryPropertyRef Direction2{GeometryElementDomain::MeshVertex, "v:principal_dir2", Geometry::PropertyValueKind::Vec3};
     };
+    [[nodiscard]] bool IsValidMeshCurvaturePropertyBindings(const MeshCurvatureConfig& config) noexcept;
     [[nodiscard]] std::string SerializeMeshCurvatureConfig(const MeshCurvatureConfig& config);
     [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateMeshCurvatureConfigSection(
         std::string_view payload, std::string_view reference, std::string_view subject);
