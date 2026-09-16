@@ -6,6 +6,11 @@
 
 extern "C++"
 {
+namespace Extrinsic::Runtime
+{
+    struct EditorPointCloudServicePreparedFrame;
+}
+
 namespace Extrinsic::Sandbox::Editor
 {
     inline constexpr std::array<Runtime::GeometryPresentationSlotSemantic, 5>
@@ -122,8 +127,8 @@ namespace Extrinsic::Sandbox::Editor
             explicit SandboxEditorFrame(const Runtime::EditorWorkspaceSnapshot& frame);
         };
 
-        // View data is copied, but command handles borrow live runtime services and
-        // remain valid only inside the prepared-frame visitor that supplies them.
+        // Most view data is copied; the point-cloud service frame and live command
+        // handles are borrowed only for the prepared-frame draw visit.
         struct SandboxEditorContext final
         {
             SandboxEditorContext() = default;
@@ -135,7 +140,7 @@ namespace Extrinsic::Sandbox::Editor
                 const Runtime::EditorPointAnalysisPreparedFrame& pointAnalysis,
                 const Runtime::EditorPointSetPreparedFrame& pointSet,
                 const Runtime::EditorPointConstructionPreparedFrame& pointConstruction,
-                const Runtime::EditorPointCloudServicePreparedFrame& pointCloudService,
+                Runtime::EditorPointCloudServicePreparedFrame& pointCloudService,
                 const Runtime::EditorNormalPreparedFrame& normals,
                 const Runtime::EditorRegistrationPreparedFrame& registration,
                 const Runtime::EditorMeshFieldPreparedFrame& meshFields,
@@ -153,7 +158,8 @@ namespace Extrinsic::Sandbox::Editor
             Runtime::EditorPointAnalysisPreparedFrame PointAnalysis{};
             Runtime::EditorPointSetPreparedFrame PointSet{};
             Runtime::EditorPointConstructionPreparedFrame PointConstruction{};
-            Runtime::EditorPointCloudServicePreparedFrame PointCloudService{};
+            // Borrows shell-owned frame storage for the current draw visit.
+            const Runtime::EditorPointCloudServicePreparedFrame* PointCloudService{nullptr};
             Runtime::EditorNormalPreparedFrame Normals{};
             Runtime::EditorRegistrationPreparedFrame Registration{};
             Runtime::EditorMeshFieldPreparedFrame MeshFields{};
@@ -168,8 +174,6 @@ namespace Extrinsic::Sandbox::Editor
             Runtime::EditorRenderRecipeDraftSnapshot RenderRecipeDraft{};
             bool SceneAvailable{false};
             bool ProcessingConfigCommandsAvailable{false};
-            bool ClusteringAvailable{false};
-            bool PointCloudConsolidationAvailable{false};
             bool RenderRecipeCommandsAvailable{false};
             bool RenderArtifactCommandsAvailable{false};
             const Runtime::EditorSelectionModel* Selection{nullptr};
@@ -318,101 +322,6 @@ namespace Extrinsic::Sandbox::Editor
         std::uint32_t stableEntityId,
         const SandboxParameterizationPanelConfig& config);
 
-    using SandboxPointCloudConsolidationPanelConfig =
-        Runtime::PointCloudConsolidationConfig;
-
-    struct SandboxPointCloudConsolidationStrategyOption
-    {
-        Runtime::PointCloudConsolidationStrategy Strategy{
-            Runtime::PointCloudConsolidationStrategy::Wlop};
-        std::string_view Label{};
-        std::string_view StableToken{};
-        bool Available{false};
-    };
-
-    [[nodiscard]]
-    std::array<SandboxPointCloudConsolidationStrategyOption, 4u>
-    SandboxPointCloudConsolidationStrategyOptions() noexcept;
-
-    struct SandboxPointCloudConsolidationPanelApplyRequest
-    {
-        Runtime::PointCloudConsolidationConfig Config{};
-        Runtime::PointCloudConsolidationRequest Execute{};
-        std::string SourceId{
-            "sandbox.point_cloud_consolidation.panel"};
-    };
-
-    [[nodiscard]]
-    std::optional<SandboxPointCloudConsolidationPanelApplyRequest>
-    BuildSandboxPointCloudConsolidationPanelApplyRequest(
-        std::uint32_t stableEntityId,
-        const Runtime::PointCloudConsolidationPropertyRefs& properties,
-        const SandboxPointCloudConsolidationPanelConfig& config);
-
-    struct SandboxPointCloudConsolidationPanelActionResult
-    {
-        Runtime::RuntimeEngineConfigApplyResult Config{};
-        std::optional<Runtime::PointCloudConsolidationResult> Submission{};
-
-        [[nodiscard]] bool Succeeded() const noexcept
-        {
-            return Config.Succeeded() && Submission.has_value() &&
-                   Submission->Status ==
-                       Runtime::PointCloudConsolidationRunStatus::Queued;
-        }
-    };
-
-    [[nodiscard]] SandboxPointCloudConsolidationPanelActionResult
-    ApplySandboxPointCloudConsolidationPanelAction(
-        const SandboxEditorContext& context,
-        std::uint32_t stableEntityId,
-        const Runtime::PointCloudConsolidationPropertyRefs& properties,
-        const SandboxPointCloudConsolidationPanelConfig& config);
-
-    struct SandboxPointCloudConsolidationResultSummary
-    {
-        bool Succeeded{false};
-        bool Queued{false};
-        std::string Status{};
-        std::string ImplementationId{};
-        std::string StrategyToken{};
-        std::string RequestedBackend{};
-        std::string ActualBackend{};
-        bool FellBackToCpu{false};
-        std::string BackendDiagnostic{};
-        std::string SupportRadiusAnalysisStatus{};
-        std::string SupportRadiusSource{};
-        std::string SupportRadiusQuantile{};
-        std::string Message{};
-        std::uint32_t SupportRadiusEstimatorVersion{0u};
-        std::uint32_t SupportRadiusProfileSampleCount{0u};
-        std::uint32_t SupportRadiusRequestedNeighborRank{0u};
-        std::uint32_t SupportRadiusNeighborRank{0u};
-        bool SupportRadiusWorkloadAdjusted{false};
-        double SupportRadiusNeighborDistance{0.0};
-        double ResolvedSupportRadius{0.0};
-        double SupportRadiusBoundingBoxDiagonal{0.0};
-        double SupportNeighborsP50{0.0};
-        double SupportNeighborsP95{0.0};
-        std::uint32_t SupportNeighborsMax{0u};
-        std::uint64_t PredictedSupportQueryCount{0u};
-        std::uint64_t PredictedContributionCount{0u};
-        std::uint32_t InputPointCount{0u};
-        std::uint32_t OutputPointCount{0u};
-        std::uint32_t Iterations{0u};
-        bool Converged{false};
-        double AverageDisplacement{0.0};
-        double MaxDisplacement{0.0};
-        bool UsedAuthoredNormals{false};
-        bool EstimatedNormals{false};
-        std::uint32_t NormalRefinementIterations{0u};
-        std::uint32_t InsertedPointCount{0u};
-    };
-
-    [[nodiscard]] SandboxPointCloudConsolidationResultSummary
-    BuildSandboxPointCloudConsolidationResultSummary(
-        const Runtime::PointCloudConsolidationResult& result);
-
     struct SandboxParameterizationUvPane
     {
         glm::vec2 Min{0.0f};
@@ -468,8 +377,6 @@ namespace Extrinsic::Sandbox::Editor
         const Runtime::EditorParameterizationResult& result);
 
     [[nodiscard]] bool IsFiniteVec2(glm::vec2 value) noexcept;
-    [[nodiscard]] bool IsSupportedPointCloudConsolidationStrategy(
-        Runtime::PointCloudConsolidationStrategy strategy) noexcept;
 }
 
 } // extern "C++"

@@ -1577,6 +1577,7 @@ TEST(SandboxEditorPresentation,
     shell.Attach(engine.Worlds(), engine.Services());
     int drawCalls = 0;
     bool receivedScene = false;
+    std::optional<Runtime::EditorPointCloudServicePreparedFrame> retained;
     const Runtime::EditorWindowHandle handle = shell.RegisterEditorWindow(
         Editor::EditorWindowDescriptor{
             .Id = "test.context_window",
@@ -1584,12 +1585,15 @@ TEST(SandboxEditorPresentation,
             .Title = "Context Window",
             .OpenByDefault = true,
             .Draw =
-                [&drawCalls, &receivedScene](
+                [&drawCalls, &receivedScene, &retained](
                     bool&,
                     const Editor::SandboxEditorContext& context)
                 {
                     ++drawCalls;
                     receivedScene = context.SceneAvailable;
+                    ASSERT_NE(context.PointCloudService, nullptr);
+                    EXPECT_TRUE(context.PointCloudService->Commands.IsBound());
+                    retained = *context.PointCloudService;
                 },
         });
     ASSERT_TRUE(handle.IsValid());
@@ -1598,8 +1602,13 @@ TEST(SandboxEditorPresentation,
 
     EXPECT_EQ(drawCalls, 1);
     EXPECT_TRUE(receivedScene);
+    ASSERT_TRUE(retained.has_value());
+    EXPECT_TRUE(retained->Commands.IsBound());
     EXPECT_TRUE(shell.UnregisterEditorWindow(handle));
     shell.Detach();
+    EXPECT_FALSE(retained->Commands.IsBound());
+    EXPECT_FALSE(Runtime::IsEditorClusteringAvailable(
+        retained->Commands, retained->Clustering));
     engine.Shutdown();
 }
 

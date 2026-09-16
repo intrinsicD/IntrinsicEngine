@@ -28,7 +28,6 @@ import Extrinsic.Runtime.PointFieldOperations;
 import Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.Runtime.PointSetOperations;
 import Extrinsic.Runtime.PointConstructionOperations;
-import Extrinsic.Runtime.PointCloudServiceOperations;
 import Extrinsic.Sandbox.Editor.Shell;
 
 import Extrinsic.Runtime.EditorCommon;
@@ -51,7 +50,6 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.MeshTopologyOperations;
 import Extrinsic.Runtime.ParameterizationOperations;
-import Extrinsic.Runtime.PointCloudConsolidationTypes;
 
 #include "Sandbox.PanelSupport.hpp"
 

@@ -67,6 +67,7 @@ import Extrinsic.Runtime.ParameterizationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationTypes;
 
 #include "../../../src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp"
+#include "../../../src/app/Sandbox/Editor/Sandbox.PointCloudConsolidationPanel.hpp"
 
 namespace Config = Extrinsic::Core::Config;
 namespace ECS = Extrinsic::ECS;
@@ -783,11 +784,9 @@ TEST(SandboxPointCloudConsolidationPanel,
 
     Editor::SandboxEditorContext context{};
     context.Processing = prepared.Commands;
-    context.PointCloudService = prepared;
+    context.PointCloudService = &prepared;
     context.ProcessingConfigCommandsAvailable =
         Runtime::AreEditorProcessingConfigCommandsAvailable(prepared.Commands);
-    context.PointCloudConsolidationAvailable =
-        prepared.PointCloudConsolidationAvailable;
 
     Runtime::PointCloudConsolidationConfig requested{};
     requested.Backend =
@@ -877,4 +876,19 @@ TEST(SandboxPointCloudConsolidationPanel,
 
     attachment.Detach();
     engine.Shutdown();
+}
+
+TEST(SandboxPointCloudConsolidationPanel, UnattachedContextRejectsWithoutSubmitting)
+{
+    const Editor::SandboxEditorContext context{};
+    const Runtime::PointCloudConsolidationConfig config{};
+    const auto properties = Runtime::MakePointCloudConsolidationPropertyRefs(
+        Runtime::GeometryElementDomain::PointCloudPoint, "v:position");
+    ASSERT_TRUE(Editor::BuildSandboxPointCloudConsolidationPanelApplyRequest(
+        1u, properties, config).has_value());
+    const auto result = Editor::ApplySandboxPointCloudConsolidationPanelAction(
+        context, 1u, properties, config);
+    EXPECT_EQ(result.Config.Status, Runtime::RuntimeEngineConfigApplyStatus::Rejected);
+    EXPECT_FALSE(result.Submission.has_value());
+    EXPECT_FALSE(result.Succeeded());
 }

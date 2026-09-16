@@ -15,6 +15,20 @@ all-panel module interface. Standard/GLM includes stay in each unit's global
 module fragment. The shell and panel registration interfaces do not include
 these complete views.
 
+The shell's active prepared-frame storage owns the point-cloud service frame.
+`SandboxEditorContext` borrows it for the draw visit and is reset before that
+storage on draw completion and detach. Its constructor requires a frame lvalue;
+callers must keep that storage alive for the complete visit. The canonical frame
+definition shares global C++ attachment with its family result/sink records, so
+unrelated panels can forward-declare the borrow without importing config types.
+A default context exposes the same empty unavailable service state. Consolidation
+helper records are declared only in `Sandbox.PointCloudConsolidationPanel.hpp`,
+consumed by MethodPanels and its integration test; their definitions live in the
+existing MethodPanels implementation. Shared support, domain and mesh-processing
+implementations do not depend on consolidation config or service operations.
+The service/session owners still require complete config/result records.
+
+
 Prepared-frame command/query handles carry the workspace attachment epoch.
 Retaining one beyond detach is observable as unbound, and every operation
 fails closed before reaching the copied service pointers; callback surfaces

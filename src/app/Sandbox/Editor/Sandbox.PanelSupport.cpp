@@ -31,7 +31,6 @@ import Extrinsic.Runtime.PointFieldOperations;
 import Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.Runtime.PointSetOperations;
 import Extrinsic.Runtime.PointConstructionOperations;
-import Extrinsic.Runtime.PointCloudServiceOperations;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.EditorJobProjection;
@@ -43,11 +42,9 @@ import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.VisualizationRecipes;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.TextureBakeModule;
-import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.ParameterizationConfig;
-import Extrinsic.Runtime.PointCloudConsolidationTypes;
 
 #include "Sandbox.PanelSupport.hpp"
 
@@ -72,7 +69,7 @@ namespace Extrinsic::Sandbox::Editor
                 const Runtime::EditorPointAnalysisPreparedFrame& pointAnalysis,
                 const Runtime::EditorPointSetPreparedFrame& pointSet,
                 const Runtime::EditorPointConstructionPreparedFrame& pointConstruction,
-                const Runtime::EditorPointCloudServicePreparedFrame& pointCloudService,
+                Runtime::EditorPointCloudServicePreparedFrame& pointCloudService,
                 const Runtime::EditorNormalPreparedFrame& normals,
                 const Runtime::EditorRegistrationPreparedFrame& registration,
                 const Runtime::EditorMeshFieldPreparedFrame& meshFields,
@@ -85,7 +82,7 @@ namespace Extrinsic::Sandbox::Editor
               Processing(processing),
               PointFields(pointFields), PointAnalysis(pointAnalysis),
               PointSet(pointSet), PointConstruction(pointConstruction),
-              PointCloudService(pointCloudService), Normals(normals),
+              PointCloudService(&pointCloudService), Normals(normals),
               Registration(registration),
               MeshFields(meshFields),
               MeshTopology(meshTopology),
@@ -99,9 +96,6 @@ namespace Extrinsic::Sandbox::Editor
               SceneAvailable(scene.SceneAvailable),
               ProcessingConfigCommandsAvailable(
                   Runtime::AreEditorProcessingConfigCommandsAvailable(processing)),
-              ClusteringAvailable(pointCloudService.ClusteringAvailable),
-              PointCloudConsolidationAvailable(
-                  pointCloudService.PointCloudConsolidationAvailable),
               RenderRecipeCommandsAvailable(
                   renderRecipe.CommandsAvailable),
               RenderArtifactCommandsAvailable(
@@ -584,22 +578,6 @@ namespace Extrinsic::Sandbox::Editor
                 });
         }
 
-        [[nodiscard]] bool IsSupportedPointCloudConsolidationStrategy(
-            const Runtime::PointCloudConsolidationStrategy strategy) noexcept
-        {
-            const auto options =
-                SandboxPointCloudConsolidationStrategyOptions();
-            return std::any_of(
-                options.begin(),
-                options.end(),
-                [strategy](
-                    const SandboxPointCloudConsolidationStrategyOption& option)
-                {
-                    return option.Strategy == strategy && option.Available &&
-                           !option.StableToken.empty();
-                });
-        }
-
         [[nodiscard]] const char* ParameterizationSolverStatusLabel(
             const ParameterizationSolverStatus status) noexcept
         {
@@ -699,155 +677,6 @@ namespace Extrinsic::Sandbox::Editor
                     context.Parameterization.ResultSinks.Parameterization);
         }
         return result;
-    }
-
-    std::array<SandboxPointCloudConsolidationStrategyOption, 4u>
-    SandboxPointCloudConsolidationStrategyOptions() noexcept
-    {
-        using Strategy = Runtime::PointCloudConsolidationStrategy;
-        return {
-            SandboxPointCloudConsolidationStrategyOption{
-                .Strategy = Strategy::Lop,
-                .Label = "LOP",
-                .StableToken = Runtime::StableToken(Strategy::Lop),
-                .Available = true,
-            },
-            SandboxPointCloudConsolidationStrategyOption{
-                .Strategy = Strategy::Wlop,
-                .Label = "WLOP",
-                .StableToken = Runtime::StableToken(Strategy::Wlop),
-                .Available = true,
-            },
-            SandboxPointCloudConsolidationStrategyOption{
-                .Strategy = Strategy::Clop,
-                .Label = "CLOP",
-                .StableToken = Runtime::StableToken(Strategy::Clop),
-                .Available = true,
-            },
-            SandboxPointCloudConsolidationStrategyOption{
-                .Strategy = Strategy::Ear,
-                .Label = "EAR",
-                .StableToken = Runtime::StableToken(Strategy::Ear),
-                .Available = true,
-            },
-        };
-    }
-
-    std::optional<SandboxPointCloudConsolidationPanelApplyRequest>
-    BuildSandboxPointCloudConsolidationPanelApplyRequest(
-        const std::uint32_t stableEntityId,
-        const Runtime::PointCloudConsolidationPropertyRefs& properties,
-        const SandboxPointCloudConsolidationPanelConfig& config)
-    {
-        if (stableEntityId == 0u ||
-            !Runtime::IsValidPointCloudConsolidationPropertyRefs(properties) ||
-            !IsSupportedPointCloudConsolidationStrategy(config.Strategy) ||
-            Runtime::StableToken(config.Strategy).empty())
-        {
-            return std::nullopt;
-        }
-
-        if (!Runtime::IsValidEditorPointCloudConsolidationConfig(config))
-            return std::nullopt;
-
-        return SandboxPointCloudConsolidationPanelApplyRequest{
-            .Config = config,
-            .Execute = Runtime::PointCloudConsolidationRequest{
-                .StableEntityId = stableEntityId,
-                .Properties = properties,
-                .Config = config,
-            },
-        };
-    }
-
-    SandboxPointCloudConsolidationPanelActionResult
-    ApplySandboxPointCloudConsolidationPanelAction(
-        const SandboxEditorContext& context,
-        const std::uint32_t stableEntityId,
-        const Runtime::PointCloudConsolidationPropertyRefs& properties,
-        const SandboxPointCloudConsolidationPanelConfig& config)
-    {
-        SandboxPointCloudConsolidationPanelActionResult result{};
-        result.Config.Status =
-            Runtime::RuntimeEngineConfigApplyStatus::Rejected;
-        result.Config.Source = Runtime::RuntimeConfigControlSource::Editor;
-        const auto request =
-            BuildSandboxPointCloudConsolidationPanelApplyRequest(
-                stableEntityId, properties, config);
-        if (!request.has_value())
-            return result;
-
-        result.Config = Runtime::ApplyEditorPointCloudConsolidationConfig(
-            context.PointCloudService.Commands,
-            request->Config,
-            request->SourceId);
-        if (result.Config.Succeeded())
-        {
-            result.Submission =
-                Runtime::SubmitEditorPointCloudConsolidation(
-                    context.PointCloudService.Commands,
-                    context.PointCloudService.PointCloudConsolidation,
-                    request->Execute);
-        }
-        return result;
-    }
-
-    SandboxPointCloudConsolidationResultSummary
-    BuildSandboxPointCloudConsolidationResultSummary(
-        const Runtime::PointCloudConsolidationResult& result)
-    {
-        return SandboxPointCloudConsolidationResultSummary{
-            .Succeeded = result.Succeeded(),
-            .Queued = result.Status ==
-                Runtime::PointCloudConsolidationRunStatus::Queued,
-            .Status = std::string{Runtime::ToString(result.Status)},
-            .ImplementationId = result.ImplementationId,
-            .StrategyToken = result.StrategyToken,
-            .RequestedBackend = std::string{
-                Runtime::StableToken(result.RequestedBackend)},
-            .ActualBackend = std::string{
-                Runtime::StableToken(result.ActualBackend)},
-            .FellBackToCpu = result.FellBackToCpu,
-            .BackendDiagnostic = result.BackendDiagnostic,
-            .SupportRadiusAnalysisStatus =
-                result.SupportRadiusAnalysisStatus,
-            .SupportRadiusSource = result.SupportRadiusSource,
-            .SupportRadiusQuantile = result.SupportRadiusQuantile,
-            .Message = result.Message,
-            .SupportRadiusEstimatorVersion =
-                result.SupportRadiusEstimatorVersion,
-            .SupportRadiusProfileSampleCount =
-                result.SupportRadiusProfileSampleCount,
-            .SupportRadiusRequestedNeighborRank =
-                result.SupportRadiusRequestedNeighborRank,
-            .SupportRadiusNeighborRank =
-                result.SupportRadiusNeighborRank,
-            .SupportRadiusWorkloadAdjusted =
-                result.SupportRadiusWorkloadAdjusted,
-            .SupportRadiusNeighborDistance =
-                result.SupportRadiusNeighborDistance,
-            .ResolvedSupportRadius = result.ResolvedSupportRadius,
-            .SupportRadiusBoundingBoxDiagonal =
-                result.SupportRadiusBoundingBoxDiagonal,
-            .SupportNeighborsP50 = result.SupportNeighborsP50,
-            .SupportNeighborsP95 = result.SupportNeighborsP95,
-            .SupportNeighborsMax = result.SupportNeighborsMax,
-            .PredictedSupportQueryCount =
-                result.PredictedSupportQueryCount,
-            .PredictedContributionCount =
-                result.PredictedContributionCount,
-            .InputPointCount = result.InputPointCount,
-            .OutputPointCount = result.OutputPointCount,
-            .Iterations = result.Iterations,
-            .Converged = result.Converged,
-            .AverageDisplacement = result.AverageDisplacement,
-            .MaxDisplacement = result.MaxDisplacement,
-            .UsedAuthoredNormals = result.UsedAuthoredNormals,
-            .EstimatedNormals = result.EstimatedNormals,
-            .NormalRefinementIterations =
-                result.NormalRefinementIterations,
-            .InsertedPointCount = result.InsertedPointCount,
-        };
     }
 
     glm::vec2 ProjectSandboxParameterizationUvPoint(

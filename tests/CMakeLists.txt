@@ -531,6 +531,18 @@ intrinsic_add_module_boundary_test(EditorCompilationLocality.PointCloudServices
 set_tests_properties(EditorCompilationLocality.PointCloudServices
     PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
 
+# Unrelated app panels borrow the shell's service frame without its config records.
+if(TARGET ExtrinsicSandboxEditor)
+    intrinsic_add_module_boundary_test(EditorCompilationLocality.UnrelatedPanels
+            --check-source src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
+            --check-source src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+            --check-source src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp
+            --forbid-module Extrinsic.Runtime.PointCloudConsolidationConfig
+            --forbid-module Extrinsic.Runtime.PointCloudServiceOperations)
+    set_tests_properties(EditorCompilationLocality.UnrelatedPanels
+        PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
+endif()
+
 # Borrowing device/cache pointers must not import their complete APIs or kernels.
 intrinsic_add_module_boundary_test(EditorCompilationLocality.ProcessingServiceBorrows
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cppm

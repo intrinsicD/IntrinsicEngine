@@ -48,18 +48,18 @@ export namespace Extrinsic::Runtime
             ClusteringService* Clustering{nullptr};
             PointCloudConsolidationService* PointCloudConsolidation{nullptr};
         };
+        struct EditorPointCloudServicePreparedFrame
+        {
+            EditorProcessingCommands Commands{};
+            // Borrowed while `Commands.IsBound()`; never dereferenced otherwise.
+            ClusteringService* Clustering{nullptr};
+            PointCloudConsolidationService* PointCloudConsolidation{nullptr};
+            EditorPointCloudServiceResultSinks ResultSinks{};
+            EditorPointCloudServiceResultsSnapshot Results{};
+            bool ClusteringAvailable{false};
+            bool PointCloudConsolidationAvailable{false};
+        };
     }
-    struct EditorPointCloudServicePreparedFrame
-    {
-        EditorProcessingCommands Commands{};
-        // Borrowed while `Commands.IsBound()`; never dereferenced otherwise.
-        ClusteringService* Clustering{nullptr};
-        PointCloudConsolidationService* PointCloudConsolidation{nullptr};
-        EditorPointCloudServiceResultSinks ResultSinks{};
-        EditorPointCloudServiceResultsSnapshot Results{};
-        bool ClusteringAvailable{false};
-        bool PointCloudConsolidationAvailable{false};
-    };
     [[nodiscard]] EditorPointCloudServicePreparedFrame
     PrepareEditorPointCloudServiceFrame(const EditorWorkspaceAttachment&);
 

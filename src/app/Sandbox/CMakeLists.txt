@@ -14,6 +14,7 @@ if(INTRINSIC_BUILD_SANDBOX OR INTRINSIC_BUILD_TESTS)
             Editor/Sandbox.EditorController.cpp
             Editor/Sandbox.PanelSupport.cpp
             Editor/Sandbox.PanelSupport.hpp
+            Editor/Sandbox.PointCloudConsolidationPanel.hpp
             Editor/Sandbox.EditorShell.cpp
             Editor/Sandbox.DomainPanels.cpp
             Editor/Sandbox.MethodPanels.cpp

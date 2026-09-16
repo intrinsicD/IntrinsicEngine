@@ -2969,6 +2969,7 @@ namespace Extrinsic::Sandbox::Editor
             {
                 Runtime::EditorWorkspaceSnapshotPreparedFrame Workspace{};
                 Runtime::EditorSceneEditingPreparedFrame Scene{};
+                Runtime::EditorPointCloudServicePreparedFrame PointCloudService{};
                 Runtime::EditorVisualizationEditingPreparedFrame Visualization{};
                 Runtime::EditorRenderRecipeEditingPreparedFrame RenderRecipe{};
             };
@@ -3121,6 +3122,7 @@ namespace Extrinsic::Sandbox::Editor
                 ActivePreparedFrame.emplace(SandboxPreparedFrame{
                     .Workspace = std::move(*workspace),
                     .Scene = Runtime::PrepareEditorSceneEditingFrame(Attachment),
+                    .PointCloudService = Runtime::PrepareEditorPointCloudServiceFrame(Attachment),
                     .Visualization =
                         Runtime::PrepareEditorVisualizationEditingFrame(Attachment),
                     .RenderRecipe =
@@ -3136,7 +3138,7 @@ namespace Extrinsic::Sandbox::Editor
                     Runtime::PrepareEditorPointAnalysisFrame(Attachment),
                     Runtime::PrepareEditorPointSetFrame(Attachment),
                     Runtime::PrepareEditorPointConstructionFrame(Attachment),
-                    Runtime::PrepareEditorPointCloudServiceFrame(Attachment),
+                    prepared.PointCloudService,
                     Runtime::PrepareEditorNormalFrame(Attachment),
                     Runtime::PrepareEditorRegistrationFrame(Attachment),
                     Runtime::PrepareEditorMeshFieldFrame(Attachment),
@@ -3147,8 +3149,9 @@ namespace Extrinsic::Sandbox::Editor
                     LastFrame);
                 DrawMainMenuBar(&Host->Windows());
                 (void)Host->Windows().DrawOpenWindows();
-                ActivePreparedFrame.reset();
+                // Drop the context before the frame storage it borrows.
                 ActiveContext.reset();
+                ActivePreparedFrame.reset();
             }
 
             Runtime::EditorWindowHandle RegisterEditorWindow(
@@ -3208,8 +3211,9 @@ namespace Extrinsic::Sandbox::Editor
 
             void Detach()
             {
-                ActivePreparedFrame.reset();
+                // Drop the context before the frame storage it borrows.
                 ActiveContext.reset();
+                ActivePreparedFrame.reset();
                 LastFrame = {};
                 LastUvRegenerationResult.reset();
                 LastUvExtentAdoption.reset();

@@ -67,7 +67,7 @@ python3 tools/docs/check_doc_links.py --root .
 ```
 
 ## Refreshed baseline
-BUILD-009 is complete. Use its [matched source comparison](../../../ara/evidence/tables/build009_current_compile_measurement.md)
+BUILD-009 is complete. Use its [matched source comparison](../../ara/evidence/tables/build009_current_compile_measurement.md)
 and retained producer/critical-path records; the old BUILD-007 costs are historical.
 Freeze this task's immediate-before source before attributing its own changes.
 
@@ -87,3 +87,50 @@ records. A header split alone cannot remove that frame's type dependency.
 Changing it to a borrow of the current temporary Prepare*Frame arguments would
 dangle. Resolve a concrete storage/lifetime design before claiming that split
 isolates consumers. No implementation or no-change closure is claimed by this audit.
+
+## Selected implementation — 2026-09-16
+- Operator-directed continuation, immediate-before `be4066391`; one root writer,
+  Claude reviewing fixed packets under standing source-sharing authorization.
+- Canonical Clang metadata shows three avoidable app consumers: DomainPanels,
+  MeshProcessingPanels and PanelSupport. Session and service operations retain
+  necessary typed config/results dependencies; do not add a facade to hide them.
+- The shell's existing prepared-frame storage now owns the service frame; the
+  app context borrows it through a const pointer and rejects construction from
+  frame temporaries via a non-const lvalue parameter. Context resets before
+  prepared storage at draw completion and detach. The type's sole definition
+  joins its existing globally attached family records.
+- Move consolidation-specific declarations into one app-private header and
+  definitions into existing MethodPanels.cpp. No added compiled file/module or
+  DTO. Remove two duplicate availability flags; only MethodPanels reads the
+  remaining clustering flag directly from its frame. A private empty-frame
+  fallback shared by three concrete consumers preserves default-context behavior.
+- Baseline-negative/final-positive compiler checks demonstrate that the three
+  consumers no longer reach consolidation Config or PointCloudServiceOperations.
+  Existing canonical validators, service callbacks/epochs and typed results remain.
+- Claude approved the design subject to lifetime order, complete caller builds
+  and real target accounting. Verify fresh Clang20 app/runtime closure. Named
+  free-function return types are not generally encoded in their mangled name;
+  do not repeat the review's blanket ABI statement. Proper dependency-driven
+  Clang23 rebuild plus fresh Clang20 verification is the required gate.
+- Freeze matched editor-target config implementation/interface probes only after
+  final source verification. Runtime-only probes cannot measure the app cut;
+  report actual counts and per-producer costs, including relocated method helpers.
+
+## Source verification checkpoint
+- Canonical ci configure and IntrinsicTests build pass with Clang23. Focused
+  CPU: 158 passes (14.33 s). Full CPU: 4,666 passed, one expected ASan-only
+  lifecycle skip, zero failures out of 4,667 selected (150.51 s). Strengthened
+  valid-request/null-context coverage was rebuilt and all nine consolidation/
+  context-draw cases passed afterward (0.51 s); production source unchanged.
+- Fresh cache-off Clang20 Null/headless editor/runtime closure plus all three
+  actual caller test objects passed, with a final no-op reconciliation. This is
+  minimum-compiler build evidence, not Clang20 test execution. No GPU execution
+  or sanitizer claim. Strict layering/task/docs checks pass; regenerated module
+  inventory remains 419 modules with no serialized inventory difference.
+- Source accounting: +34 net C++ lines, one private declaration header, one
+  CMake header entry, no new compiled file/module/state owner or layer edge.
+  This slice isolates compilation and removes duplicate availability fields;
+  it is not a source-line reduction claim.
+- Claude reviewed plan/fixed diff/complete linkage and guard context; findings
+  resolved against source. Matched config editor-target comparison remains
+  necessary before retirement.

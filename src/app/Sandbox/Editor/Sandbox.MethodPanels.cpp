@@ -46,15 +46,203 @@ import Extrinsic.Runtime.MeshTopologyOperations;
 import Extrinsic.Runtime.ParameterizationOperations;
 import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationTypes;
+import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.ProgressivePoissonConfig;
 import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
-import Extrinsic.Runtime.PointCloudConsolidationTypes;
 
 #include "Sandbox.PanelSupport.hpp"
+#include "Sandbox.PointCloudConsolidationPanel.hpp"
+
+namespace Extrinsic::Sandbox::Editor
+{
+    namespace
+    {
+        const Runtime::EditorPointCloudServicePreparedFrame& PointCloudServiceFrame(
+            const SandboxEditorContext& context)
+        {
+            // Preserve the empty, unavailable state of a default context.
+            static const Runtime::EditorPointCloudServicePreparedFrame unavailable{};
+            return context.PointCloudService ? *context.PointCloudService : unavailable;
+        }
+    }
+}
+
+extern "C++"
+{
+namespace Extrinsic::Sandbox::Editor
+{
+        [[nodiscard]] bool IsSupportedPointCloudConsolidationStrategy(
+            const Runtime::PointCloudConsolidationStrategy strategy) noexcept
+        {
+            const auto options =
+                SandboxPointCloudConsolidationStrategyOptions();
+            return std::any_of(
+                options.begin(),
+                options.end(),
+                [strategy](
+                    const SandboxPointCloudConsolidationStrategyOption& option)
+                {
+                    return option.Strategy == strategy && option.Available &&
+                           !option.StableToken.empty();
+                });
+        }
+
+    std::array<SandboxPointCloudConsolidationStrategyOption, 4u>
+    SandboxPointCloudConsolidationStrategyOptions() noexcept
+    {
+        using Strategy = Runtime::PointCloudConsolidationStrategy;
+        return {
+            SandboxPointCloudConsolidationStrategyOption{
+                .Strategy = Strategy::Lop,
+                .Label = "LOP",
+                .StableToken = Runtime::StableToken(Strategy::Lop),
+                .Available = true,
+            },
+            SandboxPointCloudConsolidationStrategyOption{
+                .Strategy = Strategy::Wlop,
+                .Label = "WLOP",
+                .StableToken = Runtime::StableToken(Strategy::Wlop),
+                .Available = true,
+            },
+            SandboxPointCloudConsolidationStrategyOption{
+                .Strategy = Strategy::Clop,
+                .Label = "CLOP",
+                .StableToken = Runtime::StableToken(Strategy::Clop),
+                .Available = true,
+            },
+            SandboxPointCloudConsolidationStrategyOption{
+                .Strategy = Strategy::Ear,
+                .Label = "EAR",
+                .StableToken = Runtime::StableToken(Strategy::Ear),
+                .Available = true,
+            },
+        };
+    }
+
+    std::optional<SandboxPointCloudConsolidationPanelApplyRequest>
+    BuildSandboxPointCloudConsolidationPanelApplyRequest(
+        const std::uint32_t stableEntityId,
+        const Runtime::PointCloudConsolidationPropertyRefs& properties,
+        const SandboxPointCloudConsolidationPanelConfig& config)
+    {
+        if (stableEntityId == 0u ||
+            !Runtime::IsValidPointCloudConsolidationPropertyRefs(properties) ||
+            !IsSupportedPointCloudConsolidationStrategy(config.Strategy) ||
+            Runtime::StableToken(config.Strategy).empty())
+        {
+            return std::nullopt;
+        }
+
+        if (!Runtime::IsValidEditorPointCloudConsolidationConfig(config))
+            return std::nullopt;
+
+        return SandboxPointCloudConsolidationPanelApplyRequest{
+            .Config = config,
+            .Execute = Runtime::PointCloudConsolidationRequest{
+                .StableEntityId = stableEntityId,
+                .Properties = properties,
+                .Config = config,
+            },
+        };
+    }
+
+    SandboxPointCloudConsolidationPanelActionResult
+    ApplySandboxPointCloudConsolidationPanelAction(
+        const SandboxEditorContext& context,
+        const std::uint32_t stableEntityId,
+        const Runtime::PointCloudConsolidationPropertyRefs& properties,
+        const SandboxPointCloudConsolidationPanelConfig& config)
+    {
+        const auto& service = PointCloudServiceFrame(context);
+        SandboxPointCloudConsolidationPanelActionResult result{};
+        result.Config.Status =
+            Runtime::RuntimeEngineConfigApplyStatus::Rejected;
+        result.Config.Source = Runtime::RuntimeConfigControlSource::Editor;
+        const auto request =
+            BuildSandboxPointCloudConsolidationPanelApplyRequest(
+                stableEntityId, properties, config);
+        if (!request.has_value())
+            return result;
+
+        result.Config = Runtime::ApplyEditorPointCloudConsolidationConfig(
+            service.Commands,
+            request->Config,
+            request->SourceId);
+        if (result.Config.Succeeded())
+        {
+            result.Submission =
+                Runtime::SubmitEditorPointCloudConsolidation(
+                    service.Commands,
+                    service.PointCloudConsolidation,
+                    request->Execute);
+        }
+        return result;
+    }
+
+    SandboxPointCloudConsolidationResultSummary
+    BuildSandboxPointCloudConsolidationResultSummary(
+        const Runtime::PointCloudConsolidationResult& result)
+    {
+        return SandboxPointCloudConsolidationResultSummary{
+            .Succeeded = result.Succeeded(),
+            .Queued = result.Status ==
+                Runtime::PointCloudConsolidationRunStatus::Queued,
+            .Status = std::string{Runtime::ToString(result.Status)},
+            .ImplementationId = result.ImplementationId,
+            .StrategyToken = result.StrategyToken,
+            .RequestedBackend = std::string{
+                Runtime::StableToken(result.RequestedBackend)},
+            .ActualBackend = std::string{
+                Runtime::StableToken(result.ActualBackend)},
+            .FellBackToCpu = result.FellBackToCpu,
+            .BackendDiagnostic = result.BackendDiagnostic,
+            .SupportRadiusAnalysisStatus =
+                result.SupportRadiusAnalysisStatus,
+            .SupportRadiusSource = result.SupportRadiusSource,
+            .SupportRadiusQuantile = result.SupportRadiusQuantile,
+            .Message = result.Message,
+            .SupportRadiusEstimatorVersion =
+                result.SupportRadiusEstimatorVersion,
+            .SupportRadiusProfileSampleCount =
+                result.SupportRadiusProfileSampleCount,
+            .SupportRadiusRequestedNeighborRank =
+                result.SupportRadiusRequestedNeighborRank,
+            .SupportRadiusNeighborRank =
+                result.SupportRadiusNeighborRank,
+            .SupportRadiusWorkloadAdjusted =
+                result.SupportRadiusWorkloadAdjusted,
+            .SupportRadiusNeighborDistance =
+                result.SupportRadiusNeighborDistance,
+            .ResolvedSupportRadius = result.ResolvedSupportRadius,
+            .SupportRadiusBoundingBoxDiagonal =
+                result.SupportRadiusBoundingBoxDiagonal,
+            .SupportNeighborsP50 = result.SupportNeighborsP50,
+            .SupportNeighborsP95 = result.SupportNeighborsP95,
+            .SupportNeighborsMax = result.SupportNeighborsMax,
+            .PredictedSupportQueryCount =
+                result.PredictedSupportQueryCount,
+            .PredictedContributionCount =
+                result.PredictedContributionCount,
+            .InputPointCount = result.InputPointCount,
+            .OutputPointCount = result.OutputPointCount,
+            .Iterations = result.Iterations,
+            .Converged = result.Converged,
+            .AverageDisplacement = result.AverageDisplacement,
+            .MaxDisplacement = result.MaxDisplacement,
+            .UsedAuthoredNormals = result.UsedAuthoredNormals,
+            .EstimatedNormals = result.EstimatedNormals,
+            .NormalRefinementIterations =
+                result.NormalRefinementIterations,
+            .InsertedPointCount = result.InsertedPointCount,
+        };
+    }
+
+}
+}
 
 namespace Extrinsic::Sandbox::Editor
 {
@@ -1339,6 +1527,7 @@ namespace Extrinsic::Sandbox::Editor
             const SandboxEditorContext& context,
             const std::string& windowTitle)
         {
+            const auto& service = PointCloudServiceFrame(context);
             ImGui::SetNextWindowSize(
                 ImVec2(440.0f, 660.0f),
                 ImGuiCond_FirstUseEver);
@@ -1362,18 +1551,18 @@ namespace Extrinsic::Sandbox::Editor
                 {
                     const auto active =
                         Runtime::GetEditorPointCloudConsolidationConfig(
-                            context.PointCloudService.Commands);
+                            service.Commands);
                     if (active.has_value())
                     {
                         PointCloudConsolidation.Draft = *active;
                         PointCloudConsolidation.Initialized = true;
                     }
                 }
-                if (context.PointCloudService.Results
+                if (service.Results
                         .LastPointCloudConsolidationResult.has_value())
                 {
                     PointCloudConsolidation.LastResult =
-                        *context.PointCloudService.Results
+                        *service.Results
                              .LastPointCloudConsolidationResult;
                 }
 
@@ -1398,8 +1587,8 @@ namespace Extrinsic::Sandbox::Editor
                 {
                     availability =
                         Runtime::ResolveEditorPointCloudConsolidationAvailability(
-                            context.PointCloudService.Commands,
-                            context.PointCloudService.PointCloudConsolidation,
+                            service.Commands,
+                            service.PointCloudConsolidation,
                             request->Execute);
                 }
                 else
@@ -1422,7 +1611,7 @@ namespace Extrinsic::Sandbox::Editor
                 {
                     PointCloudConsolidation.LastConfigApply =
                         Runtime::ApplyEditorPointCloudConsolidationConfig(
-                            context.PointCloudService.Commands,
+                            service.Commands,
                             PointCloudConsolidation.Draft,
                             "sandbox.point_cloud_consolidation.panel");
                     if (PointCloudConsolidation.LastConfigApply->Succeeded())
@@ -1557,6 +1746,7 @@ namespace Extrinsic::Sandbox::Editor
             const Runtime::EditorDomainWindowModel& model,
             const SandboxEditorContext& context)
         {
+            const auto& service = PointCloudServiceFrame(context);
             const Runtime::EditorGeometryProcessingModel& processing =
                 model.Processing;
             ImGui::SeparatorText("K-Means execution");
@@ -1567,12 +1757,12 @@ namespace Extrinsic::Sandbox::Editor
                 return;
             }
 
-            if (context.PointCloudService.Results.LastKMeansResult.has_value())
-                KMeans.LastResult = *context.PointCloudService.Results.LastKMeansResult;
+            if (service.Results.LastKMeansResult.has_value())
+                KMeans.LastResult = *service.Results.LastKMeansResult;
             if (!KMeans.Initialized || !KMeans.Dirty)
             {
                 const std::optional<Runtime::ClusteringConfig> active =
-                    Runtime::GetEditorClusteringConfig(context.PointCloudService.Commands);
+                    Runtime::GetEditorClusteringConfig(service.Commands);
                 if (active.has_value())
                 {
                     KMeans.Backend = KMeansBackendIndex(active->Backend);
@@ -1708,7 +1898,7 @@ namespace Extrinsic::Sandbox::Editor
             {
                 KMeans.LastConfigApply =
                     Runtime::ApplyEditorClusteringConfig(
-                        context.PointCloudService.Commands,
+                        service.Commands,
                         clusteringConfig,
                         "sandbox.clustering.panel");
                 if (KMeans.LastConfigApply->Succeeded())
@@ -1724,13 +1914,13 @@ namespace Extrinsic::Sandbox::Editor
             }
             ImGui::EndDisabled();
 
-            const bool clusteringAvailable = context.ClusteringAvailable;
+            const bool clusteringAvailable = service.ClusteringAvailable;
             ImGui::BeginDisabled(!clusteringAvailable || !configAvailable);
             if (ImGui::Button("Run K-Means##KMeans"))
             {
                 KMeans.LastConfigApply =
                     Runtime::ApplyEditorClusteringConfig(
-                        context.PointCloudService.Commands,
+                        service.Commands,
                         clusteringConfig,
                         "sandbox.clustering.panel.run");
                 if (KMeans.LastConfigApply->Succeeded())
@@ -1742,8 +1932,8 @@ namespace Extrinsic::Sandbox::Editor
                             KMeans.Properties,
                             clusteringConfig);
                     KMeans.LastResult = Runtime::SubmitKMeansRun(
-                        context.PointCloudService.Commands,
-                        context.PointCloudService.Clustering,
+                        service.Commands,
+                        service.Clustering,
                         request);
                 }
             }
@@ -1771,7 +1961,7 @@ namespace Extrinsic::Sandbox::Editor
             DrawKMeansResultStatus(result);
             if (hasResult)
             {
-                DrawDismissLastResultButton("Dismiss##KMeans", KMeans.LastResult, Runtime::EditorPointCloudServiceResultSlot::KMeans, context.PointCloudService.ResultSinks.DismissResult);
+                DrawDismissLastResultButton("Dismiss##KMeans", KMeans.LastResult, Runtime::EditorPointCloudServiceResultSlot::KMeans, service.ResultSinks.DismissResult);
             }
         }
 
