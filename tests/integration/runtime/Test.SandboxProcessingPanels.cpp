@@ -1095,6 +1095,130 @@ TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePu
     }
 }
 
+TEST(SandboxProcessingPanels, ProgressivePoissonManualAndDebouncedRunsShareConfigApply)
+{
+    bool reject = false;
+    unsigned rejections = 0;
+    PanelHarness h(RejectableConfigRegistry(R::kProgressivePoissonConfigSectionName, reject, rejections));
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::PointCloudPoint);
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    auto& props = scene.Raw().get<GS::Vertices>(entity).Properties;
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto poisson = *R::GetProgressivePoissonPlaygroundConfig(config);
+    poisson.Dimension = 2; poisson.GridWidth = 3; poisson.MaxLevels = 5;
+    // The float widget's widened request differs from this serialized double,
+    // so an injected fallback really loses an edit even on a manual Run.
+    poisson.RadiusAlpha = .4;
+    poisson.AutoRunOnEdit = true; poisson.DebounceSeconds = .25;
+    R::SetProgressivePoissonPlaygroundConfig(config, poisson);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("pointcloud.processing.progressive_poisson", true));
+    std::optional<R::EditorProgressivePoissonResult> result;
+    const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id = "test.poisson_execution", .MenuPath = {"View"}, .Title = "Poisson execution observer",
+        .OpenByDefault = true,
+        .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
+            result = context.PointSet.Results.LastProgressivePoissonResult;
+        }});
+    int frame = 0, step = 0, phase = 0;
+    std::uint64_t jobsBefore = 0;
+    bool completed = false;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frame > 400) { ADD_FAILURE() << "Poisson panel did not complete"; engine.RequestExit(); return; }
+        auto* window = ImGui::FindWindowByName("PointCloud / Processing / Progressive Poisson");
+        if (!window) return;
+        ImGui::SetWindowSize(window, {850, 1400});
+        ImGui::SetWindowPos(window, {0, 0});
+        ++step;
+        const auto run = [&] { ImGui::ActivateItemByID(window->GetID("Run Progressive Poisson##ProgressivePoisson")); };
+        const auto active = [&] { return *R::GetProgressivePoissonPlaygroundConfig(h.Control().GetEngineConfigControlState().ActiveConfig); };
+        if (phase == 0)
+        {
+            if (step == 2) jobsBefore = engine.Jobs().Stats().SubmittedJobs;
+            if (step == 3) { reject = true; run(); }
+            if (step == 7)
+            {
+                EXPECT_GT(rejections, 0u);
+                EXPECT_FALSE(result);
+                EXPECT_FALSE(props.Exists(poisson.Rank.Name));
+                EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
+                EXPECT_DOUBLE_EQ(active().RadiusAlpha, .4);
+                reject = false;
+                run();
+                phase = 1; step = 0;
+            }
+        }
+        else if (phase == 1 && result && result->Succeeded())
+        {
+            EXPECT_TRUE(props.Exists(poisson.Rank.Name));
+            EXPECT_EQ(props.Size(), 9u);
+            EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore + 1);
+            EXPECT_DOUBLE_EQ(active().RadiusAlpha, double(float(.4)));
+            jobsBefore = engine.Jobs().Stats().SubmittedJobs;
+            phase = 2; step = 0;
+        }
+        else if (phase == 2)
+        {
+            EditScalarControl(window, "Grid width##ProgressivePoisson", step - 3, "5");
+            if (step == 10)
+            {
+                EXPECT_EQ(active().GridWidth, 5u);
+                EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
+                // Change the accepted config during debounce, then make the
+                // widget's widened request fail. Advance UI time without sleep.
+                auto updated = h.Control().GetEngineConfigControlState().ActiveConfig;
+                auto value = active(); value.RadiusAlpha = .41;
+                R::SetProgressivePoissonPlaygroundConfig(updated, value);
+                EXPECT_TRUE(h.Apply(updated));
+                rejections = 0; reject = true;
+                ImGui::GetCurrentContext()->Time += 1.;
+            }
+            if (step == 14)
+            {
+                EXPECT_GT(rejections, 0u);
+                EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
+                EXPECT_DOUBLE_EQ(active().RadiusAlpha, .41);
+                reject = false;
+                ImGui::GetCurrentContext()->Time += 1.;
+            }
+            if (step == 18)
+            {
+                EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore)
+                    << "A rejected auto-run must not retry every frame";
+                run();
+                phase = 3; step = 0;
+            }
+        }
+        else if (phase == 3 && result && result->Succeeded() &&
+                 engine.Jobs().Stats().SubmittedJobs > jobsBefore)
+        {
+            EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore + 1);
+            EXPECT_DOUBLE_EQ(active().RadiusAlpha, double(float(.41)));
+            jobsBefore = engine.Jobs().Stats().SubmittedJobs;
+            phase = 4; step = 0;
+        }
+        else if (phase == 4)
+        {
+            EditScalarControl(window, "Grid width##ProgressivePoisson", step - 3, "7");
+            if (step == 10) ImGui::GetCurrentContext()->Time += 1.;
+            if (step > 12 && result && result->Succeeded() &&
+                engine.Jobs().Stats().SubmittedJobs > jobsBefore)
+            {
+                EXPECT_EQ(active().GridWidth, 7u);
+                EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore + 1);
+                EXPECT_EQ(props.Size(), 9u);
+                completed = true;
+                engine.RequestExit();
+            }
+        }
+    };
+    h.Engine->Run();
+    EXPECT_TRUE(completed);
+    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
+}
+
 TEST(SandboxProcessingPanels, OutlierActionsApplyTheirOwnRequestAndRetryRejectedConfig)
 {
     bool reject = false;

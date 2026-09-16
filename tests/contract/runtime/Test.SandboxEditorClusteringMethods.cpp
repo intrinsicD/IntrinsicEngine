@@ -1788,17 +1788,60 @@ TEST(SandboxEditorUi, ProgressivePoissonConfigCommandRoutesThroughConfigControl)
     config.AutoRunOnEdit = true;
     config.DebounceSeconds = 0.2;
 
-    const Runtime::EditorProgressivePoissonConfigResult configResult =
-        Runtime::ApplyEditorProgressivePoissonConfigCommand(
-            configContext,
-            Runtime::EditorProgressivePoissonConfigCommand{
-                .Config = config,
-                .SourceId = "test-progressive-poisson-config",
-            });
+    const auto configResult = Runtime::ApplyEditorProgressivePoissonConfig(
+        configContext, config, "test-progressive-poisson-config");
 
-    ASSERT_TRUE(configResult.Succeeded()) << configResult.Message;
+    ASSERT_TRUE(configResult.Succeeded());
+    EXPECT_EQ(configResult.LoadResult.SourceId, "test-progressive-poisson-config");
     EXPECT_EQ(previewCalls, 1);
     EXPECT_EQ(applyCalls, 1);
+    for (unsigned missing = 0; missing < 5; ++missing)
+    {
+        auto unavailable = configContext;
+        if (missing == 0) unavailable.EngineConfigControlState = nullptr;
+        if (missing == 1) unavailable.EngineConfigCommandsAvailable = false;
+        if (missing == 2) unavailable.PreviewEngineConfigDocument = {};
+        if (missing == 3) unavailable.ApplyEngineConfigHotSubset = {};
+        if (missing == 4) unavailable.AttachmentActive = [] { return false; };
+        EXPECT_FALSE(Runtime::ApplyEditorProgressivePoissonConfig(unavailable, config).Succeeded());
+    }
+    EXPECT_EQ(previewCalls, 1);
+    EXPECT_EQ(applyCalls, 1);
+    auto invalid = config;
+    invalid.GridWidth = 0;
+    const auto invalidResult = Runtime::ApplyEditorProgressivePoissonConfig(configContext, invalid);
+    EXPECT_FALSE(invalidResult.Succeeded());
+    EXPECT_FALSE(invalidResult.LoadResult.Diagnostics.empty());
+    EXPECT_EQ(applyCalls, 1);
+    EXPECT_EQ(Runtime::GetProgressivePoissonPlaygroundConfig(controlState.ActiveConfig)->GridWidth, 3u);
+
+    auto rejectedApply = configContext;
+    rejectedApply.ApplyEngineConfigHotSubset = [](const auto& preview) {
+        return Runtime::RuntimeEngineConfigApplyResult{
+            .Status = Runtime::RuntimeEngineConfigApplyStatus::Rejected, .LoadResult = preview};
+    };
+    EXPECT_FALSE(Runtime::ApplyEditorProgressivePoissonConfig(rejectedApply, config).Succeeded());
+    rejectedApply.ApplyEngineConfigHotSubset = [](const auto& preview) {
+        return Runtime::RuntimeEngineConfigApplyResult{
+            .Status = Runtime::RuntimeEngineConfigApplyStatus::NoChange, .LoadResult = preview};
+    };
+    const auto noChange = Runtime::ApplyEditorProgressivePoissonConfig(rejectedApply, config);
+    EXPECT_TRUE(noChange.Succeeded());
+    EXPECT_EQ(noChange.Status, Runtime::RuntimeEngineConfigApplyStatus::NoChange);
+    EXPECT_EQ(noChange.LoadResult.SourceId, Runtime::kProgressivePoissonConfigSectionName);
+
+    auto lostEdit = configContext;
+    lostEdit.PreviewEngineConfigDocument = [&](const auto&, const auto&) {
+        Core::Config::EngineConfigLoadResult result;
+        result.State = Core::Config::EngineConfigState::FallbackApplied;
+        result.Preview.Config = controlState.ActiveConfig;
+        return result;
+    };
+    auto changedConfig = config;
+    changedConfig.GridWidth = 7;
+    EXPECT_FALSE(Runtime::ApplyEditorProgressivePoissonConfig(lostEdit, changedConfig).Succeeded());
+    EXPECT_EQ(applyCalls, 1);
+    EXPECT_EQ(Runtime::GetProgressivePoissonPlaygroundConfig(controlState.ActiveConfig)->GridWidth, 3u);
     const auto activePoisson = Runtime::GetProgressivePoissonPlaygroundConfig(
         controlState.ActiveConfig);
     ASSERT_TRUE(activePoisson.has_value());

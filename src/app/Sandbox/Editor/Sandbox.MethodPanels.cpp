@@ -513,11 +513,8 @@ namespace Extrinsic::Sandbox::Editor
         void DrawProgressivePoissonDisabledRun(
             const std::string_view disabledReason)
         {
-            ImGui::BeginDisabled();
-            (void)ImGui::Button(
-                "Run Progressive Poisson##ProgressivePoisson");
-            ImGui::EndDisabled();
-            DrawDisabledReasonTooltip(disabledReason);
+            (void)DrawProcessingActionButton("Run Progressive Poisson##ProgressivePoisson",
+                {false, std::string{disabledReason}});
             if (!disabledReason.empty())
                 ImGui::TextDisabled("%.*s",
                                     static_cast<int>(disabledReason.size()),
@@ -570,7 +567,7 @@ namespace Extrinsic::Sandbox::Editor
             ProcessingEntityInput Input{};
             std::optional<Runtime::EditorProgressivePoissonResult>
                 LastResult{};
-            std::optional<Runtime::EditorProgressivePoissonConfigResult>
+            std::optional<Runtime::RuntimeEngineConfigApplyResult>
                 LastConfigResult{};
             Runtime::ProgressivePoissonPlaygroundConfig Bindings{};
             std::string VisualizationDiagnostic{};
@@ -1732,7 +1729,8 @@ namespace Extrinsic::Sandbox::Editor
                             ? "Select a matching domain entity with finite vertex positions."
                             : std::string_view{
                                   model.Diagnostics.front().Message};
-                    DrawProgressivePoissonDisabledRun(disabledReason);
+                    (void)DrawProcessingActionButton("Run K-Means##KMeans",
+                        {false, std::string{disabledReason}});
                 }
                 else
                 {
@@ -2379,15 +2377,15 @@ namespace Extrinsic::Sandbox::Editor
 
             const auto applyConfig = [&]()
             {
-                return Runtime::ApplyEditorProgressivePoissonConfigCommand(
-                    context.PointSet.Commands,
-                    Runtime::EditorProgressivePoissonConfigCommand{
-                        .Config = BuildProgressivePoissonConfig(),
-                        .SourceId = "sandbox.progressive_poisson",
-                    });
+                return Runtime::ApplyEditorProgressivePoissonConfig(
+                    context.PointSet.Commands, BuildProgressivePoissonConfig());
             };
             const auto runSampler = [&]()
             {
+                ProgressivePoisson.AutoRunPending = false;
+                ProgressivePoisson.PendingStableEntityId = 0u;
+                ProgressivePoisson.LastConfigResult = applyConfig();
+                if (!ProgressivePoisson.LastConfigResult->Succeeded()) return;
                 Runtime::EditorProgressivePoissonResult result =
                     Runtime::ApplyEditorProgressivePoissonCommand(
                         context.PointSet.Commands,
@@ -2402,8 +2400,6 @@ namespace Extrinsic::Sandbox::Editor
                     context.PointSet.ResultSinks.ProgressivePoisson(
                         std::move(result));
                 }
-                ProgressivePoisson.AutoRunPending = false;
-                ProgressivePoisson.PendingStableEntityId = 0u;
             };
 
             if (configChanged)
@@ -2424,15 +2420,12 @@ namespace Extrinsic::Sandbox::Editor
                 }
             }
 
-            if (ImGui::Button(
-                    "Run Progressive Poisson##ProgressivePoisson"))
-            {
-                ProgressivePoisson.LastConfigResult = applyConfig();
-                if (ProgressivePoisson.LastConfigResult->Succeeded())
-                    runSampler();
-            }
+            const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
+                context.PointSet.Commands, {true, {}});
+            if (DrawProcessingActionButton("Run Progressive Poisson##ProgressivePoisson", readiness))
+                runSampler();
 
-            if (ProgressivePoisson.AutoRunPending &&
+            if (ProgressivePoisson.AutoRunPending && readiness.Enabled &&
                 ProgressivePoisson.PendingStableEntityId ==
                     model.SelectedStableId)
             {
@@ -2459,9 +2452,9 @@ namespace Extrinsic::Sandbox::Editor
             if (ProgressivePoisson.LastConfigResult.has_value() &&
                 !ProgressivePoisson.LastConfigResult->Succeeded())
             {
-                ImGui::TextWrapped(
-                    "%s",
-                    ProgressivePoisson.LastConfigResult->Message.c_str());
+                ImGui::TextWrapped("Progressive Poisson config was rejected.");
+                for (const auto& diagnostic : ProgressivePoisson.LastConfigResult->LoadResult.Diagnostics)
+                    ImGui::TextWrapped("%s", diagnostic.Message.c_str());
             }
 
             const std::optional<Runtime::EditorProgressivePoissonResult>& result =

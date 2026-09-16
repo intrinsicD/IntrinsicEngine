@@ -2598,3 +2598,11 @@ entries:
     - Claude identified overly coarse whole-config fallback rejection. Reuse the existing pure app-section updater
       to detect only lost requested edits; preserve separate outlier/ICP triggers and keep UI-037 active.
     - Unrelated staged observations retain their owners and stale flags; no new closure or abandonment signal.
+
+  - turn: 2026-09-16_001#7
+    notes:
+    - N611 records a bounded implementation/reuse decision and verification only; no new benchmark or scientific
+      claim, observation promotion or whole-task closure. UI-037 remains active.
+    - Distinguish source-line reduction from unmeasured compile-time improvement. Full CPU evidence does not
+      establish GPU or sanitizer execution; preserve exact rejection/retry semantics and quiet-harness job counts.
+    - Unrelated staged observations retain their owners and stale flags; no new closure or abandonment signal.

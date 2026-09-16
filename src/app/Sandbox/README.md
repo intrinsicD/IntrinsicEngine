@@ -208,7 +208,9 @@ Unavailable buttons remain visible; the shared tooltip uses
 retry clears its prior error; UI and agent callers use the same runtime config
 validation, and every Run reapplies before execution.
 
-Progressive Poisson exposes its position, level, rank, radius, and prefix slots;
+Progressive Poisson uses the shared typed config apply result; manual and debounced
+runs both reapply before execution and clear pending auto-run on rejection.
+It exposes its position, level, rank, radius, and prefix slots;
 Geodesics exposes editable distance/source-mask outputs; K-Means exposes typed
 position, label, and color slots. Parameterization exposes position/UV bindings,
 and its UV preview follows the configured output. Their Show buttons display

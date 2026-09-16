@@ -601,10 +601,10 @@ sessions:
 - id: 2026-09-16_001
   date: '2026-09-16'
   summary: Retired RUNTIME-268, GRAPHICS-144/145 and RUNTIME-267 with bounded compile evidence; continued UI-037
-    readiness/button and execution reuse with Claude review and full CPU verification. Outlier/ICP config retries
-    and lost-edit fallback are covered; broader readiness, material/shader/cache work remain open.
-  turn_count: 6
-  events_count: 16
+    readiness/button and execution reuse with Claude review and full CPU verification. Outlier/ICP and
+    Progressive Poisson config rejection/retries are covered; broader readiness, material/shader/cache work remain open.
+  turn_count: 7
+  events_count: 17
   claims_touched:
   - C99
   - C100

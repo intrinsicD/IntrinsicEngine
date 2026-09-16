@@ -456,9 +456,9 @@ the removed `Runtime.SandboxEditorFacades` and
 | `SandboxEditorGeometryProcessingMenuItem` | `EditorGeometryProcessingMenuItem` | `Runtime.GeometryProcessingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorProgressivePoissonCommand` | `EditorProgressivePoissonCommand` | `Runtime.PointSetOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorProgressivePoissonResult` | `EditorProgressivePoissonResult` | `Runtime.PointSetOperations.cppm` | feature-owned runtime contract |
-| `SandboxEditorProgressivePoissonConfigStatus` | `EditorProgressivePoissonConfigStatus` | `Runtime.PointSetOperations.cppm` | feature-owned runtime contract |
-| `SandboxEditorProgressivePoissonConfigCommand` | `EditorProgressivePoissonConfigCommand` | `Runtime.PointSetOperations.cppm` | feature-owned runtime contract |
-| `SandboxEditorProgressivePoissonConfigResult` | `EditorProgressivePoissonConfigResult` | `Runtime.PointSetOperations.cppm` | feature-owned runtime contract |
+| `SandboxEditorProgressivePoissonConfigStatus` | `RuntimeEngineConfigApplyStatus` | `Runtime.EngineConfigControl.cppm` | shared config result contract |
+| `SandboxEditorProgressivePoissonConfigCommand` | `ProgressivePoissonPlaygroundConfig` | `Runtime.ProgressivePoissonConfig.cppm` | typed config passed directly to shared apply |
+| `SandboxEditorProgressivePoissonConfigResult` | `RuntimeEngineConfigApplyResult` | `Runtime.EngineConfigControl.cppm` | shared config result; one preview/diagnostic payload |
 | `SandboxEditorMeshDenoiseStage` | `EditorMeshDenoiseStage` | `Runtime.MeshTopologyOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorMeshCurvatureOutput` | `EditorMeshCurvatureOutput` | `Runtime.MeshCurvatureConfig.cppm` | feature-owned runtime contract |
 | `SandboxEditorMeshRemeshMode` | `EditorMeshRemeshMode` | `Runtime.MeshTopologyOperations.cppm` | feature-owned runtime contract |

@@ -13198,3 +13198,26 @@ tree:
     - tests/contract/runtime/Test.NormalEstimation.cpp
     - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
     status: resolved
+
+  - id: N611
+    type: decision
+    title: Replace bespoke Poisson config plumbing with the shared processing apply owner
+    provenance: ai-executed
+    timestamp: '2026-09-16T11:51:18+02:00'
+    choice: Continue UI-037 by deleting three redundant public config records and routing typed Poisson config
+      through the existing shared apply owner. Manual and debounced runs apply before execution and clear pending
+      work on rejection. Claude review resolved; three focused cases and full CPU verification pass with 4671
+      passes plus one expected skip. Net 86 production lines removed, no new files/modules or compile-time claim.
+      UI-037 remains active for its broader readiness inventory.
+    alternatives:
+    - Retain a method-specific copy of config preview/apply and nested preview results
+    - Allow deferred execution to bypass current config acceptance
+    - Add a new service or compatibility wrapper around the canonical apply owner
+    evidence:
+    - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
+    - src/runtime/Editor/Operations/Runtime.PointSetOperations.cppm
+    - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
+    - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+    - tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+    - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
+    status: resolved

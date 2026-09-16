@@ -15,7 +15,6 @@ export import Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.EditorCommon;
 export import Extrinsic.Runtime.BilateralFilterConfig;
 export import Extrinsic.Runtime.ProgressivePoissonConfig;
-import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Error;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
@@ -90,36 +89,6 @@ export namespace Extrinsic::Runtime
         }
     };
 
-    enum class EditorProgressivePoissonConfigStatus : std::uint8_t
-    {
-        None = 0,
-        Applied,
-        NoChange,
-        MissingConfigControl,
-        PreviewRejected,
-        ApplyRejected,
-    };
-
-    struct EditorProgressivePoissonConfigCommand
-    {
-        ProgressivePoissonPlaygroundConfig Config{};
-        std::string SourceId{"sandbox.progressive_poisson"};
-    };
-
-    struct EditorProgressivePoissonConfigResult
-    {
-        EditorProgressivePoissonConfigStatus Status{EditorProgressivePoissonConfigStatus::None};
-        Core::Config::EngineConfigLoadResult Preview{};
-        RuntimeEngineConfigApplyResult Apply{};
-        std::string Message{};
-
-        [[nodiscard]] bool Succeeded() const noexcept
-        {
-            return Status == EditorProgressivePoissonConfigStatus::Applied ||
-                   Status == EditorProgressivePoissonConfigStatus::NoChange;
-        }
-    };
-
     enum class EditorPointSetResultSlot : std::uint8_t { BilateralFilter, ProgressivePoisson };
     // Private workspace bindings borrow incomplete containers so sibling features
     // need not import these method records.
@@ -161,8 +130,8 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] EditorProgressivePoissonResult ApplyEditorProgressivePoissonCommand(
         const EditorProcessingCommands&, const EditorProgressivePoissonCommand&,
         std::function<void(EditorProgressivePoissonResult)> onComplete = {});
-    [[nodiscard]] EditorProgressivePoissonConfigResult ApplyEditorProgressivePoissonConfigCommand(
-        const EditorProcessingCommands&, const EditorProgressivePoissonConfigCommand&);
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorProgressivePoissonConfig(
+        const EditorProcessingCommands&, const ProgressivePoissonPlaygroundConfig&, std::string sourceId = {});
     [[nodiscard]] std::optional<ProgressivePoissonPlaygroundConfig>
     GetEditorProgressivePoissonConfig(const EditorProcessingCommands&);
 }

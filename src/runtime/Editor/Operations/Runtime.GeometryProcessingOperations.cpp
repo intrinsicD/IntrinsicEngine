@@ -1716,63 +1716,15 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    EditorProgressivePoissonConfigResult
-    ApplyEditorProgressivePoissonConfigCommand(
+    RuntimeEngineConfigApplyResult ApplyEditorProgressivePoissonConfig(
         const EditorProcessingCommands& commands,
-        const EditorProgressivePoissonConfigCommand& command)
+        const ProgressivePoissonPlaygroundConfig& config, std::string sourceId)
     {
-        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        EditorProgressivePoissonConfigResult result{};
-        if (context.EngineConfigControlState == nullptr ||
-            !context.PreviewEngineConfigDocument ||
-            !context.ApplyEngineConfigHotSubset ||
-            !context.EngineConfigCommandsAvailable)
-        {
-            result.Status =
-                EditorProgressivePoissonConfigStatus::MissingConfigControl;
-            result.Message =
-                "Progressive Poisson config requires the engine config-control module.";
-            return result;
-        }
-
-        Core::Config::EngineConfig candidate =
-            context.EngineConfigControlState->ActiveConfig;
-        SetProgressivePoissonPlaygroundConfig(candidate, command.Config);
-        const std::string document =
-            Core::Config::SerializeEngineConfig(candidate);
-        const std::string sourceId = command.SourceId.empty()
-            ? std::string{"sandbox.progressive_poisson"}
-            : command.SourceId;
-        result.Preview =
-            context.PreviewEngineConfigDocument(document, sourceId);
-        if (!Core::Config::IsConfigUsable(result.Preview))
-        {
-            result.Status =
-                EditorProgressivePoissonConfigStatus::PreviewRejected;
-            result.Message =
-                "Progressive Poisson config preview was rejected.";
-            return result;
-        }
-
-        result.Apply = context.ApplyEngineConfigHotSubset(result.Preview);
-        if (!result.Apply.Succeeded())
-        {
-            result.Status =
-                EditorProgressivePoissonConfigStatus::ApplyRejected;
-            result.Message =
-                "Progressive Poisson config hot-apply was rejected.";
-            return result;
-        }
-
-        result.Status =
-            result.Apply.Status == RuntimeEngineConfigApplyStatus::NoChange
-                ? EditorProgressivePoissonConfigStatus::NoChange
-                : EditorProgressivePoissonConfigStatus::Applied;
-        result.Message =
-            result.Status == EditorProgressivePoissonConfigStatus::NoChange
-                ? "Progressive Poisson config unchanged."
-                : "Progressive Poisson config applied.";
-        return result;
+        return ApplyEditorProcessingConfig(commands,
+            ValidateProgressivePoissonConfigSection(SerializeProgressivePoissonPlaygroundConfig(config), {},
+                                                    kProgressivePoissonConfigSectionName),
+            sourceId.empty() ? std::string{kProgressivePoissonConfigSectionName} : sourceId,
+            [&](Core::Config::EngineConfig& candidate) { SetProgressivePoissonPlaygroundConfig(candidate, config); });
     }
 
     std::optional<ProgressivePoissonPlaygroundConfig>

@@ -314,3 +314,46 @@ Focused regression selector:
 ```bash
 ctest --test-dir build/ci --output-on-failure -R '^NormalEstimationConfig.RoundTripAndSharedPreviewApplyRun$|^SandboxProcessingPanels\.(OutlierActionsApplyTheirOwnRequestAndRetryRejectedConfig|RegistrationRetriesConfigBeforeRunningAndPreservesTrajectoryChoice|ReusedExecutionPanelsRejectInvalidRequestsBeforePublishing)$' --no-tests=error --timeout 60
 ```
+
+### Progressive Poisson config slice — 2026-09-16
+Baseline `5cf671e06`, operator-directed reuse/compilation continuation with Claude
+review and one writer. `ApplyEditorProgressivePoissonConfigCommand` duplicates
+`ApplyEditorProcessingConfig` and publishes a bespoke status/command/result, with
+both a full preview and an apply record that already contains that preview.
+Replace it directly with the same typed config/apply result used by other methods;
+remove the superseded records and unused interface import. No compatibility shim,
+new file or module. Preserve source IDs, registered validation, diagnostics,
+NoChange, attachment guards and shared lost-edit fallback rejection.
+Manual and debounced execution share one apply-before-run lambda; a rejected
+attempt clears pending auto-run so it cannot spin. Actual GUI tests must exercise
+manual and debounced execution, rejection and retry. Other family readiness and
+property/cache preflights remain scoped follow-ups in this task. The narrow shared
+config owner is sufficient; no replacement service or generic panel framework.
+
+Verified checkpoint:
+- Progressive Poisson now reuses `ApplyEditorProcessingConfig` and
+  `RuntimeEngineConfigApplyResult`; delete the three superseded public records,
+  duplicate config preview/apply implementation and unused direct config import.
+- Manual and debounced runs share apply-before-run and clear pending execution
+  on rejection. Preserve source IDs, NoChange success, registered validation,
+  diagnostics and lost-edit fallback rejection. Fix the unrelated K-Means
+  no-selection button incorrectly displaying the Progressive Poisson label.
+- Contract coverage includes missing/expired config lanes, typed validation,
+  apply rejection, NoChange, source IDs and lost-edit fallback. Real production
+  ImGui coverage exercises manual rejection/retry, debounce rejection without
+  repeated retries, manual recovery and successful debounce execution. Advance
+  the controlled ImGui clock instead of sleeping.
+- Claude reviewed the plan, fixed source and strengthened regression. No blocking
+  finding remains: exact job counts use the deliberately quiet existing harness;
+  scalar-edit helper steps are equality-selected and negative steps are no-ops.
+- Canonical `cmake --preset ci` and `IntrinsicTests` build pass. Three focused
+  cases pass; full exclusion-only CPU CTest selects 4672, with 4671 passes and
+  one expected ASan-only lifecycle skip, zero failures (140.99 s).
+- Layering, test layout, task policy/links, docs links/sync, root hygiene and skill
+  mirror checks pass. Module inventory regenerated (419 modules, no content diff).
+  Three existing production C++ files lose 86 net physical lines; no new files,
+  modules or CMake entries. No new timing, GPU or sanitizer runtime evidence.
+- Scope/layering/tests/docs sweep passes. Clean-workshop rows 1–3 and 8 pass;
+  renderer/pass/recipe rows 4–6 unchanged; row 7 records this bounded slice.
+  UI-037 stays active for mesh/UV/bake, family readiness, backend/variant and
+  metadata/cache preflight coverage. This is not whole-inventory closure.
