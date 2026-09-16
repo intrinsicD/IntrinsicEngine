@@ -13399,3 +13399,27 @@ tree:
     - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
     - tests/support/SandboxEditorJobHarness.hpp
     status: resolved
+
+  - id: N620
+    type: decision
+    title: Remove duplicate authored material ownership from model imports
+    provenance: ai-executed
+    timestamp: '2026-09-16T19:17:52+02:00'
+    choice: Delete model-import authored material leases, copied records, parameter mapping and texture-resolution
+      polling. Keep embedded asset uploads, presentation recipes and Ready-only model replacement; extraction owns
+      effective per-renderable leases. Remove renderer/material dependencies and enforce both interface and implementation
+      with the existing compiler guard. Claude reviewed plan, diff and fixture fix. Regression-first exact allocation
+      assertions found one extra lease per model across sync/queued routes; final 33 import contracts, 4683 CPU passes
+      plus one expected skip and four ASan+UBSan Vulkan readbacks pass. Remove 368 production lines; no timing claim.
+    alternatives:
+    - Keep unused import-owned authored leases alongside the effective extraction-owned material instances
+    - Add a material handoff facade instead of deleting unconsumed state and polling
+    evidence:
+    - tasks/active/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md
+    - src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp
+    - src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cppm
+    - src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cpp
+    - tests/contract/runtime/Test.AssetImportFormatCoverage.cpp
+    - tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
+    - tests/CMakeLists.txt
+    status: resolved

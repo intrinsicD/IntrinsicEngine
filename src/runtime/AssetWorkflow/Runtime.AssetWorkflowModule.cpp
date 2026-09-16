@@ -500,7 +500,6 @@ namespace Extrinsic::Runtime
                         *Assets,
                         *Cache,
                         *BoundRegistry,
-                        *Renderer,
                         AssetWorkflowModelMaterializationOptions{
                             .World = BoundWorld,
                             .BindingEpoch = expectedEpoch,
@@ -1199,12 +1198,5 @@ namespace Extrinsic::Runtime
                 state.Device->GetFramesInFlight());
         }
         state.ReconcileTextureBakeOutputs();
-        if (state.ModelMaterializer != nullptr &&
-            state.IsBindingCurrent(state.BindingEpoch))
-        {
-            static_cast<void>(
-                state.ModelMaterializer->
-                    ResolvePendingMaterialTextureBindings());
-        }
     }
 }

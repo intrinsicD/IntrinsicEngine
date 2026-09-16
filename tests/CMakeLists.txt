@@ -490,10 +490,12 @@ set_tests_properties(KernelCompilationLocality.Commands KernelCompilationLocalit
     KernelCompilationLocality.Services KernelCompilationLocality.Jobs
     PROPERTIES LABELS "contract;build;runtime" TIMEOUT 30)
 
-# Model leases and renderer integration stay inside the implementation.
+# Model materialization seeds recipes; extraction owns effective GPU materials.
 intrinsic_add_module_boundary_test(AssetCompilationLocality.ModelMaterialization
         --check-source src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cppm
+        --check-source src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp
         --forbid-module Extrinsic.Graphics.Renderer
+        --forbid-module Extrinsic.Graphics.Material
         --forbid-module Extrinsic.Graphics.MaterialSystem)
 set_tests_properties(AssetCompilationLocality.ModelMaterialization
     PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)

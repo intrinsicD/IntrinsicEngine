@@ -16,14 +16,10 @@ import Extrinsic.Core.Error;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.GpuAssetCache;
-import Extrinsic.Graphics.Material;
 import Extrinsic.Runtime.AssetWorkflowTextureResidency;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.WorldHandle;
-
-// IRenderer is globally attached in its owning module; only a reference is used here.
-extern "C++" { namespace Extrinsic::Graphics { class IRenderer; } }
 
 export namespace Extrinsic::Runtime
 {
@@ -31,7 +27,6 @@ export namespace Extrinsic::Runtime
     {
         AssetWorkflowTextureResidencyOptions TextureOptions{};
         bool RequestEmbeddedTextureUploads{true};
-        bool ResolveMaterialTextureBindings{true};
         bool GenerateMissingNormalTextures{true};
         bool GenerateMissingAlbedoTextures{true};
         bool ProgressiveRawGeometryFirst{false};
@@ -85,24 +80,9 @@ export namespace Extrinsic::Runtime
         std::uint64_t LastUvAtlasChartCount{0};
         std::uint64_t LastUvAtlasWidth{0};
         std::uint64_t LastUvAtlasHeight{0};
-        std::uint64_t MaterialInstancesCreated{0};
-        std::uint64_t MaterialTextureBindingsResolved{0};
-        std::uint64_t MaterialTextureBindingFailures{0};
-        std::uint64_t MaterialTextureBindingUploadDeferrals{0};
-        std::uint64_t MaterialTextureBindingReloadInvalidations{0};
-        std::uint64_t MaterialTextureBindingReresolveRequests{0};
-        std::uint64_t MaterialTextureBindingReresolveSuccesses{0};
-        std::uint64_t MaterialTextureBindingReresolveFailures{0};
         std::uint64_t NonModelSceneReadyEvents{0};
         Assets::AssetId LastFailedAsset{};
         Core::ErrorCode LastError{Core::ErrorCode::Success};
-    };
-
-    struct AssetWorkflowModelMaterialRecord
-    {
-        std::uint32_t MaterialIndex{Assets::kInvalidAssetModelIndex};
-        Graphics::MaterialTextureAssetBindings TextureBindings{};
-        bool TextureBindingsResolved{false};
     };
 
     struct AssetWorkflowModelPrimitiveRecord
@@ -124,7 +104,6 @@ export namespace Extrinsic::Runtime
     {
         Assets::AssetId ModelAsset{};
         std::vector<Assets::AssetId> EmbeddedTextureAssets{};
-        std::vector<AssetWorkflowModelMaterialRecord> Materials{};
         std::vector<AssetWorkflowModelNodeRecord> Nodes{};
         std::vector<AssetWorkflowModelPrimitiveRecord> Primitives{};
     };
@@ -136,7 +115,6 @@ export namespace Extrinsic::Runtime
             Assets::AssetService& service,
             Graphics::GpuAssetCache& cache,
             ECS::Scene::Registry& scene,
-            Graphics::IRenderer& renderer,
             AssetWorkflowModelMaterializationOptions options = {});
         ~AssetWorkflowModelMaterializer();
 
@@ -151,7 +129,6 @@ export namespace Extrinsic::Runtime
             Assets::AssetId modelAsset) const noexcept;
 
         [[nodiscard]] Core::Result MaterializeReadyModelScene(Assets::AssetId modelAsset);
-        [[nodiscard]] Core::Expected<std::uint64_t> ResolvePendingMaterialTextureBindings();
 
     private:
         struct Impl;

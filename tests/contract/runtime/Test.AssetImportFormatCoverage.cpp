@@ -70,6 +70,7 @@ import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SceneDocumentModule;
@@ -919,12 +920,14 @@ namespace
     }
 
     [[nodiscard]] std::string TriangleGltfJson(
-        const std::string_view bufferUri)
+        const std::string_view bufferUri,
+        const bool authoredMaterial = true,
+        const bool instanced = false)
     {
         constexpr std::string_view pngBase64 =
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/"
             "p9sAAAAASUVORK5CYII=";
-        return std::string(R"json({
+        std::string json = std::string(R"json({
   "asset": {"version": "2.0"},
   "buffers": [{"uri": ")json")
             + std::string(bufferUri)
@@ -937,9 +940,12 @@ namespace
     {"bufferView": 0, "byteOffset": 0, "componentType": 5126, "count": 3, "type": "VEC3", "min": [0, 0, 0], "max": [1, 1, 0]},
     {"bufferView": 1, "byteOffset": 0, "componentType": 5123, "count": 3, "type": "SCALAR"}
   ],
-  "images": [{"name": "EmbeddedAlbedo", "uri": "data:image/png;base64,)json")
-            + std::string(pngBase64)
-            + std::string(R"json(", "mimeType": "image/png"}],
+)json");
+        if (authoredMaterial)
+        {
+            json += std::string(R"json(  "images": [{"name": "EmbeddedAlbedo", "uri": "data:image/png;base64,)json")
+                + std::string(pngBase64)
+                + std::string(R"json(", "mimeType": "image/png"}],
   "textures": [{"source": 0}],
   "materials": [{
     "name": "Mat",
@@ -950,41 +956,25 @@ namespace
       "baseColorTexture": {"index": 0}
     }
   }],
-  "meshes": [{"name": "TriMesh", "primitives": [{"attributes": {"POSITION": 0}, "indices": 1, "material": 0}]}],
-  "nodes": [{"mesh": 0}],
-  "scenes": [{"nodes": [0]}],
-  "scene": 0
-})json");
-    }
-
-    [[nodiscard]] std::string InstancedTriangleGltfJson(
-        const std::string_view bufferUri)
-    {
-        return std::string(R"json({
-  "asset": {"version": "2.0"},
-  "buffers": [{"uri": ")json")
-            + std::string(bufferUri)
-            + std::string(R"json(", "byteLength": 44}],
-  "bufferViews": [
-    {"buffer": 0, "byteOffset": 0, "byteLength": 36, "target": 34962},
-    {"buffer": 0, "byteOffset": 36, "byteLength": 6, "target": 34963}
-  ],
-  "accessors": [
-    {"bufferView": 0, "byteOffset": 0, "componentType": 5126, "count": 3, "type": "VEC3", "min": [0, 0, 0], "max": [1, 1, 0]},
-    {"bufferView": 1, "byteOffset": 0, "componentType": 5123, "count": 3, "type": "SCALAR"}
-  ],
-  "meshes": [{
-    "name": "SharedTriangle",
-    "primitives": [{"attributes": {"POSITION": 0}, "indices": 1}]
-  }],
-  "nodes": [
+)json");
+        }
+        json += R"json(  "meshes": [{"name": ")json";
+        json += instanced ? "SharedTriangle" : "TriMesh";
+        json += R"json(", "primitives": [{"attributes": {"POSITION": 0}, "indices": 1)json";
+        if (authoredMaterial)
+            json += R"json(, "material": 0)json";
+        json += "}]}],\n";
+        json += instanced ? R"json(  "nodes": [
     {"name": "ScaledRoot", "translation": [10, 0, 0], "scale": [2, 2, 2], "children": [1, 2]},
     {"name": "FirstInstance", "translation": [0, 2, 0], "mesh": 0},
     {"name": "SecondInstance", "translation": [3, 0, 0], "mesh": 0}
   ],
-  "scenes": [{"nodes": [0]}],
+)json" : R"json(  "nodes": [{"mesh": 0}],
+)json";
+        json += R"json(  "scenes": [{"nodes": [0]}],
   "scene": 0
-})json");
+})json";
+        return json;
     }
 
     [[nodiscard]] std::size_t CountEntitiesWithDomain(
@@ -1260,22 +1250,22 @@ namespace
         bool CompletionObservedReadyEntities{false};
     };
 
-    void ExpectModelSceneCompletionRoute(const bool queued)
+    void ExpectModelSceneCompletionRoute(const bool queued, const bool authoredMaterial = false)
     {
         SCOPED_TRACE(queued ? "queued model-scene import"
                            : "synchronous model-scene import");
 
         const std::vector<std::byte> binBytes = TriangleBufferBytes();
-        const std::string stem = queued
+        const std::string stem = std::string(queued
             ? "bug094_model_scene_completion_queued"
-            : "bug094_model_scene_completion_sync";
+            : "bug094_model_scene_completion_sync") + (authoredMaterial ? "_authored" : "");
         const std::string binName = stem + ".bin";
         TempAssetFile modelBin(
             binName,
             std::span<const std::byte>(binBytes.data(), binBytes.size()));
         TempAssetFile modelFile(
             stem + ".gltf",
-            InstancedTriangleGltfJson(binName));
+            TriangleGltfJson(binName, authoredMaterial, true));
 
         // Declared before Engine so callbacks captured by the pipeline remain
         // valid through destructor-driven shutdown after a fatal assertion.
@@ -1373,7 +1363,7 @@ namespace
         EXPECT_TRUE(importResult->MaterializedModelScene);
         EXPECT_EQ(importResult->PrimitiveEntitiesCreated, 2u);
         // The queued route completes a frame; the synchronous route has not
-        // extracted yet. Neither may retain an import-owned default material.
+        // extracted yet. Neither may retain an import-owned material.
         const auto initiallyExtracted = queued ? 2u : 0u;
         EXPECT_EQ(extraction.GetTrackedRenderableCount(), initiallyExtracted);
         EXPECT_EQ(materials.GetLiveInstanceCount(),
@@ -1387,6 +1377,39 @@ namespace
         probe.CompletionObservedReadyEntities =
             probe.CompletedEntities.size() == 2u;
         auto& raw = activeScene.Raw();
+        if (authoredMaterial)
+        {
+            Assets::AssetId sharedAlbedo{};
+            for (const auto entity : probe.CompletedEntities)
+            {
+                const auto* recipe = raw.try_get<Runtime::GeometryPresentationRecipe>(entity);
+                ASSERT_NE(recipe, nullptr);
+                ASSERT_EQ(recipe->Presentations.size(), 1u);
+                const auto& slots = recipe->Presentations.front().Slots;
+                const auto slot = [&](Runtime::GeometryPresentationSlotSemantic semantic) {
+                    return std::find_if(slots.begin(), slots.end(), [=](const auto& value) {
+                        return value.Semantic == semantic;
+                    });
+                };
+                const auto albedo = slot(Runtime::GeometryPresentationSlotSemantic::Albedo);
+                ASSERT_NE(albedo, slots.end());
+                EXPECT_EQ(albedo->SourceKind, Runtime::GeometryPresentationSourceKind::AuthoredTextureAsset);
+                ASSERT_TRUE(albedo->TextureAsset.IsValid());
+                if (sharedAlbedo.IsValid())
+                    EXPECT_EQ(albedo->TextureAsset, sharedAlbedo);
+                sharedAlbedo = albedo->TextureAsset;
+                EXPECT_TRUE(RequiredEngineService<Assets::AssetService>(engine)
+                    .Read<Assets::AssetTexture2DPayload>(sharedAlbedo).has_value());
+                const auto roughness = slot(Runtime::GeometryPresentationSlotSemantic::Roughness);
+                const auto metallic = slot(Runtime::GeometryPresentationSlotSemantic::Metallic);
+                ASSERT_NE(roughness, slots.end());
+                ASSERT_NE(metallic, slots.end());
+                EXPECT_EQ(roughness->SourceKind, Runtime::GeometryPresentationSourceKind::UniformDefault);
+                EXPECT_EQ(metallic->SourceKind, Runtime::GeometryPresentationSourceKind::UniformDefault);
+                EXPECT_FLOAT_EQ(roughness->UniformDefault.Scalar, 0.75f);
+                EXPECT_FLOAT_EQ(metallic->UniformDefault.Scalar, 0.25f);
+            }
+        }
         for (const ECS::EntityHandle entity : probe.CompletedEntities)
         {
             const GS::ConstSourceView source = GS::BuildConstView(raw, entity);
@@ -1530,7 +1553,7 @@ namespace
         });
         ASSERT_TRUE(direct.has_value()) << static_cast<int>(direct.error());
         const auto entities = FindEntitiesWithDomain(activeScene, GS::Domain::Mesh);
-        // Two material-less glTF instances plus one direct OBJ share this owner.
+        // Two glTF instances plus one direct OBJ share the extraction owner.
         ASSERT_EQ(entities.size(), 3u);
         const auto extracted = extraction.ExtractAndSubmit(
             activeScene, engine.GetRenderer(),
@@ -1552,17 +1575,29 @@ namespace
             handles.push_back(sidecar->MaterialHandle);
             const auto params = materials.GetParams(sidecar->MaterialHandle);
             EXPECT_EQ(params.Shading, Graphics::ShadingModel::Lit);
-            EXPECT_EQ(params.Flags, defaults.Flags);
-            EXPECT_EQ(params.BaseColorFactor, defaults.BaseColorFactor);
-            EXPECT_FLOAT_EQ(params.MetallicFactor, defaults.MetallicFactor);
-            EXPECT_FLOAT_EQ(params.RoughnessFactor, defaults.RoughnessFactor);
+            const bool importedDefault = !authoredMaterial ||
+                std::find(probe.CompletedEntities.begin(), probe.CompletedEntities.end(), entity) ==
+                    probe.CompletedEntities.end();
+            if (importedDefault)
+            {
+                EXPECT_EQ(params.Flags, defaults.Flags);
+                EXPECT_EQ(params.BaseColorFactor, defaults.BaseColorFactor);
+                EXPECT_FLOAT_EQ(params.MetallicFactor, defaults.MetallicFactor);
+                EXPECT_FLOAT_EQ(params.RoughnessFactor, defaults.RoughnessFactor);
+            }
         }
-        auto edited = defaults;
+        const auto editedSidecar = extraction.FindRenderableSidecarForTest(
+            Runtime::StableEntityLookup::ToRenderId(probe.CompletedEntities.front()));
+        ASSERT_TRUE(editedSidecar.has_value());
+        std::vector<Graphics::MaterialParams> before;
+        for (const auto handle : handles)
+            before.push_back(materials.GetParams(handle));
+        auto edited = materials.GetParams(editedSidecar->MaterialHandle);
         edited.RoughnessFactor = 0.125f;
-        materials.SetParams(handles.front(), edited);
-        EXPECT_FLOAT_EQ(materials.GetParams(handles.front()).RoughnessFactor, edited.RoughnessFactor);
-        EXPECT_FLOAT_EQ(materials.GetParams(handles[1]).RoughnessFactor, defaults.RoughnessFactor);
-        EXPECT_FLOAT_EQ(materials.GetParams(handles[2]).RoughnessFactor, defaults.RoughnessFactor);
+        materials.SetParams(editedSidecar->MaterialHandle, edited);
+        for (std::size_t i = 0; i < handles.size(); ++i)
+            EXPECT_FLOAT_EQ(materials.GetParams(handles[i]).RoughnessFactor,
+                handles[i] == editedSidecar->MaterialHandle ? edited.RoughnessFactor : before[i].RoughnessFactor);
         // The imported scene still exists: no import-owned lease may outlive
         // extraction's material state.
         extraction.ClearSceneState(engine.GetRenderer());
@@ -3173,6 +3208,12 @@ TEST(RuntimeAssetImportFormatCoverage, RepresentativePromotedFormatsMaterializeD
     EXPECT_EQ(lastEvent->Result->PayloadKind, Assets::AssetPayloadKind::Texture2D);
 
     engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, AuthoredModelMaterialsUseOnlyPerRenderableLeases)
+{
+    ExpectModelSceneCompletionRoute(false, true);
+    ExpectModelSceneCompletionRoute(true, true);
 }
 
 TEST(RuntimeAssetImportFormatCoverage, ModelSceneCompletionSelectsAndFramesCreatedPrimitives)

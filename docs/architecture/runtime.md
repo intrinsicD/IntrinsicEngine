@@ -703,8 +703,11 @@ is shared by the module's two implementation units, without a separate executor
 BMI. It stores the existing dependency record directly. Borrowed provider pointers
 remain guarded by the initialized value, binding epochs and submission identity;
 the workflow keeps the executor's address stable across reinitialization.
-Model materialization exposes copied records and diagnostics; material leases and
-construction helpers stay in its implementation. Model and texture imports reuse
+Model materialization exposes copied entity/asset records and diagnostics. Its
+implementation loads textures and seeds presentation recipes; extraction alone
+owns effective material leases and texture resolution. Both its interface and
+implementation are independent of renderer/material modules, enforced by
+`AssetCompilationLocality.ModelMaterialization`. Model and texture imports reuse
 the texture-residency owner's payload-mismatch and upload-deferral classification.
 Queued geometry and model/texture imports share executor-local submission,
 route/decode transitions and apply preflight using that captured identity.

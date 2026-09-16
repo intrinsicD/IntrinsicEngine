@@ -38,9 +38,6 @@ import Extrinsic.ECS.Hierarchy.Structure;
 import Extrinsic.ECS.System.BoundsPropagation;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.GpuAssetCache;
-import Extrinsic.Graphics.Material;
-import Extrinsic.Graphics.MaterialSystem;
-import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.AssetWorkflowGeometryMaterialization;
 import Extrinsic.Runtime.AssetWorkflowTextureResidency;
 import Extrinsic.Runtime.JobService;
@@ -83,12 +80,6 @@ namespace Extrinsic::Runtime
             std::uint32_t NodeIndex{Assets::kInvalidAssetModelIndex};
             std::uint32_t PrimitiveIndex{Assets::kInvalidAssetModelIndex};
             ECS::Components::Culling::World::Bounds WorldBounds{};
-        };
-
-        struct AssetWorkflowModelMaterializationState
-        {
-            AssetWorkflowModelMaterializationRecord Record{};
-            std::vector<Graphics::MaterialSystem::MaterialLease> MaterialLeases{};
         };
 
         [[nodiscard]] const char* ExtensionFor(
@@ -604,106 +595,11 @@ namespace Extrinsic::Runtime
             return embeddedTextureAssets[reference.ImageIndex];
         }
 
-        [[nodiscard]] Graphics::MaterialParams BuildMaterialParams(
-            const Assets::AssetModelMaterialPayload& material) noexcept
-        {
-            Graphics::MaterialParams params{};
-            params.BaseColorFactor = glm::vec4(
-                material.BaseColorFactor[0],
-                material.BaseColorFactor[1],
-                material.BaseColorFactor[2],
-                material.BaseColorFactor[3]);
-            params.MetallicFactor = material.MetallicFactor;
-            params.RoughnessFactor = material.RoughnessFactor;
-            return params;
-        }
-
-        [[nodiscard]] Graphics::MaterialTextureAssetBindings BuildTextureBindings(
-            const Assets::AssetModelMaterialPayload& material,
-            const std::vector<Assets::AssetId>& embeddedTextureAssets) noexcept
-        {
-            const Assets::AssetId authoredAlbedo =
-                ResolveTextureReference(material.BaseColorTexture, embeddedTextureAssets);
-            const Assets::AssetId authoredNormal =
-                ResolveTextureReference(material.NormalTexture, embeddedTextureAssets);
-            return Graphics::MaterialTextureAssetBindings{
-                .Albedo = authoredAlbedo,
-                .Normal = authoredNormal,
-                .MetallicRoughness = ResolveTextureReference(
-                    material.MetallicRoughnessTexture,
-                    embeddedTextureAssets),
-                .Emissive = {},
-                .NormalSpace =
-                    Graphics::MaterialNormalTextureSpace::TangentSpaceNormal,
-            };
-        }
-
         [[nodiscard]] bool MeshHasVertexProperty(
             const Geometry::HalfedgeMesh::Mesh& mesh,
             const std::string_view propertyName)
         {
             return !propertyName.empty() && mesh.VertexProperties().Exists(propertyName);
-        }
-
-        [[nodiscard]] bool BindingHasTextureAsset(
-            const Graphics::MaterialTextureAssetBindings& bindings) noexcept
-        {
-            return bindings.Albedo.IsValid()
-                || bindings.Normal.IsValid()
-                || bindings.MetallicRoughness.IsValid()
-                || bindings.Emissive.IsValid();
-        }
-
-        [[nodiscard]] bool BindingReferencesTextureAsset(
-            const Graphics::MaterialTextureAssetBindings& bindings,
-            const Assets::AssetId id) noexcept
-        {
-            return id.IsValid()
-                && (bindings.Albedo == id
-                    || bindings.Normal == id
-                    || bindings.MetallicRoughness == id
-                    || bindings.Emissive == id);
-        }
-
-        [[nodiscard]] bool BindingTextureAssetsReady(
-            Graphics::GpuAssetCache& cache,
-            const Graphics::MaterialTextureAssetBindings& bindings) noexcept
-        {
-            const Assets::AssetId ids[] = {
-                bindings.Albedo,
-                bindings.Normal,
-                bindings.MetallicRoughness,
-                bindings.Emissive,
-            };
-            for (const Assets::AssetId id : ids)
-            {
-                if (id.IsValid()
-                    && cache.GetState(id) != Graphics::GpuAssetState::Ready)
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        [[nodiscard]] Core::Result ResolveMaterialTextureBindingRecord(
-            Graphics::MaterialSystem& materials,
-            Graphics::GpuAssetCache& cache,
-            Graphics::MaterialHandle materialHandle,
-            const Graphics::MaterialTextureAssetBindings& bindings)
-        {
-            if (!BindingHasTextureAsset(bindings))
-            {
-                return Core::Ok();
-            }
-            if (!BindingTextureAssetsReady(cache, bindings))
-            {
-                return Core::Err(Core::ErrorCode::ResourceBusy);
-            }
-            return materials.ResolveTextureAssetBindings(
-                materialHandle,
-                bindings,
-                cache);
         }
 
         [[nodiscard]] Core::Expected<std::vector<Assets::AssetId>> LoadEmbeddedTextures(
@@ -771,156 +667,6 @@ namespace Extrinsic::Runtime
             }
 
             return embeddedTextureAssets;
-        }
-
-        [[nodiscard]] Core::Result CreateMaterialRecords(
-            Graphics::MaterialSystem& materials,
-            Graphics::GpuAssetCache& cache,
-            const Assets::AssetModelScenePayload& model,
-            const std::vector<Assets::AssetId>& embeddedTextureAssets,
-            const AssetWorkflowModelMaterializationOptions& options,
-            AssetWorkflowModelMaterializationState& state,
-            AssetWorkflowModelMaterializationDiagnostics* diagnostics)
-        {
-            const Graphics::MaterialTypeHandle standardType =
-                materials.FindType(Graphics::kMaterialTypeName_StandardPBR);
-            if (!standardType.IsValid() && !model.Materials.empty())
-            {
-                return Core::Err(Core::ErrorCode::InvalidState);
-            }
-
-            state.Record.Materials.reserve(model.Materials.size());
-            state.MaterialLeases.reserve(model.Materials.size());
-            for (std::size_t materialIndex = 0u;
-                 materialIndex < model.Materials.size();
-                 ++materialIndex)
-            {
-                const Assets::AssetModelMaterialPayload& material = model.Materials[materialIndex];
-                const Graphics::MaterialTextureAssetBindings bindings =
-                    BuildTextureBindings(
-                        material,
-                        embeddedTextureAssets);
-
-                auto lease = materials.CreateInstance(standardType, BuildMaterialParams(material));
-                if (!lease.IsValid())
-                {
-                    return Core::Err(Core::ErrorCode::OutOfMemory);
-                }
-
-                bool resolved = false;
-                if (options.ResolveMaterialTextureBindings)
-                {
-                    auto resolve = ResolveMaterialTextureBindingRecord(
-                        materials,
-                        cache,
-                        lease.GetHandle(),
-                        bindings);
-                    resolved = resolve.has_value();
-                    if (diagnostics != nullptr)
-                    {
-                        if (resolved)
-                        {
-                            ++diagnostics->MaterialTextureBindingsResolved;
-                        }
-                        else if (resolve.error() == Core::ErrorCode::ResourceBusy)
-                        {
-                            ++diagnostics->MaterialTextureBindingUploadDeferrals;
-                        }
-                        else
-                        {
-                            ++diagnostics->MaterialTextureBindingFailures;
-                        }
-                    }
-                }
-
-                state.Record.Materials.push_back(AssetWorkflowModelMaterialRecord{
-                    .MaterialIndex = static_cast<std::uint32_t>(materialIndex),
-                    .TextureBindings = bindings,
-                    .TextureBindingsResolved = resolved,
-                });
-                state.MaterialLeases.push_back(std::move(lease));
-                if (diagnostics != nullptr)
-                {
-                    ++diagnostics->MaterialInstancesCreated;
-                }
-            }
-
-            return Core::Ok();
-        }
-
-        [[nodiscard]] Core::Expected<std::uint64_t> ResolvePendingMaterialTextureBindings(
-            Graphics::MaterialSystem& materials,
-            Graphics::GpuAssetCache& cache,
-            AssetWorkflowModelMaterializationState& state,
-            AssetWorkflowModelMaterializationDiagnostics* diagnostics)
-        {
-            std::uint64_t resolvedCount = 0u;
-            const std::size_t materialCount =
-                std::min(state.Record.Materials.size(), state.MaterialLeases.size());
-            for (std::size_t index = 0u; index < materialCount; ++index)
-            {
-                AssetWorkflowModelMaterialRecord& record = state.Record.Materials[index];
-                if (record.TextureBindingsResolved)
-                {
-                    continue;
-                }
-
-                if (diagnostics != nullptr)
-                {
-                    ++diagnostics->MaterialTextureBindingReresolveRequests;
-                }
-
-                auto result = ResolveMaterialTextureBindingRecord(
-                    materials,
-                    cache,
-                    state.MaterialLeases[index].GetHandle(),
-                    record.TextureBindings);
-                if (result.has_value())
-                {
-                    record.TextureBindingsResolved = true;
-                    ++resolvedCount;
-                    if (diagnostics != nullptr)
-                    {
-                        ++diagnostics->MaterialTextureBindingsResolved;
-                        ++diagnostics->MaterialTextureBindingReresolveSuccesses;
-                    }
-                    continue;
-                }
-
-                if (diagnostics != nullptr)
-                {
-                    if (result.error() == Core::ErrorCode::ResourceBusy)
-                    {
-                        ++diagnostics->MaterialTextureBindingUploadDeferrals;
-                    }
-                    else
-                    {
-                        ++diagnostics->MaterialTextureBindingFailures;
-                        ++diagnostics->MaterialTextureBindingReresolveFailures;
-                        diagnostics->LastFailedAsset = state.Record.ModelAsset;
-                        diagnostics->LastError = result.error();
-                    }
-                }
-            }
-
-            return resolvedCount;
-        }
-
-        void InvalidateMaterialTextureBindingsForAsset(
-            AssetWorkflowModelMaterializationState& state,
-            const Assets::AssetId textureAsset,
-            AssetWorkflowModelMaterializationDiagnostics& diagnostics)
-        {
-            for (AssetWorkflowModelMaterialRecord& material : state.Record.Materials)
-            {
-                if (!material.TextureBindingsResolved
-                    || !BindingReferencesTextureAsset(material.TextureBindings, textureAsset))
-                {
-                    continue;
-                }
-                material.TextureBindingsResolved = false;
-                ++diagnostics.MaterialTextureBindingReloadInvalidations;
-            }
         }
 
         void DestroyEntities(
@@ -1634,11 +1380,10 @@ namespace Extrinsic::Runtime
             }
         }
 
-        Core::Expected<AssetWorkflowModelMaterializationState> MaterializeModelSceneAsset(
+        Core::Expected<AssetWorkflowModelMaterializationRecord> MaterializeModelSceneAsset(
             Assets::AssetService& service,
             Graphics::GpuAssetCache& cache,
             ECS::Scene::Registry& scene,
-            Graphics::MaterialSystem& materials,
             const Assets::AssetId modelAsset,
             const AssetWorkflowModelMaterializationOptions& options,
             AssetWorkflowModelMaterializationDiagnostics* diagnostics)
@@ -1652,19 +1397,19 @@ namespace Extrinsic::Runtime
             if (!modelSpan.has_value())
             {
                 RecordFailure(diagnostics, modelAsset, modelSpan.error());
-                return Core::Err<AssetWorkflowModelMaterializationState>(modelSpan.error());
+                return Core::Err<AssetWorkflowModelMaterializationRecord>(modelSpan.error());
             }
             if (modelSpan->size() != 1u)
             {
                 RecordFailure(diagnostics, modelAsset, Core::ErrorCode::AssetInvalidData);
-                return Core::Err<AssetWorkflowModelMaterializationState>(Core::ErrorCode::AssetInvalidData);
+                return Core::Err<AssetWorkflowModelMaterializationRecord>(Core::ErrorCode::AssetInvalidData);
             }
 
             const Assets::AssetModelScenePayload& model = (*modelSpan)[0];
             if (auto valid = Assets::ValidateAssetModelScenePayload(model); !valid.has_value())
             {
                 RecordFailure(diagnostics, modelAsset, valid.error());
-                return Core::Err<AssetWorkflowModelMaterializationState>(valid.error());
+                return Core::Err<AssetWorkflowModelMaterializationRecord>(valid.error());
             }
 
             auto prepared = PreparePrimitives(
@@ -1674,13 +1419,13 @@ namespace Extrinsic::Runtime
             if (!prepared.has_value())
             {
                 RecordFailure(diagnostics, modelAsset, prepared.error());
-                return Core::Err<AssetWorkflowModelMaterializationState>(prepared.error());
+                return Core::Err<AssetWorkflowModelMaterializationRecord>(prepared.error());
             }
             auto preparedNodes = PrepareNodes(model);
             if (!preparedNodes.has_value())
             {
                 RecordFailure(diagnostics, modelAsset, preparedNodes.error());
-                return Core::Err<AssetWorkflowModelMaterializationState>(preparedNodes.error());
+                return Core::Err<AssetWorkflowModelMaterializationRecord>(preparedNodes.error());
             }
             auto preparedInstances = PreparePrimitiveInstances(
                 model,
@@ -1689,7 +1434,7 @@ namespace Extrinsic::Runtime
             if (!preparedInstances.has_value())
             {
                 RecordFailure(diagnostics, modelAsset, preparedInstances.error());
-                return Core::Err<AssetWorkflowModelMaterializationState>(
+                return Core::Err<AssetWorkflowModelMaterializationRecord>(
                     preparedInstances.error());
             }
 
@@ -1699,8 +1444,8 @@ namespace Extrinsic::Runtime
                 modelPath = std::move(*servicePath);
             }
 
-            AssetWorkflowModelMaterializationState state{};
-            state.Record.ModelAsset = modelAsset;
+            AssetWorkflowModelMaterializationRecord state{};
+            state.ModelAsset = modelAsset;
 
             auto embeddedTextures = LoadEmbeddedTextures(
                 service,
@@ -1712,26 +1457,12 @@ namespace Extrinsic::Runtime
             if (!embeddedTextures.has_value())
             {
                 RecordFailure(diagnostics, modelAsset, embeddedTextures.error());
-                return Core::Err<AssetWorkflowModelMaterializationState>(embeddedTextures.error());
+                return Core::Err<AssetWorkflowModelMaterializationRecord>(embeddedTextures.error());
             }
-            state.Record.EmbeddedTextureAssets = std::move(*embeddedTextures);
-
-            if (auto materialRecords = CreateMaterialRecords(
-                    materials,
-                    cache,
-                    model,
-                    state.Record.EmbeddedTextureAssets,
-                    options,
-                    state,
-                    diagnostics);
-                !materialRecords.has_value())
-            {
-                RecordFailure(diagnostics, modelAsset, materialRecords.error());
-                return Core::Err<AssetWorkflowModelMaterializationState>(materialRecords.error());
-            }
+            state.EmbeddedTextureAssets = std::move(*embeddedTextures);
 
             auto& raw = scene.Raw();
-            state.Record.Nodes.reserve(model.Nodes.size());
+            state.Nodes.reserve(model.Nodes.size());
             std::vector<ECS::EntityHandle> nodeEntities(model.Nodes.size());
             for (std::size_t nodeIndex = 0u; nodeIndex < model.Nodes.size(); ++nodeIndex)
             {
@@ -1746,7 +1477,7 @@ namespace Extrinsic::Runtime
                 raw.get<ECS::Components::Transform::WorldMatrix>(entity).Matrix =
                     (*preparedNodes)[nodeIndex].WorldMatrix;
                 nodeEntities[nodeIndex] = entity;
-                state.Record.Nodes.push_back(AssetWorkflowModelNodeRecord{
+                state.Nodes.push_back(AssetWorkflowModelNodeRecord{
                     .Entity = entity,
                     .NodeIndex = static_cast<std::uint32_t>(nodeIndex),
                 });
@@ -1756,7 +1487,7 @@ namespace Extrinsic::Runtime
                 }
             }
 
-            state.Record.Primitives.reserve(preparedInstances->size());
+            state.Primitives.reserve(preparedInstances->size());
             std::vector<std::vector<ECS::EntityHandle>> primitiveEntitiesByNode(
                 model.Nodes.size());
             for (const PreparedPrimitiveInstance& instance : *preparedInstances)
@@ -1788,7 +1519,7 @@ namespace Extrinsic::Runtime
                         scene,
                         entity,
                         material,
-                        state.Record.EmbeddedTextureAssets,
+                        state.EmbeddedTextureAssets,
                         options,
                         primitive,
                         diagnostics);
@@ -1800,7 +1531,7 @@ namespace Extrinsic::Runtime
                                                     diagnostics);
                 }
 
-                state.Record.Primitives.push_back(AssetWorkflowModelPrimitiveRecord{
+                state.Primitives.push_back(AssetWorkflowModelPrimitiveRecord{
                     .Entity = entity,
                     .NodeIndex = instance.NodeIndex,
                     .PrimitiveIndex = primitive.PrimitiveIndex,
@@ -1873,22 +1604,19 @@ namespace Extrinsic::Runtime
         Assets::AssetService& Service;
         Graphics::GpuAssetCache& Cache;
         ECS::Scene::Registry& Scene;
-        Graphics::IRenderer& Renderer;
         AssetWorkflowModelMaterializationOptions Options{};
         AssetWorkflowModelMaterializationDiagnostics Diagnostics{};
         Assets::AssetEventBus::ListenerToken Token{Assets::AssetEventBus::InvalidToken};
-        std::unordered_map<Assets::AssetId, AssetWorkflowModelMaterializationState, Assets::AssetIdHash> Records{};
+        std::unordered_map<Assets::AssetId, AssetWorkflowModelMaterializationRecord, Assets::AssetIdHash> Records{};
 
         Impl(
             Assets::AssetService& service,
             Graphics::GpuAssetCache& cache,
             ECS::Scene::Registry& scene,
-            Graphics::IRenderer& renderer,
             AssetWorkflowModelMaterializationOptions options)
             : Service(service)
             , Cache(cache)
             , Scene(scene)
-            , Renderer(renderer)
             , Options(options)
         {
             Token = Service.SubscribeAll(
@@ -1907,7 +1635,7 @@ namespace Extrinsic::Runtime
             }
             for (auto& [_, record] : Records)
             {
-                DestroyEntities(Scene, record.Record);
+                DestroyEntities(Scene, record);
             }
             Records.clear();
         }
@@ -1926,7 +1654,6 @@ namespace Extrinsic::Runtime
                 Service,
                 Cache,
                 Scene,
-                Renderer.GetMaterialSystem(),
                 id,
                 Options,
                 &Diagnostics);
@@ -1935,54 +1662,18 @@ namespace Extrinsic::Runtime
                 return Core::Err(state.error());
             }
 
-            AssetWorkflowModelMaterializationState replacement = std::move(*state);
+            AssetWorkflowModelMaterializationRecord replacement = std::move(*state);
             if (auto it = Records.find(id); it != Records.end())
             {
-                AssetWorkflowModelMaterializationState previous = std::move(it->second);
+                AssetWorkflowModelMaterializationRecord previous = std::move(it->second);
                 it->second = std::move(replacement);
-                DestroyEntities(Scene, previous.Record);
+                DestroyEntities(Scene, previous);
             }
             else
             {
                 Records.emplace(id, std::move(replacement));
             }
             return Core::Ok();
-        }
-
-        [[nodiscard]] Core::Expected<std::uint64_t> ResolvePendingMaterialTextureBindings()
-        {
-            if (!IsBindingValid())
-            {
-                return Core::Err<std::uint64_t>(
-                    Core::ErrorCode::InvalidState);
-            }
-
-            std::uint64_t resolvedCount = 0u;
-            for (auto& [_, record] : Records)
-            {
-                auto resolved = ::Extrinsic::Runtime::ResolvePendingMaterialTextureBindings(
-                    Renderer.GetMaterialSystem(),
-                    Cache,
-                    record,
-                    &Diagnostics);
-                if (!resolved.has_value())
-                {
-                    return Core::Err<std::uint64_t>(resolved.error());
-                }
-                resolvedCount += *resolved;
-            }
-            return resolvedCount;
-        }
-
-        void InvalidateMaterialTextureBindingsForAsset(const Assets::AssetId id)
-        {
-            for (auto& [_, record] : Records)
-            {
-                ::Extrinsic::Runtime::InvalidateMaterialTextureBindingsForAsset(
-                    record,
-                    id,
-                    Diagnostics);
-            }
         }
 
         void HandleReady(const Assets::AssetId id)
@@ -1997,13 +1688,6 @@ namespace Extrinsic::Runtime
                     return;
                 }
 
-                auto texture = Service.Read<Assets::AssetTexture2DPayload>(id);
-                if (texture.has_value())
-                {
-                    ++Diagnostics.NonModelSceneReadyEvents;
-                    static_cast<void>(ResolvePendingMaterialTextureBindings());
-                    return;
-                }
                 ++Diagnostics.NonModelSceneReadyEvents;
                 return;
             }
@@ -2017,29 +1701,19 @@ namespace Extrinsic::Runtime
             if (!IsBindingValid())
                 return;
 
+            // Reloaded only announces queued work. Replace model entities when
+            // the paired Ready event supplies the complete replacement payload.
             if (event == Assets::AssetEvent::Ready)
             {
                 HandleReady(id);
-            }
-            else if (event == Assets::AssetEvent::Reloaded)
-            {
-                auto model = Service.Read<Assets::AssetModelScenePayload>(id);
-                if (!model.has_value())
-                {
-                    InvalidateMaterialTextureBindingsForAsset(id);
-                }
-                // Reloaded announces invalidation/queued work. The paired
-                // Ready event is the only point at which a model replacement
-                // is complete and may be materialized transactionally.
             }
             else if (event == Assets::AssetEvent::Destroyed)
             {
                 if (auto it = Records.find(id); it != Records.end())
                 {
-                    DestroyEntities(Scene, it->second.Record);
+                    DestroyEntities(Scene, it->second);
                     Records.erase(it);
                 }
-                InvalidateMaterialTextureBindingsForAsset(id);
             }
         }
     };
@@ -2048,13 +1722,11 @@ namespace Extrinsic::Runtime
         Assets::AssetService& service,
         Graphics::GpuAssetCache& cache,
         ECS::Scene::Registry& scene,
-        Graphics::IRenderer& renderer,
         AssetWorkflowModelMaterializationOptions options)
         : m_Impl(std::make_unique<Impl>(
             service,
             cache,
             scene,
-            renderer,
             options))
     {
     }
@@ -2084,7 +1756,7 @@ namespace Extrinsic::Runtime
         }
         const auto it = m_Impl->Records.find(modelAsset);
         return it != m_Impl->Records.end()
-            ? &it->second.Record
+            ? &it->second
             : nullptr;
     }
 
@@ -2098,13 +1770,4 @@ namespace Extrinsic::Runtime
         return m_Impl->MaterializeReadyModelScene(modelAsset);
     }
 
-    Core::Expected<std::uint64_t>
-    AssetWorkflowModelMaterializer::ResolvePendingMaterialTextureBindings()
-    {
-        if (m_Impl == nullptr)
-        {
-            return Core::Err<std::uint64_t>(Core::ErrorCode::InvalidState);
-        }
-        return m_Impl->ResolvePendingMaterialTextureBindings();
-    }
 }

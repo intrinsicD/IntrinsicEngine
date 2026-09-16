@@ -223,10 +223,10 @@ primitive and focus once only after every renderable/selectable leaf exists.
 
 Missing materials use the same extraction-owned `StandardPBR` defaults for
 direct meshes and model-scene leaves. `RenderExtractionCache::State::EnsureRenderable`
-allocates an independent lit material lease per renderable; model materialization
-does not allocate a second missing-material default or publish unused GPU slot
-copies. Authored material records still retain their separate texture-resolution
-leases pending the remaining GRAPHICS-105 consolidation.
+allocates an independent lit material lease per renderable. Model materialization
+loads embedded textures and seeds presentation recipes without allocating GPU
+materials. Extraction owns material leases and resolves ready recipe textures
+into them; the workflow forwards asset invalidation to the existing GPU cache.
 
 ### Sandbox Editor Async Method Jobs
 

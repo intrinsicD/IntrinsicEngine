@@ -115,7 +115,8 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence, repo.s
 ## Required changes
 - [ ] Finish material `ShadingModel { Lit, Unlit }` as the sole ordinary-surface lighting authority: map `KHR_materials_unlit` and align promoted forward/deferred receivers. The redundant Unlit flag is removed; keep slot 0's explicit error material distinct from the missing-material default.
 - [x] Allocate missing-material defaults through the existing render-extraction owner for both direct and model-scene routes, with an independent **lit** instance per renderable.
-- [ ] Complete authored-material policy through that effective runtime owner, preserving authored factors and bindings while removing redundant import-owned material leases.
+- [x] Remove redundant import-owned authored material leases and texture-resolution bookkeeping; extraction owns effective per-renderable materials.
+- [ ] Complete authored factor/texture projection through that effective runtime owner, including base-color modulation for textured albedo and authored metallic-roughness texture routing; preserve existing supported recipe behavior.
 - [ ] Make the per-renderable material lease plus stable-id-keyed `MaterialTextureAssetBindings` the effective appearance authority. Merging a generated normal `AssetId` must preserve the other slots and must not mutate another renderable that shares the authored material.
 - [ ] Complete the `Normal` `AttributeSource { VertexAttribute, Texture }` path: runtime/material resolution publishes `Texture` plus a valid bindless normal only for the exact ready object-space asset generation; both promoted forward and deferred shaders sample/decode that effective texture and otherwise use the required vertex normal.
 - [ ] Route source-choice and generated-texture readiness changes through a standing runtime reaction/kernel event that invalidates the affected extraction/material state. Preserve exact identity/generation checks, stale completion rejection, and frame-ready/deferred-retire behavior.
@@ -330,12 +331,13 @@ The unified surface frag (forward `default_debug_surface.frag` + deferred
 
 Delete/collapse, with the single data path replacing each:
 
-- [ ] **Import material policy consolidation** — direct meshes already choose
+- [x] **Import material allocation consolidation** — direct meshes already choose
   `ColorSource::Material` in `ImportedMeshVisualization()`; graph/point imports
   use `ImportedGeometryVisualization()`. Missing-material defaults now use
-  extraction alone; consolidate the remaining authored-material allocation, preserving
-  authored values and explicit missing-material defaults. Do not reintroduce
-  visualization-to-lighting coupling or treat the direct mesh default as unfixed.
+  extraction alone. Authored imports now seed their existing recipes and texture
+  assets without allocating another GPU material. Broader authored factor/texture
+  projection remains in Required changes; no visualization-to-lighting coupling
+  or extra missing-material default remains here.
 - [x] **Override-material synthesis** in `VisualizationSyncSystem` for
   `UniformColor` (`BuildUniformColorParams`,
   `src/graphics/renderer/Graphics.VisualizationSyncSystem.cpp`) and the per-entity
@@ -584,3 +586,78 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R '^Runti
 
 Local regression/build/test logs and bounded Claude packets:
 `/tmp/intrinsic-graphics105-import-defaults/`.
+
+## Authored import material ownership — 2026-09-16
+
+Operator-directed duplication/compile-locality continuation from `d583fc83d`.
+Reused `RenderExtractionCache`'s per-renderable lease and presentation texture
+resolution. Deleted the model materializer's unused authored leases, copied
+material records, parameter mapping, readiness/reload polling and diagnostics.
+Removed its renderer dependency and collapsed the private state wrapper into
+its copied import record. No new owner, file or compatibility path.
+A second allocation owner would require a real independent draw consumer.
+
+Keep embedded texture assets/uploads, model Ready/Destroyed lifetime, recipe
+seeding and progressive enrichment. `AssetWorkflowModule` already forwards
+texture Reloaded/Destroyed to `GpuAssetCache`; extraction resolves current
+ready assets into its own leases. Model replacement still waits for Ready.
+Import no longer rejects solely because the renderer's StandardPBR type is
+unavailable; material allocation/fallback belongs to extraction for authored
+and missing-material imports alike.
+
+Claude reviewed the plan, diff and fix. The new regression failed six allocation
+assertions before deletion: exactly one extra lease per model, for both sync and
+queued routes at import, extraction and clear. Recipe values, texture identity
+and independence checks passed. The fixed import suite passes all 33 tests.
+The final fixture uses one shared triangle builder instead of string surgery;
+Claude accepted that fix and withdrew a uniqueness concern after seeing the
+existing assertion outside its diff context. The edit now targets an imported
+instance explicitly rather than the sorted first entity, which was a direct OBJ.
+Broader authored factor/texture
+projection, KHR_materials_unlit and normal-source readiness remain open; dead
+lease contents never supplied those missing live-path semantics. No measured
+compile-time claim follows from dependency/code removal alone.
+
+Architecture/workshop review: imports, target links and public downward type
+ownership pass (rows 1–3). No renderer member/pass/recipe-edge additions (4–6 n/a),
+no whole-task maturity closure or exception (7–8 n/a). Model records retain entity
+lifetime and transactional replacement; texture assets/residency stay with the
+asset service and GPU cache. Source-documentation audit: zero objective errors;
+138 existing README size/chronology findings are outside the changed paragraph.
+The module inventory was regenerated with no content diff. Strengthened
+`AssetCompilationLocality.ModelMaterialization` to forbid Renderer, Material and
+MaterialSystem for both interface and implementation; the compiler check passes.
+
+Production delta: **368 lines removed across three existing source/interface
+files**. Existing tests reuse one fixture builder; no production helper or file
+was introduced. This closes duplicate import allocation, not the broader
+GRAPHICS-105 appearance/shader/UI work or LEGACY-043 prerequisites.
+
+A provisional full CPU gate caught a missing closing array bracket in the revised
+shared glTF test fixture: six decode-dependent tests failed before materialization.
+Fixed the fixture construction; production source and Vulkan evidence were
+unchanged. Retain this failed attempt in the local review logs rather than
+attributing it to the material cleanup or weakening import assertions.
+
+Final verification: canonical `ci` configure and `IntrinsicTests` build pass
+with Clang 23. After the fixture correction, all 33 import contracts pass
+(3.15 s, including the existing bounded enrichment/shutdown slow case), and the
+full exclusion-only CPU gate passes **4,683 tests plus one expected ASan-only
+GLFW skip**, zero failures (4,684 selected, 142.51 s). Promoted `ci-vulkan`
+configure/build and four ASan+UBSan readbacks pass with no skips (42.28 s): model
+visibility/picking, model replacement, generated albedo and imported normal bake.
+Strict layering, test layout, task policy/state links, docs links/sync, root
+hygiene, skill mirrors, clean-workshop checks and diff checks pass.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -R '^RuntimeAssetImportFormatCoverage\.' --no-tests=error --timeout 60
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests
+ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R '^RuntimeSandboxAcceptanceGpuSmoke\.(ImportedModelSceneIsVisibleAndClickPickable|ImportedModelSceneReplacementIsVisibleAndClickPickable|ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture|ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice)$' --no-tests=error --timeout 120
+```
+
+Local regression/build/test logs and bounded Claude packets:
+`/tmp/intrinsic-authored-material-reuse/`.
