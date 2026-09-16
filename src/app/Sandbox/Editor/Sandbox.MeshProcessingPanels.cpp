@@ -16,7 +16,6 @@ module;
 #include <utility>
 #include <vector>
 
-#include <glm/glm.hpp>
 #include <imgui.h>
 
 module Extrinsic.Sandbox.Editor.MeshProcessingPanels;
@@ -237,16 +236,11 @@ namespace Extrinsic::Sandbox::Editor
 
         using CurvatureState = ProcessingDraftState<Runtime::MeshCurvatureConfig, Runtime::EditorMeshCurvatureResult>;
         using GeodesicsState = ProcessingDraftState<Runtime::GeodesicsConfig, Runtime::EditorGeodesicsResult>;
-        struct SegmentationState
+        struct SegmentationState : ProcessingDraftState<Runtime::CurvatureSegmentationConfig, Runtime::EditorCurvatureSegmentationResult>
         {
             ProcessingEntityInput Input{};
-            Runtime::CurvatureSegmentationConfig Config{};
-            std::optional<Runtime::EditorCurvatureSegmentationResult> LastResult{};
-            std::optional<Runtime::RuntimeEngineConfigApplyResult> LastConfigApply{};
-            bool Initialized{false};
             bool Dirty{false};
             bool AutoVisualize{true};
-            std::string VisualizationDiagnostic{};
         };
 
         struct RemeshState
@@ -670,16 +664,7 @@ namespace Extrinsic::Sandbox::Editor
             // The header already includes processing diagnostics; render them
             // only once.
             DrawDomainWindowHeader(model);
-            if (!DomainWindowReady(model) ||
-                !model.Processing.HasSelectedEntity)
-            {
-                ImGui::TextDisabled(
-                    "Select a matching domain entity to inspect processing affordances.");
-            }
-            else
-            {
-                (this->*draw)(model, context);
-            }
+            (this->*draw)(model, context);
         }
         ImGui::End();
     }
@@ -960,27 +945,11 @@ namespace Extrinsic::Sandbox::Editor
         const SandboxEditorContext& context)
     {
         ImGui::SeparatorText("Curvature segmentation");
-        if (!model.Processing.CurvatureSegmentationAvailable)
-        {
-            ImGui::TextDisabled(
-                "Signed-curvature segmentation requires editable mesh faces and edges.");
-            return;
-        }
-
-        if (!Segmentation.Initialized)
-        {
-            if (const auto active =
-                    Runtime::GetEditorCurvatureSegmentationConfig(
-                        context.MeshFields.Commands))
-            {
-                Segmentation.Config = *active;
-            }
-            Segmentation.Initialized = true;
-            Segmentation.Dirty = false;
-        }
-
-        Runtime::CurvatureSegmentationConfig& config =
-            Segmentation.Config;
+        const auto active = Runtime::GetEditorCurvatureSegmentationConfig(context.MeshFields.Commands);
+        // Explicit Apply preserves unfinished edits until Apply or Reload.
+        if (active && !Segmentation.Dirty)
+            Segmentation.Synchronize(*active, Runtime::SerializeCurvatureSegmentationConfig(*active));
+        auto& config = Segmentation.Draft;
         bool changed = false;
         ImGui::SeparatorText("Input properties");
         changed |= DrawProcessingPropertyInput("Positions##Segmentation", model.PropertyCatalog, config.Positions);
@@ -1203,69 +1172,57 @@ namespace Extrinsic::Sandbox::Editor
         }
         Segmentation.Dirty |= changed;
 
-        const bool configCommandsAvailable =
-            context.ProcessingConfigCommandsAvailable;
-        ImGui::BeginDisabled(
-            !configCommandsAvailable ||
-            !Segmentation.Dirty);
-        if (ImGui::Button("Apply configuration##CurvatureSegmentation"))
-        {
-            Segmentation.LastConfigApply =
-                Runtime::ApplyEditorCurvatureSegmentationConfig(
-                    context.MeshFields.Commands,
-                    config,
-                    "sandbox.curvature_segmentation.panel");
-            if (Segmentation.LastConfigApply->Succeeded())
-                Segmentation.Dirty = false;
-        }
-        ImGui::EndDisabled();
-        ImGui::SameLine();
-        ImGui::BeginDisabled(!configCommandsAvailable);
-        if (ImGui::Button("Reload active##CurvatureSegmentation"))
-        {
-            Segmentation.Initialized = false;
-            Segmentation.Dirty = false;
-        }
-        ImGui::EndDisabled();
-
-        ImGui::BeginDisabled(!configCommandsAvailable);
-        if (ImGui::Button("Run segmentation##CurvatureSegmentation"))
-        {
-            Segmentation.LastConfigApply =
-                Runtime::ApplyEditorCurvatureSegmentationConfig(
-                    context.MeshFields.Commands,
-                    config,
-                    "sandbox.curvature_segmentation.panel.run");
-            if (Segmentation.LastConfigApply->Succeeded())
+        constexpr auto rejected = "The configuration was rejected; inspect config diagnostics.";
+        const auto apply = [&](const auto& draft, std::string source = "sandbox.curvature_segmentation.panel.run") {
+            auto result = Runtime::ApplyEditorCurvatureSegmentationConfig(context.MeshFields.Commands, draft, std::move(source));
+            if (result.Succeeded())
             {
                 Segmentation.Dirty = false;
-                Segmentation.LastResult =
-                    Runtime::
-                        ApplyEditorConfiguredCurvatureSegmentationCommand(
-                            context.MeshFields.Commands,
-                            model.SelectedStableId);
-                if (Segmentation.LastResult->Succeeded())
-                {
-                    if (Segmentation.AutoVisualize)
-                    {
-                        ShowCurvatureSegmentationVisualization(
-                            context, model.SelectedStableId, config);
-                    }
-                }
+                Segmentation.LastApplied.clear();
+                if (const auto applied = Runtime::GetEditorCurvatureSegmentationConfig(context.MeshFields.Commands))
+                    Segmentation.Synchronize(*applied, Runtime::SerializeCurvatureSegmentationConfig(*applied));
             }
+            return result;
+        };
+        const auto readiness = [&](Runtime::ActionReadiness method) {
+            return Runtime::ResolveEditorProcessingActionReadiness(context.MeshFields.Commands, std::move(method));
+        };
+        if (DrawProcessingActionButton("Apply configuration##CurvatureSegmentation",
+                readiness({Segmentation.Dirty, "No configuration changes to apply."})))
+            Segmentation.ConfigDiagnostic = apply(config, "sandbox.curvature_segmentation.panel").Succeeded() ? "" : rejected;
+        ImGui::SameLine();
+        if (DrawProcessingActionButton("Reload active##CurvatureSegmentation",
+                readiness({active.has_value(), "Active configuration is unavailable."})))
+        {
+            Segmentation.LastApplied.clear();
+            Segmentation.Synchronize(*active, Runtime::SerializeCurvatureSegmentationConfig(*active));
+            Segmentation.Dirty = false;
         }
-        ImGui::EndDisabled();
+
+        const auto runReadiness = readiness({model.Processing.HasSelectedEntity && model.Processing.CurvatureSegmentationAvailable,
+            model.Processing.HasSelectedEntity
+                ? "Signed-curvature segmentation requires editable mesh faces and edges."
+                : "Choose a mesh entity to run segmentation."});
+        if (!runReadiness.Enabled) ImGui::TextWrapped("%s", runReadiness.DisabledReason.c_str());
+        if (DrawProcessingActionButton("Run segmentation##CurvatureSegmentation", runReadiness))
+        {
+            ApplyProcessingExecution(Segmentation, config, apply, [&] {
+                auto result = Runtime::ApplyEditorConfiguredCurvatureSegmentationCommand(
+                    context.MeshFields.Commands, model.SelectedStableId);
+                if (result.Succeeded() && Segmentation.AutoVisualize)
+                    ShowCurvatureSegmentationVisualization(context, model.SelectedStableId, config);
+                return result;
+            }, std::function<void(Runtime::EditorCurvatureSegmentationResult)>{}, rejected);
+        }
         ImGui::SeparatorText("Display output properties");
+        ImGui::BeginDisabled(!DomainWindowReady(model));
         for (const auto* output : {&config.Components, &config.Regions, &config.RegionColors, &config.Boundaries, &config.BoundaryColors, &config.HardFeatures, &config.FeatureConfidence, &config.BoundaryRoles, &config.FeatureColors})
             DrawProcessingPropertyShowButton(context, model.SelectedStableId, *output, Segmentation.VisualizationDiagnostic);
+        ImGui::EndDisabled();
         if (!Segmentation.VisualizationDiagnostic.empty()) ImGui::Text("Display: %s", Segmentation.VisualizationDiagnostic.c_str());
 
-        if (Segmentation.LastConfigApply.has_value() &&
-            !Segmentation.LastConfigApply->Succeeded())
-        {
-            ImGui::TextDisabled(
-                "The configuration was rejected; inspect config diagnostics.");
-        }
+        if (!Segmentation.ConfigDiagnostic.empty())
+            ImGui::TextDisabled("%s", Segmentation.ConfigDiagnostic.c_str());
         if (!Segmentation.LastResult.has_value())
         {
             ImGui::TextDisabled("Last segmentation run: none");

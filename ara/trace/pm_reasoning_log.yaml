@@ -2661,3 +2661,12 @@ entries:
       already came from extraction and must not change to match unused import values. Authored leases remain tracked.
     - Claude's exact-count and edit-readback findings were fixed and the final affected import suite rerun after the
       full CPU gate. Four actual Vulkan readbacks support this bounded change, not whole-task maturity or compile speed.
+
+  - turn: 2026-09-16_001#14
+    notes:
+    - N618 records an ordinary reuse decision and verification, not a research/performance claim. No promotion
+      or new closure signal for broader O93; retain staged owners and flags.
+    - Explicit Apply needs dirty-draft protection. Claude prompted immediate Reload and truthful no-selection
+      presentation; canonical read-back is intentional because the command executes from active configuration.
+    - A provisional CPU run correctly rejected dependency metadata after final source edits; rebuilt and reran
+      against fixed source. Final 4678 passes plus expected skip establish CPU behavior, not compile-speed gains.

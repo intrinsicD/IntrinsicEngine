@@ -238,7 +238,11 @@ Curvature and geodesics reuse the same draft state, keyed by observed active
 config, and apply-before-execute helper. Rejected edits remain retryable, while
 external config changes replace the draft. Geodesics clears mesh-local source
 indices on subsequent entity changes, including deselection; initial active
-sources remain available on first use.
+sources remain available on first use. Curvature segmentation uses the same draft
+and apply-before-execute owners with explicit Apply/Reload: it adopts external
+updates only while clean, retains rejected drafts, and Reload discards local
+edits. Its Run action uses runtime admission plus config availability and stays
+visible with a disabled reason when no suitable mesh is chosen.
 `DrawProcessingExecution`, local to `MeshProcessingPanels.cpp`, owns the common
 edit/validate/reapply/run sequence for density, spacing, keypoints, descriptors,
 density weights, bilateral filtering and normal estimation. Its Run button and

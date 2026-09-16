@@ -13358,3 +13358,23 @@ tree:
     - tests/contract/runtime/Test.AssetImportFormatCoverage.cpp
     - tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
     status: resolved
+
+  - id: N618
+    type: decision
+    title: Reuse processing draft and execution owners for explicit segmentation controls
+    provenance: ai-executed
+    timestamp: '2026-09-16T17:48:01+02:00'
+    choice: Replace segmentation's separate initialization/apply-result state and execution wiring with existing
+      ProcessingDraftState and ApplyProcessingExecution. Keep explicit-apply dirty protection, canonical read-back,
+      immediate Reload and success-only visualization. Render unavailable Run and Show safely. Claude reviewed plan
+      and fixed diffs; real-widget regression covers external updates, rejection/retry, NoChange and Reload.
+      Final CPU gate passes 4678 cases with one expected skip; 43 production lines removed, no compile timing claim.
+    alternatives:
+    - Keep bespoke initialization and execution wiring that misses external configuration updates
+    - Overwrite explicit dirty drafts on every external active-config change
+    evidence:
+    - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
+    - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+    - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
+    - docs/architecture/sandbox-editor-feature-boundaries.md
+    status: resolved

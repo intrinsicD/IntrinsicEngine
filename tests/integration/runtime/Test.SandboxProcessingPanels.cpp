@@ -1739,6 +1739,141 @@ TEST(SandboxProcessingPanels, CurvatureRetriesRejectedDraftAndReexecutesUnchange
     EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
 }
 
+TEST(SandboxProcessingPanels, SegmentationPreservesExplicitDraftAndRefreshesActiveConfig)
+{
+    bool reject = false;
+    unsigned rejections = 0;
+    PanelHarness h(RejectableConfigRegistry(R::kCurvatureSegmentationConfigSectionName, reject, rejections));
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto segmentation = *R::GetCurvatureSegmentationConfig(config);
+    segmentation.SelectionMode = R::CurvatureSegmentationSelectionMode::FixedCount;
+    segmentation.FixedComponentCount = 1u;
+    segmentation.Regions.Name = "f:segmentation_initial";
+    R::SetCurvatureSegmentationConfig(config, segmentation);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("mesh.processing.segmentation", true));
+    unsigned applyRejections = 0;
+    int frames = 0, step = 0;
+    bool completed = false;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frames > 300) { ADD_FAILURE() << "Segmentation draft test did not complete"; engine.RequestExit(); return; }
+        auto* window = ImGui::FindWindowByName("Mesh / Processing / Curvature Segmentation");
+        if (!window) return;
+        ImGui::SetWindowSize(window, {900, 1500});
+        ImGui::SetWindowPos(window, {0, 0});
+        auto& props = scene.Raw().get<GS::Faces>(entity).Properties;
+        ++step;
+        const auto run = [&] { ImGui::ActivateItemByID(window->GetID("Run segmentation##CurvatureSegmentation")); };
+        const auto active = [&] { return *R::GetCurvatureSegmentationConfig(h.Control().GetEngineConfigControlState().ActiveConfig); };
+        if (step == 3)
+        {
+            ImGui::GetCurrentContext()->LogBuffer.clear();
+            ImGui::LogToBuffer();
+            // Capture across window End() calls until the deferred activation settles.
+            ImGui::GetCurrentContext()->LogWindow = nullptr;
+            run();
+        }
+        if (step == 6)
+        {
+            EXPECT_NE(std::string_view{ImGui::GetCurrentContext()->LogBuffer.c_str()}.find("Run segmentation"), std::string_view::npos);
+            EXPECT_NE(std::string_view{ImGui::GetCurrentContext()->LogBuffer.c_str()}.find("Choose a mesh entity to run segmentation."), std::string_view::npos);
+            ImGui::LogFinish();
+            EXPECT_FALSE(props.Exists(segmentation.Regions.Name));
+            ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+        }
+        if (step >= 7 && step <= 12)
+            EditScalarControl(window, "Components##CurvatureSegmentation", step - 7, "2");
+        if (step == 14)
+        {
+            // Explicit Apply: editing alone must not publish configuration.
+            EXPECT_EQ(active().FixedComponentCount, 1u);
+            reject = true;
+            ImGui::ActivateItemByID(window->GetID("Apply configuration##CurvatureSegmentation"));
+        }
+        if (step == 17)
+        {
+            EXPECT_GT(rejections, 0u);
+            applyRejections = rejections;
+            EXPECT_EQ(active().FixedComponentCount, 1u);
+            run();
+        }
+        if (step == 20)
+        {
+            EXPECT_GT(rejections, applyRejections);
+            EXPECT_EQ(active().FixedComponentCount, 1u);
+            EXPECT_FALSE(props.Exists(segmentation.Regions.Name));
+            reject = false;
+            run();
+        }
+        if (step == 23)
+        {
+            EXPECT_EQ(active().FixedComponentCount, 2u);
+            auto regions = props.Get<std::uint32_t>(segmentation.Regions.Name);
+            ASSERT_TRUE(regions);
+            regions[0] = 777u;
+            run();
+        }
+        if (step == 26)
+        {
+            // NoChange configuration must still execute, not redisplay the old result.
+            const auto regions = props.Get<std::uint32_t>(segmentation.Regions.Name);
+            ASSERT_TRUE(regions);
+            EXPECT_NE(regions[0], 777u);
+            auto external = h.Control().GetEngineConfigControlState().ActiveConfig;
+            auto updated = active(); updated.Regions.Name = "f:segmentation_external";
+            R::SetCurvatureSegmentationConfig(external, updated);
+            ASSERT_TRUE(h.Apply(external));
+        }
+        if (step == 29) run();
+        if (step == 32)
+        {
+            EXPECT_EQ(active().Regions.Name, "f:segmentation_external");
+            EXPECT_TRUE(props.Exists("f:segmentation_external"));
+        }
+        if (step >= 34 && step <= 39)
+            EditScalarControl(window, "Components##CurvatureSegmentation", step - 34, "3");
+        if (step == 41)
+        {
+            auto external = h.Control().GetEngineConfigControlState().ActiveConfig;
+            auto updated = active(); updated.FixedComponentCount = 4u;
+            R::SetCurvatureSegmentationConfig(external, updated);
+            ASSERT_TRUE(h.Apply(external));
+        }
+        if (step == 44) run();
+        if (step == 47)
+        {
+            // External writes cannot silently discard an explicit dirty draft.
+            EXPECT_EQ(active().FixedComponentCount, 3u);
+            EXPECT_EQ(active().Regions.Name, "f:segmentation_external");
+        }
+        if (step >= 49 && step <= 54)
+            EditScalarControl(window, "Components##CurvatureSegmentation", step - 49, "5");
+        if (step == 56)
+            ImGui::ActivateItemByID(window->GetID("Reload active##CurvatureSegmentation"));
+        if (step == 59)
+        {
+            auto regions = props.Get<std::uint32_t>("f:segmentation_external");
+            ASSERT_TRUE(regions);
+            regions[0] = 777u;
+            run();
+        }
+        if (step == 62)
+        {
+            EXPECT_EQ(active().FixedComponentCount, 3u);
+            const auto regions = props.Get<std::uint32_t>("f:segmentation_external");
+            ASSERT_TRUE(regions);
+            EXPECT_NE(regions[0], 777u);
+            completed = true;
+            engine.RequestExit();
+        }
+    };
+    h.Engine->Run();
+    EXPECT_TRUE(completed);
+}
+
 TEST(SandboxProcessingPanels, GeodesicsRetriesDraftAndKeepsRejectedEntityReset)
 {
     bool reject = false;

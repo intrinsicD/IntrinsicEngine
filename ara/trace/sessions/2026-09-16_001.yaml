@@ -2,10 +2,10 @@ session:
   id: 2026-09-16_001
   date: '2026-09-16'
   started: '2026-09-16T00:38:04+02:00'
-  last_turn: '2026-09-16T14:47:00+02:00'
-  turn_count: 13
+  last_turn: '2026-09-16T17:48:01+02:00'
+  turn_count: 14
   summary: Retired RUNTIME-268, GRAPHICS-144/145 and RUNTIME-267 with bounded compile evidence; continued UI-037
-    execution/readiness reuse and GRAPHICS-105 visualization/material/default-ownership consolidation with Claude.
+    execution/readiness reuse including explicit segmentation drafts and GRAPHICS-105 visualization/material/default-ownership consolidation with Claude.
     Full CPU and selected Vulkan tests pass; authored-material, readiness and cache work remain open.
 events_logged:
 - turn: 1
@@ -149,6 +149,12 @@ events_logged:
   routing: direct
   provenance: ai-executed
   summary: Remove unused model-import default material ownership; preserve the actual extraction-owned defaults.
+- turn: 14
+  type: decision
+  id: N618
+  routing: direct
+  provenance: ai-executed
+  summary: Share segmentation draft/execution owners while preserving explicit Apply/Reload and rejected edits.
 ai_actions:
 - turn: 1
   action: Diagnosed standard-header/import serialization, implemented one declaration owner, fixed review findings,
@@ -293,6 +299,17 @@ ai_actions:
   - tests/contract/runtime/Test.AssetImportFormatCoverage.cpp
   - src/runtime/README.md
   - tasks/active/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md
+- turn: 14
+  action: Reused shared draft, execution and action controls; fixed external-config refresh, protected dirty edits,
+    refreshed Reload immediately and disabled unavailable Run/Show. Claude plan/diff review informed fixes.
+    Real-widget regression and final full CPU gate pass (4678 plus one expected skip); removed 43 production lines
+    and redundant GLM umbrella include. No timing claim, module change or whole-task closure.
+  provenance: ai-executed
+  files_changed:
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+  - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
+  - docs/architecture/sandbox-editor-feature-boundaries.md
+  - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
 claims_touched:
 - id: C99
   action: crystallized
@@ -349,6 +366,10 @@ key_context:
   excerpt: User requested continued open duplication/compilation work with Claude through planning, implementation,
     review, tests and fixes. Continue GRAPHICS-105 with the existing extraction allocation owner rather than a new helper.
 
+- turn: 14
+  excerpt: User requested continued open duplication/compilation tasks with Claude through plan, implement,
+    review, test and fix. Continue UI-037 explicit segmentation state reuse; no new compilation benchmark.
+
 open_threads:
 - The broader C92 processing-family hypothesis still needs a selected baseline and repeated family-edit measurements;
   BUILD-006 separately owns backend/cache comparisons.
@@ -370,7 +391,7 @@ open_threads:
   that tooling work.
 - RUNTIME-268, GRAPHICS-144, GRAPHICS-145 and RUNTIME-267 are complete with bounded measured evidence. Mandatory
   config/session dependencies remain. UI-037 is active with shared controls, outlier/ICP, Progressive Poisson and
-  parameterization and mesh-field config/execution plus UV admission verified;
+  parameterization and mesh-field config/execution including segmentation drafts plus UV admission verified;
   full numerical UV readiness, mesh/bake, family readiness, backend/variant and metadata/cache preflight coverage remain. GRAPHICS-105 is active with overlay material duplication, retired SciVis metadata, lighting alias and unused import-owned defaults removed; authored-material and normal-source work remains. LEGACY-043 follows it, and
   BUILD-006 retains its prerequisites.
 ai_suggestions_pending:

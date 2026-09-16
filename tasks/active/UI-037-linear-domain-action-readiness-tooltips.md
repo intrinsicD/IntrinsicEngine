@@ -507,3 +507,35 @@ Verified checkpoint:
   test-layout, task validation/policy/state links, docs links/sync, root hygiene,
   skill freshness and diff checks pass. No public surface/inventory change,
   sanitizer execution or Vulkan runtime claim.
+
+
+## Segmentation draft/execution checkpoint — 2026-09-16
+
+- Operator-directed reuse: curvature segmentation now uses `ProcessingDraftState`,
+  the canonical serializer, `ApplyProcessingExecution` and shared action buttons.
+  Removed separate initialization/apply-result storage and repeated execution
+  wiring. Explicit Apply retains its Dirty bit; clean drafts adopt external
+  updates, rejected drafts remain retryable, and Reload discards edits immediately.
+  Successful apply reads back canonical config before execution and visualization.
+- Run remains visible but disabled without a suitable mesh, with selection and
+  topology reasons distinguished. Show controls require a matching entity.
+  Other domain-window controls retain their own availability guards; removed the
+  redundant common selection warning. No new helper, file, public surface,
+  dependency or geometry validation; explicit source IDs and output buttons remain.
+- Claude reviewed the plan and two fixed diffs. Adopted dirty-draft protection,
+  immediate Reload, selection messaging and disabled Show findings. Confirmed
+  canonical read-back is correct because execution reads the same active config.
+- Real-widget regression reproduced stale external output names on the old panel.
+  It covers explicit Apply, rejected Apply/Run, retry without another edit,
+  NoChange re-execution, external refresh, dirty-draft conflicts, Reload and
+  visible-disabled Run. The focused panel suite passed all 55 tests.
+- Production footprint: 43 lines removed from one implementation, including its
+  redundant GLM umbrella include. No compile-time improvement measurement or
+  sanitizer/Vulkan runtime claim. Full numerical readiness and remaining
+  action/backend controls keep UI-037 open.
+- Final canonical `ci` configure / `IntrinsicTests` build / exclusion-only CPU gate:
+  **4,678 passes, one expected ASan-only GLFW skip, zero failures** (4,679 selected,
+  141.83 s). A provisional run detected source newer than the dependency scan after
+  final review edits; rebuilding and rerunning against fixed source resolved it.
+  Layering, test layout, task policy/state links, docs links/sync, skill freshness,
+  session brief, root hygiene and diff checks pass. No module inventory change.
