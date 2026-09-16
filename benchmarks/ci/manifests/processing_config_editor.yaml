@@ -1,0 +1,39 @@
+benchmark_id: build.engine_compile_iteration.processing_config_editor.v1
+method: build.engine_compile_iteration
+dataset: intrinsicengine.processing_config_editor_2026_09_16
+params:
+  intent: performance
+  source_revisions:
+    before: be40663918749417275b06fb8268a00310688f7d
+    after: 6fb0807f49a8d660d820470e82613c1ad1a9c424
+  sample_order: [before, after, after, before, before, after]
+  measured_iterations: 3
+  warmup_iterations: 0
+  preset: ci
+  target: ExtrinsicSandboxEditor
+  compiler: /usr/bin/clang++-23
+  jobs: 4
+  configure_options:
+  - -DEXTRINSIC_BACKEND=Null
+  - -DINTRINSIC_PLATFORM_BACKEND=Null
+  - -DINTRINSIC_HEADLESS_NO_GLFW=ON
+  - -DINTRINSIC_BUILD_SANDBOX=ON
+  - -DINTRINSIC_BUILD_TESTS=OFF
+  - -DINTRINSIC_BUILD_BENCHMARKS=OFF
+  - -DINTRINSIC_ENABLE_CCACHE=OFF
+  - -DCMAKE_CXX_COMPILER_LAUNCHER=
+  - -DCMAKE_C_COMPILER_LAUNCHER=
+  - -DCMAKE_C_COMPILER=/usr/bin/clang-23
+  - -DCMAKE_CXX_COMPILER=/usr/bin/clang++-23
+  - -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-23
+  scenarios:
+    noop: null
+    config_impl: src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp
+    config_interface: src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm
+  setup: Before every sample check out the exact clean source, configure and reconcile the editor target outside timing; the first setup builds all prerequisites. On each arm change force changed C++ producers stale and verify their actual setup compilation; retain setup compiler windows. Retain all setup logs and every timed sample. Reuse one fixed source/build path; no clean-build comparison.
+  validity: One compiler invocation for implementation edits; config-interface probes must include actual importers and all three unrelated app sources before, excluding them after. Diff restricted to the declared ownership/header/helper changes; receiving MethodPanels belongs to the timed target and must rebuild in both interface arms. Compiler commands, source population and package fingerprints checked; preserve actual changed dependency maps and all producer durations.
+  measurement: Target walls include scanning, compilation and archive linking. Weighted Ninja critical paths and maximum single-process RSS are retained; neither is aggregate CPU or memory. Canonical result records stay claim_eligible false.
+  noise_scope: Warm inputs pre-read before each sample, cache/launchers off, four jobs. Normal desktop without affinity/governor/turbo/cache-flush control; no competing builds/tests during timed samples. Retain negative and overlapping observations.
+  scope: Local settled editor-target rebuilds for config implementation/interface edits, including real app consumers. No clean-build, whole-engine, runtime/GPU, cross-host/compiler, memory or statistical claim. Prior runtime-only comparisons use a different target and are not combined.
+metrics: [build_time_ms, memory_peak_bytes, sample_count]
+thresholds: {}
