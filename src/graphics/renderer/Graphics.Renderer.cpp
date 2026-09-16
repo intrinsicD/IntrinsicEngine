@@ -981,8 +981,9 @@ namespace Extrinsic::Graphics
                 return plan;
             }
 
-            std::ranges::sort(items, [](const RendererTransientPlacementItem& lhs,
-                                        const RendererTransientPlacementItem& rhs)
+            std::sort(items.begin(), items.end(),
+                [](const RendererTransientPlacementItem& lhs,
+                   const RendererTransientPlacementItem& rhs)
             {
                 return std::tie(lhs.FirstUsePass, lhs.ResourceIndex) <
                        std::tie(rhs.FirstUsePass, rhs.ResourceIndex);
@@ -1020,7 +1021,8 @@ namespace Extrinsic::Graphics
                     .AlignmentBytes = item.Requirements.AlignmentBytes,
                 });
             }
-            auto placed = BuildTransientPlacementPlan(placements, aliasingEnabled);
+            auto placed = BuildTransientPlacementPlan(
+                {placements.data(), placements.size()}, aliasingEnabled);
             plan.Placements = std::move(placed.Placements);
             plan.AliasReuseHazards = std::move(placed.AliasReuseHazards);
             plan.PeakBytes = AlignUpForRendererPlacement(
@@ -1051,7 +1053,8 @@ namespace Extrinsic::Graphics
 
         void SortRendererBarrierPackets(std::vector<BarrierPacket>& packets)
         {
-            std::ranges::sort(packets, [](const BarrierPacket& lhs, const BarrierPacket& rhs) {
+            std::sort(packets.begin(), packets.end(),
+                [](const BarrierPacket& lhs, const BarrierPacket& rhs) {
                 return std::tuple{lhs.PassIndex, BarrierPacketStageSortKey(lhs.Stage)} <
                        std::tuple{rhs.PassIndex, BarrierPacketStageSortKey(rhs.Stage)};
             });
@@ -1162,9 +1165,9 @@ namespace Extrinsic::Graphics
             }
 
             cmd.SubmitBarriers(RHI::BarrierBatchDesc{
-                .TextureBarriers = textureBarriers,
-                .BufferBarriers = bufferBarriers,
-                .MemoryBarriers = memoryBarriers,
+                .TextureBarriers = {textureBarriers.data(), textureBarriers.size()},
+                .BufferBarriers = {bufferBarriers.data(), bufferBarriers.size()},
+                .MemoryBarriers = {memoryBarriers.data(), memoryBarriers.size()},
             });
         }
 
@@ -2141,7 +2144,7 @@ namespace Extrinsic::Graphics
             {
                 m_VisualizationPropertyBufferDiagnostics =
                     m_VisualizationPropertyBufferResidency->Update(
-                        m_VisualizationPropertyBuffers);
+                        {m_VisualizationPropertyBuffers.data(), m_VisualizationPropertyBuffers.size()});
                 const std::span<const VisualizationPropertyBufferAddress> addresses =
                     m_VisualizationPropertyBufferResidency->GetLastAddresses();
                 m_VisualizationPropertyBufferAddresses.assign(addresses.begin(), addresses.end());
@@ -2289,7 +2292,7 @@ namespace Extrinsic::Graphics
                 m_VisualizationPropertyBufferAddresses.clear();
                 m_VisualizationPropertyBufferDiagnostics =
                     ValidateVisualizationPropertyBufferUploads(
-                        m_VisualizationPropertyBuffers);
+                        {m_VisualizationPropertyBuffers.data(), m_VisualizationPropertyBuffers.size()});
                 if (!m_VisualizationPropertyBuffers.empty())
                 {
                     m_VisualizationPropertyBufferDiagnostics.UploadDeferralCount +=
@@ -2299,15 +2302,17 @@ namespace Extrinsic::Graphics
                 }
             }
 
+            // These borrowed views use pointer/count constructors to avoid repeated
+            // range-concept evaluation across the renderer module graph.
             const VisualizationPacketBatch visualizationBatch{
-                .PropertyBuffers = m_VisualizationPropertyBuffers,
-                .AttributeBuffers = m_VisualizationAttributeBuffers,
-                .Scalars = m_VisualizationScalars,
-                .Colors = m_VisualizationColors,
-                .VectorFields = m_VisualizationVectorFields,
-                .Isolines = m_VisualizationIsolines,
-                .HtexAtlases = m_VisualizationHtexAtlases,
-                .FragmentBakeAtlases = m_VisualizationFragmentBakeAtlases,
+                .PropertyBuffers = {m_VisualizationPropertyBuffers.data(), m_VisualizationPropertyBuffers.size()},
+                .AttributeBuffers = {m_VisualizationAttributeBuffers.data(), m_VisualizationAttributeBuffers.size()},
+                .Scalars = {m_VisualizationScalars.data(), m_VisualizationScalars.size()},
+                .Colors = {m_VisualizationColors.data(), m_VisualizationColors.size()},
+                .VectorFields = {m_VisualizationVectorFields.data(), m_VisualizationVectorFields.size()},
+                .Isolines = {m_VisualizationIsolines.data(), m_VisualizationIsolines.size()},
+                .HtexAtlases = {m_VisualizationHtexAtlases.data(), m_VisualizationHtexAtlases.size()},
+                .FragmentBakeAtlases = {m_VisualizationFragmentBakeAtlases.data(), m_VisualizationFragmentBakeAtlases.size()},
             };
             m_VisualizationDiagnostics = ValidateVisualizationPackets(visualizationBatch);
             m_VisualizationOverlaySummary = BuildVisualizationOverlaySummary(visualizationBatch);
@@ -2556,8 +2561,8 @@ namespace Extrinsic::Graphics
                 .DebugOverlayEnabled = input.DebugOverlayEnabled,
                 .EnableGpuProfiling = input.EnableGpuProfiling,
                 .Camera = camera,
-                .Renderables = m_RenderableSnapshots,
-                .Lights = m_LightSnapshots,
+                .Renderables = {m_RenderableSnapshots.data(), m_RenderableSnapshots.size()},
+                .Lights = {m_LightSnapshots.data(), m_LightSnapshots.size()},
                 .PickRequest = PickRequestSnapshot{
                     .Pending = input.HasPendingPick || input.Pick.Pending,
                     .X = pick.X,
@@ -2573,14 +2578,14 @@ namespace Extrinsic::Graphics
                     // RUNTIME-089 Slice B — identity from the runtime selection
                     // controller; outline styling keeps SelectionSnapshot's
                     // recipe defaults.
-                    .SelectedStableIds = m_SelectionSelectedStableIds,
+                    .SelectedStableIds = {m_SelectionSelectedStableIds.data(), m_SelectionSelectedStableIds.size()},
                     .HoveredStableId   = m_SelectionHoveredStableId,
                     .HasHovered        = m_SelectionHasHovered,
                 },
                 .DebugPrimitives = DebugPrimitiveSnapshot{
-                    .Lines = m_DebugLinePackets,
-                    .Points = m_DebugPointPackets,
-                    .Triangles = m_DebugTrianglePackets,
+                    .Lines = {m_DebugLinePackets.data(), m_DebugLinePackets.size()},
+                    .Points = {m_DebugPointPackets.data(), m_DebugPointPackets.size()},
+                    .Triangles = {m_DebugTrianglePackets.data(), m_DebugTrianglePackets.size()},
                     .LineCount = static_cast<std::uint32_t>(m_DebugLinePackets.size()),
                     .PointCount = static_cast<std::uint32_t>(m_DebugPointPackets.size()),
                     .TriangleCount = static_cast<std::uint32_t>(m_DebugTrianglePackets.size()),
@@ -2590,18 +2595,18 @@ namespace Extrinsic::Graphics
                         !m_DebugTrianglePackets.empty(),
                 },
                 .Gizmos = GizmoRenderSnapshot{
-                    .TransformGizmos = m_TransformGizmoPackets,
+                    .TransformGizmos = {m_TransformGizmoPackets.data(), m_TransformGizmoPackets.size()},
                     .TransformGizmoCount = static_cast<std::uint32_t>(m_TransformGizmoPackets.size()),
                     .HasGizmos = !m_TransformGizmoPackets.empty(),
                 },
                 .Visualization = VisualizationSnapshot{
-                    .AttributeBuffers = m_VisualizationAttributeBuffers,
-                    .Scalars = m_VisualizationScalars,
-                    .Colors = m_VisualizationColors,
-                    .VectorFields = m_VisualizationVectorFields,
-                    .Isolines = m_VisualizationIsolines,
-                    .HtexAtlases = m_VisualizationHtexAtlases,
-                    .FragmentBakeAtlases = m_VisualizationFragmentBakeAtlases,
+                    .AttributeBuffers = {m_VisualizationAttributeBuffers.data(), m_VisualizationAttributeBuffers.size()},
+                    .Scalars = {m_VisualizationScalars.data(), m_VisualizationScalars.size()},
+                    .Colors = {m_VisualizationColors.data(), m_VisualizationColors.size()},
+                    .VectorFields = {m_VisualizationVectorFields.data(), m_VisualizationVectorFields.size()},
+                    .Isolines = {m_VisualizationIsolines.data(), m_VisualizationIsolines.size()},
+                    .HtexAtlases = {m_VisualizationHtexAtlases.data(), m_VisualizationHtexAtlases.size()},
+                    .FragmentBakeAtlases = {m_VisualizationFragmentBakeAtlases.data(), m_VisualizationFragmentBakeAtlases.size()},
                     .Diagnostics = m_VisualizationDiagnostics,
                     .PropertyBufferDiagnostics = m_VisualizationPropertyBufferDiagnostics,
                     .OverlaySummary = m_VisualizationOverlaySummary,
@@ -2641,15 +2646,19 @@ namespace Extrinsic::Graphics
                 .Lights = m_Subsystems.LightSystemRegistry ? &*m_Subsystems.LightSystemRegistry : nullptr,
                 .World = m_Subsystems.GpuWorldSystem ? &*m_Subsystems.GpuWorldSystem : nullptr,
                 .Culling = m_Subsystems.CullingSystemRegistry ? &*m_Subsystems.CullingSystemRegistry : nullptr,
-                .VisualizationSyncRecords = std::span<VisualizationSyncRecord>{activeSnapshot->VisualizationSyncRecords},
+                .VisualizationSyncRecords = std::span<VisualizationSyncRecord>{
+                    activeSnapshot->VisualizationSyncRecords.data(), activeSnapshot->VisualizationSyncRecords.size()},
                 .VisualizationPropertyBufferAddresses =
                     std::span<const VisualizationPropertyBufferAddress>{
-                        activeSnapshot->VisualizationPropertyBufferAddresses},
+                        activeSnapshot->VisualizationPropertyBufferAddresses.data(),
+                        activeSnapshot->VisualizationPropertyBufferAddresses.size()},
                 .VisualizationScalarPackets =
                     std::span<const ScalarAttributePacket>{
-                        activeSnapshot->VisualizationScalars},
-                .TransformSyncRecords = std::span<const TransformSyncRecord>{activeSnapshot->TransformSyncRecords},
-                .LightSnapshots = std::span<const LightSnapshot>{activeSnapshot->LightSnapshots},
+                        activeSnapshot->VisualizationScalars.data(), activeSnapshot->VisualizationScalars.size()},
+                .TransformSyncRecords = std::span<const TransformSyncRecord>{
+                    activeSnapshot->TransformSyncRecords.data(), activeSnapshot->TransformSyncRecords.size()},
+                .LightSnapshots = std::span<const LightSnapshot>{
+                    activeSnapshot->LightSnapshots.data(), activeSnapshot->LightSnapshots.size()},
                 .EnsureClusterLightResources = [this, &renderWorld]
                 {
                     return EnsureClusterLightResources(renderWorld);
@@ -3171,15 +3180,15 @@ namespace Extrinsic::Graphics
                 }
                 rhiSubmitBatches.push_back(RHI::QueueSubmitBatchDesc{
                     .Queue = batch.Queue,
-                    .Waits = rhiQueueWaits[batchIndex],
-                    .Signals = rhiQueueSignals[batchIndex],
+                    .Waits = {rhiQueueWaits[batchIndex].data(), rhiQueueWaits[batchIndex].size()},
+                    .Signals = {rhiQueueSignals[batchIndex].data(), rhiQueueSignals[batchIndex].size()},
                 });
             }
             bool useQueueSubmitPlan = false;
             if (queueSubmitPlan.Batches.size() > 1u)
             {
                 useQueueSubmitPlan = m_Device->BeginFrameQueueSubmitPlan(frame, RHI::FrameQueueSubmitPlanDesc{
-                    .Batches = rhiSubmitBatches,
+                    .Batches = {rhiSubmitBatches.data(), rhiSubmitBatches.size()},
                 });
             }
             const bool asyncComputeSubmitPlanAccepted =
@@ -3221,7 +3230,7 @@ namespace Extrinsic::Graphics
                         (void)BeginGpuProfile(
                             frame,
                             *compiled,
-                            actualQueues);
+                            {actualQueues.data(), actualQueues.size()});
                     }
                 };
 
@@ -3325,7 +3334,7 @@ namespace Extrinsic::Graphics
                     if (activeRenderPass.HasAttachments)
                     {
                         graphicsContext.BeginRenderPass(RHI::RenderPassDesc{
-                            .ColorTargets = activeRenderPass.ColorAttachments,
+                            .ColorTargets = {activeRenderPass.ColorAttachments.data(), activeRenderPass.ColorAttachments.size()},
                             .Depth = activeRenderPass.DepthAttachment,
                         });
                         const Core::Extent2D extent = m_Device != nullptr
@@ -3439,7 +3448,8 @@ namespace Extrinsic::Graphics
                 return !parallelContextRequests.empty() &&
                        m_Device->BeginFrameParallelCommandContexts(
                            frame,
-                           RHI::ParallelCommandContextPlanDesc{.Requests = parallelContextRequests});
+                           RHI::ParallelCommandContextPlanDesc{
+                               .Requests = {parallelContextRequests.data(), parallelContextRequests.size()}});
             };
             const auto executeParallelRecordJoin =
                 [&](RenderGraphExecutor::PassObserver onSubmit,
@@ -3644,7 +3654,8 @@ namespace Extrinsic::Graphics
                     const BarrierPacketStage stage) -> Core::Result
                 {
                     const BarrierPacketRange range =
-                        FindBarrierPacketRange(compiled->BarrierPackets, passIndex, stage);
+                        FindBarrierPacketRange(
+                            {compiled->BarrierPackets.data(), compiled->BarrierPackets.size()}, passIndex, stage);
                     for (std::size_t packetIndex = range.Begin; packetIndex < range.End; ++packetIndex)
                     {
                         const BarrierPacket& packet = compiled->BarrierPackets[packetIndex];
@@ -8183,7 +8194,7 @@ namespace Extrinsic::Graphics
                 .FrameNumber = m_Device->GetGlobalFrameNumber(),
                 .FrameSlot = frame.FrameIndex,
             };
-            auto plan = profiler->BeginFrame(key, descriptors);
+            auto plan = profiler->BeginFrame(key, {descriptors.data(), descriptors.size()});
             if (!plan)
             {
                 PublishStaleGpuProfileStatus(

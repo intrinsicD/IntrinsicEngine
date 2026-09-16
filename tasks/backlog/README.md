@@ -82,7 +82,7 @@ ready. Task front-matter owns prerequisite state.
 | Processing config dependency chain | [RUNTIME-267](runtime/RUNTIME-267-processing-config-consumer-locality.md) |
 | Snapshot BMI serialization (diagnostic follow-up) | [RUNTIME-268](../done/RUNTIME-268-workspace-snapshot-bmi-serialization.md) |
 | Renderer declaration serialization | [GRAPHICS-144](../done/GRAPHICS-144-renderer-consumer-locality.md) |
-| Remaining renderer implementation frontend cost | [GRAPHICS-145](rendering/GRAPHICS-145-renderer-implementation-frontend-cost.md) |
+| Remaining renderer implementation frontend cost | [GRAPHICS-145](../active/GRAPHICS-145-renderer-implementation-frontend-cost.md) |
 | Shared action readiness and disabled reasons | [UI-037](ui/UI-037-linear-domain-action-readiness-tooltips.md) |
 | Material/visualization authority consolidation | [GRAPHICS-105](rendering/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md) |
 | Stale shaders after material-authority decisions | [LEGACY-043](rendering/LEGACY-043-retire-stale-multiset-shaders.md) |

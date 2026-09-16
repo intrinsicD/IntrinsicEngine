@@ -9,6 +9,7 @@ picking backlog work; theme priorities and rationale live in
 ## Active tasks
 
 - `BUG-194` — Large-mesh property display and geodesic controls (tasks/active/BUG-194-large-mesh-property-display.md)
+- `GRAPHICS-145` — Reduce renderer implementation frontend work (tasks/active/GRAPHICS-145-renderer-implementation-frontend-cost.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
 - `METHOD-044` — Feature-aware patches and distortion-aware atlas merging (tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md)
@@ -27,7 +28,6 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `GRAPHICS-126` — Bandwidth-priced frame-recipe trace model (tasks/backlog/rendering/GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md)
 - blocked by `GRAPHICS-137`: `GRAPHICS-136` — Rename `Pipeline*` to `GraphicsState*` at the RHI boundary (tasks/backlog/rendering/GRAPHICS-136-rename-pipeline-to-graphics-state-rhi-boundary.md)
 - unblocked: `GRAPHICS-137` — Shader-object realization spike (ADR-0028 killing experiment) (tasks/backlog/rendering/GRAPHICS-137-shader-object-realization-spike.md)
-- unblocked: `GRAPHICS-145` — Reduce renderer implementation frontend work (tasks/backlog/rendering/GRAPHICS-145-renderer-implementation-frontend-cost.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 

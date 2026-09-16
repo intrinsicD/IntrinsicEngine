@@ -171,7 +171,7 @@ removed private-import exception. Rows 5–6 unchanged; row 7 is the CPUContract
 refactor endpoint. Source delta is +6 C++ lines and zero net files/modules, 419
 modules. This is reduced repeated compilation, not a source-line reduction.
 
-[GRAPHICS-145](../backlog/rendering/GRAPHICS-145-renderer-implementation-frontend-cost.md)
+[GRAPHICS-145](../active/GRAPHICS-145-renderer-implementation-frontend-cost.md)
 owns the remaining implementation frontend/template cost, supported by a separate
 final-source trace. RUNTIME-267 still owns config/frame value ownership; do not
 replace its embedded prepared frame with dangling references. UI-037, GRAPHICS-105,
