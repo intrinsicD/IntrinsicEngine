@@ -2634,3 +2634,12 @@ entries:
       without a mesh. Final review withdrew an incorrect active/draft objection after validation.
     - Twenty-nine production lines removed from one implementation is not a compile-time measurement. UI-037 remains
       open for full geometry readiness and remaining actions/backends; broader O93 is unsettled.
+
+  - turn: 2026-09-16_001#11
+    notes:
+    - N615 records a bounded implementation decision and actual verification, not a research/performance claim.
+      No staged observation has a new closure signal; preserve existing owners and flags, including broader O93.
+    - Material-free sidecar guards remain intact. Claude confirmed the final null guard and uniform/tint independence;
+      test-only include and lease teardown defects were corrected before final CPU and GPU verification.
+    - Production line reduction does not establish compile-time improvement. GRAPHICS-105 stays active for the remaining
+      material-source contracts and LEGACY-043 stays gated; seven selected Vulkan passes are not whole-engine GPU closure.

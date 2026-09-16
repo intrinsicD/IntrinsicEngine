@@ -54,7 +54,6 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.Renderer;
-import Extrinsic.Graphics.VisualizationSyncSystem;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetIngestStateMachine;
@@ -1232,9 +1231,6 @@ namespace
             engine.GetRenderer().GetMaterialSystem().GetMaterialSlot(
                 sidecar->MaterialHandle);
         EXPECT_EQ(sidecar->MaterialSlot, baseSlot);
-        EXPECT_EQ(
-            engine.GetRenderer().GetVisualizationSyncSystem().GetOverrideLeaseCount(),
-            0u);
 
         extraction.Shutdown(engine.GetRenderer());
     }

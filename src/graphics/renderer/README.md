@@ -504,7 +504,7 @@ into graphics public contracts.
 - `Graphics.RenderPrepPipeline` owns the CPU-side `PrepareFrame()` sequencing
   seam. The renderer supplies required manager/system pointers, retained
   transform/light/visualization snapshot spans, and the cluster-light resource
-  hook. One persistent nine-pass CPU task graph re-registers current callbacks
+  hook. One persistent eight-pass CPU task graph re-registers current callbacks
   on each task-graph run and reuses topology only for an exact shape. The strict
   chain is owner-thread-only, so synchronous execution cannot return with
   scheduler-owned callbacks still live; under the pipeline's single-owner
@@ -1565,7 +1565,9 @@ Concretely:
   screen-space quad expansion. The same sync step writes scalar/color
   visualization config (`ColorSourceMode`, colormap metadata, and scalar/color
   BDAs) for surface, line, and point records; retained line/point shaders
-  consume those fields on the GPU. For per-element color buffers,
+  consume those fields on the GPU. Visualization does not allocate replacement
+  materials: authored shading and texture bindings stay on the existing material
+  lease, uploaded once after visualization/tint sync. For per-element color buffers,
   `VisualizationSyncSystem` derives `GpuEntityConfig::VisDomain` from
   `PerVertexBuffer` / `PerEdgeBuffer` / `PerFaceBuffer` so shader lookup uses
   the selected element domain.

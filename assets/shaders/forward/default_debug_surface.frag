@@ -59,7 +59,9 @@ vec3 DebugUvChecker(vec2 uv) {
 void main() {
     const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;
     const GpuMaterialSlot mat = GpuMaterialSlotRef(scene.MaterialBDA).Data[fragMaterialSlot];
-    if (mat.MaterialTypeID == GpuMaterialType_DefaultDebugUVs) {
+    const GpuEntityConfig cfg = GpuEntityConfigRef(scene.EntityConfigBDA).Data[fragConfigSlot];
+    if (mat.MaterialTypeID == GpuMaterialType_DefaultDebugUVs &&
+        cfg.ColorSourceMode == GpuColorSource_Material) {
         outColor = vec4(DebugUvChecker(fragUv), 1.0);
         return;
     }
@@ -68,7 +70,6 @@ void main() {
     if (fragHasVertexColor != 0u) {
         baseColor = fragVertexColor;
     }
-    const GpuEntityConfig cfg = GpuEntityConfigRef(scene.EntityConfigBDA).Data[fragConfigSlot];
     baseColor = ResolveSurfaceVisualization(cfg, baseColor,
         fragVisualizationScalar, fragVisualizationColor, uint(gl_PrimitiveID));
 

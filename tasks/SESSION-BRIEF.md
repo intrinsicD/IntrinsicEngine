@@ -9,6 +9,7 @@ picking backlog work; theme priorities and rationale live in
 ## Active tasks
 
 - `BUG-194` — Large-mesh property display and geodesic controls (tasks/active/BUG-194-large-mesh-property-display.md)
+- `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/active/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
 - `METHOD-044` — Feature-aware patches and distortion-aware atlas merging (tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md)
@@ -21,7 +22,6 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `GRAPHICS-105`: `ASSETIO-009` — Loss-aware MaterialX subset import (tasks/backlog/assets/ASSETIO-009-loss-aware-materialx-subset-import.md)
 - blocked by `GRAPHICS-105`: `GEOM-066` — meshoptimizer v1.2 geometry oracle and adoption evidence (tasks/backlog/geometry/GEOM-066-meshoptimizer-v1-2-geometry-oracle.md)
 - unblocked: `GEOM-067` — Memory-aware BVH and merged-node evidence (tasks/backlog/geometry/GEOM-067-memory-aware-bvh-merged-node-evidence.md)
-- unblocked: `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/backlog/rendering/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
 - blocked by `LEGACY-043`: `GRAPHICS-123` — Slang single-kernel gradient pilot (tasks/backlog/rendering/GRAPHICS-123-slang-single-kernel-gradient-pilot.md)
 - unblocked: `GRAPHICS-124` — Slughorn world-space vector annotation proof (tasks/backlog/rendering/GRAPHICS-124-slughorn-world-space-vector-annotation-proof.md)
 - blocked by `GEOM-066`: `GRAPHICS-125` — Memory-priced cluster hierarchy evidence (tasks/backlog/rendering/GRAPHICS-125-memory-priced-cluster-hierarchy-evidence.md)

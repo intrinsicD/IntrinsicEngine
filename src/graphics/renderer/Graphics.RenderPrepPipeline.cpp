@@ -18,9 +18,8 @@ namespace Extrinsic::Graphics
     namespace
     {
         struct PrepPipelineCommitTag {};
-        struct PrepMaterialBaseSyncTag {};
         struct PrepVisualizationSyncTag {};
-        struct PrepMaterialOverrideSyncTag {};
+        struct PrepMaterialSyncTag {};
         struct PrepTransformSyncTag {};
         struct PrepLightSyncTag {};
         struct PrepClusterLightTableTag {};
@@ -80,13 +79,6 @@ namespace Extrinsic::Graphics
             RecordStep(result, inputs, RenderPrepStep::PipelineCommit);
         }
 
-        void ExecuteMaterialBaseSync(RenderPrepPipelineResult& result,
-                                     const RenderPrepPipelineInputs& inputs)
-        {
-            inputs.Materials->SyncGpuBuffer();
-            RecordStep(result, inputs, RenderPrepStep::MaterialBaseSync);
-        }
-
         void ExecuteVisualizationSync(RenderPrepPipelineResult& result,
                                       const RenderPrepPipelineInputs& inputs)
         {
@@ -99,11 +91,11 @@ namespace Extrinsic::Graphics
             RecordStep(result, inputs, RenderPrepStep::VisualizationSync);
         }
 
-        void ExecuteMaterialOverrideSync(RenderPrepPipelineResult& result,
-                                         const RenderPrepPipelineInputs& inputs)
+        void ExecuteMaterialSync(RenderPrepPipelineResult& result,
+                                 const RenderPrepPipelineInputs& inputs)
         {
             inputs.Materials->SyncGpuBuffer();
-            RecordStep(result, inputs, RenderPrepStep::MaterialOverrideSync);
+            RecordStep(result, inputs, RenderPrepStep::MaterialSync);
         }
 
         void ExecuteTransformSync(RenderPrepPipelineResult& result,
@@ -146,9 +138,8 @@ namespace Extrinsic::Graphics
                                const RenderPrepPipelineInputs& inputs)
         {
             ExecutePipelineCommit(result, inputs);
-            ExecuteMaterialBaseSync(result, inputs);
             ExecuteVisualizationSync(result, inputs);
-            ExecuteMaterialOverrideSync(result, inputs);
+            ExecuteMaterialSync(result, inputs);
             ExecuteTransformSync(result, inputs);
             ExecuteLightSync(result, inputs);
             ExecuteClusterLightTableSync(result, inputs);
@@ -217,9 +208,8 @@ namespace Extrinsic::Graphics
         switch (step)
         {
         case RenderPrepStep::PipelineCommit: return "PipelineCommit";
-        case RenderPrepStep::MaterialBaseSync: return "MaterialBaseSync";
         case RenderPrepStep::VisualizationSync: return "VisualizationSync";
-        case RenderPrepStep::MaterialOverrideSync: return "MaterialOverrideSync";
+        case RenderPrepStep::MaterialSync: return "MaterialSync";
         case RenderPrepStep::TransformSync: return "TransformSync";
         case RenderPrepStep::LightSync: return "LightSync";
         case RenderPrepStep::ClusterLightTableSync: return "ClusterLightTableSync";
@@ -294,23 +284,11 @@ namespace Extrinsic::Graphics
                 ExecutePipelineCommit(result, inputs);
             });
         graph.AddPass(
-            "RenderPrep.MaterialBaseSync",
-            ownerThreadOptions,
-            [] (Core::Dag::TaskGraphBuilder& b)
-            {
-                b.Read<PrepPipelineCommitTag>();
-                b.Write<PrepMaterialBaseSyncTag>();
-            },
-            [&result, &inputs]
-            {
-                ExecuteMaterialBaseSync(result, inputs);
-            });
-        graph.AddPass(
             "RenderPrep.VisualizationSync",
             ownerThreadOptions,
             [] (Core::Dag::TaskGraphBuilder& b)
             {
-                b.Read<PrepMaterialBaseSyncTag>();
+                b.Read<PrepPipelineCommitTag>();
                 b.Write<PrepVisualizationSyncTag>();
             },
             [&result, &inputs]
@@ -318,23 +296,23 @@ namespace Extrinsic::Graphics
                 ExecuteVisualizationSync(result, inputs);
             });
         graph.AddPass(
-            "RenderPrep.MaterialOverrideSync",
+            "RenderPrep.MaterialSync",
             ownerThreadOptions,
             [] (Core::Dag::TaskGraphBuilder& b)
             {
                 b.Read<PrepVisualizationSyncTag>();
-                b.Write<PrepMaterialOverrideSyncTag>();
+                b.Write<PrepMaterialSyncTag>();
             },
             [&result, &inputs]
             {
-                ExecuteMaterialOverrideSync(result, inputs);
+                ExecuteMaterialSync(result, inputs);
             });
         graph.AddPass(
             "RenderPrep.TransformSync",
             ownerThreadOptions,
             [] (Core::Dag::TaskGraphBuilder& b)
             {
-                b.Read<PrepMaterialOverrideSyncTag>();
+                b.Read<PrepMaterialSyncTag>();
                 b.Write<PrepTransformSyncTag>();
             },
             [&result, &inputs]

@@ -1,6 +1,5 @@
 module;
 
-#include <bit>
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -8,9 +7,7 @@ module;
 #include <memory>
 #include <span>
 #include <string_view>
-#include <unordered_map>
 #include <variant>
-#include <vector>
 #include <glm/glm.hpp>
 
 module Extrinsic.Graphics.VisualizationSyncSystem;
@@ -45,47 +42,12 @@ namespace Extrinsic::Graphics
     static constexpr std::uint32_t kMode_PerElementRgba = 3u;
 
     // ----------------------------------------------------------------
-    // Helper: pack normalised float RGBA into uint32_t RGBA8
-    // ----------------------------------------------------------------
-    static std::uint32_t PackColorVec4(glm::vec4 c) noexcept
-    {
-        return ColormapSystem::PackVec4(c);
-    }
-
-    // ----------------------------------------------------------------
     // Impl
     // ----------------------------------------------------------------
     struct VisualizationSyncSystem::Impl
     {
         RHI::IDevice*   Device  = nullptr;
         bool            Initialized = false;
-
-        MaterialTypeHandle SciVisTypeHandle;
-
-        // Per-record override material leases.
-        // Key = runtime-provided stable renderable ID.
-        using EntityInt = std::uint32_t;
-        std::unordered_map<EntityInt, MaterialSystem::MaterialLease> OverrideLeases;
-
-        // ----------------------------------------------------------------
-        /// Get or create the override lease for a stable renderable record.
-        MaterialSystem::MaterialLease& EnsureOverrideLease(EntityInt key,
-                                                           MaterialSystem& matSys)
-        {
-            auto it = OverrideLeases.find(key);
-            if (it == OverrideLeases.end())
-            {
-                auto lease = matSys.CreateInstance(SciVisTypeHandle, {});
-                it = OverrideLeases.emplace(key, std::move(lease)).first;
-            }
-            return it->second;
-        }
-
-        /// Release the override lease for a stable renderable record (if any).
-        void ReleaseOverrideLease(EntityInt key)
-        {
-            OverrideLeases.erase(key);
-        }
 
         static std::uint32_t ToVisDomain(Components::VisualizationConfig::Domain d) noexcept
         {
@@ -222,66 +184,6 @@ namespace Extrinsic::Graphics
                 }
             }
             return nullptr;
-        }
-
-        /// Build MaterialParams for the ScalarField override.
-        MaterialParams BuildScalarFieldParams(
-            const Components::VisualizationConfig& cfg,
-            ColormapSystem&                        colormapSys)
-        {
-            MaterialParams p{};
-
-            const RHI::BindlessIndex colormapIdx =
-                colormapSys.GetBindlessIndex(cfg.Scalar.Map);
-
-            // CustomData[0]: colourmap index, domain, range
-            p.CustomData[0] = {
-                std::bit_cast<float>(colormapIdx),
-                std::bit_cast<float>(ToVisDomain(cfg.ScalarDomain)),
-                cfg.Scalar.RangeMin,
-                cfg.Scalar.RangeMax,
-            };
-
-            // CustomData[1]: isoline / binning
-            const std::uint32_t packedColor =
-                PackColorVec4(cfg.Scalar.Isolines.Color);
-            p.CustomData[1] = {
-                std::bit_cast<float>(cfg.Scalar.Isolines.Num),
-                std::bit_cast<float>(packedColor),
-                cfg.Scalar.Isolines.Width,
-                std::bit_cast<float>(cfg.Scalar.BinCount),
-            };
-
-            // CustomData[2]: reserved for non-BDA constants.
-            p.CustomData[2] = {
-                1.f,
-                0.f,
-                0.f,
-                0.f,
-            };
-
-            return p;
-        }
-
-        /// Build MaterialParams for a UniformColor override.
-        static MaterialParams BuildUniformColorParams(glm::vec4 color)
-        {
-            MaterialParams p{};
-            p.BaseColorFactor = color;
-            p.CustomData[2]   = {
-                color.w, 0.f, 0.f, 0.f,
-            };
-            return p;
-        }
-
-        /// Build MaterialParams for a per-element RGBA buffer override.
-        static MaterialParams BuildPerElementParams()
-        {
-            MaterialParams p{};
-            p.CustomData[2] = {
-                1.f, 0.f, 0.f, 0.f,
-            };
-            return p;
         }
 
         [[nodiscard]] static std::uint32_t ToPointMode(
@@ -550,21 +452,10 @@ namespace Extrinsic::Graphics
     VisualizationSyncSystem::~VisualizationSyncSystem() = default;
 
     // ----------------------------------------------------------------
-    void VisualizationSyncSystem::Initialize(MaterialSystem& matSys,
-                                             RHI::IDevice&   device)
+    void VisualizationSyncSystem::Initialize(RHI::IDevice& device)
     {
         assert(!m_Impl->Initialized);
         m_Impl->Device = &device;
-
-        // The SciVis type is registered by MaterialSystem::Initialize() so
-        // the well-known TypeID kMaterialTypeID_SciVis (= 1) is reserved
-        // before any subsystem-specific registration runs. We only need to
-        // look up the registered handle here.
-        m_Impl->SciVisTypeHandle = matSys.FindType(kMaterialTypeName_SciVis);
-        assert(m_Impl->SciVisTypeHandle.IsValid() &&
-               "SciVis type not registered — MaterialSystem::Initialize() must register built-in types");
-        assert(m_Impl->SciVisTypeHandle.Index == kMaterialTypeID_SciVis &&
-               "SciVis registered at unexpected TypeID");
 
         m_Impl->Initialized = true;
     }
@@ -572,7 +463,6 @@ namespace Extrinsic::Graphics
     // ----------------------------------------------------------------
     void VisualizationSyncSystem::Shutdown()
     {
-        m_Impl->OverrideLeases.clear();
         m_Impl->Device       = nullptr;
         m_Impl->Initialized  = false;
     }
@@ -594,24 +484,10 @@ namespace Extrinsic::Graphics
         using namespace Components;
         using ColorSource = VisualizationConfig::ColorSource;
 
-        std::vector<std::uint32_t> liveKeys;
-        liveKeys.reserve(records.size());
-
-        // ---- Pass 1: extracted records with MaterialInstance + GpuSceneSlot -------
         for (VisualizationSyncRecord& record : records)
         {
-            if (record.Material != nullptr)
-            {
-                liveKeys.push_back(record.StableId);
-            }
             if (!record.GpuSlot)
-            {
-                if (record.Material != nullptr)
-                {
-                    m_Impl->ReleaseOverrideLease(record.StableId);
-                }
                 continue;
-            }
 
             const auto& gpuSlot = *record.GpuSlot;
             MaterialInstance* const matInst = record.Material;
@@ -654,63 +530,8 @@ namespace Extrinsic::Graphics
                 continue;
             }
 
-            if (!visCfg || visCfg->Source == ColorSource::Material)
-            {
-                // No sci-vis override — use the base material slot directly.
-                if (matInst->Lease.IsValid())
-                    matInst->EffectiveSlot = matSys.GetMaterialSlot(matInst->Lease.GetHandle());
-                m_Impl->ReleaseOverrideLease(record.StableId);
-                continue;
-            }
-
-            // Build params for the requested colour source.
-            MaterialParams overrideParams{};
-            switch (visCfg->Source)
-            {
-            case ColorSource::UniformColor:
-                overrideParams = Impl::BuildUniformColorParams(visCfg->Color);
-                break;
-
-            case ColorSource::ScalarField:
-                overrideParams = m_Impl->BuildScalarFieldParams(*visCfg, colormapSys);
-                break;
-
-            case ColorSource::PerVertexBuffer:
-            case ColorSource::PerEdgeBuffer:
-            case ColorSource::PerFaceBuffer:
-                overrideParams = Impl::BuildPerElementParams();
-                break;
-
-            default:
-                break;
-            }
-
-            // Apply params to the per-renderable override material.
-            auto& lease = m_Impl->EnsureOverrideLease(record.StableId, matSys);
-            assert(lease.IsValid());
-            matSys.SetParams(lease.GetHandle(), overrideParams);
-
-            matInst->EffectiveSlot = matSys.GetMaterialSlot(lease.GetHandle());
+            matInst->EffectiveSlot = matSys.GetMaterialSlot(matInst->Lease.GetHandle());
         }
-
-        // ---- Pass 2: release stale override leases -----------------------
-        // Records that are no longer extracted have been destroyed or are no
-        // longer visualized. Their map entries must be cleaned up.
-        std::vector<std::uint32_t> staleKeys;
-        for (const auto& [key, lease] : m_Impl->OverrideLeases)
-        {
-            (void)lease;
-            if (std::find(liveKeys.begin(), liveKeys.end(), key) == liveKeys.end())
-                staleKeys.push_back(key);
-        }
-        for (const auto key : staleKeys)
-            m_Impl->OverrideLeases.erase(key);
-    }
-
-    // ----------------------------------------------------------------
-    std::uint32_t VisualizationSyncSystem::GetOverrideLeaseCount() const noexcept
-    {
-        return static_cast<std::uint32_t>(m_Impl->OverrideLeases.size());
     }
 
 } // namespace Extrinsic::Graphics

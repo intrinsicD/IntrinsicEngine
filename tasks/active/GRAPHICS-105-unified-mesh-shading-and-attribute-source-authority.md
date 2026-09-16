@@ -12,12 +12,10 @@ depends_on:
   - RUNTIME-198
 maturity_target: Operational
 workflow_schema: 1
-workflow_profile: high-risk
-evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+template: micro
+workflow_profile: micro
+evidence: not_applicable
+evidence_skip_reason: interactive refactoring; evidence is the diff, tests, and review
 contract_schema: 1
 contracts: [geometry.element-domain-sources, geometry.property-coherence]
 ---
@@ -48,12 +46,9 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence]
   authority task.
 
 ## Context
-- Continuation after GRAPHICS-138–143: `VisualizationSyncSystem::OverrideLeases`,
-  `BuildScalarFieldParams` and `BuildPerElementParams` still exist. Their removal
-  belongs here, preserving the canonical scene handles, single named-buffer map
-  and current rendering capabilities. GRAPHICS-144 owns compiler dependencies
-  only. This task is independently actionable; LEGACY-043 follows its explicit
-  decision about the surviving deferred shader contract.
+- GRAPHICS-144 completed compiler-dependency isolation. This task owns the
+  remaining material/visualization authority cleanup; LEGACY-043 follows its
+  explicit decision about the surviving deferred shader contract.
 - Owner/layer: `graphics` for the material shading-model + per-channel attribute-source metadata and the unified shader resolution; `runtime` for uniform default-lit material assignment across import routes, extraction, and mesh-only gating; `app`/editor for the UI selector.
 - The architectural smell — **two lit/unlit authorities** historically existed:
   1. `Graphics::Components::VisualizationConfig::ColorSource::UniformColor` explicitly set `MaterialFlags::Unlit` (`Graphics.Component.VisualizationConfig.cppm:60-68`, resolved in `Graphics.VisualizationSyncSystem.cpp`). The `main` commit `3485151` worked around this for the **direct import** route by switching it to `ColorSource::Material`; BUG-052 removed the visualization-mode-to-unlit coupling for uniform, scalar, and per-element SciVis overrides.
@@ -123,7 +118,7 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence]
 - [ ] Make the per-renderable material lease plus stable-id-keyed `MaterialTextureAssetBindings` the effective appearance authority. Merging a generated normal `AssetId` must preserve the other slots and must not mutate another renderable that shares the authored material.
 - [ ] Complete the `Normal` `AttributeSource { VertexAttribute, Texture }` path: runtime/material resolution publishes `Texture` plus a valid bindless normal only for the exact ready object-space asset generation; both promoted forward and deferred shaders sample/decode that effective texture and otherwise use the required vertex normal.
 - [ ] Route source-choice and generated-texture readiness changes through a standing runtime reaction/kernel event that invalidates the affected extraction/material state. Preserve exact identity/generation checks, stale completion rejection, and frame-ready/deferred-retire behavior.
-- [ ] Collapse `VisualizationSyncSystem` override-material synthesis into the existing `GpuEntityConfig` visualization-data path once contract tests prove all retained scalar/color/isoline modes are representable. Fill a missing data field if needed; do not preserve a second material authority merely as a delivery mechanism.
+- [x] Collapse `VisualizationSyncSystem` override-material synthesis into the existing `GpuEntityConfig` visualization-data path once contract tests prove all retained scalar/color/isoline modes are representable. Fill a missing data field if needed; do not preserve a second material authority merely as a delivery mechanism.
 - [ ] Enforce normal-source capability at the command, extraction, and UI
       seams: only mesh surfaces with valid topology, texcoords, and canonical
       normal property references may select/bake this task's normal texture
@@ -144,7 +139,7 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence]
 - [ ] CPU/null contract: two renderables sharing one authored material receive independent effective material leases/bindings; changing or completing the normal bake for one leaves the other's source, slots, and generations unchanged.
 - [ ] CPU/null contract: normal `AttributeSource` resolution — `Texture` with an absent/fallback/stale/non-ready generation uses the vertex normal; the exact `Ready` object-space texture is used; `VertexAttribute` ignores a bound texture.
 - [ ] CPU/null contract: readiness/source events dirty only the affected stable render id, stale completions cannot publish, and rebinding preserves unrelated albedo/metallic-roughness/emissive slots.
-- [ ] CPU/null contract: retained `VisualizationConfig` modes reach `GpuEntityConfig` without allocating or rewriting an override material and do not change the base material's `ShadingModel`.
+- [x] CPU/null contract: retained `VisualizationConfig` modes reach `GpuEntityConfig` without allocating or rewriting an override material and do not change the base material's `ShadingModel`.
 - [ ] CPU/null contract: mesh-only gating — point cloud and graph domains reject/ignore a `Texture` channel source and resolve from vertex attributes.
 - [ ] CPU/null contract: editor/runtime command resolves a stable entity id at apply time, accepts an eligible mesh, rejects invalid/non-mesh/missing-texcoord targets with diagnostics, and never retains an ECS reference.
 - [ ] CPU/null contract: editor model reports requested/effective source, output identity/encoding/readiness/fallback; CPU-backed preview samples decode correctly, while GPU-only numeric inspection reports its unsupported/readback-required state.
@@ -376,3 +371,75 @@ Delete/collapse, with the single data path replacing each:
   GRAPHICS-105 reuses its pure producer service, then owns the material/
   presentation binding of the completed `AssetId`; it preserves bake
   identity/readiness invariants rather than wrapping the service.
+
+## 2026-09-16 — Visualization material duplication slice
+
+Operator direction: continue reuse and compilation cleanup with Claude; this
+bounded rendering cleanup is explicitly selected alongside the standing product
+convergence priority. Broader source selection and normal-texture readiness
+acceptance remains open.
+
+Reuse/right-sizing plan: `BuildEntityConfig` already publishes uniform color,
+scalar range/colormap/binning/isolines and per-element buffers to the shader's
+shared `gpu_scene.glsl` receiver. Synthesizing a second material repeats those
+settings and discards authored texture/shading state. Remove that map, packing,
+lease lifecycle and count API. Preserve the existing per-renderable material,
+tint patch, sidecar targeting/inheritance and property-buffer generation path.
+Remove the redundant pre-visualization material upload; both prep paths upload
+once after visualization/tint sync. No new owner, file, or dependency edge.
+Reintroduction would require a shader feature that cannot be represented by the
+existing material plus entity config, with an explicit ownership decision.
+
+Review focus: base material preservation, invalid-lease fallback, uniform alpha,
+debug-UV early return, scalar/color and material/removal transitions, sidecar
+config, and prep graph ordering. Claude reviews fixed read-only source/diffs.
+Validation: existing graphics contracts plus full CPU gate and relevant promoted
+Vulkan readback smokes. No measured compilation-speed claim for this slice.
+
+Pre-merge architecture sweep: layer imports and CMake links pass (rows 1–2);
+no higher-layer export or renderer member was added (rows 3–4); frame-graph
+passes/recipes are unchanged (rows 5–6, not applicable), and the existing typed
+CPU prep dependencies now connect pipeline commit → visualization → material
+upload → transform. This is partial task progress, with no maturity closure or
+new exception (rows 7–8). The automated clean-workshop bundle passes strict.
+
+Claude plan review confirmed the graph edge rewire, debug-UV visualization
+guard, and invalid-lease fallback. Diff review found no confirmed defect; the
+remaining null-pointer question is answered by the preserved unconditional
+`if (matInst == nullptr) continue` before material-slot resolution. The shared
+uniform-color shader resolver returns `cfg.UniformColor` directly, preserving
+its independence from base tint. Production delta: 255 net lines removed in
+eight existing files; no new production file or module.
+
+Next authority work remains the redundant SciVis type/layout metadata,
+transitional Unlit flags, import policy consolidation, and the normal-source
+per-renderable/config/UI/readiness contracts listed above. This slice does not
+retire GRAPHICS-105 or unblock LEGACY-043 prematurely.
+
+Validation checkpoint:
+- Canonical `ci` configure and full `IntrinsicTests` build passed. Fixed two
+  test-only defects found during verification: an explicit GLM include and
+  teardown of newly allocated fixture leases before material-system shutdown.
+- Focused graphics/material/prep/import contracts: 56 passed.
+- Full exclusion-only CPU gate: 4,677 passed, one expected ASan-only lifecycle
+  skip (4,678 selected), 141.00 seconds. This is test runtime, not a compile
+  performance measurement.
+- Claude's final resolution review found no unresolved correctness defect.
+  The upload test deliberately uses adjacent dirty slots to check the single
+  post-tint upload in both sequential and task-graph preparation.
+- Strict layering, task policy/state links, test layout, docs sync/links,
+  root hygiene, skill mirrors, and clean-workshop checks passed. Module
+  inventory regeneration produced no content change.
+
+- Promoted `ci-vulkan` ASan+UBSan build of the two relevant smoke targets and
+  all seven selected GPU/Vulkan readback tests passed, no skips, 114.95 seconds.
+  This validates the retained visualization and material paths for this slice;
+  it does not close the task's broader normal-source UI/readiness acceptance.
+
+```bash
+cmake --build --preset ci-vulkan --target IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests IntrinsicGraphicsVulkanSmokeTests -j2
+ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R '(VisualizationOverlaySurfaceGpuSmoke|RuntimeSandboxAcceptanceGpuSmoke\.(ReferenceTriangleScalarField|ReferenceTriangleVertexColor|ImportedObjectSpaceNormalBake|SurfaceAppearance))' --no-tests=error --timeout 120 --parallel 1
+```
+
+Session logs and bounded Claude review packets:
+`/tmp/intrinsic-graphics105-overrides/` (local working artifacts).

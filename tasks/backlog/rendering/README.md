@@ -6,7 +6,7 @@ its dependencies, conditional gates, scope and verification.
 
 ## Tasks
 
-- [GRAPHICS-105 — Unified mesh shading-model + per-attribute source authority](GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
+- [GRAPHICS-105 — Unified mesh shading-model + per-attribute source authority](../../active/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
 - [GRAPHICS-109 — Offscreen frame capture to PNG (headless figure renders)](GRAPHICS-109-offscreen-frame-capture-png.md)
 - [GRAPHICS-123 — Slang single-kernel gradient pilot](GRAPHICS-123-slang-single-kernel-gradient-pilot.md)
 - [GRAPHICS-124 — Slughorn world-space vector annotation proof](GRAPHICS-124-slughorn-world-space-vector-annotation-proof.md)

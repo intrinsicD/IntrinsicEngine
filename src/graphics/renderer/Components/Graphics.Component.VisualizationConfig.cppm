@@ -39,11 +39,9 @@ import Extrinsic.Graphics.Component.RenderGeometry;  // ScalarFieldConfig
 //   "face_colors"    — vec4 per-face RGBA colours
 //
 // ScalarField GPU path:
-//   VisualizationSyncSystem patches the renderable's override material
-//   with MaterialTypeID = kMaterialTypeID_SciVis and writes per-entity
-//   attribute pointers/metadata to GpuWorld::GpuEntityConfig.
-//   The surface shader branches on MaterialTypeID to apply the
-//   colourmap at fragment level.
+//   VisualizationSyncSystem writes attribute pointers and scalar/colormap metadata
+//   to GpuWorld::GpuEntityConfig. Shared shader receivers consume this data without
+//   replacing the renderable's authored material or shading model.
 //
 // Usage — geodesic distance on a mesh:
 //   VisualizationConfig vis{};

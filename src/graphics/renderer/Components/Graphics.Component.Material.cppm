@@ -1,3 +1,4 @@
+// Owns a renderable material lease and its resolved GPU slot and tint.
 module;
 
 #include <cstdint>
@@ -18,8 +19,7 @@ import Extrinsic.Graphics.MaterialSystem;
 //
 // EffectiveSlot lifecycle:
 //   Written each frame by VisualizationSyncSystem::Sync():
-//     - No VisualizationConfig → matSys.GetMaterialSlot(Lease)
-//     - VisualizationConfig present → override material slot
+//     - Existing lease slot, independent of visualization mode
 //   TransformSyncSystem reads EffectiveSlot to fill
 //   GpuInstanceData::MaterialSlot in the per-instance SSBO.
 //
@@ -39,7 +39,7 @@ export namespace Extrinsic::Graphics::Components
 
         /// Optional per-entity colour tint applied on top of the template.
         /// When set, VisualizationSyncSystem calls MaterialSystem::Patch()
-        /// to write it into BaseColorFactor each frame the config changes.
+        /// to write it into BaseColorFactor during frame preparation.
         std::optional<glm::vec4> TintOverride;
 
         /// Resolved GPU material-slot index consumed by TransformSyncSystem

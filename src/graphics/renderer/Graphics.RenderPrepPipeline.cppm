@@ -1,3 +1,4 @@
+// Orders render preparation and material upload before GPU-world submission.
 module;
 
 #include <cstdint>
@@ -27,9 +28,8 @@ namespace Extrinsic::Graphics
     export enum class RenderPrepStep : std::uint8_t
     {
         PipelineCommit,
-        MaterialBaseSync,
         VisualizationSync,
-        MaterialOverrideSync,
+        MaterialSync,
         TransformSync,
         LightSync,
         ClusterLightTableSync,

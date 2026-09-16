@@ -138,7 +138,7 @@ Task links retain detailed acceptance criteria, source references and evidence.
 | [CI-019](../../tasks/backlog/process/CI-019-thin-ci-merge-queue-topology.md) | Keep | Make CI thin and run full confidence once per merge group. |
 | [CI-020](../../tasks/backlog/process/CI-020-verification-cutover-and-legacy-retirement.md) | Keep | Cut over verification and retire legacy policy. |
 | [PROC-031](../../tasks/backlog/process/PROC-031-agent-verification-receipts.md) | Revised | Unified receipt binding remains; BUG-171 owns receipt supersession. |
-| [GRAPHICS-105](../../tasks/backlog/rendering/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md) | Revised | Material synthesis remains; remove one redundant Unlit write/bit, preserving the slot-0 error material. |
+| [GRAPHICS-105](../../tasks/active/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md) | Revised | Material synthesis remains; remove one redundant Unlit write/bit, preserving the slot-0 error material. |
 | [GRAPHICS-109](../../tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md) | Revised | PNG publication remains; reuse the manifested stb encoder implementation. |
 | [GRAPHICS-123](../../tasks/backlog/rendering/GRAPHICS-123-slang-single-kernel-gradient-pilot.md) | Keep | Slang single-kernel gradient pilot. |
 | [GRAPHICS-124](../../tasks/backlog/rendering/GRAPHICS-124-slughorn-world-space-vector-annotation-proof.md) | Keep | Slughorn world-space vector annotation proof. |

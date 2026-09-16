@@ -142,7 +142,7 @@ TEST(GraphicsMinimalAcceptance, Triangle_FirstImplementationContract)
     matSys.Initialize(device, bufferMgr);
 
     Graphics::VisualizationSyncSystem visSync;
-    visSync.Initialize(matSys, device);
+    visSync.Initialize(device);
 
     Graphics::ColormapSystem colorSys; // Not required for UniformColor test path.
 
@@ -203,11 +203,11 @@ TEST(GraphicsMinimalAcceptance, Triangle_FirstImplementationContract)
     }};
 
     visSync.Sync(visualizationRecords, matSys, colorSys, world);
-    const Graphics::MaterialParams uniformOverrideParams =
-        matSys.GetParams(Graphics::MaterialHandle{materialInstance.EffectiveSlot, 0u});
-    EXPECT_FALSE(Graphics::HasFlag(uniformOverrideParams.Flags,
+    const Graphics::MaterialParams retainedParams =
+        matSys.GetParams(materialInstance.Lease.GetHandle());
+    EXPECT_FALSE(Graphics::HasFlag(retainedParams.Flags,
                                    Graphics::MaterialFlags::Unlit));
-    EXPECT_EQ(uniformOverrideParams.Shading, Graphics::ShadingModel::Lit);
+    EXPECT_EQ(retainedParams.Shading, Graphics::ShadingModel::Lit);
     matSys.SyncGpuBuffer();
 
     RHI::GpuBounds bounds{};
@@ -229,7 +229,9 @@ TEST(GraphicsMinimalAcceptance, Triangle_FirstImplementationContract)
     world.SyncFrame();
 
     EXPECT_NE(materialInstance.EffectiveSlot, 0u);
-    EXPECT_EQ(visSync.GetOverrideLeaseCount(), 1u);
+    EXPECT_EQ(materialInstance.EffectiveSlot,
+              matSys.GetMaterialSlot(materialInstance.Lease.GetHandle()));
+    EXPECT_EQ(world.GetEntityConfigForTest(instance).UniformColor, visualization.Color);
 
     Graphics::CullingPass cullPass{culling};
     Graphics::DeferredSystem deferred;
@@ -281,7 +283,7 @@ TEST(GraphicsMinimalAcceptance, VisualizationSyncWritesLineWidthConfig)
     matSys.Initialize(device, bufferMgr);
 
     Graphics::VisualizationSyncSystem visSync;
-    visSync.Initialize(matSys, device);
+    visSync.Initialize(device);
 
     Graphics::ColormapSystem colorSys;
 
@@ -342,7 +344,7 @@ TEST(GraphicsMinimalAcceptance, VisualizationSyncWritesEquivalentLinePointColorS
     matSys.Initialize(device, bufferMgr);
 
     Graphics::VisualizationSyncSystem visSync;
-    visSync.Initialize(matSys, device);
+    visSync.Initialize(device);
 
     Graphics::ColormapSystem colorSys;
 
@@ -372,6 +374,22 @@ TEST(GraphicsMinimalAcceptance, VisualizationSyncWritesEquivalentLinePointColorS
     Graphics::Components::MaterialInstance surfaceMaterial{};
     Graphics::Components::MaterialInstance lineMaterial{};
     Graphics::Components::MaterialInstance pointMaterial{};
+    Graphics::MaterialParams authored{};
+    authored.BaseColorFactor = {0.3f, 0.6f, 0.9f, 0.4f};
+    authored.Shading = Graphics::ShadingModel::Unlit;
+    authored.NormalID = 31u;
+    authored.AlbedoID = 32u;
+    authored.MetallicRoughnessID = 33u;
+    authored.EmissiveID = 34u;
+    authored.MetallicFactor = 0.8f;
+    authored.RoughnessFactor = 0.2f;
+    authored.Flags = Graphics::MaterialFlags::ObjectSpaceNormalMap;
+    for (auto* material : {&surfaceMaterial, &lineMaterial, &pointMaterial})
+        material->Lease = matSys.CreateInstance(
+            matSys.FindType(Graphics::kMaterialTypeName_StandardPBR), authored);
+    const auto liveMaterials = matSys.GetLiveInstanceCount();
+    matSys.SyncGpuBuffer();
+
     Graphics::Components::RenderEdges edges{};
     Graphics::Components::RenderPoints points{};
 
@@ -413,19 +431,27 @@ TEST(GraphicsMinimalAcceptance, VisualizationSyncWritesEquivalentLinePointColorS
 
     visSync.Sync(records, matSys, colorSys, world);
 
-    const auto expectLitOverride =
+    const auto expectAuthoredMaterial =
         [&](const Graphics::Components::MaterialInstance& material)
     {
-        ASSERT_NE(material.EffectiveSlot, Graphics::kDefaultMaterialSlotIndex);
-        const Graphics::MaterialParams params =
-            matSys.GetParams(Graphics::MaterialHandle{material.EffectiveSlot, 0u});
-        EXPECT_FALSE(Graphics::HasFlag(params.Flags,
-                                       Graphics::MaterialFlags::Unlit));
-        EXPECT_EQ(params.Shading, Graphics::ShadingModel::Lit);
+        EXPECT_EQ(material.EffectiveSlot,
+                  matSys.GetMaterialSlot(material.Lease.GetHandle()));
+        const auto params = matSys.GetParams(material.Lease.GetHandle());
+        EXPECT_EQ(params.BaseColorFactor, authored.BaseColorFactor);
+        EXPECT_EQ(params.Shading, authored.Shading);
+        EXPECT_EQ(params.Flags, authored.Flags);
+        EXPECT_EQ(params.NormalID, authored.NormalID);
+        EXPECT_EQ(params.AlbedoID, authored.AlbedoID);
+        EXPECT_EQ(params.MetallicRoughnessID, authored.MetallicRoughnessID);
+        EXPECT_EQ(params.EmissiveID, authored.EmissiveID);
+        EXPECT_EQ(params.MetallicFactor, authored.MetallicFactor);
+        EXPECT_EQ(params.RoughnessFactor, authored.RoughnessFactor);
+        EXPECT_EQ(matSys.GetLiveInstanceCount(), liveMaterials);
+        EXPECT_EQ(matSys.GetDiagnostics().DirtySlotCount, 0u);
     };
-    expectLitOverride(surfaceMaterial);
-    expectLitOverride(lineMaterial);
-    expectLitOverride(pointMaterial);
+    expectAuthoredMaterial(surfaceMaterial);
+    expectAuthoredMaterial(lineMaterial);
+    expectAuthoredMaterial(pointMaterial);
 
     const auto expectScalarConfig = [&](const Graphics::GpuInstanceHandle instance)
     {
@@ -479,9 +505,9 @@ TEST(GraphicsMinimalAcceptance, VisualizationSyncWritesEquivalentLinePointColorS
 
         visSync.Sync(records, matSys, colorSys, world);
 
-        expectLitOverride(surfaceMaterial);
-        expectLitOverride(lineMaterial);
-        expectLitOverride(pointMaterial);
+        expectAuthoredMaterial(surfaceMaterial);
+        expectAuthoredMaterial(lineMaterial);
+        expectAuthoredMaterial(pointMaterial);
 
         const auto expectColorConfig = [&](const Graphics::GpuInstanceHandle instance)
         {
@@ -497,6 +523,47 @@ TEST(GraphicsMinimalAcceptance, VisualizationSyncWritesEquivalentLinePointColorS
         expectColorConfig(pointInstance);
     }
 
+    Graphics::Components::VisualizationConfig uniform{};
+    uniform.Source = Graphics::Components::VisualizationConfig::ColorSource::UniformColor;
+    uniform.Color = {0.9f, 0.1f, 0.2f, 0.25f};
+    for (const auto* visualization : {&uniform, &scalarVis})
+    {
+        // Exercise uniform mode, then return to the material after scalar mode.
+        for (auto& record : records)
+            record.Visualization = visualization;
+        visSync.Sync(records, matSys, colorSys, world);
+        if (visualization == &uniform)
+            for (const auto instance : {surfaceInstance, lineInstance, pointInstance})
+            {
+                const auto config = world.GetEntityConfigForTest(instance);
+                EXPECT_EQ(config.ColorSourceMode, 1u);
+                EXPECT_EQ(config.UniformColor, uniform.Color);
+            }
+    }
+    for (const bool removeConfig : {false, true})
+    {
+        uniform.Source = Graphics::Components::VisualizationConfig::ColorSource::Material;
+        for (auto& record : records)
+            record.Visualization = removeConfig ? nullptr : &uniform;
+        visSync.Sync(records, matSys, colorSys, world);
+        for (const auto instance : {surfaceInstance, lineInstance, pointInstance})
+        {
+            const auto config = world.GetEntityConfigForTest(instance);
+            EXPECT_EQ(config.ColorSourceMode, 0u);
+            EXPECT_EQ(config.ScalarBDA, 0u);
+            EXPECT_EQ(config.ColorBDA, 0u);
+        }
+        expectAuthoredMaterial(surfaceMaterial);
+        expectAuthoredMaterial(lineMaterial);
+        expectAuthoredMaterial(pointMaterial);
+    }
+
+    surfaceMaterial.Lease = {};
+    visSync.Sync(records, matSys, colorSys, world);
+    EXPECT_EQ(surfaceMaterial.EffectiveSlot, Graphics::kDefaultMaterialSlotIndex);
+
+    lineMaterial.Lease.Reset();
+    pointMaterial.Lease.Reset();
     visSync.Shutdown();
     matSys.Shutdown();
     world.Shutdown();
@@ -520,7 +587,7 @@ TEST(GraphicsMinimalAcceptance, VisualizationSyncWritesPropertyBufferConfigToTar
     matSys.Initialize(device, bufferMgr);
 
     Graphics::VisualizationSyncSystem visSync;
-    visSync.Initialize(matSys, device);
+    visSync.Initialize(device);
 
     Graphics::ColormapSystem colorSys;
 
@@ -611,7 +678,7 @@ TEST(GraphicsMinimalAcceptance, VisualizationSyncWritesPropertyBufferConfigToTar
     EXPECT_FLOAT_EQ(pointConfig.Point.PointSize, 9.25f);
     EXPECT_EQ(pointConfig.Point.PointMode, 1u);
 
-    EXPECT_EQ(visSync.GetOverrideLeaseCount(), 1u);
+    EXPECT_EQ(surfaceMaterial.EffectiveSlot, Graphics::kDefaultMaterialSlotIndex);
 
     visSync.Shutdown();
     matSys.Shutdown();

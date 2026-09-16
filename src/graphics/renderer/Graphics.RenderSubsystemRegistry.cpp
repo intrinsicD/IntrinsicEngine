@@ -84,7 +84,7 @@ namespace Extrinsic::Graphics
         if (shouldStop(RenderSubsystemStage::ColormapSystem)) return;
 
         VisualizationSyncSystemRegistry.emplace();
-        VisualizationSyncSystemRegistry->Initialize(*MaterialSystemRegistry, device);
+        VisualizationSyncSystemRegistry->Initialize(device);
         RecordInitialize(RenderSubsystemStage::VisualizationSyncSystem);
         if (shouldStop(RenderSubsystemStage::VisualizationSyncSystem)) return;
 

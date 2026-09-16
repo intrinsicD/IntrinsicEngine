@@ -13288,3 +13288,25 @@ tree:
     - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
     - docs/architecture/sandbox-editor-feature-boundaries.md
     status: resolved
+
+  - id: N615
+    type: decision
+    title: Publish visualization only through entity config and upload authored materials once
+    provenance: ai-executed
+    timestamp: '2026-09-16T13:46:46+02:00'
+    choice: Continue GRAPHICS-105 by deleting synthesized visualization material leases, parameter packing and stale cleanup.
+      Reuse GpuEntityConfig for all overlays while retaining authored material shading, textures and tint. Rewire sequential
+      and task-graph preparation to one post-visualization material upload. Claude reviewed plan, diff and final guard context.
+      Focused 56, full CPU 4677 passes plus one expected skip, and seven ASan+UBSan Vulkan readbacks pass.
+      Eight existing production files lose 255 net lines; no timing claim or whole-task retirement.
+    alternatives:
+    - Retain per-frame replacement materials alongside the existing visualization buffer
+    - Add another property or material delivery abstraction
+    evidence:
+    - tasks/active/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md
+    - src/graphics/renderer/Graphics.VisualizationSyncSystem.cpp
+    - src/graphics/renderer/Graphics.RenderPrepPipeline.cpp
+    - tests/contract/graphics/Test.MinimalTriangleAcceptance.cpp
+    - tests/contract/graphics/Test.RenderPrepPipeline.cpp
+    - tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
+    status: resolved

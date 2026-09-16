@@ -1,10 +1,18 @@
 #include <gtest/gtest.h>
+#include <glm/glm.hpp>
 
 #include <algorithm>
+#include <cstring>
 #include <thread>
 #include <vector>
 
 import Extrinsic.Core.Error;
+import Extrinsic.Graphics.Material;
+import Extrinsic.Graphics.MaterialSystem;
+import Extrinsic.Graphics.Component.Material;
+import Extrinsic.Graphics.Component.GpuSceneSlot;
+import Extrinsic.Graphics.Component.VisualizationConfig;
+import Extrinsic.RHI.Types;
 import Extrinsic.Core.Tasks;
 import Extrinsic.Graphics.RenderPrepPipeline;
 import Extrinsic.Graphics.RenderSubsystemRegistry;
@@ -46,9 +54,8 @@ namespace
     {
         return {
             RenderPrepStep::PipelineCommit,
-            RenderPrepStep::MaterialBaseSync,
             RenderPrepStep::VisualizationSync,
-            RenderPrepStep::MaterialOverrideSync,
+            RenderPrepStep::MaterialSync,
             RenderPrepStep::TransformSync,
             RenderPrepStep::LightSync,
             RenderPrepStep::ClusterLightTableSync,
@@ -294,4 +301,59 @@ TEST(RenderPrepPipeline, ForcedTaskGraphExecuteFailureReportsDiagnostic)
     EXPECT_EQ(recovered.TaskGraphPlanReuses, 1u);
     EXPECT_TRUE(recovered.TaskGraphLastCompileReusedPlan);
     EXPECT_TRUE(harness.ClusterResourcesRequested);
+}
+
+TEST(RenderPrepPipeline, UploadsTintedAuthoredMaterialOnceAfterVisualization)
+{
+    for (const bool useTaskGraph : {false, true})
+    {
+        PrepHarness harness;
+        auto& materials = *harness.Registry.MaterialSystemRegistry;
+        auto& world = *harness.Registry.GpuWorldSystem;
+        const auto instance = world.AllocateInstance(71u);
+        ASSERT_TRUE(instance.IsValid());
+        Components::GpuSceneSlot gpuSlot{};
+        gpuSlot.SetInstanceHandle(instance);
+        MaterialParams params{};
+        params.Shading = ShadingModel::Unlit;
+        params.NormalID = 19u;
+        Components::MaterialInstance material{};
+        material.Lease = materials.CreateInstance(
+            materials.FindType(kMaterialTypeName_StandardPBR), params);
+        ASSERT_TRUE(material.Lease.IsValid());
+        material.TintOverride = glm::vec4{0.25f, 0.5f, 0.75f, 0.6f};
+        Components::VisualizationConfig visualization{};
+        visualization.Source = Components::VisualizationConfig::ColorSource::UniformColor;
+        visualization.Color = {0.9f, 0.2f, 0.1f, 0.3f};
+        harness.VisualizationRecords.push_back({
+            .Material = &material, .GpuSlot = &gpuSlot,
+            .Visualization = &visualization});
+        const auto liveMaterials = materials.GetLiveInstanceCount();
+        harness.Device.BufferWrites.clear();
+        std::vector<RenderPrepStep> observed;
+        RenderPrepPipeline pipeline;
+        const auto result = pipeline.Run(harness.MakeInputs(observed),
+            RenderPrepPipelineOptions{.UseTaskGraph = useTaskGraph});
+        ASSERT_TRUE(result.Succeeded) << result.Diagnostic;
+        EXPECT_EQ(materials.GetLiveInstanceCount(), liveMaterials);
+        EXPECT_EQ(material.EffectiveSlot, materials.GetMaterialSlot(material.Lease.GetHandle()));
+        EXPECT_EQ(world.GetEntityConfigForTest(instance).UniformColor, visualization.Color);
+
+        const auto offset = material.EffectiveSlot * sizeof(Extrinsic::RHI::GpuMaterialSlot);
+        unsigned materialWrites = 0u;
+        for (const auto& write : harness.Device.BufferWrites)
+        {
+            if (write.Handle != materials.GetBuffer())
+                continue;
+            ++materialWrites;
+            ASSERT_LE(write.Offset, offset);
+            ASSERT_GE(write.Offset + write.Data.size(), offset + sizeof(Extrinsic::RHI::GpuMaterialSlot));
+            Extrinsic::RHI::GpuMaterialSlot uploaded{};
+            std::memcpy(&uploaded, write.Data.data() + offset - write.Offset, sizeof(uploaded));
+            EXPECT_EQ(uploaded.BaseColorFactor, *material.TintOverride);
+            EXPECT_EQ(uploaded.NormalID, params.NormalID);
+            EXPECT_EQ(uploaded.ShadingModel, static_cast<std::uint32_t>(params.Shading));
+        }
+        EXPECT_EQ(materialWrites, 1u);
+    }
 }
