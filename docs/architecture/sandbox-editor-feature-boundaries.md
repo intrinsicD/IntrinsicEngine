@@ -234,6 +234,11 @@ The nine point-processing panels use `ProcessingDraftState` and `PanelSupport`
 for entity/input/output selection. `DrawProcessingPointInput` accepts an optional
 domain restriction where topology requires it, such as mesh face normals taking
 vertex positions. The panels update coupled input/output domains explicitly.
+Curvature and geodesics reuse the same draft state, keyed by observed active
+config, and apply-before-execute helper. Rejected edits remain retryable, while
+external config changes replace the draft. Geodesics clears mesh-local source
+indices on subsequent entity changes, including deselection; initial active
+sources remain available on first use.
 `DrawProcessingExecution`, local to `MeshProcessingPanels.cpp`, owns the common
 edit/validate/reapply/run sequence for density, spacing, keypoints, descriptors,
 density weights, bilateral filtering and normal estimation. Its Run button and

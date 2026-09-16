@@ -2625,3 +2625,12 @@ entries:
       without new modules or files; no compile-time improvement inferred.
     - Reviewed Claude findings against source and failing assertions; retain synchronous job-lane gating. Fixed the
       new test callback window before rerunning. Broader O93 and unrelated staged topics remain open.
+
+  - turn: 2026-09-16_001#10
+    notes:
+    - N614 records an ordinary implementation/reuse choice and verified CPU behavior, not a benchmark or scientific
+      claim. No staging promotion; existing topics and flags retain their owners.
+    - Claude identified missing-config draft clobbering; local review preserved initial geodesics sources when opening
+      without a mesh. Final review withdrew an incorrect active/draft objection after validation.
+    - Twenty-nine production lines removed from one implementation is not a compile-time measurement. UI-037 remains
+      open for full geometry readiness and remaining actions/backends; broader O93 is unsettled.

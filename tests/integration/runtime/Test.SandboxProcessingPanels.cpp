@@ -638,7 +638,6 @@ TEST(SandboxProcessingPanels, GeodesicsFollowsEntityAndResetsMeshLocalSources)
     const auto first = scene.Create(), second = scene.Create();
     for (const auto entity : {first, second})
         PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
-    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, first));
     auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
     auto geodesics = *R::GetGeodesicsConfig(config);
     geodesics.SourceVertices = {0u};
@@ -652,6 +651,8 @@ TEST(SandboxProcessingPanels, GeodesicsFollowsEntityAndResetsMeshLocalSources)
         ImGui::SetWindowSize(window, {750, 1600});
         ImGui::SetWindowPos(window, {0, 0});
         ImGui::FocusWindow(window);
+        // Opening without a mesh must not consume the initial configured sources.
+        if (frame == 1) EXPECT_TRUE(h.Selection().SetSelectedEntity(scene, first));
         if (frame == 3 || frame == 12)
             ImGui::ActivateItemByID(window->GetID("Compute geodesics"));
         if (frame == 6)
@@ -1636,4 +1637,199 @@ TEST(SandboxProcessingPanels, UvRegenerationControlBlocksUnavailableAndPublishes
     h.Engine->Run();
     EXPECT_TRUE(completed);
     EXPECT_TRUE(h.Shell.UnregisterEditorWindow(windowHandle));
+}
+
+TEST(SandboxProcessingPanels, CurvatureRetriesRejectedDraftAndReexecutesUnchangedConfig)
+{
+    bool reject = false;
+    unsigned rejections = 0;
+    PanelHarness h(RejectableConfigRegistry(R::kMeshCurvatureConfigSectionName, reject, rejections));
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    auto& props = scene.Raw().get<GS::Vertices>(entity).Properties;
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto curvature = *R::GetMeshCurvatureConfig(config);
+    curvature.Mean.Name = "v:curvature_retry";
+    R::SetMeshCurvatureConfig(config, curvature);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("mesh.processing.curvature", true));
+    std::optional<R::EditorMeshCurvatureResult> result;
+    const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id = "test.curvature_execution", .MenuPath = {"View"}, .Title = "Curvature observer",
+        .OpenByDefault = true,
+        .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
+            result = context.MeshFields.Results.LastMeshCurvatureResult;
+        }});
+    int frames = 0, step = 0, phase = 0;
+    unsigned firstRejections = 0;
+    std::uint64_t jobsBefore = 0;
+    double expectedMean = 0;
+    bool completed = false;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frames > 400) { ADD_FAILURE() << "Curvature retry did not complete"; engine.RequestExit(); return; }
+        auto* window = ImGui::FindWindowByName("Mesh / Processing / Curvature");
+        if (!window) return;
+        ImGui::SetWindowSize(window, {800, 1500});
+        ImGui::SetWindowPos(window, {0, 0});
+        ++step;
+        const auto run = [&] { ImGui::ActivateItemByID(window->GetID("Compute##MeshCurvature")); };
+        const auto active = [&] { return *R::GetMeshCurvatureConfig(h.Control().GetEngineConfigControlState().ActiveConfig); };
+        if (phase == 0)
+        {
+            if (step == 3)
+            {
+                reject = true;
+                jobsBefore = engine.Jobs().Stats().SubmittedJobs;
+                ImGui::ActivateItemByID(window->GetID("Principal directions##MeshCurvature"));
+            }
+            if (step == 6)
+            {
+                EXPECT_GT(rejections, 0u);
+                firstRejections = rejections;
+                EXPECT_TRUE(active().PublishPrincipalDirections);
+                run();
+            }
+            if (step == 10)
+            {
+                EXPECT_GT(rejections, firstRejections);
+                EXPECT_FALSE(result);
+                EXPECT_FALSE(props.Exists(curvature.Mean.Name));
+                EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
+                reject = false;
+                run();
+                phase = 1; step = 0;
+            }
+        }
+        else if (phase == 1 && result && result->Succeeded())
+        {
+            EXPECT_FALSE(active().PublishPrincipalDirections);
+            auto mean = props.Get<double>(curvature.Mean.Name);
+            ASSERT_TRUE(mean);
+            expectedMean = mean[0];
+            mean[0] = 123.0;
+            EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore + 1);
+            run();
+            phase = 2; step = 0;
+        }
+        else if (phase == 2 && step > 2 && props.Get<double>(curvature.Mean.Name)[0] == expectedMean)
+        {
+            EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore + 2);
+            auto external = h.Control().GetEngineConfigControlState().ActiveConfig;
+            auto updated = active(); updated.Mean.Name = "v:external_curvature";
+            R::SetMeshCurvatureConfig(external, updated);
+            ASSERT_TRUE(h.Apply(external));
+            phase = 3; step = 0;
+        }
+        else if (phase == 3)
+        {
+            if (step == 3) run();
+            if (props.Exists("v:external_curvature"))
+            {
+                EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore + 3);
+                EXPECT_EQ(active().Mean.Name, "v:external_curvature");
+                completed = true;
+                engine.RequestExit();
+            }
+        }
+    };
+    h.Engine->Run();
+    EXPECT_TRUE(completed);
+    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
+}
+
+TEST(SandboxProcessingPanels, GeodesicsRetriesDraftAndKeepsRejectedEntityReset)
+{
+    bool reject = false;
+    unsigned rejections = 0;
+    PanelHarness h(RejectableConfigRegistry(R::kGeodesicsConfigSectionName, reject, rejections));
+    auto& scene = h.Scene();
+    const auto first = scene.Create(), second = scene.Create();
+    for (const auto entity : {first, second})
+        PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, first));
+    auto& firstProps = scene.Raw().get<GS::Vertices>(first).Properties;
+    auto& secondProps = scene.Raw().get<GS::Vertices>(second).Properties;
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto geodesics = *R::GetGeodesicsConfig(config);
+    geodesics.SourceVertices = {0u};
+    geodesics.MaxHalfedgeExpansions = 1000;
+    R::SetGeodesicsConfig(config, geodesics);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("mesh.processing.geodesics", true));
+    int frames = 0, step = 0;
+    unsigned firstRejections = 0;
+    double expectedDistance = 0;
+    bool completed = false;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frames > 100) { ADD_FAILURE() << "Geodesics retry did not complete"; engine.RequestExit(); return; }
+        auto* window = ImGui::FindWindowByName("Mesh / Geodesics / Virtual Source Propagation");
+        if (!window) return;
+        ImGui::SetWindowSize(window, {800, 1500});
+        ImGui::SetWindowPos(window, {0, 0});
+        ++step;
+        const auto run = [&] { ImGui::ActivateItemByID(window->GetID("Compute geodesics")); };
+        const auto active = [&] { return *R::GetGeodesicsConfig(h.Control().GetEngineConfigControlState().ActiveConfig); };
+        if (step == 2) reject = true;
+        EditScalarControl(window, "Expansion budget", step - 3, "1234");
+        if (step == 12)
+        {
+            EXPECT_GT(rejections, 0u);
+            firstRejections = rejections;
+            EXPECT_EQ(active().MaxHalfedgeExpansions, 1000u);
+            run();
+        }
+        if (step == 16)
+        {
+            EXPECT_GT(rejections, firstRejections);
+            EXPECT_FALSE(firstProps.Exists(geodesics.DistanceProperty));
+            reject = false;
+            run();
+        }
+        if (step == 20)
+        {
+            EXPECT_EQ(active().MaxHalfedgeExpansions, 1234u);
+            auto distance = firstProps.Get<double>(geodesics.DistanceProperty);
+            ASSERT_TRUE(distance);
+            expectedDistance = distance[0]; distance[0] = 123.0;
+            run();
+        }
+        if (step == 24)
+        {
+            EXPECT_EQ(firstProps.Get<double>(geodesics.DistanceProperty)[0], expectedDistance);
+            reject = true;
+            ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, second));
+        }
+        if (step == 28)
+        {
+            EXPECT_EQ(active().SourceVertices, (std::vector<std::uint32_t>{0u}));
+            run();
+        }
+        if (step == 32)
+        {
+            EXPECT_FALSE(secondProps.Exists(geodesics.DistanceProperty));
+            reject = false;
+            ImGui::ActivateItemByID(window->GetID("Add source"));
+        }
+        if (step == 36) run();
+        if (step == 40)
+        {
+            EXPECT_TRUE(secondProps.Exists(geodesics.DistanceProperty));
+            auto external = h.Control().GetEngineConfigControlState().ActiveConfig;
+            auto updated = active(); updated.DistanceProperty = "v:external_distance";
+            R::SetGeodesicsConfig(external, updated);
+            ASSERT_TRUE(h.Apply(external));
+        }
+        if (step == 44) run();
+        if (step == 48)
+        {
+            EXPECT_TRUE(secondProps.Exists("v:external_distance"));
+            EXPECT_EQ(active().DistanceProperty, "v:external_distance");
+            completed = true;
+            engine.RequestExit();
+        }
+    };
+    h.Engine->Run();
+    EXPECT_TRUE(completed);
 }

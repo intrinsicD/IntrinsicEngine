@@ -602,9 +602,9 @@ sessions:
   date: '2026-09-16'
   summary: Retired RUNTIME-268, GRAPHICS-144/145 and RUNTIME-267 with bounded compile evidence; continued UI-037
     readiness/button and execution reuse with Claude review and full CPU verification. Outlier/ICP, Progressive
-    Poisson and parameterization config rejection/retries plus UV admission are covered; full readiness, material/shader/cache work remain open.
-  turn_count: 9
-  events_count: 19
+    Poisson, parameterization and mesh-field config rejection/retries plus UV admission are covered; full readiness, material/shader/cache work remain open.
+  turn_count: 10
+  events_count: 20
   claims_touched:
   - C99
   - C100

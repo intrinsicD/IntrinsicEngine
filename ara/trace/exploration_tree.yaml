@@ -13267,3 +13267,24 @@ tree:
     - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
     - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
     status: resolved
+
+  - id: N614
+    type: decision
+    title: Reuse processing draft and execution state for curvature and geodesics
+    provenance: ai-executed
+    timestamp: '2026-09-16T12:43:26+02:00'
+    choice: Continue UI-037 by replacing bespoke mesh-field panel draft state with ProcessingDraftState and routing
+      Run through ApplyProcessingExecution. Preserve rejected drafts, optional config availability, first mesh initialization
+      and mesh-local source resets. Claude reviewed plan and final corrections. Focused 52 and full CPU 4676 passes
+      plus one expected skip. One implementation loses 29 production lines, no public surface/dependency change or
+      timing claim. Full readiness inventory remains open.
+    alternatives:
+    - Retain independent initialized/dirty latches and retry lockouts
+    - Synchronize a fabricated default when active config is missing
+    - Add another execution wrapper or new public readiness surface for this cleanup
+    evidence:
+    - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
+    - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+    - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
+    - docs/architecture/sandbox-editor-feature-boundaries.md
+    status: resolved

@@ -2,11 +2,11 @@ session:
   id: 2026-09-16_001
   date: '2026-09-16'
   started: '2026-09-16T00:38:04+02:00'
-  last_turn: '2026-09-16T12:27:37+02:00'
-  turn_count: 9
+  last_turn: '2026-09-16T12:43:26+02:00'
+  turn_count: 10
   summary: Retired RUNTIME-268, GRAPHICS-144/145 and RUNTIME-267 with bounded compile evidence; continued UI-037
     readiness/button and execution reuse with Claude review and full CPU verification. Outlier/ICP, Progressive
-    Poisson and parameterization config rejection/retries plus UV admission are covered; full readiness, material/shader/cache work remain open.
+    Poisson, parameterization and mesh-field config rejection/retries plus UV admission are covered; full readiness, material/shader/cache work remain open.
 events_logged:
 - turn: 1
   type: dead_end
@@ -123,6 +123,13 @@ events_logged:
   provenance: ai-executed
   summary: Share metadata-only UV admission and reject duplicate jobs before preparation; preserve numerical command
     validation and keep UI-037 open.
+- turn: 10
+  type: decision
+  id: N614
+  routing: direct
+  provenance: ai-executed
+  summary: Consolidate curvature/geodesics draft and execution state with rejection/retry, external config and mesh-local
+    source preservation.
 ai_actions:
 - turn: 1
   action: Diagnosed standard-header/import serialization, implemented one declaration owner, fixed review findings,
@@ -218,6 +225,15 @@ ai_actions:
   - src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp
   - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
   - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
+- turn: 10
+  action: Reused processing draft and apply-before-execute helpers, preserved optional config and first-mesh semantics
+    after review, and passed actual-widget plus full CPU verification.
+  provenance: ai-executed
+  files_changed:
+  - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+  - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
+  - docs/architecture/sandbox-editor-feature-boundaries.md
 claims_touched:
 - id: C99
   action: crystallized
@@ -259,6 +275,9 @@ key_context:
 - turn: 9
   excerpt: User requested continuing with Claude through planning, implementation, review, tests and fixes. Continued
     UI-037 UV admission; no whole-task retirement or timing claim.
+- turn: 10
+  excerpt: User requested continued open duplicate-code/compilation work with Claude through plan, implement, review,
+    test and fix. Continued UI-037 mesh-field reuse; no measured compile-time claim or task retirement.
 open_threads:
 - The broader C92 processing-family hypothesis still needs a selected baseline and repeated family-edit measurements;
   BUILD-006 separately owns backend/cache comparisons.
@@ -280,7 +299,7 @@ open_threads:
   that tooling work.
 - RUNTIME-268, GRAPHICS-144, GRAPHICS-145 and RUNTIME-267 are complete with bounded measured evidence. Mandatory
   config/session dependencies remain. UI-037 is active with shared controls, outlier/ICP, Progressive Poisson and
-  parameterization config/execution and UV admission verified;
+  parameterization and mesh-field config/execution plus UV admission verified;
   full numerical UV readiness, mesh/bake, family readiness, backend/variant and metadata/cache preflight coverage remain. GRAPHICS-105 is ready; LEGACY-043 follows it, and
   BUILD-006 retains its prerequisites.
 ai_suggestions_pending:

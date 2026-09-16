@@ -235,15 +235,8 @@ namespace Extrinsic::Sandbox::Editor
             bool PreserveBoundary{true};
         };
 
-        struct CurvatureState
-        {
-            Runtime::MeshCurvatureConfig Config{};
-            bool Initialized{false};
-            bool Dirty{false};
-            std::optional<std::vector<std::uint32_t>> LastSelectedEntity{};
-            std::optional<Runtime::EditorMeshCurvatureResult> LastResult{};
-            std::string ConfigDiagnostic{}, VisualizationDiagnostic{};
-        };
+        using CurvatureState = ProcessingDraftState<Runtime::MeshCurvatureConfig, Runtime::EditorMeshCurvatureResult>;
+        using GeodesicsState = ProcessingDraftState<Runtime::GeodesicsConfig, Runtime::EditorGeodesicsResult>;
         struct SegmentationState
         {
             ProcessingEntityInput Input{};
@@ -337,13 +330,9 @@ namespace Extrinsic::Sandbox::Editor
         DenoiseState Denoise{};
         CurvatureState Curvature{};
         SegmentationState Segmentation{};
-        ProcessingEntityInput GeodesicsInput{};
-        Runtime::GeodesicsConfig GeodesicsConfig{};
-        bool GeodesicsInitialized{false};
-        bool GeodesicsDirty{false};
+        GeodesicsState Geodesics{};
+        std::uint32_t GeodesicsEntity{0u};
         int GeodesicsSourceVertex{0};
-        std::optional<Runtime::EditorGeodesicsResult> GeodesicsResult{};
-        std::string GeodesicsMessage{};
         RemeshState Remesh{};
         SubdivideState Subdivide{};
         SimplifyState Simplify{};
@@ -580,12 +569,9 @@ namespace Extrinsic::Sandbox::Editor
         ResetModelCache();
         Denoise.LastResult.reset();
         Denoise.Input = {};
-        Curvature.LastResult.reset();
-        GeodesicsInput = {};
-        GeodesicsInitialized = false;
-        GeodesicsDirty = false;
-        GeodesicsResult.reset();
-        GeodesicsMessage.clear();
+        Geodesics = {};
+        GeodesicsEntity = 0u;
+        GeodesicsSourceVertex = 0;
         Curvature = {};
         Segmentation = {};
         Remesh.LastResult.reset();
@@ -882,15 +868,9 @@ namespace Extrinsic::Sandbox::Editor
     {
         if (context.MeshFields.Results.LastMeshCurvatureResult.has_value())
             Curvature.LastResult = *context.MeshFields.Results.LastMeshCurvatureResult;
-        if (!Curvature.Initialized || !Curvature.Dirty)
-        {
-            if (auto active = Runtime::GetEditorMeshCurvatureConfig(context.MeshFields.Commands))
-            {
-                Curvature.Config = *active;
-                Curvature.Initialized = true;
-            }
-        }
-        auto& config = Curvature.Config;
+        if (const auto active = Runtime::GetEditorMeshCurvatureConfig(context.MeshFields.Commands))
+            Curvature.Synchronize(*active, Runtime::SerializeMeshCurvatureConfig(*active));
+        auto& config = Curvature.Draft;
         bool changed = DrawProcessingEntity("Entity##MeshCurvature", context,
             config.StableEntityId, Curvature.LastSelectedEntity, Runtime::EditorDomainWindowKind::Mesh);
         const auto& model = GetDomainWindowModel(context, Runtime::EditorDomainWindowKind::Mesh, config.StableEntityId);
@@ -916,21 +896,18 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::EndCombo();
         }
         changed |= ImGui::Checkbox("Principal directions##MeshCurvature", &config.PublishPrincipalDirections);
-        Curvature.Dirty |= changed;
+        const auto apply = [&](const auto& request) {
+            return Runtime::ApplyEditorMeshCurvatureConfig(context.MeshFields.Commands, request);
+        };
         if (changed)
-        {
-            const auto applied = Runtime::ApplyEditorMeshCurvatureConfig(context.MeshFields.Commands, config);
-            Curvature.ConfigDiagnostic = applied.Succeeded() ? "" : "Invalid curvature property bindings.";
-            if (applied.Succeeded()) Curvature.Dirty = false;
-        }
-        ImGui::BeginDisabled(!processing.MeshCurvatureAvailable || !context.ProcessingConfigCommandsAvailable ||
-            !Curvature.ConfigDiagnostic.empty());
-        if (ImGui::Button("Compute##MeshCurvature"))
-            PublishCommandResult(Curvature.LastResult,
-                Runtime::ApplyEditorMeshCurvatureCommand(context.MeshFields.Commands, config,
-                    context.MeshFields.ResultSinks.MeshCurvature),
-                context.MeshFields.ResultSinks.MeshCurvature);
-        ImGui::EndDisabled();
+            Curvature.ConfigDiagnostic = apply(config).Succeeded() ? "" : "Invalid curvature property bindings.";
+        const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
+            context.MeshFields.Commands, {processing.MeshCurvatureAvailable, "Select a mesh to compute curvature."});
+        if (DrawProcessingActionButton("Compute##MeshCurvature", readiness))
+            ApplyProcessingExecution(Curvature, config, apply,
+                [&] { return Runtime::ApplyEditorMeshCurvatureCommand(context.MeshFields.Commands, config,
+                    context.MeshFields.ResultSinks.MeshCurvature); },
+                context.MeshFields.ResultSinks.MeshCurvature, "Curvature configuration was rejected.");
         ImGui::SeparatorText("Display output properties");
         for (const auto* output : {&config.Mean, &config.Gaussian, &config.MinPrincipal,
                                   &config.MaxPrincipal, &config.Direction1, &config.Direction2})
@@ -2896,25 +2873,28 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::End();
             return;
         }
-        const auto previousEntity = GeodesicsInput.Entity;
-        DrawProcessingEntity("Entity##Geodesics", context, GeodesicsInput.Entity,
-                             GeodesicsInput.PreviousSelection, Runtime::EditorDomainWindowKind::Mesh);
+        const bool initialized = !Geodesics.LastApplied.empty();
+        const auto previousEntity = GeodesicsEntity;
+        DrawProcessingEntity("Entity##Geodesics", context, GeodesicsEntity,
+                             Geodesics.LastSelectedEntity, Runtime::EditorDomainWindowKind::Mesh);
         DrawProcessingCpuBackend();
-        if (GeodesicsInitialized && previousEntity != GeodesicsInput.Entity)
-        {
-            // Vertex indices belong to the previous mesh, even when the new
-            // mesh happens to have slots with the same indices.
-            GeodesicsConfig.SourceVertices.clear();
-            GeodesicsDirty = true;
-            GeodesicsResult.reset();
-            GeodesicsMessage.clear();
-            GeodesicsSourceVertex = 0;
-            // Publish the reset even when the new selection has no mesh UI.
-            GeodesicsDirty = !Runtime::ApplyEditorGeodesicsConfig(
-                context.MeshFields.Commands, GeodesicsConfig).Succeeded();
-        }
         const auto& model = GetDomainWindowModel(context, Runtime::EditorDomainWindowKind::Mesh,
-                                                GeodesicsInput.Entity);
+                                                GeodesicsEntity);
+        if (initialized || (model.DomainMatches && model.Processing.HasSelectedEntity))
+            if (const auto active = Runtime::GetEditorGeodesicsConfig(context.MeshFields.Commands))
+                Geodesics.Synchronize(*active, Runtime::SerializeGeodesicsConfig(*active));
+        if (initialized && previousEntity != GeodesicsEntity)
+        {
+            // Source indices belong to the previous mesh, even if the next
+            // mesh has slots with the same indices. Publish deselection too.
+            Geodesics.Draft.SourceVertices.clear();
+            Geodesics.LastResult.reset();
+            Geodesics.VisualizationDiagnostic.clear();
+            GeodesicsSourceVertex = 0;
+            Geodesics.ConfigDiagnostic = Runtime::ApplyEditorGeodesicsConfig(
+                context.MeshFields.Commands, Geodesics.Draft).Succeeded()
+                    ? "" : "Geodesics source reset was rejected.";
+        }
         if (model.DomainMatches && model.Processing.HasSelectedEntity)
             DrawGeodesicsControls(model, context);
         else
@@ -2924,61 +2904,55 @@ namespace Extrinsic::Sandbox::Editor
     void MeshProcessingPanels::Impl::DrawGeodesicsControls(
         const Runtime::EditorDomainWindowModel& model, const SandboxEditorContext& context)
     {
-        if (!GeodesicsDirty)
-        {
-            if (auto config = Runtime::GetEditorGeodesicsConfig(context.MeshFields.Commands))
-            {
-                GeodesicsConfig = *config;
-                GeodesicsInitialized = true;
-            }
-        }
-        if (!GeodesicsInitialized)
+        if (Geodesics.LastApplied.empty())
         {
             ImGui::TextDisabled("Geodesics configuration is unavailable.");
             return;
         }
+        auto& config = Geodesics.Draft;
+        bool changed = false;
         ImGui::TextWrapped(
             "Approximate surface distance from source vertices. Pick a vertex and add "
             "it, or enter its index below.");
         if (model.Primitive.HasVertexId && ImGui::Button("Add picked vertex"))
         {
-            GeodesicsConfig.SourceVertices.push_back(model.Primitive.Primitive.VertexId);
-            GeodesicsDirty = true;
+            config.SourceVertices.push_back(model.Primitive.Primitive.VertexId);
+            changed = true;
         }
         const auto selected = Runtime::ReadEditorPrimitiveSelection(
             context.Processing, model.SelectedStableId, Runtime::GeometryElementDomain::MeshVertex);
         ImGui::BeginDisabled(!selected.Usable() || selected.Indices.empty());
         if (ImGui::Button("Use selected vertices as sources"))
         {
-            GeodesicsConfig.SourceVertices = selected.Indices;
-            GeodesicsDirty = true;
+            config.SourceVertices = selected.Indices;
+            changed = true;
         }
         ImGui::EndDisabled();
         ImGui::TextDisabled("Select vertices in Mesh / Selection, then copy them here.");
         ImGui::InputInt("Source vertex", &GeodesicsSourceVertex);
         if (ImGui::Button("Add source") && GeodesicsSourceVertex >= 0)
         {
-            GeodesicsConfig.SourceVertices.push_back(
+            config.SourceVertices.push_back(
                 static_cast<std::uint32_t>(GeodesicsSourceVertex));
-            GeodesicsDirty = true;
+            changed = true;
         }
         ImGui::SameLine();
         if (ImGui::Button("Clear sources"))
         {
-            GeodesicsConfig.SourceVertices.clear();
-            GeodesicsDirty = true;
+            config.SourceVertices.clear();
+            changed = true;
         }
-        if (GeodesicsDirty)
+        if (changed)
         {
-            auto& vertices = GeodesicsConfig.SourceVertices;
+            auto& vertices = config.SourceVertices;
             std::sort(vertices.begin(), vertices.end());
             vertices.erase(std::unique(vertices.begin(), vertices.end()), vertices.end());
         }
         std::string sourceText = "Sources:";
-        for (auto vertex : GeodesicsConfig.SourceVertices)
+        for (auto vertex : config.SourceVertices)
             sourceText += " " + std::to_string(vertex);
         ImGui::TextWrapped("%s", sourceText.c_str());
-        if (ImGui::BeginCombo("Position property", GeodesicsConfig.PositionProperty.c_str()))
+        if (ImGui::BeginCombo("Position property", config.PositionProperty.c_str()))
         {
             for (const auto& row : model.PropertyCatalog.Rows)
             {
@@ -2986,48 +2960,45 @@ namespace Extrinsic::Sandbox::Editor
                     row.ValueKind != decltype(row.ValueKind)::Vec3 || !row.Bindable)
                     continue;
                 if (ImGui::Selectable(row.Name.c_str(),
-                                      row.Name == GeodesicsConfig.PositionProperty))
+                                      row.Name == config.PositionProperty))
                 {
-                    GeodesicsConfig.PositionProperty = row.Name;
-                    GeodesicsDirty = true;
+                    config.PositionProperty = row.Name;
+                    changed = true;
                 }
             }
             ImGui::EndCombo();
         }
         ImGui::SeparatorText("Output properties");
-        GeodesicsDirty |= DrawProcessingPropertyName("Distance property", GeodesicsConfig.DistanceProperty);
-        GeodesicsDirty |= DrawProcessingPropertyName("Source mask property", GeodesicsConfig.SourceMaskProperty);
+        changed |= DrawProcessingPropertyName("Distance property", config.DistanceProperty);
+        changed |= DrawProcessingPropertyName("Source mask property", config.SourceMaskProperty);
         if (ImGui::InputScalar("Expansion budget", ImGuiDataType_U32,
-                               &GeodesicsConfig.MaxHalfedgeExpansions))
-            GeodesicsDirty = true;
-        if (GeodesicsDirty)
-        {
-            const auto applied = Runtime::ApplyEditorGeodesicsConfig(
-                context.MeshFields.Commands, GeodesicsConfig);
-            if (applied.Succeeded())
-                GeodesicsDirty = false;
-            else
-                GeodesicsMessage = "Geodesics config was rejected; check property names and expansion budget.";
-        }
-        ImGui::BeginDisabled(GeodesicsDirty || GeodesicsConfig.SourceVertices.empty() ||
-                             !context.ProcessingConfigCommandsAvailable);
-        if (ImGui::Button("Compute geodesics"))
-        {
-            GeodesicsResult = Runtime::ApplyEditorConfiguredGeodesicsCommand(
-                context.MeshFields.Commands, model.SelectedStableId);
-            GeodesicsMessage = GeodesicsResult->Message;
-        }
-        ImGui::EndDisabled();
+                               &config.MaxHalfedgeExpansions))
+            changed = true;
+        const auto apply = [&](const auto& request) {
+            return Runtime::ApplyEditorGeodesicsConfig(context.MeshFields.Commands, request);
+        };
+        if (changed)
+            Geodesics.ConfigDiagnostic = apply(config).Succeeded()
+                ? "" : "Geodesics config was rejected; check property names and expansion budget.";
+        const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
+            context.MeshFields.Commands, {!config.SourceVertices.empty(), "Add at least one source vertex."});
+        if (DrawProcessingActionButton("Compute geodesics", readiness))
+            ApplyProcessingExecution(Geodesics, config, apply,
+                [&] { return Runtime::ApplyEditorConfiguredGeodesicsCommand(
+                    context.MeshFields.Commands, model.SelectedStableId); },
+                std::function<void(Runtime::EditorGeodesicsResult)>{}, "Geodesics configuration was rejected.");
         ImGui::SeparatorText("Display output properties");
         ImGui::TextDisabled("Unreachable distances are shown in gray.");
         DrawProcessingPropertyShowButton(context, model.SelectedStableId,
-            {Runtime::GeometryElementDomain::MeshVertex, GeodesicsConfig.DistanceProperty, Geometry::PropertyValueKind::Double}, GeodesicsMessage);
+            {Runtime::GeometryElementDomain::MeshVertex, config.DistanceProperty, Geometry::PropertyValueKind::Double}, Geodesics.VisualizationDiagnostic);
         DrawProcessingPropertyShowButton(context, model.SelectedStableId,
-            {Runtime::GeometryElementDomain::MeshVertex, GeodesicsConfig.SourceMaskProperty, Geometry::PropertyValueKind::Bool}, GeodesicsMessage);
-        ImGui::TextWrapped("%s", GeodesicsMessage.c_str());
-        if (GeodesicsResult)
+            {Runtime::GeometryElementDomain::MeshVertex, config.SourceMaskProperty, Geometry::PropertyValueKind::Bool}, Geodesics.VisualizationDiagnostic);
+        if (!Geodesics.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Geodesics.ConfigDiagnostic.c_str());
+        if (!Geodesics.VisualizationDiagnostic.empty()) ImGui::TextWrapped("%s", Geodesics.VisualizationDiagnostic.c_str());
+        if (Geodesics.LastResult)
         {
-            const auto& diagnostics = GeodesicsResult->Diagnostics;
+            ImGui::TextWrapped("%s", Geodesics.LastResult->Message.c_str());
+            const auto& diagnostics = Geodesics.LastResult->Diagnostics;
             ImGui::Text("Sources: %zu | Expansions: %zu | Triangle updates: %zu",
                         diagnostics.SourceCount, diagnostics.HalfedgeExpansions,
                         diagnostics.TriangleUpdates);

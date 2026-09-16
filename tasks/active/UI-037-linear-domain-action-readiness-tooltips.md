@@ -461,3 +461,49 @@ Verified checkpoint:
   task validation/policy/state links, docs links/sync, root hygiene and skill
   freshness pass; module inventory regenerated unchanged. No sanitizer or Vulkan
   runtime execution was claimed for this CPU/UI slice.
+
+## Mesh-field draft/execution slice — plan
+
+- Continue operator-directed reuse work with curvature and geodesics. Both retain
+  independent draft/init/dirty state and prevent retry after rejected config.
+  Reuse `ProcessingDraftState`, the existing config serializers,
+  `ApplyProcessingExecution`, and shared readiness/action controls.
+- Keep geodesics' entity/source-index relationship explicit: load initial active
+  sources, clear them on later entity changes including deselection, and preserve
+  rejected drafts until active config changes or a retry succeeds. Curvature keeps
+  its queued callback and both methods keep typed Show-property actions.
+- No new file/module/public surface or geometry validator. Current method
+  admission predicates remain; complete runtime-owned numerical readiness stays
+  open. The change removes panel state/execution duplication, with no timing claim.
+
+## Mesh-field draft/execution slice — checkpoint
+
+- Curvature and geodesics reuse `ProcessingDraftState` and
+  `ApplyProcessingExecution`. Run always reapplies the visible draft, executes
+  only after accepted config (including `NoChange`), and permits retry after a
+  rejected edit. Shared action controls expose the existing admission reasons.
+  Config failures and property-display feedback no longer replace geodesics'
+  last operation message.
+- Synchronize only a present active config. Initial geodesics sources load when
+  the first mesh becomes available; later entity changes clear mesh-local sources
+  even if reset publication is rejected. External active-config changes replace
+  the draft through the existing serialized-key comparison. No new config or
+  geometry validation implementation, source file, module, or dependency.
+- Claude reviewed the plan/diff/fix. Fixed missing-config default substitution;
+  local review also caught first-use ordering when the window opens without a
+  selected mesh. The reviewer withdrew an incorrect active-versus-draft test
+  objection after the actual rejection/retry sequence was explained.
+- Final focused canonical-ci run: **52 integration tests passed**. New real-widget
+  cases cover rejected edits/no execution, retry without another edit, `NoChange`
+  re-execution, external configuration updates and rejected entity reset. Existing
+  selection-reset coverage now starts with no selected mesh. Curvature's queued
+  result sink and geodesics' synchronous publication remain distinct.
+- Production footprint: **29 lines removed from one existing implementation
+  unit**. No public interface changes or measured compile-time claim. Task stays
+  open for remaining action/backend controls and full runtime numerical readiness.
+- Full verification: canonical `ci` configure, `IntrinsicTests` build and CPU
+  exclusion-only CTest selector pass: **4,676 passes plus one expected ASan-only
+  GLFW lifecycle skip**, zero failures (4,677 selected; 141.27 s). Layering,
+  test-layout, task validation/policy/state links, docs links/sync, root hygiene,
+  skill freshness and diff checks pass. No public surface/inventory change,
+  sanitizer execution or Vulkan runtime claim.
