@@ -156,19 +156,7 @@ namespace Extrinsic::Runtime
                 work->After = work->OutputWatch.Revision.has_value() ? work->Before
                                                        : std::vector<glm::vec3>(outputProps->Size(), glm::vec3(0));
             }
-            auto maskDomain = c.Positions.Domain;
-            std::string maskName = "v:deleted";
-            std::size_t divisor = 1;
-            if (maskDomain == D::MeshFace)
-                maskName = "f:deleted";
-            if (maskDomain == D::MeshEdge || maskDomain == D::GraphEdge)
-                maskName = "e:deleted";
-            if (maskDomain == D::MeshHalfedge || maskDomain == D::GraphHalfedge)
-            {
-                maskDomain = maskDomain == D::MeshHalfedge ? D::MeshEdge : D::GraphEdge;
-                maskName = "e:deleted";
-                divisor = 2;
-            }
+            const auto [maskDomain, maskName, divisor] = Detail::ResolvePointDeletionSource(c.Positions.Domain);
             std::vector<bool> mask;
             if (props->Size() % divisor ||
                 !ReadMask(a, maskDomain, maskName, props->Size() / divisor, mask, work->Inputs))

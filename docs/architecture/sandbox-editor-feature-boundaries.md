@@ -238,7 +238,11 @@ position/deletion capture and same-domain output preflight in
 `Runtime.GeometryProcessingOperations.PointProperties.cpp`. `CapturePointInput`
 resolves the domain, watches positions and deletion storage, skips deleted rows,
 and preserves ascending source-row IDs without copying values during readiness
-or catalog queries. `ValidatePointOutputs` checks the resolved output domain,
+or catalog queries. `ResolvePointDeletionSource` supplies the shared domain,
+property name and row divisor for this capture, bilateral filtering, descriptors,
+construction and normals. Halfedges inherit the paired edge's deletion flag;
+each consumer retains its own mask validation, diagnostics and ownership.
+`ValidatePointOutputs` checks the resolved output domain,
 reserved names and existing storage against the validated typed config.
 
 Density, spacing and density weights share scalar history publication, including

@@ -143,6 +143,20 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         return true;
     }
 
+    PointDeletionSource ResolvePointDeletionSource(D domain)
+    {
+        PointDeletionSource source{.Domain = domain};
+        if (domain == D::MeshFace) source.Name = "f:deleted";
+        if (domain == D::MeshEdge || domain == D::GraphEdge) source.Name = "e:deleted";
+        if (domain == D::MeshHalfedge || domain == D::GraphHalfedge)
+        {
+            source.Domain = domain == D::MeshHalfedge ? D::MeshEdge : D::GraphEdge;
+            source.Name = "e:deleted";
+            source.Divisor = 2;
+        }
+        return source;
+    }
+
     bool CapturePointInput(
         const GeometryEntityAvailability& a, GeometryPropertyRef& positions, bool copyValues,
         PointInputCapture& w, std::string& diagnostic)
@@ -155,16 +169,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         if (props->Size() > std::numeric_limits<std::uint32_t>::max()) return fail("Input exceeds the supported slot range.");
         w.SlotCount = props->Size();
         w.Inputs.push_back(ObserveGeometryProperty(a, positions.Domain, positions.Name));
-        auto deletionDomain = positions.Domain;
-        const char* deletionName = "v:deleted";
-        std::size_t divisor = 1;
-        if (deletionDomain == D::MeshFace) deletionName = "f:deleted";
-        if (deletionDomain == D::MeshEdge || deletionDomain == D::GraphEdge) deletionName = "e:deleted";
-        if (deletionDomain == D::MeshHalfedge || deletionDomain == D::GraphHalfedge)
-        {
-            deletionDomain = deletionDomain == D::MeshHalfedge ? D::MeshEdge : D::GraphEdge;
-            deletionName = "e:deleted"; divisor = 2;
-        }
+        const auto [deletionDomain, deletionName, divisor] = ResolvePointDeletionSource(positions.Domain);
         const auto* deletionProps = ResolveGeometryPropertySet(a, deletionDomain);
         if (!deletionProps || props->Size() % divisor || deletionProps->Size() != props->Size() / divisor)
             return fail("Invalid deletion domain/cardinality.");

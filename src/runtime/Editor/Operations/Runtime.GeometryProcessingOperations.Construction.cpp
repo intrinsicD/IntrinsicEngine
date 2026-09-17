@@ -179,19 +179,8 @@ namespace Extrinsic::Runtime
             if (supplied)
                 w->Inputs.push_back(
                     Detail::ObserveGeometryProperty(a, c.Normals.Domain, c.Normals.Name));
-            auto deletionDomain = c.Positions.Domain;
-            const char* deletionName = "v:deleted";
-            std::size_t divisor = 1;
-            if (deletionDomain == D::MeshFace)
-                deletionName = "f:deleted";
-            if (deletionDomain == D::MeshEdge || deletionDomain == D::GraphEdge)
-                deletionName = "e:deleted";
-            if (deletionDomain == D::MeshHalfedge || deletionDomain == D::GraphHalfedge)
-            {
-                deletionDomain = deletionDomain == D::MeshHalfedge ? D::MeshEdge : D::GraphEdge;
-                deletionName = "e:deleted";
-                divisor = 2;
-            }
+            const auto [deletionDomain, deletionName, divisor] =
+                Detail::ResolvePointDeletionSource(c.Positions.Domain);
             const auto* deletionProps = ResolveGeometryPropertySet(a, deletionDomain);
             if (!deletionProps || props->Size() % divisor ||
                 deletionProps->Size() != props->Size() / divisor)

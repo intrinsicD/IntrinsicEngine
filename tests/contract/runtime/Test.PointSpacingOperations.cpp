@@ -93,6 +93,49 @@ namespace
     }
 } // namespace
 
+TEST(PointSpacingOperations, DeletionMaskValidationPreservesPreviewApplyRejection)
+{
+    for (unsigned domain = 1; domain <= unsigned(D::PointCloudPoint); ++domain)
+    {
+        for (unsigned fault = 0; fault < 5; ++fault)
+        {
+            SCOPED_TRACE(domain);
+            SCOPED_TRACE(fault);
+            Extrinsic::ECS::Scene::Registry scene;
+            const auto entity = Make(scene, D(domain));
+            const auto config = Config(entity, D(domain));
+            const bool halfedge = D(domain) == D::MeshHalfedge || D(domain) == D::GraphHalfedge;
+            if (fault >= 3 && !halfedge) continue;
+            auto& input = Properties(scene, entity, D(domain));
+            auto& masks = halfedge ? scene.Raw().get<GS::Edges>(entity).Properties : input;
+            const char* name = halfedge || D(domain) == D::MeshEdge || D(domain) == D::GraphEdge
+                ? "e:deleted" : D(domain) == D::MeshFace ? "f:deleted" : "v:deleted";
+            if (auto old = masks.Get<bool>(name)) masks.Remove(old);
+            if (fault == 0) (void)masks.GetOrAdd<float>(name);
+            if (fault == 1) masks.GetOrAdd<bool>(name).Vector().resize(masks.Size() - 1);
+            if (fault == 2) masks.GetOrAdd<bool>(name).Vector().resize(masks.Size() + 1);
+            if (fault == 3) masks.Resize(masks.Size() + 1);
+            if (fault == 4) input.Resize(input.Size() - 1);
+            const auto revision = input.Revision();
+            R::EditorCommandHistory history;
+            const auto commands = R::BindEditorProcessingCommands(
+                R::EditorProcessingContext{.Scene = &scene, .CommandHistory = &history});
+            const auto preview = R::PreviewEditorPointSpacingCommand(commands, config);
+            const auto applied = R::ApplyEditorPointSpacingCommand(commands, config);
+            const char* expected = fault < 3
+                ? "Deletion mask must be a count-matched bool property."
+                : "Invalid deletion domain/cardinality.";
+            EXPECT_FALSE(preview.Ready);
+            EXPECT_EQ(preview.Diagnostic, expected);
+            EXPECT_EQ(applied.Status, R::EditorCommandStatus::InvalidProcessingParameters);
+            EXPECT_EQ(applied.Message, expected);
+            EXPECT_FALSE(input.Exists(config.Radii.Name));
+            EXPECT_EQ(input.Revision(), revision);
+            EXPECT_FALSE(history.CanUndo());
+        }
+    }
+}
+
 TEST(PointSpacingOperations, InputCatalogsShareRevisionMetadataWithoutChangingEligibility)
 {
     using Query = R::GeometryPropertyCatalogSnapshot (*)(const R::EditorProcessingCommands&, std::uint32_t);

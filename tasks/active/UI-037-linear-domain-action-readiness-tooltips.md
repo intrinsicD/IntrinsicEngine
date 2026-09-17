@@ -9,7 +9,7 @@ evidence: not_applicable
 evidence_skip_reason: Interactive staged implementation; fixed diffs, review, tests and task checkpoints retain verification without unattended custody.
 maturity_target: Operational
 contract_schema: 1
-contracts: [geometry.element-domain-sources, geometry.property-coherence, runtime.editor-prepared-frame-locality]
+contracts: [geometry.element-domain-sources, geometry.property-coherence, runtime.editor-prepared-frame-locality, runtime.processing-compilation-locality]
 ---
 # UI-037 — Linear domain-action readiness and disabled-reason tooltips
 
@@ -1284,3 +1284,61 @@ Strict layering, test layout, task policy/state links, documentation sync/links,
 skill mirrors, root hygiene, clean-workshop automation, session-brief freshness
 and diff checks pass. Sanitizer and GPU/Vulkan execution were not repeated for
 this unchanged capture implementation. Compilation speed remains unmeasured.
+
+
+## Point deletion-domain mapping reuse — plan, 2026-09-17
+
+The operator continues duplicate-code and compilation-locality cleanup with
+Claude, outside the standing convergence selection preference, from clean
+`0feadc835`. Five processing captures independently map point/property domains
+to deletion storage. Share only that exact mapping in the existing compiled
+point-property owner: vertex/node/cloud rows use `v:deleted`, faces use
+`f:deleted`, edges use `e:deleted`, and halfedges use their edge domain with
+a divisor of two. The private record has three ordinary fields and five
+present callers; no policy flags, lifecycle template, module or file is needed.
+
+Preserve each caller's validation order, diagnostic text, missing-mask policy,
+revision watches, live-row filtering and readiness allocation behavior. Normal
+capture continues owning its copied masks; the other families borrow properties.
+Extend public-entry rejection coverage for malformed masks and halfedge storage,
+then run focused processing/history tests and the canonical CPU gate.
+
+### Mapping implementation checkpoint
+
+The five captures now use one compiled mapping; all validation and storage
+handling stays at the original call sites. Six production files shrink from
+2,891 to 2,866 physical lines (25 fewer), including the private declaration.
+No new file, module, target, interface dependency or behavior was introduced.
+
+Canonical Clang 23 `ci` configure, runtime contract build and `IntrinsicTests`
+build pass without warnings. All 175 focused processing/history/compiler tests
+pass, including the new public preview/apply rejection matrix across eight
+domains. Wrong mask type, short/long mask storage, edge/halfedge mismatch and
+odd halfedge counts preserve exact diagnostics, output absence and empty history.
+Layering, test layout, task policy/state links, docs sync/links, skill mirrors,
+session brief, root hygiene and diff checks pass. Source documentation has zero
+objective errors; eight retained hints cover the include-order synopsis and
+non-obvious job/capture/deletion contracts. No public inventory change.
+
+Verification commands:
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -R 'PointSpacing|KernelDensity|BilateralFilter|DescriptorAnalysis|NormalEstimation|PointConstruction|DensityWeight|Keypoint|Outlier|ProcessingCompilationLocality' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+```
+
+Claude's fixed-source review found no blockers and verified unchanged validation
+order, watch order, diagnostics, halfedge remapping and name lifetime. A second
+fixed-packet review also found no blockers; its context questions are resolved
+by the contiguous domain enum, compiled contract target and executed new test.
+The spatial cache has a related mapping with different mask validation; it is
+outside this processing slice and does not import editor helpers.
+Workshop automation passes. Manual rows 1–3 pass with unchanged layer/target
+ownership and no public API changes; rows 4–8 are unaffected or not applicable.
+
+Final CPU gate: 4,711 passed plus one expected ASan-only GLFW lifecycle skip
+(4,712 selected, zero failures, 149.84 s). No sanitizer or GPU execution in
+this mapping slice; no compilation timing claim. UI-037 remains open for its
+broader readiness/cache acceptance. Logs: `/tmp/intrinsic-seventh-*`.

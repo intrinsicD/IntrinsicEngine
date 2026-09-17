@@ -114,16 +114,8 @@ namespace Extrinsic::Runtime
             w->Inputs.push_back(ObserveGeometryProperty(a, c.Positions.Domain, c.Positions.Name));
             w->Inputs.push_back(ObserveGeometryProperty(a, c.Normals.Domain, c.Normals.Name));
             w->OutputWatch = ObserveGeometryProperty(a, c.Output.Domain, c.Output.Name);
-            auto deletionDomain = c.Positions.Domain;
-            const char* deletionName = "v:deleted";
-            std::size_t divisor = 1;
-            if (deletionDomain == D::MeshFace) deletionName = "f:deleted";
-            if (deletionDomain == D::MeshEdge || deletionDomain == D::GraphEdge) deletionName = "e:deleted";
-            if (deletionDomain == D::MeshHalfedge || deletionDomain == D::GraphHalfedge)
-            {
-                deletionDomain = deletionDomain == D::MeshHalfedge ? D::MeshEdge : D::GraphEdge;
-                deletionName = "e:deleted"; divisor = 2;
-            }
+            const auto [deletionDomain, deletionName, divisor] =
+                GeometryProcessingDetail::ResolvePointDeletionSource(c.Positions.Domain);
             const auto* deletionProps = ResolveGeometryPropertySet(a, deletionDomain);
             if (!deletionProps || props->Size() % divisor || deletionProps->Size() != props->Size() / divisor)
                 return fail("Invalid deletion domain/cardinality.");

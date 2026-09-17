@@ -64,6 +64,15 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     [[nodiscard]] bool GeometryPropertiesCurrent(const EditorProcessingContext&, entt::entity,
                                                std::span<const PointPropertyWatch>);
 
+    struct PointDeletionSource
+    {
+        GeometryElementDomain Domain{};
+        const char* Name{"v:deleted"};
+        std::size_t Divisor{1};
+    };
+    // Halfedge rows share the deletion flag of their paired edge.
+    [[nodiscard]] PointDeletionSource ResolvePointDeletionSource(GeometryElementDomain);
+
     struct PointInputCapture
     {
         std::vector<PointPropertyWatch> Inputs{};
