@@ -253,8 +253,12 @@ Both live in `RadiusRows.hpp`, so only the units that actually page neighbours
 name the spatial-index cache.
 `BuildPointInputCatalog` reuses finite live-row capture for weights, keypoints,
 outliers, descriptors, construction and normals, independently of method result records.
-`RadiusRows.cpp` also compiles once outside either family and preserves complete
-radius support and its explicit lowest-ID limit.
+`RadiusRows.cpp` compiles both pagers once outside either family and preserves
+complete radius support and its explicit lowest-ID limit. Property capture imports
+only the leaf point-LBVH algorithm for coordinate validation, without the spatial
+cache service or paging records; `ProcessingCompilationLocality.PropertyCapture`
+guards that compiler boundary. Normal processing uses its dedicated
+normal kernels without importing the unrelated point-cloud utility API.
 Processing discovery includes no mesh reconstruction header and requires neither
 full halfedge-mesh types, the spatial cache nor transform components; its source-
 domain queries use `GeometryAvailability` and its selection operations use the

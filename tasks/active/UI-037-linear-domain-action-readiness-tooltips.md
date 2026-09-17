@@ -1342,3 +1342,73 @@ Final CPU gate: 4,711 passed plus one expected ASan-only GLFW lifecycle skip
 (4,712 selected, zero failures, 149.84 s). No sanitizer or GPU execution in
 this mapping slice; no compilation timing claim. UI-037 remains open for its
 broader readiness/cache acceptance. Logs: `/tmp/intrinsic-seventh-*`.
+
+
+## Property-capture spatial-cache boundary — plan, 2026-09-17
+
+Second operator-directed iteration from `bc0a260c2`: move the unchanged
+`AdvancePointKnnRows` definition from the property-capture translation unit
+into the existing radius/kNN paging owner `RadiusRows.cpp`. The declaration
+already lives in `RadiusRows.hpp` and both density and spacing consume it.
+Property capture needs only `Geometry.PointLBVH::ValidPoint`; replace the
+spatial-cache service import with that leaf algorithm module, and remove the
+now-unused paging header and chrono include. No new file, target or public API.
+
+The compiler graph rejects the proposed no-SpatialIndexCache boundary before
+the move. Pin it with a new property-capture compiler-closure test. Preserve
+exact kNN body bytes, Euclidean/self-candidate membership, original-slot remap,
+batch ownership, error handling and caller-owned stale/cancellation gates;
+radius completeness and lowest-ID policy remain distinct. Verify focused CPU
+and existing density/spacing Vulkan smoke tests on the combined source.
+This is a dependency/ownership correction, not a measured speedup.
+
+Claude's planning pass identified an unused `Geometry.PointCloud.Utils` import
+in normal processing. Source search confirms no exported utility is used, and
+the compiler graph rejects the proposed boundary before removal. Remove that
+import and extend the existing normals closure guard. Claude's broader
+companion-input proposal would change diagnostics/watch order and add optional
+policy fields; the completed deletion-mapping slice keeps those contracts local.
+
+### Dependency implementation and review checkpoint
+
+The kNN body is byte-for-byte unchanged in its existing paging owner.
+Property capture no longer imports `SpatialIndexCache`; normal processing
+no longer imports `Geometry.PointCloud.Utils`. The new one-producer property
+closure and expanded seven-producer normal closure pass. `IntrinsicTests`
+builds and all 67 focused density/spacing/normal/compiler cases pass.
+
+Claude reviewed the initial and final fixed packets and found no correctness
+blockers. The complete compile/link and transitive closure tests resolve its
+target-ownership and leaf-export questions. Both implementation files remain
+in `ExtrinsicRuntime`; no duplicate definition, wrapper or module was added.
+A harmless blank-line nit is left outside the verified source.
+
+Three production sources shrink by two lines; five CMake guard-registration
+lines make the source/build delta +3. This is code relocation plus dependency
+removal, not duplicate-body removal or a compilation-speed measurement.
+Layering, test layout, task policy/state links, docs sync/links, skill mirrors,
+session brief and diff checks pass. Workshop rows 1–3 pass; renderer/recipe,
+retirement and exception rows are unaffected. Public module inventory unchanged.
+
+Canonical `ci-vulkan` configure and `IntrinsicPointLBVHGpuTests` build pass
+with Clang 23. All six selected GPU/Vulkan tests execute and pass: normal
+neighborhoods, kernel density, spacing, bilateral moving passes, descriptors,
+and point-construction generated geometry. No skips or failures (98.92 s).
+The combined two-slice production source delta is 27 fewer lines.
+
+```bash
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target IntrinsicPointLBVHGpuTests
+ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R 'PointLBVHGpuSmoke\.(KernelDensityPublishesAcrossDomainsAndPreservesCandidatePolicy|PointSpacingPublishesAcrossDomainsAndPreservesCandidatePolicy|NormalNeighborhoodsPublishAcrossDomainsAndRejectIncompleteSupport|BilateralPublishesMovingPassesAcrossDomains|DescriptorPublishesAcrossDomainsWithCompleteSupport)$|PointConstructionGpuSmoke.QueriesMatchReferenceAcrossDomainsAndGeneratedGeometryRenders' --no-tests=error --timeout 120
+```
+
+CPU and structural verification use the commands from the preceding mapping
+checkpoint, with focused selection
+`PointSpacing|KernelDensity|NormalEstimation|ProcessingCompilationLocality`.
+Logs and fixed review packets: `/tmp/intrinsic-eighth-*`.
+
+Final combined CPU gate: 4,712 passed plus one expected ASan-only GLFW
+lifecycle skip (4,713 selected, zero failures, 160.13 s). All source remained
+fixed through final Claude review, builds and test runs. The full CPU sanitizer
+suites were not repeated; the six GPU tests used the canonical instrumented
+`ci-vulkan` preset. UI-037 remains active for broader readiness/cache work.

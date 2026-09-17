@@ -2,7 +2,6 @@
 #include <algorithm>
 #include <array>
 #include <bit>
-#include <chrono>
 #include <cmath>
 #include <limits>
 #include <memory>
@@ -26,13 +25,12 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
-import Extrinsic.Runtime.SpatialIndexCache;
+import Geometry.PointLBVH;
 import Geometry.Properties;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Runtime.WorldHandle;
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
-#include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 
 namespace Extrinsic::Runtime::GeometryProcessingDetail
 {
@@ -250,49 +248,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             .Undo=[mutate,before]{return mutate(*before);}}).Status : mutate(*after);
     }
 
-    KnnRowsState AdvancePointKnnRows(
-        SpatialIndexCache& cache, SpatialIndexHandle index, std::span<const glm::vec3> points,
-        std::span<const std::uint32_t> slots, std::uint32_t width,
-        std::uint32_t batchSize, PointKnnRows& rows, std::string& diagnostic)
-    {
-        const auto fail = [&](std::string why) {
-            diagnostic = std::move(why); rows.Batch.reset(); return KnnRowsState::Failed;
-        };
-        if (rows.Finished) return KnnRowsState::Ready;
-        if (rows.Started == std::chrono::steady_clock::time_point{})
-            rows.Started = std::chrono::steady_clock::now();
-        if (rows.Batch)
-        {
-            if (rows.Batch->State == SpatialQueryState::Failed) return fail(rows.Batch->Diagnostic);
-            if (rows.Batch->State != SpatialQueryState::Ready) return KnnRowsState::Pending;
-            for (std::size_t row = 0; row < rows.Batch->Counts.size(); ++row)
-            {
-                if (rows.Batch->Counts[row] != width) return fail("Incomplete Vulkan kNN neighborhood.");
-                for (std::size_t j = 0; j < width; ++j)
-                {
-                    const auto id = rows.Batch->Neighbors[row * rows.Batch->Capacity + j].Index;
-                    const auto found = std::lower_bound(slots.begin(), slots.end(), id);
-                    if (found == slots.end() || *found != id) return fail("Invalid Vulkan neighbor source row.");
-                    rows.Indices.push_back(std::uint32_t(found - slots.begin()));
-                }
-            }
-            rows.NextQuery += rows.Batch->Counts.size();
-            if (rows.NextQuery == points.size())
-            {
-                rows.Batch.reset(); rows.Finished = true;
-                rows.Milliseconds = std::chrono::duration<double, std::milli>(
-                    std::chrono::steady_clock::now() - rows.Started).count();
-                return KnnRowsState::Ready;
-            }
-        }
-        const auto count = std::min<std::size_t>(batchSize, points.size() - rows.NextQuery);
-        if (rows.Batch && rows.Batch->Counts.size() != count) rows.Batch.reset();
-        rows.Batch = cache.QueueGpuKNearest(index, points.subspan(rows.NextQuery, count),
-                                            width, {}, std::move(rows.Batch));
-        ++rows.QueryBatches;
-        if (rows.Batch->State == SpatialQueryState::Failed) return fail(rows.Batch->Diagnostic);
-        return KnnRowsState::Pending;
-    }
+
 }
 
 namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
