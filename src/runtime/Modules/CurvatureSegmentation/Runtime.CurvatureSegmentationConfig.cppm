@@ -12,7 +12,6 @@ export import Extrinsic.Runtime.GeometryAvailability;
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
-import Geometry.HalfedgeMesh.CurvatureSegmentation;
 
 export namespace Extrinsic::Runtime
 {
@@ -87,9 +86,6 @@ export namespace Extrinsic::Runtime
         GeometryPropertyRef FeatureColors{GeometryElementDomain::MeshEdge, "e:curvature_feature_patch_color", Geometry::PropertyValueKind::Vec4};
 
     };
-
-    [[nodiscard]] Geometry::CurvatureSegmentation::CurvatureSegmentationParams
-    MakeCurvatureSegmentationParams(const CurvatureSegmentationConfig& config);
 
     [[nodiscard]] bool IsValidCurvatureSegmentationConfig(
         const CurvatureSegmentationConfig& config) noexcept;

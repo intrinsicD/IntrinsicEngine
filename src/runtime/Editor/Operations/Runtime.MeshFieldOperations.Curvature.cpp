@@ -44,8 +44,11 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.Curvature;
 import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.CurvatureSegmentation;
 import Geometry.HalfedgeMesh.CurvatureSegmentation.Features;
 import Geometry.Properties;
+
+#include "Config/internal/Runtime.CurvatureSegmentationParams.hpp"
 
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 

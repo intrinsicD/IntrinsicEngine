@@ -9,10 +9,13 @@ module Extrinsic.Runtime.CurvatureSegmentationConfig;
 
 import Geometry.HalfedgeMesh.CurvatureSegmentation;
 
+#include "Config/internal/Runtime.CurvatureSegmentationParams.hpp"
+
 namespace Extrinsic::Runtime
 {
     namespace CurvSeg = Geometry::CurvatureSegmentation;
 
+    extern "C++"
     [[nodiscard]] CurvSeg::CurvatureSegmentationParams
     MakeCurvatureSegmentationParams(
         const CurvatureSegmentationConfig& config)

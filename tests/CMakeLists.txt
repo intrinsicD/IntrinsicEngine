@@ -648,6 +648,15 @@ intrinsic_add_module_boundary_test(EditorCompilationLocality.SceneRegistryBorrow
 set_tests_properties(EditorCompilationLocality.SceneRegistryBorrows
     PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
 
+intrinsic_add_module_boundary_test(ConfigCompilationLocality.CurvatureInterface
+        --check-source src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm
+        --check-source src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+        --check-source src/app/Sandbox/Sandbox.ConfigSections.cppm
+        --check-source src/app/Sandbox/Sandbox.ConfigSections.cpp
+        --forbid-module Geometry.HalfedgeMesh.CurvatureSegmentation)
+set_tests_properties(ConfigCompilationLocality.CurvatureInterface
+    PROPERTIES LABELS "contract;build;runtime" TIMEOUT 30)
+
 # Feature conversion/token implementations do not depend on unrelated config families.
 foreach(_intrinsic_config_family IN ITEMS CurvatureSegmentation PointCloudConsolidation)
     if(_intrinsic_config_family STREQUAL "CurvatureSegmentation")

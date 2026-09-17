@@ -1890,3 +1890,100 @@ compilation-time improvement is claimed. UI-037's broader readiness inventory,
 shared authoritative predicates, cached derivations and all-control tooltip proof
 remain open. Curvature config's parameter conversion is a deferred, separately
 reviewed candidate; this slice does not alter it.
+
+
+## Point-property decoding and curvature config boundary — 2026-09-17
+
+Operator-directed continuation with Claude, two bounded slices. Reuse the seven
+point-config families' exact name/domain decode mechanism in the existing
+compiled ConfigDetail owner; preserve typed default kinds and keep differing
+validators/diagnostics local. A public Set/Get/Serialize regression exercises
+all nine domain tokens, distinct names containing embedded NUL/quote/backslash/
+newline bytes, and all 33 descriptor outputs before and after replacement.
+
+The curvature config's public parameter converter has only two implementation
+consumers: its own validator and the curvature operation. Give those files one
+private declaration, retaining the existing compiled definition and numerical
+validator. Remove the resulting geometry algorithm dependency from the config
+interface and shared JSON codec producer; cover actual Sandbox config producers
+in the compiler-graph guard too. Mesh-field result types still need their geometry
+imports and are not changed. One declaration header is justified by the two
+current consumers; no new wrapper, module, target or copied conversion is needed.
+
+Baseline compiler paths already confirm both config interface and shared codec
+reach Geometry.HalfedgeMesh.CurvatureSegmentation. Review packets and logs are in
+`/tmp/intrinsic-config-decode-boundary/`. Plan/fixed review with Claude, focused
+config/curvature tests, full canonical CPU gate, Sandbox build, structural/docs
+checks and inventory refresh will verify the slices. No compilation-time claim.
+
+
+### Implementation and review checkpoint
+
+The initial build rejected a global-C++ converter declaration followed by a
+named-module definition. Added the same explicit C++ linkage to the existing
+definition; its body and the numerical validator are unchanged. Claude's plan
+review identified the same issue, and its fixed-diff review accepts the correction.
+The decoder preserves each old lambda's assignment/order, comparison semantics,
+domain bounds and untouched ValueKind. Both reader shapes were checked across all
+seven families; no validators were merged.
+
+The new characterization case passes both before and after refactoring. All 131
+focused config/curvature/point-method cases and the four-producer boundary check
+pass (6.49 s). The canonical full IntrinsicTests aggregate and the ci-vulkan
+ExtrinsicSandbox target build. The existing invalid min/max component-range case
+still exercises the unchanged geometry numerical validator. Repository-wide
+references find only the expected converter definition and its three calls in
+two implementation consumers; no app or test used the removed public declaration.
+Symbol inspection finds one converter definition and the curvature consumer's
+matching reference, plus one shared property decoder definition.
+
+Claude's fixed review follow-ups are verification/bookkeeping: include the owner
+route/task delta, report the post-refactor tests and all-target build, and check
+Clang 20 linkage. Its optional unknown-domain-through-public-config test would
+contradict current validation, which rejects that token; direct private tests are
+unnecessary for this exact body extraction. The roundtrip retains the default
+vec3/uint32/float kinds across different fields; it does not claim arbitrary kinds
+are accepted. Source-documentation audit has zero errors and one reviewed comment
+finding: the decoder's validated-input/retained-kind precondition is non-obvious
+and remains documented. Net production size, counting the new private header,
+is 11 fewer physical lines across 13 files (decoding -25, boundary declarations +14).
+Workshop rows 1–3 pass; rows 4–8 are unchanged/not applicable. No new target,
+policy exception, renderer pass or task retirement. Strict structural/docs checks
+pass; refreshed module inventory remains 419. Full CPU and Clang 20 checks follow.
+
+
+### Final verification
+
+The canonical Clang 23 full CPU gate passes 4,725 cases with one expected
+GLFW/LeakSanitizer capability skip (4,726 selected, 174.53 s). The ci-vulkan
+Sandbox build passes; no GPU continuation or numerical implementation changed,
+so no new backend/performance claim follows. Full sanitizer CPU suites were not
+rerun for this extraction.
+
+A dedicated ci-derived Clang 20 Null/headless configuration with matching
+clang-scan-deps and ccache disabled compiles the ten affected implementation
+objects and their module dependencies. A relocatable link of those objects
+resolves both shared functions to exactly one definition with no unresolved
+references to them. The config-interface/shared-codec forbidden-import check
+also passes in that tree. This is focused Clang 20 compile/link evidence, not a
+full Clang 20 executable/test gate. Review/build source hashes are unchanged.
+Broader readiness/cache acceptance remains open; the deferred curvature config
+converter boundary from the previous slice is now addressed.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests
+ctest --test-dir build/ci --output-on-failure -R 'SandboxConfigSections|CurvatureSegmentation|ConfigCompilationLocality|BilateralFilter|KernelDensity|PointSpacing|OutlierAnalysis|KeypointAnalysis|DescriptorAnalysis|DensityWeight' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target ExtrinsicSandbox
+cmake --preset ci -B build/ci-clang20 -DCMAKE_C_COMPILER=/usr/bin/clang-20 -DCMAKE_CXX_COMPILER=/usr/bin/clang++-20 -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-20 -DINTRINSIC_ENABLE_CCACHE=OFF -DINTRINSIC_HEADLESS_NO_GLFW=ON -DINTRINSIC_PLATFORM_BACKEND=Null
+```
+The focused Clang 20 Ninja object targets are the config converter, curvature
+operation, shared feature codec and the seven point config implementations,
+under `src/runtime/CMakeFiles/ExtrinsicRuntime.dir/` in that build tree.
+
+Claude's final evidence/route review approves with no blockers. Its optional
+linkage reminder is included in the converter owner route; full sanitizer and
+Clang 20 runtime-suite limitations remain explicit above.
