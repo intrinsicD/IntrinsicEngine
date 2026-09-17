@@ -1275,6 +1275,104 @@ TEST(SandboxConfigSections, PointConfigFieldsPreserveStrictMergeAndIntegerValida
     }
 }
 
+TEST(SandboxConfigSections, PointConfigFloatsPreserveRangesAndDiagnosticOrder)
+{
+    using Validator = CoreConfig::EngineConfigSectionValidationResult (*)(
+        std::string_view, std::string_view, std::string_view);
+    struct Family
+    {
+        const char* Name;
+        Validator Validate;
+        std::vector<std::string_view> Fields;
+        std::string_view BackendError;
+    };
+    const std::array families{
+        Family{"PointSpacing", Runtime::ValidatePointSpacingConfigSection, {"scale_factor"}, "Unknown radii backend."},
+        Family{"BilateralFilter", Runtime::ValidateBilateralFilterConfigSection,
+            {"spatial_sigma", "normal_sigma"}, "Unknown output backend."},
+        Family{"KernelDensity", Runtime::ValidateKernelDensityConfigSection, {"bandwidth"}, "Unknown density backend."},
+        Family{"OutlierAnalysis", Runtime::ValidateOutlierAnalysisConfigSection,
+            {"radius", "stddev_multiplier", "score_threshold"}, "Unknown outlier backend."},
+        Family{"PointConstruction", Runtime::ValidatePointConstructionConfigSection,
+            {"bounding_box_padding", "normal_agreement_power", "kernel_sigma_scale", "min_distance_epsilon"},
+            "Unknown construction backend."},
+    };
+    const auto reject = [](Validator validate, const std::string& payload, const std::string& message) {
+        SCOPED_TRACE(payload);
+        const auto result = validate(payload, {}, "float-test");
+        EXPECT_FALSE(result.Usable());
+        ASSERT_EQ(result.Diagnostics.size(), 1u);
+        EXPECT_EQ(result.Diagnostics.front().Code, CoreConfig::EngineConfigDiagnosticCode::InvalidValue);
+        EXPECT_EQ(result.Diagnostics.front().Subject, "float-test");
+        EXPECT_EQ(result.Diagnostics.front().Message, message);
+        EXPECT_TRUE(result.CanonicalPayloadJson.empty());
+        EXPECT_EQ(result.ParsedFieldCount, 0u);
+    };
+    for (const auto& family : families)
+    {
+        SCOPED_TRACE(family.Name);
+        reject(family.Validate, "{\"backend\":\"bad\",\"" + std::string(family.Fields.front()) + "\":-1}",
+            std::string(family.BackendError));
+        for (const auto field : family.Fields)
+        {
+            const auto key = std::string(field);
+            for (const auto value : {"null", "true", "[]", "{}", "\"1\"", "-1", "-1e-50", "-9223372036854775808", "3.4028236e38", "1e100"})
+                reject(family.Validate, "{\"" + key + "\":" + value + "}",
+                    key + " must be a finite nonnegative float.");
+            for (const auto value : {"1", "1.0", "9223372036854775807", "9223372036854775808", "18446744073709551615", "1.401298464324817e-45", "3.4028234663852886e38"})
+            {
+                SCOPED_TRACE(key + "=" + value);
+                const auto result = family.Validate("{\"" + key + "\":" + value + "}", {}, "float-test");
+                ASSERT_TRUE(result.Usable());
+                EXPECT_TRUE(result.Diagnostics.empty());
+                EXPECT_EQ(result.ParsedFieldCount, 1u);
+                EXPECT_EQ(family.Validate(result.CanonicalPayloadJson, {}, "float-test").CanonicalPayloadJson,
+                    result.CanonicalPayloadJson);
+            }
+            if (field != "kernel_sigma_scale")
+                for (const auto zero : {"0", "-0.0"})
+                    EXPECT_TRUE(family.Validate("{\"" + key + "\":" + zero + "}", {}, "float-test").Usable());
+        }
+        for (std::size_t i = 1; i < family.Fields.size(); ++i)
+        {
+            const auto first = std::string(family.Fields[i - 1]);
+            const auto second = std::string(family.Fields[i]);
+            reject(family.Validate, "{\"" + first + "\":-1,\"" + second + "\":null}",
+                first + " must be a finite nonnegative float.");
+        }
+    }
+    for (const auto overflow : {R"({"scale_factor":1e400})", R"({"scale_factor":-1e400})"})
+        reject(Runtime::ValidatePointSpacingConfigSection, overflow, "Point spacing config must be an object.");
+    reject(Runtime::ValidatePointSpacingConfigSection, R"({"scale_factor":1e-50})",
+        "Positive scale factor must remain positive in float storage.");
+    reject(Runtime::ValidateKernelDensityConfigSection, R"({"bandwidth":1e-50})",
+        "Positive bandwidth must remain positive in float storage.");
+    reject(Runtime::ValidateBilateralFilterConfigSection, R"({"spatial_sigma":1e-50,"normal_sigma":-1})",
+        "normal_sigma must be a finite nonnegative float.");
+    reject(Runtime::ValidateBilateralFilterConfigSection, R"({"spatial_sigma":1e-50,"iterations":101})",
+        "Bilateral iterations must be 0..100.");
+    reject(Runtime::ValidateBilateralFilterConfigSection, R"({"normal_sigma":1e-50})",
+        "normal_sigma must remain positive in float storage.");
+    reject(Runtime::ValidatePointConstructionConfigSection, R"({"kernel_sigma_scale":0})",
+        "Kernel sigma scale must be positive.");
+    reject(Runtime::ValidatePointConstructionConfigSection, R"({"kernel_sigma_scale":1e-50})",
+        "Kernel sigma scale must be positive.");
+    EXPECT_TRUE(Runtime::ValidatePointConstructionConfigSection(
+        R"({"bounding_box_padding":1e-50})", {}, "float-test").Usable());
+    reject(Runtime::ValidateOutlierAnalysisConfigSection, R"({"method":"radius","radius":0})",
+        "Radius must be positive.");
+    for (const auto radius : {"9223372036854775807", "9223372036854775808", "18446744073709551615"})
+    {
+        const auto result = Runtime::ValidateOutlierAnalysisConfigSection(
+            std::string(R"({"method":"radius","radius":)") + radius + '}', {}, "float-test");
+        ASSERT_TRUE(result.Usable());
+        EXPECT_EQ(Runtime::ValidateOutlierAnalysisConfigSection(
+            result.CanonicalPayloadJson, {}, "float-test").CanonicalPayloadJson, result.CanonicalPayloadJson);
+    }
+    EXPECT_TRUE(Runtime::ValidateOutlierAnalysisConfigSection(
+        R"({"radius":1e-50,"stddev_multiplier":1e-50,"score_threshold":1e-50})", {}, "float-test").Usable());
+}
+
 TEST(SandboxConfigSections, PointPropertyValidationPreservesDiagnosticCategories)
 {
     using Validator = CoreConfig::EngineConfigSectionValidationResult (*)(

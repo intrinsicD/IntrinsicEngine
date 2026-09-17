@@ -1,8 +1,6 @@
 module;
-#include <cmath>
 #include <cstdint>
 #include <initializer_list>
-#include <limits>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
@@ -148,11 +146,9 @@ namespace Extrinsic::Runtime
         if (!data["output_name"].is_string() || data["output_name"].get<std::string>().empty() ||
             data["output_name"].get<std::string>().size() > 256)
             return reject("Output name must contain 1..256 bytes.");
-        for (auto key : {"bounding_box_padding", "normal_agreement_power", "kernel_sigma_scale",
-                         "min_distance_epsilon"})
-            if (!data[key].is_number() || !std::isfinite(data[key].get<double>()) ||
-                data[key] < 0 || data[key] > std::numeric_limits<float>::max())
-                return reject(std::string(key) + " must be a finite nonnegative float.");
+        if (auto error = ConfigDetail::ValidatePointConfigNonnegativeFloats(
+            data, {"bounding_box_padding", "normal_agreement_power", "kernel_sigma_scale", "min_distance_epsilon"}))
+            return reject(std::move(*error));
         if (data["kernel_sigma_scale"].get<float>() <= 0)
             return reject("Kernel sigma scale must be positive.");
         const auto validRef = [](const Json& ref)

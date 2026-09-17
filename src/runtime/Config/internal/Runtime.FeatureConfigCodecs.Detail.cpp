@@ -51,6 +51,19 @@ namespace Extrinsic::Runtime::ConfigDetail
         return std::nullopt;
     }
 
+    std::optional<std::string> ValidatePointConfigNonnegativeFloats(
+        const nlohmann::json& values, const std::initializer_list<std::string_view> fields)
+    {
+        for (const auto key : fields)
+        {
+            const auto& value = values.at(std::string(key));
+            if (!value.is_number() || !std::isfinite(value.get<double>()) || value.get<double>() < 0 ||
+                value.get<double>() > std::numeric_limits<float>::max())
+                return std::string(key) + " must be a finite nonnegative float.";
+        }
+        return std::nullopt;
+    }
+
     const char* PointPropertyKindToken(const Geometry::PropertyValueKind kind) noexcept
     {
         switch (kind)

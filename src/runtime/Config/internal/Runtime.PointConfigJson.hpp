@@ -13,6 +13,11 @@ extern "C++"
             std::string_view objectError, std::string_view unknownFieldPrefix,
             std::initializer_list<std::string_view> unsignedFields);
 
+        // Fields exist in the merged defaults; the first invalid field wins.
+        [[nodiscard]] std::optional<std::string> ValidatePointConfigNonnegativeFloats(
+            const nlohmann::json& values,
+            std::initializer_list<std::string_view> fields);
+
         enum class PointPropertyValidation { Valid, InvalidReference, UnknownDomain };
 
         [[nodiscard]] const char* PointPropertyKindToken(Geometry::PropertyValueKind kind) noexcept;

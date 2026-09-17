@@ -1,8 +1,6 @@
 module;
-#include <cmath>
 #include <cstdint>
 #include <initializer_list>
-#include <limits>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
@@ -57,9 +55,9 @@ namespace Extrinsic::Runtime
         if(data["gpu_query_batch_size"]==0 || data["gpu_query_batch_size"]>16384)
             return reject("GPU query batch size must be 1..16384.");
         if(data["backend"]!="cpu_octree" && data["backend"]!="cpu_lbvh" && data["backend"]!="vulkan_lbvh")return reject("Unknown density backend.");
-        for(auto key:{"bandwidth"})
-            if(!data[key].is_number() || !std::isfinite(data[key].get<double>()) || data[key]<0 ||
-               data[key].get<double>()>std::numeric_limits<float>::max())return reject(std::string(key)+" must be a finite nonnegative float.");
+        if (auto error = ConfigDetail::ValidatePointConfigNonnegativeFloats(
+            data, {"bandwidth"}))
+            return reject(std::move(*error));
         if(data["bandwidth"].get<double>()>0 && data["bandwidth"].get<float>()==0)
             return reject("Positive bandwidth must remain positive in float storage.");
         const KernelDensityConfig defaults;

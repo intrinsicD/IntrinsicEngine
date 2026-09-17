@@ -1,8 +1,6 @@
 module;
-#include <cmath>
 #include <cstdint>
 #include <initializer_list>
-#include <limits>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
@@ -71,10 +69,10 @@ namespace Extrinsic::Runtime
         if(data["method"]!="statistical" && data["method"]!="radius" && data["method"]!="local_distance_ratio")return reject("Unknown outlier method.");
         if(data["operation"]!="analyze" && data["operation"]!="remove_marked")return reject("Unknown outlier operation.");
         if(data["backend"]!="cpu_octree" && data["backend"]!="cpu_lbvh" && data["backend"]!="vulkan_lbvh")return reject("Unknown outlier backend.");
-        for(auto key:{"radius","stddev_multiplier","score_threshold"})
-            if(!data[key].is_number() || !std::isfinite(data[key].get<double>()) || data[key]<0 ||
-               data[key].get<double>()>std::numeric_limits<float>::max())return reject(std::string(key)+" must be a finite nonnegative float.");
-        if(data["method"]=="radius" && data["radius"]<=0)return reject("Radius must be positive.");
+        if (auto error = ConfigDetail::ValidatePointConfigNonnegativeFloats(
+            data, {"radius", "stddev_multiplier", "score_threshold"}))
+            return reject(std::move(*error));
+        if(data["method"]=="radius" && data["radius"].get<double>()<=0)return reject("Radius must be positive.");
         const OutlierAnalysisConfig defaults;
         for(auto [key,kind]:{std::pair{"positions",defaults.Positions.ValueKind},std::pair{"mask",defaults.Mask.ValueKind},std::pair{"score",defaults.Score.ValueKind}})
         {
