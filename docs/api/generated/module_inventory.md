@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 11 |
 | `core` | 41 |
 | `ecs` | 27 |
-| `geometry` | 120 |
+| `geometry` | 121 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 75 |
@@ -220,6 +220,7 @@ Root scanned: `src`
 | `Geometry.SDFContact` | `src/geometry/Geometry.SDFContact.cppm` | `geometry` |
 | `Geometry.Sampling` | `src/geometry/Geometry.Sampling.cppm` | `geometry` |
 | `Geometry.Segment` | `src/geometry/Geometry.Segment.cppm` | `geometry` |
+| `Geometry.Smoothing.Types` | `src/geometry/Geometry.Smoothing.Types.cppm` | `geometry` |
 | `Geometry.Sparse` | `src/geometry/Geometry.Sparse.cppm` | `geometry` |
 | `Geometry.SpatialQueries` | `src/geometry/Geometry.SpatialQueries.cppm` | `geometry` |
 | `Geometry.Sphere.Sampling` | `src/geometry/Geometry.Sphere.Sampling.cppm` | `geometry` |
@@ -450,4 +451,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **423**
+Total modules: **424**

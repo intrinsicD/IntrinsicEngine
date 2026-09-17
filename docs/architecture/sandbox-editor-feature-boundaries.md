@@ -54,6 +54,13 @@ algorithms or spatial-query/index modules; the execution unit imports its kernel
 API explicitly. `ProcessingCompilationLocality.DensityWeightContracts` checks
 these configured compiler dependencies.
 
+Mesh-topology results use `Geometry.Smoothing.Types` for the canonical denoiser
+status. The smoothing algorithm re-exports this enum; its functions and status
+spelling remain with the algorithm owner. Topology contract and prepared-frame
+producers do not import smoothing, the owning halfedge mesh or discrete calculus.
+`ProcessingCompilationLocality.MeshTopologyContracts` guards this boundary using
+configured compiler dependencies.
+
 `Runtime.EditorFeatures.Internal.hpp` holds private workspace bindings and context
 adapters. It includes `Runtime.EditorFeatureCommands.Internal.hpp` for import/file
 prerequisites, diagnostics and render-hint comparisons, and

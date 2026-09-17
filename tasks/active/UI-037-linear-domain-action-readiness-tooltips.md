@@ -2407,3 +2407,31 @@ combined CPU gate passes 4,735 tests plus one expected ASan-only GLFW lifecycle
 skip (4,736 selected, 153.83 s). Vulkan Sandbox compile/link is still in progress
 at this checkpoint. The vec3-only serializer remains local by contract, not as
 deferred duplicate cleanup.
+
+Smoothing locality is complete. The four-producer compiler guard passes; its
+three original producers failed all smoothing/mesh/DEC boundaries before the
+edit. Five production files, including the new enum owner and CMake, change from
+3,806 to 3,817 physical lines. The 11-line increase establishes a compilation
+boundary; it is not duplicate-body removal or a measured compile-time speedup.
+The first build found the execution unit's missing direct smoothing import;
+the explicit import fixes it. Claude accepts the fixed locality diff, and the
+full ci build plus ci-vulkan/Clang 23 `ExtrinsicSandbox` compile/link satisfy
+its consumer-visibility condition. The source is unchanged since fixed review
+and the final 78 focused / full CPU results above. No Vulkan execution or
+full sanitizer-suite run is implied by compile/link success.
+
+Strict layering/test-layout, task policy/state, doc links/sync, skill mirrors,
+session brief, root hygiene, ARA structure and workshop checks pass. Inventory
+refreshed: 424 modules. Source-doc audit: zero errors, 17 reviewed hints; the
+new enum retains the fail-closed contract, existing smoothing comments remain
+outside the moved declaration. Workshop rows 1–3 pass, rows 4–6 not applicable,
+row 7 retains UI-037's open readiness work, row 8 introduces no exceptions.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^SandboxConfigSections\.|^Smoothing\.|^RegistrationDomains\.|^ProcessingCompilationLocality\.(MeshTopology|Registration)|^SandboxEditorUi\.(MeshDenoise|MeshTopology|MeshProcessing)' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target ExtrinsicSandbox -j4
+```

@@ -11,7 +11,7 @@ export module Extrinsic.Runtime.MeshTopologyOperations;
 export import Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.EditorCommon;
 export import Extrinsic.Core.Error;
-export import Geometry.Smoothing;
+export import Geometry.Smoothing.Types;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
 
 export namespace Extrinsic::Runtime

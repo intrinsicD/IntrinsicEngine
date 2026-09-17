@@ -13,6 +13,7 @@ module;
 
 export module Geometry.Smoothing;
 
+export import Geometry.Smoothing.Types;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.DEC;
@@ -329,18 +330,6 @@ export namespace Geometry::Smoothing
         // Length below which a face area vector / normal is treated as
         // degenerate. Consistent with VertexNormals::Params.
         double DegenerateNormalLengthEpsilon{1.0e-12};
-    };
-
-    // Fail-closed status for the bilateral denoiser. Success means the mesh was
-    // processed; every other value means the mesh was left unmodified.
-    enum class DenoiseStatus : std::uint8_t
-    {
-        Success,
-        EmptyMesh,
-        NonManifoldInput,
-        DegenerateGeometry,
-        NonFiniteInput,
-        InvalidParams,
     };
 
     struct BilateralDenoiseResult

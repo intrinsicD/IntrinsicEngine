@@ -52,6 +52,7 @@ import Geometry.MeshOperator;
 import Geometry.Properties;
 import Geometry.Remeshing;
 import Geometry.Simplification;
+import Geometry.Smoothing;
 import Geometry.Subdivision;
 
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"

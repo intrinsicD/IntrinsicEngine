@@ -53,6 +53,7 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.Simplification.cppm
         Geometry.HalfedgeMesh.SignedHeatMethod.cppm
         Geometry.HalfedgeMesh.Smoothing.cppm
+        Geometry.Smoothing.Types.cppm
         Geometry.HalfedgeMesh.Subdivision.cppm
         Geometry.HalfedgeMesh.SubdivisionSqrt3.cppm
         Geometry.HalfedgeMesh.Utils.cppm
