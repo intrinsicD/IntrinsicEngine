@@ -64,9 +64,10 @@ codec declarations. `Runtime.FeatureConfigCodecs.Detail.cpp` directly defines
 those functions as one ordinary translation unit, sharing JSON parsing without
 a private forwarding module. Curvature parameter conversion and consolidation
 token functions retain their feature implementation owners. Seven point-processing
-config implementations also reuse the shared TU's private string-token property
-encoder through `Runtime.PointConfigJson.hpp`; their distinct parsers and
-validators stay feature-owned. The numeric-kind property codec and vec3-only
+config implementations also reuse the shared TU's string-token property encoder
+and name/domain decoder through `Runtime.PointConfigJson.hpp`. Decoding retains
+the caller's expected value kind; family parsers and validators stay feature-owned.
+The numeric-kind property codec and vec3-only
 encoders remain separate contracts. Visualization operation declarations and
 implementations have no UV-atlas dependency, enforced by
 `EditorCompilationLocality.VisualizationUvAtlas`. The workspace

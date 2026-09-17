@@ -46,6 +46,14 @@ namespace Extrinsic::Runtime::ConfigDetail
                            ? ToString(ref.Domain) : "invalid"},
                 {"name", ref.Name}, {"kind", PointPropertyKindToken(ref.ValueKind)}};
     }
+
+    void DecodePointPropertyRef(const nlohmann::json& value, GeometryPropertyRef& ref)
+    {
+        ref.Name = value.at("name");
+        for (unsigned i = 0; i <= unsigned(GeometryElementDomain::PointCloudPoint); ++i)
+            if (value.at("domain") == ToString(GeometryElementDomain(i)))
+                ref.Domain = GeometryElementDomain(i);
+    }
 }
 
 namespace Extrinsic::Runtime

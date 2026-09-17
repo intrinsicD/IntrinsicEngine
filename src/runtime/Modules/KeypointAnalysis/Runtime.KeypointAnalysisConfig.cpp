@@ -18,12 +18,7 @@ namespace Extrinsic::Runtime
         {
             KeypointAnalysisConfig c;c.StableEntityId=data.at("entity");
             for(unsigned i=0;i<4;++i)if(data.at("backend")==ToString(KeypointAnalysisBackend(i)))c.Backend=KeypointAnalysisBackend(i);
-            auto read=[&](const char* name,GeometryPropertyRef& ref){
-                ref.Name=data.at(name).at("name");
-                for(unsigned i=0;i<=unsigned(GeometryElementDomain::PointCloudPoint);++i)
-                    if(data.at(name).at("domain")==ToString(GeometryElementDomain(i)))ref.Domain=GeometryElementDomain(i);
-            };
-            read("positions",c.Positions);read("mask",c.Mask);read("score",c.Score);
+            ConfigDetail::DecodePointPropertyRef(data.at("positions"),c.Positions);ConfigDetail::DecodePointPropertyRef(data.at("mask"),c.Mask);ConfigDetail::DecodePointPropertyRef(data.at("score"),c.Score);
             c.MinimumNeighbors=data.at("minimum_neighbors");c.GpuQueryBatchSize=data.at("gpu_query_batch_size");
             c.GpuRadiusCapacity=data.at("gpu_radius_capacity");c.SalientRadius=data.at("salient_radius");
             c.NonMaxRadius=data.at("nonmax_radius");c.Gamma21=data.at("gamma21");c.Gamma32=data.at("gamma32");

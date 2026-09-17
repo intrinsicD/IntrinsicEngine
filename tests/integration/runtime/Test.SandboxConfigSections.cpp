@@ -1156,3 +1156,79 @@ TEST(SandboxConfigSections, PointPropertySerializersPreserveTokensAndNameBytes)
         }
     }
 }
+
+
+TEST(SandboxConfigSections, PointPropertyRoundTripsPreserveDomainsKindsAndNameBytes)
+{
+    using D = Runtime::GeometryElementDomain;
+    const std::array domains{D::Unknown, D::MeshVertex, D::MeshEdge, D::MeshHalfedge,
+        D::MeshFace, D::GraphNode, D::GraphHalfedge, D::GraphEdge, D::PointCloudPoint};
+    const auto check = [&]<typename Config>(
+        Config requested, std::vector<Runtime::GeometryPropertyRef Config::*> members,
+        auto set, auto get, auto serialize)
+    {
+        for (const auto domain : domains)
+        {
+            SCOPED_TRACE(static_cast<unsigned>(domain));
+            unsigned index = 0u;
+            const auto prepare = [&](Runtime::GeometryPropertyRef& ref)
+            {
+                ref.Domain = domain;
+                ref.Name = std::string{"sample:\0\"\\\n", 11} + std::to_string(index++);
+            };
+            for (const auto member : members)
+                prepare(requested.*member);
+            if constexpr (requires { requested.Outputs; })
+                for (auto& ref : requested.Outputs)
+                    prepare(ref);
+
+            CoreConfig::EngineConfig engineConfig;
+            set(engineConfig, requested);
+            const auto restored = get(engineConfig);
+            ASSERT_TRUE(restored.has_value());
+            EXPECT_EQ(serialize(*restored), serialize(requested));
+        }
+    };
+    {
+        SCOPED_TRACE("BilateralFilter");
+        using C = Runtime::BilateralFilterConfig;
+        check(C{}, {&C::Positions, &C::Normals, &C::Output}, Runtime::SetBilateralFilterConfig,
+            Runtime::GetBilateralFilterConfig, Runtime::SerializeBilateralFilterConfig);
+    }
+    {
+        SCOPED_TRACE("KernelDensity");
+        using C = Runtime::KernelDensityConfig;
+        check(C{}, {&C::Positions, &C::Density}, Runtime::SetKernelDensityConfig,
+            Runtime::GetKernelDensityConfig, Runtime::SerializeKernelDensityConfig);
+    }
+    {
+        SCOPED_TRACE("PointSpacing");
+        using C = Runtime::PointSpacingConfig;
+        check(C{}, {&C::Positions, &C::Radii}, Runtime::SetPointSpacingConfig,
+            Runtime::GetPointSpacingConfig, Runtime::SerializePointSpacingConfig);
+    }
+    {
+        SCOPED_TRACE("OutlierAnalysis");
+        using C = Runtime::OutlierAnalysisConfig;
+        check(C{}, {&C::Positions, &C::Mask, &C::Score}, Runtime::SetOutlierAnalysisConfig,
+            Runtime::GetOutlierAnalysisConfig, Runtime::SerializeOutlierAnalysisConfig);
+    }
+    {
+        SCOPED_TRACE("KeypointAnalysis");
+        using C = Runtime::KeypointAnalysisConfig;
+        check(C{}, {&C::Positions, &C::Mask, &C::Score}, Runtime::SetKeypointAnalysisConfig,
+            Runtime::GetKeypointAnalysisConfig, Runtime::SerializeKeypointAnalysisConfig);
+    }
+    {
+        SCOPED_TRACE("DescriptorAnalysis");
+        using C = Runtime::DescriptorAnalysisConfig;
+        check(C{}, {&C::Positions, &C::Normals}, Runtime::SetDescriptorAnalysisConfig,
+            Runtime::GetDescriptorAnalysisConfig, Runtime::SerializeDescriptorAnalysisConfig);
+    }
+    {
+        SCOPED_TRACE("DensityWeight");
+        using C = Runtime::DensityWeightConfig;
+        check(C{}, {&C::Positions, &C::Weights}, Runtime::SetDensityWeightConfig,
+            Runtime::GetDensityWeightConfig, Runtime::SerializeDensityWeightConfig);
+    }
+}

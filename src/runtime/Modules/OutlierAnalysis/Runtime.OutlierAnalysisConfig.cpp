@@ -20,12 +20,7 @@ namespace Extrinsic::Runtime
             for(unsigned i=0;i<3;++i)if(data.at("method")==ToString(OutlierAnalysisMethod(i)))c.Method=OutlierAnalysisMethod(i);
             c.Operation=data.at("operation")=="remove_marked"?OutlierAnalysisOperation::RemoveMarked:OutlierAnalysisOperation::Analyze;
             for(unsigned i=0;i<3;++i)if(data.at("backend")==ToString(OutlierAnalysisBackend(i)))c.Backend=OutlierAnalysisBackend(i);
-            auto read=[&](const char* name,GeometryPropertyRef& ref){
-                ref.Name=data.at(name).at("name");
-                for(unsigned i=0;i<=unsigned(GeometryElementDomain::PointCloudPoint);++i)
-                    if(data.at(name).at("domain")==ToString(GeometryElementDomain(i)))ref.Domain=GeometryElementDomain(i);
-            };
-            read("positions",c.Positions);read("mask",c.Mask);read("score",c.Score);
+            ConfigDetail::DecodePointPropertyRef(data.at("positions"),c.Positions);ConfigDetail::DecodePointPropertyRef(data.at("mask"),c.Mask);ConfigDetail::DecodePointPropertyRef(data.at("score"),c.Score);
             c.KNeighbors=data.at("k_neighbors");c.MinimumNeighbors=data.at("minimum_neighbors");
             c.GpuQueryBatchSize=data.at("gpu_query_batch_size");c.Radius=data.at("radius");c.StdDevMultiplier=data.at("stddev_multiplier");c.ScoreThreshold=data.at("score_threshold");
             return c;

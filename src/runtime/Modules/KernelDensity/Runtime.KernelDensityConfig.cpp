@@ -18,12 +18,7 @@ namespace Extrinsic::Runtime
         {
             KernelDensityConfig c;c.StableEntityId=data.at("entity");
             for(unsigned i=0;i<3;++i)if(data.at("backend")==ToString(KernelDensityBackend(i)))c.Backend=KernelDensityBackend(i);
-            auto read=[&](const char* name,GeometryPropertyRef& ref){
-                ref.Name=data.at(name).at("name");
-                for(unsigned i=0;i<=unsigned(GeometryElementDomain::PointCloudPoint);++i)
-                    if(data.at(name).at("domain")==ToString(GeometryElementDomain(i)))ref.Domain=GeometryElementDomain(i);
-            };
-            read("positions",c.Positions);read("density",c.Density);
+            ConfigDetail::DecodePointPropertyRef(data.at("positions"),c.Positions);ConfigDetail::DecodePointPropertyRef(data.at("density"),c.Density);
             c.KNeighbors=data.at("k_neighbors");
             c.GpuQueryBatchSize=data.at("gpu_query_batch_size");c.Bandwidth=data.at("bandwidth");
             return c;

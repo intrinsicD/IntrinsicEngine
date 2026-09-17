@@ -8,5 +8,7 @@ extern "C++"
     {
         [[nodiscard]] const char* PointPropertyKindToken(Geometry::PropertyValueKind kind) noexcept;
         [[nodiscard]] nlohmann::json EncodePointPropertyRef(const GeometryPropertyRef& ref);
+        // Decodes validated bindings without changing the caller's expected value kind.
+        void DecodePointPropertyRef(const nlohmann::json& value, GeometryPropertyRef& ref);
     }
 }

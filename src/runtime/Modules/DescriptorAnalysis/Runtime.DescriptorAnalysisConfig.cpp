@@ -19,13 +19,8 @@ namespace Extrinsic::Runtime
         {
             DescriptorAnalysisConfig c;c.StableEntityId=data.at("entity");
             for(unsigned i=0;i<3;++i)if(data.at("backend")==ToString(DescriptorAnalysisBackend(i)))c.Backend=DescriptorAnalysisBackend(i);
-            auto read=[&](const Json& value,GeometryPropertyRef& ref){
-                ref.Name=value.at("name");
-                for(unsigned i=0;i<=unsigned(GeometryElementDomain::PointCloudPoint);++i)
-                    if(value.at("domain")==ToString(GeometryElementDomain(i)))ref.Domain=GeometryElementDomain(i);
-            };
-            read(data.at("positions"),c.Positions);read(data.at("normals"),c.Normals);
-            for(unsigned i=0;i<33;++i)read(data.at("outputs").at(i),c.Outputs[i]);
+            ConfigDetail::DecodePointPropertyRef(data.at("positions"),c.Positions);ConfigDetail::DecodePointPropertyRef(data.at("normals"),c.Normals);
+            for(unsigned i=0;i<33;++i)ConfigDetail::DecodePointPropertyRef(data.at("outputs").at(i),c.Outputs[i]);
             c.MaxNeighbors=data.at("max_neighbors");c.GpuQueryBatchSize=data.at("gpu_query_batch_size");
             c.GpuRadiusCapacity=data.at("gpu_radius_capacity");c.FeatureRadius=data.at("feature_radius");
             return c;

@@ -19,12 +19,7 @@ namespace Extrinsic::Runtime
         {
             DensityWeightConfig c;c.StableEntityId=data.at("entity");
             for(unsigned i=0;i<3;++i)if(data.at("backend")==ToString(DensityWeightBackend(i)))c.Backend=DensityWeightBackend(i);
-            auto read=[&](const Json& value,GeometryPropertyRef& ref){
-                ref.Name=value.at("name");
-                for(unsigned i=0;i<=unsigned(GeometryElementDomain::PointCloudPoint);++i)
-                    if(value.at("domain")==ToString(GeometryElementDomain(i)))ref.Domain=GeometryElementDomain(i);
-            };
-            read(data.at("positions"),c.Positions);read(data.at("weights"),c.Weights);
+            ConfigDetail::DecodePointPropertyRef(data.at("positions"),c.Positions);ConfigDetail::DecodePointPropertyRef(data.at("weights"),c.Weights);
             c.SupportRadius=data.at("support_radius");c.GpuQueryBatchSize=data.at("gpu_query_batch_size");
             c.GpuRadiusCapacity=data.at("gpu_radius_capacity");
             for(unsigned i=0;i<3;++i)if(data.at("kernel")==Geometry::PointCloud::Kernels::DebugName(Geometry::PointCloud::Kernels::KernelType(i)))c.Kernel=Geometry::PointCloud::Kernels::KernelType(i);

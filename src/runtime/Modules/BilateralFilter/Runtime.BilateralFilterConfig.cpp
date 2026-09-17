@@ -18,12 +18,7 @@ namespace Extrinsic::Runtime
         {
             BilateralFilterConfig c;c.StableEntityId=data.at("entity");
             for(unsigned i=0;i<3;++i)if(data.at("backend")==ToString(BilateralFilterBackend(i)))c.Backend=BilateralFilterBackend(i);
-            auto read=[&](const char* name,GeometryPropertyRef& ref){
-                ref.Name=data.at(name).at("name");
-                for(unsigned i=0;i<=unsigned(GeometryElementDomain::PointCloudPoint);++i)
-                    if(data.at(name).at("domain")==ToString(GeometryElementDomain(i)))ref.Domain=GeometryElementDomain(i);
-            };
-            read("positions",c.Positions);read("normals",c.Normals);read("output",c.Output);
+            ConfigDetail::DecodePointPropertyRef(data.at("positions"),c.Positions);ConfigDetail::DecodePointPropertyRef(data.at("normals"),c.Normals);ConfigDetail::DecodePointPropertyRef(data.at("output"),c.Output);
             c.KNeighbors=data.at("k_neighbors");
             c.GpuQueryBatchSize=data.at("gpu_query_batch_size");c.SpatialSigma=data.at("spatial_sigma");c.NormalSigma=data.at("normal_sigma");c.Iterations=data.at("iterations");
             return c;
