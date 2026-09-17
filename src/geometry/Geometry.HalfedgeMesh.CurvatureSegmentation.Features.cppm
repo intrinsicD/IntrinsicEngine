@@ -11,6 +11,8 @@ module;
 
 export module Geometry.HalfedgeMesh.CurvatureSegmentation.Features;
 
+export import Geometry.CurvatureSegmentation.Diagnostics;
+
 import Geometry.HalfedgeMesh;
 
 export namespace Geometry::CurvatureSegmentation
@@ -18,24 +20,6 @@ export namespace Geometry::CurvatureSegmentation
     inline constexpr std::size_t kFeatureEvidenceScaleCount = 3u;
     inline constexpr std::uint32_t kInvalidFeatureIndex =
         std::numeric_limits<std::uint32_t>::max();
-
-    enum class FeatureEvidenceStatus : std::uint8_t
-    {
-        Success = 0,
-        EmptyMesh,
-        UnsupportedSubmeshView,
-        InvalidParameters,
-        CurvatureCountMismatch,
-        NonTriangleFace,
-        NonFinitePosition,
-        DegenerateFace,
-        NonFiniteCurvature,
-        InvalidCurvatureOrder,
-        InvalidTopology,
-        HardFeatureClassificationFailed,
-        NonFiniteResponse,
-        CurvatureEstimationFailed,
-    };
 
     enum class SoftFeatureSignal : std::uint8_t
     {
@@ -76,56 +60,6 @@ export namespace Geometry::CurvatureSegmentation
         // Physical base radius r_0 / D. The detector evaluates the frozen
         // half/base/double scale triplet around this value.
         double BaseRadiusRatio{0.02};
-    };
-
-    struct FeatureEvidenceStageTimings
-    {
-        // Zero for DetectFeatureEvidence(), which consumes supplied
-        // curvatures. ComputeFeatureEvidence() fills this field.
-        double CurvatureEstimationMilliseconds{0.0};
-        double ValidationAndFaceSamplingMilliseconds{0.0};
-        double HardFeatureClassificationMilliseconds{0.0};
-        double MultiScaleResponseMilliseconds{0.0};
-        double NonMaximumSuppressionMilliseconds{0.0};
-        double HysteresisAndFragmentFilteringMilliseconds{0.0};
-        double TotalMilliseconds{0.0};
-    };
-
-    struct FeatureEvidenceDiagnostics
-    {
-        FeatureEvidenceStatus Status{FeatureEvidenceStatus::EmptyMesh};
-        std::size_t VertexSlotCount{0u};
-        std::size_t LiveVertexCount{0u};
-        std::size_t FaceSlotCount{0u};
-        std::size_t LiveFaceCount{0u};
-        std::size_t EdgeSlotCount{0u};
-        std::size_t LiveEdgeCount{0u};
-        std::size_t InteriorCandidateEdgeCount{0u};
-        std::size_t HardFeatureEdgeCount{0u};
-        std::size_t SourceBoundaryEdgeCount{0u};
-        std::size_t NonMaximumSurvivorCount{0u};
-        std::size_t StrongEdgeCount{0u};
-        std::size_t RetainedWeakEdgeCount{0u};
-        std::size_t WeakDisconnectedEdgeCount{0u};
-        std::size_t ShortFragmentRejectedEdgeCount{0u};
-        std::size_t RetainedSoftEdgeCount{0u};
-        std::size_t EndpointVertexCount{0u};
-        std::size_t CreaseVertexCount{0u};
-        std::size_t JunctionVertexCount{0u};
-        std::size_t BoundedSearchCount{0u};
-        std::size_t SettledFaceVisitCount{0u};
-        std::size_t MaximumNeighborhoodFaceCount{0u};
-        double BoundingBoxDiagonal{0.0};
-        double ResponseScale{0.10};
-        double HysteresisLowThreshold{0.35};
-        double HysteresisHighThreshold{0.65};
-        double MaximumTurnDegrees{60.0};
-        FeatureEvidenceStageTimings Timings{};
-
-        [[nodiscard]] bool Succeeded() const noexcept
-        {
-            return Status == FeatureEvidenceStatus::Success;
-        }
     };
 
     struct FeatureEvidenceView

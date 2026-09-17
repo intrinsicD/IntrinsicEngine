@@ -12,6 +12,8 @@ module;
 
 export module Geometry.HalfedgeMesh.CurvatureSegmentation;
 
+export import Geometry.CurvatureSegmentation.Diagnostics;
+
 import Geometry.HalfedgeMesh;
 
 export namespace Geometry::CurvatureSegmentation
@@ -23,21 +25,6 @@ export namespace Geometry::CurvatureSegmentation
     {
         FixedCount = 0,
         Automatic,
-    };
-
-    enum class SegmentationStatus : std::uint8_t
-    {
-        Success = 0,
-        EmptyMesh,
-        UnsupportedSubmeshView,
-        InvalidParameters,
-        CurvatureCountMismatch,
-        NonTriangleFace,
-        NonFinitePosition,
-        DegenerateFace,
-        NonFiniteCurvature,
-        GaussianMixtureFitFailed,
-        PosteriorEvaluationFailed,
     };
 
     struct CurvatureSegmentationParams
@@ -89,91 +76,6 @@ export namespace Geometry::CurvatureSegmentation
     // MAD-to-RMS-to-unit fallback policy, including the empty-input defaults.
     [[nodiscard]] CurvatureNormalization ComputeCurvatureNormalization(
         std::span<const double> values);
-
-    struct ModelCandidateDiagnostics
-    {
-        std::uint32_t ComponentCount{0u};
-        bool FitSucceeded{false};
-        bool Converged{false};
-        std::uint32_t Iterations{0u};
-        std::uint32_t RegularizedCovariances{0u};
-        double FinalLogLikelihood{0.0};
-        double BayesianInformationCriterion{0.0};
-        double NormalizedRmsFit{0.0};
-        // Wall-clock duration of this candidate's FitEM call. Iterations
-        // remains the deterministic work counter used to normalize profiles.
-        double FitMilliseconds{0.0};
-        bool FitToleranceSatisfied{false};
-        bool Selected{false};
-    };
-
-    struct CurvatureSegmentationStageTimings
-    {
-        // Zero for Segment(), which consumes supplied curvatures. The
-        // ComputeAndSegment() convenience path fills this field and includes
-        // it in TotalMilliseconds.
-        double CurvatureEstimationMilliseconds{0.0};
-        double FaceAggregationAndNormalizationMilliseconds{0.0};
-        double GmmFittingMilliseconds{0.0};
-        double UnaryConstructionMilliseconds{0.0};
-        double DualGraphConstructionMilliseconds{0.0};
-        double SpatialOptimizationMilliseconds{0.0};
-        double ConnectivityCleanupAndPublicationMilliseconds{0.0};
-        double TotalMilliseconds{0.0};
-    };
-
-    struct CurvatureComponentSummary
-    {
-        std::uint32_t Component{0u};
-        double Weight{0.0};
-        double NormalizedK1Mean{0.0};
-        double NormalizedK2Mean{0.0};
-        double SignedK1Mean{0.0};
-        double SignedK2Mean{0.0};
-    };
-
-    struct CurvatureSegmentationDiagnostics
-    {
-        SegmentationStatus Status{SegmentationStatus::EmptyMesh};
-        std::size_t FaceSlotCount{0u};
-        std::size_t LiveFaceCount{0u};
-        std::size_t EdgeSlotCount{0u};
-        std::size_t LiveEdgeCount{0u};
-        std::size_t DualEdgeCount{0u};
-
-        double SignedK1Center{0.0};
-        double SignedK2Center{0.0};
-        double SignedK1Scale{1.0};
-        double SignedK2Scale{1.0};
-
-        std::uint32_t RequestedComponentCount{0u};
-        std::uint32_t SelectedComponentCount{0u};
-        std::uint32_t ActiveComponentCount{0u};
-        std::uint32_t ConnectedRegionCount{0u};
-        std::size_t BoundaryEdgeCount{0u};
-
-        bool AutomaticFitToleranceSatisfied{false};
-        bool GmmConverged{false};
-        std::uint32_t GmmIterations{0u};
-        std::uint32_t GmmRegularizedCovariances{0u};
-        double GmmFinalLogLikelihood{0.0};
-        double NormalizedRmsFit{0.0};
-
-        std::uint32_t SpatialIterations{0u};
-        std::size_t SpatialLabelMoves{0u};
-        std::size_t SmallRegionsMerged{0u};
-        double InitialEnergy{0.0};
-        double FinalEnergy{0.0};
-
-        std::vector<ModelCandidateDiagnostics> Candidates{};
-        std::vector<CurvatureComponentSummary> Components{};
-        CurvatureSegmentationStageTimings Timings{};
-
-        [[nodiscard]] bool Succeeded() const noexcept
-        {
-            return Status == SegmentationStatus::Success;
-        }
-    };
 
     struct CurvatureSegmentationResult
     {

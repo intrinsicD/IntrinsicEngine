@@ -36,6 +36,7 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.CatmullClark.cppm
         Geometry.HalfedgeMesh.CurvatureExtrema.cppm
         Geometry.HalfedgeMesh.Curvature.cppm
+        Geometry.CurvatureSegmentation.Diagnostics.cppm
         Geometry.HalfedgeMesh.CurvatureSegmentation.cppm
         Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cppm
         Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cppm

@@ -15,40 +15,14 @@ export module Geometry.HalfedgeMesh.CurvatureSegmentation.Patches;
 export import Geometry.HalfedgeMesh.CurvatureSegmentation;
 export import Geometry.HalfedgeMesh.CurvatureSegmentation.Features;
 
+export import Geometry.CurvatureSegmentation.Diagnostics;
+
 import Geometry.HalfedgeMesh;
 
 export namespace Geometry::CurvatureSegmentation
 {
     inline constexpr std::uint32_t kInvalidPatchIndex =
         std::numeric_limits<std::uint32_t>::max();
-
-    enum class CurvaturePatchStatus : std::uint8_t
-    {
-        Success = 0,
-        EmptyMesh,
-        UnsupportedSubmeshView,
-        InvalidParameters,
-        CurvatureCountMismatch,
-        HardEvidenceCountMismatch,
-        SoftEvidenceCountMismatch,
-        InvalidHardEvidence,
-        NonFiniteSoftEvidence,
-        SoftEvidenceOutOfRange,
-        InvalidSeedOverride,
-        NonTriangleFace,
-        NonFinitePosition,
-        DegenerateFace,
-        NonFiniteCurvature,
-        InvalidCurvatureOrder,
-        InvalidTopology,
-        GaussianMixtureFitFailed,
-        PosteriorEvaluationFailed,
-        GrowthFailed,
-        NonFiniteEnergy,
-        EnergyInvariantFailed,
-        ConnectivityInvariantFailed,
-        HardConstraintViolated,
-    };
 
     enum class PatchBoundaryRole : std::uint8_t
     {
@@ -96,19 +70,6 @@ export namespace Geometry::CurvatureSegmentation
         bool ReplaceAutomaticSeeds{false};
     };
 
-    struct CurvaturePatchStageTimings
-    {
-        double ValidationAndSamplingMilliseconds{0.0};
-        double MixtureFittingMilliseconds{0.0};
-        double PosteriorConstructionMilliseconds{0.0};
-        double SeedSelectionMilliseconds{0.0};
-        double SimultaneousGrowthMilliseconds{0.0};
-        double RegionMergingMilliseconds{0.0};
-        double BoundaryRefinementMilliseconds{0.0};
-        double PublicationAndValidationMilliseconds{0.0};
-        double TotalMilliseconds{0.0};
-    };
-
     struct CurvaturePatchRegionDiagnostics
     {
         std::uint32_t Region{0u};
@@ -154,58 +115,6 @@ export namespace Geometry::CurvatureSegmentation
         std::uint32_t Sweep{0u};
         double DeltaEnergy{0.0};
         double EnergyAfter{0.0};
-    };
-
-    struct CurvaturePatchDiagnostics
-    {
-        CurvaturePatchStatus Status{CurvaturePatchStatus::EmptyMesh};
-        std::size_t VertexSlotCount{0u};
-        std::size_t LiveVertexCount{0u};
-        std::size_t FaceSlotCount{0u};
-        std::size_t LiveFaceCount{0u};
-        std::size_t EdgeSlotCount{0u};
-        std::size_t LiveEdgeCount{0u};
-        std::size_t InteriorTransitionCount{0u};
-        std::size_t HardBlockedTransitionCount{0u};
-        std::size_t SoftPenalizedTransitionCount{0u};
-        std::size_t DescriptorPenalizedTransitionCount{0u};
-        std::size_t ProvisionalBoundaryEdgeCount{0u};
-        std::size_t FinalBoundaryEdgeCount{0u};
-        std::size_t HardBoundaryEdgeCount{0u};
-        std::size_t SoftBoundaryEdgeCount{0u};
-        std::size_t ClosureBoundaryEdgeCount{0u};
-        std::size_t BoundaryEndpointCount{0u};
-        std::size_t BoundaryJunctionCount{0u};
-
-        double BoundingBoxDiagonal{0.0};
-        double BaseRadiusWorld{0.0};
-        double SeedSpacingCost{0.0};
-        double SignedK1Center{0.0};
-        double SignedK2Center{0.0};
-        double SignedK1Scale{1.0};
-        double SignedK2Scale{1.0};
-
-        std::uint32_t SelectedComponentCount{0u};
-        std::size_t SeedCount{0u};
-        std::size_t ProvisionalRegionCount{0u};
-        std::size_t AcceptedMergeCount{0u};
-        std::size_t AcceptedRefinementMoveCount{0u};
-        std::uint32_t RefinementSweeps{0u};
-        std::size_t FinalRegionCount{0u};
-        std::size_t FinalNegativeMergeCount{0u};
-        double ProvisionalFrontLength{0.0};
-        double InitialEnergy{0.0};
-        double FinalEnergy{0.0};
-        double MinimumFinalAdmissibleDelta{0.0};
-
-        std::vector<ModelCandidateDiagnostics> Candidates{};
-        std::vector<CurvatureComponentSummary> Components{};
-        CurvaturePatchStageTimings Timings{};
-
-        [[nodiscard]] bool Succeeded() const noexcept
-        {
-            return Status == CurvaturePatchStatus::Success;
-        }
     };
 
     struct CurvaturePatchResult

@@ -2141,3 +2141,59 @@ The canonical CPU gate passes: 4,728 selected, 4,727 passed, one expected
 ASan-only GLFW lifecycle skip, zero failures (154.33 seconds). GPU runtime and
 full sanitizer CPU suites are not run for this record move. Evidence and review packets are in
 `/tmp/intrinsic-meshfield-locality/` on the verification host.
+
+
+## Segmentation diagnostic compilation boundary — plan (2026-09-17)
+
+Operator-directed reuse/compilation continuation with Claude at `b39161de4`.
+The compiler-derived baseline rejects all five intended cuts (the four
+segmentation algorithms and owning halfedge mesh) in each of the mesh-field
+interface, config adapter and prepared-frame producers. Reuse the existing
+records verbatim in one `Geometry.CurvatureSegmentation.Diagnostics` module;
+all four algorithms and runtime consume it. Keep parameters, full result arrays
+and status-string functions with their algorithm owners. This is a present
+compile boundary, without duplicate runtime records, conversions or new behavior.
+One writer owns this checkout; Claude reviews bounded read-only packets.
+
+Extend the scanner-derived CTest guard to those three runtime producers and
+the diagnostic module, then build `IntrinsicTests`, run focused segmentation/
+mesh-field/panel tests and the exclusion-only CPU gate, and link the ci-vulkan
+Sandbox. Refresh module inventory and architecture docs; run scope/layering/
+tests/docs review and structural checks. UI-037 readiness acceptance remains
+open. These dependency changes alone establish no compilation-time speedup.
+Evidence: `/tmp/intrinsic-segmentation-locality/`.
+
+The 13 moved status/diagnostic/timing records are byte-identical to baseline.
+Production scope is eight files including the new module and CMake registration,
+3,899 to 3,922 physical lines (+23 for the module boundary/imports). This is
+dependency isolation rather than duplicate-body removal. The new module has no
+imports; the mesh-field interface now reaches 47 modules. The baseline guard
+rejected all five forbidden modules in each runtime producer; the new guard passes
+all four producers. No runtime copies or field-conversion bodies were added.
+
+The focused build first exposed an existing test's incidental `PatchBoundaryRole`
+re-export dependency. Its direct Patches import fixes that without altering its
+assertions; the repeat focused build and IntrinsicTests build pass. All 102 focused
+segmentation, patch/boundary, geodesic, runtime/panel and locality cases pass
+(8.59 seconds). Claude's fixed-diff review finds no code defects, conditioned on
+the full gates. Config/ToString concerns from planning are resolved in source:
+config has no algorithm imports; only execution uses geometry status strings.
+The module inventory includes the new owner (421 modules). Source-documentation
+audit: zero errors, 11 reviewed hints; retained comments describe numerical,
+ownership, synchronous/asynchronous or failure contracts. The history heuristic
+on “Iterations remains the deterministic work counter” is a false positive.
+
+Canonical ci/Clang 23 CPU verification passes: 4,729 selected, 4,728 passed,
+one expected ASan-only GLFW lifecycle skip, zero failures (144.25 seconds).
+All locality CTests pass, including the new segmentation boundary. Strict
+layering, test layout, task policy/state links, doc links, docs sync, skill
+mirrors, root hygiene and workshop checks pass. Manual workshop rows 1–3 pass;
+rows 4–6 are unchanged; UI-037 retains its readiness follow-up; there are no
+layering exceptions. The full CPU/test build also resolves Claude's dropped
+re-export concern beyond status strings. Reviewed source/test hashes are unchanged.
+
+The ci-vulkan/Clang 23 `ExtrinsicSandbox` target builds and links after the
+canonical CPU gate; Claude's remaining build/verification conditions are met.
+No GPU runtime or full sanitizer CPU suite was run for this record move.
+The operator requested session-boundary advice to conserve context; this
+verified slice is the checkpoint, with a temporary handoff before further work.

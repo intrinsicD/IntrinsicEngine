@@ -465,15 +465,19 @@ Geodesic status and complete owned distance results live in
 `Geometry.Geodesic.Types`, shared by the algorithm and runtime reports. Mesh-field
 interfaces, config adapters and prepared frames import that data-only module;
 only the geodesic execution unit imports `Geometry.Geodesic`. Parameter choices
-and status-string conversion remain with the algorithm. The other mesh-field
-methods retain their existing diagnostic contracts and dependencies.
+and status-string conversion remain with the algorithm. Segmentation
+status and diagnostic records live in `Geometry.CurvatureSegmentation.Diagnostics`,
+shared by the GMM, feature, patch and boundary algorithms and runtime reports.
+Mesh-field interfaces, config adapters and prepared frames therefore stay
+independent of those algorithms and the owning halfedge mesh. Algorithm parameters,
+full result arrays and status-string conversion remain with their algorithm owners.
 Parameterization and UV regeneration access geometry views and publish through
 the existing mesh-soup owner without importing ECS geometry-population adapters.
 
 `ProcessingCompilationLocality.Family`, `.PointFieldResults`, `.PointAnalysis`, `.PointAnalysisTests`,
 `.Normals`, `.NormalTests`, `.MeshSupport`, `.Registration`, `.Parameterization`,
 `.RegistrationTests`, `.MeshField`, `.MeshTopology`, `.MeshFieldTests`,
-`.GeodesicResults`, `.PointSet`, `.PointSetResults`, `.PointAnalysisResults`, `.PointSetTests`, `.PointConstruction`, `.PointConstructionTests`,
+`.GeodesicResults`, `.SegmentationDiagnostics`, `.PointSet`, `.PointSetResults`, `.PointAnalysisResults`, `.PointSetTests`, `.PointConstruction`, `.PointConstructionTests`,
 `.PointCloudService`, `.Discovery` and `.UnrelatedAdapters` inspect actual
 Clang scanner requirements and CMake module closures through
 `tools/analysis/compile_hotspots.py`. Missing, ambiguous or stale source scans

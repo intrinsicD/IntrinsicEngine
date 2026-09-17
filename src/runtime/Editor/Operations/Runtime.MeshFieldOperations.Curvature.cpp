@@ -46,6 +46,8 @@ import Geometry.Curvature;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.CurvatureSegmentation;
 import Geometry.HalfedgeMesh.CurvatureSegmentation.Features;
+import Geometry.HalfedgeMesh.CurvatureSegmentation.Patches;
+import Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut;
 import Geometry.Properties;
 
 #include "Config/internal/Runtime.CurvatureSegmentationParams.hpp"

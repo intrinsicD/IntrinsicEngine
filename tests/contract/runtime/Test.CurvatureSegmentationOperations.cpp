@@ -19,6 +19,7 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.CurvatureSegmentation.Patches;
 import Geometry.HalfedgeMesh.Builder;
 import Geometry.Properties;
 import Geometry.Subdivision;

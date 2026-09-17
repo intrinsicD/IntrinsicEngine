@@ -327,6 +327,18 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.GeodesicResults
         --forbid-module Geometry.Geodesic)
 set_tests_properties(ProcessingCompilationLocality.GeodesicResults
     PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.SegmentationDiagnostics
+        --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Frame.cpp
+        --check-source src/geometry/Geometry.CurvatureSegmentation.Diagnostics.cppm
+        --forbid-module Geometry.HalfedgeMesh
+        --forbid-module Geometry.HalfedgeMesh.CurvatureSegmentation
+        --forbid-module Geometry.HalfedgeMesh.CurvatureSegmentation.Features
+        --forbid-module Geometry.HalfedgeMesh.CurvatureSegmentation.Patches
+        --forbid-module Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut)
+set_tests_properties(ProcessingCompilationLocality.SegmentationDiagnostics
+    PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshTopology
         --check-source src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cpp

@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 11 |
 | `core` | 41 |
 | `ecs` | 27 |
-| `geometry` | 117 |
+| `geometry` | 118 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 75 |
@@ -120,6 +120,7 @@ Root scanned: `src`
 | `Geometry.Containment` | `src/geometry/Geometry.Containment.cppm` | `geometry` |
 | `Geometry.ConvexHull` | `src/geometry/Geometry.ConvexHull.cppm` | `geometry` |
 | `Geometry.ConvexHullBuilder` | `src/geometry/Geometry.ConvexHullBuilder.cppm` | `geometry` |
+| `Geometry.CurvatureSegmentation.Diagnostics` | `src/geometry/Geometry.CurvatureSegmentation.Diagnostics.cppm` | `geometry` |
 | `Geometry.Curve` | `src/geometry/Geometry.Curve.cppm` | `geometry` |
 | `Geometry.Cylinder` | `src/geometry/Geometry.Cylinder.cppm` | `geometry` |
 | `Geometry.DomainViews` | `src/geometry/Geometry.DomainViews.cppm` | `geometry` |
@@ -447,4 +448,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **420**
+Total modules: **421**

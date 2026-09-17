@@ -7,24 +7,11 @@ module;
 #include <span>
 export module Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut;
 export import Geometry.HalfedgeMesh.CurvatureSegmentation.Features;
+export import Geometry.CurvatureSegmentation.Diagnostics;
+
 import Geometry.HalfedgeMesh;
 export namespace Geometry::CurvatureSegmentation
 {
-enum class BoundaryPartitionStatus : std::uint8_t
-{
-    Success,
-    EmptyMesh,
-    UnsupportedSubmeshView,
-    InvalidParameters,
-    InvalidEvidence,
-    NonFinitePosition,
-    NonTriangleFace,
-    DegenerateFace,
-    InvalidTopology,
-    InvalidCurvature,
-    WorkLimit,
-    InvariantFailure
-};
 struct BoundaryPartitionParams
 {
     double FeatureWeight{1.5};
@@ -48,20 +35,6 @@ struct BoundaryPartitionParams
 // Fixed curves_v1 profile; changing its constants requires a new profile identity.
 [[nodiscard]] BoundaryPartitionParams BoundaryCurveCoverageProfileV1() noexcept;
 
-struct BoundaryPartitionDiagnostics
-{
-    BoundaryPartitionStatus Status{BoundaryPartitionStatus::EmptyMesh};
-    std::size_t FaceCount{}, TransitionCount{}, RegionCount{}, BoundaryCount{};
-    std::size_t HardBoundaryCount{}, SoftBoundaryCount{}, ClosureBoundaryCount{};
-    std::size_t AttenuationCurveCount{}, AttenuationHardEdgeCount{};
-    std::uint64_t AttemptedMoves{}, AcceptedMoves{}, Contractions{}, FlowEdgeVisits{};
-    std::uint32_t Sweeps{}, AreaMerges{}, UnmergeableSmallRegions{};
-    bool Exact{};
-    double BoundingBoxDiagonal{}, InitialEnergy{}, FinalEnergy{}, LowerBound{};
-    double OptimizedEnergy{}, BoundaryEnergy{}, ModelEnergy{}, RegionCostEnergy{};
-    double BoundaryLength{}, SupportedLength{}, ClosureLength{};
-    double AssemblyMilliseconds{}, SolveMilliseconds{}, TotalMilliseconds{};
-};
 struct BoundaryPartitionResult
 {
     // Successful arrays use source slots; deleted face slots are UINT32_MAX.
