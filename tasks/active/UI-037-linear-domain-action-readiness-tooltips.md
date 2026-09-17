@@ -1412,3 +1412,48 @@ lifecycle skip (4,713 selected, zero failures, 160.13 s). All source remained
 fixed through final Claude review, builds and test runs. The full CPU sanitizer
 suites were not repeated; the six GPU tests used the canonical instrumented
 `ci-vulkan` preset. UI-037 remains active for broader readiness/cache work.
+
+
+## Normal-input selector reuse — plan, 2026-09-17
+
+The operator again requested continued duplication and compilation cleanup with
+Claude. Reuse the existing compiled `DrawProcessingPointInput` for descriptor,
+bilateral and construction normal selectors. All three query their existing
+catalog lazily while open. Keep descriptor/bilateral's strict position-domain
+filter, including Unknown, and construction's unrestricted catalog while its
+position domain is Unknown. The shared presentation adds domain headings and
+sample counts; canonical property identity and validated config application stay
+unchanged. No new helper, interface, target or runtime semantics.
+
+Verify the actual panel selectors with mixed vertex/face catalogs, including
+selection persisted through config, and run the existing panel and CPU gates.
+Claude is reviewing bounded candidates read-only; this checkout remains the sole
+writer. A separate follow-up removes unused population-module imports from UV
+processing, with before/after compiler-closure evidence. No compile-time speedup
+claim is intended. UI-037's broader readiness/cache acceptance remains open.
+
+
+### Selector implementation and review checkpoint
+
+The three callers now use the existing helper with unchanged catalog sources,
+widget IDs and domain filters. Production code shrinks by 28 lines, including
+all call sites; no helper or build entry was added. The new actual-panel test
+passes all six descriptor/bilateral/construction × resolved/unresolved cases:
+strict filters hide other domains, construction's unresolved filter lists both,
+and resolved selections persist via config without changing selection or
+submitting jobs. Unknown construction normals cannot persist independently of
+positions because the existing config validator requires matching domains; the
+unresolved test deliberately checks discovery, not a new persistence contract.
+
+Claude's fixed-packet review found no blockers. Its catalog-type and Unknown
+validation questions are resolved by the compiled integration target and the
+executed six-case test. The shared labels now include domain and cardinality;
+no runtime numerical, revision, history or backend behavior changes.
+
+
+`cmake --preset ci` and the `IntrinsicSandboxEditorIntegrationTests` build pass.
+All 60 focused panel/presentation tests pass (8.43 s). Task policy, layering,
+test layout, docs sync/links, task links and skill mirrors pass. Manual workshop
+rows 1–3 pass (existing app owner, no dependency edges or duplicated selector);
+rows 4–8 are unaffected. The full CPU gate will run on the combined source
+following the next compile-locality slice. Logs: `/tmp/intrinsic-ninth-*`.

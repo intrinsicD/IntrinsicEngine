@@ -278,7 +278,11 @@ mask/score publication and outlier provenance/removal transactions remain explic
 The nine point-processing panels use `ProcessingDraftState` and `PanelSupport`
 for entity/input/output selection. `DrawProcessingPointInput` accepts an optional
 domain restriction where topology requires it, such as mesh face normals taking
-vertex positions. The panels update coupled input/output domains explicitly.
+vertex positions. Descriptor, bilateral and construction normal selectors reuse
+this catalog presentation, including domain headings and sample counts.
+Descriptor and bilateral require the position domain; construction permits any
+domain while positions are unresolved. The panels update coupled input/output
+domains explicitly.
 Curvature and geodesics reuse the same draft state, keyed by observed active
 config, and apply-before-execute helper. Rejected edits remain retryable, while
 external config changes replace the draft. Geodesics clears mesh-local source

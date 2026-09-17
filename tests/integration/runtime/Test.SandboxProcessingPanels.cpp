@@ -760,6 +760,106 @@ TEST(SandboxProcessingPanels, ExplicitEntityModelsLeaveSceneSelectionAndCachesUn
     EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
 }
 
+TEST(SandboxProcessingPanels, NormalInputsPreserveDomainFiltersAndPersistSelections)
+{
+    struct Control
+    {
+        const char* Window;
+        const char* Title;
+        const char* Combo;
+        std::function<R::GeometryPropertyRef(const Config::EngineConfig&)> Normal;
+        bool AllowsUnresolvedDomain{};
+    };
+    const std::array controls{
+        Control{"view.descriptor_analysis", "FPFH Descriptor Analysis", "Normals##Descriptors",
+            [](const auto& c) { return R::GetDescriptorAnalysisConfig(c)->Normals; }},
+        Control{"view.bilateral_filter", "Bilateral Point Filter", "Normals##Bilateral",
+            [](const auto& c) { return R::GetBilateralFilterConfig(c)->Normals; }},
+        Control{"view.point_construction", "Construct from Points", "Normals",
+            [](const auto& c) { return R::GetPointConstructionConfig(c)->Normals; }, true}};
+    for (const auto& control : controls)
+    for (const bool unresolved : {false, true})
+    {
+        SCOPED_TRACE(control.Title);
+        SCOPED_TRACE(unresolved);
+        PanelHarness h;
+        auto& scene = h.Scene();
+        const auto entity = scene.Create();
+        PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+        ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+        const auto id = R::SelectionController::ToStableEntityId(entity);
+        (void)scene.Raw().get<GS::Vertices>(entity).Properties.GetOrAdd<glm::vec3>(
+            "v:alternate_normal", {0, 0, 1});
+        (void)scene.Raw().get<GS::Faces>(entity).Properties.GetOrAdd<glm::vec3>(
+            "f:alternate_normal", {0, 0, 1});
+        const auto domain = unresolved ? R::GeometryElementDomain::Unknown
+                                       : R::GeometryElementDomain::MeshVertex;
+        auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+        auto descriptors = *R::GetDescriptorAnalysisConfig(config);
+        descriptors.StableEntityId = id;
+        descriptors.Positions.Domain = descriptors.Normals.Domain = domain;
+        for (auto& output : descriptors.Outputs) output.Domain = domain;
+        R::SetDescriptorAnalysisConfig(config, descriptors);
+        auto bilateral = *R::GetBilateralFilterConfig(config);
+        bilateral.StableEntityId = id;
+        bilateral.Positions.Domain = bilateral.Normals.Domain = bilateral.Output.Domain = domain;
+        R::SetBilateralFilterConfig(config, bilateral);
+        auto construction = *R::GetPointConstructionConfig(config);
+        construction.StableEntityId = id;
+        construction.Positions.Domain = construction.Normals.Domain = domain;
+        construction.EstimateNormals = false;
+        R::SetPointConstructionConfig(config, construction);
+        ASSERT_TRUE(h.Apply(config));
+        ASSERT_TRUE(h.Shell.SetEditorWindowOpen(control.Window, true));
+        const auto jobsBefore = h.Engine->Jobs().Stats().SubmittedJobs;
+        int step = 0, frames = 0;
+        bool completed = false;
+        h.Driver->OnFrame = [&](R::Engine& engine) {
+            if (++frames > 80) { ADD_FAILURE() << "Normal selector did not finish"; engine.RequestExit(); return; }
+            auto* window = ImGui::FindWindowByName(control.Title);
+            if (!window) return;
+            ImGui::SetWindowSize(window, {750, 1800});
+            ImGui::SetWindowPos(window, {0, 0});
+            if (step == 1) { ImGui::FocusWindow(window); ImGui::SetScrollY(window, 0); }
+            if (step == 3) ImGui::ActivateItemByID(window->GetID(control.Combo));
+            if (step == 5)
+            {
+                ImGui::GetCurrentContext()->LogBuffer.clear();
+                ImGui::LogToBuffer();
+                ImGui::GetCurrentContext()->LogWindow = nullptr;
+            }
+            if (step == 7)
+            {
+                const std::string log{ImGui::GetCurrentContext()->LogBuffer.c_str()};
+                ImGui::LogFinish();
+                EXPECT_EQ(log.find("v:alternate_normal") != std::string::npos,
+                    !unresolved || control.AllowsUnresolvedDomain);
+                EXPECT_EQ(log.find("f:alternate_normal") != std::string::npos,
+                    unresolved && control.AllowsUnresolvedDomain);
+                auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+                ASSERT_FALSE(popups.empty());
+                ASSERT_NE(popups.back().Window, nullptr);
+                if (!unresolved)
+                {
+                    const auto label = std::string{R::ToString(domain)} + ": v:alternate_normal (9)";
+                    ImGui::ActivateItemByID(popups.back().Window->GetID(label.c_str()));
+                }
+            }
+            if (++step != 11) return;
+            const auto normal = control.Normal(h.Control().GetEngineConfigControlState().ActiveConfig);
+            EXPECT_EQ(normal.Domain, domain);
+            EXPECT_EQ(normal.Name, unresolved ? "v:normal" : "v:alternate_normal");
+            EXPECT_EQ(h.Selection().SelectedStableIds().front(), id);
+            EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
+            completed = true;
+            engine.RequestExit();
+        };
+        h.Engine->Run();
+        if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
+        EXPECT_TRUE(completed);
+    }
+}
+
 TEST(SandboxProcessingPanels, CpuAccelerationControlsPersistTheRequestedExecutionPath)
 {
     PanelHarness h;

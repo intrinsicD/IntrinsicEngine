@@ -2064,14 +2064,9 @@ namespace Extrinsic::Sandbox::Editor
             for (auto& output : config.Outputs) output.Domain = config.Positions.Domain;
             changed = true;
         }
-        if(ImGui::BeginCombo("Normals##Descriptors",config.Normals.Name.c_str()))
-        {
-            const auto catalog=Runtime::GetEditorPointInputCatalog(context.Processing,config.StableEntityId);
-            for(const auto& row:catalog.Entries)
-                if(row.Ref.Domain==config.Positions.Domain && ImGui::Selectable(row.Ref.Name.c_str(),row.Ref==config.Normals))
-                {config.Normals=row.Ref;changed=true;}
-            ImGui::EndCombo();
-        }
+        changed |= DrawProcessingPointInput("Normals##Descriptors",
+            [&] { return Runtime::GetEditorPointInputCatalog(context.Processing, config.StableEntityId); },
+            config.Normals, config.Positions.Domain);
         if(ImGui::TreeNode("Histogram output properties"))
         {
             ImGui::InputText("Output prefix",Descriptors.Prefix.data(),Descriptors.Prefix.size());
@@ -2320,27 +2315,10 @@ namespace Extrinsic::Sandbox::Editor
                 integer("Normal neighbors", config.NormalKNeighbors);
             else
             {
-                const auto label = std::string(Runtime::ToString(config.Normals.Domain)) + ": " +
-                                   config.Normals.Name;
-                if (ImGui::BeginCombo("Normals", label.c_str()))
-                {
-                    const auto catalog = Runtime::GetEditorPointInputCatalog(
-                        context.Processing, config.StableEntityId);
-                    for (const auto& row : catalog.Entries)
-                    {
-                        if (row.Ref.Domain != config.Positions.Domain &&
-                            config.Positions.Domain != Runtime::GeometryElementDomain::Unknown)
-                            continue;
-                        const auto name =
-                            std::string(Runtime::ToString(row.Ref.Domain)) + ": " + row.Ref.Name;
-                        if (ImGui::Selectable(name.c_str(), row.Ref == config.Normals))
-                        {
-                            config.Normals = row.Ref;
-                            changed = true;
-                        }
-                    }
-                    ImGui::EndCombo();
-                }
+                changed |= DrawProcessingPointInput("Normals",
+                    [&] { return Runtime::GetEditorPointInputCatalog(context.Processing, config.StableEntityId); },
+                    config.Normals, config.Positions.Domain == Runtime::GeometryElementDomain::Unknown
+                        ? std::nullopt : std::optional{config.Positions.Domain});
             }
             integer("Grid resolution", config.Resolution);
             integer("Maximum grid vertices", config.MaxGridVertices);
@@ -2485,15 +2463,9 @@ namespace Extrinsic::Sandbox::Editor
             config.Output.Domain = config.Normals.Domain = config.Positions.Domain;
             changed = true;
         }
-        const auto normalsLabel=std::string(Runtime::ToString(config.Normals.Domain))+": "+config.Normals.Name;
-        if(ImGui::BeginCombo("Normals##Bilateral",normalsLabel.c_str()))
-        {
-            const auto catalog=Runtime::GetEditorBilateralFilterInputCatalog(context.PointSet.Commands,config.StableEntityId);
-            for(const auto& row:catalog.Entries)
-                if(row.Ref.Domain==config.Positions.Domain && ImGui::Selectable(row.Ref.Name.c_str(),row.Ref==config.Normals))
-                {config.Normals=row.Ref;changed=true;}
-            ImGui::EndCombo();
-        }
+        changed |= DrawProcessingPointInput("Normals##Bilateral",
+            [&] { return Runtime::GetEditorBilateralFilterInputCatalog(context.PointSet.Commands, config.StableEntityId); },
+            config.Normals, config.Positions.Domain);
         if(ImGui::Button("Write to input positions")){config.Output=config.Positions;changed=true;}
         for (auto [label, ref] : {std::pair{"Output positions", &config.Output}})
             changed |= DrawProcessingPropertyName(label, ref->Name);
