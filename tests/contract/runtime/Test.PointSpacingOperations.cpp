@@ -93,6 +93,81 @@ namespace
     }
 } // namespace
 
+TEST(PointSpacingOperations, InputCatalogsShareRevisionMetadataWithoutChangingEligibility)
+{
+    using Query = R::GeometryPropertyCatalogSnapshot (*)(const R::EditorProcessingCommands&, std::uint32_t);
+    const std::array<Query, 3> queries{R::GetEditorPointInputCatalog,
+        R::GetEditorPointSpacingInputCatalog, R::GetEditorKernelDensityInputCatalog};
+    for (unsigned domain = 1; domain <= unsigned(D::PointCloudPoint); ++domain)
+    {
+        SCOPED_TRACE(domain);
+        Extrinsic::ECS::Scene::Registry scene;
+        const auto entity = Make(scene, D(domain));
+        auto& props = Properties(scene, entity, D(domain));
+        const auto config = Config(entity, D(domain));
+        R::EditorProcessingContext context{.Scene = &scene};
+        const auto commands = R::BindEditorProcessingCommands(context);
+        const auto sampleRevision = props.FindPropertyRevision("samples").value();
+        const auto before = queries.front()(commands, config.StableEntityId);
+        const auto check = [&](const R::GeometryPropertyCatalogSnapshot& catalog, auto revision) {
+            EXPECT_EQ(catalog.SourceStableId, config.StableEntityId);
+            const auto entry = std::ranges::find_if(catalog.Entries, [&](const auto& row) {
+                return row.Ref == config.Positions;
+            });
+            ASSERT_NE(entry, catalog.Entries.end());
+            EXPECT_EQ(entry->PropertyGeneration, revision);
+            EXPECT_EQ(entry->ElementCount, props.Size());
+            EXPECT_TRUE(std::ranges::all_of(catalog.Entries, [](const auto& row) {
+                return row.Ref.ValueKind == Geometry::PropertyValueKind::Vec3;
+            }));
+        };
+        for (auto query : queries)
+        {
+            const auto catalog = query(commands, config.StableEntityId);
+            check(catalog, sampleRevision);
+            EXPECT_EQ(catalog.SourceGeneration, before.SourceGeneration);
+        }
+        props.Get<float>("keep")[0] = 99.f;
+        const auto changed = queries.front()(commands, config.StableEntityId);
+        EXPECT_NE(changed.SourceGeneration, before.SourceGeneration);
+        for (auto query : queries)
+        {
+            const auto catalog = query(commands, config.StableEntityId);
+            check(catalog, sampleRevision);
+            EXPECT_EQ(catalog.SourceGeneration, changed.SourceGeneration);
+        }
+        props.Get<glm::vec3>("samples")[0].x += 0.25f;
+        const auto editedRevision = props.FindPropertyRevision("samples").value();
+        EXPECT_NE(editedRevision, sampleRevision);
+        const auto finalGeneration = queries.front()(commands, config.StableEntityId).SourceGeneration;
+        EXPECT_NE(finalGeneration, changed.SourceGeneration);
+        const auto propertySetRevision = props.Revision();
+        for (auto query : queries)
+        {
+            const auto catalog = query(commands, config.StableEntityId);
+            check(catalog, editedRevision);
+            EXPECT_EQ(catalog.SourceGeneration, finalGeneration);
+            EXPECT_EQ(props.Revision(), propertySetRevision);
+        }
+    }
+}
+
+TEST(PointSpacingOperations, SingleSampleRemainsDiscoverableOnlyForCompatibleMethods)
+{
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = Make(scene, D::PointCloudPoint);
+    auto& props = Properties(scene, entity, D::PointCloudPoint);
+    props.Resize(1);
+    const auto config = Config(entity, D::PointCloudPoint);
+    R::EditorProcessingContext context{.Scene = &scene};
+    const auto commands = R::BindEditorProcessingCommands(context);
+    const auto generic = R::GetEditorPointInputCatalog(commands, config.StableEntityId);
+    ASSERT_EQ(generic.Entries.size(), 1u);
+    EXPECT_EQ(generic.Entries.front().Ref, config.Positions);
+    EXPECT_TRUE(R::GetEditorPointSpacingInputCatalog(commands, config.StableEntityId).Entries.empty());
+    EXPECT_TRUE(R::GetEditorKernelDensityInputCatalog(commands, config.StableEntityId).Entries.empty());
+}
+
 TEST(PointSpacingOperations, QueuedJobsRejectStaleInputsOutputsAndCancellation)
 {
     for(unsigned change=0;change<5;++change)

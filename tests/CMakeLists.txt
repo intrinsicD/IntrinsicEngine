@@ -195,6 +195,10 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointCloudServi
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Discovery
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+        --forbid-module Geometry.HalfedgeMesh
+        --forbid-module Extrinsic.Runtime.SpatialIndexCache
+        --forbid-module Extrinsic.ECS.Component.Transform
+        --forbid-module Geometry.MeshSoup
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations
@@ -258,6 +262,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshField
         --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Curvature.cpp
         --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Geodesics.cpp
+        --forbid-module Geometry.MeshSoup
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations
@@ -274,6 +279,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshTopology
         --check-source src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.Topology.cpp
+        --forbid-module Geometry.MeshSoup
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations

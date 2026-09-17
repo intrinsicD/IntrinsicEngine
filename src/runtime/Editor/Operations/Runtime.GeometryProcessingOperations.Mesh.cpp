@@ -1,54 +1,35 @@
 module;
 
 #include <array>
-#include <bit>
-#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <memory>
-#include <optional>
 #include <span>
 #include <string>
-#include <string_view>
+#include <utility>
 #include <vector>
 
 #include <entt/entity/registry.hpp>
-#include <glm/glm.hpp>
 
 module Extrinsic.Runtime.GeometryProcessingOperations;
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
-import Extrinsic.Core.Error;
 import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
-import Extrinsic.ECS.Component.Transform;
-import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.EditorCommon;
-import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryAvailability;
-import Extrinsic.Runtime.JobService;
-import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Runtime.WorldHandle;
-import Geometry.HalfedgeMesh;
-import Geometry.MeshSoup;
 import Geometry.Properties;
-
-#include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 
-#include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.hpp"
-
 namespace Extrinsic::Runtime
 {
-using namespace GeometryProcessingDetail::MeshSupport;
+namespace GS = ECS::Components::GeometrySources;
 
 // Private to this discovery unit: these classify domains and algorithms for the
 // menu surface and are deliberately not in the shared mesh helper namespace,

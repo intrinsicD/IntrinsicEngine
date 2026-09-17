@@ -65,7 +65,10 @@ Physical implementation ownership follows the feature split. Geometry operation
 bodies share source-snapshot, stored-topology-fingerprint and publication helpers
 through the private `Runtime.GeometryProcessingOperations.MeshSupport.hpp` and its
 one ordinary compiled owner `MeshSupport.cpp`, which imports no family module and
-no broad processing module. The family-neutral parts of that owner — the queued
+no broad processing module. Its triangle-soup result and builder declarations live
+in `Runtime.GeometryProcessingOperations.MeshSoup.hpp`, included only by that
+compiled owner and UV regeneration. Mesh field/topology families need no mesh-soup
+module. The family-neutral parts of that owner — the queued
 job envelope, the active-job lookup and message, selected-model cache
 invalidation, finite-position collection, numeric position comparison, job-handle
 messages, result error normalization and the unpublished-job reason — are declared
@@ -225,6 +228,16 @@ name the spatial-index cache.
 outliers, descriptors, construction and normals, independently of method result records.
 `RadiusRows.cpp` also compiles once outside either family and preserves complete
 radius support and its explicit lowest-ID limit.
+Processing discovery includes no mesh reconstruction header and requires neither
+full halfedge-mesh types, the spatial cache nor transform components; its source-
+domain queries use `GeometryAvailability` and its selection operations use the
+existing processing context. Compiler-closure tests enforce this boundary.
+
+Generic point discovery, density, spacing and bilateral filtering share a compiled
+metadata-only candidate catalog in `PointProperties.cpp`. It supplies vec3 entries
+and source/property revisions; each consumer retains its own numerical and sample-
+count admission rather than borrowing another method's eligibility.
+
 The private `PointFields.hpp` and `RadiusRows.hpp` declarations have C++ linkage across module
 owners; the common implementation is compiled once as an ordinary translation
 unit, without the broad method module or mesh-topology imports. Typed configs/results, numerical kernels, sample minima,

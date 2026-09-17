@@ -42,7 +42,6 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.Mesh.Conversion;
-import Geometry.MeshSoup;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.ParameterizationConfig;

@@ -1,6 +1,6 @@
 // Mesh source snapshots and mesh-specific helpers shared by geometry operation
 // implementation units. Included after their runtime/geometry imports, which must
-// cover halfedge-mesh, mesh-soup, command-history and job-projection types.
+// cover halfedge-mesh, command-history and job-projection types.
 // No public module surface is added.
 #pragma once
 #include "Runtime.GeometryProcessingOperations.MeshSources.hpp"
@@ -20,28 +20,12 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
         namespace Dirty = Extrinsic::ECS::Components::DirtyTags;
         namespace GS = Extrinsic::ECS::Components::GeometrySources;
 
-        struct MeshSoupFromGeometrySourcesResult
-        {
-            Geometry::MeshSoup::IndexedMesh Mesh{};
-            std::vector<std::uint32_t> SourceFaceForSoupFace{};
-            EditorCommandStatus Status{
-                EditorCommandStatus::NoChange};
-            std::string Diagnostic{};
-
-            [[nodiscard]] bool Succeeded() const noexcept
-            {
-                return Status == EditorCommandStatus::Applied;
-            }
-        };
-
         // Checks property presence/cardinality without traversing or copying buffers.
         [[nodiscard]] EditorCommandStatus ValidateMeshSoupSourceMetadata(
             const GS::ConstSourceView& view, std::string& diagnostic,
             std::string_view positionProperty = GS::PropertyNames::kPosition);
 
-        [[nodiscard]] MeshSoupFromGeometrySourcesResult BuildMeshSoupFromGeometrySources(
-            const GS::ConstSourceView& view,
-            std::string_view positionProperty = GS::PropertyNames::kPosition);
+
 
 
         [[nodiscard]] bool SameKnownPropertyValues(

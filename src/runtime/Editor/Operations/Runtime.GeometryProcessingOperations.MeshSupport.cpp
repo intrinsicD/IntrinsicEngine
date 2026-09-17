@@ -44,6 +44,7 @@ import Geometry.Properties;
 
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSoup.hpp"
 
 namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
 {

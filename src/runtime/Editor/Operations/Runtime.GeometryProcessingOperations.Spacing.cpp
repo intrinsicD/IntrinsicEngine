@@ -175,17 +175,9 @@ namespace Extrinsic::Runtime
         const auto entity=EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(),id);
         if(!entity)return {};
         const auto a=BuildGeometryAvailability(context.Scene->Raw(),*entity);
-        std::uint64_t generation=1469598103934665603ull;
-        for(unsigned d=1;d<=unsigned(D::PointCloudPoint);++d)
-        {
-            const auto* props=ResolveGeometryPropertySet(a,D(d));
-            generation=(generation^(props?props->Revision():0))*1099511628211ull;
-        }
-        auto catalog=BuildGeometryPropertyCatalogSnapshot(a,id,generation);
+        auto catalog=GeometryProcessingDetail::BuildPointInputCandidateCatalog(a,id);
         std::erase_if(catalog.Entries,[&](auto& entry){
-            if(entry.Ref.ValueKind!=Geometry::PropertyValueKind::Vec3)return true;
             const auto* props=ResolveGeometryPropertySet(a,entry.Ref.Domain);
-            entry.PropertyGeneration=props->FindPropertyRevision(entry.Ref.Name).value_or(0);
             PointSpacingConfig c;c.StableEntityId=id;c.Positions=entry.Ref;c.Radii.Domain=entry.Ref.Domain;
             c.Radii.Name=entry.Ref.Name+".radii";
             while(props->Exists(c.Radii.Name))c.Radii.Name+="_";

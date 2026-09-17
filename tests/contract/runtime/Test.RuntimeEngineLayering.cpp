@@ -2145,7 +2145,7 @@ TEST(RuntimeEngineLayering,
 // cannot reappear.
 TEST(RuntimeEngineLayering, NoDuplicateGeometryPropertyVocabularyRemains)
 {
-    const std::array<std::filesystem::path, 13> sources{
+    const std::array<std::filesystem::path, 14> sources{
         RepoRoot() / "src/runtime/GeometryIntegration/Runtime.GeometryPresentation.cppm",
         RepoRoot() / "src/runtime/GeometryIntegration/Runtime.GeometryPresentation.cpp",
         RepoRoot() / "src/runtime/Editor/internal/Runtime.EditorFeatures.Internal.hpp",
@@ -2156,6 +2156,7 @@ TEST(RuntimeEngineLayering, NoDuplicateGeometryPropertyVocabularyRemains)
         RepoRoot() / "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Registration.cpp",
         RepoRoot() / "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Uv.cpp",
         RepoRoot() / "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.hpp",
+        RepoRoot() / "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSoup.hpp",
         RepoRoot() / "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Curvature.cpp",
         RepoRoot() / "src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.Topology.cpp",
         RepoRoot() / "src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp",

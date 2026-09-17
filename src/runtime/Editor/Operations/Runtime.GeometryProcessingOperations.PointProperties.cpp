@@ -39,12 +39,9 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
 {
     namespace GS = ECS::Components::GeometrySources;
     using D = GeometryElementDomain;
-    GeometryPropertyCatalogSnapshot BuildPointInputCatalog(const EditorProcessingContext& context, std::uint32_t id)
+    GeometryPropertyCatalogSnapshot BuildPointInputCandidateCatalog(
+        const GeometryEntityAvailability& availability, std::uint32_t id)
     {
-        if ((context.AttachmentActive && !context.AttachmentActive()) || !context.Scene) return {};
-        const auto entity = EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(), id);
-        if (!entity) return {};
-        const auto availability = BuildGeometryAvailability(context.Scene->Raw(), *entity);
         std::uint64_t generation = 1469598103934665603ull;
         for (unsigned d = 1; d <= unsigned(D::PointCloudPoint); ++d)
         {
@@ -52,11 +49,25 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             generation = (generation ^ (props ? props->Revision() : 0)) * 1099511628211ull;
         }
         auto catalog = BuildGeometryPropertyCatalogSnapshot(availability, id, generation);
-        std::erase_if(catalog.Entries, [&](auto& entry)
+        std::erase_if(catalog.Entries, [](const auto& entry) {
+            return entry.Ref.ValueKind != Geometry::PropertyValueKind::Vec3;
+        });
+        for (auto& entry : catalog.Entries)
         {
-            if (entry.Ref.ValueKind != Geometry::PropertyValueKind::Vec3) return true;
             const auto* props = ResolveGeometryPropertySet(availability, entry.Ref.Domain);
             entry.PropertyGeneration = props->FindPropertyRevision(entry.Ref.Name).value_or(0);
+        }
+        return catalog;
+    }
+    GeometryPropertyCatalogSnapshot BuildPointInputCatalog(const EditorProcessingContext& context, std::uint32_t id)
+    {
+        if ((context.AttachmentActive && !context.AttachmentActive()) || !context.Scene) return {};
+        const auto entity = EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(), id);
+        if (!entity) return {};
+        const auto availability = BuildGeometryAvailability(context.Scene->Raw(), *entity);
+        auto catalog = BuildPointInputCandidateCatalog(availability, id);
+        std::erase_if(catalog.Entries, [&](auto& entry)
+        {
             auto positions = entry.Ref;
             PointInputCapture capture;
             std::string diagnostic;

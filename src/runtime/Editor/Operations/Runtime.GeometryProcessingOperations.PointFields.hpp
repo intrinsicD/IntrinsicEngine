@@ -85,6 +85,10 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         std::vector<float> BeforeValues{}, AfterValues{};
     };
 
+    // Metadata-only vec3 candidates; callers retain method-specific admission.
+    [[nodiscard]] GeometryPropertyCatalogSnapshot BuildPointInputCandidateCatalog(
+        const GeometryEntityAvailability&, std::uint32_t stableId);
+
     [[nodiscard]] GeometryPropertyCatalogSnapshot BuildPointInputCatalog(const EditorProcessingContext&, std::uint32_t stableId);
 
     // Readiness/catalog capture validates live rows without copying values. Resolved

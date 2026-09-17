@@ -94,6 +94,34 @@ namespace
     }
 } // namespace
 
+TEST(BilateralFilterOperations, InputCatalogPreservesPropertyRevisionsAcrossOtherPropertyEdits)
+{
+    for (unsigned domain = 1; domain <= unsigned(D::PointCloudPoint); ++domain)
+    {
+        SCOPED_TRACE(domain);
+        Extrinsic::ECS::Scene::Registry scene;
+        const auto entity = Make(scene, D(domain));
+        auto& props = Properties(scene, entity, D(domain));
+        const auto config = Config(entity, D(domain));
+        R::EditorProcessingContext context{.Scene = &scene};
+        const auto commands = R::BindEditorProcessingCommands(context);
+        const auto sampleRevision = props.FindPropertyRevision("samples").value();
+        const auto before = R::GetEditorBilateralFilterInputCatalog(commands, config.StableEntityId);
+        props.Get<float>("keep")[0] = 99.f;
+        const auto propertySetRevision = props.Revision();
+        const auto after = R::GetEditorBilateralFilterInputCatalog(commands, config.StableEntityId);
+        EXPECT_EQ(after.SourceStableId, config.StableEntityId);
+        EXPECT_NE(after.SourceGeneration, before.SourceGeneration);
+        EXPECT_EQ(props.Revision(), propertySetRevision);
+        const auto entry = std::ranges::find_if(after.Entries, [&](const auto& row) {
+            return row.Ref == config.Positions;
+        });
+        ASSERT_NE(entry, after.Entries.end());
+        EXPECT_EQ(entry->PropertyGeneration, sampleRevision);
+        EXPECT_EQ(entry->ElementCount, props.Size());
+    }
+}
+
 TEST(BilateralFilterConfig, RoundTripAndSharedPreviewApplyRun)
 {
     namespace C = Extrinsic::Core::Config;

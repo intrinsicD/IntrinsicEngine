@@ -62,6 +62,7 @@ import Geometry.UvAtlas;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSoup.hpp"
 
 namespace Extrinsic::Runtime
 {

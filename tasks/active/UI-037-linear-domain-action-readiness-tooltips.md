@@ -917,3 +917,66 @@ with a clean checkout. This supporting slice leaves readiness acceptance open.
 - After removing that final unused import, rebuilt `IntrinsicTests`, reran all
   72 focused cases (including registration config), and repeated strict layering;
   all pass. The full CPU run above preceded this import-only review correction.
+
+
+## Point-catalog metadata reuse and mesh-soup locality — 2026-09-17
+
+Operator continues the duplication/compilation cleanup with Claude from clean
+`e18d006d7`, explicitly outside the standing convergence selection preference.
+
+- Share generation folding, vec3 candidate filtering and per-property revisions
+  in `BuildPointInputCandidateCatalog`, compiled in the existing point-property
+  owner. Generic discovery, density, spacing and bilateral retain distinct
+  numerical, deletion and sample-count filters. No new service, policy flags or
+  lifecycle template. Five production files shrink by nine lines overall.
+- Add public-entry regression coverage across all eight domains for source versus
+  property revision invalidation, read-only query behavior and the deliberate
+  one-sample generic versus two-sample spacing/density eligibility distinction.
+  Existing family tests retain output-name collisions and deleted-slot coverage.
+- Isolate the triangle-soup result/builder declarations in one private header for
+  their two current consumers: reconstruction and UV generation. Their definitions
+  stay in the existing compiled owner. Remove five unused direct mesh-soup imports;
+  parameterization still legitimately reaches it through its UV API.
+- Strengthen compiler-closure guards for discovery, mesh fields and mesh topology.
+  The pre-edit probe rejected the three inspected curvature/geodesics/topology
+  producers for reaching `Geometry.MeshSoup`; post-build guards must pass.
+  No public API or algorithm changes, and no measured compilation-speed claim.
+- The first soup-locality run found an additional unused `Geometry.Mesh.Conversion`
+  import in topology. Its re-export retained the forbidden soup dependency despite
+  removing the direct import. Removed it after confirming no conversion caller;
+  the compiler guard remains strict. Other 255 focused cases passed that run.
+- Claude's independent plan identified the discovery unit's mesh-support include
+  as serving only its geometry-source namespace alias. Use an explicit local
+  alias and remove the helper includes, nine unused module imports and unused
+  standard/GLM includes. Keep processing access and its real config/selection
+  dependencies. Extend discovery's guard to halfedge mesh, spatial cache and
+  transform components; the before probe rejected all three.
+- Claude found no catalog blockers. Add bilateral revision coverage in its own
+  existing test file, preserving test-family compilation boundaries. The suggested
+  attachment-check concern is already guarded by command-handle resolution, and
+  the requested shared-catalog docs were updated while review was running.
+- Claude also identified topology's unused `MeshSurfaceTopology` import as a
+  second indirect soup dependency. Confirmed the exact compiler trail, removed
+  that import and kept the guard unchanged. Added the new private soup header
+  to the existing no-duplicate-property-vocabulary scan.
+- Final canonical `ci` configure and `IntrinsicTests` build pass. All 302 focused
+  catalog, mesh/UV/history, vocabulary and compilation-locality tests pass,
+  including the new bilateral revision case and all strengthened guards.
+  Layering, test layout, task policy/state links, docs sync, strict doc links,
+  skill mirrors, session brief, root hygiene and workshop checks pass. Module
+  inventory regenerated unchanged. Manual workshop rows 1–3 pass; other rows
+  are unchanged with no new exception or maturity closure.
+- Full production accounting, including the new private header and CMake entry:
+  15 files, 11,948 to 11,929 physical lines (19 fewer). The declaration split is
+  justified by two real soup consumers and removes unrelated compiler dependencies;
+  it is not counted as duplicate implementation removal. Shared catalog metadata
+  replaces four copies while preserving distinct admission rules. UI-037 stays open.
+- Final fixed-source Claude review found no blockers after the two topology
+  import corrections. A separate immutable-diff review found no verified defect;
+  its context-limited reachability questions are resolved by the source review,
+  complete build and strengthened compiler-closure tests. Harmless formatting/
+  include nits were left outside this verified source revision.
+- Full exclusion-only CPU gate on the final combined source: 4,699 passes,
+  one expected ASan-only GLFW lifecycle skip, zero failures (4,700 selected,
+  148.60 s). No sanitizer or Vulkan execution, or compile-time benchmark, is
+  claimed. Existing readiness and full-buffer-cache acceptance remains open.

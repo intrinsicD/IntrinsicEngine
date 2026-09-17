@@ -46,7 +46,6 @@ import Extrinsic.Runtime.WorldHandle;
 import Geometry.Curvature;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.CurvatureSegmentation.Features;
-import Geometry.MeshSoup;
 import Geometry.Properties;
 
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"

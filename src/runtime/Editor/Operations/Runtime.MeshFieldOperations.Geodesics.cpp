@@ -35,7 +35,6 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.HalfedgeMesh;
-import Geometry.MeshSoup;
 import Geometry.Properties;
 
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
