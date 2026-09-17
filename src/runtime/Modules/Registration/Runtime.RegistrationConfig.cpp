@@ -15,10 +15,6 @@ namespace Extrinsic::Runtime
     namespace
     {
         using Json = nlohmann::json;
-        Json Ref(const GeometryPropertyRef& ref)
-        {
-            return {{"domain", ref.Domain <= GeometryElementDomain::PointCloudPoint ? ToString(ref.Domain) : std::string_view{"invalid"}}, {"name", ref.Name}, {"kind", ref.ValueKind == Geometry::PropertyValueKind::Vec3 ? "vec3" : "invalid"}};
-        }
         RegistrationConfig Parse(const Json& doc)
         {
             RegistrationConfig c;
@@ -57,8 +53,8 @@ namespace Extrinsic::Runtime
     std::string SerializeRegistrationConfig(const RegistrationConfig& c)
     {
         return Json{{"source_entity", c.SourceStableEntityId}, {"target_entity", c.TargetStableEntityId},
-            {"source_positions", Ref(c.SourcePositions)}, {"target_positions", Ref(c.TargetPositions)},
-            {"target_normals", Ref(c.TargetNormals)}, {"backend", ToString(c.Backend)},
+            {"source_positions", ConfigDetail::EncodeVec3PointPropertyRef(c.SourcePositions)}, {"target_positions", ConfigDetail::EncodeVec3PointPropertyRef(c.TargetPositions)},
+            {"target_normals", ConfigDetail::EncodeVec3PointPropertyRef(c.TargetNormals)}, {"backend", ToString(c.Backend)},
             {"variant", c.Variant == EditorICPVariant::PointToPlane ? "point_to_plane" :
                         c.Variant == EditorICPVariant::PointToPoint ? "point_to_point" : "invalid"},
             {"max_iterations", c.MaxIterations}, {"max_correspondence_distance", c.MaxCorrespondenceDistance},

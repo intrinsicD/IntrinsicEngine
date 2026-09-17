@@ -82,6 +82,14 @@ namespace Extrinsic::Runtime::ConfigDetail
                 {"name", ref.Name}, {"kind", PointPropertyKindToken(ref.ValueKind)}};
     }
 
+    nlohmann::json EncodeVec3PointPropertyRef(const GeometryPropertyRef& ref)
+    {
+        return {{"domain", ref.Domain <= GeometryElementDomain::PointCloudPoint
+                               ? ToString(ref.Domain) : "invalid"},
+                {"name", ref.Name},
+                {"kind", ref.ValueKind == Geometry::PropertyValueKind::Vec3 ? "vec3" : "invalid"}};
+    }
+
     PointPropertyValidation ValidatePointPropertyRef(
         const nlohmann::json& ref, const Geometry::PropertyValueKind kind)
     {

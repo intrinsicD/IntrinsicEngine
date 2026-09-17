@@ -2534,6 +2534,20 @@ and default CPU tests, build the Vulkan Sandbox, then review the fixed diff.
 Dependency evidence alone does not establish an elapsed build-time improvement.
 
 
+### Vec3-only serializer reuse — plan
+
+Normal estimation, point construction and registration have seven current
+bindings backed by three equivalent local JSON serializers. Their contract is
+stricter than the existing generic encoder: only Vec3 emits a valid kind token.
+Reuse the existing compiled config-codec owner with an explicitly named
+EncodeVec3PointPropertyRef; keep generic serialization and all family validation
+messages unchanged. Remove the three local bodies. Claude approves this bounded
+reuse subject to public serialization regressions and existing owner/link checks.
+The new test exercises every binding, every valid domain/kind, invalid enum values
+and embedded NUL/quote/backslash/newline name bytes before and after consolidation.
+Keep this semantic reuse separate from the property-vocabulary move commit.
+
+
 The first compiler check found the shared codec still reached live availability
 through ClusteringConfig -> ClusteringTypes. The latter also uses only property
 identities, so its import now uses the canonical Types owner; the guard includes
@@ -2588,3 +2602,22 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 cmake --preset ci-vulkan
 cmake --build --preset ci-vulkan --target ExtrinsicSandbox -j4
 ```
+
+## Vec3-only serializer reuse — verified, 2026-09-18
+
+Normal estimation, point construction and registration now use the compiled
+EncodeVec3PointPropertyRef in the existing private config helper. Three local
+bodies are deleted; seven bindings keep exact domain/name/kind JSON and all
+family-specific validation messages. The generic three-kind encoder stays
+separate. Five production files, including the shared header/helper, change from
+3,343 to 3,331 physical lines.
+
+All 19 config tests passed before consolidation, including the new public test
+of all seven bindings, valid/invalid domain and kind tokens, and embedded name
+bytes. The combined final 60 focused tests and CPU/Vulkan compile checks above
+pass afterward. Existing positive roundtrips cover all seven bindings across all
+nine domains including Unknown, with complete serialized equality. Claude's
+suggested positive coverage is already present; no redundant test was added.
+The shared ordinary translation unit imports none of these three config modules,
+and all callers already use its private declarations, so reuse adds no module
+cycle or new layer edge.

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <initializer_list>
 #include <memory>
 #include <optional>
 #include <string>
@@ -1160,6 +1161,59 @@ TEST(SandboxConfigSections, PointPropertySerializersPreserveTokensAndNameBytes)
     }
 }
 
+
+
+TEST(SandboxConfigSections, Vec3PropertySerializersPreserveAllBindingTokensAndNameBytes)
+{
+    using D = Runtime::GeometryElementDomain;
+    using K = Geometry::PropertyValueKind;
+    const std::array<std::string_view, 10> domains{
+        "Unknown", "MeshVertex", "MeshEdge", "MeshHalfedge", "MeshFace",
+        "GraphNode", "GraphHalfedge", "GraphEdge", "PointCloudPoint", "invalid"};
+    const auto check = [&]<typename Config>(
+        Config config, std::initializer_list<std::pair<std::string_view,
+            Runtime::GeometryPropertyRef Config::*>> fields, auto serialize, auto validate)
+    {
+        for (const auto& [key, member] : fields)
+        {
+            SCOPED_TRACE(key);
+            for (unsigned d = 0; d < domains.size(); ++d)
+            {
+                SCOPED_TRACE(domains[d]);
+                for (unsigned k = 0; k <= unsigned(K::Vec4) + 1; ++k)
+                {
+                    SCOPED_TRACE(k);
+                    Config requested = config;
+                    auto& ref = requested.*member;
+                    ref = {d + 1 == domains.size() ? D(255) : D(d),
+                           std::string{"v:\0\"\\\n", 6},
+                           k > unsigned(K::Vec4) ? K(255) : K(k)};
+                    const auto payload = serialize(requested);
+                    const std::string expected = "\"" + std::string(key) +
+                        "\":{\"domain\":\"" + std::string(domains[d]) +
+                        "\",\"kind\":\"" + (ref.ValueKind == K::Vec3 ? "vec3" : "invalid") +
+                        R"(","name":"v:\u0000\"\\\n"})";
+                    EXPECT_NE(payload.find(expected), std::string::npos) << payload;
+                    if (ref.ValueKind != K::Vec3 || d + 1 == domains.size())
+                        EXPECT_FALSE(validate(payload, {}, "vec3-serializer").Usable());
+                }
+            }
+        }
+    };
+    check(Runtime::NormalEstimationConfig{},
+          {{"positions", &Runtime::NormalEstimationConfig::Positions},
+           {"output", &Runtime::NormalEstimationConfig::Output}},
+          Runtime::SerializeNormalEstimationConfig, Runtime::ValidateNormalEstimationConfigSection);
+    check(Runtime::PointConstructionConfig{},
+          {{"positions", &Runtime::PointConstructionConfig::Positions},
+           {"normals", &Runtime::PointConstructionConfig::Normals}},
+          Runtime::SerializePointConstructionConfig, Runtime::ValidatePointConstructionConfigSection);
+    check(Runtime::RegistrationConfig{},
+          {{"source_positions", &Runtime::RegistrationConfig::SourcePositions},
+           {"target_positions", &Runtime::RegistrationConfig::TargetPositions},
+           {"target_normals", &Runtime::RegistrationConfig::TargetNormals}},
+          Runtime::SerializeRegistrationConfig, Runtime::ValidateRegistrationConfigSection);
+}
 
 TEST(SandboxConfigSections, PointConfigFieldsPreserveStrictMergeAndIntegerValidation)
 {

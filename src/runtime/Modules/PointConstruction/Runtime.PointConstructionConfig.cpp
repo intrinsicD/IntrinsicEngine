@@ -13,16 +13,6 @@ namespace Extrinsic::Runtime
     namespace
     {
         using Json = nlohmann::json;
-        Json Ref(const GeometryPropertyRef& ref)
-        {
-            return {
-                {"domain", ref.Domain >= GeometryElementDomain::Unknown &&
-                                   ref.Domain <= GeometryElementDomain::PointCloudPoint
-                               ? ToString(ref.Domain)
-                               : "invalid"},
-                {"name", ref.Name},
-                {"kind", ref.ValueKind == Geometry::PropertyValueKind::Vec3 ? "vec3" : "invalid"}};
-        }
         PointConstructionConfig Parse(const Json& data)
         {
             PointConstructionConfig c;
@@ -86,8 +76,8 @@ namespace Extrinsic::Runtime
         return Json{{"entity", c.StableEntityId},
                     {"method", ToString(c.Method)},
                     {"backend", ToString(c.Backend)},
-                    {"positions", Ref(c.Positions)},
-                    {"normals", Ref(c.Normals)},
+                    {"positions", ConfigDetail::EncodeVec3PointPropertyRef(c.Positions)},
+                    {"normals", ConfigDetail::EncodeVec3PointPropertyRef(c.Normals)},
                     {"output_name", c.OutputName},
                     {"estimate_normals", c.EstimateNormals},
                     {"mutual", c.Mutual},

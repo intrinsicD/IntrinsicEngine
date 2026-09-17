@@ -22,6 +22,7 @@ extern "C++"
 
         [[nodiscard]] const char* PointPropertyKindToken(Geometry::PropertyValueKind kind) noexcept;
         [[nodiscard]] nlohmann::json EncodePointPropertyRef(const GeometryPropertyRef& ref);
+        [[nodiscard]] nlohmann::json EncodeVec3PointPropertyRef(const GeometryPropertyRef& ref);
         [[nodiscard]] PointPropertyValidation ValidatePointPropertyRef(
             const nlohmann::json& ref, Geometry::PropertyValueKind kind);
         // Fields exist in the merged defaults; diagnostics follow the supplied order.
