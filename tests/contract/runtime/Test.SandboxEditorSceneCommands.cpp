@@ -735,9 +735,9 @@ void CaptureAssetImportEventWaitPhase(
     public:
         explicit WaitForConditionApplication(
             std::function<bool(Runtime::Engine&)> ready,
-            std::uint32_t maxFrames = 512u)
+            std::chrono::milliseconds timeout = std::chrono::seconds(10))
             : m_Ready(std::move(ready))
-            , m_MaxFrames(maxFrames)
+            , m_Timeout(timeout)
         {
         }
 
@@ -745,8 +745,10 @@ void CaptureAssetImportEventWaitPhase(
         void Frame(double, double) override
         {
             auto& engine = Kernel();
-            ++m_ObservedFrames;
-            if ((m_Ready && m_Ready(engine)) || m_ObservedFrames >= m_MaxFrames)
+            const auto now = std::chrono::steady_clock::now();
+            if (!m_Deadline)
+                m_Deadline = now + m_Timeout;
+            if ((m_Ready && m_Ready(engine)) || now >= *m_Deadline)
             {
                 engine.RequestExit();
                 return;
@@ -757,8 +759,8 @@ void CaptureAssetImportEventWaitPhase(
 
     private:
         std::function<bool(Runtime::Engine&)> m_Ready{};
-        std::uint32_t m_MaxFrames{1u};
-        std::uint32_t m_ObservedFrames{0u};
+        std::chrono::milliseconds m_Timeout;
+        std::optional<std::chrono::steady_clock::time_point> m_Deadline;
     };
 
 struct BlockingGeometryDecodeState
@@ -2709,16 +2711,33 @@ TEST(SandboxEditorUi, DuplicateDroppedGeometryImportUsesSingleIngestRecord)
         "v 0 1 0\n"
         "f 1 2 3\n");
 
-    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
-                                               std::make_unique<FixedFrameApplication>(128u));
+    std::uint32_t observedFrames = 0u;
+    QueuedGeometryDecodeBarrier* decodeBarrierPtr = nullptr;
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(), std::make_unique<WaitForConditionApplication>(
+            [&](Runtime::Engine& runningEngine)
+            {
+                if (++observedFrames == 129u)
+                    decodeBarrierPtr->Release();
+                const auto queue = RequiredEngineService<Runtime::AssetWorkflowModule>(runningEngine)
+                    .GetAssetImportQueueSnapshot();
+                return queue.ActiveCount == 0u && queue.TerminalCount == 1u;
+            }));
+    QueuedGeometryDecodeBarrier decodeBarrier;
+    decodeBarrierPtr = &decodeBarrier;
     ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
+
+    RequiredEngineService<Runtime::AssetWorkflowModule>(engine)
+        .SetQueuedGeometryImportBeforeDecodeHookForTest(decodeBarrier.MakeHook());
 
     const std::vector<std::string> droppedPaths{
         meshFile.Path.string(),
         meshFile.Path.string(),
     };
     RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).ImportDroppedFilePaths(droppedPaths);
+
+    ASSERT_TRUE(decodeBarrier.WaitForBlockedWorker());
 
     std::vector<Runtime::RuntimeAssetIngestRecord> records =
         RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).GetAssetIngestRecordsForTest();
@@ -2741,6 +2760,8 @@ TEST(SandboxEditorUi, DuplicateDroppedGeometryImportUsesSingleIngestRecord)
            "headless hosts";
 
     engine.Run();
+    decodeBarrier.Release();
+    EXPECT_GT(observedFrames, 128u);
 
     EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh), 1u);
     records = RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).GetAssetIngestRecordsForTest();
