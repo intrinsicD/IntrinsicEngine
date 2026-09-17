@@ -223,6 +223,8 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Registration
         --check-source src/runtime/Editor/Operations/Runtime.RegistrationOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.RegistrationOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Registration.cpp
+        --forbid-module Geometry.HalfedgeMesh
+        --forbid-module Geometry.MeshSoup
         --forbid-module Extrinsic.Runtime.GeometryProcessingOperations
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations

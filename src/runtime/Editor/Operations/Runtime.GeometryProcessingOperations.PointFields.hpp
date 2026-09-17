@@ -1,7 +1,7 @@
 // Private capture and scalar transactions for point-property methods, plus the
 // job envelope and main-thread job/cache helpers every processing family shares.
 // Include after processing-context, property, command-history and job-projection
-// imports.
+// imports, including Core.Error for shared result diagnostics.
 #pragma once
 
 extern "C++"
@@ -37,6 +37,17 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
 
         [[nodiscard]] std::string BuildActiveDerivedJobMessage(
             std::string_view label, const EditorJobRecord& job);
+
+        [[nodiscard]] bool SameGeometryPositions(
+            const std::vector<glm::vec3>& lhs,
+            const std::vector<glm::vec3>& rhs) noexcept;
+
+        void AppendDerivedJobHandleToMessage(
+            std::string& message,
+            const JobToken handle);
+
+        [[nodiscard]] Core::ErrorCode ResultErrorOrUnknown(
+            const Core::ErrorCode error) noexcept;
 
         // Why a queued CPU job never published its result. Phrased for the
         // terminal result every abandoned job still owes the editor.

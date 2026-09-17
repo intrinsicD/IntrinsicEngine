@@ -59,14 +59,6 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             const std::uint32_t stableEntityId);
 
 
-        [[nodiscard]] bool SameGeometryPositions(
-            const std::vector<glm::vec3>& lhs,
-            const std::vector<glm::vec3>& rhs) noexcept;
-
-
-        void AppendDerivedJobHandleToMessage(
-            std::string& message,
-            const JobToken handle);
 
 
         // Shared apply gate for queued mesh CPU jobs: the entity still exists,
@@ -198,11 +190,6 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
         [[nodiscard]] bool SameMeshTopologyAndPositions(
             const Geometry::HalfedgeMesh::Mesh& before,
             const Geometry::HalfedgeMesh::Mesh& after) noexcept;
-
-
-        [[nodiscard]] Core::ErrorCode ResultErrorOrUnknown(
-            const Core::ErrorCode error) noexcept;
-
 
         // Forward the mesh's corner UVs into a scratch halfedge mesh.
         //

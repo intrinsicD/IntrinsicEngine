@@ -14,6 +14,7 @@ module;
 #include <glm/vec3.hpp>
 #include <entt/entity/registry.hpp>
 module Extrinsic.Runtime.PointFieldOperations;
+import Extrinsic.Core.Error;
 import Geometry.PointCloud.Utils;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.JobService;

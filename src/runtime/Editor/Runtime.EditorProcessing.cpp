@@ -13,6 +13,7 @@ module;
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 module Extrinsic.Runtime.EditorProcessing;
+import Extrinsic.Core.Error;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.EngineConfigControl;

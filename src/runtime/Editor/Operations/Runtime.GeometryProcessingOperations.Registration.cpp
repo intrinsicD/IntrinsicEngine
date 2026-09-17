@@ -36,7 +36,6 @@ import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Component.Transform;
-import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -47,8 +46,6 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldHandle;
-import Geometry.HalfedgeMesh;
-import Geometry.MeshSoup;
 import Geometry.Properties;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.Runtime.SpatialIndexCache;
@@ -60,7 +57,7 @@ import Geometry.PointLBVH;
 
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 
-#include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -69,6 +66,8 @@ extern "C++"
 namespace GeometryProcessingDetail::MeshSupport
 {
 
+        using EditorFeatureDetail::ResolveStableEntity;
+        using EditorFeatureDetail::ToEditorCommandStatus;
         using EditorFeatureDetail::SameTransformComponent;
         using EditorFeatureDetail::ExecuteEditorTransformMutation;
         inline constexpr std::array<EditorICPVariant, 2>

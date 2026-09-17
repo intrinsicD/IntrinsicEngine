@@ -882,3 +882,38 @@ with a clean checkout. This supporting slice leaves readiness acceptance open.
 - Claude reviewed the fixed source and found no blocking defects. Existing helper
   tests pin signed zero/NaN payloads; normal history tests cover preserved NaNs.
   No public surface changed, so no inventory regeneration was required.
+
+
+## Registration compilation locality — 2026-09-17
+
+- Second operator-directed iteration, suggested by Claude and verified against
+  source: registration used only three additional family-neutral mesh-support
+  helpers, yet included all by-value mesh snapshots and two full mesh modules.
+- Move those declarations to the existing `PointFields.hpp` block; definitions
+  remain compiled once in `MeshSupport.cpp`. Registration now includes the narrow
+  header, with its two used entity/status aliases explicit in the source.
+  Four existing narrow-header consumers gain the leaf `Core.Error` import for
+  the moved error-result declaration. No new module or helper body is introduced.
+- Extend `ProcessingCompilationLocality.Registration` to forbid `Geometry.HalfedgeMesh`
+  and `Geometry.MeshSoup`. The exact check rejected both imports before the edit.
+  Existing registration semantics, numeric snapshot comparison and result mapping
+  remain unchanged. Update the architecture paragraph and canonical reuse route.
+- Verification: canonical `ci` configure and `IntrinsicTests` build pass;
+  all 70 focused registration/comparison/history/locality cases pass. Combined
+  full CPU gate: 4,696 passes and one expected ASan-only lifecycle skip
+  (4,697 selected, 153.66 s). The new registration compiler-closure guard passes.
+  Layering, test layout, task policy/state links, session brief, skill mirrors,
+  explicit-file docs sync, doc links, diff and automated workshop checks pass.
+  Module inventory regenerated unchanged. Manual workshop rows 1–3 pass;
+  renderer/recipe/maturity rows are unchanged and no exception is introduced.
+- Seven production C++ files are one line larger overall: four explicit leaf
+  imports replace two heavy imports and one unused dirty-tags import, and aliases become explicit at their user.
+  Shared declarations moved without extra definitions or wrappers. No measured
+  compile-speed, sanitizer or Vulkan-execution claim; UI-037 remains active.
+- Claude found no blocking issues in the second fixed-source review. Its valid
+  unused dirty-tags import finding was removed from registration; the transform
+  component still owns the dirty tag this operation actually uses. The requested
+  post-edit verification note was already recorded while review was running.
+- After removing that final unused import, rebuilt `IntrinsicTests`, reran all
+  72 focused cases (including registration config), and repeated strict layering;
+  all pass. The full CPU run above preceded this import-only review correction.

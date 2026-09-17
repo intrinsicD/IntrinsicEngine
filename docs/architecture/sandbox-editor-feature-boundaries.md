@@ -67,9 +67,10 @@ through the private `Runtime.GeometryProcessingOperations.MeshSupport.hpp` and i
 one ordinary compiled owner `MeshSupport.cpp`, which imports no family module and
 no broad processing module. The family-neutral parts of that owner — the queued
 job envelope, the active-job lookup and message, selected-model cache
-invalidation, finite-position collection and the unpublished-job reason — are
-declared in `PointFields.hpp` instead, which `MeshSupport.hpp` includes. That
-keeps point-set families off the by-value halfedge-mesh and mesh-soup snapshots
+invalidation, finite-position collection, numeric position comparison, job-handle
+messages, result error normalization and the unpublished-job reason — are declared
+in `PointFields.hpp` instead, which `MeshSupport.hpp` includes. That keeps point-set
+families and registration off the by-value halfedge-mesh and mesh-soup snapshots
 in the mesh header. Mesh topology, mesh fields, registration and
 UV/parameterization each own a public family module. Workspace model assembly lives in
 `Runtime.EditorWorkspaceSnapshots.Models.cpp`. The workspace session stores its

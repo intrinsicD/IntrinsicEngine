@@ -15,6 +15,7 @@
 #include <vector>
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
+import Extrinsic.Core.Error;
 import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorCommandHistory;
