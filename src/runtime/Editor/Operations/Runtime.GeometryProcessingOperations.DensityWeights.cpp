@@ -24,7 +24,6 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Runtime.WorldHandle;
-import Extrinsic.ECS.Component.Transform;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Core.Error;
 import Geometry.PointCloud.Utils;

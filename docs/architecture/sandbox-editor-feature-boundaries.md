@@ -46,7 +46,13 @@ statistics. Action implementations include these declarations directly, without
 the workspace storage. Scene actions need only the command helpers; visualization
 actions also use the property helpers. Their definitions remain compiled once in
 `Runtime.EditorFeatureContextAdapters.cpp`. Geometry operations use the smaller
-`Runtime.EditorGeometryHelpers.hpp` for entity signatures and undo helpers.
+`Runtime.EditorGeometryHelpers.hpp` for entity signatures, stable-entity lookup
+and command-status conversion. Registration and scene actions additionally
+include `Runtime.EditorTransformHelpers.hpp` for transform comparison and undo
+publication; unrelated geometry families need no transform component module.
+UV view request tokens reuse the compiled editor signature byte mixer while
+retaining their own field ordering. The curvature changed-value template and
+topology positive-finite predicate live only in their consuming implementations.
 These headers contain no module imports; each implementation imports the types
 it uses. Helpers retain C++ linkage across their owning operation units.
 `EditorCompilationLocality.Actions` excludes unrelated processing services,

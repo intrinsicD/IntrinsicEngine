@@ -32,6 +32,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Family
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Spacing.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.cpp
+        --forbid-module Extrinsic.ECS.Component.Transform
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointSetOperations
@@ -55,6 +56,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointAnalysis
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Descriptors.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp
+        --forbid-module Extrinsic.ECS.Component.Transform
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations
         --forbid-module Extrinsic.Runtime.PointSetOperations
@@ -101,6 +103,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Normals
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp
+        --forbid-module Extrinsic.ECS.Component.Transform
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations
         --forbid-module Extrinsic.Runtime.GeometryProcessingOperations
@@ -123,6 +126,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.NormalTests
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshSupport
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.cpp
+        --forbid-module Extrinsic.ECS.Component.Transform
         --forbid-module Extrinsic.Runtime.GeometryProcessingOperations
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
@@ -143,6 +147,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointSet
         --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Bilateral.cpp
+        --forbid-module Extrinsic.ECS.Component.Transform
         --forbid-module Geometry.HalfedgeMesh
         --forbid-module Geometry.MeshSoup
         --forbid-module Extrinsic.Runtime.GeometryProcessingOperations
@@ -245,6 +250,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Parameterizatio
         --check-source src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Uv.cpp
+        --forbid-module Extrinsic.ECS.Component.Transform
         --forbid-module Extrinsic.Runtime.GeometryProcessingOperations
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
@@ -262,6 +268,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshField
         --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Curvature.cpp
         --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Geodesics.cpp
+        --forbid-module Extrinsic.ECS.Component.Transform
         --forbid-module Geometry.MeshSoup
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
@@ -279,6 +286,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshTopology
         --check-source src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.Topology.cpp
+        --forbid-module Extrinsic.ECS.Component.Transform
         --forbid-module Geometry.MeshSoup
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations

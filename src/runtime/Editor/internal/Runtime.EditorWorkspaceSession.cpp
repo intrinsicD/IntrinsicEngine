@@ -56,7 +56,6 @@ import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
-import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Renderer;

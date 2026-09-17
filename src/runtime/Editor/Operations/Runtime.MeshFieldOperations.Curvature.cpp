@@ -32,7 +32,6 @@ import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
-import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -58,6 +57,30 @@ import Geometry.Properties;
 
 namespace Extrinsic::Runtime::MeshFieldDetail
 {
+    namespace
+    {
+        // Counts how many published values differ from the ones already
+        // stored. A property the previous run did not have counts as changed in
+        // every slot, because every value is newly authored.
+        template <typename T>
+        [[nodiscard]] std::size_t CountChangedValues(
+            const bool hadProperty,
+            const std::vector<T>& before,
+            const std::vector<T>& after) noexcept
+        {
+            if (!hadProperty || before.size() != after.size())
+                return after.size();
+
+            std::size_t changed = 0u;
+            for (std::size_t i = 0u; i < after.size(); ++i)
+            {
+                if (after[i] != before[i])
+                    ++changed;
+            }
+            return changed;
+        }
+    }
+
         using namespace GeometryProcessingDetail::MeshSupport;
         namespace Curv = Geometry::Curvature;
         namespace CurvSeg = Geometry::CurvatureSegmentation;

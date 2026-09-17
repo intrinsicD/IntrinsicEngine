@@ -30,7 +30,6 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Error;
 import Extrinsic.ECS.Component.DirtyTags;
-import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Scene.Handle;
@@ -501,34 +500,22 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        void HashUvViewTokenValue(
-            std::uint64_t& token,
-            const std::uint64_t value) noexcept
-        {
-            constexpr std::uint64_t prime = 1099511628211ull;
-            for (std::uint32_t shift = 0u; shift < 64u; shift += 8u)
-            {
-                token ^= (value >> shift) & 0xFFu;
-                token *= prime;
-            }
-        }
-
         [[nodiscard]] std::uint64_t BuildUvViewRequestToken(
             const EditorParameterizationViewModel& model,
             const std::uint32_t width,
             const std::uint32_t height) noexcept
         {
-            std::uint64_t token = 1469598103934665603ull;
-            HashUvViewTokenValue(token, model.SelectedStableEntityId);
-            HashUvViewTokenValue(token, width);
-            HashUvViewTokenValue(token, height);
-            HashUvViewTokenValue(
+            std::uint64_t token = EditorFeatureDetail::kEditorSignatureOffset;
+            EditorFeatureDetail::MixSignature(token, model.SelectedStableEntityId);
+            EditorFeatureDetail::MixSignature(token, width);
+            EditorFeatureDetail::MixSignature(token, height);
+            EditorFeatureDetail::MixSignature(
                 token,
                 static_cast<std::uint32_t>(model.View.RenderMode));
-            HashUvViewTokenValue(
+            EditorFeatureDetail::MixSignature(
                 token,
                 static_cast<std::uint32_t>(model.View.BackgroundMode));
-            HashUvViewTokenValue(
+            EditorFeatureDetail::MixSignature(
                 token,
                 model.View.ShowDistortionHeatmap ? 1u : 0u);
             for (const float bound : {
@@ -537,22 +524,22 @@ namespace Extrinsic::Runtime
                      model.UvBoundsMax.x,
                      model.UvBoundsMax.y})
             {
-                HashUvViewTokenValue(token, std::bit_cast<std::uint32_t>(bound));
+                EditorFeatureDetail::MixSignature(token, std::bit_cast<std::uint32_t>(bound));
             }
             for (const std::uint32_t index : model.LineIndices)
-                HashUvViewTokenValue(token, index);
+                EditorFeatureDetail::MixSignature(token, index);
             for (const glm::vec2 uv : model.UVs)
             {
-                HashUvViewTokenValue(
+                EditorFeatureDetail::MixSignature(
                     token,
                     std::bit_cast<std::uint32_t>(uv.x));
-                HashUvViewTokenValue(
+                EditorFeatureDetail::MixSignature(
                     token,
                     std::bit_cast<std::uint32_t>(uv.y));
             }
             for (const float value : model.TriangleConformalDistortion)
             {
-                HashUvViewTokenValue(
+                EditorFeatureDetail::MixSignature(
                     token,
                     std::bit_cast<std::uint32_t>(value));
             }

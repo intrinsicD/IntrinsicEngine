@@ -79,6 +79,7 @@ import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 
 #include "Editor/internal/Runtime.EditorFeatures.Internal.hpp"
+#include "Editor/internal/Runtime.EditorTransformHelpers.hpp"
 
 #include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
 

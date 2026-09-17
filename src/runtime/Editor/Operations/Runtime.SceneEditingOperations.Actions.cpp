@@ -35,6 +35,7 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldHandle;
 
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
+#include "Editor/internal/Runtime.EditorTransformHelpers.hpp"
 
 #include "Editor/internal/Runtime.EditorFeatureCommands.Internal.hpp"
 

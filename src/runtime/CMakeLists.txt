@@ -183,6 +183,7 @@ target_sources(${target_name}
         Editor/internal/Runtime.EditorFeatureCommands.Internal.hpp
         Editor/internal/Runtime.EditorFeatureProperties.Internal.hpp
         Editor/internal/Runtime.EditorGeometryHelpers.hpp
+        Editor/internal/Runtime.EditorTransformHelpers.hpp
         Editor/Operations/Runtime.GeometryProcessingOperations.MeshSoup.hpp
         Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.hpp
         Editor/Operations/Runtime.MeshFieldOperations.Properties.hpp

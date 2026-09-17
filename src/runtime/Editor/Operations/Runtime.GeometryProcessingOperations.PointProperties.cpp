@@ -30,7 +30,6 @@ import Extrinsic.Runtime.SpatialIndexCache;
 import Geometry.Properties;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Runtime.WorldHandle;
-import Extrinsic.ECS.Component.Transform;
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"

@@ -980,3 +980,77 @@ Operator continues the duplication/compilation cleanup with Claude from clean
   one expected ASan-only GLFW lifecycle skip, zero failures (4,700 selected,
   148.60 s). No sanitizer or Vulkan execution, or compile-time benchmark, is
   claimed. Existing readiness and full-buffer-cache acceptance remains open.
+
+## Private helper ownership and transform locality — plan, 2026-09-17
+
+The operator continues to direct duplicate-code and compilation-dependency
+cleanup with Claude. Isolate the two shared transform-mutation declarations
+from the common entity/signature header, retaining their existing compiled
+definitions and C++ linkage. Only registration and scene actions consume them;
+18 other implementation units import the transform module solely for the
+shared declaration surface. Preserve real transform dependencies in registration,
+construction, scene actions, workspace model assembly and the definition owner.
+Pin the removed family dependencies with compiler-closure tests.
+
+Move the single-caller changed-value template into curvature's implementation
+and the positive-finite predicate into topology's implementation. Replace UV
+view token byte mixing with the existing editor signature helper: identical
+offset, prime, eight-byte order and float bit patterns; the distinct diagnostic
+fingerprint stays separate. No new public API or behavior is intended. Existing
+family, undo/redo and UV-token contracts plus the full CPU gate cover the slice.
+
+Reuse decision: keep compiled transform/signature definitions in
+`Runtime.EditorFeatureContextAdapters.cpp`; a declaration-only transform header
+is necessary because the existing command header would expose unrelated
+render-hint/file types to registration. No new implementation owner or wrapper.
+Claude's separate candidate to unify mesh-builder diagnostics remains deferred
+to a semantic slice. No compilation-time speedup is claimed without a comparison.
+
+### Implementation and review checkpoint
+
+The two transform declarations now live in `Runtime.EditorTransformHelpers.hpp`,
+included by registration, scene actions and the existing definition owner. All
+18 unused direct imports are removed. A before/after check of the configured
+compiler records rejected all 18 producers before the edit and passes all 18
+after it; eight existing processing-family guards now forbid the transform
+module. Registration/construction/scene edits retain their real dependencies.
+
+`CountChangedValues` and `IsPositiveFinite` now have implementation-local
+anonymous-namespace ownership in curvature and topology respectively. UV view
+request tokens reuse `MixSignature` and `kEditorSignatureOffset`; both mixers
+use the same eight little-endian bytes, XOR-then-multiply prime and offset.
+Token field order and float bit casts are unchanged. The existing semantic
+token test also checks that signed zero changes the request and resubmitting
+the original restores its token. Tokens remain transient renderer request/cache
+identity, with no persisted-format or cross-process contract.
+
+Claude reviewed the plan and fixed diff: no verified blocking findings. Review
+uncertainties about constant visibility, include completeness, remaining helper
+callers, transitive imports and fixture behavior are closed by the full build,
+the compiler-closure tests and the focused token test. No review-driven source
+changes were required. The distinct diagnostic/sandbox hash algorithms and
+polygon-preserving normal reconstruction remain separate.
+
+Production delta, including the new declaration-only header: 25 source/build
+files, 23,435 to 23,424 lines (11 removed). The fan-out is mostly one removed
+import per consumer; there is no new implementation or public module.
+Architecture/workshop rows 1–3 pass: fewer imports, unchanged target links and
+public type ownership. Rows 4–6 are unaffected (no renderer state/pass/recipe
+changes); whole-task retirement and exceptions do not apply (rows 7–8). Source
+documentation audit: zero objective errors; seven existing review hints in the
+shared mesh header. Module inventory remains unchanged at 419 modules.
+
+Canonical `ci` configure and `IntrinsicTests` build pass with Clang 23. The
+focused processing/editor boundaries, parameterization, registration, mesh-field,
+point-field and runtime-layering selection passes 131 tests. Strict layering,
+test layout, task policy/state links, docs sync/links, skill mirrors, root hygiene,
+clean-workshop automation, session-brief freshness and diff checks pass.
+Local logs and fixed Claude packet: `/tmp/intrinsic-third-*`. This continues
+UI-037's operator-directed support work; its broad readiness acceptance stays open.
+
+Final full CPU verification: **4,699 passed plus one expected ASan-only GLFW
+skip**, zero failures (4,700 selected, 149.83 s), using
+`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60`.
+Sanitizer and GPU/Vulkan execution were not repeated for this private-helper
+refactor. Compilation dependency reduction is verified; build-time speedup is
+not measured.

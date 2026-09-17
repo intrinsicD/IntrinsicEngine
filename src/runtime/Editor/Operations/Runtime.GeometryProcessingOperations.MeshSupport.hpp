@@ -59,28 +59,6 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
 
 
 
-        // Counts how many published values differ from the ones already
-        // stored. A property the previous run did not have counts as changed in
-        // every slot, because every value is newly authored.
-        template <typename T>
-        [[nodiscard]] std::size_t CountChangedValues(
-            const bool hadProperty,
-            const std::vector<T>& before,
-            const std::vector<T>& after) noexcept
-        {
-            if (!hadProperty || before.size() != after.size())
-                return after.size();
-
-            std::size_t changed = 0u;
-            for (std::size_t i = 0u; i < after.size(); ++i)
-            {
-                if (after[i] != before[i])
-                    ++changed;
-            }
-            return changed;
-        }
-
-        [[nodiscard]] bool IsPositiveFinite(const double value) noexcept;
 
 
         struct MeshDenoiseSourceResult

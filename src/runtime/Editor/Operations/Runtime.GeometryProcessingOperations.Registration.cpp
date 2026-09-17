@@ -54,6 +54,7 @@ import Geometry.Registration;
 import Geometry.PointLBVH;
 
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
+#include "Editor/internal/Runtime.EditorTransformHelpers.hpp"
 
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 

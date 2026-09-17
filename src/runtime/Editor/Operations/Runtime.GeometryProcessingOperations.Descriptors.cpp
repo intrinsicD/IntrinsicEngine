@@ -20,7 +20,6 @@ module Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Component.DirtyTags;
-import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EngineConfigControl;

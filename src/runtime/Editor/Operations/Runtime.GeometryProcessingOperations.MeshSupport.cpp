@@ -22,7 +22,6 @@
 
 import Extrinsic.Core.Error;
 import Extrinsic.ECS.Component.DirtyTags;
-import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Scene.Handle;
@@ -494,11 +493,6 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             }
 
             return JobApplyValidation::Current;
-        }
-
-        bool IsPositiveFinite(const double value) noexcept
-        {
-            return std::isfinite(value) && value > 0.0;
         }
 
         std::vector<glm::vec3> ExtractMeshPositions(

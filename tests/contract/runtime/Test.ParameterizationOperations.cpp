@@ -1325,6 +1325,13 @@ TEST(ParameterizationOperations, GpuViewRequestTokenIsStableAndSemantic)
     EXPECT_EQ(first.Message, "ready");
 
     const std::uint64_t referenceToken = requests.back().RequestToken;
+    auto signedZeroModel = model;
+    signedZeroModel.UVs[0].x = -0.0f;
+    static_cast<void>(submit(signedZeroModel));
+    EXPECT_NE(requests.back().RequestToken, referenceToken);
+    static_cast<void>(submit(model));
+    EXPECT_EQ(requests.back().RequestToken, referenceToken);
+
     model.View.BackgroundMode =
         Runtime::ParameterizationUvBackgroundMode::Checker;
     (void)submit(model);

@@ -22,7 +22,6 @@ import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.ECS.Scene.Handle;
-import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.SpatialIndexCache;

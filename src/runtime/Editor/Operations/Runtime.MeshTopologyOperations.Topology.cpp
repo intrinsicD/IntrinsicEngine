@@ -33,7 +33,6 @@ import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
-import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -64,6 +63,14 @@ import Geometry.Subdivision;
 
 namespace Extrinsic::Runtime::MeshTopologyDetail
 {
+    namespace
+    {
+        bool IsPositiveFinite(const double value) noexcept
+        {
+            return std::isfinite(value) && value > 0.0;
+        }
+    }
+
         using namespace GeometryProcessingDetail::MeshSupport;
         namespace Smooth = Geometry::Smoothing;
         namespace Remesh = Geometry::Remeshing;

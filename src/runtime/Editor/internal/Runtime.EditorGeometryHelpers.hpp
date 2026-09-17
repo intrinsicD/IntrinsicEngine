@@ -1,5 +1,5 @@
-// Shared entity signatures and undo helpers for scene and geometry operations.
-// Include after editor/common, command-history, ECS registry and transform imports;
+// Shared entity signatures, entity lookup and command-status conversion.
+// Include after editor/common, command-history and ECS registry imports;
 // the including global module fragment provides integer, optional and string types.
 #pragma once
 
@@ -22,19 +22,6 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
     [[nodiscard]] std::optional<ECS::EntityHandle> ResolveStableEntity(
         const entt::registry& raw,
         const std::uint32_t stableId);
-
-    [[nodiscard]] bool SameTransformComponent(
-        const ECS::Components::Transform::Component& lhs,
-        const ECS::Components::Transform::Component& rhs) noexcept;
-
-    [[nodiscard]] EditorCommandHistoryResult ExecuteEditorTransformMutation(
-        EditorCommandHistory& history,
-        ECS::Scene::Registry* scene,
-        const WorldHandle world,
-        const std::uint32_t stableEntityId,
-        const ECS::Components::Transform::Component& before,
-        const ECS::Components::Transform::Component& after,
-        std::string label);
 
     [[nodiscard]] EditorCommandStatus ToEditorCommandStatus(
         const EditorCommandHistoryStatus status) noexcept;
