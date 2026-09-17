@@ -1,3 +1,8 @@
+#include <array>
+#include <cmath>
+#include <limits>
+#include <span>
+#include <utility>
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
 #include <vector>
@@ -18,6 +23,41 @@ namespace
         return {.Domain = domain, .Name = name, .ValueKind = Geometry::PropertyValueKind::Vec3};
     }
 } // namespace
+TEST(SpatialIndexCache, SnapshotComparisonPreservesOrderedRowsAndNumericEquality)
+{
+    EXPECT_FALSE(R::SpatialIndexSnapshotMatches(nullptr, {}, {}));
+    R::SpatialIndexSnapshot empty;
+    EXPECT_TRUE(R::SpatialIndexSnapshotMatches(&empty, {}, {}));
+
+    const std::array<glm::vec3, 3> points{{{0, 0, 0}, {1, 2, 3}, {2, 3, 4}}};
+    R::SpatialIndexSnapshot snapshot;
+    ASSERT_TRUE(snapshot.Index.Build(points));
+    snapshot.Slots = {2, 4, 8};
+    EXPECT_TRUE(R::SpatialIndexSnapshotMatches(&snapshot, snapshot.Slots, points));
+    EXPECT_FALSE(R::SpatialIndexSnapshotMatches(&snapshot,
+        std::span(snapshot.Slots).first(2), points));
+    EXPECT_FALSE(R::SpatialIndexSnapshotMatches(&snapshot,
+        snapshot.Slots, std::span(points).first(2)));
+    auto slots = snapshot.Slots;
+    slots[1] = 5;
+    EXPECT_FALSE(R::SpatialIndexSnapshotMatches(&snapshot, slots, points));
+    slots = snapshot.Slots;
+    std::swap(slots[0], slots[1]);
+    EXPECT_FALSE(R::SpatialIndexSnapshotMatches(&snapshot, slots, points));
+
+    auto changed = points;
+    changed[1].x = std::nextafter(changed[1].x, 2.f);
+    EXPECT_FALSE(R::SpatialIndexSnapshotMatches(&snapshot, snapshot.Slots, changed));
+    changed = points;
+    std::swap(changed[0], changed[1]);
+    EXPECT_FALSE(R::SpatialIndexSnapshotMatches(&snapshot, snapshot.Slots, changed));
+    changed = points;
+    changed[0].x = -0.f;
+    EXPECT_TRUE(R::SpatialIndexSnapshotMatches(&snapshot, snapshot.Slots, changed));
+    changed[0].x = std::numeric_limits<float>::quiet_NaN();
+    EXPECT_FALSE(R::SpatialIndexSnapshotMatches(&snapshot, snapshot.Slots, changed));
+}
+
 TEST(SpatialIndexCache, ReusesOnlyUnchangedPropertyAndLiveElementIdentity)
 {
     R::WorldRegistry worlds;

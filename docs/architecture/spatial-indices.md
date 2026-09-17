@@ -121,6 +121,10 @@ participant, producer/readback ordering and device shutdown. Batches retain
 entries until completion, so pruning does not invalidate submitted resources.
 Results retain original property row IDs; CPU snapshot indices are compact and
 carry an explicit `Slots` mapping.
+`SpatialIndexSnapshotMatches` is the compiled comparison shared by the nine
+property-processing adapters: it rejects a null snapshot and compares ordered
+source slots and numeric positions exactly. Callers retain acquisition, freshness
+and backend checks and their own failure diagnostics.
 
 `Acquire(..., SpatialIndexSpace::EntityTransform)` indexes transformed positions
 and includes the entity TRS matrix in cache freshness. This preserves the

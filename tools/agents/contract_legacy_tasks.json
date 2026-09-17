@@ -4,6 +4,7 @@
     "backlog/assets/ASSETIO-009-loss-aware-materialx-subset-import.md": "6d07ff34135a77297323bd3ce7f098c568c02dd41da4d6e8b2047b9a8f9f198e",
     "backlog/assets/ASSETIO-010-async-model-companion-preflight.md": "db7669d3eedc1608ff56422c9ebfe465f7bf0c399b190ad6359265b2219763d6",
     "backlog/assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md": "70532d82578fe7bc87475593a674965d03ca40b39ba7c3764b9588b6db4838b7",
+    "backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md": "6ace4339819695da1c6b6e8f2f3aafb56e911dc956124c6187f977c61b00d8d1",
     "backlog/bugs/BUG-096-icp-point-to-plane-target-normals.md": "000e708d24b13fe5e1e8eedc73f8298cec217114fbbf207748714f5aac8505e0",
     "backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md": "70c5fdec849b43b827b3c67d251f84da7a976b8c92d309da27c12a060329c8f1",
     "backlog/bugs/BUG-108-fibonacci-sphere-small-count-endpoints.md": "ef05bc71ea4fae2aac48bc435dc59f9938124abda2413bc8961289c97733d639",
@@ -78,7 +79,6 @@
   "schema_version": 1,
   "source_revision": "577b45837d47e731f4495c8ab4ea1570bdc63911",
   "tasks": {
-    "backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md": "6ace4339819695da1c6b6e8f2f3aafb56e911dc956124c6187f977c61b00d8d1",
     "backlog/geometry/GEOM-013-feature-preserving-dual-contouring.md": "96e0817fc8ef0da504deb323cb1e6c96b2593b1c44d35add8c10fdd82ec3990c",
     "backlog/geometry/GEOM-065-invariant-aware-scientific-field-mip-pyramids.md": "5d9b1f891093ec92b7086de4397113f1c0afc6acc59c63ce3ed2d669dd5c20bf",
     "backlog/geometry/GEOM-068-weighted-dijkstra-edge-cost-contract.md": "e1e5935f77896ed8b8a1cdab79317c98a22ff6737de2d2b85d35de5763453ee7",

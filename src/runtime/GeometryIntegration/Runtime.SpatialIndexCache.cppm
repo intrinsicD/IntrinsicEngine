@@ -52,6 +52,9 @@ export namespace Extrinsic::Runtime
         Geometry::PointLBVH::Index Index{};
         std::vector<std::uint32_t> Slots{};
     };
+    // Ordered source rows and exact numeric positions (+0 == -0); null never matches.
+    [[nodiscard]] bool SpatialIndexSnapshotMatches(const SpatialIndexSnapshot*,
+        std::span<const std::uint32_t> slots, std::span<const glm::vec3> points) noexcept;
     struct SpatialIndexWorkspace
     {
         SpatialIndexHandle Handle{};

@@ -28,6 +28,13 @@ import Extrinsic.RHI.TransferQueue;
 
 namespace Extrinsic::Runtime
 {
+    bool SpatialIndexSnapshotMatches(const SpatialIndexSnapshot* snapshot,
+        std::span<const std::uint32_t> slots, std::span<const glm::vec3> points) noexcept
+    {
+        return snapshot && std::ranges::equal(snapshot->Slots, slots) &&
+               std::ranges::equal(points, snapshot->Index.Points());
+    }
+
     namespace
     {
         static_assert(sizeof(Geometry::PointLBVH::Neighbor) == 8);

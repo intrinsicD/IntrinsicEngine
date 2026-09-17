@@ -2,6 +2,14 @@
 id: BUG-091
 theme: G
 depends_on: []
+workflow_schema: 1
+template: micro
+workflow_profile: micro
+evidence: not_applicable
+evidence_skip_reason: Interactive discovery-failure follow-up; command logs and the existing diagnostic plan retain evidence.
+contract_schema: 1
+contracts: []
+contract_review: The catalog has no CTest discovery-timeout contract; this task changes test enumeration policy without changing engine APIs, method contracts or layer ownership.
 ---
 # BUG-091 — GoogleTest PRE_TEST discovery times out on a cold start
 
@@ -131,3 +139,38 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Treating one passing rerun as proof that the cold-start defect is fixed.
 - Folding the work into `CI-008` unless evidence shows grouping/process-budget
   changes are necessary to solve discovery rather than only test execution.
+
+
+## Additional observation — 2026-09-17
+
+During UI-037 compilation/reuse work on the Clang 23 `ci-vulkan` tree,
+`ctest --test-dir build/ci-vulkan -N -L gpu -L vulkan -R
+'PointLBVHGpuSmoke|PointConstructionGpuSmoke'` exited 8 before listing cases.
+`GoogleTestAddTests.cmake:112` reported `Process terminated due to timeout`
+while enumerating `build/ci-vulkan/bin/IntrinsicPointLBVHGpuTests`, with empty
+output. The failure came after reconfiguration and before rebuilding the target
+for the current source, and before any requested GPU test assertions ran. The
+CPU target build had just completed; the focused CPU run and Vulkan rebuild
+started after this failure. This is another enumeration observation, not proof
+of a kernel regression or a root-cause finding. No discovery/test budget was
+changed. A bounded direct listing after the rebuild and a normal CTest invocation
+are the diagnostic follow-up; results are recorded below when available.
+
+
+After the target rebuild, one bounded direct invocation,
+`/usr/bin/time -f 'elapsed_seconds=%e exit_status=%x' timeout 30
+build/ci-vulkan/bin/IntrinsicPointLBVHGpuTests --gtest_list_tests`, succeeded in
+0.04 s with exit 0 and the expected PointLBVHGpuSmoke/PointConstructionGpuSmoke
+inventory. The generated include still specifies `TEST_DISCOVERY_TIMEOUT 5`.
+Logs: `/tmp/intrinsic-twelfth-discovery-direct.log` and
+`/tmp/intrinsic-twelfth-discovery-direct-time.log`. A subsequent normal selected
+CTest execution began running GPU cases successfully; the cold-start root cause
+and distribution requirements above remain open.
+
+
+The subsequent normal CTest invocation completed: all nine selected GPU/Vulkan
+publication tests passed, no skips or failures (123.13 s total). Logs are in
+`/tmp/intrinsic-twelfth-vulkan-test.log`; the exact selector is in the dated
+UI-037 snapshot-comparison checkpoint. This clears the scoped verification run,
+not BUG-091's unreproduced cold-start cause. Enrollment in the current micro
+workflow moves the original contract-baseline hash unchanged to `consumed`.

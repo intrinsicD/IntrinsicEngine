@@ -9,7 +9,7 @@ evidence: not_applicable
 evidence_skip_reason: Interactive staged implementation; fixed diffs, review, tests and task checkpoints retain verification without unattended custody.
 maturity_target: Operational
 contract_schema: 1
-contracts: [geometry.element-domain-sources, geometry.property-coherence, runtime.editor-prepared-frame-locality, runtime.processing-compilation-locality]
+contracts: [geometry.element-domain-sources, geometry.property-coherence, runtime.editor-prepared-frame-locality, runtime.processing-compilation-locality, runtime.spatial-query-locality]
 ---
 # UI-037 — Linear domain-action readiness and disabled-reason tooltips
 
@@ -1604,3 +1604,103 @@ claiming duplicate-body removal or measured compilation speed. Workshop automati
 passes; manual ownership/reuse/layering rows 1–3 pass and rows 4–8 are unaffected.
 The full CPU gate will run on the combined source after the next reuse slice.
 Logs and review packets: `/tmp/intrinsic-eleventh-*`.
+
+
+## Shared spatial-snapshot comparison — plan, 2026-09-17
+
+Continue from `a44207ea0` with the nine matching sample guards identified by
+Claude: density, spacing, normals, bilateral, outliers, density weights,
+keypoints, descriptors and construction. The cache owns immutable snapshot
+positions and original-slot identity, so place one compiled free predicate in
+SpatialIndexCache, with a declaration in its existing interface. No private
+processing wrapper, new module, record, policy flag or acquisition lifecycle.
+
+Narrow Claude's proposal to the predicate. Adding snapshot ownership to every
+acquisition result is unnecessary here and changes lease lifetime; keep Acquire,
+Snapshot and Ready calls and result assignments exactly where they are. Also do
+not count compressing three assignments onto one line as a reduction. Share only
+null rejection plus same-size/order/value checks using numeric vec3 equality:
+positive and negative zero match, NaNs do not. Keep every family mismatch string,
+backend gate, status and IndexReused assignment-before-rejection unchanged.
+
+Nine present callers justify the small public function; direct snapshot tests
+will exercise null/empty data, cardinality, row identity/order, one-ULP drift,
+signed zero and NaNs. Existing all-domain entry-point tests and actual Vulkan
+execution exercise the callers. Keep SpatialCompilationLocality.QueryInterface
+and family closure guards green, regenerate inventory, and rerun the full CPU
+gate on the combined source. This is shared validation and compile ownership,
+not a timing claim. The broader acquire wrapper would require a future caller
+needing a distinct acquisition contract before reconsideration.
+
+
+The pre-build Vulkan `ctest -N` discovery timed out in the existing BUG-091
+harness path before any selected tests ran. The occurrence is recorded in
+`tasks/backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md`; keep the
+normal budgets and diagnose after the target rebuild. This is distinct from
+the introduced-and-fixed guard source-path error in the preceding slice.
+
+
+### Snapshot comparison review and CPU checkpoint
+
+All nine callers share `SpatialIndexSnapshotMatches`; their surrounding code,
+acquisition, snapshot leases, reuse reporting and mismatch diagnostics are
+unchanged. The helper adds ten production lines including its declaration and
+comment; the callers remove fifteen, for five fewer production lines without
+format compression. There are no new target entries or files. Across the two
+slices the production line count is unchanged; duplicated comparisons are now
+compiled once and the bilateral config/results have a narrower import closure.
+
+Claude's fixed final diff review found no blockers and confirmed equality,
+ownership and line accounting. Full IntrinsicTests build and all 211 focused
+CPU/compilation tests pass (44.31 s), including the new null/order/cardinality/
+ULP/zero/NaN test and the unchanged spatial interface boundary. Both interface
+inventory generation and task policy pass; the inventory remains 419. Source
+documentation has zero errors; the numeric-equality comment is retained because
+it distinguishes this predicate from bitwise undo-buffer comparisons.
+
+Manual architecture/workshop rows 1–3 pass: existing spatial owner, nine real
+callers and no new dependency edges or lease changes. Renderer/recipe,
+retirement and exception rows are unaffected. No performance timing claim.
+The full CPU gate and nine GPU publication paths are the final combined checks.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -R 'SpatialIndex|SpatialCompilationLocality|PointSpacing|KernelDensity|BilateralFilter|DescriptorAnalysis|NormalEstimation|PointConstruction|DensityWeight|Keypoint|Outlier|ProcessingCompilationLocality|SandboxProcessingPanels' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target IntrinsicPointLBVHGpuTests ExtrinsicSandbox
+```
+
+Logs/review packets: `/tmp/intrinsic-twelfth-*`. Claude also identified unused
+Utils/Features re-exports in OutlierAnalysisConfig, KeypointAnalysisConfig and
+DescriptorAnalysisConfig. A valid six-producer baseline probe confirms those
+config dependencies (`/tmp/intrinsic-thirteenth-boundary-before.log`); that remains
+a separate next candidate, with no edits in this slice.
+
+
+Recording the BUG-091 recurrence enrolls that previously grandfathered task in
+the current micro workflow and explicit contract-review schema. The structural
+gate caught the missing enrollment; the original contract-baseline hash is now
+moved unchanged to `consumed`, and task policy/session-brief checks pass. No gate
+or discovery budget was changed. The CPU build also reports existing warnings
+in unchanged test fixtures (ignored AddTriangle result and constructor member
+order); these are not test failures or new warnings from the touched sources.
+
+
+Final combined CPU gate: 4,718 passed plus one expected ASan-only GLFW lifecycle
+skip (4,719 selected, zero failures, 179.58 s). All nine GPU/Vulkan publication
+tests passed (123.13 s total, no skips): normal estimation, outliers, density,
+spacing, bilateral, keypoints, descriptors, density weights and construction.
+The canonical instrumented ci-vulkan build includes a successful standalone
+Sandbox link. No full CPU sanitizer suite was repeated. Source stayed fixed
+through the final Claude code review and both execution gates.
+
+```bash
+ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R '^PointLBVHGpuSmoke\.(NormalNeighborhoodsPublishAcrossDomainsAndRejectIncompleteSupport|OutlierNeighborhoodsPublishAcrossDomainsAndCountDenseSupport|KernelDensityPublishesAcrossDomainsAndPreservesCandidatePolicy|PointSpacingPublishesAcrossDomainsAndPreservesCandidatePolicy|BilateralPublishesMovingPassesAcrossDomains|KeypointPublishesAcrossDomainsWithCompleteSupport|DescriptorPublishesAcrossDomainsWithCompleteSupport|DensityWeightPublishesAllKernelsAcrossDomains)$|^PointConstructionGpuSmoke.QueriesMatchReferenceAcrossDomainsAndGeneratedGeometryRenders$' --no-tests=error --timeout 120
+```
+
+All final structural/workshop, layering, docs/link, task-policy/state-link,
+source-documentation, root-hygiene and diff checks pass. UI-037 retains its
+broader readiness/cache acceptance; BUG-091 retains its cold-start root-cause
+and distribution work. No compilation-speed measurement or retirement claim.

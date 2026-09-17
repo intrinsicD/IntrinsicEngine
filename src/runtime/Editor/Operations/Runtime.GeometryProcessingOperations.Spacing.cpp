@@ -211,9 +211,7 @@ namespace Extrinsic::Runtime
             w->GpuIndex = acquired.Handle;
             w->Index = context.SpatialIndices->Snapshot(acquired.Handle);
             w->Result.IndexReused = acquired.Reused;
-            if (!w->Index || w->Index->Slots != w->Slots ||
-                w->Index->Index.Points().size() != w->Points.size() ||
-                !std::equal(w->Points.begin(), w->Points.end(), w->Index->Index.Points().begin()))
+            if (!SpatialIndexSnapshotMatches(w->Index.get(), w->Slots, w->Points))
                 return report(EditorCommandStatus::StaleEntity,
                               "Radii index snapshot does not match the selected samples.");
         }
