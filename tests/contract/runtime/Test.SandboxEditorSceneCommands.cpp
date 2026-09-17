@@ -769,6 +769,8 @@ struct BlockingGeometryDecodeState
         std::atomic_bool Release{false};
         std::atomic_bool MutationObservedWhileBlocked{false};
         std::atomic_uint32_t FramesWhileBlocked{0u};
+        std::uint32_t FramesBeforeAction{3u};
+        bool DeadlineExpired{false};
         std::atomic_uint32_t ObservedPayloadKind{0u};
         Runtime::RuntimeAssetIngestHandle Operation{};
         std::size_t BaselineLiveAssetCount{0u};
@@ -838,11 +840,9 @@ class DriveBlockedGeometryImportApplication final : public Intrinsic::Tests::Run
 public:
     explicit DriveBlockedGeometryImportApplication(
         std::shared_ptr<BlockingGeometryDecodeState> state,
-        const BlockedGeometryImportAction action = BlockedGeometryImportAction::Release,
-        const std::uint32_t maxFrames            = 512u)
+        const BlockedGeometryImportAction action = BlockedGeometryImportAction::Release)
         : m_State(std::move(state))
         , m_Action(action)
-        , m_MaxFrames(maxFrames)
     {
     }
 
@@ -850,7 +850,9 @@ public:
     void Frame(double, double) override
     {
         auto& engine = Kernel();
-        ++m_ObservedFrames;
+        const auto now = std::chrono::steady_clock::now();
+        if (!m_Deadline)
+            m_Deadline = now + std::chrono::seconds(10);
         if (m_State->Started.load(std::memory_order_acquire) &&
             !m_State->Release.load(std::memory_order_acquire))
         {
@@ -872,7 +874,7 @@ public:
             }
             const std::uint32_t blockedFrames =
                 m_State->FramesWhileBlocked.fetch_add(1u, std::memory_order_acq_rel) + 1u;
-            if (blockedFrames >= 3u)
+            if (blockedFrames >= m_State->FramesBeforeAction)
             {
                 if (m_Action == BlockedGeometryImportAction::Cancel)
                 {
@@ -886,13 +888,14 @@ public:
             }
         }
 
+        m_State->DeadlineExpired = now >= *m_Deadline;
         if ((m_Action == BlockedGeometryImportAction::Release &&
              RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine)
                  .GetLastAssetImportEvent()
                  .has_value()) ||
             (m_Action == BlockedGeometryImportAction::Cancel && m_State->CancelAttempted &&
              ++m_FramesAfterAction >= 16u) ||
-            m_ObservedFrames >= m_MaxFrames)
+            m_State->DeadlineExpired)
         {
             m_State->Release.store(true, std::memory_order_release);
             engine.RequestExit();
@@ -904,8 +907,7 @@ public:
 private:
     std::shared_ptr<BlockingGeometryDecodeState> m_State{};
     BlockedGeometryImportAction m_Action{BlockedGeometryImportAction::Release};
-    std::uint32_t m_MaxFrames{1u};
-    std::uint32_t m_ObservedFrames{0u};
+    std::optional<std::chrono::steady_clock::time_point> m_Deadline;
     std::uint32_t m_FramesAfterAction{0u};
 };
 
@@ -2214,6 +2216,8 @@ TEST(SandboxEditorUi, QueuedManualGeometryImportsRemainResponsiveAndApplyOnce)
     {
         SCOPED_TRACE(Assets::DebugNameForAssetPayloadKind(importCase.PayloadKind));
         auto decodeState = std::make_shared<BlockingGeometryDecodeState>();
+        if (importCase.Domain == GS::Domain::PointCloud)
+            decodeState->FramesBeforeAction = 513u;
         auto application =
             std::make_unique<DriveBlockedGeometryImportApplication>(decodeState);
 
@@ -2285,11 +2289,12 @@ TEST(SandboxEditorUi, QueuedManualGeometryImportsRemainResponsiveAndApplyOnce)
         EXPECT_EQ(queue.Entries[0].Operation, commandResult->Operation);
 
         engine.Run();
+        EXPECT_FALSE(decodeState->DeadlineExpired);
 
         EXPECT_TRUE(decodeState->Started.load(std::memory_order_acquire));
         EXPECT_GE(
             decodeState->FramesWhileBlocked.load(std::memory_order_acquire),
-            3u);
+            decodeState->FramesBeforeAction);
         EXPECT_TRUE(decodeState->ImGuiFrameBaselineCaptured);
         EXPECT_GT(
             decodeState->ImGuiFramesProducedWhileBlocked,
@@ -2413,7 +2418,7 @@ TEST(SandboxEditorUi, QueuedManualGeometryCancellationPreventsApply)
     decodeState->Operation = commandResult->Operation;
 
     engine.Run();
-
+    EXPECT_FALSE(decodeState->DeadlineExpired);
     EXPECT_TRUE(decodeState->Started.load(std::memory_order_acquire));
     EXPECT_GE(
         decodeState->FramesWhileBlocked.load(std::memory_order_acquire),
@@ -2527,7 +2532,6 @@ TEST(SandboxEditorUi, ShutdownCancelsBlockedManualGeometryBeforeSessionTeardown)
     shutdownState->Operation = commandResult->Operation;
 
     engine.Run();
-
     ASSERT_TRUE(shutdownState->Started.load(std::memory_order_acquire));
     EXPECT_TRUE(shutdownState->ExitRequestedWhileWorkerBlocked);
     EXPECT_FALSE(shutdownState->Release.load(std::memory_order_acquire));

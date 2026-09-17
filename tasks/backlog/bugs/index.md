@@ -40,6 +40,10 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
 
+- Closed 2026-09-17: [BUG-203 — Manual geometry import frame budget](../../done/BUG-203-manual-import-frame-budget.md).
+  Controlled 513-frame decode passes 25 repetitions with bounded completion waiting;
+  full CPU gate passes, with explicit timeout failure and unchanged apply assertions.
+
 - Closed 2026-09-17: [BUG-202 — Duplicate dropped import frame budget](../../done/BUG-202-duplicate-drop-frame-budget.md).
   Reused bounded completion waiting; a real decode barrier reproduces the old
   failure and passes 100 controlled repetitions with the fix. Full CPU gate passes.

@@ -2242,3 +2242,69 @@ After the review fixes, rebuild `IntrinsicSandboxEditorIntegrationTests` and
 run `ctest --test-dir build/ci --output-on-failure -R '^SandboxConfigSections\.|^SandboxEditorPresentation.DisabledActionReasonTooltipAppearsAfterTwoFrames$' --no-tests=error --timeout 120`:
 all 15 affected cases pass (1.15 seconds). The full CPU gate above used the same
 production source; only these additional assertions changed afterward.
+
+
+## Normal config/result locality and numeric-validation reuse — 2026-09-17
+
+Operator-directed continuation with Claude at `b92f0aab7`. One writer owns the
+checkout/build; Claude reviews bounded read-only packets. UI-037 readiness
+acceptance remains open. Evidence: `/tmp/intrinsic-normal-config-locality/`.
+
+The compiler baseline reaches both normal algorithms, mesh/point-cloud owners
+and three spatial indices from each of five config/normal interface, codec and
+frame producers. Move the two enums and diagnostics verbatim into import-free
+`Geometry.NormalEstimation.Types`; geometry and runtime share that owner, without
+copies/adapters. Parameters, property results and DebugName stay with algorithms.
+The new locality CTest passes all six producers. Full test/Sandbox builds resolve
+Claude's transitive-export concerns; config uses integer tokens and execution
+already imports both algorithms. Production scope is five files including CMake
+and the new module: 555 to 572 physical lines (+17 for the compilation boundary).
+
+Five numeric validators share one compiled non-template helper through existing
+`Runtime.PointConfigJson.hpp`/`Runtime.FeatureConfigCodecs.Detail.cpp`. Point
+spacing, bilateral filtering, kernel density, outlier analysis and construction
+keep field order, exact diagnostics, underflow and positivity rules. The distinct
+keypoint/descriptor representability and double-valued density checks stay local.
+Seven existing production files change from 3,380 to 3,386 physical lines: six
+net lines for the shared declaration/function while removing four duplicate
+control-flow bodies and ten unused includes. No new numeric policy axis or file.
+
+The public regression passes before consolidation. Claude's review prompts
+integer-extreme and preceding-backend-error cases. Those expose an existing bug:
+JSON comparison treats unsigned numbers above INT64_MAX as negative. A standalone
+probe reproduces it. The shared float lower bound and radius-method positivity
+check now compare as double, consistent with the upper bound. Tests accept
+INT64_MAX, INT64_MAX+1 and UINT64_MAX (including radius mode), reject INT64_MIN,
+and preserve float max, subnormals, signed zero, underflow, zero-radius and error
+ordering. Claude accepts the shared comparison correction. Existing explicit
+cmath/limits includes resolve its include question; the installed parser rejects
+overflow before validation, so +/-1e400 retain the object-error diagnostic.
+
+Verification and review:
+- Canonical ci/Clang 23 `IntrinsicTests` and ci-vulkan `ExtrinsicSandbox` build
+  and link. Initial 61 normal/config tests pass; after numeric correction all
+  33 focused config/outlier/locality tests pass (2.37 s).
+- The first full gate passes 4,731 cases plus one expected ASan-only GLFW skip.
+  A later full gate discovers the independent fixed-frame fixture failure now
+  tracked as [BUG-203](../done/BUG-203-manual-import-frame-budget.md). Controlled reproduction and the test-only correction are
+  recorded in that task; cancelled intermediate runs are not passing evidence.
+- Final combined source: 4,731 CPU tests passed, one expected ASan-only GLFW
+  lifecycle skip, zero failures (4,732 selected; 152.55 s). BUG-203 controlled
+  regression passes 25/25 times; all four neighboring import tests pass.
+- Strict layering, test layout, task policy/state links, doc links/sync, mirrors,
+  root hygiene, ARA structure and workshop checks pass. Inventory: 422 modules.
+  Source-doc audit: zero errors and six reviewed hints; retained comments specify
+  numerical/index-layout/key-presence contracts and the existing large codec
+  unit remains the compiled owner. Workshop rows 1–3 pass, 4–6 unchanged;
+  readiness remains open and there are no layer exceptions.
+- No measured compilation-time speedup, GPU execution or full sanitizer CPU-suite
+  claim follows from these dependency cuts and CPU/compile-link checks.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+ctest --test-dir build/ci --output-on-failure -R '^SandboxConfigSections\.|^ProcessingCompilationLocality.NormalContracts$|^OutlierAnalysis' --no-tests=error --timeout 60
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target ExtrinsicSandbox -j4
+```
