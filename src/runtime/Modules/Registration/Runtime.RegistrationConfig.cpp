@@ -32,16 +32,9 @@ namespace Extrinsic::Runtime
             c.InlierRatio = doc.at("inlier_ratio");
             c.ConvergenceThreshold = doc.at("convergence_threshold");
             c.TrajectoryStep = doc.at("trajectory_step");
-            auto parseRef = [&](const char* key, GeometryPropertyRef& ref) {
-                const auto& value = doc.at(key);
-                ref.Name = value.at("name");
-                for (unsigned i = 0; i <= unsigned(GeometryElementDomain::PointCloudPoint); ++i)
-                    if (ToString(GeometryElementDomain(i)) == value.at("domain").get<std::string>())
-                        ref.Domain = GeometryElementDomain(i);
-            };
-            parseRef("source_positions", c.SourcePositions);
-            parseRef("target_positions", c.TargetPositions);
-            parseRef("target_normals", c.TargetNormals);
+            ConfigDetail::DecodePointPropertyRef(doc.at("source_positions"), c.SourcePositions);
+            ConfigDetail::DecodePointPropertyRef(doc.at("target_positions"), c.TargetPositions);
+            ConfigDetail::DecodePointPropertyRef(doc.at("target_normals"), c.TargetNormals);
             return c;
         }
         Core::Config::EngineConfigSection Section(const RegistrationConfig& value)
@@ -101,14 +94,12 @@ namespace Extrinsic::Runtime
         for (auto key : {"source_positions", "target_positions", "target_normals"})
         {
             const auto& ref = doc[key];
-            if (!ref.is_object() || ref.size() != 3 || !ref.contains("domain") ||
-                !ref.contains("name") || !ref.contains("kind") || ref["kind"] != "vec3" ||
-                !ref["name"].is_string() || ref["name"].get<std::string>().empty() || !ref["domain"].is_string())
+            using ConfigDetail::PointPropertyValidation;
+            const auto validation = ConfigDetail::ValidatePointPropertyRef(ref, Geometry::PropertyValueKind::Vec3);
+            if (validation == PointPropertyValidation::InvalidReference || !ref["domain"].is_string())
                 return reject(std::string(key) + " requires domain, name and kind=vec3.");
-            bool valid = false;
-            for (unsigned i = 0; i <= unsigned(GeometryElementDomain::PointCloudPoint); ++i)
-                valid |= ref["domain"] == ToString(GeometryElementDomain(i));
-            if (!valid) return reject(std::string(key) + " has an unknown element domain.");
+            if (validation == PointPropertyValidation::UnknownDomain)
+                return reject(std::string(key) + " has an unknown element domain.");
         }
         result.State = EngineConfigState::Valid;
         result.CanonicalPayloadJson = SerializeRegistrationConfig(Parse(doc));

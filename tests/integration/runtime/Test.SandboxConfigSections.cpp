@@ -1545,6 +1545,59 @@ TEST(SandboxConfigSections, PointPropertyRoundTripsPreserveDomainsKindsAndNameBy
         check(C{}, {&C::Positions, &C::Normals}, Runtime::SetPointConstructionConfig,
             Runtime::GetPointConstructionConfig, Runtime::SerializePointConstructionConfig);
     }
+    {
+        SCOPED_TRACE("Registration");
+        using C = Runtime::RegistrationConfig;
+        check(C{}, {&C::SourcePositions, &C::TargetPositions, &C::TargetNormals},
+            Runtime::SetRegistrationConfig, Runtime::GetRegistrationConfig,
+            Runtime::SerializeRegistrationConfig);
+    }
+}
+
+TEST(SandboxConfigSections, RegistrationPropertyValidationPreservesDiagnosticCategories)
+{
+    struct Case
+    {
+        std::string_view Reference;
+        bool UnknownDomain{};
+    };
+    const std::array cases{
+        Case{"null"}, Case{"[]"}, Case{"12"}, Case{"{}"},
+        Case{R"({"name":"p","kind":"vec3"})"},
+        Case{R"({"domain":"MeshVertex","kind":"vec3"})"},
+        Case{R"({"domain":"MeshVertex","name":"p"})"},
+        Case{R"({"domain":"MeshVertex","name":"p","kind":"vec3","extra":true})"},
+        Case{R"({"domain":"MeshVertex","name":"p","kind":"float"})"},
+        Case{R"({"domain":"MeshVertex","name":"p","kind":3})"},
+        Case{R"({"domain":"MeshVertex","name":null,"kind":"vec3"})"},
+        Case{R"({"domain":"MeshVertex","name":"","kind":"vec3"})"},
+        Case{R"({"domain":"unknown-token","name":"","kind":"vec3"})"},
+        Case{R"({"domain":null,"name":"p","kind":"vec3"})"},
+        Case{R"({"domain":0,"name":"p","kind":"vec3"})"},
+        Case{R"({"domain":false,"name":"p","kind":"vec3"})"},
+        Case{R"({"domain":{},"name":"p","kind":"vec3"})"},
+        Case{R"({"domain":[],"name":"p","kind":"vec3"})"},
+        Case{R"({"domain":"unknown-token","name":"p","kind":"vec3"})", true},
+    };
+    const auto reject = [](const std::string& payload, const std::string& expected) {
+        SCOPED_TRACE(payload);
+        const auto result = Runtime::ValidateRegistrationConfigSection(payload, {}, "registration-binding");
+        EXPECT_FALSE(result.Usable());
+        ASSERT_EQ(result.Diagnostics.size(), 1u);
+        EXPECT_EQ(result.Diagnostics.front().Code, CoreConfig::EngineConfigDiagnosticCode::InvalidValue);
+        EXPECT_EQ(result.Diagnostics.front().Subject, "registration-binding");
+        EXPECT_EQ(result.Diagnostics.front().Message, expected);
+    };
+    for (const std::string key : {"source_positions", "target_positions", "target_normals"})
+        for (const auto& test : cases)
+            reject("{\"" + key + "\":" + std::string(test.Reference) + "}",
+                   key + (test.UnknownDomain ? " has an unknown element domain."
+                                             : " requires domain, name and kind=vec3."));
+    reject(R"({"source_positions":null,"target_positions":null,"target_normals":null})",
+           "source_positions requires domain, name and kind=vec3.");
+    reject(R"({"target_positions":null,"target_normals":null})",
+           "target_positions requires domain, name and kind=vec3.");
+    reject(R"({"max_iterations":0,"source_positions":null})", "max_iterations must be positive.");
 }
 
 TEST(SandboxConfigSections, Vec3PropertyValidationPreservesFamilyRules)

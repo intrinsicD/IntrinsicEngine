@@ -2372,3 +2372,38 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 cmake --preset ci-vulkan
 cmake --build --preset ci-vulkan --target ExtrinsicSandbox -j4
 ```
+
+## Registration property reuse and smoothing result locality — plan, 2026-09-18
+
+Operator-directed duplication/compilation cleanup with Claude from `de8011d45`;
+Codex owns this checkout and builds, Claude reviews fixed read-only packets.
+The existing source-documentation and processing-locality contracts apply; the
+broader readiness task remains open. Logs: `/tmp/intrinsic-registration-smoothing/`.
+
+- Reuse the existing compiled `DecodePointPropertyRef` and
+  `ValidatePointPropertyRef` in registration. Keep its non-string-domain
+  malformed-reference diagnostic and local vec3-only serializer, whose invalid
+  kind handling differs from the generic serializer. No new helper or policy flag.
+- Move only `DenoiseStatus` to `Geometry.Smoothing.Types`, retaining the existing
+  namespace, values and fail-closed contract. The algorithm re-exports that sole
+  owner; topology results import it directly. This tiny interface is justified by
+  the compiler boundary: all three topology contract/display-name/frame producers
+  currently reach `Geometry.Smoothing`, `Geometry.HalfedgeMesh` and `Geometry.DEC`.
+  Algorithms and `DebugName` keep their present compiled owner.
+- Verify registration diagnostics for all three bindings and domain/name-byte
+  round-trips before/after reuse; add the compiler-closure regression, then run
+  the full CPU gate and Vulkan Sandbox compile/link on combined source. Keep
+  locality and duplicate-body removal in separate commits. No elapsed build-time
+  claim follows from the dependency cut.
+
+Registration reuse is implemented: both duplicated bodies are removed and the
+production file shrinks from 134 to 125 physical lines. All three property
+bindings retain malformed versus unknown-domain categories, first-error order,
+and all nine domain tokens/name bytes. The extended 17-case config suite passed
+before the refactor; the combined 78-case focused suite passes after it. Claude
+finds no blockers in the fixed registration diff; the existing header declarations
+are confirmed by the canonical ci/Clang 23 full `IntrinsicTests` build. The final
+combined CPU gate passes 4,735 tests plus one expected ASan-only GLFW lifecycle
+skip (4,736 selected, 153.83 s). Vulkan Sandbox compile/link is still in progress
+at this checkpoint. The vec3-only serializer remains local by contract, not as
+deferred duplicate cleanup.
