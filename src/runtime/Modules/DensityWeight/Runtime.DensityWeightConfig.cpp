@@ -74,15 +74,9 @@ namespace Extrinsic::Runtime
             return reject("Support radius must be positive and finite, at most floatmax.");
         if(data["kernel"]!="gaussian" && data["kernel"]!="theta_lop" && data["kernel"]!="wendland_c2")return reject("Unknown radial kernel.");
         if(data["mode"]!="direct" && data["mode"]!="reciprocal")return reject("Unknown density weight mode.");
-        const auto validRef=[&](const Json& ref,Geometry::PropertyValueKind kind)
-        {
-            if(!ref.is_object() || ref.size()!=3 || !ref.contains("domain") || !ref.contains("name") || !ref.contains("kind") ||
-               ref["kind"]!=ConfigDetail::PointPropertyKindToken(kind) || !ref["name"].is_string() || ref["name"].get<std::string>().empty())return false;
-            for(unsigned i=0;i<=unsigned(GeometryElementDomain::PointCloudPoint);++i)
-                if(ref["domain"]==ToString(GeometryElementDomain(i)))return true;
-            return false;
-        };
-        if(!validRef(data["positions"],Geometry::PropertyValueKind::Vec3) || !validRef(data["weights"],Geometry::PropertyValueKind::Float) ||
+        using ConfigDetail::PointPropertyValidation;
+        if(ConfigDetail::ValidatePointPropertyRef(data["positions"],Geometry::PropertyValueKind::Vec3) != PointPropertyValidation::Valid ||
+           ConfigDetail::ValidatePointPropertyRef(data["weights"],Geometry::PropertyValueKind::Float) != PointPropertyValidation::Valid ||
            data["positions"]["domain"]!=data["weights"]["domain"] || data["positions"]["name"]==data["weights"]["name"])
             return reject("Position and weight bindings need distinct canonical vec3/float properties on the same domain.");
         result.State=EngineConfigState::Valid;result.CanonicalPayloadJson=SerializeDensityWeightConfig(Parse(data));result.ParsedFieldCount=input.size();return result;

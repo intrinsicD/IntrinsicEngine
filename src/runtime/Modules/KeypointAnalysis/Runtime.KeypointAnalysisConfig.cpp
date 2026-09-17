@@ -78,13 +78,11 @@ namespace Extrinsic::Runtime
         const KeypointAnalysisConfig defaults;
         for(auto [key,kind]:{std::pair{"positions",defaults.Positions.ValueKind},std::pair{"mask",defaults.Mask.ValueKind},std::pair{"score",defaults.Score.ValueKind}})
         {
-            const auto& ref=data[key];
-            if(!ref.is_object() || ref.size()!=3 || !ref.contains("domain") || !ref.contains("name") || !ref.contains("kind") ||
-               ref["kind"]!=ConfigDetail::PointPropertyKindToken(kind) || !ref["name"].is_string() || ref["name"].get<std::string>().empty())
+            const auto validation = ConfigDetail::ValidatePointPropertyRef(data[key], kind);
+            if(validation == ConfigDetail::PointPropertyValidation::InvalidReference)
                 return reject(std::string(key)+" needs a canonical typed property reference.");
-            bool found=false;
-            for(unsigned i=0;i<=unsigned(GeometryElementDomain::PointCloudPoint);++i)found |= ref["domain"]==ToString(GeometryElementDomain(i));
-            if(!found)return reject("Unknown element domain.");
+            if(validation == ConfigDetail::PointPropertyValidation::UnknownDomain)
+                return reject("Unknown element domain.");
         }
         if(data["positions"]["domain"]!=data["mask"]["domain"] || data["mask"]["domain"]!=data["score"]["domain"] ||
            data["positions"]["name"]==data["mask"]["name"] || data["positions"]["name"]==data["score"]["name"] || data["mask"]["name"]==data["score"]["name"])

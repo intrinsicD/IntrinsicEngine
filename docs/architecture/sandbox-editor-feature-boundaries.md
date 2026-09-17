@@ -69,9 +69,11 @@ The config interface, shared codec and Sandbox config registration producers
 exclude the segmentation algorithm through
 `ConfigCompilationLocality.CurvatureInterface`. Consolidation token functions
 retain their feature implementation owner. Seven point-processing config
-implementations also reuse the shared TU's string-token property encoder and
-name/domain decoder through `Runtime.PointConfigJson.hpp`. Decoding retains the
-caller's expected value kind; family parsers and validators stay feature-owned.
+implementations also reuse the shared TU's string-token property encoder,
+validator and name/domain decoder through `Runtime.PointConfigJson.hpp`.
+Validation distinguishes malformed references from unknown domain tokens;
+family validators retain their own diagnostics and property relationship rules.
+Decoding retains the caller's expected value kind; family parsers stay feature-owned.
 The numeric-kind property codec and vec3-only
 encoders remain separate contracts. Visualization operation declarations and
 implementations have no UV-atlas dependency, enforced by

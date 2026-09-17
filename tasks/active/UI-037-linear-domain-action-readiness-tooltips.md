@@ -1987,3 +1987,36 @@ under `src/runtime/CMakeFiles/ExtrinsicRuntime.dir/` in that build tree.
 Claude's final evidence/route review approves with no blockers. Its optional
 linkage reminder is included in the converter owner route; full sanitizer and
 Clang 20 runtime-suite limitations remain explicit above.
+
+
+## Point-property validation consolidation (2026-09-17)
+
+Operator-directed continuation of duplication/compile-locality cleanup with
+Claude. This bounded slice extends the existing private PointConfigJson owner:
+seven point-config families now call one compiled property-reference validator.
+Its three outcomes preserve the five families' separate malformed-reference and
+unknown-domain diagnostics and the other two families' combined diagnostics.
+The exact three-field grammar, string kind tokens, nonempty names, guard order,
+valid `Unknown` token and family-owned property relationships remain unchanged.
+Numeric-kind codecs and vec3-only encoders have different contracts and stay
+separate. No public module surface, dependency edge, target or tuning changes.
+
+Claude reviewed the plan; its shape/domain ordering and global C++ linkage
+conditions are preserved. A new public-API fixture covers 20 malformed references
+across all seven families, checking exact diagnostic text, subject and code;
+it and the serializer/full-domain roundtrip fixtures pass against the original
+implementation before extraction (3 cases). After extraction, IntrinsicTests
+builds and all 109 focused config/point tests
+pass. The canonical Clang 23 CPU gate passes 4,726 cases with one expected
+GLFW/LeakSanitizer capability skip (4,727 selected, 169.39 s). The ci-vulkan
+ExtrinsicSandbox target builds and links. No GPU runtime or full sanitizer CPU
+suite was rerun for this grammar extraction. Claude's fixed-diff review approves
+without blockers; its full-CPU/app-link conditions are satisfied. Reviewed source
+and test hashes are unchanged. Scope/layering/tests/docs review and task policy,
+doc links, layering, test layout, root hygiene and skill-mirror checks pass.
+Source-documentation audit has no errors; the one retained decoder comment
+explains its non-obvious validated-input/value-kind precondition. No measured
+compilation-speed claim is made.
+Broader readiness/cache acceptance remains open. The operator requested a fresh
+session recommendation to limit context costs; stop after this verified slice
+and leave a temporary handoff rather than beginning another slice.

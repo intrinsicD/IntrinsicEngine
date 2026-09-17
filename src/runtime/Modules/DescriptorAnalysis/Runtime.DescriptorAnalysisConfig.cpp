@@ -81,22 +81,16 @@ namespace Extrinsic::Runtime
                data[key].get<double>()>std::numeric_limits<float>::max() ||
                (data[key]>0 && data[key].get<float>()==0))
                 return reject(std::string(key)+" must be zero (automatic) or a positive representable float.");
-        const auto validRef=[&](const Json& ref,Geometry::PropertyValueKind kind)
-        {
-            if(!ref.is_object() || ref.size()!=3 || !ref.contains("domain") || !ref.contains("name") || !ref.contains("kind") ||
-               ref["kind"]!=ConfigDetail::PointPropertyKindToken(kind) || !ref["name"].is_string() || ref["name"].get<std::string>().empty())return false;
-            for(unsigned i=0;i<=unsigned(GeometryElementDomain::PointCloudPoint);++i)
-                if(ref["domain"]==ToString(GeometryElementDomain(i)))return true;
-            return false;
-        };
-        if(!validRef(data["positions"],Geometry::PropertyValueKind::Vec3) || !validRef(data["normals"],Geometry::PropertyValueKind::Vec3) ||
+        using ConfigDetail::PointPropertyValidation;
+        if(ConfigDetail::ValidatePointPropertyRef(data["positions"],Geometry::PropertyValueKind::Vec3) != PointPropertyValidation::Valid ||
+           ConfigDetail::ValidatePointPropertyRef(data["normals"],Geometry::PropertyValueKind::Vec3) != PointPropertyValidation::Valid ||
            data["positions"]["domain"]!=data["normals"]["domain"])
             return reject("Positions and normals need canonical vec3 references on the same domain.");
         if(!data["outputs"].is_array() || data["outputs"].size()!=33)return reject("FPFH requires exactly 33 float output references.");
         for(unsigned i=0;i<33;++i)
         {
             const auto& ref=data["outputs"][i];
-            if(!validRef(ref,Geometry::PropertyValueKind::Float) || ref["domain"]!=data["positions"]["domain"] ||
+            if(ConfigDetail::ValidatePointPropertyRef(ref,Geometry::PropertyValueKind::Float) != PointPropertyValidation::Valid || ref["domain"]!=data["positions"]["domain"] ||
                ref["name"]==data["positions"]["name"] || ref["name"]==data["normals"]["name"])
                 return reject("Descriptor outputs must be float properties on the input domain, distinct from inputs.");
             for(unsigned j=0;j<i;++j)if(ref["name"]==data["outputs"][j]["name"])

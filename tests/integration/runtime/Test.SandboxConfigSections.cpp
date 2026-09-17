@@ -1158,6 +1158,77 @@ TEST(SandboxConfigSections, PointPropertySerializersPreserveTokensAndNameBytes)
 }
 
 
+TEST(SandboxConfigSections, PointPropertyValidationPreservesDiagnosticCategories)
+{
+    using Validator = CoreConfig::EngineConfigSectionValidationResult (*)(
+        std::string_view, std::string_view, std::string_view);
+    struct Family
+    {
+        const char* Name;
+        Validator Validate;
+        std::string_view InvalidReference;
+        std::string_view UnknownDomain;
+    };
+    constexpr std::string_view typed = "positions needs a canonical typed property reference.";
+    constexpr std::string_view domain = "Unknown element domain.";
+    constexpr std::string_view descriptor =
+        "Positions and normals need canonical vec3 references on the same domain.";
+    constexpr std::string_view density =
+        "Position and weight bindings need distinct canonical vec3/float properties on the same domain.";
+    const std::array families{
+        Family{"BilateralFilter", Runtime::ValidateBilateralFilterConfigSection, typed, domain},
+        Family{"KernelDensity", Runtime::ValidateKernelDensityConfigSection, typed, domain},
+        Family{"PointSpacing", Runtime::ValidatePointSpacingConfigSection, typed, domain},
+        Family{"OutlierAnalysis", Runtime::ValidateOutlierAnalysisConfigSection, typed, domain},
+        Family{"KeypointAnalysis", Runtime::ValidateKeypointAnalysisConfigSection, typed, domain},
+        Family{"DescriptorAnalysis", Runtime::ValidateDescriptorAnalysisConfigSection, descriptor, descriptor},
+        Family{"DensityWeight", Runtime::ValidateDensityWeightConfigSection, density, density},
+    };
+    struct Case
+    {
+        std::string_view Reference;
+        bool HasUnknownDomain;
+    };
+    const std::array cases{
+        Case{"null", false},
+        Case{"[]", false},
+        Case{"12", false},
+        Case{"{}", false},
+        Case{R"({"name":"samples","kind":"vec3"})", false},
+        Case{R"({"domain":"MeshVertex","kind":"vec3"})", false},
+        Case{R"({"domain":"MeshVertex","name":"samples"})", false},
+        Case{R"({"domain":"MeshVertex","name":"samples","extra":true})", false},
+        Case{R"({"domain":"MeshVertex","name":"samples","kind":"vec3","extra":true})", false},
+        Case{R"({"domain":"MeshVertex","name":"samples","kind":"float"})", false},
+        Case{R"({"domain":"MeshVertex","name":"samples","kind":3})", false},
+        Case{R"({"domain":"MeshVertex","name":null,"kind":"vec3"})", false},
+        Case{R"({"domain":"MeshVertex","name":"","kind":"vec3"})", false},
+        Case{R"({"domain":"not-a-domain","name":"","kind":"vec3"})", false},
+        Case{R"({"domain":"not-a-domain","name":"samples","kind":"vec3"})", true},
+        Case{R"({"domain":0,"name":"samples","kind":"vec3"})", true},
+        Case{R"({"domain":null,"name":"samples","kind":"vec3"})", true},
+        Case{R"({"domain":false,"name":"samples","kind":"vec3"})", true},
+        Case{R"({"domain":{},"name":"samples","kind":"vec3"})", true},
+        Case{R"({"domain":[],"name":"samples","kind":"vec3"})", true},
+    };
+    for (const auto& family : families)
+    {
+        SCOPED_TRACE(family.Name);
+        for (const auto& test : cases)
+        {
+            SCOPED_TRACE(test.Reference);
+            const auto result = family.Validate(
+                "{\"positions\":" + std::string(test.Reference) + "}", {}, "test-binding");
+            EXPECT_FALSE(result.Usable());
+            ASSERT_EQ(result.Diagnostics.size(), 1u);
+            EXPECT_EQ(result.Diagnostics.front().Code, CoreConfig::EngineConfigDiagnosticCode::InvalidValue);
+            EXPECT_EQ(result.Diagnostics.front().Subject, "test-binding");
+            EXPECT_EQ(result.Diagnostics.front().Message,
+                test.HasUnknownDomain ? family.UnknownDomain : family.InvalidReference);
+        }
+    }
+}
+
 TEST(SandboxConfigSections, PointPropertyRoundTripsPreserveDomainsKindsAndNameBytes)
 {
     using D = Runtime::GeometryElementDomain;

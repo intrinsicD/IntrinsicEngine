@@ -1,4 +1,4 @@
-// Shared feature config codecs and point-property JSON encoding, compiled once
+// Shared feature config codecs and point-property JSON handling, compiled once
 // in an ordinary translation unit without exposing JSON through module APIs.
 #include <algorithm>
 #include <array>
@@ -45,6 +45,20 @@ namespace Extrinsic::Runtime::ConfigDetail
                                ref.Domain <= GeometryElementDomain::PointCloudPoint
                            ? ToString(ref.Domain) : "invalid"},
                 {"name", ref.Name}, {"kind", PointPropertyKindToken(ref.ValueKind)}};
+    }
+
+    PointPropertyValidation ValidatePointPropertyRef(
+        const nlohmann::json& ref, const Geometry::PropertyValueKind kind)
+    {
+        if (!ref.is_object() || ref.size() != 3 || !ref.contains("domain") ||
+            !ref.contains("name") || !ref.contains("kind") ||
+            ref["kind"] != PointPropertyKindToken(kind) || !ref["name"].is_string() ||
+            ref["name"].get<std::string>().empty())
+            return PointPropertyValidation::InvalidReference;
+        for (unsigned i = 0; i <= unsigned(GeometryElementDomain::PointCloudPoint); ++i)
+            if (ref["domain"] == ToString(GeometryElementDomain(i)))
+                return PointPropertyValidation::Valid;
+        return PointPropertyValidation::UnknownDomain;
     }
 
     void DecodePointPropertyRef(const nlohmann::json& value, GeometryPropertyRef& ref)
