@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 11 |
 | `core` | 41 |
 | `ecs` | 27 |
-| `geometry` | 121 |
+| `geometry` | 123 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 75 |
@@ -191,6 +191,7 @@ Root scanned: `src`
 | `Geometry.Parameterization.Diagnostics` | `src/geometry/Geometry.Parameterization.Diagnostics.cppm` | `geometry` |
 | `Geometry.Parameterization.Harmonic` | `src/geometry/Geometry.Parameterization.Harmonic.cppm` | `geometry` |
 | `Geometry.Parameterization.Optimize` | `src/geometry/Geometry.Parameterization.Optimize.cppm` | `geometry` |
+| `Geometry.Parameterization.Types` | `src/geometry/Geometry.Parameterization.Types.cppm` | `geometry` |
 | `Geometry.Plane` | `src/geometry/Geometry.Plane.cppm` | `geometry` |
 | `Geometry.PointCloud.Consolidation` | `src/geometry/Geometry.PointCloud.Consolidation.cppm` | `geometry` |
 | `Geometry.PointCloud.Conversion` | `src/geometry/Geometry.PointCloud.Conversion.cppm` | `geometry` |
@@ -230,6 +231,7 @@ Root scanned: `src`
 | `Geometry.SupportRadius` | `src/geometry/Geometry.SupportRadius.cppm` | `geometry` |
 | `Geometry.SurfaceReconstruction` | `src/geometry/Geometry.SurfaceReconstruction.cppm` | `geometry` |
 | `Geometry.Triangle` | `src/geometry/Geometry.Triangle.cppm` | `geometry` |
+| `Geometry.UvAtlas.Types` | `src/geometry/Geometry.UvAtlas.Types.cppm` | `geometry` |
 | `Geometry.UvAtlas` | `src/geometry/Geometry.UvAtlas.cppm` | `geometry` |
 | `Geometry.Validation` | `src/geometry/Geometry.Validation.cppm` | `geometry` |
 | `Geometry` | `src/geometry/Geometry.cppm` | `geometry` |
@@ -451,4 +453,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **424**
+Total modules: **426**

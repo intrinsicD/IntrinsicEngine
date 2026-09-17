@@ -1,3 +1,4 @@
+// Mesh UV-atlas generation and property transfer, with shared outcome enums.
 module;
 
 #include <cstddef>
@@ -13,33 +14,10 @@ export module Geometry.UvAtlas;
 
 import Geometry.Properties;
 import Geometry.MeshSoup;
-import Geometry.Parameterization.Diagnostics;
+import Geometry.Parameterization.Types;
+export import Geometry.UvAtlas.Types;
 
 export namespace Geometry::UvAtlas {
-enum class UvAtlasStatus : std::uint8_t {
-  Success = 0,
-  EmptyInput,
-  MissingPositions,
-  MissingFaces,
-  MissingAuthoredUvs,
-  NonTriangleFace,
-  OutOfRangeIndex,
-  NonFinitePosition,
-  NonFiniteAuthoredUv,
-  DegenerateInput,
-  InvalidAuthoredUvs,
-  BackendUnavailable,
-  BackendRejectedInput,
-  BackendFailed,
-  Cancelled,
-};
-
-enum class UvAtlasProvenance : std::uint8_t {
-  None = 0,
-  AuthoredPreserved,
-  Generated,
-};
-
 enum class UvAtlasMethod : std::uint8_t {
   None = 0,
   Authored,

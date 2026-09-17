@@ -61,6 +61,14 @@ producers do not import smoothing, the owning halfedge mesh or discrete calculus
 `ProcessingCompilationLocality.MeshTopologyContracts` guards this boundary using
 configured compiler dependencies.
 
+Parameterization results use `Geometry.Parameterization.Types` for copied quality
+and rejection diagnostics and `Geometry.UvAtlas.Types` for atlas status/provenance.
+The algorithm interfaces re-export their canonical types. The runtime interface
+and prepared frame do not import parameterization/atlas algorithms, the owning
+halfedge mesh or mesh soup; execution units import the APIs they use directly.
+`ProcessingCompilationLocality.ParameterizationContracts` checks this boundary
+from configured compiler dependencies.
+
 `Runtime.EditorFeatures.Internal.hpp` holds private workspace bindings and context
 adapters. It includes `Runtime.EditorFeatureCommands.Internal.hpp` for import/file
 prerequisites, diagnostics and render-hint comparisons, and
@@ -95,7 +103,10 @@ retain their feature implementation owner. Seven point-processing config
 implementations also reuse the shared TU's string-token property encoder,
 validator and name/domain decoder through `Runtime.PointConfigJson.hpp`.
 Validation distinguishes malformed references from unknown domain tokens;
-family validators retain their own diagnostics and property relationship rules.
+five families reuse `ValidatePointConfigPropertyRefs` for their matching ordered
+per-field diagnostics. Each supplied field exists in the merged defaults; the
+first invalid reference wins before family-specific property relationship checks.
+Other families retain their own diagnostic wording and classification.
 Decoding retains the caller's expected value kind; family parsers stay feature-owned.
 The numeric-kind property codec and vec3-only
 encoders remain separate contracts. Visualization operation declarations and

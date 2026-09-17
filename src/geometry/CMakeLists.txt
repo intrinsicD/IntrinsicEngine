@@ -78,6 +78,7 @@ target_sources(${target_name}
         Geometry.Octree.cppm
         Geometry.Overlap.cppm
         Geometry.PCA.cppm
+        Geometry.Parameterization.Types.cppm
         Geometry.Parameterization.Diagnostics.cppm
         Geometry.Parameterization.Bff.cppm
         Geometry.Parameterization.Harmonic.cppm
@@ -119,6 +120,7 @@ target_sources(${target_name}
         Geometry.SupportRadius.cppm
         Geometry.SurfaceReconstruction.cppm
         Geometry.Triangle.cppm
+        Geometry.UvAtlas.Types.cppm
         Geometry.UvAtlas.cppm
         Geometry.Validation.cppm
         Geometry.cppm

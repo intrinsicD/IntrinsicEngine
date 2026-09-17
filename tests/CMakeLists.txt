@@ -171,6 +171,18 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshTopologyCon
         --forbid-module Geometry.DEC)
 set_tests_properties(ProcessingCompilationLocality.MeshTopologyContracts
     PROPERTIES LABELS "contract;build;runtime" TIMEOUT 30)
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.ParameterizationContracts
+        --check-source src/geometry/Geometry.Parameterization.Types.cppm
+        --check-source src/geometry/Geometry.UvAtlas.Types.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.ParameterizationOperations.Frame.cpp
+        --forbid-module Geometry.Parameterization
+        --forbid-module Geometry.Parameterization.Diagnostics
+        --forbid-module Geometry.UvAtlas
+        --forbid-module Geometry.HalfedgeMesh
+        --forbid-module Geometry.MeshSoup)
+set_tests_properties(ProcessingCompilationLocality.ParameterizationContracts
+    PROPERTIES LABELS "contract;build;runtime" TIMEOUT 30)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.NormalContracts
         --check-source src/geometry/Geometry.NormalEstimation.Types.cppm
         --check-source src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm

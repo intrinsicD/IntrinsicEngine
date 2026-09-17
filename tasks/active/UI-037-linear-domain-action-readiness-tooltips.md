@@ -2435,3 +2435,75 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 cmake --preset ci-vulkan
 cmake --build --preset ci-vulkan --target ExtrinsicSandbox -j4
 ```
+
+
+## Property validation reuse and parameterization result locality — plan, 2026-09-18
+
+Operator-directed duplication/compilation continuation from `bc6b1cc8a`, with
+Codex owning this checkout/build and Claude reviewing fixed read-only packets.
+UI-037's readiness acceptance remains open. Existing declared source-documentation
+and processing-compilation-locality contracts cover these slices.
+
+- Five point config validators repeat the same ordered property validation and
+  diagnostic assembly. Reuse `ValidatePointPropertyRef` through one compiled
+  non-template loop in the existing `Runtime.FeatureConfigCodecs.Detail.cpp` /
+  `Runtime.PointConfigJson.hpp` owner. Keep all family-specific relationship
+  rules and other families' different messages. Public tests add all-field kind
+  and first-error coverage, run before and after the refactor.
+- Parameterization's copied records and atlas status enums need no owning mesh
+  or solver imports. Compiler baseline rejects eight intended cuts across the
+  runtime interface and prepared frame. Move the sole canonical definitions to
+  `Geometry.Parameterization.Types` and `Geometry.UvAtlas.Types`; original
+  algorithms re-export them, runtime result producers import only types.
+  No adapters, duplicate records or new runtime behavior. Keep evaluation options,
+  algorithms and string functions with their existing owners.
+- Claude approves the plan. Use checked JSON access with a documented merged-key
+  precondition. Verify actual compiler closure and direct imports, full consumer
+  build, focused and default CPU tests, Vulkan Sandbox compile/link, source/docs
+  checks and final fixed-diff review. Keep reuse and locality in separate commits.
+  Dependency removal alone establishes no elapsed compilation-time improvement.
+
+
+Both slices are complete. Five diagnostic loops now share one compiled owner;
+all seven affected production files, including the existing header/helper,
+change from 3,288 to 3,282 physical lines. Six config tests pass before the
+refactor and all 18 config-section tests pass after it. The added public cases
+pin every field's kind and first-error order across all five callers.
+
+The canonical parameterization records and atlas enums moved without field,
+enumerator or default changes. Four compiler producers pass the new boundary
+check. Seven production files including both new modules and CMake change from
+977 to 995 physical lines; the increase buys a compilation boundary. Removed
+one duplicate stable-token declaration. Algorithm implementations are unchanged.
+
+Claude's fixed-diff review finds no blockers. All 11 private JSON-header
+consumers already include `<utility>` before the header; adding a standard
+header inside their named-module purview would violate its existing include
+contract. Rejection's failure-path cost rationale remains at the existing
+`SummarizeRejection` implementation, and the moved record retains its unevaluated
+contract. The surviving stable-token declaration and definition are in the same
+runtime module; algorithm re-exports and all consumer imports compile correctly.
+
+Final combined-source verification: canonical ci/Clang 23 `IntrinsicTests`
+build passes; 116 focused tests pass; full CPU gate passes 4,737 tests plus one
+expected ASan-only GLFW lifecycle skip (4,738 selected; zero failures,
+167.95 seconds). Canonical ci-vulkan/Clang 23 `ExtrinsicSandbox` compiles and
+links. No GPU execution, full sanitizer-suite execution or measured build-time
+speedup is claimed. Source hashes match the reviewed and tested snapshot.
+
+Strict layering/test layout, task policy/state, doc links/sync (explicit changed
+files), mirrors/session brief, root hygiene and workshop checks pass. Module
+inventory refreshed to 426. Source-doc audit: zero errors, 11 inspected comment
+hints; retained comments describe ordering, publication, copied/borrowed lifetime,
+rejection state or existing solver contracts. Workshop rows 1–3 pass, rows 4–6
+not applicable, row 7 retains UI-037 readiness work, row 8 adds no exceptions.
+Logs/review packets: `/tmp/intrinsic-parameterization-reuse/`.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -R '^SandboxConfigSections\.|Parameterization|UvAtlas' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target ExtrinsicSandbox -j4
+```

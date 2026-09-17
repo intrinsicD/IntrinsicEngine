@@ -17,8 +17,8 @@ export module Extrinsic.Runtime.ParameterizationOperations;
 export import Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.EditorCommon;
 export import Extrinsic.Runtime.ParameterizationConfig;
-export import Geometry.Parameterization;
-export import Geometry.UvAtlas;
+export import Geometry.Parameterization.Types;
+export import Geometry.UvAtlas.Types;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
 
@@ -101,9 +101,6 @@ export namespace Extrinsic::Runtime
         }
     };
     using EditorParameterizationStrategy = ParameterizationStrategyKind;
-
-    [[nodiscard]] std::string_view
-    StableTokenForEditorParameterizationStrategy(EditorParameterizationStrategy strategy) noexcept;
 
     struct EditorParameterizationCommand
     {

@@ -1,3 +1,4 @@
+// LSCM and CPU strategy dispatch over meshes, with shared copied result diagnostics.
 module;
 
 #include <cstddef>
@@ -110,34 +111,7 @@ export namespace Geometry::Parameterization
     // The strategy is the concrete parameter payload for an implemented solver.
     // HarmonicParams with Uniform weights selects the Tutte embedding.
 
-    enum class ParameterizationStatus : std::uint8_t
-    {
-        Success,
-        InvalidInput,
-        SolverFailed,
-    };
-
     using ParameterizationStrategy = std::variant<ParameterizationParams, HarmonicParams, BffParams>;
-
-    // Why a mesh was rejected, in terms of the two topological preconditions
-    // every implemented strategy shares: one connected component and exactly
-    // one boundary loop. `ParameterizeMesh` fills this in only when the run did
-    // not succeed, so the flood fill and loop walk cost nothing on the success
-    // path. `Evaluated` is false when the counts could not be taken at all
-    // (empty mesh, no faces, or non-finite positions).
-    struct ParameterizationRejection
-    {
-        bool Evaluated{false};
-        std::size_t ConnectedComponentCount{0u};
-        std::size_t BoundaryLoopCount{0u};
-
-        // True when the counts alone explain the rejection.
-        [[nodiscard]] bool ViolatesDiskTopology() const noexcept
-        {
-            return Evaluated &&
-                   (ConnectedComponentCount != 1u || BoundaryLoopCount != 1u);
-        }
-    };
 
     struct ParameterizeResult
     {
