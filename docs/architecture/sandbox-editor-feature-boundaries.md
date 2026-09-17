@@ -439,14 +439,16 @@ make sibling feature implementations import the family again.
 The point-field copied result contains the editor's centroid and spacing/bounds
 summary values directly. Geometry's owning `CloudStatistics` stays inside the
 spacing implementation; it does not enter the family interface, config facade
-or prepared-frame closure. Parameterization and UV regeneration access geometry
-views and publish through the existing mesh-soup owner without importing ECS
-geometry-population adapters.
+or prepared-frame closure. Likewise, the bilateral result owns four last-pass
+diagnostics directly; both its config and the point-set result interface stay
+independent of point-cloud utilities and owning point-cloud containers.
+Parameterization and UV regeneration access geometry views and publish through
+the existing mesh-soup owner without importing ECS geometry-population adapters.
 
 `ProcessingCompilationLocality.Family`, `.PointFieldResults`, `.PointAnalysis`, `.PointAnalysisTests`,
 `.Normals`, `.NormalTests`, `.MeshSupport`, `.Registration`, `.Parameterization`,
 `.RegistrationTests`, `.MeshField`, `.MeshTopology`, `.MeshFieldTests`,
-`.PointSet`, `.PointSetTests`, `.PointConstruction`, `.PointConstructionTests`,
+`.PointSet`, `.PointSetResults`, `.PointSetTests`, `.PointConstruction`, `.PointConstructionTests`,
 `.PointCloudService`, `.Discovery` and `.UnrelatedAdapters` inspect actual
 Clang scanner requirements and CMake module closures through
 `tools/analysis/compile_hotspots.py`. Missing, ambiguous or stale source scans

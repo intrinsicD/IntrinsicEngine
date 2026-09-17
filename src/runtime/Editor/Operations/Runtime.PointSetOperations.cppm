@@ -18,7 +18,6 @@ export import Extrinsic.Runtime.ProgressivePoissonConfig;
 import Extrinsic.Core.Error;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
-import Geometry.PointCloud.Utils;
 export namespace Extrinsic::Runtime
 {
     struct EditorBilateralFilterResult
@@ -29,7 +28,9 @@ export namespace Extrinsic::Runtime
         std::string ActualBackend{}, Message{};
         std::size_t SlotCount{}, LiveCount{}, WrittenCount{};
         float SpatialSigmaUsed{};
-        Geometry::PointCloud::BilateralFilterResult Diagnostics{};
+        // Diagnostics describe the last completed pass; zero before any pass.
+        std::size_t PointsFiltered{}, DegenerateNormals{};
+        float AverageDisplacement{}, MaxDisplacement{};
         std::uint32_t CompletedIterations{};
         std::size_t WorkspaceBuilds{};
         bool IndexReused{};

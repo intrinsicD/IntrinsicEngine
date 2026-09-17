@@ -2493,8 +2493,8 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::Text("Requested: %s; ran: %s",Runtime::ToString(result.RequestedBackend),result.ActualBackend.c_str());
             ImGui::Text("Live / total: %zu / %zu",result.LiveCount,result.SlotCount);
             ImGui::Text("Passes: %u; spatial sigma: %.5g",result.CompletedIterations,double(result.SpatialSigmaUsed));
-            ImGui::Text("Last-pass displacement mean / max: %.5g / %.5g",double(result.Diagnostics.AverageDisplacement),double(result.Diagnostics.MaxDisplacement));
-            ImGui::Text("Degenerate normals: %zu; private index builds: %zu",result.Diagnostics.DegenerateNormals,result.WorkspaceBuilds);
+            ImGui::Text("Last-pass displacement mean / max: %.5g / %.5g",double(result.AverageDisplacement),double(result.MaxDisplacement));
+            ImGui::Text("Degenerate normals: %zu; private index builds: %zu",result.DegenerateNormals,result.WorkspaceBuilds);
             ImGui::TextWrapped("%s",result.Message.c_str());
             DrawDismissLastResultButton("Dismiss##Bilateral", Bilateral.LastResult, Runtime::EditorPointSetResultSlot::BilateralFilter, context.PointSet.ResultSinks.DismissResult);
         }

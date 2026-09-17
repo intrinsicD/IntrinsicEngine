@@ -165,6 +165,40 @@ TEST(BilateralFilterConfig, RoundTripAndSharedPreviewApplyRun)
     EXPECT_EQ(applies, 1);
 }
 
+TEST(BilateralFilterOperations, CopiedDiagnosticsDescribeTheLastLiveSamplePass)
+{
+    R::WorldRegistry worlds;
+    const auto world = worlds.CreateWorld("bilateral diagnostics");
+    auto& scene = *worlds.Get(world);
+    R::SpatialIndexCache cache(worlds);
+    const auto entity = Make(scene, D::PointCloudPoint);
+    auto& props = Properties(scene, entity, D::PointCloudPoint);
+    std::ranges::copy(plane, props.Get<glm::vec3>("samples").Vector().begin());
+    props.Get<glm::vec3>("directions")[0] = {};
+    auto config = Config(entity, D::PointCloudPoint);
+    const auto commands = R::BindEditorProcessingCommands(R::EditorProcessingContext{
+        .Scene = &scene, .World = world, .SpatialIndices = &cache});
+    for (const auto backend : {R::BilateralFilterBackend::CpuOctree, R::BilateralFilterBackend::CpuLBVH})
+    {
+        SCOPED_TRACE(int(backend));
+        config.Backend = backend;
+        for (const auto iterations : {0u, 3u})
+        {
+            SCOPED_TRACE(iterations);
+            config.Iterations = iterations;
+            const auto result = R::ApplyEditorBilateralFilterCommand(commands, config);
+            ASSERT_TRUE(result.Succeeded()) << result.Message;
+            EXPECT_EQ(result.SlotCount, 5u);
+            EXPECT_EQ(result.LiveCount, 4u);
+            EXPECT_EQ(result.CompletedIterations, iterations);
+            EXPECT_EQ(result.PointsFiltered, iterations ? 3u : 0u);
+            EXPECT_EQ(result.DegenerateNormals, iterations ? 1u : 0u);
+            EXPECT_FLOAT_EQ(result.AverageDisplacement, 0.f);
+            EXPECT_FLOAT_EQ(result.MaxDisplacement, 0.f);
+        }
+    }
+}
+
 TEST(BilateralFilterOperations, EveryDomainCopyAndInPlaceHistory)
 {
     for(unsigned d=1;d<=8;++d)for(bool inPlace:{false,true})
@@ -201,7 +235,10 @@ TEST(BilateralFilterOperations, EveryDomainCopyAndInPlaceHistory)
         ASSERT_TRUE(indexed.Succeeded())<<indexed.Message;EXPECT_EQ(indexed.ActualBackend,"cpu_lbvh");EXPECT_EQ(indexed.WorkspaceBuilds,2);
         const auto actual=std::as_const(props).Get<glm::vec3>(config.Output.Name);
         for(std::size_t i=0;i<size;++i)if(i!=4 || D(d)!=D::PointCloudPoint)EXPECT_LE(glm::length(actual[i]-values[i]),1e-5);
-        EXPECT_FLOAT_EQ(indexed.Diagnostics.AverageDisplacement,reference.Diagnostics.AverageDisplacement);
+        EXPECT_FLOAT_EQ(indexed.AverageDisplacement,reference.AverageDisplacement);
+        EXPECT_FLOAT_EQ(indexed.MaxDisplacement,reference.MaxDisplacement);
+        EXPECT_EQ(indexed.PointsFiltered,reference.PointsFiltered);
+        EXPECT_EQ(indexed.DegenerateNormals,reference.DegenerateNormals);
         props.Get<glm::vec3>("directions")[0].x=1;
         EXPECT_EQ(history.Undo().Status,R::EditorCommandHistoryStatus::StaleEntity);
     }

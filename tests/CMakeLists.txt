@@ -51,6 +51,14 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointFieldResul
         --check-source src/runtime/Editor/Operations/Runtime.PointFieldOperations.Frame.cpp
         --forbid-module Geometry.PointCloud.Utils
         --forbid-module Geometry.PointCloud)
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointSetResults
+        --check-source src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cppm
+        --check-source src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.Frame.cpp
+        --forbid-module Geometry.PointCloud.Utils
+        --forbid-module Geometry.PointCloud)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointAnalysis
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cppm
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cpp
@@ -350,6 +358,7 @@ set_tests_properties(ProcessingCompilationLocality.Family ProcessingCompilationL
     ProcessingCompilationLocality.PositionCapture
     ProcessingCompilationLocality.PropertyCapture
     ProcessingCompilationLocality.PointFieldResults
+    ProcessingCompilationLocality.PointSetResults
     ProcessingCompilationLocality.ParameterizationSolve
     ProcessingCompilationLocality.PointSet ProcessingCompilationLocality.PointConstruction
     ProcessingCompilationLocality.PointCloudService ProcessingCompilationLocality.Discovery

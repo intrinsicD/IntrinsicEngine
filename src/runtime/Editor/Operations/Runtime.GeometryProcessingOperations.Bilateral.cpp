@@ -16,6 +16,7 @@ module;
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
 module Extrinsic.Runtime.PointSetOperations;
+import Geometry.PointCloud.Utils;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Component.DirtyTags;
@@ -202,7 +203,11 @@ namespace Extrinsic::Runtime
                 filtered=PC::BilateralFilterStepFromNeighbors(w.Points,w.Normals,w.NeighborIds,w.Params);
             }
             if(!filtered){r.Status=EditorCommandStatus::GeometryProcessingFailed;r.Message="Bilateral filtering failed: invalid neighborhoods or unrepresentable float updates.";return;}
-            w.Points=std::move(filtered->Positions);r.Diagnostics=filtered->Diagnostics;
+            w.Points=std::move(filtered->Positions);
+            r.PointsFiltered=filtered->Diagnostics.PointsFiltered;
+            r.DegenerateNormals=filtered->Diagnostics.DegenerateNormals;
+            r.AverageDisplacement=filtered->Diagnostics.AverageDisplacement;
+            r.MaxDisplacement=filtered->Diagnostics.MaxDisplacement;
             ++r.CompletedIterations;r.Status=EditorCommandStatus::Applied;
             r.CpuComputeMilliseconds+=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
         }

@@ -6,7 +6,6 @@ module;
 #include <string_view>
 export module Extrinsic.Runtime.BilateralFilterConfig;
 export import Extrinsic.Runtime.GeometryAvailability;
-export import Geometry.PointCloud.Utils;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 export namespace Extrinsic::Runtime

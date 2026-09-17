@@ -1606,8 +1606,10 @@ namespace
                         if(Phase==1)EXPECT_TRUE(result.IndexReused);
                         EXPECT_EQ(result.CompletedIterations,3);EXPECT_EQ(result.WorkspaceBuilds,2);
                         const auto& ref=ReferenceResults[unsigned(result.Output.Domain)-1];
-                        EXPECT_NEAR(result.Diagnostics.AverageDisplacement,ref.Diagnostics.AverageDisplacement,1e-5);
-                        EXPECT_NEAR(result.Diagnostics.MaxDisplacement,ref.Diagnostics.MaxDisplacement,1e-5);
+                        EXPECT_EQ(result.PointsFiltered,ref.PointsFiltered);
+                        EXPECT_EQ(result.DegenerateNormals,ref.DegenerateNormals);
+                        EXPECT_NEAR(result.AverageDisplacement,ref.AverageDisplacement,1e-5);
+                        EXPECT_NEAR(result.MaxDisplacement,ref.MaxDisplacement,1e-5);
 
                     }
                     NeighborhoodMs.push_back(neighborhoodMs);FitMs.push_back(fitMs);BatchCounts.push_back(batches);

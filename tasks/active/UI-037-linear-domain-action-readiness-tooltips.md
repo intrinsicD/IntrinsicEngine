@@ -1535,3 +1535,72 @@ Workshop automation, docs sync/links, task links/policy, skill mirrors, session
 brief, layering, test layout, root hygiene and diff checks pass. UI-037 remains
 open for the broader readiness/cache acceptance; these are supporting reuse and
 compilation-boundary slices, not retirement or a timing result.
+
+
+## Bilateral config/result compilation boundary — plan, 2026-09-17
+
+The operator again directs continued duplication/compilation cleanup with Claude,
+from clean baseline `a7f8f0b8c`. Remove the unused PointCloud.Utils re-export from
+BilateralFilterConfig. Replace the editor result's geometry-owned diagnostics
+record with its four plain values: points filtered, degenerate normals, average
+and maximum displacement. These describe the last completed pass, with zeros
+before any pass. Keep every value and update all in-tree UI/CPU/GPU consumers;
+keep the numerical kernel and private work data unchanged. Existing config
+serialization and apply behavior remain unchanged. No new wrapper, module or
+target; the result boundary is the present owner for copied display values.
+
+Pin the no-Utils/no-Cloud boundary across config interface/implementation and
+operation interface/progressive implementation/frame with a five-producer test.
+The initial probe incorrectly named a nonexistent PointSetOperations.cpp and
+failed before inspecting dependencies; it is not baseline dependency evidence.
+The focused run caught the same guard registration mistake. The corrected guard
+names the existing Runtime.GeometryProcessingOperations.cpp producer. Baseline
+source has the two removed direct imports; use the corrected compiler closure
+for after-change evidence. Verify last-pass
+reporting, degenerate/deleted rows and zero iterations, existing all-domain CPU
+comparison and moving-pass Vulkan coverage. Claude separately examines the next
+reuse candidate: nine acquisition/snapshot guards. Do not add an acquisition
+record or policy framework unless it actually reduces the repeated mechanism.
+
+
+### Bilateral implementation and correction checkpoint
+
+All four last-pass values are retained with identical types (two size_t counts,
+two floats). The new CPU case executes both backends with zero and three passes,
+one zero normal and one deleted NaN row; all expected counts/defaults pass.
+All-domain CPU and Vulkan comparisons now cover all four copied fields.
+
+The first build exposed the numerical implementation's reliance on the old
+config re-export; adding its explicit private Utils import fixes that error.
+The full IntrinsicTests rebuild then passes. Of 117 focused cases, 116 passed;
+the only failure was the new guard's nonexistent source path. Correcting that
+path to the actual progressive processing producer makes the five-producer
+compiler guard pass. Neither initial failure is pre-existing or environmental.
+The initial before-probe is invalid evidence, as documented in the plan above.
+
+Claude's initial fixed-packet review accepted ownership and last-pass behavior
+but required execution evidence, complete-record confirmation and a full build.
+The source record has exactly the four copied members; the compiled full target,
+executed CPU cases and corrected compiler guard settle those questions. The
+public source-doc audit has no errors and four pre-existing comment/synopsis
+review hints; module inventory remains 419 with no generated diff. Layering,
+task policy, test layout and documentation synchronization pass.
+
+
+The Vulkan bilateral test passes with all four diagnostic comparisons (14.69 s,
+no skip, canonical ASan+UBSan preset). Claude's final code review has no blockers
+and asks for the standalone Sandbox build. The edited panel already compiled in
+IntrinsicTests as part of ExtrinsicSandboxEditor (initial build log step 34),
+but the standalone executable is intentionally disabled in ci. Its attempted
+ci target invocation was a command-selection error; use the canonical ci-vulkan
+preset, where that target is enabled, for the additional link check.
+
+
+The ci-vulkan standalone ExtrinsicSandbox build and link pass, including the
+edited panel, resolving the final reviewer verification request. Production
+source adds five lines (explicit four-field copying and import placement);
+the compiler guard adds nine CMake lines. This slice cuts dependencies without
+claiming duplicate-body removal or measured compilation speed. Workshop automation
+passes; manual ownership/reuse/layering rows 1–3 pass and rows 4–8 are unaffected.
+The full CPU gate will run on the combined source after the next reuse slice.
+Logs and review packets: `/tmp/intrinsic-eleventh-*`.
