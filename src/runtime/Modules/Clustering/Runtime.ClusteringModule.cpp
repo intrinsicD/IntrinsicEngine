@@ -180,22 +180,6 @@ namespace Extrinsic::Runtime
             return points;
         }
 
-        [[nodiscard]] bool SamePositions(
-            const std::vector<glm::vec3>& lhs,
-            const std::vector<glm::vec3>& rhs) noexcept
-        {
-            if (lhs.size() != rhs.size())
-                return false;
-            for (std::size_t i = 0u; i < lhs.size(); ++i)
-            {
-                if (!GeometryValueComparison::BitEqual(lhs[i], rhs[i]))
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-
         [[nodiscard]] glm::vec4 LabelColor(const std::uint32_t label)
         {
             const float h =
@@ -283,38 +267,12 @@ namespace Extrinsic::Runtime
             const KMeansOutputPropertyState& lhs,
             const KMeansOutputPropertyState& rhs) noexcept
         {
-            if (lhs.HadLabels != rhs.HadLabels ||
-                lhs.HadColors != rhs.HadColors ||
-                lhs.HadScalarLabels != rhs.HadScalarLabels ||
-                lhs.Labels != rhs.Labels ||
-                lhs.Colors.size() != rhs.Colors.size() ||
-                lhs.ScalarLabels.size() != rhs.ScalarLabels.size())
-            {
-                return false;
-            }
-
-            for (std::size_t i = 0u; i < lhs.Colors.size(); ++i)
-            {
-                const glm::vec4& a = lhs.Colors[i];
-                const glm::vec4& b = rhs.Colors[i];
-                if (!BitEqual(a.x, b.x) ||
-                    !BitEqual(a.y, b.y) ||
-                    !BitEqual(a.z, b.z) ||
-                    !BitEqual(a.w, b.w))
-                {
-                    return false;
-                }
-            }
-            for (std::size_t i = 0u;
-                 i < lhs.ScalarLabels.size();
-                 ++i)
-            {
-                if (!BitEqual(
-                        lhs.ScalarLabels[i],
-                        rhs.ScalarLabels[i]))
-                    return false;
-            }
-            return true;
+            return lhs.HadLabels == rhs.HadLabels &&
+                   lhs.HadColors == rhs.HadColors &&
+                   lhs.HadScalarLabels == rhs.HadScalarLabels &&
+                   lhs.Labels == rhs.Labels &&
+                   BitEqual(lhs.Colors, rhs.Colors) &&
+                   BitEqual(lhs.ScalarLabels, rhs.ScalarLabels);
         }
 
         [[nodiscard]] std::optional<KMeansOutputPropertyState>
@@ -806,7 +764,7 @@ namespace Extrinsic::Runtime
                                                .InputPositions.Name);
                                KMeansOutputPropertyState currentOutputs{};
                                if (!currentPoints.has_value() ||
-                                   !SamePositions(
+                                   !GeometryValueComparison::BitEqual(
                                        *currentPoints,
                                        *expected.Points) ||
                                    !CaptureKMeansOutputPropertyState(
@@ -972,7 +930,7 @@ namespace Extrinsic::Runtime
                     *properties,
                     job.Snapshot.Command.Properties.InputPositions.Name);
             if (!current.has_value() ||
-                !SamePositions(*current, job.Snapshot.Points))
+                !GeometryValueComparison::BitEqual(*current, job.Snapshot.Points))
             {
                 stats.CommitsDropped += 1u;
                 KMeansRunCompleted dropped = job.Completion;

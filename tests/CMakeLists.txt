@@ -56,6 +56,8 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointAnalysis
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Descriptors.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp
+        --forbid-module Geometry.HalfedgeMesh
+        --forbid-module Geometry.MeshSoup
         --forbid-module Extrinsic.ECS.Component.Transform
         --forbid-module Extrinsic.Runtime.NormalOperations
         --forbid-module Extrinsic.Runtime.PointFieldOperations

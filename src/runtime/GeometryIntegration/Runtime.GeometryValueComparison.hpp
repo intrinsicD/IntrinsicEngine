@@ -3,7 +3,9 @@
 #pragma once
 #include <bit>
 #include <concepts>
+#include <cstddef>
 #include <cstdint>
+#include <vector>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
@@ -33,5 +35,21 @@ namespace Extrinsic::Runtime::GeometryValueComparison
     {
         return BitEqual(lhs.x, rhs.x) && BitEqual(lhs.y, rhs.y) &&
                BitEqual(lhs.z, rhs.z) && BitEqual(lhs.w, rhs.w);
+    }
+
+    template <typename T>
+    [[nodiscard]] bool BitEqual(const std::vector<T>& lhs, const std::vector<T>& rhs) noexcept
+    {
+        if (lhs.size() != rhs.size())
+            return false;
+        for (std::size_t i = 0u; i < lhs.size(); ++i)
+        {
+            // Materialize bool values when the buffer uses packed proxy storage.
+            const T lhsValue = lhs[i];
+            const T rhsValue = rhs[i];
+            if (!BitEqual(lhsValue, rhsValue))
+                return false;
+        }
+        return true;
     }
 }

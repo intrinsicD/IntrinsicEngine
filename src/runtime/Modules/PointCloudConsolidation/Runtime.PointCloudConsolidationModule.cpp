@@ -86,23 +86,8 @@ namespace Extrinsic::Runtime
         {
             const auto lhsProperty = lhs.Get<TValue>(name);
             const auto rhsProperty = rhs.Get<TValue>(name);
-            if (!lhsProperty || !rhsProperty ||
-                lhsProperty.Vector().size() != rhsProperty.Vector().size())
-            {
-                return false;
-            }
-            for (std::size_t index = 0u;
-                 index < lhsProperty.Vector().size();
-                 ++index)
-            {
-                if (!BitEqual(
-                        static_cast<TValue>(lhsProperty[index]),
-                        static_cast<TValue>(rhsProperty[index])))
-                {
-                    return false;
-                }
-            }
-            return true;
+            return lhsProperty && rhsProperty &&
+                   BitEqual(lhsProperty.Vector(), rhsProperty.Vector());
         }
 
         [[nodiscard]] bool SamePropertySet(
@@ -1621,15 +1606,8 @@ namespace Extrinsic::Runtime
                     return false;
                 if (!snapshot.Exists)
                     continue;
-                if (property.Vector().size() != snapshot.Values.size())
+                if (!BitEqual(property.Vector(), snapshot.Values))
                     return false;
-                for (std::size_t index = 0u;
-                     index < snapshot.Values.size();
-                     ++index)
-                {
-                    if (!BitEqual(property[index], snapshot.Values[index]))
-                        return false;
-                }
             }
             return true;
         }

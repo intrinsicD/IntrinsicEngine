@@ -612,46 +612,14 @@ namespace Extrinsic::Runtime
             ParameterizationSourceSnapshot Source{};
         };
 
-        [[nodiscard]] bool SameUvValues(
-            const std::span<const glm::vec2> lhs,
-            const std::span<const glm::vec2> rhs) noexcept
-        {
-            if (lhs.size() != rhs.size())
-                return false;
-            for (std::size_t i = 0u; i < lhs.size(); ++i)
-            {
-                if (!GeometryValueComparison::BitEqual(lhs[i], rhs[i]))
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-
         [[nodiscard]] bool SameUvState(
             const ParameterizationUvState& lhs,
             const ParameterizationUvState& rhs) noexcept
         {
             return lhs.Present == rhs.Present &&
                    lhs.CornerPresent == rhs.CornerPresent &&
-                   SameUvValues(lhs.Values, rhs.Values) &&
-                   SameUvValues(lhs.CornerValues, rhs.CornerValues);
-        }
-
-        [[nodiscard]] bool SamePositions(
-            const std::span<const glm::vec3> lhs,
-            const std::span<const glm::vec3> rhs) noexcept
-        {
-            if (lhs.size() != rhs.size())
-                return false;
-            for (std::size_t i = 0u; i < lhs.size(); ++i)
-            {
-                if (!GeometryValueComparison::BitEqual(lhs[i], rhs[i]))
-                {
-                    return false;
-                }
-            }
-            return true;
+                   GeometryValueComparison::BitEqual(lhs.Values, rhs.Values) &&
+                   GeometryValueComparison::BitEqual(lhs.CornerValues, rhs.CornerValues);
         }
 
         [[nodiscard]] ParameterizationSourceSnapshot
@@ -705,7 +673,7 @@ namespace Extrinsic::Runtime
         {
             return lhs.SurfaceIndices == rhs.SurfaceIndices &&
                    lhs.TriangleFaces == rhs.TriangleFaces &&
-                   SamePositions(lhs.Positions, rhs.Positions) &&
+                   GeometryValueComparison::BitEqual(lhs.Positions, rhs.Positions) &&
                    SameUvState(lhs.Uv, rhs.Uv);
         }
 

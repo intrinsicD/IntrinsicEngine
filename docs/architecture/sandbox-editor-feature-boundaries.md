@@ -217,10 +217,12 @@ not import the geometry-processing operation interface.
 
 Bit-exact property guards share the private
 `GeometryIntegration/Runtime.GeometryValueComparison.hpp` overloads across mesh
-properties, Progressive Poisson, clustering and consolidation. Callers materialize
-typed values before comparison; graph/topology tags and unsupported-property
-policies remain local. Mesh position guards retain numeric comparison, including
-its distinct signed-zero/NaN behavior; they do not use the bit-exact helper.
+properties, Progressive Poisson, normals, parameterization, clustering and
+consolidation. Matching `std::vector<T>` buffers use the same helper for length
+and element comparison, including packed Booleans, signed zero and NaN payloads.
+Graph/topology tags and unsupported-property policies remain local.
+`SameGeometryPositions` retains numeric comparison, including its distinct
+signed-zero/NaN behavior; it does not use the bit-exact helper.
 
 Density, spacing, density weights, keypoints and outlier analysis share live
 position/deletion capture and same-domain output preflight in
@@ -340,7 +342,10 @@ spacing contracts, validated config operations and typed result sinks.
 `Extrinsic.Runtime.PointAnalysisOperations` owns weights, keypoints, outliers and
 FPFH descriptors: one family because all four resolve a feature scale, page
 radius or kNN support through the shared row helpers, and publish named
-same-domain scalars in one undoable transaction.
+same-domain scalars in one undoable transaction. The family and its shared
+property/row helpers import neither `Geometry.HalfedgeMesh` nor
+`Geometry.MeshSoup`; they operate on resolved property domains, including mesh
+domains, without owning a full mesh representation.
 `Extrinsic.Runtime.PointSetOperations` owns bilateral filtering and progressive
 Poisson ordering, which share the shared-context-only dependency, a CPU/GPU
 backend pair with truthful requested/actual/fallback reporting and same-domain

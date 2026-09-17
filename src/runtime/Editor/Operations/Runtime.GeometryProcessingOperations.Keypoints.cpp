@@ -28,7 +28,6 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.Properties;
-import Geometry.HalfedgeMesh;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.GeometryAvailability;

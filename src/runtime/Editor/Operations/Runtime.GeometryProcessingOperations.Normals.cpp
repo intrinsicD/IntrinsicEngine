@@ -57,13 +57,6 @@ namespace Extrinsic::Runtime
         using D = GeometryElementDomain;
         namespace Detail = GeometryProcessingDetail;
         using Watch = Detail::PointPropertyWatch;
-        bool SameOutput(std::span<const glm::vec3> a, std::span<const glm::vec3> b)
-        {
-            // Deleted output rows may contain NaNs; preserve their exact stored values.
-            return std::ranges::equal(a, b, [](glm::vec3 x, glm::vec3 y) {
-                return GeometryValueComparison::BitEqual(x, y);
-            });
-        }
         struct NormalWork
         {
             NormalEstimationConfig Config{};
@@ -523,7 +516,8 @@ namespace Extrinsic::Runtime
                     return EditorCommandHistoryStatus::StaleEntity;
                 const auto &read = std::as_const(*props);
                 const auto current = read.Get<glm::vec3>(output.Name);
-                if (expected.Exists && (!current || !SameOutput(current.Vector(), expected.Values)))
+                // Deleted output rows may contain NaNs; compare their stored bits.
+                if (expected.Exists && (!current || !GeometryValueComparison::BitEqual(current.Vector(), expected.Values)))
                     return EditorCommandHistoryStatus::StaleEntity;
                 if (target.Exists)
                     props->GetOrAdd<glm::vec3>(output.Name).Vector() = target.Values;

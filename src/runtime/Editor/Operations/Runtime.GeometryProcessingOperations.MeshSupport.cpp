@@ -193,25 +193,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             const auto currentProperty = current.Get<T>(name);
             if (!currentProperty)
                 return std::nullopt;
-            if (currentProperty.Vector().size() !=
-                expectedProperty.Vector().size())
-            {
-                return false;
-            }
-            for (std::size_t i = 0u;
-                 i < expectedProperty.Vector().size();
-                 ++i)
-            {
-                const T currentValue = currentProperty[i];
-                const T expectedValue = expectedProperty[i];
-                if (!GeometryValueComparison::BitEqual(
-                        currentValue,
-                        expectedValue))
-                {
-                    return false;
-                }
-            }
-            return true;
+            return GeometryValueComparison::BitEqual(
+                currentProperty.Vector(), expectedProperty.Vector());
         }
 
     }

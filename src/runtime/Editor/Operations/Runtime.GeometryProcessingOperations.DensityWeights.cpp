@@ -16,7 +16,6 @@ module;
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
 module Extrinsic.Runtime.PointAnalysisOperations;
-import Geometry.HalfedgeMesh;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.SpatialIndexCache;

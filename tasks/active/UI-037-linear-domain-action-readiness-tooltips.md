@@ -1138,3 +1138,80 @@ failures (4,704 selected, 164.90 s), using
 Sanitizer and GPU/Vulkan execution were not repeated for this runtime
 preparation/diagnostic refactor. Final source was rebuilt after review comments;
 no production logic changed after the passing focused run.
+
+## Exact buffer comparison and point-analysis locality — plan, 2026-09-17
+
+The operator continues to direct duplication/compile-locality work with Claude.
+Consolidate repeated exact-value buffer loops in the existing
+`Runtime.GeometryValueComparison.hpp` owner. The present consumers all pass
+matching `std::vector<T>` storage, including packed Booleans; use that narrow
+overload instead of the proposed unrestricted two-range template, which could
+convert one property's value type to another. No generic predicate, new module
+or implementation file is needed. Keep element-wise component comparison,
+length checks, NaN payloads and signed zero. Preserve each caller's property
+existence, provenance, state flags and unsupported-type policy.
+
+Replace loops/wrappers in parameterization, normals, mesh snapshots, clustering
+and consolidation. Numeric `SameGeometryPositions` and the Poisson connectivity
+comparators retain their different contracts. Extend the existing helper tests
+for empty/mismatched buffers, float/double/vector bits, packed Boolean storage and
+wide integer values; rerun method history and stale-publication tests.
+
+Independent source inspection found unused `Geometry.HalfedgeMesh` imports in
+density weights, keypoints, outliers and descriptors. Compiler-closure checks
+currently reject all four producers against a proposed no-full-mesh contract.
+Remove those edges and extend the existing point-analysis boundary to forbid
+full halfedge mesh and mesh soup. The family operates on resolved properties;
+mesh-domain eligibility and point-cloud-only destructive operations stay intact.
+Claude agrees the repeated comparison loops are a bounded reuse candidate; the
+additional dependency cut is based on the recorded compiler evidence. No
+compile-time speedup is claimed without matched measurements.
+
+### Implementation and verification checkpoint
+
+The existing private `BitEqual` owner now compares matching typed buffers;
+parameterization, normals, mesh snapshots, clustering and consolidation reuse
+it. Packed Boolean values are materialized before scalar comparison. Presence,
+unknown-type, state-flag and topology policies stay with the callers. The numeric
+mesh-position predicate and connectivity-specific comparisons are unchanged.
+Ten production files lose 105 net lines. No target, public module, dependency
+exception or compatibility path was added.
+
+Density weights, keypoints, outliers and descriptors no longer import the full
+halfedge mesh. The strengthened `ProcessingCompilationLocality.PointAnalysis`
+check passes across all ten family/shared producers, forbidding both full mesh
+and mesh soup. The four-producer before check failed on the removed imports;
+this is compiler-dependency evidence, not a compile-time measurement.
+
+Canonical `ci` configure and the runtime contract build pass with Clang 23.
+All **487 focused tests pass**, covering exact buffer edge cases, operation
+history/stale guards, point analysis and processing boundaries. The three added
+helper cases cover empty/unequal lengths, float/double/GLM NaN payloads and signed
+zero, packed Boolean rows and integer values that cannot survive conversion
+through floating-point storage. Existing deleted-row normal history coverage
+also passes. Logs and immutable review packet: `/tmp/intrinsic-fifth-*`.
+
+The architecture entry and reuse route identify the common owner and its
+contract limits. The source-documentation audit has zero errors or review hints;
+the 419-module inventory is unchanged. Architecture/workshop rows 1–3 pass:
+unchanged layer/target ownership and fewer implementation imports. Rows 4–6
+are unaffected; whole-task retirement and exceptions do not apply (7–8).
+UI-037 remains open for its broader readiness/cache acceptance. No research
+claim or compilation-speed claim is made by this refactor.
+
+Claude's immutable-diff review reports no verified blocking defects. Successful
+compilation resolves its buffer-type and overload-visibility uncertainties; the
+passing ten-producer boundary resolves its import-closure/coverage questions.
+Suggested header removals do not apply: normals still uses span, count and
+min/max, and parameterization still uses spans. The helper stays scoped to the
+present scalar/vector storage types; no heterogeneous range API, new predicate
+parameter or speculative heavy-element specialization was introduced.
+
+Final verification: `IntrinsicTests` builds and the full CPU exclusion gate
+passes **4,706 tests plus one expected ASan-only GLFW skip** (4,707 selected,
+zero failures, 156.75 s). Sanitizer and GPU/Vulkan execution were not repeated
+for this comparison/dependency refactor. Strict layering, test layout, task
+policy/state links, docs sync/links, skill mirrors, root hygiene, clean-workshop
+automation, session-brief freshness and diff checks pass. The touched-scope
+planner correctly selects broad feedback for the private header; the canonical
+full CPU run supplies the broader evidence here.
