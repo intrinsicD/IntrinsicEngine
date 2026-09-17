@@ -35,16 +35,12 @@ import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.GeometryAvailability;
-import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.HalfedgeMesh.Utils;
-import Geometry.Mesh.Conversion;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.ParameterizationConfig;
-import Extrinsic.Runtime.SelectionController;
 import Geometry.HalfedgeMesh;
 import Geometry.Parameterization;
 import Geometry.Properties;
@@ -52,7 +48,7 @@ import Geometry.Properties;
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
-#include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -714,7 +710,7 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] bool RestoreDeletedVertexSlots(
-            GeometryProcessingDetail::MeshSupport::MeshDenoiseSourceResult& source,
+            GeometryProcessingDetail::MeshSupport::MeshProcessingSourceResult& source,
             std::string& diagnostic)
         {
             if (source.DeletedVertices.size() != source.Mesh.VerticesSize())
@@ -1160,18 +1156,16 @@ namespace Extrinsic::Runtime
                 raw,
                 *entity);
 
-        GeometryProcessingDetail::MeshSupport::MeshDenoiseSourceResult source =
-            GeometryProcessingDetail::MeshSupport::BuildHalfedgeMeshForDenoise(
-                view, command.Config.Positions.Name);
+        GeometryProcessingDetail::MeshSupport::MeshProcessingSourceResult source =
+            GeometryProcessingDetail::MeshSupport::BuildHalfedgeMeshForProcessing(
+                view, "Parameterization", command.Config.Positions.Name);
         if (source.Status != EditorCommandStatus::Applied)
         {
             return finish(MakeResult(
                 command,
                 source.Status,
                 Parameterization::ParameterizationStatus::InvalidInput,
-                source.Diagnostic.empty()
-                    ? "Parameterization could not build the selected mesh."
-                    : std::move(source.Diagnostic)));
+                std::move(source.Diagnostic)));
         }
         if (!RestoreDeletedVertexSlots(source, topologyDiagnostic))
         {

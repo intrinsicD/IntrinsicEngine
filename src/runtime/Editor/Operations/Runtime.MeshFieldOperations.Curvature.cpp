@@ -92,20 +92,6 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                 EditorMeshCurvatureOutput::PrincipalDirections,
             }};
 
-        [[nodiscard]] MeshDenoiseSourceResult BuildHalfedgeMeshForCurvature(
-            const GS::ConstSourceView& view, const std::string_view positionProperty)
-        {
-            auto source = BuildHalfedgeMeshForDenoise(view, positionProperty);
-            if (source.Status == EditorCommandStatus::UnsupportedGeometryDomain)
-                source.Diagnostic = "Mesh curvature requires selected mesh GeometrySources.";
-            else if (source.Status == EditorCommandStatus::InvalidProcessingParameters)
-                source.Diagnostic = "Mesh curvature requires finite count-matched vertex "
-                                    "positions and valid mesh topology.";
-            else if (!source.Succeeded() && source.Diagnostic.empty())
-                source.Diagnostic = "Mesh curvature could not build a halfedge mesh from GeometrySources.";
-            return source;
-        }
-
         struct MeshCurvaturePropertyState
         {
             MeshCurvatureConfig Bindings{};
@@ -755,15 +741,13 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                 return result;
             }
 
-            MeshDenoiseSourceResult source =
-                BuildHalfedgeMeshForDenoise(view, positionProperty);
+            MeshProcessingSourceResult source =
+                BuildHalfedgeMeshForProcessing(view, "Curvature segmentation", positionProperty);
             if (!source.Succeeded())
             {
                 result.Status = source.Status;
                 result.Error = source.Error;
-                result.Diagnostic = source.Diagnostic.empty()
-                    ? "Curvature segmentation could not build a halfedge mesh from GeometrySources."
-                    : source.Diagnostic;
+                result.Diagnostic = std::move(source.Diagnostic);
                 return result;
             }
 
@@ -1796,7 +1780,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
         SubmitMeshCurvatureCpuJob(
             const EditorProcessingContext& context,
             const EditorMeshCurvatureCommand& command,
-            MeshDenoiseSourceResult source,
+            MeshProcessingSourceResult source,
             MeshCurvaturePropertyState before,
             const std::uint64_t geometryMetadataSignature,
             std::function<void(EditorMeshCurvatureResult)> onComplete)
@@ -2026,8 +2010,8 @@ ApplyEditorMeshCurvatureCommand(
         entt::registry& raw = context.Scene->Raw();
 
         const GS::ConstSourceView constView = GS::BuildConstView(raw, *entity);
-        MeshDenoiseSourceResult source =
-            BuildHalfedgeMeshForCurvature(constView, command.Positions.Name);
+        MeshProcessingSourceResult source =
+            BuildHalfedgeMeshForProcessing(constView, "Mesh curvature", command.Positions.Name);
         result.VertexSlotCount = source.BeforePositions.size();
         if (!source.Succeeded())
         {

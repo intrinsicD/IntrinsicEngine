@@ -1054,3 +1054,87 @@ skip**, zero failures (4,700 selected, 149.83 s), using
 Sanitizer and GPU/Vulkan execution were not repeated for this private-helper
 refactor. Compilation dependency reduction is verified; build-time speedup is
 not measured.
+
+## Shared mesh preparation and diagnostic locality — plan, 2026-09-17
+
+The operator continues to direct duplication/compile-locality work with Claude.
+Use one operation-neutral mesh preparation function and result declaration in
+`MeshSources.hpp`, beside the existing source snapshots. Geodesics and
+parameterization can then stop including `MeshSupport.hpp` and its point/job
+helper declarations. Keep the ordinary compiled implementation owner and the
+separate polygon-preserving normal builder. No public modules are added.
+
+Consolidate the identical domain/position-presence checks privately in that
+compiled owner; retain their order relative to position snapshots, deletion-mask
+checks, topology metadata, soup construction and conversion. A full metadata
+check before the snapshots would change failure counters and precedence, so do
+not substitute that larger validator. Prefix every preparation failure with the
+calling operation and report the actual bound position property. Remove the
+curvature rewriting wrapper and dead fallback wording; topology previews use
+the same source-defect text as execution. Keep the compact topology result
+projection: it drops unused position/deletion/source-face buffers before the
+whole-mesh kernels and queued preparation, so widening it would extend those
+buffers' lifetimes. This narrows Claude's broader deletion suggestion.
+
+Two new public-operation regressions fail on the baseline exactly as intended:
+geodesics errors name denoise and `v:position` for a missing/malformed `v:rest`
+source; parameterization conversion errors name denoise. Their status, output
+retention and history assertions already pass. Add preview/apply equality and
+malformed-mask coverage, retain stale-job/undo/topology tests, then run the full
+CPU gate. No numerical method or deletion/polygon interpretation changes.
+
+Initial focused verification passed all behavior tests and exposed an overbroad
+new dependency assertion: UV regeneration legitimately calls
+`Geometry::Mesh::Conversion::ToHalfedgeMesh` when applying its generated soup.
+The new `ProcessingCompilationLocality.ParameterizationSolve` guard therefore
+checks the solver interface/implementation only; the existing family guard
+remains unchanged. This preserves the real conversion owner and verifies the
+removed unused solver dependency without adding a forwarding helper.
+
+### Verified implementation and review checkpoint
+
+`BuildHalfedgeMeshForProcessing`/`MeshProcessingSourceResult` now own the shared
+preparation contract. A private domain/position gate replaces two copies in the
+compiled owner. The curvature error-rewriting wrapper is removed; the topology
+wrapper only projects the compact result. Error status/code, source-buffer
+counts, mask-before-topology precedence, triangulation, source-face mapping and
+separate normal reconstruction are retained. Missing position and malformed
+mask errors identify the actual bound property. Topology metadata failures have
+identical preview/apply messages for denoise, simplify, remesh and subdivide.
+
+Source result, builder, position extraction and stored-topology signature
+declarations live in `MeshSources.hpp`. Geodesics still needs the signature for
+undo validation, a use missed by the initial planning suggestion; it is included
+in the narrower surface. Geodesics/parameterization no longer parse the broad
+mesh-publication and point/job helper header and remove nine unused imports.
+Job types remain reachable through the shared processing context where required.
+The new solver boundary proves that its conversion dependency is gone; UV
+regeneration keeps its real conversion call. No new implementation file, public
+module, alias or forwarding API was introduced.
+
+Claude reviewed the plan, fixed production diff and final boundary correction:
+no verified functional regression or remaining blocker. Build and focused tests
+closed the review's include, linkage, prefix-equality, mask-order and existing
+message-test questions. The two new diagnostic regressions first failed on the
+unchanged source; after the fix all **337 focused tests pass**. The third new
+behavior test covers combined malformed mask/topology, preserved snapshot
+counts, unchanged positions and empty history. Existing queued/stale/undo and
+normal tests pass. Canonical `ci` configure and `IntrinsicTests` build pass with
+Clang 23. Logs and immutable Claude packets: `/tmp/intrinsic-fourth-*`.
+
+Production delta: eight source/header files, 8,653 to 8,587 lines (66 removed).
+Architecture/workshop rows 1–3 pass: fewer imports, unchanged target links, no
+public ownership change. Rows 4–6 are unaffected; whole-task retirement and
+exceptions do not apply (7–8). Strict layering, test layout, task policy/state
+links, docs sync/links, skill mirrors, root hygiene, clean-workshop automation,
+session-brief freshness and diff checks pass. Source-documentation audit has
+zero objective errors and seven retained review hints; the 419-module inventory
+is unchanged. UI-037 remains open for broader readiness/cache acceptance.
+Compilation speedup is not claimed without a matched timing comparison.
+
+Final CPU gate: **4,703 passed plus one expected ASan-only GLFW skip**, zero
+failures (4,704 selected, 164.90 s), using
+`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60`.
+Sanitizer and GPU/Vulkan execution were not repeated for this runtime
+preparation/diagnostic refactor. Final source was rebuilt after review comments;
+no production logic changed after the passing focused run.

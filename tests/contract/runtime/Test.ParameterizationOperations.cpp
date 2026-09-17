@@ -849,6 +849,24 @@ TEST(ParameterizationOperations, InvalidConfigEditDoesNotSerializeFallbackToken)
     EXPECT_FALSE(previewCalled);
 }
 
+TEST(ParameterizationOperations, ConversionFailureNamesParameterizationAndRetainsUvs)
+{
+    ParameterizationHarness harness{};
+    auto positions = harness.Vertices().Properties.Get<glm::vec3>("v:position");
+    for (auto& position : positions.Vector())
+        position = glm::vec3{0.0f};
+    auto uvs = harness.Vertices().Properties.GetOrAdd<glm::vec2>("v:texcoord", {0.25f, 0.5f});
+    const auto before = uvs.Vector();
+
+    const auto result = Apply(harness, Runtime::ParameterizationStrategyKind::Lscm);
+    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_TRUE(result.Message.starts_with("Parameterization")) << result.Message;
+    EXPECT_EQ(result.Message.find("denoise"), std::string::npos) << result.Message;
+    EXPECT_FALSE(result.Rejection.Evaluated);
+    EXPECT_EQ(uvs.Vector(), before);
+    EXPECT_EQ(harness.History.UndoCount(), 0u);
+}
+
 TEST(ParameterizationOperations, WrongTypedUvAndNonTriangleFacesFailClosed)
 {
     ParameterizationHarness wrongType{};

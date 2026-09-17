@@ -1,6 +1,7 @@
 // Config, source binding, publication, and undo coverage for mesh geodesics.
 #include <array>
 #include <cmath>
+#include <string>
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
@@ -102,6 +103,33 @@ TEST(GeodesicsOperations, AcceptsAlternateVertexPositionsAndRejectsWrongTypes)
     EXPECT_FALSE(Runtime::ApplyEditorGeodesicsCommand(h.Commands(), h.Command).Succeeded());
     EXPECT_EQ(h.Properties().Get<float>("v:geodesic_distance").Vector()[0], 9.f);
 }
+TEST(GeodesicsOperations, SourceDiagnosticsNameTheOperationAndBoundPositionProperty)
+{
+    for (const bool malformedDeletionMask : {false, true})
+    {
+        SCOPED_TRACE(malformedDeletionMask);
+        Harness h;
+        h.Command.Config.PositionProperty = "v:rest";
+        if (malformedDeletionMask)
+        {
+            auto positions = h.Properties().GetOrAdd<glm::vec3>("v:rest", {});
+            positions.Vector() = h.Properties().Get<glm::vec3>("v:position").Vector();
+            auto deleted = h.Properties().GetOrAdd<bool>("v:deleted", false);
+            deleted.Vector().pop_back();
+        }
+        const auto result = Runtime::ApplyEditorGeodesicsCommand(h.Commands(), h.Command);
+        EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+        EXPECT_TRUE(result.Message.starts_with("Geodesics")) << result.Message;
+        EXPECT_EQ(result.Message.find("denoise"), std::string::npos) << result.Message;
+        EXPECT_NE(result.Message.find("v:rest"), std::string::npos) << result.Message;
+        if (malformedDeletionMask)
+            EXPECT_NE(result.Message.find("v:deleted"), std::string::npos) << result.Message;
+        EXPECT_EQ(h.History.UndoCount(), 0u);
+        EXPECT_FALSE(h.Properties().Exists("v:geodesic_distance"));
+        EXPECT_FALSE(h.Properties().Exists("v:is_geodesic_source"));
+    }
+}
+
 TEST(GeodesicsOperations, ConfigRoundTripsAndRejectsInvalidPayloads)
 {
     Config::EngineConfig engine;

@@ -25,14 +25,9 @@ import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
-import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.GeometryAvailability;
-import Extrinsic.Runtime.JobService;
-import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Runtime.WorldHandle;
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;
 
@@ -40,13 +35,16 @@ import Geometry.Properties;
 
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 
-#include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.hpp"
 #include "Editor/Operations/Runtime.MeshFieldOperations.Properties.hpp"
 
 namespace Extrinsic::Runtime
 {
     using namespace GeometryProcessingDetail::MeshSupport;
     using namespace MeshFieldDetail;
+    using EditorFeatureDetail::ResolveStableEntity;
+    using EditorFeatureDetail::ToEditorCommandStatus;
+    namespace GS = ECS::Components::GeometrySources;
 
     EditorGeodesicsResult ApplyEditorGeodesicsCommand(
         const EditorProcessingCommands& commands, const EditorGeodesicsCommand& command)
@@ -70,10 +68,10 @@ namespace Extrinsic::Runtime
         const auto entity = ResolveStableEntity(raw, command.StableEntityId);
         if (!entity)
             return fail(EditorCommandStatus::StaleEntity, "Geodesics target is stale.");
-        auto source = BuildHalfedgeMeshForDenoise(GS::BuildConstView(raw, *entity),
+        auto source = BuildHalfedgeMeshForProcessing(GS::BuildConstView(raw, *entity), "Geodesics",
                                                   command.Config.PositionProperty);
         if (!source.Succeeded())
-            return fail(source.Status, "Geodesics input: " + source.Diagnostic);
+            return fail(source.Status, std::move(source.Diagnostic));
         for (auto face : source.Mesh.LiveFaces())
             for (auto vertex : source.Mesh.VerticesAroundFace(face))
                 if (source.DeletedVertices[vertex.Index])

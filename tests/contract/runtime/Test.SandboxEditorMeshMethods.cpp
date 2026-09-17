@@ -1021,10 +1021,12 @@ TEST(SandboxEditorUi, MeshTopologyAdmissionSharesCommandValidation)
     EXPECT_FALSE(missingDenoise.DisabledReason.empty());
     EXPECT_FALSE(missingSimplify.Enabled);
     EXPECT_FALSE(missingSimplify.DisabledReason.empty());
-    EXPECT_EQ(Runtime::ApplyEditorMeshDenoiseCommand(context, denoise).Status,
-              Status::UnsupportedGeometryDomain);
-    EXPECT_EQ(Runtime::ApplyEditorMeshSimplifyCommand(context, simplify).Status,
-              Status::UnsupportedGeometryDomain);
+    const auto rejectedDenoise = Runtime::ApplyEditorMeshDenoiseCommand(context, denoise);
+    const auto rejectedSimplify = Runtime::ApplyEditorMeshSimplifyCommand(context, simplify);
+    EXPECT_EQ(rejectedDenoise.Status, Status::UnsupportedGeometryDomain);
+    EXPECT_EQ(rejectedSimplify.Status, Status::UnsupportedGeometryDomain);
+    EXPECT_EQ(rejectedDenoise.Message, missingDenoise.DisabledReason);
+    EXPECT_EQ(rejectedSimplify.Message, missingSimplify.DisabledReason);
     registry.Destroy(mesh);
     EXPECT_FALSE(Runtime::PreviewEditorMeshDenoiseCommand(context, denoise).Enabled);
     EXPECT_EQ(Runtime::ApplyEditorMeshDenoiseCommand(context, denoise).Status, Status::StaleEntity);
@@ -1132,8 +1134,12 @@ TEST(SandboxEditorUi, MeshTopologyOptionAdmissionSharesValidationAndPermitsRecov
         EXPECT_FALSE(readiness.Enabled);
         EXPECT_FALSE(readiness.DisabledReason.empty());
     }
-    EXPECT_EQ(Runtime::ApplyEditorMeshRemeshCommand(context, remesh).Status, Status::UnsupportedGeometryDomain);
-    EXPECT_EQ(Runtime::ApplyEditorMeshSubdivideCommand(context, subdivide).Status, Status::UnsupportedGeometryDomain);
+    const auto rejectedRemesh = Runtime::ApplyEditorMeshRemeshCommand(context, remesh);
+    const auto rejectedSubdivide = Runtime::ApplyEditorMeshSubdivideCommand(context, subdivide);
+    EXPECT_EQ(rejectedRemesh.Status, Status::UnsupportedGeometryDomain);
+    EXPECT_EQ(rejectedSubdivide.Status, Status::UnsupportedGeometryDomain);
+    EXPECT_EQ(rejectedRemesh.Message, Runtime::PreviewEditorMeshRemeshCommand(context, remesh).DisabledReason);
+    EXPECT_EQ(rejectedSubdivide.Message, Runtime::PreviewEditorMeshSubdivideCommand(context, subdivide).DisabledReason);
 }
 
 TEST(SandboxEditorUi, UniformRemeshDoesNotRequireAdaptiveSizingCapability)
@@ -1366,6 +1372,43 @@ TEST(SandboxEditorUi, MeshDenoiseDerivedJobDiscardsStaleMeshBeforeApply)
     EXPECT_EQ(completedResult->Status, Runtime::EditorCommandStatus::StaleEntity);
     EXPECT_FALSE(completedResult->Succeeded());
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+}
+
+TEST(SandboxEditorUi, MeshPreparationPreservesMaskFailurePrecedenceAndSnapshotCounts)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    auto context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    const auto mesh = MakeSelectable(registry, "Malformed mesh source");
+    AddDenoiseTetraMeshSource(registry, mesh);
+    const auto id = Runtime::SelectionController::ToStableEntityId(mesh);
+    const auto before = MeshVertexPositions(registry, mesh);
+    auto& vertices = registry.Raw().get<GS::Vertices>(mesh).Properties;
+    auto deleted = vertices.GetOrAdd<bool>("v:deleted", false);
+    deleted.Vector().pop_back();
+    // Both defects are present: the snapshot/mask phase precedes topology validation.
+    auto& halfedges = registry.Raw().get<GS::Halfedges>(mesh).Properties;
+    halfedges.Get<std::uint32_t>(PN::kHalfedgeNext).Vector().pop_back();
+
+    const auto denoise = Runtime::ApplyEditorMeshDenoiseCommand(context, {.StableEntityId = id});
+    const auto remesh = Runtime::ApplyEditorMeshRemeshCommand(context, {.StableEntityId = id});
+    for (const auto status : {denoise.Status, remesh.Status})
+        EXPECT_EQ(status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    for (const auto error : {denoise.Error, remesh.Error})
+        EXPECT_EQ(error, Core::ErrorCode::InvalidArgument);
+    for (const auto& message : {denoise.Message, remesh.Message})
+    {
+        EXPECT_NE(message.find("v:deleted"), std::string::npos) << message;
+        EXPECT_NE(message.find("v:position"), std::string::npos) << message;
+    }
+    EXPECT_EQ(denoise.VertexSlotCount, before.size());
+    EXPECT_EQ(denoise.SkippedDeletedVertexCount, 0u);
+    EXPECT_EQ(history.UndoCount(), 0u);
+    ExpectPositionsExactlyEqual(MeshVertexPositions(registry, mesh), before);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
 }
 
 TEST(SandboxEditorUi, MeshDenoiseCommandFailsClosedForInvalidTargetsAndUnavailableKernel)

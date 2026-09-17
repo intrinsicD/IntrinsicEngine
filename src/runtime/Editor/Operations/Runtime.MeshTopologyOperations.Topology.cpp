@@ -882,7 +882,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
 
         [[nodiscard]] EditorMeshDenoiseResult MakePendingMeshDenoiseResult(
             const EditorMeshDenoiseCommand& command,
-            const MeshDenoiseSourceResult& source,
+            const MeshProcessingSourceResult& source,
             const JobToken handle)
         {
             EditorMeshDenoiseResult result =
@@ -1878,7 +1878,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
         [[nodiscard]] EditorMeshDenoiseResult SubmitMeshDenoiseCpuJob(
             const EditorProcessingContext& context,
             const EditorMeshDenoiseCommand& command,
-            MeshDenoiseSourceResult source,
+            MeshProcessingSourceResult source,
             const std::uint64_t geometryMetadataSignature,
             std::function<void(EditorMeshDenoiseResult)> onComplete)
         {
@@ -1907,7 +1907,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             if (const std::optional<EditorJobRecord> active =
                     FindActiveEditorJob(context, identity))
             {
-                MeshDenoiseSourceResult pendingSource{};
+                MeshProcessingSourceResult pendingSource{};
                 pendingSource.BeforePositions = state->SnapshotPositions;
                 pendingSource.DeletedVertices = state->DeletedVertices;
                 EditorMeshDenoiseResult pending =
@@ -1940,7 +1940,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 return result;
             }
 
-            MeshDenoiseSourceResult pendingSource{};
+            MeshProcessingSourceResult pendingSource{};
             pendingSource.BeforePositions = state->SnapshotPositions;
             pendingSource.DeletedVertices = state->DeletedVertices;
             return MakePendingMeshDenoiseResult(
@@ -2457,7 +2457,8 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
         // connectivity validity at execution, before any mutation or job submission.
         template <typename Result, typename Command>
         [[nodiscard]] ActionReadiness PreviewMeshCommand(
-            const EditorProcessingCommands& commands, const Command& command)
+            const EditorProcessingCommands& commands, const Command& command,
+            const std::string_view operationName)
         {
             const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
             Result result{};
@@ -2466,6 +2467,8 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             std::string diagnostic;
             const auto status = ValidateMeshSoupSourceMetadata(
                 GS::BuildConstView(context.Scene->Raw(), *entity), diagnostic);
+            if (status != EditorCommandStatus::Applied)
+                diagnostic = std::string{operationName} + ": " + diagnostic;
             return {status == EditorCommandStatus::Applied, std::move(diagnostic)};
         }
 
@@ -2478,25 +2481,25 @@ namespace Extrinsic::Runtime
     ActionReadiness PreviewEditorMeshRemeshCommand(
         const EditorProcessingCommands& commands, const EditorMeshRemeshCommand& command)
     {
-        return PreviewMeshCommand<EditorMeshRemeshResult>(commands, command);
+        return PreviewMeshCommand<EditorMeshRemeshResult>(commands, command, "Mesh remesh");
     }
 
     ActionReadiness PreviewEditorMeshSubdivideCommand(
         const EditorProcessingCommands& commands, const EditorMeshSubdivideCommand& command)
     {
-        return PreviewMeshCommand<EditorMeshSubdivideResult>(commands, command);
+        return PreviewMeshCommand<EditorMeshSubdivideResult>(commands, command, "Mesh subdivide");
     }
 
     ActionReadiness PreviewEditorMeshDenoiseCommand(
         const EditorProcessingCommands& commands, const EditorMeshDenoiseCommand& command)
     {
-        return PreviewMeshCommand<EditorMeshDenoiseResult>(commands, command);
+        return PreviewMeshCommand<EditorMeshDenoiseResult>(commands, command, "Mesh denoise");
     }
 
     ActionReadiness PreviewEditorMeshSimplifyCommand(
         const EditorProcessingCommands& commands, const EditorMeshSimplifyCommand& command)
     {
-        return PreviewMeshCommand<EditorMeshSimplifyResult>(commands, command);
+        return PreviewMeshCommand<EditorMeshSimplifyResult>(commands, command, "Mesh simplify");
     }
 
     EditorMeshDenoiseResult
@@ -2515,8 +2518,8 @@ ApplyEditorMeshDenoiseCommand(
         entt::registry& raw = context.Scene->Raw();
 
         const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
-        MeshDenoiseSourceResult source =
-            BuildHalfedgeMeshForDenoise(view);
+        MeshProcessingSourceResult source =
+            BuildHalfedgeMeshForProcessing(view, "Mesh denoise");
         result.VertexSlotCount = source.BeforePositions.size();
         result.SkippedDeletedVertexCount =
             static_cast<std::size_t>(

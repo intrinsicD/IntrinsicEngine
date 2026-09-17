@@ -69,10 +69,16 @@ may not import `Extrinsic.Runtime.Private.*` or include runtime-private headers.
 
 Physical implementation ownership follows the feature split. Geometry operation
 bodies share source-snapshot, stored-topology-fingerprint and publication helpers
-through the private `Runtime.GeometryProcessingOperations.MeshSupport.hpp` and its
-one ordinary compiled owner `MeshSupport.cpp`, which imports no family module and
-no broad processing module. Its triangle-soup result and builder declarations live
-in `Runtime.GeometryProcessingOperations.MeshSoup.hpp`, included only by that
+through private headers and one ordinary compiled owner `MeshSupport.cpp`, which
+imports no family module and no broad processing module. `MeshSources.hpp` holds
+source preparation and fingerprint declarations; geodesics and parameterization
+include it without the job/publication declarations in `MeshSupport.hpp`.
+`BuildHalfedgeMeshForProcessing` names the requesting operation in failures;
+position-binding errors identify the bound property. Shared metadata checks retain the source snapshot and
+deletion-mask ordering before topology conversion; topology previews report the
+same metadata defect text as execution. The compact topology result discards
+unused snapshot buffers before whole-mesh processing. The shared owner's
+triangle-soup result and builder declarations live in `Runtime.GeometryProcessingOperations.MeshSoup.hpp`, included only by that
 compiled owner and UV regeneration. Mesh field/topology families need no mesh-soup
 module. The family-neutral parts of that owner — the queued
 job envelope, the active-job lookup and message, selected-model cache

@@ -263,6 +263,12 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Parameterizatio
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations
         --forbid-module Extrinsic.Runtime.Private.EditorWorkspaceAttachment)
+# UV regeneration reconstructs its generated soup; the parameterization solver
+# uses the common source builder and must not import that conversion API.
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.ParameterizationSolve
+        --check-source src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp
+        --forbid-module Geometry.Mesh.Conversion)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshField
         --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cpp
@@ -323,6 +329,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.RegistrationTes
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations
         --forbid-module Extrinsic.Runtime.ParameterizationOperations)
 set_tests_properties(ProcessingCompilationLocality.Family ProcessingCompilationLocality.PointAnalysis ProcessingCompilationLocality.PointAnalysisTests ProcessingCompilationLocality.UnrelatedAdapters ProcessingCompilationLocality.Normals ProcessingCompilationLocality.NormalTests ProcessingCompilationLocality.MeshSupport ProcessingCompilationLocality.Registration ProcessingCompilationLocality.Parameterization ProcessingCompilationLocality.RegistrationTests ProcessingCompilationLocality.MeshField ProcessingCompilationLocality.MeshTopology ProcessingCompilationLocality.MeshFieldTests
+    ProcessingCompilationLocality.ParameterizationSolve
     ProcessingCompilationLocality.PointSet ProcessingCompilationLocality.PointConstruction
     ProcessingCompilationLocality.PointCloudService ProcessingCompilationLocality.Discovery
     ProcessingCompilationLocality.PointSetTests ProcessingCompilationLocality.PointConstructionTests

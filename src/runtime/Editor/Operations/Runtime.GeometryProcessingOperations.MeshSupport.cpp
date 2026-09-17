@@ -51,9 +51,11 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
         using EditorFeatureDetail::MixSignature;
         using EditorFeatureDetail::MixSignatureString;
 
-        [[nodiscard]] EditorCommandStatus ValidateMeshSoupSourceMetadata(
+    namespace
+    {
+        [[nodiscard]] EditorCommandStatus ValidateMeshPositionSourceMetadata(
             const GS::ConstSourceView& view, std::string& diagnostic,
-            std::string_view positionProperty)
+            const std::string_view positionProperty)
         {
             diagnostic.clear();
             const GS::SourceAvailability availability =
@@ -63,9 +65,6 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
                 view.HalfedgeSource == nullptr ||
                 view.FaceSource == nullptr)
             {
-                // Every geometry-operation family that rebuilds a triangle soup
-                // shares this gate, so the wording names only the source
-                // defect. The calling family prefixes its own operation name.
                 diagnostic = "selected entity has no mesh GeometrySources";
                 return EditorCommandStatus::UnsupportedGeometryDomain;
             }
@@ -73,9 +72,22 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             const auto positions = view.VertexSource->Properties.Get<glm::vec3>(positionProperty);
             if (!positions || positions.Vector().empty())
             {
-                diagnostic = "selected mesh has no vertex position property";
+                diagnostic = "selected mesh requires a non-empty vertex position property: " +
+                             std::string{positionProperty};
                 return EditorCommandStatus::InvalidProcessingParameters;
             }
+            return EditorCommandStatus::Applied;
+        }
+    }
+
+        [[nodiscard]] EditorCommandStatus ValidateMeshSoupSourceMetadata(
+            const GS::ConstSourceView& view, std::string& diagnostic,
+            std::string_view positionProperty)
+        {
+            const auto status = ValidateMeshPositionSourceMetadata(view, diagnostic, positionProperty);
+            if (status != EditorCommandStatus::Applied)
+                return status;
+            const auto positions = view.VertexSource->Properties.Get<glm::vec3>(positionProperty);
             if (positions.Vector().size() >
                 static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()))
             {
@@ -508,102 +520,70 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             return positions;
         }
 
-        [[nodiscard]] MeshDenoiseSourceResult BuildHalfedgeMeshForDenoise(
+        [[nodiscard]] MeshProcessingSourceResult BuildHalfedgeMeshForProcessing(
             const GS::ConstSourceView& view,
-            std::string_view positionProperty)
+            const std::string_view operationName,
+            const std::string_view positionProperty)
         {
-            MeshDenoiseSourceResult result{};
-            const GS::SourceAvailability availability =
-                GS::BuildSourceAvailability(view);
-            if (availability.ProvenanceDomain != GS::Domain::Mesh ||
-                view.VertexSource == nullptr ||
-                view.HalfedgeSource == nullptr ||
-                view.FaceSource == nullptr)
+            MeshProcessingSourceResult result{};
+            const auto fail = [&](const EditorCommandStatus status, std::string diagnostic)
             {
-                result.Status =
-                    EditorCommandStatus::UnsupportedGeometryDomain;
+                result.Status = status;
                 result.Error = Core::ErrorCode::InvalidArgument;
-                result.Diagnostic =
-                    "Mesh denoise requires selected mesh GeometrySources.";
+                result.Diagnostic = std::string{operationName} + ": " + diagnostic;
+            };
+            std::string diagnostic;
+            const auto status = ValidateMeshPositionSourceMetadata(view, diagnostic, positionProperty);
+            if (status != EditorCommandStatus::Applied)
+            {
+                fail(status, std::move(diagnostic));
                 return result;
             }
 
             const auto positions = view.VertexSource->Properties.Get<glm::vec3>(positionProperty);
-            if (!positions || positions.Vector().empty())
-            {
-                result.Status =
-                    EditorCommandStatus::InvalidProcessingParameters;
-                result.Error = Core::ErrorCode::InvalidArgument;
-                result.Diagnostic =
-                    "Mesh denoise requires a non-empty v:position property.";
-                return result;
-            }
-
             result.BeforePositions = positions.Vector();
             result.DeletedVertices.assign(result.BeforePositions.size(), false);
-            if (const auto deleted =
-                    view.VertexSource->Properties.Get<bool>("v:deleted"))
+            if (const auto deleted = view.VertexSource->Properties.Get<bool>("v:deleted"))
             {
                 if (deleted.Vector().size() != result.BeforePositions.size())
                 {
-                    result.Status =
-                        EditorCommandStatus::InvalidProcessingParameters;
-                    result.Error = Core::ErrorCode::InvalidArgument;
-                    result.Diagnostic =
-                        "Mesh denoise requires v:deleted to match v:position when present.";
+                    fail(EditorCommandStatus::InvalidProcessingParameters,
+                         "v:deleted must match the bound position property: " + std::string{positionProperty});
                     return result;
                 }
                 for (std::size_t i = 0u; i < deleted.Vector().size(); ++i)
                     result.DeletedVertices[i] = deleted.Vector()[i];
             }
 
-            MeshSoupFromGeometrySourcesResult soup =
-                BuildMeshSoupFromGeometrySources(view, positionProperty);
+            MeshSoupFromGeometrySourcesResult soup = BuildMeshSoupFromGeometrySources(view, positionProperty);
             if (!soup.Succeeded())
             {
-                result.Status = soup.Status;
-                result.Error = Core::ErrorCode::InvalidArgument;
-                result.Diagnostic = soup.Diagnostic.empty()
-                                        ? "Mesh denoise could not build a triangle soup "
-                                          "from GeometrySources."
-                                        : soup.Diagnostic;
+                fail(soup.Status, std::move(soup.Diagnostic));
                 return result;
             }
 
-            auto converted =
-                Geometry::Mesh::Conversion::ToHalfedgeMesh(soup.Mesh);
+            auto converted = Geometry::Mesh::Conversion::ToHalfedgeMesh(soup.Mesh);
             if (!converted.Succeeded())
             {
-                result.Status =
-                    EditorCommandStatus::GeometryProcessingFailed;
-                result.Error = Core::ErrorCode::InvalidArgument;
-                result.Diagnostic = "Mesh denoise could not convert selected "
-                                    "GeometrySources to halfedge topology.";
+                fail(EditorCommandStatus::GeometryProcessingFailed,
+                     "could not convert selected GeometrySources to halfedge topology.");
                 return result;
             }
             if (converted.Mesh.VerticesSize() != result.BeforePositions.size())
             {
-                result.Status =
-                    EditorCommandStatus::GeometryProcessingFailed;
-                result.Error = Core::ErrorCode::InvalidArgument;
-                result.Diagnostic =
-                    "Mesh denoise conversion changed the vertex slot count.";
+                fail(EditorCommandStatus::GeometryProcessingFailed,
+                     "conversion changed the vertex slot count.");
                 return result;
             }
-            if (converted.Mesh.FacesSize() !=
-                soup.SourceFaceForSoupFace.size())
+            if (converted.Mesh.FacesSize() != soup.SourceFaceForSoupFace.size())
             {
-                result.Status =
-                    EditorCommandStatus::GeometryProcessingFailed;
-                result.Error = Core::ErrorCode::InvalidArgument;
-                result.Diagnostic =
-                    "Mesh denoise conversion changed the face slot count.";
+                fail(EditorCommandStatus::GeometryProcessingFailed,
+                     "conversion changed the face slot count.");
                 return result;
             }
 
             result.Mesh = std::move(converted.Mesh);
-            result.SourceFaceForMeshFace =
-                std::move(soup.SourceFaceForSoupFace);
+            result.SourceFaceForMeshFace = std::move(soup.SourceFaceForSoupFace);
             result.Status = EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             return result;
@@ -613,40 +593,13 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             const GS::ConstSourceView& view,
             std::string_view operationName)
         {
-            MeshDenoiseSourceResult source = BuildHalfedgeMeshForDenoise(view);
-            MeshTopologySourceResult result{};
-            result.Status = source.Status;
-            result.Error = source.Error;
-            if (source.Succeeded())
-            {
-                result.Mesh = std::move(source.Mesh);
-                return result;
-            }
-
-            result.Diagnostic = std::string{operationName};
-            if (source.Status ==
-                EditorCommandStatus::UnsupportedGeometryDomain)
-            {
-                result.Diagnostic +=
-                    " requires selected mesh GeometrySources.";
-            }
-            else if (source.Status ==
-                     EditorCommandStatus::InvalidProcessingParameters)
-            {
-                result.Diagnostic +=
-                    " requires a non-empty finite mesh with valid topology.";
-            }
-            else
-            {
-                result.Diagnostic +=
-                    " could not build a halfedge mesh from GeometrySources.";
-            }
-            if (!source.Diagnostic.empty())
-            {
-                result.Diagnostic += " ";
-                result.Diagnostic += source.Diagnostic;
-            }
-            return result;
+            auto source = BuildHalfedgeMeshForProcessing(view, operationName);
+            return {
+                .Mesh = std::move(source.Mesh),
+                .Status = source.Status,
+                .Error = source.Error,
+                .Diagnostic = std::move(source.Diagnostic),
+            };
         }
 
         void MarkMeshTopologyReplacementDirty(

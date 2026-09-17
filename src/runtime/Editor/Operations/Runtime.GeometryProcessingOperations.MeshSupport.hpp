@@ -32,11 +32,6 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             const Geometry::ConstPropertySet& current,
             const Geometry::ConstPropertySet& expected) noexcept;
 
-        // `std::nullopt` means the stored topology could not be read at all, so
-        // no two readings may be treated as equal.
-        [[nodiscard]] std::optional<std::uint64_t> MeshTopologyValueSignature(
-            const GS::ConstSourceView& view);
-
         [[nodiscard]] std::optional<std::uint64_t>
         StoredMeshTopologySignatureForEntity(
             entt::registry& raw,
@@ -59,32 +54,6 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
 
 
 
-
-
-        struct MeshDenoiseSourceResult
-        {
-            Geometry::HalfedgeMesh::Mesh Mesh{};
-            std::vector<glm::vec3> BeforePositions{};
-            std::vector<bool> DeletedVertices{};
-            std::vector<std::uint32_t> SourceFaceForMeshFace{};
-            EditorCommandStatus Status{
-                EditorCommandStatus::NoChange};
-            Core::ErrorCode Error{Core::ErrorCode::Success};
-            std::string Diagnostic{};
-
-            [[nodiscard]] bool Succeeded() const noexcept
-            {
-                return Status == EditorCommandStatus::Applied;
-            }
-        };
-
-        [[nodiscard]] MeshDenoiseSourceResult BuildHalfedgeMeshForDenoise(
-            const GS::ConstSourceView& view,
-            std::string_view positionProperty = GS::PropertyNames::kPosition);
-
-
-        [[nodiscard]] std::vector<glm::vec3> ExtractMeshPositions(
-            const Geometry::HalfedgeMesh::Mesh& mesh);
 
 
         // Immutable vertex-position snapshot captured for an undo/redo
