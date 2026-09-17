@@ -21,6 +21,30 @@ its dependencies, conditional gates, scope and verification.
 - [GEOM-073 — Point-analysis property/span contracts](GEOM-073-point-analysis-property-span-contracts.md)
 - [GEOM-074 — Graph property and adjacency contracts](GEOM-074-graph-property-adjacency-contracts.md)
 - [GEOM-076 — Evidence-gated curvature-region UV atlas cuts](GEOM-076-curvature-region-guided-uv-atlas-cuts.md)
+- [GEOM-078 — Intrinsic surface-sample point cloud with contiguous face ranges](GEOM-078-intrinsic-surface-sample-point-cloud.md)
+
+## Vulkan candidates
+
+- [GEOM-079 — Vulkan topology-normal and local PCA kernels](GEOM-079-vulkan-topology-and-pca-normal-kernels.md)
+- [GEOM-080 — Vulkan mesh curvature and principal directions](GEOM-080-vulkan-mesh-curvature.md)
+- [GEOM-081 — Vulkan explicit mesh and property smoothing](GEOM-081-vulkan-explicit-mesh-and-property-smoothing.md)
+- [GEOM-082 — Vulkan bilateral mesh denoising](GEOM-082-vulkan-bilateral-mesh-denoising.md)
+- [GEOM-083 — Vulkan intrinsic surface sampling](GEOM-083-vulkan-intrinsic-surface-sampling.md)
+- [GEOM-084 — Vulkan voxel downsampling](GEOM-084-vulkan-voxel-downsampling.md)
+- [GEOM-085 — Vulkan Marching Cubes extraction](GEOM-085-vulkan-marching-cubes.md)
+- [GEOM-086 — Vulkan Gaussian-mixture EM fitting](GEOM-086-vulkan-gaussian-mixture-em.md)
+- [GEOM-087 — Vulkan geometry quality metrics](GEOM-087-vulkan-geometry-quality-metrics.md)
+- [GEOM-088 — Vulkan Loop, sqrt3 and Catmull-Clark subdivision](GEOM-088-vulkan-mesh-subdivision.md)
+- [GEOM-089 — Vulkan heat methods and implicit smoothing](GEOM-089-vulkan-heat-methods-and-implicit-smoothing.md)
+- [GEOM-090 — Assess Vulkan LSCM, harmonic and BFF parameterization](GEOM-090-vulkan-one-shot-parameterization-assessment.md)
+- [GEOM-091 — Vulkan stages for existing curvature segmentation](GEOM-091-vulkan-curvature-segmentation-stages.md)
+- [GEOM-092 — Vulkan SPFH and FPFH descriptor kernels](GEOM-092-vulkan-fpfh-descriptor-kernels.md)
+- [GEOM-093 — Vulkan kernel-density and compact-density reductions](GEOM-093-vulkan-density-estimation-and-weight-kernels.md)
+- [GEOM-094 — Vulkan outlier and point-statistics reductions](GEOM-094-vulkan-outlier-and-point-statistics-reductions.md)
+- [GEOM-095 — Vulkan bilateral point-filter iterations](GEOM-095-vulkan-bilateral-point-filter-kernels.md)
+- [GEOM-096 — Vulkan ICP accumulation and solve assessment](GEOM-096-vulkan-icp-accumulation-and-solve-assessment.md)
+- [GEOM-097 — Vulkan continuous LOP projection](GEOM-097-vulkan-continuous-lop-projection.md)
+- [GEOM-098 — Vulkan anisotropic WLOP and EAR stages](GEOM-098-vulkan-anisotropic-wlop-and-ear.md)
 
 Completed and superseded work is recorded in the
 [retirement log](../../done/RETIREMENT-LOG.md) and Git history.

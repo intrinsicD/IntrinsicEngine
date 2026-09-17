@@ -29,12 +29,20 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `GRAPHICS-137`: `GRAPHICS-136` — Rename `Pipeline*` to `GraphicsState*` at the RHI boundary (tasks/backlog/rendering/GRAPHICS-136-rename-pipeline-to-graphics-state-rhi-boundary.md)
 - unblocked: `GRAPHICS-137` — Shader-object realization spike (ADR-0028 killing experiment) (tasks/backlog/rendering/GRAPHICS-137-shader-object-realization-spike.md)
 
+## Theme C — Physics readiness
+
+- unblocked: `PHYSICS-005` — Vulkan SPH fluid reference integration (tasks/backlog/physics/PHYSICS-005-vulkan-sph-fluid.md)
+- unblocked: `PHYSICS-006` — Vulkan particle-spring reference integration (tasks/backlog/physics/PHYSICS-006-vulkan-particle-spring.md)
+- unblocked: `PHYSICS-007` — Vulkan XPBD cloth constraints and integration (tasks/backlog/physics/PHYSICS-007-vulkan-xpbd-cloth.md)
+
 ## Theme F — Architecture/runtime/UI foundation seeds
 
 - unblocked: `ASSETIO-010` — Async model companion preflight (tasks/backlog/assets/ASSETIO-010-async-model-companion-preflight.md)
 - blocked by `ASSETIO-010`: `ASSETIO-011` — Semantic Sandbox File / Import workflow matrix (tasks/backlog/assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md)
+- unblocked: `GEOM-078` — Intrinsic surface-sample point cloud with contiguous face ranges (tasks/backlog/geometry/GEOM-078-intrinsic-surface-sample-point-cloud.md)
 - blocked by `GRAPHICS-105`: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
+- unblocked: `RUNTIME-269` — Shared Vulkan sparse solve kernels for existing methods (tasks/backlog/runtime/RUNTIME-269-shared-vulkan-sparse-solve-kernels.md)
 
 ## Theme G — Active bugs
 
@@ -73,6 +81,26 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `GEOM-073` — Point-analysis property/span contracts (tasks/backlog/geometry/GEOM-073-point-analysis-property-span-contracts.md)
 - blocked by `GEOM-068`: `GEOM-074` — Graph property and adjacency contracts (tasks/backlog/geometry/GEOM-074-graph-property-adjacency-contracts.md)
 - blocked by `METHOD-040`: `GEOM-076` — Evidence-gated curvature-region UV atlas cuts (tasks/backlog/geometry/GEOM-076-curvature-region-guided-uv-atlas-cuts.md)
+- unblocked: `GEOM-079` — Vulkan topology-normal and local PCA kernels (tasks/backlog/geometry/GEOM-079-vulkan-topology-and-pca-normal-kernels.md)
+- unblocked: `GEOM-080` — Vulkan mesh curvature and principal directions (tasks/backlog/geometry/GEOM-080-vulkan-mesh-curvature.md)
+- unblocked: `GEOM-081` — Vulkan explicit mesh and property smoothing (tasks/backlog/geometry/GEOM-081-vulkan-explicit-mesh-and-property-smoothing.md)
+- unblocked: `GEOM-082` — Vulkan bilateral mesh denoising (tasks/backlog/geometry/GEOM-082-vulkan-bilateral-mesh-denoising.md)
+- blocked by `GEOM-078`: `GEOM-083` — Vulkan intrinsic surface sampling (tasks/backlog/geometry/GEOM-083-vulkan-intrinsic-surface-sampling.md)
+- unblocked: `GEOM-084` — Vulkan voxel downsampling (tasks/backlog/geometry/GEOM-084-vulkan-voxel-downsampling.md)
+- unblocked: `GEOM-085` — Vulkan Marching Cubes extraction (tasks/backlog/geometry/GEOM-085-vulkan-marching-cubes.md)
+- unblocked: `GEOM-086` — Vulkan Gaussian-mixture EM fitting (tasks/backlog/geometry/GEOM-086-vulkan-gaussian-mixture-em.md)
+- unblocked: `GEOM-087` — Vulkan geometry quality metrics (tasks/backlog/geometry/GEOM-087-vulkan-geometry-quality-metrics.md)
+- unblocked: `GEOM-088` — Vulkan Loop, sqrt3 and Catmull-Clark subdivision (tasks/backlog/geometry/GEOM-088-vulkan-mesh-subdivision.md)
+- blocked by `RUNTIME-269`: `GEOM-089` — Vulkan heat methods and implicit smoothing (tasks/backlog/geometry/GEOM-089-vulkan-heat-methods-and-implicit-smoothing.md)
+- blocked by `RUNTIME-269`: `GEOM-090` — Assess Vulkan LSCM, harmonic and BFF parameterization (tasks/backlog/geometry/GEOM-090-vulkan-one-shot-parameterization-assessment.md)
+- blocked by `GEOM-080`: `GEOM-091` — Vulkan stages for existing curvature segmentation (tasks/backlog/geometry/GEOM-091-vulkan-curvature-segmentation-stages.md)
+- unblocked: `GEOM-092` — Vulkan SPFH and FPFH descriptor kernels (tasks/backlog/geometry/GEOM-092-vulkan-fpfh-descriptor-kernels.md)
+- unblocked: `GEOM-093` — Vulkan kernel-density and compact-density reductions (tasks/backlog/geometry/GEOM-093-vulkan-density-estimation-and-weight-kernels.md)
+- unblocked: `GEOM-094` — Vulkan outlier and point-statistics reductions (tasks/backlog/geometry/GEOM-094-vulkan-outlier-and-point-statistics-reductions.md)
+- unblocked: `GEOM-095` — Vulkan bilateral point-filter iterations (tasks/backlog/geometry/GEOM-095-vulkan-bilateral-point-filter-kernels.md)
+- unblocked: `GEOM-096` — Vulkan ICP accumulation and solve assessment (tasks/backlog/geometry/GEOM-096-vulkan-icp-accumulation-and-solve-assessment.md)
+- blocked by `GEOM-086`: `GEOM-097` — Vulkan continuous LOP projection (tasks/backlog/geometry/GEOM-097-vulkan-continuous-lop-projection.md)
+- unblocked: `GEOM-098` — Vulkan anisotropic WLOP and EAR stages (tasks/backlog/geometry/GEOM-098-vulkan-anisotropic-wlop-and-ear.md)
 - blocked by `METHOD-014`: `HARDEN-084` — Localized CPU/GPU parity signatures (tasks/backlog/methods/HARDEN-084-localized-cpu-gpu-parity-signatures.md)
 - unblocked: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
 - unblocked: `METHOD-003A` — Spatial-query CPU-reference integration intake (tasks/backlog/methods/METHOD-003A-spatial-query-reference-integration-intake.md)

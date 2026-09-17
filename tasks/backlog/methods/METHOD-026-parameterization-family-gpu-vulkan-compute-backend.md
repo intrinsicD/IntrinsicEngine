@@ -8,6 +8,7 @@ depends_on:
   - RUNTIME-194
   - RUNTIME-195
   - RUNTIME-202
+  - RUNTIME-269
 maturity_target: ParityProven
 workflow_schema: 1
 workflow_profile: standard
@@ -27,11 +28,15 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, method.e
   the GPU. Expose it per strategy only after an actual `gpu;vulkan` run proves
   CPU-reference parity (and SLIM injectivity), with a GPU-vs-CPU comparison
   result and honest CPU-reference fallback. Linear one-shot strategies remain
-  CPU-only by recorded decision.
+  outside this task; GEOM-090 separately assesses LSCM/harmonic/BFF candidates.
 
 ## Non-goals
 - No new strategy or numeric change — the GPU path must match the `METHOD-021`/`METHOD-022` reference within a documented parity tolerance and preserve SLIM injectivity.
-- No GPU acceleration of the linear one-shot strategies (LSCM/SCP/BFF) — not in this task and not deferred from it. Their method tasks record no GPU follow-up (a one-shot sparse direct solve/eigensolve gains little from `gpu_vulkan_compute`); if a benchmark ever justifies one, it opens as its own method/backend task.
+- No GPU acceleration of the linear one-shot strategies (LSCM/SCP/BFF) in this
+  task. [GEOM-090](../geometry/GEOM-090-vulkan-one-shot-parameterization-assessment.md)
+  owns the newly requested, evidence-gated LSCM/harmonic/BFF assessment. SCP is
+  not part of that existing-method cohort. No speedup or lack of benefit is
+  assumed without matched measurements.
 - No new GPU primitive library — reuse the shared `Extrinsic.Graphics.ComputeParallelPrimitives` (GRAPHICS-108) and the runtime GPU-queue/readback substrate rather than private CUB-equivalents.
 
 ## Context
@@ -47,6 +52,10 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, method.e
   bounded iteration. Results drain once through the `RUNTIME-195` multi-range
   transfer/readback operation, never through a
   per-iteration CPU round trip or device-wide `ReadBuffer` stall.
+- Reuse the bounded sparse kernels owned by
+  [RUNTIME-269](../runtime/RUNTIME-269-shared-vulkan-sparse-solve-kernels.md).
+  This task retains ARAP/SLIM assembly, constraints, iteration control and
+  injectivity checks; the shared solver is not a second method owner.
 - Gating: reference parity (`METHOD-021`/`022`) and completion of the
   SLIM-only `METHOD-025` optimized-CPU evaluation must exist first. The CPU
   reference is always canonical; compare against `cpu_optimized` only for SLIM

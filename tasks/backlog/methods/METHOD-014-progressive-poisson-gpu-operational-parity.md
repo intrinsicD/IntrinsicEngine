@@ -43,6 +43,11 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, method.e
   parity diagnostics exist, but public execution still falls back to CPU.
 - This task owns the `Operational` and `ParityProven` milestones for the
   progressive Poisson Vulkan backend.
+- Candidate review on 2026-09-17 confirms this is the existing owner; no
+  duplicate GPU task is needed. RUNTIME-195's actual-Vulkan transport/parser
+  test uses a CPU-reference-shaped seeded payload. Preserve that useful test,
+  but it does not establish acceptance-kernel compute parity or public GPU
+  execution; those remain acceptance criteria here.
 
 ## Control surfaces
 - Config: registered app section

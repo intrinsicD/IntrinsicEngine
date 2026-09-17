@@ -33,6 +33,10 @@ contracts: [repo.source-documentation, geometry.element-domain-sources]
 - Retired `GEOM-016` hardened centroid voxel downsampling with deterministic ordering and stable tie-breaking; this task adds index-returning strategies under the same determinism and invalid-input contract.
 
 - Index-returning selection is what makes downstream property transfer exact (select rows from every property), which the centroid path cannot do.
+- [GEOM-084](GEOM-084-vulkan-voxel-downsampling.md) owns the separately requested
+  Vulkan backend. It starts with the existing centroid operation and may add
+  these index-returning strategies only after their CPU contracts land here.
+  This task remains CPU strategy work and does not wait for GPU implementation.
 
 ## Spatial acceleration consideration
 
@@ -60,7 +64,8 @@ See the [shared spatial-index consumer inventory](../../../docs/architecture/spa
 ## Docs
 - [ ] Interface documentation for the strategy semantics and tie-break contract.
 - [ ] Regenerate the module inventory if the module surface changes.
-- [ ] Update the port-gap cluster notes in `tasks/backlog/geometry/README.md`.
+- [ ] Update the canonical downsampling API documentation with the reduction
+      and exact property-transfer contracts; keep the backlog README an index.
 
 ## Acceptance criteria
 - [ ] All strategies are covered by tests in the default CPU gate.
@@ -81,4 +86,6 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - No `std::rand` or global RNG state.
 
 ## Maturity
-- Target: `CPUContracted`; no `Operational` follow-up is owed.
+- Target: `CPUContracted` for the CPU reduction strategies.
+- `Operational` is owned by GEOM-084 for optional Vulkan execution; this task
+  does not promise GPU admission for a strategy before its parity gate passes.

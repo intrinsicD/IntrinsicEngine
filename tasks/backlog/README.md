@@ -41,7 +41,10 @@ Rendering leaves retain their own evidence and adoption gates. GRAPHICS-105 stil
 
 ### Theme C — Physics readiness (P1)
 
-No physics task is currently in the backlog. See the [physics architecture](../../docs/architecture/physics.md) and the active-task view before proposing new work.
+The [physics queue](physics/README.md) contains operator-requested Vulkan
+candidates for the existing SPH, particle-spring and XPBD reference methods.
+Their tasks own runtime integration and retain the
+[physics ownership boundary](../../docs/architecture/physics.md).
 
 ### Theme D — ECS hardening parity (P0, bounded contract convergence)
 

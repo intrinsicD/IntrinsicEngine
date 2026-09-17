@@ -29,6 +29,10 @@ The canonical property-domain contract for method integration is
   owns selected finite `vec3` property inputs and source-cardinality
   hierarchy publication on the originating element domain.
 
+## Shared Vulkan numerical kernels
+
+- [RUNTIME-269 — Shared Vulkan sparse solve kernels for existing methods](RUNTIME-269-shared-vulkan-sparse-solve-kernels.md)
+
 ## Scene lighting and point presentation
 
 - [`RUNTIME-218` — Default scene lighting and light authoring](RUNTIME-218-default-scene-lighting-and-light-authoring.md)
