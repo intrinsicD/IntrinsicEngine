@@ -1514,7 +1514,17 @@ TEST(SandboxConfigSections, PointPropertyRoundTripsPreserveDomainsKindsAndNameBy
     {
         SCOPED_TRACE("DensityWeight");
         using C = Runtime::DensityWeightConfig;
-        check(C{}, {&C::Positions, &C::Weights}, Runtime::SetDensityWeightConfig,
-            Runtime::GetDensityWeightConfig, Runtime::SerializeDensityWeightConfig);
+        for (const auto kernel : {Geometry::PointCloud::Kernels::KernelType::Gaussian,
+                                  Geometry::PointCloud::Kernels::KernelType::ThetaLop,
+                                  Geometry::PointCloud::Kernels::KernelType::WendlandC2})
+            for (const auto mode : {Geometry::PointCloud::Kernels::DensityWeightMode::Direct,
+                                    Geometry::PointCloud::Kernels::DensityWeightMode::Reciprocal})
+            {
+                C config;
+                config.Kernel = kernel;
+                config.Mode = mode;
+                check(config, {&C::Positions, &C::Weights}, Runtime::SetDensityWeightConfig,
+                    Runtime::GetDensityWeightConfig, Runtime::SerializeDensityWeightConfig);
+            }
     }
 }

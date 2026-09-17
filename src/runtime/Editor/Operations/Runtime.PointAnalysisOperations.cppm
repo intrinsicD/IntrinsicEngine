@@ -18,7 +18,7 @@ export import Extrinsic.Runtime.DensityWeightConfig;
 export import Extrinsic.Runtime.DescriptorAnalysisConfig;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
-import Geometry.PointCloud.Kernels;
+import Geometry.PointCloud.Kernels.Types;
 export namespace Extrinsic::Runtime
 {
     struct EditorOutlierAnalysisResult

@@ -6,7 +6,7 @@ module;
 #include <string_view>
 export module Extrinsic.Runtime.DensityWeightConfig;
 export import Extrinsic.Runtime.GeometryAvailability;
-export import Geometry.PointCloud.Kernels;
+export import Geometry.PointCloud.Kernels.Types;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 export namespace Extrinsic::Runtime

@@ -12,24 +12,12 @@ module;
 
 export module Geometry.PointCloud.Kernels;
 
+export import Geometry.PointCloud.Kernels.Types;
 import Geometry.KDTree;
 export import Geometry.SpatialQueries;
 
 export namespace Geometry::PointCloud::Kernels
 {
-    enum class KernelType : std::uint8_t
-    {
-        Gaussian = 0,
-        ThetaLop,
-        WendlandC2,
-    };
-
-    enum class DensityWeightMode : std::uint8_t
-    {
-        Direct = 0,
-        Reciprocal,
-    };
-
     enum class DensityWeightStatus : std::uint8_t
     {
         Success = 0,
@@ -47,16 +35,6 @@ export namespace Geometry::PointCloud::Kernels
         InvalidNeighborhoods,
     };
 
-    struct DensityWeightDiagnostics
-    {
-        std::size_t PointCount{0u};
-        std::size_t QueryCount{0u};
-        std::size_t NeighborContributionCount{0u};
-        std::size_t EmptyNeighborhoodCount{0u};
-        bool UsedSuppliedIndex{false};
-        bool UsedSuppliedNeighborhoods{false};
-    };
-
     struct DensityWeightResult
     {
         DensityWeightStatus Status{
@@ -70,10 +48,6 @@ export namespace Geometry::PointCloud::Kernels
         }
     };
 
-    [[nodiscard]] std::string_view DebugName(
-        KernelType kernel) noexcept;
-    [[nodiscard]] std::string_view DebugName(
-        DensityWeightMode mode) noexcept;
     [[nodiscard]] std::string_view DebugName(
         DensityWeightStatus status) noexcept;
 

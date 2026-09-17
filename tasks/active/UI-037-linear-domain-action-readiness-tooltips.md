@@ -2308,3 +2308,37 @@ ctest --test-dir build/ci --output-on-failure -R '^SandboxConfigSections\.|^Proc
 cmake --preset ci-vulkan
 cmake --build --preset ci-vulkan --target ExtrinsicSandbox -j4
 ```
+
+## Density config/result locality — 2026-09-18
+
+Operator-directed continuation with Claude from `0e7f7d65d`; Codex owns the
+checkout/build and Claude reviews fixed read-only packets. UI-037's wider
+readiness acceptance remains open. Logs/reviews: `/tmp/intrinsic-density-locality/`.
+
+The configured compiler baseline reaches `Geometry.PointCloud.Kernels` and
+`Geometry.KDTree` from all five density config/interface/codec/frame producers.
+Move the kernel/mode enums, copied diagnostics and their two token-spelling
+functions verbatim into `Geometry.PointCloud.Kernels.Types` and its compiled
+implementation. The algorithm re-exports the sole type owner; execution imports
+its kernel API explicitly. Seven producers pass the new dependency-boundary test,
+which excludes the kernel algorithm, spatial queries and all three point indices.
+All six kernel/mode combinations round-trip across the nine domain tokens.
+Eight production files, including new files and CMake: 1,306 to 1,330 physical
+lines; the 24-line increase pays for the compilation boundary, not new behavior.
+
+Claude approves the fixed diff, conditioned on full consumer compilation and
+separate commits for the codec tests. The first focused build identified the
+execution unit's missing direct kernel import; the corrected build passes.
+Before codec consolidation, all 16 config cases plus the new boundary test pass.
+The final combined `IntrinsicTests` build passes on canonical ci/Clang 23; the
+41 focused config/kernel/density-operation/boundary tests pass after consolidation.
+No measured build-speed, GPU-execution or full-sanitizer-suite claim follows.
+
+Architecture sweep: layer/CMake/type-ownership rows 1–3 pass, renderer/pass/recipe
+rows 4–6 are not applicable, row 7 retains the open readiness task, row 8 has no
+exceptions. Source documentation audit: zero errors; ten reviewed hints retain
+kernel numerical/index contracts and the existing point-analysis family synopsis.
+Inventory regenerated: 423 modules. Final combined full CPU gate: 4,733 passed,
+one expected ASan-only GLFW lifecycle skip, zero failures (4,734 selected;
+153.06 seconds). Canonical ci-vulkan/Clang 23 `ExtrinsicSandbox` also compiles
+and links with ASan+UBSan instrumentation; no GPU or sanitizer test run is implied.

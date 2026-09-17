@@ -26,6 +26,7 @@ import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Core.Error;
 import Geometry.PointCloud.Utils;
+import Geometry.PointCloud.Kernels;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.EditorCommandHistory;

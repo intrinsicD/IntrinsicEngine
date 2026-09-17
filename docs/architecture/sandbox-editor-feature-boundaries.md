@@ -46,6 +46,14 @@ and normal prepared frames therefore do not import normal algorithms, owning
 mesh/point-cloud containers or spatial indices. The compiler-derived
 `ProcessingCompilationLocality.NormalContracts` test guards that boundary.
 
+Density-weight config and point-analysis results use
+`Geometry.PointCloud.Kernels.Types` for the kernel/mode enums, their token
+spellings and copied density diagnostics. The algorithm module re-exports this
+owner. Config codecs and point-analysis prepared frames do not import the kernel
+algorithms or spatial-query/index modules; the execution unit imports its kernel
+API explicitly. `ProcessingCompilationLocality.DensityWeightContracts` checks
+these configured compiler dependencies.
+
 `Runtime.EditorFeatures.Internal.hpp` holds private workspace bindings and context
 adapters. It includes `Runtime.EditorFeatureCommands.Internal.hpp` for import/file
 prerequisites, diagnostics and render-hint comparisons, and

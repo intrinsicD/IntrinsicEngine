@@ -146,6 +146,21 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Normals
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations
         --forbid-module Extrinsic.Runtime.Private.EditorWorkspaceAttachment)
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.DensityWeightContracts
+        --check-source src/geometry/Geometry.PointCloud.Kernels.Types.cppm
+        --check-source src/geometry/Geometry.PointCloud.Kernels.Types.cpp
+        --check-source src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cppm
+        --check-source src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Frame.cpp
+        --forbid-module Geometry.PointCloud.Kernels
+        --forbid-module Geometry.KDTree
+        --forbid-module Geometry.SpatialQueries
+        --forbid-module Geometry.Octree
+        --forbid-module Geometry.PointLBVH)
+set_tests_properties(ProcessingCompilationLocality.DensityWeightContracts
+    PROPERTIES LABELS "contract;build;runtime" TIMEOUT 30)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.NormalContracts
         --check-source src/geometry/Geometry.NormalEstimation.Types.cppm
         --check-source src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm
