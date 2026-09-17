@@ -39,6 +39,7 @@ import Extrinsic.Runtime.WorldRegistry;
 import Geometry.KMeans;
 import Geometry.Properties;
 
+#include "GeometryIntegration/Runtime.GeometryPositionCapture.hpp"
 #include "Modules/Clustering/Runtime.ClusteringGpuState.Internal.hpp"
 #include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
 
@@ -151,34 +152,7 @@ namespace Extrinsic::Runtime
             return nullptr;
         }
 
-        [[nodiscard]] bool IsFinitePosition(const glm::vec3& position) noexcept
-        {
-            return std::isfinite(position.x) &&
-                   std::isfinite(position.y) &&
-                   std::isfinite(position.z);
-        }
-
-        [[nodiscard]] std::optional<std::vector<glm::vec3>> CollectPositions(
-            const Geometry::PropertySet& properties,
-            const std::string_view propertyName)
-        {
-            const auto positions =
-                properties.Get<glm::vec3>(propertyName);
-            if (!positions || positions.Vector().empty())
-                return std::nullopt;
-            if (positions.Vector().size() != properties.Size())
-                return std::nullopt;
-
-            std::vector<glm::vec3> points{};
-            points.reserve(positions.Vector().size());
-            for (const glm::vec3& position : positions.Vector())
-            {
-                if (!IsFinitePosition(position))
-                    return std::nullopt;
-                points.push_back(position);
-            }
-            return points;
-        }
+        using GeometryProcessingDetail::MeshSupport::CollectFiniteGeometryPositions;
 
         [[nodiscard]] glm::vec4 LabelColor(const std::uint32_t label)
         {
@@ -426,7 +400,7 @@ namespace Extrinsic::Runtime
             const auto* properties = ResolveGeometryPropertySet(
                 availability, command.Properties.InputPositions.Domain);
             std::optional<std::vector<glm::vec3>> points =
-                CollectPositions(
+                CollectFiniteGeometryPositions(
                     *properties,
                     command.Properties.InputPositions.Name);
             if (!points.has_value())
@@ -758,7 +732,7 @@ namespace Extrinsic::Runtime
                                const std::optional<
                                    std::vector<glm::vec3>>
                                    currentPoints =
-                                       CollectPositions(
+                                       CollectFiniteGeometryPositions(
                                            *currentProperties,
                                            mutation.Properties
                                                .InputPositions.Name);
@@ -926,7 +900,7 @@ namespace Extrinsic::Runtime
             }
 
             std::optional<std::vector<glm::vec3>> current =
-                CollectPositions(
+                CollectFiniteGeometryPositions(
                     *properties,
                     job.Snapshot.Command.Properties.InputPositions.Name);
             if (!current.has_value() ||

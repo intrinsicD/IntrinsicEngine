@@ -330,7 +330,13 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.RegistrationTes
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations
         --forbid-module Extrinsic.Runtime.ParameterizationOperations)
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PositionCapture
+        --check-source src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp
+        --forbid-module Geometry.HalfedgeMesh
+        --forbid-module Geometry.MeshSoup)
 set_tests_properties(ProcessingCompilationLocality.Family ProcessingCompilationLocality.PointAnalysis ProcessingCompilationLocality.PointAnalysisTests ProcessingCompilationLocality.UnrelatedAdapters ProcessingCompilationLocality.Normals ProcessingCompilationLocality.NormalTests ProcessingCompilationLocality.MeshSupport ProcessingCompilationLocality.Registration ProcessingCompilationLocality.Parameterization ProcessingCompilationLocality.RegistrationTests ProcessingCompilationLocality.MeshField ProcessingCompilationLocality.MeshTopology ProcessingCompilationLocality.MeshFieldTests
+    ProcessingCompilationLocality.PositionCapture
     ProcessingCompilationLocality.ParameterizationSolve
     ProcessingCompilationLocality.PointSet ProcessingCompilationLocality.PointConstruction
     ProcessingCompilationLocality.PointCloudService ProcessingCompilationLocality.Discovery

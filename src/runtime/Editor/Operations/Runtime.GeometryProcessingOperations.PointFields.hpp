@@ -3,12 +3,13 @@
 // Include after processing-context, property, command-history and job-projection
 // imports, including Core.Error for shared result diagnostics.
 #pragma once
+#include "GeometryIntegration/Runtime.GeometryPositionCapture.hpp"
 
 extern "C++"
 {
 namespace Extrinsic::Runtime::GeometryProcessingDetail
 {
-    // Declaration owner for the family-neutral helpers compiled in
+    // Family-neutral job/cache helpers compiled in
     // `Runtime.GeometryProcessingOperations.MeshSupport.cpp`. They live here
     // rather than in `…MeshSupport.hpp` because point-set families need them
     // without that header's by-value halfedge-mesh and mesh-soup snapshots.
@@ -19,13 +20,6 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         // envelope carries only a diagnostic — and exists at all because an
         // empty envelope is how `JobService` reports a dropped job.
         struct EditorJobResult { std::string Diagnostic{}; };
-
-        [[nodiscard]] bool IsFiniteGeometryPosition(const glm::vec3& position) noexcept;
-
-        // `std::nullopt` when the property is missing, mis-sized against the
-        // element domain, or carries a non-finite coordinate.
-        [[nodiscard]] std::optional<std::vector<glm::vec3>> CollectFiniteGeometryPositions(
-            const Geometry::PropertySet& properties, std::string_view positionProperty);
 
         void InvalidateSelectedModelCache(const EditorProcessingContext& context);
 

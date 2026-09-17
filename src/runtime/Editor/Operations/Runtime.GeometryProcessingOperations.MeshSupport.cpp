@@ -333,37 +333,6 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
                 GS::BuildConstView(raw, *entity));
         }
 
-        [[nodiscard]] bool IsFiniteGeometryPosition(
-            const glm::vec3& position) noexcept
-        {
-            return std::isfinite(position.x) &&
-                   std::isfinite(position.y) &&
-                   std::isfinite(position.z);
-        }
-
-        [[nodiscard]] std::optional<std::vector<glm::vec3>>
-        CollectFiniteGeometryPositions(
-            const Geometry::PropertySet& properties,
-            const std::string_view positionProperty)
-        {
-            const auto positions =
-                properties.Get<glm::vec3>(positionProperty);
-            if (!positions || positions.Vector().empty())
-                return std::nullopt;
-            if (positions.Vector().size() != properties.Size())
-                return std::nullopt;
-
-            std::vector<glm::vec3> points{};
-            points.reserve(positions.Vector().size());
-            for (const glm::vec3& position : positions.Vector())
-            {
-                if (!IsFiniteGeometryPosition(position))
-                    return std::nullopt;
-                points.push_back(position);
-            }
-            return points;
-        }
-
         [[nodiscard]] bool SameGeometryPositions(
             const std::vector<glm::vec3>& lhs,
             const std::vector<glm::vec3>& rhs) noexcept

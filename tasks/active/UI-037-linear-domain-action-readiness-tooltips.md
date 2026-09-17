@@ -1215,3 +1215,72 @@ policy/state links, docs sync/links, skill mirrors, root hygiene, clean-workshop
 automation, session-brief freshness and diff checks pass. The touched-scope
 planner correctly selects broad feedback for the private header; the canonical
 full CPU run supplies the broader evidence here.
+
+## Shared finite-position capture — plan, 2026-09-17
+
+The operator continues to direct duplication and compilation-locality work with
+Claude. GEOM-073 discovery confirms that Cloud adapters have distinct slot and
+scale semantics; no broad utility rewrite is included here. The concrete reuse
+candidate is the byte-for-byte equivalent finite-position capture in clustering
+and mesh processing: both require a nonempty vec3 property matching domain size,
+reject any non-finite row and copy every row without interpreting deletion masks.
+
+Reuse `CollectFiniteGeometryPositions` through a narrow private declaration
+header, move its implementation and finite predicate from the mesh-support
+translation unit into the existing point-property owner, and delete clustering's
+copy. No new module or implementation file, public API, alias or wrapper is
+needed. Keep existing namespace/function identity to limit caller churn. Compiler
+closure currently confirms both clustering and point properties exclude full
+halfedge mesh and soup; preserve that boundary while sharing capture. Add direct
+contract cases for storage rejection, row order, retained deleted rows, and owned
+snapshot independence, then verify existing clustering/history/mesh behavior.
+
+### Implementation checkpoint
+
+Clustering's three capture sites now reuse the original compiled function through
+`Runtime.GeometryPositionCapture.hpp`. The original body and function identity
+are unchanged; the ordinary `PointProperties.cpp` owns the definition and finite
+predicate. Existing mesh/UV callers keep the same declaration through their
+point-field include. The new declaration header is justified by a current
+clustering caller that must not parse editor job/context records. No public
+module surface or target edge changes. Including the new header, production
+source shrinks by 12 lines; the boundary adds six CMake test-registration lines.
+
+Three new contract cases verify missing/wrong-kind/empty/mis-sized rejection,
+all component NaN/infinity rejection (including deleted rows), retained row order
+and subnormal inputs, and snapshot ownership after source mutation. All **366
+focused tests pass**, including clustering/history, mesh/UV/parameterization and
+compiler boundaries. Canonical Clang 23 `ci` configure/build passes; an unused
+variable warning in the test was fixed and the focused build rerun cleanly.
+The two-producer PositionCapture boundary passes before and after reuse: it
+proves the shared owner and clustering still exclude full mesh/soup modules,
+not that a new dependency edge was removed. No timing improvement is claimed.
+
+Claude's GEOM-073 discovery recommends a broader Gaussian-noise kernel but its
+proposed adapter switch changes submesh-view handling. That proposal is not
+implemented: a later GEOM-073 slice must preserve view offsets, absolute seed
+indices, deletion semantics and adapter-specific scale resolution. No geometry
+method or compatibility commitment changes in this slice.
+
+Architecture/workshop rows 1–3 pass: unchanged ownership/targets, one compiled
+capture and a private declaration surface. Rows 4–6 are unaffected; task
+retirement and exceptions do not apply (7–8). Source-documentation has zero
+objective errors; retained hints cover correctness and include-order comments.
+The generated 419-module inventory is unchanged. Logs/review packets live at
+`/tmp/intrinsic-sixth-*`. UI-037 remains open for readiness/cache acceptance.
+
+Claude reviewed the fixed production/test diff and identified the already-fixed
+unused test variable plus one contract question. `PropertyRegistry::Storage<T>`
+returns null on a type-ID mismatch; `PropertyRegistry::Get<T>` returns nullopt and
+`PropertySet::Get<T>` returns an invalid handle. Thus wrong-kind rejection is an
+existing contract, including assertions-enabled builds. The new tests and the
+successful compile/link close the review's header, linkage and caller questions.
+
+Final verification: `IntrinsicTests` builds without warnings. The full CPU
+exclusion gate passes **4,710 tests plus one expected ASan-only GLFW skip**
+(4,711 selected, zero failures, 165.12 s). Claude's follow-up review confirms
+no remaining blockers after the warning fix and property-type evidence.
+Strict layering, test layout, task policy/state links, documentation sync/links,
+skill mirrors, root hygiene, clean-workshop automation, session-brief freshness
+and diff checks pass. Sanitizer and GPU/Vulkan execution were not repeated for
+this unchanged capture implementation. Compilation speed remains unmeasured.

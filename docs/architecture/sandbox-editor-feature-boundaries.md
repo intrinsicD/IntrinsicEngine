@@ -224,6 +224,15 @@ Graph/topology tags and unsupported-property policies remain local.
 `SameGeometryPositions` retains numeric comparison, including its distinct
 signed-zero/NaN behavior; it does not use the bit-exact helper.
 
+Clustering and mesh processing share `CollectFiniteGeometryPositions`, declared
+in the private `GeometryIntegration/Runtime.GeometryPositionCapture.hpp` and
+compiled in `Runtime.GeometryProcessingOperations.PointProperties.cpp`.
+It snapshots a nonempty, count-matched vec3 property in source-row order and
+rejects any non-finite value. It does not interpret deletion masks. Clustering
+uses the narrow declaration header without importing mesh or editor job types;
+`ProcessingCompilationLocality.PositionCapture` guards the mesh-free closure of
+clustering and the compiled capture owner.
+
 Density, spacing, density weights, keypoints and outlier analysis share live
 position/deletion capture and same-domain output preflight in
 `Runtime.GeometryProcessingOperations.PointProperties.cpp`. `CapturePointInput`

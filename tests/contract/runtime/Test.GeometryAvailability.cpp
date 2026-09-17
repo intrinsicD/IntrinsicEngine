@@ -5,8 +5,10 @@
 #include <limits>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
@@ -21,9 +23,70 @@ import Geometry.Graph;
 import Geometry.HalfedgeMesh;
 import Geometry.PointCloud;
 
+#include "../../../src/runtime/GeometryIntegration/Runtime.GeometryPositionCapture.hpp"
+
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
 namespace G = Extrinsic::Graphics::Components;
 namespace Runtime = Extrinsic::Runtime;
+
+using Runtime::GeometryProcessingDetail::MeshSupport::CollectFiniteGeometryPositions;
+
+TEST(GeometryPositionCapture, RejectsMissingWrongTypedEmptyAndMisSizedStorage)
+{
+    Geometry::PropertySet properties;
+    EXPECT_FALSE(CollectFiniteGeometryPositions(properties, "f:center"));
+    (void)properties.GetOrAdd<float>("f:scalar");
+    EXPECT_FALSE(CollectFiniteGeometryPositions(properties, "f:scalar"));
+    auto positions = properties.GetOrAdd<glm::vec3>("f:center");
+    EXPECT_FALSE(CollectFiniteGeometryPositions(properties, "f:center"));
+    properties.Resize(2u);
+    EXPECT_FALSE(CollectFiniteGeometryPositions(properties, "f:scalar"));
+    positions.Vector().resize(1u);
+    EXPECT_FALSE(CollectFiniteGeometryPositions(properties, "f:center"));
+    positions.Vector().resize(3u);
+    EXPECT_FALSE(CollectFiniteGeometryPositions(properties, "f:center"));
+}
+
+TEST(GeometryPositionCapture, OwnsAllRowsInOrderWithoutInterpretingDeletion)
+{
+    Geometry::PropertySet properties;
+    properties.Resize(3u);
+    auto positions = properties.GetOrAdd<glm::vec3>("f:center");
+    positions.Vector() = {{3, 2, 1}, {-0.0f, 0, 0},
+                          {std::numeric_limits<float>::denorm_min(), 4, 5}};
+    auto deleted = properties.GetOrAdd<bool>("f:deleted");
+    deleted[1] = true;
+    const auto snapshot = CollectFiniteGeometryPositions(properties, "f:center");
+    ASSERT_TRUE(snapshot);
+    EXPECT_EQ(*snapshot, positions.Vector());
+    ASSERT_EQ(snapshot->size(), 3u);
+    positions[0] = {99, 99, 99};
+    EXPECT_EQ(snapshot->front(), glm::vec3(3, 2, 1));
+    EXPECT_TRUE(deleted[1]);
+    EXPECT_EQ(properties.Size(), 3u);
+}
+
+TEST(GeometryPositionCapture, RejectsNonFiniteComponentsEvenInDeletedRows)
+{
+    Geometry::PropertySet properties;
+    properties.Resize(2u);
+    auto positions = properties.GetOrAdd<glm::vec3>("p:sample");
+    auto deleted = properties.GetOrAdd<bool>("p:deleted");
+    deleted[1] = true;
+    for (const float invalid : {std::numeric_limits<float>::quiet_NaN(),
+                               std::numeric_limits<float>::infinity(),
+                               -std::numeric_limits<float>::infinity()})
+    {
+        for (int component = 0; component < 3; ++component)
+        {
+            positions[1] = glm::vec3(0);
+            positions[1][component] = invalid;
+            EXPECT_FALSE(CollectFiniteGeometryPositions(properties, "p:sample"));
+            EXPECT_TRUE(deleted[1]);
+            EXPECT_EQ(properties.Size(), 2u);
+        }
+    }
+}
 
 namespace
 {
