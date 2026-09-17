@@ -1,0 +1,78 @@
+session:
+  id: 2026-09-17_001
+  date: '2026-09-17'
+  started: '2026-09-17T10:39:34+02:00'
+  last_turn: '2026-09-17T10:39:34+02:00'
+  turn_count: 1
+  summary: Shared K-Means metadata admission with Claude, removed redundant common-model domain
+    state, and verified 30 focused tests plus 4696 CPU passes and one expected skip; pulled
+    main and kept its checkout clean.
+events_logged:
+- turn: 1
+  type: decision
+  id: N625
+  routing: direct
+  provenance: ai-executed
+  summary: Shared K-Means metadata admission with Claude, removed redundant common-model domain
+    state, and verified 30 focused tests plus 4696 CPU passes and one expected skip; pulled
+    main and kept its checkout clean.
+ai_actions:
+- turn: 1
+  action: Implemented the bounded K-Means reuse slice, reviewed it with read-only Claude packets,
+    corrected remaining tests, and ran canonical ci build/CPU gates. On resumption source
+    commit a174b4f8d was already merged externally; pulled task-only main update 5cf2dcd5c
+    as requested. Recorded verification in a separate worktree, preserving clean main.
+  provenance: ai-executed
+  files_changed:
+  - src/runtime/Modules/Clustering/Runtime.ClusteringTypes.cpp
+  - src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp
+  - src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+  - tests/contract/runtime/Test.ClusteringModule.cpp
+  - tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+  - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
+  - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
+  - tasks/backlog/runtime/RUNTIME-211-kmeans-property-domain-integration.md
+  - tasks/backlog/ui/UI-043-kmeans-property-domain-panel.md
+claims_touched: []
+key_context:
+- turn: 1
+  excerpt: Operator continued duplicate-code and compile-locality cleanup with Claude, then
+    requested a pull. Broader K-Means domains and whole-task readiness remain separately owned.
+open_threads:
+- The broader C92 processing-family hypothesis still needs a selected baseline and repeated
+  family-edit measurements; BUILD-006 separately owns backend/cache comparisons.
+- BUG-193 owns unexplained GPU pacing variability and WLOP watchdog margin; BUG-189/191/192
+  closed only finite-work fixture budget corrections.
+- BUG-178 compiler-cache ICE, BUG-188 sandbox sanitizer discovery and BUG-180 leak-enabled
+  GPU process retention remain open.
+- METHOD-044 native/config/UI adoption and METHOD-045 atlas chart-area/remeshing quality work
+  remain open. METHOD-043 retains later candidate integration after METHOD-042 offline closure.
+- REVIEW-004 Framework24 convergence and further consumer-justified workspace/model simplification
+  remain open; no whole-engine completion.
+- Existing staged research observations retain their named owners and stale flags; local refactor/task
+  retirement does not settle their broader method, architecture or performance hypotheses.
+- ASSETIO-012 is retired. UI-046 retains geometry export, UI-047 path choosing, and ASSETIO-011
+  broader real-widget import coverage; their shared geometry capability owner is now explicit.
+- 'BUG-194 remains open: user confirms responsive UI/camera and persistent missing saliency
+  display. Actual model CPU and Vulkan probes select the scalar; exact Display status, acceleration
+  and Appearance behavior remain needed.'
+- BUG-195 owns disk-headroom preflight and evidence-write recovery; completed backend verification
+  does not close that tooling work.
+- RUNTIME-268, GRAPHICS-144, GRAPHICS-145 and RUNTIME-267 are complete with bounded measured
+  evidence. Mandatory config/session dependencies remain. UI-037 is active with shared controls,
+  outlier/ICP, Progressive Poisson and parameterization and mesh-field config/execution including
+  segmentation drafts, shared topology computation and BUG-200 repair plus UV and all topology
+  admission plus remesh/subdivide options and Poisson metadata admission/draft retry plus
+  curvature/segmentation admission verified; all common-model method availability flags removed;
+  full numerical UV readiness, mesh/bake, family readiness, backend/variant and metadata/cache
+  preflight coverage remain. GRAPHICS-105 is active with overlay material duplication, retired
+  SciVis metadata, lighting alias and unused import-owned default/authored allocations removed;
+  authored factor/texture projection and normal-source work remain. LEGACY-043 follows it,
+  and BUILD-006 retains its prerequisites. K-Means shared metadata admission and explicit
+  draft retry are now verified; the common model has no per-method domain list. RUNTIME-211/UI-043
+  own broader eight-domain execution.
+ai_suggestions_pending:
+- Do not generalize the snapshot technique across engine layers without measuring the actual
+  producer and consumer graph. Existing staged topics retain their owners and flags.

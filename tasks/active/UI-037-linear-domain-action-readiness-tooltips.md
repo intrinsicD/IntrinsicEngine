@@ -855,6 +855,71 @@ Verified checkpoint:
   already rejects kind changes. Prove those paths in focused tests and review.
 
 
+## K-Means admission and shared-model cleanup — verification checkpoint
+
+- Implementation commit: `a174b4f8d`. On resuming, the operator's checkout
+  already contained that commit on main and origin/main. A requested fast-forward
+  pull then brought main to `5cf2dcd5c`; the additional commit changes backlog
+  documents only. Verification below uses that checkout's identical C++ source.
+  This checkpoint is recorded in a separate worktree to preserve the clean main
+  checkout and the one-writer rule.
+- The existing clustering Types implementation owns metadata admission reused
+  by runtime snapshot capture and editor preview/submission. Rejections preserve
+  typed status, backend and request identity; queued failures retain their world
+  and correlation, while immediate editor rejection queues/publishes nothing.
+  Finite scans, exact output capture, source staleness, publication and history
+  stay in execution. The finite-input rejection status is preserved.
+- Config parsing and admission share typed binding rules. All eight known config
+  domains remain accepted; the current three execution domains are unchanged.
+  RUNTIME-211/UI-043 now describe extending the existing validator and catalog
+  controls instead of adding another readiness path.
+- Removed KMeansDomains, its shared-model producer, its helper and the app domain
+  conversion switch. Shared processing models contain no per-method availability
+  flags or domain inventories. K-Means keeps entity/input/output controls and Run
+  visible, uses catalog defaults, and previews the exact draft with the shared
+  disabled-action tooltip. Explicit Apply/Reload, config rejection/retry, output
+  Show actions and requested/actual backend reporting remain intact.
+- Claude reviewed the plan, fixed diff and exact supporting source. Addressed its
+  finite-status/correlation concerns. Source proof resolved its speculative
+  import-cycle, invalid-ID, provenance and config-kind objections without new
+  facades or duplicate guards; its final review has no blockers.
+- Focused verification: **30 passes**, zero failures (1.82 s). Runtime tests cover
+  rejection priority, custom/missing/count-mismatched input, output-kind conflict,
+  non-finite execution, event identity and detached service frames. Config tests
+  cover eight domains and nine malformed bindings. Real ImGui coverage proves
+  visible blocked controls, property selection, rejected-draft retry and one
+  successful queued run. Existing history/fallback/Show tests also pass.
+- Fixed two remaining test references to the deleted domain list. The new widget
+  test initially assumed the catalog would prefer its custom input over an
+  existing v:point property; it now explicitly selects the custom row. A Clang
+  lexer crash during an overlapping test-file correction did not recur with
+  stabilized sources and CCACHE_DISABLE=1. No speculative source workaround was
+  added, and this does not establish a cache-defect diagnosis.
+- Production C++ is **69 lines smaller** across ten existing files. No new
+  production file/module, compatibility path or exported dependency edge.
+  The existing implementation owner now performs admission; this is structural
+  cleanup, not a measured compilation-speed claim.
+- UI-037 remains active for other families, backend/variant controls, bake
+  readiness and cached numerical/topology/deleted-slot/publication checks.
+  RUNTIME-211/UI-043 retain the broader K-Means domain integration. No task is
+  retired by this bounded checkpoint.
+
+- Canonical ci configure and IntrinsicTests build passed. The full exclusion-only
+  CPU gate selected **4,697 tests: 4,696 passes, one expected ASan-only GLFW
+  lifecycle skip, zero failures** (148.96 s). This run did not execute sanitizer
+  or Vulkan/GPU tests. The changed common interface and affected GPU-smoke
+  consumers were compiled by the full target.
+- Layering, test layout, task policy/state links, docs links/sync, skills,
+  session-brief freshness, root hygiene and diff checks pass. Inventory refreshed
+  unchanged at 419 modules. The touched source-doc audit reports zero objective
+  errors and 145 review hints; declaration lifetime/admission comments are
+  intentional, with existing broad README debt left scoped to its owners.
+- Scope/layering/tests/docs and automated workshop sweep pass. Manual rows 1–3
+  pass, 4–6 are unchanged, 7 remains partial readiness coverage, 8 has no exception.
+  Verification logs and fixed Claude packets are in
+  `/tmp/intrinsic-kmeans-admission/` on the verification host.
+
+
 ## Property comparison reuse and compile locality — 2026-09-17
 
 Operator explicitly continues duplicate-code and compilation cleanup with Claude,
