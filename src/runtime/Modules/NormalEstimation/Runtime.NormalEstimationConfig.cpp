@@ -32,14 +32,8 @@ namespace Extrinsic::Runtime
             for (unsigned i = 0; i < 3; ++i)
                 if (d.at("backend") == ToString(NormalEstimationBackend(i)))
                     c.Backend = NormalEstimationBackend(i);
-            auto readRef = [&](const char *key, GeometryPropertyRef &r) {
-                r.Name = d.at(key).at("name");
-                for (unsigned i = 0; i <= unsigned(GeometryElementDomain::PointCloudPoint); ++i)
-                    if (d.at(key).at("domain") == ToString(GeometryElementDomain(i)))
-                        r.Domain = GeometryElementDomain(i);
-            };
-            readRef("positions", c.Positions);
-            readRef("output", c.Output);
+            ConfigDetail::DecodePointPropertyRef(d.at("positions"), c.Positions);
+            ConfigDetail::DecodePointPropertyRef(d.at("output"), c.Output);
             c.KNeighbors = d.at("k_neighbors");
             c.MinimumNeighbors = d.at("minimum_neighbors");
             c.GpuQueryBatchSize = d.at("gpu_query_batch_size");
@@ -158,15 +152,11 @@ namespace Extrinsic::Runtime
                 return reject("Fallback normal coordinates must be finite floats.");
         for (auto key : {"positions", "output"})
         {
-            const auto &r = d[key];
-            if (!r.is_object() || r.size() != 3 || !r.contains("domain") || !r.contains("name") ||
-                !r.contains("kind") || r["kind"] != "vec3" || !r["name"].is_string() ||
-                r["name"].get<std::string>().empty())
+            const auto validation = ConfigDetail::ValidatePointPropertyRef(
+                d[key], Geometry::PropertyValueKind::Vec3);
+            if (validation == ConfigDetail::PointPropertyValidation::InvalidReference)
                 return reject(std::string(key) + " requires domain, nonempty name and kind=vec3.");
-            bool valid = false;
-            for (unsigned i = 0; i <= unsigned(GeometryElementDomain::PointCloudPoint); ++i)
-                valid |= r["domain"] == ToString(GeometryElementDomain(i));
-            if (!valid)
+            if (validation == ConfigDetail::PointPropertyValidation::UnknownDomain)
                 return reject(std::string(key) + " has an unknown element domain.");
         }
         if (d["method"] == "mesh_face_normals")

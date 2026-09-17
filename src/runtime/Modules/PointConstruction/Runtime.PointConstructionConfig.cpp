@@ -34,15 +34,8 @@ namespace Extrinsic::Runtime
             for (unsigned i = 0; i < 3; ++i)
                 if (data.at("backend") == ToString(PointConstructionBackend(i)))
                     c.Backend = PointConstructionBackend(i);
-            const auto read = [&](const Json& value, GeometryPropertyRef& ref)
-            {
-                ref.Name = value.at("name");
-                for (unsigned i = 0; i <= unsigned(GeometryElementDomain::PointCloudPoint); ++i)
-                    if (value.at("domain") == ToString(GeometryElementDomain(i)))
-                        ref.Domain = GeometryElementDomain(i);
-            };
-            read(data.at("positions"), c.Positions);
-            read(data.at("normals"), c.Normals);
+            ConfigDetail::DecodePointPropertyRef(data.at("positions"), c.Positions);
+            ConfigDetail::DecodePointPropertyRef(data.at("normals"), c.Normals);
             c.EstimateNormals = data.at("estimate_normals");
             c.Mutual = data.at("mutual");
             c.Resolution = data.at("resolution");
@@ -151,18 +144,9 @@ namespace Extrinsic::Runtime
             return reject(std::move(*error));
         if (data["kernel_sigma_scale"].get<float>() <= 0)
             return reject("Kernel sigma scale must be positive.");
-        const auto validRef = [](const Json& ref)
-        {
-            if (!ref.is_object() || ref.size() != 3 || !ref.contains("domain") ||
-                !ref.contains("name") || !ref.contains("kind") || ref["kind"] != "vec3" ||
-                !ref["name"].is_string() || ref["name"].get<std::string>().empty())
-                return false;
-            for (unsigned i = 0; i <= unsigned(GeometryElementDomain::PointCloudPoint); ++i)
-                if (ref["domain"] == ToString(GeometryElementDomain(i)))
-                    return true;
-            return false;
-        };
-        if (!validRef(data["positions"]) || !validRef(data["normals"]))
+        using ConfigDetail::PointPropertyValidation;
+        if (ConfigDetail::ValidatePointPropertyRef(data["positions"], Geometry::PropertyValueKind::Vec3) != PointPropertyValidation::Valid ||
+            ConfigDetail::ValidatePointPropertyRef(data["normals"], Geometry::PropertyValueKind::Vec3) != PointPropertyValidation::Valid)
             return reject("Inputs require canonical vec3 property references.");
         if (data["method"] == "hoppe" && data["estimate_normals"] == false &&
             data["positions"]["domain"] != data["normals"]["domain"])

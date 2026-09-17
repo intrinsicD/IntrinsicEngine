@@ -1398,6 +1398,12 @@ TEST(SandboxConfigSections, PointPropertyValidationPreservesDiagnosticCategories
         Family{"KeypointAnalysis", Runtime::ValidateKeypointAnalysisConfigSection, typed, domain},
         Family{"DescriptorAnalysis", Runtime::ValidateDescriptorAnalysisConfigSection, descriptor, descriptor},
         Family{"DensityWeight", Runtime::ValidateDensityWeightConfigSection, density, density},
+        Family{"NormalEstimation", Runtime::ValidateNormalEstimationConfigSection,
+            "positions requires domain, nonempty name and kind=vec3.",
+            "positions has an unknown element domain."},
+        Family{"PointConstruction", Runtime::ValidatePointConstructionConfigSection,
+            "Inputs require canonical vec3 property references.",
+            "Inputs require canonical vec3 property references."},
     };
     struct Case
     {
@@ -1526,5 +1532,61 @@ TEST(SandboxConfigSections, PointPropertyRoundTripsPreserveDomainsKindsAndNameBy
                 check(config, {&C::Positions, &C::Weights}, Runtime::SetDensityWeightConfig,
                     Runtime::GetDensityWeightConfig, Runtime::SerializeDensityWeightConfig);
             }
+    }
+    {
+        SCOPED_TRACE("NormalEstimation");
+        using C = Runtime::NormalEstimationConfig;
+        check(C{}, {&C::Positions, &C::Output}, Runtime::SetNormalEstimationConfig,
+            Runtime::GetNormalEstimationConfig, Runtime::SerializeNormalEstimationConfig);
+    }
+    {
+        SCOPED_TRACE("PointConstruction");
+        using C = Runtime::PointConstructionConfig;
+        check(C{}, {&C::Positions, &C::Normals}, Runtime::SetPointConstructionConfig,
+            Runtime::GetPointConstructionConfig, Runtime::SerializePointConstructionConfig);
+    }
+}
+
+TEST(SandboxConfigSections, Vec3PropertyValidationPreservesFamilyRules)
+{
+    const auto reject = [](auto validate, std::string_view payload, std::string_view message) {
+        SCOPED_TRACE(payload);
+        const auto result = validate(payload, {}, "property-test");
+        EXPECT_FALSE(result.Usable());
+        ASSERT_EQ(result.Diagnostics.size(), 1u);
+        EXPECT_EQ(result.Diagnostics.front().Message, message);
+    };
+    const auto normal = Runtime::ValidateNormalEstimationConfigSection;
+    const auto construction = Runtime::ValidatePointConstructionConfigSection;
+    reject(normal, R"({"output":null})", "output requires domain, nonempty name and kind=vec3.");
+    reject(normal, R"({"output":{"domain":null,"name":"n","kind":"vec3"}})",
+           "output has an unknown element domain.");
+    reject(normal, R"({"positions":null,"output":null})",
+           "positions requires domain, nonempty name and kind=vec3.");
+    reject(construction, R"({"normals":null})", "Inputs require canonical vec3 property references.");
+    reject(construction, R"({"normals":{"domain":null,"name":"n","kind":"vec3"}})",
+           "Inputs require canonical vec3 property references.");
+    reject(construction, R"({"positions":null,"output_name":null})",
+           "Output name must contain 1..256 bytes.");
+    EXPECT_TRUE(normal(
+        R"({"method":"mesh_face_normals","positions":{"domain":"MeshVertex","name":"p","kind":"vec3"},"output":{"domain":"MeshFace","name":"n","kind":"vec3"}})",
+        {}, "property-test").Usable());
+    reject(normal, R"({"output":{"domain":"MeshFace","name":"n","kind":"vec3"}})",
+           "Normals must use a distinct output property on the input domain.");
+    reject(construction,
+           R"({"estimate_normals":false,"normals":{"domain":"MeshFace","name":"n","kind":"vec3"}})",
+           "Supplied normals must share the position domain.");
+    for (auto kind : {Geometry::PropertyValueKind::Float, Geometry::PropertyValueKind::UInt32})
+    {
+        Runtime::NormalEstimationConfig n;
+        n.Positions.ValueKind = kind;
+        const auto normalPayload = Runtime::SerializeNormalEstimationConfig(n);
+        EXPECT_NE(normalPayload.find("\"kind\":\"invalid\""), std::string::npos);
+        EXPECT_FALSE(normal(normalPayload, {}, "property-test").Usable());
+        Runtime::PointConstructionConfig c;
+        c.Positions.ValueKind = kind;
+        const auto constructionPayload = Runtime::SerializePointConstructionConfig(c);
+        EXPECT_NE(constructionPayload.find("\"kind\":\"invalid\""), std::string::npos);
+        EXPECT_FALSE(construction(constructionPayload, {}, "property-test").Usable());
     }
 }

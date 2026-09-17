@@ -100,6 +100,9 @@ are rejected before numeric fields; nested property objects replace defaults
 in full. Families retain their error text, field order, ranges, property rules
 and canonical serializers. Positive-float underflow rules stay with each family. The shared float bounds
 and outlier radius guard compare signed and unsigned JSON numbers consistently.
+Normal estimation and point construction also reuse the compiled canonical
+property-reference decoder and validator. Their vec3-only serializers and
+family-specific diagnostic/domain rules remain local.
 The fallback-oriented feature codecs keep their
 separate warning/merge semantics.
 

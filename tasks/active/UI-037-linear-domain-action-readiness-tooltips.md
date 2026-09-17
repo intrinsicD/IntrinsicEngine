@@ -2342,3 +2342,33 @@ Inventory regenerated: 423 modules. Final combined full CPU gate: 4,733 passed,
 one expected ASan-only GLFW lifecycle skip, zero failures (4,734 selected;
 153.06 seconds). Canonical ci-vulkan/Clang 23 `ExtrinsicSandbox` also compiles
 and links with ASan+UBSan instrumentation; no GPU or sanitizer test run is implied.
+
+## Normal/construction property-codec reuse — 2026-09-18
+
+Following density locality commit `6d5cd32a9`, normal estimation and point
+construction now call the existing compiled `DecodePointPropertyRef` and
+`ValidatePointPropertyRef` owner. Four duplicate bodies disappear; the two
+production files shrink from 409 to 383 physical lines. No new helper, file or
+policy switch. Normal's separate malformed-reference/unknown-domain messages and
+construction's combined message remain; ordering, method/domain rules and each
+vec3-only serializer's `invalid` sentinel remain local. Registration's distinct
+non-string-domain diagnostic is outside this slice.
+
+Existing public diagnostic and all-domain/name-byte round-trip tables cover both
+families. Added cases pin the second property, first-error priority, face-normal
+and supplied-normal domains, and wrong-kind serialization. These tests pass
+before and after reuse. Claude approves the fixed diff; its optional wrong-kind
+category check is already covered by the expanded malformed-reference table.
+Combined-source verification is the 41 focused tests, full CPU gate and Vulkan
+Sandbox compile/link recorded above. Strict layering/test-layout, task/state,
+doc links/sync, source documentation, mirrors, root hygiene, ARA structure and
+workshop checks pass. UI-037 remains open; no compilation-time claim is made.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^SandboxConfigSections\.|^ProcessingCompilationLocality.DensityWeightContracts$|^DensityWeightOperations\.|^PointCloudKernels\.' --no-tests=error --timeout 60
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target ExtrinsicSandbox -j4
+```
