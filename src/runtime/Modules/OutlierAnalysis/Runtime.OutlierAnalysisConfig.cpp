@@ -74,14 +74,9 @@ namespace Extrinsic::Runtime
             return reject(std::move(*error));
         if(data["method"]=="radius" && data["radius"].get<double>()<=0)return reject("Radius must be positive.");
         const OutlierAnalysisConfig defaults;
-        for(auto [key,kind]:{std::pair{"positions",defaults.Positions.ValueKind},std::pair{"mask",defaults.Mask.ValueKind},std::pair{"score",defaults.Score.ValueKind}})
-        {
-            const auto validation = ConfigDetail::ValidatePointPropertyRef(data[key], kind);
-            if(validation == ConfigDetail::PointPropertyValidation::InvalidReference)
-                return reject(std::string(key)+" needs a canonical typed property reference.");
-            if(validation == ConfigDetail::PointPropertyValidation::UnknownDomain)
-                return reject("Unknown element domain.");
-        }
+        if (auto error = ConfigDetail::ValidatePointConfigPropertyRefs(
+            data, {{"positions", defaults.Positions.ValueKind}, {"mask", defaults.Mask.ValueKind}, {"score", defaults.Score.ValueKind}}))
+            return reject(std::move(*error));
         if(data["positions"]["domain"]!=data["mask"]["domain"] || data["mask"]["domain"]!=data["score"]["domain"] ||
            data["positions"]["name"]==data["mask"]["name"] || data["positions"]["name"]==data["score"]["name"] || data["mask"]["name"]==data["score"]["name"])
             return reject("Position, mask and score must be distinct properties on the same domain.");

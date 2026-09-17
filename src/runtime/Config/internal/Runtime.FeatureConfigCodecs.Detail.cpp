@@ -96,6 +96,21 @@ namespace Extrinsic::Runtime::ConfigDetail
         return PointPropertyValidation::UnknownDomain;
     }
 
+    std::optional<std::string> ValidatePointConfigPropertyRefs(
+        const nlohmann::json& values,
+        const std::initializer_list<std::pair<std::string_view, Geometry::PropertyValueKind>> fields)
+    {
+        for (const auto& [key, kind] : fields)
+        {
+            const auto validation = ValidatePointPropertyRef(values.at(std::string(key)), kind);
+            if (validation == PointPropertyValidation::InvalidReference)
+                return std::string(key) + " needs a canonical typed property reference.";
+            if (validation == PointPropertyValidation::UnknownDomain)
+                return "Unknown element domain.";
+        }
+        return std::nullopt;
+    }
+
     void DecodePointPropertyRef(const nlohmann::json& value, GeometryPropertyRef& ref)
     {
         ref.Name = value.at("name");

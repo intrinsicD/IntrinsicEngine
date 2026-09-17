@@ -61,14 +61,9 @@ namespace Extrinsic::Runtime
         if(data["bandwidth"].get<double>()>0 && data["bandwidth"].get<float>()==0)
             return reject("Positive bandwidth must remain positive in float storage.");
         const KernelDensityConfig defaults;
-        for(auto [key,kind]:{std::pair{"positions",defaults.Positions.ValueKind},std::pair{"density",defaults.Density.ValueKind}})
-        {
-            const auto validation = ConfigDetail::ValidatePointPropertyRef(data[key], kind);
-            if(validation == ConfigDetail::PointPropertyValidation::InvalidReference)
-                return reject(std::string(key)+" needs a canonical typed property reference.");
-            if(validation == ConfigDetail::PointPropertyValidation::UnknownDomain)
-                return reject("Unknown element domain.");
-        }
+        if (auto error = ConfigDetail::ValidatePointConfigPropertyRefs(
+            data, {{"positions", defaults.Positions.ValueKind}, {"density", defaults.Density.ValueKind}}))
+            return reject(std::move(*error));
         if(data["positions"]["domain"]!=data["density"]["domain"] ||
            data["positions"]["name"]==data["density"]["name"])
             return reject("Position and density must be distinct properties on the same domain.");

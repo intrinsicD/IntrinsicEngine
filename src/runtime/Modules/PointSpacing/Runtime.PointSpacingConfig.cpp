@@ -61,14 +61,9 @@ namespace Extrinsic::Runtime
         if(data["scale_factor"].get<double>()>0 && data["scale_factor"].get<float>()==0)
             return reject("Positive scale factor must remain positive in float storage.");
         const PointSpacingConfig defaults;
-        for(auto [key,kind]:{std::pair{"positions",defaults.Positions.ValueKind},std::pair{"radii",defaults.Radii.ValueKind}})
-        {
-            const auto validation = ConfigDetail::ValidatePointPropertyRef(data[key], kind);
-            if(validation == ConfigDetail::PointPropertyValidation::InvalidReference)
-                return reject(std::string(key)+" needs a canonical typed property reference.");
-            if(validation == ConfigDetail::PointPropertyValidation::UnknownDomain)
-                return reject("Unknown element domain.");
-        }
+        if (auto error = ConfigDetail::ValidatePointConfigPropertyRefs(
+            data, {{"positions", defaults.Positions.ValueKind}, {"radii", defaults.Radii.ValueKind}}))
+            return reject(std::move(*error));
         if(data["positions"]["domain"]!=data["radii"]["domain"] ||
            data["positions"]["name"]==data["radii"]["name"])
             return reject("Position and radii must be distinct properties on the same domain.");

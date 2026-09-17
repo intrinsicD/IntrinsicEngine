@@ -72,14 +72,9 @@ namespace Extrinsic::Runtime
             if(!data[key].is_number() || !std::isfinite(data[key].get<double>()) || data[key]<0 || data[key]>1)
                 return reject(std::string(key)+" must be finite in [0,1].");
         const KeypointAnalysisConfig defaults;
-        for(auto [key,kind]:{std::pair{"positions",defaults.Positions.ValueKind},std::pair{"mask",defaults.Mask.ValueKind},std::pair{"score",defaults.Score.ValueKind}})
-        {
-            const auto validation = ConfigDetail::ValidatePointPropertyRef(data[key], kind);
-            if(validation == ConfigDetail::PointPropertyValidation::InvalidReference)
-                return reject(std::string(key)+" needs a canonical typed property reference.");
-            if(validation == ConfigDetail::PointPropertyValidation::UnknownDomain)
-                return reject("Unknown element domain.");
-        }
+        if (auto error = ConfigDetail::ValidatePointConfigPropertyRefs(
+            data, {{"positions", defaults.Positions.ValueKind}, {"mask", defaults.Mask.ValueKind}, {"score", defaults.Score.ValueKind}}))
+            return reject(std::move(*error));
         if(data["positions"]["domain"]!=data["mask"]["domain"] || data["mask"]["domain"]!=data["score"]["domain"] ||
            data["positions"]["name"]==data["mask"]["name"] || data["positions"]["name"]==data["score"]["name"] || data["mask"]["name"]==data["score"]["name"])
             return reject("Position, mask and score must be distinct properties on the same domain.");

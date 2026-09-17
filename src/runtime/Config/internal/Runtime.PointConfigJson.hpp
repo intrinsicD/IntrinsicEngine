@@ -24,6 +24,10 @@ extern "C++"
         [[nodiscard]] nlohmann::json EncodePointPropertyRef(const GeometryPropertyRef& ref);
         [[nodiscard]] PointPropertyValidation ValidatePointPropertyRef(
             const nlohmann::json& ref, Geometry::PropertyValueKind kind);
+        // Fields exist in the merged defaults; diagnostics follow the supplied order.
+        [[nodiscard]] std::optional<std::string> ValidatePointConfigPropertyRefs(
+            const nlohmann::json& values,
+            std::initializer_list<std::pair<std::string_view, Geometry::PropertyValueKind>> fields);
         // Decodes validated bindings without changing the caller's expected value kind.
         void DecodePointPropertyRef(const nlohmann::json& value, GeometryPropertyRef& ref);
     }

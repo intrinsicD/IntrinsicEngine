@@ -63,14 +63,9 @@ namespace Extrinsic::Runtime
             if(data[key].get<double>()>0 && data[key].get<float>()==0)
                 return reject(std::string(key)+" must remain positive in float storage.");
         const BilateralFilterConfig defaults;
-        for(auto [key,kind]:{std::pair{"positions",defaults.Positions.ValueKind},std::pair{"normals",defaults.Normals.ValueKind},std::pair{"output",defaults.Output.ValueKind}})
-        {
-            const auto validation = ConfigDetail::ValidatePointPropertyRef(data[key], kind);
-            if(validation == ConfigDetail::PointPropertyValidation::InvalidReference)
-                return reject(std::string(key)+" needs a canonical typed property reference.");
-            if(validation == ConfigDetail::PointPropertyValidation::UnknownDomain)
-                return reject("Unknown element domain.");
-        }
+        if (auto error = ConfigDetail::ValidatePointConfigPropertyRefs(
+            data, {{"positions", defaults.Positions.ValueKind}, {"normals", defaults.Normals.ValueKind}, {"output", defaults.Output.ValueKind}}))
+            return reject(std::move(*error));
         if(data["positions"]["domain"]!=data["output"]["domain"] || data["positions"]["domain"]!=data["normals"]["domain"])
             return reject("Positions, normals and output must share an element domain.");
         if(data["output"]["name"]==data["normals"]["name"] && data["positions"]["name"]!=data["normals"]["name"])

@@ -1450,6 +1450,63 @@ TEST(SandboxConfigSections, PointPropertyValidationPreservesDiagnosticCategories
     }
 }
 
+TEST(SandboxConfigSections, PointPropertyFieldsPreserveKindsAndFirstErrorOrder)
+{
+    using Validator = CoreConfig::EngineConfigSectionValidationResult (*)(
+        std::string_view, std::string_view, std::string_view);
+    struct Family
+    {
+        const char* Name;
+        Validator Validate;
+        std::vector<std::pair<std::string, std::string>> Fields;
+    };
+    const std::array families{
+        Family{"BilateralFilter", Runtime::ValidateBilateralFilterConfigSection,
+            {{"positions", "vec3"}, {"normals", "vec3"}, {"output", "vec3"}}},
+        Family{"KernelDensity", Runtime::ValidateKernelDensityConfigSection,
+            {{"positions", "vec3"}, {"density", "float"}}},
+        Family{"PointSpacing", Runtime::ValidatePointSpacingConfigSection,
+            {{"positions", "vec3"}, {"radii", "float"}}},
+        Family{"OutlierAnalysis", Runtime::ValidateOutlierAnalysisConfigSection,
+            {{"positions", "vec3"}, {"mask", "uint32"}, {"score", "float"}}},
+        Family{"KeypointAnalysis", Runtime::ValidateKeypointAnalysisConfigSection,
+            {{"positions", "vec3"}, {"mask", "uint32"}, {"score", "float"}}},
+    };
+    const auto binding = [](const std::string& key, const std::string& kind)
+    {
+        return '"' + key + R"(":{"domain":"not-a-domain","name":"sample","kind":")" + kind + "\"}";
+    };
+    for (const auto& family : families)
+    {
+        SCOPED_TRACE(family.Name);
+        const auto reject = [&](const std::string& payload, const std::string& message)
+        {
+            SCOPED_TRACE(payload);
+            const auto result = family.Validate(payload, {}, "ordered-bindings");
+            EXPECT_FALSE(result.Usable());
+            EXPECT_TRUE(result.CanonicalPayloadJson.empty());
+            ASSERT_EQ(result.Diagnostics.size(), 1u);
+            EXPECT_EQ(result.Diagnostics.front().Code, CoreConfig::EngineConfigDiagnosticCode::InvalidValue);
+            EXPECT_EQ(result.Diagnostics.front().Subject, "ordered-bindings");
+            EXPECT_EQ(result.Diagnostics.front().Message, message);
+        };
+        for (std::size_t i = 0; i < family.Fields.size(); ++i)
+        {
+            const auto& [key, kind] = family.Fields[i];
+            const auto typedError = key + " needs a canonical typed property reference.";
+            reject("{" + binding(key, kind == "vec3" ? "float" : "vec3") + "}", typedError);
+            reject("{" + binding(key, kind) + "}", "Unknown element domain.");
+            if (i + 1 < family.Fields.size())
+            {
+                const auto& [nextKey, nextKind] = family.Fields[i + 1];
+                reject("{" + binding(key, kind) + ",\"" + nextKey + "\":null}",
+                    "Unknown element domain.");
+                reject("{\"" + key + "\":null," + binding(nextKey, nextKind) + "}", typedError);
+            }
+        }
+    }
+}
+
 TEST(SandboxConfigSections, PointPropertyRoundTripsPreserveDomainsKindsAndNameBytes)
 {
     using D = Runtime::GeometryElementDomain;
