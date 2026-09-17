@@ -9,19 +9,12 @@ module;
 #include <utility>
 #include <nlohmann/json.hpp>
 module Extrinsic.Runtime.DensityWeightConfig;
+#include "Config/internal/Runtime.PointConfigJson.hpp"
 namespace Extrinsic::Runtime
 {
     namespace
     {
         using Json=nlohmann::json;
-        const char* Kind(Geometry::PropertyValueKind k)
-        {
-            switch(k){case Geometry::PropertyValueKind::Vec3:return "vec3";case Geometry::PropertyValueKind::UInt32:return "uint32";case Geometry::PropertyValueKind::Float:return "float";default:return "invalid";}
-        }
-        Json Ref(const GeometryPropertyRef& ref)
-        {
-            return {{"domain",ref.Domain>=GeometryElementDomain::Unknown && ref.Domain<=GeometryElementDomain::PointCloudPoint ? ToString(ref.Domain) : "invalid"},{"name",ref.Name},{"kind",Kind(ref.ValueKind)}};
-        }
         DensityWeightConfig Parse(const Json& data)
         {
             DensityWeightConfig c;c.StableEntityId=data.at("entity");
@@ -54,7 +47,7 @@ namespace Extrinsic::Runtime
     std::string SerializeDensityWeightConfig(const DensityWeightConfig& c)
     {
         return Json{{"entity",c.StableEntityId},{"backend",ToString(c.Backend)},
-            {"positions",Ref(c.Positions)},{"weights",Ref(c.Weights)},
+            {"positions",ConfigDetail::EncodePointPropertyRef(c.Positions)},{"weights",ConfigDetail::EncodePointPropertyRef(c.Weights)},
             {"support_radius",c.SupportRadius},{"kernel",Geometry::PointCloud::Kernels::DebugName(c.Kernel)},
             {"mode",Geometry::PointCloud::Kernels::DebugName(c.Mode)},
             {"gpu_query_batch_size",c.GpuQueryBatchSize},{"gpu_radius_capacity",c.GpuRadiusCapacity}}.dump();
@@ -89,7 +82,7 @@ namespace Extrinsic::Runtime
         const auto validRef=[&](const Json& ref,Geometry::PropertyValueKind kind)
         {
             if(!ref.is_object() || ref.size()!=3 || !ref.contains("domain") || !ref.contains("name") || !ref.contains("kind") ||
-               ref["kind"]!=Kind(kind) || !ref["name"].is_string() || ref["name"].get<std::string>().empty())return false;
+               ref["kind"]!=ConfigDetail::PointPropertyKindToken(kind) || !ref["name"].is_string() || ref["name"].get<std::string>().empty())return false;
             for(unsigned i=0;i<=unsigned(GeometryElementDomain::PointCloudPoint);++i)
                 if(ref["domain"]==ToString(GeometryElementDomain(i)))return true;
             return false;

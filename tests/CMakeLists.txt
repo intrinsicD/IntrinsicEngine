@@ -583,6 +583,14 @@ intrinsic_add_module_boundary_test(EditorCompilationLocality.Visualization
         --forbid-module Extrinsic.Graphics.Renderer
         --forbid-module Extrinsic.Graphics.GpuAssetCache
         --forbid-module Extrinsic.Runtime.RenderExtraction)
+intrinsic_add_module_boundary_test(EditorCompilationLocality.VisualizationUvAtlas
+        --check-source src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Public.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Debug.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp
+        --forbid-module Geometry.UvAtlas)
+set_tests_properties(EditorCompilationLocality.VisualizationUvAtlas
+    PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
 intrinsic_add_module_boundary_test(EditorCompilationLocality.WorkspaceSnapshots
         --check-source src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm
         --forbid-module Extrinsic.Graphics.Renderer

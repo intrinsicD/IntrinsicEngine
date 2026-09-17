@@ -35,7 +35,6 @@ import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.VisualizationRecipes;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.Properties;
-import Geometry.UvAtlas;
 
 extern "C++" { namespace Extrinsic::ECS::Scene { class Registry; } }
 

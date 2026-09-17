@@ -63,7 +63,13 @@ The five feature config modules own their public schemas and globally attached
 codec declarations. `Runtime.FeatureConfigCodecs.Detail.cpp` directly defines
 those functions as one ordinary translation unit, sharing JSON parsing without
 a private forwarding module. Curvature parameter conversion and consolidation
-token functions retain their feature implementation owners. The workspace
+token functions retain their feature implementation owners. Seven point-processing
+config implementations also reuse the shared TU's private string-token property
+encoder through `Runtime.PointConfigJson.hpp`; their distinct parsers and
+validators stay feature-owned. The numeric-kind property codec and vec3-only
+encoders remain separate contracts. Visualization operation declarations and
+implementations have no UV-atlas dependency, enforced by
+`EditorCompilationLocality.VisualizationUvAtlas`. The workspace
 attachment retains its private module interface. Production app sources
 may not import `Extrinsic.Runtime.Private.*` or include runtime-private headers.
 

@@ -9,7 +9,7 @@ evidence: not_applicable
 evidence_skip_reason: Interactive staged implementation; fixed diffs, review, tests and task checkpoints retain verification without unattended custody.
 maturity_target: Operational
 contract_schema: 1
-contracts: [geometry.element-domain-sources, geometry.property-coherence, runtime.editor-prepared-frame-locality, runtime.processing-compilation-locality, runtime.spatial-query-locality]
+contracts: [repo.source-documentation, geometry.element-domain-sources, geometry.property-coherence, runtime.editor-prepared-frame-locality, runtime.processing-compilation-locality, runtime.spatial-query-locality]
 ---
 # UI-037 — Linear domain-action readiness and disabled-reason tooltips
 
@@ -1789,3 +1789,104 @@ cmake --preset ci-vulkan
 cmake --build --preset ci-vulkan --target IntrinsicPointLBVHGpuTests ExtrinsicSandbox
 ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R '^PointLBVHGpuSmoke\.(Keypoint|Descriptor)' --no-tests=error --timeout 120
 ```
+
+
+## Point-config serialization reuse and visualization boundary — 2026-09-17
+
+Operator-directed continuation with Claude. Reuse search found seven identical
+Kind/Ref JSON encoders in the bilateral, density, spacing, outlier, keypoint,
+descriptor and density-weight config implementations. Share one compiled
+`ConfigDetail::EncodePointPropertyRef` in the existing ordinary shared codec TU,
+with one private declaration header and C++ linkage across module units. No new
+module, implementation file, target, registry or policy parameter. Retain the
+three-kind string vocabulary, domain bounds and invalid sentinel, and name bytes.
+The existing five-family numeric-kind codec and registration/construction's
+vec3-only encoders have different contracts and stay separate.
+
+The new public-serializer fixture passes against the original code for all seven
+families, including Unknown/invalid domains, supported/unsupported kinds and
+NUL/quote/backslash/newline names. Extend existing round-trip/application coverage
+after replacement. This header exists because the proven common implementation
+serves seven module owners; a header-only body would compile the duplicate again.
+
+Remove the unused Geometry.UvAtlas import from visualization operations. The
+baseline compiler graph shows the interface and Public/Debug/Actions producers
+all inherit it; guard those four actual producers after rebuilding. Curvature
+config's public parameter-conversion function was separately inspected with
+Claude but is deferred, with no edits to its validator or conversion.
+
+Review the fixed diff, run canonical CPU builds/tests and the Sandbox build,
+refresh the module inventory and boundary docs, and preserve broader UI-037
+readiness/cache acceptance. Logs/packets: `/tmp/intrinsic-config-locality/`.
+No compilation-time claim follows from these source/dependency changes.
+
+### Serialization implementation and correction checkpoint
+
+Claude's reuse review found that validators also call the duplicated Kind helper.
+The first build caught those unresolved calls and an overbroad textual replacement
+of `validRef` names. Fixed both: `PointPropertyKindToken` and
+`EncodePointPropertyRef` now compile once, serializers and validators use the same
+three-kind vocabulary, and the family-local validRef lambdas retain their exact
+validation. The failed build is retained in the local packet, not hidden.
+
+All seven callers and the ordinary shared implementation are private sources of
+one ExtrinsicRuntime target with common compile definitions; no target-link edge
+was added. The private header declares only global C++ linkage functions, imports
+nothing, and is included after JSON/type declarations. The shared implementation
+includes that header before its definitions and explicitly imports the canonical
+GeometryAvailability owner. Include-order errors already fail compilation; no
+third-party header-guard macro policy is needed. The source-documentation contract
+is declared for the new private header.
+
+### Fixed-diff review and focused verification
+
+The corrected focused build and all 165 selected CPU/dependency tests pass
+(17.30 s). Claude's fixed-diff review found no blocker and confirmed encoder,
+validator-token and linkage equivalence. Its follow-ups were checked against
+source: both enums have fixed uint8_t bases; the boundary helper sets no labels
+to override; compile_hotspots walks transitive CMake usages. Clarified the header
+prerequisite comment and added explicit non-vec3 position rejection for all seven
+validators; the final serializer/validator fixture and UV dependency guard pass.
+The full IntrinsicTests target builds with Clang 23.
+
+Symbol inspection of libExtrinsicRuntime.a finds one definition of each shared
+function and seven referencing object files. The production delta, including the
+new private header and unchanged-format caller replacements, is 14 fewer physical
+lines across ten production files. Existing numeric-kind and vec3-only encoders
+remain because their contracts differ. No JSON implementation moved into a public
+module or a repeatedly compiled header.
+
+Manual architecture/workshop rows 1–3 pass: current runtime owners, same CMake
+target and no downward type leak. Rows 4–8 are unchanged/not applicable; no new
+renderer/pass/recipe, task closure or exception. Strict structural checks, docs
+links/sync, task policy, test layout, root hygiene and skill-mirror checks pass.
+Module inventory remains 419. Source-documentation audit has zero errors and one
+pre-existing large-shared-codec-file hint; sharing a small encoding mechanism does
+not require another implementation target. Existing ignored-AddTriangle warnings
+in unchanged parameterization/mesh test fixtures are not new source warnings.
+
+### Combined verification and bounded follow-up
+
+The final canonical CPU build passes. The first full CPU run exposed the remaining
+fixed-frame duplicate dropped-import test: no mesh/result while decode was still
+pending. Recorded and corrected separately as
+[BUG-202](../done/BUG-202-duplicate-drop-frame-budget.md), using the existing
+condition waiter and decode barrier. The unchanged test passed 100 isolated runs;
+a controlled 128-frame probe reproduced the failure, then the corrected waiter
+passed 100 delayed-worker repetitions and all ten neighboring cases. Claude
+approved that fixed diff; terminal publication ordering and sub-deadline completion
+were verified against source and run evidence. No production import code changed.
+
+The combined full CPU selector passes 4,723 tests, with one expected GLFW/LSan
+capability skip (4,724 selected, 146.28 s). The ci-vulkan preset builds
+ExtrinsicSandbox, IntrinsicPointLBVHGpuTests and
+IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests. All nine selected Vulkan tests
+pass (89.02 s), covering each of the seven point families plus generated-UV/albedo
+and exact normal-bake readback integration. That preset uses combined ASan/UBSan;
+this is focused Vulkan sanitizer evidence, not a new full ci-asan/ci-ubsan sweep.
+
+The source hashes match the reviewed and built implementations. No measured
+compilation-time improvement is claimed. UI-037's broader readiness inventory,
+shared authoritative predicates, cached derivations and all-control tooltip proof
+remain open. Curvature config's parameter conversion is a deferred, separately
+reviewed candidate; this slice does not alter it.

@@ -31,6 +31,13 @@ import Extrinsic.Runtime.PhysicsModule;
 import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.ProgressivePoissonConfig;
 import Extrinsic.Sandbox.ConfigSections;
+import Extrinsic.Runtime.BilateralFilterConfig;
+import Extrinsic.Runtime.KernelDensityConfig;
+import Extrinsic.Runtime.PointSpacingConfig;
+import Extrinsic.Runtime.OutlierAnalysisConfig;
+import Extrinsic.Runtime.KeypointAnalysisConfig;
+import Extrinsic.Runtime.DescriptorAnalysisConfig;
+import Extrinsic.Runtime.DensityWeightConfig;
 
 namespace CoreConfig = Extrinsic::Core::Config;
 namespace Runtime = Extrinsic::Runtime;
@@ -1068,4 +1075,84 @@ TEST(SandboxConfigSections,
     ASSERT_TRUE(decoded.has_value());
     EXPECT_EQ(decoded->Parameters.ClusterCount, 6u);
     EXPECT_EQ(decoded->Parameters.MaxIterations, 44u);
+}
+
+TEST(SandboxConfigSections, PointPropertySerializersPreserveTokensAndNameBytes)
+{
+    using D = Runtime::GeometryElementDomain;
+    using K = Geometry::PropertyValueKind;
+    using Writer = std::string (*)(const Runtime::GeometryPropertyRef&);
+    using Validator = CoreConfig::EngineConfigSectionValidationResult (*)(
+        std::string_view, std::string_view, std::string_view);
+    struct Family
+    {
+        const char* Name;
+        Writer Write;
+        Validator Validate;
+    };
+    const std::array<Family, 7> writers{{
+        {"BilateralFilter", +[](const Runtime::GeometryPropertyRef& ref) {
+            Runtime::BilateralFilterConfig config;
+            config.Positions = ref;
+            return Runtime::SerializeBilateralFilterConfig(config);
+        }, Runtime::ValidateBilateralFilterConfigSection},
+        {"KernelDensity", +[](const Runtime::GeometryPropertyRef& ref) {
+            Runtime::KernelDensityConfig config;
+            config.Positions = ref;
+            return Runtime::SerializeKernelDensityConfig(config);
+        }, Runtime::ValidateKernelDensityConfigSection},
+        {"PointSpacing", +[](const Runtime::GeometryPropertyRef& ref) {
+            Runtime::PointSpacingConfig config;
+            config.Positions = ref;
+            return Runtime::SerializePointSpacingConfig(config);
+        }, Runtime::ValidatePointSpacingConfigSection},
+        {"OutlierAnalysis", +[](const Runtime::GeometryPropertyRef& ref) {
+            Runtime::OutlierAnalysisConfig config;
+            config.Positions = ref;
+            return Runtime::SerializeOutlierAnalysisConfig(config);
+        }, Runtime::ValidateOutlierAnalysisConfigSection},
+        {"KeypointAnalysis", +[](const Runtime::GeometryPropertyRef& ref) {
+            Runtime::KeypointAnalysisConfig config;
+            config.Positions = ref;
+            return Runtime::SerializeKeypointAnalysisConfig(config);
+        }, Runtime::ValidateKeypointAnalysisConfigSection},
+        {"DescriptorAnalysis", +[](const Runtime::GeometryPropertyRef& ref) {
+            Runtime::DescriptorAnalysisConfig config;
+            config.Positions = ref;
+            return Runtime::SerializeDescriptorAnalysisConfig(config);
+        }, Runtime::ValidateDescriptorAnalysisConfigSection},
+        {"DensityWeight", +[](const Runtime::GeometryPropertyRef& ref) {
+            Runtime::DensityWeightConfig config;
+            config.Positions = ref;
+            return Runtime::SerializeDensityWeightConfig(config);
+        }, Runtime::ValidateDensityWeightConfigSection},
+    }};
+    struct Case
+    {
+        D Domain;
+        K Kind;
+        std::string Name;
+        std::string_view Expected;
+    };
+    const std::array cases{
+        Case{D::Unknown, K::Vec3, "samples", R"({"domain":"Unknown","kind":"vec3","name":"samples"})"},
+        Case{D::MeshFace, K::Float, "f:weight", R"({"domain":"MeshFace","kind":"float","name":"f:weight"})"},
+        Case{D::PointCloudPoint, K::UInt32, "labels", R"({"domain":"PointCloudPoint","kind":"uint32","name":"labels"})"},
+        Case{D::MeshVertex, K::Vec4, "v:color", R"({"domain":"MeshVertex","kind":"invalid","name":"v:color"})"},
+        Case{D(255), K(255), "", R"({"domain":"invalid","kind":"invalid","name":""})"},
+        Case{D::MeshVertex, K::Vec3, std::string{"v:\0\"\\\n", 6}, R"({"domain":"MeshVertex","kind":"vec3","name":"v:\u0000\"\\\n"})"},
+    };
+    for (const auto& [family, write, validate] : writers)
+    {
+        SCOPED_TRACE(family);
+        for (const auto& test : cases)
+        {
+            SCOPED_TRACE(test.Expected);
+            const auto document = write({test.Domain, test.Name, test.Kind});
+            EXPECT_NE(document.find("\"positions\":" + std::string(test.Expected)), std::string::npos)
+                << document;
+            if (test.Kind != K::Vec3)
+                EXPECT_FALSE(validate(document, {}, family).Usable());
+        }
+    }
 }

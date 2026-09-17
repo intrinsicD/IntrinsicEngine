@@ -1,5 +1,5 @@
-// Defines the five feature config families' codecs in one ordinary translation
-// unit so their JSON parsing and validation share one compiled implementation.
+// Shared feature config codecs and point-property JSON encoding, compiled once
+// in an ordinary translation unit without exposing JSON through module APIs.
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -23,6 +23,30 @@ import Extrinsic.Runtime.CurvatureSegmentationConfig;
 import Extrinsic.Runtime.ParameterizationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.ProgressivePoissonConfig;
+import Extrinsic.Runtime.GeometryAvailability;
+
+#include "Config/internal/Runtime.PointConfigJson.hpp"
+
+namespace Extrinsic::Runtime::ConfigDetail
+{
+    const char* PointPropertyKindToken(const Geometry::PropertyValueKind kind) noexcept
+    {
+        switch (kind)
+        {
+        case Geometry::PropertyValueKind::Vec3: return "vec3";
+        case Geometry::PropertyValueKind::UInt32: return "uint32";
+        case Geometry::PropertyValueKind::Float: return "float";
+        default: return "invalid";
+        }
+    }
+    nlohmann::json EncodePointPropertyRef(const GeometryPropertyRef& ref)
+    {
+        return {{"domain", ref.Domain >= GeometryElementDomain::Unknown &&
+                               ref.Domain <= GeometryElementDomain::PointCloudPoint
+                           ? ToString(ref.Domain) : "invalid"},
+                {"name", ref.Name}, {"kind", PointPropertyKindToken(ref.ValueKind)}};
+    }
+}
 
 namespace Extrinsic::Runtime
 {

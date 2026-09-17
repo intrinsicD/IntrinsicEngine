@@ -8,19 +8,12 @@ module;
 #include <utility>
 #include <nlohmann/json.hpp>
 module Extrinsic.Runtime.KeypointAnalysisConfig;
+#include "Config/internal/Runtime.PointConfigJson.hpp"
 namespace Extrinsic::Runtime
 {
     namespace
     {
         using Json=nlohmann::json;
-        const char* Kind(Geometry::PropertyValueKind k)
-        {
-            switch(k){case Geometry::PropertyValueKind::Vec3:return "vec3";case Geometry::PropertyValueKind::UInt32:return "uint32";case Geometry::PropertyValueKind::Float:return "float";default:return "invalid";}
-        }
-        Json Ref(const GeometryPropertyRef& ref)
-        {
-            return {{"domain",ref.Domain>=GeometryElementDomain::Unknown && ref.Domain<=GeometryElementDomain::PointCloudPoint ? ToString(ref.Domain) : "invalid"},{"name",ref.Name},{"kind",Kind(ref.ValueKind)}};
-        }
         KeypointAnalysisConfig Parse(const Json& data)
         {
             KeypointAnalysisConfig c;c.StableEntityId=data.at("entity");
@@ -52,7 +45,7 @@ namespace Extrinsic::Runtime
     std::string SerializeKeypointAnalysisConfig(const KeypointAnalysisConfig& c)
     {
         return Json{{"entity",c.StableEntityId},{"backend",ToString(c.Backend)},
-            {"positions",Ref(c.Positions)},{"mask",Ref(c.Mask)},{"score",Ref(c.Score)},
+            {"positions",ConfigDetail::EncodePointPropertyRef(c.Positions)},{"mask",ConfigDetail::EncodePointPropertyRef(c.Mask)},{"score",ConfigDetail::EncodePointPropertyRef(c.Score)},
             {"minimum_neighbors",c.MinimumNeighbors},{"gpu_query_batch_size",c.GpuQueryBatchSize},
             {"gpu_radius_capacity",c.GpuRadiusCapacity},{"salient_radius",c.SalientRadius},
             {"nonmax_radius",c.NonMaxRadius},{"gamma21",c.Gamma21},{"gamma32",c.Gamma32}}.dump();
@@ -92,7 +85,7 @@ namespace Extrinsic::Runtime
         {
             const auto& ref=data[key];
             if(!ref.is_object() || ref.size()!=3 || !ref.contains("domain") || !ref.contains("name") || !ref.contains("kind") ||
-               ref["kind"]!=Kind(kind) || !ref["name"].is_string() || ref["name"].get<std::string>().empty())
+               ref["kind"]!=ConfigDetail::PointPropertyKindToken(kind) || !ref["name"].is_string() || ref["name"].get<std::string>().empty())
                 return reject(std::string(key)+" needs a canonical typed property reference.");
             bool found=false;
             for(unsigned i=0;i<=unsigned(GeometryElementDomain::PointCloudPoint);++i)found |= ref["domain"]==ToString(GeometryElementDomain(i));
