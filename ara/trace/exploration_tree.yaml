@@ -13526,3 +13526,32 @@ tree:
     - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
     - tasks/done/BUG-201-session-log-yaml-scalar.md
     status: resolved
+
+  - id: N625
+    type: decision
+    title: Share K-Means admission and remove common-model domain state
+    provenance: ai-executed
+    timestamp: '2026-09-17T10:39:34+02:00'
+    choice: Reuse the existing compiled clustering Types owner for metadata admission shared
+      by runtime capture and editor preview/submission; reuse typed binding validation in config.
+      Remove KMeansDomains, its producer/helper and app conversion. Preserve finite rejection
+      status, correlated async completion and explicit draft retry; keep full finite/publication
+      checks in execution. Claude final review has no blockers. Final 30 focused tests and 4696
+      CPU passes plus one expected skip. No compile-time or GPU/sanitizer claim. UI-037 and
+      RUNTIME-211/UI-043 remain open.
+    alternatives:
+    - Keep duplicate model-domain admission and hide blocked controls
+    - Add a separate clustering admission module or new readiness service
+    evidence:
+    - src/runtime/Modules/Clustering/Runtime.ClusteringTypes.cpp
+    - src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp
+    - src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cpp
+    - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+    - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+    - tests/contract/runtime/Test.ClusteringModule.cpp
+    - tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+    - tests/integration/runtime/Test.SandboxProcessingPanels.cpp
+    - tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
+    - tasks/backlog/runtime/RUNTIME-211-kmeans-property-domain-integration.md
+    - tasks/backlog/ui/UI-043-kmeans-property-domain-panel.md
+    status: resolved

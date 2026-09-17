@@ -2738,3 +2738,21 @@ entries:
       sanitizer or Vulkan claim.
     - Prior turn punctuation edit made one unquoted trace scalar invalid YAML after its parse check. Repaired as BUG-201,
       retired with historical source reproduction and final four-file parsing. No event meaning changed.
+
+  - turn: 2026-09-17_001#1
+    notes:
+    - N625 records bounded refactoring and verification, not a research result. No claims or
+      observation promotions; 32 existing staged topics retain their owners and flags, including
+      O93 broader lifecycle and O38 GPU maturity.
+    - The final CPU gate selected 4697 tests with 4696 passes and one expected ASan-only GLFW
+      lifecycle skip. Production C++ shrinks by 69 lines across ten existing files, without
+      measured compile-speed, sanitizer or Vulkan execution claims.
+    - Claude finite-status and identity concerns were addressed; exact helper/codec source disproved
+      speculative import, invalid-ID, provenance and config-kind findings. No extra defensive
+      facade was introduced.
+    - A lexer crash occurred during an overlapping test-file correction; stabilized-source CCACHE_DISABLE=1
+      rebuild passed. The cause remains unproven and no cache/source workaround ships. The new
+      widget regression explicitly selects its custom input instead of assuming default ranking.
+    - The resumed checkout already had the source merged to main; the requested fast-forward
+      pull added backlog-only changes. Verification recording uses a separate worktree rather
+      than mutating the clean operator checkout.
