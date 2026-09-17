@@ -68,6 +68,8 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] bool IsEditorPointCloudConsolidationAvailable(
         const EditorProcessingCommands&, const PointCloudConsolidationService*) noexcept;
 
+    [[nodiscard]] ActionReadiness PreviewEditorKMeansRun(
+        const EditorProcessingCommands&, const ClusteringService*, const RunKMeans&);
     [[nodiscard]] KMeansRunCompleted SubmitKMeansRun(
         const EditorProcessingCommands&, ClusteringService*, const RunKMeans&);
     [[nodiscard]] PointCloudConsolidationResult SubmitEditorPointCloudConsolidation(

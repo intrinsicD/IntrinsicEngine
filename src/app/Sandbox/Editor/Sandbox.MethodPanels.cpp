@@ -437,23 +437,6 @@ namespace Extrinsic::Sandbox::Editor
                       std::distance(kKMeansBackends.begin(), found));
         }
 
-        [[nodiscard]] Runtime::GeometryElementDomain KMeansDomain(
-            const Runtime::EditorGeometryProcessingDomain domain) noexcept
-        {
-            using Domain = Runtime::EditorGeometryProcessingDomain;
-            switch (domain)
-            {
-            case Domain::MeshVertices:
-                return Runtime::GeometryElementDomain::MeshVertex;
-            case Domain::GraphVertices:
-                return Runtime::GeometryElementDomain::GraphNode;
-            case Domain::PointCloudPoints:
-                return Runtime::GeometryElementDomain::PointCloudPoint;
-            default: break;
-            }
-            return Runtime::GeometryElementDomain::Unknown;
-        }
-
         [[nodiscard]] Runtime::ProgressivePoissonPlaygroundChannel
         ProgressivePoissonChannelFromIndex(const std::int32_t index) noexcept
         {
@@ -1718,21 +1701,7 @@ namespace Extrinsic::Sandbox::Editor
                 // The header already includes processing diagnostics; render
                 // them only once.
                 DrawDomainWindowHeader(model);
-                if (!DomainWindowReady(model) ||
-                    !model.Processing.HasSelectedEntity)
-                {
-                    const std::string_view disabledReason =
-                        model.Diagnostics.empty()
-                            ? "Select a matching domain entity with finite vertex positions."
-                            : std::string_view{
-                                  model.Diagnostics.front().Message};
-                    (void)DrawProcessingActionButton("Run K-Means##KMeans",
-                        {false, std::string{disabledReason}});
-                }
-                else
-                {
-                    DrawKMeansControls(model, context);
-                }
+                DrawKMeansControls(model, context);
             }
             ImGui::End();
         }
@@ -1742,15 +1711,7 @@ namespace Extrinsic::Sandbox::Editor
             const SandboxEditorContext& context)
         {
             const auto& service = PointCloudServiceFrame(context);
-            const Runtime::EditorGeometryProcessingModel& processing =
-                model.Processing;
             ImGui::SeparatorText("K-Means execution");
-            if (processing.KMeansDomains.empty())
-            {
-                ImGui::TextDisabled(
-                    "K-Means is unavailable for this selection.");
-                return;
-            }
 
             if (service.Results.LastKMeansResult.has_value())
                 KMeans.LastResult = *service.Results.LastKMeansResult;
@@ -1770,20 +1731,20 @@ namespace Extrinsic::Sandbox::Editor
                         active->Parameters.Initialization ==
                         Runtime::KMeansInitialization::Hierarchical;
                     if (active->Properties) KMeans.Properties = *active->Properties;
-                    else if (!KMeans.Initialized)
-                        KMeans.Properties = Runtime::MakeKMeansPropertyRefs(KMeansDomain(processing.KMeansDomains.front()));
                     KMeans.Initialized = true;
                 }
             }
             if (KMeans.Entity != model.SelectedStableId)
             {
                 KMeans.Entity = model.SelectedStableId;
-                const auto available = std::find_if(model.PropertyCatalog.Rows.begin(), model.PropertyCatalog.Rows.end(),
-                    [&](const auto& row) { return row.Bindable && row.Descriptor == KMeans.Properties.InputPositions; });
-                if (available == model.PropertyCatalog.Rows.end())
+                if (!FindPointSetProperty(model.PropertyCatalog, KMeans.Properties.InputPositions))
                 {
-                    KMeans.Properties = Runtime::MakeKMeansPropertyRefs(KMeansDomain(processing.KMeansDomains.front()));
-                    KMeans.Dirty = true;
+                    if (const auto* preferred = FindPreferredPointSetPosition(model.PropertyCatalog))
+                    {
+                        KMeans.Properties = Runtime::MakeKMeansPropertyRefs(preferred->Descriptor.Domain);
+                        KMeans.Properties.InputPositions = preferred->Descriptor;
+                        KMeans.Dirty = true;
+                    }
                 }
             }
             ImGui::SeparatorText("Input properties");
@@ -1910,8 +1871,12 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::EndDisabled();
 
             const bool clusteringAvailable = service.ClusteringAvailable;
-            ImGui::BeginDisabled(!clusteringAvailable || !configAvailable);
-            if (ImGui::Button("Run K-Means##KMeans"))
+            const Runtime::RunKMeans request = Runtime::MakeConfiguredKMeansRequest(
+                model.SelectedStableId, KMeans.Properties, clusteringConfig);
+            auto readiness = Runtime::PreviewEditorKMeansRun(service.Commands, service.Clustering, request);
+            if (readiness.Enabled && !configAvailable)
+                readiness = {false, "Clustering config control is unavailable."};
+            if (DrawProcessingActionButton("Run K-Means##KMeans", readiness))
             {
                 KMeans.LastConfigApply =
                     Runtime::ApplyEditorClusteringConfig(
@@ -1921,18 +1886,12 @@ namespace Extrinsic::Sandbox::Editor
                 if (KMeans.LastConfigApply->Succeeded())
                 {
                     KMeans.Dirty = false;
-                    const Runtime::RunKMeans request =
-                        Runtime::MakeConfiguredKMeansRequest(
-                            model.SelectedStableId,
-                            KMeans.Properties,
-                            clusteringConfig);
                     KMeans.LastResult = Runtime::SubmitKMeansRun(
                         service.Commands,
                         service.Clustering,
                         request);
                 }
             }
-            ImGui::EndDisabled();
             ImGui::SeparatorText("Display output properties");
             DrawProcessingPropertyShowButton(context, model.SelectedStableId, KMeans.Properties.OutputLabels, KMeans.VisualizationDiagnostic);
             DrawProcessingPropertyShowButton(context, model.SelectedStableId, KMeans.Properties.OutputColors, KMeans.VisualizationDiagnostic);

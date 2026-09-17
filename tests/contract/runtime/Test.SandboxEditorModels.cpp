@@ -2299,10 +2299,6 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     EXPECT_EQ(meshEntries[17].Algorithm, Algorithm::Repair);
     EXPECT_EQ(meshEntries[18].Algorithm, Algorithm::Geodesics);
 
-    const std::vector<Domain> meshKMeans =
-        Runtime::GetAvailableEditorKMeansDomains(registry, mesh);
-    ASSERT_EQ(meshKMeans.size(), 1u);
-    EXPECT_EQ(meshKMeans[0], Domain::MeshVertices);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
     Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     const Runtime::EditorDomainWindowModel meshModel =
@@ -2360,10 +2356,6 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     EXPECT_EQ(graphEntries[3].Algorithm, Algorithm::ShortestPath);
     EXPECT_EQ(graphEntries[4].Algorithm, Algorithm::SurfaceReconstruction);
     EXPECT_EQ(graphEntries[5].Algorithm, Algorithm::KnnGraphConstruction);
-    const std::vector<Domain> graphKMeans =
-        Runtime::GetAvailableEditorKMeansDomains(registry, graph);
-    ASSERT_EQ(graphKMeans.size(), 1u);
-    EXPECT_EQ(graphKMeans[0], Domain::GraphVertices);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
     const Runtime::EditorDomainWindowModel graphModel =
         Runtime::BuildEditorDomainWindowModel(
@@ -2405,10 +2397,6 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     EXPECT_EQ(cloudEntries[6].Algorithm, Algorithm::ProgressivePoissonSampling);
     EXPECT_EQ(cloudEntries[10].Algorithm, Algorithm::SurfaceReconstruction);
     EXPECT_EQ(cloudEntries[11].Algorithm, Algorithm::KnnGraphConstruction);
-    const std::vector<Domain> cloudKMeans =
-        Runtime::GetAvailableEditorKMeansDomains(registry, cloud);
-    ASSERT_EQ(cloudKMeans.size(), 1u);
-    EXPECT_EQ(cloudKMeans[0], Domain::PointCloudPoints);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
     const Runtime::EditorDomainWindowModel cloudModel =
         Runtime::BuildEditorDomainWindowModel(
@@ -2985,9 +2973,6 @@ TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudStat
     EXPECT_TRUE(meshModel.Primitive.HasFaceId);
     EXPECT_TRUE(meshModel.Primitive.HasVertexId);
     ASSERT_TRUE(meshModel.Processing.HasSelectedEntity);
-    ASSERT_EQ(meshModel.Processing.KMeansDomains.size(), 1u);
-    EXPECT_EQ(meshModel.Processing.KMeansDomains[0],
-              Runtime::EditorGeometryProcessingDomain::MeshVertices);
     ASSERT_FALSE(meshModel.Processing.Entries.empty());
     EXPECT_EQ(meshModel.Processing.Entries[0].Algorithm,
               Runtime::EditorGeometryProcessingAlgorithm::KMeans);
@@ -3033,9 +3018,6 @@ TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudStat
     EXPECT_TRUE(graphModel.Primitive.HasEdgeId);
     EXPECT_TRUE(graphModel.Primitive.HasVertexId);
     ASSERT_TRUE(graphModel.Processing.HasSelectedEntity);
-    ASSERT_EQ(graphModel.Processing.KMeansDomains.size(), 1u);
-    EXPECT_EQ(graphModel.Processing.KMeansDomains[0],
-              Runtime::EditorGeometryProcessingDomain::GraphVertices);
 
     const std::uint32_t cloudStableId =
         Runtime::SelectionController::ToStableEntityId(cloud);
@@ -3064,9 +3046,6 @@ TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudStat
     ASSERT_TRUE(cloudModel.Primitive.HasPrimitive);
     EXPECT_TRUE(cloudModel.Primitive.HasPointId);
     ASSERT_TRUE(cloudModel.Processing.HasSelectedEntity);
-    ASSERT_EQ(cloudModel.Processing.KMeansDomains.size(), 1u);
-    EXPECT_EQ(cloudModel.Processing.KMeansDomains[0],
-              Runtime::EditorGeometryProcessingDomain::PointCloudPoints);
 }
 TEST(SandboxEditorUi, DomainVisualizationTargetsFollowLaneSourcePresence)
 {

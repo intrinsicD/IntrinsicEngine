@@ -3487,3 +3487,41 @@ TEST(SandboxEditorUi, ProgressivePoissonAdmissionSharesTypedValidation)
     EXPECT_TRUE(Runtime::PreviewEditorProgressivePoissonCommand(context, command).Enabled);
     EXPECT_TRUE(Runtime::ApplyEditorProgressivePoissonCommand(context, command).Succeeded());
 }
+
+TEST(SandboxEditorUi, KMeansBindingPredicateMatchesConfigKindsNamesAndDomains)
+{
+    Runtime::ClusteringConfig config;
+    for (unsigned domain = 1; domain <= unsigned(Runtime::GeometryElementDomain::PointCloudPoint); ++domain)
+    {
+        config.Properties = Runtime::MakeKMeansPropertyRefs(static_cast<Runtime::GeometryElementDomain>(domain));
+        EXPECT_TRUE(Runtime::IsValidKMeansPropertyBindings(*config.Properties));
+        EXPECT_TRUE(Runtime::ValidateClusteringConfigSection(
+            Runtime::SerializeClusteringConfig(config), Runtime::SerializeClusteringConfig({}),
+            "test.clustering").Usable());
+    }
+    const auto valid = Runtime::MakeKMeansPropertyRefs(Runtime::GeometryElementDomain::PointCloudPoint);
+    for (int variant = 0; variant < 9; ++variant)
+    {
+        SCOPED_TRACE(variant);
+        auto refs = valid;
+        switch (variant)
+        {
+        case 0: refs.InputPositions.Name.clear(); break;
+        case 1: refs.OutputLabels.Name = refs.InputPositions.Name; break;
+        case 2: refs.OutputColors.Domain = Runtime::GeometryElementDomain::MeshVertex; break;
+        case 3: refs.OutputColors.ValueKind = Geometry::PropertyValueKind::Float; break;
+        case 4: refs.InputPositions.ValueKind = Geometry::PropertyValueKind::UInt32; break;
+        case 5: refs.OutputScalarLabels = {refs.InputPositions.Domain, refs.OutputColors.Name,
+                    Geometry::PropertyValueKind::Float}; break;
+        case 6: refs.OutputScalarLabels = {refs.InputPositions.Domain, "p:scalar",
+                    Geometry::PropertyValueKind::UInt32}; break;
+        case 7: refs = Runtime::MakeKMeansPropertyRefs(Runtime::GeometryElementDomain::Unknown); break;
+        case 8: refs = Runtime::MakeKMeansPropertyRefs(static_cast<Runtime::GeometryElementDomain>(255)); break;
+        }
+        EXPECT_FALSE(Runtime::IsValidKMeansPropertyBindings(refs));
+        config.Properties = refs;
+        EXPECT_FALSE(Runtime::ValidateClusteringConfigSection(
+            Runtime::SerializeClusteringConfig(config), Runtime::SerializeClusteringConfig({}),
+            "test.clustering").Usable());
+    }
+}

@@ -437,27 +437,6 @@ ResolveEditorGeometryProcessingEntries(
         return "Unknown";
     }
 
-    std::vector<EditorGeometryProcessingDomain>
-    GetAvailableEditorKMeansDomains(const ECS::Scene::Registry& registry,
-                                    const ECS::EntityHandle entity)
-    {
-        using Domain = EditorGeometryProcessingDomain;
-        const Domain domains =
-            GetEditorGeometryProcessingCapabilities(registry, entity).Domains &
-            GetEditorSupportedGeometryProcessingDomains(
-                EditorGeometryProcessingAlgorithm::KMeans);
-
-        std::vector<Domain> result{};
-        result.reserve(3u);
-        if (HasAnyEditorGeometryProcessingDomain(domains, Domain::MeshVertices))
-            result.push_back(Domain::MeshVertices);
-        if (HasAnyEditorGeometryProcessingDomain(domains, Domain::GraphVertices))
-            result.push_back(Domain::GraphVertices);
-        if (HasAnyEditorGeometryProcessingDomain(domains, Domain::PointCloudPoints))
-            result.push_back(Domain::PointCloudPoints);
-        return result;
-    }
-
     Geometry::ConstPropertySet ResolveEditorSelectedMeshVertexProperties(
         const EditorProcessingCommands& commands)
     {

@@ -5,6 +5,7 @@ module;
 #include <optional>
 #include <string>
 #include <string_view>
+#include <entt/entity/fwd.hpp>
 export module Extrinsic.Runtime.ClusteringTypes;
 import Extrinsic.Core.Error;
 import Extrinsic.Runtime.KernelEvents;
@@ -61,6 +62,8 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] KMeansPropertyRefs MakeKMeansPropertyRefs(
         GeometryElementDomain domain);
 
+    [[nodiscard]] bool IsValidKMeansPropertyBindings(const KMeansPropertyRefs&) noexcept;
+
     enum class KMeansRunStatus : std::uint8_t
     {
         Queued,
@@ -113,6 +116,12 @@ export namespace Extrinsic::Runtime
             return Status == KMeansRunStatus::Applied;
         }
     };
+
+    // Metadata-only admission: nullopt admits; a value describes rejection.
+    // Execution still checks finite values and captures exact publication state.
+    // Dispatch fills world/correlation; an admission rejection has neither.
+    [[nodiscard]] std::optional<KMeansRunCompleted> ValidateKMeansRequest(
+        const entt::registry*, const RunKMeans&);
 
     struct ClusterLabelsChanged
     {

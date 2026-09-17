@@ -927,7 +927,13 @@ Segmentation's endpoint counts are checked without traversal; reconstruction
 still validates finite geometry, connectivity and publication conflicts. Curvature
 config parsing and execution share typed binding rules. The common processing
 model carries domain capabilities and enrichment state, with no method-specific
-availability flags; normal-estimation readiness stays in its own family.
+availability flags or per-method domain lists; normal-estimation readiness stays
+in its own family. K-Means previews and submission reuse the clustering owner's
+compiled metadata validator, also used before runtime snapshot capture. Its
+config codec shares typed binding rules. K-Means controls stay visible without a
+selection or default input; catalog rows provide initial bindings and canonical
+admission explains blocked actions. Finite-value checks and exact output-state
+capture stay in execution. RUNTIME-211/UI-043 own broader element-domain support.
 
 `UI-021` makes `Extrinsic.Runtime.GeometryAvailability` the shared availability
 policy for those editor models and commands. Domain windows, visualization

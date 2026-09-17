@@ -316,6 +316,8 @@ TEST(SandboxEditorSession, StaleCopiedCommandSurfacesFailAfterDetachAndReattach)
         staleServiceFrame.Commands, staleServiceFrame.Clustering));
     EXPECT_FALSE(Runtime::IsEditorPointCloudConsolidationAvailable(
         staleServiceFrame.Commands, staleServiceFrame.PointCloudConsolidation));
+    EXPECT_FALSE(Runtime::PreviewEditorKMeansRun(staleServiceFrame.Commands,
+        staleServiceFrame.Clustering, {}).Enabled);
     EXPECT_EQ(Runtime::SubmitKMeansRun(staleServiceFrame.Commands,
                                        staleServiceFrame.Clustering, {})
                   .Status,

@@ -31,8 +31,12 @@ maturity_target: Operational
   Consume family-owned runtime prepared frames; add no parallel panel scaffold.
 
 
-- Existing three-menu discovery still filters to the shared vertex source.
-  Reuse `RUNTIME-211`'s Lloyd/k-means++ literature intake and runtime preflight.
+- Existing three-menu discovery offers catalog bindings and uses
+  `PreviewEditorKMeansRun` for the exact draft, with visible entity/input/output
+  controls and shared disabled tooltips. The shared editor model no longer
+  stores K-Means domain availability. Runtime admission still executes only the
+  three vertex/point domains; RUNTIME-211 owns broadening that same validator.
+  Reuse its Lloyd/k-means++ literature intake and runtime preflight.
 
 ## Engine integration
 
@@ -57,8 +61,9 @@ See the [shared spatial-index consumer inventory](../../../docs/architecture/spa
 
 ## Required changes
 
-- [ ] Replace vertex-only choices with compatible catalog rows, grouped by
-      logical element domain and filtered by runtime readiness.
+- [ ] Complete catalog choices across all element domains through the existing
+      runtime readiness, grouping them by logical element domain and retaining
+      actionable disabled reasons for unsupported inputs.
 - [ ] Route every action through the existing validated K-Means operation and
       preserve backend/fallback/diagnostic display.
 - [ ] Bind output visualization to the selected originating domain.

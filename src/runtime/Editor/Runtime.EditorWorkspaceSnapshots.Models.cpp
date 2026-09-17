@@ -2227,8 +2227,6 @@ namespace {
 
             model.Entries =
       ResolveEditorGeometryProcessingEntries(model.Capabilities);
-            model.KMeansDomains =
-      GetAvailableEditorKMeansDomains(*context.Scene, *selected);
             // Operation-specific results live in their owning family's prepared
             // frame, not here. `model.Diagnostics` carries only whole-model facts
             // (no scene, no selection, unsupported domain), because

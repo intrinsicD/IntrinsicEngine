@@ -88,79 +88,6 @@ namespace Extrinsic::Runtime
             return GK::Backend::CPU;
         }
 
-        [[nodiscard]] bool IsExecutionDomain(
-            const GeometryElementDomain domain) noexcept
-        {
-            switch (domain)
-            {
-            case GeometryElementDomain::MeshVertex:
-            case GeometryElementDomain::GraphNode:
-            case GeometryElementDomain::PointCloudPoint:
-                return true;
-            default: break;
-            }
-            return false;
-        }
-
-        [[nodiscard]] bool HasExpectedPropertyKinds(
-            const KMeansPropertyRefs& refs) noexcept
-        {
-            const GeometryElementDomain domain = refs.InputPositions.Domain;
-            return IsExecutionDomain(domain) &&
-                   refs.InputPositions.HasName() &&
-                   refs.InputPositions.ValueKind ==
-                       Geometry::PropertyValueKind::Vec3 &&
-                   refs.OutputLabels.Domain == domain &&
-                   refs.OutputLabels.HasName() &&
-                   refs.OutputLabels.ValueKind ==
-                       Geometry::PropertyValueKind::UInt32 &&
-                   refs.OutputColors.Domain == domain &&
-                   refs.OutputColors.HasName() &&
-                   refs.OutputColors.ValueKind ==
-                       Geometry::PropertyValueKind::Vec4 &&
-                   (!refs.OutputScalarLabels.has_value() ||
-                    (refs.OutputScalarLabels->Domain == domain &&
-                     refs.OutputScalarLabels->HasName() &&
-                     refs.OutputScalarLabels->ValueKind ==
-                         Geometry::PropertyValueKind::Float));
-        }
-
-        [[nodiscard]] bool HasDistinctPropertyNames(
-            const KMeansPropertyRefs& refs) noexcept
-        {
-            if (refs.InputPositions.Name == refs.OutputLabels.Name ||
-                refs.InputPositions.Name == refs.OutputColors.Name ||
-                refs.OutputLabels.Name == refs.OutputColors.Name)
-            {
-                return false;
-            }
-            if (!refs.OutputScalarLabels.has_value())
-                return true;
-            return refs.OutputScalarLabels->Name != refs.InputPositions.Name &&
-                   refs.OutputScalarLabels->Name != refs.OutputLabels.Name &&
-                   refs.OutputScalarLabels->Name != refs.OutputColors.Name;
-        }
-
-        [[nodiscard]] bool CanWriteProperty(
-            const Geometry::PropertySet& properties,
-            const GeometryPropertyRef& ref) noexcept
-        {
-            const Geometry::PropertyValueKind actual =
-                DetectGeometryPropertyValueKind(properties, ref.Name);
-            return actual == Geometry::PropertyValueKind::Unknown ||
-                   actual == ref.ValueKind;
-        }
-
-        [[nodiscard]] bool CanWriteOutputs(
-            const Geometry::PropertySet& properties,
-            const KMeansPropertyRefs& refs) noexcept
-        {
-            return CanWriteProperty(properties, refs.OutputLabels) &&
-                   CanWriteProperty(properties, refs.OutputColors) &&
-                   (!refs.OutputScalarLabels.has_value() ||
-                    CanWriteProperty(properties, *refs.OutputScalarLabels));
-        }
-
         [[nodiscard]] KMeansRunCompleted MakeCompletion(
             const RunKMeans& command,
             const WorldHandle world,
@@ -528,98 +455,18 @@ namespace Extrinsic::Runtime
             const RunKMeans& command,
             KMeansRunCompleted& failure)
         {
-            const GeometryElementDomain domain =
-                command.Properties.InputPositions.Domain;
-            if (!HasExpectedPropertyKinds(command.Properties) ||
-                !HasDistinctPropertyNames(command.Properties) ||
-                command.Parameters.ClusterCount == 0u ||
-                command.Parameters.MaxIterations == 0u ||
-                command.Backend == ClusteringBackend::None)
+            if (auto rejected = ValidateKMeansRequest(&scene.Raw(), command))
             {
-                failure = MakeCompletion(
-                    command,
-                    world,
-                    correlation,
-                    KMeansRunStatus::InvalidProcessingParameters,
-                    Core::ErrorCode::InvalidArgument,
-                    "K-Means requires one supported input/output property domain, the canonical vec3/uint32/vec4/float value kinds, distinct property names, a concrete backend, and positive cluster and iteration counts.");
+                failure = std::move(*rejected);
+                failure.World = world;
+                failure.Correlation = correlation;
                 return std::nullopt;
             }
 
-            entt::registry& raw = scene.Raw();
-            const ECS::EntityHandle entity =
-                SelectionController::ToEntityHandle(command.StableEntityId);
-            if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
-            {
-                failure = MakeCompletion(
-                    command,
-                    world,
-                    correlation,
-                    KMeansRunStatus::StaleEntity,
-                    Core::ErrorCode::ResourceNotFound,
-                    "K-Means target entity is stale or no longer live.");
-                return std::nullopt;
-            }
-
-            const GeometryEntityAvailability availability =
-                BuildGeometryAvailability(raw, entity);
-            const GeometryPropertyResolution inputResolution =
-                ResolveGeometryProperty(
-                    availability,
-                    command.Properties.InputPositions,
-                    std::nullopt,
-                    true);
-            if (!inputResolution.Resolved() || inputResolution.ElementCount == 0u)
-            {
-                failure = MakeCompletion(
-                    command,
-                    world,
-                    correlation,
-                    KMeansRunStatus::UnsupportedGeometryDomain,
-                    Core::ErrorCode::InvalidArgument,
-                    "Selected entity does not expose the requested non-empty, finite K-Means input position property.");
-                return std::nullopt;
-            }
-
-            GS::MutableSourceView view = GS::BuildMutableView(raw, entity);
-            if (!view.Valid() || !SourceViewSupportsDomain(view, domain))
-            {
-                failure = MakeCompletion(
-                    command,
-                    world,
-                    correlation,
-                    KMeansRunStatus::UnsupportedGeometryDomain,
-                    Core::ErrorCode::InvalidArgument,
-                    "Selected entity no longer exposes the requested writable K-Means GeometrySources domain.");
-                return std::nullopt;
-            }
-
-            Geometry::PropertySet* properties =
-                TargetProperties(view, domain);
-            if (properties == nullptr)
-            {
-                failure = MakeCompletion(
-                    command,
-                    world,
-                    correlation,
-                    KMeansRunStatus::UnsupportedGeometryDomain,
-                    Core::ErrorCode::InvalidArgument,
-                    "Requested K-Means GeometrySources domain has no writable property set.");
-                return std::nullopt;
-            }
-
-            if (!CanWriteOutputs(*properties, command.Properties))
-            {
-                failure = MakeCompletion(
-                    command,
-                    world,
-                    correlation,
-                    KMeansRunStatus::InvalidProcessingParameters,
-                    Core::ErrorCode::TypeMismatch,
-                    "One or more requested K-Means output properties already exist with incompatible value kinds.");
-                return std::nullopt;
-            }
-
+            const auto availability = BuildGeometryAvailability(
+                scene.Raw(), SelectionController::ToEntityHandle(command.StableEntityId));
+            const auto* properties = ResolveGeometryPropertySet(
+                availability, command.Properties.InputPositions.Domain);
             std::optional<std::vector<glm::vec3>> points =
                 CollectPositions(
                     *properties,
@@ -630,9 +477,9 @@ namespace Extrinsic::Runtime
                     command,
                     world,
                     correlation,
-                    KMeansRunStatus::InvalidProcessingParameters,
+                    KMeansRunStatus::UnsupportedGeometryDomain,
                     Core::ErrorCode::InvalidArgument,
-                    "K-Means requires a non-empty finite vec3 input position property on the requested domain.");
+                    "Selected entity does not expose the requested non-empty, finite K-Means input position property.");
                 return std::nullopt;
             }
 

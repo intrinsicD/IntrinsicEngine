@@ -38,6 +38,19 @@ namespace Extrinsic::Runtime
         return commands.IsBound() && consolidation != nullptr && consolidation->Available();
     }
 
+    ActionReadiness PreviewEditorKMeansRun(
+        const EditorProcessingCommands& commands,
+        const ClusteringService* clustering, const RunKMeans& command)
+    {
+        if (!IsEditorClusteringAvailable(commands, clustering))
+            return {false, "ClusteringService is unavailable."};
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
+        if (const auto rejected = ValidateKMeansRequest(
+                context.Scene ? &context.Scene->Raw() : nullptr, command))
+            return {false, rejected->Message};
+        return {true, {}};
+    }
+
     KMeansRunCompleted SubmitKMeansRun(
         const EditorProcessingCommands& commands,
         ClusteringService* const clustering,
@@ -57,6 +70,12 @@ namespace Extrinsic::Runtime
         if (!IsEditorClusteringAvailable(commands, clustering))
             return result;
 
+        if (auto rejected = ValidateKMeansRequest(
+                context.Scene ? &context.Scene->Raw() : nullptr, command))
+        {
+            rejected->World = context.World;
+            return std::move(*rejected);
+        }
         result.Correlation = clustering->RunKMeans(command);
         result.Status = KMeansRunStatus::Queued;
         result.Message = "K-Means runtime job queued.";

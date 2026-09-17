@@ -1044,17 +1044,7 @@ namespace Extrinsic::Runtime
                         ReadPropertyRef(context, *bindings, "scalar_labels", *properties.OutputScalarLabels, true);
                     }
                     else properties.OutputScalarLabels.reset();
-                    bool valid = bindings->is_object() && properties.InputPositions.HasName() &&
-                        properties.OutputLabels.HasName() && properties.OutputColors.HasName() &&
-                        properties.InputPositions.Domain == properties.OutputLabels.Domain &&
-                        properties.InputPositions.Domain == properties.OutputColors.Domain &&
-                        properties.InputPositions.Name != properties.OutputLabels.Name &&
-                        properties.InputPositions.Name != properties.OutputColors.Name &&
-                        properties.OutputLabels.Name != properties.OutputColors.Name;
-                    if (properties.OutputScalarLabels)
-                        valid &= properties.OutputScalarLabels->Domain == properties.InputPositions.Domain &&
-                            properties.OutputScalarLabels->HasName() && properties.OutputScalarLabels->Name != properties.InputPositions.Name &&
-                            properties.OutputScalarLabels->Name != properties.OutputLabels.Name && properties.OutputScalarLabels->Name != properties.OutputColors.Name;
+                    const bool valid = bindings->is_object() && IsValidKMeansPropertyBindings(properties);
                     if (!valid && context.Result)
                     {
                         context.Result->State = Core::Config::EngineConfigState::Invalid;

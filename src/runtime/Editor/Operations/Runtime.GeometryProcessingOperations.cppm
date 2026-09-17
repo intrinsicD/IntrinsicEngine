@@ -148,19 +148,14 @@ export namespace Extrinsic::Runtime
     ResolveEditorGeometryProcessingEntries(const ECS::Scene::Registry& registry,
                                            ECS::EntityHandle entity);
 
-    [[nodiscard]] std::vector<EditorGeometryProcessingDomain>
-    GetAvailableEditorKMeansDomains(const ECS::Scene::Registry& registry, ECS::EntityHandle entity);
-
     [[nodiscard]] const char*
     DebugNameForEditorGeometryProcessingDomain(EditorGeometryProcessingDomain domain) noexcept;
 
     [[nodiscard]] const char* DebugNameForEditorGeometryProcessingAlgorithm(
         EditorGeometryProcessingAlgorithm algorithm) noexcept;
 
-    // Availability flags are host kernel capability combined with the selected
-    // entity's resolved domains; panels disable their action and show the
-    // matching reason rather than failing at execution time. Per-method results
-    // live in the owning family's prepared frame, not here.
+    // Shared selection and discovery metadata. Method admission and results
+    // belong to each operation family.
     struct EditorGeometryProcessingModel
     {
         bool HasSelectedEntity{false};
@@ -169,7 +164,6 @@ export namespace Extrinsic::Runtime
         std::string DirectMeshEnrichmentDiagnostic{};
         EditorGeometryProcessingCapabilities Capabilities{};
         std::vector<EditorGeometryProcessingEntry> Entries{};
-        std::vector<EditorGeometryProcessingDomain> KMeansDomains{};
         std::vector<EditorDiagnostic> Diagnostics{};
     };
 

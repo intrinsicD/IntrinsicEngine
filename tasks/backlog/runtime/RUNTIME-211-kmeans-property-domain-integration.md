@@ -29,9 +29,13 @@ maturity_target: Operational
 
 ## Context
 
-- `ClusteringModule` already carries `GeometryPropertyRef` values, but
-  `IsExecutionDomain`, property resolution, publication, and diagnostics admit
-  only mesh vertices, graph nodes, and point-cloud points.
+- `ClusteringTypes::ValidateKMeansRequest` now owns metadata admission shared
+  by editor preview/submission and the sole `ClusteringModule` snapshot path.
+  Its private execution-domain predicate and module publication/staleness paths
+  still admit only mesh vertices, graph nodes, and point-cloud points. Extend
+  those existing owners; do not add a parallel availability service. Config
+  binding validation already accepts all eight known domains, independently of
+  execution support. Full finite/snapshot checks remain execution-owned.
 - Lloyd's least-squares quantization (DOI `10.1109/TIT.1982.1056489`), Arthur
   and Vassilvitskii's k-means++ seeding, and Bahmani et al.'s scalable
   k-means++ formulate the objective over vectors, not mesh provenance or
@@ -67,8 +71,9 @@ See the [shared spatial-index consumer inventory](../../../docs/architecture/spa
       CPU/GPU job scopes, diagnostics, staleness, and completion.
 - [ ] Publish only the named, count-matched output cohort on the originating
       domain and preserve unknown/custom properties plus mesh/graph topology.
-- [ ] Reuse one property-aware availability result for direct, config/agent,
-      and later UI callers.
+- [ ] Extend the existing property-aware metadata admission for direct and
+      editor callers to the complete domain contract, keeping config/agent
+      bindings and execution-time finite/publication checks consistent.
 - [ ] Preserve backend identity, GPU fallback, history, and exact CPU/Vulkan
       parity behavior.
 

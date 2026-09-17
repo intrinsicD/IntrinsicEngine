@@ -29,6 +29,7 @@ import Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.Runtime.PointSetOperations;
 import Extrinsic.Runtime.PointConstructionOperations;
 import Extrinsic.Runtime.PointCloudServiceOperations;
+import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
@@ -96,7 +97,8 @@ namespace
         Editor::MethodPanels Methods;
 
         explicit PanelHarness(Config::EngineConfigSectionRegistry sections =
-            Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry())
+            Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry(),
+            bool clustering = false)
         {
             Config::EngineConfig config{};
             Config::PopulateEngineConfigSectionDefaults(config, sections);
@@ -111,6 +113,7 @@ namespace
             Engine->EmplaceModule<R::EngineConfigControl>(std::move(sections));
             Engine->EmplaceModule<R::SceneInteractionModule>();
             Engine->EmplaceModule<R::AsyncWorkModule>();
+            if (clustering) Engine->EmplaceModule<R::ClusteringModule>();
             Engine->EmplaceModule<R::EditorUiModule>();
             Engine->Initialize();
             Shell.Attach(Engine->Worlds(), Engine->Services());
@@ -2356,4 +2359,120 @@ TEST(SandboxProcessingPanels, MeshFieldAdmissionBlocksMissingInputsAndRunsChosen
         EXPECT_TRUE(completed);
         EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
     }
+}
+
+TEST(SandboxProcessingPanels, KMeansAdmissionKeepsControlsVisibleAndRetriesRejectedDraft)
+{
+    bool reject = false;
+    unsigned rejections = 0;
+    PanelHarness h(RejectableConfigRegistry(R::kClusteringConfigSectionName, reject, rejections), true);
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::PointCloudPoint);
+    auto& props = scene.Raw().get<GS::Vertices>(entity).Properties;
+    auto positions = props.Get<glm::vec3>("v:position");
+    auto custom = props.GetOrAdd<glm::vec3>("p:samples", {});
+    custom.Vector() = positions.Vector();
+    props.Remove(positions);
+    auto conflict = props.GetOrAdd<float>("p:kmeans_color", 0);
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("pointcloud.processing.kmeans", true));
+    std::optional<R::KMeansRunCompleted> result;
+    const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id = "test.kmeans_admission", .MenuPath = {"View"}, .Title = "K-Means admission observer",
+        .OpenByDefault = true,
+        .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
+            result = context.PointCloudService->Results.LastKMeansResult;
+            if (!h.Selection().SelectedStableIds().empty())
+            {
+                const auto request = R::MakeConfiguredKMeansRequest(
+                    R::SelectionController::ToStableEntityId(entity),
+                    *R::GetClusteringConfig(h.Control().GetEngineConfigControlState().ActiveConfig));
+                auto customRequest = request;
+                customRequest.Properties.InputPositions.Name = "p:samples";
+                const auto readiness = R::PreviewEditorKMeansRun(context.PointCloudService->Commands,
+                    context.PointCloudService->Clustering, customRequest);
+                if (props.Exists("p:kmeans_color") && !props.Get<glm::vec4>("p:kmeans_color"))
+                {
+                    EXPECT_FALSE(readiness.Enabled);
+                    const auto rejected = R::SubmitKMeansRun(context.PointCloudService->Commands,
+                        context.PointCloudService->Clustering, customRequest);
+                    EXPECT_EQ(rejected.Message, readiness.DisabledReason);
+                    EXPECT_EQ(rejected.World, h.Engine->ActiveWorld());
+                    EXPECT_FALSE(rejected.Correlation.IsValid());
+                }
+            }
+        }});
+    int frame = 0, step = 0;
+    bool completed = false;
+    std::uint64_t jobsBefore = 0;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frame > 400) { ADD_FAILURE() << "K-Means did not finish"; engine.RequestExit(); return; }
+        auto* window = ImGui::FindWindowByName("PointCloud / Processing / K-Means");
+        if (!window) return;
+        ImGui::SetWindowSize(window, {850, 1500});
+        ImGui::SetWindowPos(window, {0, 0});
+        ++step;
+        const auto click = [&](const char* label) { ImGui::ActivateItemByID(window->GetID(label)); };
+        if (step == 3)
+        {
+            jobsBefore = engine.Jobs().Stats().SubmittedJobs;
+            ImGui::GetCurrentContext()->LogBuffer.clear();
+            ImGui::LogToBuffer();
+            ImGui::GetCurrentContext()->LogWindow = nullptr;
+            click("Run K-Means##KMeans");
+        }
+        if (step == 6)
+        {
+            const std::string_view log{ImGui::GetCurrentContext()->LogBuffer.c_str()};
+            EXPECT_NE(log.find("Positions"), std::string_view::npos);
+            EXPECT_NE(log.find("Run K-Means"), std::string_view::npos);
+            ImGui::LogFinish();
+            EXPECT_FALSE(result);
+            EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
+            EXPECT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+        }
+        if (step == 9) click("Run K-Means##KMeans");
+        if (step == 12)
+        {
+            EXPECT_FALSE(result);
+            EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
+            props.Remove(conflict);
+            reject = true;
+            click("Positions##KMeans");
+        }
+        if (step == 14)
+        {
+            auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+            ASSERT_FALSE(popups.empty());
+            ASSERT_NE(popups.back().Window, nullptr);
+            const std::string label = std::string{R::DebugNameForEditorPropertyCatalogDomain(
+                R::EditorPropertyCatalogDomain::PointCloudPoints)} + " / p:samples (" +
+                std::to_string(props.Size()) + ")";
+            ImGui::ActivateItemByID(popups.back().Window->GetID(label.c_str()));
+        }
+        if (step == 17) click("Run K-Means##KMeans");
+        if (step == 21)
+        {
+            EXPECT_GT(rejections, 0u);
+            EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
+            EXPECT_FALSE(R::GetClusteringConfig(h.Control().GetEngineConfigControlState().ActiveConfig)->Properties);
+            reject = false;
+            click("Run K-Means##KMeans");
+        }
+        if (step > 23 && result && result->Status != R::KMeansRunStatus::Queued)
+        {
+            EXPECT_TRUE(result->Succeeded()) << result->Message;
+            EXPECT_EQ(result->Properties.InputPositions.Name, "p:samples");
+            EXPECT_TRUE(props.Get<std::uint32_t>("p:kmeans_label"));
+            EXPECT_TRUE(props.Get<glm::vec4>("p:kmeans_color"));
+            EXPECT_FALSE(props.Exists("v:position"));
+            EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore + 1u);
+            completed = true;
+            engine.RequestExit();
+        }
+    };
+    h.Engine->Run();
+    if (ImGui::GetCurrentContext()->LogEnabled) ImGui::LogFinish();
+    EXPECT_TRUE(completed);
+    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
 }

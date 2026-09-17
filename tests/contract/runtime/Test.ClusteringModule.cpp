@@ -547,6 +547,12 @@ namespace
             Correlations.push_back(service->RunKMeans(MakePointCloudRequest(
                 Runtime::SelectionController::ToStableEntityId(
                     missingInput))));
+            const auto nonfinite = AddPointCloud(scene,
+                {{std::numeric_limits<float>::infinity(), 0.0f, 0.0f}});
+            auto nonfiniteRequest = MakePointCloudRequest(
+                Runtime::SelectionController::ToStableEntityId(nonfinite));
+            EXPECT_FALSE(Runtime::ValidateKMeansRequest(&scene.Raw(), nonfiniteRequest));
+            Correlations.push_back(service->RunKMeans(nonfiniteRequest));
         }
 
         void Frame(double, double) override
@@ -870,7 +876,7 @@ TEST(ClusteringModule, ValidationFailuresPublishCanonicalTypedCompletions)
 
     EXPECT_FALSE(appPtr->MissingService);
     EXPECT_FALSE(appPtr->TimedOut);
-    ASSERT_EQ(appPtr->Completions.size(), 3u);
+    ASSERT_EQ(appPtr->Completions.size(), 4u);
     EXPECT_TRUE(std::all_of(
         appPtr->Correlations.begin(),
         appPtr->Correlations.end(),
@@ -894,10 +900,13 @@ TEST(ClusteringModule, ValidationFailuresPublishCanonicalTypedCompletions)
     EXPECT_EQ(countStatus(Runtime::KMeansRunStatus::StaleEntity), 1);
     EXPECT_EQ(
         countStatus(Runtime::KMeansRunStatus::UnsupportedGeometryDomain),
-        1);
+        2);
     for (const Runtime::KMeansRunCompleted& completion :
          appPtr->Completions)
     {
+        EXPECT_EQ(completion.World, engine.ActiveWorld());
+        EXPECT_NE(std::find(appPtr->Correlations.begin(), appPtr->Correlations.end(),
+                           completion.Correlation), appPtr->Correlations.end());
         EXPECT_FALSE(completion.Succeeded());
         EXPECT_EQ(completion.ActualBackend,
                   Runtime::ClusteringBackend::None);
@@ -926,6 +935,9 @@ TEST(ClusteringModule, CpuResultsAreDeterministicAndHonorCustomPropertyRefs)
     for (const Runtime::KMeansRunCompleted& completion :
          appPtr->Completions)
     {
+        EXPECT_EQ(completion.World, engine.ActiveWorld());
+        EXPECT_NE(std::find(appPtr->Correlations.begin(), appPtr->Correlations.end(),
+                           completion.Correlation), appPtr->Correlations.end());
         EXPECT_TRUE(completion.Succeeded()) << completion.Message;
         EXPECT_EQ(completion.Properties.InputPositions.Name,
                   "p:cluster_input");
@@ -1011,4 +1023,48 @@ TEST(ClusteringModule, RunKMeansWithoutModuleFailsClosedAtCommandDrain)
     EXPECT_FALSE(appPtr->LabelsCommitted);
 
     engine.Shutdown();
+}
+
+TEST(ClusteringModule, MetadataAdmissionRejectsInvalidBindingsAndSourcesWithoutScanningValues)
+{
+    ECS::Scene::Registry scene;
+    const auto entity = AddPointCloud(scene, {{0, 0, 0}, {1, 0, 0}});
+    auto request = MakePointCloudRequest(Runtime::SelectionController::ToStableEntityId(entity));
+    auto& properties = scene.Raw().get<GS::Vertices>(entity).Properties;
+    const auto expectRejected = [&](Runtime::KMeansRunStatus status) {
+        const auto result = Runtime::ValidateKMeansRequest(&scene.Raw(), request);
+        ASSERT_TRUE(result);
+        EXPECT_EQ(result->Status, status);
+        EXPECT_EQ(result->StableEntityId, request.StableEntityId);
+        EXPECT_EQ(result->RequestedBackend, request.Backend);
+        EXPECT_EQ(result->ActualBackend, Runtime::ClusteringBackend::None);
+        EXPECT_FALSE(result->Message.empty());
+        EXPECT_FALSE(result->Correlation.IsValid());
+        EXPECT_FALSE(properties.Exists(request.Properties.OutputLabels.Name));
+    };
+    EXPECT_FALSE(Runtime::ValidateKMeansRequest(&scene.Raw(), request));
+    request.Parameters.ClusterCount = 0u;
+    EXPECT_EQ(Runtime::ValidateKMeansRequest(nullptr, request)->Status,
+              Runtime::KMeansRunStatus::MissingScene);
+    request.StableEntityId = 0u;
+    expectRejected(Runtime::KMeansRunStatus::InvalidProcessingParameters);
+    request.Parameters.ClusterCount = 2u;
+    expectRejected(Runtime::KMeansRunStatus::StaleEntity);
+    request.StableEntityId = Runtime::SelectionController::ToStableEntityId(entity);
+    request.Properties.InputPositions.Name = "p:custom";
+    expectRejected(Runtime::KMeansRunStatus::UnsupportedGeometryDomain);
+    auto input = properties.GetOrAdd<glm::vec3>("p:custom", {});
+    input.Vector() = {{0, 0, 0}, {std::numeric_limits<float>::infinity(), 0, 0}};
+    EXPECT_FALSE(Runtime::ValidateKMeansRequest(&scene.Raw(), request));
+    input.Vector().pop_back();
+    expectRejected(Runtime::KMeansRunStatus::InvalidProcessingParameters);
+    input.Vector().push_back({1, 0, 0});
+    auto conflict = properties.GetOrAdd<float>(request.Properties.OutputColors.Name, 0);
+    expectRejected(Runtime::KMeansRunStatus::InvalidProcessingParameters);
+    EXPECT_EQ(Runtime::ValidateKMeansRequest(&scene.Raw(), request)->Error,
+              Extrinsic::Core::ErrorCode::TypeMismatch);
+    properties.Remove(conflict);
+    EXPECT_FALSE(Runtime::ValidateKMeansRequest(&scene.Raw(), request));
+    properties.Remove(input);
+    expectRejected(Runtime::KMeansRunStatus::UnsupportedGeometryDomain);
 }

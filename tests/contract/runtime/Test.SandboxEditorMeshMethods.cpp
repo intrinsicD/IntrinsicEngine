@@ -4124,7 +4124,9 @@ TEST(SandboxEditorUi, DirectMeshEnrichmentPendingPreservesGeometryReadiness)
     EXPECT_FALSE(
         pendingModel.Processing.DirectMeshEnrichmentDiagnostic.empty());
     EXPECT_FALSE(pendingModel.Processing.Entries.empty());
-    EXPECT_FALSE(pendingModel.Processing.KMeansDomains.empty());
+    EXPECT_TRUE(std::ranges::any_of(pendingModel.Processing.Entries, [](const auto& entry) {
+        return entry.Algorithm == Runtime::EditorGeometryProcessingAlgorithm::KMeans;
+    }));
     EXPECT_TRUE(Runtime::PreviewEditorMeshDenoiseCommand(
         context, {.StableEntityId = pendingModel.SelectedStableId}).Enabled);
     EXPECT_TRUE(Runtime::PreviewEditorMeshCurvatureCommand(
@@ -4189,7 +4191,9 @@ TEST(SandboxEditorUi, DirectMeshEnrichmentPendingPreservesGeometryReadiness)
     EXPECT_FALSE(
         readyModel.Processing.DirectMeshEnrichmentDiagnostic.empty());
     EXPECT_FALSE(readyModel.Processing.Entries.empty());
-    EXPECT_FALSE(readyModel.Processing.KMeansDomains.empty());
+    EXPECT_TRUE(std::ranges::any_of(readyModel.Processing.Entries, [](const auto& entry) {
+        return entry.Algorithm == Runtime::EditorGeometryProcessingAlgorithm::KMeans;
+    }));
     EXPECT_TRUE(Runtime::PreviewEditorMeshDenoiseCommand(
         context, {.StableEntityId = readyModel.SelectedStableId}).Enabled);
     EXPECT_TRUE(Runtime::PreviewEditorMeshCurvatureCommand(

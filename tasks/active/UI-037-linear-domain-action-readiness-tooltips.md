@@ -828,3 +828,28 @@ Verified checkpoint:
   controls, bake readiness and cached numerical/topology/deleted-slot/publication
   conflict checks. All method-specific availability flags are now absent from the
   common processing model; this does not close whole-task numerical readiness.
+
+
+## K-Means admission and shared-model cleanup — implementation plan
+
+- Operator explicitly continues duplication/compile-locality cleanup with Claude,
+  outside the standing convergence selection preference. Reuse the existing
+  clustering Types implementation, service operation wrapper, property catalog,
+  config codec and shared action/tooltip presentation; add no file or service.
+- Move metadata admission from the clustering snapshot builder into one compiled
+  validator consumed by service execution and editor preview/submission. Return
+  an optional existing typed rejection record; nullopt admits. Scene/entity,
+  parameter/binding, property kind/count and output conflicts are metadata checks.
+  Keep finite scans, snapshot capture, asynchronous publication/history and
+  staleness validation in execution, preserving non-finite failure status.
+- Config and runtime share the binding predicate. ReadPropertyRef already checks
+  canonical value kinds; preserve all known config domains while execution keeps
+  the existing three-domain limit. RUNTIME-211/UI-043 still own generalization.
+- Remove the common model's KMeansDomains vector, its producer/helper and the
+  app conversion switch. Use catalog rows for default binding and keep entity,
+  input/output controls and the disabled action visible even without a selection.
+  Preview the exact draft; preserve explicit Apply/Reload and CPU/Vulkan fallback.
+- Claude plan review identified finite-status and correlation preservation risks.
+  Its proposed null-scene admission and value-kind compatibility objections do
+  not match the existing contract: absent scenes reject, and ReadPropertyRef
+  already rejects kind changes. Prove those paths in focused tests and review.
