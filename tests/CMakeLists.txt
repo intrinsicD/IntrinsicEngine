@@ -45,6 +45,12 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Family
         --forbid-module Extrinsic.Runtime.MeshFieldOperations
         --forbid-module Extrinsic.Runtime.MeshTopologyOperations
         --forbid-module Extrinsic.Runtime.Private.EditorWorkspaceAttachment)
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointFieldResults
+        --check-source src/runtime/Editor/Operations/Runtime.PointFieldOperations.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.PointFieldOperations.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.PointFieldOperations.Frame.cpp
+        --forbid-module Geometry.PointCloud.Utils
+        --forbid-module Geometry.PointCloud)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointAnalysis
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cppm
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cpp
@@ -253,6 +259,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Parameterizatio
         --check-source src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Uv.cpp
+        --forbid-module Extrinsic.ECS.Components.GeometrySourcesPopulate
         --forbid-module Extrinsic.ECS.Component.Transform
         --forbid-module Extrinsic.Runtime.GeometryProcessingOperations
         --forbid-module Extrinsic.Runtime.NormalOperations
@@ -342,6 +349,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PositionCapture
 set_tests_properties(ProcessingCompilationLocality.Family ProcessingCompilationLocality.PointAnalysis ProcessingCompilationLocality.PointAnalysisTests ProcessingCompilationLocality.UnrelatedAdapters ProcessingCompilationLocality.Normals ProcessingCompilationLocality.NormalTests ProcessingCompilationLocality.MeshSupport ProcessingCompilationLocality.Registration ProcessingCompilationLocality.Parameterization ProcessingCompilationLocality.RegistrationTests ProcessingCompilationLocality.MeshField ProcessingCompilationLocality.MeshTopology ProcessingCompilationLocality.MeshFieldTests
     ProcessingCompilationLocality.PositionCapture
     ProcessingCompilationLocality.PropertyCapture
+    ProcessingCompilationLocality.PointFieldResults
     ProcessingCompilationLocality.ParameterizationSolve
     ProcessingCompilationLocality.PointSet ProcessingCompilationLocality.PointConstruction
     ProcessingCompilationLocality.PointCloudService ProcessingCompilationLocality.Discovery

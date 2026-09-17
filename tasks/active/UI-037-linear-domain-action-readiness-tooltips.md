@@ -1457,3 +1457,81 @@ test layout, docs sync/links, task links and skill mirrors pass. Manual workshop
 rows 1–3 pass (existing app owner, no dependency edges or duplicated selector);
 rows 4–8 are unaffected. The full CPU gate will run on the combined source
 following the next compile-locality slice. Logs: `/tmp/intrinsic-ninth-*`.
+
+
+## Copied spacing-result and UV dependency boundaries — plan, 2026-09-17
+
+Claude identified the point-field interface's `CloudStatistics` member as the
+reason its interface, config forwarding and frame units depend transitively on
+`Geometry.PointCloud.Utils` and the owning point-cloud container. Replace it with
+the five editor-consumed summary fields directly in `EditorPointSpacingResult`:
+centroid, mean/min/max nearest spacing and bounds diagonal. The existing live
+count already supplies point count; unused AABB metadata is removed under the
+operator's API-simplification direction and no-external-consumer contract.
+Update all app, CPU and GPU callers together. Keep the geometry kernel/result
+unchanged and copy values at the runtime result boundary. No wrapper, new module,
+compatibility path or runtime algorithm change.
+
+Also remove unused `GeometrySourcesPopulate` imports from parameterization and
+UV regeneration, which use view/property access and the existing mesh-soup
+publication owner. Before-change compiler probes reject both intended cuts.
+Add a three-producer PointFieldResults closure test and extend the three-producer
+Parameterization guard. Verify all copied summary fields against a fixed live
+rectangle with a deleted NaN row, existing all-domain CPU comparisons, and the
+existing Vulkan spacing test. Run full CPU and structural gates on the combined
+source, with a fixed-packet Claude review. This is compile-dependency evidence,
+not a measured compilation-speed claim. No new layer edge or target is planned.
+
+
+### Compilation implementation and review checkpoint
+
+The result now owns the five consumed summary values; every in-tree app, CPU
+and GPU consumer is updated. Geometry kernels and their result records are
+unchanged. Both unused UV imports are removed. The new three-producer result
+closure and expanded three-producer UV closure pass against Clang's dependency
+graph; both failed at baseline. Module inventory regeneration reports 419 modules
+and no generated diff. No new public module or engine dependency edge.
+
+Claude's fixed-packet review found no blockers. The full `IntrinsicTests` build
+settles UV symbol reachability and copied result type compatibility; the boundary
+tests settle transitive dependencies. The contract test includes algorithm/cmath
+and executes the fixed rectangle/deleted-NaN fixture successfully. The panel
+already has no direct PointCloud.Utils import to remove. Source-documentation
+audit has zero errors; its one review hint is the existing required explanation
+of immediate versus deferred result delivery.
+
+All 163 focused spacing, density, UV, panel and compilation cases pass (16.92 s).
+The slice adds three production source lines overall (five copied values replace
+one structure assignment, minus the unused imports); eight CMake lines register
+and extend guards. Combined with selector reuse, production source is 25 lines
+smaller. This is a dependency cut, not duplicate-kernel removal or measured speedup.
+Manual architecture/workshop rows 1–3 pass: same family ownership and runtime
+boundary; no wrappers or new targets. Rows 4–8 remain unaffected. Structural,
+layering and documentation checks pass. CPU and Vulkan gates follow below.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -R 'PointSpacing|KernelDensity|Parameterization|UvRegeneration|ProcessingCompilationLocality|SandboxProcessingPanels' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target IntrinsicPointLBVHGpuTests
+ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R '^PointLBVHGpuSmoke.PointSpacingPublishesAcrossDomainsAndPreservesCandidatePolicy$' --no-tests=error --timeout 120
+```
+
+Logs and fixed Claude review packet: `/tmp/intrinsic-tenth-*`.
+
+
+The canonical Clang 23 `ci-vulkan` configure/build and spacing GPU test pass
+(11.16 s test, no skips), with ASan+UBSan enabled by that preset. The extended
+comparison covers centroid and bounds diagonal as well as all nearest-spacing
+values across eight input domains. No full CPU sanitizer suite was repeated.
+
+
+Final combined CPU gate: 4,715 passed plus one expected ASan-only GLFW lifecycle
+skip (4,716 selected, zero failures, 182.14 s). Source stayed fixed throughout
+Claude review, both builds and both execution gates. Both builds are warning-free.
+Workshop automation, docs sync/links, task links/policy, skill mirrors, session
+brief, layering, test layout, root hygiene and diff checks pass. UI-037 remains
+open for the broader readiness/cache acceptance; these are supporting reuse and
+compilation-boundary slices, not retirement or a timing result.

@@ -436,7 +436,14 @@ visiting the prepared frame, then copies the values into its returned record.
 Do not place complete family records in shared private bindings: that would
 make sibling feature implementations import the family again.
 
-`ProcessingCompilationLocality.Family`, `.PointAnalysis`, `.PointAnalysisTests`,
+The point-field copied result contains the editor's centroid and spacing/bounds
+summary values directly. Geometry's owning `CloudStatistics` stays inside the
+spacing implementation; it does not enter the family interface, config facade
+or prepared-frame closure. Parameterization and UV regeneration access geometry
+views and publish through the existing mesh-soup owner without importing ECS
+geometry-population adapters.
+
+`ProcessingCompilationLocality.Family`, `.PointFieldResults`, `.PointAnalysis`, `.PointAnalysisTests`,
 `.Normals`, `.NormalTests`, `.MeshSupport`, `.Registration`, `.Parameterization`,
 `.RegistrationTests`, `.MeshField`, `.MeshTopology`, `.MeshFieldTests`,
 `.PointSet`, `.PointSetTests`, `.PointConstruction`, `.PointConstructionTests`,

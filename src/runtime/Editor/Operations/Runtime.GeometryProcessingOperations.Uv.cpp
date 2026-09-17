@@ -50,7 +50,6 @@ import Extrinsic.Runtime.WorldHandle;
 import Geometry.HalfedgeMesh;
 import Geometry.MeshSoup;
 import Geometry.Properties;
-import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.Mesh.Conversion;
 import Geometry.UvAtlas;

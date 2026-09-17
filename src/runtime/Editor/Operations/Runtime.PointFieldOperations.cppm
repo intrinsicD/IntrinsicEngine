@@ -5,6 +5,7 @@ module;
 #include <functional>
 #include <optional>
 #include <string>
+#include <glm/vec3.hpp>
 export module Extrinsic.Runtime.PointFieldOperations;
 export import Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.EditorCommon;
@@ -12,7 +13,6 @@ export import Extrinsic.Runtime.KernelDensityConfig;
 export import Extrinsic.Runtime.PointSpacingConfig;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
-import Geometry.PointCloud.Utils;
 export namespace Extrinsic::Runtime
 {
     struct EditorKernelDensityResult
@@ -42,7 +42,8 @@ export namespace Extrinsic::Runtime
         std::string ActualBackend{}, Message{};
         std::size_t SlotCount{}, LiveCount{}, WrittenCount{};
         float MeanRadius{}, MinRadius{}, MaxRadius{};
-        Geometry::PointCloud::CloudStatistics Statistics{};
+        glm::vec3 Centroid{};
+        float AverageSpacing{}, MinSpacing{}, MaxSpacing{}, BoundingBoxDiagonal{};
         bool IndexReused{};
         std::size_t GpuQueryBatches{};
         double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};

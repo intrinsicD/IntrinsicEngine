@@ -1359,9 +1359,13 @@ namespace
                         const auto& ref=ReferenceResults[unsigned(result.Radii.Domain)-1];
                         for(auto [actual,expected] : {std::pair{result.MeanRadius,ref.MeanRadius},
                             std::pair{result.MinRadius,ref.MinRadius},std::pair{result.MaxRadius,ref.MaxRadius},
-                            std::pair{result.Statistics.AverageSpacing,ref.Statistics.AverageSpacing},
-                            std::pair{result.Statistics.MinSpacing,ref.Statistics.MinSpacing},
-                            std::pair{result.Statistics.MaxSpacing,ref.Statistics.MaxSpacing}})
+                            std::pair{result.AverageSpacing,ref.AverageSpacing},
+                            std::pair{result.MinSpacing,ref.MinSpacing},
+                            std::pair{result.MaxSpacing,ref.MaxSpacing},
+                            std::pair{result.BoundingBoxDiagonal,ref.BoundingBoxDiagonal},
+                            std::pair{result.Centroid.x,ref.Centroid.x},
+                            std::pair{result.Centroid.y,ref.Centroid.y},
+                            std::pair{result.Centroid.z,ref.Centroid.z}})
                         {
                             EXPECT_NEAR(actual,expected,1e-5);
                             MaxError=std::max(MaxError,double(std::abs(actual-expected)));

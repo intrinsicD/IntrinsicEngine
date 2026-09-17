@@ -2431,8 +2431,8 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::Text("Requested: %s; ran: %s",Runtime::ToString(result.RequestedBackend),result.ActualBackend.c_str());
             ImGui::Text("Live / total: %zu / %zu",result.LiveCount,result.SlotCount);
             ImGui::Text("Radius min / mean / max: %.5g / %.5g / %.5g",double(result.MinRadius),double(result.MeanRadius),double(result.MaxRadius));
-            ImGui::Text("Nearest spacing min / mean / max: %.5g / %.5g / %.5g", double(result.Statistics.MinSpacing), double(result.Statistics.AverageSpacing), double(result.Statistics.MaxSpacing));
-            ImGui::Text("Centroid: %.5g / %.5g / %.5g; bounds diagonal: %.5g", double(result.Statistics.Centroid.x), double(result.Statistics.Centroid.y), double(result.Statistics.Centroid.z), double(result.Statistics.BoundingBoxDiagonal));
+            ImGui::Text("Nearest spacing min / mean / max: %.5g / %.5g / %.5g", double(result.MinSpacing), double(result.AverageSpacing), double(result.MaxSpacing));
+            ImGui::Text("Centroid: %.5g / %.5g / %.5g; bounds diagonal: %.5g", double(result.Centroid.x), double(result.Centroid.y), double(result.Centroid.z), double(result.BoundingBoxDiagonal));
             ImGui::TextWrapped("%s",result.Message.c_str());
             DrawDismissLastResultButton("Dismiss##Spacing", Spacing.LastResult, Runtime::EditorPointFieldResultSlot::PointSpacing, context.PointFields.ResultSinks.DismissResult);
         }

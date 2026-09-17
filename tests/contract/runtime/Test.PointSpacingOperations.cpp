@@ -93,6 +93,33 @@ namespace
     }
 } // namespace
 
+TEST(PointSpacingOperations, CopiedSummaryDescribesOnlyLiveSamples)
+{
+    R::WorldRegistry worlds;
+    const auto world = worlds.CreateWorld("spacing summary");
+    auto& scene = *worlds.Get(world);
+    R::SpatialIndexCache cache(worlds);
+    const auto entity = Make(scene, D::PointCloudPoint);
+    auto samples = Properties(scene, entity, D::PointCloudPoint).Get<glm::vec3>("samples");
+    std::ranges::copy(plane, samples.Vector().begin());
+    auto config = Config(entity, D::PointCloudPoint);
+    const R::EditorProcessingContext context{.Scene = &scene, .World = world, .SpatialIndices = &cache};
+    for (const auto backend : {R::PointSpacingBackend::CpuOctree, R::PointSpacingBackend::CpuLBVH})
+    {
+        SCOPED_TRACE(int(backend));
+        config.Backend = backend;
+        const auto result = R::ApplyEditorPointSpacingCommand(R::BindEditorProcessingCommands(context), config);
+        ASSERT_TRUE(result.Succeeded()) << result.Message;
+        EXPECT_EQ(result.SlotCount, 5u);
+        EXPECT_EQ(result.LiveCount, 4u);
+        EXPECT_EQ(result.Centroid, glm::vec3(1.f, 1.5f, 0.f));
+        EXPECT_FLOAT_EQ(result.AverageSpacing, 2.f);
+        EXPECT_FLOAT_EQ(result.MinSpacing, 2.f);
+        EXPECT_FLOAT_EQ(result.MaxSpacing, 2.f);
+        EXPECT_FLOAT_EQ(result.BoundingBoxDiagonal, std::sqrt(13.f));
+    }
+}
+
 TEST(PointSpacingOperations, DeletionMaskValidationPreservesPreviewApplyRejection)
 {
     for (unsigned domain = 1; domain <= unsigned(D::PointCloudPoint); ++domain)
@@ -316,7 +343,11 @@ TEST(PointSpacingOperations, EveryDomainPublishesNamedRadiiAndPreservesDeletedRo
         ASSERT_TRUE(indexed.Succeeded())<<indexed.Message;EXPECT_EQ(indexed.ActualBackend,"cpu_lbvh");
         const auto actual=std::as_const(props).Get<float>("radii");
         for(std::size_t i=0;i<size;++i)EXPECT_NEAR(actual[i],values[i],1e-5*std::max(1.f,values[i]));
-        EXPECT_FLOAT_EQ(indexed.Statistics.AverageSpacing,reference.Statistics.AverageSpacing);
+        EXPECT_FLOAT_EQ(indexed.AverageSpacing,reference.AverageSpacing);
+        EXPECT_FLOAT_EQ(indexed.MinSpacing,reference.MinSpacing);
+        EXPECT_FLOAT_EQ(indexed.MaxSpacing,reference.MaxSpacing);
+        EXPECT_EQ(indexed.Centroid,reference.Centroid);
+        EXPECT_FLOAT_EQ(indexed.BoundingBoxDiagonal,reference.BoundingBoxDiagonal);
         EXPECT_FLOAT_EQ(indexed.MeanRadius,reference.MeanRadius);
         EXPECT_TRUE(R::ApplyEditorPointSpacingCommand(R::BindEditorProcessingCommands(context), config).IndexReused);
         Intrinsic::Tests::EditorFeatureTestContext visualization;visualization.Scene=&scene;visualization.VisualizationCommandsAvailable=true;

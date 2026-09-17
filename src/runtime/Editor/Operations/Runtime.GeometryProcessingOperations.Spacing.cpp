@@ -121,7 +121,11 @@ namespace Extrinsic::Runtime
             if (!analysis || analysis->Radii.size()!=w.Slots.size())
             {r.Message="Point spacing failed: invalid neighborhoods or unrepresentable float distances/radii.";return;}
             r.MeanRadius=analysis->AverageRadius;r.MinRadius=analysis->MinRadius;r.MaxRadius=analysis->MaxRadius;
-            r.Statistics=analysis->Statistics;
+            r.Centroid=analysis->Statistics.Centroid;
+            r.AverageSpacing=analysis->Statistics.AverageSpacing;
+            r.MinSpacing=analysis->Statistics.MinSpacing;
+            r.MaxSpacing=analysis->Statistics.MaxSpacing;
+            r.BoundingBoxDiagonal=analysis->Statistics.BoundingBoxDiagonal;
             for (std::size_t i=0;i<w.Slots.size();++i) w.AfterValues[w.Slots[i]]=analysis->Radii[i];
             r.WrittenCount=w.Slots.size();r.Status=EditorCommandStatus::Applied;
             r.CpuComputeMilliseconds=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
