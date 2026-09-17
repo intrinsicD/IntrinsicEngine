@@ -12,6 +12,8 @@ module;
 
 export module Geometry.PointCloud.Normals;
 
+export import Geometry.NormalEstimation.Types;
+
 import Geometry.KDTree;
 export import Geometry.SpatialQueries;
 import Geometry.PointLBVH;
@@ -31,12 +33,6 @@ export namespace Geometry::PointCloud::Normals
         SuppliedOctree,
         SuppliedPointLBVH,
         SuppliedNeighborhoods,
-    };
-
-    enum class OrientationMode : std::uint8_t
-    {
-        None,
-        MinimumSpanningTree,
     };
 
     enum class RecomputeStatus : std::uint8_t
@@ -69,26 +65,6 @@ export namespace Geometry::PointCloud::Normals
         Octree::SplitPolicy OctreePolicy{};
         std::size_t OctreeMaxPerNode{32};
         std::size_t OctreeMaxDepth{10};
-    };
-
-    struct Diagnostics
-    {
-        std::size_t PointSlotCount{0};
-        std::size_t FinitePointCount{0};
-        std::size_t WrittenCount{0};
-        std::size_t ValidNormalPointCount{0};
-        std::size_t FallbackPointCount{0};
-        std::size_t DegenerateNeighborhoodCount{0};
-        std::size_t TooFewNeighborCount{0};
-        std::size_t CollinearNeighborhoodCount{0};
-        std::size_t DuplicatePositionCount{0};
-        std::size_t NonFinitePointCount{0};
-        std::size_t SkippedDeletedPointCount{0};
-        std::size_t SpatialQueryFailureCount{0};
-        std::size_t FlippedOrientationCount{0};
-        std::size_t KNNVisitedNodeCount{0};
-        std::size_t KNNDistanceEvaluationCount{0};
-        bool FallbackNormalWasRepaired{false};
     };
 
     struct EstimateResult

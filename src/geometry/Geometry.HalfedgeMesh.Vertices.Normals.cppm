@@ -1,3 +1,4 @@
+// Mesh vertex normals from weighted incident-face contributions.
 module;
 
 #include <cstddef>
@@ -8,21 +9,14 @@ module;
 
 export module Geometry.HalfedgeMesh.Vertices.Normals;
 
+export import Geometry.NormalEstimation.Types;
+
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 
 export namespace Geometry::HalfedgeMesh::VertexNormals
 {
     inline constexpr std::string_view kDefaultOutputProperty = "v:normal";
-
-    enum class AveragingMode : std::uint8_t
-    {
-        UniformFace,
-        AreaWeighted,
-        AngleWeighted,
-        AreaAngleWeighted,
-        MaxWeighted,
-    };
 
     enum class RecomputeStatus : std::uint8_t
     {

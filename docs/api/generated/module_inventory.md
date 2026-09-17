@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 11 |
 | `core` | 41 |
 | `ecs` | 27 |
-| `geometry` | 118 |
+| `geometry` | 119 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 75 |
@@ -182,6 +182,7 @@ Root scanned: `src`
 | `Geometry.MeshClosestFace` | `src/geometry/Geometry.MeshClosestFace.cppm` | `geometry` |
 | `Geometry.MeshOperator` | `src/geometry/Geometry.MeshOperator.cppm` | `geometry` |
 | `Geometry.MeshSoup` | `src/geometry/Geometry.MeshSoup.cppm` | `geometry` |
+| `Geometry.NormalEstimation.Types` | `src/geometry/Geometry.NormalEstimation.Types.cppm` | `geometry` |
 | `Geometry.OBB` | `src/geometry/Geometry.OBB.cppm` | `geometry` |
 | `Geometry.Octree` | `src/geometry/Geometry.Octree.cppm` | `geometry` |
 | `Geometry.Overlap` | `src/geometry/Geometry.Overlap.cppm` | `geometry` |
@@ -448,4 +449,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **421**
+Total modules: **422**

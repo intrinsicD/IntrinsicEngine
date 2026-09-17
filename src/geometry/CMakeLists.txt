@@ -87,6 +87,7 @@ target_sources(${target_name}
         Geometry.PointCloud.Features.cppm
         Geometry.PointCloud.IO.cppm
         Geometry.PointCloud.Kernels.cppm
+        Geometry.NormalEstimation.Types.cppm
         Geometry.PointCloud.Normals.cppm
         Geometry.PointCloud.QualityMetrics.cppm
         Geometry.PointCloud.SurfaceSampling.cppm

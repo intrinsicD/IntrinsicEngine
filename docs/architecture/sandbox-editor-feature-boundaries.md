@@ -38,6 +38,14 @@ not the workspace cache object, so scene/geometry/visualization operations
 preserve selected-model cache behavior without widening their public owner
 boundaries.
 
+Normal config and editor results use `Geometry.NormalEstimation.Types` for the
+canonical orientation/weighting enums and copied point-normal diagnostics. The
+point and mesh normal algorithms re-export those types; their parameters,
+result properties and functions stay with the algorithm owners. Config codecs
+and normal prepared frames therefore do not import normal algorithms, owning
+mesh/point-cloud containers or spatial indices. The compiler-derived
+`ProcessingCompilationLocality.NormalContracts` test guards that boundary.
+
 `Runtime.EditorFeatures.Internal.hpp` holds private workspace bindings and context
 adapters. It includes `Runtime.EditorFeatureCommands.Internal.hpp` for import/file
 prerequisites, diagnostics and render-hint comparisons, and

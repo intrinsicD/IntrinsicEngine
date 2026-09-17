@@ -146,6 +146,22 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Normals
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations
         --forbid-module Extrinsic.Runtime.Private.EditorWorkspaceAttachment)
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.NormalContracts
+        --check-source src/geometry/Geometry.NormalEstimation.Types.cppm
+        --check-source src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm
+        --check-source src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.NormalOperations.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.NormalOperations.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.NormalOperations.Frame.cpp
+        --forbid-module Geometry.PointCloud.Normals
+        --forbid-module Geometry.HalfedgeMesh.Vertices.Normals
+        --forbid-module Geometry.HalfedgeMesh
+        --forbid-module Geometry.PointCloud
+        --forbid-module Geometry.KDTree
+        --forbid-module Geometry.Octree
+        --forbid-module Geometry.PointLBVH)
+set_tests_properties(ProcessingCompilationLocality.NormalContracts
+    PROPERTIES LABELS "contract;build;runtime" TIMEOUT 30)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.NormalTests
         --check-source tests/contract/runtime/Test.NormalEstimation.cpp
         --forbid-module Extrinsic.Runtime.PointAnalysisOperations
