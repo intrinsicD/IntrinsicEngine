@@ -319,6 +319,14 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshField
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations
         --forbid-module Extrinsic.Runtime.Private.EditorWorkspaceAttachment)
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.GeodesicResults
+        --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Frame.cpp
+        --check-source src/geometry/Geometry.Geodesic.Types.cppm
+        --forbid-module Geometry.Geodesic)
+set_tests_properties(ProcessingCompilationLocality.GeodesicResults
+    PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshTopology
         --check-source src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cpp

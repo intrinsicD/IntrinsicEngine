@@ -42,6 +42,7 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut.cppm
         Geometry.HalfedgeMesh.DEC.cppm
         Geometry.HalfedgeMesh.Features.cppm
+        Geometry.Geodesic.Types.cppm
         Geometry.HalfedgeMesh.Geodesic.cppm
         Geometry.HalfedgeMesh.IO.cppm
         Geometry.HalfedgeMesh.Parameterization.cppm

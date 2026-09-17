@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 11 |
 | `core` | 41 |
 | `ecs` | 27 |
-| `geometry` | 116 |
+| `geometry` | 117 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 75 |
@@ -129,6 +129,7 @@ Root scanned: `src`
 | `Geometry.Frustum` | `src/geometry/Geometry.Frustum.cppm` | `geometry` |
 | `Geometry.GJK` | `src/geometry/Geometry.GJK.cppm` | `geometry` |
 | `Geometry.GaussianMixture` | `src/geometry/Geometry.GaussianMixture.cppm` | `geometry` |
+| `Geometry.Geodesic.Types` | `src/geometry/Geometry.Geodesic.Types.cppm` | `geometry` |
 | `Geometry.Graph.Fwd` | `src/geometry/Geometry.Graph.Fwd.cppm` | `geometry` |
 | `Geometry.Graph.IO` | `src/geometry/Geometry.Graph.IO.cppm` | `geometry` |
 | `Geometry.Graph.ShortestPath` | `src/geometry/Geometry.Graph.ShortestPath.cppm` | `geometry` |
@@ -446,4 +447,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **419**
+Total modules: **420**

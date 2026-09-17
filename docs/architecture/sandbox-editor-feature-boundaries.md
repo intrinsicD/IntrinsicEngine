@@ -461,13 +461,19 @@ copied scalar values; their config, result and prepared-frame producers do not
 import point-cloud features, utilities or owning containers. The numerical
 implementations keep their feature-scale types, while density-weight kernel
 choices and diagnostics retain their separate kernel-module contract.
+Geodesic status and complete owned distance results live in
+`Geometry.Geodesic.Types`, shared by the algorithm and runtime reports. Mesh-field
+interfaces, config adapters and prepared frames import that data-only module;
+only the geodesic execution unit imports `Geometry.Geodesic`. Parameter choices
+and status-string conversion remain with the algorithm. The other mesh-field
+methods retain their existing diagnostic contracts and dependencies.
 Parameterization and UV regeneration access geometry views and publish through
 the existing mesh-soup owner without importing ECS geometry-population adapters.
 
 `ProcessingCompilationLocality.Family`, `.PointFieldResults`, `.PointAnalysis`, `.PointAnalysisTests`,
 `.Normals`, `.NormalTests`, `.MeshSupport`, `.Registration`, `.Parameterization`,
 `.RegistrationTests`, `.MeshField`, `.MeshTopology`, `.MeshFieldTests`,
-`.PointSet`, `.PointSetResults`, `.PointAnalysisResults`, `.PointSetTests`, `.PointConstruction`, `.PointConstructionTests`,
+`.GeodesicResults`, `.PointSet`, `.PointSetResults`, `.PointAnalysisResults`, `.PointSetTests`, `.PointConstruction`, `.PointConstructionTests`,
 `.PointCloudService`, `.Discovery` and `.UnrelatedAdapters` inspect actual
 Clang scanner requirements and CMake module closures through
 `tools/analysis/compile_hotspots.py`. Missing, ambiguous or stale source scans

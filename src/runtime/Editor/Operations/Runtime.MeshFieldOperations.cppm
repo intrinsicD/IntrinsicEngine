@@ -14,7 +14,7 @@ export import Extrinsic.Runtime.MeshCurvatureConfig;
 export import Extrinsic.Runtime.CurvatureSegmentationConfig;
 export import Extrinsic.Runtime.GeodesicsConfig;
 export import Extrinsic.Core.Error;
-export import Geometry.Geodesic;
+export import Geometry.Geodesic.Types;
 export import Geometry.HalfedgeMesh.CurvatureSegmentation;
 export import Geometry.HalfedgeMesh.CurvatureSegmentation.Patches;
 export import Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut;

@@ -2085,3 +2085,59 @@ compilation-speed claim is made.
 Broader readiness/cache acceptance remains open. The operator requested a fresh
 session recommendation to limit context costs; stop after this verified slice
 and leave a temporary handoff rather than beginning another slice.
+
+
+## Geodesic result compilation boundary (2026-09-17)
+
+Operator-directed continuation of duplication and compilation cleanup with
+Claude, starting at `5b02fc803`. This is a bounded UI-037 compilation slice;
+readiness acceptance remains open. The initial compiler graph contains 25
+mesh-field consumer producers. EditorProcessing, EditorCommon and
+EditorWorkspaceAttachment do not import the full halfedge mesh; the other
+mesh-field algorithm diagnostics still do.
+
+Reuse/right-sizing decision: move the existing `VirtualSourceStatus` and complete
+`VirtualSourceResult` verbatim into `Geometry.Geodesic.Types`, used directly by
+geometry and runtime. This avoids a duplicate runtime record and field-by-field
+conversion while retaining the distance field, counters and success predicate.
+One new data-only module separates two present consumers; no factory, facade,
+backend or parameter axis is added. Parameters and `ToString` stay in the
+algorithm module, so their implementation attachment does not change. The
+original algorithm re-exports its result types for its own public result API.
+
+Claude recommended a geodesic pilot, gated on actual consumer reachability,
+before a broader segmentation extraction. Its proposed extra parameter/string
+move is unnecessary for runtime consumers and is deliberately omitted. The
+baseline scanner guard detects the algorithm dependency in all three selected
+mesh-field producers. The new CTest uses the same compiler metadata and also
+checks the new types module. No algorithm, publication/history, diagnostic value
+or existing behavior test is changed. Source-documentation and module-inventory
+checks apply to the new interface. No compile-time performance claim is made.
+
+The focused geometry/runtime/editor build passes with canonical ci Clang 23;
+all 64 selected geodesic, segmentation, mesh-field and boundary tests pass.
+`ProcessingCompilationLocality.GeodesicResults` passes for all four producers.
+The mesh-field closure replaces `Geometry.Geodesic` with
+`Geometry.Geodesic.Types` (55 modules before and after); this proves separation
+from algorithm-interface edits, not a reduction in total modules or measured
+wall-clock compilation time. The production change is five files including the
+new module and CMake registration, 802 to 816 physical lines (+14 for the new
+module boundary); it introduces no duplicate record or conversion implementation.
+
+Claude's fixed-diff review has no code blockers. Both validation conditions are
+satisfied by the boundary test and full IntrinsicTests plus ci-vulkan
+ExtrinsicSandbox builds. Its possible prefix-match/label-overwrite concerns do
+not apply: the boundary checker compares exact names and the registration helper
+sets no labels. Optional include/order/blank-line suggestions require no change.
+Source documentation reports zero errors and six reviewed declaration-comment
+hints: numerical/lifetime comments stay; the unchanged heat-method overview is
+outside this mechanical record extraction. Inventory refreshed to 420 modules.
+Strict task policy/state links, layering, test layout, docs links, skill mirrors,
+root hygiene, ARA structure and workshop checks pass. Manual workshop rows 1-3
+pass, rows 4-6 do not change, UI-037 retains readiness follow-up and there are no
+layer exceptions. Source and test hashes match the fixed review packet.
+
+The canonical CPU gate passes: 4,728 selected, 4,727 passed, one expected
+ASan-only GLFW lifecycle skip, zero failures (154.33 seconds). GPU runtime and
+full sanitizer CPU suites are not run for this record move. Evidence and review packets are in
+`/tmp/intrinsic-meshfield-locality/` on the verification host.
