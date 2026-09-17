@@ -32,7 +32,7 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Core.Error;
-import Geometry.PointCloud.Utils;
+import Geometry.PointCloud.Features;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -140,7 +140,9 @@ namespace Extrinsic::Runtime
             if(w.Config.Backend!=KeypointAnalysisBackend::CpuKDTree &&
                std::max(scale->SalientRadius,scale->NonMaxRadius)>Geometry::PointLBVH::CoordinateLimit)
             {w.Result.Message="Resolved keypoint radius exceeds the LBVH range.";return;}
-            w.Result.Scale=*scale;
+            w.Result.MeanSpacing=scale->MeanSpacing;
+            w.Result.SalientRadius=scale->SalientRadius;
+            w.Result.NonMaxRadius=scale->NonMaxRadius;
             w.Result.CpuComputeMilliseconds=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
             w.Result.Status=EditorCommandStatus::Pending;
         }
@@ -166,7 +168,7 @@ namespace Extrinsic::Runtime
                 if(c.Backend==KeypointAnalysisBackend::CpuLBVH)
                 {
                     std::vector<std::uint32_t> row;
-                    const auto radius=std::max(r.Scale.SalientRadius,r.Scale.NonMaxRadius);
+                    const auto radius=std::max(r.SalientRadius,r.NonMaxRadius);
                     for(std::uint32_t i=0;i<w.Points.size();++i)
                     {
                         const auto neighbors=w.Index->Index.Radius(w.Points[i],radius,std::uint32_t(w.Points.size()-1),i);
@@ -176,12 +178,16 @@ namespace Extrinsic::Runtime
                         if(!AppendRow(w,row))return;
                     }
                 }
-                analysis=Features::AnalyzeKeypointsFromNeighbors(w.Points,Parameters(c),r.Scale,{w.Rows.Offsets,w.Rows.Indices});
+                analysis=Features::AnalyzeKeypointsFromNeighbors(w.Points,Parameters(c),{.MeanSpacing=r.MeanSpacing, .SalientRadius=r.SalientRadius, .NonMaxRadius=r.NonMaxRadius},
+                    {w.Rows.Offsets,w.Rows.Indices});
             }
             if(!analysis) {r.Message="Keypoint analysis rejected invalid support or unrepresentable covariance.";return;}
             for(std::size_t i=0;i<w.Slots.size();++i)
             {w.AfterMask[w.Slots[i]]=analysis->Mask[i];w.AfterScore[w.Slots[i]]=analysis->Saliency[i];}
-            r.KeypointCount=analysis->Keypoints.Indices.size();r.WrittenCount=w.Slots.size();r.Scale=analysis->Scale;
+            r.KeypointCount=analysis->Keypoints.Indices.size();r.WrittenCount=w.Slots.size();
+            r.MeanSpacing=analysis->Scale.MeanSpacing;
+            r.SalientRadius=analysis->Scale.SalientRadius;
+            r.NonMaxRadius=analysis->Scale.NonMaxRadius;
             r.Status=EditorCommandStatus::Applied;
             r.CpuComputeMilliseconds=(c.Backend==KeypointAnalysisBackend::VulkanLBVH?r.CpuComputeMilliseconds:0)+
                 std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
@@ -197,7 +203,7 @@ namespace Extrinsic::Runtime
             }
             std::string diagnostic;
             const auto state=GeometryProcessingDetail::AdvancePointRadiusRows(*context.SpatialIndices,w.GpuIndex,
-                w.Points,w.Slots,std::max(w.Result.Scale.SalientRadius,w.Result.Scale.NonMaxRadius),w.Config.GpuQueryBatchSize,w.Config.GpuRadiusCapacity,0,w.Rows,diagnostic);
+                w.Points,w.Slots,std::max(w.Result.SalientRadius,w.Result.NonMaxRadius),w.Config.GpuQueryBatchSize,w.Config.GpuRadiusCapacity,0,w.Rows,diagnostic);
             w.Result.MaximumNeighbors=w.Rows.MaximumNeighbors;w.Result.GpuQueryBatches=w.Rows.QueryBatches;
             w.Result.GpuNeighborhoodMilliseconds=w.Rows.Milliseconds;
             if(w.Rows.Queried)w.Result.ActualBackend="vulkan_lbvh";
@@ -317,7 +323,9 @@ namespace Extrinsic::Runtime
                         std::memcpy(&header,w->GpuResult->Data.data(),sizeof(header));
                         r.MaximumNeighbors=header.MaximumNeighbors;r.KeypointCount=header.KeypointCount;
                         r.GpuQueryBatches=3*((w->Slots.size()+w->Config.GpuQueryBatchSize-1)/w->Config.GpuQueryBatchSize)+1;
-                        r.Scale={header.MeanSpacing,header.SalientRadius,header.NonMaxRadius};
+                        r.MeanSpacing=header.MeanSpacing;
+                        r.SalientRadius=header.SalientRadius;
+                        r.NonMaxRadius=header.NonMaxRadius;
                         if(header.Error)
                             r.Message=(header.Error&2)?"Vulkan keypoint support overflowed capacity; previous outputs retained.":
                                 (header.Error&8)?"Vulkan keypoint spatial traversal exceeded its stack limit.":

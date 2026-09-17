@@ -18,7 +18,6 @@ export import Extrinsic.Runtime.DensityWeightConfig;
 export import Extrinsic.Runtime.DescriptorAnalysisConfig;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
-import Geometry.PointCloud.Features;
 import Geometry.PointCloud.Kernels;
 export namespace Extrinsic::Runtime
 {
@@ -50,7 +49,8 @@ export namespace Extrinsic::Runtime
         GeometryPropertyRef Mask{}, Score{};
         std::string ActualBackend{}, Message{};
         std::size_t SlotCount{}, LiveCount{}, KeypointCount{}, WrittenCount{};
-        Geometry::PointCloud::Features::KeypointScale Scale{};
+        // Resolved spacing and radii in source-property coordinate units.
+        float MeanSpacing{}, SalientRadius{}, NonMaxRadius{};
         std::size_t MaximumNeighbors{};
         bool IndexReused{};
         std::size_t GpuQueryBatches{};
@@ -91,7 +91,8 @@ export namespace Extrinsic::Runtime
         std::array<GeometryPropertyRef,33> Outputs{};
         std::string ActualBackend{}, Message{};
         std::size_t SlotCount{}, LiveCount{}, WrittenCount{};
-        Geometry::PointCloud::Features::DescriptorScale Scale{};
+        // Resolved spacing and radii in source-property coordinate units.
+        float MeanSpacing{}, FeatureRadius{};
         std::size_t MaximumNeighbors{};
         bool IndexReused{};
         std::size_t GpuQueryBatches{};

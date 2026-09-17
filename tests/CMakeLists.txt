@@ -59,6 +59,19 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointSetResults
         --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.Frame.cpp
         --forbid-module Geometry.PointCloud.Utils
         --forbid-module Geometry.PointCloud)
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointAnalysisResults
+        --check-source src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm
+        --check-source src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp
+        --check-source src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm
+        --check-source src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp
+        --check-source src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cppm
+        --check-source src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Frame.cpp
+        --forbid-module Geometry.PointCloud.Utils
+        --forbid-module Geometry.PointCloud.Features
+        --forbid-module Geometry.PointCloud)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointAnalysis
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cppm
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cpp
@@ -359,6 +372,7 @@ set_tests_properties(ProcessingCompilationLocality.Family ProcessingCompilationL
     ProcessingCompilationLocality.PropertyCapture
     ProcessingCompilationLocality.PointFieldResults
     ProcessingCompilationLocality.PointSetResults
+    ProcessingCompilationLocality.PointAnalysisResults
     ProcessingCompilationLocality.ParameterizationSolve
     ProcessingCompilationLocality.PointSet ProcessingCompilationLocality.PointConstruction
     ProcessingCompilationLocality.PointCloudService ProcessingCompilationLocality.Discovery

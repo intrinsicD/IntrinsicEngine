@@ -35,6 +35,7 @@ import Extrinsic.Core.Error;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Geometry.Properties;
+import Geometry.PointCloud.Features;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
@@ -168,7 +169,8 @@ namespace Extrinsic::Runtime
             if(w.Config.Backend!=DescriptorAnalysisBackend::CpuKDTree &&
                scale->FeatureRadius>Geometry::PointLBVH::CoordinateLimit)
             {w.Result.Message="Resolved descriptor radius exceeds the LBVH range.";return;}
-            w.Result.Scale=*scale;
+            w.Result.MeanSpacing=scale->MeanSpacing;
+            w.Result.FeatureRadius=scale->FeatureRadius;
             w.Result.CpuComputeMilliseconds=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
             w.Result.Status=EditorCommandStatus::Pending;
         }
@@ -194,7 +196,7 @@ namespace Extrinsic::Runtime
                 if(c.Backend==DescriptorAnalysisBackend::CpuLBVH)
                 {
                     std::vector<std::uint32_t> row;
-                    const auto radius=r.Scale.FeatureRadius;
+                    const auto radius=r.FeatureRadius;
                     for(std::uint32_t i=0;i<w.Points.size();++i)
                     {
                         const auto capacity=c.MaxNeighbors?std::min(c.MaxNeighbors,std::uint32_t(w.Points.size()-1)):std::uint32_t(w.Points.size()-1);
@@ -207,12 +209,15 @@ namespace Extrinsic::Runtime
                         if(!AppendRow(w,row))return;
                     }
                 }
-                analysis=Features::ComputeDescriptorsFromNeighbors(w.Points,w.Normals,{},Parameters(c),r.Scale,{w.Rows.Offsets,w.Rows.Indices});
+                analysis=Features::ComputeDescriptorsFromNeighbors(w.Points,w.Normals,{},Parameters(c),{.MeanSpacing=r.MeanSpacing, .FeatureRadius=r.FeatureRadius},
+                    {w.Rows.Offsets,w.Rows.Indices});
             }
             if(!analysis) {r.Message="Descriptor analysis rejected invalid support or invalid normals.";return;}
             for(std::size_t i=0;i<w.Slots.size();++i)for(unsigned b=0;b<33;++b)
                 w.AfterOutputs[b][w.Slots[i]]=analysis->Row(std::uint32_t(i))[b];
-            r.WrittenCount=w.Slots.size();r.Scale=analysis->Scale;
+            r.WrittenCount=w.Slots.size();
+            r.MeanSpacing=analysis->Scale.MeanSpacing;
+            r.FeatureRadius=analysis->Scale.FeatureRadius;
             r.Status=EditorCommandStatus::Applied;
             r.CpuComputeMilliseconds=(c.Backend==DescriptorAnalysisBackend::VulkanLBVH?r.CpuComputeMilliseconds:0)+
                 std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
@@ -228,7 +233,7 @@ namespace Extrinsic::Runtime
             }
             std::string diagnostic;
             const auto state=GeometryProcessingDetail::AdvancePointRadiusRows(*context.SpatialIndices,w.GpuIndex,
-                w.Points,w.Slots,w.Result.Scale.FeatureRadius,w.Config.GpuQueryBatchSize,w.Config.GpuRadiusCapacity,w.Config.MaxNeighbors,w.Rows,diagnostic);
+                w.Points,w.Slots,w.Result.FeatureRadius,w.Config.GpuQueryBatchSize,w.Config.GpuRadiusCapacity,w.Config.MaxNeighbors,w.Rows,diagnostic);
             w.Result.MaximumNeighbors=w.Rows.MaximumNeighbors;w.Result.GpuQueryBatches=w.Rows.QueryBatches;
             w.Result.GpuNeighborhoodMilliseconds=w.Rows.Milliseconds;
             if(w.Rows.Queried)w.Result.ActualBackend="vulkan_lbvh";

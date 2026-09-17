@@ -1851,9 +1851,9 @@ namespace
                         if(FullCompute)EXPECT_EQ(result.GpuQueryBatches,3*((result.LiveCount+127)/128)+1);
                         const auto& reference=ReferenceResults[unsigned(result.Mask.Domain)-1];
                         EXPECT_EQ(result.KeypointCount,reference.KeypointCount);
-                        EXPECT_FLOAT_EQ(result.Scale.MeanSpacing,reference.Scale.MeanSpacing);
-                        EXPECT_FLOAT_EQ(result.Scale.SalientRadius,reference.Scale.SalientRadius);
-                        EXPECT_FLOAT_EQ(result.Scale.NonMaxRadius,reference.Scale.NonMaxRadius);
+                        EXPECT_FLOAT_EQ(result.MeanSpacing,reference.MeanSpacing);
+                        EXPECT_FLOAT_EQ(result.SalientRadius,reference.SalientRadius);
+                        EXPECT_FLOAT_EQ(result.NonMaxRadius,reference.NonMaxRadius);
                     }
                     for(unsigned d=1;d<=8;++d)
                     {
@@ -2133,8 +2133,8 @@ namespace
                         EXPECT_GT(result.GpuQueryBatches,0);if(Phase>0)EXPECT_TRUE(result.IndexReused);
                         const auto& reference=ReferenceResults[unsigned(result.Outputs[0].Domain)-1];
                         EXPECT_EQ(result.WrittenCount,reference.WrittenCount);
-                        EXPECT_FLOAT_EQ(result.Scale.MeanSpacing,reference.Scale.MeanSpacing);
-                        EXPECT_FLOAT_EQ(result.Scale.FeatureRadius,reference.Scale.FeatureRadius);
+                        EXPECT_FLOAT_EQ(result.MeanSpacing,reference.MeanSpacing);
+                        EXPECT_FLOAT_EQ(result.FeatureRadius,reference.FeatureRadius);
                     }
                     for(unsigned d=1;d<=8;++d)
                     {

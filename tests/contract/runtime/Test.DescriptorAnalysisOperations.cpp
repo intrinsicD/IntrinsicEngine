@@ -161,6 +161,8 @@ TEST(DescriptorAnalysisOperations, EveryDomainReferenceCacheHistoryAndDeletedRow
         ASSERT_TRUE(R::PreviewEditorDescriptorAnalysisCommand(context,c).Ready);
         const auto reference=R::ApplyEditorDescriptorAnalysisCommand(context,c);
         ASSERT_TRUE(reference.Succeeded())<<reference.Message;EXPECT_EQ(reference.ActualBackend,"cpu_kdtree");
+        EXPECT_GT(reference.MeanSpacing,0.f);
+        EXPECT_FLOAT_EQ(reference.FeatureRadius,c.FeatureRadius);
         std::array<std::vector<float>,33> expected;
         for(unsigned b=0;b<33;++b)
         {
@@ -176,6 +178,8 @@ TEST(DescriptorAnalysisOperations, EveryDomainReferenceCacheHistoryAndDeletedRow
         const auto indexed=R::ApplyEditorDescriptorAnalysisCommand(context,c);ASSERT_TRUE(indexed.Succeeded())<<indexed.Message;
         EXPECT_EQ(indexed.ActualBackend,"cpu_lbvh");EXPECT_EQ(indexed.WrittenCount,reference.WrittenCount);
         for(unsigned b=0;b<33;++b)EXPECT_EQ(std::as_const(props).Get<float>(c.Outputs[b].Name).Vector(),expected[b]);
+        EXPECT_FLOAT_EQ(indexed.MeanSpacing,reference.MeanSpacing);
+        EXPECT_FLOAT_EQ(indexed.FeatureRadius,reference.FeatureRadius);
         EXPECT_TRUE(R::ApplyEditorDescriptorAnalysisCommand(context,c).IndexReused);
         Intrinsic::Tests::EditorFeatureTestContext visualization;visualization.Scene=&scene;visualization.VisualizationCommandsAvailable=true;
         std::optional<R::VisualizationRecipe> stored;
@@ -240,4 +244,31 @@ TEST(DescriptorAnalysisOperations, InvalidNormalsScaleAndOutputPreflightRetainDa
     EXPECT_FALSE(R::ApplyEditorDescriptorAnalysisCommand(context,c).Succeeded());
     EXPECT_EQ(std::as_const(props).Get<float>(c.Outputs[0].Name).Vector(),std::vector<float>(props.Size(),77));
     for(unsigned b=1;b<33;++b)EXPECT_FALSE(props.Exists(c.Outputs[b].Name));
+}
+
+TEST(DescriptorAnalysisOperations, ResolvedScaleDiagnosticsPreserveAutomaticAndExplicitRadii)
+{
+    R::WorldRegistry worlds;
+    const auto world=worlds.CreateWorld("resolved-scale");
+    auto& scene=*worlds.Get(world);
+    R::SpatialIndexCache cache(worlds);
+    const auto entity=Make(scene,D::PointCloudPoint);
+    auto positions=Properties(scene,entity,D::PointCloudPoint).Get<glm::vec3>("samples");
+    for(std::size_t i=0;i<plane.size();++i)positions[i]=plane[i];
+    const auto commands=R::BindEditorProcessingCommands(R::EditorProcessingContext{
+        .Scene=&scene,.World=world,.SpatialIndices=&cache});
+    for(const auto backend:{R::DescriptorAnalysisBackend::CpuKDTree,R::DescriptorAnalysisBackend::CpuLBVH})
+    {
+        for(const bool automatic:{false,true})
+        {
+            auto config=Config(entity,D::PointCloudPoint);
+            config.Backend=backend;
+            config.FeatureRadius=automatic?0.f:7.f;
+            const auto result=R::ApplyEditorDescriptorAnalysisCommand(commands,config);
+            ASSERT_TRUE(result.Succeeded())<<result.Message;
+            EXPECT_EQ(result.LiveCount,4u);
+            EXPECT_FLOAT_EQ(result.MeanSpacing,2.f);
+            EXPECT_FLOAT_EQ(result.FeatureRadius,automatic?10.f:config.FeatureRadius);
+        }
+    }
 }

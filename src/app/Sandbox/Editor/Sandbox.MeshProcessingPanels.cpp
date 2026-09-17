@@ -2028,7 +2028,7 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::Text("Status: %s",Runtime::DebugNameForEditorCommandStatus(result.Status));
             ImGui::Text("Requested: %s; ran: %s",Runtime::ToString(result.RequestedBackend),result.ActualBackend.c_str());
             ImGui::Text("Live / total: %zu / %zu; keypoints: %zu",result.LiveCount,result.SlotCount,result.KeypointCount);
-            ImGui::Text("Spacing: %.5g; salient / suppression radii: %.5g / %.5g",double(result.Scale.MeanSpacing),double(result.Scale.SalientRadius),double(result.Scale.NonMaxRadius));
+            ImGui::Text("Spacing: %.5g; salient / suppression radii: %.5g / %.5g",double(result.MeanSpacing),double(result.SalientRadius),double(result.NonMaxRadius));
             ImGui::Text("GPU %s: %zu; largest indexed support: %zu",
                 result.RequestedBackend==Runtime::KeypointAnalysisBackend::VulkanCompute?"dispatches":"batches",
                 result.GpuQueryBatches,result.MaximumNeighbors);
@@ -2120,7 +2120,7 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::Text("Status: %s",Runtime::DebugNameForEditorCommandStatus(result.Status));
             ImGui::Text("Requested: %s; ran: %s",Runtime::ToString(result.RequestedBackend),result.ActualBackend.c_str());
             ImGui::Text("Live / total: %zu / %zu; rows written: %zu",result.LiveCount,result.SlotCount,result.WrittenCount);
-            ImGui::Text("Spacing: %.5g; feature radius: %.5g",double(result.Scale.MeanSpacing),double(result.Scale.FeatureRadius));
+            ImGui::Text("Spacing: %.5g; feature radius: %.5g",double(result.MeanSpacing),double(result.FeatureRadius));
             ImGui::Text("GPU batches: %zu; largest indexed support: %zu",result.GpuQueryBatches,result.MaximumNeighbors);
             ImGui::TextWrapped("%s",result.Message.c_str());
             DrawDismissLastResultButton("Dismiss##Descriptors", Descriptors.LastResult, Runtime::EditorPointAnalysisResultSlot::DescriptorAnalysis, context.PointAnalysis.ResultSinks.DismissResult);

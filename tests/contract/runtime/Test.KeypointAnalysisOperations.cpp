@@ -173,6 +173,9 @@ TEST(KeypointAnalysisOperations, EveryDomainReferenceCacheHistoryAndDeletedRows)
         ASSERT_TRUE(R::PreviewEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),c).Ready);
         const auto reference=R::ApplyEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),c);
         ASSERT_TRUE(reference.Succeeded())<<reference.Message;EXPECT_EQ(reference.ActualBackend,"cpu_kdtree");
+        EXPECT_GT(reference.MeanSpacing,0.f);
+        EXPECT_FLOAT_EQ(reference.SalientRadius,c.SalientRadius);
+        EXPECT_FLOAT_EQ(reference.NonMaxRadius,c.NonMaxRadius);
         const auto mask=std::as_const(props).Get<std::uint32_t>("keypoints").Vector();
         const auto score=std::as_const(props).Get<float>("saliency").Vector();
         EXPECT_EQ(mask[2],77);EXPECT_EQ(score[2],77);if(half){EXPECT_EQ(mask[3],77);EXPECT_EQ(score[3],77);}
@@ -185,6 +188,9 @@ TEST(KeypointAnalysisOperations, EveryDomainReferenceCacheHistoryAndDeletedRows)
         EXPECT_EQ(indexed.ActualBackend,"cpu_lbvh");EXPECT_EQ(indexed.KeypointCount,reference.KeypointCount);
         EXPECT_EQ(std::as_const(props).Get<std::uint32_t>("keypoints").Vector(),mask);
         for(std::size_t i=0;i<size;++i)EXPECT_NEAR(std::as_const(props).Get<float>("saliency")[i],score[i],1e-5);
+        EXPECT_FLOAT_EQ(indexed.MeanSpacing,reference.MeanSpacing);
+        EXPECT_FLOAT_EQ(indexed.SalientRadius,reference.SalientRadius);
+        EXPECT_FLOAT_EQ(indexed.NonMaxRadius,reference.NonMaxRadius);
         EXPECT_TRUE(R::ApplyEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),c).IndexReused);
         Intrinsic::Tests::EditorFeatureTestContext visualization;visualization.Scene=&scene;visualization.VisualizationCommandsAvailable=true;
         std::optional<R::VisualizationRecipe> stored;
@@ -266,4 +272,32 @@ TEST(KeypointAnalysisOperations, ExpiredQueuedCommandsNeverBorrowFreedSceneOrDel
     EXPECT_FALSE(history.CanUndo());
     EXPECT_FALSE(commands.IsBound());
     EXPECT_TRUE(R::GetEditorPointInputCatalog(commands, config.StableEntityId).Entries.empty());
+}
+
+TEST(KeypointAnalysisOperations, ResolvedScaleDiagnosticsPreserveAutomaticAndExplicitRadii)
+{
+    R::WorldRegistry worlds;
+    const auto world=worlds.CreateWorld("resolved-scale");
+    auto& scene=*worlds.Get(world);
+    R::SpatialIndexCache cache(worlds);
+    const auto entity=Make(scene,D::PointCloudPoint);
+    auto positions=Properties(scene,entity,D::PointCloudPoint).Get<glm::vec3>("samples");
+    for(std::size_t i=0;i<plane.size();++i)positions[i]=plane[i];
+    const auto commands=R::BindEditorProcessingCommands(R::EditorProcessingContext{
+        .Scene=&scene,.World=world,.SpatialIndices=&cache});
+    for(const auto backend:{R::KeypointAnalysisBackend::CpuKDTree,R::KeypointAnalysisBackend::CpuLBVH})
+    {
+        for(const bool automatic:{false,true})
+        {
+            auto config=Config(entity,D::PointCloudPoint);
+            config.Backend=backend;
+            if(automatic)config.SalientRadius=config.NonMaxRadius=0;
+            const auto result=R::ApplyEditorKeypointAnalysisCommand(commands,config);
+            ASSERT_TRUE(result.Succeeded())<<result.Message;
+            EXPECT_EQ(result.LiveCount,4u);
+            EXPECT_FLOAT_EQ(result.MeanSpacing,2.f);
+            EXPECT_FLOAT_EQ(result.SalientRadius,automatic?12.f:config.SalientRadius);
+            EXPECT_FLOAT_EQ(result.NonMaxRadius,automatic?8.f:config.NonMaxRadius);
+        }
+    }
 }

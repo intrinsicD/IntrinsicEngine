@@ -442,13 +442,18 @@ spacing implementation; it does not enter the family interface, config facade
 or prepared-frame closure. Likewise, the bilateral result owns four last-pass
 diagnostics directly; both its config and the point-set result interface stay
 independent of point-cloud utilities and owning point-cloud containers.
+Point-analysis results likewise carry keypoint/descriptor spacing and radii as
+copied scalar values; their config, result and prepared-frame producers do not
+import point-cloud features, utilities or owning containers. The numerical
+implementations keep their feature-scale types, while density-weight kernel
+choices and diagnostics retain their separate kernel-module contract.
 Parameterization and UV regeneration access geometry views and publish through
 the existing mesh-soup owner without importing ECS geometry-population adapters.
 
 `ProcessingCompilationLocality.Family`, `.PointFieldResults`, `.PointAnalysis`, `.PointAnalysisTests`,
 `.Normals`, `.NormalTests`, `.MeshSupport`, `.Registration`, `.Parameterization`,
 `.RegistrationTests`, `.MeshField`, `.MeshTopology`, `.MeshFieldTests`,
-`.PointSet`, `.PointSetResults`, `.PointSetTests`, `.PointConstruction`, `.PointConstructionTests`,
+`.PointSet`, `.PointSetResults`, `.PointAnalysisResults`, `.PointSetTests`, `.PointConstruction`, `.PointConstructionTests`,
 `.PointCloudService`, `.Discovery` and `.UnrelatedAdapters` inspect actual
 Clang scanner requirements and CMake module closures through
 `tools/analysis/compile_hotspots.py`. Missing, ambiguous or stale source scans

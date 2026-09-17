@@ -6,7 +6,6 @@ module;
 #include <string_view>
 export module Extrinsic.Runtime.KeypointAnalysisConfig;
 export import Extrinsic.Runtime.GeometryAvailability;
-export import Geometry.PointCloud.Features;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 export namespace Extrinsic::Runtime

@@ -1704,3 +1704,88 @@ All final structural/workshop, layering, docs/link, task-policy/state-link,
 source-documentation, root-hygiene and diff checks pass. UI-037 retains its
 broader readiness/cache acceptance; BUG-091 retains its cold-start root-cause
 and distribution work. No compilation-speed measurement or retirement claim.
+
+
+## Point-analysis config and result boundaries — plan, 2026-09-17
+
+The operator continues compilation-locality/reuse work with Claude. Keep the
+existing config, operation and geometry owners; add no module, service, wrapper
+or compatibility path. Remove the unused Utils export from OutlierAnalysisConfig
+and Features exports from KeypointAnalysisConfig/DescriptorAnalysisConfig.
+A fresh compiler-derived baseline finds the expected dependencies in all six
+config producers and the three point-analysis interface/config/frame producers.
+Logs and fixed read-only Claude packets live at `/tmp/intrinsic-next-locality/`.
+
+The second bounded candidate replaces the two geometry-owned result scale
+records with their five consumed scalar values on the existing runtime result
+records. Keep scale resolution and supplied-neighborhood algorithms in Features;
+copy all values at the current success/prepare/GPU completion boundaries and
+construct the geometry scale only at its numerical call. Density-weight Kernels
+is a real API dependency and stays. Preserve failure-state diagnostics, deleted
+slot mapping, radius values, job sequencing and all publication/undo semantics.
+
+Extend the compiler-derived boundary checks over actual config/interface/frame
+producers, compare copied diagnostics through existing cross-domain CPU and GPU
+entry-point tests, rebuild the app and full CPU target, and run the CPU gate plus
+the affected Vulkan paths. Review the fixed final diff and refresh architecture
+docs/module inventory. No compilation-speed claim follows without matched timing.
+UI-037's broader readiness/cache acceptance stays open.
+
+### Point-analysis implementation and review checkpoint
+
+Both boundaries are implemented. The nine-producer compiler guard excludes
+Features, Utils and the owning PointCloud from the config/interface/frame
+closure; the baseline showed 21 forbidden paths and the rebuilt guard passes.
+The geometry scales contain exactly the five zero-initialized floats now copied
+onto runtime results. Numerical adapters import Features directly and rebuild
+its scale with designated fields at the supplied-neighborhood call. Keypoints'
+unused Utils import is removed. No new production file, type wrapper or target.
+
+The existing eight-domain CPU tests now compare every copied diagnostic; two
+new public-command fixtures check automatic/explicit radii against analytic
+rectangle spacing for KD-tree and LBVH while ignoring a deleted NaN sample.
+Existing GPU comparisons cover the same fields. All 78 focused CPU/dependency
+tests pass (10.34 s). Canonical ci configuration and full IntrinsicTests build
+pass with Clang 23. A mistaken initial request to build ExtrinsicSandbox under
+ci failed because that preset disables the app; the corrected CPU build passes
+and the app is built under its intended ci-vulkan preset. This was an invocation
+error, not a source/build-system failure.
+
+Claude's plan review accepted both slices. Its import concerns were checked
+against source: SpatialIndexCache exports PointLBVH; runtime tests do not call
+Features; numerical adapters now import it explicitly. Its fixed-diff review
+found no correctness or layering blocker and confirmed success, pending and
+failure copies. The analytic test expectations match the existing nearest-
+neighbor estimator and automatic-radius rules and all pass. Broader failure
+paths remain covered by the existing stale/cancel/overflow GPU fixtures.
+
+Production delta: 11 added physical lines across seven existing production
+files, for explicit boundary copies/comments and designated reconstruction;
+this slice narrows compilation dependencies rather than claiming line reduction.
+Architecture/workshop rows 1–3 pass: existing owners and downward edges only.
+Rows 4–8 are unchanged or not applicable; no task retirement or exception.
+Strict layering, workshop, task policy, test layout, root hygiene, docs links
+and sync pass. Module inventory remains 419 after regeneration. Source-doc
+audit reports zero objective errors; two interface-comment review hints do not
+change the field units contract. Full CPU and affected Vulkan execution follow.
+
+Final combined verification: 4,721 CPU tests passed plus one expected ASan-only
+GLFW lifecycle skip (4,722 selected, zero failures, 151.34 s). All eight affected
+Vulkan tests passed with ASan+UBSan and no skips (57.01 s), covering keypoint
+neighborhood/full-compute publication, stale/cancel/overflow rejection, numerical
+edge cases, descriptor publication and dense lowest-ID caps. The standalone
+Sandbox links under ci-vulkan. Full CPU sanitizer variants were not rerun.
+No source/test edits followed the fixed Claude diff review or successful gates;
+source hashes are recorded with the local review packet. UI-037 remains open
+for its broader readiness/cache acceptance, with no compilation timing claim.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+ctest --test-dir build/ci --output-on-failure -R 'ProcessingCompilationLocality|KeypointAnalysis|DescriptorAnalysis|OutlierAnalysis|DensityWeight' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target IntrinsicPointLBVHGpuTests ExtrinsicSandbox
+ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R '^PointLBVHGpuSmoke\.(Keypoint|Descriptor)' --no-tests=error --timeout 120
+```
