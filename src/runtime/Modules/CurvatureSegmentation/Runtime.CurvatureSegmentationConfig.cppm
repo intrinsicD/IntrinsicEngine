@@ -8,7 +8,7 @@ module;
 #include <string_view>
 
 export module Extrinsic.Runtime.CurvatureSegmentationConfig;
-export import Extrinsic.Runtime.GeometryAvailability;
+export import Extrinsic.Runtime.GeometryProperty.Types;
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;

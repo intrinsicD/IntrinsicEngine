@@ -14,28 +14,13 @@ export module Extrinsic.Runtime.GeometryAvailability;
 
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.Component.RenderGeometry;
-// Re-exported: this module's public surface names Geometry::PropertySet and
-// Geometry::PropertyValueKind, so consumers (including `app`, which may
-// import runtime only) must be able to name them through this module.
+export import Extrinsic.Runtime.GeometryProperty.Types;
 export import Geometry.Properties;
 
 export namespace Extrinsic::Runtime
 {
     namespace GeometrySources = Extrinsic::ECS::Components::GeometrySources;
     namespace RenderComponents = Extrinsic::Graphics::Components;
-
-    enum class GeometryElementDomain : std::uint8_t
-    {
-        Unknown,
-        MeshVertex,
-        MeshEdge,
-        MeshHalfedge,
-        MeshFace,
-        GraphNode,
-        GraphHalfedge,
-        GraphEdge,
-        PointCloudPoint,
-    };
 
     enum class GeometryRenderLane : std::uint8_t
     {
@@ -91,7 +76,6 @@ export namespace Extrinsic::Runtime
         }
     };
 
-    [[nodiscard]] std::string_view ToString(GeometryElementDomain domain) noexcept;
     [[nodiscard]] std::string_view ToString(GeometryRenderLane lane) noexcept;
     [[nodiscard]] std::string_view ToString(GeometryAvailabilityStatus status) noexcept;
 
@@ -117,55 +101,6 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::size_t ResolveGeometryElementCount(
         const GeometryEntityAvailability& availability,
         GeometryElementDomain domain) noexcept;
-
-    // ========================================================================
-    // RUNTIME-192 — canonical geometry-property vocabulary.
-    //
-    // One way to name a geometry property and to enumerate resolved
-    // properties of a source. This replaces the duplicated
-    // progressive/editor/bake domain and value-kind enums, which mirrored
-    // subsets of `GeometryElementDomain` + `Geometry::PropertyValueKind` and
-    // forced conversion switches between otherwise identical identities.
-    //
-    // Vocabularies deliberately NOT merged here, because they answer
-    // different questions: `GeometrySources::Domain` (provenance),
-    // mesh sampling/raster domains, `Runtime::VertexChannel` (structural
-    // stream), `Graphics::MaterialChannel` (material slot), and
-    // visualization output meaning.
-    // ========================================================================
-
-    // A constraint on a property's value kind. `std::nullopt` means "any kind
-    // is acceptable".
-    //
-    // This is intentionally an optional rather than an extra enumerator:
-    // "unconstrained" is a property of a *query*, not a value type a property
-    // can actually have. The retired `ProgressivePropertyValueKind` conflated
-    // the two by adding an `Any` member alongside real kinds, which made every
-    // switch over it carry an unreachable case.
-    using GeometryPropertyValueKindFilter =
-        std::optional<Geometry::PropertyValueKind>;
-
-    // Canonical, authoring-safe reference to one geometry property.
-    //
-    // It names WHICH property and nothing else: no entity, pointer, element
-    // count, generation, storage, provenance, material channel, or
-    // visualization semantics. That makes it safe to place in a desired-state
-    // authoring recipe and to compare across bake, presentation,
-    // visualization, and selected-analysis consumers.
-    struct GeometryPropertyRef
-    {
-        GeometryElementDomain       Domain{GeometryElementDomain::Unknown};
-        std::string                 Name{};
-        Geometry::PropertyValueKind ValueKind{
-            Geometry::PropertyValueKind::Unknown};
-
-        [[nodiscard]] bool HasName() const noexcept { return !Name.empty(); }
-    };
-
-    [[nodiscard]] bool operator==(const GeometryPropertyRef& lhs,
-                                  const GeometryPropertyRef& rhs) noexcept;
-    [[nodiscard]] bool operator!=(const GeometryPropertyRef& lhs,
-                                  const GeometryPropertyRef& rhs) noexcept;
 
     enum class GeometryPropertyResolutionStatus : std::uint8_t
     {
@@ -224,19 +159,6 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] std::string_view ToString(
         GeometryPropertyResolutionStatus status) noexcept;
-
-    // Shared display name for the canonical value kind. Returns `const char*`
-    // because every current caller feeds it to a printf-style UI format.
-    [[nodiscard]] const char* DebugNameForGeometryPropertyValueKind(
-        Geometry::PropertyValueKind kind) noexcept;
-
-    // Display name for a kind *constraint*; unconstrained renders as "Any".
-    [[nodiscard]] const char* DebugNameForGeometryPropertyValueKindFilter(
-        GeometryPropertyValueKindFilter filter) noexcept;
-
-    [[nodiscard]] bool MatchesGeometryPropertyValueKind(
-        GeometryPropertyValueKindFilter expected,
-        Geometry::PropertyValueKind actual) noexcept;
 
     // Value kind of `name` in `properties`, or `Unknown` when absent.
     [[nodiscard]] Geometry::PropertyValueKind DetectGeometryPropertyValueKind(

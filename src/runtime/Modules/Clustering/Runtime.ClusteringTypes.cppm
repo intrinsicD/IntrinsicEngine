@@ -10,7 +10,7 @@ export module Extrinsic.Runtime.ClusteringTypes;
 import Extrinsic.Core.Error;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.CommandBus;
-export import Extrinsic.Runtime.GeometryAvailability;
+export import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.WorldHandle;
 export namespace Extrinsic::Runtime
 {

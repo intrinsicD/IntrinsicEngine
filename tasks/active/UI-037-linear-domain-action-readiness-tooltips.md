@@ -2507,3 +2507,84 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 cmake --preset ci-vulkan
 cmake --build --preset ci-vulkan --target ExtrinsicSandbox -j4
 ```
+
+
+## Canonical config property vocabulary locality — plan, 2026-09-18
+
+Operator-directed compilation/duplication continuation from `985c7671e`.
+Codex owns this checkout and build; Claude reviews bounded read-only packets.
+The existing processing-compilation-locality and source-documentation contracts
+apply. UI-037 readiness remains open.
+
+Fourteen config interfaces import live GeometryAvailability only to name
+canonical property identities. Existing compiler records show 56 prohibited
+paths across those interfaces to availability, property containers, ECS sources
+and render components. Move the sole canonical value-kind enum to
+Geometry.Properties.Types and domain/ref/filter declarations plus their compiled
+pure functions to Runtime.GeometryProperty.Types. Configs import the small owner;
+GeometryAvailability re-exports it for its existing live consumers. No duplicated
+records, conversion adapters, algorithm changes, or token/default changes.
+
+The new files establish concrete compilation boundaries for fourteen current
+consumers. Claude's plan review highlights lost accidental transitive exports:
+add direct imports where live consumers actually need them and build all consumers.
+Keep property traits/storage in Geometry.Properties; preserve the domain ToString
+and equality function bodies exactly. Add the compiler-record guard, run focused
+and default CPU tests, build the Vulkan Sandbox, then review the fixed diff.
+Dependency evidence alone does not establish an elapsed build-time improvement.
+
+
+The first compiler check found the shared codec still reached live availability
+through ClusteringConfig -> ClusteringTypes. The latter also uses only property
+identities, so its import now uses the canonical Types owner; the guard includes
+ClusteringTypes and ClusteringConfig (32 producers total, fifteen config interfaces).
+This fixes the observed dependency instead of excluding the shared codec.
+
+ClusteringTypes' compiled command preflight and ClusteringModule execution still
+need live resolution and now import GeometryAvailability directly; their public
+records and config do not. The guard checks the type interface, not that preflight.
+
+
+The expanded guard also found CurvatureSegmentationConfig.cpp intentionally
+constructs algorithm parameters and calls IsValidSegmentationParams. That existing
+adapter is outside the authoring-only boundary; retain its authoritative validator
+rather than copy rules or split another algorithm in this slice. Guard its interface
+and the eleven authoring-only config implementations (31 producers total). This
+corrects the initial overly broad test selection; no existing gate is changed.
+
+
+## Property vocabulary locality — verified, 2026-09-18
+
+The sole canonical enum and runtime property identity now live in the two Types
+interfaces. All six pure function bodies and enumerators are unchanged; live
+availability/catalog/preflight owners retain their original responsibilities.
+Fifteen config interfaces avoid the live source/property/render owners. The
+31-producer compiler guard passes; its baseline and intermediate failures drove
+the clustering correction and the documented algorithm-adapter boundary.
+
+Claude accepts the fixed diff and final boundary correction. All combined-source
+verification passes: canonical ci/Clang 23 IntrinsicTests build, 60 focused tests,
+and 4,739 passed CPU tests plus the expected ASan-only GLFW lifecycle skip (4,740
+selected, zero failures, 169.60 seconds). Final ci-vulkan/Clang 23 ExtrinsicSandbox
+compile/link passes after all edits. This is not GPU execution or a full sanitizer
+suite. Strict layering, test layout, task policy/state, doc links/sync, mirrors,
+session brief, root hygiene and clean-workshop checks pass. Inventory: 428 modules.
+Source-doc audit: 20 interfaces/headers, zero errors; 62 hints primarily flag
+unchanged storage/availability comments. New declarations retain authoring and
+optional-kind contracts. Workshop rows 1–3 pass, 4–6 n/a, row 7 keeps UI-037 open,
+row 8 has no exceptions.
+
+The locality slice spans 26 production files including three new units and CMake:
+8,079 -> 8,076 physical lines. The small decrease comes from scoped comment
+shortening alongside definition moves; it is not duplicate-body removal or a
+measured compilation-time result. Source hashes match the reviewed/tested snapshot.
+Logs and fixed Claude packets: `/tmp/intrinsic-property-contracts/`.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^SandboxConfigSections\.|^RuntimeGeometryAvailability\.|^ProcessingCompilationLocality\.|^RuntimeEngineLayering.NoDuplicateGeometryPropertyVocabularyRemains$|^SandboxEditorPresentation.DisabledActionReasonTooltipAppearsAfterTwoFrames$' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target ExtrinsicSandbox -j4
+```

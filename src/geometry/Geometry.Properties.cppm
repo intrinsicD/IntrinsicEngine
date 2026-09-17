@@ -1,3 +1,4 @@
+// Typed property storage and registries for geometry containers and algorithms.
 module;
 
 #include <cassert>
@@ -19,6 +20,7 @@ module;
 #include <glm/glm.hpp>
 
 export module Geometry.Properties;
+export import Geometry.Properties.Types;
 
 import Geometry.Linalg;
 
@@ -50,20 +52,6 @@ export namespace Geometry
             }
         };
     } // namespace Internal
-
-    enum class PropertyValueKind : std::uint8_t
-    {
-        Unknown,
-        Bool,
-        Int32,
-        UInt32,
-        UInt64,
-        Float,
-        Double,
-        Vec2,
-        Vec3,
-        Vec4
-    };
 
     struct PropertyDescriptor
     {

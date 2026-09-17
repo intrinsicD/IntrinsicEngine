@@ -6,7 +6,7 @@ module;
 #include <string_view>
 #include <glm/vec3.hpp>
 export module Extrinsic.Runtime.NormalEstimationConfig;
-export import Extrinsic.Runtime.GeometryAvailability;
+export import Extrinsic.Runtime.GeometryProperty.Types;
 export import Geometry.NormalEstimation.Types;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;

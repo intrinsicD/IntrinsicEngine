@@ -23,6 +23,46 @@ function(intrinsic_add_module_boundary_test name)
             ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
             ${ARGN})
 endfunction()
+# CurvatureSegmentationConfig.cpp validates geometry algorithm parameters; only
+# its authoring interface, not that algorithm adapter, belongs to this boundary.
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.ConfigPropertyTypes
+        --check-source src/runtime/Modules/Clustering/Runtime.ClusteringTypes.cppm
+        --check-source src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cppm
+        --check-source src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+        --check-source src/geometry/Geometry.Properties.Types.cppm
+        --check-source src/runtime/GeometryIntegration/Runtime.GeometryProperty.Types.cppm
+        --check-source src/runtime/GeometryIntegration/Runtime.GeometryProperty.Types.cpp
+        --check-source src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm
+        --check-source src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cppm
+        --check-source src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp
+        --check-source src/runtime/Modules/Curvature/Runtime.MeshCurvatureConfig.cppm
+        --check-source src/runtime/Modules/Curvature/Runtime.MeshCurvatureConfig.cpp
+        --check-source src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cppm
+        --check-source src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp
+        --check-source src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm
+        --check-source src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp
+        --check-source src/runtime/Modules/Registration/Runtime.RegistrationConfig.cppm
+        --check-source src/runtime/Modules/Registration/Runtime.RegistrationConfig.cpp
+        --check-source src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cppm
+        --check-source src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp
+        --check-source src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm
+        --check-source src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp
+        --check-source src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cppm
+        --check-source src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cppm
+        --check-source src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cpp
+        --check-source src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm
+        --check-source src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cppm
+        --check-source src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp
+        --check-source src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cppm
+        --check-source src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp
+        --check-source src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm
+        --check-source src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp
+        --forbid-module Geometry.Properties
+        --forbid-module Extrinsic.Runtime.GeometryAvailability
+        --forbid-module Extrinsic.ECS.Components.GeometrySources
+        --forbid-module Extrinsic.Graphics.Component.RenderGeometry)
+set_tests_properties(ProcessingCompilationLocality.ConfigPropertyTypes
+    PROPERTIES LABELS "contract;runtime;build;headless")
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Family
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cppm
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cpp

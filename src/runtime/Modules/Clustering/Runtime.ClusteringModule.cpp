@@ -20,6 +20,7 @@ module;
 #include <glm/glm.hpp>
 
 module Extrinsic.Runtime.ClusteringModule;
+import Extrinsic.Runtime.GeometryAvailability;
 
 import Extrinsic.Runtime.Module;
 import Extrinsic.Core.Error;

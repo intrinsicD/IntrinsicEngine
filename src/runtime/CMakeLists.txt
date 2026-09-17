@@ -74,6 +74,7 @@ target_sources(${target_name}
         Kernel/Runtime.ServiceRegistry.cppm
         Kernel/Runtime.WorldHandle.cppm
         Kernel/Runtime.WorldRegistry.cppm
+        GeometryIntegration/Runtime.GeometryProperty.Types.cppm
         GeometryIntegration/Runtime.GeometryAvailability.cppm
         GeometryIntegration/Runtime.SpatialIndexCache.cppm
         Modules/PhysicsIntegration/Runtime.PhysicsModule.cppm
@@ -229,6 +230,7 @@ target_sources(${target_name}
         Kernel/Runtime.KernelEvents.cpp
         Kernel/Runtime.ServiceRegistry.cpp
         Kernel/Runtime.WorldRegistry.cpp
+        GeometryIntegration/Runtime.GeometryProperty.Types.cpp
         GeometryIntegration/Runtime.GeometryAvailability.cpp
         GeometryIntegration/Runtime.SpatialIndexCache.cpp
         Modules/PhysicsIntegration/Runtime.PhysicsModule.cpp

@@ -8,7 +8,7 @@ module;
 #include <vector>
 
 export module Extrinsic.Runtime.ParameterizationConfig;
-export import Extrinsic.Runtime.GeometryAvailability;
+export import Extrinsic.Runtime.GeometryProperty.Types;
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;

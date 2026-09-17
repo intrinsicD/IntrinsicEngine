@@ -7,6 +7,7 @@ module;
 #include <entt/entity/registry.hpp>
 #include <glm/vec3.hpp>
 module Extrinsic.Runtime.ClusteringTypes;
+import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.SelectionController;
 namespace Extrinsic::Runtime
 {

@@ -97,6 +97,7 @@ target_sources(${target_name}
         Geometry.PointCloud.Utils.cppm
         Geometry.PointCloud.cppm
         Geometry.Primitives.cppm
+        Geometry.Properties.Types.cppm
         Geometry.Properties.cppm
         Geometry.Quadric.cppm
         Geometry.Queries.cppm

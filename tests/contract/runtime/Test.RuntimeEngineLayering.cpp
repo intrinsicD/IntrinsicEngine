@@ -2177,18 +2177,22 @@ TEST(RuntimeEngineLayering, NoDuplicateGeometryPropertyVocabularyRemains)
             << path.string();
     }
 
-    // The canonical vocabulary and its constraint form live in one place.
+    // Authoring vocabulary has one owner, separate from live source catalogs.
+    const std::string propertyTypes =
+        ReadFile(RepoRoot() / "src/runtime/GeometryIntegration/Runtime.GeometryProperty.Types.cppm");
     const std::string availability =
         ReadFile(RepoRoot() / "src/runtime/GeometryIntegration/Runtime.GeometryAvailability.cppm");
-    EXPECT_NE(availability.find("struct GeometryPropertyRef"), std::string::npos);
+    EXPECT_NE(propertyTypes.find("struct GeometryPropertyRef"), std::string::npos);
+    EXPECT_NE(availability.find("export import Extrinsic.Runtime.GeometryProperty.Types;"),
+              std::string::npos);
     EXPECT_NE(availability.find("GeometryPropertyCatalogSnapshot"),
               std::string::npos);
-    EXPECT_NE(availability.find("using GeometryPropertyValueKindFilter"),
+    EXPECT_NE(propertyTypes.find("using GeometryPropertyValueKindFilter"),
               std::string::npos);
 
     // The retired derived-job-only MeshSurface scope was not promoted into the
     // canonical property-domain vocabulary.
-    EXPECT_EQ(availability.find("MeshSurface"), std::string::npos);
+    EXPECT_EQ(propertyTypes.find("MeshSurface"), std::string::npos);
 
     // The persisted wire format keeps its legacy spellings, and they are owned
     // by the serializer rather than derived from the canonical debug names.

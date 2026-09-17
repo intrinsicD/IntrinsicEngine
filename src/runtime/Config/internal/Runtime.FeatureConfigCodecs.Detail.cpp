@@ -23,7 +23,7 @@ import Extrinsic.Runtime.CurvatureSegmentationConfig;
 import Extrinsic.Runtime.ParameterizationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.ProgressivePoissonConfig;
-import Extrinsic.Runtime.GeometryAvailability;
+import Extrinsic.Runtime.GeometryProperty.Types;
 
 #include "Config/internal/Runtime.PointConfigJson.hpp"
 

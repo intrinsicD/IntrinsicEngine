@@ -404,6 +404,20 @@ For canonical-helper discovery before adding a mechanism, use
 
 ## Processing compilation locality
 
+Processing config interfaces import `Extrinsic.Runtime.GeometryProperty.Types`
+for canonical element domains, property references and kind filters. Its kind
+vocabulary comes from `Geometry.Properties.Types`; neither interface imports
+property storage, live ECS sources or rendering components. `GeometryAvailability`
+re-exports the vocabulary and owns source inspection, catalog snapshots and
+resolution. `ProcessingCompilationLocality.ConfigPropertyTypes` checks the type
+owners, fifteen config interfaces, eleven config implementations, clustering
+types and the shared feature codec against those live owners using the configured
+compiler graph. The curvature-segmentation implementation deliberately calls the
+geometry parameter validator and retains its algorithm import.
+Property identities do not replace source provenance, sampling/raster domains,
+vertex streams, material slots or visualization output meanings; those vocabularies
+describe different contracts and remain with their current owners.
+
 `Extrinsic.Runtime.EditorProcessing` owns one shared execution context and
 attachment-checked command handle, independent of method configs, results and
 workspace storage. `Extrinsic.Runtime.PointFieldOperations` owns density and

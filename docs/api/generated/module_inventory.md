@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 11 |
 | `core` | 41 |
 | `ecs` | 27 |
-| `geometry` | 123 |
+| `geometry` | 124 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 75 |
@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 97 |
+| `runtime` | 98 |
 
 ## Modules
 
@@ -207,6 +207,7 @@ Root scanned: `src`
 | `Geometry.PointCloud` | `src/geometry/Geometry.PointCloud.cppm` | `geometry` |
 | `Geometry.PointLBVH` | `src/geometry/Geometry.PointLBVH.cppm` | `geometry` |
 | `Geometry.Primitives` | `src/geometry/Geometry.Primitives.cppm` | `geometry` |
+| `Geometry.Properties.Types` | `src/geometry/Geometry.Properties.Types.cppm` | `geometry` |
 | `Geometry.Properties` | `src/geometry/Geometry.Properties.cppm` | `geometry` |
 | `Geometry.Quadric` | `src/geometry/Geometry.Quadric.cppm` | `geometry` |
 | `Geometry.Queries` | `src/geometry/Geometry.Queries.cppm` | `geometry` |
@@ -396,6 +397,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.GeometryAvailability` | `src/runtime/GeometryIntegration/Runtime.GeometryAvailability.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeometryPlanBuilders` | `src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeometryPresentation` | `src/runtime/GeometryIntegration/Runtime.GeometryPresentation.cppm` | `runtime` |
+| `Extrinsic.Runtime.GeometryProperty.Types` | `src/runtime/GeometryIntegration/Runtime.GeometryProperty.Types.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshPrimitiveView` | `src/runtime/GeometryIntegration/Runtime.MeshPrimitiveView.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshSurfaceTopology` | `src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cppm` | `runtime` |
 | `Extrinsic.Runtime.PrimitiveSelectionRefinement` | `src/runtime/GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cppm` | `runtime` |
@@ -453,4 +455,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **426**
+Total modules: **428**
