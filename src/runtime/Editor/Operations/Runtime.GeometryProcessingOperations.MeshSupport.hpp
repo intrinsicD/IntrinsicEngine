@@ -1,9 +1,7 @@
 // Mesh source snapshots and mesh-specific helpers shared by geometry operation
 // implementation units. Included after their runtime/geometry imports, which must
 // cover halfedge-mesh, mesh-soup, command-history and job-projection types.
-// Include GeometryIntegration/Runtime.GeometryValueComparison.hpp in the global
-// module fragment first; including it here would attach its definitions to the
-// importing named module. No public module surface is added.
+// No public module surface is added.
 #pragma once
 #include "Runtime.GeometryProcessingOperations.MeshSources.hpp"
 // Job envelope and the shared job/cache/finite-position helpers are declared by
@@ -45,42 +43,6 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             const GS::ConstSourceView& view,
             std::string_view positionProperty = GS::PropertyNames::kPosition);
 
-
-        using GeometryValueComparison::BitEqual;
-
-        template <typename T>
-        [[nodiscard]] std::optional<bool> SameTypedPropertyValues(
-            const Geometry::ConstPropertySet& current,
-            const Geometry::ConstPropertySet& expected,
-            const std::string_view name) noexcept
-        {
-            const auto expectedProperty = expected.Get<T>(name);
-            if (!expectedProperty)
-                return std::nullopt;
-
-            const auto currentProperty = current.Get<T>(name);
-            if (!currentProperty)
-                return std::nullopt;
-            if (currentProperty.Vector().size() !=
-                expectedProperty.Vector().size())
-            {
-                return false;
-            }
-            for (std::size_t i = 0u;
-                 i < expectedProperty.Vector().size();
-                 ++i)
-            {
-                const T currentValue = currentProperty[i];
-                const T expectedValue = expectedProperty[i];
-                if (!BitEqual(
-                        currentValue,
-                        expectedValue))
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
 
         [[nodiscard]] bool SameKnownPropertyValues(
             const Geometry::ConstPropertySet& current,

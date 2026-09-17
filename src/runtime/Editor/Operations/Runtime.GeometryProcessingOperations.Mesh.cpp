@@ -1,5 +1,4 @@
 module;
-#include "GeometryIntegration/Runtime.GeometryValueComparison.hpp"
 
 #include <array>
 #include <bit>

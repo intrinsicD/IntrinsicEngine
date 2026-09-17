@@ -1,8 +1,8 @@
 module;
+#include "GeometryIntegration/Runtime.GeometryValueComparison.hpp"
 #include <string_view>
 #include <functional>
 #include <algorithm>
-#include <bit>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -62,11 +62,7 @@ namespace Extrinsic::Runtime
         {
             // Deleted output rows may contain NaNs; preserve their exact stored values.
             return std::ranges::equal(a, b, [](glm::vec3 x, glm::vec3 y) {
-                for (unsigned component = 0; component < 3; ++component)
-                    if (std::bit_cast<std::uint32_t>(x[component]) !=
-                        std::bit_cast<std::uint32_t>(y[component]))
-                        return false;
-                return true;
+                return GeometryValueComparison::BitEqual(x, y);
             });
         }
         struct NormalWork

@@ -638,10 +638,7 @@ namespace Extrinsic::Runtime
                 return false;
             for (std::size_t i = 0u; i < lhs.size(); ++i)
             {
-                if (std::bit_cast<std::uint32_t>(lhs[i].x) !=
-                        std::bit_cast<std::uint32_t>(rhs[i].x) ||
-                    std::bit_cast<std::uint32_t>(lhs[i].y) !=
-                        std::bit_cast<std::uint32_t>(rhs[i].y))
+                if (!GeometryValueComparison::BitEqual(lhs[i], rhs[i]))
                 {
                     return false;
                 }
@@ -667,12 +664,7 @@ namespace Extrinsic::Runtime
                 return false;
             for (std::size_t i = 0u; i < lhs.size(); ++i)
             {
-                if (std::bit_cast<std::uint32_t>(lhs[i].x) !=
-                        std::bit_cast<std::uint32_t>(rhs[i].x) ||
-                    std::bit_cast<std::uint32_t>(lhs[i].y) !=
-                        std::bit_cast<std::uint32_t>(rhs[i].y) ||
-                    std::bit_cast<std::uint32_t>(lhs[i].z) !=
-                        std::bit_cast<std::uint32_t>(rhs[i].z))
+                if (!GeometryValueComparison::BitEqual(lhs[i], rhs[i]))
                 {
                     return false;
                 }

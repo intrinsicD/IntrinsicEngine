@@ -1,7 +1,6 @@
 // Mesh curvature and curvature segmentation: vertex/face/edge fields published
 // onto the mesh that produced them. Topology is never replaced here.
 module;
-#include "GeometryIntegration/Runtime.GeometryValueComparison.hpp"
 #include <functional>
 #include <entt/entity/fwd.hpp>
 

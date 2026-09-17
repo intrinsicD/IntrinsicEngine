@@ -853,3 +853,32 @@ Verified checkpoint:
   Its proposed null-scene admission and value-kind compatibility objections do
   not match the existing contract: absent scenes reject, and ReadPropertyRef
   already rejects kind changes. Prove those paths in focused tests and review.
+
+
+## Property comparison reuse and compile locality — 2026-09-17
+
+Operator explicitly continues duplicate-code and compilation cleanup with Claude,
+outside the standing convergence work-selection preference. Baseline: `5cf2dcd5c`
+with a clean checkout. This supporting slice leaves readiness acceptance open.
+
+- Owner search found `SameTypedPropertyValues` has one caller, in the compiled
+  mesh-support owner. Move its unchanged template into that source's anonymous
+  namespace and remove the resulting six unused comparator includes. Keep the
+  shared header's actually shared templates and declarations.
+- Normals history and parameterization UV/source snapshots duplicate the existing
+  `GeometryValueComparison::BitEqual` component-bit checks. Reuse that owner;
+  retain sequence cardinality checks, NaN payloads and signed-zero distinctions.
+  Keep `SameGeometryPositions` numeric equality separate: its contract differs.
+- No new file, public module, dependency edge, tuning surface or compatibility
+  wrapper. Existing scalar/vector bit-comparison and history/staleness regressions
+  cover the unchanged behavior. Ten production files have a net reduction of
+  18 lines, including the relocated helper. This is no measured compile-speed claim.
+- Verification: canonical `ci` configure and `IntrinsicTests` build pass with
+  Clang 23; focused comparator/history/locality run passes all 66 cases. Full CPU
+  gate passes 4,696 tests with one expected ASan-only GLFW lifecycle skip
+  (4,697 selected, 159.63 s). Layering, test layout, task policy/state links,
+  session brief, docs sync over explicit changed files, doc links, root hygiene
+  and diff checks pass. No sanitizer or Vulkan execution in this slice.
+- Claude reviewed the fixed source and found no blocking defects. Existing helper
+  tests pin signed zero/NaN payloads; normal history tests cover preserved NaNs.
+  No public surface changed, so no inventory regeneration was required.
