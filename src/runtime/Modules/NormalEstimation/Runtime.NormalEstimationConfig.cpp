@@ -1,8 +1,15 @@
 module;
 #include <cmath>
+#include <cstdint>
+#include <initializer_list>
 #include <limits>
 #include <nlohmann/json.hpp>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
 module Extrinsic.Runtime.NormalEstimationConfig;
+#include "Config/internal/Runtime.PointConfigJson.hpp"
 namespace Extrinsic::Runtime
 {
     namespace
@@ -118,18 +125,11 @@ namespace Extrinsic::Runtime
         };
         auto input = Json::parse(payload, nullptr, false),
              d = Json::parse(SerializeNormalEstimationConfig({}));
-        if (!input.is_object())
-            return reject("Normal estimation config must be an object.");
-        for (auto it = input.begin(); it != input.end(); ++it)
-        {
-            if (!d.contains(it.key()))
-                return reject("Unknown normal field: " + it.key());
-            d[it.key()] = it.value();
-        }
-        for (auto key : {"entity", "k_neighbors", "minimum_neighbors", "orientation", "weighting", "gpu_query_batch_size"})
-            if (!d[key].is_number_unsigned() ||
-                d[key].get<std::uint64_t>() > std::numeric_limits<std::uint32_t>::max())
-                return reject(std::string(key) + " must be an unsigned 32-bit integer.");
+        if (auto error = ConfigDetail::ValidatePointConfigFields(
+            input, d, "Normal estimation config must be an object.", "Unknown normal field: ",
+            {"entity", "k_neighbors", "minimum_neighbors",
+             "orientation", "weighting", "gpu_query_batch_size"}))
+            return reject(std::move(*error));
         if (d["k_neighbors"] == 0 || d["minimum_neighbors"] == 0 || d["orientation"] > 1 ||
             d["weighting"] > 4)
             return reject("Positive neighborhood sizes, orientation 0..1 and weighting 0..4 are required.");

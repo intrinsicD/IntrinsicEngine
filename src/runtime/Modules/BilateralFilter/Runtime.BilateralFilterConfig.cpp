@@ -1,12 +1,13 @@
 module;
 #include <cmath>
 #include <cstdint>
+#include <initializer_list>
 #include <limits>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
-#include <nlohmann/json.hpp>
 module Extrinsic.Runtime.BilateralFilterConfig;
 #include "Config/internal/Runtime.PointConfigJson.hpp"
 namespace Extrinsic::Runtime
@@ -49,15 +50,10 @@ namespace Extrinsic::Runtime
         auto reject=[&](std::string message){result.Diagnostics.push_back({.Code=EngineConfigDiagnosticCode::InvalidValue,
             .Subject=std::string(subject),.Message=std::move(message)});return result;};
         auto input=Json::parse(payload,nullptr,false),data=Json::parse(SerializeBilateralFilterConfig({}));
-        if(!input.is_object())return reject("Bilateral filter config must be an object.");
-        for(auto it=input.begin();it!=input.end();++it)
-        {
-            if(!data.contains(it.key()))return reject("Unknown output field: "+it.key());
-            data[it.key()]=it.value();
-        }
-        for(auto key:{"entity","k_neighbors","gpu_query_batch_size","iterations"})
-            if(!data[key].is_number_unsigned() || data[key].get<std::uint64_t>()>std::numeric_limits<std::uint32_t>::max())
-                return reject(std::string(key)+" must be an unsigned 32-bit integer.");
+        if (auto error = ConfigDetail::ValidatePointConfigFields(
+            input, data, "Bilateral filter config must be an object.", "Unknown output field: ",
+            {"entity", "k_neighbors", "gpu_query_batch_size", "iterations"}))
+            return reject(std::move(*error));
         if(data["gpu_query_batch_size"]==0 || data["gpu_query_batch_size"]>16384)
             return reject("GPU query batch size must be 1..16384.");
         if(data["backend"]!="cpu_octree" && data["backend"]!="cpu_lbvh" && data["backend"]!="vulkan_lbvh")return reject("Unknown output backend.");

@@ -1,12 +1,13 @@
 module;
 #include <cmath>
 #include <cstdint>
+#include <initializer_list>
 #include <limits>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
-#include <nlohmann/json.hpp>
 module Extrinsic.Runtime.OutlierAnalysisConfig;
 #include "Config/internal/Runtime.PointConfigJson.hpp"
 namespace Extrinsic::Runtime
@@ -61,15 +62,10 @@ namespace Extrinsic::Runtime
         auto reject=[&](std::string message){result.Diagnostics.push_back({.Code=EngineConfigDiagnosticCode::InvalidValue,
             .Subject=std::string(subject),.Message=std::move(message)});return result;};
         auto input=Json::parse(payload,nullptr,false),data=Json::parse(SerializeOutlierAnalysisConfig({}));
-        if(!input.is_object())return reject("Outlier analysis config must be an object.");
-        for(auto it=input.begin();it!=input.end();++it)
-        {
-            if(!data.contains(it.key()))return reject("Unknown outlier field: "+it.key());
-            data[it.key()]=it.value();
-        }
-        for(auto key:{"entity","k_neighbors","minimum_neighbors","gpu_query_batch_size"})
-            if(!data[key].is_number_unsigned() || data[key].get<std::uint64_t>()>std::numeric_limits<std::uint32_t>::max())
-                return reject(std::string(key)+" must be an unsigned 32-bit integer.");
+        if (auto error = ConfigDetail::ValidatePointConfigFields(
+            input, data, "Outlier analysis config must be an object.", "Unknown outlier field: ",
+            {"entity", "k_neighbors", "minimum_neighbors", "gpu_query_batch_size"}))
+            return reject(std::move(*error));
         if(data["k_neighbors"]==0 || data["gpu_query_batch_size"]==0 || data["gpu_query_batch_size"]>16384)
             return reject("k must be positive and GPU query batch size must be 1..16384.");
         if(data["method"]!="statistical" && data["method"]!="radius" && data["method"]!="local_distance_ratio")return reject("Unknown outlier method.");

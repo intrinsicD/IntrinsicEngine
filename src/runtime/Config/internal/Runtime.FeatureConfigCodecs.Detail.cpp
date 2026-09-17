@@ -29,6 +29,28 @@ import Extrinsic.Runtime.GeometryAvailability;
 
 namespace Extrinsic::Runtime::ConfigDetail
 {
+    std::optional<std::string> ValidatePointConfigFields(
+        const nlohmann::json& input, nlohmann::json& defaults,
+        const std::string_view objectError, const std::string_view unknownFieldPrefix,
+        const std::initializer_list<std::string_view> unsignedFields)
+    {
+        if (!input.is_object()) return std::string(objectError);
+        for (auto it = input.begin(); it != input.end(); ++it)
+        {
+            if (!defaults.contains(it.key()))
+                return std::string(unknownFieldPrefix) + it.key();
+            defaults[it.key()] = it.value();
+        }
+        for (const auto key : unsignedFields)
+        {
+            const auto& value = defaults.at(std::string(key));
+            if (!value.is_number_unsigned() ||
+                value.get<std::uint64_t>() > std::numeric_limits<std::uint32_t>::max())
+                return std::string(key) + " must be an unsigned 32-bit integer.";
+        }
+        return std::nullopt;
+    }
+
     const char* PointPropertyKindToken(const Geometry::PropertyValueKind kind) noexcept
     {
         switch (kind)

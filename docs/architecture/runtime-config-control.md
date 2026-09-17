@@ -92,6 +92,14 @@ labels, feature evidence, boundary roles, and face/edge colors, marks geometry
 GPU-dirty, and records undo/redo state. Applying the config alone has no
 geometry or renderer side effect.
 
+Strict point-processing config validators share shallow default-field overrides
+and ordered unsigned-32 checks through the private `Runtime.PointConfigJson.hpp`
+declarations, compiled in `Runtime.FeatureConfigCodecs.Detail.cpp`. Unknown keys
+are rejected before numeric fields; nested property objects replace defaults
+in full. Families retain their error text, field order, ranges, property rules
+and canonical serializers. The fallback-oriented feature codecs keep their
+separate warning/merge semantics.
+
 The `sandbox.parameterization` payload carries one of the implemented CPU strategy
 tokens (`lscm`, `harmonic_cotangent`, `tutte_uniform`, or `bff`) and the typed
 LSCM, harmonic, and BFF values described in

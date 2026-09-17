@@ -1,12 +1,13 @@
 module;
 #include <cmath>
 #include <cstdint>
+#include <initializer_list>
 #include <limits>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
-#include <nlohmann/json.hpp>
 module Extrinsic.Runtime.KeypointAnalysisConfig;
 #include "Config/internal/Runtime.PointConfigJson.hpp"
 namespace Extrinsic::Runtime
@@ -53,15 +54,10 @@ namespace Extrinsic::Runtime
         auto reject=[&](std::string message){result.Diagnostics.push_back({.Code=EngineConfigDiagnosticCode::InvalidValue,
             .Subject=std::string(subject),.Message=std::move(message)});return result;};
         auto input=Json::parse(payload,nullptr,false),data=Json::parse(SerializeKeypointAnalysisConfig({}));
-        if(!input.is_object())return reject("Keypoint analysis config must be an object.");
-        for(auto it=input.begin();it!=input.end();++it)
-        {
-            if(!data.contains(it.key()))return reject("Unknown keypoint field: "+it.key());
-            data[it.key()]=it.value();
-        }
-        for(auto key:{"entity","minimum_neighbors","gpu_query_batch_size","gpu_radius_capacity"})
-            if(!data[key].is_number_unsigned() || data[key].get<std::uint64_t>()>std::numeric_limits<std::uint32_t>::max())
-                return reject(std::string(key)+" must be an unsigned 32-bit integer.");
+        if (auto error = ConfigDetail::ValidatePointConfigFields(
+            input, data, "Keypoint analysis config must be an object.", "Unknown keypoint field: ",
+            {"entity", "minimum_neighbors", "gpu_query_batch_size", "gpu_radius_capacity"}))
+            return reject(std::move(*error));
         if(data["gpu_query_batch_size"]==0 || data["gpu_query_batch_size"]>16384 ||
            data["gpu_radius_capacity"]==0 || data["gpu_radius_capacity"]>1024)
             return reject("GPU query batch must be 1..16384 and complete radius capacity 1..1024.");

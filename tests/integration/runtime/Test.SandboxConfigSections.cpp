@@ -38,6 +38,9 @@ import Extrinsic.Runtime.OutlierAnalysisConfig;
 import Extrinsic.Runtime.KeypointAnalysisConfig;
 import Extrinsic.Runtime.DescriptorAnalysisConfig;
 import Extrinsic.Runtime.DensityWeightConfig;
+import Extrinsic.Runtime.NormalEstimationConfig;
+import Extrinsic.Runtime.PointConstructionConfig;
+import Extrinsic.Runtime.RegistrationConfig;
 
 namespace CoreConfig = Extrinsic::Core::Config;
 namespace Runtime = Extrinsic::Runtime;
@@ -1157,6 +1160,120 @@ TEST(SandboxConfigSections, PointPropertySerializersPreserveTokensAndNameBytes)
     }
 }
 
+
+TEST(SandboxConfigSections, PointConfigFieldsPreserveStrictMergeAndIntegerValidation)
+{
+    using Validator = CoreConfig::EngineConfigSectionValidationResult (*)(
+        std::string_view, std::string_view, std::string_view);
+    struct Family
+    {
+        const char* Name;
+        Validator Validate;
+        std::string_view ObjectError;
+        std::string_view UnknownPrefix;
+        std::vector<std::string_view> IntegerFields;
+        std::string (*SerializeWithEntity)(std::uint32_t);
+        std::string_view PositionField{"positions"};
+    };
+    const std::array families{
+        Family{"BilateralFilter", Runtime::ValidateBilateralFilterConfigSection,
+            "Bilateral filter config must be an object.", "Unknown output field: ",
+            {"entity", "k_neighbors", "gpu_query_batch_size", "iterations"},
+            [](std::uint32_t id) { Runtime::BilateralFilterConfig c; c.StableEntityId = id; return Runtime::SerializeBilateralFilterConfig(c); }},
+        Family{"KernelDensity", Runtime::ValidateKernelDensityConfigSection,
+            "Kernel density config must be an object.", "Unknown density field: ",
+            {"entity", "k_neighbors", "gpu_query_batch_size"},
+            [](std::uint32_t id) { Runtime::KernelDensityConfig c; c.StableEntityId = id; return Runtime::SerializeKernelDensityConfig(c); }},
+        Family{"PointSpacing", Runtime::ValidatePointSpacingConfigSection,
+            "Point spacing config must be an object.", "Unknown radii field: ",
+            {"entity", "k_neighbors", "gpu_query_batch_size"},
+            [](std::uint32_t id) { Runtime::PointSpacingConfig c; c.StableEntityId = id; return Runtime::SerializePointSpacingConfig(c); }},
+        Family{"OutlierAnalysis", Runtime::ValidateOutlierAnalysisConfigSection,
+            "Outlier analysis config must be an object.", "Unknown outlier field: ",
+            {"entity", "k_neighbors", "minimum_neighbors", "gpu_query_batch_size"},
+            [](std::uint32_t id) { Runtime::OutlierAnalysisConfig c; c.StableEntityId = id; return Runtime::SerializeOutlierAnalysisConfig(c); }},
+        Family{"KeypointAnalysis", Runtime::ValidateKeypointAnalysisConfigSection,
+            "Keypoint analysis config must be an object.", "Unknown keypoint field: ",
+            {"entity", "minimum_neighbors", "gpu_query_batch_size", "gpu_radius_capacity"},
+            [](std::uint32_t id) { Runtime::KeypointAnalysisConfig c; c.StableEntityId = id; return Runtime::SerializeKeypointAnalysisConfig(c); }},
+        Family{"DescriptorAnalysis", Runtime::ValidateDescriptorAnalysisConfigSection,
+            "Descriptor analysis config must be an object.", "Unknown descriptor field: ",
+            {"entity", "max_neighbors", "gpu_query_batch_size", "gpu_radius_capacity"},
+            [](std::uint32_t id) { Runtime::DescriptorAnalysisConfig c; c.StableEntityId = id; return Runtime::SerializeDescriptorAnalysisConfig(c); }},
+        Family{"DensityWeight", Runtime::ValidateDensityWeightConfigSection,
+            "Density weight config must be an object.", "Unknown density weight field: ",
+            {"entity", "gpu_query_batch_size", "gpu_radius_capacity"},
+            [](std::uint32_t id) { Runtime::DensityWeightConfig c; c.StableEntityId = id; return Runtime::SerializeDensityWeightConfig(c); }},
+        Family{"NormalEstimation", Runtime::ValidateNormalEstimationConfigSection,
+            "Normal estimation config must be an object.", "Unknown normal field: ",
+            {"entity", "k_neighbors", "minimum_neighbors", "orientation", "weighting", "gpu_query_batch_size"},
+            [](std::uint32_t id) { Runtime::NormalEstimationConfig c; c.StableEntityId = id; return Runtime::SerializeNormalEstimationConfig(c); }},
+        Family{"PointConstruction", Runtime::ValidatePointConstructionConfigSection,
+            "Point construction config must be an object.", "Unknown construction field: ",
+            {"entity", "resolution", "k_neighbors", "normal_k_neighbors", "gpu_query_batch_size", "max_grid_vertices"},
+            [](std::uint32_t id) { Runtime::PointConstructionConfig c; c.StableEntityId = id; return Runtime::SerializePointConstructionConfig(c); }},
+        Family{"Registration", Runtime::ValidateRegistrationConfigSection,
+            "Registration config must be an object.", "Unknown registration field: ",
+            {"source_entity", "target_entity", "max_iterations", "trajectory_step"},
+            [](std::uint32_t id) { Runtime::RegistrationConfig c; c.SourceStableEntityId = id; return Runtime::SerializeRegistrationConfig(c); }, "source_positions"},
+    };
+    for (const auto& family : families)
+    {
+        SCOPED_TRACE(family.Name);
+        const auto reject = [&](std::string_view payload, std::string_view message) {
+            SCOPED_TRACE(payload);
+            const auto result = family.Validate(payload, {}, "field-test");
+            EXPECT_FALSE(result.Usable());
+            ASSERT_EQ(result.Diagnostics.size(), 1u);
+            EXPECT_EQ(result.Diagnostics.front().Code, CoreConfig::EngineConfigDiagnosticCode::InvalidValue);
+            EXPECT_EQ(result.Diagnostics.front().Subject, "field-test");
+            EXPECT_EQ(result.Diagnostics.front().Message, message);
+            EXPECT_TRUE(result.CanonicalPayloadJson.empty());
+            EXPECT_EQ(result.ParsedFieldCount, 0u);
+        };
+        for (const auto payload : {"{", "null", "[]", "true", "1", "\"text\""})
+            reject(payload, family.ObjectError);
+
+        const auto entityKey = std::string(family.IntegerFields.front());
+        reject("{\"zzz\":0,\"aaa\":0,\"" + entityKey + "\":-1}",
+            std::string(family.UnknownPrefix) + "aaa");
+        reject("{\"" + entityKey + "\":-1,\"zzz\":0}",
+            std::string(family.UnknownPrefix) + "zzz");
+        const auto defaults = family.Validate("{}", {}, "field-test");
+        ASSERT_TRUE(defaults.Usable());
+        EXPECT_EQ(defaults.CanonicalPayloadJson, family.SerializeWithEntity(0u));
+        EXPECT_EQ(defaults.ParsedFieldCount, 0u);
+        for (const auto id : {0u, 42u, UINT32_MAX})
+        {
+            const auto result = family.Validate(
+                "{\"" + entityKey + "\":" + std::to_string(id) + "}", {}, "field-test");
+            ASSERT_TRUE(result.Usable());
+            EXPECT_TRUE(result.Diagnostics.empty());
+            EXPECT_EQ(result.CanonicalPayloadJson, family.SerializeWithEntity(id));
+            EXPECT_EQ(result.ParsedFieldCount, 1u);
+        }
+        std::string allInvalid = "{";
+        for (const auto key : family.IntegerFields)
+        {
+            const auto message = std::string(key) + " must be an unsigned 32-bit integer.";
+            for (const auto value : {"-1", "0.0", "true", "null", "\"2\"", "[]", "{}",
+                                     "4294967296", "18446744073709551616"})
+                reject("{\"" + std::string(key) + "\":" + value + "}", message);
+            if (allInvalid.size() > 1) allInvalid += ',';
+            allInvalid += "\"" + std::string(key) + "\":-1";
+        }
+        reject(allInvalid + '}', entityKey + " must be an unsigned 32-bit integer.");
+        for (std::size_t i = 1; i < family.IntegerFields.size(); ++i)
+        {
+            const auto first = std::string(family.IntegerFields[i - 1]);
+            const auto second = std::string(family.IntegerFields[i]);
+            reject("{\"" + first + "\":-1,\"" + second + "\":-1}",
+                first + " must be an unsigned 32-bit integer.");
+        }
+        EXPECT_FALSE(family.Validate("{\"" + std::string(family.PositionField) +
+            "\":{\"name\":\"samples\"}}", {}, "field-test").Usable());
+    }
+}
 
 TEST(SandboxConfigSections, PointPropertyValidationPreservesDiagnosticCategories)
 {

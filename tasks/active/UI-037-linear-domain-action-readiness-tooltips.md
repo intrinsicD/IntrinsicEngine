@@ -2197,3 +2197,48 @@ canonical CPU gate; Claude's remaining build/verification conditions are met.
 No GPU runtime or full sanitizer CPU suite was run for this record move.
 The operator requested session-boundary advice to conserve context; this
 verified slice is the checkpoint, with a temporary handoff before further work.
+
+## Strict point-config field validation reuse (2026-09-17)
+
+Operator-directed continuation with Claude at `7d76d7111`. Ten point-config
+validators duplicate the adjacent shallow default-field merge and ordered
+unsigned-32 validation. Share that exact mechanism through the existing private
+`Runtime.PointConfigJson.hpp` and compiled `Runtime.FeatureConfigCodecs.Detail.cpp`
+owner. Preserve family diagnostics, field order, numeric constraints, parsed
+counts and nested replacement. The five fallback-oriented codecs in that owner
+have different warning/merge semantics and remain separate. No new public
+module, record, template, policy switch or layer edge is needed.
+
+Claude's planning review requires an adjacency/text audit of all ten families
+and pre-edit public tests for exact diagnostics and their priority. Both are
+part of this slice. Verify the regression before and after consolidation, then
+build `IntrinsicTests`, run config/processing focused tests and the canonical
+CPU gate. Review a fixed diff with Claude and run the structural/source-doc
+checks. Evidence lives in `/tmp/intrinsic-point-config-reuse/`; readiness/cache
+acceptance remains open, and this slice makes no measured compile-speed claim.
+
+The pre-edit public-validator regression passes against the original code, then
+all 45 config/tooltip/compilation-locality tests pass after consolidation.
+Canonical ci uses Clang 23; `IntrinsicTests` builds and the exclusion-only CPU
+gate passes: 4,730 selected, 4,729 passed, one expected ASan-only GLFW lifecycle
+skip, zero failures (154.67 seconds). The archive has one compiled helper
+definition and ten caller references. Across all 12 affected production files,
+physical lines change from 4,029 to 4,026, including helper declarations and
+explicit standard-library includes. This removes duplicate control flow, with
+only a small net line reduction; it adds no files or public module surface.
+
+Claude approves the fixed diff and identifies two test gaps: an unknown key that
+sorts after an invalid integer, and ordering beyond the first integer field.
+Both assertions are added; Claude approves their follow-up review. Production
+hashes are unchanged from the reviewed/full-gate source. Strict layering,
+test layout, task policy/state links, docs sync/links, skill mirrors, root
+hygiene, session brief and workshop checks pass. Source-doc audit has zero
+errors and three reviewed hints: both header comments express preconditions;
+the existing large codec implementation remains the appropriate compiled owner.
+Manual workshop rows 1–3 pass; renderer/recipe rows 4–6 are unchanged, UI-037
+retains readiness follow-up, and there are no layer exceptions. GPU execution
+and sanitizer CPU suites are not run for this validation-only consolidation.
+After the review fixes, rebuild `IntrinsicSandboxEditorIntegrationTests` and
+run `ctest --test-dir build/ci --output-on-failure -R '^SandboxConfigSections\.|^SandboxEditorPresentation.DisabledActionReasonTooltipAppearsAfterTwoFrames$' --no-tests=error --timeout 120`:
+all 15 affected cases pass (1.15 seconds). The full CPU gate above used the same
+production source; only these additional assertions changed afterward.

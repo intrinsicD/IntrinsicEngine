@@ -1,13 +1,15 @@
 module;
 #include <cmath>
 #include <cstdint>
+#include <initializer_list>
 #include <limits>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
-#include <nlohmann/json.hpp>
 module Extrinsic.Runtime.PointConstructionConfig;
+#include "Config/internal/Runtime.PointConfigJson.hpp"
 namespace Extrinsic::Runtime
 {
     namespace
@@ -124,19 +126,11 @@ namespace Extrinsic::Runtime
         };
         auto input = Json::parse(payload, nullptr, false),
              data = Json::parse(SerializePointConstructionConfig({}));
-        if (!input.is_object())
-            return reject("Point construction config must be an object.");
-        for (auto it = input.begin(); it != input.end(); ++it)
-        {
-            if (!data.contains(it.key()))
-                return reject("Unknown construction field: " + it.key());
-            data[it.key()] = it.value();
-        }
-        for (auto key : {"entity", "resolution", "k_neighbors", "normal_k_neighbors",
-                         "gpu_query_batch_size", "max_grid_vertices"})
-            if (!data[key].is_number_unsigned() ||
-                data[key].get<std::uint64_t>() > std::numeric_limits<std::uint32_t>::max())
-                return reject(std::string(key) + " must be an unsigned 32-bit integer.");
+        if (auto error = ConfigDetail::ValidatePointConfigFields(
+            input, data, "Point construction config must be an object.", "Unknown construction field: ",
+            {"entity", "resolution", "k_neighbors",
+             "normal_k_neighbors", "gpu_query_batch_size", "max_grid_vertices"}))
+            return reject(std::move(*error));
         if (data["resolution"] < 1 || data["resolution"] > 512 || data["k_neighbors"] < 1 ||
             data["k_neighbors"] > 63 || data["normal_k_neighbors"] < 3 ||
             data["normal_k_neighbors"] > 1024 || data["gpu_query_batch_size"] < 1 ||

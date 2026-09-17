@@ -1,8 +1,15 @@
 module;
 #include <cmath>
+#include <cstdint>
+#include <initializer_list>
 #include <limits>
 #include <nlohmann/json.hpp>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
 module Extrinsic.Runtime.RegistrationConfig;
+#include "Config/internal/Runtime.PointConfigJson.hpp"
 namespace Extrinsic::Runtime
 {
     namespace
@@ -77,15 +84,10 @@ namespace Extrinsic::Runtime
         };
         const auto input = Json::parse(payload, nullptr, false);
         auto doc = Json::parse(SerializeRegistrationConfig({}));
-        if (!input.is_object()) return reject("Registration config must be an object.");
-        for (auto it = input.begin(); it != input.end(); ++it)
-        {
-            if (!doc.contains(it.key())) return reject("Unknown registration field: " + it.key());
-            doc[it.key()] = it.value();
-        }
-        for (auto key : {"source_entity", "target_entity", "max_iterations", "trajectory_step"})
-            if (!doc[key].is_number_unsigned() || doc[key].get<std::uint64_t>() > std::numeric_limits<std::uint32_t>::max())
-                return reject(std::string(key) + " must be an unsigned 32-bit integer.");
+        if (auto error = ConfigDetail::ValidatePointConfigFields(
+            input, doc, "Registration config must be an object.", "Unknown registration field: ",
+            {"source_entity", "target_entity", "max_iterations", "trajectory_step"}))
+            return reject(std::move(*error));
         if (doc["max_iterations"] == 0) return reject("max_iterations must be positive.");
         for (auto key : {"max_correspondence_distance", "inlier_ratio", "convergence_threshold"})
             if (!doc[key].is_number() || !std::isfinite(doc[key].get<double>()))
