@@ -2959,3 +2959,74 @@ python3 tools/ci/touched_scope.py --root . --changed-file tests/support/MockRHI.
 After the whitespace-only correction, all 1,906 focused cases pass (1,903
 consumer-executable cases plus three cases sharing those suites, 51.42 seconds).
 The pattern is retained in `/tmp/intrinsic-mock-rhi/focused-pattern.txt`.
+
+## Compiled point-neighborhood and job-lookup reuse — 2026-09-18
+
+Operator-directed continuation with Claude from clean `d341af47a` on
+`codex/mesh-field-diagnostics-locality`. Codex owns this checkout/build; Claude
+provides read-only planning and fixed-diff review through the configured CLI.
+The standing Framework24 focus and UI-037's remaining acceptance criteria stay
+unchanged. Catalog review retains the existing source-documentation, element-
+domain and processing-compilation-locality contracts; no new contract or
+public module surface is introduced.
+
+Reuse discovery found nine point-method submissions repeating the optional
+`JobCommands.FindActive` callback guard already owned by the compiled
+`MeshSupport::FindActiveEditorJob`. They now call that helper while retaining
+`IsActiveEditorJobState`, their typed output identities and original messages.
+Registration and mesh-family callers keep their existing semantics. A public
+kernel-density command test covers all eleven job states, an absent callback
+and an empty record; existing per-family queued-job tests cover duplicates,
+staleness, cancellation and delivery.
+
+Density, spacing and local-distance-ratio outliers now share `AppendPointKnnRows`
+in the existing ordinary `RadiusRows.cpp` owner, declared privately with C++
+linkage. The three adapters keep their width floors, config gates, kernels,
+publication and requested/actual backend reporting. The helper uses each
+caller's existing immutable spatial-index snapshot, complete Euclidean point
+kNN rows with self candidates, query order and compact indices. It preserves
+the diagnostic and partial-row failure behavior. Statistical outliers exclude
+self and construction has batching/cancellation/reference differences, so both
+stay separate. Radius support and GPU continuation code are unchanged. Review
+of the spatial consumer inventory found no missing query capability for this
+slice. No new module, source file, target or lifecycle template is needed.
+
+Claude found no implementation blocker and identified insufficient wide-row,
+coincident-point and nonidentity source-row coverage. The revised reference
+comparisons cover k=1/2/63, all eight domains for density/spacing, small-input
+clamping, and 70-row point clouds with coincident samples and interior deletion.
+The latter retain 68 live rows for density/spacing and 69 for outliers, so k=63
+actually exercises 64-candidate rows. The optional additional construction
+terminal-state matrix is deferred; its production substitution retains its
+existing state predicate and identity, with the current job tests rerun.
+
+Compiler metadata has one `RadiusRows.cpp` action. Symbol inspection finds one
+`AppendPointKnnRows` definition in that object and references from the three
+consumer objects. Across all 11 changed production files, physical lines are
+4,338 before and 4,339 after: the new declaration and readable compiled owner
+offset deleted duplicate bodies. This is mechanism consolidation and compilation
+locality, not total line reduction or a measured elapsed build-speed claim.
+
+Verification: canonical ci/Clang 23 builds the focused runtime target and
+`IntrinsicTests`; all 162 focused tests pass after the review fixes. The full CPU
+gate selects 4,744 tests: 4,743 pass, one expected ASan-only GLFW lifecycle skip,
+zero failures (147.93 seconds of test execution, not compilation). Claude's final
+read-only test review accepts the coverage repairs and has no blockers. Strict
+layering, test layout, task policy/state, docs sync/links, root hygiene, skill
+mirrors and brief checks pass. Live routing reconciles 41 targets, 4,751 cases
+and 363 sources. The source-doc audit has zero errors; its three declaration-
+comment prompts were reviewed and retained for self/row completeness, partial
+failure and main-thread/cancellation contracts. Architecture review preserves
+layer/target ownership, existing C++ linkage and immutable query borrows;
+renderer/recipe/scaffold changes are not applicable, with no new exceptions.
+Logs and fixed review packets are in `/tmp/intrinsic-reuse-next/`. No sanitizer-
+suite or GPU-execution claim; UI-037 remains active.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^(KernelDensity|PointSpacing|OutlierAnalysis|DensityWeight|Keypoint|Descriptor|Bilateral|NormalEstimation|PointConstruction|ProcessingCompilationLocality)' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicTests
+```

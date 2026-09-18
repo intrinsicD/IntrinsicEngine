@@ -312,13 +312,16 @@ because execution consumes the resolved property bindings.
 
 Density, spacing and density weights share scalar history publication, including
 stale-storage guards, render dirty notifications and workspace invalidation on
-apply, undo and redo. Density and spacing also share framed fixed-width kNN
-pagination; radius pagination retains its separate support-membership contract.
-Both live in `RadiusRows.hpp`, so only the units that actually page neighbours
-name the spatial-index cache.
+apply, undo and redo. Density, spacing and local-distance-ratio outliers share
+`AppendPointKnnRows` for complete CPU LBVH rows, including self candidates and
+compact indices. Each adapter chooses its width and retains its numerical kernel;
+statistical outliers keep their self-excluding queries. Density and spacing also
+share framed fixed-width kNN pagination; radius pagination retains its separate
+support-membership contract. These declarations live in `RadiusRows.hpp` for
+consumers of spatial-index neighborhoods.
 `BuildPointInputCatalog` reuses finite live-row capture for weights, keypoints,
 outliers, descriptors, construction and normals, independently of method result records.
-`RadiusRows.cpp` compiles both pagers once outside either family and preserves
+`RadiusRows.cpp` compiles the CPU capture and both pagers once outside either family and preserves
 complete radius support and its explicit lowest-ID limit. Property capture imports
 only the leaf point-LBVH algorithm for coordinate validation, without the spatial
 cache service or paging records; `ProcessingCompilationLocality.PropertyCapture`
@@ -339,6 +342,8 @@ owners; the common implementation is compiled once as an ordinary translation
 unit, without the broad method module or mesh-topology imports. Typed configs/results, numerical kernels, sample minima,
 backend gates and job completion delivery remain with method adapters. Keypoint
 mask/score publication and outlier provenance/removal transactions remain explicit.
+Point-method submissions reuse the compiled `FindActiveEditorJob` lookup while
+retaining their active-state filters, output identities and duplicate-job messages.
 
 The nine point-processing panels use `ProcessingDraftState` and `PanelSupport`
 for entity/input/output selection. `DrawProcessingPointInput` accepts an optional

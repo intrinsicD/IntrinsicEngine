@@ -739,11 +739,10 @@ namespace Extrinsic::Runtime
             .Scope = ToEditorJobScope(w->Config.Positions.Domain),
             .OutputSemantic = GeometryPresentationSlotSemantic::Displacement,
             .OutputName = std::string("construct:") + ToString(config.Method)};
-        if (context.JobCommands.FindActive)
-            if (auto active = context.JobCommands.FindActive(identity);
-                active && IsActiveEditorJobState(active->State))
-                return report(EditorCommandStatus::Pending,
-                              "A construction job for this source/method is already active.");
+        if (auto active = GeometryProcessingDetail::MeshSupport::FindActiveEditorJob(context, identity);
+            active && IsActiveEditorJobState(active->State))
+            return report(EditorCommandStatus::Pending,
+                          "A construction job for this source/method is already active.");
         const auto pending = report(EditorCommandStatus::Pending, "Point construction queued.");
         auto delivered = std::make_shared<bool>(false);
         auto sink = GuardEditorProcessingResult(context, std::move(onComplete));

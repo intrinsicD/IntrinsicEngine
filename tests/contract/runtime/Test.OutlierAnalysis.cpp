@@ -384,12 +384,40 @@ TEST(OutlierAnalysisConfig, DistanceRatioRoundTripsDefaultsAndClampsKToSmallInpu
     EXPECT_EQ(restored->Method,config.Method);EXPECT_EQ(restored->ScoreThreshold,1.25f);
     const auto defaults=R::ValidateOutlierAnalysisConfigSection(R"({"method":"local_distance_ratio"})",{},"test");
     EXPECT_TRUE(defaults.Usable());
-    R::WorldRegistry worlds;auto world=worlds.CreateWorld("distance ratio");auto& scene=*worlds.Get(world);
-    R::SpatialIndexCache cache(worlds);auto entity=Make(scene,D::PointCloudPoint);
-    auto c=Config(entity,D::PointCloudPoint);c.Method=config.Method;c.KNeighbors=63;c.Backend=R::OutlierAnalysisBackend::CpuLBVH;
-    R::EditorProcessingContext context{.Scene=&scene,.World=world,.SpatialIndices=&cache};
-    EXPECT_TRUE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),c).Enabled);
-    EXPECT_TRUE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),c).Succeeded());
+    for (const auto sampleCount : {5u, 70u})
+    {
+        SCOPED_TRACE(sampleCount);
+        R::WorldRegistry worlds;auto world=worlds.CreateWorld("distance ratio");auto& scene=*worlds.Get(world);
+        R::SpatialIndexCache cache(worlds);auto entity=Make(scene,D::PointCloudPoint);
+        auto& props = Properties(scene, entity, D::PointCloudPoint);
+        props.Resize(sampleCount);
+        auto samples = props.Get<glm::vec3>("samples");
+        for (std::size_t i = 0; i < samples.Size(); ++i)
+            samples[i] = {float(i * i) * 0.01f, 0, 0};
+        samples[1] = samples[0];
+        props.Get<bool>("v:deleted").Vector().assign(sampleCount, false);
+        props.Get<bool>("v:deleted")[2] = true;
+        samples[2] = {std::numeric_limits<float>::quiet_NaN(), 0, 0};
+        auto c=Config(entity,D::PointCloudPoint);c.Method=config.Method;
+        R::EditorProcessingContext context{.Scene=&scene,.World=world,.SpatialIndices=&cache};
+        const auto commands = R::BindEditorProcessingCommands(context);
+        for (const auto k : {1u, 2u, 63u})
+        {
+            SCOPED_TRACE(k);
+            c.KNeighbors = k;
+            c.Backend = R::OutlierAnalysisBackend::CpuOctree;
+            ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(commands, c).Succeeded());
+            const auto expected = std::as_const(Properties(scene, entity, D::PointCloudPoint))
+                                      .Get<float>("scores").Vector();
+            c.Backend = R::OutlierAnalysisBackend::CpuLBVH;
+            EXPECT_TRUE(R::PreviewEditorOutlierAnalysisCommand(commands, c).Enabled);
+            const auto result = R::ApplyEditorOutlierAnalysisCommand(commands, c);
+            ASSERT_TRUE(result.Succeeded()) << result.Message;
+            const auto actual = std::as_const(Properties(scene, entity, D::PointCloudPoint)).Get<float>("scores");
+            ASSERT_EQ(actual.Vector().size(), expected.size());
+            for (std::size_t i = 0; i < expected.size(); ++i) EXPECT_NEAR(actual[i], expected[i], 1e-5f);
+        }
+    }
 }
 
 TEST(OutlierAnalysisOperations, ExpiredQueuedCommandsNeverBorrowFreedSceneOrDeliver)

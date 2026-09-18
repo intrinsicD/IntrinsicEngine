@@ -312,13 +312,23 @@ TEST(PointSpacingConfig, RoundTripAndSharedPreviewApplyRun)
 
 TEST(PointSpacingOperations, EveryDomainPublishesNamedRadiiAndPreservesDeletedRowsWithHistory)
 {
-    for(unsigned d=1;d<=8;++d) for(float scale : {0.f,2.f})
+    for(unsigned d=1;d<=8;++d) for(float scale : {0.f,2.f}) for(unsigned k : {1u, 2u, 63u})
     {
         SCOPED_TRACE(d);
         SCOPED_TRACE(scale);
+        SCOPED_TRACE(k);
         R::WorldRegistry worlds;auto world=worlds.CreateWorld("radii");auto& scene=*worlds.Get(world);
-        R::SpatialIndexCache cache(worlds);auto entity=Make(scene,D(d));auto config=Config(entity,D(d));config.ScaleFactor=scale;
-        auto& props=Properties(scene,entity,D(d));const auto size=props.Size();
+        R::SpatialIndexCache cache(worlds);auto entity=Make(scene,D(d));auto config=Config(entity,D(d));config.ScaleFactor=scale;config.KNeighbors=k;
+        auto& props=Properties(scene,entity,D(d));
+        if (D(d) == D::PointCloudPoint)
+        {
+            props.Resize(70);
+            auto samples = props.Get<glm::vec3>("samples");
+            for (std::size_t i = 0; i < samples.Size(); ++i)
+                samples[i] = {float(i * i) * 0.01f, 0, 0};
+            samples[1] = samples[0];
+        }
+        const auto size=props.Size();
         const bool half=D(d)==D::MeshHalfedge || D(d)==D::GraphHalfedge;
         if(half)scene.Raw().get<GS::Edges>(entity).Properties.GetOrAdd<bool>("e:deleted")[1]=true;
         else props.GetOrAdd<bool>(D(d)==D::MeshFace?"f:deleted":(D(d)==D::MeshEdge || D(d)==D::GraphEdge)?"e:deleted":"v:deleted")[2]=true;

@@ -106,16 +106,9 @@ namespace Extrinsic::Runtime
             else
             {
                 const auto width=std::min<std::size_t>(w.Points.size(),std::max<std::size_t>(c.KNeighbors,2)+1);
-                if (c.Backend == KernelDensityBackend::CpuLBVH)
-                {
-                    w.Neighbors.Indices.reserve(w.Points.size()*width);
-                    for (auto point : w.Points)
-                    {
-                        const auto row=w.Index->Index.KNearest(point,std::uint32_t(width));
-                        if (row.size()!=width) {r.Message="Incomplete CPU kNN neighborhood.";return;}
-                        for (const auto& n : row) w.Neighbors.Indices.push_back(n.Index);
-                    }
-                }
+                if (c.Backend == KernelDensityBackend::CpuLBVH &&
+                    !AppendPointKnnRows(*w.Index, w.Points, std::uint32_t(width), w.Neighbors.Indices, r.Message))
+                    return;
                 analysis = PC::EstimateKernelDensityFromNeighbors(w.Points,w.Neighbors.Indices,params);
             }
             if (!analysis || analysis->Densities.size()!=w.Slots.size())
@@ -220,11 +213,10 @@ namespace Extrinsic::Runtime
                                          .Scope = ToEditorJobScope(w->Config.Density.Domain),
                                          .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
                                          .OutputName = w->Config.Density.Name};
-        if (context.JobCommands.FindActive)
-            if (auto active = context.JobCommands.FindActive(identity);
-                active && IsActiveEditorJobState(active->State))
-                return report(EditorCommandStatus::Pending,
-                              "A density job for this output is already active.");
+        if (auto active = GeometryProcessingDetail::MeshSupport::FindActiveEditorJob(context, identity);
+            active && IsActiveEditorJobState(active->State))
+            return report(EditorCommandStatus::Pending,
+                          "A density job for this output is already active.");
         auto sink = GuardEditorProcessingResult(context, std::move(onComplete));
         auto delivered = std::make_shared<bool>(false);
         auto pending = w->Result;

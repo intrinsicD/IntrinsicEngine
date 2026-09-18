@@ -13,6 +13,24 @@ import Extrinsic.Runtime.SpatialIndexCache;
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 namespace Extrinsic::Runtime::GeometryProcessingDetail
 {
+    bool AppendPointKnnRows(
+        const SpatialIndexSnapshot& source, std::span<const glm::vec3> points,
+        std::uint32_t width, std::vector<std::uint32_t>& indices, std::string& diagnostic)
+    {
+        indices.reserve(indices.size() + points.size() * width);
+        for (const auto point : points)
+        {
+            const auto row = source.Index.KNearest(point, width);
+            if (row.size() != width)
+            {
+                diagnostic = "Incomplete CPU kNN neighborhood.";
+                return false;
+            }
+            for (const auto& neighbor : row) indices.push_back(neighbor.Index);
+        }
+        return true;
+    }
+
     bool AppendPointRadiusRow(PointRadiusRows& rows,std::vector<std::uint32_t>& row,std::string& diagnostic)
     {
         if(row.size()>std::numeric_limits<std::uint32_t>::max()-rows.Indices.size())

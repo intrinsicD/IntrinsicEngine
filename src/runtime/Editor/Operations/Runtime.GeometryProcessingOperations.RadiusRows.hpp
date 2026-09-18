@@ -1,4 +1,4 @@
-// Private framed radius and kNN pagination shared by property-based point methods.
+// Private CPU kNN capture and framed neighborhood pagination for point methods.
 #pragma once
 #include <chrono>
 #include <cstdint>
@@ -10,6 +10,12 @@ extern "C++"
 {
 namespace Extrinsic::Runtime::GeometryProcessingDetail
 {
+    // Width includes self candidates; append compact indices in query order.
+    // A failed row leaves earlier rows appended; callers must discard the result.
+    [[nodiscard]] bool AppendPointKnnRows(
+        const SpatialIndexSnapshot&, std::span<const glm::vec3> points,
+        std::uint32_t width, std::vector<std::uint32_t>& indices, std::string& diagnostic);
+
     struct PointRadiusRows
     {
         std::vector<std::uint32_t> Indices{},Offsets{0};

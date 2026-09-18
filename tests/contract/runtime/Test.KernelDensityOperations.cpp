@@ -122,6 +122,58 @@ TEST(KernelDensityOperations, QueuedJobsRejectStaleInputsOutputsAndCancellation)
         EXPECT_EQ(props.Exists("density"),change==0 || change==3);
     }
 }
+TEST(KernelDensityOperations, OnlyActiveJobRecordsBlockSubmission)
+{
+    using State = R::JobState;
+    const std::array cases{
+        std::pair{State::Invalid, false}, std::pair{State::AwaitingDependencies, true},
+        std::pair{State::Queued, true}, std::pair{State::Running, true},
+        std::pair{State::AwaitingGate, true}, std::pair{State::AwaitingApply, true},
+        std::pair{State::Published, false}, std::pair{State::Dropped, false},
+        std::pair{State::Cancelled, false}, std::pair{State::Rejected, false},
+        std::pair{State::StaleDiscarded, false}};
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = Make(scene, D::MeshVertex);
+    const auto config = Config(entity, D::MeshVertex);
+    R::EditorProcessingContext context{.Scene = &scene};
+    unsigned submissions = 0, lookups = 0;
+    context.JobCommands.Submit = [&](R::JobDesc, R::EditorJobIdentity identity) {
+        ++submissions;
+        EXPECT_EQ(identity.EntityId, config.StableEntityId);
+        EXPECT_EQ(identity.OutputName, config.Density.Name);
+        return R::JobToken{};
+    };
+    const auto apply = [&] {
+        submissions = lookups = 0;
+        return R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), config);
+    };
+    for (const auto [state, blocks] : cases)
+    {
+        SCOPED_TRACE(static_cast<unsigned>(state));
+        context.JobCommands.FindActive = [&](const R::EditorJobIdentity& identity) {
+            ++lookups;
+            return std::optional{R::EditorJobRecord{.Identity = identity, .State = state}};
+        };
+        const auto result = apply();
+        EXPECT_EQ(lookups, 1u);
+        EXPECT_EQ(submissions, blocks ? 0u : 1u);
+        EXPECT_EQ(result.Status, blocks ? R::EditorCommandStatus::Pending
+                                       : R::EditorCommandStatus::GeometryProcessingFailed);
+    }
+    context.JobCommands.FindActive = {};
+    EXPECT_EQ(apply().Status, R::EditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_EQ(lookups, 0u);
+    EXPECT_EQ(submissions, 1u);
+    context.JobCommands.FindActive = [&](const R::EditorJobIdentity&) -> std::optional<R::EditorJobRecord> {
+        ++lookups;
+        return std::nullopt;
+    };
+    EXPECT_EQ(apply().Status, R::EditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_EQ(lookups, 1u);
+    EXPECT_EQ(submissions, 1u);
+    EXPECT_FALSE(Properties(scene, entity, D::MeshVertex).Exists("density"));
+}
+
 TEST(KernelDensityConfig, RoundTripAndSharedPreviewApplyRun)
 {
     namespace C = Extrinsic::Core::Config;
@@ -167,13 +219,23 @@ TEST(KernelDensityConfig, RoundTripAndSharedPreviewApplyRun)
 
 TEST(KernelDensityOperations, EveryDomainPublishesNamedDensityAndPreservesDeletedRowsWithHistory)
 {
-    for(unsigned d=1;d<=8;++d) for(float bandwidth : {0.f,.2f})
+    for(unsigned d=1;d<=8;++d) for(float bandwidth : {0.f,.2f}) for(unsigned k : {1u, 2u, 63u})
     {
         SCOPED_TRACE(d);
         SCOPED_TRACE(bandwidth);
+        SCOPED_TRACE(k);
         R::WorldRegistry worlds;auto world=worlds.CreateWorld("density");auto& scene=*worlds.Get(world);
-        R::SpatialIndexCache cache(worlds);auto entity=Make(scene,D(d));auto config=Config(entity,D(d));config.Bandwidth=bandwidth;
-        auto& props=Properties(scene,entity,D(d));const auto size=props.Size();
+        R::SpatialIndexCache cache(worlds);auto entity=Make(scene,D(d));auto config=Config(entity,D(d));config.Bandwidth=bandwidth;config.KNeighbors=k;
+        auto& props=Properties(scene,entity,D(d));
+        if (D(d) == D::PointCloudPoint)
+        {
+            props.Resize(70);
+            auto samples = props.Get<glm::vec3>("samples");
+            for (std::size_t i = 0; i < samples.Size(); ++i)
+                samples[i] = {float(i * i) * 0.01f, 0, 0};
+            samples[1] = samples[0];
+        }
+        const auto size=props.Size();
         const bool half=D(d)==D::MeshHalfedge || D(d)==D::GraphHalfedge;
         if(half)scene.Raw().get<GS::Edges>(entity).Properties.GetOrAdd<bool>("e:deleted")[1]=true;
         else props.GetOrAdd<bool>(D(d)==D::MeshFace?"f:deleted":(D(d)==D::MeshEdge || D(d)==D::GraphEdge)?"e:deleted":"v:deleted")[2]=true;

@@ -585,11 +585,10 @@ namespace Extrinsic::Runtime
                                          .Scope = ToEditorJobScope(w->Config.Output.Domain),
                                          .OutputSemantic = GeometryPresentationSlotSemantic::Normal,
                                          .OutputName = w->Config.Output.Name};
-        if (context.JobCommands.FindActive)
-            if (auto active = context.JobCommands.FindActive(identity);
-                active && IsActiveEditorJobState(active->State))
-                return report(EditorCommandStatus::Pending,
-                              "A normal job for this output is already active.");
+        if (auto active = GeometryProcessingDetail::MeshSupport::FindActiveEditorJob(context, identity);
+            active && IsActiveEditorJobState(active->State))
+            return report(EditorCommandStatus::Pending,
+                          "A normal job for this output is already active.");
         auto sink = GuardEditorProcessingResult(context, std::move(onComplete));
         auto delivered = std::make_shared<bool>(false);
         auto pending = w->Result;

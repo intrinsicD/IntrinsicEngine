@@ -39,6 +39,7 @@ import Extrinsic.Runtime.JobService;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -176,13 +177,9 @@ namespace Extrinsic::Runtime
                     const auto width = QueryWidth(c, w.Points.size());
                     if (c.Backend == OutlierAnalysisBackend::CpuLBVH)
                     {
-                        w.NeighborIds.reserve(w.Points.size() * width);
-                        for (auto point : w.Points)
-                        {
-                            const auto neighbors = w.Index->Index.KNearest(point, width);
-                            if (neighbors.size() != width) { r.Message="Incomplete CPU kNN neighborhood."; return; }
-                            for (const auto& neighbor : neighbors) w.NeighborIds.push_back(neighbor.Index);
-                        }
+                        if (!GeometryProcessingDetail::AppendPointKnnRows(
+                                *w.Index, w.Points, width, w.NeighborIds, r.Message))
+                            return;
                     }
                     else
                         for (auto& id : w.NeighborIds)
@@ -445,11 +442,10 @@ namespace Extrinsic::Runtime
                                          .Scope = ToEditorJobScope(w->Config.Mask.Domain),
                                          .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
                                          .OutputName = w->Config.Mask.Name};
-        if (context.JobCommands.FindActive)
-            if (auto active = context.JobCommands.FindActive(identity);
-                active && IsActiveEditorJobState(active->State))
-                return report(EditorCommandStatus::Pending,
-                              "An outlier job for this output is already active.");
+        if (auto active = GeometryProcessingDetail::MeshSupport::FindActiveEditorJob(context, identity);
+            active && IsActiveEditorJobState(active->State))
+            return report(EditorCommandStatus::Pending,
+                          "An outlier job for this output is already active.");
         auto sink = GuardEditorProcessingResult(context, std::move(onComplete));
         auto delivered = std::make_shared<bool>(false);
         auto pending = w->Result;
