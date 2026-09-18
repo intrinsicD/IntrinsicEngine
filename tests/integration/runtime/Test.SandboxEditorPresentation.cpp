@@ -28,6 +28,7 @@
 #include "RuntimeTestModule.hpp"
 
 #include "EditorFeatureTestContext.hpp"
+#include "TestImGuiFrameScope.hpp"
 
 import Extrinsic.Runtime.NormalOperations;
 import Extrinsic.Runtime.RegistrationOperations;
@@ -638,10 +639,8 @@ TEST(SandboxEditorPresentation, DomainPanelsPreserveLifetimeCacheAndResultPublic
           "CachedModelFrame != frame",
           "CachedDomainModels",
           "DomainWindowModelCacheHits",
-        "DrawSandboxUvRegenerationControls",
+        "DrawTextureBakeControls",
         "context.Parameterization.Results.LastUvRegenerationResult",
-        "ImGui::InputInt(\"Bake padding\"",
-        ".PaddingTexels = paddingSupported",
         "std::int32_t TextureBakeWidth{1024};",
         "LastUvRegenerationResult.reset();",
         "LastUvExtentAdoption.reset();",
@@ -652,11 +651,8 @@ TEST(SandboxEditorPresentation, DomainPanelsPreserveLifetimeCacheAndResultPublic
     }
 }
 
-// The two texture-bake panels used to carry their own copy of the UV
-// regeneration block, and they drifted: one passed the wrong command handle and
-// neither supplied the terminal callback, so a queued atlas job's real outcome
-// was dropped. The block now has exactly one implementation; these checks keep
-// the panels routed through it and keep that implementation whole.
+// Both panels route through shared bake controls so queued UV results retain
+// their terminal callback, dismissal, and extent-adoption path.
 TEST(SandboxEditorPresentation, UvRegenerationHasOneImplementationBothPanelsDriveIt)
 {
     const std::string shared = ReadRepositoryTextFile(
@@ -664,7 +660,12 @@ TEST(SandboxEditorPresentation, UvRegenerationHasOneImplementationBothPanelsDriv
     ASSERT_FALSE(shared.empty());
 
     for (const std::string_view required :
-         {"void DrawSandboxUvRegenerationControls(",
+         {"void DrawTextureBakeControls(",
+          "SandboxUvRegenerationControls{",
+          ".LastResult = lastUvRegenerationResult",
+          "ImGui::InputInt(\"Bake padding\"",
+          ".PaddingTexels = paddingSupported",
+          "void DrawSandboxUvRegenerationControls(",
           "ApplyEditorUvRegenerationCommand(",
           "context->Parameterization.Commands",
           "context->Parameterization.ResultSinks.UvRegeneration",
@@ -689,13 +690,153 @@ TEST(SandboxEditorPresentation, UvRegenerationHasOneImplementationBothPanelsDriv
     {
         const std::string source = ReadRepositoryTextFile(std::string{panel});
         ASSERT_FALSE(source.empty()) << panel;
-        EXPECT_NE(source.find("DrawSandboxUvRegenerationControls("),
+        EXPECT_NE(source.find("DrawTextureBakeControls("),
                   std::string::npos)
             << panel;
+        EXPECT_EQ(source.find("ApplyEditorTextureBakeCommand("),
+                  std::string::npos)
+            << panel << " must not own a second bake submission path";
         EXPECT_EQ(source.find("ApplyEditorUvRegenerationCommand("),
                   std::string::npos)
             << panel << " must not own a second UV submission path";
     }
+}
+
+TEST(SandboxEditorPresentation, BoundRenderRowsPreserveDiagnosticPriorityAndEmptyState)
+{
+    TestSupport::ImGuiFrameScope gui;
+    ImGui::GetIO().DisplaySize = {1600, 1200};
+    gui.NextFrame();
+    const auto draw = [&](const Runtime::EditorBoundRenderStateModel& model)
+    {
+        ImGui::SetNextWindowSize({1500, 1000});
+        ImGui::Begin("Bound render rows", nullptr, ImGuiWindowFlags_NoSavedSettings);
+        gui.Context->LogBuffer.clear();
+        ImGui::LogToBuffer();
+        Editor::DrawBoundRenderStateRows(model);
+        const std::string text{gui.Context->LogBuffer.c_str()};
+        ImGui::LogFinish();
+        ImGui::End();
+        return text;
+    };
+
+    Runtime::EditorBoundRenderStateModel model{};
+    model.RecipeGeneration = 42u;
+    model.Rows.push_back({
+        .Label = "Scalar preview",
+        .Property = {.Name = "v:temperature"},
+        .HasCatalogMatch = true,
+        .SourceDescription = "Explicit source label",
+        .DisabledReason = "Hidden lower-priority reason",
+        .Diagnostic = "Primary row diagnostic",
+    });
+    model.Rows.push_back({
+        .Kind = Runtime::EditorBoundRenderStateRowKind::DerivedJob,
+        .Label = "Pending bake job",
+        .JobProgress = 0.25f,
+        .DisabledReason = "Wait for the bake job",
+    });
+    model.Diagnostics.push_back({.Message = "Model-level diagnostic"});
+    const auto populated = draw(model);
+    for (const auto* expected : {"Rows: 2 generation=42", "Scalar preview",
+             "Explicit source label", "v:temperature catalog", "Primary row diagnostic",
+             "Pending bake job", "0.25", "Wait for the bake job", "Model-level diagnostic"})
+        EXPECT_NE(populated.find(expected), std::string::npos) << expected << '\n' << populated;
+    EXPECT_EQ(populated.find("Hidden lower-priority reason"), std::string::npos);
+
+    gui.NextFrame();
+    model.Rows.clear();
+    const auto empty = draw(model);
+    EXPECT_NE(empty.find("No bound render state rows."), std::string::npos);
+    EXPECT_NE(empty.find("Model-level diagnostic"), std::string::npos);
+}
+
+TEST(SandboxEditorPresentation, TextureBakeControlsKeepCallerMutationStateAcrossFrames)
+{
+    TestSupport::ImGuiFrameScope gui;
+    ImGui::GetIO().DisplaySize = {1600, 1600};
+    gui.NextFrame();
+    Runtime::EditorTextureBakeControlsModel model{};
+    const std::string outputName(150u, 'x');
+    model.BakedTextures.push_back({.OutputName = outputName});
+    Editor::TextureBakeMutationUiState inspector{}, appearance{};
+    inspector.MutationDiagnostic = "Inspector mutation diagnostic";
+    Editor::SandboxEditorContext context{};
+    const auto draw = [&](const char* title, Editor::TextureBakeMutationUiState& mutation,
+                          const bool rename)
+    {
+        ImGui::SetNextWindowPos({0, 0});
+        ImGui::SetNextWindowSize({1400, 1500});
+        ImGui::Begin(title, nullptr, ImGuiWindowFlags_NoSavedSettings);
+        if (rename)
+        {
+            ImGui::PushID(outputName.c_str());
+            ImGui::ActivateItemByID(ImGui::GetID("Rename"));
+            ImGui::PopID();
+        }
+        gui.Context->LogBuffer.clear();
+        ImGui::LogToBuffer();
+        Editor::DrawTextureBakeControls(model, &context, nullptr, mutation);
+        const std::string text{gui.Context->LogBuffer.c_str()};
+        ImGui::LogFinish();
+        ImGui::End();
+        return text;
+    };
+
+    (void)draw("Inspector bake controls", inspector, true);
+    gui.NextFrame();
+    const auto renamed = draw("Inspector bake controls", inspector, false);
+    EXPECT_EQ(inspector.RenameTarget, outputName);
+    EXPECT_EQ(std::string{inspector.RenameBuffer.data()}, outputName.substr(0u, 127u));
+    EXPECT_EQ(inspector.RenameBuffer.back(), '\0');
+    EXPECT_NE(renamed.find(inspector.MutationDiagnostic), std::string::npos);
+
+    gui.NextFrame();
+    const auto separate = draw("Appearance bake controls", appearance, false);
+    EXPECT_TRUE(appearance.RenameTarget.empty());
+    EXPECT_EQ(appearance.RenameBuffer.front(), '\0');
+    EXPECT_TRUE(appearance.MutationDiagnostic.empty());
+    EXPECT_EQ(separate.find(inspector.MutationDiagnostic), std::string::npos);
+    gui.NextFrame();
+    const auto persisted = draw("Inspector bake controls", inspector, false);
+    EXPECT_EQ(inspector.RenameTarget, outputName);
+    EXPECT_NE(persisted.find(inspector.MutationDiagnostic), std::string::npos);
+}
+
+TEST(SandboxEditorPresentation, TextureBakeControlsClampToBakeableSourcesAndAllowEmptyFallbacks)
+{
+    TestSupport::ImGuiFrameScope gui;
+    ImGui::GetIO().DisplaySize = {1600, 1600};
+    gui.NextFrame();
+    Runtime::EditorTextureBakeControlsModel model{};
+    model.Sources = {
+        {.Name = "Blocked source", .Bakeable = false},
+        {.Name = "First source", .Bakeable = true},
+        {.Name = "Second source", .Bakeable = true},
+    };
+    Editor::TextureBakeMutationUiState mutation{};
+    std::int32_t selected = 99;
+    Editor::TextureBakeUiState state{.SourceIndex = &selected};
+    const auto draw = [&](Editor::TextureBakeUiState* storage)
+    {
+        ImGui::SetNextWindowSize({1400, 1500});
+        ImGui::Begin("Bake sources", nullptr, ImGuiWindowFlags_NoSavedSettings);
+        gui.Context->LogBuffer.clear();
+        ImGui::LogToBuffer();
+        Editor::DrawTextureBakeControls(model, nullptr, storage, mutation);
+        const std::string text{gui.Context->LogBuffer.c_str()};
+        ImGui::LogFinish();
+        ImGui::End();
+        return text;
+    };
+    (void)draw(&state);
+    EXPECT_EQ(selected, 1);
+    gui.NextFrame();
+    model.Sources.clear();
+    (void)draw(&state);
+    EXPECT_EQ(selected, 0);
+    gui.NextFrame();
+    EXPECT_NE(draw(nullptr).find("No baked property textures on this entity."), std::string::npos);
 }
 
 // The shell rebuilds `SandboxEditorContext` every frame and drops it again at

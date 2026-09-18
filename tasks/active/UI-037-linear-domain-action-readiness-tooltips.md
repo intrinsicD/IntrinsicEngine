@@ -3927,3 +3927,84 @@ lifecycle skip; zero failures (157.72 s). Reviewed source hashes remain fixed.
 Fable's build/test conditions are satisfied. No sanitizer-suite or GPU execution
 and no elapsed compilation-speed improvement is claimed. UI-037 remains open;
 this is a complete compilation-locality checkpoint.
+
+
+## Continuation — shared appearance drawing (2026-09-18)
+
+Operator direction continues duplicate-code and compilation cleanup with Claude
+Fable 5.1 from `b185f7810`; the broader readiness acceptance remains open.
+Reuse search verified the inspector and domain appearance implementations of
+`DrawBoundRenderStateRows` are token-identical and `DrawTextureBakeControls`
+differ only in formatting and optional braces. Both now reuse compiled free
+functions in the existing `Sandbox.PanelSupport.cpp`, with declarations in its
+app-private header. No new file, module, service or dependency layer is needed.
+
+Fable approved the plan with state-lifetime, linkage, ImGui-ID and dependency
+checks. A plain mutation-state record is justified by two real callers: each
+keeps one process-lifetime static, preserving the original separation and
+persistence of rename target/buffer and diagnostic. Borrowed bake/UV state,
+callbacks, defaults, IDs and command order remain unchanged. Bake-only constants
+and two helpers move out of the shared header into the implementation. Re-split
+the drawing bodies only if the callers acquire different behavior contracts.
+The existing source-documentation contract applies; canonical runtime ownership
+and readiness contracts are unchanged.
+
+Verification plan: real ImGui checks for row diagnostic priority/empty rows,
+rename-state isolation/persistence/truncation and bakeable-source clamping;
+existing presentation, domain, UV/bake and compilation-locality cases; canonical
+ci focused targets followed by IntrinsicTests and the full CPU selector. Update
+existing source-location checks for the shared owner without dropping their UV
+callback, dismissal or padding assertions. Review a frozen diff with Fable and
+run task/layer/docs checks. Evidence: `/tmp/intrinsic-panel-reuse/`.
+
+Implementation/review: the first build caught missing braces around the domain
+callsite's new static plus draw call. A later script selected a helper use instead
+of its definition while moving private helpers; rebuilding from the exact baseline
+and signature-anchored extraction fixed it. Both were local edit errors, not engine
+regressions. The rename test initially queued ImGui activation too late; queueing
+in frame N and checking in N+1 exercises the real button and now passes.
+
+All 82 focused tests pass. Canonical ci/Clang23 IntrinsicTests builds; the initial
+full CPU run selected 4,758 cases: 4,757 passed, one expected ASan-only GLFW
+lifecycle skip, zero failures (156.21 s). Fable's fixed-source review found no
+blocking production defect. Its refinements replace order-sensitive structured
+binding with named field references, strengthen the UV call-binding check, and
+drop two weak log-substring assertions while retaining source-index checks.
+The tests exercise actual ImGui drawing, diagnostic priority, empty state, rename
+isolation/persistence and 127-byte NUL-terminated truncation. No extra source-shape
+checks or pre-existing behavior changes were added. Final gates follow below.
+
+Across all four affected production files, physical source lines fall 6,237 ->
+5,616 (-621), including the new state record and declarations. The shared header
+falls 370 -> 340 lines. Module-map closure sets remain 117/124/115 for domain,
+shell and support respectively, with zero added or removed modules; the removed
+direct imports remain transitively reachable. Object symbols confirm both
+consumers reference exactly one compiled definition of each drawing helper in
+PanelSupport. Body comparisons match baseline after accounting only for the state
+parameter, equivalent local type alias, and named state references. No elapsed
+compilation-speed or binary-size gain is claimed.
+
+Scope/layer/tests/docs sweep: app presentation only; runtime APIs, command
+contracts and GPU continuations unchanged. No new module, file, library, layering
+edge or policy exception. Workshop rows 1–3 and 8 pass; 4–7 are not applicable.
+Strict layering, test layout, task policy/state links, task validation, root
+hygiene, docs links/sync, skill mirrors and session-brief checks pass. Module
+inventory regeneration is unchanged (429 modules). Source-doc audit has zero
+objective errors; existing declaration/README heuristic findings remain outside
+this slice. Fable review packets, source hashes, symbol/module-map evidence and
+all logs are retained in `/tmp/intrinsic-panel-reuse/`.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicSandboxEditorIntegrationTests IntrinsicRuntimeContractTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^SandboxEditorPresentation\.|^SandboxDomainPanels\.|^SandboxEditorUi\.(.*TextureBake.*|.*UvRegeneration.*|ActionReadinessDerivesDomainPrerequisiteReasons)|^EditorCompilationLocality\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 120
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+```
+
+Final verification after review refinements: IntrinsicTests builds; all 82
+focused cases pass again. The final CPU gate selected 4,758 cases: 4,757 passed,
+one expected ASan-only GLFW lifecycle skip, zero failures (151.79 s). Fable's
+delta review found no new concern. Final C++/test hashes remained unchanged
+through verification. No sanitizer-suite/GPU execution or elapsed compilation
+speedup is claimed. UI-037 remains open; this is a complete reuse checkpoint.

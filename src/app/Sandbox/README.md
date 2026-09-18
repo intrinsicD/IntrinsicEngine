@@ -116,11 +116,15 @@ focused scene, geometry, visualization, and render-recipe operations. The shell
 copies prepared bindings/snapshots into app-owned `SandboxEditorContext` and
 `SandboxEditorFrame` records. The private `Sandbox.PanelSupport.hpp` shares those records, drawing controls,
 and method-panel action models between implementations and integration tests.
-It also owns the one UV-regeneration block (`DrawSandboxUvRegenerationControls`):
+`Sandbox.PanelSupport.cpp` owns the shared bound-render-state rows and texture-bake
+controls used by the inspector and domain appearance panels. Each caller retains
+its own persistent rename draft and mutation diagnostic; bake-only constants and
+helpers stay private to the compiled implementation.
+The bake controls use the one UV-regeneration block (`DrawSandboxUvRegenerationControls`):
 atlas parameters, submission through `Parameterization.Commands` with the
 session's `ResultSinks.UvRegeneration` terminal callback, once-per-result
 atlas-extent adoption into the bake width/height, status and dismissal. Both
-texture-bake panels call it; neither submits the command itself.
+texture-bake panels reach it through the shared controls; neither submits the command itself.
 Registration-only interfaces use `Sandbox.EditorFwd.hpp`; they do not expose
 complete drawing state.
 `Sandbox.Editor.MethodPanels` owns the K-Means,

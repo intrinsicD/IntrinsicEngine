@@ -13,46 +13,8 @@ namespace Extrinsic::Runtime
 
 namespace Extrinsic::Sandbox::Editor
 {
-    inline constexpr std::array<Runtime::GeometryPresentationSlotSemantic, 5>
-        kTextureBakeTargetSemantics{{
-            Runtime::GeometryPresentationSlotSemantic::Albedo,
-            Runtime::GeometryPresentationSlotSemantic::Normal,
-            Runtime::GeometryPresentationSlotSemantic::Roughness,
-            Runtime::GeometryPresentationSlotSemantic::Metallic,
-            Runtime::GeometryPresentationSlotSemantic::ScalarField,
-        }};
-
-    inline constexpr std::array<Runtime::PropertyTextureBakeEncoding, 8>
-        kTextureBakeEncoders{{
-            Runtime::PropertyTextureBakeEncoding::Auto,
-            Runtime::PropertyTextureBakeEncoding::RgbaColor,
-            Runtime::PropertyTextureBakeEncoding::Normal,
-            Runtime::PropertyTextureBakeEncoding::ScalarColormap,
-            Runtime::PropertyTextureBakeEncoding::LinearScalar,
-            Runtime::PropertyTextureBakeEncoding::LabelPalette,
-            Runtime::PropertyTextureBakeEncoding::Vector2,
-            Runtime::PropertyTextureBakeEncoding::Vector3,
-        }};
-
-    inline constexpr std::array<Runtime::PropertyTextureBakeStorage, 3>
-        kTextureBakeStorageModes{{
-            Runtime::PropertyTextureBakeStorage::Auto,
-            Runtime::PropertyTextureBakeStorage::RawFloat,
-            Runtime::PropertyTextureBakeStorage::EncodedRgba,
-        }};
-
-    inline constexpr std::array<const char*, 3>
-        kTextureBakeStorageNames{{
-            "auto (raw except normals/labels)",
-            "raw float texture",
-            "encoded RGBA texture",
-        }};
-
     inline constexpr std::array<const char*, 6> kColormapNames{{
         "Viridis", "Inferno", "Plasma", "Jet", "Coolwarm", "Heat"}};
-
-    inline constexpr std::array<const char*, 2> kNormalSpaceNames{{
-        "object space", "world space"}};
 
     // Borrows panel storage only for the current draw call.
     struct TextureBakeUiState
@@ -84,6 +46,8 @@ namespace Extrinsic::Sandbox::Editor
     inline constexpr auto kScalarFieldSource =
         static_cast<decltype(Runtime::EditorVisualizationConfigModel{}.Source)>(2);
 
+    void DrawBoundRenderStateRows(const Runtime::EditorBoundRenderStateModel& bound);
+
     void DrawDiagnostics(const std::vector<Runtime::EditorDiagnostic>& diagnostics);
 
     void DrawDomainWindowHeader(
@@ -93,14 +57,6 @@ namespace Extrinsic::Sandbox::Editor
         const Runtime::EditorDomainWindowModel& model) noexcept;
 
     void DrawVec3(const char* label, const glm::vec3 value);
-
-    [[nodiscard]] const char* DebugNameForTextureBakeEncoder(
-        const Runtime::PropertyTextureBakeEncoding encoder) noexcept;
-
-    [[nodiscard]] std::span<const Runtime::EditorTextureBakeTarget>
-    TextureBakeTargetsFor(
-        const Runtime::EditorTextureBakeControlsModel& model,
-        const std::string_view outputName);
 
     [[nodiscard]] Runtime::EditorVisualizationConfigCommand
     MakeVisualizationConfigCommandFromModel(
@@ -184,6 +140,20 @@ namespace Extrinsic::Sandbox::Editor
         };
 
     }
+
+    // Each drawing surface retains its own persistent rename draft and diagnostic.
+    struct TextureBakeMutationUiState
+    {
+        std::string RenameTarget{};
+        std::array<char, 128> RenameBuffer{};
+        std::string MutationDiagnostic{};
+    };
+
+    void DrawTextureBakeControls(
+        const Runtime::EditorTextureBakeControlsModel& model,
+        const SandboxEditorContext* context,
+        TextureBakeUiState* state,
+        TextureBakeMutationUiState& mutation);
 
     // Storage the shared UV-regeneration block reads and writes. Every pointer
     // must be bound; callers pass either their panel-lifetime members or the
