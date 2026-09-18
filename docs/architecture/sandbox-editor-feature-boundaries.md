@@ -21,8 +21,9 @@ carry an unused service pointer. `EditorCompilationLocality.AssetService` guards
 the scene/workspace interfaces and shared test producers against that dependency.
 
 Editor job lists and the optional UV-regeneration job own copies of the canonical
-`EditorJobRecord` and its `EditorJobDependency` values from
-`Runtime.EditorJobProjection.cppm`. Runtime and app consumers share these records;
+`EditorJobRecord` from `Runtime.EditorJobProjection.cppm`. Its dependencies reuse
+the scheduler's value-owned `JobDependency` from `Runtime.JobService.cppm`, including
+their order, tokens and reasons. Runtime and app consumers share these records;
 there is no separate UI job payload or field-copy converter. Missing jobs remain
 empty or absent, while present records retain their state, identity, backend
 domains, dependency reasons, progress and diagnostics independently of later
@@ -712,11 +713,11 @@ the removed `Runtime.SandboxEditorFacades` and
 | `SandboxEditorGeometryPresentationSlotModel` | `EditorGeometryPresentationSlotModel` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorJobScope` | `EditorJobScope` | `Runtime.EditorJobProjection.cppm` | feature-owned runtime contract |
 | `SandboxEditorJobIdentity` | `EditorJobIdentity` | `Runtime.EditorJobProjection.cppm` | feature-owned runtime contract |
-| `SandboxEditorJobDependency` | `EditorJobDependency` | `Runtime.EditorJobProjection.cppm` | feature-owned runtime contract |
+| `SandboxEditorJobDependency` | `JobDependency` | `Runtime.JobService.cppm` | canonical scheduler value contract |
 | `SandboxEditorJobDomain` | `EditorJobDomain` | `Runtime.EditorJobProjection.cppm` | feature-owned runtime contract |
 | `SandboxEditorJobRecord` | `EditorJobRecord` | `Runtime.EditorJobProjection.cppm` | feature-owned runtime contract |
 | `SandboxEditorJobQueueSnapshot` | `EditorJobQueueSnapshot` | `Runtime.EditorJobProjection.cppm` | feature-owned runtime contract |
-| `SandboxEditorJobDependencyModel` | `EditorJobDependency` | `Runtime.EditorJobProjection.cppm` | feature-owned runtime contract |
+| `SandboxEditorJobDependencyModel` | `JobDependency` | `Runtime.JobService.cppm` | canonical scheduler value contract |
 | `SandboxEditorJobModel` | `EditorJobRecord` | `Runtime.EditorJobProjection.cppm` | feature-owned runtime contract |
 | `SandboxEditorGeometryCompositionSummary` | `EditorGeometryCompositionSummary` | `Runtime.EditorWorkspaceSnapshots.cppm` | feature-owned runtime contract |
 | `SandboxEditorGeometryPresentationModel` | `EditorGeometryPresentationModel` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |

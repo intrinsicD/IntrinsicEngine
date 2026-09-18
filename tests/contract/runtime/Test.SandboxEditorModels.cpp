@@ -3443,9 +3443,13 @@ TEST(SandboxEditorUi, GeometryPresentationInspectorReportsSlotsPropertiesAndJobs
             .RequestedJobDomain = Runtime::EditorJobDomain::Auto,
             .ResolvedJobDomain = Runtime::EditorJobDomain::GpuCompute,
             .Dependencies = {
-                Runtime::EditorJobDependency{
+                Runtime::JobDependency{
                     .Job = dependencyHandle,
                     .Reason = "normal requires uv",
+                },
+                Runtime::JobDependency{
+                    .Job = Runtime::JobToken{100u, 2u},
+                    .Reason = "normal requires geometry",
                 },
             },
             .NormalizedProgress = static_cast<float>(i) /
@@ -3485,9 +3489,12 @@ TEST(SandboxEditorUi, GeometryPresentationInspectorReportsSlotsPropertiesAndJobs
         EXPECT_EQ(copied.State, expected.State);
         EXPECT_EQ(copied.RequestedJobDomain, expected.RequestedJobDomain);
         EXPECT_EQ(copied.ResolvedJobDomain, expected.ResolvedJobDomain);
-        ASSERT_EQ(copied.Dependencies.size(), 1u);
-        EXPECT_EQ(copied.Dependencies[0].Job, expected.Dependencies[0].Job);
-        EXPECT_EQ(copied.Dependencies[0].Reason, expected.Dependencies[0].Reason);
+        ASSERT_EQ(copied.Dependencies.size(), 2u);
+        for (std::size_t dependency = 0u; dependency < copied.Dependencies.size(); ++dependency)
+        {
+            EXPECT_EQ(copied.Dependencies[dependency].Job, expected.Dependencies[dependency].Job);
+            EXPECT_EQ(copied.Dependencies[dependency].Reason, expected.Dependencies[dependency].Reason);
+        }
         EXPECT_FLOAT_EQ(copied.NormalizedProgress, expected.NormalizedProgress);
         EXPECT_EQ(copied.ProgressDeterminate, expected.ProgressDeterminate);
         EXPECT_EQ(copied.PreviousOutputRetained, expected.PreviousOutputRetained);
@@ -3500,7 +3507,7 @@ TEST(SandboxEditorUi, GeometryPresentationInspectorReportsSlotsPropertiesAndJobs
     jobs.Entries[0].State = Runtime::JobState::Cancelled;
     EXPECT_EQ(presentation.Jobs[0].Identity.OutputName, "normal");
     EXPECT_EQ(presentation.Jobs[0].State, Runtime::JobState::AwaitingDependencies);
-    ASSERT_EQ(presentation.Jobs[0].Dependencies.size(), 1u);
+    ASSERT_EQ(presentation.Jobs[0].Dependencies.size(), 2u);
     EXPECT_EQ(presentation.Jobs[0].Dependencies[0].Reason, "normal requires uv");
     EXPECT_EQ(presentation.Jobs[5].Diagnostic, "failed bake");
 

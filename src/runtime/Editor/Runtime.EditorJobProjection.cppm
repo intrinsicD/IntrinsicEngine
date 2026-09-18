@@ -42,11 +42,6 @@ export namespace Extrinsic::Runtime
         const EditorJobIdentity& rhs) noexcept;
     [[nodiscard]] bool IsActiveEditorJobState(JobState state) noexcept;
     [[nodiscard]] bool IsFailedEditorJobState(JobState state) noexcept;
-    struct EditorJobDependency
-    {
-        JobToken Job{};
-        std::string Reason{};
-    };
     enum class EditorJobDomain : std::uint8_t
     {
         Cpu,
@@ -62,7 +57,7 @@ export namespace Extrinsic::Runtime
         JobState State{JobState::Invalid};
         EditorJobDomain RequestedJobDomain{EditorJobDomain::Cpu};
         EditorJobDomain ResolvedJobDomain{EditorJobDomain::Cpu};
-        std::vector<EditorJobDependency> Dependencies{};
+        std::vector<JobDependency> Dependencies{};
         float NormalizedProgress{0.0f};
         bool ProgressDeterminate{true};
         bool PreviousOutputRetained{false};

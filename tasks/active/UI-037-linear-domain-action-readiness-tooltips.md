@@ -3619,3 +3619,51 @@ reports zero errors and five pre-existing contract-comment review prompts;
 inspection retains the lifetime/linkage/test-seam comments. Final full CPU and
 combined diff review follow the dependency-record slice. Evidence is under
 `/tmp/intrinsic-editor-reuse-next/`.
+
+
+## Canonical scheduler dependencies in editor job records — 2026-09-18
+
+Continuation after `cd9450d23`, preserving the user's duplication/compilation
+cleanup direction. `EditorJobDependency` exactly repeats the scheduler's
+`JobDependency` (token plus owned reason string), whose module is already
+imported. Reuse that canonical value in `EditorJobRecord`, delete the duplicate
+record without an alias, and update the current presentation snapshot regression
+to verify two ordered dependencies and independently copied reasons. Runtime's
+current job projection leaves dependencies empty; this slice does not add queue
+publication behavior. The existing source-documentation contract applies; no new
+module, import, config state, backend or API compatibility requirement.
+
+Plan: focused snapshot/job/locality tests, all task Verification commands, and
+one combined full CPU run; fixed final diff reviewed with Claude Sonnet. Count
+removed duplicate symbols and source lines without an elapsed-speed claim.
+
+Verified combined checkpoint: canonical ci/Clang 23 builds both focused targets
+and `IntrinsicTests`, including GPU-smoke consumers. All 89 focused tests pass;
+full CPU selects 4,752, with 4,751 passed, one expected ASan-only GLFW lifecycle
+skip, zero failures (150.78 s test execution). No GPU execution or sanitizer-suite
+run is claimed. Source/test hashes stayed fixed through final verification.
+
+The job interface shrinks 91 -> 86 lines; its removed duplicate type has zero
+symbols in rebuilt snapshot and model-test objects (44 and 60 entries before).
+Across both slices, five production files shrink 6,179 -> 6,165 lines. Final
+compiler metadata extends the first slice's affected set to 38 producers, each
+losing five or six transitive dependencies. These are source/dependency facts;
+no elapsed compile-time or final binary-size improvement was measured.
+
+Claude Sonnet reviewed both slices. Its final diff-only review raised a missing
+header guard and a possibly unused GPU fixture member; full CMake/source context
+resolved both: the compiling `.cpp` already guards the shared header, and the GPU
+fixture legitimately uses `m_Assets` for direct asset assertions. No findings
+remain. Architecture sweep: existing ownership and layer directions retained;
+no added dependency, facade, config state, frame recipe, backend or exception.
+Clean-workshop rows 1–3 and 8 pass; renderer/pass/recipe/maturity rows 4–7 do not
+apply. The live scheduler-to-editor projection's empty dependency list is unchanged.
+
+Strict layering/test layout/task policy/state, task validation, docs-sync/links,
+root hygiene, skill mirrors and session-brief checks pass. Module inventory is
+regenerated unchanged. Source-doc audits: zero errors; the job interface has zero
+review prompts. Compiler-hotspot tooling passes all 26 tests; touched-route
+reconciliation passes against the configured ci registry. Commands, logs,
+compiler closures, source hashes and Claude review packets are retained at
+`/tmp/intrinsic-editor-reuse-next/`. Start a fresh session from this checkpoint to
+avoid reloading completed-slice history. Broader UI-037 acceptance remains open.
