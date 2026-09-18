@@ -4283,3 +4283,34 @@ failures (151.89 s). Reviewed source/build hashes stayed fixed. Strict test
 layout, layering, task policy/state links, doc links, root hygiene, skill mirrors
 and session-brief freshness pass. Module inventory regenerates unchanged
 at 429 modules. All work in this support slice is complete.
+
+
+## Continuation — K-Means config-backed action readiness (2026-09-19)
+
+Operator-directed duplication/compilation continuation with Claude Fable 5.1,
+starting from `888d8f36b`. UI-037 remains open. The K-Means panel now composes
+`PreviewEditorKMeansRun` with the existing compiled
+`ResolveEditorProcessingActionReadiness` owner instead of merging a copied
+config-availability flag and inventing its own disabled reason. Missing config
+controls take the shared reason priority. Apply/Reload retain their distinct
+local draft policy. No new abstraction, file or production dependency is added.
+
+Fable's plan review correctly distinguished the composite config-backed action
+from the config-independent method preview/submit pair; those runtime contracts
+remain unchanged. New runtime coverage exercises the composed action with ready,
+missing-config, missing-service, invalid-request and expired-attachment states,
+unchanged canonical rejection messages, metadata-only preview without callbacks
+or publication, and a positive queued submission without config state. Existing
+ImGui tests cover disabled hover/click and enabled command dispatch; this slice
+does not add a dedicated real K-Means panel interaction test. The production
+composition is checked in fixed-diff review, not a duplicate source-string test.
+
+Initial focused verification passed 16 tests; the combined locality slice passed
+77 focused cases. Fable's fixed-diff review prompted isolated alias tests for that
+slice and the positive config-independent submission case; both refined tests
+pass, and the final delta review has no blocking finding. The source/build hashes
+and review packets are retained in `/tmp/intrinsic-kmeans-readiness/`.
+
+Verification uses canonical ci/Clang 23 without sanitizers. The following
+checkpoint records the combined full CPU gate and structural results. No
+elapsed compilation-speed, GPU execution or sanitizer-suite result is claimed.

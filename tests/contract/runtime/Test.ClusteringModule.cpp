@@ -16,6 +16,7 @@
 #include "RuntimeTestModule.hpp"
 
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Tasks;
 import Extrinsic.ECS.Component.DirtyTags;
@@ -26,8 +27,10 @@ import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
+import Extrinsic.Runtime.PointCloudServiceOperations;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.SceneDocumentModule;
@@ -1023,6 +1026,119 @@ TEST(ClusteringModule, RunKMeansWithoutModuleFailsClosedAtCommandDrain)
     EXPECT_FALSE(appPtr->LabelsCommitted);
 
     engine.Shutdown();
+}
+
+TEST(ClusteringModule, EditorReadinessUsesLiveConfigLaneAndCanonicalAdmission)
+{
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(1u));
+    engine.EmplaceModule<Runtime::ClusteringModule>();
+    engine.Initialize();
+    auto* service = engine.Services().Find<Runtime::ClusteringService>();
+    ASSERT_NE(service, nullptr);
+    ASSERT_TRUE(service->Available());
+    auto* scene = engine.Worlds().Get(engine.ActiveWorld());
+    ASSERT_NE(scene, nullptr);
+    const auto entity = AddPointCloud(*scene, {{0, 0, 0}, {1, 0, 0}});
+    auto request = MakePointCloudRequest(Runtime::SelectionController::ToStableEntityId(entity));
+    auto& properties = scene->Raw().get<GS::Vertices>(entity).Properties;
+
+    CoreConfig::EngineConfigSectionRegistry sections;
+    ASSERT_TRUE(sections.Register(Runtime::MakeClusteringConfigSectionRegistration()));
+    Runtime::RuntimeEngineConfigControlState state;
+    CoreConfig::PopulateEngineConfigSectionDefaults(state.ActiveConfig, sections);
+    unsigned previews = 0, applies = 0;
+    bool attached = true;
+    Runtime::EditorProcessingContext context{.Scene = scene};
+    context.EngineConfigControlState = &state;
+    context.EngineConfigCommandsAvailable = true;
+    context.PreviewEngineConfigDocument = [&](const auto& document, const auto& origin) {
+        ++previews;
+        return CoreConfig::PreviewEngineConfig(document, state.ActiveConfig, {origin, &sections});
+    };
+    context.ApplyEngineConfigHotSubset = [&](const auto& preview) {
+        ++applies;
+        state.ActiveConfig = preview.Preview.Config;
+        return Runtime::RuntimeEngineConfigApplyResult{.Status = Runtime::RuntimeEngineConfigApplyStatus::Applied};
+    };
+    context.AttachmentActive = [&] { return attached; };
+    const auto commands = Runtime::BindEditorProcessingCommands(context);
+    const auto previewAction = [&](const auto& handle, const Runtime::ClusteringService* candidate) {
+        return Runtime::ResolveEditorProcessingActionReadiness(handle,
+            Runtime::PreviewEditorKMeansRun(handle, candidate, request));
+    };
+    const auto configUnavailable = Runtime::ResolveEditorProcessingActionReadiness({}, {});
+    const auto ready = previewAction(commands, service);
+    ASSERT_TRUE(ready.Enabled);
+    EXPECT_TRUE(ready.DisabledReason.empty());
+
+    for (unsigned missing = 0; missing < 5; ++missing)
+    {
+        SCOPED_TRACE(missing);
+        auto incomplete = context;
+        if (missing == 0) incomplete.EngineConfigControlState = nullptr;
+        if (missing == 1) incomplete.EngineConfigCommandsAvailable = false;
+        if (missing == 2) incomplete.PreviewEngineConfigDocument = {};
+        if (missing == 3) incomplete.ApplyEngineConfigHotSubset = {};
+        if (missing == 4) incomplete.AttachmentActive = [] { return false; };
+        const auto handle = Runtime::BindEditorProcessingCommands(incomplete);
+        for (auto* candidate : {service, static_cast<Runtime::ClusteringService*>(nullptr)})
+        {
+            const auto blocked = previewAction(handle, candidate);
+            EXPECT_FALSE(blocked.Enabled);
+            EXPECT_EQ(blocked.DisabledReason, configUnavailable.DisabledReason);
+        }
+        if (missing < 4)
+            EXPECT_TRUE(Runtime::PreviewEditorKMeansRun(handle, service, request).Enabled);
+        EXPECT_FALSE(Runtime::ApplyEditorClusteringConfig(handle, {}).Succeeded());
+    }
+
+    Runtime::ClusteringService unavailableService;
+    for (auto* candidate : {&unavailableService, static_cast<Runtime::ClusteringService*>(nullptr)})
+    {
+        const auto blocked = previewAction(commands, candidate);
+        EXPECT_FALSE(blocked.Enabled);
+        EXPECT_EQ(blocked.DisabledReason,
+                  Runtime::SubmitKMeansRun(commands, candidate, request).Message);
+    }
+
+    request.Parameters.ClusterCount = 0u;
+    const auto rejected = Runtime::ValidateKMeansRequest(&scene->Raw(), request);
+    ASSERT_TRUE(rejected);
+    const auto invalid = previewAction(commands, service);
+    EXPECT_FALSE(invalid.Enabled);
+    EXPECT_EQ(invalid.DisabledReason, rejected->Message);
+    EXPECT_EQ(Runtime::SubmitKMeansRun(commands, service, request).Message, rejected->Message);
+    request.Parameters.ClusterCount = 2u;
+    // Admission reads metadata; numerical validation still belongs to execution.
+    properties.Get<glm::vec3>(std::string{PN::kPosition}).Vector()[1].x =
+        std::numeric_limits<float>::infinity();
+    EXPECT_TRUE(previewAction(commands, service).Enabled);
+    EXPECT_EQ(previews, 0u);
+    EXPECT_EQ(applies, 0u);
+    EXPECT_EQ(service->Stats().CommandsHandled, 0u);
+    EXPECT_EQ(service->Stats().JobsSubmitted, 0u);
+    EXPECT_FALSE(properties.Exists(request.Properties.OutputLabels.Name));
+
+    properties.Get<glm::vec3>(std::string{PN::kPosition}).Vector()[1].x = 1.0f;
+    auto withoutConfig = context;
+    withoutConfig.EngineConfigControlState = nullptr;
+    const auto submission = Runtime::SubmitKMeansRun(
+        Runtime::BindEditorProcessingCommands(withoutConfig), service, request);
+    EXPECT_EQ(submission.Status, Runtime::KMeansRunStatus::Queued);
+    EXPECT_TRUE(submission.Correlation.IsValid());
+
+    attached = false;
+    const auto expired = previewAction(commands, service);
+    EXPECT_FALSE(expired.Enabled);
+    EXPECT_EQ(expired.DisabledReason, configUnavailable.DisabledReason);
+    EXPECT_FALSE(Runtime::ApplyEditorClusteringConfig(commands, {}).Succeeded());
+    EXPECT_EQ(Runtime::SubmitKMeansRun(commands, service, request).Status,
+              Runtime::KMeansRunStatus::ModuleUnavailable);
+    EXPECT_EQ(previews, 0u);
+    EXPECT_EQ(applies, 0u);
+    engine.Shutdown();
+    EXPECT_EQ(previewAction(commands, service).DisabledReason,
+              configUnavailable.DisabledReason);
 }
 
 TEST(ClusteringModule, MetadataAdmissionRejectsInvalidBindingsAndSourcesWithoutScanningValues)

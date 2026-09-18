@@ -908,7 +908,10 @@ exports a visualization-component adapter.
 with the live config lane, using the same availability predicate as config apply.
 Unavailable config commands take reason priority; otherwise method diagnostics
 remain authoritative. This preview executes no config callbacks or property scans;
-commands still validate current inputs at apply time. Typed processing config
+commands still validate current inputs at apply time. The K-Means panel's
+config-backed action composes this resolver with `PreviewEditorKMeansRun`;
+the method preview and `SubmitKMeansRun` remain usable without config controls.
+Typed processing config
 apply rejects file-load fallback that loses the requested section edits; fallback
 in unrelated sections remains usable. Progressive Poisson and parameterization use
 this same apply owner and `RuntimeEngineConfigApplyResult`, passing typed configs

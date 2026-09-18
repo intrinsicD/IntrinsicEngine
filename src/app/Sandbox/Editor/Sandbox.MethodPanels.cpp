@@ -1890,9 +1890,9 @@ namespace Extrinsic::Sandbox::Editor
             const bool clusteringAvailable = service.ClusteringAvailable;
             const Runtime::RunKMeans request = Runtime::MakeConfiguredKMeansRequest(
                 model.SelectedStableId, KMeans.Properties, clusteringConfig);
-            auto readiness = Runtime::PreviewEditorKMeansRun(service.Commands, service.Clustering, request);
-            if (readiness.Enabled && !configAvailable)
-                readiness = {false, "Clustering config control is unavailable."};
+            const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
+                service.Commands,
+                Runtime::PreviewEditorKMeansRun(service.Commands, service.Clustering, request));
             if (DrawProcessingActionButton("Run K-Means##KMeans", readiness))
             {
                 KMeans.LastConfigApply =
