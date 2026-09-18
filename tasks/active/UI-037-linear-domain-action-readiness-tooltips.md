@@ -3082,3 +3082,67 @@ cmake --build --preset ci --target IntrinsicTests -j4
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
 python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicTests
 ```
+
+## Shared point-index admission — 2026-09-18
+
+Operator-directed continuation with Claude from clean `8d48f3759`; Codex owns
+this checkout/build and Claude reviews read-only. The Framework24 focus and
+UI-037 readiness acceptance remain unchanged. Existing declared source-doc,
+processing-locality and element-domain contracts cover this slice.
+
+Reuse/right-sizing review identifies nine identical cache acquire/lease/match
+sequences. One private free function, `AcquirePointIndex` in the existing
+`RadiusRows.cpp`, replaces those mechanisms without a new module, source, target,
+context wrapper or lifecycle template. Adapters keep typed backend predicates,
+status mapping, exact mismatch text and publication freshness. Bilateral's
+zero-iteration bypass, topology-normal bypass, outlier removal and registration's
+transformed-target contract stay explicit. Acquisition failure preserves lease
+outputs; mismatch retains the acquired handle, immutable snapshot and reuse flag.
+No neighborhood semantics or missing spatial-query capability changes.
+
+The helper's small tri-state return avoids a result wrapper plus repeated lease
+assignments. Public density command regressions cover acquisition failure,
+coordinate mismatch and equal-count source-row mismatch, including cache reuse
+and unchanged output values/revisions. Existing family and Vulkan workflows
+remain the integration checks.
+
+Claude's fixed-diff review found no blockers. Its optional move/copy nit retains
+the prior acquired-diagnostic copy semantics; callers ignore diagnostics on ready
+or mismatched outcomes, so no expanded comment is needed. Reviewed source-doc
+prompts retain only the lease-output, self/row-completeness and main-thread
+contracts. Every adapter reconstructs the baseline exactly outside the replacement
+block and three includes; all mismatch strings byte-match. One compiler action
+and symbol inspection show one helper definition and nine consumer references.
+The 11 production files grow from 4,339 to 4,374 physical lines: the declaration,
+compiled owner and readable call sites consolidate the mechanism but do not reduce
+total source lines. No elapsed compilation speedup is measured or claimed.
+
+Architecture review preserves runtime ownership, C++ linkage and existing cache
+leases. The ordinary owner explicitly imports the narrow WorldHandle type and
+includes entt's entity declaration. Layer and target checks pass; public surface,
+renderer/pass/recipe, maturity-closure and exception changes are not applicable.
+Logs and the fixed review packet are in `/tmp/intrinsic-index-admission/`.
+
+
+Verification uses canonical ci/Clang 23: `IntrinsicTests` builds, all 164 focused
+cases pass, and the full exclusion-only CPU gate selects 4,746 cases (4,745 pass,
+one expected ASan-only GLFW lifecycle skip, zero failures). The ci-vulkan target
+builds with the preset's ASan+UBSan instrumentation; all 20 selected GPU/Vulkan
+integration cases execute and pass, including all nine adapters and both
+construction workflows. This is focused sanitizer-backed Vulkan coverage, not
+full CPU sanitizer-suite coverage. No capability maturity or benchmark claim is
+added. Test routing reconciles 41 targets, 4,753 cases and 363 sources. Strict
+layering, test layout, task policy/state and docs sync pass; doc links, root
+hygiene, skill mirrors, brief and diff checks pass. Source-doc audit has no errors;
+its four declaration-comment prompts retain the contracts described above.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^(KernelDensity|PointSpacing|OutlierAnalysis|DensityWeight|Keypoint|Descriptor|Bilateral|NormalEstimation|PointConstruction|ProcessingCompilationLocality)' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target IntrinsicPointLBVHGpuTests -j4
+ctest --test-dir build/ci-vulkan --output-on-failure -R '^(PointLBVHGpuSmoke\.(Normal|Outlier|LocalDistance|KernelDensity|PointSpacing|Bilateral|Keypoint|Descriptor|DensityWeight)|PointConstructionGpuSmoke\.)' -L gpu -L vulkan --no-tests=error --timeout 180
+python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicTests
+```

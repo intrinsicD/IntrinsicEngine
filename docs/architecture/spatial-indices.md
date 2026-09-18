@@ -123,8 +123,11 @@ Results retain original property row IDs; CPU snapshot indices are compact and
 carry an explicit `Slots` mapping.
 `SpatialIndexSnapshotMatches` is the compiled comparison shared by the nine
 property-processing adapters: it rejects a null snapshot and compares ordered
-source slots and numeric positions exactly. Callers retain acquisition, freshness
-and backend checks and their own failure diagnostics.
+source slots and numeric positions exactly. Their private `AcquirePointIndex`
+helper in `Runtime.GeometryProcessingOperations.RadiusRows.cpp` compiles cache
+acquisition, immutable snapshot retention and matching once. Acquisition failure
+leaves lease outputs untouched; mismatch retains the lease and reuse flag for
+reporting. Callers retain freshness/backend gates, status mapping and diagnostics.
 
 `Acquire(..., SpatialIndexSpace::EntityTransform)` indexes transformed positions
 and includes the entity TRS matrix in cache freshness. This preserves the

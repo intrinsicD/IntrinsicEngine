@@ -9,10 +9,32 @@
 #include <utility>
 #include <vector>
 #include <glm/glm.hpp>
+#include <entt/entity/entity.hpp>
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.WorldHandle;
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 namespace Extrinsic::Runtime::GeometryProcessingDetail
 {
+    PointIndexState AcquirePointIndex(
+        SpatialIndexCache& cache, WorldHandle world, entt::entity entity,
+        const GeometryPropertyRef& positions, std::span<const std::uint32_t> slots,
+        std::span<const glm::vec3> points, SpatialIndexHandle& handle,
+        std::shared_ptr<const SpatialIndexSnapshot>& snapshot, bool& reused,
+        std::string& diagnostic)
+    {
+        auto acquired = cache.Acquire(world, entity, positions);
+        if (!acquired.Ready())
+        {
+            diagnostic = std::move(acquired.Diagnostic);
+            return PointIndexState::Unavailable;
+        }
+        handle = acquired.Handle;
+        snapshot = cache.Snapshot(acquired.Handle);
+        reused = acquired.Reused;
+        return SpatialIndexSnapshotMatches(snapshot.get(), slots, points)
+            ? PointIndexState::Ready : PointIndexState::Mismatched;
+    }
+
     bool AppendPointKnnRows(
         const SpatialIndexSnapshot& source, std::span<const glm::vec3> points,
         std::uint32_t width, std::vector<std::uint32_t>& indices, std::string& diagnostic)

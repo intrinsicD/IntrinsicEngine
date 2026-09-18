@@ -301,11 +301,14 @@ namespace Extrinsic::Runtime
         if(!w)return report(EditorCommandStatus::InvalidProcessingParameters,diagnostic);
         if(w->Config.Backend!=DescriptorAnalysisBackend::CpuKDTree)
         {
-            const auto acquired=context.SpatialIndices->Acquire(context.World,w->Entity,w->Config.Positions);
-            if(!acquired.Ready())return report(EditorCommandStatus::InvalidProcessingParameters,acquired.Diagnostic);
-            w->GpuIndex=acquired.Handle;w->Index=context.SpatialIndices->Snapshot(acquired.Handle);w->Result.IndexReused=acquired.Reused;
-            if (!SpatialIndexSnapshotMatches(w->Index.get(), w->Slots, w->Points))
-                return report(EditorCommandStatus::StaleEntity,"Descriptor index does not match the selected samples.");
+            const auto indexState = GeometryProcessingDetail::AcquirePointIndex(
+                *context.SpatialIndices, context.World, w->Entity, w->Config.Positions,
+                w->Slots, w->Points, w->GpuIndex, w->Index, w->Result.IndexReused, diagnostic);
+            if (indexState == GeometryProcessingDetail::PointIndexState::Unavailable)
+                return report(EditorCommandStatus::InvalidProcessingParameters, diagnostic);
+            if (indexState == GeometryProcessingDetail::PointIndexState::Mismatched)
+                return report(EditorCommandStatus::StaleEntity,
+                              "Descriptor index does not match the selected samples.");
         }
         if(!context.JobCommands.Available()){Compute(*w);return Publish(context,w);}
         const EditorJobIdentity identity{.EntityId=config.StableEntityId,.Scope=ToEditorJobScope(w->Config.Outputs[0].Domain),

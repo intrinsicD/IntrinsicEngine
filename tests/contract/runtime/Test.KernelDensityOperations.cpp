@@ -303,6 +303,74 @@ TEST(KernelDensityOperations, InvalidUnsupportedAndNumericalFailuresRetainOutput
     config.Bandwidth=1;config.KNeighbors=std::numeric_limits<std::uint32_t>::max();
     EXPECT_TRUE(R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), config).Succeeded());
 }
+TEST(KernelDensityOperations, IndexAdmissionFailurePreservesOutputAndCacheDiagnostic)
+{
+    R::WorldRegistry worlds;
+    const auto world = worlds.CreateWorld("density");
+    auto& scene = *worlds.Get(world);
+    R::SpatialIndexCache cache(worlds);
+    const auto entity = Make(scene, D::PointCloudPoint);
+    auto config = Config(entity, D::PointCloudPoint);
+    config.Backend = R::KernelDensityBackend::CpuLBVH;
+    auto& props = Properties(scene, entity, D::PointCloudPoint);
+    props.GetOrAdd<float>("density").Vector().assign(props.Size(), 77);
+    const auto revision = std::as_const(props).Get<float>("density").Revision();
+    R::EditorProcessingContext context{.Scene = &scene, .World = {}, .SpatialIndices = &cache};
+    const auto expected = cache.Acquire(context.World, entity, config.Positions);
+    ASSERT_FALSE(expected.Ready());
+    ASSERT_FALSE(expected.Diagnostic.empty());
+
+    const auto result = R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), config);
+
+    EXPECT_EQ(result.Status, R::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_EQ(result.Message, expected.Diagnostic);
+    EXPECT_FALSE(result.IndexReused);
+    EXPECT_EQ(std::as_const(props).Get<float>("density").Revision(), revision);
+    EXPECT_TRUE(std::ranges::all_of(std::as_const(props).Get<float>("density").Vector(),
+                                   [](float value) { return value == 77; }));
+}
+
+TEST(KernelDensityOperations, IndexAdmissionRejectsMismatchedPositionsAndSourceRows)
+{
+    for (const bool mismatchRows : {false, true})
+    {
+        SCOPED_TRACE(mismatchRows);
+        R::WorldRegistry worlds;
+        const auto world = worlds.CreateWorld("index source");
+        auto& indexedScene = *worlds.Get(world);
+        Extrinsic::ECS::Scene::Registry capturedScene;
+        const auto entity = Make(capturedScene, D::PointCloudPoint);
+        ASSERT_EQ(Make(indexedScene, D::PointCloudPoint), entity);
+        auto config = Config(entity, D::PointCloudPoint);
+        config.Backend = R::KernelDensityBackend::CpuLBVH;
+        auto& indexed = Properties(indexedScene, entity, D::PointCloudPoint);
+        auto points = indexed.Get<glm::vec3>("samples");
+        if (mismatchRows)
+        {
+            // Keep compact coordinates identical while shifting every source row.
+            for (std::size_t i = 4; i > 0; --i) points[i] = points[i - 1];
+            indexed.Get<bool>("v:deleted")[0] = true;
+            indexed.Get<bool>("v:deleted")[4] = false;
+        }
+        else points[0].x += 1;
+        R::SpatialIndexCache cache(worlds);
+        auto& props = Properties(capturedScene, entity, D::PointCloudPoint);
+        props.GetOrAdd<float>("density").Vector().assign(props.Size(), 77);
+        const auto revision = std::as_const(props).Get<float>("density").Revision();
+        R::EditorProcessingContext context{.Scene = &capturedScene, .World = world, .SpatialIndices = &cache};
+        for (const bool reused : {false, true})
+        {
+            const auto result = R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), config);
+            EXPECT_EQ(result.Status, R::EditorCommandStatus::StaleEntity);
+            EXPECT_EQ(result.Message, "Density index snapshot does not match the selected samples.");
+            EXPECT_EQ(result.IndexReused, reused);
+            EXPECT_EQ(std::as_const(props).Get<float>("density").Revision(), revision);
+            EXPECT_TRUE(std::ranges::all_of(std::as_const(props).Get<float>("density").Vector(),
+                                           [](float value) { return value == 77; }));
+        }
+    }
+}
+
 TEST(KernelDensityOperations, NewOutputUndoAndPositionEditsRebuildTheCache)
 {
     R::WorldRegistry worlds;auto world=worlds.CreateWorld("density");auto& scene=*worlds.Get(world);

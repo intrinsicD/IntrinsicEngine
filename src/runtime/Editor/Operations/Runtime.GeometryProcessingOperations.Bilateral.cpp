@@ -38,6 +38,7 @@ import Geometry.Properties;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -359,13 +360,12 @@ namespace Extrinsic::Runtime
             return report(EditorCommandStatus::InvalidProcessingParameters, std::move(diagnostic));
         if (w->Config.Iterations && w->Config.Backend != BilateralFilterBackend::CpuOctree)
         {
-            auto acquired = context.SpatialIndices->Acquire(context.World, w->Entity, w->Config.Positions);
-            if (!acquired.Ready())
-                return report(EditorCommandStatus::InvalidProcessingParameters, acquired.Diagnostic);
-            w->GpuIndex = acquired.Handle;
-            w->Index = context.SpatialIndices->Snapshot(acquired.Handle);
-            w->Result.IndexReused = acquired.Reused;
-            if (!SpatialIndexSnapshotMatches(w->Index.get(), w->Slots, w->Points))
+            const auto indexState = GeometryProcessingDetail::AcquirePointIndex(
+                *context.SpatialIndices, context.World, w->Entity, w->Config.Positions,
+                w->Slots, w->Points, w->GpuIndex, w->Index, w->Result.IndexReused, diagnostic);
+            if (indexState == GeometryProcessingDetail::PointIndexState::Unavailable)
+                return report(EditorCommandStatus::InvalidProcessingParameters, diagnostic);
+            if (indexState == GeometryProcessingDetail::PointIndexState::Mismatched)
                 return report(EditorCommandStatus::StaleEntity,
                               "Bilateral index snapshot does not match the selected samples.");
         }

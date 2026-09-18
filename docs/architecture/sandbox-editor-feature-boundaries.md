@@ -321,6 +321,12 @@ support-membership contract. These declarations live in `RadiusRows.hpp` for
 consumers of spatial-index neighborhoods.
 `BuildPointInputCatalog` reuses finite live-row capture for weights, keypoints,
 outliers, descriptors, construction and normals, independently of method result records.
+`RadiusRows.cpp` also owns `AcquirePointIndex`, shared by all nine point-processing
+adapters. The private helper retains the immutable lease and cache-reuse flag,
+then compares captured source rows and coordinates; typed backend gates, failure
+statuses and method-specific diagnostics stay with the callers. Registration's
+transformed target-space acquisition stays separate.
+
 `RadiusRows.cpp` compiles the CPU capture and both pagers once outside either family and preserves
 complete radius support and its explicit lowest-ID limit. Property capture imports
 only the leaf point-LBVH algorithm for coordinate validation, without the spatial

@@ -1,4 +1,4 @@
-// Private CPU kNN capture and framed neighborhood pagination for point methods.
+// Private index admission and neighborhood capture for point-property methods.
 #pragma once
 #include <chrono>
 #include <cstdint>
@@ -10,6 +10,15 @@ extern "C++"
 {
 namespace Extrinsic::Runtime::GeometryProcessingDetail
 {
+    enum class PointIndexState { Ready, Unavailable, Mismatched };
+    // Main-thread admission after caller preflight. Unavailable leaves lease outputs
+    // untouched; Mismatched retains the acquired lease and reuse flag for reporting.
+    [[nodiscard]] PointIndexState AcquirePointIndex(
+        SpatialIndexCache&, WorldHandle, entt::entity, const GeometryPropertyRef& positions,
+        std::span<const std::uint32_t> slots, std::span<const glm::vec3> points,
+        SpatialIndexHandle&, std::shared_ptr<const SpatialIndexSnapshot>&,
+        bool& reused, std::string& diagnostic);
+
     // Width includes self candidates; append compact indices in query order.
     // A failed row leaves earlier rows appended; callers must discard the result.
     [[nodiscard]] bool AppendPointKnnRows(
