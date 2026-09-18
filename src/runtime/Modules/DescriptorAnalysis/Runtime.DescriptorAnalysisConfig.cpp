@@ -50,10 +50,10 @@ namespace Extrinsic::Runtime
     std::string SerializeDescriptorAnalysisConfig(const DescriptorAnalysisConfig& c)
     {
         auto outputs=Json::array();for(const auto& output:c.Outputs)outputs.push_back(ConfigDetail::EncodePointPropertyRef(output));
-        return Json{{"entity",c.StableEntityId},{"backend",ToString(c.Backend)},
+        return ConfigDetail::SerializeConfigJson(Json{{"entity",c.StableEntityId},{"backend",ToString(c.Backend)},
             {"positions",ConfigDetail::EncodePointPropertyRef(c.Positions)},{"normals",ConfigDetail::EncodePointPropertyRef(c.Normals)},{"outputs",outputs},
             {"max_neighbors",c.MaxNeighbors},{"gpu_query_batch_size",c.GpuQueryBatchSize},
-            {"gpu_radius_capacity",c.GpuRadiusCapacity},{"feature_radius",c.FeatureRadius}}.dump();
+            {"gpu_radius_capacity",c.GpuRadiusCapacity},{"feature_radius",c.FeatureRadius}});
     }
     Core::Config::EngineConfigSectionValidationResult ValidateDescriptorAnalysisConfigSection(
         std::string_view payload,std::string_view,std::string_view subject)

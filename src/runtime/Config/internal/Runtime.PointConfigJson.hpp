@@ -1,4 +1,4 @@
-// Parsing, validated section lookup and property JSON shared by runtime feature configs.
+// Parsing, serialization, validated lookup and property JSON shared by runtime configs.
 // Include after core config, JSON, standard-library and property declarations.
 #pragma once
 
@@ -8,6 +8,7 @@ extern "C++"
     {
         [[nodiscard]] nlohmann::json ParseConfigJson(
             std::string_view payload, bool allowExceptions);
+        [[nodiscard]] std::string SerializeConfigJson(const nlohmann::json& value);
 
         using SectionValidatorFn = Core::Config::EngineConfigSectionValidationResult (*)(
             std::string_view, std::string_view, std::string_view);

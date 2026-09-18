@@ -35,6 +35,12 @@ namespace Extrinsic::Runtime::ConfigDetail
         return nlohmann::json::parse(payload, nullptr, allowExceptions);
     }
 
+    std::string SerializeConfigJson(const nlohmann::json& value)
+    {
+        // Keep the default serializer instantiated in this translation unit.
+        return value.dump();
+    }
+
     [[nodiscard]] std::optional<std::string> FindValidatedCanonicalPayload(
         const Core::Config::EngineConfig& config,
         const std::string_view name,
@@ -2266,7 +2272,7 @@ namespace Extrinsic::Runtime
                           {"colors", EncodePropertyRef(config.Properties->OutputColors)},
                           {"scalar_labels", config.Properties->OutputScalarLabels
                               ? EncodePropertyRef(*config.Properties->OutputScalarLabels) : json(nullptr)}};
-        return json::object({
+        return ConfigDetail::SerializeConfigJson(json::object({
             {"properties", properties},
             {"cluster_count", config.Parameters.ClusterCount},
             {"max_iterations", config.Parameters.MaxIterations},
@@ -2274,13 +2280,13 @@ namespace Extrinsic::Runtime
             {"initialization",
              std::string{ToConfigString(config.Parameters.Initialization)}},
             {"backend", std::string{ToConfigString(config.Backend)}},
-        }).dump();
+        }));
     }
 
     std::string SerializeCurvatureSegmentationConfig(
         const CurvatureSegmentationConfig& config)
     {
-        return json::object({
+        return ConfigDetail::SerializeConfigJson(json::object({
             {"positions", EncodePropertyRef(config.Positions)},
             {"components", EncodePropertyRef(config.Components)},
             {"regions", EncodePropertyRef(config.Regions)},
@@ -2313,7 +2319,7 @@ namespace Extrinsic::Runtime
             {"hard_dihedral_threshold_degrees",
              config.HardDihedralThresholdDegrees},
             {"patch_complexity_cost", config.PatchComplexityCost},
-        }).dump();
+        }));
     }
 
     bool IsValidProgressivePoissonPropertyBindings(
@@ -2342,7 +2348,7 @@ namespace Extrinsic::Runtime
     std::string SerializeProgressivePoissonPlaygroundConfig(
         const ProgressivePoissonPlaygroundConfig& config)
     {
-        return json::object({
+        return ConfigDetail::SerializeConfigJson(json::object({
             {"positions", EncodePropertyRef(config.Positions)},
             {"level_property", EncodePropertyRef(config.Level)},
             {"rank_property", EncodePropertyRef(config.Rank)},
@@ -2363,13 +2369,13 @@ namespace Extrinsic::Runtime
             {"backend", std::string{ToConfigString(config.Backend)}},
             {"auto_run_on_edit", config.AutoRunOnEdit},
             {"debounce_seconds", config.DebounceSeconds},
-        }).dump();
+        }));
     }
 
     std::string SerializeParameterizationConfig(
         const ParameterizationConfig& config)
     {
-        return json::object({
+        return ConfigDetail::SerializeConfigJson(json::object({
             {"positions", EncodePropertyRef(config.Positions)},
             {"texcoords", EncodePropertyRef(config.Texcoords)},
             {"strategy", std::string{ToConfigString(config.Strategy)}},
@@ -2409,13 +2415,13 @@ namespace Extrinsic::Runtime
                  {"angle_sum_tolerance", config.Bff.AngleSumTolerance},
                  {"degeneracy_tolerance", config.Bff.DegeneracyTolerance},
              })},
-        }).dump();
+        }));
     }
 
     std::string SerializePointCloudConsolidationConfig(
         const PointCloudConsolidationConfig& config)
     {
-        return json::object({
+        return ConfigDetail::SerializeConfigJson(json::object({
             {"gpu_query_batch_size", config.GpuQueryBatchSize},
             {"gpu_radius_capacity", config.GpuRadiusCapacity},
             {"backend", std::string{ToConfigString(config.Backend)}},
@@ -2440,7 +2446,7 @@ namespace Extrinsic::Runtime
             {"clop_mixture_relative_tolerance", config.ClopMixtureRelativeTolerance},
             {"clop_covariance_floor", config.ClopCovarianceFloor},
             {"ear_edge_sensitivity", config.EarEdgeSensitivity},
-        }).dump();
+        }));
     }
 
     Core::Config::EngineConfigSectionValidationResult

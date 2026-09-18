@@ -40,11 +40,11 @@ namespace Extrinsic::Runtime
 
     std::string SerializeKeypointAnalysisConfig(const KeypointAnalysisConfig& c)
     {
-        return Json{{"entity",c.StableEntityId},{"backend",ToString(c.Backend)},
+        return ConfigDetail::SerializeConfigJson(Json{{"entity",c.StableEntityId},{"backend",ToString(c.Backend)},
             {"positions",ConfigDetail::EncodePointPropertyRef(c.Positions)},{"mask",ConfigDetail::EncodePointPropertyRef(c.Mask)},{"score",ConfigDetail::EncodePointPropertyRef(c.Score)},
             {"minimum_neighbors",c.MinimumNeighbors},{"gpu_query_batch_size",c.GpuQueryBatchSize},
             {"gpu_radius_capacity",c.GpuRadiusCapacity},{"salient_radius",c.SalientRadius},
-            {"nonmax_radius",c.NonMaxRadius},{"gamma21",c.Gamma21},{"gamma32",c.Gamma32}}.dump();
+            {"nonmax_radius",c.NonMaxRadius},{"gamma21",c.Gamma21},{"gamma32",c.Gamma32}});
     }
     Core::Config::EngineConfigSectionValidationResult ValidateKeypointAnalysisConfigSection(
         std::string_view payload,std::string_view,std::string_view subject)

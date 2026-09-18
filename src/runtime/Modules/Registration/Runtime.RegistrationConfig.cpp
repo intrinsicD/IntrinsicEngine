@@ -52,14 +52,14 @@ namespace Extrinsic::Runtime
     }
     std::string SerializeRegistrationConfig(const RegistrationConfig& c)
     {
-        return Json{{"source_entity", c.SourceStableEntityId}, {"target_entity", c.TargetStableEntityId},
+        return ConfigDetail::SerializeConfigJson(Json{{"source_entity", c.SourceStableEntityId}, {"target_entity", c.TargetStableEntityId},
             {"source_positions", ConfigDetail::EncodeVec3PointPropertyRef(c.SourcePositions)}, {"target_positions", ConfigDetail::EncodeVec3PointPropertyRef(c.TargetPositions)},
             {"target_normals", ConfigDetail::EncodeVec3PointPropertyRef(c.TargetNormals)}, {"backend", ToString(c.Backend)},
             {"variant", c.Variant == EditorICPVariant::PointToPlane ? "point_to_plane" :
                         c.Variant == EditorICPVariant::PointToPoint ? "point_to_point" : "invalid"},
             {"max_iterations", c.MaxIterations}, {"max_correspondence_distance", c.MaxCorrespondenceDistance},
             {"inlier_ratio", c.InlierRatio}, {"trajectory_step", c.TrajectoryStep},
-            {"convergence_threshold", c.ConvergenceThreshold}}.dump();
+            {"convergence_threshold", c.ConvergenceThreshold}});
     }
     Core::Config::EngineConfigSectionValidationResult ValidateRegistrationConfigSection(
         std::string_view payload, std::string_view, std::string_view subject)

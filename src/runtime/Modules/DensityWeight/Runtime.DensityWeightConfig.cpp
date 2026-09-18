@@ -42,11 +42,11 @@ namespace Extrinsic::Runtime
 
     std::string SerializeDensityWeightConfig(const DensityWeightConfig& c)
     {
-        return Json{{"entity",c.StableEntityId},{"backend",ToString(c.Backend)},
+        return ConfigDetail::SerializeConfigJson(Json{{"entity",c.StableEntityId},{"backend",ToString(c.Backend)},
             {"positions",ConfigDetail::EncodePointPropertyRef(c.Positions)},{"weights",ConfigDetail::EncodePointPropertyRef(c.Weights)},
             {"support_radius",c.SupportRadius},{"kernel",Geometry::PointCloud::Kernels::DebugName(c.Kernel)},
             {"mode",Geometry::PointCloud::Kernels::DebugName(c.Mode)},
-            {"gpu_query_batch_size",c.GpuQueryBatchSize},{"gpu_radius_capacity",c.GpuRadiusCapacity}}.dump();
+            {"gpu_query_batch_size",c.GpuQueryBatchSize},{"gpu_radius_capacity",c.GpuRadiusCapacity}});
     }
     Core::Config::EngineConfigSectionValidationResult ValidateDensityWeightConfigSection(
         std::string_view payload,std::string_view,std::string_view subject)

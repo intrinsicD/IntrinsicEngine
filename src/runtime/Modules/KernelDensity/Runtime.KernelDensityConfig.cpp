@@ -35,10 +35,10 @@ namespace Extrinsic::Runtime
     }
     std::string SerializeKernelDensityConfig(const KernelDensityConfig& c)
     {
-        return Json{{"entity",c.StableEntityId},{"backend",ToString(c.Backend)},
+        return ConfigDetail::SerializeConfigJson(Json{{"entity",c.StableEntityId},{"backend",ToString(c.Backend)},
                     {"positions",ConfigDetail::EncodePointPropertyRef(c.Positions)},{"density",ConfigDetail::EncodePointPropertyRef(c.Density)},
                     {"k_neighbors",c.KNeighbors},{"gpu_query_batch_size",c.GpuQueryBatchSize},
-                    {"bandwidth",c.Bandwidth}}.dump();
+                    {"bandwidth",c.Bandwidth}});
     }
     Core::Config::EngineConfigSectionValidationResult ValidateKernelDensityConfigSection(
         std::string_view payload,std::string_view,std::string_view subject)

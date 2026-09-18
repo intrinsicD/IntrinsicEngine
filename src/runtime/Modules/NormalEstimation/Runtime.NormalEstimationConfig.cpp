@@ -81,7 +81,7 @@ namespace Extrinsic::Runtime
     }
     std::string SerializeNormalEstimationConfig(const NormalEstimationConfig &c)
     {
-        return Json{{"entity", c.StableEntityId},
+        return ConfigDetail::SerializeConfigJson(Json{{"entity", c.StableEntityId},
                     {"method", ToString(c.Method)},
                     {"backend", ToString(c.Backend)},
                     {"positions", ConfigDetail::EncodeVec3PointPropertyRef(c.Positions)},
@@ -96,8 +96,7 @@ namespace Extrinsic::Runtime
                     {"degenerate_epsilon", c.DegenerateNormalLengthEpsilon},
                     {"collinear_epsilon", c.CollinearEigenvalueRatioEpsilon},
                     {"weighting", unsigned(c.Weighting)},
-                    {"orient_toward_fallback", c.OrientTowardFallback}}
-            .dump();
+                    {"orient_toward_fallback", c.OrientTowardFallback}});
     }
     Core::Config::EngineConfigSectionValidationResult ValidateNormalEstimationConfigSection(
         std::string_view payload, std::string_view, std::string_view subject)

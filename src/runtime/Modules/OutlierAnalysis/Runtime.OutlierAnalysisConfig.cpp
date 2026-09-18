@@ -47,10 +47,10 @@ namespace Extrinsic::Runtime
     }
     std::string SerializeOutlierAnalysisConfig(const OutlierAnalysisConfig& c)
     {
-        return Json{{"entity",c.StableEntityId},{"method",ToString(c.Method)},{"backend",ToString(c.Backend)},
+        return ConfigDetail::SerializeConfigJson(Json{{"entity",c.StableEntityId},{"method",ToString(c.Method)},{"backend",ToString(c.Backend)},
                     {"operation",ToString(c.Operation)},{"positions",ConfigDetail::EncodePointPropertyRef(c.Positions)},{"mask",ConfigDetail::EncodePointPropertyRef(c.Mask)},{"score",ConfigDetail::EncodePointPropertyRef(c.Score)},
                     {"k_neighbors",c.KNeighbors},{"minimum_neighbors",c.MinimumNeighbors},{"gpu_query_batch_size",c.GpuQueryBatchSize},
-                    {"radius",c.Radius},{"stddev_multiplier",c.StdDevMultiplier},{"score_threshold",c.ScoreThreshold}}.dump();
+                    {"radius",c.Radius},{"stddev_multiplier",c.StdDevMultiplier},{"score_threshold",c.ScoreThreshold}});
     }
     Core::Config::EngineConfigSectionValidationResult ValidateOutlierAnalysisConfigSection(
         std::string_view payload,std::string_view,std::string_view subject)

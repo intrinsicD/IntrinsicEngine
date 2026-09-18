@@ -35,10 +35,10 @@ namespace Extrinsic::Runtime
     }
     std::string SerializeBilateralFilterConfig(const BilateralFilterConfig& c)
     {
-        return Json{{"entity",c.StableEntityId},{"backend",ToString(c.Backend)},
+        return ConfigDetail::SerializeConfigJson(Json{{"entity",c.StableEntityId},{"backend",ToString(c.Backend)},
                     {"positions",ConfigDetail::EncodePointPropertyRef(c.Positions)},{"normals",ConfigDetail::EncodePointPropertyRef(c.Normals)},{"output",ConfigDetail::EncodePointPropertyRef(c.Output)},
                     {"k_neighbors",c.KNeighbors},{"gpu_query_batch_size",c.GpuQueryBatchSize},
-                    {"spatial_sigma",c.SpatialSigma},{"normal_sigma",c.NormalSigma},{"iterations",c.Iterations}}.dump();
+                    {"spatial_sigma",c.SpatialSigma},{"normal_sigma",c.NormalSigma},{"iterations",c.Iterations}});
     }
     Core::Config::EngineConfigSectionValidationResult ValidateBilateralFilterConfigSection(
         std::string_view payload,std::string_view,std::string_view subject)

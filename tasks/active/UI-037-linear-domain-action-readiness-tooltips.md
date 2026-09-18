@@ -3285,3 +3285,56 @@ python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --
 Review packets, parser-object inspection and logs are retained under
 `/tmp/intrinsic-reuse-continuation/`. This is a clean session boundary; read this
 checkpoint rather than the full task history. UI-037 remains open.
+
+## Compiled config serialization — verified, 2026-09-18
+
+Operator-directed reuse/compilation continuation with Claude from `83c1326aa`.
+Codex owns edits/builds; Claude supplied read-only planning and fixed-diff review.
+The existing source-documentation and processing-compilation-locality contracts
+apply; broader readiness acceptance stays open.
+
+Reuse discovery found twelve default JSON dump calls in eleven consumers of
+`Runtime.PointConfigJson.hpp`, plus five calls in its compiled codec owner.
+All now use `ConfigDetail::SerializeConfigJson(const nlohmann::json&)` beside
+the parser in `Runtime.FeatureConfigCodecs.Detail.cpp`. Family-owned schema
+construction, typed decoding and validation remain unchanged. No new target,
+module, dependency edge or public API is needed. Other serializers retain their
+owners and formatting contracts.
+
+Object inspection finds zero serializer/dump definitions and one helper
+reference in each consumer. The shared owner contains twelve serializer-related
+definitions and one strong helper definition. Consumer edits invert to baseline
+tokens; the owner inverts byte-for-byte after removing the helper and its five
+call substitutions. Thirteen production files total 4,106 -> 4,111 lines (+5).
+This consolidates repeated compilation; no elapsed-speed or binary-size claim.
+
+Claude found no blockers; its whitespace note is fixed. Public regressions pin
+compact raw UTF-8 and slash/quote/backslash/newline/NUL encoding in all eleven
+families, plus invalid-UTF-8 termination through one consumer. All three encoding
+tests pass before and after the production change. The first test draft expected
+exceptions, but these sources use `-fno-exceptions`. A redundant 33-death draft
+then timed out while Apport processed crashes. One shared-policy death check
+retains the required coverage without changing any timeout or runtime policy.
+
+Canonical `ci`/Clang 23 configures and `IntrinsicTests` builds. All 59 focused
+config/locality cases pass. Full CPU: 4,748 selected, 4,747 passed, one expected
+ASan-only GLFW lifecycle skip, zero failures (151.73 s of test execution).
+After the whitespace fix, all 22 config cases pass again. Routing reconciles
+41 targets, 4,755 cases and 363 sources. No GPU or sanitizer-suite run is claimed.
+Strict layering, test layout, task policy/state, docs sync, doc links, root
+hygiene, skill mirrors, session brief and diff checks pass. Source-doc audit has
+zero errors; five existing declaration comments retain required validation and
+decoding contracts, and its large-file prompt covers the shared codec owner.
+No module inventory, recipe change, policy exception or maturity closure is owed.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicSandboxEditorIntegrationTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^(SandboxConfigSections|ProcessingCompilationLocality|ConfigCompilationLocality)\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicTests
+```
+
+Logs, symbol inspection and Claude packets: `/tmp/intrinsic-config-serialization/`.
+This is a clean session boundary; continue from this checkpoint. UI-037 remains open.

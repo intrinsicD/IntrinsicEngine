@@ -73,7 +73,7 @@ namespace Extrinsic::Runtime
     }
     std::string SerializePointConstructionConfig(const PointConstructionConfig& c)
     {
-        return Json{{"entity", c.StableEntityId},
+        return ConfigDetail::SerializeConfigJson(Json{{"entity", c.StableEntityId},
                     {"method", ToString(c.Method)},
                     {"backend", ToString(c.Backend)},
                     {"positions", ConfigDetail::EncodeVec3PointPropertyRef(c.Positions)},
@@ -89,8 +89,7 @@ namespace Extrinsic::Runtime
                     {"bounding_box_padding", c.BoundingBoxPadding},
                     {"normal_agreement_power", c.NormalAgreementPower},
                     {"kernel_sigma_scale", c.KernelSigmaScale},
-                    {"min_distance_epsilon", c.MinDistanceEpsilon}}
-            .dump();
+                    {"min_distance_epsilon", c.MinDistanceEpsilon}});
     }
     Core::Config::EngineConfigSectionValidationResult
     ValidatePointConstructionConfigSection(std::string_view payload, std::string_view,

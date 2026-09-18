@@ -35,10 +35,10 @@ namespace Extrinsic::Runtime
     }
     std::string SerializePointSpacingConfig(const PointSpacingConfig& c)
     {
-        return Json{{"entity",c.StableEntityId},{"backend",ToString(c.Backend)},
+        return ConfigDetail::SerializeConfigJson(Json{{"entity",c.StableEntityId},{"backend",ToString(c.Backend)},
                     {"positions",ConfigDetail::EncodePointPropertyRef(c.Positions)},{"radii",ConfigDetail::EncodePointPropertyRef(c.Radii)},
                     {"k_neighbors",c.KNeighbors},{"gpu_query_batch_size",c.GpuQueryBatchSize},
-                    {"scale_factor",c.ScaleFactor}}.dump();
+                    {"scale_factor",c.ScaleFactor}});
     }
     Core::Config::EngineConfigSectionValidationResult ValidatePointSpacingConfigSection(
         std::string_view payload,std::string_view,std::string_view subject)

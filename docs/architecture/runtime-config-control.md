@@ -112,6 +112,10 @@ payloads use the same parser instantiation with their exact input bounds.
 Callers explicitly select discarded results for malformed untrusted input or
 the library's exception policy for generated/validated JSON; validation and
 diagnostic policy remain family-owned. JSON stays private to implementation files.
+These codecs also share `SerializeConfigJson`, so the default JSON serializer
+compiles in the same owner. Family serializers still construct their own JSON
+values; compact formatting, sorted object keys, raw UTF-8 and strict invalid
+encoding rejection retain the library defaults.
 
 The `sandbox.parameterization` payload carries one of the implemented CPU strategy
 tokens (`lscm`, `harmonic_cotangent`, `tutte_uniform`, or `bff`) and the typed

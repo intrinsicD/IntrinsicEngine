@@ -1315,6 +1315,48 @@ TEST(SandboxConfigSections, Vec3PropertySerializersPreserveAllBindingTokensAndNa
           Runtime::SerializeRegistrationConfig, Runtime::ValidateRegistrationConfigSection);
 }
 
+TEST(SandboxConfigSections, ConfigSerializersPreserveEncodingPolicy)
+{
+    const auto check = []<typename Config>(Config config,
+        Runtime::GeometryPropertyRef Config::* property, auto serialize)
+    {
+        // Valid Unicode stays UTF-8, while JSON control bytes must be escaped.
+        (config.*property).Name = "v:\xc3\xa9\xf0\x9f\x8c\x8d/\"\\\n";
+        (config.*property).Name.push_back('\0');
+        const auto payload = serialize(config);
+        EXPECT_NE(payload.find("\"name\":\"v:\xc3\xa9\xf0\x9f\x8c\x8d/\\\"\\\\\\n\\u0000\""),
+                  std::string::npos) << payload;
+        EXPECT_EQ(payload.find('\n'), std::string::npos);
+    };
+    check(Runtime::BilateralFilterConfig{}, &Runtime::BilateralFilterConfig::Positions,
+          Runtime::SerializeBilateralFilterConfig);
+    check(Runtime::KernelDensityConfig{}, &Runtime::KernelDensityConfig::Positions,
+          Runtime::SerializeKernelDensityConfig);
+    check(Runtime::PointSpacingConfig{}, &Runtime::PointSpacingConfig::Positions,
+          Runtime::SerializePointSpacingConfig);
+    check(Runtime::OutlierAnalysisConfig{}, &Runtime::OutlierAnalysisConfig::Positions,
+          Runtime::SerializeOutlierAnalysisConfig);
+    check(Runtime::KeypointAnalysisConfig{}, &Runtime::KeypointAnalysisConfig::Positions,
+          Runtime::SerializeKeypointAnalysisConfig);
+    check(Runtime::DescriptorAnalysisConfig{}, &Runtime::DescriptorAnalysisConfig::Positions,
+          Runtime::SerializeDescriptorAnalysisConfig);
+    check(Runtime::DensityWeightConfig{}, &Runtime::DensityWeightConfig::Positions,
+          Runtime::SerializeDensityWeightConfig);
+    check(Runtime::NormalEstimationConfig{}, &Runtime::NormalEstimationConfig::Positions,
+          Runtime::SerializeNormalEstimationConfig);
+    check(Runtime::PointConstructionConfig{}, &Runtime::PointConstructionConfig::Positions,
+          Runtime::SerializePointConstructionConfig);
+    check(Runtime::RegistrationConfig{}, &Runtime::RegistrationConfig::SourcePositions,
+          Runtime::SerializeRegistrationConfig);
+    check(Runtime::MeshCurvatureConfig{}, &Runtime::MeshCurvatureConfig::Positions,
+          Runtime::SerializeMeshCurvatureConfig);
+
+    Runtime::KernelDensityConfig invalid;
+    invalid.Positions.Name = "v:\xff";
+    // Runtime builds disable exceptions; the strict JSON policy aborts.
+    EXPECT_DEATH((void)Runtime::SerializeKernelDensityConfig(invalid), "");
+}
+
 TEST(SandboxConfigSections, PointConfigFieldsPreserveStrictMergeAndIntegerValidation)
 {
     using Validator = CoreConfig::EngineConfigSectionValidationResult (*)(

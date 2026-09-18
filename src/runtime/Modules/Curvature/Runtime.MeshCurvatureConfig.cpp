@@ -63,7 +63,7 @@ namespace Extrinsic::Runtime
         }
         return true;
     }
-    std::string SerializeMeshCurvatureConfig(const MeshCurvatureConfig& config) { return Encode(config).dump(); }
+    std::string SerializeMeshCurvatureConfig(const MeshCurvatureConfig& config) { return ConfigDetail::SerializeConfigJson(Encode(config)); }
     Core::Config::EngineConfigSectionValidationResult ValidateMeshCurvatureConfigSection(
         std::string_view payload, std::string_view, std::string_view subject)
     {
@@ -97,7 +97,7 @@ namespace Extrinsic::Runtime
         if (!IsValidMeshCurvaturePropertyBindings(bindings))
             return reject("Curvature property names must be distinct public vertex properties (v:...).");
         result.State=EngineConfigState::Valid;
-        result.CanonicalPayloadJson=doc.dump();
+        result.CanonicalPayloadJson=ConfigDetail::SerializeConfigJson(doc);
         result.ParsedFieldCount=static_cast<std::uint32_t>(doc.size());
         return result;
     }
