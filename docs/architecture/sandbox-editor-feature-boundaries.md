@@ -178,7 +178,7 @@ compiled owner and UV regeneration. Mesh field/topology families need no mesh-so
 module. The family-neutral parts of that owner — the queued
 job envelope, the active-job lookup and message, selected-model cache
 invalidation, finite-position collection, numeric position comparison, job-handle
-messages, result error normalization and the unpublished-job reason — are declared
+messages and result error normalization — are declared
 in `PointFields.hpp` instead, which `MeshSupport.hpp` includes. That keeps point-set
 families and registration off the by-value halfedge-mesh and mesh-soup snapshots
 in the mesh header. Mesh topology, mesh fields, registration and
@@ -453,6 +453,13 @@ job lane is returned rather than delivered. Apply gates test the attachment
 epoch before reading the borrowed scene or spatial cache, so a detached job
 fails closed instead of dereferencing freed state; finalizers read only their
 own job state and publish no output, history or cache invalidation.
+Poisson, registration, UV, curvature and mesh topology finalizers share the
+compiled `BuildUnpublishedEditorJobFailure` status/error mapping and diagnostic
+builder in `MeshSupport.cpp`, declared in the private `JobFailure.hpp`. Only
+`Current` validation admits worker detail; each caller retains its own predicate
+for that detail, typed result data and exactly-once delivery flag. UV keeps its
+separate atlas rejection status. The point-field header does not require the
+editor command-status module for these declarations.
 
 The UV-regeneration controls have one implementation,
 `DrawSandboxUvRegenerationControls` in the app-private `Sandbox.PanelSupport.*`.

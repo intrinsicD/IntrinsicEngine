@@ -56,6 +56,7 @@ import Geometry.Properties;
 
 #include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 
@@ -1479,30 +1480,15 @@ namespace Extrinsic::Runtime
         {
             if (job.Delivered)
                 return;
-            const JobApplyValidation validation = job.LastApplyValidation;
-            const bool stale = validation == JobApplyValidation::MissingTarget ||
-                               validation == JobApplyValidation::StaleGeneration ||
-                               validation == JobApplyValidation::StaleWorld;
-
-            std::string message{"Sandbox.ProgressivePoisson.CPU did not apply: "};
-            message += MeshSupport::QueuedCpuJobUnpublishedReason(validation);
-            // A worker that already failed carries the more specific reason.
-            if (validation == JobApplyValidation::Current &&
-                !job.Result.Message.empty() &&
-                job.Result.Status == EditorCommandStatus::GeometryProcessingFailed)
-            {
-                message += " (";
-                message += job.Result.Message;
-                message += ")";
-            }
-            message += ".";
-
+            auto failure = MeshSupport::BuildUnpublishedEditorJobFailure(
+                job.LastApplyValidation,
+                "Sandbox.ProgressivePoisson.CPU",
+                job.Result.Status == EditorCommandStatus::GeometryProcessingFailed
+                    ? std::string_view{job.Result.Message} : std::string_view{});
             EditorProgressivePoissonResult result = job.Result;
-            result.Status = stale ? EditorCommandStatus::StaleEntity
-                                  : EditorCommandStatus::GeometryProcessingFailed;
-            result.Error = stale ? Core::ErrorCode::InvalidState
-                                 : Core::ErrorCode::Unknown;
-            result.Message = std::move(message);
+            result.Status = failure.Status;
+            result.Error = failure.Error;
+            result.Message = std::move(failure.Message);
             PublishProgressivePoissonResultSink(job, std::move(result));
         }
 

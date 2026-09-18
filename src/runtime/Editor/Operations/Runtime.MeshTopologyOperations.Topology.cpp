@@ -56,6 +56,7 @@ import Geometry.Smoothing;
 import Geometry.Subdivision;
 
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 
 #include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
@@ -1757,58 +1758,44 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             if (job.TerminalResultPublished)
                 return;
 
-            const JobApplyValidation validation = job.LastApplyValidation;
-            const EditorCommandStatus status =
-                validation == JobApplyValidation::MissingTarget ||
-                        validation == JobApplyValidation::StaleGeneration ||
-                        validation == JobApplyValidation::StaleWorld
-                    ? EditorCommandStatus::StaleEntity
-                    : EditorCommandStatus::GeometryProcessingFailed;
-            const Core::ErrorCode error =
-                status == EditorCommandStatus::StaleEntity
-                    ? Core::ErrorCode::InvalidState
-                    : Core::ErrorCode::Unknown;
-
-            std::string message{MeshCpuJobName(job.Kind)};
-            message += " did not apply: ";
-            message += QueuedCpuJobUnpublishedReason(validation);
-            message += ".";
+            auto failure = BuildUnpublishedEditorJobFailure(
+                job.LastApplyValidation, MeshCpuJobName(job.Kind));
 
             switch (job.Kind)
             {
             case EditorMeshCpuJobKind::Denoise:
             {
                 EditorMeshDenoiseResult result = job.DenoiseResult;
-                result.Status = status;
-                result.Error = error;
-                result.Message = std::move(message);
+                result.Status = failure.Status;
+                result.Error = failure.Error;
+                result.Message = std::move(failure.Message);
                 PublishMeshDenoiseResultSink(job, std::move(result));
                 return;
             }
             case EditorMeshCpuJobKind::Remesh:
             {
                 EditorMeshRemeshResult result = job.RemeshResult;
-                result.Status = status;
-                result.Error = error;
-                result.Message = std::move(message);
+                result.Status = failure.Status;
+                result.Error = failure.Error;
+                result.Message = std::move(failure.Message);
                 PublishMeshRemeshResultSink(job, std::move(result));
                 return;
             }
             case EditorMeshCpuJobKind::Subdivide:
             {
                 EditorMeshSubdivideResult result = job.SubdivideResult;
-                result.Status = status;
-                result.Error = error;
-                result.Message = std::move(message);
+                result.Status = failure.Status;
+                result.Error = failure.Error;
+                result.Message = std::move(failure.Message);
                 PublishMeshSubdivideResultSink(job, std::move(result));
                 return;
             }
             case EditorMeshCpuJobKind::Simplify:
             {
                 EditorMeshSimplifyResult result = job.SimplifyResult;
-                result.Status = status;
-                result.Error = error;
-                result.Message = std::move(message);
+                result.Status = failure.Status;
+                result.Error = failure.Error;
+                result.Message = std::move(failure.Message);
                 PublishMeshSimplifyResultSink(job, std::move(result));
                 return;
             }

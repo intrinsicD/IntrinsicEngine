@@ -3143,10 +3143,11 @@ TEST(SandboxEditorUi, MeshSimplifyStaleDiscardReportsTerminalResultInsteadOfStay
            "still showing its submit-time Pending message.";
     EXPECT_EQ(completedResult->Status, Runtime::EditorCommandStatus::StaleEntity);
     EXPECT_FALSE(completedResult->Succeeded());
-    EXPECT_NE(completedResult->Message.find("did not apply"), std::string::npos)
-        << completedResult->Message;
-    EXPECT_NE(completedResult->Message.find("geometry changed"), std::string::npos)
-        << completedResult->Message;
+    EXPECT_EQ(completedResult->Error, Core::ErrorCode::InvalidState);
+    EXPECT_EQ(completedResult->Message,
+              "Sandbox.MeshSimplify.CPU did not apply: "
+              "the source geometry changed after the job was queued, "
+              "so the result no longer matches the geometry it was computed from.");
 
     // Refusal is not mutation: the mesh keeps the topology the user edited.
     EXPECT_EQ(SourceMeshCounts(registry, mesh).Faces, before.Faces);
@@ -4931,8 +4932,12 @@ TEST(SandboxEditorUi, StaleQueuedUvRegenerationStillReportsOneTerminalResult)
     EXPECT_FALSE(delivered->Succeeded());
     EXPECT_EQ(delivered->Status, Runtime::EditorCommandStatus::StaleEntity)
         << delivered->Diagnostic;
-    EXPECT_NE(delivered->Diagnostic.find("did not apply"), std::string::npos)
-        << delivered->Diagnostic;
+    EXPECT_EQ(delivered->UvStatus,
+              Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput);
+    EXPECT_EQ(delivered->Diagnostic,
+              "UV regeneration did not apply: "
+              "the source geometry changed after the job was queued, "
+              "so the result no longer matches the geometry it was computed from.");
     EXPECT_EQ(history.UndoCount(), 0u);
 }
 

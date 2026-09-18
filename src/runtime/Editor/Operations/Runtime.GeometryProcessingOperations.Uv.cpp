@@ -55,6 +55,7 @@ import Geometry.Mesh.Conversion;
 import Geometry.UvAtlas;
 
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 
 #include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
@@ -712,24 +713,14 @@ using namespace GeometryProcessingDetail::MeshSupport;
     {
         if (job.TerminalResultPublished)
             return;
-
-        const JobApplyValidation validation = job.LastApplyValidation;
-        const EditorCommandStatus status =
-            validation == JobApplyValidation::MissingTarget ||
-                    validation == JobApplyValidation::StaleGeneration ||
-                    validation == JobApplyValidation::StaleWorld
-                ? EditorCommandStatus::StaleEntity
-                : EditorCommandStatus::GeometryProcessingFailed;
-
-        std::string diagnostic{"UV regeneration did not apply: "};
-        diagnostic += QueuedCpuJobUnpublishedReason(validation);
-        diagnostic += ".";
+        auto failure = BuildUnpublishedEditorJobFailure(
+            job.LastApplyValidation, "UV regeneration");
         PublishUvRegenerationResultSink(
             job,
             MakeUvRegenerationResult(
-                status,
+                failure.Status,
                 Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput,
-                std::move(diagnostic)));
+                std::move(failure.Message)));
     }
 
     [[nodiscard]] JobResultEnvelope RunUvRegenerationCpuWorker(

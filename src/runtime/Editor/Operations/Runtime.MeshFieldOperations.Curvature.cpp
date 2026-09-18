@@ -53,6 +53,7 @@ import Geometry.Properties;
 #include "Config/internal/Runtime.CurvatureSegmentationParams.hpp"
 
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 
 #include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
@@ -1696,27 +1697,12 @@ namespace Extrinsic::Runtime::MeshFieldDetail
         {
             if (job.TerminalResultPublished)
                 return;
-            const JobApplyValidation validation = job.LastApplyValidation;
-            const EditorCommandStatus status =
-                validation == JobApplyValidation::MissingTarget ||
-                        validation == JobApplyValidation::StaleGeneration ||
-                        validation == JobApplyValidation::StaleWorld
-                    ? EditorCommandStatus::StaleEntity
-                    : EditorCommandStatus::GeometryProcessingFailed;
-            const Core::ErrorCode error =
-                status == EditorCommandStatus::StaleEntity
-                    ? Core::ErrorCode::InvalidState
-                    : Core::ErrorCode::Unknown;
-
-            std::string message{kMeshCurvatureJobName};
-            message += " did not apply: ";
-            message += QueuedCpuJobUnpublishedReason(validation);
-            message += ".";
-
+            auto failure = BuildUnpublishedEditorJobFailure(
+                job.LastApplyValidation, kMeshCurvatureJobName);
             EditorMeshCurvatureResult result = job.CurvatureResult;
-            result.Status = status;
-            result.Error = error;
-            result.Message = std::move(message);
+            result.Status = failure.Status;
+            result.Error = failure.Error;
+            result.Message = std::move(failure.Message);
             PublishMeshCurvatureResultSink(job, std::move(result));
         }
 

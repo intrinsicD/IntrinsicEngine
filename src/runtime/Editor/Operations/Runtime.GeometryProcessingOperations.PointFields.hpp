@@ -43,10 +43,6 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         [[nodiscard]] Core::ErrorCode ResultErrorOrUnknown(
             const Core::ErrorCode error) noexcept;
 
-        // Why a queued CPU job never published its result. Phrased for the
-        // terminal result every abandoned job still owes the editor.
-        [[nodiscard]] std::string_view QueuedCpuJobUnpublishedReason(
-            JobApplyValidation validation) noexcept;
     }
 
         struct PointPropertyWatch

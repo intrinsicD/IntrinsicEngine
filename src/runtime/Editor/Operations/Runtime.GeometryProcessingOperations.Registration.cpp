@@ -54,6 +54,7 @@ import Geometry.Registration;
 import Geometry.PointLBVH;
 
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 #include "Editor/internal/Runtime.EditorTransformHelpers.hpp"
 
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
@@ -758,29 +759,15 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
         {
             if (job.Delivered)
                 return;
-            const JobApplyValidation validation = job.LastApplyValidation;
-            const bool stale = validation == JobApplyValidation::MissingTarget ||
-                               validation == JobApplyValidation::StaleGeneration ||
-                               validation == JobApplyValidation::StaleWorld;
-
-            std::string message{"Sandbox.RegistrationICP did not apply: "};
-            message += QueuedCpuJobUnpublishedReason(validation);
-            // A worker or GPU-advance failure carries the more specific reason.
-            if (validation == JobApplyValidation::Current &&
-                !job.Result.Succeeded() && !job.Result.Message.empty())
-            {
-                message += " (";
-                message += job.Result.Message;
-                message += ")";
-            }
-            message += ".";
-
+            auto failure = BuildUnpublishedEditorJobFailure(
+                job.LastApplyValidation,
+                "Sandbox.RegistrationICP",
+                !job.Result.Succeeded()
+                    ? std::string_view{job.Result.Message} : std::string_view{});
             EditorRegistrationResult result = job.Result;
-            result.Status = stale ? EditorCommandStatus::StaleEntity
-                                  : EditorCommandStatus::GeometryProcessingFailed;
-            result.Error = stale ? Core::ErrorCode::InvalidState
-                                 : Core::ErrorCode::Unknown;
-            result.Message = std::move(message);
+            result.Status = failure.Status;
+            result.Error = failure.Error;
+            result.Message = std::move(failure.Message);
             job.Result = result;
             PublishRegistrationResultSink(job, std::move(result));
         }

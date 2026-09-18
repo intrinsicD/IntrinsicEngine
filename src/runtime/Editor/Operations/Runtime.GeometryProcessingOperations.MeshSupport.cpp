@@ -42,6 +42,7 @@ import Geometry.MeshSoup;
 import Geometry.Properties;
 
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSoup.hpp"
 
@@ -391,6 +392,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             return message;
         }
 
+    namespace
+    {
         std::string_view QueuedCpuJobUnpublishedReason(
             const JobApplyValidation validation) noexcept
         {
@@ -412,6 +415,33 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
                 break;
             }
             return "it terminated without publishing a result";
+        }
+    }
+
+        UnpublishedEditorJobFailure BuildUnpublishedEditorJobFailure(
+            const JobApplyValidation validation,
+            const std::string_view label,
+            const std::string_view detail)
+        {
+            UnpublishedEditorJobFailure failure{};
+            if (validation == JobApplyValidation::MissingTarget ||
+                validation == JobApplyValidation::StaleGeneration ||
+                validation == JobApplyValidation::StaleWorld)
+            {
+                failure.Status = EditorCommandStatus::StaleEntity;
+                failure.Error = Core::ErrorCode::InvalidState;
+            }
+            failure.Message = label;
+            failure.Message += " did not apply: ";
+            failure.Message += QueuedCpuJobUnpublishedReason(validation);
+            if (validation == JobApplyValidation::Current && !detail.empty())
+            {
+                failure.Message += " (";
+                failure.Message += detail;
+                failure.Message += ")";
+            }
+            failure.Message += ".";
+            return failure;
         }
 
         JobApplyValidation ValidateMeshCpuJobSource(

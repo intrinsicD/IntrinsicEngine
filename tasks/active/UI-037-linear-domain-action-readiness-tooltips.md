@@ -3793,3 +3793,72 @@ hashes still match Fable's reviewed diff. Fable's test re-review found no blocke
 final self-review also checked both undo/redo source restoration and point-source
 staleness. No GPU execution, sanitizer-suite run or compilation speedup is
 claimed. This is a completed checkpoint within the still-open UI-037 task.
+
+## 2026-09-18 continuation — shared unpublished-job failures
+
+Operator direction: continue duplicate-code/compilation cleanup with Claude
+Fable 5.1; broader readiness acceptance stays open. Reuse review found five
+finalizers repeating status/error mapping and diagnostic construction across
+Poisson, registration, UV, curvature and mesh topology operations. Extend the
+existing compiled `MeshSupport.cpp` owner with a plain failure value declared
+in a small private `JobFailure.hpp`; no template, target or module is needed.
+Keep typed result copies, delivery flags, callbacks and registration's stored
+result local. UV retains `BackendRejectedInput`. Only `Current` may append
+worker detail; Poisson requires `GeometryProcessingFailed`, while registration
+uses its broader `!Succeeded()` predicate. A shared lifecycle abstraction would
+need a demonstrated identical delivery contract and is outside this slice.
+
+Fable's plan review confirmed the factoring and highlighted owned-message
+construction before stored-result replacement, header prerequisites and the
+allocation-bearing helper's lack of `noexcept`. Existing tests are strengthened
+through public commands. The first baseline check rejected a new, incorrect
+expectation: cancellation before apply validation leaves `Current` and emits
+the generic unpublished reason. Preserve that behavior; this is not a scheduler
+semantics change. Structural consolidation alone makes no build-time claim.
+
+The first implementation build found `EditorProcessing.cpp` also consumes
+`PointFields.hpp` without command-status visibility. A separate private failure
+header keeps that discovery consumer's imports unchanged. This is the concrete
+compilation reason for the new header; the missing-type failure belongs to this
+slice and was corrected without widening the generic context.
+
+Fable's fixed-diff review found no concrete defect. The copied worker detail is
+owned before registration replaces its stored result, and the two caller
+predicates retain their original behavior. Its concern about header placement
+was resolved: standard headers are supplied in each module's global fragment;
+private declarations follow imports. `MeshSupport.cpp` already imports
+`EditorCommon`. Dedicated dropped-worker detail scenarios were not added;
+equivalence of those gates was reviewed against the original functions.
+
+Canonical ci/Clang 23 focused and aggregate `IntrinsicTests` builds pass after
+the header correction. All 121 selected lifecycle/method/locality tests pass.
+Compiler module maps for the six changed implementations are unchanged, with
+zero added dependencies. Across all eight affected production files, including
+the new narrow header, physical lines fall 10,480 -> 10,467. The main gain is
+one compiled status/diagnostic mechanism replacing five bodies; no elapsed
+compile-time result is inferred from this small net reduction.
+
+Architecture/workshop review: runtime ownership, value-owned messages, thread
+and delivery semantics remain intact; scorecard rows 1–3 and 8 pass, rows 4–7
+are not applicable. Strict layering, task policy/state links, test layout,
+root hygiene, docs links/sync (explicit changed paths), skill mirrors and session
+brief checks pass. Inventory regeneration is unchanged. Touched-scope producer
+reconciliation and all 26 compile-hotspot tooling tests pass. Header source-doc
+review has zero objective errors; the new declaration comment records the
+non-obvious detail gate, while existing point-field lifetime/preflight comments
+remain relevant. Logs, fixed Fable packets and source/module-map hashes are in
+`/tmp/intrinsic-editor-reuse-next/`.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests -j4
+ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi\.(.*ProgressivePoisson.*|.*Registration.*|.*Mesh(Denoise|Remesh|Subdivide|Simplify|Curvature).*|.*Queued.*|.*UvRegeneration.*)|ProcessingCompilationLocality' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+```
+
+Final CPU gate: 4,754 selected, 4,753 passed and one expected ASan-only GLFW
+lifecycle skip, zero failures (157.54 s test execution). Source/test hashes
+match Fable's fixed diff. No GPU execution, sanitizer-suite run or elapsed
+compilation-speed improvement is claimed. This is a completed session checkpoint
+inside the still-open UI-037 task.

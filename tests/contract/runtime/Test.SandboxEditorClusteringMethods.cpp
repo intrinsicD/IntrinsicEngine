@@ -1563,8 +1563,12 @@ TEST(SandboxEditorUi, ProgressivePoissonAndRegistrationCancelledJobsReportOneTer
         EXPECT_EQ(completed->FellBackToCpu, queued.FellBackToCpu);
         EXPECT_EQ(completed->BackendFallbackReason, queued.BackendFallbackReason);
         EXPECT_EQ(completed->InputCount, positions.size());
-        EXPECT_NE(completed->Message.find("did not apply"), std::string::npos)
-            << completed->Message;
+        EXPECT_EQ(completed->Status,
+                  Runtime::EditorCommandStatus::GeometryProcessingFailed);
+        EXPECT_EQ(completed->Error, Core::ErrorCode::Unknown);
+        EXPECT_EQ(completed->Message,
+                  "Sandbox.ProgressivePoisson.CPU did not apply: "
+                  "it terminated without publishing a result.");
         EXPECT_FALSE(registry.Raw()
                          .get<GS::Vertices>(cloud)
                          .Properties.Exists("v:poisson_level"));
@@ -1619,8 +1623,12 @@ TEST(SandboxEditorUi, ProgressivePoissonAndRegistrationCancelledJobsReportOneTer
         EXPECT_EQ(deliveries, 1u);
         ASSERT_TRUE(completed.has_value());
         EXPECT_FALSE(completed->Succeeded());
-        EXPECT_NE(completed->Message.find("did not apply"), std::string::npos)
-            << completed->Message;
+        EXPECT_EQ(completed->Status,
+                  Runtime::EditorCommandStatus::GeometryProcessingFailed);
+        EXPECT_EQ(completed->Error, Core::ErrorCode::Unknown);
+        EXPECT_EQ(completed->Message,
+                  "Sandbox.RegistrationICP did not apply: "
+                  "it terminated without publishing a result.");
         EXPECT_FALSE(history.CanUndo());
         const ECSC::Transform::Component& after =
             registry.Raw().get<ECSC::Transform::Component>(source);
