@@ -61,6 +61,9 @@ export namespace Extrinsic::Runtime
             }};
     };
 
+    [[nodiscard]] bool IsValidPointCloudConsolidationPropertyRefs(
+        const PointCloudConsolidationPropertyRefs& properties) noexcept;
+
     [[nodiscard]] PointCloudConsolidationPropertyRefs
     MakePointCloudConsolidationPropertyRefs(
         GeometryElementDomain domain,

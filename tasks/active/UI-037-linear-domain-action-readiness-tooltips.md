@@ -4314,3 +4314,52 @@ and review packets are retained in `/tmp/intrinsic-kmeans-readiness/`.
 Verification uses canonical ci/Clang 23 without sanitizers. The following
 checkpoint records the combined full CPU gate and structural results. No
 elapsed compilation-speed, GPU execution or sanitizer-suite result is claimed.
+
+
+## Continuation — consolidation property-validator locality (2026-09-19)
+
+The second operator-directed slice moves the unchanged property-reference
+predicate into the existing `Runtime.PointCloudConsolidationTypes` owner.
+The lifecycle module re-exports that declaration and uses it for source
+preflight; the method panel imports Types directly. The former private
+`HasValidPropertyRefs` body and exported forwarding wrapper are gone. No new
+module, header, service, config or dependency is introduced. Function body
+tokens match baseline after the declared name/attribute/whitespace changes;
+optional-normal, alias and domain semantics are unchanged.
+
+Clang's method-panel module map drops from 156 to 123 dependencies, removing
+33 entries including the lifecycle, consolidation algorithm, point LBVH,
+spatial-cache and RHI-device modules. The new
+`EditorCompilationLocality.MethodPanelServices` checks the recursive compiler
+dependency closure; it rejects the original lifecycle import and passes after
+the move. Five affected production files total 6,563 -> 6,556 physical lines
+(-7); the compiler guard adds seven CMake lines, leaving that combined scope
+unchanged. New behavior/boundary coverage is additional test code. These counts
+are structural evidence, not a measured compilation-speed improvement.
+
+Fable reviewed the plan and fixed diff, then accepted the isolated alias-test
+corrections. The pre-merge sweep passes: one intent per commit, unchanged layer
+policy, validated behavior, current docs. Workshop rows 1–3/8 pass; 4–7 n/a.
+Strict layering has zero exceptions. Source-documentation audit for both
+interfaces: zero errors/findings. The module inventory remains 429 modules.
+The build retains a pre-existing initializer-order warning in the consolidation
+test fixture; it is unrelated to the moved validator.
+
+Exact combined verification:
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicSandboxEditorIntegrationTests IntrinsicRuntimeContractTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^(ClusteringModule\.|PointCloudConsolidationModule\.|PointCloudConsolidationConfig\.|SandboxPointCloudConsolidationPanel\.|SandboxEditorPresentation\.|NormalEstimationConfig\.RoundTripAndSharedPreviewApplyRun|ProcessingCompilationLocality\.Consolidation|ProcessingCompilationLocality\.PointCloudService|EditorCompilationLocality\.(PointCloudServices|MethodPanelServices))' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+```
+
+77 focused cases pass. Both refined tests pass after review corrections.
+Final exclusion-only CPU gate: 4,768 selected, 4,767 passed, one expected
+ASan-only GLFW lifecycle check skipped, zero failures (152.41 seconds).
+Strict task policy/state links, test layout, doc links/sync, root hygiene,
+skill mirrors and session-brief freshness pass. Source/build hashes remain
+fixed through final verification; logs and review packets are in
+`/tmp/intrinsic-kmeans-readiness/`. No GPU execution, sanitizer-suite or elapsed
+compile-time result is claimed. UI-037 remains open; these two slices are complete.

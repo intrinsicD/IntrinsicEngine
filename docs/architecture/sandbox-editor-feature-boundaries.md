@@ -311,6 +311,11 @@ friendship does not pull registration, GPU or world state into the service API.
 Types directly. Within the operations family, only the implementation imports
 module-owned consolidation preflight. The compiler-derived
 `EditorCompilationLocality.PointCloudServices` check enforces these boundaries.
+The method panel also consumes these Types and operation contracts directly.
+Consolidation property-reference validation compiles beside its records in
+`Runtime.PointCloudConsolidationTypes`; both the panel and lifecycle preflight
+call that owner. `EditorCompilationLocality.MethodPanelServices` keeps both
+lifecycle modules out of the panel's compiler dependency closure.
 `Runtime.ClusteringConfig` imports the Types owner without importing the lifecycle
 module. `Runtime.ModuleLifecycle` provides the minimal lifecycle interface;
 complete setup/frame/recipe capabilities remain in

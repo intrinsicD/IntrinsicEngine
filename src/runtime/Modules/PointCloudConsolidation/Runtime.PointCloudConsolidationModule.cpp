@@ -693,55 +693,6 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] bool HasValidPropertyRefs(
-            const PointCloudConsolidationPropertyRefs& refs) noexcept
-        {
-            const GeometryElementDomain domain = refs.InputPositions.Domain;
-            if (domain == GeometryElementDomain::Unknown ||
-                !refs.InputPositions.HasName() ||
-                refs.InputPositions.ValueKind !=
-                    Geometry::PropertyValueKind::Vec3 ||
-                refs.OutputPositions.Domain != domain ||
-                !refs.OutputPositions.HasName() ||
-                refs.OutputPositions.ValueKind !=
-                    Geometry::PropertyValueKind::Vec3)
-            {
-                return false;
-            }
-
-            const auto validOptional = [domain](
-                const std::optional<GeometryPropertyRef>& ref)
-            {
-                return !ref.has_value() ||
-                       (ref->Domain == domain && ref->HasName() &&
-                        ref->ValueKind ==
-                            Geometry::PropertyValueKind::Vec3);
-            };
-            if (!validOptional(refs.InputNormals) ||
-                !validOptional(refs.OutputNormals))
-            {
-                return false;
-            }
-
-            if (refs.InputNormals.has_value() &&
-                refs.InputNormals->Name == refs.InputPositions.Name)
-            {
-                return false;
-            }
-            if (refs.OutputNormals.has_value() &&
-                refs.OutputNormals->Name == refs.OutputPositions.Name)
-            {
-                return false;
-            }
-            if (refs.OutputNormals.has_value() &&
-                refs.OutputNormals->Name == refs.InputPositions.Name)
-            {
-                return false;
-            }
-            return !refs.InputNormals.has_value() ||
-                   refs.OutputPositions.Name != refs.InputNormals->Name;
-        }
-
         [[nodiscard]] std::size_t DeletedElementCount(
             const GeometryEntityAvailability& availability,
             const GeometryElementDomain domain) noexcept
@@ -812,7 +763,7 @@ namespace Extrinsic::Runtime
                     Core::ErrorCode::InvalidArgument,
                     "gpu_vulkan_compute currently supports ordinary LOP and isotropic WLOP only; anisotropic WLOP, CLOP, and EAR remain explicit CPU-reference capabilities.");
             }
-            if (!HasValidPropertyRefs(refs))
+            if (!IsValidPointCloudConsolidationPropertyRefs(refs))
             {
                 return UnavailableConsolidation(
                     Core::ErrorCode::InvalidArgument,
@@ -2521,12 +2472,6 @@ namespace Extrinsic::Runtime
                 std::move(*snapshot),
                 stats);
         }
-    }
-
-    bool IsValidPointCloudConsolidationPropertyRefs(
-        const PointCloudConsolidationPropertyRefs& properties) noexcept
-    {
-        return HasValidPropertyRefs(properties);
     }
 
     PointCloudConsolidationAvailability

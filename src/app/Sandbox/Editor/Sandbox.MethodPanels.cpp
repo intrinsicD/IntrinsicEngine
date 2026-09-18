@@ -46,7 +46,6 @@ import Extrinsic.Runtime.MeshTopologyOperations;
 import Extrinsic.Runtime.ParameterizationOperations;
 import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationTypes;
-import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.ProgressivePoissonConfig;
 import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;

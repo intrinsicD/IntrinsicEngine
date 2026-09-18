@@ -61,6 +61,9 @@ and `.WorkspaceAttachment` check the bake producer and its editor consumers.
 None may reach the renderer, GPU asset cache or render extraction. The bake
 interface additionally excludes scene-registry, live asset-service, RHI-device
 and command-history composition; those dependencies belong in its implementation.
+`EditorCompilationLocality.MethodPanelServices` excludes clustering and
+consolidation lifecycle modules from the method panel, which uses their Types
+and editor operation contracts.
 `.WorkspaceAttachment` also excludes `Extrinsic.Runtime.EditorWorkspaceSnapshots`
 and `Extrinsic.Runtime.SceneEditingOperations`: the private session borrows the
 snapshot request through a declaration and names the payload kind from its

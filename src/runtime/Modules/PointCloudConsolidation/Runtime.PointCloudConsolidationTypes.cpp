@@ -7,6 +7,55 @@ module;
 module Extrinsic.Runtime.PointCloudConsolidationTypes;
 namespace Extrinsic::Runtime
 {
+    bool IsValidPointCloudConsolidationPropertyRefs(
+        const PointCloudConsolidationPropertyRefs& refs) noexcept
+    {
+        const GeometryElementDomain domain = refs.InputPositions.Domain;
+        if (domain == GeometryElementDomain::Unknown ||
+            !refs.InputPositions.HasName() ||
+            refs.InputPositions.ValueKind !=
+                Geometry::PropertyValueKind::Vec3 ||
+            refs.OutputPositions.Domain != domain ||
+            !refs.OutputPositions.HasName() ||
+            refs.OutputPositions.ValueKind !=
+                Geometry::PropertyValueKind::Vec3)
+        {
+            return false;
+        }
+
+        const auto validOptional = [domain](
+            const std::optional<GeometryPropertyRef>& ref)
+        {
+            return !ref.has_value() ||
+                   (ref->Domain == domain && ref->HasName() &&
+                    ref->ValueKind ==
+                        Geometry::PropertyValueKind::Vec3);
+        };
+        if (!validOptional(refs.InputNormals) ||
+            !validOptional(refs.OutputNormals))
+        {
+            return false;
+        }
+
+        if (refs.InputNormals.has_value() &&
+            refs.InputNormals->Name == refs.InputPositions.Name)
+        {
+            return false;
+        }
+        if (refs.OutputNormals.has_value() &&
+            refs.OutputNormals->Name == refs.OutputPositions.Name)
+        {
+            return false;
+        }
+        if (refs.OutputNormals.has_value() &&
+            refs.OutputNormals->Name == refs.InputPositions.Name)
+        {
+            return false;
+        }
+        return !refs.InputNormals.has_value() ||
+               refs.OutputPositions.Name != refs.InputNormals->Name;
+    }
+
     PointCloudConsolidationPropertyRefs
     MakePointCloudConsolidationPropertyRefs(
         const GeometryElementDomain domain,

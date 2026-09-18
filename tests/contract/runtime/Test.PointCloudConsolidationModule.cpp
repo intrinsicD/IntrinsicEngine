@@ -44,6 +44,71 @@ namespace ECS = Extrinsic::ECS;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
 namespace Runtime = Extrinsic::Runtime;
 
+TEST(PointCloudConsolidationModule, PropertyReferenceValidationPreservesOptionalNormalsAndAliasing)
+{
+    using Domain = Runtime::GeometryElementDomain;
+    using Kind = Geometry::PropertyValueKind;
+    for (const auto domain : {Domain::MeshVertex, Domain::MeshEdge, Domain::MeshHalfedge,
+             Domain::MeshFace, Domain::GraphNode, Domain::GraphEdge, Domain::GraphHalfedge,
+             Domain::PointCloudPoint})
+    {
+        SCOPED_TRACE(static_cast<unsigned>(domain));
+        auto refs = Runtime::MakePointCloudConsolidationPropertyRefs(domain, "position", "normal");
+        EXPECT_TRUE(Runtime::IsValidPointCloudConsolidationPropertyRefs(refs));
+        refs.OutputPositions.Name = "smoothed";
+        refs.OutputNormals->Name = "smoothed_normal";
+        EXPECT_TRUE(Runtime::IsValidPointCloudConsolidationPropertyRefs(refs));
+        refs.InputNormals.reset();
+        EXPECT_TRUE(Runtime::IsValidPointCloudConsolidationPropertyRefs(refs));
+        refs.OutputNormals.reset();
+        EXPECT_TRUE(Runtime::IsValidPointCloudConsolidationPropertyRefs(refs));
+        refs.InputNormals = Runtime::GeometryPropertyRef{domain, "normal", Kind::Vec3};
+        EXPECT_TRUE(Runtime::IsValidPointCloudConsolidationPropertyRefs(refs));
+    }
+
+    for (unsigned invalid = 0; invalid < 17; ++invalid)
+    {
+        SCOPED_TRACE(invalid);
+        auto refs = Runtime::MakePointCloudConsolidationPropertyRefs(Domain::MeshFace, "position", "normal");
+        switch (invalid)
+        {
+        case 0: refs.InputPositions.Domain = Domain::Unknown; break;
+        case 1: refs.InputPositions.Name.clear(); break;
+        case 2: refs.InputPositions.ValueKind = Kind::Float; break;
+        case 3: refs.OutputPositions.Domain = Domain::MeshVertex; break;
+        case 4: refs.OutputPositions.Name.clear(); break;
+        case 5: refs.OutputPositions.ValueKind = Kind::Float; break;
+        case 6: refs.InputNormals->Domain = Domain::MeshVertex; break;
+        case 7: refs.InputNormals->Name.clear(); break;
+        case 8: refs.InputNormals->ValueKind = Kind::Float; break;
+        case 9: refs.OutputNormals->Domain = Domain::MeshVertex; break;
+        case 10: refs.OutputNormals->Name.clear(); break;
+        case 11: refs.OutputNormals->ValueKind = Kind::Float; break;
+        case 12:
+            refs.OutputPositions.Name = "smoothed";
+            refs.OutputNormals->Name = "smoothed_normal";
+            refs.InputNormals->Name = refs.InputPositions.Name;
+            break;
+        case 13:
+            refs.OutputPositions.Name = "smoothed";
+            refs.OutputNormals->Name = refs.OutputPositions.Name;
+            break;
+        case 14:
+            refs.OutputPositions.Name = "smoothed";
+            refs.OutputNormals->Name = refs.InputPositions.Name;
+            break;
+        case 15:
+            refs.OutputNormals->Name = "smoothed_normal";
+            refs.OutputPositions.Name = refs.InputNormals->Name;
+            break;
+        case 16:
+            refs = Runtime::MakePointCloudConsolidationPropertyRefs(Domain::Unknown, "position");
+            break;
+        }
+        EXPECT_FALSE(Runtime::IsValidPointCloudConsolidationPropertyRefs(refs));
+    }
+}
+
 namespace
 {
     using namespace std::chrono_literals;

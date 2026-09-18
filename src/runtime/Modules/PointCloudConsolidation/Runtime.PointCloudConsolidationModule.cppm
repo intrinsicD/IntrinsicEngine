@@ -29,9 +29,6 @@ export namespace Extrinsic::Runtime
 {
     class PointCloudConsolidationGpuState;
 
-    [[nodiscard]] bool IsValidPointCloudConsolidationPropertyRefs(
-        const PointCloudConsolidationPropertyRefs& properties) noexcept;
-
     [[nodiscard]] PointCloudConsolidationAvailability
     ResolvePointCloudConsolidationAvailability(
         const GeometryEntityAvailability& availability,
