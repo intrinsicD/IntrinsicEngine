@@ -16,10 +16,16 @@ module;
 export module Extrinsic.Runtime.CommandBus;
 
 import Extrinsic.Core.Hash;
-import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
-import Extrinsic.Runtime.WorldRegistry;
+
+// Contexts only borrow these registries. Match their owners' C++ linkage so
+// command declarations do not pull in scene storage or world lifecycle code.
+extern "C++"
+{
+    namespace Extrinsic::ECS::Scene { class Registry; }
+    namespace Extrinsic::Runtime { class WorldRegistry; }
+}
 
 // ============================================================
 // ARCH-007 — Kernel command bus with a single pre-sim drain point.

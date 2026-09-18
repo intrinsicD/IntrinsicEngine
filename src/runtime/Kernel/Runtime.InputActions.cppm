@@ -1,3 +1,5 @@
+// Runtime input bindings and dispatch contexts keep frame actions on the shared
+// callback path while borrowing scene and render state from their owners.
 module;
 
 #include <cstdint>
@@ -10,10 +12,11 @@ export module Extrinsic.Runtime.InputActions;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
-import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
+
+extern "C++" { namespace Extrinsic::ECS::Scene { class Registry; } }
 
 namespace Extrinsic::Runtime
 {

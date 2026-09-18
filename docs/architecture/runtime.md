@@ -211,6 +211,20 @@ The four kernel interfaces that need only erased identity —
 `Extrinsic.Core.FrameGraph`. Callers that actually build an ECS execution graph
 import the frame graph themselves.
 
+Command contexts borrow `ECS::Scene::Registry` and `WorldRegistry` through
+references and pointers. `Runtime.CommandBus` uses matching, non-exported
+`extern "C++"` declarations for these globally attached types; neither its
+interface nor its drain implementation needs the registry definitions.
+Handlers that access scene storage or world lifecycle operations import the
+corresponding owner directly. `KernelCompilationLocality.Commands` guards both
+registry boundaries using the compiler's dependency graph.
+
+Setup/frame-hook contexts in `Runtime.Module` use the same registry declarations;
+`Runtime.InputActions` likewise borrows the scene without importing its storage.
+Their compiled implementations only pass the references to callbacks. The
+callbacks import complete owners when they invoke scene or world operations.
+`KernelCompilationLocality.ContextBorrows` guards these interface dependencies.
+
 `JobService` names `RHI::ICommandContext` only by reference, for GPU queue
 participants. It declares the class with a non-exported `extern "C++"`
 declaration that matches the sole definition in `Extrinsic.RHI.CommandContext`;
@@ -889,8 +903,9 @@ events, jobs, and explicit world handles.
 `Extrinsic.Runtime.WorldRegistry` owns the sole `WorldRegistry` definition and
 its out-of-line members with `extern "C++"` language linkage, the same pattern
 `Graphics::IRenderer` and the kernel `ModuleLifecycle` records use. A module
-interface that only borrows a `WorldRegistry&` — currently
-`Extrinsic.Runtime.SpatialIndexCache`, whose CPU constructor takes one — names
+interface that only borrows a `WorldRegistry` reference or pointer — such as
+`Extrinsic.Runtime.SpatialIndexCache`, `Extrinsic.Runtime.CommandBus` and
+`Extrinsic.Runtime.Module` — names
 it through a matching non-exported forward declaration instead of importing the
 owner and its `ECS::Scene::Registry`/`JobService` closure. The declaration and
 the definition are the same type in either import order; there is no forward

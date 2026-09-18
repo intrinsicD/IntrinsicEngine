@@ -62,6 +62,7 @@ contracts:
     source: docs/architecture/runtime.md
     applies_when:
       - Kernel type identity, its shared hash implementation or command/event/service/job interface dependencies change.
+      - Setup/frame-hook or input-action contexts' borrowed registry declarations change.
       - JobService's borrowed GPU command-context declaration or its sole owner definition changes.
     proofs:
       - tests/unit/core/Test.CoreHash.cpp

@@ -15,7 +15,6 @@ export import Extrinsic.Runtime.RenderRecipeActivation;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Geometry2D;
-import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Platform.Input;
 import Extrinsic.Runtime.CommandBus;
@@ -24,7 +23,12 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.WorldHandle;
-import Extrinsic.Runtime.WorldRegistry;
+
+extern "C++"
+{
+    namespace Extrinsic::ECS::Scene { class Registry; }
+    namespace Extrinsic::Runtime { class WorldRegistry; }
+}
 
 namespace Extrinsic::Runtime
 {

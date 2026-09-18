@@ -680,6 +680,8 @@ set_tests_properties(SpatialCompilationLocality.QueryInterface
 # task-graph backend and scheduler. Real graph users keep their own edge.
 intrinsic_add_module_boundary_test(KernelCompilationLocality.Commands
         --check-source src/runtime/Kernel/Runtime.CommandBus.cppm
+        --forbid-module Extrinsic.ECS.Scene.Registry
+        --forbid-module Extrinsic.Runtime.WorldRegistry
         --forbid-module Extrinsic.Core.FrameGraph)
 intrinsic_add_module_boundary_test(KernelCompilationLocality.Events
         --check-source src/runtime/Kernel/Runtime.KernelEvents.cppm
@@ -687,6 +689,12 @@ intrinsic_add_module_boundary_test(KernelCompilationLocality.Events
 intrinsic_add_module_boundary_test(KernelCompilationLocality.Services
         --check-source src/runtime/Kernel/Runtime.ServiceRegistry.cppm
         --forbid-module Extrinsic.Core.FrameGraph)
+# Setup and input-action contexts borrow registries; callbacks import owners.
+intrinsic_add_module_boundary_test(KernelCompilationLocality.ContextBorrows
+        --check-source src/runtime/Kernel/Runtime.Module.cppm
+        --check-source src/runtime/Kernel/Runtime.InputActions.cppm
+        --forbid-module Extrinsic.ECS.Scene.Registry
+        --forbid-module Extrinsic.Runtime.WorldRegistry)
 # CPU job declarations additionally borrow `RHI::ICommandContext` by reference.
 # Any RHI edge here means GPU command recording moved back into every job
 # caller's compile closure; participants that record commands import the owner.
@@ -699,6 +707,7 @@ intrinsic_add_module_boundary_test(KernelCompilationLocality.Jobs
         --forbid-module Extrinsic.RHI.Handles)
 set_tests_properties(KernelCompilationLocality.Commands KernelCompilationLocality.Events
     KernelCompilationLocality.Services KernelCompilationLocality.Jobs
+    KernelCompilationLocality.ContextBorrows
     PROPERTIES LABELS "contract;build;runtime" TIMEOUT 30)
 
 # Model materialization seeds recipes; extraction owns effective GPU materials.

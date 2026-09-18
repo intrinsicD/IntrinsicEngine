@@ -9,7 +9,7 @@ evidence: not_applicable
 evidence_skip_reason: Interactive staged implementation; fixed diffs, review, tests and task checkpoints retain verification without unattended custody.
 maturity_target: Operational
 contract_schema: 1
-contracts: [repo.source-documentation, geometry.element-domain-sources, geometry.property-coherence, runtime.editor-prepared-frame-locality, runtime.render-diagnostics-locality, runtime.processing-compilation-locality, runtime.spatial-query-locality]
+contracts: [repo.source-documentation, geometry.element-domain-sources, geometry.property-coherence, runtime.editor-prepared-frame-locality, runtime.render-diagnostics-locality, runtime.processing-compilation-locality, runtime.spatial-query-locality, runtime.kernel-interface-locality]
 ---
 # UI-037 — Linear domain-action readiness and disabled-reason tooltips
 
@@ -4103,3 +4103,58 @@ ctest --test-dir build/ci --output-on-failure -R '^(EngineSetup|RuntimeModule|Sa
 cmake --build --preset ci --target IntrinsicTests -j4
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
 ```
+
+## Continuation — borrow-only kernel registry dependencies (2026-09-18)
+
+Operator-directed compilation/reuse cleanup with Claude Fable 5.1 from
+`10ec14fc6`. UI-037's remaining readiness acceptance is unchanged. The existing
+C++ linkage on `ECS::Scene::Registry` and `WorldRegistry` permits the command,
+setup and input-action contexts to borrow those exact types without importing
+their complete owners. Reuse the established non-exported declaration pattern;
+no wrapper, new source, ownership change or compatibility path is needed.
+Concrete scene/world users retain explicit owner imports. Command/event/job
+signature helpers and envelopes remain separate because their diagnostics,
+access and ownership contracts differ; no queue helper is justified to save
+three lines. This slice reduces compile dependencies, not duplicate algorithms.
+
+Claude reviewed the bounded plan and fixed diff. Its doc-route finding was
+corrected; delta review found no blocker. Compiler guards traverse all listed
+producers and their transitive dependency graph. The Engine-only convergence
+policy remains unchanged and passes. Source-doc audit: zero errors; seven
+existing command-contract comments reviewed. No ownership, layout, sequencing,
+config-lane, frame-recipe or failure-state behavior changes. Workshop rows
+1–3/8 pass, 4–7 n/a; strict layering has no exceptions or violations.
+
+All three affected production interfaces total 550 -> 563 physical lines: the
+extra declarations/comments remove imports without adding an abstraction. The
+full aggregate build caught one benchmark consumer missing its direct scene
+owner import; `Bench_KMeansGpuVulkanSmoke.cpp` now imports it (+1 line).
+The benchmark parameters, algorithms and reporting are unchanged. All 101
+benchmark manifests validate. No GPU execution or performance result is claimed.
+
+Canonical ci/Clang23 configuration, focused targets and `IntrinsicTests` build
+pass; 174 focused cases pass. The sandbox editor library is built by these
+targets; standalone `ExtrinsicSandbox` is disabled in the ci preset. Compiler
+module maps exclude the scene registry from all three touched interfaces:
+CommandBus 15 -> 12 entries, Module 30 -> 27, InputActions 12 -> 10. Engine's
+transitive map changes 40 -> 38. This is dependency evidence, not elapsed build
+time evidence. No additional Codex subagents were needed.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^(RuntimeCommandBus|RuntimeKernelEvents|RuntimeJobService|RuntimeWorldRegistry|RuntimeModule|RuntimeInputActions|RuntimeSceneLifecycle|EngineSetup|CoreHash|CoreFrameGraph|KernelCompilationLocality|RenderCompilationLocality|EditorCompilationLocality|SpatialCompilationLocality)\.|^SandboxEditorUi\.ActionReadinessDerivesDomainPrerequisiteReasons$|^SandboxEditorPresentation\.DisabledActionReasonTooltipAppearsAfterTwoFrames$' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 120
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+```
+
+Logs, fixed review packets, source hashes and baseline module maps:
+`/tmp/intrinsic-kernel-imports/`.
+
+Final checkpoint (2026-09-19): full exclusion-only CPU gate selected 4,761
+cases; 4,760 passed, one expected ASan-only GLFW lifecycle skip, zero failures
+(161.31 s). Reviewed source/test hashes stayed fixed through verification.
+Strict task policy/state links, doc links/sync, root hygiene, source/test layout,
+kernel convergence, skill mirrors and session-brief freshness pass. Module
+inventory regenerates unchanged at 429 modules. No sanitizer-suite or GPU run.
+UI-037 remains open; all code in this compilation-dependency slice is complete.

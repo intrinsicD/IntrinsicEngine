@@ -28,6 +28,7 @@ import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Scene.Handle;
+import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.CommandBus;
