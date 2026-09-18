@@ -1239,6 +1239,11 @@ if(TARGET ExtrinsicRuntime)
         SEARCH_DIRS contract/runtime
         FILES ${_runtime_contract_test_files}
     )
+    intrinsic_test_object_lib(EditorFeatureTestSupportObjs
+        SOURCES support/EditorFeatureTestContext.cpp
+        DEPS ExtrinsicRuntime
+    )
+
     # imgui_core_lib (backend-agnostic ImGui, no GLFW/Vulkan) gives
     # Test.ImGuiAdapter.cpp the imgui.h include path to synthesize a panel draw.
     intrinsic_test_object_lib(RuntimeContractTestObjs
@@ -2087,7 +2092,7 @@ endif()
 
 if(TARGET RuntimeContractTestObjs)
     intrinsic_test_executable(IntrinsicRuntimeContractTests
-        OBJECTS RuntimeContractTestObjs
+        OBJECTS RuntimeContractTestObjs EditorFeatureTestSupportObjs
         LINK_LIBS ExtrinsicRuntime IntrinsicProgressivePoissonReference
         LABELS contract runtime
     )
@@ -2103,7 +2108,7 @@ endif()
 
 if(TARGET SandboxEditorIntegrationTestObjs)
     intrinsic_test_executable(IntrinsicSandboxEditorIntegrationTests
-        OBJECTS SandboxEditorIntegrationTestObjs
+        OBJECTS SandboxEditorIntegrationTestObjs EditorFeatureTestSupportObjs
         LINK_LIBS ExtrinsicSandboxEditor ExtrinsicRuntime
         LABELS integration runtime
     )
@@ -2348,7 +2353,7 @@ endif()
 # by the Slice 1/2 CPU acceptance test).
 if(TARGET RuntimeSandboxAcceptanceGpuSmokeTestObjs)
     intrinsic_test_executable(IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests
-        OBJECTS RuntimeSandboxAcceptanceGpuSmokeTestObjs
+        OBJECTS RuntimeSandboxAcceptanceGpuSmokeTestObjs EditorFeatureTestSupportObjs
         LINK_LIBS ExtrinsicSandboxEditor ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore
         LABELS gpu vulkan integration runtime graphics
     )
@@ -2495,7 +2500,7 @@ intrinsic_test_executable(IntrinsicGraphicsContractCpuTests
 )
 
 intrinsic_test_executable(IntrinsicRuntimeGraphicsCpuTests
-    OBJECTS RuntimeGraphicsCpuTestObjs
+    OBJECTS RuntimeGraphicsCpuTestObjs EditorFeatureTestSupportObjs
     LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicRHI ExtrinsicECS ExtrinsicCore ExtrinsicPlatform
     LABELS integration runtime graphics
 )

@@ -4,7 +4,12 @@ Shared helpers, fixtures, builders, and test-only utilities used by multiple tes
 
 `EditorFeatureTestContext.hpp` supplies the editor context and shared canonical
 vertex/UV/topology builders used by the Models, Visualization and MeshMethods
-contract partitions. `GraphicsTestSupport.hpp` shares command-pass inspection
+contract partitions. Its context conversions and geometry builders compile once
+in `EditorFeatureTestContext.cpp`; `EditorFeatureTestSupportObjs` links them into
+the runtime contract, editor integration, runtime graphics and Sandbox GPU-smoke
+test executables.
+
+`GraphicsTestSupport.hpp` shares command-pass inspection
 and exact format conversion for graphics readback tests; `MockRHI.hpp` owns
 the mock backbuffer-barrier query. Expected pixels and packet setup stay in
 their individual tests.

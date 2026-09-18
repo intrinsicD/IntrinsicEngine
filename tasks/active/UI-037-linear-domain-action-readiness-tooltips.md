@@ -2865,3 +2865,35 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 cmake --preset ci-vulkan
 cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests -j4
 ```
+
+
+## Compiled editor context support — verified, 2026-09-18
+
+Seven non-template context methods and six geometry builders now compile once
+in `tests/support/EditorFeatureTestContext.cpp`, using the existing object-library
+helper as `EditorFeatureTestSupportObjs`. The header retains its data, imports,
+constant and declarations. All 13 bodies match their originals after whitespace
+normalization, including borrowed-cache invalidation, command binding and
+property/topology initialization.
+
+The source registry confirms 23 direct consumers: 19 runtime contract, one
+editor integration, two runtime graphics and one Sandbox GPU smoke source. All
+four executables compile/link in ci; the GPU smoke also links in ci-vulkan.
+Compiler metadata has one support action, and symbol inspection finds all 13
+definitions in that object and none in the 23 consumer objects. The header
+shrinks from 342 to 162 lines; the complete source/build set, including the new
+source and CMake, grows from 3,051 to 3,098 lines. The extra declarations and
+build entry buy compilation locality, not a physical-line reduction or a
+measured elapsed speedup. Core-only `TestSupportObjs` remains runtime-free.
+
+Claude's fixed-packet review found no blockers conditional on the four links;
+those links passed. Codex also reviewed the final CMake comment placement. The
+325 focused tests, full 4,742-passing CPU gate and structural checks recorded
+above cover the final combined source. Test routing passes its 19 synthetic
+tests and the live aggregate: 41 targets, 4,750 cases, 363 test sources. No
+UI-037 acceptance checkbox is closed by this test-only compilation change.
+
+```bash
+python3 tests/regression/tooling/Test.TestGateRouting.py --self-test
+python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicTests
+```
