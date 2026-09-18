@@ -404,6 +404,10 @@ this catalog presentation, including domain headings and sample counts.
 Descriptor and bilateral require the position domain; construction permits any
 domain while positions are unresolved. The panels update coupled input/output
 domains explicitly.
+K-Means and Progressive Poisson share the local `DrawPointSetPositionInput`
+chooser in `Sandbox.MethodPanels.cpp`; their output-domain updates remain in
+the callers. Consolidation retains its distinct selection identity and default
+focus behavior.
 Curvature and geodesics reuse the same draft state, keyed by observed active
 config, and apply-before-execute helper. Rejected edits remain retryable, while
 external config changes replace the draft. Geodesics clears mesh-local source

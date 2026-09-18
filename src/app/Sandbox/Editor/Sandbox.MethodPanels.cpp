@@ -396,6 +396,31 @@ namespace Extrinsic::Sandbox::Editor
             return label;
         }
 
+        [[nodiscard]] const Runtime::EditorPropertyCatalogRow*
+        DrawPointSetPositionInput(
+            const char* label,
+            const Runtime::EditorPropertyCatalogModel& catalog,
+            const Runtime::GeometryPropertyRef& current)
+        {
+            const Runtime::EditorPropertyCatalogRow* picked = nullptr;
+            if (ImGui::BeginCombo(label, current.Name.c_str()))
+            {
+                const auto* selected = &current;
+                for (const auto& row : catalog.Rows)
+                {
+                    if (!IsPointSetVec3Property(row)) continue;
+                    const auto rowLabel = PointSetPropertyLabel(row);
+                    if (ImGui::Selectable(rowLabel.c_str(), row.Descriptor == *selected))
+                    {
+                        picked = &row;
+                        selected = &row.Descriptor;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            return picked;
+        }
+
         template <std::size_t Size>
         void SetPropertyNameBuffer(
             std::array<char, Size>& buffer,
@@ -1748,21 +1773,13 @@ namespace Extrinsic::Sandbox::Editor
                 }
             }
             ImGui::SeparatorText("Input properties");
-            if (ImGui::BeginCombo("Positions##KMeans", KMeans.Properties.InputPositions.Name.c_str()))
+            if (const auto* row = DrawPointSetPositionInput(
+                    "Positions##KMeans", model.PropertyCatalog, KMeans.Properties.InputPositions))
             {
-                for (const auto& row : model.PropertyCatalog.Rows)
-                {
-                    if (!IsPointSetVec3Property(row)) continue;
-                    const auto label = PointSetPropertyLabel(row);
-                    if (ImGui::Selectable(label.c_str(), row.Descriptor == KMeans.Properties.InputPositions))
-                    {
-                        if (row.Descriptor.Domain != KMeans.Properties.InputPositions.Domain)
-                            KMeans.Properties = Runtime::MakeKMeansPropertyRefs(row.Descriptor.Domain);
-                        KMeans.Properties.InputPositions = row.Descriptor;
-                        KMeans.Dirty = true;
-                    }
-                }
-                ImGui::EndCombo();
+                if (row->Descriptor.Domain != KMeans.Properties.InputPositions.Domain)
+                    KMeans.Properties = Runtime::MakeKMeansPropertyRefs(row->Descriptor.Domain);
+                KMeans.Properties.InputPositions = row->Descriptor;
+                KMeans.Dirty = true;
             }
             ImGui::SeparatorText("Output properties");
             KMeans.Dirty |= DrawProcessingPropertyName("Labels##KMeans", KMeans.Properties.OutputLabels.Name);
@@ -2080,22 +2097,14 @@ namespace Extrinsic::Sandbox::Editor
                 ProgressivePoisson.Dimension <= 2 ? 2 : 3;
             bool configChanged = false;
             ImGui::SeparatorText("Input properties");
-            if (ImGui::BeginCombo("Positions##ProgressivePoisson", ProgressivePoisson.Draft.Positions.Name.c_str()))
+            if (const auto* row = DrawPointSetPositionInput(
+                    "Positions##ProgressivePoisson", model.PropertyCatalog, ProgressivePoisson.Draft.Positions))
             {
-                for (const auto& row : model.PropertyCatalog.Rows)
-                {
-                    if (!IsPointSetVec3Property(row)) continue;
-                    const auto label = PointSetPropertyLabel(row);
-                    if (ImGui::Selectable(label.c_str(), row.Descriptor == ProgressivePoisson.Draft.Positions))
-                    {
-                        ProgressivePoisson.Draft.Positions = row.Descriptor;
-                        for (auto* output : {&ProgressivePoisson.Draft.Level, &ProgressivePoisson.Draft.Rank,
-                                             &ProgressivePoisson.Draft.SplatRadius, &ProgressivePoisson.Draft.PrefixVisible})
-                            output->Domain = row.Descriptor.Domain;
-                        configChanged = true;
-                    }
-                }
-                ImGui::EndCombo();
+                ProgressivePoisson.Draft.Positions = row->Descriptor;
+                for (auto* output : {&ProgressivePoisson.Draft.Level, &ProgressivePoisson.Draft.Rank,
+                                     &ProgressivePoisson.Draft.SplatRadius, &ProgressivePoisson.Draft.PrefixVisible})
+                    output->Domain = row->Descriptor.Domain;
+                configChanged = true;
             }
             ImGui::SeparatorText("Output properties");
             configChanged |= DrawProcessingPropertyName("Level##ProgressivePoisson", ProgressivePoisson.Draft.Level.Name);
