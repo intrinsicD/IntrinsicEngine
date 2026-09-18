@@ -19,6 +19,7 @@
 #include <imgui_internal.h>
 
 #include "RuntimeTestModule.hpp"
+#include "TestImGuiFrameScope.hpp"
 
 import Extrinsic.Runtime.NormalOperations;
 import Extrinsic.Runtime.RegistrationOperations;
@@ -271,6 +272,153 @@ TEST(SandboxDomainPanels, UniformColorCommandsDisableBakingAndRetainScalarStyle)
         EXPECT_EQ(command->ScalarColormap, decltype(model.ScalarColormap)::Inferno);
         EXPECT_EQ(command->IsolineValues, model.IsolineValues);
         EXPECT_EQ(command->IsolineValueCount, 3u);
+    }
+}
+
+TEST(SandboxDomainPanels, SharedScalarControlsPreserveStylingAndEditAuthority)
+{
+    namespace G = Extrinsic::Graphics::Components;
+    TestSupport::ImGuiFrameScope gui;
+    ImGui::GetIO().DisplaySize = {1200, 1200};
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = scene.Create();
+    const auto stableId = Runtime::SelectionController::ToStableEntityId(entity);
+    std::size_t publications = 0;
+    Editor::SandboxEditorContext context;
+    context.VisualizationCommands = Runtime::BindEditorVisualizationEditingCommands({
+        .Scene = &scene,
+        .InvalidateWorkspaceSnapshotCache = [&] { ++publications; },
+        .VisualizationCommandsAvailable = true,
+    });
+    Runtime::EditorVisualizationConfigModel model;
+    model.HasConfig = true;
+    model.Source = Editor::kScalarFieldSource;
+    model.Color = {0.2f, 0.4f, 0.6f, 1.0f};
+    model.ScalarFieldName = "curvature";
+    model.ColorBufferName = "saved-colors";
+    model.ScalarAutoRange = false;
+    model.ScalarRangeMin = -2.0f;
+    model.ScalarRangeMax = 6.0f;
+    model.ScalarColormap = decltype(model.ScalarColormap)::Plasma;
+    model.ScalarBinCount = 7u;
+    model.IsolineCount = 9u;
+    model.IsolineWidth = 2.5f;
+    model.IsolineColor = {0.8f, 0.6f, 0.4f, 1.0f};
+    model.IsolineValues = {1.0f, 3.0f, 5.0f};
+    model.IsolineValueCount = 3u;
+
+    for (const auto target : {Runtime::EditorVisualizationTarget::Entity,
+                              Runtime::EditorVisualizationTarget::Surface})
+    {
+        SCOPED_TRACE(Runtime::DebugNameForEditorVisualizationTarget(target));
+        const auto reset = [&]
+        {
+            const auto status = Runtime::ApplyEditorVisualizationConfigCommand(
+                context.VisualizationCommands,
+                Editor::MakeVisualizationConfigCommandFromModel(stableId, model, target));
+            EXPECT_TRUE(status == Runtime::EditorCommandStatus::Applied ||
+                        status == Runtime::EditorCommandStatus::NoChange);
+            publications = 0;
+        };
+        const auto current = [&]() -> G::VisualizationConfig
+        {
+            if (target == Runtime::EditorVisualizationTarget::Entity)
+                return scene.Raw().get<G::VisualizationConfig>(entity);
+            const auto* lanes = scene.Raw().try_get<G::VisualizationLaneOverrides>(entity);
+            EXPECT_NE(lanes, nullptr);
+            if (lanes == nullptr) return {};
+            EXPECT_TRUE(lanes->Surface.has_value());
+            return lanes->Surface.value_or(G::VisualizationConfig{});
+        };
+        const auto activate = [&](const char* label, const bool canEdit, const int index = -1)
+        {
+            for (int frame = 0; frame != 2; ++frame)
+            {
+                gui.NextFrame();
+                ImGui::SetNextWindowPos({0, 0});
+                ImGui::SetNextWindowSize({1100, 1100});
+                ImGui::Begin("Shared scalar controls", nullptr, ImGuiWindowFlags_NoSavedSettings);
+                ImGui::PushID(static_cast<int>(target));
+                if (frame == 0)
+                {
+                    if (index >= 0) ImGui::PushID(index);
+                    ImGui::ActivateItemByID(ImGui::GetID(label));
+                    if (index >= 0) ImGui::PopID();
+                }
+                Editor::DrawScalarFieldColorControls(model, context, stableId, target, canEdit);
+                Editor::DrawScalarFieldBinAndIsolineControls(model, context, stableId, target, canEdit);
+                ImGui::PopID();
+                ImGui::End();
+            }
+        };
+
+        const auto expectStyle = [&](const G::VisualizationConfig& config)
+        {
+            EXPECT_EQ(config.Source, model.Source);
+            EXPECT_EQ(config.Color, model.Color);
+            EXPECT_EQ(config.ScalarFieldName, model.ScalarFieldName);
+            EXPECT_EQ(config.ColorBufferName, model.ColorBufferName);
+            EXPECT_EQ(config.ScalarDomain, model.ScalarDomain);
+            EXPECT_FLOAT_EQ(config.Scalar.RangeMin, model.ScalarRangeMin);
+            EXPECT_FLOAT_EQ(config.Scalar.RangeMax, model.ScalarRangeMax);
+            EXPECT_EQ(config.Scalar.BinCount, model.ScalarBinCount);
+            EXPECT_EQ(config.Scalar.Map, model.ScalarColormap);
+            EXPECT_EQ(config.Scalar.Isolines.Num, model.IsolineCount);
+            EXPECT_FLOAT_EQ(config.Scalar.Isolines.Width, model.IsolineWidth);
+            EXPECT_EQ(config.Scalar.Isolines.Color, model.IsolineColor);
+            EXPECT_EQ(config.UseBakedTexture, model.UseBakedTexture);
+        };
+        reset();
+        activate("Auto range", true);
+        EXPECT_EQ(publications, 1u);
+        const auto changed = current();
+        EXPECT_TRUE(changed.Scalar.AutoRange);
+        expectStyle(changed);
+        EXPECT_EQ(changed.Scalar.Isolines.Values, model.IsolineValues);
+        EXPECT_EQ(changed.Scalar.Isolines.ValueCount, model.IsolineValueCount);
+
+        for (const char* label : {"Auto range", "Add isovalue", "Remove"})
+        {
+            reset();
+            activate(label, false, std::string_view{label} == "Remove" ? 1 : -1);
+            EXPECT_EQ(publications, 0u) << label;
+            EXPECT_FALSE(current().Scalar.AutoRange);
+            EXPECT_EQ(current().Scalar.Isolines.ValueCount, 3u);
+        }
+        for (const bool autoRange : {false, true})
+        {
+            model.ScalarAutoRange = autoRange;
+            reset();
+            activate("Add isovalue", true);
+            EXPECT_EQ(publications, 1u);
+            const auto added = current();
+            expectStyle(added);
+            EXPECT_EQ(added.Scalar.AutoRange, autoRange);
+            EXPECT_EQ(added.Scalar.Isolines.ValueCount, 4u);
+            for (std::size_t i = 0; i < 3; ++i)
+                EXPECT_FLOAT_EQ(added.Scalar.Isolines.Values[i], model.IsolineValues[i]);
+            EXPECT_FLOAT_EQ(added.Scalar.Isolines.Values[3], autoRange ? 0.0f : 2.0f);
+        }
+        model.ScalarAutoRange = false;
+        for (int remove = 0; remove < 3; ++remove)
+        {
+            reset();
+            activate("Remove", true, remove);
+            EXPECT_EQ(publications, 1u);
+            const auto removed = current();
+            expectStyle(removed);
+            EXPECT_FALSE(removed.Scalar.AutoRange);
+            EXPECT_EQ(removed.Scalar.Isolines.ValueCount, 2u);
+            for (int i = 0; i < 2; ++i)
+                EXPECT_FLOAT_EQ(removed.Scalar.Isolines.Values[i],
+                                model.IsolineValues[i < remove ? i : i + 1]);
+        }
+        model.IsolineValueCount = model.IsolineValues.size();
+        reset();
+        activate("Add isovalue", true);
+        EXPECT_EQ(publications, 0u);
+        EXPECT_EQ(current().Scalar.Isolines.ValueCount, model.IsolineValues.size());
+        model.IsolineValueCount = 3u;
     }
 }
 

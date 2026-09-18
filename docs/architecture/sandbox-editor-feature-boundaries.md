@@ -469,6 +469,11 @@ for that detail, typed result data and exactly-once delivery flag. UV keeps its
 separate atlas rejection status. The point-field header does not require the
 editor command-status module for these declarations.
 
+Inspector and domain appearance panels share compiled uniform-color,
+scalar color/range and bin/isoline controls in `Sandbox.PanelSupport.cpp`.
+The callers own source visibility and the domain-only baked-texture restriction;
+the shared controls retain full-model command submission and caller ImGui IDs.
+
 The UV-regeneration controls have one implementation,
 `DrawSandboxUvRegenerationControls` in the app-private `Sandbox.PanelSupport.*`.
 It owns the atlas parameters, the submission that pairs

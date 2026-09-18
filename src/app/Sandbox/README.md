@@ -116,8 +116,10 @@ focused scene, geometry, visualization, and render-recipe operations. The shell
 copies prepared bindings/snapshots into app-owned `SandboxEditorContext` and
 `SandboxEditorFrame` records. The private `Sandbox.PanelSupport.hpp` shares those records, drawing controls,
 and method-panel action models between implementations and integration tests.
-`Sandbox.PanelSupport.cpp` owns the shared bound-render-state rows and texture-bake
-controls used by the inspector and domain appearance panels. Each caller retains
+`Sandbox.PanelSupport.cpp` owns the shared bound-render-state rows, uniform-color,
+scalar-field styling and texture-bake controls used by the inspector and domain
+appearance panels. Scalar color/range and bin/isoline drawing are separate so
+domain panels retain their baked-texture restriction. Each caller retains
 its own persistent rename draft and mutation diagnostic; bake-only constants and
 helpers stay private to the compiled implementation.
 The bake controls use the one UV-regeneration block (`DrawSandboxUvRegenerationControls`):

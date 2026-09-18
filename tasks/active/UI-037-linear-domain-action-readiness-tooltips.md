@@ -4008,3 +4008,46 @@ one expected ASan-only GLFW lifecycle skip, zero failures (151.79 s). Fable's
 delta review found no new concern. Final C++/test hashes remained unchanged
 through verification. No sanitizer-suite/GPU execution or elapsed compilation
 speedup is claimed. UI-037 remains open; this is a complete reuse checkpoint.
+
+
+## Continuation — shared scalar styling controls (2026-09-18)
+
+Operator-directed duplication/compilation cleanup with Claude Fable 5.1 from
+`d0315afc6`; UI-037's broader readiness acceptance remains open. Reuse search
+found matching uniform-color and scalar drawing, except for the domain-only
+baked-texture return between range and bins. The matching bodies now compile
+once in existing PanelSupport; callers retain visibility checks and ImGui IDs.
+Separate color/range and bin/isoline functions preserve that difference without
+a policy flag. The existing colormap-name array is reused. Two real callers
+justify plain functions; no new file/module/state owner/layer edge. Re-split
+only if their behavior contracts diverge further.
+
+Fable reviewed the plan and fixed diff with no production regression found.
+Applied its naming, shared submission, formatting and stronger test feedback.
+Real ImGui activation through bound runtime commands covers entity/surface
+routing, full styling/non-default colormap preservation, edit suppression,
+add seeds, removal order and capacity. The unchanged caller baked-visibility
+branch was reviewed directly; no new end-to-end visibility test was added
+because the existing public panel seam exposes registration, not direct drawing.
+
+All affected production files: 5,616 -> 5,533 lines (-83). Compiler module-map
+sets remain 117/124/115 for domain/shell/support, with no dependency changes.
+Symbols confirm one compiled definition per shared helper and two consumers;
+body tokens match after the declared extraction. No elapsed compile-speed claim.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicSandboxEditorIntegrationTests IntrinsicRuntimeContractTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^SandboxEditorPresentation\.|^SandboxDomainPanels\.|^SandboxEditorUi\..*Visualization.*|^EditorCompilationLocality\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 120
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+```
+
+Final canonical ci/Clang23 build passes; all 79 focused tests pass. CPU gate:
+4,759 selected, 4,758 passed, one expected ASan-only GLFW skip, zero failures
+(152.55 s). Reviewed source/test hashes stayed fixed. Strict layering, test
+layout, task policy/state links, docs links/sync, root hygiene, skill mirrors
+and session brief pass; source-doc audit has zero objective errors. No public
+module/inventory change. Architecture review retains runtime validation and
+lifetimes; workshop rows 1–3/8 pass, 4–7 n/a. No GPU/sanitizer-suite execution.
+Packets, hashes, comparisons and logs: `/tmp/intrinsic-scalar-controls/`.

@@ -332,6 +332,200 @@ namespace Extrinsic::Sandbox::Editor
         }
     }
 
+    void DrawUniformVisualizationColorEdit(
+        const EditorVisualizationConfigModel& visualization,
+        const SandboxEditorContext& context,
+        const std::uint32_t selectedStableId,
+        const EditorVisualizationTarget target,
+        const bool canEditVisualization)
+    {
+        if (!visualization.HasConfig ||
+            visualization.Source != kUniformColorSource)
+        {
+            return;
+        }
+
+        glm::vec4 color = visualization.Color;
+        if (ImGui::ColorEdit4("Color##uniform-visualization-color",
+                              &color.x) &&
+            canEditVisualization)
+        {
+            (void)ApplyEditorVisualizationConfigCommand(
+                context.VisualizationCommands,
+                MakeUniformVisualizationConfigCommandFromModel(
+                    selectedStableId,
+                    visualization,
+                    target,
+                    color));
+        }
+    }
+
+    namespace
+    {
+        // Every control reapplies the full copied model so unrelated styling survives.
+        void SubmitScalarVisualizationConfig(
+            const EditorVisualizationConfigModel& next,
+            const SandboxEditorContext& context,
+            const std::uint32_t selectedStableId,
+            const EditorVisualizationTarget target,
+            const bool canEditVisualization)
+        {
+            if (canEditVisualization)
+                (void)ApplyEditorVisualizationConfigCommand(
+                    context.VisualizationCommands,
+                    MakeVisualizationConfigCommandFromModel(selectedStableId, next, target));
+        }
+    }
+
+    void DrawScalarFieldColorControls(
+        const EditorVisualizationConfigModel& visualization,
+        const SandboxEditorContext& context,
+        const std::uint32_t selectedStableId,
+        const EditorVisualizationTarget target,
+        const bool canEditVisualization)
+    {
+        ImGui::SeparatorText("Scalar field");
+        ImGui::Text("Property: %s",
+                    visualization.ScalarFieldName.empty()
+                        ? "<none>"
+                        : visualization.ScalarFieldName.c_str());
+
+        int colormapIndex = static_cast<int>(visualization.ScalarColormap);
+        if (colormapIndex < 0 ||
+            colormapIndex >= static_cast<int>(kColormapNames.size()))
+        {
+            colormapIndex = 0;
+        }
+        if (ImGui::Combo("Colormap",
+                         &colormapIndex,
+                         kColormapNames.data(),
+                         static_cast<int>(kColormapNames.size())))
+        {
+            EditorVisualizationConfigModel next = visualization;
+            next.ScalarColormap =
+                static_cast<decltype(next.ScalarColormap)>(colormapIndex);
+            SubmitScalarVisualizationConfig(next, context, selectedStableId, target,
+                                            canEditVisualization);
+        }
+
+        bool autoRange = visualization.ScalarAutoRange;
+        if (ImGui::Checkbox("Auto range", &autoRange))
+        {
+            EditorVisualizationConfigModel next = visualization;
+            next.ScalarAutoRange = autoRange;
+            SubmitScalarVisualizationConfig(next, context, selectedStableId, target,
+                                            canEditVisualization);
+        }
+        if (!visualization.ScalarAutoRange)
+        {
+            float rangeMinMax[2]{visualization.ScalarRangeMin,
+                                 visualization.ScalarRangeMax};
+            if (ImGui::DragFloat2("Clamp min/max",
+                                  rangeMinMax,
+                                  0.01f,
+                                  0.0f,
+                                  0.0f,
+                                  "%.5f") &&
+                rangeMinMax[0] < rangeMinMax[1])
+            {
+                EditorVisualizationConfigModel next = visualization;
+                next.ScalarRangeMin = rangeMinMax[0];
+                next.ScalarRangeMax = rangeMinMax[1];
+                SubmitScalarVisualizationConfig(next, context, selectedStableId, target,
+                                                canEditVisualization);
+            }
+        }
+    }
+
+    void DrawScalarFieldBinAndIsolineControls(
+        const EditorVisualizationConfigModel& visualization,
+        const SandboxEditorContext& context,
+        const std::uint32_t selectedStableId,
+        const EditorVisualizationTarget target,
+        const bool canEditVisualization)
+    {
+        int binCount = static_cast<int>(visualization.ScalarBinCount);
+        if (ImGui::DragInt("Bins (0 = continuous)", &binCount, 0.25f, 0, 64) &&
+            binCount >= 0)
+        {
+            EditorVisualizationConfigModel next = visualization;
+            next.ScalarBinCount = static_cast<std::uint32_t>(binCount);
+            SubmitScalarVisualizationConfig(next, context, selectedStableId, target,
+                                            canEditVisualization);
+        }
+
+        ImGui::SeparatorText("Isolines");
+        int isolineCount = static_cast<int>(visualization.IsolineCount);
+        if (ImGui::DragInt("Count##isolines", &isolineCount, 0.25f, 0, 256) &&
+            isolineCount >= 0)
+        {
+            EditorVisualizationConfigModel next = visualization;
+            next.IsolineCount = static_cast<std::uint32_t>(isolineCount);
+            SubmitScalarVisualizationConfig(next, context, selectedStableId, target,
+                                            canEditVisualization);
+        }
+        float isolineWidth = visualization.IsolineWidth;
+        if (ImGui::DragFloat("Width##isolines", &isolineWidth, 0.05f, 0.1f, 16.0f) &&
+            isolineWidth > 0.0f)
+        {
+            EditorVisualizationConfigModel next = visualization;
+            next.IsolineWidth = isolineWidth;
+            SubmitScalarVisualizationConfig(next, context, selectedStableId, target,
+                                            canEditVisualization);
+        }
+        glm::vec4 isolineColor = visualization.IsolineColor;
+        if (ImGui::ColorEdit4("Color##isolines", &isolineColor.x))
+        {
+            EditorVisualizationConfigModel next = visualization;
+            next.IsolineColor = isolineColor;
+            SubmitScalarVisualizationConfig(next, context, selectedStableId, target,
+                                            canEditVisualization);
+        }
+
+        ImGui::TextUnformatted("Highlight isovalues");
+        for (std::uint32_t i = 0u; i < visualization.IsolineValueCount; ++i)
+        {
+            ImGui::PushID(static_cast<int>(i));
+            float value = visualization.IsolineValues[i];
+            if (ImGui::DragFloat("##isovalue", &value, 0.001f, 0.0f, 0.0f, "%.5f"))
+            {
+                EditorVisualizationConfigModel next = visualization;
+                next.IsolineValues[i] = value;
+                SubmitScalarVisualizationConfig(next, context, selectedStableId, target,
+                                                canEditVisualization);
+            }
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Remove"))
+            {
+                EditorVisualizationConfigModel next = visualization;
+                for (std::uint32_t j = i; j + 1u < next.IsolineValueCount; ++j)
+                {
+                    next.IsolineValues[j] = next.IsolineValues[j + 1u];
+                }
+                next.IsolineValueCount -= 1u;
+                SubmitScalarVisualizationConfig(next, context, selectedStableId, target,
+                                                canEditVisualization);
+            }
+            ImGui::PopID();
+        }
+        if (visualization.IsolineValueCount <
+            visualization.IsolineValues.size())
+        {
+            if (ImGui::SmallButton("Add isovalue"))
+            {
+                EditorVisualizationConfigModel next = visualization;
+                const float seed = visualization.ScalarAutoRange
+                    ? 0.0f
+                    : 0.5f * (visualization.ScalarRangeMin +
+                              visualization.ScalarRangeMax);
+                next.IsolineValues[next.IsolineValueCount] = seed;
+                next.IsolineValueCount += 1u;
+                SubmitScalarVisualizationConfig(next, context, selectedStableId, target,
+                                                canEditVisualization);
+            }
+        }
+    }
+
     void DrawBoundRenderStateRows(
         const EditorBoundRenderStateModel& bound)
     {

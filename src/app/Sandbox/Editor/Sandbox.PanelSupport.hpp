@@ -155,6 +155,28 @@ namespace Extrinsic::Sandbox::Editor
         TextureBakeUiState* state,
         TextureBakeMutationUiState& mutation);
 
+    void DrawUniformVisualizationColorEdit(
+        const Runtime::EditorVisualizationConfigModel& visualization,
+        const SandboxEditorContext& context,
+        std::uint32_t selectedStableId,
+        Runtime::EditorVisualizationTarget target,
+        bool canEditVisualization);
+
+    // Both scalar blocks require the caller's scalar-source visibility check.
+    void DrawScalarFieldColorControls(
+        const Runtime::EditorVisualizationConfigModel& visualization,
+        const SandboxEditorContext& context,
+        std::uint32_t selectedStableId,
+        Runtime::EditorVisualizationTarget target,
+        bool canEditVisualization);
+
+    void DrawScalarFieldBinAndIsolineControls(
+        const Runtime::EditorVisualizationConfigModel& visualization,
+        const SandboxEditorContext& context,
+        std::uint32_t selectedStableId,
+        Runtime::EditorVisualizationTarget target,
+        bool canEditVisualization);
+
     // Storage the shared UV-regeneration block reads and writes. Every pointer
     // must be bound; callers pass either their panel-lifetime members or the
     // same frame-local fallbacks the rest of their bake panel uses, so an
