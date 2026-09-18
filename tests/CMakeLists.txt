@@ -2039,6 +2039,12 @@ intrinsic_test_object_lib(MockRhiTestSupportObjs
     DEPS ExtrinsicRHI ExtrinsicCore
 )
 
+# Mesh fixture bodies are shared by their three geometry executables.
+intrinsic_test_object_lib(GeometryMeshBuilderTestSupportObjs
+    SOURCES support/geometry/MeshBuilders.cpp
+    DEPS ExtrinsicCore IntrinsicGeometry
+)
+
 # Shared support for all test executables (sanitizer defaults, shared test hooks).
 intrinsic_test_object_lib(TestSupportObjs
     SOURCES
@@ -2196,7 +2202,7 @@ endif()
 
 # --- Core + Geometry (DEC, mesh algorithms — no GPU, no ECS) ---
 intrinsic_test_executable(IntrinsicGeometryTests
-    OBJECTS  GeometryTestObjs
+    OBJECTS  GeometryTestObjs GeometryMeshBuilderTestSupportObjs
     LINK_LIBS ExtrinsicCore IntrinsicGeometry
     LABELS unit geometry
     ${_intrinsic_pure_ctest_registration}
@@ -2262,13 +2268,13 @@ intrinsic_test_executable(IntrinsicGeometryIoTests
 )
 
 intrinsic_test_executable(IntrinsicGeometryProcessStateTests
-    OBJECTS GeometryProcessStateTestObjs
+    OBJECTS GeometryProcessStateTestObjs GeometryMeshBuilderTestSupportObjs
     LINK_LIBS ExtrinsicCore IntrinsicGeometry
     LABELS unit geometry
 )
 
 intrinsic_test_executable(IntrinsicGeometrySlowTests
-    OBJECTS GeometrySlowTestObjs
+    OBJECTS GeometrySlowTestObjs GeometryMeshBuilderTestSupportObjs
     LINK_LIBS ExtrinsicCore IntrinsicGeometry
     LABELS unit geometry slow
 )

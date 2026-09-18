@@ -3030,3 +3030,55 @@ cmake --build --preset ci --target IntrinsicTests -j4
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
 python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicTests
 ```
+
+## Compiled geometry test fixtures — 2026-09-18
+
+Operator-directed duplication/compile-locality continuation with Claude from
+clean `eb3a6ba2a`; Codex owns this checkout and build. UI-037 remains active and
+its readiness acceptance criteria are unchanged. Catalog review retains the
+existing source-documentation contract; this companion slice changes only tests.
+
+Reuse discovery identified `tests/support/geometry/Test_MeshBuilders.h` as the
+existing owner used by 29 test sources. Move its 15 non-template bodies unchanged
+to `geometry/MeshBuilders.cpp`, compiled by `GeometryMeshBuilderTestSupportObjs`
+and explicitly linked into the three consumer executables. Preserve signatures,
+defaults and global-module attachment. The existing production tetrahedron and
+icosahedron builders remain the two fixture wrappers' owners. No geometry
+algorithm or production module changes. Keep geometric contracts in the header;
+correct its false interior-vertex and five-vertex quad-pair descriptions.
+
+The initial narrow-import build required an explicit `Geometry.Properties`
+import for vertex/face handles; adding it fixes the compilation error. All 15
+bodies then compare byte-for-byte against the baseline. Compiler/symbol inspection
+finds one support action and 15 definitions, with none in the 29 consumer objects.
+The header shrinks from 291 to 52 lines; the new implementation has 232 lines
+and CMake adds six net lines. This relocates compilation; it does not establish
+an elapsed build-time improvement.
+
+Verification: all three executables compile/link with canonical ci/Clang 23;
+all 1,578 consumer CTest cases pass, including the four opted-in slow cases.
+The full exclusion-only CPU gate passes 4,743 tests with one expected ASan-only
+GLFW lifecycle skip (4,744 selected, 148.87 seconds of test execution). Claude's
+fixed-diff review and resolution have no remaining concerns. The wider ODR check
+covers all 106 objects in the three executable groups plus both support groups:
+only the new support object defines these 15 global functions. Final review also
+clarified the diamond's diagonal and restored the two alias equivalence comments.
+The source-doc audit has zero errors; 15 reviewed declaration comments describe
+fixture geometry/equivalence. No production layering, runtime wiring, config,
+GPU path or public module changes; no sanitizer or GPU evidence is claimed.
+Logs, exact test selection, body/symbol comparisons and Claude packets:
+`/tmp/intrinsic-construction-mesh-reuse/`.
+
+Final comment-only rebuild of `IntrinsicTests` and all 1,578 focused cases pass
+again. Test routing passes 19 self-tests and reconciles 41 targets, 4,751 cases
+and 363 test sources; support-source edits retain the conservative broad route.
+Test layout, task policy/state and docs sync pass in strict mode; links, root
+hygiene, skill mirrors, session-brief and diff checks also pass. Scope is one fixture-compilation
+move; layer/public-surface/renderer/maturity/exception changes are not applicable.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicTests
+```
