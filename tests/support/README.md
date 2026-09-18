@@ -12,10 +12,12 @@ frame statistics; renderer execution consumers import `Graphics.Renderer`
 themselves. Asset import uses command callbacks; the context does not borrow the
 live asset service. Tests that use that service import its module directly.
 
-`GraphicsTestSupport.hpp` shares command-pass inspection
-and exact format conversion for graphics readback tests; `MockRHI.hpp` owns
-the mock backbuffer-barrier query. Expected pixels and packet setup stay in
-their individual tests.
+`GraphicsTestSupport.hpp` declares command-pass inspection and exact readback
+format conversion. The bodies compile once in `GraphicsTestSupport.cpp` through
+`GraphicsTestSupportObjs`, linked into the graphics CPU contract and Vulkan
+smoke executables. The `GraphicsTestSupport` CPU suite checks first-match lookup,
+channel order, sRGB conversion and alpha preservation. `MockRHI.hpp` owns the
+mock backbuffer-barrier query; expected pixels and packet setup stay in callers.
 
 `SandboxEditorJobHarness.hpp` declares the shared editor-job fixture. Its
 snapshot, command callbacks, drain loop and scheduler lifecycle compile once in

@@ -4228,3 +4228,58 @@ checkpoint. All 26 compile-hotspot tool tests also pass. Strict structural
 checks pass and source/test hashes remain fixed. Evidence and fixed review
 packets: `/tmp/intrinsic-reuse-round3/`. UI-037 remains open; both session
 slices are complete. No additional Codex subagents were used.
+
+
+## Continuation — compiled graphics test support (2026-09-19)
+
+Operator-directed duplication/compile-locality work with Claude Fable 5.1 from
+`2a81b9db0`. UI-037 remains open; this continues its shared test-support cleanup
+and does not close the remaining action/readiness acceptance matrix.
+
+Reuse decision: `tests/support/GraphicsTestSupport.hpp` already owned first-match
+command-pass lookup and byte-preserving RGBA/sRGB conversion. Renderer lifecycle,
+ImGui smoke and UV-view smoke now reuse its lookup; default-recipe smoke reuses
+its matching conversion functions. The ImGui-specific pixel record/converter
+stays local. Snapshot pointers remain borrowed, duplicate names return the first
+pass, unknown formats retain their passthrough behavior and alpha stays linear.
+
+Non-constexpr helper bodies compile in `GraphicsTestSupport.cpp`, linked through
+one object target into graphics CPU contract and Vulkan smoke executables only.
+The header imports the canonical render-diagnostics owner and uses `string_view`
+for allocation-free lookup. No production source, module surface, backend, label
+or GPU execution behavior changes. The compile database has one helper action;
+this is compilation-structure evidence, not an elapsed compilation-speed claim.
+
+Existing helper/caller files plus the new helper and build entries total
+14,093 -> 14,054 physical lines (-39); the new regression test is additional
+coverage. Three CPU tests passed before extraction and after it, checking first
+match/missing lookup, four pixel formats, unknown-format fallback, sRGB values,
+monotonicity and alpha preservation. The final tests also cover a bounded
+non-null-terminated name view and constexpr format checks. All 108 focused
+cases pass. Canonical ci uses Clang 23 without sanitizers; both consumer
+executables and the full `IntrinsicTests` target build successfully.
+
+Fable's plan and fixed-diff reviews found no blocking defect. Conditional import,
+link-scope and call-site concerns are settled by successful builds of all affected
+consumers; `Format` is uint32_t and the default-recipe test still needs cmath for
+isfinite. The four-point review passes. Source-documentation audit: zero errors,
+one retained first-match/borrow-lifetime comment. No Codex subagents were needed.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests IntrinsicGraphicsVulkanSmokeTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^(GraphicsTestSupport|RendererFrameLifecycle|TransientDebugSurfacePass|VisualizationOverlayPass|ImGuiPass|PresentPass|DebugViewPass|MinimalTriangleReadbackHarness)\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+```
+
+Fixed review packets, source hashes and verification logs:
+`/tmp/intrinsic-graphics-support/`. No GPU execution or sanitizer-suite result
+is claimed.
+
+Final checkpoint: the full exclusion-only CPU gate selected 4,765 cases;
+4,764 passed, one expected ASan-only GLFW lifecycle check skipped, zero
+failures (151.89 s). Reviewed source/build hashes stayed fixed. Strict test
+layout, layering, task policy/state links, doc links, root hygiene, skill mirrors
+and session-brief freshness pass. Module inventory regenerates unchanged
+at 429 modules. All work in this support slice is complete.

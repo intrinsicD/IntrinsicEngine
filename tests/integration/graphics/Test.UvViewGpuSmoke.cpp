@@ -32,6 +32,8 @@ import Extrinsic.RHI.Handles;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 
+#include "GraphicsTestSupport.hpp"
+
 namespace
 {
 namespace Counters =
@@ -131,15 +133,7 @@ Counters::Snapshot ToCounterSnapshot(
     };
 }
 
-[[nodiscard]] const Extrinsic::Graphics::RenderGraphCommandPassStats*
-FindCommandPass(const Extrinsic::Graphics::RenderGraphFrameStats& stats,
-                const std::string_view passName) noexcept
-{
-    const auto found = std::ranges::find_if(
-        stats.CommandRecords.Passes,
-        [passName](const auto& pass) { return pass.Name == passName; });
-    return found == stats.CommandRecords.Passes.end() ? nullptr : &*found;
-}
+using Extrinsic::Tests::GraphicsSupport::FindCommandPass;
 
 class UvViewSmokeApp final : public Intrinsic::Tests::RuntimeTestModule
 {

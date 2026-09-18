@@ -59,6 +59,8 @@ import Extrinsic.RHI.Types;
 
 #include "MockRHI.hpp"
 
+#include "GraphicsTestSupport.hpp"
+
 namespace
 {
     constexpr Extrinsic::RHI::FrontFace kVulkanCameraTriangleFrontFace =
@@ -235,19 +237,7 @@ namespace
         }
     }
 
-    [[nodiscard]] const Extrinsic::Graphics::RenderGraphCommandPassStats* FindCommandPass(
-        const Extrinsic::Graphics::RenderGraphFrameStats& stats,
-        const std::string& name)
-    {
-        for (const auto& pass : stats.CommandRecords.Passes)
-        {
-            if (pass.Name == name)
-            {
-                return &pass;
-            }
-        }
-        return nullptr;
-    }
+    using Extrinsic::Tests::GraphicsSupport::FindCommandPass;
 
     [[nodiscard]] std::uint32_t CountCommandPass(
         const Extrinsic::Graphics::RenderGraphFrameStats& stats,

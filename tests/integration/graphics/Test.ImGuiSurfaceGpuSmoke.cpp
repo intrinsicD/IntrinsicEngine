@@ -26,6 +26,8 @@ import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 
+#include "GraphicsTestSupport.hpp"
+
 namespace
 {
 namespace Counters = Extrinsic::Tests::Support::OperationalCounterStability;
@@ -179,16 +181,7 @@ struct Rgba8Pixel
     }
 }
 
-[[nodiscard]] const Extrinsic::Graphics::RenderGraphCommandPassStats* FindCommandPass(
-    const Extrinsic::Graphics::RenderGraphFrameStats& stats,
-    const std::string_view passName) noexcept
-{
-    const auto it = std::find_if(
-        stats.CommandRecords.Passes.begin(),
-        stats.CommandRecords.Passes.end(),
-        [passName](const auto& pass) { return pass.Name == passName; });
-    return it == stats.CommandRecords.Passes.end() ? nullptr : &*it;
-}
+using Extrinsic::Tests::GraphicsSupport::FindCommandPass;
 
 void DrawLargeSelectedEntityInspectorPayload()
 {

@@ -1996,6 +1996,7 @@ set(_graphics_contract_cpu_test_files
     Test.DebugViewPass.cpp
     Test.FrameRecipeContract.cpp
     Test.GeometryResidency.cpp
+    Test.GraphicsTestSupport.cpp
     Test.GpuWorldCompactionContract.cpp
     Test.GpuWorldLifetimeContract.cpp
     Test.GpuWorldUniformSoAContract.cpp
@@ -2120,6 +2121,12 @@ endif()
 intrinsic_test_object_lib(MockRhiTestSupportObjs
     SOURCES support/MockRHI.cpp
     DEPS ExtrinsicRHI ExtrinsicCore
+)
+
+# Graphics inspection and readback conversion compile once for CPU and GPU tests.
+intrinsic_test_object_lib(GraphicsTestSupportObjs
+    SOURCES support/GraphicsTestSupport.cpp
+    DEPS ExtrinsicGraphics ExtrinsicRHI ExtrinsicCore
 )
 
 # Mesh fixture bodies are shared by their three geometry executables.
@@ -2434,7 +2441,7 @@ endif()
 
 if(TARGET GraphicsVulkanSmokeTestObjs)
     intrinsic_test_executable(IntrinsicGraphicsVulkanSmokeTests
-        OBJECTS GraphicsVulkanSmokeTestObjs RuntimeTestModuleSupportObjs
+        OBJECTS GraphicsVulkanSmokeTestObjs RuntimeTestModuleSupportObjs GraphicsTestSupportObjs
         LINK_LIBS ExtrinsicRuntime ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
         LABELS gpu vulkan graphics
     )
@@ -2589,7 +2596,7 @@ if(TARGET GraphicsVulkanContractTestObjs)
 endif()
 
 intrinsic_test_executable(IntrinsicGraphicsContractCpuTests
-    OBJECTS GraphicsContractCpuTestObjs MockRhiTestSupportObjs
+    OBJECTS GraphicsContractCpuTestObjs MockRhiTestSupportObjs GraphicsTestSupportObjs
     LINK_LIBS ExtrinsicGraphics ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform
     LABELS contract graphics
 )
