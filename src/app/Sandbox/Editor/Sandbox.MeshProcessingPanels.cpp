@@ -348,6 +348,10 @@ namespace Extrinsic::Sandbox::Editor
             std::vector<std::string> menuPath,
             std::string title,
             DrawWindow draw);
+        // IDs and targets must be string literals retained by the callback.
+        void RegisterRedirectWindow(const char* id,
+                                    std::vector<std::string> menuPath,
+                                    std::string title, const char* target);
         void ResetModelCache();
         [[nodiscard]] const Runtime::EditorDomainWindowModel&
         GetDomainWindowModel(
@@ -422,110 +426,56 @@ namespace Extrinsic::Sandbox::Editor
         for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
                  {{"mesh.processing.outliers", "Mesh"}, {"graph.processing.outliers", "Graph"},
                   {"pointcloud.processing.remove_outliers", "PointCloud"}}})
-            Handles.push_back(Shell->RegisterEditorWindow({
-                .Id=id, .MenuPath={domain,"Processing"}, .Title="Outlier Analysis",
-                .Draw=[](bool& open,const SandboxEditorContext&){open=false;},
-                .OpenStateChanged=[this,id](bool open){
-                    if(!open)return;
-                    (void)Shell->SetEditorWindowOpen("view.outlier_analysis",true);
-                    (void)Shell->SetEditorWindowOpen(id,false);
-                }}));
+            RegisterRedirectWindow(id, {domain, "Processing"}, "Outlier Analysis",
+                                   "view.outlier_analysis");
         RegisterWindow("view.keypoint_analysis", {"View"}, "ISS Keypoint Analysis", &Impl::DrawKeypointsWindow);
         for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
                  {{"mesh.processing.keypoints", "Mesh"}, {"graph.processing.keypoints", "Graph"},
                   {"pointcloud.processing.keypoints", "PointCloud"}}})
-            Handles.push_back(Shell->RegisterEditorWindow({
-                .Id=id, .MenuPath={domain,"Processing"}, .Title="ISS Keypoint Analysis",
-                .Draw=[](bool& open,const SandboxEditorContext&){open=false;},
-                .OpenStateChanged=[this,id](bool open){
-                    if(!open)return;
-                    (void)Shell->SetEditorWindowOpen("view.keypoint_analysis",true);
-                    (void)Shell->SetEditorWindowOpen(id,false);
-                }}));
+            RegisterRedirectWindow(id, {domain, "Processing"}, "ISS Keypoint Analysis",
+                                   "view.keypoint_analysis");
         RegisterWindow("view.descriptor_analysis", {"View"}, "FPFH Descriptor Analysis", &Impl::DrawDescriptorsWindow);
         for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
                  {{"mesh.processing.descriptors", "Mesh"}, {"graph.processing.descriptors", "Graph"},
                   {"pointcloud.processing.descriptors", "PointCloud"}}})
-            Handles.push_back(Shell->RegisterEditorWindow({
-                .Id=id, .MenuPath={domain,"Processing"}, .Title="FPFH Descriptor Analysis",
-                .Draw=[](bool& open,const SandboxEditorContext&){open=false;},
-                .OpenStateChanged=[this,id](bool open){
-                    if(!open)return;
-                    (void)Shell->SetEditorWindowOpen("view.descriptor_analysis",true);
-                    (void)Shell->SetEditorWindowOpen(id,false);
-                }}));
+            RegisterRedirectWindow(id, {domain, "Processing"}, "FPFH Descriptor Analysis",
+                                   "view.descriptor_analysis");
         RegisterWindow("view.kernel_density", {"View"}, "Kernel Density", &Impl::DrawDensityWindow);
         for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
                  {{"mesh.processing.kernel_density", "Mesh"}, {"graph.processing.kernel_density", "Graph"},
                   {"pointcloud.processing.kernel_density", "PointCloud"}}})
-            Handles.push_back(Shell->RegisterEditorWindow({
-                .Id=id, .MenuPath={domain,"Processing"}, .Title="Kernel Density",
-                .Draw=[](bool& open,const SandboxEditorContext&){open=false;},
-                .OpenStateChanged=[this,id](bool open){
-                    if(!open)return;
-                    (void)Shell->SetEditorWindowOpen("view.kernel_density",true);
-                    (void)Shell->SetEditorWindowOpen(id,false);
-                }}));
+            RegisterRedirectWindow(id, {domain, "Processing"}, "Kernel Density",
+                                   "view.kernel_density");
         RegisterWindow("view.density_weights", {"View"}, "Compact Density Weights", &Impl::DrawDensityWeightsWindow);
         for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
                  {{"mesh.processing.density_weights", "Mesh"}, {"graph.processing.density_weights", "Graph"},
                   {"pointcloud.processing.density_weights", "PointCloud"}}})
-            Handles.push_back(Shell->RegisterEditorWindow({
-                .Id=id, .MenuPath={domain,"Processing"}, .Title="Compact Density Weights",
-                .Draw=[](bool& open,const SandboxEditorContext&){open=false;},
-                .OpenStateChanged=[this,id](bool open){
-                    if(!open)return;
-                    (void)Shell->SetEditorWindowOpen("view.density_weights",true);
-                    (void)Shell->SetEditorWindowOpen(id,false);
-                }}));
+            RegisterRedirectWindow(id, {domain, "Processing"}, "Compact Density Weights",
+                                   "view.density_weights");
         RegisterWindow("view.point_construction", {"View"}, "Construct from Points", &Impl::DrawConstructionWindow);
         for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
                  {{"mesh.processing.point_construction", "Mesh"}, {"graph.processing.point_construction", "Graph"},
                   {"pointcloud.processing.point_construction", "PointCloud"}}})
-            Handles.push_back(Shell->RegisterEditorWindow({
-                .Id=id, .MenuPath={domain,"Processing"}, .Title="Construct from Points",
-                .Draw=[](bool& open,const SandboxEditorContext&){open=false;},
-                .OpenStateChanged=[this,id](bool open){
-                    if(!open)return;
-                    (void)Shell->SetEditorWindowOpen("view.point_construction",true);
-                    (void)Shell->SetEditorWindowOpen(id,false);
-                }}));
+            RegisterRedirectWindow(id, {domain, "Processing"}, "Construct from Points",
+                                   "view.point_construction");
         RegisterWindow("view.point_spacing", {"View"}, "Point Spacing and Radii", &Impl::DrawSpacingWindow);
         for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
                  {{"mesh.processing.point_spacing", "Mesh"}, {"graph.processing.point_spacing", "Graph"},
                   {"pointcloud.processing.point_spacing", "PointCloud"}}})
-            Handles.push_back(Shell->RegisterEditorWindow({
-                .Id=id, .MenuPath={domain,"Processing"}, .Title="Point Spacing and Radii",
-                .Draw=[](bool& open,const SandboxEditorContext&){open=false;},
-                .OpenStateChanged=[this,id](bool open){
-                    if(!open)return;
-                    (void)Shell->SetEditorWindowOpen("view.point_spacing",true);
-                    (void)Shell->SetEditorWindowOpen(id,false);
-                }}));
+            RegisterRedirectWindow(id, {domain, "Processing"}, "Point Spacing and Radii",
+                                   "view.point_spacing");
         RegisterWindow("view.bilateral_filter", {"View"}, "Bilateral Point Filter", &Impl::DrawBilateralWindow);
         for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
                  {{"mesh.processing.bilateral_filter", "Mesh"}, {"graph.processing.bilateral_filter", "Graph"},
                   {"pointcloud.processing.bilateral_filter", "PointCloud"}}})
-            Handles.push_back(Shell->RegisterEditorWindow({
-                .Id=id, .MenuPath={domain,"Processing"}, .Title="Bilateral Point Filter",
-                .Draw=[](bool& open,const SandboxEditorContext&){open=false;},
-                .OpenStateChanged=[this,id](bool open){
-                    if(!open)return;
-                    (void)Shell->SetEditorWindowOpen("view.bilateral_filter",true);
-                    (void)Shell->SetEditorWindowOpen(id,false);
-                }}));
+            RegisterRedirectWindow(id, {domain, "Processing"}, "Bilateral Point Filter",
+                                   "view.bilateral_filter");
         RegisterWindow("view.normal_estimation", {"View"}, "Normal Estimation", &Impl::DrawNormalsWindow);
         for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
                  {{"mesh.processing.vertices.normals", "Mesh"}, {"graph.processing.vertices.normals", "Graph"},
                   {"pointcloud.processing.vertices.normals", "PointCloud"}}})
-            Handles.push_back(Shell->RegisterEditorWindow({
-                .Id = id, .MenuPath = {domain, "Processing", "Vertices"}, .Title = "Normals",
-                .Draw = [](bool& open, const SandboxEditorContext&) { open = false; },
-                .OpenStateChanged = [this, id](bool open) {
-                    if (!open) return;
-                    (void)Shell->SetEditorWindowOpen("view.normal_estimation", true);
-                    (void)Shell->SetEditorWindowOpen(id, false);
-                }}));
+            RegisterRedirectWindow(id, {domain, "Processing", "Vertices"}, "Normals",
+                                   "view.normal_estimation");
         Handles.push_back(Shell->RegisterEditorWindow({
             .Id = "mesh.processing.faces.normals", .MenuPath = {"Mesh", "Processing", "Faces"},
             .Title = "Normals",
@@ -541,14 +491,8 @@ namespace Extrinsic::Sandbox::Editor
         for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
                  {{"mesh.processing.registration", "Mesh"}, {"graph.processing.registration", "Graph"},
                   {"pointcloud.processing.registration", "PointCloud"}}})
-            Handles.push_back(Shell->RegisterEditorWindow({
-                .Id = id, .MenuPath = {domain, "Processing"}, .Title = "ICP Registration",
-                .Draw = [](bool& open, const SandboxEditorContext&) { open = false; },
-                .OpenStateChanged = [this, id](bool open) {
-                    if (!open) return;
-                    (void)Shell->SetEditorWindowOpen("view.registration", true);
-                    (void)Shell->SetEditorWindowOpen(id, false);
-                }}));
+            RegisterRedirectWindow(id, {domain, "Processing"}, "ICP Registration",
+                                   "view.registration");
     }
 
     void MeshProcessingPanels::Impl::Unregister()
@@ -610,6 +554,25 @@ namespace Extrinsic::Sandbox::Editor
                     {
                         ResetModelCache();
                     },
+            }));
+    }
+
+    void MeshProcessingPanels::Impl::RegisterRedirectWindow(
+        const char* id, std::vector<std::string> menuPath,
+        std::string title, const char* target)
+    {
+        Handles.push_back(Shell->RegisterEditorWindow(
+            EditorWindowDescriptor{
+                .Id = id,
+                .MenuPath = std::move(menuPath),
+                .Title = std::move(title),
+                .Draw = [](bool& open, const SandboxEditorContext&) { open = false; },
+                .OpenStateChanged = [this, id, target](bool open)
+                {
+                    if (!open) return;
+                    (void)Shell->SetEditorWindowOpen(target, true);
+                    (void)Shell->SetEditorWindowOpen(id, false);
+                },
             }));
     }
 

@@ -4158,3 +4158,48 @@ Strict task policy/state links, doc links/sync, root hygiene, source/test layout
 kernel convergence, skill mirrors and session-brief freshness pass. Module
 inventory regenerates unchanged at 429 modules. No sanitizer-suite or GPU run.
 UI-037 remains open; all code in this compilation-dependency slice is complete.
+
+
+## Continuation — processing menu redirects (2026-09-19)
+
+Operator-directed duplicate-code cleanup with Claude Fable 5.1 from
+`4d3fef75b`. The ten redirect descriptor/callback bodies in
+`Sandbox.MeshProcessingPanels.cpp` now use one private
+`Impl::RegisterRedirectWindow` member. IDs, menu paths, titles, registration
+order, default closed state and callback order stay explicit and unchanged.
+The face-normal alias retains its additional preset action. The existing
+`RegisterWindow` helper draws content and resets the model cache, so its
+contract does not fit redirect aliases. One local helper is sufficient; no
+shared header, new module or configurable redirect framework is needed.
+
+Affected production source: 2,808 -> 2,771 physical lines (-37). Existing
+presentation tests cover all ten alias families and structured menu paths;
+the face-output integration test covers the distinct face-normal preset.
+No elapsed compilation improvement is inferred from the consolidation.
+Fixed review packet and verification logs: `/tmp/intrinsic-reuse-round3/`.
+Claude's fixed-diff review found no blocker; its declaration grouping and
+literal-lifetime comments were applied and reviewed. All 156 registration
+literals retain their order, and the panel module imports are unchanged.
+The four-point scope/layer/tests/docs sweep passes; no state ownership,
+validation, frame composition or control-surface contract changes.
+
+Combined verification with the independent input-action locality slice:
+canonical ci/Clang23 configure, focused targets and `IntrinsicTests` build pass.
+All 101 focused cases pass. After the final declaration/comment changes, the
+full exclusion-only CPU gate selects 4,762 cases: 4,761 pass, one expected
+ASan-only GLFW lifecycle skip, zero failures (151.59 s). Source/test hashes
+remain fixed through final verification. No sanitizer-suite or GPU run.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^(SandboxEditorPresentation|SandboxProcessingPanels|RuntimeInputActions|EditorWindowRegistry|KernelCompilationLocality|EditorCompilationLocality)\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 120
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+```
+
+Strict layering, test layout, task policy/state links, docs links/sync, root
+hygiene, kernel convergence, skill mirrors and session brief pass. Source-doc
+audit has zero findings in the touched interface; the module inventory
+regenerates unchanged (429 modules). UI-037's broader readiness acceptance
+remains open.
