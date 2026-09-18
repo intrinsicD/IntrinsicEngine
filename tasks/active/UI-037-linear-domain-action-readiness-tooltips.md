@@ -3521,3 +3521,31 @@ pass. Routing reconciles 41 targets, 4,756 cases and 363 sources. Source-doc aud
 zero errors, three existing large-file prompts. Exact commands, logs, symbols and
 Claude packets: `/tmp/intrinsic-property-options/`. Continue in a fresh session;
 do not repeat this completed option-record slice.
+
+
+## Shared property-selector requirements — 2026-09-18
+
+Operator-directed reuse continuation from `29b8a0138`. Claude Sonnet and source
+review found identical domain/type fallback resolution in the property catalog
+and presentation-slot builders. Both now use the file-local
+`ResolveGeometryPresentationSlotSelector`; the redundant options wrapper is
+removed. Authored domain/kind take precedence; unresolved domains keep empty
+options. No public API, import, ownership, CMake or algorithm change. Separate
+rules would be warranted only if the two views acquire different semantics.
+The production implementation shrinks from 3,250 to 3,233 lines (-17), without an
+elapsed build-speed claim. The canonical enumerator and owned option records stay
+unchanged. Architecture documentation describes the shared rule.
+
+A public snapshot regression covers explicit and partially inferred domain/kind,
+vertex/face/edge defaults and absent geometry; its first version passed baseline
+production, and final fixtures include face scalars/normals and edge colors.
+Claude approved the fixed diff. The focused ci/Clang 23 build and 30 selected
+runtime/presentation/compilation-locality cases pass. Evidence and the plan:
+`/tmp/intrinsic-readiness-reuse/`. Broader UI-037 acceptance stays open.
+
+Full canonical `IntrinsicTests` build and CPU selector pass: 4,750 selected,
+4,749 passed, one expected ASan-only GLFW lifecycle skip, zero failures
+(150.16 s). Layering, test layout, task policy/state, links, root hygiene and
+explicit-file docs-sync checks pass. Source-doc audit: zero errors and one
+existing large-file review prompt. No module inventory change is required for
+this implementation-only slice; no GPU or sanitizer-suite run is claimed.

@@ -3302,6 +3302,90 @@ TEST(SandboxEditorUi, PropertyOptionsPreserveCanonicalCatalogSnapshot)
     checkOptions(target->Options);
     checkOptions(slot->PropertyOptions);
 }
+TEST(SandboxEditorUi, PropertySelectorsShareExplicitAndInferredSlotRequirements)
+{
+    using Domain = Runtime::GeometryElementDomain;
+    using Kind = Geometry::PropertyValueKind;
+    using Lane = Runtime::GeometryRenderLane;
+    using Semantic = Runtime::GeometryPresentationSlotSemantic;
+    struct Case
+    {
+        bool HasGeometry;
+        Lane RenderLane;
+        Semantic SlotSemantic;
+        Domain PropertyDomain;
+        Kind PropertyKind;
+        Domain ExpectedDomain;
+        Kind ExpectedKind;
+    };
+    const Case cases[]{
+        {true, Lane::Surface, Semantic::Normal, Domain::MeshFace, Kind::Float,
+         Domain::MeshFace, Kind::Float},
+        {true, Lane::Surface, Semantic::Normal, Domain::MeshFace, Kind::Unknown,
+         Domain::MeshFace, Kind::Vec3},
+        {true, Lane::Surface, Semantic::Normal, Domain::Unknown, Kind::Float,
+         Domain::MeshVertex, Kind::Float},
+        {true, Lane::Surface, Semantic::Normal, Domain::Unknown, Kind::Unknown,
+         Domain::MeshVertex, Kind::Vec3},
+        {true, Lane::Surface, Semantic::ScalarField, Domain::Unknown, Kind::Unknown,
+         Domain::MeshFace, Kind::Float},
+        {true, Lane::Edges, Semantic::LineColor, Domain::Unknown, Kind::Unknown,
+         Domain::MeshEdge, Kind::Vec4},
+        {false, Lane::Surface, Semantic::Normal, Domain::Unknown, Kind::Unknown,
+         Domain::Unknown, Kind::Vec3},
+    };
+    for (const auto& item : cases)
+    {
+        SCOPED_TRACE(static_cast<int>(item.ExpectedDomain));
+        SCOPED_TRACE(static_cast<int>(item.ExpectedKind));
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        const auto entity = MakeSelectable(registry, "Slot requirements");
+        if (item.HasGeometry)
+        {
+            AddTriangleMeshSource(registry, entity);
+            auto& faces = registry.Raw().get<GS::Faces>(entity).Properties;
+            (void)faces.GetOrAdd<float>("f:field", 0.5f);
+            (void)faces.GetOrAdd<glm::vec3>("f:normal", glm::vec3{0.0f, 0.0f, 1.0f});
+            (void)registry.Raw().get<GS::Edges>(entity).Properties.GetOrAdd<glm::vec4>(
+                "e:color", glm::vec4{1.0f});
+        }
+        auto recipe = MakeGeometryPresentationRecipe();
+        recipe.Lanes.front().Lane = item.RenderLane;
+        auto& slots = recipe.Presentations.front().Slots;
+        slots.resize(1);
+        slots.front().Semantic = item.SlotSemantic;
+        slots.front().Property = {.Domain = item.PropertyDomain, .ValueKind = item.PropertyKind};
+        registry.Raw().emplace<Runtime::GeometryPresentationRecipe>(entity, std::move(recipe));
+        ASSERT_TRUE(selection.SetSelectedEntity(registry, entity));
+
+        const auto frame = Runtime::BuildEditorWorkspaceSnapshot(MakeContext(registry, selection));
+        const auto& targets = frame.Inspector.PropertyCatalog.BindingTargets;
+        ASSERT_EQ(targets.size(), 1u);
+        EXPECT_EQ(targets.front().RequiredDomain, item.ExpectedDomain);
+        EXPECT_EQ(targets.front().ExpectedValueKind, item.ExpectedKind);
+        const auto view = GS::BuildConstView(registry.Raw(), entity);
+        EXPECT_EQ(targets.front().ExpectedElementCount, Runtime::ResolveGeometryElementCount(
+            Runtime::BuildGeometryAvailability(view), item.ExpectedDomain));
+        const auto expected = Runtime::EnumerateGeometryPresentationPropertyOptions(
+            view, item.ExpectedDomain, item.ExpectedKind);
+        if (item.HasGeometry) ASSERT_FALSE(expected.empty());
+        else EXPECT_TRUE(expected.empty());
+        const auto* slot = FindGeometryPresentationSlot(frame.Inspector.GeometryPresentation, item.SlotSemantic);
+        ASSERT_NE(slot, nullptr);
+        for (const auto* options : {&targets.front().Options, &slot->PropertyOptions})
+        {
+            ASSERT_EQ(options->size(), expected.size());
+            for (std::size_t i = 0; i < expected.size(); ++i)
+            {
+                EXPECT_EQ((*options)[i].Property, expected[i].Property);
+                EXPECT_EQ((*options)[i].ElementCount, expected[i].ElementCount);
+                EXPECT_EQ((*options)[i].Compatible, expected[i].Compatible);
+                EXPECT_EQ((*options)[i].DisabledReason, expected[i].DisabledReason);
+            }
+        }
+    }
+}
 TEST(SandboxEditorUi, GeometryPresentationInspectorReportsSlotsPropertiesAndJobs)
 {
     ECS::Scene::Registry registry;

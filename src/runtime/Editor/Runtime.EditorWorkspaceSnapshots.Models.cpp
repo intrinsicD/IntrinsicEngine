@@ -588,10 +588,15 @@ namespace {
             append(EditorPropertyCatalogDomain::PointCloudPoints);
         }
 
-        [[nodiscard]] EditorPropertyBindingTargetModel
-        BuildPropertyBindingTargetModel(
+        struct GeometryPresentationSlotSelector
+        {
+            GeometryElementDomain Domain;
+            GeometryPropertyValueKindFilter ExpectedValueKind;
+        };
+
+        [[nodiscard]] GeometryPresentationSlotSelector ResolveGeometryPresentationSlotSelector(
             const GS::ConstSourceView& view,
-            const GeometryPresentationSlotSnapshot& slot)
+            const GeometryPresentationSlotSnapshot& slot) noexcept
         {
             GeometryElementDomain domain = slot.Property.Domain;
             if (domain == GeometryElementDomain::Unknown)
@@ -612,6 +617,15 @@ namespace {
                 expected = DefaultExpectedValueKindForSlot(slot.Semantic);
             }
 
+            return {domain, expected};
+        }
+
+        [[nodiscard]] EditorPropertyBindingTargetModel
+        BuildPropertyBindingTargetModel(
+            const GS::ConstSourceView& view,
+            const GeometryPresentationSlotSnapshot& slot)
+        {
+            const auto [domain, expected] = ResolveGeometryPresentationSlotSelector(view, slot);
             const GeometryEntityAvailability geometryAvailability =
                 BuildGeometryAvailability(view);
 
@@ -1179,38 +1193,6 @@ namespace {
             }
         }
 
-        [[nodiscard]] std::vector<GeometryPresentationPropertyOption>
-        BuildGeometryPresentationSlotPropertyOptions(
-            const GS::ConstSourceView& view,
-            const GeometryPresentationSlotSnapshot& extractedSlot)
-        {
-            GeometryElementDomain domain = extractedSlot.Property.Domain;
-            if (domain == GeometryElementDomain::Unknown)
-            {
-                const GS::SourceAvailability availability =
-                    GS::BuildSourceAvailability(view);
-                domain = DefaultDomainForGeometryPresentationSlot(
-                    availability.ProvenanceDomain,
-                    extractedSlot.Lane,
-                    extractedSlot.Semantic);
-            }
-            if (domain == GeometryElementDomain::Unknown)
-                return {};
-
-            GeometryPropertyValueKindFilter expected{};
-            if (extractedSlot.Property.ValueKind !=
-                Geometry::PropertyValueKind::Unknown)
-            {
-                expected = extractedSlot.Property.ValueKind;
-            }
-            else
-            {
-                expected = DefaultExpectedValueKindForSlot(extractedSlot.Semantic);
-            }
-
-            return EnumerateGeometryPresentationPropertyOptions(view, domain, expected);
-        }
-
         [[nodiscard]] EditorGeometryPresentationSlotModel ToGeometryPresentationSlotModel(
             const GS::ConstSourceView& view,
             const GeometryPresentationRecipe& bindings,
@@ -1255,8 +1237,9 @@ namespace {
                 model.GeneratedTexture = status->GeneratedTexture;
             }
 
-            model.PropertyOptions =
-                BuildGeometryPresentationSlotPropertyOptions(view, extractedSlot);
+            const auto [domain, expected] = ResolveGeometryPresentationSlotSelector(view, extractedSlot);
+            if (domain != GeometryElementDomain::Unknown)
+                model.PropertyOptions = EnumerateGeometryPresentationPropertyOptions(view, domain, expected);
             return model;
         }
 

@@ -29,7 +29,10 @@ The enumerator's ordered records carry the property reference, count, source
 generation, compatibility and disabled reason directly into both editor views.
 These callers leave the optional observed source generation at its default zero.
 App consumers read the value kind from `Property.ValueKind`; snapshots retain
-independent strings without a second record or conversion pass.
+independent strings without a second record or conversion pass. Both builders use
+one private slot-selector resolver: authored domain and value kind take precedence,
+otherwise provenance/lane/semantic defaults apply. An unresolved domain yields
+empty options in both views.
 
 The shell's active prepared-frame storage owns the point-cloud service frame.
 `SandboxEditorContext` borrows it for the draw visit and is reset before that
