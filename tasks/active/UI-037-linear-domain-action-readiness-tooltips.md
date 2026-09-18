@@ -3406,3 +3406,79 @@ python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --
 
 Evidence: `/tmp/intrinsic-config-rejection/`. This is a verified session boundary;
 UI-037 stays open and none of its broader readiness checkboxes is closed here.
+
+
+## Canonical editor job snapshots — plan, 2026-09-18
+
+Operator direction continues duplicate-code and compilation cleanup with Claude.
+This companion slice removes the duplicate `EditorJobModel` and
+`EditorJobDependencyModel`, using the existing value-owned `EditorJobRecord` and
+`EditorJobDependency` in presentation and UV snapshots. The compiled
+`ToEditorJobModel` adapter copies every field without adding validation, ownership
+or filtering; delete it and update runtime/app consumers to the canonical field
+names. No compatibility alias, new file, dependency edge or scheduler change.
+
+Reuse/right-sizing: the owner is `Runtime.EditorJobProjection.cppm`. The two
+producer paths construct models only from actual records, so the old model's
+unused `Queued` default does not replace the record's `Invalid` state. Empty
+collections and absent UV jobs remain empty; active-job selection order and
+independent copied strings/dependencies remain unchanged. A separate projection
+would be justified only by a real difference in payload or presentation semantics.
+This changes existing runtime/app surfaces only; applicable catalog contracts
+remain declared in front-matter. No broader readiness checkbox closes here.
+
+Claude Sonnet reviewed the bounded plan. Resolve its default-state concern with
+the caller audit and baseline public snapshot coverage; verify all field renames
+by compiling both runtime and app consumers. Extend the existing snapshot test
+for all fields, invalid state and copy independence; retain the real UV-job/cache
+lifecycle test. Configure canonical ci/Clang, run focused tests then full CPU
+verification, strict structural checks, module inventory and a fixed-diff review.
+No elapsed compilation-speed claim is made.
+
+The first fixed-diff implementation passed 34 focused UI, UV lifecycle and
+editor-locality tests. A second, separately reviewed refinement deletes the
+single-use append adapter: the newly constructed presentation model now takes
+the callback's owned vector directly, preserving one callback call, ordering
+and the absent-callback case. Claude Sonnet found both changes safe. Its
+suggested empty-vector comment/assert is unnecessary beside the freshly created
+model; the required module synopsis is retained. Final combined-source gates
+follow before commit.
+
+
+### Canonical editor job snapshots — verified checkpoint
+
+Removed both duplicate model records, the compiled field-copy adapter and the
+single-caller append helper. Nine affected production files total 13,777 ->
+13,712 physical lines (-65); no replacement file or alias. The canonical record
+now serves queue, inspector and UV snapshots. Public tests preserve every field,
+invalid state, nested dependency/identity copy independence and real queued UV
+state transitions. The producer's returned vector transfers directly into the
+fresh presentation model. No module import, layer policy, scheduler or backend
+behavior changed. No elapsed compilation-speed or binary-size claim is made.
+
+Claude Sonnet's fixed-diff review and final vector-transfer review found no
+blockers. Two public tests passed on baseline production; 34 focused UI/UV and
+editor-locality cases passed both before and after the last refinement. Final
+canonical ci/Clang 23 IntrinsicTests build and CPU gate: 4,748 selected, 4,747
+passed, one expected ASan-only GLFW lifecycle skip, zero failures. No GPU or
+sanitizer-suite execution is claimed. Source remained frozen during verification.
+
+Strict layering/test layout/task policy and state links, doc links, docs sync,
+root hygiene, skill mirrors and session brief checks pass. Module inventory was
+regenerated with no content change. Routing reconciles 41 targets, 4,755 cases
+and 363 sources. Source-documentation audit: zero errors; four existing file-size
+review prompts and one unrelated historical-comment prompt remain outside this
+bounded deletion. Architecture documentation names the shared record owner.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^SandboxEditorUi\.(GeometryPresentation|UvRegeneration|ActionReadinessDerivesDomainPrerequisiteReasons)|^SandboxEditorPresentation\.DisabledActionReasonTooltipAppearsAfterTwoFrames$|^EditorCompilationLocality\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 120
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicTests
+```
+
+Evidence: `/tmp/intrinsic-job-record/`. UI-037 remains open; no readiness
+acceptance criterion is closed by this companion cleanup. Start a fresh session
+after this checkpoint to keep subsequent context bounded.

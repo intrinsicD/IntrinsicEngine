@@ -1,8 +1,8 @@
-// Private property catalogs, job models and timers shared by editor consumers.
+// Private property catalogs and timers shared by editor consumers.
 // C++ declarations share the compiled owner Runtime.EditorFeatureContextAdapters.cpp.
 #pragma once
 
-// Requires VisualizationEditingOperations, EditorCommon, EditorJobProjection,
+// Requires VisualizationEditingOperations, EditorCommon,
 // GeometryAvailability, VertexAttributeBinding, VertexChannelBindings,
 // ECS.Components.GeometrySources and Geometry.Properties. Provide <chrono>,
 // <cstddef>, <cstdint>, <optional>, <string>, <string_view> and <vector> in the
@@ -13,9 +13,6 @@ extern "C++"
 namespace Extrinsic::Runtime::EditorFeatureDetail
 {
     using namespace Extrinsic::Runtime;
-
-    [[nodiscard]] EditorJobModel ToEditorJobModel(
-        const EditorJobRecord& job);
 
     using EditorModelBuildClock = std::chrono::steady_clock;
 

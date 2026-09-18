@@ -5578,20 +5578,20 @@ TEST(SandboxEditorUi, UvRegenerationPanelModelTracksDerivedJobStateThroughCache)
     frame = Runtime::BuildEditorWorkspaceSnapshot(context);
     ASSERT_TRUE(frame.Inspector.TextureBake.Uv.UvRegenerationJob.has_value());
     EXPECT_TRUE(Runtime::IsActiveEditorJobState(
-        frame.Inspector.TextureBake.Uv.UvRegenerationJob->Status));
-    EXPECT_EQ(frame.Inspector.TextureBake.Uv.UvRegenerationJob->Key.OutputName,
+        frame.Inspector.TextureBake.Uv.UvRegenerationJob->State));
+    EXPECT_EQ(frame.Inspector.TextureBake.Uv.UvRegenerationJob->Identity.OutputName,
               "uv_regeneration");
 
     Core::Tasks::Scheduler::WaitForAll();
     frame = Runtime::BuildEditorWorkspaceSnapshot(context);
     ASSERT_TRUE(frame.Inspector.TextureBake.Uv.UvRegenerationJob.has_value());
-    EXPECT_EQ(frame.Inspector.TextureBake.Uv.UvRegenerationJob->Status,
+    EXPECT_EQ(frame.Inspector.TextureBake.Uv.UvRegenerationJob->State,
               Runtime::JobState::AwaitingGate);
 
     EXPECT_EQ(jobs.Jobs().DrainCompletions(jobs.Events(), 1u), 1u);
     frame = Runtime::BuildEditorWorkspaceSnapshot(context);
     ASSERT_TRUE(frame.Inspector.TextureBake.Uv.UvRegenerationJob.has_value());
-    EXPECT_EQ(frame.Inspector.TextureBake.Uv.UvRegenerationJob->Status,
+    EXPECT_EQ(frame.Inspector.TextureBake.Uv.UvRegenerationJob->State,
               Runtime::JobState::Published);
     EXPECT_TRUE(frame.Inspector.TextureBake.Uv.TexcoordsFinite);
 

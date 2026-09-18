@@ -2214,12 +2214,12 @@ namespace Extrinsic::Sandbox::Editor
                     if (!presentation.Jobs.empty())
                     {
                         ImGui::Text("Derived jobs: %zu", presentation.Jobs.size());
-                        for (const EditorJobModel& job :
+                        for (const EditorJobRecord& job :
                              presentation.Jobs)
                         {
                             ImGui::BulletText("%s %s %.0f%% deps=%zu %s",
                                               job.Name.c_str(),
-                                              std::string(ToString(job.Status)).c_str(),
+                                              std::string(ToString(job.State)).c_str(),
                                               job.NormalizedProgress * 100.0f,
                                               job.Dependencies.size(),
                                               job.Diagnostic.c_str());

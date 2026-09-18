@@ -15,6 +15,14 @@ all-panel module interface. Standard/GLM includes stay in each unit's global
 module fragment. The shell and panel registration interfaces do not include
 these complete views.
 
+Editor job lists and the optional UV-regeneration job own copies of the canonical
+`EditorJobRecord` and its `EditorJobDependency` values from
+`Runtime.EditorJobProjection.cppm`. Runtime and app consumers share these records;
+there is no separate UI job payload or field-copy converter. Missing jobs remain
+empty or absent, while present records retain their state, identity, backend
+domains, dependency reasons, progress and diagnostics independently of later
+queue changes.
+
 The shell's active prepared-frame storage owns the point-cloud service frame.
 `SandboxEditorContext` borrows it for the draw visit and is reset before that
 storage on draw completion and detach. Its constructor requires a frame lvalue;
@@ -692,8 +700,8 @@ the removed `Runtime.SandboxEditorFacades` and
 | `SandboxEditorJobDomain` | `EditorJobDomain` | `Runtime.EditorJobProjection.cppm` | feature-owned runtime contract |
 | `SandboxEditorJobRecord` | `EditorJobRecord` | `Runtime.EditorJobProjection.cppm` | feature-owned runtime contract |
 | `SandboxEditorJobQueueSnapshot` | `EditorJobQueueSnapshot` | `Runtime.EditorJobProjection.cppm` | feature-owned runtime contract |
-| `SandboxEditorJobDependencyModel` | `EditorJobDependencyModel` | `Runtime.EditorJobProjection.cppm` | feature-owned runtime contract |
-| `SandboxEditorJobModel` | `EditorJobModel` | `Runtime.EditorJobProjection.cppm` | feature-owned runtime contract |
+| `SandboxEditorJobDependencyModel` | `EditorJobDependency` | `Runtime.EditorJobProjection.cppm` | feature-owned runtime contract |
+| `SandboxEditorJobModel` | `EditorJobRecord` | `Runtime.EditorJobProjection.cppm` | feature-owned runtime contract |
 | `SandboxEditorGeometryCompositionSummary` | `EditorGeometryCompositionSummary` | `Runtime.EditorWorkspaceSnapshots.cppm` | feature-owned runtime contract |
 | `SandboxEditorGeometryPresentationModel` | `EditorGeometryPresentationModel` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorBoundRenderStateRowKind` | `EditorBoundRenderStateRowKind` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |

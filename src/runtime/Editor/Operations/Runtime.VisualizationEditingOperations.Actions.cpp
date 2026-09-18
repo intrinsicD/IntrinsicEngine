@@ -57,7 +57,6 @@ import Geometry.Properties;
 
 namespace Extrinsic::Runtime {
 namespace {
-        using EditorFeatureDetail::ToEditorJobModel;
         using EditorFeatureDetail::ResolveStableEntity;
         using EditorFeatureDetail::ToEditorCommandStatus;
         using EditorFeatureDetail::AppendVisualizationPropertiesForDomain;
@@ -1132,8 +1131,8 @@ namespace {
         constexpr std::string_view kUvRegenerationJobOutputName{
             "uv_regeneration"};
 
-        [[nodiscard]] std::optional<EditorJobModel>
-        FindDerivedJobModelForOutput(
+        [[nodiscard]] std::optional<EditorJobRecord>
+        FindDerivedJobForOutput(
             const EditorVisualizationEditingContext& context,
             const std::uint32_t stableEntityId,
             const std::string_view outputName)
@@ -1166,7 +1165,7 @@ namespace {
 
             if (selected == nullptr)
                 return std::nullopt;
-            return ToEditorJobModel(*selected);
+            return *selected;
         }
 
         [[nodiscard]] bool IsTextureBakeSourceDomain(
@@ -1357,7 +1356,7 @@ namespace {
                 context.TextureBake->Available();
             const bool hasOperationalGpu = context.OperationalGpuAvailable;
             model.Uv = BuildUvDiagnosticsModel(context, view);
-            model.Uv.UvRegenerationJob = FindDerivedJobModelForOutput(
+            model.Uv.UvRegenerationJob = FindDerivedJobForOutput(
                 context,
                 stableEntityId,
                 kUvRegenerationJobOutputName);

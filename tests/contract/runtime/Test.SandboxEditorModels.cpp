@@ -3286,6 +3286,7 @@ TEST(SandboxEditorUi, GeometryPresentationInspectorReportsSlotsPropertiesAndJobs
         Runtime::JobState::Rejected,
         Runtime::JobState::Cancelled,
         Runtime::JobState::StaleDiscarded,
+        Runtime::JobState::Invalid,
     };
     for (std::size_t i = 0u; i < statuses.size(); ++i)
     {
@@ -3301,6 +3302,8 @@ TEST(SandboxEditorUi, GeometryPresentationInspectorReportsSlotsPropertiesAndJobs
             },
             .Name = "presentation job",
             .State = statuses[i],
+            .RequestedJobDomain = Runtime::EditorJobDomain::Auto,
+            .ResolvedJobDomain = Runtime::EditorJobDomain::GpuCompute,
             .Dependencies = {
                 Runtime::EditorJobDependency{
                     .Job = dependencyHandle,
@@ -3309,6 +3312,10 @@ TEST(SandboxEditorUi, GeometryPresentationInspectorReportsSlotsPropertiesAndJobs
             },
             .NormalizedProgress = static_cast<float>(i) /
                                   static_cast<float>(statuses.size()),
+            .ProgressDeterminate = false,
+            .PreviousOutputRetained = true,
+            .PayloadToken = 123u + i,
+            .ElapsedMilliseconds = 456u + i,
             .Diagnostic = i == 5u ? "failed bake" : std::string{},
         });
     }
@@ -3326,8 +3333,35 @@ TEST(SandboxEditorUi, GeometryPresentationInspectorReportsSlotsPropertiesAndJobs
     EXPECT_EQ(presentation.Shape, Runtime::GeometryPresentationShape::Mesh);
     EXPECT_EQ(presentation.RecipeGeneration, 7u);
     EXPECT_EQ(presentation.Slots.size(), 2u);
-    EXPECT_EQ(presentation.Jobs.size(), statuses.size());
-    EXPECT_EQ(presentation.Jobs[0].Status, Runtime::JobState::AwaitingDependencies);
+    ASSERT_EQ(presentation.Jobs.size(), statuses.size());
+    for (std::size_t i = 0u; i < jobs.Entries.size(); ++i)
+    {
+        const auto& expected = jobs.Entries[i];
+        const auto& copied = presentation.Jobs[i];
+        EXPECT_EQ(copied.Token, expected.Token);
+        EXPECT_EQ(copied.Identity.EntityId, expected.Identity.EntityId);
+        EXPECT_EQ(copied.Identity.Scope, expected.Identity.Scope);
+        EXPECT_EQ(copied.Identity.OutputSemantic, expected.Identity.OutputSemantic);
+        EXPECT_EQ(copied.Identity.OutputName, expected.Identity.OutputName);
+        EXPECT_EQ(copied.Name, expected.Name);
+        EXPECT_EQ(copied.State, expected.State);
+        EXPECT_EQ(copied.RequestedJobDomain, expected.RequestedJobDomain);
+        EXPECT_EQ(copied.ResolvedJobDomain, expected.ResolvedJobDomain);
+        ASSERT_EQ(copied.Dependencies.size(), 1u);
+        EXPECT_EQ(copied.Dependencies[0].Job, expected.Dependencies[0].Job);
+        EXPECT_EQ(copied.Dependencies[0].Reason, expected.Dependencies[0].Reason);
+        EXPECT_FLOAT_EQ(copied.NormalizedProgress, expected.NormalizedProgress);
+        EXPECT_EQ(copied.ProgressDeterminate, expected.ProgressDeterminate);
+        EXPECT_EQ(copied.PreviousOutputRetained, expected.PreviousOutputRetained);
+        EXPECT_EQ(copied.PayloadToken, expected.PayloadToken);
+        EXPECT_EQ(copied.ElapsedMilliseconds, expected.ElapsedMilliseconds);
+        EXPECT_EQ(copied.Diagnostic, expected.Diagnostic);
+    }
+    jobs.Entries[0].Identity.OutputName = "changed output";
+    jobs.Entries[0].Dependencies[0].Reason = "changed dependency";
+    jobs.Entries[0].State = Runtime::JobState::Cancelled;
+    EXPECT_EQ(presentation.Jobs[0].Identity.OutputName, "normal");
+    EXPECT_EQ(presentation.Jobs[0].State, Runtime::JobState::AwaitingDependencies);
     ASSERT_EQ(presentation.Jobs[0].Dependencies.size(), 1u);
     EXPECT_EQ(presentation.Jobs[0].Dependencies[0].Reason, "normal requires uv");
     EXPECT_EQ(presentation.Jobs[5].Diagnostic, "failed bake");

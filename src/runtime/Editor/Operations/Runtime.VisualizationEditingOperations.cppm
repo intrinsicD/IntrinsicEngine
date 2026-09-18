@@ -241,7 +241,7 @@ export namespace Extrinsic::Runtime
         std::uint64_t RecipeGeneration{0u};
         GeometryPresentationSnapshotStats Stats{};
         std::vector<EditorGeometryPresentationSlotModel> Slots{};
-        std::vector<EditorJobModel> Jobs{};
+        std::vector<EditorJobRecord> Jobs{};
         EditorGeometryCompositionSummary Composition{};
         std::vector<EditorDiagnostic> Diagnostics{};
     };

@@ -625,32 +625,6 @@ namespace
         return message;
     }
 
-    [[nodiscard]] EditorJobModel ToEditorJobModel(
-        const EditorJobRecord& job)
-    {
-        EditorJobModel model{
-            .Handle = job.Token,
-            .Key = job.Identity,
-            .Name = job.Name,
-            .RequestedJobDomain = job.RequestedJobDomain,
-            .ResolvedJobDomain = job.ResolvedJobDomain,
-            .Status = job.State,
-            .NormalizedProgress = job.NormalizedProgress,
-            .ProgressDeterminate = job.ProgressDeterminate,
-            .PreviousOutputRetained = job.PreviousOutputRetained,
-            .PayloadToken = job.PayloadToken,
-            .ElapsedMilliseconds = job.ElapsedMilliseconds,
-            .Diagnostic = job.Diagnostic,
-        };
-        model.Dependencies.reserve(job.Dependencies.size());
-        for (const EditorJobDependency& dependency : job.Dependencies)
-            model.Dependencies.push_back(EditorJobDependencyModel{
-                .Job = dependency.Job,
-                .Reason = dependency.Reason,
-            });
-        return model;
-    }
-
 ScopedEditorStatTimer::ScopedEditorStatTimer(std::uint64_t* target) noexcept
     : m_Target(target)
 {

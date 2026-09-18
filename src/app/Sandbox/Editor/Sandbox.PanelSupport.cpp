@@ -345,9 +345,9 @@ namespace Extrinsic::Sandbox::Editor
         {
             if (uv.UvRegenerationJob.has_value())
             {
-                const EditorJobModel& job = *uv.UvRegenerationJob;
+                const EditorJobRecord& job = *uv.UvRegenerationJob;
                 ImGui::Text("UV job: %s %.0f%%",
-                            std::string(ToString(job.Status)).c_str(),
+                            std::string(ToString(job.State)).c_str(),
                             job.NormalizedProgress * 100.0f);
                 if (!job.Diagnostic.empty())
                     ImGui::TextWrapped("%s", job.Diagnostic.c_str());

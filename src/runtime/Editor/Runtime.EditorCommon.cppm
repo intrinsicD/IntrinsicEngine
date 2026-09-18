@@ -132,7 +132,7 @@ export namespace Extrinsic::Runtime
         std::string BackendId{};
         std::string LastFailure{};
         bool CheckerPreviewAvailable{false};
-        std::optional<EditorJobModel> UvRegenerationJob{};
+        std::optional<EditorJobRecord> UvRegenerationJob{};
     };
 
 }

@@ -1,3 +1,4 @@
+// Shared copied job records and command handles for runtime and editor snapshots.
 module;
 
 #include <cstdint>
@@ -72,27 +73,6 @@ export namespace Extrinsic::Runtime
     struct EditorJobQueueSnapshot
     {
         std::vector<EditorJobRecord> Entries{};
-    };
-    struct EditorJobDependencyModel
-    {
-        JobToken Job{};
-        std::string Reason{};
-    };
-    struct EditorJobModel
-    {
-        JobToken Handle{};
-        EditorJobIdentity Key{};
-        std::string Name{};
-        EditorJobDomain RequestedJobDomain{EditorJobDomain::Cpu};
-        EditorJobDomain ResolvedJobDomain{EditorJobDomain::Cpu};
-        JobState Status{JobState::Queued};
-        std::vector<EditorJobDependencyModel> Dependencies{};
-        float NormalizedProgress{0.0f};
-        bool ProgressDeterminate{true};
-        bool PreviousOutputRetained{false};
-        std::uint64_t PayloadToken{0u};
-        std::uint64_t ElapsedMilliseconds{0u};
-        std::string Diagnostic{};
     };
     struct EditorJobCommandSurface
     {

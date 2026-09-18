@@ -1187,19 +1187,6 @@ namespace {
             return GeometryPresentationShape::Unknown;
         }
 
-        void AppendGeometryPresentationJobRowsForEntity(
-            EditorGeometryPresentationModel& model,
-            const EditorFeatureBindings& context,
-            const std::uint32_t stableEntityId)
-        {
-            if (!context.JobCommands.SnapshotEntity)
-                return;
-
-            for (const EditorJobRecord& job :
-                 context.JobCommands.SnapshotEntity(stableEntityId))
-                model.Jobs.push_back(ToEditorJobModel(job));
-        }
-
         void AccumulateGeometryPresentationJobSummaryForEntity(
             EditorGeometryCompositionSummary& summary,
             const EditorFeatureBindings& context,
@@ -1399,10 +1386,8 @@ namespace {
 
             const std::uint32_t stableEntityId =
                 SelectionController::ToStableEntityId(entity);
-            AppendGeometryPresentationJobRowsForEntity(
-                model,
-                context,
-                stableEntityId);
+            if (context.JobCommands.SnapshotEntity)
+                model.Jobs = context.JobCommands.SnapshotEntity(stableEntityId);
             AccumulateGeometryPresentationCompositionSummary(
                 context,
                 raw,
@@ -1585,26 +1570,26 @@ namespace {
             std::vector<EditorBoundRenderStateRow>& rows,
             const EditorGeometryPresentationModel& presentation)
         {
-            for (const EditorJobModel& job :
+            for (const EditorJobRecord& job :
                  presentation.Jobs)
             {
                 rows.push_back(EditorBoundRenderStateRow{
                     .Kind = EditorBoundRenderStateRowKind::DerivedJob,
                     .Label = job.Name,
                     .Lane = GeometryRenderLane::Surface,
-                    .Semantic = job.Key.OutputSemantic,
-                    .Readiness = IsFailedEditorJobState(job.Status)
+                    .Semantic = job.Identity.OutputSemantic,
+                    .Readiness = IsFailedEditorJobState(job.State)
                         ? GeometryPresentationReadiness::Failed
-                        : (IsActiveEditorJobState(job.Status)
+                        : (IsActiveEditorJobState(job.State)
                                ? GeometryPresentationReadiness::Pending
                                : GeometryPresentationReadiness::Ready),
-                    .Job = job.Handle,
-                    .JobStatus = job.Status,
+                    .Job = job.Token,
+                    .JobStatus = job.State,
                     .JobProgress = job.NormalizedProgress,
                     .JobProgressDeterminate = job.ProgressDeterminate,
                     .Enabled = true,
                     .PreviousOutputRetained = job.PreviousOutputRetained,
-                    .SourceDescription = job.Key.OutputName,
+                    .SourceDescription = job.Identity.OutputName,
                     .Diagnostic = job.Diagnostic,
                 });
             }
