@@ -57,6 +57,7 @@ import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
@@ -78,6 +79,7 @@ import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 
 #include "Editor/internal/Runtime.EditorFeatures.Internal.hpp"
+#include "Editor/internal/Runtime.EditorVisualizationHelpers.hpp"
 #include "Editor/internal/Runtime.EditorTransformHelpers.hpp"
 
 #include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
@@ -87,9 +89,28 @@ extern "C++"
 namespace Extrinsic::Runtime::EditorFeatureDetail {
 namespace
 {
+    namespace G = Extrinsic::Graphics::Components;
     namespace A = Extrinsic::Assets;
     namespace ECSC = Extrinsic::ECS::Components;
     namespace GS = Extrinsic::ECS::Components::GeometrySources;
+
+    [[nodiscard]] const std::optional<G::VisualizationConfig>*
+    LaneOverrideForTarget(const G::VisualizationLaneOverrides& overrides,
+                          const EditorVisualizationTarget target) noexcept
+    {
+        switch (target)
+        {
+        case EditorVisualizationTarget::Surface:
+            return &overrides.Surface;
+        case EditorVisualizationTarget::Edges:
+            return &overrides.Edges;
+        case EditorVisualizationTarget::Points:
+            return &overrides.Points;
+        case EditorVisualizationTarget::Entity:
+            break;
+        }
+        return nullptr;
+    }
 
     [[nodiscard]] std::string ErrorName(const Core::ErrorCode error)
     {
@@ -283,6 +304,49 @@ namespace
             static_cast<std::uint64_t>(byteCount);
     }
 }
+
+    [[nodiscard]] std::optional<G::VisualizationConfig>
+    StoredVisualizationConfigForTarget(
+        const entt::registry& raw,
+        const ECS::EntityHandle entity,
+        const EditorVisualizationTarget target)
+    {
+        if (target == EditorVisualizationTarget::Entity)
+        {
+            if (const auto* config = raw.try_get<G::VisualizationConfig>(entity))
+                return *config;
+            return std::nullopt;
+        }
+
+        const auto* overrides =
+            raw.try_get<G::VisualizationLaneOverrides>(entity);
+        if (overrides == nullptr)
+            return std::nullopt;
+
+        const std::optional<G::VisualizationConfig>* lane =
+            LaneOverrideForTarget(*overrides, target);
+        return lane != nullptr ? *lane : std::nullopt;
+    }
+
+    [[nodiscard]] std::optional<G::VisualizationConfig>
+    EffectiveVisualizationConfigForTarget(
+        const entt::registry& raw,
+        const ECS::EntityHandle entity,
+        const EditorVisualizationTarget target)
+    {
+        if (std::optional<G::VisualizationConfig> stored =
+                StoredVisualizationConfigForTarget(raw, entity, target);
+            stored.has_value())
+        {
+            return stored;
+        }
+        if (target == EditorVisualizationTarget::Entity)
+            return std::nullopt;
+        return StoredVisualizationConfigForTarget(
+            raw,
+            entity,
+            EditorVisualizationTarget::Entity);
+    }
 
     void MixSignature(std::uint64_t& signature,
                       std::uint64_t value) noexcept

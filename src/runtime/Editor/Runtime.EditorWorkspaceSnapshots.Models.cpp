@@ -85,6 +85,7 @@ import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 
 #include "Editor/internal/Runtime.EditorFeatures.Internal.hpp"
+#include "Editor/internal/Runtime.EditorVisualizationHelpers.hpp"
 
 extern "C++"
 {
@@ -151,67 +152,6 @@ namespace {
                 .IsolineValueCount = config.Scalar.Isolines.ValueCount,
                 .UseBakedTexture = config.UseBakedTexture,
             };
-        }
-
-        [[nodiscard]] const std::optional<G::VisualizationConfig>*
-        LaneOverrideForTarget(const G::VisualizationLaneOverrides& overrides,
-                              const EditorVisualizationTarget target) noexcept
-        {
-            switch (target)
-            {
-            case EditorVisualizationTarget::Surface:
-                return &overrides.Surface;
-            case EditorVisualizationTarget::Edges:
-                return &overrides.Edges;
-            case EditorVisualizationTarget::Points:
-                return &overrides.Points;
-            case EditorVisualizationTarget::Entity:
-                break;
-            }
-            return nullptr;
-        }
-
-        [[nodiscard]] std::optional<G::VisualizationConfig>
-        StoredVisualizationConfigForTarget(
-            const entt::registry& raw,
-            const ECS::EntityHandle entity,
-            const EditorVisualizationTarget target)
-        {
-            if (target == EditorVisualizationTarget::Entity)
-            {
-                if (const auto* config = raw.try_get<G::VisualizationConfig>(entity))
-                    return *config;
-                return std::nullopt;
-            }
-
-            const auto* overrides =
-                raw.try_get<G::VisualizationLaneOverrides>(entity);
-            if (overrides == nullptr)
-                return std::nullopt;
-
-            const std::optional<G::VisualizationConfig>* lane =
-                LaneOverrideForTarget(*overrides, target);
-            return lane != nullptr ? *lane : std::nullopt;
-        }
-
-        [[nodiscard]] std::optional<G::VisualizationConfig>
-        EffectiveVisualizationConfigForTarget(
-            const entt::registry& raw,
-            const ECS::EntityHandle entity,
-            const EditorVisualizationTarget target)
-        {
-            if (std::optional<G::VisualizationConfig> stored =
-                    StoredVisualizationConfigForTarget(raw, entity, target);
-                stored.has_value())
-            {
-                return stored;
-            }
-            if (target == EditorVisualizationTarget::Entity)
-                return std::nullopt;
-            return StoredVisualizationConfigForTarget(
-                raw,
-                entity,
-                EditorVisualizationTarget::Entity);
         }
 
         [[nodiscard]] EditorVisualizationConfigModel

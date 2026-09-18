@@ -800,6 +800,7 @@ intrinsic_add_module_boundary_test(EditorCompilationLocality.AssetService
         --check-source src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
         --check-source src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp
         --check-source src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp
         --forbid-module Extrinsic.Asset.Service)
 set_tests_properties(EditorCompilationLocality.AssetService
     PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)

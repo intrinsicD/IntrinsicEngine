@@ -111,7 +111,12 @@ prerequisites, diagnostics and render-hint comparisons, and
 statistics. Action implementations include these declarations directly, without
 the workspace storage. Scene actions need only the command helpers; visualization
 actions also use the property helpers. Their definitions remain compiled once in
-`Runtime.EditorFeatureContextAdapters.cpp`. Geometry operations use the smaller
+`Runtime.EditorFeatureContextAdapters.cpp`. Stored lane overrides and effective
+entity-fallback visualization lookup use this same owner for command history
+and copied models, declared in `Runtime.EditorVisualizationHelpers.hpp` so
+unrelated context consumers need no visualization component import. Stored lookup
+preserves absence for undo; effective lookup falls back from an absent lane
+override to the entity config. Geometry operations use the smaller
 `Runtime.EditorGeometryHelpers.hpp` for entity signatures, stable-entity lookup
 and command-status conversion. Registration and scene actions additionally
 include `Runtime.EditorTransformHelpers.hpp` for transform comparison and undo

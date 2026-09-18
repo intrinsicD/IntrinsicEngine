@@ -1611,85 +1611,112 @@ TEST(SandboxEditorUi, VisualizationConfigCommandRoutesThroughSelectedEntity)
                   scalar),
               Runtime::EditorCommandStatus::MissingVisualizationCommands);
 }
-TEST(SandboxEditorUi, VisualizationConfigCommandTargetsPointLaneOverride)
+TEST(SandboxEditorUi, VisualizationConfigCommandTargetsLaneOverrides)
 {
     using Target = Runtime::EditorVisualizationTarget;
-
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::EditorCommandHistory history;
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "VisualMesh");
-    AddTriangleMeshSource(registry, mesh);
-    registry.Raw().emplace<G::RenderPoints>(mesh);
-    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
-    const std::uint32_t stableId =
-        Runtime::SelectionController::ToStableEntityId(mesh);
-
-    G::VisualizationConfig base{};
-    base.Source = G::VisualizationConfig::ColorSource::UniformColor;
-    base.Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f};
-    registry.Raw().emplace<G::VisualizationConfig>(mesh, base);
-
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    context.CommandHistory = &history;
-    context.VisualizationCommandsAvailable = true;
-
-    const Runtime::EditorVisualizationConfigCommand pointUniform{
-        .StableEntityId = stableId,
-        .Target = Target::Points,
-        .EnableConfig = true,
-        .Source = G::VisualizationConfig::ColorSource::UniformColor,
-        .Color = glm::vec4{0.0f, 0.8f, 0.2f, 1.0f},
+    using Window = Runtime::EditorDomainWindowKind;
+    const std::array lanes{
+        std::pair{Target::Surface, Window::Mesh},
+        std::pair{Target::Edges, Window::Graph},
+        std::pair{Target::Points, Window::PointCloud},
     };
+    for (const auto& [target, windowKind] : lanes)
+    {
+        SCOPED_TRACE(Runtime::DebugNameForEditorVisualizationTarget(target));
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        Runtime::EditorCommandHistory history;
+        const ECS::EntityHandle mesh = MakeSelectable(registry, "VisualMesh");
+        AddTriangleMeshSource(registry, mesh);
+        (void)registry.Raw().get_or_emplace<G::RenderPoints>(mesh);
+        (void)registry.Raw().get_or_emplace<G::RenderEdges>(mesh);
+        ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+        const std::uint32_t stableId =
+            Runtime::SelectionController::ToStableEntityId(mesh);
 
-    EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(
-                  context,
-                  pointUniform),
-              Runtime::EditorCommandStatus::Applied);
-    const auto& defaultConfig = registry.Raw().get<G::VisualizationConfig>(mesh);
-    EXPECT_EQ(defaultConfig.Color, glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
-    ASSERT_TRUE(registry.Raw().all_of<G::VisualizationLaneOverrides>(mesh));
-    const auto& overrides =
-        registry.Raw().get<G::VisualizationLaneOverrides>(mesh);
-    ASSERT_TRUE(overrides.Points.has_value());
-    EXPECT_EQ(overrides.Points->Source,
-              G::VisualizationConfig::ColorSource::UniformColor);
-    EXPECT_EQ(overrides.Points->Color, glm::vec4(0.0f, 0.8f, 0.2f, 1.0f));
-    EXPECT_FALSE(overrides.Surface.has_value());
-    EXPECT_FALSE(overrides.Edges.has_value());
+        G::VisualizationConfig base{};
+        base.Source = G::VisualizationConfig::ColorSource::UniformColor;
+        base.Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f};
 
-    const Runtime::EditorDomainWindowModel pointModel =
-        Runtime::BuildEditorDomainWindowModel(
-            context,
-            Runtime::EditorDomainWindowKind::PointCloud);
-    ASSERT_TRUE(pointModel.Visualization.Visualization.HasConfig);
-    EXPECT_EQ(pointModel.Visualization.Visualization.Color,
-              glm::vec4(0.0f, 0.8f, 0.2f, 1.0f));
-    EXPECT_EQ(pointModel.Visualization.Target, Target::Points);
+        Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+        context.CommandHistory = &history;
+        context.VisualizationCommandsAvailable = true;
 
-    EXPECT_EQ(history.Undo().Status,
-              Runtime::EditorCommandHistoryStatus::Undone);
-    EXPECT_FALSE(registry.Raw().all_of<G::VisualizationLaneOverrides>(mesh));
-    EXPECT_EQ(registry.Raw().get<G::VisualizationConfig>(mesh).Color,
-              glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+        const auto configModel = [&] {
+            return Runtime::BuildEditorDomainWindowModel(context, windowKind)
+                .Visualization.Visualization;
+        };
+        EXPECT_FALSE(configModel().HasConfig);
+        registry.Raw().emplace<G::VisualizationConfig>(mesh, base);
+        ASSERT_TRUE(configModel().HasConfig);
+        EXPECT_EQ(configModel().Color, base.Color);
 
-    EXPECT_EQ(history.Redo().Status,
-              Runtime::EditorCommandHistoryStatus::Redone);
-    ASSERT_TRUE(registry.Raw().all_of<G::VisualizationLaneOverrides>(mesh));
-    EXPECT_TRUE(registry.Raw()
-                    .get<G::VisualizationLaneOverrides>(mesh)
-                    .Points.has_value());
+        const Runtime::EditorVisualizationConfigCommand laneUniform{
+            .StableEntityId = stableId,
+            .Target = target,
+            .EnableConfig = true,
+            .Source = G::VisualizationConfig::ColorSource::UniformColor,
+            .Color = glm::vec4{0.0f, 0.8f, 0.2f, 1.0f},
+        };
 
-    EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(
-                  context,
-                  Runtime::EditorVisualizationConfigCommand{
-                      .StableEntityId = stableId,
-                      .Target = Target::Points,
-                      .EnableConfig = false,
-                  }),
-              Runtime::EditorCommandStatus::Applied);
-    EXPECT_FALSE(registry.Raw().all_of<G::VisualizationLaneOverrides>(mesh));
-    EXPECT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
+        EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(
+                      context,
+                      laneUniform),
+                  Runtime::EditorCommandStatus::Applied);
+        const auto& defaultConfig = registry.Raw().get<G::VisualizationConfig>(mesh);
+        EXPECT_EQ(defaultConfig.Color, glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+        ASSERT_TRUE(registry.Raw().all_of<G::VisualizationLaneOverrides>(mesh));
+        const auto& overrides =
+            registry.Raw().get<G::VisualizationLaneOverrides>(mesh);
+        EXPECT_EQ(overrides.Surface.has_value(), target == Target::Surface);
+        EXPECT_EQ(overrides.Edges.has_value(), target == Target::Edges);
+        EXPECT_EQ(overrides.Points.has_value(), target == Target::Points);
+        for (const auto& [otherTarget, otherKind] : lanes)
+        {
+            const auto other = Runtime::BuildEditorDomainWindowModel(context, otherKind);
+            ASSERT_TRUE(other.Visualization.Visualization.HasConfig);
+            EXPECT_EQ(other.Visualization.Visualization.Color,
+                      otherTarget == target ? laneUniform.Color : base.Color);
+        }
+
+        const Runtime::EditorDomainWindowModel laneModel =
+            Runtime::BuildEditorDomainWindowModel(
+                context,
+                windowKind);
+        ASSERT_TRUE(laneModel.Visualization.Visualization.HasConfig);
+        EXPECT_EQ(laneModel.Visualization.Visualization.Color,
+                  glm::vec4(0.0f, 0.8f, 0.2f, 1.0f));
+        EXPECT_EQ(laneModel.Visualization.Target, target);
+
+        EXPECT_EQ(history.Undo().Status,
+                  Runtime::EditorCommandHistoryStatus::Undone);
+        EXPECT_FALSE(registry.Raw().all_of<G::VisualizationLaneOverrides>(mesh));
+        EXPECT_EQ(registry.Raw().get<G::VisualizationConfig>(mesh).Color,
+                  glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+
+        ASSERT_TRUE(configModel().HasConfig);
+        EXPECT_EQ(configModel().Color, base.Color);
+
+        EXPECT_EQ(history.Redo().Status,
+                  Runtime::EditorCommandHistoryStatus::Redone);
+        ASSERT_TRUE(registry.Raw().all_of<G::VisualizationLaneOverrides>(mesh));
+        EXPECT_EQ(configModel().Color, laneUniform.Color);
+
+        EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(
+                      context,
+                      Runtime::EditorVisualizationConfigCommand{
+                          .StableEntityId = stableId,
+                          .Target = target,
+                          .EnableConfig = false,
+                      }),
+                  Runtime::EditorCommandStatus::Applied);
+        EXPECT_FALSE(registry.Raw().all_of<G::VisualizationLaneOverrides>(mesh));
+        EXPECT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
+        ASSERT_TRUE(configModel().HasConfig);
+        EXPECT_EQ(configModel().Color, base.Color);
+        registry.Raw().remove<G::VisualizationConfig>(mesh);
+        EXPECT_FALSE(configModel().HasConfig);
+    }
 }
 TEST(SandboxEditorUi,
      VisualizationConfigHistoryRejectsInterveningStateAndRestoresExactly)

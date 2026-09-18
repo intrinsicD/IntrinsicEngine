@@ -26,7 +26,6 @@ module Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.Registry;
-import Extrinsic.Asset.Service;
 import Extrinsic.Core.Error;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
@@ -48,6 +47,7 @@ import Extrinsic.Runtime.WorldHandle;
 import Geometry.Properties;
 
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
+#include "Editor/internal/Runtime.EditorVisualizationHelpers.hpp"
 
 #include "Editor/internal/Runtime.EditorFeatureCommands.Internal.hpp"
 
@@ -57,6 +57,8 @@ import Geometry.Properties;
 
 namespace Extrinsic::Runtime {
 namespace {
+        using EditorFeatureDetail::StoredVisualizationConfigForTarget;
+        using EditorFeatureDetail::EffectiveVisualizationConfigForTarget;
         using EditorFeatureDetail::ResolveStableEntity;
         using EditorFeatureDetail::ToEditorCommandStatus;
         using EditorFeatureDetail::AppendVisualizationPropertiesForDomain;
@@ -98,24 +100,6 @@ namespace {
             return config;
         }
 
-        [[nodiscard]] const std::optional<G::VisualizationConfig>*
-        LaneOverrideForTarget(const G::VisualizationLaneOverrides& overrides,
-                              const EditorVisualizationTarget target) noexcept
-        {
-            switch (target)
-            {
-            case EditorVisualizationTarget::Surface:
-                return &overrides.Surface;
-            case EditorVisualizationTarget::Edges:
-                return &overrides.Edges;
-            case EditorVisualizationTarget::Points:
-                return &overrides.Points;
-            case EditorVisualizationTarget::Entity:
-                break;
-            }
-            return nullptr;
-        }
-
         [[nodiscard]] std::optional<G::VisualizationConfig>*
         MutableLaneOverrideForTarget(G::VisualizationLaneOverrides& overrides,
                                      const EditorVisualizationTarget target) noexcept
@@ -132,49 +116,6 @@ namespace {
                 break;
             }
             return nullptr;
-        }
-
-        [[nodiscard]] std::optional<G::VisualizationConfig>
-        StoredVisualizationConfigForTarget(
-            const entt::registry& raw,
-            const ECS::EntityHandle entity,
-            const EditorVisualizationTarget target)
-        {
-            if (target == EditorVisualizationTarget::Entity)
-            {
-                if (const auto* config = raw.try_get<G::VisualizationConfig>(entity))
-                    return *config;
-                return std::nullopt;
-            }
-
-            const auto* overrides =
-                raw.try_get<G::VisualizationLaneOverrides>(entity);
-            if (overrides == nullptr)
-                return std::nullopt;
-
-            const std::optional<G::VisualizationConfig>* lane =
-                LaneOverrideForTarget(*overrides, target);
-            return lane != nullptr ? *lane : std::nullopt;
-        }
-
-        [[nodiscard]] std::optional<G::VisualizationConfig>
-        EffectiveVisualizationConfigForTarget(
-            const entt::registry& raw,
-            const ECS::EntityHandle entity,
-            const EditorVisualizationTarget target)
-        {
-            if (std::optional<G::VisualizationConfig> stored =
-                    StoredVisualizationConfigForTarget(raw, entity, target);
-                stored.has_value())
-            {
-                return stored;
-            }
-            if (target == EditorVisualizationTarget::Entity)
-                return std::nullopt;
-            return StoredVisualizationConfigForTarget(
-                raw,
-                entity,
-                EditorVisualizationTarget::Entity);
         }
 
         [[nodiscard]] EditorCommandHistoryStatus ApplyVisualizationConfigTarget(

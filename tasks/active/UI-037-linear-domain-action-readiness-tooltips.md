@@ -3667,3 +3667,59 @@ reconciliation passes against the configured ci registry. Commands, logs,
 compiler closures, source hashes and Claude review packets are retained at
 `/tmp/intrinsic-editor-reuse-next/`. Start a fresh session from this checkpoint to
 avoid reloading completed-slice history. Broader UI-037 acceptance remains open.
+
+
+## 2026-09-18 continuation — shared visualization lookup
+
+Operator direction remains duplication reduction and compilation locality.
+Baseline: `e03f17b40`; clean checkout and one writer. Reuse search found identical
+stored/effective visualization lookup in workspace models and visualization
+commands. Move the shared read-only mechanism into the existing compiled
+context-adapter owner and declare it in a narrow private visualization header;
+keep mutation local to visualization commands. No public module, facade or
+new compiled source file is needed. Reintroduce separate logic only if the contracts
+actually diverge. Stored absence must remain distinct from entity fallback for
+undo, and snapshots remain owned values. Only the three consumers import the visualization component type. Claude Sonnet reviewed the bounded plan; its claim that a
+C++-linked owner would itself widen module imports was not adopted.
+
+Extend the existing lane override command/model/history regression across
+surface, edge and point lanes, including absent config, entity inheritance,
+other-lane isolation, undo, redo and disabling. Remove the unused asset-service import from visualization actions; extend the existing compiler
+asset-service boundary check to cover that producer. Final evidence follows.
+Broader readiness acceptance remains open.
+
+First build exposed two declaration prerequisites: `Asset.ImportRouter` is
+required by the existing command-helper header and stays; the shared properties
+header reaches a workspace session without a visible visualization component.
+A dedicated `Runtime.EditorVisualizationHelpers.hpp` keeps the new declarations
+out of unrelated consumers instead of widening their imports. This is the
+concrete compilation reason for one small private header. The first build's
+missing-type failures were caused by this slice, diagnosed and corrected here.
+
+Canonical ci/Clang 23 focused builds pass after correction, with no new compiler
+warnings. All 64 focused runtime/editor/locality tests pass. `IntrinsicTests`
+also builds all consumers. Compiler-produced module maps show visualization
+actions' closure falling from 73 to 67 modules, removing `Asset.Service` and
+five dependencies; none were added there. Across the three changed production
+implementations and the new private header, physical lines fall 8,486 -> 8,453.
+These are structural facts, not elapsed compilation-speed claims.
+
+Claude Sonnet's corrected fixed-diff review found no concrete bugs. Its initial
+hypothetical missing lane-override type was resolved against the actual exported
+`VisualizationLaneOverrides` in the visualization component module; the new
+header documents its EnTT prerequisite. Architecture review retains runtime
+ownership, owned optional results, existing command/history semantics and C++
+linkage. No public module surface, config lane, backend, recipe or exception
+changes. Clean-workshop rows 1–3 and 8 pass; rows 4–7 do not apply.
+
+Strict layering/test layout/task policy/state/docs-sync, doc links, root hygiene,
+skill mirrors and session-brief checks pass. The inventory regenerates unchanged;
+the new-header source-doc audit has no findings. Hotspot tooling passes 26 tests,
+and touched-scope reconciliation passes against the configured ci registry.
+Logs, exact commands, source hashes and Claude review packets are in
+`/tmp/intrinsic-visualization-reuse/`. Full CPU outcome is recorded below.
+
+Full CPU gate: 4,752 selected, 4,751 passed, one expected ASan-only GLFW lifecycle
+skip, zero failures (150.92 s test execution). Source hashes remained unchanged
+through final verification and review. No GPU execution or sanitizer-suite run
+is claimed. This is a verified session checkpoint; broader UI-037 stays open.
