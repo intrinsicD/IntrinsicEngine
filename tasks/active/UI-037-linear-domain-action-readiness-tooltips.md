@@ -2649,3 +2649,51 @@ The locality-only source passed 116 focused tests. Claude found no code blockers
 canonical ci/Clang 23 IntrinsicTests and ci-vulkan ExtrinsicSandbox compile/link
 pass on the final combined source. Inventory refresh produces 429 modules.
 Logs and fixed review packets: `/tmp/intrinsic-consolidation-locality/`.
+
+
+## Config getter reuse — verified, 2026-09-18
+
+Eleven point/mesh config getters now reuse the compiled
+`ConfigDetail::FindValidatedCanonicalPayload` in the existing private config
+helper. Together with its five original callers, sixteen getters share one
+lookup/schema/validation gate. Typed decoding, error text and schema ownership
+stay local. A null serializer preserves the eleven validators' empty reference
+argument; the original five retain lazy default serialization and fallback
+rejection. The eleven validators only emit Invalid or Valid, so the strict Valid
+gate preserves current behavior. The private header documents that future
+fallback handling belongs to preview/apply, not getter decoding.
+
+Claude endorsed the plan and fixed code diff. His two completion conditions are
+satisfied: canonical full-consumer build passes, and Codex reviewed the omitted
+429-module generated inventory and these intentional task notes. The first getter
+build found curvature lacked the shared header; its include and explicit standard
+prerequisites now follow the existing named-module pattern. No new helper file,
+module, template, factory, compatibility path or cross-layer dependency is added.
+Thirteen production files change from 4,094 to 4,097 physical lines (+3 for shared
+declarations/includes and nullable reference support); the benefit is one owner
+for repeated lookup logic, not fewer physical lines.
+
+All 20 config tests, including the new eleven-family schema/error/recovery test,
+passed before and after consolidation. Existing authored-value roundtrips and
+strict shared-family fallback rejection remain. The combined source passes 117
+focused tests and the default CPU gate: 4,742 passed, one expected ASan-only GLFW
+lifecycle skip, zero failures (4,743 selected, 164.78 seconds). Canonical ci/Clang
+23 IntrinsicTests and ci-vulkan/Clang 23 ExtrinsicSandbox compile/link pass. No GPU
+execution, full sanitizer-suite run or elapsed compilation-time improvement is
+claimed. Reviewed source/test/tool hashes match the tested source.
+
+Strict layering, test layout, task policy/state, docs sync/links, skill mirrors,
+session brief, root hygiene and workshop checks pass. Source-doc audit: four
+interfaces/headers, zero errors, 17 inspected contract comments retained for
+lifetime, validation, field ordering, fallback and numerical semantics. Workshop
+rows 1–3 pass, 4–7 n/a (UI-037 remains open), 8 pass with no temporary exceptions.
+Logs/reviews: `/tmp/intrinsic-consolidation-locality/`.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^SandboxConfigSections\.|Consolidation|^ProcessingCompilationLocality\.|^SandboxEditorPresentation\.DisabledActionReasonTooltipAppearsAfterTwoFrames$' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target ExtrinsicSandbox -j4
+```

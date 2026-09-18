@@ -84,11 +84,11 @@ namespace Extrinsic::Runtime
     }
     std::optional<OutlierAnalysisConfig> GetOutlierAnalysisConfig(const Core::Config::EngineConfig& c)
     {
-        const auto* section=Core::Config::FindEngineConfigSection(c.AppSections,kOutlierAnalysisConfigSectionName);
-        if(!section || section->SchemaId!=kOutlierAnalysisConfigSectionSchemaId || section->SchemaVersion!=1)return {};
-        auto validation=ValidateOutlierAnalysisConfigSection(section->PayloadJson,{},kOutlierAnalysisConfigSectionName);
-        if(!validation.Usable())return {};
-        return Parse(Json::parse(validation.CanonicalPayloadJson));
+        const auto payload = ConfigDetail::FindValidatedCanonicalPayload(
+            c, kOutlierAnalysisConfigSectionName, kOutlierAnalysisConfigSectionSchemaId, 1u,
+            nullptr, ValidateOutlierAnalysisConfigSection);
+        if (!payload) return {};
+        return Parse(Json::parse(*payload));
     }
     void SetOutlierAnalysisConfig(Core::Config::EngineConfig& c,const OutlierAnalysisConfig& value)
     {Core::Config::UpsertEngineConfigSection(c.AppSections,Section(value));}

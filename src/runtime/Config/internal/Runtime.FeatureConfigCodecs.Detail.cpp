@@ -29,6 +29,31 @@ import Extrinsic.Runtime.GeometryProperty.Types;
 
 namespace Extrinsic::Runtime::ConfigDetail
 {
+    [[nodiscard]] std::optional<std::string> FindValidatedCanonicalPayload(
+        const Core::Config::EngineConfig& config,
+        const std::string_view name,
+        const std::string_view schemaId,
+        const std::uint32_t schemaVersion,
+        std::string (*serializeDefault)(),
+        const SectionValidatorFn validate)
+    {
+        const Core::Config::EngineConfigSection* section =
+            Core::Config::FindEngineConfigSection(config.AppSections, name);
+        if (section == nullptr || section->SchemaId != schemaId ||
+            section->SchemaVersion != schemaVersion)
+        {
+            return std::nullopt;
+        }
+        const std::string referencePayloadJson = serializeDefault ? serializeDefault() : std::string{};
+        Core::Config::EngineConfigSectionValidationResult validated =
+            validate(section->PayloadJson, referencePayloadJson, name);
+        if (validated.State != Core::Config::EngineConfigState::Valid)
+        {
+            return std::nullopt;
+        }
+        return std::move(validated.CanonicalPayloadJson);
+    }
+
     std::optional<std::string> ValidatePointConfigFields(
         const nlohmann::json& input, nlohmann::json& defaults,
         const std::string_view objectError, const std::string_view unknownFieldPrefix,
@@ -134,13 +159,8 @@ namespace Extrinsic::Runtime
     {
         using json = nlohmann::json;
 
-        // All five family validators are free functions, so the shared lookup
-        // takes a raw function pointer instead of building a std::function.
-        using SectionValidatorFn =
-            Core::Config::EngineConfigSectionValidationResult (*)(
-                std::string_view documentPayloadJson,
-                std::string_view referencePayloadJson,
-                std::string_view diagnosticSubject);
+        using ConfigDetail::SectionValidatorFn;
+        using ConfigDetail::FindValidatedCanonicalPayload;
 
         [[nodiscard]] Core::Config::EngineConfigSection MakeConfigSection(
             const std::string_view name,
@@ -154,31 +174,6 @@ namespace Extrinsic::Runtime
                 .SchemaVersion = schemaVersion,
                 .PayloadJson = std::move(payloadJson),
             };
-        }
-
-        [[nodiscard]] std::optional<std::string> FindValidatedCanonicalPayload(
-            const Core::Config::EngineConfig& config,
-            const std::string_view name,
-            const std::string_view schemaId,
-            const std::uint32_t schemaVersion,
-            std::string (*serializeDefault)(),
-            const SectionValidatorFn validate)
-        {
-            const Core::Config::EngineConfigSection* section =
-                Core::Config::FindEngineConfigSection(config.AppSections, name);
-            if (section == nullptr || section->SchemaId != schemaId ||
-                section->SchemaVersion != schemaVersion)
-            {
-                return std::nullopt;
-            }
-            const std::string referencePayloadJson = serializeDefault();
-            Core::Config::EngineConfigSectionValidationResult validated =
-                validate(section->PayloadJson, referencePayloadJson, name);
-            if (validated.State != Core::Config::EngineConfigState::Valid)
-            {
-                return std::nullopt;
-            }
-            return std::move(validated.CanonicalPayloadJson);
         }
 
         [[nodiscard]] Core::Config::EngineConfigSectionRegistration

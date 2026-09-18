@@ -71,11 +71,11 @@ namespace Extrinsic::Runtime
     }
     std::optional<PointSpacingConfig> GetPointSpacingConfig(const Core::Config::EngineConfig& c)
     {
-        const auto* section=Core::Config::FindEngineConfigSection(c.AppSections,kPointSpacingConfigSectionName);
-        if(!section || section->SchemaId!=kPointSpacingConfigSectionSchemaId || section->SchemaVersion!=1)return {};
-        auto validation=ValidatePointSpacingConfigSection(section->PayloadJson,{},kPointSpacingConfigSectionName);
-        if(!validation.Usable())return {};
-        return Parse(Json::parse(validation.CanonicalPayloadJson));
+        const auto payload = ConfigDetail::FindValidatedCanonicalPayload(
+            c, kPointSpacingConfigSectionName, kPointSpacingConfigSectionSchemaId, 1u,
+            nullptr, ValidatePointSpacingConfigSection);
+        if (!payload) return {};
+        return Parse(Json::parse(*payload));
     }
     void SetPointSpacingConfig(Core::Config::EngineConfig& c,const PointSpacingConfig& value)
     {Core::Config::UpsertEngineConfigSection(c.AppSections,Section(value));}

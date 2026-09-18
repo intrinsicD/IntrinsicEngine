@@ -173,15 +173,11 @@ namespace Extrinsic::Runtime
     }
     std::optional<NormalEstimationConfig> GetNormalEstimationConfig(const Core::Config::EngineConfig &c)
     {
-        const auto *s =
-            Core::Config::FindEngineConfigSection(c.AppSections, kNormalEstimationConfigSectionName);
-        if (!s || s->SchemaId != kNormalEstimationConfigSectionSchemaId || s->SchemaVersion != 1)
-            return {};
-        auto v =
-            ValidateNormalEstimationConfigSection(s->PayloadJson, {}, kNormalEstimationConfigSectionName);
-        if (!v.Usable())
-            return {};
-        return Parse(Json::parse(v.CanonicalPayloadJson));
+        const auto payload = ConfigDetail::FindValidatedCanonicalPayload(
+            c, kNormalEstimationConfigSectionName, kNormalEstimationConfigSectionSchemaId, 1u,
+            nullptr, ValidateNormalEstimationConfigSection);
+        if (!payload) return {};
+        return Parse(Json::parse(*payload));
     }
     void SetNormalEstimationConfig(Core::Config::EngineConfig &c, const NormalEstimationConfig &v)
     {

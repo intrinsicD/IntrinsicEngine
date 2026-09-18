@@ -71,11 +71,11 @@ namespace Extrinsic::Runtime
     }
     std::optional<KernelDensityConfig> GetKernelDensityConfig(const Core::Config::EngineConfig& c)
     {
-        const auto* section=Core::Config::FindEngineConfigSection(c.AppSections,kKernelDensityConfigSectionName);
-        if(!section || section->SchemaId!=kKernelDensityConfigSectionSchemaId || section->SchemaVersion!=1)return {};
-        auto validation=ValidateKernelDensityConfigSection(section->PayloadJson,{},kKernelDensityConfigSectionName);
-        if(!validation.Usable())return {};
-        return Parse(Json::parse(validation.CanonicalPayloadJson));
+        const auto payload = ConfigDetail::FindValidatedCanonicalPayload(
+            c, kKernelDensityConfigSectionName, kKernelDensityConfigSectionSchemaId, 1u,
+            nullptr, ValidateKernelDensityConfigSection);
+        if (!payload) return {};
+        return Parse(Json::parse(*payload));
     }
     void SetKernelDensityConfig(Core::Config::EngineConfig& c,const KernelDensityConfig& value)
     {Core::Config::UpsertEngineConfigSection(c.AppSections,Section(value));}

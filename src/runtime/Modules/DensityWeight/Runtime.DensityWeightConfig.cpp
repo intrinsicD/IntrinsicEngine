@@ -79,11 +79,11 @@ namespace Extrinsic::Runtime
     }
     std::optional<DensityWeightConfig> GetDensityWeightConfig(const Core::Config::EngineConfig& c)
     {
-        const auto* section=Core::Config::FindEngineConfigSection(c.AppSections,kDensityWeightConfigSectionName);
-        if(!section || section->SchemaId!=kDensityWeightConfigSectionSchemaId || section->SchemaVersion!=1)return {};
-        auto validation=ValidateDensityWeightConfigSection(section->PayloadJson,{},kDensityWeightConfigSectionName);
-        if(!validation.Usable())return {};
-        return Parse(Json::parse(validation.CanonicalPayloadJson));
+        const auto payload = ConfigDetail::FindValidatedCanonicalPayload(
+            c, kDensityWeightConfigSectionName, kDensityWeightConfigSectionSchemaId, 1u,
+            nullptr, ValidateDensityWeightConfigSection);
+        if (!payload) return {};
+        return Parse(Json::parse(*payload));
     }
     void SetDensityWeightConfig(Core::Config::EngineConfig& c,const DensityWeightConfig& value)
     {Core::Config::UpsertEngineConfigSection(c.AppSections,Section(value));}

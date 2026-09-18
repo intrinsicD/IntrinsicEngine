@@ -1081,6 +1081,70 @@ TEST(SandboxConfigSections,
     EXPECT_EQ(decoded->Parameters.MaxIterations, 44u);
 }
 
+TEST(SandboxConfigSections, PointConfigGettersRequireMatchingSchemaAndValidatedPayload)
+{
+    struct Case
+    {
+        std::string_view Name;
+        std::string_view SchemaId;
+        bool (*Get)(const CoreConfig::EngineConfig&);
+    };
+    const Case cases[]{
+        {Runtime::kBilateralFilterConfigSectionName, Runtime::kBilateralFilterConfigSectionSchemaId,
+            [](const CoreConfig::EngineConfig& c) { return Runtime::GetBilateralFilterConfig(c).has_value(); }},
+        {Runtime::kKernelDensityConfigSectionName, Runtime::kKernelDensityConfigSectionSchemaId,
+            [](const CoreConfig::EngineConfig& c) { return Runtime::GetKernelDensityConfig(c).has_value(); }},
+        {Runtime::kDensityWeightConfigSectionName, Runtime::kDensityWeightConfigSectionSchemaId,
+            [](const CoreConfig::EngineConfig& c) { return Runtime::GetDensityWeightConfig(c).has_value(); }},
+        {Runtime::kPointSpacingConfigSectionName, Runtime::kPointSpacingConfigSectionSchemaId,
+            [](const CoreConfig::EngineConfig& c) { return Runtime::GetPointSpacingConfig(c).has_value(); }},
+        {Runtime::kKeypointAnalysisConfigSectionName, Runtime::kKeypointAnalysisConfigSectionSchemaId,
+            [](const CoreConfig::EngineConfig& c) { return Runtime::GetKeypointAnalysisConfig(c).has_value(); }},
+        {Runtime::kOutlierAnalysisConfigSectionName, Runtime::kOutlierAnalysisConfigSectionSchemaId,
+            [](const CoreConfig::EngineConfig& c) { return Runtime::GetOutlierAnalysisConfig(c).has_value(); }},
+        {Runtime::kDescriptorAnalysisConfigSectionName, Runtime::kDescriptorAnalysisConfigSectionSchemaId,
+            [](const CoreConfig::EngineConfig& c) { return Runtime::GetDescriptorAnalysisConfig(c).has_value(); }},
+        {Runtime::kNormalEstimationConfigSectionName, Runtime::kNormalEstimationConfigSectionSchemaId,
+            [](const CoreConfig::EngineConfig& c) { return Runtime::GetNormalEstimationConfig(c).has_value(); }},
+        {Runtime::kPointConstructionConfigSectionName, Runtime::kPointConstructionConfigSectionSchemaId,
+            [](const CoreConfig::EngineConfig& c) { return Runtime::GetPointConstructionConfig(c).has_value(); }},
+        {Runtime::kRegistrationConfigSectionName, Runtime::kRegistrationConfigSectionSchemaId,
+            [](const CoreConfig::EngineConfig& c) { return Runtime::GetRegistrationConfig(c).has_value(); }},
+        {Runtime::kMeshCurvatureConfigSectionName, Runtime::kMeshCurvatureConfigSectionSchemaId,
+            [](const CoreConfig::EngineConfig& c) { return Runtime::GetMeshCurvatureConfig(c).has_value(); }},
+    };
+    for (const auto& test : cases)
+    {
+        SCOPED_TRACE(test.Name);
+        CoreConfig::EngineConfig config;
+        EXPECT_FALSE(test.Get(config));
+        config.AppSections.push_back({.Name = std::string(test.Name),
+            .SchemaId = std::string(test.SchemaId), .SchemaVersion = 1u, .PayloadJson = "{}"});
+        auto& section = config.AppSections.back();
+        EXPECT_TRUE(test.Get(config));
+        section.Name += ".other";
+        EXPECT_FALSE(test.Get(config));
+        section.Name = test.Name;
+        section.SchemaId += ".foreign";
+        EXPECT_FALSE(test.Get(config));
+        section.SchemaId = test.SchemaId;
+        for (const auto version : {0u, 2u})
+        {
+            section.SchemaVersion = version;
+            EXPECT_FALSE(test.Get(config));
+        }
+        section.SchemaVersion = 1u;
+        for (const auto payload : {"not-json", "null", "[]", R"({"unknown_field":true})"})
+        {
+            SCOPED_TRACE(payload);
+            section.PayloadJson = payload;
+            EXPECT_FALSE(test.Get(config));
+        }
+        section.PayloadJson = "{}";
+        EXPECT_TRUE(test.Get(config));
+    }
+}
+
 TEST(SandboxConfigSections, PointPropertySerializersPreserveTokensAndNameBytes)
 {
     using D = Runtime::GeometryElementDomain;

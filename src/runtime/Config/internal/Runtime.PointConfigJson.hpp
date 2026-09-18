@@ -1,11 +1,21 @@
-// Strict field validation and string-token property JSON shared by point configs.
-// Include after JSON, standard-library and property-reference declarations.
+// Validated section lookup and property JSON shared by runtime feature configs.
+// Include after core config, JSON, standard-library and property declarations.
 #pragma once
 
 extern "C++"
 {
     namespace Extrinsic::Runtime::ConfigDetail
     {
+        using SectionValidatorFn = Core::Config::EngineConfigSectionValidationResult (*)(
+            std::string_view, std::string_view, std::string_view);
+
+        // Only Valid payloads are decoded; fallback remains a preview/apply concern.
+        // A null default serializer supplies an empty reference payload to validation.
+        [[nodiscard]] std::optional<std::string> FindValidatedCanonicalPayload(
+            const Core::Config::EngineConfig& config, std::string_view name,
+            std::string_view schemaId, std::uint32_t schemaVersion,
+            std::string (*serializeDefault)(), SectionValidatorFn validate);
+
         // Defaults contain each unsigned field. Nested values replace defaults;
         // unknown keys precede integer diagnostics, which follow the supplied order.
         [[nodiscard]] std::optional<std::string> ValidatePointConfigFields(

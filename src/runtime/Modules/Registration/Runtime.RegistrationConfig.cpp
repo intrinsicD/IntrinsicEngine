@@ -104,11 +104,11 @@ namespace Extrinsic::Runtime
     }
     std::optional<RegistrationConfig> GetRegistrationConfig(const Core::Config::EngineConfig& config)
     {
-        const auto* section = Core::Config::FindEngineConfigSection(config.AppSections, kRegistrationConfigSectionName);
-        if (!section || section->SchemaId != kRegistrationConfigSectionSchemaId || section->SchemaVersion != 1) return {};
-        const auto validated = ValidateRegistrationConfigSection(section->PayloadJson, {}, kRegistrationConfigSectionName);
-        if (!validated.Usable()) return {};
-        return Parse(Json::parse(validated.CanonicalPayloadJson));
+        const auto payload = ConfigDetail::FindValidatedCanonicalPayload(
+            config, kRegistrationConfigSectionName, kRegistrationConfigSectionSchemaId, 1u,
+            nullptr, ValidateRegistrationConfigSection);
+        if (!payload) return {};
+        return Parse(Json::parse(*payload));
     }
     void SetRegistrationConfig(Core::Config::EngineConfig& config, const RegistrationConfig& value)
     {

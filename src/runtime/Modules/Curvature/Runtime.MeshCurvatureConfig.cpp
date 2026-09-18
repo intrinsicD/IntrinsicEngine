@@ -1,8 +1,15 @@
 module;
 #include <array>
+#include <cstdint>
+#include <initializer_list>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
 #include <limits>
 #include <nlohmann/json.hpp>
 module Extrinsic.Runtime.MeshCurvatureConfig;
+#include "Config/internal/Runtime.PointConfigJson.hpp"
 namespace Extrinsic::Runtime
 {
     namespace
@@ -96,11 +103,11 @@ namespace Extrinsic::Runtime
     }
     std::optional<MeshCurvatureConfig> GetMeshCurvatureConfig(const Core::Config::EngineConfig& config)
     {
-        const auto* section=Core::Config::FindEngineConfigSection(config.AppSections, kMeshCurvatureConfigSectionName);
-        if (!section || section->SchemaId != kMeshCurvatureConfigSectionSchemaId || section->SchemaVersion != 1) return std::nullopt;
-        const auto validation=ValidateMeshCurvatureConfigSection(section->PayloadJson, {}, kMeshCurvatureConfigSectionName);
-        if (!validation.Usable()) return std::nullopt;
-        const auto doc=Json::parse(validation.CanonicalPayloadJson);
+        const auto payload = ConfigDetail::FindValidatedCanonicalPayload(
+            config, kMeshCurvatureConfigSectionName, kMeshCurvatureConfigSectionSchemaId, 1u,
+            nullptr, ValidateMeshCurvatureConfigSection);
+        if (!payload) return {};
+        const auto doc=Json::parse(*payload);
         MeshCurvatureConfig result;
         result.StableEntityId=doc["entity"];
         result.Output=static_cast<EditorMeshCurvatureOutput>(doc["output"].get<unsigned>());

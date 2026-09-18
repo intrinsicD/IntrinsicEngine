@@ -82,11 +82,11 @@ namespace Extrinsic::Runtime
     }
     std::optional<KeypointAnalysisConfig> GetKeypointAnalysisConfig(const Core::Config::EngineConfig& c)
     {
-        const auto* section=Core::Config::FindEngineConfigSection(c.AppSections,kKeypointAnalysisConfigSectionName);
-        if(!section || section->SchemaId!=kKeypointAnalysisConfigSectionSchemaId || section->SchemaVersion!=1)return {};
-        auto validation=ValidateKeypointAnalysisConfigSection(section->PayloadJson,{},kKeypointAnalysisConfigSectionName);
-        if(!validation.Usable())return {};
-        return Parse(Json::parse(validation.CanonicalPayloadJson));
+        const auto payload = ConfigDetail::FindValidatedCanonicalPayload(
+            c, kKeypointAnalysisConfigSectionName, kKeypointAnalysisConfigSectionSchemaId, 1u,
+            nullptr, ValidateKeypointAnalysisConfigSection);
+        if (!payload) return {};
+        return Parse(Json::parse(*payload));
     }
     void SetKeypointAnalysisConfig(Core::Config::EngineConfig& c,const KeypointAnalysisConfig& value)
     {Core::Config::UpsertEngineConfigSection(c.AppSections,Section(value));}

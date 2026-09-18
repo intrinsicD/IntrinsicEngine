@@ -74,11 +74,11 @@ namespace Extrinsic::Runtime
     }
     std::optional<BilateralFilterConfig> GetBilateralFilterConfig(const Core::Config::EngineConfig& c)
     {
-        const auto* section=Core::Config::FindEngineConfigSection(c.AppSections,kBilateralFilterConfigSectionName);
-        if(!section || section->SchemaId!=kBilateralFilterConfigSectionSchemaId || section->SchemaVersion!=1)return {};
-        auto validation=ValidateBilateralFilterConfigSection(section->PayloadJson,{},kBilateralFilterConfigSectionName);
-        if(!validation.Usable())return {};
-        return Parse(Json::parse(validation.CanonicalPayloadJson));
+        const auto payload = ConfigDetail::FindValidatedCanonicalPayload(
+            c, kBilateralFilterConfigSectionName, kBilateralFilterConfigSectionSchemaId, 1u,
+            nullptr, ValidateBilateralFilterConfigSection);
+        if (!payload) return {};
+        return Parse(Json::parse(*payload));
     }
     void SetBilateralFilterConfig(Core::Config::EngineConfig& c,const BilateralFilterConfig& value)
     {Core::Config::UpsertEngineConfigSection(c.AppSections,Section(value));}

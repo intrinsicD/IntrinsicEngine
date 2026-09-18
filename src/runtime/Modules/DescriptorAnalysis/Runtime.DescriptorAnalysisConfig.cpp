@@ -96,11 +96,11 @@ namespace Extrinsic::Runtime
     }
     std::optional<DescriptorAnalysisConfig> GetDescriptorAnalysisConfig(const Core::Config::EngineConfig& c)
     {
-        const auto* section=Core::Config::FindEngineConfigSection(c.AppSections,kDescriptorAnalysisConfigSectionName);
-        if(!section || section->SchemaId!=kDescriptorAnalysisConfigSectionSchemaId || section->SchemaVersion!=1)return {};
-        auto validation=ValidateDescriptorAnalysisConfigSection(section->PayloadJson,{},kDescriptorAnalysisConfigSectionName);
-        if(!validation.Usable())return {};
-        return Parse(Json::parse(validation.CanonicalPayloadJson));
+        const auto payload = ConfigDetail::FindValidatedCanonicalPayload(
+            c, kDescriptorAnalysisConfigSectionName, kDescriptorAnalysisConfigSectionSchemaId, 1u,
+            nullptr, ValidateDescriptorAnalysisConfigSection);
+        if (!payload) return {};
+        return Parse(Json::parse(*payload));
     }
     void SetDescriptorAnalysisConfig(Core::Config::EngineConfig& c,const DescriptorAnalysisConfig& value)
     {Core::Config::UpsertEngineConfigSection(c.AppSections,Section(value));}

@@ -149,16 +149,11 @@ namespace Extrinsic::Runtime
     std::optional<PointConstructionConfig>
     GetPointConstructionConfig(const Core::Config::EngineConfig& c)
     {
-        const auto* section = Core::Config::FindEngineConfigSection(
-            c.AppSections, kPointConstructionConfigSectionName);
-        if (!section || section->SchemaId != kPointConstructionConfigSectionSchemaId ||
-            section->SchemaVersion != 1)
-            return {};
-        const auto validated = ValidatePointConstructionConfigSection(
-            section->PayloadJson, {}, kPointConstructionConfigSectionName);
-        if (!validated.Usable())
-            return {};
-        return Parse(Json::parse(validated.CanonicalPayloadJson));
+        const auto payload = ConfigDetail::FindValidatedCanonicalPayload(
+            c, kPointConstructionConfigSectionName, kPointConstructionConfigSectionSchemaId, 1u,
+            nullptr, ValidatePointConstructionConfigSection);
+        if (!payload) return {};
+        return Parse(Json::parse(*payload));
     }
     void SetPointConstructionConfig(Core::Config::EngineConfig& c,
                                     const PointConstructionConfig& value)
