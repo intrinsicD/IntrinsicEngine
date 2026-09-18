@@ -55,7 +55,7 @@ namespace Extrinsic::Runtime
         EngineConfigSectionValidationResult result;
         auto reject=[&](std::string message){result.Diagnostics.push_back({.Code=EngineConfigDiagnosticCode::InvalidValue,
             .Subject=std::string(subject),.Message=std::move(message)});return result;};
-        auto input=Json::parse(payload,nullptr,false),data=Json::parse(SerializeDensityWeightConfig({}));
+        auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializeDensityWeightConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Density weight config must be an object.", "Unknown density weight field: ",
             {"entity", "gpu_query_batch_size", "gpu_radius_capacity"}))
@@ -83,7 +83,7 @@ namespace Extrinsic::Runtime
             c, kDensityWeightConfigSectionName, kDensityWeightConfigSectionSchemaId, 1u,
             nullptr, ValidateDensityWeightConfigSection);
         if (!payload) return {};
-        return Parse(Json::parse(*payload));
+        return Parse(ConfigDetail::ParseConfigJson(*payload, true));
     }
     void SetDensityWeightConfig(Core::Config::EngineConfig& c,const DensityWeightConfig& value)
     {Core::Config::UpsertEngineConfigSection(c.AppSections,Section(value));}

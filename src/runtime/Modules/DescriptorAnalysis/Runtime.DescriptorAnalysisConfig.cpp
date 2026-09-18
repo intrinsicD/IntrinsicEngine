@@ -62,7 +62,7 @@ namespace Extrinsic::Runtime
         EngineConfigSectionValidationResult result;
         auto reject=[&](std::string message){result.Diagnostics.push_back({.Code=EngineConfigDiagnosticCode::InvalidValue,
             .Subject=std::string(subject),.Message=std::move(message)});return result;};
-        auto input=Json::parse(payload,nullptr,false),data=Json::parse(SerializeDescriptorAnalysisConfig({}));
+        auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializeDescriptorAnalysisConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Descriptor analysis config must be an object.", "Unknown descriptor field: ",
             {"entity", "max_neighbors", "gpu_query_batch_size", "gpu_radius_capacity"}))
@@ -100,7 +100,7 @@ namespace Extrinsic::Runtime
             c, kDescriptorAnalysisConfigSectionName, kDescriptorAnalysisConfigSectionSchemaId, 1u,
             nullptr, ValidateDescriptorAnalysisConfigSection);
         if (!payload) return {};
-        return Parse(Json::parse(*payload));
+        return Parse(ConfigDetail::ParseConfigJson(*payload, true));
     }
     void SetDescriptorAnalysisConfig(Core::Config::EngineConfig& c,const DescriptorAnalysisConfig& value)
     {Core::Config::UpsertEngineConfigSection(c.AppSections,Section(value));}

@@ -106,6 +106,13 @@ family-specific diagnostic/domain rules remain local.
 The fallback-oriented feature codecs keep their
 separate warning/merge semantics.
 
+The point-config consumers and mesh-curvature codec share `ParseConfigJson`
+with the fallback codecs in that compiled owner. Both string and string-view
+payloads use the same parser instantiation with their exact input bounds.
+Callers explicitly select discarded results for malformed untrusted input or
+the library's exception policy for generated/validated JSON; validation and
+diagnostic policy remain family-owned. JSON stays private to implementation files.
+
 The `sandbox.parameterization` payload carries one of the implemented CPU strategy
 tokens (`lscm`, `harmonic_cotangent`, `tutte_uniform`, or `bff`) and the typed
 LSCM, harmonic, and BFF values described in

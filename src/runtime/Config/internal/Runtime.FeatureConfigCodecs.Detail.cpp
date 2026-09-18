@@ -29,6 +29,12 @@ import Extrinsic.Runtime.GeometryProperty.Types;
 
 namespace Extrinsic::Runtime::ConfigDetail
 {
+    nlohmann::json ParseConfigJson(const std::string_view payload, const bool allowExceptions)
+    {
+        // Keep the parser and its input adapter instantiated in one translation unit.
+        return nlohmann::json::parse(payload, nullptr, allowExceptions);
+    }
+
     [[nodiscard]] std::optional<std::string> FindValidatedCanonicalPayload(
         const Core::Config::EngineConfig& config,
         const std::string_view name,
@@ -294,7 +300,7 @@ namespace Extrinsic::Runtime
             ValidationContext& context,
             const std::string_view payload)
         {
-            json object = json::parse(payload, nullptr, false);
+            json object = ConfigDetail::ParseConfigJson(payload, false);
             if (object.is_discarded())
             {
                 AddWarning(

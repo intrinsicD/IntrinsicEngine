@@ -47,7 +47,7 @@ namespace Extrinsic::Runtime
         EngineConfigSectionValidationResult result;
         auto reject=[&](std::string message){result.Diagnostics.push_back({.Code=EngineConfigDiagnosticCode::InvalidValue,
             .Subject=std::string(subject),.Message=std::move(message)});return result;};
-        auto input=Json::parse(payload,nullptr,false),data=Json::parse(SerializeBilateralFilterConfig({}));
+        auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializeBilateralFilterConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Bilateral filter config must be an object.", "Unknown output field: ",
             {"entity", "k_neighbors", "gpu_query_batch_size", "iterations"}))
@@ -78,7 +78,7 @@ namespace Extrinsic::Runtime
             c, kBilateralFilterConfigSectionName, kBilateralFilterConfigSectionSchemaId, 1u,
             nullptr, ValidateBilateralFilterConfigSection);
         if (!payload) return {};
-        return Parse(Json::parse(*payload));
+        return Parse(ConfigDetail::ParseConfigJson(*payload, true));
     }
     void SetBilateralFilterConfig(Core::Config::EngineConfig& c,const BilateralFilterConfig& value)
     {Core::Config::UpsertEngineConfigSection(c.AppSections,Section(value));}

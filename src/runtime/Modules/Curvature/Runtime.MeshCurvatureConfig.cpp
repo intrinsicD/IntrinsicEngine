@@ -74,7 +74,7 @@ namespace Extrinsic::Runtime
                 .Subject=std::string{subject}, .Message=std::move(message)});
             return result;
         };
-        auto doc = Json::parse(payload, nullptr, false);
+        auto doc = ConfigDetail::ParseConfigJson(payload, false);
         if (!doc.is_object()) return reject("Mesh curvature config must be an object.");
         const auto defaults = Encode({});
         for (const auto& [key, value] : doc.items())
@@ -107,7 +107,7 @@ namespace Extrinsic::Runtime
             config, kMeshCurvatureConfigSectionName, kMeshCurvatureConfigSectionSchemaId, 1u,
             nullptr, ValidateMeshCurvatureConfigSection);
         if (!payload) return {};
-        const auto doc=Json::parse(*payload);
+        const auto doc=ConfigDetail::ParseConfigJson(*payload, true);
         MeshCurvatureConfig result;
         result.StableEntityId=doc["entity"];
         result.Output=static_cast<EditorMeshCurvatureOutput>(doc["output"].get<unsigned>());

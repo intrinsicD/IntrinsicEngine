@@ -1081,6 +1081,42 @@ TEST(SandboxConfigSections,
     EXPECT_EQ(decoded->Parameters.MaxIterations, 44u);
 }
 
+TEST(SandboxConfigSections, ConfigParsingPreservesStrictAndFallbackFailurePolicy)
+{
+    const auto reference = Runtime::SerializeClusteringConfig({});
+    const std::array payloads{
+        std::string{"{"}, std::string{"{} trailing"}, std::string{"/* comment */{}"},
+        std::string{"{\"unused\":\"a"} + '\0' + "b\"}"};
+    for (const auto& payload : payloads)
+    {
+        SCOPED_TRACE(payload);
+        const auto strict = Runtime::ValidateMeshCurvatureConfigSection(payload, {}, "curvature");
+        EXPECT_FALSE(strict.Usable());
+        EXPECT_TRUE(strict.CanonicalPayloadJson.empty());
+        ASSERT_EQ(strict.Diagnostics.size(), 1u);
+        EXPECT_EQ(strict.Diagnostics.front().Code, CoreConfig::EngineConfigDiagnosticCode::InvalidValue);
+        EXPECT_EQ(strict.Diagnostics.front().Message, "Mesh curvature config must be an object.");
+
+        const auto fallback = Runtime::ValidateClusteringConfigSection(payload, reference, "clustering");
+        EXPECT_EQ(fallback.State, CoreConfig::EngineConfigState::FallbackApplied);
+        EXPECT_TRUE(fallback.Usable());
+        EXPECT_EQ(fallback.CanonicalPayloadJson, reference);
+        ASSERT_EQ(fallback.Diagnostics.size(), 1u);
+        EXPECT_EQ(fallback.Diagnostics.front().Code, CoreConfig::EngineConfigDiagnosticCode::ParseError);
+    }
+
+    const std::string buffer = "x{} trailing";
+    const auto bounded = std::string_view{buffer}.substr(1u, 2u);
+    const auto strict = Runtime::ValidateMeshCurvatureConfigSection(bounded, {}, "curvature");
+    EXPECT_EQ(strict.State, CoreConfig::EngineConfigState::Valid);
+    EXPECT_TRUE(strict.Diagnostics.empty());
+    EXPECT_EQ(strict.CanonicalPayloadJson, Runtime::SerializeMeshCurvatureConfig({}));
+    const auto fallback = Runtime::ValidateClusteringConfigSection(bounded, reference, "clustering");
+    EXPECT_EQ(fallback.State, CoreConfig::EngineConfigState::Valid);
+    EXPECT_TRUE(fallback.Diagnostics.empty());
+    EXPECT_EQ(fallback.CanonicalPayloadJson, reference);
+}
+
 TEST(SandboxConfigSections, PointConfigGettersRequireMatchingSchemaAndValidatedPayload)
 {
     struct Case
@@ -1349,8 +1385,11 @@ TEST(SandboxConfigSections, PointConfigFieldsPreserveStrictMergeAndIntegerValida
             EXPECT_TRUE(result.CanonicalPayloadJson.empty());
             EXPECT_EQ(result.ParsedFieldCount, 0u);
         };
-        for (const auto payload : {"{", "null", "[]", "true", "1", "\"text\""})
+        for (const auto payload : {"", "{", "null", "[]", "true", "1", "\"text\"",
+                                   "{} trailing", "{}{}", "/* comment */{}"})
             reject(payload, family.ObjectError);
+        const std::string embeddedNull = std::string{"{\"unused\":\"a"} + '\0' + "b\"}";
+        reject(embeddedNull, family.ObjectError);
 
         const auto entityKey = std::string(family.IntegerFields.front());
         reject("{\"zzz\":0,\"aaa\":0,\"" + entityKey + "\":-1}",
@@ -1361,6 +1400,12 @@ TEST(SandboxConfigSections, PointConfigFieldsPreserveStrictMergeAndIntegerValida
         ASSERT_TRUE(defaults.Usable());
         EXPECT_EQ(defaults.CanonicalPayloadJson, family.SerializeWithEntity(0u));
         EXPECT_EQ(defaults.ParsedFieldCount, 0u);
+        const std::string surroundedObject = "x{} trailing";
+        const auto bounded = family.Validate(
+            std::string_view{surroundedObject}.substr(1u, 2u), {}, "field-test");
+        ASSERT_TRUE(bounded.Usable());
+        EXPECT_TRUE(bounded.Diagnostics.empty());
+        EXPECT_EQ(bounded.CanonicalPayloadJson, defaults.CanonicalPayloadJson);
         for (const auto id : {0u, 42u, UINT32_MAX})
         {
             const auto result = family.Validate(

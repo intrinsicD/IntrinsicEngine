@@ -110,8 +110,8 @@ namespace Extrinsic::Runtime
                                           .Message = std::move(message)});
             return result;
         };
-        auto input = Json::parse(payload, nullptr, false),
-             d = Json::parse(SerializeNormalEstimationConfig({}));
+        auto input = ConfigDetail::ParseConfigJson(payload, false),
+             d = ConfigDetail::ParseConfigJson(SerializeNormalEstimationConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, d, "Normal estimation config must be an object.", "Unknown normal field: ",
             {"entity", "k_neighbors", "minimum_neighbors",
@@ -177,7 +177,7 @@ namespace Extrinsic::Runtime
             c, kNormalEstimationConfigSectionName, kNormalEstimationConfigSectionSchemaId, 1u,
             nullptr, ValidateNormalEstimationConfigSection);
         if (!payload) return {};
-        return Parse(Json::parse(*payload));
+        return Parse(ConfigDetail::ParseConfigJson(*payload, true));
     }
     void SetNormalEstimationConfig(Core::Config::EngineConfig &c, const NormalEstimationConfig &v)
     {

@@ -47,7 +47,7 @@ namespace Extrinsic::Runtime
         EngineConfigSectionValidationResult result;
         auto reject=[&](std::string message){result.Diagnostics.push_back({.Code=EngineConfigDiagnosticCode::InvalidValue,
             .Subject=std::string(subject),.Message=std::move(message)});return result;};
-        auto input=Json::parse(payload,nullptr,false),data=Json::parse(SerializeKernelDensityConfig({}));
+        auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializeKernelDensityConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Kernel density config must be an object.", "Unknown density field: ",
             {"entity", "k_neighbors", "gpu_query_batch_size"}))
@@ -75,7 +75,7 @@ namespace Extrinsic::Runtime
             c, kKernelDensityConfigSectionName, kKernelDensityConfigSectionSchemaId, 1u,
             nullptr, ValidateKernelDensityConfigSection);
         if (!payload) return {};
-        return Parse(Json::parse(*payload));
+        return Parse(ConfigDetail::ParseConfigJson(*payload, true));
     }
     void SetKernelDensityConfig(Core::Config::EngineConfig& c,const KernelDensityConfig& value)
     {Core::Config::UpsertEngineConfigSection(c.AppSections,Section(value));}

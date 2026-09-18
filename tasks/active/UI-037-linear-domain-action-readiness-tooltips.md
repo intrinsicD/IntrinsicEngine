@@ -3218,3 +3218,70 @@ python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --
 Logs, fixed Claude packets and compiled-owner inspection are retained under
 `/tmp/intrinsic-compiled-test-support/`. UI-037's broader readiness inventory
 remains open. Start the next session from this checkpoint, not the full history.
+
+## Compiled config parser — plan, 2026-09-18
+
+Operator-directed compilation/reuse continuation with Claude from `b95993ced`.
+Codex owns edits/builds; Claude provides read-only planning and fixed-diff review.
+The existing source-documentation and processing-compilation-locality contracts
+apply. This slice leaves the broader UI-037 readiness inventory open.
+
+Eleven config implementations already using `Runtime.PointConfigJson.hpp` each
+instantiate JSON parsers for string and string-view inputs. Reuse that private
+header and its existing compiled owner, `Runtime.FeatureConfigCodecs.Detail.cpp`,
+for `ConfigDetail::ParseConfigJson`. The same parser now consumes a string view;
+its failure policy is explicit at every call (false for untrusted validation,
+true for generated defaults and validated payloads). Keep schema, validation,
+merge order, diagnostics and typed decoding with their current owners. There
+are no new modules, targets, templates or public APIs. Geodesics remains separate
+because it does not consume the property helper; avoid widening its imports.
+
+This private function is justified by eleven existing consumers and repeated
+parser-template compilation, not by reducing forwarding lines. Baseline objects
+each define sixteen parser symbols across two input-adapter instantiations.
+Verify removal from the consumers and one compiled owner after the build; do not
+infer elapsed compilation speedup. Existing public config contracts gain exact
+input-range and malformed/trailing/embedded-NUL coverage. Run config integration,
+compilation-locality, full canonical CPU and touched structural checks. Planning
+review rejected shared prepared-frame templates and bound-context wrappers:
+those candidates would increase coupling for little or no compilation benefit.
+
+### Config parser — verified checkpoint
+
+Claude approved the fixed production diff without blockers. Its coverage notes
+led to an additional public regression for mesh-curvature rejection and
+clustering fallback, including bounded input views. All eleven consumer edits
+invert exactly to their baseline outside the parser-call substitutions. Object
+inspection finds no parser definitions in any consumer; the existing shared
+owner contains one parser adapter and one strong `ParseConfigJson` definition.
+The thirteen production files total 4,097 -> 4,106 lines (+9); this consolidates
+compilation work, not source-line count. No elapsed speedup or final-binary-size
+claim is made. Docs and the reuse route identify the compiled owner.
+
+Canonical `ci` configures with Clang 23 and `IntrinsicTests` builds. The full
+exclusion-only CPU run selects 4,746 cases: 4,745 pass, one expected ASan-only
+GLFW lifecycle skip, zero failures (149.59 s). After adding the review-requested
+test, the affected integration executable rebuilds and all 55 config/locality
+cases pass. Production code is identical across these runs. Routing reconciles
+41 targets, 4,754 cases and 363 test sources. No GPU continuation, backend or
+numerical algorithm changed; no Vulkan or sanitizer-suite evidence is claimed.
+
+Strict layering, test layout, task policy/state, docs sync (explicit changed
+files), doc links, root hygiene, skill mirrors, session brief and diff checks
+pass. Source-documentation audit has zero errors; its five pre-existing comment
+prompts retain required default/validation order and decoding contracts. Review
+preserves runtime ownership and global C++ linkage. No new dependency edge,
+public surface, recipe/pass, maturity closure or policy exception is involved.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --build --preset ci --target IntrinsicSandboxEditorIntegrationTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^(SandboxConfigSections|ProcessingCompilationLocality)\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 120
+python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicTests
+```
+
+Review packets, parser-object inspection and logs are retained under
+`/tmp/intrinsic-reuse-continuation/`. This is a clean session boundary; read this
+checkpoint rather than the full task history. UI-037 remains open.

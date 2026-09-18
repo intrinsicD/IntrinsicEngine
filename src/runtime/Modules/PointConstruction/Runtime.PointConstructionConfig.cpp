@@ -105,8 +105,8 @@ namespace Extrinsic::Runtime
                                           .Message = std::move(message)});
             return result;
         };
-        auto input = Json::parse(payload, nullptr, false),
-             data = Json::parse(SerializePointConstructionConfig({}));
+        auto input = ConfigDetail::ParseConfigJson(payload, false),
+             data = ConfigDetail::ParseConfigJson(SerializePointConstructionConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Point construction config must be an object.", "Unknown construction field: ",
             {"entity", "resolution", "k_neighbors",
@@ -153,7 +153,7 @@ namespace Extrinsic::Runtime
             c, kPointConstructionConfigSectionName, kPointConstructionConfigSectionSchemaId, 1u,
             nullptr, ValidatePointConstructionConfigSection);
         if (!payload) return {};
-        return Parse(Json::parse(*payload));
+        return Parse(ConfigDetail::ParseConfigJson(*payload, true));
     }
     void SetPointConstructionConfig(Core::Config::EngineConfig& c,
                                     const PointConstructionConfig& value)

@@ -71,8 +71,8 @@ namespace Extrinsic::Runtime
                 .Subject = std::string{subject}, .Message = std::move(message)});
             return result;
         };
-        const auto input = Json::parse(payload, nullptr, false);
-        auto doc = Json::parse(SerializeRegistrationConfig({}));
+        const auto input = ConfigDetail::ParseConfigJson(payload, false);
+        auto doc = ConfigDetail::ParseConfigJson(SerializeRegistrationConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, doc, "Registration config must be an object.", "Unknown registration field: ",
             {"source_entity", "target_entity", "max_iterations", "trajectory_step"}))
@@ -108,7 +108,7 @@ namespace Extrinsic::Runtime
             config, kRegistrationConfigSectionName, kRegistrationConfigSectionSchemaId, 1u,
             nullptr, ValidateRegistrationConfigSection);
         if (!payload) return {};
-        return Parse(Json::parse(*payload));
+        return Parse(ConfigDetail::ParseConfigJson(*payload, true));
     }
     void SetRegistrationConfig(Core::Config::EngineConfig& config, const RegistrationConfig& value)
     {
