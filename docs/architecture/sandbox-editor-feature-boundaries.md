@@ -106,11 +106,11 @@ private composition still consume live availability.
 
 `Runtime.EditorFeatures.Internal.hpp` holds private workspace bindings and context
 adapters. It includes `Runtime.EditorFeatureCommands.Internal.hpp` for import/file
-prerequisites, diagnostics and render-hint comparisons, and
+prerequisites and diagnostics, and
 `Runtime.EditorFeatureProperties.Internal.hpp` for property catalogs and model
 statistics. Action implementations include these declarations directly, without
-the workspace storage. Scene actions need only the command helpers; visualization
-actions also use the property helpers. Their definitions remain compiled once in
+the workspace storage. Scene actions use the command helpers; visualization
+actions use the property helpers. Their definitions remain compiled once in
 `Runtime.EditorFeatureContextAdapters.cpp`. Stored lane overrides and effective
 entity-fallback visualization lookup use this same owner for command history
 and copied models, declared in `Runtime.EditorVisualizationHelpers.hpp` so
@@ -128,8 +128,15 @@ These headers contain no module imports; each implementation imports the types
 it uses. Helpers retain C++ linkage across their owning operation units.
 `EditorCompilationLocality.Actions` excludes unrelated processing services,
 render-recipe editing, renderer and workspace snapshots from both action units.
-Scene primitive-view history and visualization render-hint history retain separate
-state because only visualization history owns surface visualization settings.
+Scene primitive-view history and visualization render-hint history share owned
+`EditorRenderHintComponents` snapshots and their compiled capture, comparison and
+apply functions through `Runtime.EditorRenderHintHelpers.hpp`. Float width/size
+sources compare by their exact bits; property-name sources compare as strings.
+Visualization history composes this record with surface visualization settings
+and applies those settings before the render components. Each family retains its
+own transaction and guard. The narrow helper header lets visualization actions
+exclude scene-editing and asset-import modules, enforced by
+`EditorCompilationLocality.RenderHintActions`.
 The five feature config modules own their public schemas and globally attached
 codec declarations. `Runtime.FeatureConfigCodecs.Detail.cpp` directly defines
 those functions as one ordinary translation unit, sharing JSON parsing without

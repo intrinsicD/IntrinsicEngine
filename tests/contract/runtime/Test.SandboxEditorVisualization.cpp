@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
@@ -895,6 +896,9 @@ TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
 
     const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
     AddTriangleMeshSource(registry, mesh);
+    auto& initialOverrides = raw.emplace<G::VisualizationLaneOverrides>(mesh);
+    initialOverrides.Surface = G::VisualizationConfig{};
+    initialOverrides.Surface->UseBakedTexture = true;
     const std::uint32_t meshStableId =
         Runtime::SelectionController::ToStableEntityId(mesh);
     EXPECT_EQ(Runtime::ApplyEditorRenderHintCommand(
@@ -910,8 +914,21 @@ TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
     EXPECT_EQ(raw.get<G::RenderSurface>(mesh).Domain,
               G::RenderSurface::SourceDomain::Face);
     EXPECT_TRUE(history.Snapshot().Dirty);
+    ASSERT_TRUE(raw.all_of<G::VisualizationLaneOverrides>(mesh));
+    ASSERT_TRUE(raw.get<G::VisualizationLaneOverrides>(mesh).Surface.has_value());
+    EXPECT_FALSE(raw.get<G::VisualizationLaneOverrides>(mesh).Surface->UseBakedTexture);
+    raw.get<G::VisualizationLaneOverrides>(mesh).Surface->UseBakedTexture = true;
+    EXPECT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::StaleEntity);
+    ASSERT_TRUE(raw.all_of<G::RenderSurface>(mesh));
+    EXPECT_EQ(raw.get<G::RenderSurface>(mesh).Domain, G::RenderSurface::SourceDomain::Face);
+    ASSERT_TRUE(raw.all_of<G::VisualizationLaneOverrides>(mesh));
+    ASSERT_TRUE(raw.get<G::VisualizationLaneOverrides>(mesh).Surface.has_value());
+    raw.get<G::VisualizationLaneOverrides>(mesh).Surface->UseBakedTexture = false;
 
-    EXPECT_TRUE(history.Undo().Succeeded());
+    ASSERT_TRUE(history.Undo().Succeeded());
+    ASSERT_TRUE(raw.all_of<G::VisualizationLaneOverrides>(mesh));
+    ASSERT_TRUE(raw.get<G::VisualizationLaneOverrides>(mesh).Surface.has_value());
+    EXPECT_TRUE(raw.get<G::VisualizationLaneOverrides>(mesh).Surface->UseBakedTexture);
     EXPECT_FALSE(raw.all_of<G::RenderSurface>(mesh));
     EXPECT_TRUE(history.Redo().Succeeded());
     ASSERT_TRUE(raw.all_of<G::RenderSurface>(mesh));
@@ -1048,6 +1065,103 @@ TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
     ASSERT_NE(std::get_if<float>(&cloudPoints.SizeSource), nullptr);
     EXPECT_FLOAT_EQ(*std::get_if<float>(&cloudPoints.SizeSource), 0.05f);
 }
+TEST(SandboxEditorUi, RenderHintHistoryPreservesScalarSourceIdentityAcrossCommandFamilies)
+{
+    const std::array<std::variant<float, std::string>, 4> sources{
+        2.0f, -0.0f, std::bit_cast<float>(0x7fc00001u), std::string{"v:size"}};
+    for (const bool visualizationCommand : {false, true})
+    {
+        for (const auto& source : sources)
+        {
+            SCOPED_TRACE(visualizationCommand);
+            SCOPED_TRACE(source.index());
+            SCOPED_TRACE(std::holds_alternative<float>(source)
+                ? std::to_string(std::bit_cast<std::uint32_t>(std::get<float>(source)))
+                : std::get<std::string>(source));
+            ECS::Scene::Registry registry;
+            Runtime::SelectionController selection;
+            Runtime::EditorCommandHistory history;
+            auto context = MakeContext(registry, selection);
+            context.CommandHistory = &history;
+            const auto mesh = MakeSelectable(registry, "Mesh");
+            AddTriangleMeshSource(registry, mesh);
+            auto& raw = registry.Raw();
+            raw.emplace_or_replace<G::RenderEdges>(mesh).WidthSource = source;
+            auto& points = raw.emplace_or_replace<G::RenderPoints>(mesh);
+            points.Type = G::RenderPoints::RenderType::Flat;
+            points.SizeSource = source;
+            const auto stableId = Runtime::SelectionController::ToStableEntityId(mesh);
+            const auto apply = [&]
+            {
+                if (visualizationCommand)
+                    return Runtime::ApplyEditorRenderHintCommand(context,
+                        Runtime::EditorRenderHintCommand{
+                            .StableEntityId = stableId,
+                            .PointType = G::RenderPoints::RenderType::Sphere,
+                            .SetPointRenderType = true,
+                        });
+                return Runtime::ApplyEditorPrimitiveViewCommand(context,
+                    Runtime::EditorPrimitiveViewCommand{
+                        .StableEntityId = stableId,
+                        .SetVertexRenderMode = true,
+                        .VertexRenderMode = Runtime::MeshVertexViewRenderMode::ImpostorSphere,
+                    });
+            };
+            const auto expectSources = [&]
+            {
+                for (const auto* restored : {
+                         &raw.get<G::RenderPoints>(mesh).SizeSource,
+                         &raw.get<G::RenderEdges>(mesh).WidthSource})
+                {
+                    ASSERT_EQ(restored->index(), source.index());
+                    if (const auto* scalar = std::get_if<float>(&source))
+                    {
+                        EXPECT_EQ(std::bit_cast<std::uint32_t>(std::get<float>(*restored)),
+                                  std::bit_cast<std::uint32_t>(*scalar));
+                    }
+                    else
+                    {
+                        EXPECT_EQ(std::get<std::string>(*restored), std::get<std::string>(source));
+                    }
+                }
+            };
+            ASSERT_EQ(apply(), Runtime::EditorCommandStatus::Applied);
+            EXPECT_EQ(apply(), Runtime::EditorCommandStatus::NoChange);
+            EXPECT_EQ(history.UndoCount(), 1u);
+            ASSERT_TRUE(history.Undo().Succeeded());
+            expectSources();
+            EXPECT_EQ(raw.get<G::RenderPoints>(mesh).Type,
+                      G::RenderPoints::RenderType::Flat);
+            ASSERT_TRUE(history.Redo().Succeeded());
+            expectSources();
+            if (const auto* scalar = std::get_if<float>(&source))
+                raw.get<G::RenderEdges>(mesh).WidthSource = std::bit_cast<float>(
+                    std::bit_cast<std::uint32_t>(*scalar) ^ 0x80000000u);
+            else
+                raw.get<G::RenderEdges>(mesh).WidthSource = std::string{"v:other"};
+            const auto beforeRejectedUndo = history.Snapshot();
+            EXPECT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::StaleEntity);
+            EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
+            EXPECT_EQ(raw.get<G::RenderPoints>(mesh).Type,
+                      G::RenderPoints::RenderType::Sphere);
+            raw.get<G::RenderEdges>(mesh).WidthSource =
+                std::holds_alternative<float>(source)
+                    ? std::variant<float, std::string>{std::string{"v:other"}}
+                    : std::variant<float, std::string>{2.0f};
+            EXPECT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::StaleEntity);
+            EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
+            raw.get<G::RenderEdges>(mesh).WidthSource = source;
+            raw.get<G::RenderPoints>(mesh).SizeSource =
+                std::holds_alternative<float>(source)
+                    ? std::variant<float, std::string>{std::bit_cast<float>(
+                          std::bit_cast<std::uint32_t>(std::get<float>(source)) ^ 0x80000000u)}
+                    : std::variant<float, std::string>{std::string{"v:other"}};
+            EXPECT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::StaleEntity);
+            EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
+        }
+    }
+}
+
 TEST(SandboxEditorUi, RenderHintCommandRepackagesGraphLaneResidency)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig());

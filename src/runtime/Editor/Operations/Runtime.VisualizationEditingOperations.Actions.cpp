@@ -24,7 +24,6 @@ module;
 module Extrinsic.Runtime.VisualizationEditingOperations;
 
 import Extrinsic.ECS.Scene.Handle;
-import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Error;
 import Extrinsic.ECS.Component.DirtyTags;
@@ -39,7 +38,6 @@ import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
@@ -49,7 +47,7 @@ import Geometry.Properties;
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/internal/Runtime.EditorVisualizationHelpers.hpp"
 
-#include "Editor/internal/Runtime.EditorFeatureCommands.Internal.hpp"
+#include "Editor/internal/Runtime.EditorRenderHintHelpers.hpp"
 
 #include "Editor/internal/Runtime.EditorFeatureProperties.Internal.hpp"
 
@@ -70,7 +68,10 @@ namespace {
         using EditorFeatureDetail::ToGeometryElementDomain;
         using EditorFeatureDetail::VertexChannelCatalogDomainForView;
         using EditorFeatureDetail::VertexChannelPropertySetForView;
-        using EditorFeatureDetail::SameRenderHintComponent;
+        using EditorFeatureDetail::EditorRenderHintComponents;
+        using EditorFeatureDetail::ReadRenderHintComponents;
+        using EditorFeatureDetail::SameRenderHintComponents;
+        using EditorFeatureDetail::ApplyRenderHintComponents;
         namespace Dirty = Extrinsic::ECS::Components::DirtyTags;
         namespace GS = Extrinsic::ECS::Components::GeometrySources;
         namespace G = Extrinsic::Graphics::Components;
@@ -533,10 +534,8 @@ namespace {
 
         struct EditorRenderHintState
         {
-            std::optional<G::RenderSurface> Surface{};
+            EditorRenderHintComponents Components{};
             std::optional<G::VisualizationConfig> SurfaceVisualization{};
-            std::optional<G::RenderEdges> Edges{};
-            std::optional<G::RenderPoints> Points{};
         };
 
         [[nodiscard]] EditorRenderHintState ReadRenderHintState(
@@ -546,12 +545,7 @@ namespace {
             EditorRenderHintState state{};
             state.SurfaceVisualization = StoredVisualizationConfigForTarget(
                 raw, entity, EditorVisualizationTarget::Surface);
-            if (const auto* surface = raw.try_get<G::RenderSurface>(entity))
-                state.Surface = *surface;
-            if (const auto* lines = raw.try_get<G::RenderEdges>(entity))
-                state.Edges = *lines;
-            if (const auto* points = raw.try_get<G::RenderPoints>(entity))
-                state.Points = *points;
+            state.Components = ReadRenderHintComponents(raw, entity);
             return state;
         }
 
@@ -559,9 +553,7 @@ namespace {
             const EditorRenderHintState& lhs,
             const EditorRenderHintState& rhs)
         {
-            return SameRenderHintComponent(lhs.Surface, rhs.Surface) &&
-                   SameRenderHintComponent(lhs.Edges, rhs.Edges) &&
-                   SameRenderHintComponent(lhs.Points, rhs.Points) &&
+            return SameRenderHintComponents(lhs.Components, rhs.Components) &&
                    SameOptionalVisualizationConfig(lhs.SurfaceVisualization, rhs.SurfaceVisualization);
         }
 
@@ -637,15 +629,15 @@ namespace {
                 if (command.EnableSurface)
                 {
                     G::RenderSurface surface =
-                        state.Surface.value_or(G::RenderSurface{});
+                        state.Components.Surface.value_or(G::RenderSurface{});
                     if (surface.Domain != command.SurfaceDomain)
                         state.SurfaceVisualization = G::VisualizationConfig{};
                     surface.Domain = command.SurfaceDomain;
-                    state.Surface = surface;
+                    state.Components.Surface = surface;
                 }
                 else
                 {
-                    state.Surface.reset();
+                    state.Components.Surface.reset();
                 }
             }
 
@@ -654,20 +646,20 @@ namespace {
                 if (command.EnableEdges)
                 {
                     G::RenderEdges lines =
-                        state.Edges.value_or(G::RenderEdges{});
+                        state.Components.Edges.value_or(G::RenderEdges{});
                     lines.Domain = command.EdgeDomain;
                     if (command.SetUniformEdgeWidth)
                         lines.WidthSource = command.UniformEdgeWidth;
-                    state.Edges = lines;
+                    state.Components.Edges = lines;
                 }
                 else
                 {
-                    state.Edges.reset();
+                    state.Components.Edges.reset();
                 }
             }
-            else if (command.SetUniformEdgeWidth && state.Edges.has_value())
+            else if (command.SetUniformEdgeWidth && state.Components.Edges.has_value())
             {
-                state.Edges->WidthSource = command.UniformEdgeWidth;
+                state.Components.Edges->WidthSource = command.UniformEdgeWidth;
             }
 
             if (command.SetPoints)
@@ -675,23 +667,23 @@ namespace {
                 if (command.EnablePoints)
                 {
                     G::RenderPoints points =
-                        state.Points.value_or(G::RenderPoints{});
+                        state.Components.Points.value_or(G::RenderPoints{});
                     points.Type = command.PointType;
                     if (command.SetUniformPointSize)
                         points.SizeSource = command.UniformPointSize;
-                    state.Points = points;
+                    state.Components.Points = points;
                 }
                 else
                 {
-                    state.Points.reset();
+                    state.Components.Points.reset();
                 }
             }
-            else if (state.Points.has_value())
+            else if (state.Components.Points.has_value())
             {
                 if (command.SetPointRenderType)
-                    state.Points->Type = command.PointType;
+                    state.Components.Points->Type = command.PointType;
                 if (command.SetUniformPointSize)
-                    state.Points->SizeSource = command.UniformPointSize;
+                    state.Components.Points->SizeSource = command.UniformPointSize;
             }
 
             return state;
@@ -713,22 +705,7 @@ namespace {
 
             (void)ApplyVisualizationConfigTarget(scene, stableEntityId,
                 EditorVisualizationTarget::Surface, state.SurfaceVisualization);
-            if (state.Surface.has_value())
-                raw.emplace_or_replace<G::RenderSurface>(entity, *state.Surface);
-            else if (raw.all_of<G::RenderSurface>(entity))
-                raw.remove<G::RenderSurface>(entity);
-
-            if (state.Edges.has_value())
-                raw.emplace_or_replace<G::RenderEdges>(entity, *state.Edges);
-            else if (raw.all_of<G::RenderEdges>(entity))
-                raw.remove<G::RenderEdges>(entity);
-
-            if (state.Points.has_value())
-                raw.emplace_or_replace<G::RenderPoints>(entity, *state.Points);
-            else if (raw.all_of<G::RenderPoints>(entity))
-                raw.remove<G::RenderPoints>(entity);
-
-            return EditorCommandHistoryStatus::Applied;
+            return ApplyRenderHintComponents(scene, stableEntityId, state.Components);
         }
 
         struct EditorRenderHintMutationIdentity

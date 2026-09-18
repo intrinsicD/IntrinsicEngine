@@ -1,10 +1,9 @@
-// Private command diagnostics, import preflight and render-hint comparisons.
+// Private command diagnostics and import preflight for editor actions.
 // C++ declarations share the compiled owner Runtime.EditorFeatureContextAdapters.cpp.
 #pragma once
 
-// Requires SceneEditingOperations, Asset.ImportRouter, Core.Error and
-// Graphics.Component.RenderGeometry. Provide <array>, <optional>, <string> and
-// <string_view> in the global module fragment.
+// Requires SceneEditingOperations, Asset.ImportRouter and Core.Error.
+// Provide <array>, <string> and <string_view> in the global module fragment.
 
 extern "C++"
 {
@@ -52,16 +51,6 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         const bool commandSurfaceAvailable,
         const std::string_view path,
         const Assets::AssetPayloadKind selectedPayloadKind);
-
-    [[nodiscard]] bool SameRenderHintComponent(
-        const std::optional<Graphics::Components::RenderSurface>& lhs,
-        const std::optional<Graphics::Components::RenderSurface>& rhs);
-    [[nodiscard]] bool SameRenderHintComponent(
-        const std::optional<Graphics::Components::RenderEdges>& lhs,
-        const std::optional<Graphics::Components::RenderEdges>& rhs);
-    [[nodiscard]] bool SameRenderHintComponent(
-        const std::optional<Graphics::Components::RenderPoints>& lhs,
-        const std::optional<Graphics::Components::RenderPoints>& rhs);
 
 } // namespace Extrinsic::Runtime::EditorFeatureDetail
 

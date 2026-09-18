@@ -3723,3 +3723,73 @@ Full CPU gate: 4,752 selected, 4,751 passed, one expected ASan-only GLFW lifecyc
 skip, zero failures (150.92 s test execution). Source hashes remained unchanged
 through final verification and review. No GPU execution or sanitizer-suite run
 is claimed. This is a verified session checkpoint; broader UI-037 stays open.
+
+## 2026-09-18 continuation — shared render-hint components
+
+Operator direction: continue duplicate-code and compilation-locality work with
+Claude Fable 5.1. This bounded slice remains under UI-037; broader readiness
+acceptance stays open. The existing `runtime.editor-prepared-frame-locality`
+and `repo.source-documentation` declarations cover the changed private helpers.
+
+Reuse review found matching surface/edge/point capture, exact comparison and
+application in scene primitive-view and visualization commands. Both now use
+`EditorRenderHintComponents` and three compiled free functions in the existing
+`Runtime.EditorFeatureContextAdapters.cpp` owner. No new module or target is
+needed. A narrow private header replaces the broad command-helper dependency
+in visualization actions, allowing its scene-editing and asset-import imports
+to be removed. Per-component comparisons are private to their sole owner.
+
+Retained differences: scene and visualization history transactions and guards
+remain separate; only visualization owns surface visualization, which is still
+applied before the render components. Float-bit and string-variant comparisons,
+optional absence, command validation and cache invalidation remain unchanged.
+Poisson's visualization equality has different float semantics and is not merged.
+
+Claude Fable 5.1 reviewed the plan. Keep implementation bodies compiled, retain
+update order and check the two history contracts through public commands. The
+repository's supported Clang preset supplies build evidence; no GCC evidence or
+elapsed compilation-speed improvement is claimed. The new regression exercises
+both command families with finite, signed-zero, NaN and property-name sources;
+the existing render-hint test additionally checks surface-visualization undo
+and intervening-edit rejection. Verification results follow below.
+
+Canonical ci/Clang 23 focused build and all 65 selected editor/session/locality
+tests passed. `IntrinsicTests` also builds. Both builds emit no warnings.
+Compiler-produced module maps show visualization actions' module closure falling
+67 -> 55, with 12 removed and none added. All affected production implementations
+and private headers together fall 6,008 -> 5,984 physical lines. These are
+structural measurements, not elapsed build-time results.
+
+Fable's fixed-diff review found no production bug. Its test feedback led to
+optional-existence assertions, both width/size round-trip checks and distinct
+string/variant stale-state checks. The indirect-import concern was resolved
+against the compiler dependency closure used by the locality tool. Architecture
+review retains runtime ownership, owned snapshots, exact comparisons, mutation
+order and family history guards. Clean-workshop rows 1–3 and 8 pass; rows 4–7
+are not applicable. Strict layering, test layout, task policy/state, docs sync,
+links, root hygiene, skill mirrors and session-brief checks pass. The inventory
+regenerates unchanged, touched-scope reconciliation passes, the changed-header
+audit has no findings and hotspot tooling passes 26 tests.
+
+Exact commands, module maps, source hashes and Fable packets/results are retained
+in `/tmp/intrinsic-render-hint-reuse/`. Final corrected-test and CPU outcomes
+are recorded below.
+
+Verification for this slice:
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests
+ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi\.(.*Visualization.*|.*Appearance.*|.*RenderHint.*|.*PrimitiveView.*|.*GeometryPresentation.*)|SandboxEditorSession|EditorCompilationLocality' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 120
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+```
+
+Final verification: the full CPU gate selected 4,754 tests: 4,753 passed, one
+expected ASan-only GLFW lifecycle skip, zero failures (151.23 s). Subsequent
+changes only strengthened the test assertions; the final `IntrinsicTests`
+build and all 65 focused tests pass again (7.81 s). Production and architecture
+hashes still match Fable's reviewed diff. Fable's test re-review found no blocker;
+final self-review also checked both undo/redo source restoration and point-source
+staleness. No GPU execution, sanitizer-suite run or compilation speedup is
+claimed. This is a completed checkpoint within the still-open UI-037 task.

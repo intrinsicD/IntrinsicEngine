@@ -80,6 +80,7 @@ import Extrinsic.Runtime.VisualizationEditingOperations;
 
 #include "Editor/internal/Runtime.EditorFeatures.Internal.hpp"
 #include "Editor/internal/Runtime.EditorVisualizationHelpers.hpp"
+#include "Editor/internal/Runtime.EditorRenderHintHelpers.hpp"
 #include "Editor/internal/Runtime.EditorTransformHelpers.hpp"
 
 #include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
@@ -2283,25 +2284,59 @@ namespace
 
 }
 
-    bool SameRenderHintComponent(
-        const std::optional<Graphics::Components::RenderSurface>& lhs,
-        const std::optional<Graphics::Components::RenderSurface>& rhs)
+    [[nodiscard]] EditorRenderHintComponents ReadRenderHintComponents(
+        const entt::registry& raw,
+        const ECS::EntityHandle entity)
     {
-        return SameOptionalRenderComponent(lhs, rhs, SameRenderSurface);
+        EditorRenderHintComponents state{};
+        if (const auto* surface = raw.try_get<G::RenderSurface>(entity))
+            state.Surface = *surface;
+        if (const auto* lines = raw.try_get<G::RenderEdges>(entity))
+            state.Edges = *lines;
+        if (const auto* points = raw.try_get<G::RenderPoints>(entity))
+            state.Points = *points;
+        return state;
     }
 
-    bool SameRenderHintComponent(
-        const std::optional<Graphics::Components::RenderEdges>& lhs,
-        const std::optional<Graphics::Components::RenderEdges>& rhs)
+    bool SameRenderHintComponents(
+        const EditorRenderHintComponents& lhs,
+        const EditorRenderHintComponents& rhs)
     {
-        return SameOptionalRenderComponent(lhs, rhs, SameRenderEdges);
+        return SameOptionalRenderComponent(lhs.Surface, rhs.Surface, SameRenderSurface) &&
+               SameOptionalRenderComponent(lhs.Edges, rhs.Edges, SameRenderEdges) &&
+               SameOptionalRenderComponent(lhs.Points, rhs.Points, SameRenderPoints);
     }
 
-    bool SameRenderHintComponent(
-        const std::optional<Graphics::Components::RenderPoints>& lhs,
-        const std::optional<Graphics::Components::RenderPoints>& rhs)
+    [[nodiscard]] EditorCommandHistoryStatus ApplyRenderHintComponents(
+        ECS::Scene::Registry* scene,
+        const std::uint32_t stableEntityId,
+        const EditorRenderHintComponents& state)
     {
-        return SameOptionalRenderComponent(lhs, rhs, SameRenderPoints);
+        if (scene == nullptr)
+            return EditorCommandHistoryStatus::MissingScene;
+
+        entt::registry& raw = scene->Raw();
+        const ECS::EntityHandle entity =
+            SelectionController::ToEntityHandle(stableEntityId);
+        if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
+            return EditorCommandHistoryStatus::StaleEntity;
+
+        if (state.Surface.has_value())
+            raw.emplace_or_replace<G::RenderSurface>(entity, *state.Surface);
+        else if (raw.all_of<G::RenderSurface>(entity))
+            raw.remove<G::RenderSurface>(entity);
+
+        if (state.Edges.has_value())
+            raw.emplace_or_replace<G::RenderEdges>(entity, *state.Edges);
+        else if (raw.all_of<G::RenderEdges>(entity))
+            raw.remove<G::RenderEdges>(entity);
+
+        if (state.Points.has_value())
+            raw.emplace_or_replace<G::RenderPoints>(entity, *state.Points);
+        else if (raw.all_of<G::RenderPoints>(entity))
+            raw.remove<G::RenderPoints>(entity);
+
+        return EditorCommandHistoryStatus::Applied;
     }
 
 } // namespace Extrinsic::Runtime::EditorFeatureDetail

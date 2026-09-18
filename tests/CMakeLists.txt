@@ -953,6 +953,10 @@ intrinsic_add_module_boundary_test(EditorCompilationLocality.Actions
         --forbid-module Extrinsic.Runtime.ClusteringModule
         --forbid-module Extrinsic.Runtime.PointCloudConsolidationModule
         --forbid-module Extrinsic.Runtime.EditorWorkspaceSnapshots)
+intrinsic_add_module_boundary_test(EditorCompilationLocality.RenderHintActions
+        --check-source src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp
+        --forbid-module Extrinsic.Runtime.SceneEditingOperations
+        --forbid-module Extrinsic.Asset.ImportRouter)
 intrinsic_add_module_boundary_test(EditorCompilationLocality.ProcessingFamilies
         ${_intrinsic_editor_processing_family_frame_checks}
         --forbid-module Extrinsic.Runtime.GeometryProcessingOperations)
@@ -962,6 +966,7 @@ set_tests_properties(EditorCompilationLocality.TextureBake EditorCompilationLoca
     EditorCompilationLocality.ProcessingFamilies EditorCompilationLocality.CommandFrames
     EditorCompilationLocality.SceneFrame EditorCompilationLocality.VisualizationFrame
     EditorCompilationLocality.RenderRecipeFrame EditorCompilationLocality.Actions
+    EditorCompilationLocality.RenderHintActions
     PROPERTIES LABELS "contract;build;runtime;graphics" TIMEOUT 30)
 
 # Try to locate a symbolizer so sanitizer reports have function/file/line.

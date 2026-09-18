@@ -36,6 +36,7 @@ import Extrinsic.Runtime.WorldHandle;
 
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/internal/Runtime.EditorTransformHelpers.hpp"
+#include "Editor/internal/Runtime.EditorRenderHintHelpers.hpp"
 
 #include "Editor/internal/Runtime.EditorFeatureCommands.Internal.hpp"
 
@@ -53,78 +54,19 @@ namespace {
         using EditorFeatureDetail::ToEditorCommandStatus;
         using EditorFeatureDetail::EvaluateFileImportPrerequisites;
         using EditorFeatureDetail::FileImportPrerequisiteEvaluation;
-        using EditorFeatureDetail::SameRenderHintComponent;
+        using EditorFeatureDetail::EditorRenderHintComponents;
+        using EditorFeatureDetail::ReadRenderHintComponents;
+        using EditorFeatureDetail::SameRenderHintComponents;
+        using EditorFeatureDetail::ApplyRenderHintComponents;
         namespace ECSC = Extrinsic::ECS::Components;
         namespace GS = Extrinsic::ECS::Components::GeometrySources;
         namespace G = Extrinsic::Graphics::Components;
         namespace A = Extrinsic::Assets;
 
-        struct EditorRenderHintState
-        {
-            std::optional<G::RenderSurface> Surface{};
-            std::optional<G::RenderEdges> Edges{};
-            std::optional<G::RenderPoints> Points{};
-        };
-
-        [[nodiscard]] EditorRenderHintState ReadRenderHintState(
-            const entt::registry& raw,
-            const ECS::EntityHandle entity)
-        {
-            EditorRenderHintState state{};
-            if (const auto* surface = raw.try_get<G::RenderSurface>(entity))
-                state.Surface = *surface;
-            if (const auto* lines = raw.try_get<G::RenderEdges>(entity))
-                state.Edges = *lines;
-            if (const auto* points = raw.try_get<G::RenderPoints>(entity))
-                state.Points = *points;
-            return state;
-        }
-
-        [[nodiscard]] bool SameRenderHintState(
-            const EditorRenderHintState& lhs,
-            const EditorRenderHintState& rhs)
-        {
-            return SameRenderHintComponent(lhs.Surface, rhs.Surface) &&
-                   SameRenderHintComponent(lhs.Edges, rhs.Edges) &&
-                   SameRenderHintComponent(lhs.Points, rhs.Points);
-        }
-
         [[nodiscard]] bool IsFinitePositive(const float value) noexcept
         {
             return std::isfinite(value) && value > 0.0f;
         }
-        [[nodiscard]] EditorCommandHistoryStatus ApplyRenderHintState(
-            ECS::Scene::Registry* scene,
-            const std::uint32_t stableEntityId,
-            const EditorRenderHintState& state)
-        {
-            if (scene == nullptr)
-                return EditorCommandHistoryStatus::MissingScene;
-
-            entt::registry& raw = scene->Raw();
-            const ECS::EntityHandle entity =
-                SelectionController::ToEntityHandle(stableEntityId);
-            if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
-                return EditorCommandHistoryStatus::StaleEntity;
-
-            if (state.Surface.has_value())
-                raw.emplace_or_replace<G::RenderSurface>(entity, *state.Surface);
-            else if (raw.all_of<G::RenderSurface>(entity))
-                raw.remove<G::RenderSurface>(entity);
-
-            if (state.Edges.has_value())
-                raw.emplace_or_replace<G::RenderEdges>(entity, *state.Edges);
-            else if (raw.all_of<G::RenderEdges>(entity))
-                raw.remove<G::RenderEdges>(entity);
-
-            if (state.Points.has_value())
-                raw.emplace_or_replace<G::RenderPoints>(entity, *state.Points);
-            else if (raw.all_of<G::RenderPoints>(entity))
-                raw.remove<G::RenderPoints>(entity);
-
-            return EditorCommandHistoryStatus::Applied;
-        }
-
         struct EditorRenderHintMutationIdentity
         {
             ECS::Scene::Registry* Scene{nullptr};
@@ -137,8 +79,8 @@ namespace {
             ECS::Scene::Registry* scene,
             const WorldHandle world,
             const std::uint32_t stableEntityId,
-            const EditorRenderHintState& before,
-            const EditorRenderHintState& after)
+            const EditorRenderHintComponents& before,
+            const EditorRenderHintComponents& after)
         {
             return Internal::ExecuteUndoableEntityMutation(
                 history,
@@ -153,8 +95,8 @@ namespace {
                 after,
                 [](
                     const EditorRenderHintMutationIdentity& identity,
-                    const EditorRenderHintState& expected,
-                    const EditorRenderHintState&)
+                    const EditorRenderHintComponents& expected,
+                    const EditorRenderHintComponents&)
                 {
                     if (identity.Scene == nullptr || !identity.World.IsValid())
                         return EditorCommandHistoryStatus::MissingScene;
@@ -168,25 +110,25 @@ namespace {
                     {
                         return EditorCommandHistoryStatus::StaleEntity;
                     }
-                    return SameRenderHintState(
-                               ReadRenderHintState(raw, entity),
+                    return SameRenderHintComponents(
+                               ReadRenderHintComponents(raw, entity),
                                expected)
                         ? EditorCommandHistoryStatus::Applied
                         : EditorCommandHistoryStatus::StaleEntity;
                 },
                 [](
                     const EditorRenderHintMutationIdentity& identity,
-                    const EditorRenderHintState& target)
+                    const EditorRenderHintComponents& target)
                 {
-                    return ApplyRenderHintState(
+                    return ApplyRenderHintComponents(
                         identity.Scene,
                         identity.StableEntityId,
                         target);
                 },
                 [](
                     const EditorRenderHintMutationIdentity&,
-                    const EditorRenderHintState&,
-                    const EditorRenderHintState& target)
+                    const EditorRenderHintComponents&,
+                    const EditorRenderHintComponents& target)
                 {
                     return target;
                 });
@@ -623,9 +565,9 @@ ApplyEditorPrimitiveViewCommand(
             }
         }
 
-        const EditorRenderHintState before =
-            ReadRenderHintState(raw, entity);
-        EditorRenderHintState after = before;
+        const EditorRenderHintComponents before =
+            ReadRenderHintComponents(raw, entity);
+        EditorRenderHintComponents after = before;
         if (command.SetEdgeView)
         {
             if (command.EnableEdgeView)
@@ -656,7 +598,7 @@ ApplyEditorPrimitiveViewCommand(
                 after.Points->SizeSource = command.VertexPointRadiusPx;
         }
 
-        if (SameRenderHintState(before, after))
+        if (SameRenderHintComponents(before, after))
             return EditorCommandStatus::NoChange;
         if (context.CommandHistory != nullptr)
         {
@@ -675,7 +617,7 @@ ApplyEditorPrimitiveViewCommand(
         return InvalidateSelectedModelCacheIfApplied(
             context,
             ToEditorCommandStatus(
-                ApplyRenderHintState(context.Scene, command.StableEntityId, after)));
+                ApplyRenderHintComponents(context.Scene, command.StableEntityId, after)));
     }
 
 } // namespace Extrinsic::Runtime
