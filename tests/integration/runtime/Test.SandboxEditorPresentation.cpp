@@ -74,7 +74,6 @@ import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.RenderRecipeConfig;
-import Extrinsic.Graphics.Renderer;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;

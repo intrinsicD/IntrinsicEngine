@@ -64,7 +64,6 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.RenderingContract;
-import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;

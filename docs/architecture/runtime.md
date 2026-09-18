@@ -273,6 +273,11 @@ the prep pipeline, a concrete rendering system or an upload helper.
 `RenderCompilationLocality.EngineInterface` applies the same closure check to
 `Runtime.Engine.cppm`, additionally forbidding `Extrinsic.Runtime.Module`.
 
+The shared `EditorFeatureTestContext.hpp` also imports the diagnostics owner.
+`EditorCompilationLocality.TestContext` keeps its compiled helper and the
+method/model/presentation test cohort free of `Graphics.Renderer`; tests that
+call renderer methods retain their explicit facade import.
+
 The workspace-model implementation unit
 `Runtime.EditorWorkspaceSnapshots.Models.cpp` imports
 `Extrinsic.Graphics.RenderDiagnostics` for frame/GPU/command diagnostic records

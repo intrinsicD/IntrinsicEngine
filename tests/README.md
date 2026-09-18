@@ -21,6 +21,11 @@ commands, workspace model builders, context adapters and method test producers.
 The two point families are independently checked against each other and against
 broad processing/session composition.
 
+`EditorCompilationLocality.TestContext` checks the compiled editor test helper
+and its method/model/presentation consumers against `Graphics.Renderer`.
+Shared context fields use the diagnostics owner; tests that call renderer methods
+keep their own explicit facade import.
+
 `RenderCompilationLocality.RuntimeDiagnostics` uses the same tool on the render
 diagnostics owner, runtime frame-pacing / recipe-activation contracts, recipe
 editing operations and the kernel module that re-exports the contracts: none may reach `Graphics.Renderer`,

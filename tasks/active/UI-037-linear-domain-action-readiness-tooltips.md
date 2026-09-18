@@ -9,7 +9,7 @@ evidence: not_applicable
 evidence_skip_reason: Interactive staged implementation; fixed diffs, review, tests and task checkpoints retain verification without unattended custody.
 maturity_target: Operational
 contract_schema: 1
-contracts: [repo.source-documentation, geometry.element-domain-sources, geometry.property-coherence, runtime.editor-prepared-frame-locality, runtime.processing-compilation-locality, runtime.spatial-query-locality]
+contracts: [repo.source-documentation, geometry.element-domain-sources, geometry.property-coherence, runtime.editor-prepared-frame-locality, runtime.render-diagnostics-locality, runtime.processing-compilation-locality, runtime.spatial-query-locality]
 ---
 # UI-037 — Linear domain-action readiness and disabled-reason tooltips
 
@@ -3549,3 +3549,39 @@ Full canonical `IntrinsicTests` build and CPU selector pass: 4,750 selected,
 explicit-file docs-sync checks pass. Source-doc audit: zero errors and one
 existing large-file review prompt. No module inventory change is required for
 this implementation-only slice; no GPU or sanitizer-suite run is claimed.
+
+
+## Editor test diagnostics dependencies — verified, 2026-09-18
+
+Continuation from `31796b85d`, authorized compilation cleanup. The shared
+`EditorFeatureTestContext.hpp` now imports the canonical `Graphics.RenderDiagnostics`
+owner for `RenderGraphFrameStats`. Models, mesh-method, clustering-method and
+presentation tests drop their duplicate renderer-facade dependency; the model
+test directly imports `RenderCommandRouter` for its command-status enum. This
+explicit enum import fixes the missing re-export exposed by the first rebuild.
+Renderer-method callers retain their existing imports. No runtime behavior,
+public API, new helper/file or ownership change; a direct facade import is
+appropriate only when a consumer actually needs its complete API.
+
+The rebuilt Clang/CMake graphs show 17 test producers no longer reach
+`Graphics.Renderer`. The shared helper's transitive module set drops 122 -> 94;
+method consumers lose 27–28 modules and the large editor model/mesh/clustering
+consumers lose 15 each. `EditorCompilationLocality.TestContext` guards all 17
+producers through the existing compiler-metadata checker. These are dependency
+counts, not an elapsed compilation-speed claim. Production sources are unchanged;
+four test import edits net -1 physical line, the shared header is unchanged in
+length, and the new CMake guard adds 23 lines. Runtime/test docs explain the owner.
+
+Claude Sonnet reviewed the plan and corrected fixed diff. Canonical ci/Clang 23
+focused builds and 63 tests pass; the `IntrinsicTests` aggregate builds every
+consumer, including GPU-smoke sources. Final full CPU gate: 4,751 selected,
+4,750 passed, one expected ASan-only GLFW lifecycle skip, zero failures (150.43 s).
+No GPU execution or sanitizer-suite run is claimed. Compiler-hotspot tooling's
+26 tests pass; routing reconciles 41 targets, 4,757 cases and 363 sources.
+Layering/test layout, task policy/state, docs sync/links, root hygiene, skill
+mirrors and session brief checks pass. Inventory regenerated without changes.
+Source-doc audit: zero errors, 17 existing review prompts outside edited prose.
+Sources/tests stayed frozen during the final gates; hashes, compiler metadata,
+exact prompts/diffs, commands and logs are in `/tmp/intrinsic-readiness-reuse/`.
+UI-037's broader readiness acceptance remains open. Start the next slice in a
+fresh session instead of repeating either completed cleanup.

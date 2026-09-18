@@ -7,7 +7,9 @@ vertex/UV/topology builders used by the Models, Visualization and MeshMethods
 contract partitions. Its context conversions and geometry builders compile once
 in `EditorFeatureTestContext.cpp`; `EditorFeatureTestSupportObjs` links them into
 the runtime contract, editor integration, runtime graphics and Sandbox GPU-smoke
-test executables.
+test executables. The context imports `Graphics.RenderDiagnostics` for copied
+frame statistics; renderer execution consumers import `Graphics.Renderer`
+themselves.
 
 `GraphicsTestSupport.hpp` shares command-pass inspection
 and exact format conversion for graphics readback tests; `MockRHI.hpp` owns

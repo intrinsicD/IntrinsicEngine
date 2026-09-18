@@ -766,6 +766,29 @@ intrinsic_add_module_boundary_test(EditorCompilationLocality.ProcessingServiceBo
 set_tests_properties(EditorCompilationLocality.ProcessingServiceBorrows
     PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
 
+# Editor test data and borrowed renderer references do not need the renderer facade.
+intrinsic_add_module_boundary_test(EditorCompilationLocality.TestContext
+        --check-source tests/support/EditorFeatureTestContext.cpp
+        --check-source tests/contract/runtime/Test.ParameterizationOperations.cpp
+        --check-source tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp
+        --check-source tests/contract/runtime/Test.NormalEstimation.cpp
+        --check-source tests/contract/runtime/Test.OutlierAnalysis.cpp
+        --check-source tests/contract/runtime/Test.KernelDensityOperations.cpp
+        --check-source tests/contract/runtime/Test.BilateralFilterOperations.cpp
+        --check-source tests/contract/runtime/Test.KeypointAnalysisOperations.cpp
+        --check-source tests/contract/runtime/Test.DescriptorAnalysisOperations.cpp
+        --check-source tests/contract/runtime/Test.DensityWeightOperations.cpp
+        --check-source tests/contract/runtime/Test.PointConstructionOperations.cpp
+        --check-source tests/contract/runtime/Test.PointSpacingOperations.cpp
+        --check-source tests/contract/runtime/Test.RuntimeReferenceScene.cpp
+        --check-source tests/contract/runtime/Test.SandboxEditorModels.cpp
+        --check-source tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+        --check-source tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+        --check-source tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+        --forbid-module Extrinsic.Graphics.Renderer)
+set_tests_properties(EditorCompilationLocality.TestContext
+    PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
+
 # Scene contexts borrow the canonical registry; EnTT storage belongs to concrete users.
 intrinsic_add_module_boundary_test(EditorCompilationLocality.SceneRegistryBorrows
         --check-source src/runtime/Editor/Runtime.EditorCommandHistory.cppm

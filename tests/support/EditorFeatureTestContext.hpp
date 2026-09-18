@@ -18,7 +18,7 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Components.GeometrySources;
 import Geometry.Properties;
 import Extrinsic.Graphics.RenderRecipeConfig;
-import Extrinsic.Graphics.Renderer;
+import Extrinsic.Graphics.RenderDiagnostics;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
