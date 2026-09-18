@@ -107,14 +107,6 @@ export namespace Extrinsic::Runtime
         bool HasNamedPointSize{false};
         std::string PointSizeName{};
     };
-    struct EditorGeometryPresentationPropertyOptionModel
-    {
-        GeometryPropertyRef Descriptor{};
-        Geometry::PropertyValueKind ActualValueKind{Geometry::PropertyValueKind::Unknown};
-        std::size_t ElementCount{0u};
-        bool Compatible{false};
-        std::string DisabledReason{};
-    };
     enum class EditorPropertyCatalogDomain : std::uint8_t
     {
         MeshVertices,
@@ -162,7 +154,7 @@ export namespace Extrinsic::Runtime
         GeometryElementDomain RequiredDomain{GeometryElementDomain::Unknown};
         GeometryPropertyValueKindFilter ExpectedValueKind{};
         std::size_t ExpectedElementCount{0u};
-        std::vector<EditorGeometryPresentationPropertyOptionModel> Options{};
+        std::vector<GeometryPresentationPropertyOption> Options{};
     };
     struct EditorVertexChannelBindingOptionModel
     {
@@ -218,7 +210,7 @@ export namespace Extrinsic::Runtime
         bool PreviousOutputRetained{false};
         bool Unsupported{false};
         std::string Diagnostic{};
-        std::vector<EditorGeometryPresentationPropertyOptionModel> PropertyOptions{};
+        std::vector<GeometryPresentationPropertyOption> PropertyOptions{};
     };
 
     struct EditorGeometryCompositionSummary

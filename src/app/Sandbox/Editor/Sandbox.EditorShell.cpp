@@ -2163,16 +2163,16 @@ namespace Extrinsic::Sandbox::Editor
                                 if (ImGui::BeginCombo("Source property",
                                                       currentProperty))
                                 {
-                                    for (const EditorGeometryPresentationPropertyOptionModel&
+                                    for (const GeometryPresentationPropertyOption&
                                              option : slot.PropertyOptions)
                                     {
                                         if (!option.Compatible)
                                             ImGui::BeginDisabled();
                                         const bool selected =
-                                            option.Descriptor.Name ==
+                                            option.Property.Name ==
                                             slot.Property.Name;
                                         if (ImGui::Selectable(
-                                                option.Descriptor.Name.c_str(),
+                                                option.Property.Name.c_str(),
                                                 selected) &&
                                             option.Compatible)
                                         {
@@ -2190,11 +2190,11 @@ namespace Extrinsic::Sandbox::Editor
                                                             ? GeometryPresentationSourceKind::PropertyBake
                                                             : GeometryPresentationSourceKind::PropertyBuffer,
                                                     .Domain =
-                                                        option.Descriptor.Domain,
+                                                        option.Property.Domain,
                                                     .ExpectedValueKind =
-                                                        option.Descriptor.ValueKind,
+                                                        option.Property.ValueKind,
                                                     .PropertyName =
-                                                        option.Descriptor.Name,
+                                                        option.Property.Name,
                                                 });
                                         }
                                         if (!option.Compatible)

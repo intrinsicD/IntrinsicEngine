@@ -159,12 +159,12 @@ void DrawPropertyBindingTargets(
                 DebugNameForGeometryPropertyValueKindFilter(
                     target.ExpectedValueKind),
                 target.ExpectedElementCount);
-    for (const EditorGeometryPresentationPropertyOptionModel &option :
+    for (const GeometryPresentationPropertyOption &option :
          target.Options) {
       if (option.Compatible) {
-        ImGui::BulletText("%s", option.Descriptor.Name.c_str());
+        ImGui::BulletText("%s", option.Property.Name.c_str());
       } else {
-        ImGui::BulletText("%s", option.Descriptor.Name.c_str());
+        ImGui::BulletText("%s", option.Property.Name.c_str());
         ImGui::SameLine();
         ImGui::TextDisabled("%s", option.DisabledReason.c_str());
       }

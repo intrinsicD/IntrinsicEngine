@@ -3482,3 +3482,42 @@ python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --
 Evidence: `/tmp/intrinsic-job-record/`. UI-037 remains open; no readiness
 acceptance criterion is closed by this companion cleanup. Start a fresh session
 after this checkpoint to keep subsequent context bounded.
+
+
+## Canonical property-option snapshots — verified, 2026-09-18
+
+Operator-directed reuse/compilation continuation from `7c28a7dff`; Codex owns
+source/builds and Claude Sonnet reviewed the plan and fixed diff. Both editor
+option vectors now reuse `GeometryPresentationPropertyOption` from the already
+imported `Runtime.GeometryPresentation` owner. Removed the editor-only record,
+redundant `ActualValueKind`, converter and two conversion loops; app readers use
+`Property`. The value-owned record preserves ordering, compatibility, disabled
+reasons and the enumerator's source-generation field (default zero here).
+No new file, dependency, alias, config state or policy exception. A separate
+record would require distinct presentation or ownership semantics.
+
+Four production files total 9,104 -> 9,059 physical lines (-45). The rebuilt
+snapshot object contains none of the duplicate type's 73 baseline symbol entries.
+No elapsed compilation-speed or binary-size improvement is claimed. The existing
+source-documentation contract covers the interface; UI-037's broader readiness
+acceptance remains open. Architecture documentation and its owner mapping are
+updated; regenerated module inventory has no content change.
+
+The public snapshot regression passed on baseline production and now checks the
+canonical fields in both option vectors, ordering and independent copied strings.
+Final review added an empty-copy assertion before element access. Claude's import
+concern is resolved by the existing direct import and successful module/app builds.
+Canonical ci/Clang 23 builds both focused targets and `IntrinsicTests`: 29 focused
+cases pass; full CPU selects 4,749, with 4,748 passed, one expected ASan-only GLFW
+lifecycle skip, zero failures (165.41 s). No GPU or sanitizer-suite run is claimed.
+Source/tests stayed frozen during final gates; evidence includes their hashes.
+
+The task's Verification commands pass. The focused run additionally selects
+`PropertyOptions`, `PropertyCatalog`, `GeometryPresentation`,
+`SurfacePropertySelector`, `SelectedModelCacheInvalidatesOnGeometryPresentationRecipeGeneration`
+and `EditorCompilationLocality` cases. Strict layering/test layout/task policy
+and state, docs sync/links, root hygiene, skill mirrors and session brief checks
+pass. Routing reconciles 41 targets, 4,756 cases and 363 sources. Source-doc audit:
+zero errors, three existing large-file prompts. Exact commands, logs, symbols and
+Claude packets: `/tmp/intrinsic-property-options/`. Continue in a fresh session;
+do not repeat this completed option-record slice.

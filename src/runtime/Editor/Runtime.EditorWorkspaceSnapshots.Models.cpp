@@ -630,23 +630,8 @@ namespace {
 
             if (domain != GeometryElementDomain::Unknown)
             {
-                std::vector<GeometryPresentationPropertyOption> options =
-                    EnumerateGeometryPresentationPropertyOptions(
-                        view,
-                        domain,
-                        expected);
-                model.Options.reserve(options.size());
-                for (const GeometryPresentationPropertyOption& option : options)
-                {
-                    model.Options.push_back(
-                        EditorGeometryPresentationPropertyOptionModel{
-                            .Descriptor = option.Property,
-                            .ActualValueKind = option.Property.ValueKind,
-                            .ElementCount = option.ElementCount,
-                            .Compatible = option.Compatible,
-                            .DisabledReason = option.DisabledReason,
-                        });
-                }
+                model.Options = EnumerateGeometryPresentationPropertyOptions(
+                    view, domain, expected);
             }
             return model;
         }
@@ -1007,18 +992,6 @@ namespace {
             return GeometryElementDomain::Unknown;
         }
 
-        [[nodiscard]] EditorGeometryPresentationPropertyOptionModel
-        ToGeometryPresentationPropertyOptionModel(const GeometryPresentationPropertyOption& option)
-        {
-            return EditorGeometryPresentationPropertyOptionModel{
-                .Descriptor = option.Property,
-                .ActualValueKind = option.Property.ValueKind,
-                .ElementCount = option.ElementCount,
-                .Compatible = option.Compatible,
-                .DisabledReason = option.DisabledReason,
-            };
-        }
-
         [[nodiscard]] EditorDiagnostic MakeDiagnostic(
             const EditorDiagnosticCode code,
             std::string message)
@@ -1206,7 +1179,7 @@ namespace {
             }
         }
 
-        [[nodiscard]] std::vector<EditorGeometryPresentationPropertyOptionModel>
+        [[nodiscard]] std::vector<GeometryPresentationPropertyOption>
         BuildGeometryPresentationSlotPropertyOptions(
             const GS::ConstSourceView& view,
             const GeometryPresentationSlotSnapshot& extractedSlot)
@@ -1235,17 +1208,7 @@ namespace {
                 expected = DefaultExpectedValueKindForSlot(extractedSlot.Semantic);
             }
 
-            std::vector<GeometryPresentationPropertyOption> options =
-                EnumerateGeometryPresentationPropertyOptions(
-                    view,
-                    domain,
-                    expected);
-
-            std::vector<EditorGeometryPresentationPropertyOptionModel> out{};
-            out.reserve(options.size());
-            for (const GeometryPresentationPropertyOption& option : options)
-                out.push_back(ToGeometryPresentationPropertyOptionModel(option));
-            return out;
+            return EnumerateGeometryPresentationPropertyOptions(view, domain, expected);
         }
 
         [[nodiscard]] EditorGeometryPresentationSlotModel ToGeometryPresentationSlotModel(

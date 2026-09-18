@@ -23,6 +23,14 @@ empty or absent, while present records retain their state, identity, backend
 domains, dependency reasons, progress and diagnostics independently of later
 queue changes.
 
+Property-binding targets and presentation slots own vectors of the canonical
+`GeometryPresentationPropertyOption` from `Runtime.GeometryPresentation.cppm`.
+The enumerator's ordered records carry the property reference, count, source
+generation, compatibility and disabled reason directly into both editor views.
+These callers leave the optional observed source generation at its default zero.
+App consumers read the value kind from `Property.ValueKind`; snapshots retain
+independent strings without a second record or conversion pass.
+
 The shell's active prepared-frame storage owns the point-cloud service frame.
 `SandboxEditorContext` borrows it for the draw visit and is reset before that
 storage on draw completion and detach. Its constructor requires a frame lvalue;
@@ -685,7 +693,7 @@ the removed `Runtime.SandboxEditorFacades` and
 | `SandboxEditorTransformModel` | `EditorTransformModel` | `Runtime.SceneEditingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorRenderHintModel` | `EditorRenderHintModel` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorGeometryDomainModel` | `EditorGeometryDomainModel` | `Runtime.EditorWorkspaceSnapshots.cppm` | feature-owned runtime contract |
-| `SandboxEditorGeometryPresentationPropertyOptionModel` | `EditorGeometryPresentationPropertyOptionModel` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
+| `SandboxEditorGeometryPresentationPropertyOptionModel` | `GeometryPresentationPropertyOption` | `Runtime.GeometryPresentation.cppm` | feature-owned runtime contract |
 | `SandboxEditorPropertyCatalogDomain` | `EditorPropertyCatalogDomain` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |
 | `SandboxEditorPropertyValuePreview` | `EditorPropertyValuePreview` | `Runtime.EditorWorkspaceSnapshots.cppm` | feature-owned runtime contract |
 | `SandboxEditorPropertyCatalogRow` | `EditorPropertyCatalogRow` | `Runtime.VisualizationEditingOperations.cppm` | feature-owned runtime contract |

@@ -3248,6 +3248,60 @@ TEST(SandboxEditorUi, SelectionDetailsModelReportsHoveredEntityAndPrimitiveIds)
                      frame.Selection.Primitive.Primitive.Kind),
                  "Face");
 }
+TEST(SandboxEditorUi, PropertyOptionsPreserveCanonicalCatalogSnapshot)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "PropertyOptionsMesh");
+    AddTriangleMeshSource(registry, mesh);
+    auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
+    (void)properties.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f, 0.0f, 1.0f});
+    (void)properties.GetOrAdd<float>("v:temperature", 0.5f);
+    AttachGeometryPresentation(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    const auto frame = Runtime::BuildEditorWorkspaceSnapshot(MakeContext(registry, selection));
+    const auto& targets = frame.Inspector.PropertyCatalog.BindingTargets;
+    const auto target = std::find_if(targets.begin(), targets.end(), [](const auto& item)
+    {
+        return item.Semantic == Runtime::GeometryPresentationSlotSemantic::Normal;
+    });
+    ASSERT_NE(target, targets.end());
+    const auto* slot = FindGeometryPresentationSlot(
+        frame.Inspector.GeometryPresentation, Runtime::GeometryPresentationSlotSemantic::Normal);
+    ASSERT_NE(slot, nullptr);
+    const auto expected = Runtime::EnumerateGeometryPresentationPropertyOptions(
+        GS::BuildConstView(registry.Raw(), mesh), Runtime::GeometryElementDomain::MeshVertex,
+        Geometry::PropertyValueKind::Vec3);
+    ASSERT_FALSE(expected.empty());
+    EXPECT_TRUE(expected.front().Compatible);
+    EXPECT_FALSE(expected.back().Compatible);
+    const auto checkOptions = [&](const auto& options)
+    {
+        ASSERT_EQ(options.size(), expected.size());
+        for (std::size_t i = 0; i < expected.size(); ++i)
+        {
+            SCOPED_TRACE(i);
+            EXPECT_EQ(options[i].Property, expected[i].Property);
+            EXPECT_EQ(options[i].SourceGeneration, expected[i].SourceGeneration);
+            EXPECT_EQ(options[i].ElementCount, expected[i].ElementCount);
+            EXPECT_EQ(options[i].Compatible, expected[i].Compatible);
+            EXPECT_EQ(options[i].DisabledReason, expected[i].DisabledReason);
+        }
+    };
+    checkOptions(target->Options);
+    checkOptions(slot->PropertyOptions);
+
+    auto copy = slot->PropertyOptions;
+    ASSERT_FALSE(copy.empty());
+    copy.front().Property.Name = "changed copy";
+    copy.back().DisabledReason = "changed reason";
+    (void)properties.GetOrAdd<glm::vec3>("v:later", glm::vec3{1.0f});
+    auto normal = properties.Get<glm::vec3>("v:normal");
+    properties.Remove(normal);
+    checkOptions(target->Options);
+    checkOptions(slot->PropertyOptions);
+}
 TEST(SandboxEditorUi, GeometryPresentationInspectorReportsSlotsPropertiesAndJobs)
 {
     ECS::Scene::Registry registry;
@@ -3377,9 +3431,9 @@ TEST(SandboxEditorUi, GeometryPresentationInspectorReportsSlotsPropertiesAndJobs
     const auto disabled = std::find_if(
         normal->PropertyOptions.begin(),
         normal->PropertyOptions.end(),
-        [](const Runtime::EditorGeometryPresentationPropertyOptionModel& option)
+        [](const Runtime::GeometryPresentationPropertyOption& option)
         {
-            return option.Descriptor.Name == "v:temperature";
+            return option.Property.Name == "v:temperature";
         });
     ASSERT_NE(disabled, normal->PropertyOptions.end());
     EXPECT_FALSE(disabled->Compatible);
