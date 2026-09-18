@@ -188,7 +188,21 @@ TEST(RegistrationConfig, SharedPreviewApplyAndConfiguredRunUseCanonicalOperands)
         .SourceStableEntityId=R::SelectionController::ToStableEntityId(source),
         .TargetStableEntityId=R::SelectionController::ToStableEntityId(target),
         .InlierRatio=1.,.TrajectoryStep=50,.SourcePositions=Ref(D::GraphEdge),.TargetPositions=Ref(D::MeshFace)};
-    ASSERT_TRUE(R::PreviewEditorRegistrationCommand(commands,config).Ready);
+    const auto ready = R::PreviewEditorRegistrationCommand(commands,config);
+    ASSERT_TRUE(ready.Enabled) << ready.DisabledReason;
+    EXPECT_TRUE(ready.DisabledReason.empty());
+    EXPECT_TRUE(R::ResolveEditorProcessingActionReadiness(commands,ready).Enabled);
+    EXPECT_EQ(previews,0);EXPECT_EQ(applies,0);
+    EXPECT_EQ(scene.Raw().get<T::Component>(source).Position,glm::vec3(0));
+    auto invalid = config;
+    invalid.InlierRatio = -1;
+    const auto blocked = R::PreviewEditorRegistrationCommand(commands,invalid);
+    EXPECT_FALSE(blocked.Enabled);
+    EXPECT_FALSE(blocked.DisabledReason.empty());
+    EXPECT_EQ(R::ApplyEditorRegistrationCommand(commands,invalid).Message,blocked.DisabledReason);
+    EXPECT_EQ(R::ResolveEditorProcessingActionReadiness(commands,blocked).DisabledReason,
+              blocked.DisabledReason);
+    EXPECT_EQ(previews,0);EXPECT_EQ(applies,0);
     EXPECT_EQ(scene.Raw().get<T::Component>(source).Position,glm::vec3(0));
     ASSERT_TRUE(R::ApplyEditorRegistrationConfig(commands,config).Succeeded());
     EXPECT_EQ(previews,1);EXPECT_EQ(applies,1);

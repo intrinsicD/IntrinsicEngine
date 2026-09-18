@@ -2798,3 +2798,70 @@ checkbox is closed by test-support locality.
 python3 tests/regression/tooling/Test.TestGateRouting.py --self-test
 python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicTests
 ```
+
+
+## Registration readiness and compiled context support — plan, 2026-09-18
+
+Operator-directed continuation from `0201e2709` to reduce duplication and
+repeated compilation; Codex owns this checkout/build and Claude supplies
+read-only planning and fixed-diff review. The existing source-documentation
+and processing-locality contracts cover this slice. UI-037 stays open.
+
+- Registration preview reuses `ActionReadiness` from `Runtime.EditorProcessing`.
+  Its extra command status has no consumer. Keep `ApplyRegistrationChecked`
+  as the validation owner and preserve config-lane priority; test empty success
+  reasons, rejection-message agreement and side-effect-free preview.
+- Move the non-template conversions and six geometry builders from
+  `tests/support/EditorFeatureTestContext.hpp` to one compiled source. The
+  existing test object-library helper supplies module scanning and matching
+  flags; four existing runtime-dependent executables link that object. Leave
+  header imports intact. Core-only `TestSupportObjs` gains no runtime edge.
+  One small support target serves 23 direct consumer TUs; no production
+  abstraction is added. Definitions would return inline only if required by
+  templates or constant evaluation.
+- Keep separate commits. Build canonical ci consumers, run focused registration/
+  editor tests and the CPU gate, compile all tests plus Vulkan Sandbox and the
+  GPU support consumer. Verify source docs, inventory, layering and test routing.
+  Moving bodies establishes one compiled owner; it does not measure elapsed
+  compilation improvement. Logs: `/tmp/intrinsic-registration-context/`.
+
+
+## Shared registration readiness — verified, 2026-09-18
+
+Registration now returns the existing `ActionReadiness` directly. Its unused
+status record and panel conversion are removed; `ApplyRegistrationChecked`
+still owns admission. Successful preview clears the disabled reason; invalid
+parameter diagnostics match command rejection. The existing canonical-operands
+test checks both cases through the config-lane resolver and verifies preview
+does not change the source transform or invoke config callbacks. Three
+production files change from 4,092 to 4,085 physical lines. No module, layer
+edge, compatibility wrapper or config format is added.
+
+Claude's fixed-diff review found no code blockers. Its documentation separator
+fix is applied. The same 325 focused registration/editor/locality tests pass
+before and after the separate context-support move. Canonical ci/Clang 23
+`IntrinsicTests` builds, and the final combined default CPU gate selects 4,743
+tests: 4,742 pass, one expected ASan-only GLFW lifecycle skip, zero failures
+(148.27 seconds). Canonical ci-vulkan/Clang 23 `ExtrinsicSandbox` and
+`IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests` compile and link. This is
+compile/link coverage, not GPU execution or a full sanitizer-suite run.
+
+Module inventory regeneration remains at 429 modules without a content change.
+Strict layering, test layout, task policy/state, docs sync/links, skill mirrors,
+brief freshness, root hygiene and workshop checks pass. Source-doc audit has
+zero errors; three retained comments state the narrowed ICP catalog, terminal
+callback lifetime and explicit low-level test seam contracts. Workshop rows
+1–3 pass, 4–7 n/a, 8 pass with no temporary exceptions. UI-037's broad
+action-inventory and scan-free readiness acceptance remains open. Source/test
+hashes match the reviewed/tested surface. Logs/reviews:
+`/tmp/intrinsic-registration-context/`.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests IntrinsicRuntimeGraphicsCpuTests IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests -j4
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^(RegistrationDomains|RegistrationConfig|SandboxEditor|SandboxProcessingPanels|ProcessingCompilationLocality)' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests -j4
+```

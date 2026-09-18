@@ -1139,12 +1139,12 @@ ApplyRegistrationChecked(
         return ApplyRegistrationChecked(EditorProcessingCommandsAccess::Resolve(commands), command, false,
                                         std::move(onComplete));
     }
-    EditorRegistrationReadiness PreviewEditorRegistrationCommand(
+    ActionReadiness PreviewEditorRegistrationCommand(
         const EditorProcessingCommands& commands, const EditorRegistrationCommand& command)
     {
         const auto result =
             ApplyRegistrationChecked(EditorProcessingCommandsAccess::Resolve(commands), command, true);
-        return {result.Succeeded(), result.Status, result.Message};
+        return {result.Succeeded(), result.Succeeded() ? std::string{} : result.Message};
     }
     EditorRegistrationResult ApplyEditorConfiguredRegistrationCommand(
         const EditorProcessingCommands& commands, std::function<void(EditorRegistrationResult)> onComplete)

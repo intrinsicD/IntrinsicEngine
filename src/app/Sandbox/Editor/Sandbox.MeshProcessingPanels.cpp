@@ -2579,7 +2579,7 @@ namespace Extrinsic::Sandbox::Editor
         if (!Registration.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Registration.ConfigDiagnostic.c_str());
         const auto preview = Runtime::PreviewEditorRegistrationCommand(context.Registration.Commands, config);
         const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
-            context.Registration.Commands, {preview.Ready, preview.Diagnostic});
+            context.Registration.Commands, preview);
         if (!readiness.Enabled) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
         const bool runFinal = DrawProcessingActionButton("Run ICP##ICP", readiness);
         if (runFinal) config.TrajectoryStep = config.MaxIterations;

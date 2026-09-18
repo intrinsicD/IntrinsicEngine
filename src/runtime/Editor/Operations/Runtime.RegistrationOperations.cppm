@@ -53,13 +53,6 @@ export namespace Extrinsic::Runtime
         }
     };
 
-    struct EditorRegistrationReadiness
-    {
-        bool Ready{};
-        EditorCommandStatus Status{EditorCommandStatus::NoChange};
-        std::string Diagnostic{};
-    };
-
     // Incomplete borrowed containers keep sibling workspace features independent
     // of registration records; prepared frames copy their values.
     extern "C++"
@@ -82,7 +75,7 @@ export namespace Extrinsic::Runtime
     };
     [[nodiscard]] EditorRegistrationPreparedFrame PrepareEditorRegistrationFrame(const EditorWorkspaceAttachment&);
 
-    [[nodiscard]] EditorRegistrationReadiness PreviewEditorRegistrationCommand(
+    [[nodiscard]] ActionReadiness PreviewEditorRegistrationCommand(
         const EditorProcessingCommands&, const EditorRegistrationCommand&);
     // ICP needs a solvable correspondence problem, so this catalog keeps only
     // vec3 bindings carrying at least three live finite samples. It is

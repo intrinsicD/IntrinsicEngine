@@ -303,9 +303,9 @@ each consumer retains its own mask validation, diagnostics and ownership.
 `ValidatePointOutputs` checks the resolved output domain,
 reserved names and existing storage against the validated typed config.
 
-Normal, outlier, keypoint, descriptor, density-weight, kernel-density, spacing
-and bilateral previews return the shared `ActionReadiness` directly. Their
-method preflight is independent of the config-command lane; config-backed panel
+Normal, outlier, keypoint, descriptor, density-weight, kernel-density, spacing,
+bilateral and registration previews return the shared `ActionReadiness` directly.
+Their method preflight is independent of the config-command lane; config-backed panel
 actions combine it with `ResolveEditorProcessingActionReadiness`, which gives
 missing config commands priority. Construction retains its resolved request
 because execution consumes the resolved property bindings.
