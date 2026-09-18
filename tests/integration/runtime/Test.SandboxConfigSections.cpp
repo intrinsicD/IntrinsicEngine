@@ -769,8 +769,17 @@ TEST(SandboxConfigSections, CurvatureBindingsRoundTripAndRejectAliasing)
     EXPECT_EQ(decoded->Mean, curvature->Mean);
     EXPECT_EQ(decoded->Direction2, curvature->Direction2);
     curvature->Direction2 = curvature->Positions;
-    EXPECT_FALSE(Runtime::ValidateMeshCurvatureConfigSection(
-        Runtime::SerializeMeshCurvatureConfig(*curvature), {}, "curvature").Usable());
+    const auto rejected = Runtime::ValidateMeshCurvatureConfigSection(
+        Runtime::SerializeMeshCurvatureConfig(*curvature), {}, "curvature");
+    EXPECT_EQ(rejected.State, CoreConfig::EngineConfigState::Invalid);
+    EXPECT_FALSE(rejected.Usable());
+    EXPECT_TRUE(rejected.CanonicalPayloadJson.empty());
+    EXPECT_EQ(rejected.ParsedFieldCount, 0u);
+    ASSERT_EQ(rejected.Diagnostics.size(), 1u);
+    EXPECT_EQ(rejected.Diagnostics.front().Code, CoreConfig::EngineConfigDiagnosticCode::InvalidValue);
+    EXPECT_EQ(rejected.Diagnostics.front().Subject, "curvature");
+    EXPECT_EQ(rejected.Diagnostics.front().Message,
+        "Curvature property names must be distinct public vertex properties (v:...).");
     auto segmentation = *Runtime::GetCurvatureSegmentationConfig(config);
     segmentation.Regions.Name = "f:region_custom";
     Runtime::SetCurvatureSegmentationConfig(config, segmentation);
@@ -1091,10 +1100,13 @@ TEST(SandboxConfigSections, ConfigParsingPreservesStrictAndFallbackFailurePolicy
     {
         SCOPED_TRACE(payload);
         const auto strict = Runtime::ValidateMeshCurvatureConfigSection(payload, {}, "curvature");
+        EXPECT_EQ(strict.State, CoreConfig::EngineConfigState::Invalid);
         EXPECT_FALSE(strict.Usable());
         EXPECT_TRUE(strict.CanonicalPayloadJson.empty());
+        EXPECT_EQ(strict.ParsedFieldCount, 0u);
         ASSERT_EQ(strict.Diagnostics.size(), 1u);
         EXPECT_EQ(strict.Diagnostics.front().Code, CoreConfig::EngineConfigDiagnosticCode::InvalidValue);
+        EXPECT_EQ(strict.Diagnostics.front().Subject, "curvature");
         EXPECT_EQ(strict.Diagnostics.front().Message, "Mesh curvature config must be an object.");
 
         const auto fallback = Runtime::ValidateClusteringConfigSection(payload, reference, "clustering");
@@ -1419,6 +1431,7 @@ TEST(SandboxConfigSections, PointConfigFieldsPreserveStrictMergeAndIntegerValida
         const auto reject = [&](std::string_view payload, std::string_view message) {
             SCOPED_TRACE(payload);
             const auto result = family.Validate(payload, {}, "field-test");
+            EXPECT_EQ(result.State, CoreConfig::EngineConfigState::Invalid);
             EXPECT_FALSE(result.Usable());
             ASSERT_EQ(result.Diagnostics.size(), 1u);
             EXPECT_EQ(result.Diagnostics.front().Code, CoreConfig::EngineConfigDiagnosticCode::InvalidValue);

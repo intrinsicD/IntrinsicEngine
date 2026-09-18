@@ -52,29 +52,28 @@ namespace Extrinsic::Runtime
         std::string_view payload,std::string_view,std::string_view subject)
     {
         using namespace Core::Config;
+        using ConfigDetail::RejectConfigSection;
         EngineConfigSectionValidationResult result;
-        auto reject=[&](std::string message){result.Diagnostics.push_back({.Code=EngineConfigDiagnosticCode::InvalidValue,
-            .Subject=std::string(subject),.Message=std::move(message)});return result;};
         auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializeDensityWeightConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Density weight config must be an object.", "Unknown density weight field: ",
             {"entity", "gpu_query_batch_size", "gpu_radius_capacity"}))
-            return reject(std::move(*error));
+            return RejectConfigSection(subject, std::move(*error));
         if(data["gpu_query_batch_size"]==0 || data["gpu_query_batch_size"]>16384 ||
            data["gpu_radius_capacity"]==0 || data["gpu_radius_capacity"]>1024)
-            return reject("GPU query batch must be 1..16384 and complete radius capacity 1..1024.");
+            return RejectConfigSection(subject, "GPU query batch must be 1..16384 and complete radius capacity 1..1024.");
         if(data["backend"]!="cpu_kdtree" && data["backend"]!="cpu_lbvh" && data["backend"]!="vulkan_lbvh")
-            return reject("Unknown density weight backend.");
+            return RejectConfigSection(subject, "Unknown density weight backend.");
         if(!data["support_radius"].is_number() || !std::isfinite(data["support_radius"].get<double>()) ||
            data["support_radius"]<=0 || data["support_radius"].get<double>()>std::numeric_limits<float>::max())
-            return reject("Support radius must be positive and finite, at most floatmax.");
-        if(data["kernel"]!="gaussian" && data["kernel"]!="theta_lop" && data["kernel"]!="wendland_c2")return reject("Unknown radial kernel.");
-        if(data["mode"]!="direct" && data["mode"]!="reciprocal")return reject("Unknown density weight mode.");
+            return RejectConfigSection(subject, "Support radius must be positive and finite, at most floatmax.");
+        if(data["kernel"]!="gaussian" && data["kernel"]!="theta_lop" && data["kernel"]!="wendland_c2")return RejectConfigSection(subject, "Unknown radial kernel.");
+        if(data["mode"]!="direct" && data["mode"]!="reciprocal")return RejectConfigSection(subject, "Unknown density weight mode.");
         using ConfigDetail::PointPropertyValidation;
         if(ConfigDetail::ValidatePointPropertyRef(data["positions"],Geometry::PropertyValueKind::Vec3) != PointPropertyValidation::Valid ||
            ConfigDetail::ValidatePointPropertyRef(data["weights"],Geometry::PropertyValueKind::Float) != PointPropertyValidation::Valid ||
            data["positions"]["domain"]!=data["weights"]["domain"] || data["positions"]["name"]==data["weights"]["name"])
-            return reject("Position and weight bindings need distinct canonical vec3/float properties on the same domain.");
+            return RejectConfigSection(subject, "Position and weight bindings need distinct canonical vec3/float properties on the same domain.");
         result.State=EngineConfigState::Valid;result.CanonicalPayloadJson=SerializeDensityWeightConfig(Parse(data));result.ParsedFieldCount=input.size();return result;
     }
     std::optional<DensityWeightConfig> GetDensityWeightConfig(const Core::Config::EngineConfig& c)

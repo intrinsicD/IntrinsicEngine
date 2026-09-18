@@ -56,30 +56,29 @@ namespace Extrinsic::Runtime
         std::string_view payload,std::string_view,std::string_view subject)
     {
         using namespace Core::Config;
+        using ConfigDetail::RejectConfigSection;
         EngineConfigSectionValidationResult result;
-        auto reject=[&](std::string message){result.Diagnostics.push_back({.Code=EngineConfigDiagnosticCode::InvalidValue,
-            .Subject=std::string(subject),.Message=std::move(message)});return result;};
         auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializeOutlierAnalysisConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Outlier analysis config must be an object.", "Unknown outlier field: ",
             {"entity", "k_neighbors", "minimum_neighbors", "gpu_query_batch_size"}))
-            return reject(std::move(*error));
+            return RejectConfigSection(subject, std::move(*error));
         if(data["k_neighbors"]==0 || data["gpu_query_batch_size"]==0 || data["gpu_query_batch_size"]>16384)
-            return reject("k must be positive and GPU query batch size must be 1..16384.");
-        if(data["method"]!="statistical" && data["method"]!="radius" && data["method"]!="local_distance_ratio")return reject("Unknown outlier method.");
-        if(data["operation"]!="analyze" && data["operation"]!="remove_marked")return reject("Unknown outlier operation.");
-        if(data["backend"]!="cpu_octree" && data["backend"]!="cpu_lbvh" && data["backend"]!="vulkan_lbvh")return reject("Unknown outlier backend.");
+            return RejectConfigSection(subject, "k must be positive and GPU query batch size must be 1..16384.");
+        if(data["method"]!="statistical" && data["method"]!="radius" && data["method"]!="local_distance_ratio")return RejectConfigSection(subject, "Unknown outlier method.");
+        if(data["operation"]!="analyze" && data["operation"]!="remove_marked")return RejectConfigSection(subject, "Unknown outlier operation.");
+        if(data["backend"]!="cpu_octree" && data["backend"]!="cpu_lbvh" && data["backend"]!="vulkan_lbvh")return RejectConfigSection(subject, "Unknown outlier backend.");
         if (auto error = ConfigDetail::ValidatePointConfigNonnegativeFloats(
             data, {"radius", "stddev_multiplier", "score_threshold"}))
-            return reject(std::move(*error));
-        if(data["method"]=="radius" && data["radius"].get<double>()<=0)return reject("Radius must be positive.");
+            return RejectConfigSection(subject, std::move(*error));
+        if(data["method"]=="radius" && data["radius"].get<double>()<=0)return RejectConfigSection(subject, "Radius must be positive.");
         const OutlierAnalysisConfig defaults;
         if (auto error = ConfigDetail::ValidatePointConfigPropertyRefs(
             data, {{"positions", defaults.Positions.ValueKind}, {"mask", defaults.Mask.ValueKind}, {"score", defaults.Score.ValueKind}}))
-            return reject(std::move(*error));
+            return RejectConfigSection(subject, std::move(*error));
         if(data["positions"]["domain"]!=data["mask"]["domain"] || data["mask"]["domain"]!=data["score"]["domain"] ||
            data["positions"]["name"]==data["mask"]["name"] || data["positions"]["name"]==data["score"]["name"] || data["mask"]["name"]==data["score"]["name"])
-            return reject("Position, mask and score must be distinct properties on the same domain.");
+            return RejectConfigSection(subject, "Position, mask and score must be distinct properties on the same domain.");
         result.State=EngineConfigState::Valid;result.CanonicalPayloadJson=SerializeOutlierAnalysisConfig(Parse(data));result.ParsedFieldCount=input.size();return result;
     }
     std::optional<OutlierAnalysisConfig> GetOutlierAnalysisConfig(const Core::Config::EngineConfig& c)

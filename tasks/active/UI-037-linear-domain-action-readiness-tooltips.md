@@ -3338,3 +3338,71 @@ python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --
 
 Logs, symbol inspection and Claude packets: `/tmp/intrinsic-config-serialization/`.
 This is a clean session boundary; continue from this checkpoint. UI-037 remains open.
+
+
+## Shared config rejection — plan, 2026-09-18
+
+Operator-directed reuse/compilation continuation from `ef97deb04`. Codex owns
+this checkout and builds; Claude supplies bounded read-only planning and review.
+The existing source-documentation and processing-compilation-locality contracts
+cover this slice; UI-037's broader readiness acceptance remains open.
+
+Eleven consumers of `Runtime.PointConfigJson.hpp` repeat a capturing rejection
+lambda: append one `InvalidValue` diagnostic to a fresh result, then copy that
+result. Reuse discovery found no existing helper for this exact failure shape;
+the shared codec owner's fallback/merge diagnostics have different semantics.
+Add `ConfigDetail::RejectConfigSection(subject, message)` in the existing private
+header and compiled codec owner; replace all eleven lambdas with direct calls.
+Keep family messages, validation order, success fields and fallback codecs intact.
+This needs no new target, file, module, dependency or public API. The concrete
+eleven callers justify a free function; no factory or generic policy is needed.
+
+Claude verified every rejection precedes any result mutation. Extend existing
+public tests to pin explicit Invalid state and the full curvature failure shape,
+then run them before and after the change. Build the focused integration target
+and all `IntrinsicTests`; run config/locality cases and the full CPU selector,
+plus applicable structural checks. Inspect consumer objects for the removed
+diagnostic-vector insertion/copy definitions and the shared owner's definition.
+This verifies a compiled owner, not elapsed compilation speedup. Evidence and
+fixed review packets: `/tmp/intrinsic-config-rejection/`.
+
+
+## Shared config rejection — verified, 2026-09-18
+
+All 91 rejection paths across the eleven codecs now call the existing compiled
+owner's `RejectConfigSection`; duplicate capturing lambdas are removed. Consumer
+changes invert to baseline tokens with every message unchanged. The thirteen
+production files total 4,111 -> 4,098 physical lines (-13), including the helper,
+declaration and local using declarations. Each consumer object has one shared
+helper reference and no diagnostic-vector insertion or copy-constructor definition;
+the shared owner has one strong helper definition. No elapsed-build-speed or
+binary-size improvement is claimed.
+
+Claude's fixed-diff review found no blockers; its local-using and string-alignment
+readability suggestions are applied. Three strengthened public tests passed on
+baseline production, and all 59 focused config/locality cases passed after the
+extraction. The first full run rejected five stale dependency scans because the
+readability edits happened during CTest. This was an agent verification-order
+error, resolved by rebuilding all `IntrinsicTests` and rerunning against frozen
+source; no gate was changed. Final canonical ci/Clang 23 CPU run: 4,748 selected,
+4,747 passed, one expected ASan-only GLFW lifecycle skip, zero failures (150.70 s
+of test execution). No GPU or sanitizer-suite execution is claimed.
+
+Strict layering, test layout, task policy/state, doc links, docs sync, root
+hygiene, skill mirrors, session brief and diff checks pass. Routing reconciles
+41 targets, 4,755 cases and 363 sources. Source-doc audit has zero errors; its
+five existing declaration comments document required contracts and its size
+prompt names the coherent shared codec owner. No public module surface changed.
+The architecture doc and reuse route identify the common failure owner.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicSandboxEditorIntegrationTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^(SandboxConfigSections|ProcessingCompilationLocality|ConfigCompilationLocality)\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicTests
+```
+
+Evidence: `/tmp/intrinsic-config-rejection/`. This is a verified session boundary;
+UI-037 stays open and none of its broader readiness checkboxes is closed here.

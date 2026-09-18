@@ -65,37 +65,33 @@ namespace Extrinsic::Runtime
         std::string_view payload, std::string_view, std::string_view subject)
     {
         using namespace Core::Config;
+        using ConfigDetail::RejectConfigSection;
         EngineConfigSectionValidationResult result;
-        auto reject = [&](std::string message) {
-            result.Diagnostics.push_back({.Code = EngineConfigDiagnosticCode::InvalidValue,
-                .Subject = std::string{subject}, .Message = std::move(message)});
-            return result;
-        };
         const auto input = ConfigDetail::ParseConfigJson(payload, false);
         auto doc = ConfigDetail::ParseConfigJson(SerializeRegistrationConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, doc, "Registration config must be an object.", "Unknown registration field: ",
             {"source_entity", "target_entity", "max_iterations", "trajectory_step"}))
-            return reject(std::move(*error));
-        if (doc["max_iterations"] == 0) return reject("max_iterations must be positive.");
+            return RejectConfigSection(subject, std::move(*error));
+        if (doc["max_iterations"] == 0) return RejectConfigSection(subject, "max_iterations must be positive.");
         for (auto key : {"max_correspondence_distance", "inlier_ratio", "convergence_threshold"})
             if (!doc[key].is_number() || !std::isfinite(doc[key].get<double>()))
-                return reject(std::string(key) + " must be finite.");
+                return RejectConfigSection(subject, std::string(key) + " must be finite.");
         if (doc["inlier_ratio"] <= 0 || doc["inlier_ratio"] > 1 || doc["convergence_threshold"] < 0)
-            return reject("inlier_ratio must be in (0,1]; convergence_threshold must be nonnegative.");
+            return RejectConfigSection(subject, "inlier_ratio must be in (0,1]; convergence_threshold must be nonnegative.");
         if (doc["variant"] != "point_to_point" && doc["variant"] != "point_to_plane")
-            return reject("variant must be point_to_point or point_to_plane.");
+            return RejectConfigSection(subject, "variant must be point_to_point or point_to_plane.");
         if (doc["backend"] != "cpu_kdtree" && doc["backend"] != "cpu_lbvh" && doc["backend"] != "vulkan_lbvh")
-            return reject("backend must be cpu_kdtree, cpu_lbvh or vulkan_lbvh.");
+            return RejectConfigSection(subject, "backend must be cpu_kdtree, cpu_lbvh or vulkan_lbvh.");
         for (auto key : {"source_positions", "target_positions", "target_normals"})
         {
             const auto& ref = doc[key];
             using ConfigDetail::PointPropertyValidation;
             const auto validation = ConfigDetail::ValidatePointPropertyRef(ref, Geometry::PropertyValueKind::Vec3);
             if (validation == PointPropertyValidation::InvalidReference || !ref["domain"].is_string())
-                return reject(std::string(key) + " requires domain, name and kind=vec3.");
+                return RejectConfigSection(subject, std::string(key) + " requires domain, name and kind=vec3.");
             if (validation == PointPropertyValidation::UnknownDomain)
-                return reject(std::string(key) + " has an unknown element domain.");
+                return RejectConfigSection(subject, std::string(key) + " has an unknown element domain.");
         }
         result.State = EngineConfigState::Valid;
         result.CanonicalPayloadJson = SerializeRegistrationConfig(Parse(doc));

@@ -117,6 +117,11 @@ compiles in the same owner. Family serializers still construct their own JSON
 values; compact formatting, sorted object keys, raw UTF-8 and strict invalid
 encoding rejection retain the library defaults.
 
+Their strict failures share `RejectConfigSection(subject, message)` in the same
+compiled owner: one `InvalidValue` diagnostic, an invalid result, empty canonical
+payload and zero parsed fields. Each family still chooses its own message and
+first failing check; fallback-oriented codecs retain their separate result policy.
+
 The `sandbox.parameterization` payload carries one of the implemented CPU strategy
 tokens (`lscm`, `harmonic_cotangent`, `tutte_uniform`, or `bff`) and the typed
 LSCM, harmonic, and BFF values described in

@@ -44,29 +44,28 @@ namespace Extrinsic::Runtime
         std::string_view payload,std::string_view,std::string_view subject)
     {
         using namespace Core::Config;
+        using ConfigDetail::RejectConfigSection;
         EngineConfigSectionValidationResult result;
-        auto reject=[&](std::string message){result.Diagnostics.push_back({.Code=EngineConfigDiagnosticCode::InvalidValue,
-            .Subject=std::string(subject),.Message=std::move(message)});return result;};
         auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializeKernelDensityConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Kernel density config must be an object.", "Unknown density field: ",
             {"entity", "k_neighbors", "gpu_query_batch_size"}))
-            return reject(std::move(*error));
+            return RejectConfigSection(subject, std::move(*error));
         if(data["gpu_query_batch_size"]==0 || data["gpu_query_batch_size"]>16384)
-            return reject("GPU query batch size must be 1..16384.");
-        if(data["backend"]!="cpu_octree" && data["backend"]!="cpu_lbvh" && data["backend"]!="vulkan_lbvh")return reject("Unknown density backend.");
+            return RejectConfigSection(subject, "GPU query batch size must be 1..16384.");
+        if(data["backend"]!="cpu_octree" && data["backend"]!="cpu_lbvh" && data["backend"]!="vulkan_lbvh")return RejectConfigSection(subject, "Unknown density backend.");
         if (auto error = ConfigDetail::ValidatePointConfigNonnegativeFloats(
             data, {"bandwidth"}))
-            return reject(std::move(*error));
+            return RejectConfigSection(subject, std::move(*error));
         if(data["bandwidth"].get<double>()>0 && data["bandwidth"].get<float>()==0)
-            return reject("Positive bandwidth must remain positive in float storage.");
+            return RejectConfigSection(subject, "Positive bandwidth must remain positive in float storage.");
         const KernelDensityConfig defaults;
         if (auto error = ConfigDetail::ValidatePointConfigPropertyRefs(
             data, {{"positions", defaults.Positions.ValueKind}, {"density", defaults.Density.ValueKind}}))
-            return reject(std::move(*error));
+            return RejectConfigSection(subject, std::move(*error));
         if(data["positions"]["domain"]!=data["density"]["domain"] ||
            data["positions"]["name"]==data["density"]["name"])
-            return reject("Position and density must be distinct properties on the same domain.");
+            return RejectConfigSection(subject, "Position and density must be distinct properties on the same domain.");
         result.State=EngineConfigState::Valid;result.CanonicalPayloadJson=SerializeKernelDensityConfig(Parse(data));result.ParsedFieldCount=input.size();return result;
     }
     std::optional<KernelDensityConfig> GetKernelDensityConfig(const Core::Config::EngineConfig& c)

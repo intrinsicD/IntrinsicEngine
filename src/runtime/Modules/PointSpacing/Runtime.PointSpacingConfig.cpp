@@ -44,29 +44,28 @@ namespace Extrinsic::Runtime
         std::string_view payload,std::string_view,std::string_view subject)
     {
         using namespace Core::Config;
+        using ConfigDetail::RejectConfigSection;
         EngineConfigSectionValidationResult result;
-        auto reject=[&](std::string message){result.Diagnostics.push_back({.Code=EngineConfigDiagnosticCode::InvalidValue,
-            .Subject=std::string(subject),.Message=std::move(message)});return result;};
         auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializePointSpacingConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Point spacing config must be an object.", "Unknown radii field: ",
             {"entity", "k_neighbors", "gpu_query_batch_size"}))
-            return reject(std::move(*error));
+            return RejectConfigSection(subject, std::move(*error));
         if(data["gpu_query_batch_size"]==0 || data["gpu_query_batch_size"]>16384)
-            return reject("GPU query batch size must be 1..16384.");
-        if(data["backend"]!="cpu_octree" && data["backend"]!="cpu_lbvh" && data["backend"]!="vulkan_lbvh")return reject("Unknown radii backend.");
+            return RejectConfigSection(subject, "GPU query batch size must be 1..16384.");
+        if(data["backend"]!="cpu_octree" && data["backend"]!="cpu_lbvh" && data["backend"]!="vulkan_lbvh")return RejectConfigSection(subject, "Unknown radii backend.");
         if (auto error = ConfigDetail::ValidatePointConfigNonnegativeFloats(
             data, {"scale_factor"}))
-            return reject(std::move(*error));
+            return RejectConfigSection(subject, std::move(*error));
         if(data["scale_factor"].get<double>()>0 && data["scale_factor"].get<float>()==0)
-            return reject("Positive scale factor must remain positive in float storage.");
+            return RejectConfigSection(subject, "Positive scale factor must remain positive in float storage.");
         const PointSpacingConfig defaults;
         if (auto error = ConfigDetail::ValidatePointConfigPropertyRefs(
             data, {{"positions", defaults.Positions.ValueKind}, {"radii", defaults.Radii.ValueKind}}))
-            return reject(std::move(*error));
+            return RejectConfigSection(subject, std::move(*error));
         if(data["positions"]["domain"]!=data["radii"]["domain"] ||
            data["positions"]["name"]==data["radii"]["name"])
-            return reject("Position and radii must be distinct properties on the same domain.");
+            return RejectConfigSection(subject, "Position and radii must be distinct properties on the same domain.");
         result.State=EngineConfigState::Valid;result.CanonicalPayloadJson=SerializePointSpacingConfig(Parse(data));result.ParsedFieldCount=input.size();return result;
     }
     std::optional<PointSpacingConfig> GetPointSpacingConfig(const Core::Config::EngineConfig& c)

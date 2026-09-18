@@ -68,34 +68,30 @@ namespace Extrinsic::Runtime
         std::string_view payload, std::string_view, std::string_view subject)
     {
         using namespace Core::Config;
+        using ConfigDetail::RejectConfigSection;
         EngineConfigSectionValidationResult result;
-        auto reject = [&](std::string message) {
-            result.Diagnostics.push_back({.Code=EngineConfigDiagnosticCode::InvalidValue,
-                .Subject=std::string{subject}, .Message=std::move(message)});
-            return result;
-        };
         auto doc = ConfigDetail::ParseConfigJson(payload, false);
-        if (!doc.is_object()) return reject("Mesh curvature config must be an object.");
+        if (!doc.is_object()) return RejectConfigSection(subject, "Mesh curvature config must be an object.");
         const auto defaults = Encode({});
         for (const auto& [key, value] : doc.items())
-            if (!defaults.contains(key)) return reject("Unknown curvature field: " + key);
+            if (!defaults.contains(key)) return RejectConfigSection(subject, "Unknown curvature field: " + key);
         for (const auto& [key, value] : defaults.items())
             if (!doc.contains(key)) doc[key] = value;
         if (!doc["entity"].is_number_unsigned() || doc["entity"].get<std::uint64_t>() > std::numeric_limits<std::uint32_t>::max() ||
             !doc["output"].is_number_unsigned() || doc["output"].get<std::uint64_t>() > 3 ||
             !doc["publish_directions"].is_boolean())
-            return reject("Invalid curvature entity, output mode or direction control.");
+            return RejectConfigSection(subject, "Invalid curvature entity, output mode or direction control.");
         MeshCurvatureConfig bindings;
         for (const auto& slot : slots)
         {
             const auto& ref = doc[slot.Key];
             if (!ref.is_object() || ref.size() != 3 || !ref.contains("domain") || ref["domain"] != ToString(GeometryElementDomain::MeshVertex) ||
                 !ref.contains("kind") || ref["kind"] != slot.Kind || !ref.contains("name") || !ref["name"].is_string())
-                return reject("Curvature requires typed mesh vertex bindings.");
+                return RejectConfigSection(subject, "Curvature requires typed mesh vertex bindings.");
             (bindings.*slot.Member).Name = ref["name"].get<std::string>();
         }
         if (!IsValidMeshCurvaturePropertyBindings(bindings))
-            return reject("Curvature property names must be distinct public vertex properties (v:...).");
+            return RejectConfigSection(subject, "Curvature property names must be distinct public vertex properties (v:...).");
         result.State=EngineConfigState::Valid;
         result.CanonicalPayloadJson=ConfigDetail::SerializeConfigJson(doc);
         result.ParsedFieldCount=static_cast<std::uint32_t>(doc.size());

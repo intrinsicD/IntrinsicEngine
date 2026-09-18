@@ -50,34 +50,33 @@ namespace Extrinsic::Runtime
         std::string_view payload,std::string_view,std::string_view subject)
     {
         using namespace Core::Config;
+        using ConfigDetail::RejectConfigSection;
         EngineConfigSectionValidationResult result;
-        auto reject=[&](std::string message){result.Diagnostics.push_back({.Code=EngineConfigDiagnosticCode::InvalidValue,
-            .Subject=std::string(subject),.Message=std::move(message)});return result;};
         auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializeKeypointAnalysisConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Keypoint analysis config must be an object.", "Unknown keypoint field: ",
             {"entity", "minimum_neighbors", "gpu_query_batch_size", "gpu_radius_capacity"}))
-            return reject(std::move(*error));
+            return RejectConfigSection(subject, std::move(*error));
         if(data["gpu_query_batch_size"]==0 || data["gpu_query_batch_size"]>16384 ||
            data["gpu_radius_capacity"]==0 || data["gpu_radius_capacity"]>1024)
-            return reject("GPU query batch must be 1..16384 and complete radius capacity 1..1024.");
+            return RejectConfigSection(subject, "GPU query batch must be 1..16384 and complete radius capacity 1..1024.");
         if(data["backend"]!="cpu_kdtree" && data["backend"]!="cpu_lbvh" && data["backend"]!="vulkan_lbvh" && data["backend"]!="vulkan_compute")
-            return reject("Unknown keypoint backend.");
+            return RejectConfigSection(subject, "Unknown keypoint backend.");
         for(auto key:{"salient_radius","nonmax_radius"})
             if(!data[key].is_number() || !std::isfinite(data[key].get<double>()) || data[key]<0 ||
                data[key].get<double>()>std::numeric_limits<float>::max() ||
                (data[key]>0 && data[key].get<float>()==0))
-                return reject(std::string(key)+" must be zero (automatic) or a positive representable float.");
+                return RejectConfigSection(subject, std::string(key)+" must be zero (automatic) or a positive representable float.");
         for(auto key:{"gamma21","gamma32"})
             if(!data[key].is_number() || !std::isfinite(data[key].get<double>()) || data[key]<0 || data[key]>1)
-                return reject(std::string(key)+" must be finite in [0,1].");
+                return RejectConfigSection(subject, std::string(key)+" must be finite in [0,1].");
         const KeypointAnalysisConfig defaults;
         if (auto error = ConfigDetail::ValidatePointConfigPropertyRefs(
             data, {{"positions", defaults.Positions.ValueKind}, {"mask", defaults.Mask.ValueKind}, {"score", defaults.Score.ValueKind}}))
-            return reject(std::move(*error));
+            return RejectConfigSection(subject, std::move(*error));
         if(data["positions"]["domain"]!=data["mask"]["domain"] || data["mask"]["domain"]!=data["score"]["domain"] ||
            data["positions"]["name"]==data["mask"]["name"] || data["positions"]["name"]==data["score"]["name"] || data["mask"]["name"]==data["score"]["name"])
-            return reject("Position, mask and score must be distinct properties on the same domain.");
+            return RejectConfigSection(subject, "Position, mask and score must be distinct properties on the same domain.");
         result.State=EngineConfigState::Valid;result.CanonicalPayloadJson=SerializeKeypointAnalysisConfig(Parse(data));result.ParsedFieldCount=input.size();return result;
     }
     std::optional<KeypointAnalysisConfig> GetKeypointAnalysisConfig(const Core::Config::EngineConfig& c)

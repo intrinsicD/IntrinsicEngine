@@ -41,6 +41,15 @@ namespace Extrinsic::Runtime::ConfigDetail
         return value.dump();
     }
 
+    Core::Config::EngineConfigSectionValidationResult RejectConfigSection(
+        const std::string_view subject, std::string message)
+    {
+        Core::Config::EngineConfigSectionValidationResult result;
+        result.Diagnostics.push_back({.Code = Core::Config::EngineConfigDiagnosticCode::InvalidValue,
+            .Subject = std::string(subject), .Message = std::move(message)});
+        return result;
+    }
+
     [[nodiscard]] std::optional<std::string> FindValidatedCanonicalPayload(
         const Core::Config::EngineConfig& config,
         const std::string_view name,

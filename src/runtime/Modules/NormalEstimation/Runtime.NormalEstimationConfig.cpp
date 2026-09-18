@@ -102,54 +102,49 @@ namespace Extrinsic::Runtime
         std::string_view payload, std::string_view, std::string_view subject)
     {
         using namespace Core::Config;
+        using ConfigDetail::RejectConfigSection;
         EngineConfigSectionValidationResult result;
-        auto reject = [&](std::string message) {
-            result.Diagnostics.push_back({.Code = EngineConfigDiagnosticCode::InvalidValue,
-                                          .Subject = std::string(subject),
-                                          .Message = std::move(message)});
-            return result;
-        };
         auto input = ConfigDetail::ParseConfigJson(payload, false),
              d = ConfigDetail::ParseConfigJson(SerializeNormalEstimationConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, d, "Normal estimation config must be an object.", "Unknown normal field: ",
             {"entity", "k_neighbors", "minimum_neighbors",
              "orientation", "weighting", "gpu_query_batch_size"}))
-            return reject(std::move(*error));
+            return RejectConfigSection(subject, std::move(*error));
         if (d["k_neighbors"] == 0 || d["minimum_neighbors"] == 0 || d["orientation"] > 1 ||
             d["weighting"] > 4)
-            return reject("Positive neighborhood sizes, orientation 0..1 and weighting 0..4 are required.");
+            return RejectConfigSection(subject, "Positive neighborhood sizes, orientation 0..1 and weighting 0..4 are required.");
         if (d["method"] != "point_set_pca" && d["method"] != "mesh_face_weighted" &&
             d["method"] != "graph_neighborhood" && d["method"] != "mesh_face_normals")
-            return reject("Unknown normal method.");
+            return RejectConfigSection(subject, "Unknown normal method.");
         if (d["backend"] != "cpu_kdtree" && d["backend"] != "cpu_lbvh" && d["backend"] != "vulkan_lbvh")
-            return reject("Normal backend must be cpu_kdtree, cpu_lbvh or vulkan_lbvh.");
+            return RejectConfigSection(subject, "Normal backend must be cpu_kdtree, cpu_lbvh or vulkan_lbvh.");
         if (d["gpu_query_batch_size"] == 0 || d["gpu_query_batch_size"] > 16384)
-            return reject("GPU query batch size must be in 1..16384.");
+            return RejectConfigSection(subject, "GPU query batch size must be in 1..16384.");
         if (!d["use_radius"].is_boolean() || !d["orient_toward_fallback"].is_boolean())
-            return reject("Normal toggles must be boolean.");
+            return RejectConfigSection(subject, "Normal toggles must be boolean.");
         for (auto key : {"radius", "degenerate_epsilon", "collinear_epsilon"})
             if (!d[key].is_number() || !std::isfinite(d[key].get<double>()))
-                return reject(std::string(key) + " must be finite.");
+                return RejectConfigSection(subject, std::string(key) + " must be finite.");
         if (d["radius"].get<double>() < 0 || d["radius"].get<double>() > std::numeric_limits<float>::max() ||
             (d["use_radius"].get<bool>() && d["radius"] <= 0) || d["degenerate_epsilon"] <= 0 ||
             d["collinear_epsilon"] <= 0)
-            return reject("Normal radii and numerical epsilons are outside their supported range.");
+            return RejectConfigSection(subject, "Normal radii and numerical epsilons are outside their supported range.");
         auto &fallback = d["fallback_normal"];
         if (!fallback.is_array() || fallback.size() != 3)
-            return reject("Fallback normal must have three finite float coordinates.");
+            return RejectConfigSection(subject, "Fallback normal must have three finite float coordinates.");
         for (auto &x : fallback)
             if (!x.is_number() || !std::isfinite(x.get<double>()) ||
                 std::abs(x.get<double>()) > std::numeric_limits<float>::max())
-                return reject("Fallback normal coordinates must be finite floats.");
+                return RejectConfigSection(subject, "Fallback normal coordinates must be finite floats.");
         for (auto key : {"positions", "output"})
         {
             const auto validation = ConfigDetail::ValidatePointPropertyRef(
                 d[key], Geometry::PropertyValueKind::Vec3);
             if (validation == ConfigDetail::PointPropertyValidation::InvalidReference)
-                return reject(std::string(key) + " requires domain, nonempty name and kind=vec3.");
+                return RejectConfigSection(subject, std::string(key) + " requires domain, nonempty name and kind=vec3.");
             if (validation == ConfigDetail::PointPropertyValidation::UnknownDomain)
-                return reject(std::string(key) + " has an unknown element domain.");
+                return RejectConfigSection(subject, std::string(key) + " has an unknown element domain.");
         }
         if (d["method"] == "mesh_face_normals")
         {
@@ -159,12 +154,12 @@ namespace Extrinsic::Runtime
                     ? GeometryElementDomain::MeshVertex : GeometryElementDomain::MeshFace;
                 if (d[key]["domain"] != ToString(expected) &&
                     d[key]["domain"] != ToString(GeometryElementDomain::Unknown))
-                    return reject("Face normals require mesh vertex positions and a mesh face output.");
+                    return RejectConfigSection(subject, "Face normals require mesh vertex positions and a mesh face output.");
             }
         }
         else if (d["positions"]["domain"] != d["output"]["domain"] ||
                  d["positions"]["name"] == d["output"]["name"])
-            return reject("Normals must use a distinct output property on the input domain.");
+            return RejectConfigSection(subject, "Normals must use a distinct output property on the input domain.");
         result.State = EngineConfigState::Valid;
         result.CanonicalPayloadJson = SerializeNormalEstimationConfig(Parse(d));
         result.ParsedFieldCount = input.size();

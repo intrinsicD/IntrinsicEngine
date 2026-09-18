@@ -59,38 +59,37 @@ namespace Extrinsic::Runtime
         std::string_view payload,std::string_view,std::string_view subject)
     {
         using namespace Core::Config;
+        using ConfigDetail::RejectConfigSection;
         EngineConfigSectionValidationResult result;
-        auto reject=[&](std::string message){result.Diagnostics.push_back({.Code=EngineConfigDiagnosticCode::InvalidValue,
-            .Subject=std::string(subject),.Message=std::move(message)});return result;};
         auto input=ConfigDetail::ParseConfigJson(payload, false),data=ConfigDetail::ParseConfigJson(SerializeDescriptorAnalysisConfig({}), true);
         if (auto error = ConfigDetail::ValidatePointConfigFields(
             input, data, "Descriptor analysis config must be an object.", "Unknown descriptor field: ",
             {"entity", "max_neighbors", "gpu_query_batch_size", "gpu_radius_capacity"}))
-            return reject(std::move(*error));
+            return RejectConfigSection(subject, std::move(*error));
         if(data["gpu_query_batch_size"]==0 || data["gpu_query_batch_size"]>16384 ||
            data["gpu_radius_capacity"]==0 || data["gpu_radius_capacity"]>1024)
-            return reject("GPU query batch must be 1..16384 and complete radius capacity 1..1024.");
+            return RejectConfigSection(subject, "GPU query batch must be 1..16384 and complete radius capacity 1..1024.");
         if(data["backend"]!="cpu_kdtree" && data["backend"]!="cpu_lbvh" && data["backend"]!="vulkan_lbvh")
-            return reject("Unknown descriptor backend.");
+            return RejectConfigSection(subject, "Unknown descriptor backend.");
         for(auto key:{"feature_radius"})
             if(!data[key].is_number() || !std::isfinite(data[key].get<double>()) || data[key]<0 ||
                data[key].get<double>()>std::numeric_limits<float>::max() ||
                (data[key]>0 && data[key].get<float>()==0))
-                return reject(std::string(key)+" must be zero (automatic) or a positive representable float.");
+                return RejectConfigSection(subject, std::string(key)+" must be zero (automatic) or a positive representable float.");
         using ConfigDetail::PointPropertyValidation;
         if(ConfigDetail::ValidatePointPropertyRef(data["positions"],Geometry::PropertyValueKind::Vec3) != PointPropertyValidation::Valid ||
            ConfigDetail::ValidatePointPropertyRef(data["normals"],Geometry::PropertyValueKind::Vec3) != PointPropertyValidation::Valid ||
            data["positions"]["domain"]!=data["normals"]["domain"])
-            return reject("Positions and normals need canonical vec3 references on the same domain.");
-        if(!data["outputs"].is_array() || data["outputs"].size()!=33)return reject("FPFH requires exactly 33 float output references.");
+            return RejectConfigSection(subject, "Positions and normals need canonical vec3 references on the same domain.");
+        if(!data["outputs"].is_array() || data["outputs"].size()!=33)return RejectConfigSection(subject, "FPFH requires exactly 33 float output references.");
         for(unsigned i=0;i<33;++i)
         {
             const auto& ref=data["outputs"][i];
             if(ConfigDetail::ValidatePointPropertyRef(ref,Geometry::PropertyValueKind::Float) != PointPropertyValidation::Valid || ref["domain"]!=data["positions"]["domain"] ||
                ref["name"]==data["positions"]["name"] || ref["name"]==data["normals"]["name"])
-                return reject("Descriptor outputs must be float properties on the input domain, distinct from inputs.");
+                return RejectConfigSection(subject, "Descriptor outputs must be float properties on the input domain, distinct from inputs.");
             for(unsigned j=0;j<i;++j)if(ref["name"]==data["outputs"][j]["name"])
-                return reject("Descriptor output names must be unique.");
+                return RejectConfigSection(subject, "Descriptor output names must be unique.");
         }
         result.State=EngineConfigState::Valid;result.CanonicalPayloadJson=SerializeDescriptorAnalysisConfig(Parse(data));result.ParsedFieldCount=input.size();return result;
     }

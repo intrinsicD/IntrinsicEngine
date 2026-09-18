@@ -10,6 +10,9 @@ extern "C++"
             std::string_view payload, bool allowExceptions);
         [[nodiscard]] std::string SerializeConfigJson(const nlohmann::json& value);
 
+        [[nodiscard]] Core::Config::EngineConfigSectionValidationResult RejectConfigSection(
+            std::string_view subject, std::string message);
+
         using SectionValidatorFn = Core::Config::EngineConfigSectionValidationResult (*)(
             std::string_view, std::string_view, std::string_view);
 
