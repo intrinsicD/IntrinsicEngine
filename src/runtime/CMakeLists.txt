@@ -227,6 +227,7 @@ target_sources(${target_name}
         Config/Runtime.EngineConfigControl.cpp
         Kernel/Runtime.InputActions.cpp
         Kernel/Runtime.KernelEvents.cpp
+        Kernel/Runtime.Module.cpp
         Kernel/Runtime.ServiceRegistry.cpp
         Kernel/Runtime.WorldRegistry.cpp
         GeometryIntegration/Runtime.GeometryProperty.Types.cpp

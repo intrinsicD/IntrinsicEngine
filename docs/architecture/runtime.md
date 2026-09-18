@@ -87,6 +87,11 @@ values and from
 `RuntimeFrameHookContext`: it exists only at the stable post-`UiEndCapture`,
 post-render-input-initialization, pre-gizmo insertion point.
 
+`EngineSetup` construction and non-template hook registration compile in
+`Kernel/Runtime.Module.cpp`. The interface retains its records, small accessors
+and typed command/event templates, so registration-body edits do not change the
+module interface. The class and its out-of-line definitions share C++ linkage.
+
 The `RUNTIME-185` production audit found ten implementors: nine runtime-owned
 responsibilities plus the Sandbox-local optional frame-pacing capture module.
 They register exactly seven generic frame hooks (Editor UI: three, texture

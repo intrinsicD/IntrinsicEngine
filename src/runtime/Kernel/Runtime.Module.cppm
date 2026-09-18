@@ -132,20 +132,7 @@ namespace Extrinsic::Runtime
                         renderRecipeActivation = {},
                     ViewportInputHookRegistrar
                         viewportInputHookRegistrar = {},
-                    const bool* initializedState = nullptr)
-            : m_Commands(commands)
-            , m_Events(events)
-            , m_Jobs(jobs)
-            , m_Worlds(worlds)
-            , m_Services(services)
-            , m_FrameHookRegistrar(std::move(frameHookRegistrar))
-            , m_RenderRecipeActivation(
-                  std::move(renderRecipeActivation))
-            , m_ViewportInputHookRegistrar(
-                  std::move(viewportInputHookRegistrar))
-            , m_InitializedState(initializedState)
-        {
-        }
+                    const bool* initializedState = nullptr);
 
         [[nodiscard]] CommandBus& Commands() noexcept { return m_Commands; }
         [[nodiscard]] KernelEventBus& Events() noexcept { return m_Events; }
@@ -178,26 +165,10 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] Core::Result RegisterFrameHook(
             FramePhase phase,
-            RuntimeFrameHook hook)
-        {
-            if (!hook)
-                return Core::Err(Core::ErrorCode::InvalidArgument);
-            if (!m_FrameHookRegistrar)
-                return Core::Err(Core::ErrorCode::InvalidState);
-            m_FrameHookRegistrar(phase, std::move(hook));
-            return Core::Ok();
-        }
+            RuntimeFrameHook hook);
 
         [[nodiscard]] Core::Result RegisterViewportInputHook(
-            RuntimeViewportInputHook hook)
-        {
-            if (!hook)
-                return Core::Err(Core::ErrorCode::InvalidArgument);
-            if (!m_ViewportInputHookRegistrar)
-                return Core::Err(Core::ErrorCode::InvalidState);
-            m_ViewportInputHookRegistrar(std::move(hook));
-            return Core::Ok();
-        }
+            RuntimeViewportInputHook hook);
 
     private:
         CommandBus& m_Commands;

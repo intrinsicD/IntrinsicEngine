@@ -4051,3 +4051,55 @@ and session brief pass; source-doc audit has zero objective errors. No public
 module/inventory change. Architecture review retains runtime validation and
 lifetimes; workshop rows 1–3/8 pass, 4–7 n/a. No GPU/sanitizer-suite execution.
 Packets, hashes, comparisons and logs: `/tmp/intrinsic-scalar-controls/`.
+
+## Continuation — local position chooser and compiled setup (2026-09-18)
+
+Operator directs continued duplication/compile-locality cleanup with Claude
+Fable 5.1 from `5a321e24e`. UI-037's broad readiness inventory remains open.
+K-Means and Progressive Poisson now share `DrawPointSetPositionInput` locally
+in `Sandbox.MethodPanels.cpp`. The existing catalog filter, labels, widget IDs
+and within-frame selected-row tracking are preserved; each caller still owns
+its output-domain changes. Consolidation stays separate because it uses row
+identity and default focus. A shared public header or policy-flagged selector
+would add unnecessary scope. The two loops become one, with nine net added
+source lines for the function boundary and borrowed-result handling.
+
+The independent runtime slice moves `EngineSetup` construction and its two
+non-template hook-registration bodies from `Runtime.Module.cppm` into the
+matching private implementation unit. Keep C++ linkage, template definitions,
+small accessors, field layout, callback moves and error precedence unchanged.
+The extra source file is justified by compile locality; there is no new module,
+state owner, wrapper or layer dependency. Including CMake registration, this
+slice adds 29 physical lines while removing 29 interface lines. Neither source
+count nor code motion establishes an elapsed build-time improvement.
+
+Claude's fixed-packet Fable 5.1 review found no blocking defect. Existing real
+ImGui K-Means/Poisson retry tests cover the unchanged selector IDs and binding
+paths; `EngineSetup.RetainsOnlyRegistrationPhaseFrameAndViewportRegistrars`
+covers invalid-hook priority, unavailable registrars and successful callbacks.
+Verification results follow after the canonical focused and full CPU gates.
+Review packets and logs: `/tmp/intrinsic-reuse-round2/`.
+
+Final verification: canonical ci/Clang23 focused targets and `IntrinsicTests`
+build; 104 focused cases pass. Full exclusion-only CPU gate: 4,760 selected,
+4,759 passed, one expected ASan-only GLFW lifecycle skip, zero failures
+(151.84 s). The final implementation-only header edit rebuilt only
+`Runtime.Module.cpp.o` before relinking the focused executables. Symbol output
+confirms the constructor and registration bodies in that object. Final source
+hashes remained fixed through all verification. No GPU execution, sanitizer
+suite or elapsed compilation-speed claim.
+
+Scope/layer/tests/docs review passes. Layering has zero violations/allowlist
+entries; test layout, task policy/state/validation, doc links/sync, root hygiene,
+skill mirrors and session brief pass. Source-doc audit has zero findings in the
+touched interface; module inventory regenerates unchanged (429 modules).
+Architecture/workshop rows 1–3 and 8 pass; rows 4–7 are not applicable. No
+ownership, config-lane, renderer recipe or lifetime contract changes.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicSandboxEditorIntegrationTests IntrinsicRuntimeContractTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^(EngineSetup|RuntimeModule|SandboxProcessingPanels|SandboxPointCloudConsolidationPanel|SandboxCurvatureSegmentationPanel|SandboxDescriptorAnalysisPanel|EditorCompilationLocality|ProcessingCompilationLocality|KernelCompilationLocality)\.|^SandboxEditorUi\.ActionReadinessDerivesDomainPrerequisiteReasons$|^SandboxEditorPresentation\.DisabledActionReasonTooltipAppearsAfterTwoFrames$' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 120
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+```
