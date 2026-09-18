@@ -17,7 +17,6 @@ namespace Intrinsic::Tests
             .World = World,
             .Selection = Selection,
             .CommandHistory = CommandHistory,
-            .AssetService = AssetService,
             .LastRefinedPrimitive = LastRefinedPrimitive,
             .LastRefinedPrimitiveGeneration = LastRefinedPrimitiveGeneration,
             .CameraControllers = CameraControllers,

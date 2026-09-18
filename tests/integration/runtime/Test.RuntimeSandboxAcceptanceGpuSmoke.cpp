@@ -6669,7 +6669,6 @@ private:
             .Scene = m_Scene,
             .World = m_World,
             .CommandHistory = m_History,
-            .AssetService = m_Assets,
             .Device = m_Device,
             .TextureBake = m_TextureBake,
         };

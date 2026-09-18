@@ -3585,3 +3585,37 @@ Sources/tests stayed frozen during the final gates; hashes, compiler metadata,
 exact prompts/diffs, commands and logs are in `/tmp/intrinsic-readiness-reuse/`.
 UI-037's broader readiness acceptance remains open. Start the next slice in a
 fresh session instead of repeating either completed cleanup.
+
+
+## Unused editor asset-service wiring — 2026-09-18
+
+Operator-directed reuse and compilation cleanup from `04d9b86bb`, with Codex as
+sole writer and Claude Sonnet as bounded read-only reviewer. Source search found
+that `EditorSceneEditingContext`, private `EditorFeatureBindings` and the shared
+test context only forwarded `AssetService*`; no editor operation consumed it.
+Imports already execute through asset-workflow command callbacks, and texture
+baking uses the attached service. Remove the dead fields, adapter copies, service
+lookup, redundant imports and fixture assignments; retain actual service users.
+This uses the existing owners without a replacement wrapper or linkage change.
+The existing source-documentation and editor compilation contracts apply.
+
+Verify with canonical ci/Clang 23 focused editor/runtime builds, the scene/import,
+bake and readiness contracts, and the compiler-metadata boundary guard. The final
+combined cleanup checkpoint also owes the full `IntrinsicTests` build/CPU gate
+and task Verification commands above. Dependency counts establish reachability,
+not elapsed compilation speed. Broader UI-037 acceptance remains open.
+
+The focused build passes; 79 selected scene/import, texture-bake, lifecycle,
+readiness and editor-locality cases pass. Clang/CMake metadata shows all 35
+inspected affected producers no longer reach `Asset.Service`: most drop six
+transitive modules, four drop five. The scene interface is 54 -> 48, workspace
+interface 87 -> 81, and shared test support 94 -> 88. The new production guard
+covers eight producers; the existing test-context guard covers another 17.
+Four production files shrink 6,088 -> 6,079 lines (-9); test setup/imports remove
+12 lines, and dependency guards add 15 net lines. No runtime-speed claim.
+Claude reviewed the fixed production/test diff with no findings. Layering, test
+layout, task policy, inventory and session-brief checks pass. Source-doc audit
+reports zero errors and five pre-existing contract-comment review prompts;
+inspection retains the lifetime/linkage/test-seam comments. Final full CPU and
+combined diff review follow the dependency-record slice. Evidence is under
+`/tmp/intrinsic-editor-reuse-next/`.

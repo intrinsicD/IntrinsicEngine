@@ -18,7 +18,6 @@ export module Extrinsic.Runtime.SceneEditingOperations;
 
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.Registry;
-import Extrinsic.Asset.Service;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
@@ -369,7 +368,6 @@ export namespace Extrinsic::Runtime
             WorldHandle World{DefaultWorldHandle};
             SelectionController* Selection{nullptr};
             EditorCommandHistory* CommandHistory{nullptr};
-            Assets::AssetService* AssetService{nullptr};
             const std::optional<PrimitiveSelectionResult>* LastRefinedPrimitive{nullptr};
             std::uint64_t LastRefinedPrimitiveGeneration{0u};
             CameraControllerRegistry* CameraControllers{nullptr};

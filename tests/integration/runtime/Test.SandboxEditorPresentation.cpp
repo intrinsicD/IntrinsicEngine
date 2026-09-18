@@ -65,7 +65,6 @@ import Extrinsic.Sandbox.Editor.MethodPanels;
 import Extrinsic.Sandbox.Editor.Shell;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.Registry;
-import Extrinsic.Asset.Service;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Scene.Handle;

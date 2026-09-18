@@ -32,7 +32,6 @@
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
-import Extrinsic.Asset.Service;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
@@ -5602,7 +5601,6 @@ TEST(SandboxEditorUi, TextureBakeControlsReportUvSourcesAndRequireRuntimeModule)
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
     Runtime::EditorCommandHistory history;
-    Assets::AssetService assets;
     Tests::MockDevice device;
     device.Operational = true;
 
@@ -5621,7 +5619,6 @@ TEST(SandboxEditorUi, TextureBakeControlsReportUvSourcesAndRequireRuntimeModule)
     Intrinsic::Tests::EditorFeatureTestContext context =
         MakeContext(registry, selection, true, nullptr, &device);
     context.CommandHistory = &history;
-    context.AssetService = &assets;
     Runtime::TextureBakeService textureBake{};
     context.TextureBake = &textureBake;
 
@@ -5877,7 +5874,6 @@ TEST(SandboxEditorUi, TextureBakeRequiresOperationalGpuBackend)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
-    Assets::AssetService assets;
     Tests::MockDevice device;
     device.Operational = false;
 
@@ -5895,7 +5891,6 @@ TEST(SandboxEditorUi, TextureBakeRequiresOperationalGpuBackend)
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
     Intrinsic::Tests::EditorFeatureTestContext context =
         MakeContext(registry, selection, true, nullptr, &device);
-    context.AssetService = &assets;
     Runtime::TextureBakeService textureBake{};
     context.TextureBake = &textureBake;
 

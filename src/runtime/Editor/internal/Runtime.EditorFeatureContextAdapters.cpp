@@ -52,7 +52,6 @@ import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.TextureBakeModule;
-import Extrinsic.Asset.Service;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Scene.Handle;
@@ -1179,7 +1178,6 @@ MakeEditorSceneEditingContext(const EditorFeatureBindings &bindings) {
       .World = bindings.World,
       .Selection = bindings.Selection,
       .CommandHistory = bindings.CommandHistory,
-      .AssetService = bindings.AssetService,
       .LastRefinedPrimitive = bindings.LastRefinedPrimitive,
       .LastRefinedPrimitiveGeneration = bindings.LastRefinedPrimitiveGeneration,
       .CameraControllers = bindings.CameraControllers,
@@ -1319,7 +1317,6 @@ ToEditorFeatureBindingsImpl(const EditorWorkspaceSnapshotContext &context) {
       .World = scene.World,
       .Selection = scene.Selection,
       .CommandHistory = scene.CommandHistory,
-      .AssetService = scene.AssetService,
       .LastRefinedPrimitive = scene.LastRefinedPrimitive,
       .LastRefinedPrimitiveGeneration = scene.LastRefinedPrimitiveGeneration,
       .CameraControllers = scene.CameraControllers,
@@ -1772,7 +1769,6 @@ namespace
             SceneDocumentModule* const sceneDocuments  = services.Find<SceneDocumentModule>();
             SceneInteractionModule* const interaction  = services.Find<SceneInteractionModule>();
             SelectionController* const selection       = services.Find<SelectionController>();
-            Assets::AssetService* const assetService   = services.Find<Assets::AssetService>();
             AssetWorkflowModule* const assetWorkflow = services.Find<AssetWorkflowModule>();
             TextureBakeService* const textureBake          = services.Find<TextureBakeService>();
             EditorFeatureBindings context{
@@ -1780,7 +1776,6 @@ namespace
                 .World          = activeWorld,
                 .Selection      = selection,
                 .CommandHistory = commandHistory,
-                .AssetService   = assetService,
                 .LastRefinedPrimitive =
                     interaction != nullptr ? &interaction->LastRefinedPrimitive() : nullptr,
                 .LastRefinedPrimitiveGeneration =

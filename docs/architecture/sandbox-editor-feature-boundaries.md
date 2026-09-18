@@ -15,6 +15,11 @@ all-panel module interface. Standard/GLM includes stay in each unit's global
 module fragment. The shell and panel registration interfaces do not include
 these complete views.
 
+Scene editing contexts carry asset-import command callbacks. The asset-workflow
+owner resolves live asset services; editor contexts and snapshot bindings do not
+carry an unused service pointer. `EditorCompilationLocality.AssetService` guards
+the scene/workspace interfaces and shared test producers against that dependency.
+
 Editor job lists and the optional UV-regeneration job own copies of the canonical
 `EditorJobRecord` and its `EditorJobDependency` values from
 `Runtime.EditorJobProjection.cppm`. Runtime and app consumers share these records;

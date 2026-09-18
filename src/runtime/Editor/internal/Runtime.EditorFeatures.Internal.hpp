@@ -31,7 +31,6 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         WorldHandle World{DefaultWorldHandle};
         SelectionController* Selection{nullptr};
         EditorCommandHistory* CommandHistory{nullptr};
-        Assets::AssetService* AssetService{nullptr};
         const std::optional<PrimitiveSelectionResult>* LastRefinedPrimitive{nullptr};
         std::uint64_t LastRefinedPrimitiveGeneration{0u};
         CameraControllerRegistry* CameraControllers{nullptr};

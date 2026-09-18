@@ -9,7 +9,8 @@ in `EditorFeatureTestContext.cpp`; `EditorFeatureTestSupportObjs` links them int
 the runtime contract, editor integration, runtime graphics and Sandbox GPU-smoke
 test executables. The context imports `Graphics.RenderDiagnostics` for copied
 frame statistics; renderer execution consumers import `Graphics.Renderer`
-themselves.
+themselves. Asset import uses command callbacks; the context does not borrow the
+live asset service. Tests that use that service import its module directly.
 
 `GraphicsTestSupport.hpp` shares command-pass inspection
 and exact format conversion for graphics readback tests; `MockRHI.hpp` owns

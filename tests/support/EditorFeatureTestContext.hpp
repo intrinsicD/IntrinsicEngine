@@ -10,7 +10,6 @@
 #include <string>
 
 import Extrinsic.Asset.ImportRouter;
-import Extrinsic.Asset.Service;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Scene.Registry;
@@ -56,7 +55,6 @@ namespace Intrinsic::Tests
         Runtime::WorldHandle World{Runtime::DefaultWorldHandle};
         Runtime::SelectionController* Selection{nullptr};
         Runtime::EditorCommandHistory* CommandHistory{nullptr};
-        Assets::AssetService* AssetService{nullptr};
         const std::optional<Runtime::PrimitiveSelectionResult>* LastRefinedPrimitive{nullptr};
         std::uint64_t LastRefinedPrimitiveGeneration{0u};
         Runtime::CameraControllerRegistry* CameraControllers{nullptr};

@@ -74,7 +74,6 @@ import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.Graph;
 import Geometry.Properties;
-import Extrinsic.Asset.Service;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.TextureBakeModule;

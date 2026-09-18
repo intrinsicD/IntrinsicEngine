@@ -785,8 +785,23 @@ intrinsic_add_module_boundary_test(EditorCompilationLocality.TestContext
         --check-source tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
         --check-source tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
         --check-source tests/integration/runtime/Test.SandboxEditorPresentation.cpp
-        --forbid-module Extrinsic.Graphics.Renderer)
+        --forbid-module Extrinsic.Graphics.Renderer
+        --forbid-module Extrinsic.Asset.Service)
 set_tests_properties(EditorCompilationLocality.TestContext
+    PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
+
+# Scene import commands route through the asset workflow; contexts do not borrow its service.
+intrinsic_add_module_boundary_test(EditorCompilationLocality.AssetService
+        --check-source src/runtime/Editor/Operations/Runtime.SceneEditingOperations.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Public.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Debug.cpp
+        --check-source src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm
+        --check-source src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+        --check-source src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp
+        --check-source src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+        --forbid-module Extrinsic.Asset.Service)
+set_tests_properties(EditorCompilationLocality.AssetService
     PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
 
 # Scene contexts borrow the canonical registry; EnTT storage belongs to concrete users.
