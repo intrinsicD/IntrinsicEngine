@@ -2033,6 +2033,12 @@ if(TARGET ExtrinsicRuntime
     )
 endif()
 
+# RHI test doubles are compiled once and linked only into their consumers.
+intrinsic_test_object_lib(MockRhiTestSupportObjs
+    SOURCES support/MockRHI.cpp
+    DEPS ExtrinsicRHI ExtrinsicCore
+)
+
 # Shared support for all test executables (sanitizer defaults, shared test hooks).
 intrinsic_test_object_lib(TestSupportObjs
     SOURCES
@@ -2054,7 +2060,7 @@ endif()
 
 if(TARGET GraphicsIntegrationCpuTestObjs)
     intrinsic_test_executable(IntrinsicGraphicsIntegrationCpuTests
-        OBJECTS GraphicsIntegrationCpuTestObjs
+        OBJECTS GraphicsIntegrationCpuTestObjs MockRhiTestSupportObjs
         LINK_LIBS ExtrinsicGraphics ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform
         LABELS integration graphics
     )
@@ -2092,7 +2098,7 @@ endif()
 
 if(TARGET RuntimeContractTestObjs)
     intrinsic_test_executable(IntrinsicRuntimeContractTests
-        OBJECTS RuntimeContractTestObjs EditorFeatureTestSupportObjs
+        OBJECTS RuntimeContractTestObjs EditorFeatureTestSupportObjs MockRhiTestSupportObjs
         LINK_LIBS ExtrinsicRuntime IntrinsicProgressivePoissonReference
         LABELS contract runtime
     )
@@ -2440,20 +2446,20 @@ if(TARGET ExtrinsicSandbox
 endif()
 
 intrinsic_test_executable(IntrinsicGraphicsUnitTests
-    OBJECTS GraphicsUnitTestObjs
+    OBJECTS GraphicsUnitTestObjs MockRhiTestSupportObjs
     LINK_LIBS ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform
     LABELS unit graphics
 )
 
 # CPU-only graphics tests — runs in the default CPU gate.
 intrinsic_test_executable(IntrinsicGraphicsAssetsUnitTests
-    OBJECTS GraphicsAssetsUnitTestObjs
+    OBJECTS GraphicsAssetsUnitTestObjs MockRhiTestSupportObjs
     LINK_LIBS ExtrinsicCore ExtrinsicAssets ExtrinsicRHI ExtrinsicPlatform ExtrinsicGraphicsAssets
     LABELS unit graphics
 )
 
 intrinsic_test_executable(IntrinsicGraphicsRhiCpuUnitTests
-    OBJECTS GraphicsRhiCpuUnitTestObjs
+    OBJECTS GraphicsRhiCpuUnitTestObjs MockRhiTestSupportObjs
     LINK_LIBS ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform
     LABELS unit graphics
 )
@@ -2475,12 +2481,12 @@ endif()
 unset(_intrinsic_pure_ctest_registration)
 
 intrinsic_test_executable(IntrinsicGraphicsRendererCpuUnitTests
-    OBJECTS GraphicsRendererCpuUnitTestObjs
+    OBJECTS GraphicsRendererCpuUnitTestObjs MockRhiTestSupportObjs
     LINK_LIBS ExtrinsicGraphics ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform
     LABELS unit graphics
 )
 intrinsic_test_executable(IntrinsicGraphicsContractTests
-    OBJECTS GraphicsContractTestObjs
+    OBJECTS GraphicsContractTestObjs MockRhiTestSupportObjs
     LINK_LIBS ExtrinsicGraphics ExtrinsicRHI ExtrinsicECS ExtrinsicCore ExtrinsicPlatform
     LABELS contract graphics
 )
@@ -2494,13 +2500,13 @@ if(TARGET GraphicsVulkanContractTestObjs)
 endif()
 
 intrinsic_test_executable(IntrinsicGraphicsContractCpuTests
-    OBJECTS GraphicsContractCpuTestObjs
+    OBJECTS GraphicsContractCpuTestObjs MockRhiTestSupportObjs
     LINK_LIBS ExtrinsicGraphics ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform
     LABELS contract graphics
 )
 
 intrinsic_test_executable(IntrinsicRuntimeGraphicsCpuTests
-    OBJECTS RuntimeGraphicsCpuTestObjs EditorFeatureTestSupportObjs
+    OBJECTS RuntimeGraphicsCpuTestObjs EditorFeatureTestSupportObjs MockRhiTestSupportObjs
     LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicRHI ExtrinsicECS ExtrinsicCore ExtrinsicPlatform
     LABELS integration runtime graphics
 )

@@ -2897,3 +2897,65 @@ UI-037 acceptance checkbox is closed by this test-only compilation change.
 python3 tests/regression/tooling/Test.TestGateRouting.py --self-test
 python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicTests
 ```
+
+## Compiled RHI mock support — verified, 2026-09-18
+
+The operator explicitly continued duplication and compilation-locality work with
+Claude. This companion test-support slice follows the compiled editor context;
+UI-037's action inventory and operational acceptance remain open. The standing
+Framework24 focus is unchanged. Catalog review adds no contract ID: the existing
+`repo.source-documentation` declaration covers this header/documentation change;
+no production geometry, runtime, config or backend contract changes.
+
+Reuse discovery found one existing mock owner, `tests/support/MockRHI.hpp`,
+with 53 direct source consumers across nine executable targets. No support
+header, named module, or additional conditional source includes it. The new
+`MockRHI.cpp` compiles 56 existing method bodies through the existing
+`intrinsic_test_object_lib` helper, with `ExtrinsicRHI` and `ExtrinsicCore`
+dependencies. Each of the nine executables explicitly links
+`MockRhiTestSupportObjs`; core-only `TestSupportObjs` stays independent of RHI.
+No generic helper, wrapper, alternate mock implementation or production surface
+is introduced. Special members, layout, includes/imports, default arguments,
+constant evaluation, small accessors and no-op methods remain unchanged.
+
+Claude reviewed the plan and fixed diff read-only. Its conditional-consumer
+check is satisfied by the repository-wide include audit. Its routing concern
+revealed an imprecise README sentence, now corrected: support sources do not
+register test cases, and touched-scope planning conservatively selects the broad
+route. A trailing-space finding is fixed. Removed historical comments are
+replaced by the non-obvious payload indexing, failure-control and buffer-read
+contracts; picking-specific byte layout remains the consumer's responsibility.
+
+All 56 moved bodies match after whitespace/comment normalization; reinserting
+them reconstructs the original header tokens. Compiler metadata contains one
+support compilation, and symbol inspection finds the 56 definitions and four
+vtables in that object and none in the 53 consumer objects. The header changes
+from 1,179 to 575 lines; the complete header/source/CMake set grows from 3,893
+to 4,005 lines. Added declarations/build wiring buy compilation locality;
+this is not source-line reduction or a measured elapsed build-speed claim.
+Logs, body comparisons, consumer mapping and reviews: `/tmp/intrinsic-mock-rhi/`.
+
+Verification uses canonical ci with Clang 23. The aggregate builds and all nine
+consumer executables link. Before and after the move, the default CPU gate
+selects 4,743 tests: 4,742 pass, one expected ASan-only GLFW lifecycle skip,
+zero failures (149.50 seconds before, 150.31 after; these are test execution
+observations, not compilation measurements). The final whitespace correction
+also rebuilds and relinks all nine consumers successfully. No GPU execution,
+full sanitizer-suite run or elapsed compilation comparison was performed.
+Routing passes 19 synthetic checks and live reconciliation (41 targets,
+4,750 cases, 363 test sources). Strict layering, test layout, task policy/state,
+docs sync, links, root hygiene, skill mirrors and session-brief checks pass.
+The touched source-documentation audit has zero errors and zero review findings.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+python3 tests/regression/tooling/Test.TestGateRouting.py --self-test
+python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicTests
+python3 tools/ci/touched_scope.py --root . --changed-file tests/support/MockRHI.cpp --preset ci --preset-build-dir build/ci --build-dir build/ci --print
+```
+
+After the whitespace-only correction, all 1,906 focused cases pass (1,903
+consumer-executable cases plus three cases sharing those suites, 51.42 seconds).
+The pattern is retained in `/tmp/intrinsic-mock-rhi/focused-pattern.txt`.

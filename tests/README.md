@@ -534,6 +534,13 @@ Shared support fixtures live under `support/`. Reusable GPU helpers should stay
 engine-free where possible and keep backend-specific setup local to the owning
 `gpu;vulkan` fixture or executable.
 
+[`support/MockRHI.hpp`](support/MockRHI.hpp) exposes the shared RHI test doubles;
+their non-trivial behavior compiles in [`support/MockRHI.cpp`](support/MockRHI.cpp).
+Executables consuming these doubles include `MockRhiTestSupportObjs` in their
+`intrinsic_test_executable` `OBJECTS` list. Changes to shared support use the
+broad touched-scope verification route. Core-only test support remains
+independent of RHI.
+
 `regression/tooling/Test.ClangToolchainSelection.py` checks automatic compiler
 selection through directory aliases while preserving the C++ driver name. It
 runs in the structural CI workflow without requiring an installed Clang toolchain.
