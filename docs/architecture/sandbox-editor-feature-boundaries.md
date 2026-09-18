@@ -69,6 +69,16 @@ halfedge mesh or mesh soup; execution units import the APIs they use directly.
 `ProcessingCompilationLocality.ParameterizationContracts` checks this boundary
 from configured compiler dependencies.
 
+Consolidation result records use `Geometry.PointCloud.Consolidation.Types` for
+its canonical status enum and `Runtime.GeometryProperty.Types` for property
+identities. The algorithm re-exports the status; parameters, projection state,
+result arrays and status spelling remain with the algorithm owner.
+`ProcessingCompilationLocality.ConsolidationContracts` keeps the runtime records
+independent of the algorithm, point containers, spatial indexes and live geometry
+availability. `ConsolidationConsumers` checks the algorithm boundary for the
+service-family interface and prepared frame; their editor presentation and
+private composition still consume live availability.
+
 `Runtime.EditorFeatures.Internal.hpp` holds private workspace bindings and context
 adapters. It includes `Runtime.EditorFeatureCommands.Internal.hpp` for import/file
 prerequisites, diagnostics and render-hint comparisons, and

@@ -14,6 +14,7 @@ module;
 #include <glm/gtc/constants.hpp>
 
 export module Geometry.PointCloud.Consolidation;
+export import Geometry.PointCloud.Consolidation.Types;
 
 import Geometry.PointCloud;
 import Geometry.PointLBVH;
@@ -76,42 +77,6 @@ export namespace Geometry::PointCloud::Consolidation
         Wlop,
         Clop,
         Ear,
-    };
-
-    enum class Status : std::uint8_t
-    {
-        Success = 0,
-        EmptyInput,
-        TooFewPoints,
-        InvalidCloud,
-        NonFiniteInput,
-        InvalidSupportRadius,
-        InvalidRepulsionWeight,
-        InvalidIterationLimit,
-        InvalidConvergenceTolerance,
-        InvalidTargetCount,
-        InvalidMixtureComponentCount,
-        InvalidMixtureParameters,
-        InvalidNormalAngle,
-        InvalidEdgeSensitivity,
-        InvalidNormalRefinementRounds,
-        NormalsRequired,
-        InvalidNormals,
-        NormalEstimationFailed,
-        ResourceLimit,
-        SpatialIndexBuildFailed,
-        SpatialQueryFailed,
-        EmptyNeighborhood,
-        DensityEstimationFailed,
-        MixtureFitFailed,
-        MixtureNotConverged,
-        EmptyContinuousAttraction,
-        UpsamplingFailed,
-        NumericalFailure,
-        NotConverged,
-        UnsupportedStrategy,
-        InvalidNeighborhoods,
-        InvalidProjectionState,
     };
 
     struct Params

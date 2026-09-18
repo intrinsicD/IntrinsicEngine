@@ -10,10 +10,10 @@ export module Extrinsic.Runtime.PointCloudConsolidationTypes;
 import Extrinsic.Core.Error;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.CommandBus;
-export import Extrinsic.Runtime.GeometryAvailability;
+export import Extrinsic.Runtime.GeometryProperty.Types;
 export import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.WorldHandle;
-import Geometry.PointCloud.Consolidation;
+export import Geometry.PointCloud.Consolidation.Types;
 export namespace Extrinsic::Runtime
 {
     enum class PointCloudConsolidationRunStatus : std::uint8_t

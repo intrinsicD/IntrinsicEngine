@@ -84,6 +84,7 @@ target_sources(${target_name}
         Geometry.Parameterization.Harmonic.cppm
         Geometry.Parameterization.Optimize.cppm
         Geometry.Plane.cppm
+        Geometry.PointCloud.Consolidation.Types.cppm
         Geometry.PointCloud.Consolidation.cppm
         Geometry.PointCloud.Conversion.cppm
         Geometry.PointCloud.Features.cppm

@@ -63,6 +63,28 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.ConfigPropertyT
         --forbid-module Extrinsic.Graphics.Component.RenderGeometry)
 set_tests_properties(ProcessingCompilationLocality.ConfigPropertyTypes
     PROPERTIES LABELS "contract;runtime;build;headless")
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.ConsolidationContracts
+        --check-source src/geometry/Geometry.PointCloud.Consolidation.Types.cppm
+        --check-source src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cppm
+        --check-source src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cpp
+        --forbid-module Geometry.PointCloud.Consolidation
+        --forbid-module Geometry.PointCloud
+        --forbid-module Geometry.PointLBVH
+        --forbid-module Geometry.Properties
+        --forbid-module Extrinsic.Runtime.GeometryAvailability
+        --forbid-module Extrinsic.ECS.Components.GeometrySources
+        --forbid-module Extrinsic.Graphics.Component.RenderGeometry)
+# EditorCommon and private frame composition still need live availability;
+# service consumers must not inherit the consolidation algorithm.
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.ConsolidationConsumers
+        --check-source src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.Frame.cpp
+        --forbid-module Geometry.PointCloud.Consolidation
+        --forbid-module Geometry.PointCloud
+        --forbid-module Geometry.PointLBVH)
+set_tests_properties(ProcessingCompilationLocality.ConsolidationContracts
+    ProcessingCompilationLocality.ConsolidationConsumers
+    PROPERTIES LABELS "contract;runtime;build;headless")
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Family
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cppm
         --check-source src/runtime/Editor/Runtime.EditorProcessing.cpp

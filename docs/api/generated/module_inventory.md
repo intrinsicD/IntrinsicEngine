@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 11 |
 | `core` | 41 |
 | `ecs` | 27 |
-| `geometry` | 124 |
+| `geometry` | 125 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 75 |
@@ -193,6 +193,7 @@ Root scanned: `src`
 | `Geometry.Parameterization.Optimize` | `src/geometry/Geometry.Parameterization.Optimize.cppm` | `geometry` |
 | `Geometry.Parameterization.Types` | `src/geometry/Geometry.Parameterization.Types.cppm` | `geometry` |
 | `Geometry.Plane` | `src/geometry/Geometry.Plane.cppm` | `geometry` |
+| `Geometry.PointCloud.Consolidation.Types` | `src/geometry/Geometry.PointCloud.Consolidation.Types.cppm` | `geometry` |
 | `Geometry.PointCloud.Consolidation` | `src/geometry/Geometry.PointCloud.Consolidation.cppm` | `geometry` |
 | `Geometry.PointCloud.Conversion` | `src/geometry/Geometry.PointCloud.Conversion.cppm` | `geometry` |
 | `Geometry.PointCloud.Features` | `src/geometry/Geometry.PointCloud.Features.cppm` | `geometry` |
@@ -455,4 +456,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **428**
+Total modules: **429**

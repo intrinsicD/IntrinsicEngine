@@ -2621,3 +2621,31 @@ suggested positive coverage is already present; no redundant test was added.
 The shared ordinary translation unit imports none of these three config modules,
 and all callers already use its private declarations, so reuse adds no module
 cycle or new layer edge.
+
+
+## Consolidation result locality — verified, 2026-09-18
+
+Operator-directed duplication/compilation continuation from `bc6da168d`;
+Codex owns the checkout/build and Claude supplies read-only planning/review.
+UI-037 readiness remains open. Existing source-documentation and
+processing-compilation-locality contracts cover this slice.
+
+The sole canonical consolidation status enum moves unchanged to
+`Geometry.PointCloud.Consolidation.Types`. The algorithm re-exports it; runtime
+records use it and the existing `Runtime.GeometryProperty.Types`. Parameters,
+projection state, result arrays and status spelling retain their algorithm owner.
+Four production files, including the new module and CMake, change from 747 to
+758 physical lines; the increase buys a compilation boundary, not deduplication.
+
+Compiler metadata exposed 28 candidate dependency paths across four existing
+producers. Twenty are cut. Eight remain because EditorCommon/presentation and
+private frame composition still consume live availability. The two new checks
+therefore guard three record producers against both live sources and algorithms,
+and two editor consumers against the consolidation algorithm and point/index
+owners. Existing guards are unchanged; the initial overbroad check is retained
+in the logs. No compatibility shim, duplicate status or new layer edge is added.
+
+The locality-only source passed 116 focused tests. Claude found no code blockers;
+canonical ci/Clang 23 IntrinsicTests and ci-vulkan ExtrinsicSandbox compile/link
+pass on the final combined source. Inventory refresh produces 429 modules.
+Logs and fixed review packets: `/tmp/intrinsic-consolidation-locality/`.
