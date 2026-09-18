@@ -53,6 +53,8 @@ compile-time type identity from `Extrinsic.Core.Hash` and may not reach
 `RHI::ICommandContext` through a declaration, may additionally reach none of
 `Extrinsic.RHI.CommandContext`, `.Descriptors`, `.Types` and `.Handles`. Real
 graph users and GPU queue participants import those owners themselves.
+`KernelCompilationLocality.InputActions` additionally excludes `Platform.Window`
+from the input-action interface, whose viewport uses the core extent type.
 
 `EditorCompilationLocality.TextureBake`, `.Visualization`, `.WorkspaceSnapshots`
 and `.WorkspaceAttachment` check the bake producer and its editor consumers.

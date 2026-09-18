@@ -224,6 +224,9 @@ Setup/frame-hook contexts in `Runtime.Module` use the same registry declarations
 Their compiled implementations only pass the references to callbacks. The
 callbacks import complete owners when they invoke scene or world operations.
 `KernelCompilationLocality.ContextBorrows` guards these interface dependencies.
+Input-action dispatch names `Core::Extent2D` directly; the window interface's
+alias adds no type information. `KernelCompilationLocality.InputActions` keeps
+`Platform.Window` out of the input-action interface's compiler dependencies.
 
 `JobService` names `RHI::ICommandContext` only by reference, for GPU queue
 participants. It declares the class with a non-exported `extern "C++"`

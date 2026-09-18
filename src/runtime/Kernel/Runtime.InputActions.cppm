@@ -14,7 +14,6 @@ import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Platform.Input;
-import Extrinsic.Platform.Window;
 
 extern "C++" { namespace Extrinsic::ECS::Scene { class Registry; } }
 
@@ -84,7 +83,7 @@ namespace Extrinsic::Runtime
         void DispatchForFrame(const Core::Config::EngineConfig& config,
                               ECS::Scene::Registry& scene,
                               const Platform::Input::Context& input,
-                              const Platform::Extent2D& viewport,
+                              const Core::Extent2D& viewport,
                               bool imguiCapturesKeyboard,
                               double frameDt,
                               std::uint64_t frameIndex,

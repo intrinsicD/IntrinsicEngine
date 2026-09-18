@@ -4203,3 +4203,28 @@ hygiene, kernel convergence, skill mirrors and session brief pass. Source-doc
 audit has zero findings in the touched interface; the module inventory
 regenerates unchanged (429 modules). UI-037's broader readiness acceptance
 remains open.
+
+
+## Continuation — input-action viewport dependency (2026-09-19)
+
+Independent compile-locality slice alongside `d360ae0d0`. Reuse decision:
+`Platform::Extent2D` is exactly an alias of `Core::Extent2D`; the input-action
+interface already imports the core owner and uses that type in its context.
+Dispatch now names the core type directly in declaration and definition,
+removing `Platform.Window` without changing type identity, linkage, callers,
+input behavior or object layout. The two production files total 209 -> 208
+lines. No wrapper, new file or extra import is needed.
+
+`KernelCompilationLocality.InputActions` rejects the original compiler graph
+and passes on the final source. The interface's module map drops Window
+(10 -> 9 dependencies). This is dependency evidence, not an elapsed compile-time
+result. Canonical runtime documentation and the test guide explain the boundary;
+the module inventory remains unchanged. Fable's plan and fixed-diff review
+agree; its transitivity concern is settled by the actual recursive compiler
+metadata check. Workshop rows 1–3/8 pass, 4–7 n/a.
+
+The exact combined verification commands and CPU results are in the preceding
+checkpoint. All 26 compile-hotspot tool tests also pass. Strict structural
+checks pass and source/test hashes remain fixed. Evidence and fixed review
+packets: `/tmp/intrinsic-reuse-round3/`. UI-037 remains open; both session
+slices are complete. No additional Codex subagents were used.

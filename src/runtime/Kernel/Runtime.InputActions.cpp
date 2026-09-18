@@ -65,7 +65,7 @@ namespace Extrinsic::Runtime
         const Core::Config::EngineConfig& config,
         ECS::Scene::Registry& scene,
         const Platform::Input::Context& input,
-        const Platform::Extent2D& viewport,
+        const Core::Extent2D& viewport,
         const bool imguiCapturesKeyboard,
         const double frameDt,
         const std::uint64_t frameIndex,
