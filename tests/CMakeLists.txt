@@ -541,6 +541,15 @@ intrinsic_add_module_boundary_test(RenderCompilationLocality.RuntimeDiagnostics
 set_tests_properties(RenderCompilationLocality.RuntimeDiagnostics
     PROPERTIES LABELS "contract;build;runtime;graphics" TIMEOUT 30)
 
+# Pacing consumers share copied counters without the renderer's diagnostic graph.
+intrinsic_add_module_boundary_test(RenderCompilationLocality.FramePacing
+        --check-source src/runtime/Kernel/Runtime.FramePacingDiagnostics.cppm
+        --forbid-module Extrinsic.Graphics.RenderDiagnostics
+        --forbid-module Extrinsic.Graphics.Renderer
+        --forbid-module Extrinsic.RHI.Device)
+set_tests_properties(RenderCompilationLocality.FramePacing
+    PROPERTIES LABELS "contract;build;runtime;graphics" TIMEOUT 30)
+
 # Resource managers borrow the device; only their implementations import its API.
 foreach(_manager IN ITEMS BufferManager TextureManager SamplerManager PipelineManager)
     intrinsic_add_module_boundary_test(RenderCompilationLocality.${_manager}DeviceBorrow

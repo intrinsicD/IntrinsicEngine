@@ -697,8 +697,11 @@ namespace Extrinsic::Runtime
         const auto publishPacingSample = [&]()
         {
             if (m_Impl->m_Renderer)
-                MirrorRenderGraphFramePacingDiagnostics(
-                    pacing, m_Impl->m_Renderer->GetLastRenderGraphStats());
+            {
+                const auto& stats = m_Impl->m_Renderer->GetLastRenderGraphStats();
+                pacing.RenderGraphCompileMicros = stats.Compile.TimeMicros;
+                pacing.RenderGraphExecuteMicros = stats.Execute.TimeMicros;
+            }
             pacing.TotalMicros = ElapsedMicros(framePacingBegin);
             m_Impl->m_LastFramePacingDiagnostics = pacing;
         };

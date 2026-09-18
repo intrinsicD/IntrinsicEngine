@@ -242,10 +242,11 @@ visualization operations, workspace snapshots and private workspace attachment.
 The runtime data contracts that name renderer-produced records import narrow
 graphics owners rather than the renderer:
 
-- `Extrinsic.Runtime.FramePacingDiagnostics` imports
-  `Extrinsic.Graphics.RenderDiagnostics`, the declaration-only owner of
-  `RenderGraphFrameStats` and the compile/execute/command-record/contract/GPU-
-  profile and upload diagnostic records it aggregates.
+- `Extrinsic.Runtime.FramePacingDiagnostics` contains copied timings/counters
+  and has no module imports. The engine copies renderer compile/execute times
+  at its sample-publication boundary; EditorUiModule supplies ImGui timings.
+  `Extrinsic.Graphics.RenderDiagnostics` remains the canonical owner of
+  `RenderGraphFrameStats` and its complete diagnostic records.
 - `Extrinsic.Runtime.RenderRecipeActivation` imports
   `Extrinsic.Graphics.RenderRecipeConfig`, which owns `FrameRecipeOverride` and
   its diagnostics alongside the config schema. Activation installs an override
@@ -270,6 +271,8 @@ CTest `RenderCompilationLocality.RuntimeDiagnostics` reads the configured
 Clang/CMake module graph and fails if any of those runtime contracts, or the
 diagnostics owner itself, reaches `Graphics.Renderer`, the subsystem registry,
 the prep pipeline, a concrete rendering system or an upload helper.
+`RenderCompilationLocality.FramePacing` additionally keeps rendering diagnostics
+and device interfaces out of the pacing record's compiler dependency closure.
 `RenderCompilationLocality.EngineInterface` applies the same closure check to
 `Runtime.Engine.cppm`, additionally forbidding `Extrinsic.Runtime.Module`.
 
@@ -703,6 +706,9 @@ stale identities, and publication after a terminal stage fail closed. Worker
 stages own only copied CPU data and use `JobService`; the bounded main-thread
 apply boundary remains the only place that mutates imported ECS or asset state.
 Direct synchronous imports produce the same seven-stage trace.
+Recipe validation, stage-payload matching and trace appends compile once in
+`Runtime.AssetWorkflowModule.cpp`; the interface exposes their declarations
+alongside the copied recipe and result records.
 The import executor is private to `AssetWorkflowModule`: its declaration header
 is shared by the module's two implementation units, without a separate executor
 BMI. It stores the existing dependency record directly. Borrowed provider pointers

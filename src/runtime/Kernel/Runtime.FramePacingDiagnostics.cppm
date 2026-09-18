@@ -1,13 +1,9 @@
-// Per-frame runtime pacing record: the phase timings and UI/render counters the
-// engine loop fills in, plus the mirror that copies the renderer's framegraph
-// compile/execute durations into it.
+// Per-frame timings and counters shared by runtime phases and diagnostic readers.
 module;
 
 #include <cstdint>
 
 export module Extrinsic.Runtime.FramePacingDiagnostics;
-
-import Extrinsic.Graphics.RenderDiagnostics;
 
 namespace Extrinsic::Runtime
 {
@@ -63,7 +59,4 @@ namespace Extrinsic::Runtime
         std::uint64_t ReleaseRenderWorldMicros{0u};
     };
 
-    export void MirrorRenderGraphFramePacingDiagnostics(
-        RuntimeFramePacingDiagnostics& pacing,
-        const Graphics::RenderGraphFrameStats& stats) noexcept;
 }

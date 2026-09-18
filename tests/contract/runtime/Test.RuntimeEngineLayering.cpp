@@ -1779,8 +1779,6 @@ TEST(RuntimeEngineLayering, EditorUiModulePrivatelyMirrorsImGuiFramePacingDiagno
         ReadFile(RepoRoot() / "src/runtime/Editor/Runtime.EditorUiModule.cpp");
     const auto diagnosticsInterface =
         ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.FramePacingDiagnostics.cppm");
-    const auto diagnosticsImpl =
-        ReadFile(RepoRoot() / "src/runtime/Kernel/Runtime.FramePacingDiagnostics.cpp");
 
     EXPECT_EQ(engineInterface.find("export import Extrinsic.Runtime.FramePacingDiagnostics"),
               std::string::npos);
@@ -1790,18 +1788,12 @@ TEST(RuntimeEngineLayering, EditorUiModulePrivatelyMirrorsImGuiFramePacingDiagno
               std::string::npos);
     EXPECT_EQ(engineImpl.find("MirrorImGuiFramePacingDiagnostics("),
               std::string::npos);
-    EXPECT_NE(engineImpl.find("MirrorRenderGraphFramePacingDiagnostics("),
-              std::string::npos);
 
     EXPECT_EQ(engineInterface.find("export struct RuntimeFramePacingDiagnostics"),
               std::string::npos);
     EXPECT_EQ(engineImpl.find("pacing.ImGuiEditorCallbackMicros ="),
               std::string::npos);
     EXPECT_EQ(engineImpl.find("pacing.ImGuiDrawDataCopyMicros ="),
-              std::string::npos);
-    EXPECT_EQ(engineImpl.find("pacing.RenderGraphCompileMicros ="),
-              std::string::npos);
-    EXPECT_EQ(engineImpl.find("pacing.RenderGraphExecuteMicros ="),
               std::string::npos);
 
     EXPECT_NE(diagnosticsInterface.find("export module Extrinsic.Runtime.FramePacingDiagnostics"),
@@ -1811,14 +1803,6 @@ TEST(RuntimeEngineLayering, EditorUiModulePrivatelyMirrorsImGuiFramePacingDiagno
     EXPECT_EQ(diagnosticsInterface.find("import Extrinsic.Runtime.ImGuiAdapter"),
               std::string::npos);
     EXPECT_EQ(diagnosticsInterface.find("MirrorImGuiFramePacingDiagnostics"),
-              std::string::npos);
-    EXPECT_NE(diagnosticsInterface.find("MirrorRenderGraphFramePacingDiagnostics"),
-              std::string::npos);
-    EXPECT_EQ(diagnosticsImpl.find("ImGuiAdapterDiagnostics"),
-              std::string::npos);
-    EXPECT_EQ(diagnosticsImpl.find("pacing.ImGuiEditorCallbackMicros ="),
-              std::string::npos);
-    EXPECT_NE(diagnosticsImpl.find("pacing.RenderGraphCompileMicros = stats.Compile.TimeMicros"),
               std::string::npos);
 
     EXPECT_EQ(editorUiModuleInterface.find("ImGuiAdapter"),

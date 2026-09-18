@@ -225,7 +225,6 @@ target_sources(${target_name}
         Kernel/Runtime.Engine.cpp
         Config/Runtime.EngineConfigBoot.cpp
         Config/Runtime.EngineConfigControl.cpp
-        Kernel/Runtime.FramePacingDiagnostics.cpp
         Kernel/Runtime.InputActions.cpp
         Kernel/Runtime.KernelEvents.cpp
         Kernel/Runtime.ServiceRegistry.cpp

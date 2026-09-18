@@ -1,6 +1,7 @@
+// Asset import recipes, stage records and the runtime composition module.
+// Validation and workflow execution compile in the implementation units.
 module;
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -9,7 +10,6 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <variant>
 #include <vector>
 
@@ -158,96 +158,14 @@ namespace Extrinsic::Runtime
         bool Terminal{false};
     };
 
-    export [[nodiscard]] inline bool AssetImportStagePayloadMatches(
-        const AssetImportStage stage,
-        const AssetImportStagePayload& payload) noexcept
-    {
-        switch (stage)
-        {
-        case AssetImportStage::Route:
-            return std::holds_alternative<AssetImportRouteResult>(payload);
-        case AssetImportStage::Decode:
-            return std::holds_alternative<AssetImportDecodeResult>(payload);
-        case AssetImportStage::CpuMaterialize:
-            return std::holds_alternative<
-                AssetImportCpuMaterializationResult>(payload);
-        case AssetImportStage::EcsAuthor:
-            return std::holds_alternative<AssetImportEcsAuthorResult>(payload);
-        case AssetImportStage::Postprocess:
-            return std::holds_alternative<AssetImportPostprocessResult>(payload);
-        case AssetImportStage::GpuResidency:
-            return std::holds_alternative<AssetImportGpuResidencyResult>(payload);
-        case AssetImportStage::Complete:
-            return std::holds_alternative<AssetImportCompletionResult>(payload);
-        }
-        return false;
-    }
+    export [[nodiscard]] bool AssetImportStagePayloadMatches(
+        AssetImportStage stage, const AssetImportStagePayload& payload) noexcept;
 
-    export [[nodiscard]] inline Core::Result ValidateAssetImportRecipe(
-        const AssetImportRecipe& recipe) noexcept
-    {
-        if (recipe.Path.empty() ||
-            recipe.PayloadKind == Assets::AssetPayloadKind::Unknown)
-        {
-            return Core::Err(Core::ErrorCode::InvalidArgument);
-        }
+    export [[nodiscard]] Core::Result ValidateAssetImportRecipe(
+        const AssetImportRecipe& recipe) noexcept;
 
-        const bool isReimport =
-            recipe.Source == RuntimeAssetIngestSource::Reimport;
-        if (isReimport != recipe.ExistingAsset.IsValid())
-            return Core::Err(Core::ErrorCode::InvalidArgument);
-
-        if (recipe.PayloadKind != Assets::AssetPayloadKind::Texture2D &&
-            (!recipe.Authoring.AuthorRenderableComponents ||
-             !recipe.Authoring.AuthorSelectableIdentity))
-        {
-            return Core::Err(Core::ErrorCode::InvalidArgument);
-        }
-        return Core::Ok();
-    }
-
-    export [[nodiscard]] inline Core::Result AppendAssetImportStageResult(
-        AssetImportStageTrace& trace,
-        AssetImportStageResult result)
-    {
-        constexpr std::array<AssetImportStage, 7> orderedStages{
-            AssetImportStage::Route,
-            AssetImportStage::Decode,
-            AssetImportStage::CpuMaterialize,
-            AssetImportStage::EcsAuthor,
-            AssetImportStage::Postprocess,
-            AssetImportStage::GpuResidency,
-            AssetImportStage::Complete,
-        };
-
-        if (trace.Terminal ||
-            trace.Results.size() >= orderedStages.size() ||
-            result.Identity != trace.Identity ||
-            result.Stage != orderedStages[trace.Results.size()])
-        {
-            return Core::Err(Core::ErrorCode::InvalidState);
-        }
-
-        if (result.Succeeded())
-        {
-            if (result.Diagnostic != RuntimeAssetIngestDiagnostic::None ||
-                !AssetImportStagePayloadMatches(
-                    result.Stage,
-                    result.Payload))
-                return Core::Err(Core::ErrorCode::InvalidArgument);
-        }
-        else if (result.Diagnostic == RuntimeAssetIngestDiagnostic::None)
-        {
-            return Core::Err(Core::ErrorCode::InvalidArgument);
-        }
-
-        const bool terminal =
-            !result.Succeeded() ||
-            result.Stage == AssetImportStage::Complete;
-        trace.Results.push_back(std::move(result));
-        trace.Terminal = terminal;
-        return Core::Ok();
-    }
+    export [[nodiscard]] Core::Result AppendAssetImportStageResult(
+        AssetImportStageTrace& trace, AssetImportStageResult result);
 
     export struct RuntimeAssetImportRequest
     {
