@@ -1,29 +1,10 @@
+// Shared editor-job fixture; link SandboxEditorJobHarness.cpp for runtime contract tests.
 #pragma once
 
-// Test-side stand-in for the piece of `EditorWorkspaceSession` that owns editor
-// job identity, added by RUNTIME-194 Slice B5d.
-//
-// `JobService` deliberately stores no domain identity, so the editor records
-// which entity and output each token belongs to and joins that against
-// `JobService::SnapshotAll()` to answer the active-output and per-entity row
-// queries its dedup guard and panels read. Contract tests that drive editor
-// facades without a session need the same join, and several of them need it,
-// so it lives here rather than being re-derived per file.
-//
-// This mirrors the session; it does not replace it. Session-level behaviour
-// (attachment epochs, world scoping) stays covered by the session's own tests.
-
 #include <chrono>
-#include <cstdint>
-#include <optional>
-#include <thread>
 #include <unordered_map>
-#include <utility>
-#include <vector>
-
 
 import Extrinsic.Core.StrongHandle;
-import Extrinsic.Core.Tasks;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.EditorJobProjection;
@@ -37,147 +18,23 @@ namespace Extrinsic::Tests
             : m_Scheduler(workerCount) {}
 
         [[nodiscard]] Runtime::JobService& Jobs() noexcept { return m_Jobs; }
-        [[nodiscard]] Runtime::KernelEventBus& Events() noexcept
-        {
-            return m_Events;
-        }
+        [[nodiscard]] Runtime::KernelEventBus& Events() noexcept { return m_Events; }
 
-        // Installs the `JobService` submit path on `context`, recording the
-        // editor identity the service does not keep.
-        void Attach(auto& context)
-        {
-            context.JobCommands.Submit =
-                [this](Runtime::JobDesc desc,
-                       Runtime::EditorJobIdentity identity)
-                    -> Runtime::JobToken
-            {
-                const Runtime::JobToken token = m_Jobs.Submit(std::move(desc));
-                if (token.IsValid())
-                    m_Identities.insert_or_assign(token, std::move(identity));
-                return token;
-            };
-            context.JobCommands.FindActive =
-                [this](const Runtime::EditorJobIdentity& requested)
-                    -> std::optional<Runtime::EditorJobRecord>
-            {
-                for (const Runtime::EditorJobRecord& job :
-                     Snapshot().Entries)
-                {
-                    if (Runtime::IsActiveEditorJobState(job.State) &&
-                        Runtime::SameEditorJobOutput(
-                            job.Identity,
-                            requested))
-                    {
-                        return job;
-                    }
-                }
-                return std::nullopt;
-            };
-            context.JobCommands.SnapshotEntity =
-                [this](const std::uint32_t stableEntityId)
-            {
-                std::vector<Runtime::EditorJobRecord> rows{};
-                for (const Runtime::EditorJobRecord& job :
-                     Snapshot().Entries)
-                {
-                    if (job.Identity.EntityId == stableEntityId)
-                        rows.push_back(job);
-                }
-                return rows;
-            };
-        }
+        void Attach(auto& context) { AttachCommands(context.JobCommands); }
 
-        // The queue view the editor's dedup guard and panels read.
-        [[nodiscard]] Runtime::EditorJobQueueSnapshot Snapshot() const
-        {
-            Runtime::EditorJobQueueSnapshot snapshot{};
-            for (const Runtime::JobSnapshot& job : m_Jobs.SnapshotAll())
-            {
-                const auto identity = m_Identities.find(job.Token);
-                if (identity == m_Identities.end())
-                    continue;
-
-                snapshot.Entries.push_back(Runtime::EditorJobRecord{
-                    .Token = job.Token,
-                    .Identity = identity->second,
-                    .Name = job.DebugName,
-                    .State = job.State,
-                    .NormalizedProgress = job.Progress.Normalized,
-                    .ProgressDeterminate = job.Progress.Determinate,
-                    .ElapsedMilliseconds = job.ElapsedMilliseconds,
-                });
-            }
-            return snapshot;
-        }
-
-        // Per RUNTIME-194 Slice B0, drain until every retained job is terminal
-        // rather than asserting on a fixed drain count.
+        [[nodiscard]] Runtime::EditorJobQueueSnapshot Snapshot() const;
         [[nodiscard]] bool DrainUntilTerminal(
-            const std::chrono::milliseconds timeout = std::chrono::seconds{5})
-        {
-            const auto deadline = std::chrono::steady_clock::now() + timeout;
-            for (;;)
-            {
-                if (Core::Tasks::Scheduler::IsInitialized())
-                    Core::Tasks::Scheduler::WaitForAll();
-                (void)m_Jobs.DrainCompletions(m_Events);
-
-                bool allTerminal = true;
-                for (const Runtime::JobSnapshot& job : m_Jobs.SnapshotAll())
-                {
-                    if (!IsTerminal(job.State))
-                    {
-                        allTerminal = false;
-                        break;
-                    }
-                }
-                if (allTerminal)
-                    return true;
-                if (std::chrono::steady_clock::now() >= deadline)
-                    return false;
-                std::this_thread::sleep_for(std::chrono::milliseconds{1});
-            }
-        }
+            std::chrono::milliseconds timeout = std::chrono::seconds{5});
 
     private:
-        [[nodiscard]] static bool IsTerminal(
-            const Runtime::JobState state) noexcept
-        {
-            switch (state)
-            {
-            case Runtime::JobState::Published:
-            case Runtime::JobState::Dropped:
-            case Runtime::JobState::Cancelled:
-            case Runtime::JobState::Rejected:
-            case Runtime::JobState::StaleDiscarded:
-                return true;
-            default:
-                return false;
-            }
-        }
+        void AttachCommands(Runtime::EditorJobCommandSurface&);
+        [[nodiscard]] static bool IsTerminal(Runtime::JobState state) noexcept;
 
-        // `JobService` dispatches at submit onto the shared CPU pool and has
-        // no inline fallback, so the harness owns a scheduler. It is the *last*
-        // member so it is destroyed *first*: the pool must be quiesced while
-        // everything a worker can still reach is alive (RUNTIME-194 Slice B5c).
-        // For the same reason, declare the harness after the scene/context it
-        // submits work against.
         class SchedulerScope final
         {
         public:
-            explicit SchedulerScope(const unsigned workerCount)
-            {
-                if (Core::Tasks::Scheduler::IsInitialized())
-                    Core::Tasks::Scheduler::Shutdown();
-                Core::Tasks::Scheduler::Initialize(workerCount);
-            }
-
-            ~SchedulerScope()
-            {
-                Core::Tasks::Scheduler::WaitForAll();
-                Core::Tasks::Scheduler::Shutdown();
-            }
-
+            explicit SchedulerScope(unsigned workerCount);
+            ~SchedulerScope();
             SchedulerScope(const SchedulerScope&) = delete;
             SchedulerScope& operator=(const SchedulerScope&) = delete;
         };
@@ -188,6 +45,8 @@ namespace Extrinsic::Tests
                            Runtime::EditorJobIdentity,
                            Core::StrongHandleHash<Runtime::JobTokenTag>>
             m_Identities{};
+        // Destroy the scheduler first, while worker-reachable state is alive.
+        // Callers likewise declare the harness after its scene/context.
         SchedulerScope m_Scheduler;
     };
 }

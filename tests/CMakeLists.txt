@@ -1244,6 +1244,7 @@ if(TARGET ExtrinsicRuntime)
     intrinsic_test_object_lib(RuntimeContractTestObjs
         SOURCES
             ${_runtime_contract_test_sources}
+            support/SandboxEditorJobHarness.cpp
         DEPS ExtrinsicRuntime IntrinsicProgressivePoissonReference imgui_core_lib nlohmann_json::nlohmann_json
     )
 

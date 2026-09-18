@@ -2765,3 +2765,36 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 cmake --preset ci-vulkan
 cmake --build --preset ci-vulkan --target ExtrinsicSandbox -j4
 ```
+
+## Compiled editor-job test harness — verified, 2026-09-18
+
+The existing `SandboxEditorJobHarness` now compiles its identity join, command
+callbacks, snapshot/drain loops and scheduler lifecycle once in
+`tests/support/SandboxEditorJobHarness.cpp`, added to `RuntimeContractTestObjs`.
+All 12 existing consumers use the same fixture. Its context adapter remains a
+one-line template, while scheduler teardown remains first and keeps borrowed
+scene/context state alive. Six moved bodies match the original after whitespace
+and parameter-name normalization. Symbol inspection confirms the implementation
+comes from the support object instead of each consumer.
+
+The smaller header exposed one previously implicit scheduler import in
+`Test.SandboxEditorMeshMethods.cpp`; that caller now imports `Core.Tasks`
+explicitly. Four affected source/build files, including the new helper and
+CMake registration, change from 9,086 to 9,080 physical lines. The benefit is
+compiling shared bodies once; source movement is not deduplication of distinct
+algorithms, and no elapsed build-time improvement was measured.
+
+Claude approved the fixed main diff; Codex reviewed the one-line explicit-import
+fix and confirmed all 12 consumers compile/link. The runtime and panel tests
+exercise publication, dedup, cancellation and attachment expiry before and after
+the move. The routing tool's 19 synthetic tests pass.
+
+The final combined builds, 446 focused tests and 4,742-passing CPU gate recorded
+above include this slice. Live gate routing also passes for `IntrinsicTests`: 41
+targets, 4,750 registered cases and 363 source files. No broad UI-037 acceptance
+checkbox is closed by test-support locality.
+
+```bash
+python3 tests/regression/tooling/Test.TestGateRouting.py --self-test
+python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicTests
+```

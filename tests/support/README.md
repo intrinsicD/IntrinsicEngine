@@ -9,6 +9,10 @@ and exact format conversion for graphics readback tests; `MockRHI.hpp` owns
 the mock backbuffer-barrier query. Expected pixels and packet setup stay in
 their individual tests.
 
+`SandboxEditorJobHarness.hpp` declares the shared editor-job fixture. Its
+snapshot, command callbacks, drain loop and scheduler lifecycle compile once in
+`SandboxEditorJobHarness.cpp`, linked by the runtime contract test target.
+
 ## Visible-Triangle Readback Harness
 
 `MinimalTriangleReadback.hpp` is the reusable readback harness for the
