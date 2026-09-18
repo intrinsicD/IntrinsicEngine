@@ -12,9 +12,10 @@ module;
 export module Extrinsic.Runtime.EditorCommandHistory;
 
 import Extrinsic.ECS.Scene.Handle;
-import Extrinsic.Runtime.SelectionController;
-
-extern "C++" { namespace Extrinsic::ECS::Scene { class Registry; } }
+extern "C++" {
+    namespace Extrinsic::ECS::Scene { class Registry; }
+    namespace Extrinsic::Runtime { class SelectionController; }
+}
 
 export namespace Extrinsic::Runtime
 {

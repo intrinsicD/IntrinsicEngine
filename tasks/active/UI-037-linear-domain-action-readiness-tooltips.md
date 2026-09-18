@@ -3862,3 +3862,68 @@ lifecycle skip, zero failures (157.54 s test execution). Source/test hashes
 match Fable's fixed diff. No GPU execution, sanitizer-suite run or elapsed
 compilation-speed improvement is claimed. This is a completed session checkpoint
 inside the still-open UI-037 task.
+
+## Continuation — selection-controller borrows (2026-09-18)
+
+Operator direction: continue duplication and compilation-locality work with
+Claude Fable 5.1. This slice preserves UI-037's open readiness inventory.
+Reuse decision: `EditorCommandHistory` and `EditorProcessing` each need only a
+`SelectionController*`; reuse the existing borrowed-service C++ linkage pattern
+and the sole controller owner instead of creating a facade or a types module.
+Its config, pick and primitive records retain their module attachment. No fields,
+algorithms, ownership, command behavior or dependency-layer rules change.
+
+The baseline compiler-metadata guard fails for both interfaces. Fable reviewed
+the plan and requested reverse-dependency accounting plus minimum-Clang
+verification because the class linkage changes. Keep complete API imports only
+at actual callers, guard the transitive closure, and rebuild all callers.
+The first build caught member definitions needing matching C++ linkage; both
+implementation units now wrap only their member definitions. An incorrectly
+placed closing brace in the primitive unit was corrected before verification.
+
+Verification for this slice: canonical ci configure; focused runtime/editor
+targets, selection/history/editor/locality CTest cases; IntrinsicTests and the
+full exclusion-only CPU gate; fresh cache-off Clang20 Null/headless runtime/editor
+closure; strict layering/task/docs/workshop checks and module inventory.
+Exact logs and fixed review packets live in `/tmp/intrinsic-locality-next/`.
+No elapsed compilation improvement is inferred from dependency counts.
+
+Fixed-source review: Fable approved subject to green builds/CPU tests. The
+review's transitivity concern is covered by `compile_hotspots.py`'s recursive
+CMake usages traversal; its suggestion to restore a historical task comment
+conflicts with current source-documentation policy and was not adopted.
+Selection/history and parameterization are the only newly explicit callers.
+All 151 focused CTest cases pass, including the six-producer selection-borrow
+guard and the two-frame disabled-tooltip integration. Canonical focused targets
+build with Clang23. Existing unrelated nodiscard warnings remain in test code.
+
+Compiler metadata for the captured editor/test cohort removes SelectionController
+from 38 producers; command history's transitive module count drops 17 -> 1 and
+generic processing's 39 -> 36. This isolates edits to controller details; it
+does not measure elapsed rebuild time. Across all seven affected production
+files, physical source lines are 3,420 -> 3,429 (+9); no new module, source file,
+compiled target, wrapper, state owner or allocation is introduced.
+
+Scope/layer/tests/docs sweep: one dependency cut, unchanged layouts and method
+bodies, one real compiler-boundary regression. Strict layering (zero allowlist
+entries), test layout, task policy, doc links, root hygiene and skill freshness
+pass; generated inventory is unchanged (429 modules). Source-doc audit finds
+zero objective errors in the three touched interfaces; existing declaration
+comments remain outside this change. All 26 compile-hotspot tooling tests pass.
+Clean-workshop rows 1-3 and 8 pass; 4-7 are not applicable (no renderer/pass,
+recipe, maturity-closure or exception changes). Full CPU and Clang20 evidence
+follow below.
+
+Minimum-compiler check: fresh cache-off Clang20 ci-derived Null/headless
+`ExtrinsicSandboxEditor` runtime/library closure builds, as do the four
+selection/history/primitive/session-lifecycle test objects. Reconciliation is
+a no-op and the six-producer compiler-boundary guard passes. This is compiler
+compatibility evidence, not Clang20 test execution. Owned tmpfs build removed
+after retaining logs and compiler metadata; existing user builds are untouched.
+Canonical Clang23 `IntrinsicTests` builds successfully.
+
+Final CPU gate: 4,755 selected, 4,754 passed and one expected ASan-only GLFW
+lifecycle skip; zero failures (157.72 s). Reviewed source hashes remain fixed.
+Fable's build/test conditions are satisfied. No sanitizer-suite or GPU execution
+and no elapsed compilation-speed improvement is claimed. UI-037 remains open;
+this is a complete compilation-locality checkpoint.

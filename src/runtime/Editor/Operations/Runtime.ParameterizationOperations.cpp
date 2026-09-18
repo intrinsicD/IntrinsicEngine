@@ -38,6 +38,7 @@ import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.HalfedgeMesh.Utils;
 import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.ParameterizationConfig;
 import Geometry.HalfedgeMesh;

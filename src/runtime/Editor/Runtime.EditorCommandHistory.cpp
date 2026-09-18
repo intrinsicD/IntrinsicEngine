@@ -16,6 +16,7 @@ module Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.ECS.Scene.Registry;
 
 import Extrinsic.ECS.Hierarchy.Structure;
+import Extrinsic.Runtime.SelectionController;
 
 namespace Extrinsic::Runtime
 {

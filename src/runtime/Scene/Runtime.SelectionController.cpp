@@ -42,7 +42,8 @@ namespace Extrinsic::Runtime
         }
     }
 
-    // RUNTIME-092 Slice B: render-id -> live entity resolution seam.
+extern "C++"
+{
     SelectionController::EntityHandle SelectionController::ResolveStableEntityId(
         Registry& registry, std::uint32_t stableEntityId)
     {
@@ -517,4 +518,5 @@ namespace Extrinsic::Runtime
     {
         return m_Config;
     }
+}
 }

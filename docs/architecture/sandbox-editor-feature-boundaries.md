@@ -247,6 +247,14 @@ processing, discovery and snapshot interfaces against compiler dependencies for
 both owners and the LBVH implementation. Context storage, config callbacks and
 prepared-frame lifetime remain unchanged.
 
+`EditorCommandHistory` and `EditorProcessing` also borrow `SelectionController`
+through a forward declaration. The sole class definition and its member
+implementations retain their owner in `Runtime.SelectionController` with matching
+C++ linkage; selection config, pick and primitive records remain module-attached.
+History's selection command implementation imports the controller, while the
+history interface and generic processing code do not. Compiler dependencies are
+guarded by `EditorCompilationLocality.SelectionControllerBorrows`.
+
 Scene-facing interfaces borrow `ECS::Scene::Registry` the same way. Its sole
 definition in `ECS.Scene.Registry` has C++ linkage and still owns EnTT storage
 by value. Command history, processing, selection/refinement, scene serialization,

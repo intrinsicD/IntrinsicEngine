@@ -159,7 +159,8 @@ export namespace Extrinsic::Runtime
     // interaction module supplies correlated readbacks; methods consume copied,
     // domain-qualified indices. No graphics or input device owns mutable selection.
     // ClearSceneState must run before replacing the bound registry.
-    class SelectionController
+    // Pointer-only consumers borrow this class without importing its full API.
+    extern "C++" class SelectionController
     {
     public:
         using Registry     = Extrinsic::ECS::Scene::Registry;

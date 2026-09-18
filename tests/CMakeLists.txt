@@ -766,6 +766,18 @@ intrinsic_add_module_boundary_test(EditorCompilationLocality.ProcessingServiceBo
 set_tests_properties(EditorCompilationLocality.ProcessingServiceBorrows
     PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
 
+# Pointer-only selection borrows keep controller details out of shared editor APIs.
+intrinsic_add_module_boundary_test(EditorCompilationLocality.SelectionControllerBorrows
+        --check-source src/runtime/Editor/Runtime.EditorCommandHistory.cppm
+        --check-source src/runtime/Editor/Runtime.EditorProcessing.cppm
+        --check-source src/runtime/Editor/Runtime.EditorProcessing.cpp
+        --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.NormalOperations.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cppm
+        --forbid-module Extrinsic.Runtime.SelectionController)
+set_tests_properties(EditorCompilationLocality.SelectionControllerBorrows
+    PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
+
 # Editor test data and borrowed renderer references do not need the renderer facade.
 intrinsic_add_module_boundary_test(EditorCompilationLocality.TestContext
         --check-source tests/support/EditorFeatureTestContext.cpp

@@ -103,6 +103,8 @@ namespace Extrinsic::Runtime
                 view.VertexSource->Properties.FindPropertyRevision("v:position").value_or(0));
         return stamp;
     }
+extern "C++"
+{
     PrimitiveSelectionSnapshot SelectionController::ReadPrimitives(const Registry& registry,
                                                                    std::uint32_t id, D domain) const
     {
@@ -235,4 +237,5 @@ namespace Extrinsic::Runtime
         }
         return result;
     }
+} // extern "C++"
 } // namespace Extrinsic::Runtime
