@@ -3146,3 +3146,75 @@ cmake --build --preset ci-vulkan --target IntrinsicPointLBVHGpuTests -j4
 ctest --test-dir build/ci-vulkan --output-on-failure -R '^(PointLBVHGpuSmoke\.(Normal|Outlier|LocalDistance|KernelDensity|PointSpacing|Bilateral|Keypoint|Descriptor|DensityWeight)|PointConstructionGpuSmoke\.)' -L gpu -L vulkan --no-tests=error --timeout 180
 python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicTests
 ```
+
+## Compiled runtime test lifecycle — plan, 2026-09-18
+
+Operator continuation with Claude from clean `85d5331d7`. Codex owns edits
+and builds; Claude reviews read-only. The source-documentation contract already
+declared above applies. UI-037 remains open; this supports its existing test
+harness compilation cleanup without changing readiness or product scope.
+
+`RuntimeTestModule.hpp` is included by 47 test sources. Move non-template
+registration, companion lifecycle and kernel shutdown bodies into one
+`RuntimeTestModule.cpp`, following the existing test-support object pattern.
+Keep templates, trivial accessors and required module imports in the header.
+The generated source registry identifies ten executable consumers; list the
+support object explicitly in each and define it before the early LBVH target.
+No production change, new wrapper, generic build helper or runtime API change.
+Reintroduction of inline bodies would require a demonstrated need at a caller.
+
+Preserve lexical hook/resolve ordering, per-boot shutdown-latch reset, virtual
+fixture dispatch, quiescence before fixture teardown and production-service
+availability during teardown. Existing `RuntimeModule` and kernel-event
+contracts cover these behaviors; all five baseline lifecycle cases pass.
+Claude endorses this extraction and recommends leaving the seven-consumer
+graphics leaf helpers inline because their extra wiring adds little value.
+No elapsed compilation speedup is inferred from this source change.
+
+### Runtime lifecycle support — verified checkpoint
+
+Claude's fixed-diff review found no blockers. Preserve current ordering rationale
+in the implementation and README; removed historical comments are not needed
+in the declaration surface. All moved control-flow bodies retain their existing
+statements. No tests or production behavior were changed. The compiler database
+contains one support-source action; symbol inspection finds both shared module
+vtables and registration in that object and none in the 47 consumer objects.
+Each of the ten real Ninja link commands contains the support object exactly
+once. The test-case registry intentionally excludes support sources.
+
+The header shrinks from 158 to 94 physical lines; its new implementation has
+84 lines. Together with five added CMake lines, the source/build total grows by
+25 lines to provide declarations and one compiled owner. Production source is
+unchanged. This removes repeated compilation, not source-line count, and makes
+no elapsed build-speed claim. Tests README documents the required object link.
+
+Canonical `ci` configure and `IntrinsicTests` build pass with Clang 23. All 11
+focused runtime lifecycle/kernel-event tests pass. The full exclusion-only CPU
+gate selects 4,746 cases: 4,745 pass, one expected ASan-only GLFW lifecycle
+skip, zero failures (155.27 s). All five Vulkan-consuming executables build in
+`ci-vulkan`; one integration case per executable executes and passes under
+ASan+UBSan, no skips (43.88 s). This is focused sanitizer-backed Vulkan coverage,
+not full CPU sanitizer-suite evidence.
+
+Routing reconciles 41 targets, 4,753 cases and 363 case-owning sources. Strict
+layering, test layout, task policy/state, docs sync, doc links, root hygiene,
+skill mirrors, session brief, diff and clean-workshop automation pass. The
+source-documentation audit reports zero errors/review findings for the two
+support files. Manual architecture/workshop rows preserve downward test
+dependencies and global-module type ownership; renderer state, pass/recipe
+order, maturity closure and exceptions are unchanged/not applicable.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^(RuntimeModule|RuntimeKernelEvents|KernelEvents)\.' --no-tests=error --timeout 60
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target IntrinsicGraphicsVulkanSmokeTests IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests IntrinsicRuntimeClusteringServiceGpuSmokeTests IntrinsicRuntimePointCloudConsolidationGpuParityTests IntrinsicPointLBVHGpuTests -j4
+ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R '^(DefaultRecipeSurfaceGpuSmoke\.RecipeSelectorReachesOperationalVulkanCommandStream|RuntimeSandboxAcceptanceGpuSmoke\.ExtrinsicSandboxDefaultConfigPresentsReferenceTriangleAtFrameCenter|ClusteringServiceGpuSmoke\.VulkanExecutionMatchesCpuReferenceAndCommitsCanonicalProperties|PointCloudConsolidationGpuParity\.VulkanAutoProcessesChildMeshPositionsAndPublishesDisplacement|PointLBVHGpuSmoke\.FramedKNearestReusesBuffersAndRejectsStaleTarget)$' --no-tests=error --timeout 180 --parallel 1
+python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicTests
+```
+
+Logs, fixed Claude packets and compiled-owner inspection are retained under
+`/tmp/intrinsic-compiled-test-support/`. UI-037's broader readiness inventory
+remains open. Start the next session from this checkpoint, not the full history.

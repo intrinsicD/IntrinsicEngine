@@ -541,6 +541,14 @@ Executables consuming these doubles include `MockRhiTestSupportObjs` in their
 broad touched-scope verification route. Core-only test support remains
 independent of RHI.
 
+[`support/RuntimeTestModule.hpp`](support/RuntimeTestModule.hpp) keeps fixture
+templates and declarations; registration and lifecycle bodies compile in
+[`support/RuntimeTestModule.cpp`](support/RuntimeTestModule.cpp). Consumers list
+`RuntimeTestModuleSupportObjs` in their `OBJECTS`; core-only support remains
+independent of runtime. Fixture hooks run before production UI hooks, resolve
+after production modules, and release fixture state before those services shut
+down.
+
 `regression/tooling/Test.ClangToolchainSelection.py` checks automatic compiler
 selection through directory aliases while preserving the C++ driver name. It
 runs in the structural CI workflow without requiring an installed Clang toolchain.

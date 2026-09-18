@@ -1239,6 +1239,11 @@ if(TARGET ExtrinsicRuntime)
         SEARCH_DIRS contract/runtime
         FILES ${_runtime_contract_test_files}
     )
+    intrinsic_test_object_lib(RuntimeTestModuleSupportObjs
+        SOURCES support/RuntimeTestModule.cpp
+        DEPS ExtrinsicRuntime
+    )
+
     intrinsic_test_object_lib(EditorFeatureTestSupportObjs
         SOURCES support/EditorFeatureTestContext.cpp
         DEPS ExtrinsicRuntime
@@ -1680,7 +1685,7 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
         DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
     )
     intrinsic_test_executable(IntrinsicPointLBVHGpuTests
-        OBJECTS PointLBVHGpuTestObjs
+        OBJECTS PointLBVHGpuTestObjs RuntimeTestModuleSupportObjs
         LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
         LABELS integration graphics gpu vulkan
     )
@@ -2104,7 +2109,7 @@ endif()
 
 if(TARGET RuntimeContractTestObjs)
     intrinsic_test_executable(IntrinsicRuntimeContractTests
-        OBJECTS RuntimeContractTestObjs EditorFeatureTestSupportObjs MockRhiTestSupportObjs
+        OBJECTS RuntimeContractTestObjs EditorFeatureTestSupportObjs MockRhiTestSupportObjs RuntimeTestModuleSupportObjs
         LINK_LIBS ExtrinsicRuntime IntrinsicProgressivePoissonReference
         LABELS contract runtime
     )
@@ -2112,7 +2117,7 @@ endif()
 
 if(TARGET RuntimeContractSlowTestObjs)
     intrinsic_test_executable(IntrinsicRuntimeContractSlowTests
-        OBJECTS RuntimeContractSlowTestObjs
+        OBJECTS RuntimeContractSlowTestObjs RuntimeTestModuleSupportObjs
         LINK_LIBS ExtrinsicRuntime
         LABELS contract runtime slow
     )
@@ -2120,7 +2125,7 @@ endif()
 
 if(TARGET SandboxEditorIntegrationTestObjs)
     intrinsic_test_executable(IntrinsicSandboxEditorIntegrationTests
-        OBJECTS SandboxEditorIntegrationTestObjs EditorFeatureTestSupportObjs
+        OBJECTS SandboxEditorIntegrationTestObjs EditorFeatureTestSupportObjs RuntimeTestModuleSupportObjs
         LINK_LIBS ExtrinsicSandboxEditor ExtrinsicRuntime
         LABELS integration runtime
     )
@@ -2194,7 +2199,7 @@ endif()
 
 if(TARGET RuntimePhysicsModuleTestObjs)
     intrinsic_test_executable(IntrinsicRuntimePhysicsModuleTests
-        OBJECTS RuntimePhysicsModuleTestObjs
+        OBJECTS RuntimePhysicsModuleTestObjs RuntimeTestModuleSupportObjs
         LINK_LIBS ExtrinsicRuntime ExtrinsicPhysics ExtrinsicECS ExtrinsicCore
         LABELS integration runtime ecs physics
     )
@@ -2351,7 +2356,7 @@ endif()
 
 if(TARGET GraphicsVulkanSmokeTestObjs)
     intrinsic_test_executable(IntrinsicGraphicsVulkanSmokeTests
-        OBJECTS GraphicsVulkanSmokeTestObjs
+        OBJECTS GraphicsVulkanSmokeTestObjs RuntimeTestModuleSupportObjs
         LINK_LIBS ExtrinsicRuntime ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
         LABELS gpu vulkan graphics
     )
@@ -2365,7 +2370,7 @@ endif()
 # by the Slice 1/2 CPU acceptance test).
 if(TARGET RuntimeSandboxAcceptanceGpuSmokeTestObjs)
     intrinsic_test_executable(IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests
-        OBJECTS RuntimeSandboxAcceptanceGpuSmokeTestObjs EditorFeatureTestSupportObjs
+        OBJECTS RuntimeSandboxAcceptanceGpuSmokeTestObjs EditorFeatureTestSupportObjs RuntimeTestModuleSupportObjs
         LINK_LIBS ExtrinsicSandboxEditor ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore
         LABELS gpu vulkan integration runtime graphics
     )
@@ -2374,7 +2379,7 @@ endif()
 
 if(TARGET RuntimeClusteringServiceGpuSmokeTestObjs)
     intrinsic_test_executable(IntrinsicRuntimeClusteringServiceGpuSmokeTests
-        OBJECTS RuntimeClusteringServiceGpuSmokeTestObjs
+        OBJECTS RuntimeClusteringServiceGpuSmokeTestObjs RuntimeTestModuleSupportObjs
         LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore IntrinsicGeometry
         LABELS gpu vulkan integration runtime geometry
     )
@@ -2383,7 +2388,7 @@ endif()
 
 if(TARGET RuntimePointCloudConsolidationGpuParityTestObjs)
     intrinsic_test_executable(IntrinsicRuntimePointCloudConsolidationGpuParityTests
-        OBJECTS RuntimePointCloudConsolidationGpuParityTestObjs
+        OBJECTS RuntimePointCloudConsolidationGpuParityTestObjs RuntimeTestModuleSupportObjs
         LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore IntrinsicGeometry
         LABELS gpu vulkan integration runtime geometry
     )
@@ -2512,7 +2517,7 @@ intrinsic_test_executable(IntrinsicGraphicsContractCpuTests
 )
 
 intrinsic_test_executable(IntrinsicRuntimeGraphicsCpuTests
-    OBJECTS RuntimeGraphicsCpuTestObjs EditorFeatureTestSupportObjs MockRhiTestSupportObjs
+    OBJECTS RuntimeGraphicsCpuTestObjs EditorFeatureTestSupportObjs MockRhiTestSupportObjs RuntimeTestModuleSupportObjs
     LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicRHI ExtrinsicECS ExtrinsicCore ExtrinsicPlatform
     LABELS integration runtime graphics
 )
