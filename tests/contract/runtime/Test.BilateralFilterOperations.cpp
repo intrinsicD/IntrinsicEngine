@@ -147,7 +147,7 @@ TEST(BilateralFilterConfig, RoundTripAndSharedPreviewApplyRun)
         return R::RuntimeEngineConfigApplyResult{.Status = R::RuntimeEngineConfigApplyStatus::Applied};
     };
     auto commands = R::BindEditorProcessingCommands(context);
-    ASSERT_TRUE(R::PreviewEditorBilateralFilterCommand(commands, config).Ready);
+    ASSERT_TRUE(R::PreviewEditorBilateralFilterCommand(commands, config).Enabled);
     EXPECT_FALSE(Properties(scene, entity, D::MeshFace).Exists("filtered"));
     ASSERT_TRUE(R::ApplyEditorBilateralFilterConfig(commands, config).Succeeded());
     ASSERT_TRUE(R::GetEditorBilateralFilterConfig(commands));
@@ -220,7 +220,7 @@ TEST(BilateralFilterOperations, EveryDomainCopyAndInPlaceHistory)
         const auto catalog=R::GetEditorBilateralFilterInputCatalog(commands,config.StableEntityId);
         EXPECT_TRUE(std::ranges::any_of(catalog.Entries,[&](auto& e){return e.Ref==config.Positions;}));
         EXPECT_TRUE(std::ranges::any_of(catalog.Entries,[&](auto& e){return e.Ref==config.Normals;}));
-        ASSERT_TRUE(R::PreviewEditorBilateralFilterCommand(commands,config).Ready);
+        ASSERT_TRUE(R::PreviewEditorBilateralFilterCommand(commands,config).Enabled);
         const auto reference=R::ApplyEditorBilateralFilterCommand(commands,config);
         ASSERT_TRUE(reference.Succeeded())<<reference.Message;EXPECT_EQ(reference.CompletedIterations,3);
         const auto values=std::as_const(props).Get<glm::vec3>(config.Output.Name).Vector();
@@ -269,7 +269,7 @@ TEST(BilateralFilterOperations, ZeroPassAndOutputPreflight)
     const auto context=R::BindEditorProcessingCommands(R::EditorProcessingContext{.Scene=&scene});
     config.Iterations=0;const auto result=R::ApplyEditorBilateralFilterCommand(context,config);ASSERT_TRUE(result.Succeeded());EXPECT_EQ(result.CompletedIterations,0);
     EXPECT_EQ(std::as_const(props).Get<glm::vec3>("filtered").Vector(),std::as_const(props).Get<glm::vec3>("samples").Vector());
-    config.Output=config.Normals;EXPECT_FALSE(R::PreviewEditorBilateralFilterCommand(context,config).Ready);
-    config.Output=config.Positions;config.Output.Name="v:deleted";EXPECT_FALSE(R::PreviewEditorBilateralFilterCommand(context,config).Ready);
-    config.Output=config.Positions;config.Backend=R::BilateralFilterBackend::VulkanLBVH;EXPECT_FALSE(R::PreviewEditorBilateralFilterCommand(context,config).Ready);
+    config.Output=config.Normals;EXPECT_FALSE(R::PreviewEditorBilateralFilterCommand(context,config).Enabled);
+    config.Output=config.Positions;config.Output.Name="v:deleted";EXPECT_FALSE(R::PreviewEditorBilateralFilterCommand(context,config).Enabled);
+    config.Output=config.Positions;config.Backend=R::BilateralFilterBackend::VulkanLBVH;EXPECT_FALSE(R::PreviewEditorBilateralFilterCommand(context,config).Enabled);
 }

@@ -537,16 +537,13 @@ namespace Extrinsic::Runtime
             return r;
         }
     } // namespace
-    EditorNormalEstimationReadiness PreviewEditorNormalEstimationCommand(
+    ActionReadiness PreviewEditorNormalEstimationCommand(
         const EditorProcessingCommands &commands, const NormalEstimationConfig &config)
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        EditorNormalEstimationReadiness result;
-        auto work = CaptureNormalWork(context, config, result.Diagnostic, CapturePurpose::Readiness);
-        result.Ready = bool(work);
-        if (work)
-            result.Resolved = work->Config;
-        return result;
+        std::string diagnostic;
+        const auto work = CaptureNormalWork(context, config, diagnostic, CapturePurpose::Readiness);
+        return {bool(work), std::move(diagnostic)};
     }
     EditorNormalEstimationResult ApplyEditorNormalEstimationCommand(
         const EditorProcessingCommands &commands, const NormalEstimationConfig &config,

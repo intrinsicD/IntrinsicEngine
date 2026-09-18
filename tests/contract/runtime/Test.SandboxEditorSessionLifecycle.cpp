@@ -885,7 +885,7 @@ TEST(SandboxEditorSessionLifecycle, PointFieldFramesRetainIndependentResultsAndR
         attachment.Detach();
         EXPECT_FALSE(expired.Commands.IsBound());
         EXPECT_FALSE(Runtime::GetEditorPointSpacingConfig(expired.Commands));
-        EXPECT_FALSE(Runtime::PreviewEditorKernelDensityCommand(expired.Commands, {}).Ready);
+        EXPECT_FALSE(Runtime::PreviewEditorKernelDensityCommand(expired.Commands, {}).Enabled);
         EXPECT_FALSE(Runtime::PrepareEditorPointFieldFrame(attachment).Results.LastPointSpacingResult);
         attachment.Attach(engine.Worlds(), engine.Services());
         ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment));
@@ -902,7 +902,7 @@ TEST(SandboxEditorSessionLifecycle, PointFieldFramesRetainIndependentResultsAndR
     }
     expired.ResultSinks.KernelDensity({.Message="after destruction"});
     expired.ResultSinks.DismissResult(Runtime::EditorPointFieldResultSlot::KernelDensity);
-    EXPECT_FALSE(Runtime::PreviewEditorPointSpacingCommand(expired.Commands, {}).Ready);
+    EXPECT_FALSE(Runtime::PreviewEditorPointSpacingCommand(expired.Commands, {}).Enabled);
     engine.Shutdown();
 }
 
@@ -959,7 +959,7 @@ TEST(SandboxEditorSessionLifecycle, PointAnalysisFramesRetainAllSlotsAndRejectEx
         attachment.Detach();
         EXPECT_FALSE(expired.Commands.IsBound());
         EXPECT_FALSE(Runtime::GetEditorDensityWeightConfig(expired.Commands));
-        EXPECT_FALSE(Runtime::PreviewEditorKeypointAnalysisCommand(expired.Commands, {}).Ready);
+        EXPECT_FALSE(Runtime::PreviewEditorKeypointAnalysisCommand(expired.Commands, {}).Enabled);
         EXPECT_FALSE(Runtime::PrepareEditorPointAnalysisFrame(attachment).Results.LastDensityWeightResult);
         attachment.Attach(engine.Worlds(), engine.Services());
         ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment));
@@ -975,7 +975,7 @@ TEST(SandboxEditorSessionLifecycle, PointAnalysisFramesRetainAllSlotsAndRejectEx
     expired.ResultSinks.KeypointAnalysis({.Message="after destruction"});
     expired.ResultSinks.DensityWeight({.Message="after destruction"});
     expired.ResultSinks.DismissResult(Runtime::EditorPointAnalysisResultSlot::OutlierAnalysis);
-    EXPECT_FALSE(Runtime::PreviewEditorOutlierAnalysisCommand(expired.Commands, {}).Ready);
+    EXPECT_FALSE(Runtime::PreviewEditorOutlierAnalysisCommand(expired.Commands, {}).Enabled);
     engine.Shutdown();
 }
 

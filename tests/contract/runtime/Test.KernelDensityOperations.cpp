@@ -147,7 +147,7 @@ TEST(KernelDensityConfig, RoundTripAndSharedPreviewApplyRun)
         return R::RuntimeEngineConfigApplyResult{.Status = R::RuntimeEngineConfigApplyStatus::Applied};
     };
     auto commands = R::BindEditorProcessingCommands(context);
-    ASSERT_TRUE(R::PreviewEditorKernelDensityCommand(commands, config).Ready);
+    ASSERT_TRUE(R::PreviewEditorKernelDensityCommand(commands, config).Enabled);
     EXPECT_FALSE(Properties(scene, entity, D::MeshFace).Exists("density"));
     ASSERT_TRUE(R::ApplyEditorKernelDensityConfig(commands, config).Succeeded());
     ASSERT_TRUE(R::GetEditorKernelDensityConfig(commands));
@@ -184,7 +184,7 @@ TEST(KernelDensityOperations, EveryDomainPublishesNamedDensityAndPreservesDelete
         R::EditorProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
         const auto catalog=R::GetEditorKernelDensityInputCatalog(R::BindEditorProcessingCommands(context), config.StableEntityId);
         EXPECT_TRUE(std::ranges::any_of(catalog.Entries,[&](auto& e){return e.Ref==config.Positions;}));
-        ASSERT_TRUE(R::PreviewEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), config).Ready);
+        ASSERT_TRUE(R::PreviewEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), config).Enabled);
         const auto reference=R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), config);
         ASSERT_TRUE(reference.Succeeded())<<reference.Message;EXPECT_EQ(reference.ActualBackend,"cpu_octree");
         const auto values=std::as_const(props).Get<float>("density").Vector();
@@ -232,7 +232,7 @@ TEST(KernelDensityOperations, InvalidUnsupportedAndNumericalFailuresRetainOutput
     R::EditorProcessingContext context{.Scene=&scene};
     auto& props=Properties(scene,entity,D::PointCloudPoint);props.GetOrAdd<float>("density").Vector().assign(props.Size(),77);
     for(const char* name:{"v:deleted","h:next","samples"})
-    {auto bad=config;bad.Density.Name=name;EXPECT_FALSE(R::PreviewEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), bad).Ready);}
+    {auto bad=config;bad.Density.Name=name;EXPECT_FALSE(R::PreviewEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), bad).Enabled);}
     config.Backend=R::KernelDensityBackend::VulkanLBVH;
     EXPECT_FALSE(R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), config).Succeeded());
     config.Backend=R::KernelDensityBackend::CpuOctree;config.Bandwidth=1e-30f;

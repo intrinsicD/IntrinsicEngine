@@ -163,7 +163,7 @@ namespace Extrinsic::Sandbox::Editor
             if (!state.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", state.ConfigDiagnostic.c_str());
             const auto method = preview(state.Draft);
             const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
-                commands, {method.Ready, method.Diagnostic});
+                commands, method);
             if (!readiness.Enabled) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
             if (DrawProcessingActionButton(button, readiness))
                 ApplyProcessingExecution(state, state.Draft, apply, execute, sink, executionRejected);
@@ -1722,15 +1722,15 @@ namespace Extrinsic::Sandbox::Editor
                         ? "f:normal" : "v:normal";
                 const auto readiness =
                     Runtime::PreviewEditorNormalEstimationCommand(context.Normals.Commands, candidate);
-                ImGui::BeginDisabled(!readiness.Ready);
+                ImGui::BeginDisabled(!readiness.Enabled);
                 if (ImGui::Selectable(Runtime::ToString(method), config.Method == method))
                 {
                     config = candidate;
                     changed = true;
                 }
                 ImGui::EndDisabled();
-                if (!readiness.Ready)
-                    DrawDisabledReasonTooltip(readiness.Diagnostic);
+                if (!readiness.Enabled)
+                    DrawDisabledReasonTooltip(readiness.DisabledReason);
             }
             ImGui::EndCombo();
         }
@@ -1915,7 +1915,7 @@ namespace Extrinsic::Sandbox::Editor
         auto analyze=config;analyze.Operation=Runtime::OutlierAnalysisOperation::Analyze;
         const auto preview = Runtime::PreviewEditorOutlierAnalysisCommand(context.PointAnalysis.Commands, analyze);
         const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
-            context.PointAnalysis.Commands, {preview.Ready, preview.Diagnostic});
+            context.PointAnalysis.Commands, preview);
         if (!readiness.Enabled) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
         const auto execute = [&](const Runtime::OutlierAnalysisConfig& request) {
             ApplyProcessingExecution(Outliers, request,
@@ -1929,7 +1929,7 @@ namespace Extrinsic::Sandbox::Editor
         remove.Operation = Runtime::OutlierAnalysisOperation::RemoveMarked;
         const auto removal = Runtime::PreviewEditorOutlierAnalysisCommand(context.PointAnalysis.Commands, remove);
         const auto removalReadiness = Runtime::ResolveEditorProcessingActionReadiness(
-            context.PointAnalysis.Commands, {removal.Ready, removal.Diagnostic});
+            context.PointAnalysis.Commands, removal);
         if (DrawProcessingActionButton("Remove marked points", removalReadiness)) execute(remove);
         ImGui::TextWrapped("Removal compacts point clouds and supports Undo. Detect again after changing positions or the mask.");
         auto mask=config.Mask,

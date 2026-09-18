@@ -28,12 +28,6 @@ export namespace Extrinsic::Runtime
         double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
         [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied || Status==EditorCommandStatus::NoChange; }
     };
-    struct EditorNormalEstimationReadiness
-    {
-        bool Ready{};
-        std::string Diagnostic{};
-        NormalEstimationConfig Resolved{};
-    };
     // Incomplete borrowed containers keep sibling workspace features independent
     // of normal method records; prepared frames copy their values.
     extern "C++"
@@ -57,7 +51,7 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] EditorNormalPreparedFrame PrepareEditorNormalFrame(const EditorWorkspaceAttachment&);
     // Immediate outcomes return directly. Only a newly queued job delivers a
     // terminal callback, while attached. Duplicate Pending requests add no callback.
-    [[nodiscard]] EditorNormalEstimationReadiness PreviewEditorNormalEstimationCommand(const EditorProcessingCommands&, const NormalEstimationConfig&);
+    [[nodiscard]] ActionReadiness PreviewEditorNormalEstimationCommand(const EditorProcessingCommands&, const NormalEstimationConfig&);
     [[nodiscard]] EditorNormalEstimationResult ApplyEditorNormalEstimationCommand(const EditorProcessingCommands&, const NormalEstimationConfig&, std::function<void(EditorNormalEstimationResult)> onComplete = {});
     [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorNormalEstimationConfig(const EditorProcessingCommands&, const NormalEstimationConfig&, std::string sourceId = {});
     [[nodiscard]] std::optional<NormalEstimationConfig> GetEditorNormalEstimationConfig(const EditorProcessingCommands&);

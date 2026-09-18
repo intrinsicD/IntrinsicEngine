@@ -398,13 +398,13 @@ namespace Extrinsic::Runtime
             return r;
         }
     }
-    EditorOutlierAnalysisReadiness PreviewEditorOutlierAnalysisCommand(
+    ActionReadiness PreviewEditorOutlierAnalysisCommand(
         const EditorProcessingCommands& commands,const OutlierAnalysisConfig& config)
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        EditorOutlierAnalysisReadiness r;
-        auto w=Capture(context,config,r.Diagnostic,CapturePurpose::Readiness);
-        r.Ready=bool(w);if(w)r.Resolved=w->Config;return r;
+        std::string diagnostic;
+        const auto work = Capture(context, config, diagnostic, CapturePurpose::Readiness);
+        return {bool(work), std::move(diagnostic)};
     }
     EditorOutlierAnalysisResult ApplyEditorOutlierAnalysisCommand(
         const EditorProcessingCommands& commands, const OutlierAnalysisConfig &config, std::function<void(EditorOutlierAnalysisResult)> onComplete)

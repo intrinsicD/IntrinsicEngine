@@ -116,7 +116,7 @@ TEST(DescriptorAnalysisConfig, RoundTripAndSharedPreviewApplyRun)
         return R::RuntimeEngineConfigApplyResult{.Status = R::RuntimeEngineConfigApplyStatus::Applied};
     };
     auto commands = R::BindEditorProcessingCommands(context);
-    ASSERT_TRUE(R::PreviewEditorDescriptorAnalysisCommand(commands, config).Ready);
+    ASSERT_TRUE(R::PreviewEditorDescriptorAnalysisCommand(commands, config).Enabled);
     EXPECT_FALSE(Properties(scene, entity, D::MeshFace).Exists("descriptor.alpha0"));
     ASSERT_TRUE(R::ApplyEditorDescriptorAnalysisConfig(commands, config).Succeeded());
     ASSERT_TRUE(R::GetEditorDescriptorAnalysisConfig(commands));
@@ -158,7 +158,7 @@ TEST(DescriptorAnalysisOperations, EveryDomainReferenceCacheHistoryAndDeletedRow
         const auto catalog=R::GetEditorPointInputCatalog(context,c.StableEntityId);
         EXPECT_TRUE(std::ranges::any_of(catalog.Entries,[&](auto& e){return e.Ref==c.Positions;}));
         EXPECT_TRUE(std::ranges::any_of(catalog.Entries,[&](auto& e){return e.Ref==c.Normals;}));
-        ASSERT_TRUE(R::PreviewEditorDescriptorAnalysisCommand(context,c).Ready);
+        ASSERT_TRUE(R::PreviewEditorDescriptorAnalysisCommand(context,c).Enabled);
         const auto reference=R::ApplyEditorDescriptorAnalysisCommand(context,c);
         ASSERT_TRUE(reference.Succeeded())<<reference.Message;EXPECT_EQ(reference.ActualBackend,"cpu_kdtree");
         EXPECT_GT(reference.MeanSpacing,0.f);
@@ -235,10 +235,10 @@ TEST(DescriptorAnalysisOperations, InvalidNormalsScaleAndOutputPreflightRetainDa
     auto& props=Properties(scene,entity,D::MeshVertex);
     const auto context=R::BindEditorProcessingCommands(R::EditorProcessingContext{.Scene=&scene});
     for(auto name:{"samples","directions","v:deleted","h:connectivity"})
-    {auto bad=c;bad.Outputs[32].Name=name;EXPECT_FALSE(R::PreviewEditorDescriptorAnalysisCommand(context,bad).Ready);}
-    auto gpu=c;gpu.Backend=R::DescriptorAnalysisBackend::VulkanLBVH;EXPECT_FALSE(R::PreviewEditorDescriptorAnalysisCommand(context,gpu).Ready);
+    {auto bad=c;bad.Outputs[32].Name=name;EXPECT_FALSE(R::PreviewEditorDescriptorAnalysisCommand(context,bad).Enabled);}
+    auto gpu=c;gpu.Backend=R::DescriptorAnalysisBackend::VulkanLBVH;EXPECT_FALSE(R::PreviewEditorDescriptorAnalysisCommand(context,gpu).Enabled);
     props.GetOrAdd<float>(c.Outputs[0].Name).Vector().assign(props.Size(),77);
-    props.Get<glm::vec3>("directions")[0]={0,0,0};EXPECT_FALSE(R::PreviewEditorDescriptorAnalysisCommand(context,c).Ready);
+    props.Get<glm::vec3>("directions")[0]={0,0,0};EXPECT_FALSE(R::PreviewEditorDescriptorAnalysisCommand(context,c).Enabled);
     EXPECT_FALSE(R::ApplyEditorDescriptorAnalysisCommand(context,c).Succeeded());
     props.Get<glm::vec3>("directions")[0]={0,0,1};props.Get<glm::vec3>("samples").Vector().assign(props.Size(),glm::vec3(0));
     EXPECT_FALSE(R::ApplyEditorDescriptorAnalysisCommand(context,c).Succeeded());

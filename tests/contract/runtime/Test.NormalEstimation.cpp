@@ -117,7 +117,7 @@ TEST(NormalEstimation, EveryCanonicalDomainPublishesNamedNormalsAndSupportsUndoR
             ASSERT_TRUE(std::ranges::any_of(catalog.Entries,
                                             [&](const auto &e) { return e.Ref == config.Positions; }));
             const auto inputRevision = std::as_const(props).Get<glm::vec3>("samples").Revision();
-            ASSERT_TRUE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Ready);
+            ASSERT_TRUE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Enabled);
             EXPECT_FALSE(props.Exists("estimated"));
             const auto result = R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config);
             ASSERT_EQ(result.Status, R::EditorCommandStatus::Applied) << result.Message;
@@ -182,7 +182,7 @@ TEST(NormalEstimation, TopologyVariantsConsumeCustomPositionsAndGraphMethodAccep
             R::EditorProcessingContext context{.Scene = &scene};
             if (domain == D::GraphNode && method == R::NormalEstimationMethod::MeshFaceWeighted)
             {
-                EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Ready);
+                EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Enabled);
                 continue;
             }
             auto result = R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config);
@@ -256,7 +256,7 @@ TEST(NormalEstimation, RejectsInvalidBindingsAndUnavailableBackendsWithoutMutati
             config.Positions.Name = "missing";
             break;
         }
-        EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Ready);
+        EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Enabled);
         const auto rejected = R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config);
         EXPECT_FALSE(rejected.Succeeded());
         EXPECT_EQ(rejected.Method, config.Method);
@@ -265,7 +265,7 @@ TEST(NormalEstimation, RejectsInvalidBindingsAndUnavailableBackendsWithoutMutati
         EXPECT_FALSE(props.Exists("estimated"));
     }
     props.Get<glm::vec3>("samples")[0].x = std::numeric_limits<float>::quiet_NaN();
-    EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), base).Ready);
+    EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), base).Enabled);
     EXPECT_FALSE(props.Exists("estimated"));
 }
 
@@ -413,7 +413,21 @@ TEST(NormalEstimationConfig, RoundTripAndSharedPreviewApplyRun)
     EXPECT_FALSE(R::ResolveEditorProcessingActionReadiness(commands, {}).DisabledReason.empty());
     EXPECT_EQ(previews, 0u);
     EXPECT_EQ(applies, 0u);
-    ASSERT_TRUE(R::PreviewEditorNormalEstimationCommand(commands, config).Ready);
+    const auto method = R::PreviewEditorNormalEstimationCommand(commands, config);
+    ASSERT_TRUE(method.Enabled);
+    EXPECT_TRUE(method.DisabledReason.empty());
+    EXPECT_TRUE(R::ResolveEditorProcessingActionReadiness(commands, method).Enabled);
+    auto invalidConfig = config;
+    invalidConfig.KNeighbors = 0;
+    const auto invalidMethod = R::PreviewEditorNormalEstimationCommand(commands, invalidConfig);
+    ASSERT_FALSE(invalidMethod.Enabled);
+    ASSERT_FALSE(invalidMethod.DisabledReason.empty());
+    EXPECT_EQ(R::ResolveEditorProcessingActionReadiness(commands, invalidMethod).DisabledReason,
+              invalidMethod.DisabledReason);
+    EXPECT_EQ(R::ApplyEditorNormalEstimationCommand(commands, invalidConfig).Message,
+              invalidMethod.DisabledReason);
+    EXPECT_EQ(R::ResolveEditorProcessingActionReadiness({}, invalidMethod).DisabledReason,
+              unavailable.DisabledReason);
     EXPECT_FALSE(Properties(scene, entity, D::MeshFace).Exists("estimated"));
     ASSERT_TRUE(R::ApplyEditorNormalEstimationConfig(commands, config).Succeeded());
     ASSERT_TRUE(R::GetEditorNormalEstimationConfig(commands));
@@ -512,9 +526,9 @@ TEST(NormalEstimation, TopologyCatalogRetainsSmallGraphsAndReportsPcaMinimum)
     const auto catalog = R::GetEditorPointInputCatalog(R::BindEditorProcessingCommands(context), config.StableEntityId);
     EXPECT_TRUE(
         std::ranges::any_of(catalog.Entries, [&](const auto &e) { return e.Ref == config.Positions; }));
-    EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Ready);
+    EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Enabled);
     config.Method = R::NormalEstimationMethod::GraphNeighborhood;
-    EXPECT_TRUE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Ready);
+    EXPECT_TRUE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Enabled);
     const auto result = R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config);
     EXPECT_TRUE(result.Succeeded()) << result.Message;
     EXPECT_GT(result.InvalidEdges, 0);
@@ -573,7 +587,7 @@ TEST(NormalEstimation, FaceNormalsUseFullPolygonRingAndPublishOnlyFaceOutput)
     EXPECT_EQ(R::GetNormalEstimationConfig(engineConfig)->Method, config.Method);
     R::EditorCommandHistory history;
     R::EditorProcessingContext context{.Scene = &scene, .CommandHistory = &history};
-    ASSERT_TRUE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Ready);
+    ASSERT_TRUE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Enabled);
     const auto result = R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config);
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     EXPECT_EQ(result.SlotCount, 2u);
@@ -620,7 +634,7 @@ TEST(NormalEstimation, FaceNormalsPreserveDeletedSlotsAndReportDegenerateFallbac
     EXPECT_EQ(result.ValidCount, 0u);
     EXPECT_EQ(std::as_const(faces).Get<glm::vec3>("f:normal")[1], (glm::vec3{0, 1, 0}));
     config.Output.Domain = D::MeshVertex;
-    EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Ready);
+    EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Enabled);
 }
 
 
@@ -683,7 +697,7 @@ TEST(NormalEstimation, VulkanUnavailablePreservesOutputsOnEveryDomain)
         auto config = Config(entity, D(d));
         config.Backend = R::NormalEstimationBackend::VulkanLBVH;
         R::EditorProcessingContext context{.Scene=&scene};
-        EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Ready);
+        EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Enabled);
         const auto result = R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config);
         EXPECT_EQ(result.RequestedBackend, R::NormalEstimationBackend::VulkanLBVH);
         EXPECT_FALSE(result.Succeeded());
@@ -811,7 +825,7 @@ TEST(NormalEstimation, ExpiredAttachmentGuardsFreedSceneHistoryAndCommands)
     active = false;
     scene.reset();
     EXPECT_EQ(history.Undo().Status, R::EditorCommandHistoryStatus::StaleEntity);
-    EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(commands, config).Ready);
+    EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(commands, config).Enabled);
     EXPECT_TRUE(R::GetEditorPointInputCatalog(commands, config.StableEntityId).Entries.empty());
     EXPECT_FALSE(R::ApplyEditorNormalEstimationCommand(commands, config).Succeeded());
     EXPECT_FALSE(R::GetEditorNormalEstimationConfig(commands));

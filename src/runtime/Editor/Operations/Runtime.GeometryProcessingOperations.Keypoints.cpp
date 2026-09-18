@@ -248,13 +248,13 @@ namespace Extrinsic::Runtime
             return r;
         }
     }
-    EditorKeypointAnalysisReadiness PreviewEditorKeypointAnalysisCommand(
+    ActionReadiness PreviewEditorKeypointAnalysisCommand(
         const EditorProcessingCommands& commands,const KeypointAnalysisConfig& config)
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        EditorKeypointAnalysisReadiness r;
-        auto w=Capture(context,config,r.Diagnostic,CapturePurpose::Readiness);
-        r.Ready=bool(w);if(w)r.Resolved=w->Config;return r;
+        std::string diagnostic;
+        const auto work = Capture(context, config, diagnostic, CapturePurpose::Readiness);
+        return {bool(work), std::move(diagnostic)};
     }
     EditorKeypointAnalysisResult ApplyEditorKeypointAnalysisCommand(
         const EditorProcessingCommands& commands,const KeypointAnalysisConfig& config, std::function<void(EditorKeypointAnalysisResult)> onComplete)

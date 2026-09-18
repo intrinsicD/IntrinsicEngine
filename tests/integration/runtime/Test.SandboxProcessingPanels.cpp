@@ -387,8 +387,8 @@ TEST(SandboxProcessingPanels, ShowButtonsApplyAppearancePropertiesOnMeshGraphAnd
                         harness.Control().GetEngineConfigControlState().ActiveConfig);
                     const auto readiness = R::PreviewEditorOutlierAnalysisCommand(
                         R::BindEditorProcessingCommands({.Scene = &scene}), input);
-                    EXPECT_FALSE(readiness.Ready);
-                    EXPECT_NE(readiness.Diagnostic.find("more live samples than k"), std::string::npos);
+                    EXPECT_FALSE(readiness.Enabled);
+                    EXPECT_NE(readiness.DisabledReason.find("more live samples than k"), std::string::npos);
                 }
                 ImGui::ActivateItemByID(window->GetID(show.Button));
             }

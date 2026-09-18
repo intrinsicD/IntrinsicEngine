@@ -150,11 +150,12 @@ namespace Extrinsic::Runtime
             r.Status=EditorFeatureDetail::ToEditorCommandStatus(status);if(!r.Succeeded())r.Message="Density publication rejected by history checks.";return r;
         }
     }
-    EditorDensityWeightReadiness PreviewEditorDensityWeightCommand(const EditorProcessingCommands& commands,const DensityWeightConfig& config)
+    ActionReadiness PreviewEditorDensityWeightCommand(const EditorProcessingCommands& commands,const DensityWeightConfig& config)
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        EditorDensityWeightReadiness r;auto w=Capture(context,config,r.Diagnostic,Purpose::Readiness);
-        r.Ready=bool(w);if(w)r.Resolved=w->Config;return r;
+        std::string diagnostic;
+        const auto work = Capture(context, config, diagnostic, Purpose::Readiness);
+        return {bool(work), std::move(diagnostic)};
     }
     EditorDensityWeightResult ApplyEditorDensityWeightCommand(const EditorProcessingCommands& commands,const DensityWeightConfig& config, std::function<void(EditorDensityWeightResult)> onComplete)
     {

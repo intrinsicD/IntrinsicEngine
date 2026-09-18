@@ -158,13 +158,13 @@ namespace Extrinsic::Runtime
             return r;
         }
     }
-    EditorKernelDensityReadiness PreviewEditorKernelDensityCommand(
+    ActionReadiness PreviewEditorKernelDensityCommand(
         const EditorProcessingCommands& commands,const KernelDensityConfig& config)
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        EditorKernelDensityReadiness r;
-        auto w=Capture(context,config,r.Diagnostic,CapturePurpose::Readiness);
-        r.Ready=bool(w);if(w)r.Resolved=w->Config;return r;
+        std::string diagnostic;
+        const auto work = Capture(context, config, diagnostic, CapturePurpose::Readiness);
+        return {bool(work), std::move(diagnostic)};
     }
     GeometryPropertyCatalogSnapshot GetEditorKernelDensityInputCatalog(
         const EditorProcessingCommands& commands,std::uint32_t id)

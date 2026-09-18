@@ -697,7 +697,7 @@ namespace
                 if(Phase==0)
                 {
                     auto unsupported=Config(8);unsupported.KNeighbors=64;
-                    EXPECT_FALSE(Runtime::PreviewEditorNormalEstimationCommand(Runtime::BindEditorProcessingCommands(Context),unsupported).Ready);
+                    EXPECT_FALSE(Runtime::PreviewEditorNormalEstimationCommand(Runtime::BindEditorProcessingCommands(Context),unsupported).Enabled);
                 }
                 for(unsigned d=1;d<=8;++d)
                 {
@@ -919,7 +919,7 @@ namespace
                 if(Phase==0)
                 {
                     auto unsupported=Config(8);unsupported.KNeighbors=Ratio ? 64 : 65;
-                    EXPECT_FALSE(Runtime::PreviewEditorOutlierAnalysisCommand(Runtime::BindEditorProcessingCommands(Context),unsupported).Ready);
+                    EXPECT_FALSE(Runtime::PreviewEditorOutlierAnalysisCommand(Runtime::BindEditorProcessingCommands(Context),unsupported).Enabled);
                 }
                 for(unsigned d=1;d<=8;++d)
                 {
@@ -1173,7 +1173,7 @@ namespace
                 if(Phase==0)
                 {
                     auto unsupported=Config(8);unsupported.KNeighbors=64;
-                    EXPECT_FALSE(Runtime::PreviewEditorKernelDensityCommand(Runtime::BindEditorProcessingCommands(Context), unsupported).Ready);
+                    EXPECT_FALSE(Runtime::PreviewEditorKernelDensityCommand(Runtime::BindEditorProcessingCommands(Context), unsupported).Enabled);
                 }
                 for(unsigned d=1;d<=8;++d)
                 {
@@ -1415,7 +1415,7 @@ namespace
                 if(Phase==0)
                 {
                     auto unsupported=Config(8);unsupported.KNeighbors=64;
-                    EXPECT_FALSE(Runtime::PreviewEditorPointSpacingCommand(Runtime::BindEditorProcessingCommands(Context), unsupported).Ready);
+                    EXPECT_FALSE(Runtime::PreviewEditorPointSpacingCommand(Runtime::BindEditorProcessingCommands(Context), unsupported).Enabled);
                 }
                 for(unsigned d=1;d<=8;++d)
                 {
@@ -1663,7 +1663,7 @@ namespace
                 {
                     auto unsupported=Config(8);unsupported.KNeighbors=64;
                     EXPECT_FALSE(Runtime::PreviewEditorBilateralFilterCommand(
-                        Runtime::BindEditorProcessingCommands(Context),unsupported).Ready);
+                        Runtime::BindEditorProcessingCommands(Context),unsupported).Enabled);
                 }
                 for(unsigned d=1;d<=8;++d)
                 {
@@ -2454,11 +2454,11 @@ namespace
                     {
                         glm::vec3 subnormal(0);subnormal[axis]=sign*std::numeric_limits<float>::denorm_min();p.Get<glm::vec3>("samples")[0]=subnormal;
                         const auto ready=Runtime::PreviewEditorDensityWeightCommand(Runtime::BindEditorProcessingCommands(Context),Config(8));
-                        EXPECT_FALSE(ready.Ready);EXPECT_NE(ready.Diagnostic.find("subnormal"),std::string::npos);
+                        EXPECT_FALSE(ready.Enabled);EXPECT_NE(ready.DisabledReason.find("subnormal"),std::string::npos);
                     }
                     p.Get<glm::vec3>("samples")[0]={0,0,0};
                     auto c=Config(8);c.SupportRadius=double(Geometry::PointLBVH::CoordinateLimit);
-                    EXPECT_FALSE(Runtime::PreviewEditorDensityWeightCommand(Runtime::BindEditorProcessingCommands(Context),c).Ready);
+                    EXPECT_FALSE(Runtime::PreviewEditorDensityWeightCommand(Runtime::BindEditorProcessingCommands(Context),c).Enabled);
                     EXPECT_EQ(std::as_const(p).Get<float>("weights")[0],77);EXPECT_EQ(History.UndoCount(),0);
                 }
             }

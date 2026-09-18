@@ -278,13 +278,13 @@ namespace Extrinsic::Runtime
             return r;
         }
     }
-    EditorDescriptorAnalysisReadiness PreviewEditorDescriptorAnalysisCommand(
+    ActionReadiness PreviewEditorDescriptorAnalysisCommand(
         const EditorProcessingCommands& commands,const DescriptorAnalysisConfig& config)
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        EditorDescriptorAnalysisReadiness r;
-        auto w=Capture(context,config,r.Diagnostic,CapturePurpose::Readiness);
-        r.Ready=bool(w);if(w)r.Resolved=w->Config;return r;
+        std::string diagnostic;
+        const auto work = Capture(context, config, diagnostic, CapturePurpose::Readiness);
+        return {bool(work), std::move(diagnostic)};
     }
     EditorDescriptorAnalysisResult ApplyEditorDescriptorAnalysisCommand(
         const EditorProcessingCommands& commands,const DescriptorAnalysisConfig& config,

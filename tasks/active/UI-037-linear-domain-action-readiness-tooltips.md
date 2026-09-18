@@ -2697,3 +2697,71 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 cmake --preset ci-vulkan
 cmake --build --preset ci-vulkan --target ExtrinsicSandbox -j4
 ```
+
+## Shared readiness and compiled test support — plan, 2026-09-18
+
+Operator-directed duplication/compilation continuation from `731084f66`, with
+Codex as sole checkout/build writer and Claude providing bounded read-only
+planning and fixed-diff review. Existing source-documentation and processing
+locality contracts apply; broad UI-037 readiness acceptance remains open.
+
+- Replace eight unused resolved-config readiness records with the existing
+  `ActionReadiness`. Keep the exact shared capture predicates and config-lane
+  priority; construction retains its consumed resolved request. This removes
+  duplicate records and panel conversions without another wrapper or service.
+- Compile the existing `SandboxEditorJobHarness` implementation once in the
+  runtime contract object target. Its 12 consumers retain the same fixture,
+  scheduler teardown order, job identity, callbacks and drain behavior. Only
+  the small generic context-to-command-surface adapter remains templated.
+- Keep these as separate commits. Build runtime and panel consumers, run their
+  focused tests then the default CPU gate, compile all tests and the Vulkan
+  Sandbox, and run source/docs/structural checks. No elapsed compile-time claim
+  follows from moving bodies or removing repeated records.
+
+## Shared point-method readiness — verified, 2026-09-18
+
+Eight previews now return the existing `ActionReadiness` directly: normal,
+outlier, keypoint, descriptor, density-weight, kernel-density, spacing and
+bilateral. Their unused resolved-config copies and eight duplicate records
+are removed. Construction keeps its resolved request because its panel consumes
+it. The panel passes the shared value directly into the existing config-lane
+resolver; preflight, command validation and reason priority are unchanged.
+Thirteen production files change from 6,558 to 6,508 physical lines. No new
+module, dependency, compatibility wrapper or configuration format is introduced.
+
+The existing normal-config test now exercises actual preview results through
+the config-lane resolver and compares the invalid-neighborhood diagnostic with
+command rejection. The spacing diagnostic assertions and seven GPU-smoke sites
+use the shared fields. The first build caught two old spacing test member names;
+the corrected rebuild passes. All 446 focused tests passed before and after the
+separate job-harness move.
+
+Claude's corrected fixed-packet review found no blockers; its compilation and
+test conditions are satisfied by the recorded runs. The initial review mixed
+in nonexistent source names and was superseded, not accepted as evidence.
+Module inventory regeneration remains at 429 modules with no content change.
+UI-037's broad readiness/action-inventory acceptance remains open.
+
+Final combined verification: canonical ci/Clang 23 `IntrinsicTests` builds,
+including the updated GPU smoke TU; all 446 focused tests pass, then the default
+CPU gate selects 4,743 tests: 4,742 pass, one expected ASan-only GLFW lifecycle
+skip, zero failures (148.23 s). Canonical ci-vulkan/Clang 23 `ExtrinsicSandbox`
+compiles and links. This is not GPU execution or a full sanitizer-suite run.
+
+Strict layering, test layout, task policy/state, docs sync/links, skill mirrors,
+session brief, root hygiene and workshop checks pass. Source-doc audit has zero
+errors: four production interfaces retain eight inspected synopsis/lifetime
+comments; the new support source/header and README have zero review findings.
+Workshop rows 1–3 pass, 4–7 n/a, 8 pass with no exceptions. Source/test hashes
+match the reviewed/tested source, apart from the explicitly reviewed scheduler
+import fix. Logs and review packets: `/tmp/intrinsic-normal-readiness/`.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests -j4
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^(NormalEstimation|OutlierAnalysis|KeypointAnalysis|DescriptorAnalysis|DensityWeight|KernelDensity|PointSpacing|BilateralFilter|PointConstruction|RegistrationDomains|SandboxEditor|SandboxProcessingPanels|ProcessingCompilationLocality)' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target ExtrinsicSandbox -j4
+```

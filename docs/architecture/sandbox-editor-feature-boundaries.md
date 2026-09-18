@@ -303,6 +303,13 @@ each consumer retains its own mask validation, diagnostics and ownership.
 `ValidatePointOutputs` checks the resolved output domain,
 reserved names and existing storage against the validated typed config.
 
+Normal, outlier, keypoint, descriptor, density-weight, kernel-density, spacing
+and bilateral previews return the shared `ActionReadiness` directly. Their
+method preflight is independent of the config-command lane; config-backed panel
+actions combine it with `ResolveEditorProcessingActionReadiness`, which gives
+missing config commands priority. Construction retains its resolved request
+because execution consumes the resolved property bindings.
+
 Density, spacing and density weights share scalar history publication, including
 stale-storage guards, render dirty notifications and workspace invalidation on
 apply, undo and redo. Density and spacing also share framed fixed-width kNN

@@ -152,8 +152,8 @@ TEST(PointSpacingOperations, DeletionMaskValidationPreservesPreviewApplyRejectio
             const char* expected = fault < 3
                 ? "Deletion mask must be a count-matched bool property."
                 : "Invalid deletion domain/cardinality.";
-            EXPECT_FALSE(preview.Ready);
-            EXPECT_EQ(preview.Diagnostic, expected);
+            EXPECT_FALSE(preview.Enabled);
+            EXPECT_EQ(preview.DisabledReason, expected);
             EXPECT_EQ(applied.Status, R::EditorCommandStatus::InvalidProcessingParameters);
             EXPECT_EQ(applied.Message, expected);
             EXPECT_FALSE(input.Exists(config.Radii.Name));
@@ -292,7 +292,7 @@ TEST(PointSpacingConfig, RoundTripAndSharedPreviewApplyRun)
         return R::RuntimeEngineConfigApplyResult{.Status = R::RuntimeEngineConfigApplyStatus::Applied};
     };
     auto commands = R::BindEditorProcessingCommands(context);
-    ASSERT_TRUE(R::PreviewEditorPointSpacingCommand(commands, config).Ready);
+    ASSERT_TRUE(R::PreviewEditorPointSpacingCommand(commands, config).Enabled);
     EXPECT_FALSE(Properties(scene, entity, D::MeshFace).Exists("radii"));
     ASSERT_TRUE(R::ApplyEditorPointSpacingConfig(commands, config).Succeeded());
     ASSERT_TRUE(R::GetEditorPointSpacingConfig(commands));
@@ -329,7 +329,7 @@ TEST(PointSpacingOperations, EveryDomainPublishesNamedRadiiAndPreservesDeletedRo
         R::EditorProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
         const auto catalog=R::GetEditorPointSpacingInputCatalog(R::BindEditorProcessingCommands(context), config.StableEntityId);
         EXPECT_TRUE(std::ranges::any_of(catalog.Entries,[&](auto& e){return e.Ref==config.Positions;}));
-        ASSERT_TRUE(R::PreviewEditorPointSpacingCommand(R::BindEditorProcessingCommands(context), config).Ready);
+        ASSERT_TRUE(R::PreviewEditorPointSpacingCommand(R::BindEditorProcessingCommands(context), config).Enabled);
         const auto reference=R::ApplyEditorPointSpacingCommand(R::BindEditorProcessingCommands(context), config);
         ASSERT_TRUE(reference.Succeeded())<<reference.Message;EXPECT_EQ(reference.ActualBackend,"cpu_octree");
         const auto values=std::as_const(props).Get<float>("radii").Vector();
@@ -382,7 +382,7 @@ TEST(PointSpacingOperations, InvalidUnsupportedAndNumericalFailuresRetainOutput)
     R::EditorProcessingContext context{.Scene=&scene};
     auto& props=Properties(scene,entity,D::PointCloudPoint);props.GetOrAdd<float>("radii").Vector().assign(props.Size(),77);
     for(const char* name:{"v:deleted","h:next","samples"})
-    {auto bad=config;bad.Radii.Name=name;EXPECT_FALSE(R::PreviewEditorPointSpacingCommand(R::BindEditorProcessingCommands(context), bad).Ready);}
+    {auto bad=config;bad.Radii.Name=name;EXPECT_FALSE(R::PreviewEditorPointSpacingCommand(R::BindEditorProcessingCommands(context), bad).Enabled);}
     config.Backend=R::PointSpacingBackend::VulkanLBVH;
     EXPECT_FALSE(R::ApplyEditorPointSpacingCommand(R::BindEditorProcessingCommands(context), config).Succeeded());
     config.Backend=R::PointSpacingBackend::CpuOctree;config.ScaleFactor=std::numeric_limits<float>::max();

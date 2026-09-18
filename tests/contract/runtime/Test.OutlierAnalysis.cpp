@@ -109,7 +109,7 @@ TEST(OutlierAnalysis, EveryDomainMatchesReferenceAndPublishesOnlyNamedProperties
             R::EditorProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
             const auto catalog=R::GetEditorPointInputCatalog(R::BindEditorProcessingCommands(context),config.StableEntityId);
             EXPECT_TRUE(std::ranges::any_of(catalog.Entries,[&](auto& e){return e.Ref==config.Positions;}));
-            ASSERT_TRUE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Ready);
+            ASSERT_TRUE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Enabled);
             EXPECT_FALSE(props.Exists("outliers"));
             const auto reference=R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config);
             ASSERT_TRUE(reference.Succeeded())<<reference.Message;
@@ -129,7 +129,7 @@ TEST(OutlierAnalysis, EveryDomainMatchesReferenceAndPublishesOnlyNamedProperties
             for(std::size_t i=0;i<size;++i)EXPECT_NEAR(actual[i],scores[i],1e-5);
             EXPECT_TRUE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).IndexReused);
             if(D(d)==D::PointCloudPoint) EXPECT_EQ(mask[4],0);
-            else {config.Operation=R::OutlierAnalysisOperation::RemoveMarked;EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Ready);}
+            else {config.Operation=R::OutlierAnalysisOperation::RemoveMarked;EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Enabled);}
         }
 }
 
@@ -142,9 +142,9 @@ TEST(OutlierAnalysis, RemovalRequiresCurrentDetectionAndPreservesEveryPropertyTh
     R::EditorCommandHistory history;R::SelectionController selection;
     R::EditorProcessingContext context = [&] { R::EditorProcessingContext value{}; value.Scene = &scene; value.Selection = &selection; value.CommandHistory = &history; return value; }();
     auto remove=config;remove.Operation=R::OutlierAnalysisOperation::RemoveMarked;
-    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),remove).Ready);
+    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),remove).Enabled);
     ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Succeeded());
-    EXPECT_TRUE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),remove).Ready);
+    EXPECT_TRUE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),remove).Enabled);
     props.Get<float>("keep")[1]=17; // unrelated attribute edits do not invalidate detection.
     ASSERT_FALSE(selection.EditPrimitives(scene, config.StableEntityId, D::PointCloudPoint,
         R::PrimitiveSelectionEdit::All).Indices.empty());
@@ -155,7 +155,7 @@ TEST(OutlierAnalysis, RemovalRequiresCurrentDetectionAndPreservesEveryPropertyTh
     EXPECT_EQ(std::as_const(props).Get<std::string>("custom")[3],"4"); // deleted row preserved
     EXPECT_EQ(std::as_const(props).Get<float>("keep")[1],17);
     ASSERT_TRUE(history.Undo().Succeeded());EXPECT_EQ(props.Size(),5);EXPECT_EQ(std::as_const(props).Get<std::string>("custom")[3],"3");
-    EXPECT_TRUE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),remove).Ready);
+    EXPECT_TRUE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),remove).Enabled);
     ASSERT_TRUE(history.Redo().Succeeded());EXPECT_EQ(props.Size(),4);
     props.Get<float>("keep")[0]=123;EXPECT_FALSE(history.Undo().Succeeded());
 }
@@ -172,9 +172,9 @@ TEST(OutlierAnalysis, DeletedRowsRemainUntouchedAndMaskOrInputEditsInvalidateRem
     EXPECT_FALSE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),remove).Succeeded());EXPECT_FALSE(history.Undo().Succeeded());
     ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Succeeded());
     props.Get<glm::vec3>("samples")[0].x+=1;
-    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),remove).Ready);
+    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),remove).Enabled);
     ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Succeeded());
-    props.Get<bool>("v:deleted")[1]=true;EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),remove).Ready);
+    props.Get<bool>("v:deleted")[1]=true;EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),remove).Enabled);
 }
 
 TEST(OutlierAnalysis, RadiusUsesAllCountsAndRetainsCoincidentPeers)
@@ -201,11 +201,11 @@ TEST(OutlierAnalysis, InvalidParametersAndReservedOutputsFailBeforeMutation)
     Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::MeshFace);auto config=Config(entity,D::MeshFace);
     R::EditorProcessingContext context{.Scene=&scene};
     for(auto name:{"f:halfedge","v:deleted","e:v0"})
-    {auto c=config;c.Mask.Name=name;EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),c).Ready);}
+    {auto c=config;c.Mask.Name=name;EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),c).Enabled);}
     auto c=config;c.Backend=R::OutlierAnalysisBackend::VulkanLBVH;
     EXPECT_FALSE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),c).Succeeded());
     auto& props=Properties(scene,entity,D::MeshFace);(void)props.GetOrAdd<float>("outliers");
-    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Ready);
+    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Enabled);
 }
 TEST(OutlierAnalysis, QueuedJobsRejectStaleInputsOutputsAndCancellation)
 {
@@ -271,7 +271,7 @@ TEST(OutlierAnalysisConfig, RoundTripAndSharedPreviewApplyRun)
             return R::RuntimeEngineConfigApplyResult{.Status = R::RuntimeEngineConfigApplyStatus::Applied};
         };
         auto commands = R::BindEditorProcessingCommands(context);
-        ASSERT_TRUE(R::PreviewEditorOutlierAnalysisCommand(commands, config).Ready);
+        ASSERT_TRUE(R::PreviewEditorOutlierAnalysisCommand(commands, config).Enabled);
         EXPECT_FALSE(Properties(scene, entity, D::MeshFace).Exists("outliers"));
         ASSERT_TRUE(R::ApplyEditorOutlierAnalysisConfig(commands, config).Succeeded());
         ASSERT_TRUE(R::GetEditorOutlierAnalysisConfig(commands));
@@ -352,9 +352,9 @@ TEST(OutlierAnalysis, RadiusBoundaryAndStatisticalMinimumMatchAcrossCpuBackends)
     ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Succeeded());
     EXPECT_EQ(std::as_const(props).Get<float>("scores").Vector(),scores);
     config.Method=R::OutlierAnalysisMethod::Statistical;config.KNeighbors=5;
-    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Ready);
+    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Enabled);
     config.Backend=R::OutlierAnalysisBackend::CpuOctree;
-    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Ready);
+    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Enabled);
 }
 TEST(OutlierAnalysis, UndoAnotherOutputCannotMakeAnEditedMaskCurrent)
 {
@@ -367,7 +367,7 @@ TEST(OutlierAnalysis, UndoAnotherOutputCannotMakeAnEditedMaskCurrent)
     props.Get<std::uint32_t>(first.Mask.Name)[0]=1;
     ASSERT_TRUE(history.Undo().Succeeded());
     first.Operation=R::OutlierAnalysisOperation::RemoveMarked;
-    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),first).Ready);
+    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),first).Enabled);
     EXPECT_FALSE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),first).Succeeded());
     EXPECT_EQ(props.Size(),5);
 }
@@ -388,7 +388,7 @@ TEST(OutlierAnalysisConfig, DistanceRatioRoundTripsDefaultsAndClampsKToSmallInpu
     R::SpatialIndexCache cache(worlds);auto entity=Make(scene,D::PointCloudPoint);
     auto c=Config(entity,D::PointCloudPoint);c.Method=config.Method;c.KNeighbors=63;c.Backend=R::OutlierAnalysisBackend::CpuLBVH;
     R::EditorProcessingContext context{.Scene=&scene,.World=world,.SpatialIndices=&cache};
-    EXPECT_TRUE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),c).Ready);
+    EXPECT_TRUE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),c).Enabled);
     EXPECT_TRUE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),c).Succeeded());
 }
 
@@ -614,6 +614,6 @@ TEST(OutlierAnalysis, RadiusParametersAndMissingSceneFailBeforeAnyMutation)
     const auto unbound = R::BindEditorProcessingCommands({});
     const auto missingScene = R::ApplyEditorOutlierAnalysisCommand(unbound, config);
     EXPECT_FALSE(missingScene.Succeeded());
-    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(unbound, config).Ready);
+    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(unbound, config).Enabled);
     EXPECT_FALSE(Properties(scene, entity, D::PointCloudPoint).Exists("outliers"));
 }

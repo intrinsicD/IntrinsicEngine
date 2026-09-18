@@ -28,12 +28,6 @@ export namespace Extrinsic::Runtime
         double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
         [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied || Status==EditorCommandStatus::NoChange; }
     };
-    struct EditorKernelDensityReadiness
-    {
-        bool Ready{};
-        std::string Diagnostic{};
-        KernelDensityConfig Resolved{};
-    };
     struct EditorPointSpacingResult
     {
         EditorCommandStatus Status{EditorCommandStatus::NoChange};
@@ -48,12 +42,6 @@ export namespace Extrinsic::Runtime
         std::size_t GpuQueryBatches{};
         double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
         [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied || Status==EditorCommandStatus::NoChange; }
-    };
-    struct EditorPointSpacingReadiness
-    {
-        bool Ready{};
-        std::string Diagnostic{};
-        PointSpacingConfig Resolved{};
     };
     enum class EditorPointFieldResultSlot : std::uint8_t { KernelDensity, PointSpacing };
     // C++ linkage permits incomplete borrowed declarations in private workspace
@@ -85,14 +73,14 @@ export namespace Extrinsic::Runtime
     // terminal outcome of a newly queued job while its attachment remains active.
     // Pending for an already active output observes that job and registers no
     // additional callback. Configured Apply follows the same delivery contract.
-    [[nodiscard]] EditorKernelDensityReadiness PreviewEditorKernelDensityCommand(const EditorProcessingCommands&, const KernelDensityConfig&);
+    [[nodiscard]] ActionReadiness PreviewEditorKernelDensityCommand(const EditorProcessingCommands&, const KernelDensityConfig&);
     [[nodiscard]] GeometryPropertyCatalogSnapshot GetEditorKernelDensityInputCatalog(const EditorProcessingCommands&, std::uint32_t stableId);
     [[nodiscard]] EditorKernelDensityResult ApplyEditorKernelDensityCommand(const EditorProcessingCommands&, const KernelDensityConfig&, std::function<void(EditorKernelDensityResult)> onComplete = {});
     [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorKernelDensityConfig(const EditorProcessingCommands&, const KernelDensityConfig&, std::string sourceId = {});
     [[nodiscard]] std::optional<KernelDensityConfig> GetEditorKernelDensityConfig(const EditorProcessingCommands&);
     [[nodiscard]] EditorKernelDensityResult ApplyEditorConfiguredKernelDensity(const EditorProcessingCommands&, std::function<void(EditorKernelDensityResult)> onComplete = {});
 
-    [[nodiscard]] EditorPointSpacingReadiness PreviewEditorPointSpacingCommand(const EditorProcessingCommands&, const PointSpacingConfig&);
+    [[nodiscard]] ActionReadiness PreviewEditorPointSpacingCommand(const EditorProcessingCommands&, const PointSpacingConfig&);
     [[nodiscard]] GeometryPropertyCatalogSnapshot GetEditorPointSpacingInputCatalog(const EditorProcessingCommands&, std::uint32_t stableId);
     [[nodiscard]] EditorPointSpacingResult ApplyEditorPointSpacingCommand(const EditorProcessingCommands&, const PointSpacingConfig&, std::function<void(EditorPointSpacingResult)> onComplete = {});
     [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorPointSpacingConfig(const EditorProcessingCommands&, const PointSpacingConfig&, std::string sourceId = {});

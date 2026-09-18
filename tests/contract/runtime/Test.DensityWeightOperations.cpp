@@ -101,7 +101,7 @@ TEST(DensityWeightConfig, RoundTripAndSharedPreviewApplyRun)
     context.PreviewEngineConfigDocument=[&](const auto& document,const auto& origin){++previews;return C::PreviewEngineConfig(document,state.ActiveConfig,{origin,&registry});};
     context.ApplyEngineConfigHotSubset=[&](const auto& preview){++applies;state.ActiveConfig=preview.Preview.Config;return R::RuntimeEngineConfigApplyResult{.Status=R::RuntimeEngineConfigApplyStatus::Applied};};
     auto commands=R::BindEditorProcessingCommands(context);
-    ASSERT_TRUE(R::PreviewEditorDensityWeightCommand(commands,c).Ready);EXPECT_FALSE(Properties(scene,entity,D::MeshFace).Exists(c.Weights.Name));
+    ASSERT_TRUE(R::PreviewEditorDensityWeightCommand(commands,c).Enabled);EXPECT_FALSE(Properties(scene,entity,D::MeshFace).Exists(c.Weights.Name));
     ASSERT_TRUE(R::ApplyEditorDensityWeightConfig(commands,c).Succeeded());ASSERT_TRUE(R::GetEditorDensityWeightConfig(commands));
     EXPECT_EQ(R::SerializeDensityWeightConfig(*R::GetEditorDensityWeightConfig(commands)),R::SerializeDensityWeightConfig(c));
     ASSERT_TRUE(R::ApplyEditorConfiguredDensityWeight(commands).Succeeded());EXPECT_EQ(previews,1);EXPECT_EQ(applies,1);
@@ -131,7 +131,7 @@ TEST(DensityWeightOperations, EveryDomainKernelModeCacheHistoryAndDeletedRows)
         R::EditorProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
         const auto catalog=R::GetEditorPointInputCatalog(R::BindEditorProcessingCommands(context),c.StableEntityId);
         EXPECT_TRUE(std::ranges::any_of(catalog.Entries,[&](auto& e){return e.Ref==c.Positions;}));
-        ASSERT_TRUE(R::PreviewEditorDensityWeightCommand(R::BindEditorProcessingCommands(context),c).Ready);
+        ASSERT_TRUE(R::PreviewEditorDensityWeightCommand(R::BindEditorProcessingCommands(context),c).Enabled);
         const auto reference=R::ApplyEditorDensityWeightCommand(R::BindEditorProcessingCommands(context),c);ASSERT_TRUE(reference.Succeeded())<<reference.Message;
         const auto expected=std::as_const(props).Get<float>(c.Weights.Name).Vector();EXPECT_EQ(expected[2],77);if(half)EXPECT_EQ(expected[3],77);
         EXPECT_EQ(reference.ActualBackend,"cpu_kdtree");EXPECT_EQ(props.Size(),size);EXPECT_EQ(std::as_const(props).Get<glm::vec3>("samples").Revision(),revision);
@@ -173,11 +173,11 @@ TEST(DensityWeightOperations, OneSampleAndBackendPreflightPreserveOutputs)
     }
     props.GetOrAdd<float>(c.Weights.Name)[0]=77;
     for(auto name:{"samples","directions","v:deleted","h:connectivity"})
-    {auto bad=c;bad.Weights.Name=name;EXPECT_FALSE(R::PreviewEditorDensityWeightCommand(R::BindEditorProcessingCommands(context),bad).Ready);}
-    c.SupportRadius=double(Geometry::PointLBVH::CoordinateLimit);EXPECT_FALSE(R::PreviewEditorDensityWeightCommand(R::BindEditorProcessingCommands(context),c).Ready);
+    {auto bad=c;bad.Weights.Name=name;EXPECT_FALSE(R::PreviewEditorDensityWeightCommand(R::BindEditorProcessingCommands(context),bad).Enabled);}
+    c.SupportRadius=double(Geometry::PointLBVH::CoordinateLimit);EXPECT_FALSE(R::PreviewEditorDensityWeightCommand(R::BindEditorProcessingCommands(context),c).Enabled);
     c.SupportRadius=1;c.Backend=R::DensityWeightBackend::VulkanLBVH;
     for(float value:{std::numeric_limits<float>::denorm_min(),-std::numeric_limits<float>::denorm_min()})
-    {props.Get<glm::vec3>("samples")[0]={value,0,0};const auto ready=R::PreviewEditorDensityWeightCommand(R::BindEditorProcessingCommands(context),c);EXPECT_FALSE(ready.Ready);EXPECT_NE(ready.Diagnostic.find("subnormal"),std::string::npos);}
+    {props.Get<glm::vec3>("samples")[0]={value,0,0};const auto ready=R::PreviewEditorDensityWeightCommand(R::BindEditorProcessingCommands(context),c);EXPECT_FALSE(ready.Enabled);EXPECT_NE(ready.DisabledReason.find("subnormal"),std::string::npos);}
     c.Backend=R::DensityWeightBackend::CpuKDTree;props.Get<glm::vec3>("samples")[0]={std::numeric_limits<float>::quiet_NaN(),0,0};
     EXPECT_FALSE(R::ApplyEditorDensityWeightCommand(R::BindEditorProcessingCommands(context),c).Succeeded());EXPECT_EQ(std::as_const(props).Get<float>(c.Weights.Name)[0],77);
 }
@@ -206,7 +206,7 @@ TEST(DensityWeightOperations, PublicationUndoAndRedoAdvancePropertyWithoutInvali
             EXPECT_EQ(invalidations, expected);
         };
         clear();
-        ASSERT_TRUE(R::PreviewEditorDensityWeightCommand(R::BindEditorProcessingCommands(context), config).Ready);
+        ASSERT_TRUE(R::PreviewEditorDensityWeightCommand(R::BindEditorProcessingCommands(context), config).Enabled);
         EXPECT_EQ(invalidations, 0);
         EXPECT_FALSE(scene.Raw().any_of<Dirty::GpuDirty>(entity));
         EXPECT_FALSE(scene.Raw().any_of<Dirty::DirtyVertexAttributes>(entity));
@@ -302,7 +302,7 @@ TEST(DensityWeightOperations, InvalidDeletionSourcesRejectPreviewAndExecution)
         else deleted.Vector().pop_back();
         R::EditorCommandHistory history;
         R::EditorProcessingContext context{.Scene=&scene, .CommandHistory=&history};
-        EXPECT_FALSE(R::PreviewEditorDensityWeightCommand(R::BindEditorProcessingCommands(context), config).Ready);
+        EXPECT_FALSE(R::PreviewEditorDensityWeightCommand(R::BindEditorProcessingCommands(context), config).Enabled);
         EXPECT_EQ(R::ApplyEditorDensityWeightCommand(R::BindEditorProcessingCommands(context), config).Status, R::EditorCommandStatus::InvalidProcessingParameters);
         EXPECT_FALSE(history.CanUndo());
         EXPECT_FALSE(Properties(scene, entity, D(domain)).Exists(config.Weights.Name));

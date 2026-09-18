@@ -38,12 +38,6 @@ export namespace Extrinsic::Runtime
         double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
         [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied || Status==EditorCommandStatus::NoChange; }
     };
-    struct EditorBilateralFilterReadiness
-    {
-        bool Ready{};
-        std::string Diagnostic{};
-        BilateralFilterConfig Resolved{};
-    };
 
     [[nodiscard]] const char*
     DebugNameForProgressivePoissonChannel(ProgressivePoissonPlaygroundChannel channel) noexcept;
@@ -119,7 +113,7 @@ export namespace Extrinsic::Runtime
     // terminal outcome of a newly queued job while its attachment remains active.
     // Pending for an already active output observes that job and registers no
     // additional callback. Configured Apply follows the same delivery contract.
-    [[nodiscard]] EditorBilateralFilterReadiness PreviewEditorBilateralFilterCommand(const EditorProcessingCommands&, const BilateralFilterConfig&);
+    [[nodiscard]] ActionReadiness PreviewEditorBilateralFilterCommand(const EditorProcessingCommands&, const BilateralFilterConfig&);
     // Narrower than the shared point-input catalog: each candidate must also
     // supply count-matched normals and trial-capture a distinct filtered output.
     [[nodiscard]] GeometryPropertyCatalogSnapshot GetEditorBilateralFilterInputCatalog(const EditorProcessingCommands&, std::uint32_t stableId);

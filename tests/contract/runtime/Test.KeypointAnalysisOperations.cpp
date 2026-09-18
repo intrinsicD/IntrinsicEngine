@@ -119,7 +119,7 @@ TEST(KeypointAnalysisConfig, RoundTripAndSharedPreviewApplyRun)
         return R::RuntimeEngineConfigApplyResult{.Status = R::RuntimeEngineConfigApplyStatus::Applied};
     };
     auto commands = R::BindEditorProcessingCommands(context);
-    ASSERT_TRUE(R::PreviewEditorKeypointAnalysisCommand(commands, config).Ready);
+    ASSERT_TRUE(R::PreviewEditorKeypointAnalysisCommand(commands, config).Enabled);
     EXPECT_FALSE(Properties(scene, entity, D::MeshFace).Exists("saliency"));
     ASSERT_TRUE(R::ApplyEditorKeypointAnalysisConfig(commands, config).Succeeded());
     ASSERT_TRUE(R::GetEditorKeypointAnalysisConfig(commands));
@@ -170,7 +170,7 @@ TEST(KeypointAnalysisOperations, EveryDomainReferenceCacheHistoryAndDeletedRows)
         R::EditorProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
         const auto catalog=R::GetEditorPointInputCatalog(R::BindEditorProcessingCommands(context),c.StableEntityId);
         EXPECT_TRUE(std::ranges::any_of(catalog.Entries,[&](auto& e){return e.Ref==c.Positions;}));
-        ASSERT_TRUE(R::PreviewEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),c).Ready);
+        ASSERT_TRUE(R::PreviewEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),c).Enabled);
         const auto reference=R::ApplyEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),c);
         ASSERT_TRUE(reference.Succeeded())<<reference.Message;EXPECT_EQ(reference.ActualBackend,"cpu_kdtree");
         EXPECT_GT(reference.MeanSpacing,0.f);
@@ -237,10 +237,10 @@ TEST(KeypointAnalysisOperations, InvalidScaleAndOutputPreflightRetainExistingDat
 {
     Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::MeshVertex);auto c=Config(entity,D::MeshVertex);
     auto& props=Properties(scene,entity,D::MeshVertex);R::EditorProcessingContext context{.Scene=&scene};
-    for(auto name:{"samples","v:deleted","h:connectivity"}){auto bad=c;bad.Score.Name=name;EXPECT_FALSE(R::PreviewEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),bad).Ready);}
-    auto gpu=c;gpu.Backend=R::KeypointAnalysisBackend::VulkanLBVH;EXPECT_FALSE(R::PreviewEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),gpu).Ready);
+    for(auto name:{"samples","v:deleted","h:connectivity"}){auto bad=c;bad.Score.Name=name;EXPECT_FALSE(R::PreviewEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),bad).Enabled);}
+    auto gpu=c;gpu.Backend=R::KeypointAnalysisBackend::VulkanLBVH;EXPECT_FALSE(R::PreviewEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),gpu).Enabled);
     gpu.Backend=R::KeypointAnalysisBackend::VulkanCompute;
-    EXPECT_FALSE(R::PreviewEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),gpu).Ready);
+    EXPECT_FALSE(R::PreviewEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),gpu).Enabled);
     EXPECT_FALSE(R::ApplyEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),gpu).Succeeded());
     props.GetOrAdd<float>("saliency").Vector().assign(props.Size(),77);
     props.Get<glm::vec3>("samples").Vector().assign(props.Size(),glm::vec3(0));
