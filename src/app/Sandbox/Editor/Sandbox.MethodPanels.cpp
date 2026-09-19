@@ -2429,6 +2429,32 @@ namespace Extrinsic::Sandbox::Editor
             return "Unsupported";
         }
 
+        template <typename T, std::size_t Size>
+        static bool DrawParameterizationChoice(
+            const char* label,
+            T& value,
+            const std::array<T, Size>& options,
+            const char* (*nameFor)(T) noexcept)
+        {
+            if (!ImGui::BeginCombo(label, nameFor(value)))
+                return false;
+
+            bool changed = false;
+            for (const T option : options)
+            {
+                const bool selected = value == option;
+                if (ImGui::Selectable(nameFor(option), selected))
+                {
+                    value = option;
+                    changed = true;
+                }
+                if (selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+            return changed;
+        }
+
         static bool DrawParameterizationUvViewControls(
             decltype(ParameterizationPanelConfig{}.View)& config)
         {
@@ -2445,46 +2471,12 @@ namespace Extrinsic::Sandbox::Editor
                 BackgroundMode::Texture,
             };
 
-            bool changed = false;
-            if (ImGui::BeginCombo(
-                    "Render mode##ParameterizationUvView",
-                    ParameterizationUvRenderModeLabel(config.RenderMode)))
-            {
-                for (const RenderMode mode : renderModes)
-                {
-                    const bool selected = config.RenderMode == mode;
-                    if (ImGui::Selectable(
-                            ParameterizationUvRenderModeLabel(mode),
-                            selected))
-                    {
-                        config.RenderMode = mode;
-                        changed = true;
-                    }
-                    if (selected)
-                        ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndCombo();
-            }
-            if (ImGui::BeginCombo(
-                    "Background##ParameterizationUvView",
-                    ParameterizationUvBackgroundModeLabel(
-                        config.BackgroundMode)))
-            {
-                for (const BackgroundMode mode : backgroundModes)
-                {
-                    const bool selected = config.BackgroundMode == mode;
-                    if (ImGui::Selectable(
-                            ParameterizationUvBackgroundModeLabel(mode),
-                            selected))
-                    {
-                        config.BackgroundMode = mode;
-                        changed = true;
-                    }
-                    if (selected)
-                        ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndCombo();
-            }
+            bool changed = DrawParameterizationChoice(
+                "Render mode##ParameterizationUvView", config.RenderMode,
+                renderModes, ParameterizationUvRenderModeLabel);
+            changed |= DrawParameterizationChoice(
+                "Background##ParameterizationUvView", config.BackgroundMode,
+                backgroundModes, ParameterizationUvBackgroundModeLabel);
             changed |= ImGui::Checkbox(
                 "Distortion heatmap##ParameterizationUvView",
                 &config.ShowDistortionHeatmap);
@@ -2571,26 +2563,9 @@ namespace Extrinsic::Sandbox::Editor
                 Boundary::Custom,
             };
 
-            bool changed = false;
-            if (ImGui::BeginCombo(
-                    "Boundary##Parameterization",
-                    ParameterizationBoundaryLabel(config.Boundary)))
-            {
-                for (const Boundary boundary : boundaries)
-                {
-                    const bool selected = config.Boundary == boundary;
-                    if (ImGui::Selectable(
-                            ParameterizationBoundaryLabel(boundary),
-                            selected))
-                    {
-                        config.Boundary = boundary;
-                        changed = true;
-                    }
-                    if (selected)
-                        ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndCombo();
-            }
+            bool changed = DrawParameterizationChoice(
+                "Boundary##Parameterization", config.Boundary,
+                boundaries, ParameterizationBoundaryLabel);
             changed |= ImGui::Checkbox(
                 "Arc-length boundary spacing##Parameterization",
                 &config.ArcLengthSpacing);
@@ -2649,28 +2624,11 @@ namespace Extrinsic::Sandbox::Editor
                 Mode::TargetLengths,
                 Mode::TargetAngles,
             };
-            bool changed = false;
-            if (ImGui::BeginCombo(
-                    "Boundary mode##Parameterization",
-                    ParameterizationBffModeLabel(config.Mode)))
-            {
-                for (const Mode mode : modes)
-                {
-                    const bool selected = config.Mode == mode;
-                    if (ImGui::Selectable(
-                            ParameterizationBffModeLabel(mode),
-                            selected))
-                    {
-                        config.Mode = mode;
-                        if (mode == Mode::AutomaticConformal)
-                            config.BoundaryData.clear();
-                        changed = true;
-                    }
-                    if (selected)
-                        ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndCombo();
-            }
+            bool changed = DrawParameterizationChoice(
+                "Boundary mode##Parameterization", config.Mode,
+                modes, ParameterizationBffModeLabel);
+            if (changed && config.Mode == Mode::AutomaticConformal)
+                config.BoundaryData.clear();
 
             if (config.Mode != Mode::AutomaticConformal)
             {

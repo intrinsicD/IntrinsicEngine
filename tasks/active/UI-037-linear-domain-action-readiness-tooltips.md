@@ -4547,3 +4547,42 @@ cmake --preset ci
 Evidence, baseline failure, compiler closures and immutable review packet:
 `/tmp/intrinsic-clustering-locality/`. Combined CPU verification is recorded in
 the following parameterization checkpoint; UI-037 remains open.
+
+
+## Continuation — shared parameterization dropdowns (2026-09-19)
+
+Alongside clustering commit `e9e5afc74`, replace four repeated enum dropdown
+loops in `Sandbox.MethodPanels.cpp` with file-private
+`DrawParameterizationChoice`. Reuse search found no matching shared owner:
+property selectors consume catalog records, while domain controls map integer
+indices. Four present callers justify this local template; no header, public
+API, policy flags or broader widget framework is added. Strategy-record drawing
+stays separate. BFF's boundary-data clearing remains in its caller, including
+reselection of AutomaticConformal. Labels, IDs, option order, unknown-value
+preview, focus ordering and boolean accumulation are unchanged.
+
+Production size is 3,427 -> 3,385 lines including the helper and all callers.
+Fable's fixed-diff review found no correctness defect; reviewed source/build
+hashes remained unchanged through verification. Existing real-window and typed
+config/action tests pass; no new source-string UI assertion was introduced.
+No elapsed compilation-speed improvement is inferred from this consolidation.
+
+Combined verification, canonical ci / Clang 23 / unsanitized:
+
+```bash
+cmake --build --preset ci --target IntrinsicSandboxEditorIntegrationTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^(ClusteringModule\.|SandboxParameterizationPanel\.|ParameterizationOperations\.|SandboxEditorPresentation\.|EditorCompilationLocality\.)' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+```
+
+All 104 combined focused tests pass. Full CPU gate: 4,770 selected, 4,769 passed,
+one expected ASan-only GLFW lifecycle skip, zero failures (153.22 s). Standalone
+Sandbox compilation/linking also passed as recorded above. No GPU execution or
+sanitizer-suite result is claimed. Scope/layering/tests/docs sweep passes;
+workshop rows 1–3/8 pass, 4–7 are not applicable. Strict layering (zero
+exceptions), test layout, task policy/state links, docs sync/links, root hygiene,
+skill mirrors/session-brief freshness and all 26 compile-hotspot tooling tests
+pass. Source documentation has zero errors and one pre-existing MethodPanels
+size hint, reduced by this deletion. UI-037's broader readiness work remains
+open. Logs and review packets: `/tmp/intrinsic-clustering-locality/`.
