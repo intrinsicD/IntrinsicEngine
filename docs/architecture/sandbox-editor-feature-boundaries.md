@@ -311,6 +311,11 @@ friendship does not pull registration, GPU or world state into the service API.
 Types directly. Within the operations family, only the implementation imports
 module-owned consolidation preflight. The compiler-derived
 `EditorCompilationLocality.PointCloudServices` check enforces these boundaries.
+The consolidation lifecycle interface borrows the device, world registry and
+spatial-index cache through declarations matching their owners' C++ linkage.
+Its implementation imports those owners and the consolidation algorithm;
+`EditorCompilationLocality.ConsolidationLifecycle` keeps all four out of the
+interface's compiler dependency closure.
 The method panel also consumes these Types and operation contracts directly.
 Consolidation property-reference validation compiles beside its records in
 `Runtime.PointCloudConsolidationTypes`; both the panel and lifecycle preflight

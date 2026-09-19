@@ -12,7 +12,6 @@ export module Extrinsic.Runtime.PointCloudConsolidationModule;
 export import Extrinsic.Runtime.PointCloudConsolidationTypes;
 
 import Extrinsic.Core.Error;
-import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.EditorCommandHistory;
 export import Extrinsic.Runtime.GeometryAvailability;
@@ -21,9 +20,17 @@ import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.ModuleLifecycle;
 import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.WorldHandle;
-import Extrinsic.Runtime.WorldRegistry;
-import Extrinsic.Runtime.SpatialIndexCache;
-import Geometry.PointCloud.Consolidation;
+
+// Borrowed services retain their owners' C++ linkage without importing implementations.
+extern "C++"
+{
+    namespace Extrinsic::RHI { class IDevice; }
+    namespace Extrinsic::Runtime
+    {
+        class WorldRegistry;
+        class SpatialIndexCache;
+    }
+}
 
 export namespace Extrinsic::Runtime
 {

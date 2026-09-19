@@ -724,6 +724,16 @@ intrinsic_add_module_boundary_test(AssetCompilationLocality.ModelMaterialization
 set_tests_properties(AssetCompilationLocality.ModelMaterialization
     PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
 
+# Consolidation borrows services; its implementation owns their full dependencies.
+intrinsic_add_module_boundary_test(EditorCompilationLocality.ConsolidationLifecycle
+        --check-source src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm
+        --forbid-module Extrinsic.RHI.Device
+        --forbid-module Extrinsic.Runtime.WorldRegistry
+        --forbid-module Extrinsic.Runtime.SpatialIndexCache
+        --forbid-module Geometry.PointCloud.Consolidation)
+set_tests_properties(EditorCompilationLocality.ConsolidationLifecycle
+    PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
+
 # Texture-bake composition stays inside its existing implementation. Check both
 # its public producer and the editor interfaces that consume bake records.
 intrinsic_add_module_boundary_test(EditorCompilationLocality.TextureBake
