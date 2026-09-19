@@ -29,8 +29,41 @@ import Geometry.PointLBVH;
 import Geometry.Properties;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Runtime.WorldHandle;
+import Extrinsic.Runtime.WorldRegistry;
+import Extrinsic.Runtime.CommandBus;
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
+#include "Editor/internal/Runtime.EditorPointInputReadiness.hpp"
+
+namespace Extrinsic::Runtime
+{
+    extern "C++" struct EditorPointInputReadinessState
+    {
+        struct Entry
+        {
+            ECS::Scene::Registry* Scene{};
+            WorldHandle World{};
+            std::uint64_t WorldGeneration{};
+            entt::entity Entity{};
+            GeometryPropertyRef Positions{};
+            std::vector<GeometryProcessingDetail::PointPropertyWatch> Inputs{};
+            std::function<bool()> AttachmentActive{};
+            std::function<void()> Invalidate{};
+            std::uint64_t RequestedFrame{};
+            bool Queued{};
+            std::optional<bool> Accepted{};
+            std::size_t LiveCount{};
+            bool ValidLbvh{true}, HasSubnormalCoordinates{};
+            std::string Diagnostic{};
+        };
+        WorldRegistry* Worlds{};
+        CommandBus* Commands{};
+        JobService* Jobs{};
+        std::uint64_t Frame{};
+        std::vector<std::shared_ptr<Entry>> Entries{};
+        EditorPointInputReadinessStats Stats{};
+    };
+}
 
 namespace Extrinsic::Runtime::GeometryProcessingDetail
 {
@@ -68,8 +101,20 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             auto positions = entry.Ref;
             PointInputCapture capture;
             std::string diagnostic;
-            return !CapturePointInput(availability, positions, false, capture, diagnostic) || !capture.LiveCount;
+            return !PreparePointInput(context, *entity, availability, positions, capture, diagnostic) || !capture.LiveCount;
         });
+        // Deferred membership can change without any source property edit.
+        if (context.PointInputReadiness)
+        {
+            for (const auto& entry : catalog.Entries)
+            {
+                catalog.SourceGeneration = (catalog.SourceGeneration ^ unsigned(entry.Ref.Domain)) * 1099511628211ull;
+                for (const unsigned char c : entry.Ref.Name)
+                    catalog.SourceGeneration = (catalog.SourceGeneration ^ c) * 1099511628211ull;
+                catalog.SourceGeneration = (catalog.SourceGeneration ^ entry.PropertyGeneration) * 1099511628211ull;
+            }
+            catalog.SourceGeneration = (catalog.SourceGeneration ^ catalog.Entries.size()) * 1099511628211ull;
+        }
         return catalog;
     }
     PointPropertyWatch ObserveGeometryProperty(const GeometryEntityAvailability& a, D domain, std::string name)
@@ -155,8 +200,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         return source;
     }
 
-    bool CapturePointInput(
-        const GeometryEntityAvailability& a, GeometryPropertyRef& positions, bool copyValues,
+    static bool CapturePointInputMetadata(
+        const GeometryEntityAvailability& a, GeometryPropertyRef& positions,
         PointInputCapture& w, std::string& diagnostic)
     {
         const auto fail = [&](std::string why) { diagnostic = std::move(why); return false; };
@@ -175,6 +220,17 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         if (deletionProps->Exists(deletionName) && (!deleted || deleted.Size() != deletionProps->Size()))
             return fail("Deletion mask must be a count-matched bool property.");
         w.Inputs.push_back(ObserveGeometryProperty(a, deletionDomain, deletionName));
+        return true;
+    }
+
+    static bool ScanPointInputRows(
+        const GeometryEntityAvailability& a, const GeometryPropertyRef& positions, bool copyValues,
+        PointInputCapture& w, std::string& diagnostic)
+    {
+        const auto fail = [&](std::string why) { diagnostic = std::move(why); return false; };
+        const auto* props = ResolveGeometryPropertySet(a, positions.Domain);
+        const auto [deletionDomain, deletionName, divisor] = ResolvePointDeletionSource(positions.Domain);
+        const auto deleted = ResolveGeometryPropertySet(a, deletionDomain)->Get<bool>(deletionName);
         const auto points = props->Get<glm::vec3>(positions.Name);
         for (std::uint32_t i = 0; i < props->Size(); ++i)
         {
@@ -191,6 +247,118 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             if (copyValues) { w.Points.push_back(points[i]); w.Slots.push_back(i); }
         }
         return true;
+    }
+    bool CapturePointInput(
+        const GeometryEntityAvailability& a, GeometryPropertyRef& positions, bool copyValues,
+        PointInputCapture& w, std::string& diagnostic)
+    {
+        return CapturePointInputMetadata(a, positions, w, diagnostic) &&
+               ScanPointInputRows(a, positions, copyValues, w, diagnostic);
+    }
+
+    namespace
+    {
+        struct CheckPointInputReadiness
+        {
+            std::weak_ptr<EditorPointInputReadinessState> State{};
+            std::weak_ptr<EditorPointInputReadinessState::Entry> Entry{};
+        };
+
+        void CheckPointInput(const CheckPointInputReadiness& command)
+        {
+            const auto state = command.State.lock();
+            const auto entry = command.Entry.lock();
+            if (!state || !entry) return;
+            entry->Queued = false;
+            if (entry->AttachmentActive && !entry->AttachmentActive()) return;
+            const auto invalidate = [&] { if (entry->Invalidate) entry->Invalidate(); };
+            if (state->Worlds->ActiveWorld() != entry->World ||
+                state->Worlds->Get(entry->World) != entry->Scene ||
+                (state->Jobs && state->Jobs->WorldGeneration(entry->World) != entry->WorldGeneration) ||
+                !entry->Scene->Raw().valid(entry->Entity))
+            {
+                invalidate();
+                return;
+            }
+            const auto availability = BuildGeometryAvailability(entry->Scene->Raw(), entry->Entity);
+            auto positions = entry->Positions;
+            PointInputCapture capture;
+            std::string diagnostic;
+            if (!CapturePointInputMetadata(availability, positions, capture, diagnostic) ||
+                capture.Inputs != entry->Inputs)
+            {
+                invalidate();
+                return;
+            }
+            entry->Accepted = ScanPointInputRows(availability, positions, false, capture, diagnostic);
+            ++state->Stats.PropertyScans;
+            entry->LiveCount = capture.LiveCount;
+            entry->ValidLbvh = capture.ValidLbvh;
+            entry->HasSubnormalCoordinates = capture.HasSubnormalCoordinates;
+            entry->Diagnostic = std::move(diagnostic);
+            invalidate();
+        }
+    }
+
+    bool EditorProcessingContextWorldCurrent(const EditorProcessingContext& context)
+    {
+        const auto& state = context.PointInputReadiness;
+        return !state || (state->Worlds->ActiveWorld() == context.World &&
+                         state->Worlds->Get(context.World) == context.Scene);
+    }
+
+    EditorPointInputReadinessStats PointInputReadinessStats(const EditorProcessingContext& context)
+    {
+        return context.PointInputReadiness ? context.PointInputReadiness->Stats : EditorPointInputReadinessStats{};
+    }
+
+    bool PreparePointInput(
+        const EditorProcessingContext& context, entt::entity entity,
+        const GeometryEntityAvailability& availability, GeometryPropertyRef& positions,
+        PointInputCapture& capture, std::string& diagnostic)
+    {
+        if (!CapturePointInputMetadata(availability, positions, capture, diagnostic)) return false;
+        if (!context.PointInputReadiness)
+            return ScanPointInputRows(availability, positions, false, capture, diagnostic);
+        auto& state = *context.PointInputReadiness;
+        if (!state.Commands)
+        {
+            diagnostic = "Point-input readiness is unavailable. Attach an editor with a command queue.";
+            return false;
+        }
+        const auto generation = state.Jobs ? state.Jobs->WorldGeneration(context.World) : 0;
+        auto slot = std::ranges::find_if(state.Entries, [&](const auto& entry) {
+            return entry->Scene == context.Scene && entry->World == context.World &&
+                   entry->Entity == entity && entry->Positions == positions;
+        });
+        if (slot == state.Entries.end())
+            slot = state.Entries.insert(slot, std::shared_ptr<EditorPointInputReadinessState::Entry>{});
+        auto& entry = *slot;
+        if (!entry || entry->WorldGeneration != generation || entry->Inputs != capture.Inputs)
+            entry = std::make_shared<EditorPointInputReadinessState::Entry>(
+                EditorPointInputReadinessState::Entry{
+                    .Scene = context.Scene, .World = context.World, .WorldGeneration = generation,
+                    .Entity = entity, .Positions = positions, .Inputs = capture.Inputs,
+                    .AttachmentActive = context.AttachmentActive,
+                    .Invalidate = context.InvalidateWorkspaceSnapshotCache});
+        entry->RequestedFrame = state.Frame;
+        if (entry->Accepted.has_value())
+        {
+            capture.LiveCount = entry->LiveCount;
+            capture.ValidLbvh = entry->ValidLbvh;
+            capture.HasSubnormalCoordinates = entry->HasSubnormalCoordinates;
+            diagnostic = entry->Diagnostic;
+            return *entry->Accepted;
+        }
+        if (!entry->Queued)
+        {
+            entry->Queued = state.Commands->Enqueue(CheckPointInputReadiness{context.PointInputReadiness, entry}).IsValid();
+            if (entry->Queued) ++state.Stats.ChecksQueued;
+        }
+        diagnostic = entry->Queued
+            ? "Checking live point samples. Wait for input validation."
+            : "Unable to queue point-input validation. Reattach the editor and retry.";
+        return false;
     }
 
     bool CapturePointScalarField(
@@ -284,4 +452,33 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             return points;
         }
 
+}
+
+namespace Extrinsic::Runtime
+{
+    extern "C++" std::shared_ptr<EditorPointInputReadinessState> MakeEditorPointInputReadiness(
+        WorldRegistry& worlds, CommandBus* commands, JobService* jobs)
+    {
+        auto state = std::make_shared<EditorPointInputReadinessState>();
+        state->Worlds = &worlds;
+        state->Commands = commands;
+        state->Jobs = jobs;
+        if (commands)
+            commands->RegisterHandler<GeometryProcessingDetail::CheckPointInputReadiness>(
+                [](CommandContext&, const GeometryProcessingDetail::CheckPointInputReadiness& command) {
+                    GeometryProcessingDetail::CheckPointInput(command);
+                    return CommandOutcome::Ok();
+                });
+        return state;
+    }
+
+    extern "C++" void BeginEditorPointInputReadinessFrame(EditorPointInputReadinessState& state)
+    {
+        ++state.Frame;
+        // Keep only requests from this/previous prepared frame. Revision changes
+        // replace a slot; closed panels cannot accumulate a history of source data.
+        std::erase_if(state.Entries, [&](const auto& entry) {
+            return entry->RequestedFrame + 1 < state.Frame;
+        });
+    }
 }

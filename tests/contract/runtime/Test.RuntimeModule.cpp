@@ -472,7 +472,7 @@ TEST(RuntimeModule, EnginePublishesOnlyConsumedBuiltInServices)
     Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig());
     engine.Initialize();
 
-    EXPECT_EQ(engine.Services().Find<Runtime::CommandBus>(), nullptr);
+    EXPECT_EQ(engine.Services().Find<Runtime::CommandBus>(), &engine.Commands());
     EXPECT_EQ(engine.Services().Find<Runtime::KernelEventBus>(), nullptr);
     EXPECT_EQ(engine.Services().Find<Runtime::WorldRegistry>(), nullptr);
     // The kernel retains JobService, but only AsyncWorkModule publishes it for
@@ -483,6 +483,7 @@ TEST(RuntimeModule, EnginePublishesOnlyConsumedBuiltInServices)
     EXPECT_NE(engine.Services().Find<Runtime::RenderExtractionCache>(), nullptr);
 
     engine.Shutdown();
+    EXPECT_EQ(engine.Services().Find<Runtime::CommandBus>(), nullptr);
     EXPECT_EQ(engine.Services().Find<Runtime::JobService>(), nullptr);
     EXPECT_EQ(engine.Services().Find<RHI::IDevice>(), nullptr);
 }

@@ -96,6 +96,11 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     [[nodiscard]] bool CapturePointInput(
         const GeometryEntityAvailability&, GeometryPropertyRef& positions, bool copyValues,
         PointInputCapture&, std::string& diagnostic);
+    [[nodiscard]] bool PreparePointInput(
+        const EditorProcessingContext&, entt::entity, const GeometryEntityAvailability&,
+        GeometryPropertyRef& positions, PointInputCapture&, std::string& diagnostic);
+    [[nodiscard]] bool EditorProcessingContextWorldCurrent(const EditorProcessingContext&);
+    [[nodiscard]] EditorPointInputReadinessStats PointInputReadinessStats(const EditorProcessingContext&);
     // Callers resolve output domains and validate their typed config before preflight.
     [[nodiscard]] bool ValidatePointOutputs(
         const GeometryEntityAvailability&, const GeometryPropertyRef& positions,

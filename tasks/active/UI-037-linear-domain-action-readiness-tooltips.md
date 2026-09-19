@@ -4665,3 +4665,107 @@ exceptions), test layout, doc links/sync, root hygiene, skill mirrors and brief
 freshness pass. The existing consolidation fixture initializer-order warning
 is unchanged. No GPU execution or sanitizer-suite result is claimed. Logs and
 review packets: `/tmp/intrinsic-consolidation-readiness/`.
+
+## Continuation — deferred shared point-input readiness (2026-09-19)
+
+Operator directs continued duplicate-code/compilation work with Claude Fable 5.1,
+starting at `62cb78abb`. This slice follows the handoff's substantive shared
+point-scan gap. It covers the common point-input catalog, outlier readiness and
+keypoint readiness. Normal PCA/topology readiness remains a subsequent UI-037
+slice; the broad task checklist stays open.
+
+Reuse/right-sizing decision: `PointProperties.cpp::CapturePointInput` already
+owns live-row filtering, finite/LBVH/subnormal classification and compact counts.
+Split its metadata/row work in that compiled owner and reuse the row function
+for execution and deferred readiness. Consolidation's whole-buffer finite
+predicate is not substitutable: point methods exclude deleted samples and map
+halfedge pairs to edge deletion flags. There is no new algorithm, service class,
+module, worker job, or public cache template. The existing engine `CommandBus`
+is discoverable through the existing service registry so session-owned state can
+request work at the established main-thread command drain; a dummy worker job
+would add scheduling without any safe worker-side ECS work.
+
+The shared processing interface gains only an opaque session state pointer and
+copied diagnostic counters. Cache keys include scene/world/epoch, versioned
+entity, canonical positions and both input-property watches. Requests replace
+superseded revisions; entries unused in the previous prepared frame expire, so
+closed panels cannot accumulate historical sources and large catalogs do not
+starve behind a fixed entry cap. Queue payloads hold weak references. Metadata
+validation precedes lookup, negative row verdicts are reusable, and commands
+still recapture rather than trusting readiness. Catalog generations include
+accepted membership; the combo keeps its binding when a pending entry is omitted.
+Prepared sessions never fall back to scans when command wiring is unavailable;
+explicit standalone processing contexts retain synchronous validation.
+
+- [x] Plan review with Claude Fable 5.1 and bounded Codex Sol ownership review.
+- [x] Implement one shared deferred verdict for catalog/outlier/keypoint queries.
+- [x] Verify lifecycle, revision/deletion invalidation, negative caching,
+      supersession, full command revalidation and unchanged direct contracts.
+- [x] Finish fixed-diff review and strongest relevant CPU/structural checks.
+
+Development evidence and immutable review packets: `/tmp/intrinsic-point-readiness/`.
+No elapsed compilation/frame-time speedup, GPU execution or sanitizer-suite
+result is claimed. The implementation adds cache behavior; it is not a net
+source-line reduction.
+
+Review closure: Fable's revision/handler questions were checked against the
+process-monotonic property token contract and replace-on-registration command
+bus. Catalog hashes include domain/name as well as revisions; attached discard
+paths invalidate snapshots, and queue failure is distinct from pending.
+The shell prepares once per `DrawFrame` and then borrows the prepared frame for
+all families. Twelve new runtime regressions include a real four-frame engine
+run with selected-model construction (one queued check/one scan), an 81-property
+catalog without starvation, absent command wiring, paired halfedge masks,
+negative verdicts, property/remove-readd revisions, retained borrows, superseded
+work, detach/world changes, expiry and apply-time revalidation. Retained-world
+statistics assertions first prove the handle is bound.
+
+Initial focused verification passed 176 cases. The first complete CPU run
+caught two integration failures: standalone catalog generations no longer
+matched sibling input catalogs, and the built-in-service test expected the
+command bus to be unpublished. The fix restricts asynchronous membership hashing
+to prepared session state, preserving the existing standalone contract, and
+pins the consumed built-in bus to `Engine::Commands()` plus null after shutdown.
+The 14 affected/new tests pass after these fixes. Neither failure was pre-existing;
+no gate was weakened. Development compile fixes also supplied a private forward
+declaration, an explicit Graph test import and the existing public
+`RuntimeTestModule` frame seam instead of calling private `Engine::RunFrame`.
+
+Pre-merge sweep: one UI-037 readiness/cache intent, runtime-only ownership,
+no new layer or link edge, command revalidation preserved. Clean-workshop rows
+1–3 pass; renderer/pass/recipe rows 4–6 and closure row 7 are not applicable;
+row 8 passes with no exceptions. Automated workshop, strict layering, task,
+test-layout and doc-link checks pass. Source-doc audit: zero errors, eleven
+review hints (ten lifetime/ordering/capture contract comments and the existing
+four-line PointFields synopsis). Module inventory remains 429; all 26
+compile-hotspot tooling tests pass. The strengthened processing-service borrow
+guard also forbids the command-bus module from shared editor interfaces.
+
+Final verification: canonical ci/Clang 23, unsanitized. `IntrinsicTests` builds;
+standalone `ExtrinsicSandbox` compiles and links with a temporary ci app override,
+then the normal ci configuration is restored and `IntrinsicTests` rebuilt.
+The final CPU gate selects 4,791 tests: 4,790 pass, one expected ASan-only GLFW
+lifecycle skip, zero failures (154.12 seconds). Source hashes remained fixed
+through final build/test. Final Sol source review found no blocker after the
+Fable review closure and integration fixes.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^EditorPointReadiness\.|^KeypointAnalysis|^OutlierAnalysis|^SandboxEditorSession|^SandboxProcessingPanels\.|^SandboxEditorPresentation\.|^ProcessingCompilationLocality\.|^EditorCompilationLocality\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+ctest --test-dir build/ci --output-on-failure -R '^EditorPointReadiness\.|^PointSpacingOperations.InputCatalogsShareRevisionMetadataWithoutChangingEligibility$|^RuntimeModule.EnginePublishesOnlyConsumedBuiltInServices$' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --preset ci -DINTRINSIC_BUILD_SANDBOX=ON
+cmake --build --preset ci --target ExtrinsicSandbox -j4
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+```
+
+Production scope is nine files, 3,688 -> 3,943 physical lines (+255), including
+the new 15-line private declaration header; test registration adds one CMake
+line. This adds the required cache lifetime/validation behavior while sharing
+one compiled scanner, rather than reducing net lines. No elapsed compile-time
+or frame-time speedup is inferred. A changed source is scanned once during
+command drain, so this is not worker parallelism or a per-drain time budget.
+UI-037 stays open for remaining per-frame method readiness scans and its broad
+action inventory. This is a completed session checkpoint.

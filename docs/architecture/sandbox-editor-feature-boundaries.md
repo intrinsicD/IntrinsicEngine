@@ -376,8 +376,30 @@ statistical outliers keep their self-excluding queries. Density and spacing also
 share framed fixed-width kNN pagination; radius pagination retains its separate
 support-membership contract. These declarations live in `RadiusRows.hpp` for
 consumers of spatial-index neighborhoods.
-`BuildPointInputCatalog` reuses finite live-row capture for weights, keypoints,
+`BuildPointInputCatalog` shares live-row validation with weights, keypoints,
 outliers, descriptors, construction and normals, independently of method result records.
+Prepared editor sessions own an opaque point-input readiness cache. Catalog,
+outlier and keypoint previews inspect metadata and enqueue a missing verdict on
+the engine's existing command bus; the next main-thread command drain runs the
+compiled canonical row scan. No property values are copied or scanned while
+these previews are built. Keys include world/epoch, scene, entity, canonical
+position property and its count/revision, and deletion-source count/revision;
+halfedges use the paired edge's mask. Negative verdicts are cached too.
+Only the latest generation for a logical source is retained, and sources unused
+in the previous prepared frame expire. Weak queued references cannot keep old
+entries alive. Metadata errors remain immediate; pending input verdicts disable
+actions. Catalogs omit pending entries and include membership in their generation.
+The combo retains its current binding independently of catalog membership.
+Prepared processing handles are main-thread borrows and reject a switched or
+destroyed world before dereferencing its scene. Retained mutable property borrows
+must call `MarkModified()` after later writes, as required by property coherence.
+Apply paths always capture current inputs again. Explicit standalone contexts
+without session state retain synchronous preflight; sessions without a command
+bus report readiness unavailable. Normal-method readiness still owns its
+separate topology/mask checks. The cache definition and scanner stay compiled
+in `PointProperties.cpp`, with only an opaque pointer and copied counters in the
+shared processing interface. Engine registers its existing `CommandBus` as a
+built-in service for this session wiring.
 `RadiusRows.cpp` also owns `AcquirePointIndex`, shared by all nine point-processing
 adapters. The private helper retains the immutable lease and cache-reuse flag,
 then compares captured source rows and coordinates; typed backend gates, failure

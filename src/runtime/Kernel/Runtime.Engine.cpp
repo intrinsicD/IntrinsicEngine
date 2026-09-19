@@ -251,6 +251,9 @@ namespace Extrinsic::Runtime
         requireProvide(m_Impl->m_ServiceRegistry.Provide<RenderExtractionCache>(
                            m_Impl->m_RenderExtractionCache, "Engine"),
                        "RenderExtractionCache");
+        requireProvide(m_Impl->m_ServiceRegistry.Provide<CommandBus>(
+                           m_Impl->m_CommandBus, "Engine"),
+                       "CommandBus");
         requireProvide(m_Impl->m_ServiceRegistry.Provide<RHI::IDevice>(
                            *m_Impl->m_Device, "Engine"),
                        "RHI::IDevice");

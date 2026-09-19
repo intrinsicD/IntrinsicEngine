@@ -83,13 +83,16 @@ namespace Extrinsic::Runtime
             const auto validation = ValidateKeypointAnalysisConfigSection(
                 SerializeKeypointAnalysisConfig(c), {}, kKeypointAnalysisConfigSectionName);
             if (!validation.Usable()) return fail(validation.Diagnostics.front().Message);
-            if (!context.Scene) return fail("Scene is unavailable.");
+            if ((context.AttachmentActive && !context.AttachmentActive()) || !context.Scene)
+                return fail("Scene is unavailable.");
             const auto entity = EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(), c.StableEntityId);
             if (!entity) return fail("Keypoint target entity is stale or missing.");
             const auto a = BuildGeometryAvailability(context.Scene->Raw(), *entity);
             auto w = std::make_shared<KeypointWork>();
-            if (!GeometryProcessingDetail::CapturePointInput(a, c.Positions,
-                    purpose == CapturePurpose::Execute, *w, diagnostic)) return {};
+            const bool captured = purpose == CapturePurpose::Execute
+                ? GeometryProcessingDetail::CapturePointInput(a, c.Positions, true, *w, diagnostic)
+                : GeometryProcessingDetail::PreparePointInput(context, *entity, a, c.Positions, *w, diagnostic);
+            if (!captured) return {};
             if (c.Mask.Domain == D::Unknown) c.Mask.Domain = c.Positions.Domain;
             if (c.Score.Domain == D::Unknown) c.Score.Domain = c.Positions.Domain;
             const std::array outputs{c.Mask, c.Score};

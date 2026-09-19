@@ -19,6 +19,7 @@ extern "C++" {
         class SpatialIndexCache;
         class SelectionController;
         struct EditorProcessingCommandsAccess;
+        struct EditorPointInputReadinessState;
     }
 }
 export namespace Extrinsic::Runtime
@@ -61,6 +62,9 @@ export namespace Extrinsic::Runtime
             bool MeshSubdivideSqrt3KernelAvailable{true};
             bool MeshSubdivideLoopFeatureEdgesAvailable{true};
             bool MeshSimplifyKernelAvailable{true};
+            // Prepared sessions share deferred point-input verdicts. Standalone
+            // contexts without this state perform synchronous preflight.
+            std::shared_ptr<EditorPointInputReadinessState> PointInputReadiness{};
         };
     }
 
@@ -69,6 +73,11 @@ export namespace Extrinsic::Runtime
     {
         bool Enabled{};
         std::string DisabledReason{};
+    };
+
+    struct EditorPointInputReadinessStats
+    {
+        std::uint64_t ChecksQueued{}, PropertyScans{};
     };
 
     class EditorProcessingCommands final
@@ -92,10 +101,14 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] ActionReadiness ResolveEditorProcessingActionReadiness(
         const EditorProcessingCommands&, ActionReadiness method);
     // Live finite vec3 rows on every resolved element domain of the entity, with
-    // each entry's property revision folded into the snapshot generation. Every
+    // each entry's property revision and membership folded into the generation.
+    // Prepared sessions omit pending entries until the command drain validates
+    // them; standalone contexts validate synchronously. Every
     // method whose point input accepts any such property shares this catalog;
     // methods that additionally trial-capture an output or require a minimum
     // sample count own their own narrower catalog.
     [[nodiscard]] GeometryPropertyCatalogSnapshot GetEditorPointInputCatalog(
         const EditorProcessingCommands&, std::uint32_t stableId);
+    [[nodiscard]] EditorPointInputReadinessStats GetEditorPointInputReadinessStats(
+        const EditorProcessingCommands&);
 }

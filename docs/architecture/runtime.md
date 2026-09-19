@@ -112,9 +112,11 @@ Two-phase `Provide`/`Require`/`OnResolve` remains behavior-backed: texture bake,
 asset workflow, scene document, editor UI, camera, interaction, and config
 control resolve real cross-owner capabilities independent of module insertion
 order, and missing required providers fail boot. Engine publishes only the six
-built-in capabilities with production lookup consumers: `JobService`,
+built-in capabilities with production lookup consumers: `CommandBus`,
 `RenderExtractionCache`, `RHI::IDevice`, `Platform::IWindow`,
-`Graphics::IRenderer`, and `RuntimeInputActionRegistry`. Registry statistics
+`Graphics::IRenderer`, and `RuntimeInputActionRegistry`. The editor session uses
+`CommandBus` for deferred point-input validation. `AsyncWorkModule` publishes
+the kernel-owned `JobService` for configured asynchronous consumers. Registry statistics
 and a copied boot-error list were removed; fail-closed validation retains
 `HasBootErrors`, `LastBootError`, and `ValidateBoot`. Module shutdown runs after
 `RuntimeShutdownAnnounced` has been published and pumped. A module that owns a

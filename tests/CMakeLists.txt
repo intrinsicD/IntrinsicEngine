@@ -812,6 +812,7 @@ intrinsic_add_module_boundary_test(EditorCompilationLocality.ProcessingServiceBo
         --check-source src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm
         --forbid-module Extrinsic.RHI.Device
         --forbid-module Extrinsic.Runtime.SpatialIndexCache
+        --forbid-module Extrinsic.Runtime.CommandBus
         --forbid-module Geometry.PointLBVH)
 set_tests_properties(EditorCompilationLocality.ProcessingServiceBorrows
     PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)

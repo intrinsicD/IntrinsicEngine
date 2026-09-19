@@ -44,6 +44,7 @@ import Extrinsic.Runtime.ClusteringTypes;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.PointCloudConsolidationTypes;
 import Extrinsic.Runtime.RenderArtifactPublication;
@@ -80,6 +81,7 @@ import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 
 #include "Editor/internal/Runtime.EditorFeatures.Internal.hpp"
+#include "Editor/internal/Runtime.EditorPointInputReadiness.hpp"
 
 namespace Extrinsic::Runtime::EditorFeatureDetail
 {
@@ -121,6 +123,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         bool m_FramePrepared{false};
         EditorFeatureBindings m_Context{};
         EditorProcessingContext m_ProcessingContext{};
+        std::shared_ptr<EditorPointInputReadinessState> m_PointInputReadiness{};
         EditorFeatureResultBindings m_ResultBindings{};
         EditorWorkspaceSnapshot m_LastFrame{};
         EditorSelectedModelCache m_SelectedModelCache{};
@@ -453,6 +456,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         m_Services        = &services;
         m_AttachmentEpoch = std::make_shared<std::atomic_bool>(true);
         m_Jobs = services.Find<JobService>();
+        m_PointInputReadiness = MakeEditorPointInputReadiness(
+            worlds, services.Find<CommandBus>(), m_Jobs);
         m_SpatialIndices = services.Find<SpatialIndexCache>();
         m_ClusteringService = services.Find<ClusteringService>();
         if (m_ClusteringService != nullptr &&
@@ -831,6 +836,8 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         }
         // Capture only after epoch guards and config/job callbacks are installed.
         m_ProcessingContext = MakeEditorProcessingContext(context);
+        m_ProcessingContext.PointInputReadiness = m_PointInputReadiness;
+        BeginEditorPointInputReadinessFrame(*m_PointInputReadiness);
         m_LastFrame = BuildEditorWorkspaceSnapshot(
             MakeEditorWorkspaceSnapshotContext(context, m_ProcessingContext),
             request);
@@ -904,6 +911,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         m_PointCloudServices = {};
         m_LastFrame = {};
         m_SelectedModelCache = {};
+        m_PointInputReadiness.reset();
         m_LastObservedRuntimeImportSequence = 0u;
         m_LastObservedRuntimeSceneFileSequence = 0u;
         m_LastImportResult.reset();

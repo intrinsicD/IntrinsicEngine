@@ -83,6 +83,7 @@ import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -104,6 +105,7 @@ import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
+import Geometry.Graph;
 import Geometry.Graph.Vertex.Normals;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
@@ -115,6 +117,7 @@ import Geometry.Smoothing;
 import Geometry.UvAtlas;
 
 #include "MockRHI.hpp"
+#include "RuntimeTestModule.hpp"
 
 namespace Runtime = Extrinsic::Runtime;
 namespace Assets = Extrinsic::Assets;
@@ -1092,4 +1095,310 @@ TEST(SandboxEditorSessionLifecycle, NormalFramesCopyResultsAndGuardExpiredCallba
     expired.ResultSinks.NormalEstimation({.Message = "destroyed attachment"});
     expired.ResultSinks.DismissResult();
     engine.Shutdown();
+}
+
+namespace
+{
+    class PointReadinessFrameProbe final : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        std::function<void()> OnFrame{};
+    private:
+        void Frame(double, double) override
+        {
+            if (OnFrame) OnFrame();
+            else Kernel().RequestExit();
+        }
+    };
+    class EditorPointReadiness : public testing::Test
+    {
+    protected:
+        Runtime::Engine Engine{HeadlessConfig()};
+        Runtime::EditorWorkspaceAttachment Attachment{};
+        ECS::Scene::Registry* Scene{};
+        entt::entity Entity{};
+        Runtime::EditorProcessingCommands Commands{};
+        Runtime::KeypointAnalysisConfig Keypoints{};
+        Runtime::OutlierAnalysisConfig Outliers{};
+        PointReadinessFrameProbe* FrameProbe{};
+
+        void SetUp() override
+        {
+            FrameProbe = &Intrinsic::Tests::AddRuntimeTestModule(
+                Engine, std::make_unique<PointReadinessFrameProbe>());
+            Engine.EmplaceModule<Runtime::AsyncWorkModule>();
+            Engine.EmplaceModule<Runtime::SceneInteractionModule>();
+            Engine.Initialize();
+            Scene = Engine.Worlds().Get(Engine.Worlds().ActiveWorld());
+            Entity = Scene->Create();
+            auto& props = Scene->Raw().emplace<GS::Vertices>(Entity).Properties;
+            props.Resize(5);
+            props.GetOrAdd<glm::vec3>("samples").Vector() =
+                {{0,0,0}, {1,0,0}, {0,1,0}, {1,1,0}, {std::numeric_limits<float>::quiet_NaN(),0,0}};
+            props.GetOrAdd<bool>("v:deleted")[4] = true;
+            Keypoints.StableEntityId = Runtime::SelectionController::ToStableEntityId(Entity);
+            Keypoints.Positions = {Runtime::GeometryElementDomain::PointCloudPoint, "samples", Geometry::PropertyValueKind::Vec3};
+            Keypoints.Mask = {Keypoints.Positions.Domain, "keypoints", Geometry::PropertyValueKind::UInt32};
+            Keypoints.Score = {Keypoints.Positions.Domain, "saliency", Geometry::PropertyValueKind::Float};
+            Keypoints.MinimumNeighbors = 1;
+            Outliers.StableEntityId = Keypoints.StableEntityId;
+            Outliers.Positions = Keypoints.Positions;
+            Outliers.Mask = {Keypoints.Positions.Domain, "outliers", Geometry::PropertyValueKind::UInt32};
+            Outliers.Score = {Keypoints.Positions.Domain, "scores", Geometry::PropertyValueKind::Float};
+            Outliers.KNeighbors = 2;
+            Attachment.Attach(Engine.Worlds(), Engine.Services());
+            PrepareFrame();
+        }
+        void TearDown() override
+        {
+            Attachment.Detach();
+            Engine.Shutdown();
+        }
+        void PrepareFrame()
+        {
+            ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(Attachment, MakeNoEditorModelBuildRequest()));
+            Commands = Runtime::PrepareEditorPointAnalysisFrame(Attachment).Commands;
+        }
+        Geometry::PropertySet& Properties() { return Scene->Raw().get<GS::Vertices>(Entity).Properties; }
+        Runtime::ActionReadiness Preview() { return Runtime::PreviewEditorKeypointAnalysisCommand(Commands, Keypoints); }
+        Runtime::EditorPointInputReadinessStats Stats() { return Runtime::GetEditorPointInputReadinessStats(Commands); }
+        void Drain() { Engine.Commands().Drain(*Scene); }
+    };
+}
+
+TEST_F(EditorPointReadiness, CatalogAndMethodsShareDeferredVerdictAcrossFrames)
+{
+    const auto pending = Runtime::GetEditorPointInputCatalog(Commands, Keypoints.StableEntityId);
+    EXPECT_TRUE(pending.Empty());
+    for (int i = 0; i < 3; ++i)
+    {
+        EXPECT_FALSE(Preview().Enabled);
+        EXPECT_FALSE(Runtime::PreviewEditorOutlierAnalysisCommand(Commands, Outliers).Enabled);
+        EXPECT_EQ(Stats().ChecksQueued, 1u);
+        EXPECT_EQ(Stats().PropertyScans, 0u);
+    }
+    Drain();
+    const auto ready = Runtime::GetEditorPointInputCatalog(Commands, Keypoints.StableEntityId);
+    ASSERT_EQ(ready.Size(), 1u);
+    EXPECT_EQ(ready.Entries.front().Ref, Keypoints.Positions);
+    EXPECT_NE(ready.SourceGeneration, pending.SourceGeneration);
+    for (int i = 0; i < 3; ++i)
+    {
+        PrepareFrame();
+        EXPECT_TRUE(Preview().Enabled);
+        EXPECT_TRUE(Runtime::PreviewEditorOutlierAnalysisCommand(Commands, Outliers).Enabled);
+        EXPECT_EQ(Stats().PropertyScans, 1u);
+        EXPECT_EQ(Stats().ChecksQueued, 1u);
+    }
+    Properties().GetOrAdd<float>("unrelated")[0] = 7;
+    EXPECT_TRUE(Preview().Enabled);
+    EXPECT_EQ(Stats().ChecksQueued, 1u);
+}
+
+TEST_F(EditorPointReadiness, RevisionsAndRetainedBorrowInvalidateNegativeVerdicts)
+{
+    EXPECT_FALSE(Preview().Enabled);
+    Drain();
+    ASSERT_TRUE(Preview().Enabled);
+    auto positions = Properties().Get<glm::vec3>("samples");
+    auto& values = positions.Vector();
+    values[0].x = std::numeric_limits<float>::infinity();
+    EXPECT_FALSE(Preview().Enabled);
+    EXPECT_EQ(Stats().PropertyScans, 1u);
+    Drain();
+    const auto invalid = Preview();
+    EXPECT_FALSE(invalid.Enabled);
+    EXPECT_EQ(invalid.DisabledReason, "Live position samples must be finite.");
+    EXPECT_EQ(Stats().PropertyScans, 2u);
+    EXPECT_EQ(Preview().DisabledReason, invalid.DisabledReason);
+    EXPECT_EQ(Stats().ChecksQueued, 2u);
+    values[0] = {0,0,0};
+    positions.MarkModified();
+    EXPECT_FALSE(Preview().Enabled);
+    Drain();
+    EXPECT_TRUE(Preview().Enabled);
+    EXPECT_EQ(Stats().PropertyScans, 3u);
+}
+
+TEST_F(EditorPointReadiness, SupersededAndChangedBeforeDrainRequestsNeverScanOldKeys)
+{
+    EXPECT_FALSE(Preview().Enabled);
+    Properties().Get<glm::vec3>("samples")[0].x = 2;
+    Drain();
+    EXPECT_EQ(Stats().PropertyScans, 0u);
+    EXPECT_FALSE(Preview().Enabled);
+    Properties().Get<glm::vec3>("samples")[0].x = 3;
+    EXPECT_FALSE(Preview().Enabled);
+    Drain();
+    EXPECT_TRUE(Preview().Enabled);
+    EXPECT_EQ(Stats().ChecksQueued, 3u);
+    EXPECT_EQ(Stats().PropertyScans, 1u);
+}
+
+TEST_F(EditorPointReadiness, DeletionMaskAndMetadataInvalidateWithoutScanning)
+{
+    EXPECT_FALSE(Preview().Enabled);
+    Drain();
+    ASSERT_TRUE(Preview().Enabled);
+    Properties().Get<bool>("v:deleted")[4] = false;
+    EXPECT_FALSE(Preview().Enabled);
+    Drain();
+    EXPECT_EQ(Preview().DisabledReason, "Live position samples must be finite.");
+    auto mask = Properties().Get<bool>("v:deleted");
+    Properties().Remove(mask);
+    (void)Properties().GetOrAdd<float>("v:deleted");
+    EXPECT_EQ(Preview().DisabledReason, "Deletion mask must be a count-matched bool property.");
+    EXPECT_EQ(Stats().ChecksQueued, 2u);
+    auto wrong = Properties().Get<float>("v:deleted");
+    Properties().Remove(wrong);
+    Properties().GetOrAdd<bool>("v:deleted")[4] = true;
+    EXPECT_FALSE(Preview().Enabled);
+    Drain();
+    EXPECT_TRUE(Preview().Enabled);
+}
+
+TEST_F(EditorPointReadiness, HalfedgeReadinessUsesPairedEdgeMask)
+{
+    Geometry::Graph::Graph graph;
+    auto a = graph.AddVertex({0,0,0}), b = graph.AddVertex({1,0,0}), c = graph.AddVertex({0,1,0});
+    (void)graph.AddEdge(a,b); (void)graph.AddEdge(b,c); (void)graph.AddEdge(c,a);
+    GS::PopulateFromGraph(Scene->Raw(), Entity, graph);
+    auto& halves = Scene->Raw().get<GS::Halfedges>(Entity).Properties;
+    halves.GetOrAdd<glm::vec3>("samples").Vector() =
+        {{0,0,0}, {1,0,0}, {0,1,0}, {1,1,0}, {NAN,0,0}, {NAN,0,0}};
+    auto& edges = Scene->Raw().get<GS::Edges>(Entity).Properties;
+    edges.GetOrAdd<bool>("e:deleted")[2] = true;
+    Keypoints.Positions.Domain = Runtime::GeometryElementDomain::GraphHalfedge;
+    Keypoints.Mask.Domain = Keypoints.Score.Domain = Keypoints.Positions.Domain;
+    EXPECT_FALSE(Preview().Enabled);
+    Drain();
+    EXPECT_TRUE(Preview().Enabled);
+    edges.Get<bool>("e:deleted")[2] = false;
+    EXPECT_FALSE(Preview().Enabled);
+    Drain();
+    EXPECT_EQ(Preview().DisabledReason, "Live position samples must be finite.");
+    halves.Resize(5);
+    EXPECT_EQ(Preview().DisabledReason, "Invalid deletion domain/cardinality.");
+    EXPECT_EQ(Stats().PropertyScans, 2u);
+}
+
+TEST_F(EditorPointReadiness, CommandsRecaptureDespiteWarmReadiness)
+{
+    EXPECT_FALSE(Preview().Enabled);
+    Drain();
+    ASSERT_TRUE(Preview().Enabled);
+    Properties().Get<glm::vec3>("samples")[0].x = std::numeric_limits<float>::quiet_NaN();
+    EXPECT_FALSE(Runtime::ApplyEditorKeypointAnalysisCommand(Commands, Keypoints).Succeeded());
+    EXPECT_FALSE(Runtime::ApplyEditorOutlierAnalysisCommand(Commands, Outliers).Succeeded());
+    EXPECT_FALSE(Properties().Exists("keypoints"));
+    EXPECT_FALSE(Properties().Exists("outliers"));
+    EXPECT_EQ(Stats().PropertyScans, 1u);
+}
+
+TEST_F(EditorPointReadiness, DetachWorldEpochAndDestroyedEntityDiscardQueuedWork)
+{
+    EXPECT_FALSE(Preview().Enabled);
+    auto old = Commands;
+    Attachment.Detach();
+    Drain();
+    EXPECT_FALSE(old.IsBound());
+    Attachment.Attach(Engine.Worlds(), Engine.Services());
+    PrepareFrame();
+    EXPECT_FALSE(Preview().Enabled);
+    auto& jobs = RequiredEngineService<Runtime::JobService>(Engine);
+    jobs.AdvanceWorldGeneration(Engine.Worlds().ActiveWorld());
+    Drain();
+    EXPECT_EQ(Stats().PropertyScans, 0u);
+    EXPECT_FALSE(Preview().Enabled);
+    Drain();
+    EXPECT_TRUE(Preview().Enabled);
+    Properties().Get<glm::vec3>("samples")[0].x = 9;
+    EXPECT_FALSE(Preview().Enabled);
+    Scene->Destroy(Entity);
+    Drain();
+    EXPECT_EQ(Stats().PropertyScans, 1u);
+    EXPECT_FALSE(Preview().Enabled);
+}
+
+TEST_F(EditorPointReadiness, UnrequestedSourcesExpireWithoutScanning)
+{
+    EXPECT_FALSE(Preview().Enabled);
+    PrepareFrame();
+    PrepareFrame();
+    Drain();
+    EXPECT_EQ(Stats().PropertyScans, 0u);
+    EXPECT_FALSE(Preview().Enabled);
+    Drain();
+    EXPECT_TRUE(Preview().Enabled);
+    EXPECT_EQ(Stats().ChecksQueued, 2u);
+    EXPECT_EQ(Stats().PropertyScans, 1u);
+}
+
+TEST_F(EditorPointReadiness, LargeCatalogCompletesWithoutEntryCapStarvation)
+{
+    for (unsigned i = 0; i < 80; ++i)
+        Properties().GetOrAdd<glm::vec3>("extra" + std::to_string(i)).Vector().assign(5, glm::vec3(1));
+    EXPECT_TRUE(Runtime::GetEditorPointInputCatalog(Commands, Keypoints.StableEntityId).Empty());
+    EXPECT_EQ(Stats().ChecksQueued, 81u);
+    EXPECT_EQ(Stats().PropertyScans, 0u);
+    Drain();
+    EXPECT_EQ(Runtime::GetEditorPointInputCatalog(Commands, Keypoints.StableEntityId).Size(), 81u);
+    PrepareFrame();
+    EXPECT_EQ(Runtime::GetEditorPointInputCatalog(Commands, Keypoints.StableEntityId).Size(), 81u);
+    EXPECT_EQ(Stats().ChecksQueued, 81u);
+    EXPECT_EQ(Stats().PropertyScans, 81u);
+}
+
+TEST_F(EditorPointReadiness, ActiveWorldSwitchRejectsRetainedCommandsAndQueuedWork)
+{
+    EXPECT_FALSE(Preview().Enabled);
+    auto old = Commands;
+    const auto originalWorld = Engine.Worlds().ActiveWorld();
+    auto world = Engine.Worlds().CreateWorld("other readiness world");
+    ASSERT_TRUE(Engine.Worlds().RequestSetActiveWorld(world));
+    auto& jobs = RequiredEngineService<Runtime::JobService>(Engine);
+    (void)Engine.Worlds().ApplyMaintenance(Engine.Events(), jobs);
+    EXPECT_FALSE(old.IsBound());
+    Drain();
+    // Return before preparing a new frame to inspect the unchanged old cache.
+    ASSERT_TRUE(Engine.Worlds().RequestSetActiveWorld(originalWorld));
+    (void)Engine.Worlds().ApplyMaintenance(Engine.Events(), jobs);
+    ASSERT_TRUE(old.IsBound());
+    EXPECT_EQ(Runtime::GetEditorPointInputReadinessStats(old).PropertyScans, 0u);
+}
+
+TEST_F(EditorPointReadiness, MissingCommandQueueNeverFallsBackToPanelScanning)
+{
+    Attachment.Detach();
+    ASSERT_TRUE(Engine.Services().Withdraw<Runtime::CommandBus>(Engine.Commands()));
+    Attachment.Attach(Engine.Worlds(), Engine.Services());
+    PrepareFrame();
+    const auto preview = Preview();
+    EXPECT_FALSE(preview.Enabled);
+    EXPECT_NE(preview.DisabledReason.find("command queue"), std::string::npos);
+    EXPECT_TRUE(Runtime::GetEditorPointInputCatalog(Commands, Keypoints.StableEntityId).Empty());
+    EXPECT_EQ(Stats().ChecksQueued, 0u);
+    EXPECT_EQ(Stats().PropertyScans, 0u);
+}
+
+TEST_F(EditorPointReadiness, IdleRuntimeFramesAndSelectedModelsReuseTheVerdict)
+{
+    Properties().GetOrAdd<glm::vec3>("v:position").Vector() =
+        {{0,0,0}, {1,0,0}, {0,1,0}, {1,1,0}, {2,2,0}};
+    Keypoints.Positions.Name = "v:position";
+    auto& selection = RequiredEngineService<Runtime::SelectionController>(Engine);
+    ASSERT_TRUE(selection.SetSelectedByStableEntityId(*Scene, Keypoints.StableEntityId));
+    ASSERT_FALSE(Preview().Enabled);
+    unsigned frames = 0;
+    FrameProbe->OnFrame = [&] {
+        if (++frames == 4) Engine.RequestExit();
+        ASSERT_TRUE(Runtime::PrepareEditorWorkspaceSnapshotFrame(Attachment));
+        Commands = Runtime::PrepareEditorPointAnalysisFrame(Attachment).Commands;
+        EXPECT_TRUE(Preview().Enabled);
+        EXPECT_EQ(Stats().ChecksQueued, 1u);
+        EXPECT_EQ(Stats().PropertyScans, 1u);
+    };
+    Engine.Run();
+    FrameProbe->OnFrame = {};
+    EXPECT_EQ(frames, 4u);
 }

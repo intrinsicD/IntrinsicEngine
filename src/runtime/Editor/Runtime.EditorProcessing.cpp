@@ -37,7 +37,10 @@ namespace Extrinsic::Runtime
 
     bool EditorProcessingCommands::IsBound() const noexcept
     {
-        return m_Context && (!m_Context->AttachmentActive || m_Context->AttachmentActive());
+        // Prepared command handles borrow a world's scene on the main thread.
+        // Their session state can reject a switched/destroyed world before use.
+        return m_Context && (!m_Context->AttachmentActive || m_Context->AttachmentActive()) &&
+               GeometryProcessingDetail::EditorProcessingContextWorldCurrent(*m_Context);
     }
     extern "C++" const EditorProcessingContext& EditorProcessingCommandsAccess::Resolve(const EditorProcessingCommands& commands) noexcept
     {
@@ -72,6 +75,11 @@ namespace Extrinsic::Runtime
     {
         return GeometryProcessingDetail::BuildPointInputCatalog(
             EditorProcessingCommandsAccess::Resolve(commands), stableId);
+    }
+    EditorPointInputReadinessStats GetEditorPointInputReadinessStats(const EditorProcessingCommands& commands)
+    {
+        return GeometryProcessingDetail::PointInputReadinessStats(
+            EditorProcessingCommandsAccess::Resolve(commands));
     }
     extern "C++" RuntimeEngineConfigApplyResult ApplyEditorProcessingConfig(
         const EditorProcessingCommands& commands,
