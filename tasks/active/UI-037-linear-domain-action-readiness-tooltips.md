@@ -16,6 +16,47 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, geometry
 Current continuation: see [normal capture checkpoint and open points](#continuation--shared-normal-point-capture-2026-09-19).
 Read that checkpoint plus the initial scope before consulting the historical slices.
 
+## Remaining closure estimate — 2026-09-19
+
+Working estimate at `d15cc352a`: **12 bounded implementation/verification slices,
+with a planning range of 10–14**, not twelve promised sessions. Medium confidence:
+this is a targeted source inspection, not an exhaustive completed action matrix.
+Each implementation slice includes its own focused tests and review; the final
+slices close cross-family coverage and the task, rather than postponing testing.
+
+| Slice | Closure deliverable |
+| --- | --- |
+| 1 | Shared cached input readiness for density, density weights and spacing. |
+| 2 | Bilateral/descriptor readiness with revision-keyed position-plus-normal validation. |
+| 3 | Point-construction readiness without per-preview point capture. |
+| 4 | Normal topology readiness without deletion-mask copies/count scans; resolve empty-face semantics against apply. |
+| 5 | ICP source/target and point-to-plane normal readiness without repeated captures. |
+| 6 | Close mesh/curvature/UV admission gaps against their existing validators; reuse current metadata previews. |
+| 7 | Runtime-owned parameterization strategy, pin and boundary prerequisites. |
+| 8 | Texture-bake request-specific property/UV/device/range readiness and shared presentation. |
+| 9 | Close service-action/backend/variant gaps for K-Means, Progressive Poisson, consolidation and outlier actions. |
+| 10 | Finish common prepared-frame readiness, visible disabled actions and remaining app-owned prerequisite decisions. |
+| 11 | Complete the cross-family table-driven readiness/validator matrix, stale-state and zero-scan regressions. |
+| 12 | Finish real ImGui action/option tooltip and command coverage; full verification, review and retirement. |
+
+Evidence behind the estimate: scalar previews still call `CapturePointScalarField`;
+bilateral/descriptors scan live positions/normals; construction and ICP preview
+capture data; normal topology still copies masks. Mesh/curvature/UV already have
+shared metadata admission and buttons, so those are gap closure, not rewrites.
+Parameterization Run still combines selection booleans with config-lane readiness,
+and bake presentation retains `CanBake`/inline-only prerequisite handling.
+
+Largest split risks are paired-property/ICP cache keys and parameterization
+prerequisites. Smaller service/presentation items may combine. The finite-input
+cache, shared action button/tooltip and earlier per-family tests are already done
+and must be reused. Do not restart those implementations.
+
+**Non-gating follow-ups:** general compile-owner cleanup or compile-time benchmarks;
+worker scheduling/per-drain budgeting unless a measured problem prevents the
+existing nonblocking-readiness contract; extra normal-row mapping coverage unless
+mapping changes. These do not enlarge UI-037 closure. Keep compilation work with
+its own task owner. No additional algorithms or broad UI redesign are included.
+
 ## Goal
 - Keep every action in the Sandbox's linear mesh, UV, bake, point-cloud,
   registration, and parameterization workflow visible while making its current
