@@ -1127,6 +1127,7 @@ namespace
         Runtime::DensityWeightConfig Weights{};
         Runtime::BilateralFilterConfig Bilateral{};
         Runtime::DescriptorAnalysisConfig Descriptors{};
+        Runtime::PointConstructionConfig Construction{};
         PointReadinessFrameProbe* FrameProbe{};
 
         void SetUp() override
@@ -1162,6 +1163,11 @@ namespace
             Density.Density = {Keypoints.Positions.Domain, "density", Geometry::PropertyValueKind::Float};
             Spacing.Radii = {Keypoints.Positions.Domain, "radii", Geometry::PropertyValueKind::Float};
             Weights.Weights = {Keypoints.Positions.Domain, "weights", Geometry::PropertyValueKind::Float};
+            Construction.StableEntityId = Keypoints.StableEntityId;
+            Construction.Positions = Keypoints.Positions;
+            Construction.Method = Runtime::PointConstructionMethod::KnnGraph;
+            Construction.KNeighbors = 2;
+            Construction.Resolution = 6;
             Attachment.Attach(Engine.Worlds(), Engine.Services());
             PrepareFrame();
         }
@@ -1207,6 +1213,18 @@ namespace
             return {Runtime::PreviewEditorBilateralFilterCommand(
                         Runtime::PrepareEditorPointSetFrame(Attachment).Commands, Bilateral),
                     Runtime::PreviewEditorDescriptorAnalysisCommand(Commands, Descriptors)};
+        }
+        Runtime::EditorPointConstructionReadiness PreviewConstruction()
+        {
+            return Runtime::PreviewEditorPointConstructionCommand(
+                Runtime::PrepareEditorPointConstructionFrame(Attachment).Commands, Construction);
+        }
+        void SupplyConstructionNormals()
+        {
+            SetNormalInputs();
+            Construction.Method = Runtime::PointConstructionMethod::Hoppe;
+            Construction.EstimateNormals = false;
+            Construction.Normals = Bilateral.Normals;
         }
         void Drain() { Engine.Commands().Drain(*Scene); }
     };
@@ -1618,6 +1636,193 @@ TEST_F(EditorPointReadiness, OrientedCommandsRecaptureWarmNormals)
     EXPECT_EQ(Stats().PropertyScans, 2u);
 }
 
+TEST_F(EditorPointReadiness, ConstructionSharesDeferredInputAndNormalVerdictsAcrossFrames)
+{
+    SupplyConstructionNormals();
+    EXPECT_FALSE(Preview().Enabled);
+    for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
+    EXPECT_EQ(PreviewConstruction().Diagnostic, "Checking live point samples. Wait for input validation.");
+    EXPECT_EQ(Stats().ChecksQueued, 2u);
+    EXPECT_EQ(Stats().PropertyScans, 0u);
+    Drain();
+    for (unsigned frame = 0; frame < 3; ++frame)
+    {
+        PrepareFrame();
+        ASSERT_TRUE(PreviewConstruction().Ready) << PreviewConstruction().Diagnostic;
+        for (const auto& preview : PreviewOriented()) EXPECT_TRUE(preview.Enabled);
+        EXPECT_TRUE(Preview().Enabled);
+        EXPECT_EQ(Stats().ChecksQueued, 2u);
+        EXPECT_EQ(Stats().PropertyScans, 2u);
+    }
+    Properties().GetOrAdd<float>("unrelated")[0] = 1;
+    EXPECT_TRUE(PreviewConstruction().Ready);
+    Construction.Normals = Construction.Positions;
+    EXPECT_EQ(PreviewConstruction().Diagnostic, "Live supplied normals must be finite and nonzero.");
+    EXPECT_EQ(Stats().ChecksQueued, 2u);
+}
+
+TEST_F(EditorPointReadiness, ConstructionWithoutSuppliedNormalsOnlyRequestsPositions)
+{
+    Construction.Normals.Name = "missing";
+    EXPECT_FALSE(PreviewConstruction().Ready);
+    Construction.Method = Runtime::PointConstructionMethod::Hoppe;
+    Construction.EstimateNormals = true;
+    EXPECT_FALSE(PreviewConstruction().Ready);
+    EXPECT_EQ(Stats().ChecksQueued, 1u);
+    Drain();
+    ASSERT_TRUE(PreviewConstruction().Ready);
+    Construction.Method = Runtime::PointConstructionMethod::KnnGraph;
+    Construction.EstimateNormals = false;
+    EXPECT_TRUE(PreviewConstruction().Ready);
+    EXPECT_EQ(Stats().PropertyScans, 1u);
+    EXPECT_EQ(Stats().ChecksQueued, 1u);
+}
+
+TEST_F(EditorPointReadiness, ConstructionCachedNormalLengthsPreserveFamilyThresholds)
+{
+    SupplyConstructionNormals();
+    for (const float length : {0.0f, 0x1p-27f, 0x1p-26f, 2e18f, 2e19f})
+    {
+        SCOPED_TRACE(length);
+        Properties().Get<glm::vec3>("directions")[0] = {length,0,0};
+        EXPECT_FALSE(PreviewConstruction().Ready);
+        Drain();
+        const bool accepted = length == 0x1p-26f || length == 2e18f;
+        const auto scans = Stats().PropertyScans;
+        for (unsigned frame = 0; frame < 2; ++frame)
+        {
+            PrepareFrame();
+            const auto preview = PreviewConstruction();
+            EXPECT_EQ(preview.Ready, accepted) << preview.Diagnostic;
+            if (!accepted) EXPECT_EQ(preview.Diagnostic, "Live supplied normals must be finite and nonzero.");
+            const auto oriented = PreviewOriented();
+            EXPECT_TRUE(oriented[0].Enabled);
+            EXPECT_EQ(oriented[1].Enabled, length != 0);
+            EXPECT_EQ(Stats().PropertyScans, scans);
+        }
+    }
+    EXPECT_EQ(Stats().PropertyScans, 6u);
+    Properties().Get<glm::vec3>("directions")[0].x = NAN;
+    EXPECT_FALSE(PreviewConstruction().Ready);
+    Drain();
+    EXPECT_EQ(PreviewConstruction().Diagnostic, "Live normal samples must be finite.");
+    Properties().Get<glm::vec3>("samples")[1].x = NAN;
+    EXPECT_FALSE(PreviewConstruction().Ready);
+    Drain();
+    EXPECT_EQ(PreviewConstruction().Diagnostic, "Live position samples must be finite.");
+}
+
+TEST_F(EditorPointReadiness, ConstructionPreservesTransformMetadataAndLiveCountGates)
+{
+    SupplyConstructionNormals();
+    Construction.Normals.Name = "missing";
+    EXPECT_EQ(PreviewConstruction().Diagnostic,
+              "Hoppe reconstruction requires count-matched normals on the position domain, or CPU normal estimation.");
+    EXPECT_EQ(Stats().ChecksQueued, 0u);
+    Construction.Normals = Bilateral.Normals;
+    auto& transform = Scene->Raw().emplace<ECS::Components::Transform::Component>(Entity);
+    transform.Scale = {0,1,1};
+    EXPECT_EQ(PreviewConstruction().Diagnostic, "The source hierarchy must have a finite, nonsingular world transform.");
+    EXPECT_EQ(Stats().ChecksQueued, 0u);
+    transform.Scale = {1,1,1};
+    auto deleted = Properties().Get<bool>("v:deleted");
+    deleted[1] = deleted[2] = deleted[3] = true;
+    EXPECT_FALSE(PreviewConstruction().Ready);
+    Drain();
+    const auto insufficient = PreviewConstruction();
+    EXPECT_FALSE(insufficient.Ready);
+    EXPECT_EQ(insufficient.Diagnostic,
+              "Construction requires 3..1048576 live samples for Hoppe or 1..1048576 for graphs.");
+    Construction.Method = Runtime::PointConstructionMethod::KnnGraph;
+    EXPECT_TRUE(PreviewConstruction().Ready);
+    deleted[0] = true;
+    EXPECT_FALSE(PreviewConstruction().Ready);
+    Drain();
+    EXPECT_EQ(PreviewConstruction().Diagnostic, insufficient.Diagnostic);
+    EXPECT_EQ(Stats().PropertyScans, 3u);
+}
+
+TEST_F(EditorPointReadiness, ConstructionRetainsBackendCoordinateGatesWithoutRescanning)
+{
+    Construction.Backend = Runtime::PointConstructionBackend::CpuLBVH;
+    EXPECT_FALSE(PreviewConstruction().Ready);
+    Drain();
+    ASSERT_TRUE(PreviewConstruction().Ready);
+    Construction.Backend = Runtime::PointConstructionBackend::VulkanLBVH;
+    EXPECT_EQ(PreviewConstruction().Diagnostic, "Vulkan construction requires framed GPU queries and editor jobs.");
+    Properties().Get<glm::vec3>("samples")[0].x = std::numeric_limits<float>::denorm_min();
+    EXPECT_EQ(PreviewConstruction().Diagnostic, "Checking live point samples. Wait for input validation.");
+    Drain();
+    EXPECT_EQ(PreviewConstruction().Diagnostic, "Vulkan construction does not support subnormal coordinate components.");
+    Construction.Backend = Runtime::PointConstructionBackend::CpuLBVH;
+    EXPECT_TRUE(PreviewConstruction().Ready);
+    Properties().Get<glm::vec3>("samples")[0].x = 2e18f;
+    EXPECT_FALSE(PreviewConstruction().Ready);
+    Drain();
+    for (auto backend : {Runtime::PointConstructionBackend::CpuReference,
+                         Runtime::PointConstructionBackend::CpuLBVH,
+                         Runtime::PointConstructionBackend::VulkanLBVH})
+    {
+        Construction.Backend = backend;
+        EXPECT_EQ(PreviewConstruction().Diagnostic,
+                  "Live positions must be finite and within the shared 1e18 coordinate limit.");
+    }
+    EXPECT_EQ(Stats().PropertyScans, 3u);
+}
+
+TEST_F(EditorPointReadiness, ConstructionNormalSupersessionAndDeletionRefreshOnlyAffectedEntries)
+{
+    SupplyConstructionNormals();
+    EXPECT_FALSE(PreviewConstruction().Ready);
+    Properties().Get<glm::vec3>("directions")[0] = {0,0,0};
+    Drain();
+    EXPECT_EQ(Stats().PropertyScans, 1u);
+    EXPECT_FALSE(PreviewConstruction().Ready);
+    Drain();
+    EXPECT_EQ(PreviewConstruction().Diagnostic, "Live supplied normals must be finite and nonzero.");
+    EXPECT_EQ(Stats().ChecksQueued, 3u);
+    Properties().Get<bool>("v:deleted")[0] = true;
+    EXPECT_FALSE(PreviewConstruction().Ready);
+    Drain();
+    EXPECT_TRUE(PreviewConstruction().Ready);
+    EXPECT_EQ(Stats().PropertyScans, 4u);
+}
+
+TEST_F(EditorPointReadiness, ConstructionCommandsRecaptureDespiteWarmReadiness)
+{
+    SupplyConstructionNormals();
+    EXPECT_FALSE(PreviewConstruction().Ready);
+    Drain();
+    ASSERT_TRUE(PreviewConstruction().Ready);
+    const auto commands = Runtime::PrepareEditorPointConstructionFrame(Attachment).Commands;
+    for (const float length : {0.0f, 0x1p-27f, 2e19f})
+    {
+        SCOPED_TRACE(length);
+        Properties().Get<glm::vec3>("directions")[0] = {length,0,0};
+        const auto result = Runtime::ApplyEditorPointConstructionCommand(commands, Construction);
+        EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+        EXPECT_EQ(result.Message, "Live supplied normals must be finite and nonzero.");
+        EXPECT_TRUE(Scene->Raw().view<ECS::Components::StableId>().empty());
+        EXPECT_EQ(Stats().PropertyScans, 2u);
+    }
+    EXPECT_FALSE(PreviewConstruction().Ready);
+    Drain();
+    ASSERT_FALSE(PreviewConstruction().Ready);
+    Properties().Get<glm::vec3>("directions")[0] = {0,0,1};
+    EXPECT_EQ(Runtime::ApplyEditorPointConstructionCommand(commands, Construction).Status,
+              Runtime::EditorCommandStatus::Pending);
+    EXPECT_EQ(Stats().PropertyScans, 3u);
+}
+
+TEST_F(EditorPointReadiness, ConstructionCommandsSubmitWhileReadinessIsPending)
+{
+    EXPECT_FALSE(PreviewConstruction().Ready);
+    const auto commands = Runtime::PrepareEditorPointConstructionFrame(Attachment).Commands;
+    EXPECT_EQ(Runtime::ApplyEditorPointConstructionCommand(commands, Construction).Status,
+              Runtime::EditorCommandStatus::Pending);
+    EXPECT_EQ(Stats().PropertyScans, 0u);
+}
+
 TEST_F(EditorPointReadiness, NormalReadinessReusesNegativeVerdictsAndRevalidatesOutputMetadata)
 {
     Normals.Output = Normals.Positions;
@@ -1788,7 +1993,7 @@ TEST_F(EditorPointReadiness, DeletionMaskAndMetadataInvalidateWithoutScanning)
 
 TEST_F(EditorPointReadiness, HalfedgeReadinessUsesPairedEdgeMask)
 {
-    SetNormalInputs();
+    SupplyConstructionNormals();
     Geometry::Graph::Graph graph;
     auto a = graph.AddVertex({0,0,0}), b = graph.AddVertex({1,0,0}), c = graph.AddVertex({0,1,0});
     (void)graph.AddEdge(a,b); (void)graph.AddEdge(b,c); (void)graph.AddEdge(c,a);
@@ -1803,6 +2008,7 @@ TEST_F(EditorPointReadiness, HalfedgeReadinessUsesPairedEdgeMask)
     Descriptors.Outputs = Runtime::MakeDescriptorOutputProperties(Descriptors.Positions.Domain, "descriptor");
     auto& edges = Scene->Raw().get<GS::Edges>(Entity).Properties;
     edges.GetOrAdd<bool>("e:deleted")[2] = true;
+    Construction.Positions.Domain = Construction.Normals.Domain = Runtime::GeometryElementDomain::GraphHalfedge;
     Keypoints.Positions.Domain = Runtime::GeometryElementDomain::GraphHalfedge;
     Keypoints.Mask.Domain = Keypoints.Score.Domain = Keypoints.Positions.Domain;
     Normals.Positions.Domain = Normals.Output.Domain = Keypoints.Positions.Domain;
@@ -1811,17 +2017,21 @@ TEST_F(EditorPointReadiness, HalfedgeReadinessUsesPairedEdgeMask)
     Weights.Positions.Domain = Weights.Weights.Domain = Keypoints.Positions.Domain;
     for (const auto& preview : PreviewScalars()) EXPECT_FALSE(preview.Enabled);
     for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
+    EXPECT_FALSE(PreviewConstruction().Ready);
     EXPECT_FALSE(Preview().Enabled);
     EXPECT_FALSE(PreviewNormals().Enabled);
     Drain();
     for (const auto& preview : PreviewOriented()) EXPECT_TRUE(preview.Enabled);
+    EXPECT_TRUE(PreviewConstruction().Ready);
     EXPECT_TRUE(Preview().Enabled);
     EXPECT_TRUE(PreviewNormals().Enabled);
     for (const auto& preview : PreviewScalars()) EXPECT_TRUE(preview.Enabled);
     edges.Get<bool>("e:deleted")[2] = false;
     for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
+    EXPECT_FALSE(PreviewConstruction().Ready);
     EXPECT_FALSE(Preview().Enabled);
     Drain();
+    EXPECT_EQ(PreviewConstruction().Diagnostic, "Live position samples must be finite.");
     EXPECT_EQ(Preview().DisabledReason, "Live position samples must be finite.");
     EXPECT_EQ(PreviewNormals().DisabledReason, "Live position samples must be finite.");
     for (const auto& preview : PreviewScalars())
@@ -1829,6 +2039,7 @@ TEST_F(EditorPointReadiness, HalfedgeReadinessUsesPairedEdgeMask)
     for (const auto& preview : PreviewOriented())
         EXPECT_EQ(preview.DisabledReason, "Live position samples must be finite.");
     halves.Resize(5);
+    EXPECT_EQ(PreviewConstruction().Diagnostic, "Invalid deletion domain/cardinality.");
     EXPECT_EQ(Preview().DisabledReason, "Invalid deletion domain/cardinality.");
     EXPECT_EQ(PreviewNormals().DisabledReason, "Invalid deletion domain/cardinality.");
     for (const auto& preview : PreviewScalars())

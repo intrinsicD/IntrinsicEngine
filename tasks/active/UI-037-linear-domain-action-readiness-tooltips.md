@@ -13,7 +13,7 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, geometry
 ---
 # UI-037 — Linear domain-action readiness and disabled-reason tooltips
 
-Current continuation: see [point/normal readiness checkpoint and open points](#continuation--shared-pointnormal-readiness-2026-09-19).
+Current continuation: see [construction readiness checkpoint and open points](#continuation--shared-construction-readiness-2026-09-19).
 Read that checkpoint plus the initial scope before consulting the historical slices.
 
 ## Remaining closure estimate — 2026-09-19
@@ -28,7 +28,7 @@ slices close cross-family coverage and the task, rather than postponing testing.
 | --- | --- |
 | 1 — complete | Shared cached input readiness for density, density weights and spacing; see the scalar checkpoint. |
 | 2 — complete | Bilateral/descriptor readiness with revision-keyed position-plus-normal validation; see the point/normal checkpoint. |
-| 3 | Point-construction readiness without per-preview point capture. |
+| 3 — complete | Point-construction readiness without per-preview point capture; see the construction checkpoint. |
 | 4 | Normal topology readiness without deletion-mask copies/count scans; resolve empty-face semantics against apply. |
 | 5 | ICP source/target and point-to-plane normal readiness without repeated captures. |
 | 6 | Close mesh/curvature/UV admission gaps against their existing validators; reuse current metadata previews. |
@@ -5166,3 +5166,137 @@ Fixed production/test diff SHA-256:
 Session boundary: after this verified checkpoint, start a fresh session from
 this section and the initial scope. Next recommended slice: point-construction
 readiness. Do not reread the accumulated historical slices.
+
+
+## Continuation — shared construction readiness (2026-09-19)
+
+Operator-directed deduplication/compilation continuation from `98b9c7554` on
+`codex/mesh-field-diagnostics-locality`; root is the sole writer. Claude Fable 5.1
+reviewed a bounded plan packet and the fixed implementation packet under
+the standing authorization. This completes slice 3 of the current closure estimate;
+UI-037 remains open, with nine planned closure slices remaining. No new algorithm,
+config schema, dependency edge or public named-module surface was introduced.
+
+Reuse decision: construction's position/normal/deletion loop duplicates
+`CapturePointInput`, `PreparePointInput` and `CapturePointNormalInput` in the
+compiled `PointProperties.cpp` owner. `ConstructionWork` now reuses the existing
+capture record. Graph construction and Hoppe with estimated normals request only
+positions; supplied-normal Hoppe reuses independent position/normal cache entries.
+Execution always recaptures data and retains the source/transform watches,
+compact source-row ordering, backend queries, publication and history guards.
+
+The concrete contract mismatch is Hoppe's stricter supplied-normal admission:
+float squared lengths must be finite and above `1e-16`. The common scanner now
+caches minimum/maximum squared norms of live finite vectors and carries the normal
+range through the existing oriented capture. Family thresholds stay in construction;
+bilateral and descriptor zero-normal semantics remain unchanged. Infinity/zero
+initial aggregates preserve empty/overflow distinctions; live-count checks still
+reject empty inputs. All cache write/read and normal-transfer sites carry the new
+summaries, with warm-path threshold and overflow tests.
+
+Config, source/property metadata and finite nonsingular world transforms precede
+input requests. Missing input verdicts disable construction until command drain.
+Settled family gates retain coordinate bounds, Vulkan subnormal rejection, normal
+length, live-count/neighborhood budgets and backend availability. Nonfinite and
+malformed-mask diagnostics now come from the shared capture. Failures are ordered
+by property then family prerequisite rather than whichever bad row was visited
+first. The mixed-normal/position regression pins position priority.
+
+Across all three production files, physical lines change from 1,554 to 1,548:
+construction 887→866, point-field declarations 132→135, compiled capture 535→547.
+The additional summaries and explicit GLM includes account for the shared-owner
+increase; the duplicated scan and capture storage are removed. Two broad GLM
+includes were narrowed. No measured compile-time or runtime speedup is claimed.
+Named-module type identity and build edges remain unchanged.
+
+Tests add eight `EditorPointReadiness.Construction*` cases and extend paired-halfedge
+readiness coverage; two construction tests verify interior-deletion output ordering
+for all eight canonical domains and both methods on both CPU backends, plus the
+live-count/neighborhood budgets. Supplied-normal Hoppe output is compared with an
+independently compacted property source carrying nonuniform normals; deleted
+positions and normals contain NaNs. Fresh execution rejects tiny/overflowing normals
+as well as exact zero after a cached success. Coverage includes cold/warm cross-family reuse, no normal
+request for graph/estimated-normal paths, zero/tiny/overflowing normals, normal-only
+supersession, deletion invalidation, metadata/transform priority, pending apply,
+fresh rejection after cached success, and submission after cached rejection is fixed.
+Existing every-domain output/history and queued stale-transform/input tests remain.
+
+Verification checkpoint: canonical ci configured with Clang 23, unsanitized;
+focused build and 207/207 focused tests pass, including 34 compilation-boundary
+guards. The full `IntrinsicTests` build passes; the exclusion-only CPU gate selects
+4,821 tests: 4,820 pass, one expected ASan-only GLFW lifecycle skip, zero failures
+(156.04 seconds). Production source stayed fixed; test-only coverage additions from Claude's review
+were rebuilt and the final 207/207 focused tests pass (21.94 seconds). Strict layering
+(zero exceptions), test layout, root hygiene and source documentation pass;
+source documentation has zero errors and eight existing advisory hints.
+Module inventory regenerates unchanged at 429.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^EditorPointReadiness\.|^PointConstruction|^BilateralFilter|^DescriptorAnalysis|^PointSpacingOperations\.|^KernelDensity|^DensityWeight|^SandboxProcessingPanels\.|^SandboxEditorPresentation\.|^ProcessingCompilationLocality\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+```
+
+Current local evidence: `/tmp/intrinsic-construction-readiness/` contains
+`configure.log`, `build-focused.log`, `focused.log`, `build-all.log`, `cpu.log`,
+`touched-plan.json`, `plan.json`, `review.diff` and `review.json`. Test-only review
+follow-up uses `build-review-tests.log`, `focused-review-tests.log`,
+`review-final.diff` and `review-followup.json`.
+Claude Fable 5.1 found no production correctness defect. Its requested
+interior-deletion Hoppe test and optional execution-threshold checks were added;
+the follow-up review found no behavioral blocker. The subsequent compiler check
+caught a test-only enum spelling (`GraphVertex` → canonical `GraphNode`), which
+was fixed before the final focused run. Review cautions about an unused `GpuPoint`
+and diagnostic dependents were checked against the actual generated-query caller
+and repository searches; no production change was needed. Existing publication
+requires a nonempty surface, and current source fixtures intentionally lack
+StableId/Transform components until their tests add them.
+
+Scope/layering/tests/docs sweep and architecture review retain the existing
+runtime owner, named-module surfaces and config/app control paths. Workshop rows
+1–3/8 pass; rows 4–7 are inapplicable. Strict task policy/state links, docs sync,
+doc links, skill mirrors and session-brief freshness pass.
+
+Final fixed source/test/docs review diff SHA-256:
+`28babc37e21416b080d2743e06e322e18cc4aa0e32ab1eb0b6d0f597073e8eb9`.
+No GPU or sanitizer execution is claimed for this checkpoint.
+
+### Current open points
+
+- [ ] Normal topology readiness: remove deletion-mask copies/count scans; decide
+      all-deleted-face availability against apply. Add interior-deletion/nonuniform
+      normal coverage if changing the mapping.
+- [ ] ICP: cache paired-source and point-to-plane normal readiness; preserve
+      distinct compatible sources, finite/count-matched normals and stale guards.
+- [ ] Mesh/curvature/UV: close admission gaps against existing metadata validators.
+      Parameterization needs runtime-owned strategy/pin/boundary prerequisites;
+      texture bake needs request-specific property/UV/device/range readiness.
+- [ ] Complete action/backend/variant readiness for service actions (K-Means,
+      Progressive Poisson, consolidation, outliers), use the common prepared-frame
+      representation everywhere, and remove remaining duplicate app prerequisites
+      and hidden actions while retaining co-equal config/UI/agent validation.
+- [ ] Finish the named table-driven
+      `SandboxEditorUi.ActionReadinessDerivesDomainPrerequisiteReasons` matrix,
+      full-family invalidation/lifecycle/supersession and zero-scan coverage, plus
+      per-action/option enabled-command and disabled-tooltip/no-command ImGui tests.
+- [ ] Run final task-wide operational closure only after the full action inventory,
+      stale apply/completion guards and app-linked checks pass; this checkpoint
+      does not retire UI-037.
+- [ ] Optional scalar-catalog coverage: explicitly assert both scalar catalogs
+      are empty without a command queue, and cover mixed live counts across
+      multiple candidate domains. Prior review suggestions, not blockers.
+- [ ] Optional point/normal follow-up: avoid the temporary second slot-vector
+      allocation during fresh execution if profiling justifies a wider capture
+      API; explicit paired-size assertions would document an already enforced
+      same-domain/deletion-order invariant. Neither blocks this slice.
+- [ ] Non-gating: bounded compilation-owner inspection and matched compile-time
+      measurements remain separate work; preserve named-module type identity.
+      Consider per-drain budgeting or a worker only if measured latency warrants
+      it. The shared deferred scan is still main-thread work.
+
+Session boundary: start a fresh session after this checkpoint is verified and
+pushed. Read this section and initial scope, without reloading the historical
+slices. Next recommended slice: normal topology readiness and all-deleted-face
+semantics. Construction-specific readiness work is complete for this slice.

@@ -14,7 +14,13 @@ module;
 #include <string>
 #include <utility>
 #include <vector>
-#include <glm/glm.hpp>
+#include <glm/common.hpp>
+#include <glm/geometric.hpp>
+#include <glm/mat3x3.hpp>
+#include <glm/mat4x4.hpp>
+#include <glm/matrix.hpp>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 #include <entt/entity/registry.hpp>
 module Extrinsic.Runtime.PointConstructionOperations;
 import Geometry.Graph.Utils;
@@ -63,14 +69,13 @@ namespace Extrinsic::Runtime
         namespace Transform = ECS::Components::Transform;
         using D = GeometryElementDomain;
         using Clock = std::chrono::steady_clock;
-        struct ConstructionWork
+        struct ConstructionWork : Detail::PointNormalCapture
         {
             PointConstructionConfig Config{};
             entt::entity Entity{entt::null};
             glm::mat4 SourceMatrix{1};
-            std::vector<Detail::PointPropertyWatch> Inputs{};
-            std::vector<glm::vec3> Points{}, Normals{}, Queries{};
-            std::vector<std::uint32_t> Slots{}, Offsets{0}, Indices{};
+            std::vector<glm::vec3> Queries{};
+            std::vector<std::uint32_t> Offsets{0}, Indices{};
             std::vector<float> Field{};
             std::optional<SR::PreparedReconstruction> Prepared{};
             std::optional<Geometry::HalfedgeMesh::Mesh> Mesh{};
@@ -175,48 +180,22 @@ namespace Extrinsic::Runtime
             w->SourceMatrix = *matrix;
             w->Result.Method = c.Method;
             w->Result.RequestedBackend = c.Backend;
-            w->Inputs.push_back(
-                Detail::ObserveGeometryProperty(a, c.Positions.Domain, c.Positions.Name));
-            if (supplied)
-                w->Inputs.push_back(
-                    Detail::ObserveGeometryProperty(a, c.Normals.Domain, c.Normals.Name));
-            const auto [deletionDomain, deletionName, divisor] =
-                Detail::ResolvePointDeletionSource(c.Positions.Domain);
-            const auto* deletionProps = ResolveGeometryPropertySet(a, deletionDomain);
-            if (!deletionProps || props->Size() % divisor ||
-                deletionProps->Size() != props->Size() / divisor)
-                return fail("Invalid deletion domain/cardinality.");
-            const auto deleted = deletionProps->Get<bool>(deletionName);
-            if (deletionProps->Exists(deletionName) &&
-                (!deleted || deleted.Size() != deletionProps->Size()))
-                return fail("Deletion mask must be count-matched bool.");
-            w->Inputs.push_back(Detail::ObserveGeometryProperty(a, deletionDomain, deletionName));
-            const auto points = props->Get<glm::vec3>(c.Positions.Name),
-                       normals = props->Get<glm::vec3>(c.Normals.Name);
-            for (std::uint32_t i = 0; i < props->Size(); ++i)
-            {
-                if (deleted && deleted[i / divisor])
-                    continue;
-                const auto point = points[i];
-                if (!Geometry::PointLBVH::ValidPoint(point))
-                    return fail("Live positions must be finite and within the shared 1e18 "
-                                "coordinate limit.");
-                if (c.Backend == PointConstructionBackend::VulkanLBVH && !GpuPoint(point))
-                    return fail(
-                        "Vulkan construction does not support subnormal coordinate components.");
-                if (supplied && (!Detail::FinitePosition(normals[i]) ||
-                                 !std::isfinite(glm::dot(normals[i], normals[i])) ||
-                                 glm::dot(normals[i], normals[i]) <= 1e-16f))
-                    return fail("Live supplied normals must be finite and nonzero.");
-                ++w->Result.InputCount;
-                if (!preview)
-                {
-                    w->Points.push_back(point);
-                    w->Slots.push_back(i);
-                    if (supplied)
-                        w->Normals.push_back(normals[i]);
-                }
-            }
+            const bool captured = supplied
+                ? Detail::CapturePointNormalInput(context, *entity, a, c.Positions, c.Normals,
+                                                  !preview, *w, diagnostic)
+                : preview ? Detail::PreparePointInput(context, *entity, a, c.Positions, *w, diagnostic)
+                          : Detail::CapturePointInput(a, c.Positions, true, *w, diagnostic);
+            if (!captured)
+                return {};
+            if (!w->ValidLbvh)
+                return fail("Live positions must be finite and within the shared 1e18 "
+                            "coordinate limit.");
+            if (c.Backend == PointConstructionBackend::VulkanLBVH && w->HasSubnormalCoordinates)
+                return fail("Vulkan construction does not support subnormal coordinate components.");
+            if (supplied && (!std::isfinite(w->MaximumNormalSquaredNorm) ||
+                             w->MinimumNormalSquaredNorm <= 1e-16f))
+                return fail("Live supplied normals must be finite and nonzero.");
+            w->Result.InputCount = w->LiveCount;
             const auto count = w->Result.InputCount;
             if (count < (c.Method == PointConstructionMethod::Hoppe ? 3u : 1u) ||
                 count > (1u << 20))

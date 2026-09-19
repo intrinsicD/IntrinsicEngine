@@ -12,7 +12,8 @@
 #include <span>
 #include <string>
 #include <vector>
-#include <glm/glm.hpp>
+#include <glm/geometric.hpp>
+#include <glm/vec3.hpp>
 #include <entt/entity/registry.hpp>
 import Extrinsic.Core.Error;
 import Extrinsic.Runtime.EditorProcessing;
@@ -54,6 +55,7 @@ namespace Extrinsic::Runtime
             std::optional<bool> Accepted{};
             std::size_t LiveCount{};
             bool ValidLbvh{true}, HasSubnormalCoordinates{}, HasZeroVectors{}, HasNonfiniteVectors{};
+            float MinimumSquaredNorm{std::numeric_limits<float>::infinity()}, MaximumSquaredNorm{};
             std::string Diagnostic{};
         };
         WorldRegistry* Worlds{};
@@ -248,6 +250,10 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
                 vectorMagnitudeBits |= magnitude;
             }
             w.HasZeroVectors |= vectorMagnitudeBits == 0;
+            // Keep float overflow and underflow visible to the caller's normal policy.
+            const auto squaredNorm = glm::dot(points[i], points[i]);
+            w.MinimumSquaredNorm = std::min(w.MinimumSquaredNorm, squaredNorm);
+            w.MaximumSquaredNorm = std::max(w.MaximumSquaredNorm, squaredNorm);
             ++w.LiveCount;
             if (copyValues) { w.Points.push_back(points[i]); w.Slots.push_back(i); }
         }
@@ -302,6 +308,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             entry->HasSubnormalCoordinates = capture.HasSubnormalCoordinates;
             entry->HasZeroVectors = capture.HasZeroVectors;
             entry->HasNonfiniteVectors = capture.HasNonfiniteVectors;
+            entry->MinimumSquaredNorm = capture.MinimumSquaredNorm;
+            entry->MaximumSquaredNorm = capture.MaximumSquaredNorm;
             entry->Diagnostic = std::move(diagnostic);
             invalidate();
         }
@@ -356,6 +364,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             capture.HasSubnormalCoordinates = entry->HasSubnormalCoordinates;
             capture.HasZeroVectors = entry->HasZeroVectors;
             capture.HasNonfiniteVectors = entry->HasNonfiniteVectors;
+            capture.MinimumSquaredNorm = entry->MinimumSquaredNorm;
+            capture.MaximumSquaredNorm = entry->MaximumSquaredNorm;
             diagnostic = entry->Diagnostic;
             return *entry->Accepted;
         }
@@ -406,6 +416,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         w.Inputs.push_back(ObserveGeometryProperty(a, normals.Domain, normals.Name));
         w.Normals = std::move(normalInput.Points);
         w.HasZeroNormals = normalInput.HasZeroVectors;
+        w.MinimumNormalSquaredNorm = normalInput.MinimumSquaredNorm;
+        w.MaximumNormalSquaredNorm = normalInput.MaximumSquaredNorm;
         return true;
     }
 

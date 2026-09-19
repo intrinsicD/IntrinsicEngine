@@ -395,3 +395,95 @@ TEST(PointConstructionOperations, OneSampleGraphRetainsTheIsolatedNode)
         EXPECT_EQ(result.OutputEdgeCount, 0u);
     }
 }
+
+TEST(PointConstructionOperations, InteriorDeletedRowsRetainCompactSourceOrder)
+{
+    for (auto domain : {D::PointCloudPoint, D::GraphNode, D::GraphEdge, D::GraphHalfedge,
+                       D::MeshVertex, D::MeshEdge, D::MeshHalfedge, D::MeshFace})
+    {
+        SCOPED_TRACE(int(domain));
+        R::WorldRegistry worlds;
+        const auto world = worlds.CreateWorld("deleted construction samples");
+        auto& scene = *worlds.Get(world);
+        R::SpatialIndexCache cache(worlds);
+        const auto source = Make(scene, domain);
+        auto& props = Properties(scene, source, domain);
+        const bool halfedges = domain == D::GraphHalfedge || domain == D::MeshHalfedge;
+        const auto deletionDomain = halfedges ? (domain == D::MeshHalfedge ? D::MeshEdge : D::GraphEdge) : domain;
+        const auto deletionName = deletionDomain == D::MeshEdge || deletionDomain == D::GraphEdge ? "e:deleted"
+                               : deletionDomain == D::MeshFace ? "f:deleted" : "v:deleted";
+        auto deleted = Properties(scene, source, deletionDomain).GetOrAdd<bool>(deletionName);
+        deleted[1] = true;
+        auto points = props.Get<glm::vec3>("samples");
+        auto normals = props.Get<glm::vec3>("directions");
+        std::vector<glm::vec3> expected, expectedNormals;
+        for (std::size_t i = 0; i < props.Size(); ++i)
+        {
+            if (deleted[i / (halfedges ? 2 : 1)])
+            {
+                points[i] = {NAN,0,0};
+                normals[i] = {NAN,0,0};
+            }
+            else
+            {
+                normals[i] = {.05f * float(i + 1),0,1};
+                expected.push_back(points[i]);
+                expectedNormals.push_back(normals[i]);
+            }
+        }
+        // A compact property source gives Hoppe an independent row-alignment oracle.
+        const auto compact = scene.Create();
+        auto& compactProps = scene.Raw().emplace<GS::Vertices>(compact).Properties;
+        compactProps.Resize(expected.size());
+        compactProps.GetOrAdd<glm::vec3>("samples").Vector() = expected;
+        compactProps.GetOrAdd<glm::vec3>("directions").Vector() = expectedNormals;
+        R::EditorCommandHistory history;
+        const auto commands = R::BindEditorProcessingCommands(R::EditorProcessingContext{
+            .Scene = &scene, .World = world, .CommandHistory = &history, .SpatialIndices = &cache});
+        const auto reference = R::ApplyEditorPointConstructionCommand(commands,
+            Config(compact, D::PointCloudPoint, R::PointConstructionMethod::Hoppe));
+        ASSERT_TRUE(reference.Succeeded()) << reference.Message;
+        const auto expectedSurface = OutputPoints(scene, reference.OutputEntityId);
+        for (auto method : {R::PointConstructionMethod::KnnGraph, R::PointConstructionMethod::Hoppe})
+            for (auto backend : {R::PointConstructionBackend::CpuReference, R::PointConstructionBackend::CpuLBVH})
+            {
+                SCOPED_TRACE(int(method));
+                SCOPED_TRACE(int(backend));
+                auto request = Config(source, domain, method);
+                request.Backend = backend;
+                const auto result = R::ApplyEditorPointConstructionCommand(commands, request);
+                ASSERT_TRUE(result.Succeeded()) << result.Message;
+                EXPECT_EQ(result.InputCount, expected.size());
+                EXPECT_EQ(OutputPoints(scene, result.OutputEntityId),
+                          method == R::PointConstructionMethod::Hoppe ? expectedSurface : expected);
+                if (method == R::PointConstructionMethod::Hoppe)
+                    EXPECT_EQ(result.OutputFaceCount, reference.OutputFaceCount);
+            }
+    }
+}
+
+TEST(PointConstructionOperations, LiveCountAndNeighborhoodBudgetsRejectBeforePublishing)
+{
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto source = Make(scene, D::PointCloudPoint);
+    auto& props = Properties(scene, source, D::PointCloudPoint);
+    const auto commands = R::BindEditorProcessingCommands(R::EditorProcessingContext{.Scene = &scene});
+    auto config = Config(source, D::PointCloudPoint, R::PointConstructionMethod::KnnGraph);
+    for (auto count : {(1u << 20), (1u << 20) + 1})
+    {
+        SCOPED_TRACE(count);
+        props.Resize(count);
+        props.Get<glm::vec3>("samples").Vector().assign(count, {0,0,0});
+        props.Get<bool>("v:deleted").Vector().assign(count, false);
+        config.KNeighbors = 63;
+        const auto preview = R::PreviewEditorPointConstructionCommand(commands, config);
+        EXPECT_FALSE(preview.Ready);
+        EXPECT_EQ(preview.Diagnostic, count == (1u << 20)
+            ? "Graph neighborhood storage exceeds 16777216 candidate entries; reduce k or the sample count."
+            : "Construction requires 3..1048576 live samples for Hoppe or 1..1048576 for graphs.");
+        const auto result = R::ApplyEditorPointConstructionCommand(commands, config);
+        EXPECT_EQ(result.Status, R::EditorCommandStatus::InvalidProcessingParameters);
+        EXPECT_EQ(result.Message, preview.Diagnostic);
+        EXPECT_TRUE(scene.Raw().view<EC::StableId>().empty());
+    }
+}

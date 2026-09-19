@@ -3,6 +3,7 @@
 // Include after processing-context, property, command-history and job-projection
 // imports, including Core.Error for shared result diagnostics.
 #pragma once
+#include <limits>
 #include "GeometryIntegration/Runtime.GeometryPositionCapture.hpp"
 
 extern "C++"
@@ -79,11 +80,13 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         bool HasSubnormalCoordinates{};
         bool HasZeroVectors{};
         bool HasNonfiniteVectors{};
+        float MinimumSquaredNorm{std::numeric_limits<float>::infinity()}, MaximumSquaredNorm{};
     };
     struct PointNormalCapture : PointInputCapture
     {
         std::vector<glm::vec3> Normals{};
         bool HasZeroNormals{};
+        float MinimumNormalSquaredNorm{std::numeric_limits<float>::infinity()}, MaximumNormalSquaredNorm{};
     };
     struct PointScalarCapture : PointInputCapture
     {

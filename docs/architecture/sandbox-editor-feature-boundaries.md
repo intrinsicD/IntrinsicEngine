@@ -356,12 +356,15 @@ and preserves ascending source-row IDs without copying values during readiness
 or catalog queries. `ResolvePointDeletionSource` supplies the shared domain,
 property name and row divisor for this capture, bilateral filtering, descriptors,
 construction and normals. Halfedges inherit the paired edge's deletion flag;
-construction retains its capture; normal generation retains its additional topology
+construction reuses this capture; normal generation retains its additional topology
 mask validation and ownership.
 `CapturePointNormalInput` composes the same capture for positions and same-domain
-normals. Bilateral filtering and descriptors share its deletion mapping, compact
-row order and revision watches. Descriptors alone reject zero normals; LBVH
-coordinate limits apply to positions, not normal components.
+normals. Bilateral filtering, descriptors and supplied-normal Hoppe construction
+share its deletion mapping, compact row order and revision watches. Descriptors
+reject exact zero normals; Hoppe also requires finite float squared lengths above
+`1e-16`. The shared scan caches minimum/maximum squared norms, leaving those
+thresholds with the consuming family. LBVH coordinate limits apply to positions,
+not normal components.
 `ValidatePointOutputs` checks the resolved output domain,
 reserved names and existing storage against the validated typed config.
 
@@ -386,18 +389,25 @@ keypoints, outliers, descriptors, construction and normals, independently of met
 result records. Density, spacing and bilateral catalogs require two live samples;
 the generic catalog requires one. Catalog admission does not depend on the requested execution backend.
 Prepared editor sessions own an opaque point-input readiness cache. Catalog,
-density, spacing, density-weight, outlier, keypoint, normal, bilateral and descriptor
-previews inspect point metadata and enqueue a missing verdict on the engine's existing command bus.
+density, spacing, density-weight, outlier, keypoint, normal, bilateral, descriptor
+and construction previews inspect point metadata and enqueue a missing verdict on the engine's existing command bus.
 The next main-thread command drain runs the compiled canonical row scan. The
 point-input portion of these previews neither copies nor scans property values. Keys include
 world/epoch, scene, entity, canonical
 position property and its count/revision, and deletion-source count/revision;
-halfedges use the paired edge's mask. Negative verdicts are cached too. Bilateral
-and descriptor previews request both property verdicts before returning pending,
+halfedges use the paired edge's mask. Negative verdicts are cached too. Bilateral,
+descriptor and supplied-normal construction previews request both property verdicts before returning pending,
 reusing catalog and other-method entries independently. Cached zero-vector and
 nonfinite flags preserve role-specific normal checks without rescanning. Both
 properties must be accepted in the current main-thread preview; apply captures
 both again. Normal metadata and the family output rules precede these requests.
+Construction validates config, property metadata and the source world transform
+before requesting cached inputs. Graph construction and Hoppe with estimated
+normals request only positions. Position bounds, Vulkan subnormals, supplied-normal
+lengths, sample/storage budgets and backend availability follow accepted inputs.
+Nonfinite positions take priority over nonfinite normals; finite-input summaries
+then replace row-order-dependent reasons with deterministic family checks. Apply
+retains fresh captures and source/transform revision guards.
 Only the latest generation for a logical source is retained, and sources unused
 in the previous prepared frame expire. Weak queued references cannot keep old
 entries alive. Metadata errors remain immediate; pending input verdicts disable
