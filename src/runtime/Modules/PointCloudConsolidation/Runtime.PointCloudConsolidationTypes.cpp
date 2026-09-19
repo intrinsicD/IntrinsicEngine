@@ -130,6 +130,16 @@ namespace Extrinsic::Runtime
         return m_Commands != nullptr && m_Events != nullptr;
     }
 
+    PointCloudConsolidationAvailability
+    PointCloudConsolidationService::PrepareAvailability(
+        const WorldHandle world, const PointCloudConsolidationRequest& request)
+    {
+        return m_PrepareAvailability ? m_PrepareAvailability(world, request)
+            : PointCloudConsolidationAvailability{
+                .Error = Core::ErrorCode::InvalidState,
+                .Message = "Point-set consolidation service is unavailable."};
+    }
+
     CommandCorrelationId PointCloudConsolidationService::Run(
         PointCloudConsolidationRequest request)
     {
@@ -166,8 +176,11 @@ namespace Extrinsic::Runtime
     void PointCloudConsolidationService::Bind(
         CommandBus* commands,
         KernelEventBus* events,
-        const PointCloudConsolidationModuleStats* stats) noexcept
+        const PointCloudConsolidationModuleStats* stats,
+        std::function<PointCloudConsolidationAvailability(
+            WorldHandle, const PointCloudConsolidationRequest&)> prepare) noexcept
     {
+        m_PrepareAvailability = std::move(prepare);
         m_Commands = commands;
         m_Events = events;
         m_Stats = stats;

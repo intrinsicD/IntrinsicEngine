@@ -707,7 +707,7 @@ TEST(SandboxEditorSession, TypedResultSinksCopyDismissAndRejectExpiredAttachment
         expiredService.Commands, expiredService.Clustering));
     EXPECT_FALSE(Runtime::IsEditorPointCloudConsolidationAvailable(
         expiredService.Commands, expiredService.PointCloudConsolidation));
-    EXPECT_EQ(Runtime::ResolveEditorPointCloudConsolidationAvailability(
+    EXPECT_EQ(Runtime::PrepareEditorPointCloudConsolidationAvailability(
                   expiredService.Commands,
                   expiredService.PointCloudConsolidation, {})
                   .Available,

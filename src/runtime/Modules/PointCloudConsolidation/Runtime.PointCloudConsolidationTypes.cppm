@@ -73,6 +73,7 @@ export namespace Extrinsic::Runtime
     struct PointCloudConsolidationAvailability
     {
         bool Available{false};
+        bool Pending{false};
         std::size_t InputPointCount{0u};
         bool CardinalityChanging{false};
         Core::ErrorCode Error{Core::ErrorCode::Success};
@@ -144,6 +145,8 @@ export namespace Extrinsic::Runtime
 
     struct PointCloudConsolidationModuleStats
     {
+        std::uint64_t ReadinessChecksQueued{0u};
+        std::uint64_t ReadinessPropertyScans{0u};
         std::uint64_t CommandsHandled{0u};
         std::uint64_t JobsSubmitted{0u};
         std::uint64_t JobSubmissionFailures{0u};
@@ -169,6 +172,12 @@ export namespace Extrinsic::Runtime
             const PointCloudConsolidationService&) = delete;
 
         [[nodiscard]] bool Available() const noexcept;
+        // Main-thread preparation queues missing finite checks; no geometry is
+        // read beyond metadata until the command drain. Pending disables Run.
+        // The bounded cache serves one active preview: changing the requested
+        // source replaces its pending checks. Retained writes must MarkModified().
+        [[nodiscard]] PointCloudConsolidationAvailability PrepareAvailability(
+            WorldHandle world, const PointCloudConsolidationRequest& request);
         [[nodiscard]] CommandCorrelationId Run(
             PointCloudConsolidationRequest request);
         [[nodiscard]] KernelEventSubscription SubscribeCompleted(
@@ -182,8 +191,12 @@ export namespace Extrinsic::Runtime
         void Bind(
             CommandBus* commands,
             KernelEventBus* events,
-            const PointCloudConsolidationModuleStats* stats) noexcept;
+            const PointCloudConsolidationModuleStats* stats,
+            std::function<PointCloudConsolidationAvailability(
+                WorldHandle, const PointCloudConsolidationRequest&)> prepare = {}) noexcept;
 
+        std::function<PointCloudConsolidationAvailability(
+            WorldHandle, const PointCloudConsolidationRequest&)> m_PrepareAvailability{};
         CommandBus* m_Commands{};
         KernelEventBus* m_Events{};
         const PointCloudConsolidationModuleStats* m_Stats{};

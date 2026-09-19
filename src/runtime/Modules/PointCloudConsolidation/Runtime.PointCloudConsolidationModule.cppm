@@ -35,6 +35,7 @@ extern "C++"
 export namespace Extrinsic::Runtime
 {
     class PointCloudConsolidationGpuState;
+    struct PointCloudConsolidationReadinessState;
 
     [[nodiscard]] PointCloudConsolidationAvailability
     ResolvePointCloudConsolidationAvailability(
@@ -62,6 +63,7 @@ export namespace Extrinsic::Runtime
 
     private:
         PointCloudConsolidationService m_Service{};
+        std::unique_ptr<PointCloudConsolidationReadinessState> m_Readiness{};
         KernelEventSubscription m_JobCompletedSubscription{};
         KernelEventBus* m_Events{};
         JobService* m_Jobs{};

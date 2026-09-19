@@ -6,19 +6,14 @@ module;
 #include <string_view>
 #include <utility>
 
-#include <entt/entity/registry.hpp>
 
 module Extrinsic.Runtime.PointCloudServiceOperations;
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Error;
-import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.EngineConfigControl;
-import Extrinsic.Runtime.GeometryAvailability;
-import Extrinsic.Runtime.PointCloudConsolidationModule;
-import Extrinsic.Runtime.SelectionController;
 
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 
@@ -119,43 +114,16 @@ namespace Extrinsic::Runtime
     }
 
     PointCloudConsolidationAvailability
-    ResolveEditorPointCloudConsolidationAvailability(
+    PrepareEditorPointCloudConsolidationAvailability(
         const EditorProcessingCommands& commands,
-        const PointCloudConsolidationService* const consolidation,
+        PointCloudConsolidationService* const consolidation,
         const PointCloudConsolidationRequest& request)
     {
         if (!IsEditorPointCloudConsolidationAvailable(commands, consolidation))
-        {
-            return PointCloudConsolidationAvailability{
-                .Available = false,
-                .Error = Core::ErrorCode::InvalidState,
-                .Message = "Point-set consolidation service is unavailable.",
-            };
-        }
+            return {.Error = Core::ErrorCode::InvalidState,
+                .Message = "Point-set consolidation service is unavailable."};
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        if (context.Scene == nullptr)
-        {
-            return PointCloudConsolidationAvailability{
-                .Available = false,
-                .Error = Core::ErrorCode::ResourceNotFound,
-                .Message = "Scene registry is unavailable.",
-            };
-        }
-
-        const entt::registry& raw = context.Scene->Raw();
-        const ECS::EntityHandle entity =
-            SelectionController::ToEntityHandle(request.StableEntityId);
-        if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
-        {
-            return PointCloudConsolidationAvailability{
-                .Available = false,
-                .Error = Core::ErrorCode::ResourceNotFound,
-                .Message = "The selected geometry entity is stale or unavailable.",
-            };
-        }
-
-        return ResolvePointCloudConsolidationAvailability(
-            BuildGeometryAvailability(raw, entity), request.Properties, request.Config);
+        return consolidation->PrepareAvailability(context.World, request);
     }
 
     RuntimeEngineConfigApplyResult ApplyEditorClusteringConfig(

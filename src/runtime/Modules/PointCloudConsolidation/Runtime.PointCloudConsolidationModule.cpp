@@ -3,6 +3,7 @@ module;
 #include <chrono>
 
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <cmath>
 #include <cstddef>
@@ -52,6 +53,23 @@ import Geometry.SupportRadius;
 
 namespace Extrinsic::Runtime
 {
+    struct PointCloudConsolidationReadinessState
+    {
+        struct Entry
+        {
+            WorldHandle World{};
+            std::uint64_t WorldGeneration{};
+            std::uint32_t Entity{};
+            GeometryPropertyRef Property{};
+            Geometry::PropertyRevision Revision{};
+            std::size_t Count{};
+            std::optional<bool> Finite{};
+            bool Queued{false};
+        };
+        // Only the currently requested position and normal properties are retained.
+        std::array<std::shared_ptr<Entry>, 2> Entries{};
+    };
+
     namespace
     {
         namespace Dirty = ECS::Components::DirtyTags;
@@ -745,11 +763,22 @@ namespace Extrinsic::Runtime
                        Geometry::PropertyValueKind::Vec3;
         }
 
+        using FinitePropertyLookup = std::function<std::optional<bool>(
+            const Geometry::PropertySet&, const GeometryPropertyRef&)>;
+
+        [[nodiscard]] PointCloudConsolidationAvailability PendingConsolidation(
+            const std::size_t count)
+        {
+            return {.Pending = true, .InputPointCount = count,
+                .Message = "Checking position and normal values; wait for validation to finish."};
+        }
+
         [[nodiscard]] PointCloudConsolidationAvailability
         InspectConsolidationSource(
             const GeometryEntityAvailability& availability,
             const PointCloudConsolidationPropertyRefs& refs,
-            const PointCloudConsolidationConfig& config)
+            const PointCloudConsolidationConfig& config,
+            const FinitePropertyLookup& finiteLookup = {})
         {
             if (!BuildParams(config).has_value())
             {
@@ -792,16 +821,12 @@ namespace Extrinsic::Runtime
                 ResolveGeometryProperty(
                     availability,
                     refs.InputPositions,
-                    elementCount,
-                    true);
+                    elementCount);
             if (!positions.Resolved() || elementCount < 2u ||
                 elementCount > kMaximumPointCount)
             {
                 return UnavailableConsolidation(
-                    positions.Status ==
-                            GeometryPropertyResolutionStatus::NonFiniteValues
-                        ? Core::ErrorCode::InvalidArgument
-                        : Core::ErrorCode::TypeMismatch,
+                    Core::ErrorCode::TypeMismatch,
                     "Point-set consolidation requires between two and one million finite vec3 values in the selected position property.",
                     elementCount);
             }
@@ -817,6 +842,7 @@ namespace Extrinsic::Runtime
 
             const bool authoredNormalsRequired =
                 RequiresAuthoredNormals(config);
+            bool inspectNormals = false;
             if (refs.InputNormals.has_value())
             {
                 if (properties->Exists(refs.InputNormals->Name))
@@ -825,8 +851,7 @@ namespace Extrinsic::Runtime
                         ResolveGeometryProperty(
                             availability,
                             *refs.InputNormals,
-                            elementCount,
-                            true);
+                            elementCount);
                     if (!normals.Resolved())
                     {
                         return UnavailableConsolidation(
@@ -834,6 +859,7 @@ namespace Extrinsic::Runtime
                             "The selected normal property must contain finite, count-matched vec3 values.",
                             elementCount);
                     }
+                    inspectNormals = true;
                 }
                 else if (authoredNormalsRequired)
                 {
@@ -903,6 +929,25 @@ namespace Extrinsic::Runtime
                     true);
             }
 
+            // Metadata errors do not schedule work. Both input verdicts are
+            // requested together so one command drain can finish preparation.
+            const auto finite = [&](const GeometryPropertyRef& ref)
+            {
+                return finiteLookup ? finiteLookup(*properties, ref)
+                    : std::optional{GeometryPropertyValuesAreFinite(*properties, ref.Name)};
+            };
+            const auto positionsFinite = finite(refs.InputPositions);
+            if (positionsFinite.has_value() && !*positionsFinite)
+                return UnavailableConsolidation(Core::ErrorCode::InvalidArgument,
+                    "Point-set consolidation requires between two and one million finite vec3 values in the selected position property.",
+                    elementCount);
+            const auto normalsFinite = inspectNormals ? finite(*refs.InputNormals) : std::optional{true};
+            if (!positionsFinite.has_value() || !normalsFinite.has_value())
+                return PendingConsolidation(elementCount);
+            if (!*normalsFinite)
+                return UnavailableConsolidation(Core::ErrorCode::TypeMismatch,
+                    "The selected normal property must contain finite, count-matched vec3 values.", elementCount);
+
             return PointCloudConsolidationAvailability{
                 .Available = true,
                 .InputPointCount = elementCount,
@@ -910,6 +955,80 @@ namespace Extrinsic::Runtime
                 .Error = Core::ErrorCode::Success,
                 .Message = "Point-set consolidation input and publication properties are available.",
             };
+        }
+
+        struct CheckConsolidationProperty
+        {
+            std::weak_ptr<PointCloudConsolidationReadinessState::Entry> Entry{};
+        };
+
+        [[nodiscard]] const Geometry::PropertySet* CurrentReadinessProperty(
+            const PointCloudConsolidationReadinessState::Entry& entry,
+            WorldRegistry& worlds, JobService& jobs)
+        {
+            if (worlds.ActiveWorld() != entry.World ||
+                jobs.WorldGeneration(entry.World) != entry.WorldGeneration)
+                return nullptr;
+            const auto* scene = worlds.Get(entry.World);
+            if (!scene)
+                return nullptr;
+            const auto entity = SelectionController::ToEntityHandle(entry.Entity);
+            if (!scene->Raw().valid(entity))
+                return nullptr;
+            const auto* properties = ResolveGeometryPropertySet(
+                BuildGeometryAvailability(scene->Raw(), entity), entry.Property.Domain);
+            return properties && properties->Size() == entry.Count &&
+                properties->FindPropertyRevision(entry.Property.Name) == entry.Revision
+                ? properties : nullptr;
+        }
+
+        [[nodiscard]] PointCloudConsolidationAvailability PrepareConsolidationAvailability(
+            PointCloudConsolidationReadinessState& state,
+            WorldRegistry& worlds, JobService& jobs, CommandBus& commands,
+            PointCloudConsolidationModuleStats& stats,
+            const WorldHandle world, const PointCloudConsolidationRequest& request)
+        {
+            const auto* scene = worlds.Get(world);
+            if (!scene || worlds.ActiveWorld() != world)
+                return UnavailableConsolidation(Core::ErrorCode::ResourceNotFound,
+                    "Scene registry is unavailable.");
+            const auto entity = SelectionController::ToEntityHandle(request.StableEntityId);
+            if (!scene->Raw().valid(entity))
+                return UnavailableConsolidation(Core::ErrorCode::ResourceNotFound,
+                    "The selected geometry entity is stale or unavailable.");
+            auto availability = InspectConsolidationSource(
+                BuildGeometryAvailability(scene->Raw(), entity), request.Properties,
+                request.Config, [&](const Geometry::PropertySet& properties,
+                                    const GeometryPropertyRef& ref) -> std::optional<bool>
+                {
+                    const auto revision = properties.FindPropertyRevision(ref.Name).value_or(0);
+                    const auto generation = jobs.WorldGeneration(world);
+                    auto& entry = state.Entries[ref.Name == request.Properties.InputPositions.Name ? 0 : 1];
+                    if (!entry || entry->World != world || entry->WorldGeneration != generation ||
+                        entry->Entity != request.StableEntityId || entry->Property != ref ||
+                        entry->Revision != revision || entry->Count != properties.Size())
+                    {
+                        entry = std::make_shared<PointCloudConsolidationReadinessState::Entry>(
+                            PointCloudConsolidationReadinessState::Entry{
+                                .World = world, .WorldGeneration = generation,
+                                .Entity = request.StableEntityId, .Property = ref,
+                                .Revision = revision, .Count = properties.Size()});
+                    }
+                    if (!entry->Finite.has_value() && !entry->Queued)
+                    {
+                        entry->Queued = commands.Enqueue(CheckConsolidationProperty{entry}).IsValid();
+                        if (entry->Queued)
+                            ++stats.ReadinessChecksQueued;
+                    }
+                    return entry->Finite;
+                });
+            if (!availability.Available && !availability.Pending)
+            {
+                for (auto& entry : state.Entries)
+                    if (entry && !entry->Finite.has_value())
+                        entry.reset();
+            }
+            return availability;
         }
 
         void AppendUniquePropertyName(
@@ -2499,7 +2618,28 @@ namespace Extrinsic::Runtime
         m_Events = &setup.Events();
         m_Jobs = &setup.Jobs();
         m_Worlds = &setup.Worlds();
-        m_Service.Bind(&setup.Commands(), m_Events, &m_Stats);
+        m_Readiness = std::make_unique<PointCloudConsolidationReadinessState>();
+        m_Service.Bind(&setup.Commands(), m_Events, &m_Stats,
+            [this, commands = &setup.Commands()](WorldHandle world,
+                const PointCloudConsolidationRequest& request)
+            {
+                return PrepareConsolidationAvailability(*m_Readiness, *m_Worlds,
+                    *m_Jobs, *commands, m_Stats, world, request);
+            });
+        setup.RegisterCommandHandler<CheckConsolidationProperty>(
+            [this](CommandContext&, const CheckConsolidationProperty& command)
+            {
+                if (const auto entry = command.Entry.lock())
+                {
+                    entry->Queued = false;
+                    if (const auto* properties = CurrentReadinessProperty(*entry, *m_Worlds, *m_Jobs))
+                    {
+                        entry->Finite = GeometryPropertyValuesAreFinite(*properties, entry->Property.Name);
+                        ++m_Stats.ReadinessPropertyScans;
+                    }
+                }
+                return CommandOutcome::Ok();
+            });
 
         if (Core::Result provided =
                 setup.Services().Provide<PointCloudConsolidationService>(
@@ -2612,6 +2752,7 @@ namespace Extrinsic::Runtime
             context.Events.Unsubscribe(m_JobCompletedSubscription);
         m_JobCompletedSubscription = {};
         m_Service.Bind(nullptr, nullptr, nullptr);
+        m_Readiness.reset();
         m_Events = nullptr;
         m_Jobs = nullptr;
         m_Worlds = nullptr;

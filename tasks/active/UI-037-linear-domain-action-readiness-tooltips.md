@@ -4586,3 +4586,82 @@ skill mirrors/session-brief freshness and all 26 compile-hotspot tooling tests
 pass. Source documentation has zero errors and one pre-existing MethodPanels
 size hint, reduced by this deletion. UI-037's broader readiness work remains
 open. Logs and review packets: `/tmp/intrinsic-clustering-locality/`.
+
+
+## Continuation — consolidation readiness cache (2026-09-19)
+
+Operator-directed continuation from `c225b2135` prioritizes the previously
+identified per-draw consolidation scans. Codex is the sole writer; Claude Fable
+reviews bounded packets. Reuse: canonical property revisions, finite predicate,
+consolidation admission rules, command drain and shared action button/tooltip.
+
+Right-sizing decision: two feature-owned property-verdict slots replace repeated
+position/normal scans. Missing verdicts queue a private command; preparation
+reads metadata only and pending disables Run. The drain validates the captured
+world epoch/entity/domain/name/revision/count before a finite scan. Normal-only
+edits reuse position results; config, output and deleted-slot metadata stays live.
+`FindPropertyRevision` observes the edit epoch, so repeated edits invalidate.
+The direct side-effect-free preflight and command submission still revalidate.
+
+Fable recommended the existing main-thread command drain over copying up to two
+whole buffers into a worker job. This concrete bounded derivation uses no worker,
+new module, service or snapshot allocation; the scan happens once per requested
+revision outside model construction. Explicit `PrepareAvailability` owns the
+queue side effect. A future background path requires evidence that this deferred
+scan causes a hitch, and must preserve these keys and pending behavior. This is
+a documented implementation choice for this slice, not a relaxation of the
+no-scans-in-model-construction or stale-result requirements.
+
+The editor now imports the service Types owner instead of the lifecycle and
+reuses the shared action button. The existing PointCloudServices compiler guard
+also covers the operation implementation. UI-037 remains open for other families.
+Fable's fixed-diff review caught pending results masking metadata failures.
+The corrected shared inspector checks all metadata first, then requests both
+finite verdicts for one drain; a metadata failure drops unfinished checks.
+Invalid counts now take the metadata `TypeMismatch` reason before finite checks,
+including multiple-failure inputs. The cache deliberately serves one active
+preview, with old requests superseded. Its command scan remains on the main
+thread; no elapsed frame-time/compile-time improvement is claimed.
+
+Nine new runtime tests cover steady requests with zero additional scans/queues,
+repeated edits before/after drain, retained mutable borrows, independent normal
+invalidation, removal/replacement, world epochs, recycled entities, every element
+domain and strategy, metadata/count rejection without work, changing previews,
+shutdown/reinitialization and command-time revalidation. Editor domain tests now
+assert pending then readiness after the drain. Existing disabled-tooltip/click
+and detached-frame tests remain in the gate. Fable's follow-up found no blocker;
+the two omitted-source questions were checked directly: property revisions use
+a global atomic counter and the handler clears `Queued` before stale validation.
+
+Seven affected production files total 6,769 -> 6,898 lines (+129), justified by
+the bounded cache and preparation behavior; no new production file/module/service
+is added. The editor wrapper loses duplicated entity/preflight wiring and a
+lifecycle import. The strengthened compiler boundary guard passes. Inventory
+remains 429 modules. Scope/layering/tests/docs sweep passes; workshop rows 1–3/8
+pass, 4–7 n/a. Source documentation has zero errors; its remaining review hints
+are the two existing large implementations and necessary borrow/preparation
+contract comments.
+
+The first focused run exposed a new test's missing event pump and callback
+cleanup; those were fixed. An interim CPU run overlapped a review edit and its
+compiler dependency-freshness check correctly rejected the changed interface.
+Final verification rebuilds and runs with all source/build files frozen.
+
+Verification (canonical ci, Clang 23, unsanitized):
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^(ConsolidationReadiness\.|PointCloudConsolidationModule\.|PointCloudConsolidationConfig\.|SandboxPointCloudConsolidationPanel\.|SandboxEditorPresentation\.|SandboxEditorSessionLifecycle\.|EditorCompilationLocality\.|ProcessingCompilationLocality\.PointCloudService$)' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+```
+
+All 102 focused checks and 26 compile-hotspot tooling tests pass. Final CPU
+gate: 4,779 selected, 4,778 passed, one expected ASan-only GLFW lifecycle skip,
+zero failures (157.21 seconds). Source/build hashes stayed fixed through this
+final build and run. Strict task policy/state links, layering (zero
+exceptions), test layout, doc links/sync, root hygiene, skill mirrors and brief
+freshness pass. The existing consolidation fixture initializer-order warning
+is unchanged. No GPU execution or sanitizer-suite result is claimed. Logs and
+review packets: `/tmp/intrinsic-consolidation-readiness/`.

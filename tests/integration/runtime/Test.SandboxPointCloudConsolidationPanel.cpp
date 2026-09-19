@@ -651,11 +651,16 @@ TEST(SandboxPointCloudConsolidationPanel,
                 properties,
                 config);
         ASSERT_TRUE(panelRequest.has_value());
-        const Runtime::PointCloudConsolidationAvailability availability =
-            Runtime::ResolveEditorPointCloudConsolidationAvailability(
+        auto availability =
+            Runtime::PrepareEditorPointCloudConsolidationAvailability(
                 prepared.Commands,
                 prepared.PointCloudConsolidation,
                 panelRequest->Execute);
+        EXPECT_TRUE(availability.Pending);
+        EXPECT_FALSE(availability.Available);
+        engine.Commands().Drain(*scene);
+        availability = Runtime::PrepareEditorPointCloudConsolidationAvailability(
+            prepared.Commands, prepared.PointCloudConsolidation, panelRequest->Execute);
         EXPECT_TRUE(availability.Available) << availability.Message;
         EXPECT_EQ(availability.InputPointCount, 25u);
         EXPECT_FALSE(availability.CardinalityChanging);
@@ -744,11 +749,16 @@ TEST(SandboxPointCloudConsolidationPanel,
                 properties,
                 Runtime::PointCloudConsolidationConfig{});
         ASSERT_TRUE(request.has_value());
-        const Runtime::PointCloudConsolidationAvailability availability =
-            Runtime::ResolveEditorPointCloudConsolidationAvailability(
+        auto availability =
+            Runtime::PrepareEditorPointCloudConsolidationAvailability(
                 prepared.Commands,
                 prepared.PointCloudConsolidation,
                 request->Execute);
+        EXPECT_TRUE(availability.Pending);
+        EXPECT_FALSE(availability.Available);
+        engine.Commands().Drain(*scene);
+        availability = Runtime::PrepareEditorPointCloudConsolidationAvailability(
+            prepared.Commands, prepared.PointCloudConsolidation, request->Execute);
         EXPECT_TRUE(availability.Available) << availability.Message;
         EXPECT_EQ(availability.InputPointCount, 25u);
     }

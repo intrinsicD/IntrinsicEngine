@@ -412,6 +412,19 @@ presentation changes before publication and before every history transition.
 The snapshot comparison includes the production typed mesh/graph connectivity
 records; an erased property type it cannot compare rejects the transition
 rather than accepting descriptor equality.
+Consolidation's `PrepareAvailability` keeps position/normal finite verdicts in
+its existing lifecycle owner. Preparation reads metadata and queues a missing
+check through the command bus; the main-thread drain revalidates world epoch,
+entity, domain, property revision and count before scanning. Two bounded slots
+retain the currently requested position and normal verdicts independently.
+Pending checks disable the shared action button and supply its tooltip reason.
+Metadata and configuration are checked before any finite lookup, so invalid
+requests do not queue scans. Submission still scans through the same preflight
+without trusting cached verdicts. The cache serves one active preview; changing
+the requested source supersedes pending checks. Retained mutable property borrows
+must follow the canonical `MarkModified()` contract. The editor service
+operations import the service Types owner, without the consolidation lifecycle.
+
 LOP-family consolidation uses the broader property-domain form of the same
 contract. Its request carries named finite `vec3` input/output properties on
 any resolved mesh, graph, or point-cloud element domain, so a mesh face-center

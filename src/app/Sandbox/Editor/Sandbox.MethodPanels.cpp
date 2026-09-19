@@ -1519,7 +1519,7 @@ namespace Extrinsic::Sandbox::Editor
                 if (request.has_value())
                 {
                     availability =
-                        Runtime::ResolveEditorPointCloudConsolidationAvailability(
+                        Runtime::PrepareEditorPointCloudConsolidationAvailability(
                             service.Commands,
                             service.PointCloudConsolidation,
                             request->Execute);
@@ -1561,11 +1561,10 @@ namespace Extrinsic::Sandbox::Editor
                 }
                 ImGui::EndDisabled();
 
-                const bool canRun = configAvailable && request.has_value() &&
-                    availability.Available;
-                ImGui::BeginDisabled(!canRun);
-                if (ImGui::Button(
-                        "Consolidate selected property set##PointCloudConsolidation"))
+                const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
+                    service.Commands, {availability.Available, availability.Message});
+                if (DrawProcessingActionButton(
+                        "Consolidate selected property set##PointCloudConsolidation", readiness))
                 {
                     SandboxPointCloudConsolidationPanelActionResult action =
                         ApplySandboxPointCloudConsolidationPanelAction(
@@ -1583,7 +1582,6 @@ namespace Extrinsic::Sandbox::Editor
                     if (PointCloudConsolidation.LastConfigApply->Succeeded())
                         PointCloudConsolidation.Dirty = false;
                 }
-                ImGui::EndDisabled();
                 if (!configAvailable)
                 {
                     ImGui::TextDisabled(

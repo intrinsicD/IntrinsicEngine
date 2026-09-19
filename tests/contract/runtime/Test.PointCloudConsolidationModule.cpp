@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <exception>
 #include <memory>
+#include <limits>
 #include <optional>
 #include <string>
 #include <thread>
@@ -35,6 +36,7 @@ import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.WorldRegistry;
 import Geometry.PointCloud.Consolidation;
 import Geometry.Properties;
 
@@ -1660,4 +1662,282 @@ TEST(PointCloudConsolidationModule, VulkanLbvhRejectsUnavailableDeviceWithoutFal
     EXPECT_EQ(observed->Completion->ActualBackend,Runtime::PointCloudConsolidationBackend::None);
     EXPECT_EQ(observed->Scene->Raw().get<GS::Vertices>(observed->Entity).Properties.Size(),25u);
     EXPECT_EQ(observed->Stats.JobsSubmitted,0u);engine.Shutdown();
+}
+
+namespace
+{
+    class ConsolidationReadiness : public testing::Test
+    {
+    protected:
+        void SetUp() override
+        {
+            Engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+            Engine.Initialize();
+            Scene = Engine.Worlds().Get(Engine.ActiveWorld());
+            Service = Engine.Services().Find<Runtime::PointCloudConsolidationService>();
+            ASSERT_NE(Scene, nullptr);
+            ASSERT_NE(Service, nullptr);
+            Entity = AddPointCloud(*Scene, NoisyPlane());
+            Request = MakeDomainRequest(Entity, Runtime::GeometryElementDomain::PointCloudPoint,
+                "v:position", "projected");
+        }
+        void TearDown() override { Engine.Shutdown(); }
+        Runtime::PointCloudConsolidationAvailability Prepare()
+        {
+            return Service->PrepareAvailability(Engine.ActiveWorld(), Request);
+        }
+        void Drain()
+        {
+            Engine.Commands().Drain(*Scene,
+                {&Engine.Events(), &Engine.Jobs(), &Engine.Worlds()});
+        }
+        Geometry::PropertySet& Properties()
+        {
+            return Scene->Raw().get<GS::Vertices>(Entity).Properties;
+        }
+        void ExpectSameAsDirect(const Runtime::PointCloudConsolidationAvailability& cached)
+        {
+            const auto direct = Runtime::ResolvePointCloudConsolidationAvailability(
+                Runtime::BuildGeometryAvailability(Scene->Raw(), Entity),
+                Request.Properties, Request.Config);
+            EXPECT_FALSE(cached.Pending);
+            EXPECT_EQ(cached.Available, direct.Available);
+            EXPECT_EQ(cached.Error, direct.Error);
+            EXPECT_EQ(cached.Message, direct.Message);
+            EXPECT_EQ(cached.InputPointCount, direct.InputPointCount);
+            EXPECT_EQ(cached.CardinalityChanging, direct.CardinalityChanging);
+        }
+        Intrinsic::Tests::RuntimeTestKernel Engine{HeadlessConfig()};
+        ECS::Scene::Registry* Scene{};
+        Runtime::PointCloudConsolidationService* Service{};
+        ECS::EntityHandle Entity{};
+        Runtime::PointCloudConsolidationRequest Request{};
+    };
+}
+
+TEST_F(ConsolidationReadiness, RepeatedPreparationOnlyReadsMetadataAndCachedVerdicts)
+{
+    for (int i = 0; i < 20; ++i)
+    {
+        const auto pending = Prepare();
+        EXPECT_TRUE(pending.Pending);
+        EXPECT_FALSE(pending.Available);
+        EXPECT_FALSE(pending.Message.empty());
+    }
+    EXPECT_EQ(Service->Stats().ReadinessChecksQueued, 1u);
+    EXPECT_EQ(Service->Stats().ReadinessPropertyScans, 0u);
+    Drain();
+    for (int i = 0; i < 20; ++i)
+        EXPECT_TRUE(Prepare().Available);
+    EXPECT_EQ(Service->Stats().ReadinessChecksQueued, 1u);
+    EXPECT_EQ(Service->Stats().ReadinessPropertyScans, 1u);
+    Properties().Get<std::uint32_t>("p:source_index")[0] = 99u;
+    Request.Config.RepulsionWeight = 0.1;
+    ExpectSameAsDirect(Prepare());
+    EXPECT_EQ(Service->Stats().ReadinessChecksQueued, 1u);
+    EXPECT_EQ(Service->Stats().ReadinessPropertyScans, 1u);
+    (void)Properties().Add<float>("projected", 0.0f);
+    EXPECT_FALSE(Prepare().Available);
+    ExpectSameAsDirect(Prepare());
+    EXPECT_EQ(Service->Stats().ReadinessChecksQueued, 1u);
+}
+
+TEST_F(ConsolidationReadiness, RepeatedEditsAndRetainedBorrowsInvalidateBeforeAndAfterDrain)
+{
+    auto positions = Properties().Get<glm::vec3>("v:position");
+    positions[0].x = 1.0f;
+    ASSERT_TRUE(Prepare().Pending);
+    positions[0].x = std::numeric_limits<float>::infinity();
+    Drain();
+    EXPECT_EQ(Service->Stats().ReadinessPropertyScans, 0u);
+    ASSERT_TRUE(Prepare().Pending);
+    Drain();
+    EXPECT_FALSE(Prepare().Available);
+    ExpectSameAsDirect(Prepare());
+    positions[0].x = 0.0f;
+    ASSERT_TRUE(Prepare().Pending);
+    Drain();
+    ASSERT_TRUE(Prepare().Available);
+    auto& retained = positions.Vector();
+    ASSERT_TRUE(Prepare().Pending);
+    Drain();
+    ASSERT_TRUE(Prepare().Available);
+    retained[0].x = std::numeric_limits<float>::quiet_NaN();
+    positions.MarkModified();
+    ASSERT_TRUE(Prepare().Pending);
+    Drain();
+    ExpectSameAsDirect(Prepare());
+    EXPECT_FALSE(Prepare().Available);
+}
+
+TEST_F(ConsolidationReadiness, NormalChangesDoNotRescanUnchangedPositions)
+{
+    auto normals = Properties().Add<glm::vec3>("normal", glm::vec3(0, 0, 1));
+    Request.Properties.InputNormals = Runtime::GeometryPropertyRef{
+        Runtime::GeometryElementDomain::PointCloudPoint, "normal", Geometry::PropertyValueKind::Vec3};
+    ASSERT_TRUE(Prepare().Pending);
+    EXPECT_EQ(Service->Stats().ReadinessChecksQueued, 2u);
+    Drain();
+    ASSERT_TRUE(Prepare().Available);
+    EXPECT_EQ(Service->Stats().ReadinessPropertyScans, 2u);
+    normals[0].z = std::numeric_limits<float>::infinity();
+    ASSERT_TRUE(Prepare().Pending);
+    Drain();
+    ExpectSameAsDirect(Prepare());
+    EXPECT_FALSE(Prepare().Available);
+    EXPECT_EQ(Service->Stats().ReadinessPropertyScans, 3u);
+    Properties().Remove(normals);
+    EXPECT_TRUE(Prepare().Available);
+    Request.Config.Strategy = Runtime::PointCloudConsolidationStrategy::Ear;
+    Request.Config.NormalSource = Runtime::PointCloudConsolidationNormalSource::RequireAuthored;
+    EXPECT_FALSE(Prepare().Available);
+    ExpectSameAsDirect(Prepare());
+    (void)Properties().Add<glm::vec3>("normal", glm::vec3(0, 0, 1));
+    ASSERT_TRUE(Prepare().Pending);
+    Drain();
+    ExpectSameAsDirect(Prepare());
+    EXPECT_TRUE(Prepare().Available);
+    EXPECT_EQ(Service->Stats().ReadinessPropertyScans, 4u);
+}
+
+TEST_F(ConsolidationReadiness, WorldEpochEntityAndPropertyReplacementDiscardOldChecks)
+{
+    ASSERT_TRUE(Prepare().Pending);
+    Engine.Jobs().AdvanceWorldGeneration(Engine.ActiveWorld());
+    Drain();
+    EXPECT_EQ(Service->Stats().ReadinessPropertyScans, 0u);
+    ASSERT_TRUE(Prepare().Pending);
+    Drain();
+    ASSERT_TRUE(Prepare().Available);
+    auto positions = Properties().Get<glm::vec3>("v:position");
+    Properties().Remove(positions);
+    EXPECT_FALSE(Prepare().Available);
+    SetVec3Property(Properties(), "v:position", NoisyPlane());
+    ASSERT_TRUE(Prepare().Pending);
+    Scene->Raw().destroy(Entity);
+    Drain();
+    EXPECT_EQ(Service->Stats().ReadinessPropertyScans, 1u);
+    EXPECT_FALSE(Prepare().Available);
+    Entity = AddPointCloud(*Scene, NoisyPlane());
+    Request.StableEntityId = Runtime::SelectionController::ToStableEntityId(Entity);
+    ASSERT_TRUE(Prepare().Pending);
+    Drain();
+    EXPECT_TRUE(Prepare().Available);
+    const auto otherWorld = Engine.Worlds().CreateWorld("other readiness world");
+    EXPECT_FALSE(Service->PrepareAvailability(otherWorld, Request).Available);
+    ASSERT_TRUE(Engine.Worlds().RequestSetActiveWorld(otherWorld).has_value());
+    (void)Engine.Worlds().ApplyMaintenance(Engine.Events(), Engine.Jobs());
+    EXPECT_FALSE(Service->PrepareAvailability(Engine.ActiveWorld(), Request).Available);
+}
+
+TEST_F(ConsolidationReadiness, PendingCheckDoesNotSurviveShutdown)
+{
+    ASSERT_TRUE(Prepare().Pending);
+    Engine.Shutdown();
+    const auto unavailable = Service->PrepareAvailability({}, Request);
+    EXPECT_FALSE(unavailable.Available);
+    EXPECT_FALSE(unavailable.Pending);
+    Engine.Initialize();
+    Scene = Engine.Worlds().Get(Engine.ActiveWorld());
+    Service = Engine.Services().Find<Runtime::PointCloudConsolidationService>();
+    ASSERT_NE(Service, nullptr);
+    ASSERT_NE(Scene, nullptr);
+    Drain();
+    EXPECT_EQ(Service->Stats().ReadinessPropertyScans, 0u);
+    Entity = AddPointCloud(*Scene, NoisyPlane());
+    Request.StableEntityId = Runtime::SelectionController::ToStableEntityId(Entity);
+    ASSERT_TRUE(Prepare().Pending);
+    Drain();
+    EXPECT_TRUE(Prepare().Available);
+    EXPECT_EQ(Service->Stats().ReadinessPropertyScans, 1u);
+}
+
+TEST_F(ConsolidationReadiness, EveryElementDomainAndStrategyMatchesDirectAdmission)
+{
+    const auto sources = AddDomainSources(*Scene);
+    for (const auto domain : kAllElementDomains)
+    {
+        SCOPED_TRACE(std::string{Runtime::ToString(domain)});
+        Entity = ResolveTestEntity(sources, domain);
+        Request = MakeDomainRequest(Entity, domain, "sample:position", "projected");
+        ASSERT_TRUE(Prepare().Pending);
+        Drain();
+        for (const auto strategy : {Runtime::PointCloudConsolidationStrategy::Lop,
+            Runtime::PointCloudConsolidationStrategy::Wlop,
+            Runtime::PointCloudConsolidationStrategy::Clop,
+            Runtime::PointCloudConsolidationStrategy::Ear})
+        {
+            Request.Config.Strategy = strategy;
+            EXPECT_TRUE(Prepare().Available);
+            ExpectSameAsDirect(Prepare());
+        }
+    }
+    EXPECT_EQ(Service->Stats().ReadinessPropertyScans, kAllElementDomains.size());
+}
+
+TEST_F(ConsolidationReadiness, RunRevalidatesAfterCachedReadiness)
+{
+    ASSERT_TRUE(Prepare().Pending);
+    Drain();
+    ASSERT_TRUE(Prepare().Available);
+    Properties().Get<glm::vec3>("v:position")[0].x = std::numeric_limits<float>::infinity();
+    std::optional<Runtime::PointCloudConsolidationResult> completion;
+    const auto subscription = Service->SubscribeCompleted(
+        [&](const Runtime::PointCloudConsolidationResult& result) { completion = result; });
+    ASSERT_TRUE(Service->Run(Request).IsValid());
+    Drain();
+    (void)Engine.Events().Pump();
+    Service->Unsubscribe(subscription);
+    ASSERT_TRUE(completion.has_value());
+    EXPECT_FALSE(completion->Succeeded());
+    EXPECT_EQ(completion->Status, Runtime::PointCloudConsolidationRunStatus::UnsupportedPropertySource);
+    EXPECT_EQ(Service->Stats().JobsSubmitted, 0u);
+}
+
+
+TEST_F(ConsolidationReadiness, MetadataFailuresDoNotQueueScansOrKeepObsoletePendingWork)
+{
+    for (const auto count : {0u, 1u, 1'000'001u})
+    {
+        Properties().Resize(count);
+        const auto blocked = Prepare();
+        EXPECT_FALSE(blocked.Available);
+        EXPECT_FALSE(blocked.Pending);
+        EXPECT_EQ(blocked.Error, Extrinsic::Core::ErrorCode::TypeMismatch);
+        ExpectSameAsDirect(blocked);
+    }
+    EXPECT_EQ(Service->Stats().ReadinessChecksQueued, 0u);
+    Properties().Resize(25u);
+    Request.Config.Strategy = Runtime::PointCloudConsolidationStrategy::Clop;
+    Request.Config.ClopMixtureComponentCount = 26u;
+    EXPECT_FALSE(Prepare().Pending);
+    EXPECT_FALSE(Prepare().Available);
+    ExpectSameAsDirect(Prepare());
+    EXPECT_EQ(Service->Stats().ReadinessChecksQueued, 0u);
+    Request.Config = SameCardinalityConfig();
+    ASSERT_TRUE(Prepare().Pending);
+    (void)Properties().Add<float>("projected", 0.0f);
+    const auto blocked = Prepare();
+    EXPECT_FALSE(blocked.Pending);
+    EXPECT_FALSE(blocked.Available);
+    ExpectSameAsDirect(blocked);
+    Drain();
+    EXPECT_EQ(Service->Stats().ReadinessPropertyScans, 0u);
+}
+
+TEST_F(ConsolidationReadiness, ReplacingActivePreviewDiscardsOnlySupersededChecks)
+{
+    ASSERT_TRUE(Prepare().Pending);
+    const auto first = Request;
+    const auto secondEntity = AddPointCloud(*Scene, NoisyPlane());
+    Request.StableEntityId = Runtime::SelectionController::ToStableEntityId(secondEntity);
+    ASSERT_TRUE(Prepare().Pending);
+    Drain();
+    EXPECT_TRUE(Prepare().Available);
+    EXPECT_EQ(Service->Stats().ReadinessPropertyScans, 1u);
+    Request = first;
+    ASSERT_TRUE(Prepare().Pending);
+    Drain();
+    EXPECT_TRUE(Prepare().Available);
+    EXPECT_EQ(Service->Stats().ReadinessPropertyScans, 2u);
 }

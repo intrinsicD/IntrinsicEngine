@@ -1,12 +1,6 @@
-// Editor dispatch for the two service-queued point-cloud methods, K-Means
-// clustering and point-set consolidation. Both differ from every in-process
-// family: the editor only validates, applies config and queues a correlated run,
-// and the owning service delivers completion through its own subscription.
-//
-// The services are borrowed, not owned. The prepared frame carries the two
-// pointers beside the generic command handle; every operation validates the
-// handle's attachment before touching a service, so a frame copied past detach
-// reports "unavailable" instead of dereferencing a freed service.
+// Editor dispatch and prepared frames for service-queued K-Means and consolidation.
+// Borrowed service access is valid only while Commands.IsBound(); attachment
+// validation prevents dereferencing services after workspace detach.
 module;
 #include <cstdint>
 #include <functional>
@@ -76,8 +70,8 @@ export namespace Extrinsic::Runtime
         const EditorProcessingCommands&, PointCloudConsolidationService*,
         PointCloudConsolidationRequest);
     [[nodiscard]] PointCloudConsolidationAvailability
-    ResolveEditorPointCloudConsolidationAvailability(
-        const EditorProcessingCommands&, const PointCloudConsolidationService*,
+    PrepareEditorPointCloudConsolidationAvailability(
+        const EditorProcessingCommands&, PointCloudConsolidationService*,
         const PointCloudConsolidationRequest&);
 
     [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorClusteringConfig(

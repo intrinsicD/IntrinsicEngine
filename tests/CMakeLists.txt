@@ -774,9 +774,9 @@ intrinsic_add_module_boundary_test(EditorCompilationLocality.WorkspaceSnapshots
         --forbid-module Extrinsic.Graphics.Renderer
         --forbid-module Extrinsic.Graphics.GpuAssetCache
         --forbid-module Extrinsic.Runtime.RenderExtraction)
-# Editor interfaces, frames and session wiring consume service/types APIs.
-# The operation implementation still imports module-owned consolidation preflight.
+# Editor operations, frames and session wiring consume service/types APIs.
 intrinsic_add_module_boundary_test(EditorCompilationLocality.PointCloudServices
+        --check-source src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.Frame.cpp
         --check-source src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp
