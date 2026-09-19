@@ -379,10 +379,11 @@ consumers of spatial-index neighborhoods.
 `BuildPointInputCatalog` shares live-row validation with weights, keypoints,
 outliers, descriptors, construction and normals, independently of method result records.
 Prepared editor sessions own an opaque point-input readiness cache. Catalog,
-outlier and keypoint previews inspect metadata and enqueue a missing verdict on
-the engine's existing command bus; the next main-thread command drain runs the
-compiled canonical row scan. No property values are copied or scanned while
-these previews are built. Keys include world/epoch, scene, entity, canonical
+outlier, keypoint and normal previews inspect point metadata and enqueue a
+missing verdict on the engine's existing command bus; the next main-thread
+command drain runs the compiled canonical row scan. The point-input portion of
+these previews neither copies nor scans property values. Keys include
+world/epoch, scene, entity, canonical
 position property and its count/revision, and deletion-source count/revision;
 halfedges use the paired edge's mask. Negative verdicts are cached too.
 Only the latest generation for a logical source is retained, and sources unused
@@ -395,8 +396,13 @@ destroyed world before dereferencing its scene. Retained mutable property borrow
 must call `MarkModified()` after later writes, as required by property coherence.
 Apply paths always capture current inputs again. Explicit standalone contexts
 without session state retain synchronous preflight; sessions without a command
-bus report readiness unavailable. Normal-method readiness still owns its
-separate topology/mask checks. The cache definition and scanner stay compiled
+bus report readiness unavailable. Normal output metadata is checked before
+requesting the point verdict; method/backend/topology checks follow an accepted
+verdict.
+Normal-method readiness still owns its separate topology/mask checks, including
+copies of topology deletion masks. Execution reconstructs its full point-deletion
+mask from the shared capture's live source slots. The cache definition and scanner
+stay compiled
 in `PointProperties.cpp`, with only an opaque pointer and copied counters in the
 shared processing interface. Engine registers its existing `CommandBus` as a
 built-in service for this session wiring.

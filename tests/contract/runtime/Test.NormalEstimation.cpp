@@ -169,6 +169,45 @@ TEST(NormalEstimation, PreservesDeletedRowsAndUnrelatedEditsButGuardsOutputHisto
     EXPECT_EQ(std::as_const(props).Get<glm::vec3>("estimated")[0], glm::vec3(1, 0, 0));
 }
 
+TEST(NormalEstimation, SharedCapturePreservesDeletedVertexAndPairedHalfedgeOutputs)
+{
+    for (const auto [domain, method] : std::array{
+             std::pair{D::MeshVertex, R::NormalEstimationMethod::MeshFaceWeighted},
+             std::pair{D::MeshVertex, R::NormalEstimationMethod::GraphNeighborhood},
+             std::pair{D::GraphNode, R::NormalEstimationMethod::GraphNeighborhood},
+             std::pair{D::GraphHalfedge, R::NormalEstimationMethod::PointSetPCA},
+             std::pair{D::MeshHalfedge, R::NormalEstimationMethod::PointSetPCA}})
+    {
+        SCOPED_TRACE(std::to_string(unsigned(domain)) + R::ToString(method));
+        Extrinsic::ECS::Scene::Registry scene;
+        const auto entity = Make(scene, domain);
+        auto config = Config(entity, domain);
+        config.Method = method;
+        auto& props = Properties(scene, entity, domain);
+        const bool halfedges = domain == D::GraphHalfedge || domain == D::MeshHalfedge;
+        auto& deletion = halfedges ? scene.Raw().get<GS::Edges>(entity).Properties : props;
+        const auto maskName = halfedges ? "e:deleted" : "v:deleted";
+        deletion.GetOrAdd<bool>(maskName)[0] = true;
+        const glm::vec3 sentinel{7,8,9};
+        std::ranges::fill(props.GetOrAdd<glm::vec3>("estimated").Vector(), sentinel);
+        const auto deletionRevision = std::as_const(deletion).Get<bool>(maskName).Revision();
+        R::EditorProcessingContext context{.Scene = &scene};
+        const auto result = R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config);
+        ASSERT_TRUE(result.Succeeded()) << result.Message;
+        const std::size_t deletedCount = halfedges ? 2 : 1;
+        EXPECT_EQ(result.LiveCount, props.Size() - deletedCount);
+        EXPECT_EQ(result.WrittenCount, result.LiveCount);
+        const auto normals = std::as_const(props).Get<glm::vec3>("estimated");
+        for (std::size_t i = 0; i < normals.Size(); ++i)
+            if (i < deletedCount)
+                EXPECT_EQ(normals[i], sentinel);
+            else
+                EXPECT_NEAR(glm::length(normals[i]), 1.f, 1e-5);
+        EXPECT_EQ(std::as_const(deletion).Get<bool>(maskName).Revision(), deletionRevision);
+        EXPECT_TRUE(std::as_const(deletion).Get<bool>(maskName)[0]);
+    }
+}
+
 TEST(NormalEstimation, TopologyVariantsConsumeCustomPositionsAndGraphMethodAcceptsMesh)
 {
     for (auto domain : {D::MeshVertex, D::GraphNode})

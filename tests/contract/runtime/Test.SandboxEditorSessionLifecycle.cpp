@@ -25,6 +25,7 @@
 #include <gtest/gtest.h>
 
 import Extrinsic.Runtime.NormalOperations;
+import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.RegistrationOperations;
 import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.MeshTopologyOperations;
@@ -1120,6 +1121,7 @@ namespace
         Runtime::EditorProcessingCommands Commands{};
         Runtime::KeypointAnalysisConfig Keypoints{};
         Runtime::OutlierAnalysisConfig Outliers{};
+        Runtime::NormalEstimationConfig Normals{};
         PointReadinessFrameProbe* FrameProbe{};
 
         void SetUp() override
@@ -1128,6 +1130,7 @@ namespace
                 Engine, std::make_unique<PointReadinessFrameProbe>());
             Engine.EmplaceModule<Runtime::AsyncWorkModule>();
             Engine.EmplaceModule<Runtime::SceneInteractionModule>();
+            Engine.EmplaceModule<Runtime::SpatialIndexCache>();
             Engine.Initialize();
             Scene = Engine.Worlds().Get(Engine.Worlds().ActiveWorld());
             Entity = Scene->Create();
@@ -1146,6 +1149,9 @@ namespace
             Outliers.Mask = {Keypoints.Positions.Domain, "outliers", Geometry::PropertyValueKind::UInt32};
             Outliers.Score = {Keypoints.Positions.Domain, "scores", Geometry::PropertyValueKind::Float};
             Outliers.KNeighbors = 2;
+            Normals.StableEntityId = Keypoints.StableEntityId;
+            Normals.Positions = Keypoints.Positions;
+            Normals.Output = {Keypoints.Positions.Domain, "normals", Geometry::PropertyValueKind::Vec3};
             Attachment.Attach(Engine.Worlds(), Engine.Services());
             PrepareFrame();
         }
@@ -1161,6 +1167,11 @@ namespace
         }
         Geometry::PropertySet& Properties() { return Scene->Raw().get<GS::Vertices>(Entity).Properties; }
         Runtime::ActionReadiness Preview() { return Runtime::PreviewEditorKeypointAnalysisCommand(Commands, Keypoints); }
+        Runtime::ActionReadiness PreviewNormals()
+        {
+            return Runtime::PreviewEditorNormalEstimationCommand(
+                Runtime::PrepareEditorNormalFrame(Attachment).Commands, Normals);
+        }
         Runtime::EditorPointInputReadinessStats Stats() { return Runtime::GetEditorPointInputReadinessStats(Commands); }
         void Drain() { Engine.Commands().Drain(*Scene); }
     };
@@ -1174,6 +1185,7 @@ TEST_F(EditorPointReadiness, CatalogAndMethodsShareDeferredVerdictAcrossFrames)
     {
         EXPECT_FALSE(Preview().Enabled);
         EXPECT_FALSE(Runtime::PreviewEditorOutlierAnalysisCommand(Commands, Outliers).Enabled);
+        EXPECT_FALSE(PreviewNormals().Enabled);
         EXPECT_EQ(Stats().ChecksQueued, 1u);
         EXPECT_EQ(Stats().PropertyScans, 0u);
     }
@@ -1187,12 +1199,119 @@ TEST_F(EditorPointReadiness, CatalogAndMethodsShareDeferredVerdictAcrossFrames)
         PrepareFrame();
         EXPECT_TRUE(Preview().Enabled);
         EXPECT_TRUE(Runtime::PreviewEditorOutlierAnalysisCommand(Commands, Outliers).Enabled);
+        EXPECT_TRUE(PreviewNormals().Enabled);
         EXPECT_EQ(Stats().PropertyScans, 1u);
         EXPECT_EQ(Stats().ChecksQueued, 1u);
     }
     Properties().GetOrAdd<float>("unrelated")[0] = 7;
     EXPECT_TRUE(Preview().Enabled);
+    EXPECT_TRUE(PreviewNormals().Enabled);
     EXPECT_EQ(Stats().ChecksQueued, 1u);
+}
+
+TEST_F(EditorPointReadiness, NormalReadinessReusesNegativeVerdictsAndRevalidatesOutputMetadata)
+{
+    Normals.Output = Normals.Positions;
+    EXPECT_EQ(PreviewNormals().DisabledReason, "Normals must use a distinct output property on the input domain.");
+    EXPECT_EQ(Stats().ChecksQueued, 0u);
+    Normals.Output.Name = "normals";
+    EXPECT_EQ(PreviewNormals().DisabledReason, "Checking live point samples. Wait for input validation.");
+    EXPECT_EQ(Stats().PropertyScans, 0u);
+    Drain();
+    ASSERT_TRUE(PreviewNormals().Enabled);
+    auto positions = Properties().Get<glm::vec3>("samples");
+    auto& values = positions.Vector();
+    values[0].x = std::numeric_limits<float>::infinity();
+    EXPECT_FALSE(PreviewNormals().Enabled);
+    EXPECT_EQ(Stats().PropertyScans, 1u);
+    Drain();
+    EXPECT_EQ(PreviewNormals().DisabledReason, "Live position samples must be finite.");
+    EXPECT_EQ(Preview().DisabledReason, PreviewNormals().DisabledReason);
+    EXPECT_EQ(Stats().ChecksQueued, 2u);
+    values[0] = {0,0,0};
+    positions.MarkModified();
+    EXPECT_FALSE(PreviewNormals().Enabled);
+    Drain();
+    ASSERT_TRUE(PreviewNormals().Enabled);
+    Properties().GetOrAdd<float>("normals")[0] = 1;
+    EXPECT_EQ(PreviewNormals().DisabledReason, "Normal output must be absent or a count-matched vec3 property.");
+    EXPECT_EQ(Stats().ChecksQueued, 3u);
+    EXPECT_EQ(Stats().PropertyScans, 3u);
+}
+
+TEST_F(EditorPointReadiness, NormalReadinessRetainsPcaMinimumAndBackendLimits)
+{
+    auto deleted = Properties().Get<bool>("v:deleted");
+    deleted[2] = deleted[3] = true;
+    EXPECT_FALSE(PreviewNormals().Enabled);
+    Drain();
+    EXPECT_EQ(PreviewNormals().DisabledReason, "Point-set PCA requires at least three live finite samples.");
+    deleted[0] = deleted[1] = true;
+    EXPECT_FALSE(PreviewNormals().Enabled);
+    Drain();
+    EXPECT_EQ(PreviewNormals().DisabledReason, "Normal estimation requires live input samples.");
+    deleted[0] = deleted[1] = false;
+    deleted[2] = deleted[3] = false;
+    Normals.Backend = Runtime::NormalEstimationBackend::CpuLBVH;
+    EXPECT_FALSE(PreviewNormals().Enabled);
+    Drain();
+    ASSERT_TRUE(PreviewNormals().Enabled);
+    Properties().Get<glm::vec3>("samples")[0].x = 2e18f;
+    EXPECT_FALSE(PreviewNormals().Enabled);
+    Drain();
+    EXPECT_EQ(PreviewNormals().DisabledReason,
+        "CPU LBVH requires the spatial cache, at most 2^24 samples and coordinates/radius within 1e18.");
+    Normals.Backend = Runtime::NormalEstimationBackend::CpuKDTree;
+    EXPECT_TRUE(PreviewNormals().Enabled);
+    Normals.Backend = Runtime::NormalEstimationBackend::VulkanLBVH;
+    EXPECT_FALSE(PreviewNormals().Enabled);
+    EXPECT_EQ(Stats().ChecksQueued, 4u);
+    EXPECT_EQ(Stats().PropertyScans, 4u);
+}
+
+TEST_F(EditorPointReadiness, NormalTopologyReadinessSharesPointVerdictButKeepsLiveTopologyChecks)
+{
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0,0,0}), b = mesh.AddVertex({1,0,0}), c = mesh.AddVertex({0,1,0});
+    const auto d = mesh.AddVertex({1,1,0});
+    (void)mesh.AddTriangle(a,b,c);
+    (void)mesh.AddTriangle(c,b,d);
+    GS::PopulateFromMesh(Scene->Raw(), Entity, mesh);
+    Normals.Positions = {Runtime::GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};
+    Normals.Output.Domain = Normals.Positions.Domain;
+    Normals.Method = Runtime::NormalEstimationMethod::MeshFaceWeighted;
+    EXPECT_EQ(PreviewNormals().DisabledReason, "Checking live point samples. Wait for input validation.");
+    EXPECT_EQ(Stats().PropertyScans, 0u);
+    Drain();
+    ASSERT_TRUE(PreviewNormals().Enabled);
+    auto& faces = Scene->Raw().get<GS::Faces>(Entity).Properties;
+    auto& edges = Scene->Raw().get<GS::Edges>(Entity).Properties;
+    faces.GetOrAdd<bool>("f:deleted")[0] = true;
+    edges.GetOrAdd<bool>("e:deleted")[0] = true;
+    EXPECT_TRUE(PreviewNormals().Enabled);
+    Normals.Method = Runtime::NormalEstimationMethod::MeshFaceNormals;
+    Normals.Output.Domain = Runtime::GeometryElementDomain::MeshFace;
+    EXPECT_TRUE(PreviewNormals().Enabled);
+    Normals.Method = Runtime::NormalEstimationMethod::GraphNeighborhood;
+    Normals.Output.Domain = Normals.Positions.Domain;
+    EXPECT_TRUE(PreviewNormals().Enabled);
+    auto edgeMask = edges.Get<bool>("e:deleted");
+    edges.Remove(edgeMask);
+    (void)edges.GetOrAdd<float>("e:deleted");
+    EXPECT_EQ(PreviewNormals().DisabledReason, "Invalid edge deletion mask.");
+    EXPECT_EQ(Stats().PropertyScans, 1u);
+    EXPECT_EQ(Stats().ChecksQueued, 1u);
+}
+
+TEST_F(EditorPointReadiness, NormalBackendReasonFollowsPendingPointValidation)
+{
+    Normals.Backend = Runtime::NormalEstimationBackend::VulkanLBVH;
+    EXPECT_EQ(PreviewNormals().DisabledReason, "Checking live point samples. Wait for input validation.");
+    Drain();
+    const auto unavailable = PreviewNormals();
+    EXPECT_FALSE(unavailable.Enabled);
+    EXPECT_EQ(unavailable.DisabledReason,
+        "Vulkan normal neighborhoods require the framed spatial cache and job service.");
 }
 
 TEST_F(EditorPointReadiness, RevisionsAndRetainedBorrowInvalidateNegativeVerdicts)
@@ -1270,15 +1389,20 @@ TEST_F(EditorPointReadiness, HalfedgeReadinessUsesPairedEdgeMask)
     edges.GetOrAdd<bool>("e:deleted")[2] = true;
     Keypoints.Positions.Domain = Runtime::GeometryElementDomain::GraphHalfedge;
     Keypoints.Mask.Domain = Keypoints.Score.Domain = Keypoints.Positions.Domain;
+    Normals.Positions.Domain = Normals.Output.Domain = Keypoints.Positions.Domain;
     EXPECT_FALSE(Preview().Enabled);
+    EXPECT_FALSE(PreviewNormals().Enabled);
     Drain();
     EXPECT_TRUE(Preview().Enabled);
+    EXPECT_TRUE(PreviewNormals().Enabled);
     edges.Get<bool>("e:deleted")[2] = false;
     EXPECT_FALSE(Preview().Enabled);
     Drain();
     EXPECT_EQ(Preview().DisabledReason, "Live position samples must be finite.");
+    EXPECT_EQ(PreviewNormals().DisabledReason, "Live position samples must be finite.");
     halves.Resize(5);
     EXPECT_EQ(Preview().DisabledReason, "Invalid deletion domain/cardinality.");
+    EXPECT_EQ(PreviewNormals().DisabledReason, "Invalid deletion domain/cardinality.");
     EXPECT_EQ(Stats().PropertyScans, 2u);
 }
 
@@ -1290,8 +1414,13 @@ TEST_F(EditorPointReadiness, CommandsRecaptureDespiteWarmReadiness)
     Properties().Get<glm::vec3>("samples")[0].x = std::numeric_limits<float>::quiet_NaN();
     EXPECT_FALSE(Runtime::ApplyEditorKeypointAnalysisCommand(Commands, Keypoints).Succeeded());
     EXPECT_FALSE(Runtime::ApplyEditorOutlierAnalysisCommand(Commands, Outliers).Succeeded());
+    const auto normalResult = Runtime::ApplyEditorNormalEstimationCommand(
+        Runtime::PrepareEditorNormalFrame(Attachment).Commands, Normals);
+    EXPECT_EQ(normalResult.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_EQ(normalResult.Message, "Live position samples must be finite.");
     EXPECT_FALSE(Properties().Exists("keypoints"));
     EXPECT_FALSE(Properties().Exists("outliers"));
+    EXPECT_FALSE(Properties().Exists("normals"));
     EXPECT_EQ(Stats().PropertyScans, 1u);
 }
 
@@ -1376,6 +1505,8 @@ TEST_F(EditorPointReadiness, MissingCommandQueueNeverFallsBackToPanelScanning)
     const auto preview = Preview();
     EXPECT_FALSE(preview.Enabled);
     EXPECT_NE(preview.DisabledReason.find("command queue"), std::string::npos);
+    EXPECT_FALSE(PreviewNormals().Enabled);
+    EXPECT_EQ(PreviewNormals().DisabledReason, preview.DisabledReason);
     EXPECT_TRUE(Runtime::GetEditorPointInputCatalog(Commands, Keypoints.StableEntityId).Empty());
     EXPECT_EQ(Stats().ChecksQueued, 0u);
     EXPECT_EQ(Stats().PropertyScans, 0u);

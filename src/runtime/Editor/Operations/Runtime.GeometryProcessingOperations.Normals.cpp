@@ -147,7 +147,6 @@ namespace Extrinsic::Runtime
             work->Result.RequestedBackend = c.Backend;
             work->Result.Output = c.Output;
             work->Result.SlotCount = outputProps->Size();
-            work->Inputs.push_back(Detail::ObserveGeometryProperty(a, c.Positions.Domain, c.Positions.Name));
             work->OutputWatch = Detail::ObserveGeometryProperty(a, c.Output.Domain, c.Output.Name);
             if (purpose == CapturePurpose::Execute)
             {
@@ -156,28 +155,22 @@ namespace Extrinsic::Runtime
                 work->After = work->OutputWatch.Revision.has_value() ? work->Before
                                                        : std::vector<glm::vec3>(outputProps->Size(), glm::vec3(0));
             }
-            const auto [maskDomain, maskName, divisor] = Detail::ResolvePointDeletionSource(c.Positions.Domain);
-            std::vector<bool> mask;
-            if (props->Size() % divisor ||
-                !ReadMask(a, maskDomain, maskName, props->Size() / divisor, mask, work->Inputs))
-                return fail("Deletion mask is missing its domain or has an invalid type/cardinality.");
-            const auto points = props->Get<glm::vec3>(c.Positions.Name);
-            bool lbvhCoordinatesValid = true;
-            for (std::uint32_t i = 0; i < props->Size(); ++i)
+            Detail::PointInputCapture input;
+            const bool captured = purpose == CapturePurpose::Execute
+                ? Detail::CapturePointInput(a, c.Positions, true, input, diagnostic)
+                : Detail::PreparePointInput(context, *entity, a, c.Positions, input, diagnostic);
+            if (!captured)
+                return {};
+            work->Inputs = std::move(input.Inputs);
+            work->Result.LiveCount = input.LiveCount;
+            const bool lbvhCoordinatesValid = input.ValidLbvh;
+            if (purpose == CapturePurpose::Execute)
             {
-                if (purpose == CapturePurpose::Execute)
-                    work->Deleted.push_back(mask[i / divisor]);
-                if (mask[i / divisor])
-                    continue;
-                if (!Detail::FinitePosition(points[i]))
-                    return fail("Live position samples must be finite.");
-                ++work->Result.LiveCount;
-                lbvhCoordinatesValid &= Geometry::PointLBVH::ValidPoint(points[i]);
-                if (purpose == CapturePurpose::Execute)
-                {
-                    work->Points.push_back(points[i]);
-                    work->Slots.push_back(i);
-                }
+                work->Points = std::move(input.Points);
+                work->Slots = std::move(input.Slots);
+                work->Deleted.assign(input.SlotCount, true);
+                for (const auto slot : work->Slots)
+                    work->Deleted[slot] = false;
             }
             if (!work->Result.LiveCount)
                 return fail("Normal estimation requires live input samples.");
@@ -270,7 +263,8 @@ namespace Extrinsic::Runtime
             work->GraphVertices.Resize(props->Size());
             work->GraphEdges.Resize(edges->Size());
             work->GraphHalfedges.Resize(edges->Size() * 2);
-            work->GraphVertices.GetOrAdd<glm::vec3>(c.Positions.Name).Vector() = points.Vector();
+            work->GraphVertices.GetOrAdd<glm::vec3>(c.Positions.Name).Vector() =
+                props->Get<glm::vec3>(c.Positions.Name).Vector();
             work->GraphVertices.GetOrAdd<bool>("v:deleted").Vector() = work->Deleted;
             work->GraphEdges.GetOrAdd<bool>("e:deleted").Vector() = deletedEdges;
             auto connectivity =

@@ -13,6 +13,9 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, geometry
 ---
 # UI-037 — Linear domain-action readiness and disabled-reason tooltips
 
+Current continuation: see [normal capture checkpoint and open points](#continuation--shared-normal-point-capture-2026-09-19).
+Read that checkpoint plus the initial scope before consulting the historical slices.
+
 ## Goal
 - Keep every action in the Sandbox's linear mesh, UV, bake, point-cloud,
   registration, and parameterization workflow visible while making its current
@@ -4769,3 +4772,131 @@ or frame-time speedup is inferred. A changed source is scanned once during
 command drain, so this is not worker parallelism or a per-drain time budget.
 UI-037 stays open for remaining per-frame method readiness scans and its broad
 action inventory. This is a completed session checkpoint.
+
+
+## Continuation — shared normal point capture (2026-09-19)
+
+Operator-directed duplication/compilation continuation from `338e162c7`, with
+Codex as sole writer, Claude Fable 5.1 plan/fixed-diff review, and Codex Sol for
+one bounded read-only import inspection. UI-037 remains active.
+
+Reuse decision: normal execution and preview now consume the existing compiled
+`CapturePointInput` / `PreparePointInput` owner in `PointProperties.cpp`.
+Positions/deletion watches, finite checks, live counts, LBVH limits and ascending
+source slots match. Execution moves captured inputs/points/slots and reconstructs
+its full deletion vector from live slots before topology reconstruction. Commands
+still synchronously recapture current inputs. No new production file, helper,
+module, cache, job or dependency is added; the normal implementation loses six
+physical lines (666 -> 660). No elapsed compilation or frame-time improvement is
+claimed. Removing the duplicate loop is source consolidation, not benchmark evidence.
+
+Normal output/config metadata remains ahead of capture. Prepared normal previews
+now share pending/negative verdicts with catalogs, outliers and keypoints, including
+all topology variants. Missing command wiring fails closed. Standalone contexts
+retain synchronous validation. Deletion diagnostics adopt the shared owner's
+specific type/cardinality reasons. Backend/topology checks follow the accepted
+point verdict; topology deletion-mask copies remain synchronous and explicitly open.
+
+The proposed attachment forward declaration was rejected during source review:
+`EditorWorkspaceAttachment` and `RuntimeEngineConfigApplyResult` are attached to
+named modules without matching global C++ linkage. Introducing an unmatched
+forward declaration would change type identity. No interface dependency is removed
+by this slice; a future owner-level locality change needs its own bounded review.
+
+Five new runtime cases cover normal-only pending and negative verdict reuse,
+retained-borrow invalidation, output priority, PCA zero/minimum counts and LBVH
+coordinate gates, topology variants with live mask metadata, and backend reason
+order, plus executed graph/mesh vertex and paired-halfedge output preservation.
+Existing fixture coverage now includes normals in shared-cache, paired
+halfedge-mask, unavailable command queue and stale-command tests. The first
+focused run passed 157/158; its sole failure was a new test expecting a later
+preflight message instead of the existing config validator's earlier message.
+The expectation was corrected against the validator; production behavior and
+assertion strength were preserved.
+
+Fable fixed-diff review prompted stronger execution coverage, a positive CPU-LBVH
+control with an actual spatial-cache module, and an exact stale-command rejection
+assertion through the normal prepared frame. The topology fixture now retains a
+live face rather than pinning the pre-existing all-deleted-face readiness behavior.
+Fable accepted the follow-up fixed diff with no blocker. Existing
+`EveryCanonicalDomainPublishesNamedNormalsAndSupportsUndoRedo` already executes
+CPU-LBVH with deleted point rows, and the dedicated backend-reason test pins
+capability failure after point validation. Remaining optional interior-row
+coverage and all-deleted-face semantics are listed below.
+The frame-accessor concern was checked directly: `VisitPreparedFrame` only visits
+stored context; it does not advance frames or evict cache entries. The duplicated
+metadata checks deliberately retain normal diagnostic priority. Source is unchanged
+since the reviewed implementation; later edits strengthen tests/documentation.
+
+An intermediate full CPU run passed all 4,794 executed tests (one expected ASan-only
+skip among 4,795 selected; 155.57 s). The final stronger-test gate is recorded below.
+Logs/immutable review packet: `/tmp/intrinsic-normal-readiness/`.
+
+### Final verification for shared normal capture
+
+Canonical ci / Clang 23, unsanitized: focused targets and `IntrinsicTests` build
+pass. After review fixes, all 38 focused normal/readiness tests pass. Final
+exclusion-only CPU gate selects 4,796 tests: 4,795 pass, one expected ASan-only
+GLFW lifecycle skip, zero failures (154.28 seconds). SHA-256 checks confirm the
+production/test sources remained fixed through the final build and run.
+
+Strict layering (zero exceptions), test layout, task policy/state links, root
+hygiene, doc links/sync, skill mirrors and session-brief freshness pass. Source
+annotation audit: zero errors and zero review hints in the changed production
+unit. Module inventory regenerated unchanged at 429. No new module interface,
+CMake producer, layer/link edge or compatibility path. Scope/layering/tests/docs
+sweep passes; workshop rows 1–3/8 pass, renderer/pass/recipe/closure rows 4–7 n/a.
+This is CPU evidence; no new GPU execution or sanitizer-suite run is claimed.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^EditorPointReadiness\.|^NormalEstimation' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+```
+
+### Current open points
+
+- [ ] Remove remaining synchronous topology deletion-mask copies/counts from
+      normal readiness without changing graph/mesh/face execution, reason order,
+      deletion semantics or command-time revalidation.
+- [ ] Add an interior-deletion/nonuniform-normal regression if extending normal
+      slot mapping; current execution tests pin prefix deletion, paired halfedges,
+      preserved output and existing CPU-LBVH behavior. During the topology-readiness
+      slice decide the intended all-deleted-face availability against command
+      behavior; this continuation preserves the existing enabled preview.
+- [ ] Continue feature-by-feature scan/copy inventory and cache adoption for
+      density, density weights, spacing, bilateral filtering, descriptors,
+      construction, registration and mesh/UV/bake/parameterization readiness.
+      Reuse the point verdict only where contracts match; keep normal/topology/
+      paired-source predicates with their owners. Prove steady-frame zero scans,
+      negative caching, revision/deletion invalidation, lifecycle and supersession
+      for every newly cached predicate.
+- [ ] Complete the initial action/backend/variant readiness matrix and common
+      `ActionReadiness` representation in every family-owned prepared frame;
+      remove remaining duplicate app validation and action-hiding early returns.
+      Keep disabled reasons deterministic, actionable and shared with agents.
+- [ ] Finish per-family disabled/enabled button and selectable-option tooltip /
+      command/no-command coverage. The shared two-frame tooltip test is already
+      complete; it does not prove the entire action inventory.
+- [ ] Complete the named table-driven
+      `SandboxEditorUi.ActionReadinessDerivesDomainPrerequisiteReasons` closure
+      test, including ICP distinct compatible sources and finite count-matched
+      point-to-plane normals, parameterization strategy prerequisites, UV/bake
+      prerequisites and unavailable backend choices.
+- [ ] Continue bounded compilation-owner inspection; preserve named-module type
+      identity. Re-run configured compiler boundary guards for each accepted
+      change. A compilation-speed claim still requires matched measurements;
+      this slice supplies none. BUILD-006/CI-012 remain separate task owners.
+- [ ] Review whether deferred main-thread scans need a measured per-drain budget
+      or worker path; no worker parallelism or hitch-free frame claim is made.
+      Do not introduce a second cache/service without evidence.
+- [ ] Close broad acceptance only after the complete action inventory, stale
+      apply/async completion guards, co-equal control surfaces, no-scan readiness
+      and app-linked operational checks pass. This checkpoint does not retire
+      UI-037 or claim GPU/sanitizer execution.
+
+Session boundary: after this verified commit, start a fresh session using this
+checkpoint and initial task scope. Avoid rereading the full historical task note;
+its accumulated history is much larger than the remaining slice context.
