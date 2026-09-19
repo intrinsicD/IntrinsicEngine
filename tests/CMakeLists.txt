@@ -728,6 +728,10 @@ set_tests_properties(AssetCompilationLocality.ModelMaterialization
 # its public producer and the editor interfaces that consume bake records.
 intrinsic_add_module_boundary_test(EditorCompilationLocality.TextureBake
         --check-source src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cppm
+        --forbid-module Extrinsic.Runtime.GeometryPresentation
+        --forbid-module Extrinsic.Runtime.GeometryAvailability
+        --forbid-module Extrinsic.ECS.Components.GeometrySources
+        --forbid-module Geometry.Properties
         --forbid-module Extrinsic.Graphics.Renderer
         --forbid-module Extrinsic.Graphics.GpuAssetCache
         --forbid-module Extrinsic.Runtime.RenderExtraction

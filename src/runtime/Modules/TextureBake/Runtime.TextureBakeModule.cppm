@@ -14,11 +14,11 @@ export module Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Error;
 import Extrinsic.Graphics.Colormap;
-import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.ModuleLifecycle;
 import Extrinsic.Runtime.WorldHandle;
-import Geometry.Properties;
+import Geometry.Properties.Types;
 
 namespace Extrinsic::Runtime
 {

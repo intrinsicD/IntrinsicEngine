@@ -251,6 +251,9 @@ registration and teardown. The existing friend `TextureBakeModule` accesses
 that always-constructed implementation directly. Asset services, scene registry,
 RHI device, renderer, GPU asset cache, render extraction and command history
 stay out of the public bake interface's compiler dependency closure.
+Property references and value kinds come from `Runtime.GeometryProperty.Types`
+and `Geometry.Properties.Types`; live property storage, geometry availability,
+geometry source components and presentation stay in the implementation.
 
 The existing implementation also owns target detachment and scene-asset cleanup;
 module calls use those methods directly, preserving their `noexcept` boundary.
