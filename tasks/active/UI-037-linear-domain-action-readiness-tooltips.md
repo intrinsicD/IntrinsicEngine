@@ -4437,3 +4437,78 @@ result or elapsed compilation-speed improvement is claimed.
 UI-037's broader readiness/cache work remains open; these slices are complete.
 The consolidation slice does not change per-frame property scans or Run-button
 behavior. Evidence: `/tmp/intrinsic-bake-locality/`.
+
+
+### 2026-09-19 continuation — consolidation lifecycle and option lookup
+
+Operator direction continues duplication and compilation cleanup outside the
+standing Framework24 work-selection focus. The checkout starts clean at
+`5ca6c3cf1`; Codex is sole writer, Claude Fable 5.1 reviews bounded packets.
+
+Plan/reuse decisions:
+
+- Remove four implementation-only imports from the consolidation lifecycle
+  interface. Reuse existing globally attached C++ owners for the three borrowed
+  service pointers; keep module-attached history/job types and value records.
+  The existing implementation already imports all four full owners. Add the
+  configured-compiler boundary guard, with a recorded baseline failure.
+- Replace the six duplicated private K-Means/Progressive-Poisson option mapping
+  functions with two file-private array helpers, used directly by three current
+  option families. Preserve array order, clamped indices, first-match lookup and
+  unknown-value fallback to zero. Search of app/editor/core found no matching
+  shared owner. No public API, file, wrapper or policy flag is needed.
+- Keep consolidation Run readiness/cache work open: its current preflight scans
+  full position/normal buffers. Correct per-frame readiness needs generation-
+  keyed results, not a new wrapper around those scans.
+
+Fable reviewed the plan without blockers. Right-sizing: three present callers
+justify the two local helpers; borrowed declarations avoid a new lifecycle
+facade or owning record. Existing contracts cover source documentation,
+processing/kernel compilation locality and unchanged property semantics.
+Both implementation slices are complete. Lifecycle commit: `cd9a9b2b8`.
+The configured Clang module closure
+for the lifecycle interface is 72 -> 32. The new boundary guard failed on all
+four forbidden modules against the built clean parent and passes after the
+change. Interface size is 69 -> 76 lines (borrow declarations); the existing
+implementation already explicitly imports all required owners. The test build
+entry adds 10 lines. No new production file or API was introduced.
+
+The method-panel helper change is 3,475 -> 3,427 lines: six private mapping
+functions become two local templates, with nine direct uses across three
+option arrays. Other `find_if` paths return property pointers or search strategy
+records and have different contracts. Their behavior remains separate.
+
+Fable's fixed-diff review found no blockers. The omitted owner excerpt was
+checked directly: `Runtime.WorldRegistry.cppm` lines 51–53 put the class itself
+inside `export extern "C++"`. Both implementation units and external importers
+built. Its optional test-name change was declined to retain the existing
+editor-locality naming family; the retained state clamps normalize UI state
+and are not redundant with the read-only mapping helpers. Source/build hashes
+remain fixed through review and verification.
+
+Scope/layering/tests/docs sweep passes. Workshop rows 1–3/8 pass; 4–7 are not
+applicable. Strict layering (zero exceptions), test layout, task policy/state
+links, docs sync/links, root hygiene, skill mirrors and session-brief freshness
+pass. Inventory regenerated, unchanged at 429 modules. All 26 compile-hotspot
+tooling tests pass. Source documentation: zero errors, one pre-existing file-
+size review hint for MethodPanels; this slice reduces it without fragmenting
+its implementation. No correctness finding remains.
+
+Exact verification (canonical ci, Clang 23, unsanitized):
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^(PointCloudConsolidationModule\.|PointCloudConsolidationConfig\.|SandboxPointCloudConsolidationPanel\.|EditorCompilationLocality\.ConsolidationLifecycle$|EditorCompilationLocality\.PointCloudServices$)' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --build --preset ci --target IntrinsicSandboxEditorIntegrationTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^(SandboxEditorUi\..*(Clustering|KMeans|ProgressivePoisson)|SandboxEditorPresentation\.|SandboxPointCloudConsolidationPanel\.|PointCloudConsolidationModule\.|PointCloudConsolidationConfig\.|EditorCompilationLocality\.)' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+```
+
+All 26 first-slice checks and 106 combined focused tests pass. Full CPU gate:
+4,769 selected, 4,768 passed, one expected ASan-only GLFW lifecycle skip, zero
+failures (153.02 s). The focused build reports one pre-existing member-
+initialization-order warning in the consolidation test fixture. No GPU execution, sanitizer-suite result or elapsed compilation-speed
+improvement is claimed. UI-037's broader readiness acceptance remains open.
+Evidence and review packets: `/tmp/intrinsic-consolidation-locality/`.

@@ -422,75 +422,27 @@ namespace Extrinsic::Sandbox::Editor
 
 
 
-        [[nodiscard]] Runtime::ClusteringBackend KMeansBackendFromIndex(
+        template <typename T, std::size_t Size>
+        [[nodiscard]] T OptionFromIndex(
+            const std::array<T, Size>& options,
             const std::int32_t index) noexcept
         {
+            static_assert(Size > 0u);
             const std::int32_t clamped = std::clamp(
-                index,
-                0,
-                static_cast<std::int32_t>(kKMeansBackends.size() - 1u));
-            return kKMeansBackends[static_cast<std::size_t>(clamped)];
+                index, 0, static_cast<std::int32_t>(Size - 1u));
+            return options[static_cast<std::size_t>(clamped)];
         }
 
-        [[nodiscard]] std::int32_t KMeansBackendIndex(
-            const Runtime::ClusteringBackend backend) noexcept
+        template <typename T, std::size_t Size>
+        [[nodiscard]] std::int32_t IndexOfOption(
+            const std::array<T, Size>& options,
+            const T value) noexcept
         {
-            const auto found = std::find(
-                kKMeansBackends.begin(), kKMeansBackends.end(), backend);
-            return found == kKMeansBackends.end()
+            static_assert(Size > 0u);
+            const auto found = std::find(options.begin(), options.end(), value);
+            return found == options.end()
                 ? 0
-                : static_cast<std::int32_t>(
-                      std::distance(kKMeansBackends.begin(), found));
-        }
-
-        [[nodiscard]] Runtime::ProgressivePoissonPlaygroundChannel
-        ProgressivePoissonChannelFromIndex(const std::int32_t index) noexcept
-        {
-            const std::int32_t clamped = std::clamp(
-                index,
-                0,
-                static_cast<std::int32_t>(
-                    kProgressivePoissonChannels.size() - 1u));
-            return kProgressivePoissonChannels[
-                static_cast<std::size_t>(clamped)];
-        }
-
-        [[nodiscard]] std::int32_t ProgressivePoissonChannelIndex(
-            const Runtime::ProgressivePoissonPlaygroundChannel channel) noexcept
-        {
-            const auto found = std::find(
-                kProgressivePoissonChannels.begin(),
-                kProgressivePoissonChannels.end(),
-                channel);
-            return found == kProgressivePoissonChannels.end()
-                ? 0
-                : static_cast<std::int32_t>(
-                      std::distance(kProgressivePoissonChannels.begin(), found));
-        }
-
-        [[nodiscard]] Runtime::ProgressivePoissonPlaygroundBackend
-        ProgressivePoissonBackendFromIndex(const std::int32_t index) noexcept
-        {
-            const std::int32_t clamped = std::clamp(
-                index,
-                0,
-                static_cast<std::int32_t>(
-                    kProgressivePoissonBackends.size() - 1u));
-            return kProgressivePoissonBackends[
-                static_cast<std::size_t>(clamped)];
-        }
-
-        [[nodiscard]] std::int32_t ProgressivePoissonBackendIndex(
-            const Runtime::ProgressivePoissonPlaygroundBackend backend) noexcept
-        {
-            const auto found = std::find(
-                kProgressivePoissonBackends.begin(),
-                kProgressivePoissonBackends.end(),
-                backend);
-            return found == kProgressivePoissonBackends.end()
-                ? 0
-                : static_cast<std::int32_t>(
-                      std::distance(kProgressivePoissonBackends.begin(), found));
+                : static_cast<std::int32_t>(std::distance(options.begin(), found));
         }
 
         void DrawProgressivePoissonTooltip(const char* text)
@@ -1725,7 +1677,7 @@ namespace Extrinsic::Sandbox::Editor
                     Runtime::GetEditorClusteringConfig(service.Commands);
                 if (active.has_value())
                 {
-                    KMeans.Backend = KMeansBackendIndex(active->Backend);
+                    KMeans.Backend = IndexOfOption(kKMeansBackends, active->Backend);
                     KMeans.ClusterCount = static_cast<std::int32_t>(
                         active->Parameters.ClusterCount);
                     KMeans.MaxIterations = static_cast<std::int32_t>(
@@ -1778,7 +1730,7 @@ namespace Extrinsic::Sandbox::Editor
                 0,
                 static_cast<std::int32_t>(kKMeansBackends.size() - 1u));
             const Runtime::ClusteringBackend previewBackend =
-                KMeansBackendFromIndex(KMeans.Backend);
+                OptionFromIndex(kKMeansBackends, KMeans.Backend);
             if (ImGui::BeginCombo(
                     "Backend##KMeans",
                     Runtime::ToString(previewBackend).data()))
@@ -1827,7 +1779,7 @@ namespace Extrinsic::Sandbox::Editor
             KMeans.Dirty |= configChanged;
 
             const Runtime::ClusteringBackend backend =
-                KMeansBackendFromIndex(KMeans.Backend);
+                OptionFromIndex(kKMeansBackends, KMeans.Backend);
             const Runtime::ClusteringConfig clusteringConfig{
                 .Parameters = Runtime::KMeansParameters{
                     .ClusterCount = static_cast<std::uint32_t>(
@@ -1995,8 +1947,8 @@ namespace Extrinsic::Sandbox::Editor
             state.ShuffleWithinLevels = config.ShuffleWithinLevels;
             state.ShuffleSeed = static_cast<std::int32_t>(config.ShuffleSeed);
             state.PrefixCount = static_cast<std::int32_t>(config.PrefixCount);
-            state.Channel = ProgressivePoissonChannelIndex(config.Channel);
-            state.Backend = ProgressivePoissonBackendIndex(config.Backend);
+            state.Channel = IndexOfOption(kProgressivePoissonChannels, config.Channel);
+            state.Backend = IndexOfOption(kProgressivePoissonBackends, config.Backend);
             state.AutoRunOnEdit = config.AutoRunOnEdit;
             state.DebounceSeconds =
                 static_cast<float>(config.DebounceSeconds);
@@ -2027,9 +1979,9 @@ namespace Extrinsic::Sandbox::Editor
                     ProgressivePoisson.ShuffleSeed),
                 .PrefixCount = static_cast<std::uint32_t>(
                     ProgressivePoisson.PrefixCount),
-                .Channel = ProgressivePoissonChannelFromIndex(
+                .Channel = OptionFromIndex(kProgressivePoissonChannels,
                     ProgressivePoisson.Channel),
-                .Backend = ProgressivePoissonBackendFromIndex(
+                .Backend = OptionFromIndex(kProgressivePoissonBackends,
                     ProgressivePoisson.Backend),
                 .AutoRunOnEdit = ProgressivePoisson.AutoRunOnEdit,
                 .DebounceSeconds = static_cast<double>(
@@ -2236,7 +2188,7 @@ namespace Extrinsic::Sandbox::Editor
                 "Delay after the last edit before auto-running.");
 
             const Runtime::ProgressivePoissonPlaygroundChannel channel =
-                ProgressivePoissonChannelFromIndex(
+                OptionFromIndex(kProgressivePoissonChannels,
                     ProgressivePoisson.Channel);
             if (ImGui::BeginCombo(
                     "Color channel##ProgressivePoisson",
@@ -2267,7 +2219,7 @@ namespace Extrinsic::Sandbox::Editor
                 "Published source-cardinality level, rank, introduction-radius, or prefix-visibility scalar; rejected inputs retain documented sentinels.");
 
             const Runtime::ProgressivePoissonPlaygroundBackend backend =
-                ProgressivePoissonBackendFromIndex(
+                OptionFromIndex(kProgressivePoissonBackends,
                     ProgressivePoisson.Backend);
             if (ImGui::BeginCombo(
                     "Backend##ProgressivePoisson",
