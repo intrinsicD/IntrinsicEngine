@@ -1122,6 +1122,9 @@ namespace
         Runtime::KeypointAnalysisConfig Keypoints{};
         Runtime::OutlierAnalysisConfig Outliers{};
         Runtime::NormalEstimationConfig Normals{};
+        Runtime::KernelDensityConfig Density{};
+        Runtime::PointSpacingConfig Spacing{};
+        Runtime::DensityWeightConfig Weights{};
         PointReadinessFrameProbe* FrameProbe{};
 
         void SetUp() override
@@ -1152,6 +1155,11 @@ namespace
             Normals.StableEntityId = Keypoints.StableEntityId;
             Normals.Positions = Keypoints.Positions;
             Normals.Output = {Keypoints.Positions.Domain, "normals", Geometry::PropertyValueKind::Vec3};
+            Density.StableEntityId = Spacing.StableEntityId = Weights.StableEntityId = Keypoints.StableEntityId;
+            Density.Positions = Spacing.Positions = Weights.Positions = Keypoints.Positions;
+            Density.Density = {Keypoints.Positions.Domain, "density", Geometry::PropertyValueKind::Float};
+            Spacing.Radii = {Keypoints.Positions.Domain, "radii", Geometry::PropertyValueKind::Float};
+            Weights.Weights = {Keypoints.Positions.Domain, "weights", Geometry::PropertyValueKind::Float};
             Attachment.Attach(Engine.Worlds(), Engine.Services());
             PrepareFrame();
         }
@@ -1171,6 +1179,13 @@ namespace
         {
             return Runtime::PreviewEditorNormalEstimationCommand(
                 Runtime::PrepareEditorNormalFrame(Attachment).Commands, Normals);
+        }
+        std::array<Runtime::ActionReadiness, 3> PreviewScalars()
+        {
+            const auto fields = Runtime::PrepareEditorPointFieldFrame(Attachment).Commands;
+            return {Runtime::PreviewEditorKernelDensityCommand(fields, Density),
+                    Runtime::PreviewEditorPointSpacingCommand(fields, Spacing),
+                    Runtime::PreviewEditorDensityWeightCommand(Commands, Weights)};
         }
         Runtime::EditorPointInputReadinessStats Stats() { return Runtime::GetEditorPointInputReadinessStats(Commands); }
         void Drain() { Engine.Commands().Drain(*Scene); }
@@ -1207,6 +1222,189 @@ TEST_F(EditorPointReadiness, CatalogAndMethodsShareDeferredVerdictAcrossFrames)
     EXPECT_TRUE(Preview().Enabled);
     EXPECT_TRUE(PreviewNormals().Enabled);
     EXPECT_EQ(Stats().ChecksQueued, 1u);
+}
+
+TEST_F(EditorPointReadiness, ScalarCatalogsAndPreviewsShareDeferredVerdictAcrossFrames)
+{
+    const auto fields = Runtime::PrepareEditorPointFieldFrame(Attachment).Commands;
+    const auto densityPending = Runtime::GetEditorKernelDensityInputCatalog(fields, Density.StableEntityId);
+    const auto spacingPending = Runtime::GetEditorPointSpacingInputCatalog(fields, Spacing.StableEntityId);
+    EXPECT_TRUE(densityPending.Empty());
+    EXPECT_TRUE(spacingPending.Empty());
+    for (const auto& preview : PreviewScalars())
+    {
+        EXPECT_FALSE(preview.Enabled);
+        EXPECT_EQ(preview.DisabledReason, "Checking live point samples. Wait for input validation.");
+    }
+    EXPECT_EQ(Stats().ChecksQueued, 1u);
+    EXPECT_EQ(Stats().PropertyScans, 0u);
+    Drain();
+    const auto densityReady = Runtime::GetEditorKernelDensityInputCatalog(fields, Density.StableEntityId);
+    const auto spacingReady = Runtime::GetEditorPointSpacingInputCatalog(fields, Spacing.StableEntityId);
+    ASSERT_EQ(densityReady.Size(), 1u);
+    ASSERT_EQ(spacingReady.Size(), 1u);
+    EXPECT_EQ(densityReady.Entries.front().Ref, Density.Positions);
+    EXPECT_EQ(spacingReady.Entries.front().Ref, Spacing.Positions);
+    EXPECT_NE(densityReady.SourceGeneration, densityPending.SourceGeneration);
+    EXPECT_NE(spacingReady.SourceGeneration, spacingPending.SourceGeneration);
+    for (unsigned frame = 0; frame < 3; ++frame)
+    {
+        PrepareFrame();
+        for (const auto& preview : PreviewScalars()) EXPECT_TRUE(preview.Enabled) << preview.DisabledReason;
+        EXPECT_TRUE(Preview().Enabled);
+        EXPECT_TRUE(PreviewNormals().Enabled);
+        EXPECT_EQ(Stats().ChecksQueued, 1u);
+        EXPECT_EQ(Stats().PropertyScans, 1u);
+    }
+}
+
+TEST_F(EditorPointReadiness, ScalarReadinessCachesNegativeInputsButRevalidatesOutputs)
+{
+    auto positions = Properties().Get<glm::vec3>("samples");
+    auto& values = positions.Vector();
+    values[0].x = std::numeric_limits<float>::infinity();
+    for (const auto& preview : PreviewScalars()) EXPECT_FALSE(preview.Enabled);
+    Drain();
+    for (unsigned frame = 0; frame < 3; ++frame)
+    {
+        PrepareFrame();
+        for (const auto& preview : PreviewScalars())
+            EXPECT_EQ(preview.DisabledReason, "Live position samples must be finite.");
+        EXPECT_EQ(Stats().PropertyScans, 1u);
+        EXPECT_EQ(Stats().ChecksQueued, 1u);
+    }
+    values[0] = {0,0,0};
+    positions.MarkModified();
+    for (const auto& preview : PreviewScalars()) EXPECT_FALSE(preview.Enabled);
+    Drain();
+    for (const auto& preview : PreviewScalars()) EXPECT_TRUE(preview.Enabled);
+    (void)Properties().GetOrAdd<glm::vec3>("density");
+    (void)Properties().GetOrAdd<glm::vec3>("radii");
+    (void)Properties().GetOrAdd<glm::vec3>("weights");
+    const auto invalidOutputs = PreviewScalars();
+    const std::array labels{"Density", "Radii", "Weight"};
+    for (unsigned i = 0; i < invalidOutputs.size(); ++i)
+    {
+        EXPECT_FALSE(invalidOutputs[i].Enabled);
+        EXPECT_EQ(invalidOutputs[i].DisabledReason,
+            std::string(labels[i]) + " outputs must be absent or count-matched properties of the configured type.");
+    }
+    EXPECT_EQ(Stats().PropertyScans, 2u);
+    EXPECT_EQ(Stats().ChecksQueued, 2u);
+}
+
+TEST_F(EditorPointReadiness, ScalarMinimumCountsAndCatalogMembershipRemainMethodSpecific)
+{
+    auto deleted = Properties().Get<bool>("v:deleted");
+    deleted[1] = deleted[2] = deleted[3] = true;
+    for (const auto& preview : PreviewScalars()) EXPECT_FALSE(preview.Enabled);
+    Drain();
+    const auto one = PreviewScalars();
+    EXPECT_EQ(one[0].DisabledReason, "Kernel density requires at least two live samples.");
+    EXPECT_EQ(one[1].DisabledReason, "Point spacing requires at least two live samples.");
+    EXPECT_TRUE(one[2].Enabled);
+    auto fields = Runtime::PrepareEditorPointFieldFrame(Attachment).Commands;
+    EXPECT_EQ(Runtime::GetEditorPointInputCatalog(Commands, Density.StableEntityId).Size(), 1u);
+    EXPECT_TRUE(Runtime::GetEditorKernelDensityInputCatalog(fields, Density.StableEntityId).Empty());
+    EXPECT_TRUE(Runtime::GetEditorPointSpacingInputCatalog(fields, Spacing.StableEntityId).Empty());
+    deleted[1] = false;
+    for (const auto& preview : PreviewScalars()) EXPECT_FALSE(preview.Enabled);
+    Drain();
+    for (const auto& preview : PreviewScalars()) EXPECT_TRUE(preview.Enabled);
+    EXPECT_EQ(Runtime::GetEditorKernelDensityInputCatalog(fields, Density.StableEntityId).Size(), 1u);
+    EXPECT_EQ(Runtime::GetEditorPointSpacingInputCatalog(fields, Spacing.StableEntityId).Size(), 1u);
+    deleted[0] = deleted[1] = true;
+    for (const auto& preview : PreviewScalars()) EXPECT_FALSE(preview.Enabled);
+    Drain();
+    const auto zero = PreviewScalars();
+    for (const auto& preview : zero) EXPECT_FALSE(preview.Enabled);
+    EXPECT_EQ(zero[2].DisabledReason, "Density weights require at least one live sample.");
+    EXPECT_EQ(Stats().PropertyScans, 3u);
+    EXPECT_EQ(Stats().ChecksQueued, 3u);
+}
+
+TEST_F(EditorPointReadiness, ScalarBackendPredicatesFollowTheSharedInputVerdict)
+{
+    Density.Backend = Runtime::KernelDensityBackend::CpuLBVH;
+    Spacing.Backend = Runtime::PointSpacingBackend::CpuLBVH;
+    Weights.Backend = Runtime::DensityWeightBackend::CpuLBVH;
+    for (const auto& preview : PreviewScalars()) EXPECT_FALSE(preview.Enabled);
+    Drain();
+    for (const auto& preview : PreviewScalars()) ASSERT_TRUE(preview.Enabled) << preview.DisabledReason;
+    Properties().Get<glm::vec3>("samples")[0].x = 2e18f;
+    for (const auto& preview : PreviewScalars())
+        EXPECT_EQ(preview.DisabledReason, "Checking live point samples. Wait for input validation.");
+    Drain();
+    for (const auto& preview : PreviewScalars())
+    {
+        EXPECT_FALSE(preview.Enabled);
+        EXPECT_EQ(preview.DisabledReason.find("LBVH requires"), 0u);
+    }
+    // Catalog eligibility is independent of the chosen execution backend.
+    const auto fields = Runtime::PrepareEditorPointFieldFrame(Attachment).Commands;
+    EXPECT_EQ(Runtime::GetEditorKernelDensityInputCatalog(fields, Density.StableEntityId).Size(), 1u);
+    EXPECT_EQ(Runtime::GetEditorPointSpacingInputCatalog(fields, Spacing.StableEntityId).Size(), 1u);
+    Properties().Get<glm::vec3>("samples")[0].x = std::numeric_limits<float>::denorm_min();
+    Weights.Backend = Runtime::DensityWeightBackend::VulkanLBVH;
+    for (const auto& preview : PreviewScalars()) EXPECT_FALSE(preview.Enabled);
+    Drain();
+    const auto subnormal = PreviewScalars();
+    EXPECT_TRUE(subnormal[0].Enabled);
+    EXPECT_TRUE(subnormal[1].Enabled);
+    EXPECT_EQ(subnormal[2].DisabledReason,
+        "Vulkan density weights require normal or zero coordinate components; subnormal coordinates are unsupported.");
+    EXPECT_EQ(Stats().PropertyScans, 3u);
+}
+
+TEST_F(EditorPointReadiness, ScalarOutputMetadataFollowsPendingInputValidation)
+{
+    (void)Properties().GetOrAdd<glm::vec3>("density");
+    (void)Properties().GetOrAdd<glm::vec3>("radii");
+    (void)Properties().GetOrAdd<glm::vec3>("weights");
+    for (const auto& preview : PreviewScalars())
+        EXPECT_EQ(preview.DisabledReason, "Checking live point samples. Wait for input validation.");
+    EXPECT_EQ(Stats().ChecksQueued, 1u);
+    EXPECT_EQ(Stats().PropertyScans, 0u);
+    Drain();
+    for (const auto& preview : PreviewScalars())
+    {
+        EXPECT_FALSE(preview.Enabled);
+        EXPECT_NE(preview.DisabledReason.find("configured type"), std::string::npos);
+    }
+    EXPECT_EQ(Stats().PropertyScans, 1u);
+}
+
+TEST_F(EditorPointReadiness, ScalarCommandsSubmitWhileReadinessIsPending)
+{
+    for (const auto& preview : PreviewScalars()) EXPECT_FALSE(preview.Enabled);
+    const auto fields = Runtime::PrepareEditorPointFieldFrame(Attachment).Commands;
+    EXPECT_EQ(Runtime::ApplyEditorKernelDensityCommand(fields, Density).Status, Runtime::EditorCommandStatus::Pending);
+    EXPECT_EQ(Runtime::ApplyEditorPointSpacingCommand(fields, Spacing).Status, Runtime::EditorCommandStatus::Pending);
+    EXPECT_EQ(Runtime::ApplyEditorDensityWeightCommand(Commands, Weights).Status, Runtime::EditorCommandStatus::Pending);
+    EXPECT_EQ(Stats().PropertyScans, 0u);
+    EXPECT_EQ(Stats().ChecksQueued, 1u);
+}
+
+TEST_F(EditorPointReadiness, ScalarCommandsRecaptureDespiteWarmReadiness)
+{
+    for (const auto& preview : PreviewScalars()) EXPECT_FALSE(preview.Enabled);
+    Drain();
+    for (const auto& preview : PreviewScalars()) ASSERT_TRUE(preview.Enabled);
+    Properties().Get<glm::vec3>("samples")[0].x = std::numeric_limits<float>::quiet_NaN();
+    const auto fields = Runtime::PrepareEditorPointFieldFrame(Attachment).Commands;
+    const auto density = Runtime::ApplyEditorKernelDensityCommand(fields, Density);
+    const auto spacing = Runtime::ApplyEditorPointSpacingCommand(fields, Spacing);
+    const auto weights = Runtime::ApplyEditorDensityWeightCommand(Commands, Weights);
+    EXPECT_EQ(density.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_EQ(spacing.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_EQ(weights.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_EQ(density.Message, "Live position samples must be finite.");
+    EXPECT_EQ(spacing.Message, density.Message);
+    EXPECT_EQ(weights.Message, density.Message);
+    EXPECT_FALSE(Properties().Exists("density"));
+    EXPECT_FALSE(Properties().Exists("radii"));
+    EXPECT_FALSE(Properties().Exists("weights"));
+    EXPECT_EQ(Stats().PropertyScans, 1u);
 }
 
 TEST_F(EditorPointReadiness, NormalReadinessReusesNegativeVerdictsAndRevalidatesOutputMetadata)
@@ -1341,15 +1539,16 @@ TEST_F(EditorPointReadiness, RevisionsAndRetainedBorrowInvalidateNegativeVerdict
 
 TEST_F(EditorPointReadiness, SupersededAndChangedBeforeDrainRequestsNeverScanOldKeys)
 {
-    EXPECT_FALSE(Preview().Enabled);
+    for (const auto& preview : PreviewScalars()) EXPECT_FALSE(preview.Enabled);
     Properties().Get<glm::vec3>("samples")[0].x = 2;
     Drain();
     EXPECT_EQ(Stats().PropertyScans, 0u);
-    EXPECT_FALSE(Preview().Enabled);
+    for (const auto& preview : PreviewScalars()) EXPECT_FALSE(preview.Enabled);
     Properties().Get<glm::vec3>("samples")[0].x = 3;
-    EXPECT_FALSE(Preview().Enabled);
+    for (const auto& preview : PreviewScalars()) EXPECT_FALSE(preview.Enabled);
     Drain();
     EXPECT_TRUE(Preview().Enabled);
+    for (const auto& preview : PreviewScalars()) EXPECT_TRUE(preview.Enabled);
     EXPECT_EQ(Stats().ChecksQueued, 3u);
     EXPECT_EQ(Stats().PropertyScans, 1u);
 }
@@ -1390,19 +1589,28 @@ TEST_F(EditorPointReadiness, HalfedgeReadinessUsesPairedEdgeMask)
     Keypoints.Positions.Domain = Runtime::GeometryElementDomain::GraphHalfedge;
     Keypoints.Mask.Domain = Keypoints.Score.Domain = Keypoints.Positions.Domain;
     Normals.Positions.Domain = Normals.Output.Domain = Keypoints.Positions.Domain;
+    Density.Positions.Domain = Density.Density.Domain = Keypoints.Positions.Domain;
+    Spacing.Positions.Domain = Spacing.Radii.Domain = Keypoints.Positions.Domain;
+    Weights.Positions.Domain = Weights.Weights.Domain = Keypoints.Positions.Domain;
+    for (const auto& preview : PreviewScalars()) EXPECT_FALSE(preview.Enabled);
     EXPECT_FALSE(Preview().Enabled);
     EXPECT_FALSE(PreviewNormals().Enabled);
     Drain();
     EXPECT_TRUE(Preview().Enabled);
     EXPECT_TRUE(PreviewNormals().Enabled);
+    for (const auto& preview : PreviewScalars()) EXPECT_TRUE(preview.Enabled);
     edges.Get<bool>("e:deleted")[2] = false;
     EXPECT_FALSE(Preview().Enabled);
     Drain();
     EXPECT_EQ(Preview().DisabledReason, "Live position samples must be finite.");
     EXPECT_EQ(PreviewNormals().DisabledReason, "Live position samples must be finite.");
+    for (const auto& preview : PreviewScalars())
+        EXPECT_EQ(preview.DisabledReason, "Live position samples must be finite.");
     halves.Resize(5);
     EXPECT_EQ(Preview().DisabledReason, "Invalid deletion domain/cardinality.");
     EXPECT_EQ(PreviewNormals().DisabledReason, "Invalid deletion domain/cardinality.");
+    for (const auto& preview : PreviewScalars())
+        EXPECT_EQ(preview.DisabledReason, "Invalid deletion domain/cardinality.");
     EXPECT_EQ(Stats().PropertyScans, 2u);
 }
 
@@ -1507,6 +1715,11 @@ TEST_F(EditorPointReadiness, MissingCommandQueueNeverFallsBackToPanelScanning)
     EXPECT_NE(preview.DisabledReason.find("command queue"), std::string::npos);
     EXPECT_FALSE(PreviewNormals().Enabled);
     EXPECT_EQ(PreviewNormals().DisabledReason, preview.DisabledReason);
+    for (const auto& scalar : PreviewScalars())
+    {
+        EXPECT_FALSE(scalar.Enabled);
+        EXPECT_EQ(scalar.DisabledReason, preview.DisabledReason);
+    }
     EXPECT_TRUE(Runtime::GetEditorPointInputCatalog(Commands, Keypoints.StableEntityId).Empty());
     EXPECT_EQ(Stats().ChecksQueued, 0u);
     EXPECT_EQ(Stats().PropertyScans, 0u);

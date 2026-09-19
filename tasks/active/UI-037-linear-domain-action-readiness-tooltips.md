@@ -13,7 +13,7 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, geometry
 ---
 # UI-037 — Linear domain-action readiness and disabled-reason tooltips
 
-Current continuation: see [normal capture checkpoint and open points](#continuation--shared-normal-point-capture-2026-09-19).
+Current continuation: see [scalar readiness checkpoint and open points](#continuation--shared-scalar-readiness-2026-09-19).
 Read that checkpoint plus the initial scope before consulting the historical slices.
 
 ## Remaining closure estimate — 2026-09-19
@@ -26,7 +26,7 @@ slices close cross-family coverage and the task, rather than postponing testing.
 
 | Slice | Closure deliverable |
 | --- | --- |
-| 1 | Shared cached input readiness for density, density weights and spacing. |
+| 1 — complete | Shared cached input readiness for density, density weights and spacing; see the scalar checkpoint. |
 | 2 | Bilateral/descriptor readiness with revision-keyed position-plus-normal validation. |
 | 3 | Point-construction readiness without per-preview point capture. |
 | 4 | Normal topology readiness without deletion-mask copies/count scans; resolve empty-face semantics against apply. |
@@ -39,7 +39,7 @@ slices close cross-family coverage and the task, rather than postponing testing.
 | 11 | Complete the cross-family table-driven readiness/validator matrix, stale-state and zero-scan regressions. |
 | 12 | Finish real ImGui action/option tooltip and command coverage; full verification, review and retirement. |
 
-Evidence behind the estimate: scalar previews still call `CapturePointScalarField`;
+Evidence behind the original estimate: scalar previews still called `CapturePointScalarField` synchronously;
 bilateral/descriptors scan live positions/normals; construction and ICP preview
 capture data; normal topology still copies masks. Mesh/curvature/UV already have
 shared metadata admission and buttons, so those are gap closure, not rewrites.
@@ -4897,7 +4897,7 @@ cmake --build --preset ci --target IntrinsicTests -j4
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
 ```
 
-### Current open points
+### Open points at the preceding checkpoint
 
 - [ ] Remove remaining synchronous topology deletion-mask copies/counts from
       normal readiness without changing graph/mesh/face execution, reason order,
@@ -4941,3 +4941,106 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 Session boundary: after this verified commit, start a fresh session using this
 checkpoint and initial task scope. Avoid rereading the full historical task note;
 its accumulated history is much larger than the remaining slice context.
+
+
+## Continuation — shared scalar readiness (2026-09-19)
+
+Operator-directed duplication/compilation continuation from `47e446184`, with
+Codex as sole writer and Claude Fable 5.1 providing plan and fixed-diff review.
+This closes estimated slice 1; UI-037 remains active. The original planning
+estimate now has eleven remaining slices (rough range 9–13), not promised sessions.
+
+Reuse: the existing compiled `CapturePointScalarField` now routes previews through
+`PreparePointInput` and execution through fresh `CapturePointInput`. Density,
+spacing and density weights share pending/negative/revision-keyed input verdicts
+with other point families. Output validation remains after input validation;
+method minimum counts and backend/radius/subnormal gates retain their owners.
+Commands can submit while readiness is pending and always recapture current rows.
+No new service, cache, module, template, worker or production file was added.
+
+The density/spacing catalog loops and synthetic output/config validation are
+replaced by `BuildPointInputCatalog(context, id, 2)`. Config inspection confirms
+no lost name-length/character predicate; empty names fail canonical resolution.
+The generic catalog still requires one live sample. Pending entries remain absent,
+accepted membership changes its generation, and the combo's current binding is
+independent of membership. Catalog eligibility stays backend-independent.
+
+Five production files total 1,411 -> 1,380 physical lines (-31). Four redundant
+direct imports, three array includes, two unused numeric includes and two unused
+domain aliases were removed. The imports remain in the transitive closure; this
+is duplicate-source/unused-import cleanup, not a measured compilation speedup or
+compiler-closure reduction. BUILD-006/CI-012 remain separate owners.
+
+Seven new runtime cases cover shared catalogs/verdicts, steady-frame scan counts,
+negative caching and retained-borrow invalidation, output metadata, one/two/zero
+sample boundaries, backend/LBVH/subnormal gates, diagnostic order, pending-command
+submission and stale-command rejection. Existing paired-halfedge, supersession
+and missing-command-queue cases now exercise scalar consumers too. Existing family
+tests retain synchronous standalone validation and execution/history coverage.
+
+Claude Fable 5.1 accepted the fixed production/test diff with no blockers. Plan
+review prompted explicit pending-output-order and pending-submit tests. Its final
+optional coverage suggestions (scalar catalog checks with missing queue, and
+mixed-count multi-domain catalogs) remain below; existing public-command, generic
+catalog and per-domain execution tests cover the underlying paths. Documentation
+reflow and the task checkpoint followed review; production/test source stayed fixed.
+
+Canonical ci / Clang 23, unsanitized: focused targets build without warnings;
+all 151 focused tests pass, including 34 processing compilation-boundary guards.
+The `IntrinsicTests` build passes. The final exclusion-only CPU gate selects
+4,803 tests: 4,802 pass, one expected ASan-only GLFW lifecycle skip, zero failures
+(155.38 seconds). The reviewed production/test diff stayed unchanged through
+the final build and test run (SHA-256 `a674a93d63572968d98d2357abdee12fc564f87edd0d987d62e4b50eb31f5079`).
+Strict layering (zero exceptions), test layout, task policy/state links, root
+hygiene, docs sync, doc links, skill mirrors and session-brief freshness pass.
+Module inventory regenerates unchanged at 429. Source-documentation audit finds
+zero errors and eight advisory hints in the existing private header; reviewed
+comments describe required include/capture/lifetime contracts. Scope/layering/
+tests/docs review passes. Workshop rows 1–3/8 pass; renderer/recipe/closure rows
+4–7 do not apply. No public module surface, CMake edge or compatibility path changes.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^EditorPointReadiness\.|^PointSpacingOperations\.|^KernelDensity|^DensityWeight|^SandboxProcessingPanels\.|^SandboxEditorPresentation\.|^ProcessingCompilationLocality\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+```
+Logs and immutable review packet: `/tmp/intrinsic-scalar-readiness/`.
+
+### Current open points
+
+- [ ] Bilateral/descriptor readiness: reuse the point verdict where it fits and
+      cache their position-plus-normal predicates with revision/deletion guards.
+- [ ] Point-construction readiness: eliminate per-preview point capture through
+      the existing owner, preserving method-specific prerequisites.
+- [ ] Normal topology readiness: remove deletion-mask copies/count scans; decide
+      all-deleted-face availability against apply. Add interior-deletion/nonuniform
+      normal coverage if changing the mapping; existing mapping is unchanged here.
+- [ ] ICP: cache paired-source and point-to-plane normal readiness; preserve
+      distinct compatible sources, finite/count-matched normals and stale guards.
+- [ ] Mesh/curvature/UV: close admission gaps against existing metadata validators.
+      Parameterization still needs runtime-owned strategy/pin/boundary prerequisites;
+      texture bake needs request-specific property/UV/device/range readiness.
+- [ ] Complete action/backend/variant readiness for service actions (K-Means,
+      Progressive Poisson, consolidation, outliers), use the common prepared-frame
+      representation everywhere, and remove remaining duplicate app prerequisites
+      and hidden actions while retaining co-equal config/UI/agent validation.
+- [ ] Finish the named table-driven
+      `SandboxEditorUi.ActionReadinessDerivesDomainPrerequisiteReasons` matrix,
+      full-family invalidation/lifecycle/supersession and zero-scan coverage, plus
+      per-action/option enabled-command and disabled-tooltip/no-command ImGui tests.
+- [ ] Run final task-wide operational closure only after the full action inventory,
+      stale apply/completion guards and app-linked checks pass; this checkpoint
+      neither retires UI-037 nor supplies new GPU or sanitizer execution evidence.
+- [ ] Optional scalar-catalog coverage: explicitly assert both scalar catalogs
+      are empty without a command queue, and cover mixed live counts across
+      multiple candidate domains. These are review suggestions, not blockers.
+- [ ] Non-gating: bounded compilation-owner inspection and matched compile-time
+      measurements remain separate work; preserve named-module type identity.
+      Consider a per-drain budget or worker path only if measured latency warrants
+      it. This shared deferred scan is still main-thread work.
+
+Session boundary: after the verified checkpoint, start a fresh session from this
+section and the initial scope. Next recommended slice is bilateral/descriptor
+position-plus-normal readiness; do not reread the accumulated historical slices.

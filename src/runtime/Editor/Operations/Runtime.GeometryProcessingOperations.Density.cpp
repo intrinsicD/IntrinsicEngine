@@ -2,7 +2,6 @@ module;
 #include <string_view>
 #include <functional>
 #include <algorithm>
-#include <array>
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -23,7 +22,6 @@ import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
-import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.KernelEvents;
@@ -41,7 +39,6 @@ namespace Extrinsic::Runtime
     {
         namespace PC = Geometry::PointCloud;
         using namespace GeometryProcessingDetail;
-        using D = GeometryElementDomain;
         struct DensityWork : PointScalarCapture
         {
             KernelDensityConfig Config{};
@@ -56,7 +53,7 @@ namespace Extrinsic::Runtime
         {
             return PointScalarFieldCurrent(context, w.Entity, w);
         }
-        enum class CapturePurpose { Execute, Readiness, Catalog };
+        enum class CapturePurpose { Execute, Readiness };
         std::shared_ptr<DensityWork> Capture(const EditorProcessingContext& context,
             KernelDensityConfig c, std::string& diagnostic, CapturePurpose purpose = CapturePurpose::Execute)
         {
@@ -69,14 +66,13 @@ namespace Extrinsic::Runtime
             if (!entity) return fail("Density target entity is stale or missing.");
             const auto a = BuildGeometryAvailability(context.Scene->Raw(), *entity);
             auto w = std::make_shared<DensityWork>();
-            if (!CapturePointScalarField(a, c.Positions, c.Density, "Density",
+            if (!CapturePointScalarField(context, *entity, a, c.Positions, c.Density, "Density",
                                         purpose == CapturePurpose::Execute, *w, diagnostic)) return {};
             w->Config = c; w->Entity = *entity;
             w->Result.RequestedBackend = c.Backend;
             w->Result.Density = c.Density;
             w->Result.SlotCount = w->SlotCount; w->Result.LiveCount = w->LiveCount;
             if (w->Result.LiveCount < 2) return fail("Kernel density requires at least two live samples.");
-            if (purpose == CapturePurpose::Catalog) return w;
             if (c.Backend != KernelDensityBackend::CpuOctree)
             {
                 if (!context.SpatialIndices || !w->ValidLbvh || w->Result.LiveCount > (1u << 24))
@@ -163,19 +159,7 @@ namespace Extrinsic::Runtime
         const EditorProcessingCommands& commands,std::uint32_t id)
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        if(!context.Scene)return {};
-        const auto entity=EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(),id);
-        if(!entity)return {};
-        const auto a=BuildGeometryAvailability(context.Scene->Raw(),*entity);
-        auto catalog=GeometryProcessingDetail::BuildPointInputCandidateCatalog(a,id);
-        std::erase_if(catalog.Entries,[&](auto& entry){
-            const auto* props=ResolveGeometryPropertySet(a,entry.Ref.Domain);
-            KernelDensityConfig c;c.StableEntityId=id;c.Positions=entry.Ref;c.Density.Domain=entry.Ref.Domain;
-            c.Density.Name=entry.Ref.Name+".density";
-            while(props->Exists(c.Density.Name))c.Density.Name+="_";
-            std::string diagnostic;return !Capture(context,c,diagnostic,CapturePurpose::Catalog);
-        });
-        return catalog;
+        return GeometryProcessingDetail::BuildPointInputCatalog(context, id, 2);
     }
     EditorKernelDensityResult ApplyEditorKernelDensityCommand(
         const EditorProcessingCommands &commands, const KernelDensityConfig &config, std::function<void(EditorKernelDensityResult)> onComplete)

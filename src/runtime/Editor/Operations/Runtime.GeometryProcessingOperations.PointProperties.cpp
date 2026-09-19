@@ -89,7 +89,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         }
         return catalog;
     }
-    GeometryPropertyCatalogSnapshot BuildPointInputCatalog(const EditorProcessingContext& context, std::uint32_t id)
+    GeometryPropertyCatalogSnapshot BuildPointInputCatalog(
+        const EditorProcessingContext& context, std::uint32_t id, std::size_t minimumLiveCount)
     {
         if ((context.AttachmentActive && !context.AttachmentActive()) || !context.Scene) return {};
         const auto entity = EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(), id);
@@ -101,7 +102,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             auto positions = entry.Ref;
             PointInputCapture capture;
             std::string diagnostic;
-            return !PreparePointInput(context, *entity, availability, positions, capture, diagnostic) || !capture.LiveCount;
+            return !PreparePointInput(context, *entity, availability, positions, capture, diagnostic) || capture.LiveCount < minimumLiveCount;
         });
         // Deferred membership can change without any source property edit.
         if (context.PointInputReadiness)
@@ -362,11 +363,14 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     }
 
     bool CapturePointScalarField(
+        const EditorProcessingContext& context, entt::entity entity,
         const GeometryEntityAvailability& a, GeometryPropertyRef& positions,
         GeometryPropertyRef& output, std::string_view outputLabel, bool copyValues,
         PointScalarCapture& w, std::string& diagnostic)
     {
-        if (!CapturePointInput(a, positions, copyValues, w, diagnostic)) return false;
+        if (copyValues
+            ? !CapturePointInput(a, positions, true, w, diagnostic)
+            : !PreparePointInput(context, entity, a, positions, w, diagnostic)) return false;
         if (output.Domain == D::Unknown) output.Domain = positions.Domain;
         if (!ValidatePointOutputs(a, positions, std::span(&output, 1), outputLabel, diagnostic)) return false;
         w.OutputWatch = ObserveGeometryProperty(a, output.Domain, output.Name);

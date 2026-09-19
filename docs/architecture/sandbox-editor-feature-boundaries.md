@@ -376,13 +376,15 @@ statistical outliers keep their self-excluding queries. Density and spacing also
 share framed fixed-width kNN pagination; radius pagination retains its separate
 support-membership contract. These declarations live in `RadiusRows.hpp` for
 consumers of spatial-index neighborhoods.
-`BuildPointInputCatalog` shares live-row validation with weights, keypoints,
-outliers, descriptors, construction and normals, independently of method result records.
+`BuildPointInputCatalog` shares live-row validation with density, spacing, weights,
+keypoints, outliers, descriptors, construction and normals, independently of method
+result records. Density and spacing require two live samples; the generic catalog
+requires one. Catalog admission does not depend on the requested execution backend.
 Prepared editor sessions own an opaque point-input readiness cache. Catalog,
-outlier, keypoint and normal previews inspect point metadata and enqueue a
-missing verdict on the engine's existing command bus; the next main-thread
-command drain runs the compiled canonical row scan. The point-input portion of
-these previews neither copies nor scans property values. Keys include
+density, spacing, density-weight, outlier, keypoint and normal previews inspect
+point metadata and enqueue a missing verdict on the engine's existing command bus.
+The next main-thread command drain runs the compiled canonical row scan. The
+point-input portion of these previews neither copies nor scans property values. Keys include
 world/epoch, scene, entity, canonical
 position property and its count/revision, and deletion-source count/revision;
 halfedges use the paired edge's mask. Negative verdicts are cached too.
@@ -397,8 +399,8 @@ must call `MarkModified()` after later writes, as required by property coherence
 Apply paths always capture current inputs again. Explicit standalone contexts
 without session state retain synchronous preflight; sessions without a command
 bus report readiness unavailable. Normal output metadata is checked before
-requesting the point verdict; method/backend/topology checks follow an accepted
-verdict.
+requesting the point verdict; scalar output metadata follows it, preserving each
+family's diagnostic order. Method/backend/topology checks follow an accepted verdict.
 Normal-method readiness still owns its separate topology/mask checks, including
 copies of topology deletion masks. Execution reconstructs its full point-deletion
 mask from the shared capture's live source slots. The cache definition and scanner

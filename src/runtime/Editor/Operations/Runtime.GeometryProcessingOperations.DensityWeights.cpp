@@ -1,11 +1,8 @@
 module;
 #include <functional>
 #include <algorithm>
-#include <array>
 #include <chrono>
-#include <cmath>
 #include <cstdint>
-#include <limits>
 #include <memory>
 #include <optional>
 #include <span>
@@ -17,13 +14,11 @@ module;
 #include <entt/entity/registry.hpp>
 module Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.ECS.Scene.Registry;
-import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Runtime.WorldHandle;
-import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Core.Error;
 import Geometry.PointCloud.Utils;
 import Geometry.PointCloud.Kernels;
@@ -70,7 +65,7 @@ namespace Extrinsic::Runtime
             if(!entity)return fail("Density-weight target is stale or missing.");
             const auto a=BuildGeometryAvailability(context.Scene->Raw(),*entity);
             auto w = std::make_shared<DensityWeightWork>();
-            if (!Detail::CapturePointScalarField(a, c.Positions, c.Weights, "Weight",
+            if (!Detail::CapturePointScalarField(context, *entity, a, c.Positions, c.Weights, "Weight",
                                                  purpose == Purpose::Execute, *w, diagnostic)) return {};
             w->Config = c; w->Entity = *entity;
             w->Result.RequestedBackend = c.Backend; w->Result.Weights = c.Weights;

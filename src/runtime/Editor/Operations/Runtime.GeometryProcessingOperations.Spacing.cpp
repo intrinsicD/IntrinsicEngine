@@ -2,7 +2,6 @@ module;
 #include <string_view>
 #include <functional>
 #include <algorithm>
-#include <array>
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -23,7 +22,6 @@ import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
-import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.KernelEvents;
@@ -41,7 +39,6 @@ namespace Extrinsic::Runtime
     {
         namespace PC = Geometry::PointCloud;
         using namespace GeometryProcessingDetail;
-        using D = GeometryElementDomain;
         struct SpacingWork : PointScalarCapture
         {
             PointSpacingConfig Config{};
@@ -56,7 +53,7 @@ namespace Extrinsic::Runtime
         {
             return PointScalarFieldCurrent(context, w.Entity, w);
         }
-        enum class CapturePurpose { Execute, Readiness, Catalog };
+        enum class CapturePurpose { Execute, Readiness };
         std::shared_ptr<SpacingWork> Capture(const EditorProcessingContext& context,
             PointSpacingConfig c, std::string& diagnostic, CapturePurpose purpose = CapturePurpose::Execute)
         {
@@ -69,14 +66,13 @@ namespace Extrinsic::Runtime
             if (!entity) return fail("Radii target entity is stale or missing.");
             const auto a = BuildGeometryAvailability(context.Scene->Raw(), *entity);
             auto w = std::make_shared<SpacingWork>();
-            if (!CapturePointScalarField(a, c.Positions, c.Radii, "Radii",
+            if (!CapturePointScalarField(context, *entity, a, c.Positions, c.Radii, "Radii",
                                         purpose == CapturePurpose::Execute, *w, diagnostic)) return {};
             w->Config = c; w->Entity = *entity;
             w->Result.RequestedBackend = c.Backend;
             w->Result.Radii = c.Radii;
             w->Result.SlotCount = w->SlotCount; w->Result.LiveCount = w->LiveCount;
             if (w->Result.LiveCount < 2) return fail("Point spacing requires at least two live samples.");
-            if (purpose == CapturePurpose::Catalog) return w;
             if (c.Backend != PointSpacingBackend::CpuOctree)
             {
                 if (!context.SpatialIndices || !w->ValidLbvh || w->Result.LiveCount > (1u << 24))
@@ -167,19 +163,7 @@ namespace Extrinsic::Runtime
         const EditorProcessingCommands& commands,std::uint32_t id)
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        if(!context.Scene)return {};
-        const auto entity=EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(),id);
-        if(!entity)return {};
-        const auto a=BuildGeometryAvailability(context.Scene->Raw(),*entity);
-        auto catalog=GeometryProcessingDetail::BuildPointInputCandidateCatalog(a,id);
-        std::erase_if(catalog.Entries,[&](auto& entry){
-            const auto* props=ResolveGeometryPropertySet(a,entry.Ref.Domain);
-            PointSpacingConfig c;c.StableEntityId=id;c.Positions=entry.Ref;c.Radii.Domain=entry.Ref.Domain;
-            c.Radii.Name=entry.Ref.Name+".radii";
-            while(props->Exists(c.Radii.Name))c.Radii.Name+="_";
-            std::string diagnostic;return !Capture(context,c,diagnostic,CapturePurpose::Catalog);
-        });
-        return catalog;
+        return GeometryProcessingDetail::BuildPointInputCatalog(context, id, 2);
     }
     EditorPointSpacingResult ApplyEditorPointSpacingCommand(
         const EditorProcessingCommands &commands, const PointSpacingConfig &config, std::function<void(EditorPointSpacingResult)> onComplete)

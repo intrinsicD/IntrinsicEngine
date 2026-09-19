@@ -88,7 +88,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     [[nodiscard]] GeometryPropertyCatalogSnapshot BuildPointInputCandidateCatalog(
         const GeometryEntityAvailability&, std::uint32_t stableId);
 
-    [[nodiscard]] GeometryPropertyCatalogSnapshot BuildPointInputCatalog(const EditorProcessingContext&, std::uint32_t stableId);
+    [[nodiscard]] GeometryPropertyCatalogSnapshot BuildPointInputCatalog(
+        const EditorProcessingContext&, std::uint32_t stableId, std::size_t minimumLiveCount = 1);
 
     // Readiness/catalog capture validates live rows without copying values. Resolved
     // domains are returned in the references; numerical/backend gates stay with callers.
@@ -106,8 +107,9 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         const GeometryEntityAvailability&, const GeometryPropertyRef& positions,
         std::span<const GeometryPropertyRef> outputs, std::string_view outputLabel,
         std::string& diagnostic);
+    // Preview uses the prepared input verdict; execution always recaptures current rows.
     [[nodiscard]] bool CapturePointScalarField(
-        const GeometryEntityAvailability&, GeometryPropertyRef& positions,
+        const EditorProcessingContext&, entt::entity, const GeometryEntityAvailability&, GeometryPropertyRef& positions,
         GeometryPropertyRef& output, std::string_view outputLabel, bool copyValues,
         PointScalarCapture&, std::string& diagnostic);
     [[nodiscard]] bool PointScalarFieldCurrent(
