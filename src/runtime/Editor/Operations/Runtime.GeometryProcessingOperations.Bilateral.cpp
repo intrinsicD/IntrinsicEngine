@@ -4,27 +4,23 @@ module;
 #include <algorithm>
 #include <array>
 #include <chrono>
-#include <cmath>
 #include <cstdint>
 #include <memory>
-#include <limits>
 #include <optional>
 #include <span>
 #include <string>
 #include <vector>
 #include <utility>
-#include <glm/glm.hpp>
+#include <glm/vec3.hpp>
 #include <entt/entity/registry.hpp>
 module Extrinsic.Runtime.PointSetOperations;
 import Geometry.PointCloud.Utils;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Component.DirtyTags;
-import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.KernelEvents;
-import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -44,23 +40,19 @@ namespace Extrinsic::Runtime
 {
     namespace
     {
-        namespace GS = ECS::Components::GeometrySources;
         namespace PC = Geometry::PointCloud;
         using D = GeometryElementDomain;
         using GeometryProcessingDetail::PointPropertyWatch;
         using GeometryProcessingDetail::ObserveGeometryProperty;
         using GeometryProcessingDetail::MutableGeometryProperties;
         using GeometryProcessingDetail::PrimaryPointDomain;
-        using GeometryProcessingDetail::FinitePosition;
         using GeometryProcessingDetail::GeometryPropertiesCurrent;
-        struct BilateralWork
+        struct BilateralWork : GeometryProcessingDetail::PointNormalCapture
         {
             BilateralFilterConfig Config{};
             entt::entity Entity{};
-            std::vector<PointPropertyWatch> Inputs{};
             PointPropertyWatch OutputWatch{};
-            std::vector<glm::vec3> Points{}, Normals{};
-            std::vector<std::uint32_t> Slots{}, NeighborIds{};
+            std::vector<std::uint32_t> NeighborIds{};
             std::vector<glm::vec3> BeforeOutput{}, AfterOutput{};
             PC::BilateralFilterParams Params{};
             std::optional<EditorBilateralFilterResult> MainFailure{};
@@ -77,7 +69,7 @@ namespace Extrinsic::Runtime
             const std::array outputs{w.OutputWatch};
             return GeometryPropertiesCurrent(context, w.Entity, w.Inputs) && GeometryPropertiesCurrent(context, w.Entity, outputs);
         }
-        enum class CapturePurpose { Execute, Readiness, Catalog };
+        enum class CapturePurpose { Execute, Readiness };
         std::shared_ptr<BilateralWork> Capture(const EditorProcessingContext& context,
             BilateralFilterConfig c, std::string& diagnostic, CapturePurpose purpose = CapturePurpose::Execute)
         {
@@ -105,42 +97,20 @@ namespace Extrinsic::Runtime
                 if (props->Exists(output.Name) && !ResolveGeometryProperty(a, output, props->Size(), false).Resolved())
                     return fail("Filtered positions must be absent or count-matched vec3 position properties.");
             }
-            if (c.Normals.Domain != c.Positions.Domain ||
-                !ResolveGeometryProperty(a,c.Normals,props->Size(),false).Resolved())
-                return fail("Choose count-matched vec3 normals on the position domain.");
-            if (props->Size() > std::numeric_limits<std::uint32_t>::max()) return fail("Input exceeds the supported slot range.");
             auto w = std::make_shared<BilateralWork>();
+            if (!GeometryProcessingDetail::CapturePointNormalInput(
+                    context, *entity, a, c.Positions, c.Normals,
+                    purpose == CapturePurpose::Execute, *w, diagnostic)) return {};
             w->Config = c; w->Entity = *entity;
             w->Result.RequestedBackend = c.Backend;
-            w->Result.Output = c.Output; w->Result.SlotCount = props->Size();
-            w->Inputs.push_back(ObserveGeometryProperty(a, c.Positions.Domain, c.Positions.Name));
-            w->Inputs.push_back(ObserveGeometryProperty(a, c.Normals.Domain, c.Normals.Name));
+            w->Result.Output = c.Output;
             w->OutputWatch = ObserveGeometryProperty(a, c.Output.Domain, c.Output.Name);
-            const auto [deletionDomain, deletionName, divisor] =
-                GeometryProcessingDetail::ResolvePointDeletionSource(c.Positions.Domain);
-            const auto* deletionProps = ResolveGeometryPropertySet(a, deletionDomain);
-            if (!deletionProps || props->Size() % divisor || deletionProps->Size() != props->Size() / divisor)
-                return fail("Invalid deletion domain/cardinality.");
-            const auto deleted = deletionProps->Get<bool>(deletionName);
-            if (deletionProps->Exists(deletionName) && (!deleted || deleted.Size() != deletionProps->Size()))
-                return fail("Deletion mask must be a count-matched bool property.");
-            w->Inputs.push_back(ObserveGeometryProperty(a, deletionDomain, deletionName));
-            const auto points = props->Get<glm::vec3>(c.Positions.Name);
-            const auto normals = props->Get<glm::vec3>(c.Normals.Name);
-            bool validLbvh = true;
-            for (std::uint32_t i = 0; i < props->Size(); ++i)
-            {
-                if (deleted && deleted[i / divisor]) continue;
-                if (!FinitePosition(points[i]) || !FinitePosition(normals[i])) return fail("Live positions and normals must be finite.");
-                validLbvh &= Geometry::PointLBVH::ValidPoint(points[i]);
-                ++w->Result.LiveCount;
-                if (purpose == CapturePurpose::Execute) { w->Points.push_back(points[i]); w->Normals.push_back(normals[i]); w->Slots.push_back(i); }
-            }
+            w->Result.SlotCount = w->SlotCount;
+            w->Result.LiveCount = w->LiveCount;
             if (w->Result.LiveCount < 2) return fail("Bilateral filtering requires at least two live samples.");
-            if (purpose == CapturePurpose::Catalog) return w;
             if (c.Backend != BilateralFilterBackend::CpuOctree)
             {
-                if (!context.SpatialIndices || !validLbvh || w->Result.LiveCount > (1u << 24))
+                if (!context.SpatialIndices || !w->ValidLbvh || w->Result.LiveCount > (1u << 24))
                     return fail("LBVH requires the spatial cache, at most 2^24 samples and coordinates within 1e18.");
                 if (c.Backend == BilateralFilterBackend::VulkanLBVH)
                 {
@@ -154,7 +124,7 @@ namespace Extrinsic::Runtime
             if (purpose == CapturePurpose::Execute)
             {
                 if (w->OutputWatch.Revision) w->BeforeOutput = props->Get<glm::vec3>(c.Output.Name).Vector();
-                w->AfterOutput = w->OutputWatch.Revision ? w->BeforeOutput : points.Vector();
+                w->AfterOutput = w->OutputWatch.Revision ? w->BeforeOutput : props->Get<glm::vec3>(c.Positions.Name).Vector();
             }
             return w;
         }
@@ -328,19 +298,7 @@ namespace Extrinsic::Runtime
         const EditorProcessingCommands& commands,std::uint32_t id)
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        if(!context.Scene)return {};
-        const auto entity=EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(),id);
-        if(!entity)return {};
-        const auto a=BuildGeometryAvailability(context.Scene->Raw(),*entity);
-        auto catalog=GeometryProcessingDetail::BuildPointInputCandidateCatalog(a,id);
-        std::erase_if(catalog.Entries,[&](auto& entry){
-            const auto* props=ResolveGeometryPropertySet(a,entry.Ref.Domain);
-            BilateralFilterConfig c;c.StableEntityId=id;c.Positions=entry.Ref;c.Normals=entry.Ref;c.Output.Domain=entry.Ref.Domain;
-            c.Output.Name=entry.Ref.Name+".filtered";
-            while(props->Exists(c.Output.Name))c.Output.Name+="_";
-            std::string diagnostic;return !Capture(context,c,diagnostic,CapturePurpose::Catalog);
-        });
-        return catalog;
+        return GeometryProcessingDetail::BuildPointInputCatalog(context, id, 2);
     }
     EditorBilateralFilterResult ApplyEditorBilateralFilterCommand(
         const EditorProcessingCommands& commands, const BilateralFilterConfig &config,

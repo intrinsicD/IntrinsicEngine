@@ -1125,6 +1125,8 @@ namespace
         Runtime::KernelDensityConfig Density{};
         Runtime::PointSpacingConfig Spacing{};
         Runtime::DensityWeightConfig Weights{};
+        Runtime::BilateralFilterConfig Bilateral{};
+        Runtime::DescriptorAnalysisConfig Descriptors{};
         PointReadinessFrameProbe* FrameProbe{};
 
         void SetUp() override
@@ -1188,6 +1190,24 @@ namespace
                     Runtime::PreviewEditorDensityWeightCommand(Commands, Weights)};
         }
         Runtime::EditorPointInputReadinessStats Stats() { return Runtime::GetEditorPointInputReadinessStats(Commands); }
+        void SetNormalInputs()
+        {
+            Properties().GetOrAdd<glm::vec3>("directions").Vector() =
+                {{0,0,1}, {0,1,0}, {1,0,0}, {0,0,1}, {NAN,0,0}};
+            Bilateral.StableEntityId = Descriptors.StableEntityId = Keypoints.StableEntityId;
+            Bilateral.Positions = Descriptors.Positions = Keypoints.Positions;
+            Bilateral.Normals = Descriptors.Normals =
+                {Keypoints.Positions.Domain, "directions", Geometry::PropertyValueKind::Vec3};
+            Bilateral.Output = {Keypoints.Positions.Domain, "filtered", Geometry::PropertyValueKind::Vec3};
+            Bilateral.KNeighbors = 2;
+            Descriptors.Outputs = Runtime::MakeDescriptorOutputProperties(Keypoints.Positions.Domain, "descriptor");
+        }
+        std::array<Runtime::ActionReadiness, 2> PreviewOriented()
+        {
+            return {Runtime::PreviewEditorBilateralFilterCommand(
+                        Runtime::PrepareEditorPointSetFrame(Attachment).Commands, Bilateral),
+                    Runtime::PreviewEditorDescriptorAnalysisCommand(Commands, Descriptors)};
+        }
         void Drain() { Engine.Commands().Drain(*Scene); }
     };
 }
@@ -1407,6 +1427,197 @@ TEST_F(EditorPointReadiness, ScalarCommandsRecaptureDespiteWarmReadiness)
     EXPECT_EQ(Stats().PropertyScans, 1u);
 }
 
+TEST_F(EditorPointReadiness, OrientedInputsShareCatalogAndScalarVerdictsAcrossFrames)
+{
+    SetNormalInputs();
+    const auto sets = Runtime::PrepareEditorPointSetFrame(Attachment).Commands;
+    for (const auto& preview : PreviewOriented())
+        EXPECT_EQ(preview.DisabledReason, "Checking live point samples. Wait for input validation.");
+    const auto pending = Runtime::GetEditorBilateralFilterInputCatalog(sets, Bilateral.StableEntityId);
+    EXPECT_TRUE(pending.Empty());
+    EXPECT_EQ(Stats().ChecksQueued, 2u);
+    EXPECT_EQ(Stats().PropertyScans, 0u);
+    Drain();
+    const auto ready = Runtime::GetEditorBilateralFilterInputCatalog(sets, Bilateral.StableEntityId);
+    EXPECT_EQ(ready.Size(), 2u);
+    EXPECT_NE(ready.SourceGeneration, pending.SourceGeneration);
+    for (unsigned frame = 0; frame < 3; ++frame)
+    {
+        PrepareFrame();
+        for (const auto& preview : PreviewOriented()) EXPECT_TRUE(preview.Enabled) << preview.DisabledReason;
+        for (const auto& preview : PreviewScalars()) EXPECT_TRUE(preview.Enabled);
+        EXPECT_TRUE(Preview().Enabled);
+        EXPECT_TRUE(PreviewNormals().Enabled);
+        EXPECT_EQ(Stats().ChecksQueued, 2u);
+        EXPECT_EQ(Stats().PropertyScans, 2u);
+    }
+}
+
+TEST_F(EditorPointReadiness, OrientedNegativeAndZeroNormalVerdictsRemainRoleSpecific)
+{
+    SetNormalInputs();
+    auto normals = Properties().Get<glm::vec3>("directions");
+    auto& values = normals.Vector();
+    values[0].x = NAN;
+    for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
+    Drain();
+    for (unsigned frame = 0; frame < 3; ++frame)
+    {
+        PrepareFrame();
+        for (const auto& preview : PreviewOriented())
+            EXPECT_EQ(preview.DisabledReason, "Live normal samples must be finite.");
+        EXPECT_EQ(Stats().ChecksQueued, 2u);
+        EXPECT_EQ(Stats().PropertyScans, 2u);
+    }
+    values[0] = {-0.0f, 0, -0.0f};
+    normals.MarkModified();
+    for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
+    Drain();
+    for (unsigned frame = 0; frame < 3; ++frame)
+    {
+        PrepareFrame();
+        const auto ready = PreviewOriented();
+        EXPECT_TRUE(ready[0].Enabled);
+        EXPECT_EQ(ready[1].DisabledReason, "Live positions must be finite and normals finite and nonzero.");
+        for (const auto& preview : PreviewScalars()) EXPECT_TRUE(preview.Enabled);
+        EXPECT_EQ(Stats().PropertyScans, 3u);
+    }
+    values[0] = {std::numeric_limits<float>::denorm_min(), 0, 0};
+    values[4] = {0, 0, 0}; // Deleted zero normals do not affect eligibility.
+    normals.MarkModified();
+    for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
+    Drain();
+    for (const auto& preview : PreviewOriented()) EXPECT_TRUE(preview.Enabled);
+    EXPECT_EQ(Stats().PropertyScans, 4u);
+}
+
+TEST_F(EditorPointReadiness, OrientedEqualPropertiesShareOneVerdict)
+{
+    SetNormalInputs();
+    Bilateral.Normals = Bilateral.Positions;
+    Descriptors.Normals = Descriptors.Positions;
+    EXPECT_FALSE(Preview().Enabled);
+    for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
+    EXPECT_EQ(Stats().ChecksQueued, 1u);
+    Drain();
+    EXPECT_TRUE(Preview().Enabled);
+    EXPECT_TRUE(PreviewOriented()[0].Enabled);
+    EXPECT_FALSE(PreviewOriented()[1].Enabled); // The position at the origin is a zero normal.
+    EXPECT_EQ(Stats().PropertyScans, 1u);
+}
+
+TEST_F(EditorPointReadiness, OrientedMetadataPrecedesPendingAndMinimumCountsRemainDistinct)
+{
+    SetNormalInputs();
+    const auto output = Bilateral.Output;
+    const auto histogram = Descriptors.Outputs[0];
+    Bilateral.Output = Bilateral.Normals;
+    Descriptors.Outputs[0].Name = Descriptors.Normals.Name;
+    auto bad = PreviewOriented();
+    EXPECT_NE(bad[0].DisabledReason.find("cannot overwrite"), std::string::npos);
+    EXPECT_NE(bad[1].DisabledReason.find("distinct from inputs"), std::string::npos);
+    EXPECT_EQ(Stats().ChecksQueued, 0u);
+    Bilateral.Output = output;
+    Descriptors.Outputs[0] = histogram;
+    Bilateral.Normals.Name = Descriptors.Normals.Name = "missing";
+    for (const auto& preview : PreviewOriented())
+        EXPECT_EQ(preview.DisabledReason, "Choose count-matched vec3 normals on the position domain.");
+    EXPECT_EQ(Stats().ChecksQueued, 0u);
+    Bilateral.Normals.Name = Descriptors.Normals.Name = "directions";
+    auto deleted = Properties().Get<bool>("v:deleted");
+    deleted[1] = deleted[2] = deleted[3] = true;
+    for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
+    Drain();
+    auto one = PreviewOriented();
+    EXPECT_EQ(one[0].DisabledReason, "Bilateral filtering requires at least two live samples.");
+    EXPECT_EQ(one[1].DisabledReason, "Descriptor analysis requires at least two live samples and positive spacing.");
+    const auto sets = Runtime::PrepareEditorPointSetFrame(Attachment).Commands;
+    EXPECT_TRUE(Runtime::GetEditorBilateralFilterInputCatalog(sets, Bilateral.StableEntityId).Empty());
+    deleted[0] = true;
+    for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
+    Drain();
+    auto zero = PreviewOriented();
+    EXPECT_EQ(zero[0].DisabledReason, one[0].DisabledReason);
+    EXPECT_EQ(zero[1].DisabledReason, "Descriptor analysis requires live input samples.");
+    EXPECT_EQ(Stats().PropertyScans, 4u);
+}
+
+TEST_F(EditorPointReadiness, OrientedBackendLimitsApplyToPositionsAndRetainFamilyGates)
+{
+    SetNormalInputs();
+    Properties().Get<glm::vec3>("directions")[0] = {2e18f,0,1};
+    Bilateral.Backend = Runtime::BilateralFilterBackend::CpuLBVH;
+    Descriptors.Backend = Runtime::DescriptorAnalysisBackend::CpuLBVH;
+    for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
+    Drain();
+    for (const auto& preview : PreviewOriented()) ASSERT_TRUE(preview.Enabled) << preview.DisabledReason;
+    Bilateral.Backend = Runtime::BilateralFilterBackend::VulkanLBVH;
+    Descriptors.Backend = Runtime::DescriptorAnalysisBackend::VulkanLBVH;
+    for (const auto& preview : PreviewOriented())
+    {
+        EXPECT_FALSE(preview.Enabled);
+        EXPECT_EQ(preview.DisabledReason.find("Vulkan"), 0u);
+    }
+    Bilateral.Backend = Runtime::BilateralFilterBackend::CpuLBVH;
+    Descriptors.Backend = Runtime::DescriptorAnalysisBackend::CpuLBVH;
+    Properties().Get<glm::vec3>("samples")[0].x = 2e18f;
+    for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
+    Drain();
+    for (const auto& preview : PreviewOriented()) EXPECT_EQ(preview.DisabledReason.find("LBVH"), 0u);
+    const auto sets = Runtime::PrepareEditorPointSetFrame(Attachment).Commands;
+    EXPECT_EQ(Runtime::GetEditorBilateralFilterInputCatalog(sets, Bilateral.StableEntityId).Size(), 2u);
+    EXPECT_EQ(Stats().PropertyScans, 3u);
+}
+
+TEST_F(EditorPointReadiness, OrientedNormalSupersessionAndDeletionRevalidateOnlyAffectedEntries)
+{
+    SetNormalInputs();
+    for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
+    Properties().Get<glm::vec3>("directions")[0] = {1,1,0};
+    Drain();
+    EXPECT_EQ(Stats().PropertyScans, 1u);
+    for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
+    Drain();
+    for (const auto& preview : PreviewOriented()) EXPECT_TRUE(preview.Enabled);
+    EXPECT_EQ(Stats().PropertyScans, 2u);
+    EXPECT_EQ(Stats().ChecksQueued, 3u);
+    Properties().Get<bool>("v:deleted")[4] = false;
+    for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
+    Drain();
+    for (const auto& preview : PreviewOriented())
+        EXPECT_EQ(preview.DisabledReason, "Live position samples must be finite.");
+    EXPECT_EQ(Stats().PropertyScans, 4u);
+}
+
+TEST_F(EditorPointReadiness, OrientedCommandsSubmitWhileReadinessIsPending)
+{
+    SetNormalInputs();
+    for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
+    const auto sets = Runtime::PrepareEditorPointSetFrame(Attachment).Commands;
+    EXPECT_EQ(Runtime::ApplyEditorBilateralFilterCommand(sets, Bilateral).Status, Runtime::EditorCommandStatus::Pending);
+    EXPECT_EQ(Runtime::ApplyEditorDescriptorAnalysisCommand(Commands, Descriptors).Status, Runtime::EditorCommandStatus::Pending);
+    EXPECT_EQ(Stats().PropertyScans, 0u);
+}
+
+TEST_F(EditorPointReadiness, OrientedCommandsRecaptureWarmNormals)
+{
+    SetNormalInputs();
+    for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
+    const auto sets = Runtime::PrepareEditorPointSetFrame(Attachment).Commands;
+    Drain();
+    for (const auto& preview : PreviewOriented()) ASSERT_TRUE(preview.Enabled);
+    Properties().Get<glm::vec3>("directions")[0].x = NAN;
+    const auto bilateral = Runtime::ApplyEditorBilateralFilterCommand(sets, Bilateral);
+    const auto descriptor = Runtime::ApplyEditorDescriptorAnalysisCommand(Commands, Descriptors);
+    EXPECT_EQ(bilateral.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_EQ(descriptor.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_EQ(bilateral.Message, "Live normal samples must be finite.");
+    EXPECT_EQ(descriptor.Message, bilateral.Message);
+    EXPECT_FALSE(Properties().Exists(Bilateral.Output.Name));
+    for (const auto& output : Descriptors.Outputs) EXPECT_FALSE(Properties().Exists(output.Name));
+    EXPECT_EQ(Stats().PropertyScans, 2u);
+}
+
 TEST_F(EditorPointReadiness, NormalReadinessReusesNegativeVerdictsAndRevalidatesOutputMetadata)
 {
     Normals.Output = Normals.Positions;
@@ -1577,6 +1788,7 @@ TEST_F(EditorPointReadiness, DeletionMaskAndMetadataInvalidateWithoutScanning)
 
 TEST_F(EditorPointReadiness, HalfedgeReadinessUsesPairedEdgeMask)
 {
+    SetNormalInputs();
     Geometry::Graph::Graph graph;
     auto a = graph.AddVertex({0,0,0}), b = graph.AddVertex({1,0,0}), c = graph.AddVertex({0,1,0});
     (void)graph.AddEdge(a,b); (void)graph.AddEdge(b,c); (void)graph.AddEdge(c,a);
@@ -1584,6 +1796,11 @@ TEST_F(EditorPointReadiness, HalfedgeReadinessUsesPairedEdgeMask)
     auto& halves = Scene->Raw().get<GS::Halfedges>(Entity).Properties;
     halves.GetOrAdd<glm::vec3>("samples").Vector() =
         {{0,0,0}, {1,0,0}, {0,1,0}, {1,1,0}, {NAN,0,0}, {NAN,0,0}};
+    halves.GetOrAdd<glm::vec3>("directions").Vector() =
+        {{0,0,1}, {0,1,0}, {1,0,0}, {0,0,1}, {NAN,0,0}, {0,0,0}};
+    Bilateral.Positions.Domain = Bilateral.Normals.Domain = Bilateral.Output.Domain =
+        Descriptors.Positions.Domain = Descriptors.Normals.Domain = Runtime::GeometryElementDomain::GraphHalfedge;
+    Descriptors.Outputs = Runtime::MakeDescriptorOutputProperties(Descriptors.Positions.Domain, "descriptor");
     auto& edges = Scene->Raw().get<GS::Edges>(Entity).Properties;
     edges.GetOrAdd<bool>("e:deleted")[2] = true;
     Keypoints.Positions.Domain = Runtime::GeometryElementDomain::GraphHalfedge;
@@ -1593,25 +1810,32 @@ TEST_F(EditorPointReadiness, HalfedgeReadinessUsesPairedEdgeMask)
     Spacing.Positions.Domain = Spacing.Radii.Domain = Keypoints.Positions.Domain;
     Weights.Positions.Domain = Weights.Weights.Domain = Keypoints.Positions.Domain;
     for (const auto& preview : PreviewScalars()) EXPECT_FALSE(preview.Enabled);
+    for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
     EXPECT_FALSE(Preview().Enabled);
     EXPECT_FALSE(PreviewNormals().Enabled);
     Drain();
+    for (const auto& preview : PreviewOriented()) EXPECT_TRUE(preview.Enabled);
     EXPECT_TRUE(Preview().Enabled);
     EXPECT_TRUE(PreviewNormals().Enabled);
     for (const auto& preview : PreviewScalars()) EXPECT_TRUE(preview.Enabled);
     edges.Get<bool>("e:deleted")[2] = false;
+    for (const auto& preview : PreviewOriented()) EXPECT_FALSE(preview.Enabled);
     EXPECT_FALSE(Preview().Enabled);
     Drain();
     EXPECT_EQ(Preview().DisabledReason, "Live position samples must be finite.");
     EXPECT_EQ(PreviewNormals().DisabledReason, "Live position samples must be finite.");
     for (const auto& preview : PreviewScalars())
         EXPECT_EQ(preview.DisabledReason, "Live position samples must be finite.");
+    for (const auto& preview : PreviewOriented())
+        EXPECT_EQ(preview.DisabledReason, "Live position samples must be finite.");
     halves.Resize(5);
     EXPECT_EQ(Preview().DisabledReason, "Invalid deletion domain/cardinality.");
     EXPECT_EQ(PreviewNormals().DisabledReason, "Invalid deletion domain/cardinality.");
     for (const auto& preview : PreviewScalars())
         EXPECT_EQ(preview.DisabledReason, "Invalid deletion domain/cardinality.");
-    EXPECT_EQ(Stats().PropertyScans, 2u);
+    for (const auto& preview : PreviewOriented())
+        EXPECT_EQ(preview.DisabledReason, "Invalid deletion domain/cardinality.");
+    EXPECT_EQ(Stats().PropertyScans, 4u);
 }
 
 TEST_F(EditorPointReadiness, CommandsRecaptureDespiteWarmReadiness)
@@ -1706,6 +1930,7 @@ TEST_F(EditorPointReadiness, ActiveWorldSwitchRejectsRetainedCommandsAndQueuedWo
 
 TEST_F(EditorPointReadiness, MissingCommandQueueNeverFallsBackToPanelScanning)
 {
+    SetNormalInputs();
     Attachment.Detach();
     ASSERT_TRUE(Engine.Services().Withdraw<Runtime::CommandBus>(Engine.Commands()));
     Attachment.Attach(Engine.Worlds(), Engine.Services());
@@ -1721,6 +1946,10 @@ TEST_F(EditorPointReadiness, MissingCommandQueueNeverFallsBackToPanelScanning)
         EXPECT_EQ(scalar.DisabledReason, preview.DisabledReason);
     }
     EXPECT_TRUE(Runtime::GetEditorPointInputCatalog(Commands, Keypoints.StableEntityId).Empty());
+    for (const auto& oriented : PreviewOriented())
+        EXPECT_EQ(oriented.DisabledReason, preview.DisabledReason);
+    EXPECT_TRUE(Runtime::GetEditorBilateralFilterInputCatalog(
+        Runtime::PrepareEditorPointSetFrame(Attachment).Commands, Bilateral.StableEntityId).Empty());
     EXPECT_EQ(Stats().ChecksQueued, 0u);
     EXPECT_EQ(Stats().PropertyScans, 0u);
 }

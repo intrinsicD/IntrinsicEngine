@@ -13,7 +13,7 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, geometry
 ---
 # UI-037 — Linear domain-action readiness and disabled-reason tooltips
 
-Current continuation: see [scalar readiness checkpoint and open points](#continuation--shared-scalar-readiness-2026-09-19).
+Current continuation: see [point/normal readiness checkpoint and open points](#continuation--shared-pointnormal-readiness-2026-09-19).
 Read that checkpoint plus the initial scope before consulting the historical slices.
 
 ## Remaining closure estimate — 2026-09-19
@@ -27,7 +27,7 @@ slices close cross-family coverage and the task, rather than postponing testing.
 | Slice | Closure deliverable |
 | --- | --- |
 | 1 — complete | Shared cached input readiness for density, density weights and spacing; see the scalar checkpoint. |
-| 2 | Bilateral/descriptor readiness with revision-keyed position-plus-normal validation. |
+| 2 — complete | Bilateral/descriptor readiness with revision-keyed position-plus-normal validation; see the point/normal checkpoint. |
 | 3 | Point-construction readiness without per-preview point capture. |
 | 4 | Normal topology readiness without deletion-mask copies/count scans; resolve empty-face semantics against apply. |
 | 5 | ICP source/target and point-to-plane normal readiness without repeated captures. |
@@ -5044,3 +5044,125 @@ Logs and immutable review packet: `/tmp/intrinsic-scalar-readiness/`.
 Session boundary: after the verified checkpoint, start a fresh session from this
 section and the initial scope. Next recommended slice is bilateral/descriptor
 position-plus-normal readiness; do not reread the accumulated historical slices.
+
+
+## Continuation — shared point/normal readiness (2026-09-19)
+
+Operator-directed duplication/compilation continuation from `b22ad36c7`, with
+Codex as sole writer and Claude Fable 5.1 providing plan and fixed-diff review.
+Closes estimated slice 2; UI-037 remains active, with ten estimated slices left
+(rough planning range 8–12). Earlier checkpoint open-point lists are historical;
+the current list is below.
+
+Reuse: bilateral and descriptor capture now compose `CapturePointInput` /
+`PreparePointInput` through the compiled `CapturePointNormalInput` in
+`Runtime.GeometryProcessingOperations.PointProperties.cpp`. Position and normal
+properties reuse independent entries of the existing cache, including catalog
+entries, negative verdicts, revision/count/deletion keys and attachment/world
+lifetime guards. Both requests enqueue in one preview, so one command drain can
+resolve the pair. There is no pair cache, additional service, module or worker.
+The two work records inherit the ordinary shared capture record, as scalar work
+already does. Bilateral's catalog uses `BuildPointInputCatalog(context, id, 2)`;
+its synthetic configuration and repeated scan are removed.
+
+The existing row scan also records zero/nonfinite vector flags. Zero uses masked
+float bits, preserving signed-zero and subnormal semantics of the previous double
+norm test. Bilateral accepts zero normals; descriptors reject them. Normal LBVH
+bounds and subnormal flags do not become position/backend limits. Nonfinite
+failures now name the position or normal role; output and normal metadata retain
+priority over deferred input checks. Each family retains its output aliasing,
+minimum count and backend predicates. Apply always recaptures current values,
+uses the same ascending live slots, and retains revision-guarded publication and
+undo. Execution now makes two independent property captures instead of one fused
+loop; redundant normal slots are temporary. No execution-time speedup is claimed.
+
+Four production files total 1,470 -> 1,456 physical lines (-14), including the
+shared helper and capture records. Four unused direct imports and five standard
+includes are removed; two GLM umbrella includes narrow to `glm/vec3.hpp`. Existing
+named-module identity and public interfaces stay unchanged. These are source and
+include reductions, not measured compile-time or transitive-module-closure gains.
+Compile-time measurement and broader compiler-owner work retain their own owners.
+
+Eight added runtime tests cover deferred pair reuse across frames/catalog/scalar
+consumers, negative normal verdicts and retained-borrow invalidation, signed zero
+and subnormal normals, same-property aliasing, metadata priority and zero/one live
+count gates, position-only LBVH limits, supersession/deletion invalidation,
+submission during pending readiness and fresh command-time normal validation.
+Existing halfedge and missing-command-queue cases also cover both consumers.
+Existing bilateral/descriptor family tests retain all-domain execution, history,
+output aliasing and stale completion coverage. The focused ImGui normal-selector
+regression passes; source review of `DrawProcessingPointInput` confirms an empty
+pending catalog cannot clear the current normal binding: only selecting a row
+assigns the bound property. The first focused run exposed
+incorrect new descriptor fixture setup and diagnostic assumptions; those fixtures
+were corrected without weakening production validation.
+
+Verification: canonical ci / Clang 23, unsanitized focused build passes;
+183/183 focused tests pass, including 34 processing compilation-boundary guards.
+Claude Fable 5.1 reviewed the fixed production/test diff and found no blockers.
+Its two documentation findings were checked and corrected: normal generation
+retains additional topology-mask checks (point capture is shared), and the reuse
+route now links the new oriented-input coverage. Optional follow-ups are listed
+below. The full `IntrinsicTests` build passes without warnings. The exclusion-only
+CPU gate selects 4,811 tests: 4,810 pass, one expected ASan-only GLFW lifecycle
+skip, zero failures (156.53 seconds).
+Strict layering (zero exceptions), test layout, root hygiene, task policy/state
+links, docs sync, doc links, skill mirrors and session-brief freshness pass. Module inventory regenerates unchanged at 429. Source documentation
+has zero errors and eight existing advisory comments/include-contract hints.
+Scope/layering/tests/docs sweep and architecture review retain the existing runtime
+owner and named-module surfaces; workshop rows 1–3/8 pass, rows 4–7 are inapplicable.
+No new GPU or sanitizer evidence is supplied by this slice.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^EditorPointReadiness\.|^BilateralFilter|^DescriptorAnalysis|^PointSpacingOperations\.|^KernelDensity|^DensityWeight|^SandboxProcessingPanels\.|^SandboxEditorPresentation\.|^ProcessingCompilationLocality\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+```
+Current evidence files in `/tmp/intrinsic-normal-readiness/`: `configure.log`,
+`build-focused.log`, `focused.log`, `build-all.log`, `cpu.log`, `plan.json`,
+`review.diff` and `review.json`. Other files in that directory predate this slice
+and are not evidence for it. Production/test source stayed fixed through review;
+only the task record and the two small documentation corrections followed.
+Fixed production/test diff SHA-256:
+`e7e5687d1a2b7093d2ed7660ca61b7684a08a41cdb9d3a354885669071f6ebb2`.
+
+### Current open points
+
+- [ ] Point-construction readiness: eliminate per-preview point capture through
+      the existing owner, preserving method-specific prerequisites.
+- [ ] Normal topology readiness: remove deletion-mask copies/count scans; decide
+      all-deleted-face availability against apply. Add interior-deletion/nonuniform
+      normal coverage if changing the mapping; mapping is unchanged here.
+- [ ] ICP: cache paired-source and point-to-plane normal readiness; preserve
+      distinct compatible sources, finite/count-matched normals and stale guards.
+- [ ] Mesh/curvature/UV: close admission gaps against existing metadata validators.
+      Parameterization needs runtime-owned strategy/pin/boundary prerequisites;
+      texture bake needs request-specific property/UV/device/range readiness.
+- [ ] Complete action/backend/variant readiness for service actions (K-Means,
+      Progressive Poisson, consolidation, outliers), use the common prepared-frame
+      representation everywhere, and remove remaining duplicate app prerequisites
+      and hidden actions while retaining co-equal config/UI/agent validation.
+- [ ] Finish the named table-driven
+      `SandboxEditorUi.ActionReadinessDerivesDomainPrerequisiteReasons` matrix,
+      full-family invalidation/lifecycle/supersession and zero-scan coverage, plus
+      per-action/option enabled-command and disabled-tooltip/no-command ImGui tests.
+- [ ] Run final task-wide operational closure only after the full action inventory,
+      stale apply/completion guards and app-linked checks pass; this checkpoint
+      does not retire UI-037.
+- [ ] Optional scalar-catalog coverage: explicitly assert both scalar catalogs
+      are empty without a command queue, and cover mixed live counts across
+      multiple candidate domains. Prior review suggestions, not blockers.
+- [ ] Optional point/normal follow-up: avoid the temporary second slot-vector
+      allocation during fresh execution if profiling justifies a wider capture
+      API; explicit paired-size assertions would document an already enforced
+      same-domain/deletion-order invariant. Neither blocks this slice.
+- [ ] Non-gating: bounded compilation-owner inspection and matched compile-time
+      measurements remain separate work; preserve named-module type identity.
+      Consider per-drain budgeting or a worker only if measured latency warrants
+      it. The shared deferred scan is still main-thread work.
+
+Session boundary: after this verified checkpoint, start a fresh session from
+this section and the initial scope. Next recommended slice: point-construction
+readiness. Do not reread the accumulated historical slices.

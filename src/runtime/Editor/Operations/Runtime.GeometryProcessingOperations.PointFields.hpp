@@ -1,4 +1,4 @@
-// Private capture and scalar transactions for point-property methods, plus the
+// Private point/normal capture and scalar transactions for processing methods, plus the
 // job envelope and main-thread job/cache helpers every processing family shares.
 // Include after processing-context, property, command-history and job-projection
 // imports, including Core.Error for shared result diagnostics.
@@ -77,6 +77,13 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         std::size_t SlotCount{}, LiveCount{};
         bool ValidLbvh{true};
         bool HasSubnormalCoordinates{};
+        bool HasZeroVectors{};
+        bool HasNonfiniteVectors{};
+    };
+    struct PointNormalCapture : PointInputCapture
+    {
+        std::vector<glm::vec3> Normals{};
+        bool HasZeroNormals{};
     };
     struct PointScalarCapture : PointInputCapture
     {
@@ -100,6 +107,10 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     [[nodiscard]] bool PreparePointInput(
         const EditorProcessingContext&, entt::entity, const GeometryEntityAvailability&,
         GeometryPropertyRef& positions, PointInputCapture&, std::string& diagnostic);
+    [[nodiscard]] bool CapturePointNormalInput(
+        const EditorProcessingContext&, entt::entity, const GeometryEntityAvailability&,
+        GeometryPropertyRef& positions, GeometryPropertyRef& normals, bool copyValues,
+        PointNormalCapture&, std::string& diagnostic);
     [[nodiscard]] bool EditorProcessingContextWorldCurrent(const EditorProcessingContext&);
     [[nodiscard]] EditorPointInputReadinessStats PointInputReadinessStats(const EditorProcessingContext&);
     // Callers resolve output domains and validate their typed config before preflight.

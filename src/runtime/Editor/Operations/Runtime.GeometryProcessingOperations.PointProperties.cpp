@@ -53,7 +53,7 @@ namespace Extrinsic::Runtime
             bool Queued{};
             std::optional<bool> Accepted{};
             std::size_t LiveCount{};
-            bool ValidLbvh{true}, HasSubnormalCoordinates{};
+            bool ValidLbvh{true}, HasSubnormalCoordinates{}, HasZeroVectors{}, HasNonfiniteVectors{};
             std::string Diagnostic{};
         };
         WorldRegistry* Worlds{};
@@ -236,14 +236,18 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         for (std::uint32_t i = 0; i < props->Size(); ++i)
         {
             if (deleted && deleted[i / divisor]) continue;
-            if (!FinitePosition(points[i])) return fail("Live position samples must be finite.");
+            w.HasNonfiniteVectors = !FinitePosition(points[i]);
+            if (w.HasNonfiniteVectors) return fail("Live position samples must be finite.");
             w.ValidLbvh &= Geometry::PointLBVH::ValidPoint(points[i]);
             // Bit inspection remains valid when a GPU flushes subnormal floats to zero.
+            std::uint32_t vectorMagnitudeBits{};
             for (unsigned component = 0; component < 3; ++component)
             {
                 const auto magnitude = std::bit_cast<std::uint32_t>(points[i][component]) & 0x7fffffffu;
                 w.HasSubnormalCoordinates |= magnitude != 0 && magnitude < 0x00800000u;
+                vectorMagnitudeBits |= magnitude;
             }
+            w.HasZeroVectors |= vectorMagnitudeBits == 0;
             ++w.LiveCount;
             if (copyValues) { w.Points.push_back(points[i]); w.Slots.push_back(i); }
         }
@@ -296,6 +300,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             entry->LiveCount = capture.LiveCount;
             entry->ValidLbvh = capture.ValidLbvh;
             entry->HasSubnormalCoordinates = capture.HasSubnormalCoordinates;
+            entry->HasZeroVectors = capture.HasZeroVectors;
+            entry->HasNonfiniteVectors = capture.HasNonfiniteVectors;
             entry->Diagnostic = std::move(diagnostic);
             invalidate();
         }
@@ -348,6 +354,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             capture.LiveCount = entry->LiveCount;
             capture.ValidLbvh = entry->ValidLbvh;
             capture.HasSubnormalCoordinates = entry->HasSubnormalCoordinates;
+            capture.HasZeroVectors = entry->HasZeroVectors;
+            capture.HasNonfiniteVectors = entry->HasNonfiniteVectors;
             diagnostic = entry->Diagnostic;
             return *entry->Accepted;
         }
@@ -360,6 +368,45 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             ? "Checking live point samples. Wait for input validation."
             : "Unable to queue point-input validation. Reattach the editor and retry.";
         return false;
+    }
+
+    bool CapturePointNormalInput(
+        const EditorProcessingContext& context, entt::entity entity,
+        const GeometryEntityAvailability& a, GeometryPropertyRef& positions,
+        GeometryPropertyRef& normals, bool copyValues, PointNormalCapture& w,
+        std::string& diagnostic)
+    {
+        if (positions.Domain == D::Unknown) positions.Domain = PrimaryPointDomain(a);
+        if (normals.Domain == D::Unknown) normals.Domain = positions.Domain;
+        const auto* props = ResolveGeometryPropertySet(a, positions.Domain);
+        if (!props || normals.Domain != positions.Domain ||
+            !ResolveGeometryProperty(a, normals, props->Size(), false).Resolved())
+        {
+            diagnostic = "Choose count-matched vec3 normals on the position domain.";
+            return false;
+        }
+        PointInputCapture normalInput;
+        std::string normalDiagnostic;
+        const auto capture = [&](GeometryPropertyRef& ref, PointInputCapture& input, std::string& why) {
+            return copyValues ? CapturePointInput(a, ref, true, input, why)
+                              : PreparePointInput(context, entity, a, ref, input, why);
+        };
+        // Request both properties in one frame; the cache shares each verdict
+        // independently with other methods and discards superseded revisions.
+        const bool positionsReady = capture(positions, w, diagnostic);
+        const bool normalsReady = capture(normals, normalInput, normalDiagnostic);
+        if (!positionsReady || !normalsReady)
+        {
+            if (positionsReady)
+                diagnostic = normalInput.HasNonfiniteVectors
+                    ? "Live normal samples must be finite." : std::move(normalDiagnostic);
+            return false;
+        }
+        // Same-domain inputs use the same deletion mask and ascending row order.
+        w.Inputs.push_back(ObserveGeometryProperty(a, normals.Domain, normals.Name));
+        w.Normals = std::move(normalInput.Points);
+        w.HasZeroNormals = normalInput.HasZeroVectors;
+        return true;
     }
 
     bool CapturePointScalarField(

@@ -3,28 +3,23 @@ module;
 #include <functional>
 #include <algorithm>
 #include <array>
-#include <bit>
 #include <chrono>
-#include <cmath>
 #include <cstdint>
 #include <memory>
-#include <limits>
 #include <optional>
 #include <span>
 #include <string>
 #include <vector>
 #include <utility>
-#include <glm/glm.hpp>
+#include <glm/vec3.hpp>
 #include <entt/entity/registry.hpp>
 module Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Component.DirtyTags;
-import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.KernelEvents;
-import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -45,23 +40,18 @@ namespace Extrinsic::Runtime
 {
     namespace
     {
-        namespace GS = ECS::Components::GeometrySources;
         namespace Features = Geometry::PointCloud::Features;
         using D = GeometryElementDomain;
         using GeometryProcessingDetail::PointPropertyWatch;
         using GeometryProcessingDetail::ObserveGeometryProperty;
         using GeometryProcessingDetail::MutableGeometryProperties;
         using GeometryProcessingDetail::PrimaryPointDomain;
-        using GeometryProcessingDetail::FinitePosition;
         using GeometryProcessingDetail::GeometryPropertiesCurrent;
-        struct DescriptorWork
+        struct DescriptorWork : GeometryProcessingDetail::PointNormalCapture
         {
             DescriptorAnalysisConfig Config{};
             entt::entity Entity{};
-            std::vector<PointPropertyWatch> Inputs{};
             std::array<PointPropertyWatch,33> OutputWatches{};
-            std::vector<glm::vec3> Points{}, Normals{};
-            std::vector<std::uint32_t> Slots{};
             GeometryProcessingDetail::PointRadiusRows Rows{};
             std::array<std::vector<float>,33> BeforeOutputs{}, AfterOutputs{};
             std::shared_ptr<const SpatialIndexSnapshot> Index{};
@@ -74,7 +64,7 @@ namespace Extrinsic::Runtime
         {
             return GeometryPropertiesCurrent(context, w.Entity, w.Inputs) && GeometryPropertiesCurrent(context, w.Entity, w.OutputWatches);
         }
-        enum class CapturePurpose { Execute, Readiness, Catalog };
+        enum class CapturePurpose { Execute, Readiness };
         std::shared_ptr<DescriptorWork> Capture(const EditorProcessingContext& context,
             DescriptorAnalysisConfig c, std::string& diagnostic, CapturePurpose purpose = CapturePurpose::Execute)
         {
@@ -102,44 +92,24 @@ namespace Extrinsic::Runtime
                 if (props->Exists(output.Name) && !ResolveGeometryProperty(a, output, props->Size(), false).Resolved())
                     return fail("Descriptor outputs must be absent or count-matched float histogram properties.");
             }
-            if(c.Normals.Domain!=c.Positions.Domain || !ResolveGeometryProperty(a,c.Normals,props->Size(),false).Resolved())
-                return fail("Choose count-matched vec3 normals on the position domain.");
-            if (props->Size() > std::numeric_limits<std::uint32_t>::max()) return fail("Input exceeds the supported slot range.");
             auto w = std::make_shared<DescriptorWork>();
+            if (!GeometryProcessingDetail::CapturePointNormalInput(
+                    context, *entity, a, c.Positions, c.Normals,
+                    purpose == CapturePurpose::Execute, *w, diagnostic)) return {};
+            if (w->HasZeroNormals)
+                return fail("Live positions must be finite and normals finite and nonzero.");
             w->Config = c; w->Entity = *entity;
             w->Result.RequestedBackend = c.Backend;
-            w->Result.Outputs = c.Outputs; w->Result.SlotCount = props->Size();
-            w->Inputs.push_back(ObserveGeometryProperty(a, c.Positions.Domain, c.Positions.Name));
-            w->Inputs.push_back(ObserveGeometryProperty(a,c.Normals.Domain,c.Normals.Name));
+            w->Result.Outputs = c.Outputs;
             for(unsigned i=0;i<33;++i)w->OutputWatches[i]=ObserveGeometryProperty(a,c.Outputs[i].Domain,c.Outputs[i].Name);
-            const auto [deletionDomain, deletionName, divisor] =
-                GeometryProcessingDetail::ResolvePointDeletionSource(c.Positions.Domain);
-            const auto* deletionProps = ResolveGeometryPropertySet(a, deletionDomain);
-            if (!deletionProps || props->Size() % divisor || deletionProps->Size() != props->Size() / divisor)
-                return fail("Invalid deletion domain/cardinality.");
-            const auto deleted = deletionProps->Get<bool>(deletionName);
-            if (deletionProps->Exists(deletionName) && (!deleted || deleted.Size() != deletionProps->Size()))
-                return fail("Deletion mask must be a count-matched bool property.");
-            w->Inputs.push_back(ObserveGeometryProperty(a, deletionDomain, deletionName));
-            const auto points = props->Get<glm::vec3>(c.Positions.Name);
-            const auto normals = props->Get<glm::vec3>(c.Normals.Name);
-            bool validLbvh = true;
-            for (std::uint32_t i = 0; i < props->Size(); ++i)
-            {
-                if (deleted && deleted[i / divisor]) continue;
-                if(!FinitePosition(points[i]) || !FinitePosition(normals[i]) || glm::dot(glm::dvec3(normals[i]),glm::dvec3(normals[i]))<=0)
-                    return fail("Live positions must be finite and normals finite and nonzero.");
-                validLbvh &= Geometry::PointLBVH::ValidPoint(points[i]);
-                ++w->Result.LiveCount;
-                if (purpose == CapturePurpose::Execute) { w->Points.push_back(points[i]); w->Normals.push_back(normals[i]); w->Slots.push_back(i); }
-            }
+            w->Result.SlotCount = w->SlotCount;
+            w->Result.LiveCount = w->LiveCount;
             if (!w->Result.LiveCount) return fail("Descriptor analysis requires live input samples.");
-            if (purpose == CapturePurpose::Catalog) return w;
             if(w->Result.LiveCount<2)
                 return fail("Descriptor analysis requires at least two live samples and positive spacing.");
             if(c.Backend!=DescriptorAnalysisBackend::CpuKDTree)
             {
-                if(!context.SpatialIndices || !validLbvh || w->Result.LiveCount>(1u<<24) ||
+                if(!context.SpatialIndices || !w->ValidLbvh || w->Result.LiveCount>(1u<<24) ||
                    c.FeatureRadius>Geometry::PointLBVH::CoordinateLimit)
                     return fail("LBVH needs the spatial cache, at most 2^24 samples and coordinates/radii within 1e18.");
                 if(c.Backend==DescriptorAnalysisBackend::VulkanLBVH &&
