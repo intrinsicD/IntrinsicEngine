@@ -102,7 +102,5 @@ namespace Extrinsic::Sandbox::Editor
     BuildSandboxPointCloudConsolidationResultSummary(
         const Runtime::PointCloudConsolidationResult& result);
 
-    [[nodiscard]] bool IsSupportedPointCloudConsolidationStrategy(
-        Runtime::PointCloudConsolidationStrategy strategy) noexcept;
 }
 }

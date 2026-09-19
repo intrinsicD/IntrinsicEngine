@@ -7,6 +7,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -411,11 +412,29 @@ TEST(SandboxPointCloudConsolidationPanel,
             .has_value());
     properties.OutputPositions.Domain =
         Runtime::GeometryElementDomain::MeshFace;
-    config.Strategy = static_cast<Strategy>(999u);
-    EXPECT_FALSE(
-        Editor::BuildSandboxPointCloudConsolidationPanelApplyRequest(
-            91u, properties, config)
-            .has_value());
+    for (const Strategy strategy : expectedStrategies)
+    {
+        config.Strategy = strategy;
+        EXPECT_TRUE(Runtime::IsValidEditorPointCloudConsolidationConfig(config));
+        const auto accepted =
+            Editor::BuildSandboxPointCloudConsolidationPanelApplyRequest(
+                91u, properties, config);
+        ASSERT_TRUE(accepted.has_value());
+        EXPECT_EQ(accepted->Config.Strategy, strategy);
+        EXPECT_EQ(accepted->Execute.Config.Strategy, strategy);
+    }
+    for (const Strategy strategy : {
+             static_cast<Strategy>(4u),
+             static_cast<Strategy>(999u),
+             static_cast<Strategy>(std::numeric_limits<std::uint32_t>::max())})
+    {
+        SCOPED_TRACE(static_cast<std::uint32_t>(strategy));
+        config.Strategy = strategy;
+        EXPECT_FALSE(Runtime::IsValidEditorPointCloudConsolidationConfig(config));
+        EXPECT_FALSE(
+            Editor::BuildSandboxPointCloudConsolidationPanelApplyRequest(
+                91u, properties, config).has_value());
+    }
     config.Strategy = Strategy::Wlop;
     config.SupportRadius = 0.0;
     EXPECT_FALSE(

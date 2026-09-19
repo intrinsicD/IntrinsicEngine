@@ -74,22 +74,6 @@ extern "C++"
 {
 namespace Extrinsic::Sandbox::Editor
 {
-        [[nodiscard]] bool IsSupportedPointCloudConsolidationStrategy(
-            const Runtime::PointCloudConsolidationStrategy strategy) noexcept
-        {
-            const auto options =
-                SandboxPointCloudConsolidationStrategyOptions();
-            return std::any_of(
-                options.begin(),
-                options.end(),
-                [strategy](
-                    const SandboxPointCloudConsolidationStrategyOption& option)
-                {
-                    return option.Strategy == strategy && option.Available &&
-                           !option.StableToken.empty();
-                });
-        }
-
     std::array<SandboxPointCloudConsolidationStrategyOption, 4u>
     SandboxPointCloudConsolidationStrategyOptions() noexcept
     {
@@ -129,9 +113,7 @@ namespace Extrinsic::Sandbox::Editor
         const SandboxPointCloudConsolidationPanelConfig& config)
     {
         if (stableEntityId == 0u ||
-            !Runtime::IsValidPointCloudConsolidationPropertyRefs(properties) ||
-            !IsSupportedPointCloudConsolidationStrategy(config.Strategy) ||
-            Runtime::StableToken(config.Strategy).empty())
+            !Runtime::IsValidPointCloudConsolidationPropertyRefs(properties))
         {
             return std::nullopt;
         }
@@ -1574,8 +1556,6 @@ namespace Extrinsic::Sandbox::Editor
                     ? inspector.Entity.StableEntityId
                     : 0u;
                 const bool configValid =
-                    IsSupportedPointCloudConsolidationStrategy(
-                        PointCloudConsolidation.Draft.Strategy) &&
                     Runtime::IsValidEditorPointCloudConsolidationConfig(
                         PointCloudConsolidation.Draft);
                 const auto request =

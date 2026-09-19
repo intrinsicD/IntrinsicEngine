@@ -9,7 +9,7 @@ evidence: not_applicable
 evidence_skip_reason: Interactive staged implementation; fixed diffs, review, tests and task checkpoints retain verification without unattended custody.
 maturity_target: Operational
 contract_schema: 1
-contracts: [repo.source-documentation, geometry.element-domain-sources, geometry.property-coherence, runtime.editor-prepared-frame-locality, runtime.render-diagnostics-locality, runtime.processing-compilation-locality, runtime.spatial-query-locality, runtime.kernel-interface-locality]
+contracts: [repo.source-documentation, geometry.element-domain-sources, geometry.property-coherence, runtime.editor-prepared-frame-locality, runtime.render-diagnostics-locality, runtime.processing-compilation-locality, runtime.spatial-query-locality, runtime.kernel-interface-locality, runtime.texture-bake-interface-locality]
 ---
 # UI-037 — Linear domain-action readiness and disabled-reason tooltips
 
@@ -4363,3 +4363,77 @@ skill mirrors and session-brief freshness pass. Source/build hashes remain
 fixed through final verification; logs and review packets are in
 `/tmp/intrinsic-kmeans-readiness/`. No GPU execution, sanitizer-suite or elapsed
 compile-time result is claimed. UI-037 remains open; these two slices are complete.
+
+
+## Continuation — texture-bake property type locality (2026-09-19)
+
+Operator-directed compilation/duplication cleanup with Claude Fable 5.1 from
+`ff7e8098d`. The bake interface now imports the existing
+`Runtime.GeometryProperty.Types` and `Geometry.Properties.Types` owners;
+presentation and live property storage stay in its implementation. All
+declarations and bodies are unchanged. No new module, helper or dependency
+edge outside the existing layer policy is introduced.
+
+The recursive `EditorCompilationLocality.TextureBake` guard rejects the
+original interface and passes the narrowed imports. Clang's module map drops
+25 -> 19 dependencies, removing presentation, geometry availability, ECS
+geometry sources, render geometry, linear algebra and live property storage.
+The production file remains 296 lines; four guard lines and three current-state
+architecture lines document/protect the boundary. This is structural evidence,
+not an elapsed compilation-speed claim.
+
+Committed as `b96c3eb0f`. Fable reviewed the plan and fixed diff. The implementation imports its
+required presentation/storage owners; rebuilding callers checks accidental
+transitive-import reliance. Source documentation audit: zero findings/errors.
+Inventory remains 429 modules. Strict layering and test layout pass.
+Combined verification is recorded below; logs and packets are retained in
+`/tmp/intrinsic-bake-locality/`. UI-037 remains open.
+
+
+## Continuation — consolidation strategy-validation reuse (2026-09-19)
+
+The panel's request builder and config-valid flag now reuse
+`IsValidEditorPointCloudConsolidationConfig` for strategy admission. Deleted
+the helper that rebuilt/scanned menu options and the duplicate stable-token
+check. All four menu choices remain available; backend capability admission
+stays with runtime preflight. A future unavailable strategy needs a runtime
+admission rule rather than a menu-only validation policy.
+
+Fable's plan review identified the important equivalence checks: unknown
+strategies serialize to an empty stable token, enum parsing marks fallback,
+and editor validation requires exactly `Valid`. Source inspection confirmed
+each. The existing public panel-request test now directly checks canonical
+validation and request preservation for all four strategies, plus isolated
+unknown values 4, 999 and UINT32_MAX. Invalid entity, property and radius
+cases remain. No new helper, module or production file was added. The two
+production files total 3,603 -> 3,581 lines (-22); additional
+test code protects the shared admission boundary. The app-private header's
+source-documentation audit has no findings/errors.
+
+Fable's fixed-diff review has no blockers. Its two conditional concerns are
+resolved: the builder still calls the canonical validator, the request owns
+both config copies, and all added cases compile and pass. Reviewed source/build
+hashes stayed fixed through verification. Pre-merge scope/layer/tests/docs
+sweep passes; workshop rows 1–3/8 pass and 4–7 are not applicable.
+
+Exact combined verification (canonical ci, Clang 23, unsanitized):
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^(RuntimeTextureBakeModule\.|PointCloudConsolidationConfig\.|PointCloudConsolidationModule\.|SandboxPointCloudConsolidationPanel\.|SandboxEditorPresentation\.|EditorCompilationLocality\.)' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+```
+
+All 88 focused cases pass. Full CPU gate: 4,768 selected, 4,767 passed, one
+expected ASan-only GLFW lifecycle check skipped, zero failures (153.05 s).
+The build retains an unrelated ignored-nodiscard warning in the existing mesh
+fixture. Strict layering (zero exceptions), test layout, task policy/state links,
+doc links/sync, root hygiene, skill mirrors and session-brief freshness pass.
+All 26 compile-hotspot tooling tests pass. No GPU execution, sanitizer-suite
+result or elapsed compilation-speed improvement is claimed.
+
+UI-037's broader readiness/cache work remains open; these slices are complete.
+The consolidation slice does not change per-frame property scans or Run-button
+behavior. Evidence: `/tmp/intrinsic-bake-locality/`.

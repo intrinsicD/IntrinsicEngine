@@ -316,6 +316,8 @@ Consolidation property-reference validation compiles beside its records in
 `Runtime.PointCloudConsolidationTypes`; both the panel and lifecycle preflight
 call that owner. `EditorCompilationLocality.MethodPanelServices` keeps both
 lifecycle modules out of the panel's compiler dependency closure.
+Consolidation draft and request validation reuse the runtime config validator;
+the strategy menu supplies labels and choices, not a second validation policy.
 `Runtime.ClusteringConfig` imports the Types owner without importing the lifecycle
 module. `Runtime.ModuleLifecycle` provides the minimal lifecycle interface;
 complete setup/frame/recipe capabilities remain in
