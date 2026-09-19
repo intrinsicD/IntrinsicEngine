@@ -4512,3 +4512,38 @@ failures (153.02 s). The focused build reports one pre-existing member-
 initialization-order warning in the consolidation test fixture. No GPU execution, sanitizer-suite result or elapsed compilation-speed
 improvement is claimed. UI-037's broader readiness acceptance remains open.
 Evidence and review packets: `/tmp/intrinsic-consolidation-locality/`.
+
+
+## Continuation — clustering lifecycle dependencies (2026-09-19)
+
+Operator-directed compilation/duplication cleanup continues from `939828561`,
+with Codex as sole writer and Claude Fable 5.1 reviewing bounded packets.
+Reuse: `ClusteringModule` only borrows `RHI::IDevice` and `WorldRegistry`;
+matching non-exported C++ declarations reuse their existing globally attached
+owners, as consolidation already does. Its implementations retain explicit
+owner imports. No API, class layout, algorithm or lifetime behavior changes.
+
+`EditorCompilationLocality.ClusteringLifecycle` fails on both forbidden owners
+against the built baseline, then passes. The recursive configured Clang module
+closure is 39 -> 25; this is dependency evidence, not measured compile speed.
+The interface is 57 -> 62 lines and test registration adds seven lines; no new
+production file, wrapper or dependency is introduced. Runtime architecture docs
+are synchronized; the regenerated inventory remains at 429 modules.
+
+Fable's plan and fixed-diff reviews found no blocker. Its app-importer concern
+was checked by compiling/linking `ExtrinsicSandbox`, including `main.cpp`, with
+a temporary ci preset override, then restoring the normal ci configuration.
+The original focused gate passed all 13 checks. Exact commands:
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^(ClusteringModule\.|EditorCompilationLocality\.ClusteringLifecycle$|EditorCompilationLocality\.ConsolidationLifecycle$)' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --preset ci -DINTRINSIC_BUILD_SANDBOX=ON
+cmake --build --preset ci --target ExtrinsicSandbox -j4
+cmake --preset ci
+```
+
+Evidence, baseline failure, compiler closures and immutable review packet:
+`/tmp/intrinsic-clustering-locality/`. Combined CPU verification is recorded in
+the following parameterization checkpoint; UI-037 remains open.

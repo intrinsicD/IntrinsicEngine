@@ -11,7 +11,6 @@ export module Extrinsic.Runtime.ClusteringModule;
 export import Extrinsic.Runtime.ClusteringTypes;
 
 import Extrinsic.Core.Error;
-import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.EditorCommandHistory;
 export import Extrinsic.Runtime.GeometryAvailability;
@@ -19,7 +18,13 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.ModuleLifecycle;
 import Extrinsic.Runtime.WorldHandle;
-import Extrinsic.Runtime.WorldRegistry;
+
+// Borrowed services retain their owners' C++ linkage without importing implementations.
+extern "C++"
+{
+    namespace Extrinsic::RHI { class IDevice; }
+    namespace Extrinsic::Runtime { class WorldRegistry; }
+}
 
 namespace Extrinsic::Runtime
 {

@@ -242,11 +242,12 @@ implementation unit, not in this interface.
 `KernelCompilationLocality.Commands`, `.Events`, `.Services` and `.Jobs` check
 these boundaries against the configured compiler module graph.
 
-The consolidation lifecycle interface similarly borrows `RHI::IDevice`,
-`WorldRegistry` and `SpatialIndexCache` without importing their definitions.
-The implementation imports these owners and the consolidation algorithm.
-`EditorCompilationLocality.ConsolidationLifecycle` checks this boundary; public
-consolidation records remain in `Runtime.PointCloudConsolidationTypes`.
+The clustering and consolidation lifecycle interfaces similarly borrow
+`RHI::IDevice` and `WorldRegistry` without importing their definitions;
+consolidation also borrows `SpatialIndexCache`. Their implementations import the
+complete owners and algorithms. `EditorCompilationLocality.ClusteringLifecycle`
+and `.ConsolidationLifecycle` check these boundaries. Public records remain in
+`Runtime.ClusteringTypes` and `Runtime.PointCloudConsolidationTypes`.
 
 ## Texture-bake interface boundary
 

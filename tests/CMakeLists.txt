@@ -724,7 +724,14 @@ intrinsic_add_module_boundary_test(AssetCompilationLocality.ModelMaterialization
 set_tests_properties(AssetCompilationLocality.ModelMaterialization
     PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
 
-# Consolidation borrows services; its implementation owns their full dependencies.
+# Clustering and consolidation borrow services without importing their definitions.
+intrinsic_add_module_boundary_test(EditorCompilationLocality.ClusteringLifecycle
+        --check-source src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm
+        --forbid-module Extrinsic.RHI.Device
+        --forbid-module Extrinsic.Runtime.WorldRegistry)
+set_tests_properties(EditorCompilationLocality.ClusteringLifecycle
+    PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
+
 intrinsic_add_module_boundary_test(EditorCompilationLocality.ConsolidationLifecycle
         --check-source src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm
         --forbid-module Extrinsic.RHI.Device
