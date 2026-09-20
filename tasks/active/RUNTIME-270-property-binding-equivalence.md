@@ -293,3 +293,72 @@ are identical after whitespace normalization. Four-point review: one property
 compilation intent, unchanged layer/public boundaries, passing existing behavior
 coverage, synchronized ownership docs/task. Start a fresh session at this verified
 checkpoint before the broader binding audit; all open points are listed above.
+
+## 2026-09-20 — Remove duplicate mesh-field value comparisons
+
+Operator-directed duplicate-code/compile-time continuation from `3f078e224`.
+Reuse inspection found two private Vec3/Vec4 vector equality loops duplicating
+`std::vector::operator==` plus GLM's component equality. Replaced all five callers
+and deleted both routines. The installed GLM uses ordinary component equality:
+NaN remains unequal and signed zeros equal. Do not substitute the bitwise
+comparison owner in `Runtime.GeometryValueComparison.hpp`, whose contract differs.
+Bindings remain excluded from these state comparisons, as before.
+
+Production scope: only `Runtime.MeshFieldOperations.Curvature.cpp`, 2,873 → 2,832
+lines (-41); no new helper, header, import, target, interface or dependency edge.
+The new `ColorHistoryUsesNumericComponentEquality` regression exercises real
+segmentation publication, undo, signed-zero-equivalent redo, stale undo for NaN
+in every color component, unchanged history revision on rejection, and recovery.
+Existing curvature tests retain Vec3 direction publication/no-change/history
+coverage. No algorithm or public binding behavior changes.
+
+Claude CLI (`--model fable`; version suffix not independently attested) checked
+the planning proposal. Removing repeated config imports was rejected as a
+compile-time optimization because the module interface already imports those
+owners. This slice reduces duplicate source; no compile-time speedup is claimed.
+Fixed-diff review and verification results follow below. Logs are ephemeral under
+`/tmp/intrinsic-field-equality/`. No Codex subagents were needed.
+
+### Remaining open points
+
+- [ ] Exhaustive method/config/UI binding family matrix (including owning edits).
+- [ ] Checked numeric input/output adapters with target-storage, aliasing and
+      structural-ownership guarantees; fixed-kind output slots remain.
+- [ ] Explicit configured normal/color interpretation for visualization,
+      appearance and texture baking instead of source-name inference.
+- [ ] Canonical geodesics refs and explicit parameterization corner-UV retirement.
+- [ ] Feature widths beyond 1–3; Vec4 stays rejected until supported.
+- [ ] UI-037 stale-source, invalidation, prepared-frame readiness and bounded scans.
+- [ ] Bool/Int32/UInt32 scalar-twin, inactive-slot nonfinite and interactive
+      picker-budget coverage from the prior binding slice.
+- [ ] Topology-only `MissingPositions` naming and optional structural-name cases.
+- [ ] Relevant sanitizer/GPU and interactive usability verification before claims
+      in those classes; this continuation verifies CPU behavior only.
+- [ ] Matched compile-time measurement of the previous template relocation before
+      treating it as a speedup; interface-inherited imports are not a new locality
+      win. Select measured hotspots before further compilation-oriented changes.
+- [ ] Optional Vec3 direction and edge-color exceptional-value history cases,
+      including a captured NaN compared with itself; the new test covers face
+      Vec4 colors with NaN edits against a finite snapshot.
+
+Next bounded implementation: select one numeric adapter family from the remaining
+binding matrix. Start a fresh session at this verified cleanup checkpoint before
+that wider audit to avoid carrying discovery/review context into unrelated work.
+
+Review: Claude's source review confirmed property-handle lifetime and found no
+blockers; its temporary-diff read was denied, so a second review received the
+complete fixed diff directly and also found no blockers. The installed GLM
+comparison implementation was independently inspected. `<limits>` was already
+included directly by the test. Optional direction/edge-color and captured-NaN
+coverage is listed above rather than represented as completed.
+
+Verification so far: Clang 23 `ci` configure and `IntrinsicTests` build pass;
+all 200 focused tests pass. Strict layering, test layout, task policy and
+explicit-file docs-sync pass; doc links, root hygiene and session-brief freshness
+pass. Scope is one comparison cleanup; existing layer/public boundaries and
+binding contracts are unchanged, so no architecture or inventory change is due.
+
+Final CPU verification: 4,862 selected, 4,861 passed, zero failures, one expected
+`GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl` capability skip; 161.77 s.
+No sanitizer or GPU run. This is ordinary refactoring evidence, not a performance
+or research claim; no ARA claim is introduced. All remaining points are above.

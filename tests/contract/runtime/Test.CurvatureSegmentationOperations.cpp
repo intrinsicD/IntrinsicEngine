@@ -585,6 +585,31 @@ TEST(CurvatureSegmentationOperations, CustomBindingsPreserveCanonicalOutputsAndU
     EXPECT_TRUE(h.Faces().Properties.Exists(config.Regions.Name));
 }
 
+TEST(CurvatureSegmentationOperations, ColorHistoryUsesNumericComponentEquality)
+{
+    SegmentationHarness harness;
+    const auto config = MakeFixedConfig();
+    auto colors = harness.Faces().Properties.GetOrAdd<glm::vec4>(
+        config.RegionColors.Name, glm::vec4{0.0f});
+    ASSERT_TRUE(Apply(harness).Succeeded());
+    ASSERT_TRUE(harness.History.Undo().Succeeded());
+
+    // A sign-only zero edit remains equivalent to the captured authored colors.
+    colors[0] = glm::vec4{-0.0f};
+    ASSERT_TRUE(harness.History.Redo().Succeeded());
+    const glm::vec4 published = colors[0];
+    const auto revision = harness.History.Snapshot().Revision;
+    for (int component = 0; component < 4; ++component)
+    {
+        colors[0][component] = std::numeric_limits<float>::quiet_NaN();
+        EXPECT_EQ(harness.History.Undo().Status,
+                  Runtime::EditorCommandHistoryStatus::StaleEntity);
+        EXPECT_EQ(harness.History.Snapshot().Revision, revision);
+        colors[0] = published;
+    }
+    EXPECT_TRUE(harness.History.Undo().Succeeded());
+}
+
 TEST(CurvatureSegmentationOperations, SuppliedFeatureShapesAndNamesAreEquivalent)
 {
     SegmentationHarness harness;

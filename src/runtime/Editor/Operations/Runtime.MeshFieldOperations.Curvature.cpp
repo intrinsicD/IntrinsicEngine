@@ -259,24 +259,6 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             MeshCurvaturePropertySnapshot Properties{};
         };
 
-        [[nodiscard]] bool SameVec3PropertyValues(
-            const std::vector<glm::vec3>& lhs,
-            const std::vector<glm::vec3>& rhs) noexcept
-        {
-            if (lhs.size() != rhs.size())
-                return false;
-            for (std::size_t i = 0u; i < lhs.size(); ++i)
-            {
-                if (lhs[i].x != rhs[i].x ||
-                    lhs[i].y != rhs[i].y ||
-                    lhs[i].z != rhs[i].z)
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-
         [[nodiscard]] bool SameMeshCurvaturePropertyState(
             const MeshCurvaturePropertyState& lhs,
             const MeshCurvaturePropertyState& rhs) noexcept
@@ -291,8 +273,8 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                    lhs.Gaussian == rhs.Gaussian &&
                    lhs.MinPrincipal == rhs.MinPrincipal &&
                    lhs.MaxPrincipal == rhs.MaxPrincipal &&
-                   SameVec3PropertyValues(lhs.Dir1, rhs.Dir1) &&
-                   SameVec3PropertyValues(lhs.Dir2, rhs.Dir2);
+                   lhs.Dir1 == rhs.Dir1 &&
+                   lhs.Dir2 == rhs.Dir2;
         }
 
         [[nodiscard]] bool MeshCurvaturePropertyStateMatchesCount(
@@ -1089,25 +1071,6 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             std::shared_ptr<
                 const MeshCurvatureSegmentationPropertyState>;
 
-        [[nodiscard]] bool SameVec4PropertyValues(
-            const std::vector<glm::vec4>& lhs,
-            const std::vector<glm::vec4>& rhs) noexcept
-        {
-            if (lhs.size() != rhs.size())
-                return false;
-            for (std::size_t i = 0u; i < lhs.size(); ++i)
-            {
-                if (lhs[i].x != rhs[i].x ||
-                    lhs[i].y != rhs[i].y ||
-                    lhs[i].z != rhs[i].z ||
-                    lhs[i].w != rhs[i].w)
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-
         [[nodiscard]] bool SameMeshCurvatureSegmentationPropertyState(
             const MeshCurvatureSegmentationPropertyState& lhs,
             const MeshCurvatureSegmentationPropertyState& rhs) noexcept
@@ -1125,18 +1088,14 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                        rhs.HadFeaturePatchColor &&
                    lhs.Components == rhs.Components &&
                    lhs.Regions == rhs.Regions &&
-                   SameVec4PropertyValues(
-                       lhs.RegionColors, rhs.RegionColors) &&
+                   lhs.RegionColors == rhs.RegionColors &&
                    lhs.Boundaries == rhs.Boundaries &&
-                   SameVec4PropertyValues(
-                       lhs.BoundaryColors, rhs.BoundaryColors) &&
+                   lhs.BoundaryColors == rhs.BoundaryColors &&
                    lhs.HardFeatures == rhs.HardFeatures &&
                    lhs.SoftFeatureConfidences ==
                        rhs.SoftFeatureConfidences &&
                    lhs.BoundaryRoles == rhs.BoundaryRoles &&
-                   SameVec4PropertyValues(
-                       lhs.FeaturePatchColors,
-                       rhs.FeaturePatchColors);
+                   lhs.FeaturePatchColors == rhs.FeaturePatchColors;
         }
 
         [[nodiscard]] bool
