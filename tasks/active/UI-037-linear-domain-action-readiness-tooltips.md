@@ -13,7 +13,7 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, geometry
 ---
 # UI-037 — Linear domain-action readiness and disabled-reason tooltips
 
-Current continuation: see [mesh deletion-mask checkpoint and open points](#continuation--processing-deletion-mask-admission-2026-09-20).
+Current continuation: see [UV undo-mask checkpoint and open points](#continuation--uv-undo-mask-readiness-2026-09-20).
 Read that checkpoint plus the initial scope before consulting the historical slices.
 
 ## Remaining closure estimate — 2026-09-19
@@ -31,7 +31,7 @@ slices close cross-family coverage and the task, rather than postponing testing.
 | 3 — complete | Point-construction readiness without per-preview point capture; see the construction checkpoint. |
 | 4 — complete | Normal topology readiness without deletion-mask copies/count scans; empty-face no-op/fallback semantics retained and tested. |
 | 5 — partial | Shared ICP source/target/local-normal verdicts and single execution captures; exact transformed-normal preview scan remains open. |
-| 6 — partial | Shared domain cardinality covers all seven actions; processing deletion-mask admission covers six. UV downstream-mask readiness and command-only connectivity readiness remain open. |
+| 6 — partial | Shared domain and processing deletion-mask cardinality cover all seven actions. Command-only connectivity/numerical readiness remains open. |
 | 7 | Runtime-owned parameterization strategy, pin and boundary prerequisites. |
 | 8 | Texture-bake request-specific property/UV/device/range readiness and shared presentation. |
 | 9 | Close service-action/backend/variant gaps for K-Means, Progressive Poisson, consolidation and outlier actions. |
@@ -5751,7 +5751,7 @@ CPU gate: **4,841 passed, one expected ASan-only skip, zero failures** (4,842
 selected). Structural/task/docs checks passed. No public module changes or new
 source files required inventory changes; the session brief remained current.
 
-### Current open points
+### Open points at the processing-mask checkpoint
 
 - [ ] Slice 5: profile and remove/bound exact transformed-normal ICP preview
       scans while preserving extreme-scale numerical acceptance and transform
@@ -5797,3 +5797,131 @@ session. Read the initial scope and this checkpoint; older slices are history.
 Next bounded slice: UV downstream-mask readiness and error priority, starting
 from its existing soup, active-job and undo-topology sequence. Avoid reopening
 the six processing actions covered here.
+
+
+## Continuation — UV undo-mask readiness (2026-09-20)
+
+Operator direction: continue duplicate-code and compile-locality work with Claude
+Fable 5.1; continue UI-037 from `d65c64d3d`. This bounded slice closes the UV
+metadata mask gap in slice 6. UI-037 remains active; no new performance claim or
+Framework24 convergence scope change is made. Contract-catalog review retains the
+existing declared IDs and their domain/property and compilation boundaries.
+
+Reuse decision: `PreviewEditorUvRegenerationCommand` calls the existing compiled
+`ValidateMeshVertexDeletionMaskMetadata` only after successful shared UV admission.
+The command already uses that exact predicate through `MeshSupport.cpp`'s processing
+builder. No copied predicate, new helper/file/import/module/API or build entry.
+UV execution order stays metadata → active job → full soup → undo-topology mask;
+preview stays metadata → active job → mask without soup construction or ring scans.
+The mask-only diagnostic now agrees. Invalid ring plus invalid mask still produces
+ring failure in apply and mask failure in preview; the explicit regression pins
+this pending cached-connectivity work rather than claiming complete readiness.
+Absent and non-Boolean masks retain the existing processing policy.
+
+Claude Fable 5.1 reviewed the plan. Its precondition concern was checked against
+`ValidateMeshSoupSourceMetadata`, which calls the position validator before access.
+Regression changes cover short/long/empty masks, metadata and config priority,
+ring-versus-mask ordering, repair/removal, wrong-type mask acceptance, preview/apply
+staleness, no publication/history changes on failure, pending-job priority and
+post-terminal mask validation without another job. The cross-family regression
+failed on the baseline for both short and long masks, demonstrating the gap.
+
+Affected production physical lines: `Runtime.GeometryProcessingOperations.Uv.cpp`
+**1,166 → 1,174**. The eight lines reuse the existing compiled check and explain
+its distinct placement; they introduce no buffer copies or scan. Compilation
+boundaries remain unchanged; matched compile-time measurements are not part of
+this slice. Logs and review packets: `/tmp/intrinsic-uv-mask/`.
+
+Fixed-diff review by Claude Fable 5.1 found no production blocker. Follow-up
+assertions cover valid-mask/invalid-ring preview, mixed Boolean mask values and
+post-terminal command status, plus publication/history on wrong-type admission.
+The suggestion to require preservation of a wrongly typed reserved `v:deleted`
+property is outside the existing contract: copying into halfedge storage cannot
+replace its Boolean deletion property. Mask type policy remains listed below.
+Property handles point into separately owned storage (`PropertyRegistry` owns
+`unique_ptr`s), so adding/removing another property does not invalidate position
+or UV handles; successful mesh publication does, and tests do not reuse them then.
+The cross-family helper already asserts exact preview/apply agreement, non-empty
+reasons and no history, position mutation or job submission for every defect.
+
+Source-documentation audit: one implementation file, zero errors/findings.
+Pre-merge sweep: one runtime-owned intent, no dependency/API/config changes,
+no new files or compatibility paths. Workshop rows 1–3/8 pass; 4–7 are inapplicable.
+The session brief stays current; no module inventory refresh is required.
+
+Verification (preset-selected Clang 23, unsanitized):
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+ctest --test-dir build/ci --output-on-failure -R '^SandboxEditorUi\.(MeshAdmissionRejectsStorageOutsideItsElementDomain|Uv.*)$|^ProcessingCompilationLocality\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+# After test-only review follow-ups; production source unchanged:
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+ctest --test-dir build/ci --output-on-failure -R '^SandboxEditorUi\.(MeshAdmissionRejectsStorageOutsideItsElementDomain|UvMaskReadinessPreservesPriorityAndRejectsChangedSource|UvRegenerationDuplicateSubmitUsesExistingActiveJob)$|^EditorCompilationLocality.TestContext$' --timeout 60
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --strict --files src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Uv.cpp tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp docs/architecture/sandbox-editor-feature-boundaries.md tasks/active/UI-037-linear-domain-action-readiness-tooltips.md
+python3 tools/agents/generate_session_brief.py --check
+python3 tools/repo/check_root_hygiene.py --root .
+```
+
+Focused gate **46/46** passed. The `IntrinsicTests` build and full CPU gate
+passed: **4,842 passed, one expected ASan-only skip, zero failures** (4,843
+selected). The final test-only review follow-ups then rebuilt and passed **4/4**,
+including dependency-scan freshness. No source was edited while CTest ran.
+Structural/task/docs checks passed. No sanitizer, GPU or compilation-time
+improvement is claimed; those evidence classes were not measured here.
+
+### Current open points
+
+- [ ] Slice 5: profile and remove/bound exact transformed-normal ICP preview
+      scans while preserving extreme-scale numerical acceptance and transform
+      invalidation. Close paired-source/normal metadata and attachment/world
+      lifecycle gaps in the cross-family matrix.
+- [ ] Slice 6: complete cached connectivity/numerical readiness for the
+      command-only inventory in the processing-mask checkpoint without per-frame
+      topology scans. Resolve the remaining multi-defect preview/apply priority
+      difference (UV mask versus invalid ring) through that cached readiness.
+      Preserve distinct normal-builder empty-face fallback/no-op, deleted-face/edge
+      filtering and ring semantics. The UV metadata mask gap is closed.
+- [ ] Slice 6 follow-up: decide malformed mask type policy consistently with
+      existing property-domain contracts; processing treats absent/non-Boolean
+      `v:deleted` as no mask, whereas normal capture rejects wrong types. Inventory
+      face/edge mask policies per actual consumer before extending validation;
+      UV soup and processing triangulation do not consume those masks.
+- [ ] Slice 7: shared runtime parameterization strategy, pin and boundary readiness.
+- [ ] Slice 8: texture-bake property/UV/device/range readiness and shared presentation.
+- [ ] Slice 9: K-Means, Progressive Poisson, consolidation and outlier service,
+      backend and variant readiness through config/UI/agent validation.
+- [ ] Slice 10: common prepared-frame readiness, remaining app prerequisite
+      duplication and hidden actions.
+- [ ] Slice 11: full table-driven
+      `SandboxEditorUi.ActionReadinessDerivesDomainPrerequisiteReasons` matrix;
+      family invalidation/lifecycle/supersession and zero-scan coverage.
+- [ ] Slice 12: real ImGui enabled-command and disabled-tooltip/no-command
+      coverage for every action/option; final stale guards, full verification,
+      review and operational closure.
+- [ ] Optional scalar catalog coverage: missing command queue and mixed live
+      counts across candidate domains.
+- [ ] Optional point/normal capture work: second slot-vector allocation and paired
+      size assertions only if profiling or mapping changes justify it.
+- [ ] Optional ICP coverage: mixed-domain/default-source, queued transform
+      staleness and target/face malformed masks; revisit legacy `v:normal`
+      wording/Error codes only when revising that surface. Snapshot/index row
+      alignment and watch-first GPU poll validation need their own verified scope.
+- [ ] Non-gating compilation: matched timing under a build-task owner; retain
+      named-module identity and do not reopen completed compile slices.
+- [ ] Non-gating scheduling: worker/per-drain budgeting only for measured latency;
+      deferred point validation still runs on the main thread.
+
+
+Session boundary: after the fixed-diff review, final verification and checkpoint
+push, start a fresh session to avoid carrying historical source and test output.
+Read the initial scope and this latest checkpoint. Next bounded UI-037 work:
+inventory existing cached mesh-connectivity results and implement one family's
+readiness from them; do not reopen the completed metadata predicates. Keep matched
+compilation-time measurements with the BUILD-009 owner.

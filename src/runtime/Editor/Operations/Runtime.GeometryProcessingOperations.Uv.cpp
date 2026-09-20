@@ -1139,6 +1139,14 @@ using namespace GeometryProcessingDetail::MeshSupport;
         GS::ConstSourceView view{};
         auto result = ValidateUvRegenerationRequest(
             EditorProcessingCommandsAccess::Resolve(commands), command, view);
+        if (result.Succeeded())
+        {
+            // Apply checks this undo-source prerequisite after full soup validation;
+            // preview reuses its metadata predicate without traversing face rings.
+            std::string diagnostic;
+            if (ValidateMeshVertexDeletionMaskMetadata(view, diagnostic) != EditorCommandStatus::Applied)
+                return {false, "UV regeneration: " + diagnostic};
+        }
         return {result.Succeeded(), std::move(result.Diagnostic)};
     }
 

@@ -1013,21 +1013,8 @@ TEST(SandboxEditorUi, MeshAdmissionRejectsStorageOutsideItsElementDomain)
               [](const auto& c, const auto& r) { return Runtime::ApplyEditorCurvatureSegmentationCommand(c, r); });
         const Runtime::EditorUvRegenerationCommand uv{
             .StableEntityId = id, .Resolution = 64u, .Padding = 2u};
-        if (defect < 6)
-            check(uv, Runtime::PreviewEditorUvRegenerationCommand,
-                  [](const auto& c, const auto& r) { return Runtime::ApplyEditorUvRegenerationCommand(c, r); });
-        else
-        {
-            // UV soup ignores masks; its later undo-topology capture rejects them.
-            EXPECT_TRUE(Runtime::PreviewEditorUvRegenerationCommand(context, uv).Enabled);
-            const auto result = Runtime::ApplyEditorUvRegenerationCommand(context, uv);
-            EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
-            EXPECT_EQ(result.Diagnostic,
-                      "UV regeneration: v:deleted must match the bound position property: v:position");
-            EXPECT_EQ(submitted, 0u);
-            EXPECT_FALSE(history.IsDirty());
-            ExpectPositionsExactlyEqual(positions.Vector(), before);
-        }
+        check(uv, Runtime::PreviewEditorUvRegenerationCommand,
+              [](const auto& c, const auto& r) { return Runtime::ApplyEditorUvRegenerationCommand(c, r); });
     }
 }
 
@@ -5031,6 +5018,89 @@ TEST(SandboxEditorUi, UvRegenerationAdmissionMatchesCommandRejections)
               Runtime::EditorCommandStatus::InvalidProcessingParameters);
 }
 
+TEST(SandboxEditorUi, UvMaskReadinessPreservesPriorityAndRejectsChangedSource)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    auto context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    const auto mesh = MakeSelectable(registry, "Uv mask readiness");
+    AddTriangleMeshSource(registry, mesh);
+    const Runtime::EditorUvRegenerationCommand command{
+        .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
+        .Resolution = 64u, .Padding = 2u};
+    auto& vertices = registry.Raw().get<GS::Vertices>(mesh).Properties;
+    auto positions = vertices.Get<glm::vec3>(PN::kPosition);
+    auto texcoords = vertices.Get<glm::vec2>("v:texcoord");
+    const auto beforePositions = positions.Vector();
+    const auto beforeTexcoords = texcoords.Vector();
+    auto deleted = vertices.GetOrAdd<bool>("v:deleted", false);
+    EXPECT_TRUE(Runtime::PreviewEditorUvRegenerationCommand(context, command).Enabled);
+    deleted.Vector().clear();
+    const auto readiness = Runtime::PreviewEditorUvRegenerationCommand(context, command);
+    EXPECT_FALSE(readiness.Enabled);
+    EXPECT_EQ(readiness.DisabledReason,
+              "UV regeneration: v:deleted must match the bound position property: v:position");
+    const auto reject = [&](const auto& request, const auto& expected) {
+        const auto beforeDeleted = deleted.Vector();
+        const auto result = Runtime::ApplyEditorUvRegenerationCommand(context, request);
+        EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+        EXPECT_EQ(result.Diagnostic, expected);
+        EXPECT_EQ(history.UndoCount(), 0u);
+        EXPECT_FALSE(history.IsDirty());
+        ExpectPositionsExactlyEqual(positions.Vector(), beforePositions);
+        EXPECT_EQ(texcoords.Vector(), beforeTexcoords);
+        EXPECT_EQ(deleted.Vector(), beforeDeleted);
+    };
+    reject(command, readiness.DisabledReason);
+
+    auto invalid = command;
+    invalid.Resolution = 0u;
+    const auto invalidReadiness = Runtime::PreviewEditorUvRegenerationCommand(context, invalid);
+    EXPECT_FALSE(invalidReadiness.Enabled);
+    EXPECT_NE(invalidReadiness.DisabledReason.find("positive resolution"), std::string::npos);
+    reject(invalid, invalidReadiness.DisabledReason);
+
+    auto next = registry.Raw().get<GS::Halfedges>(mesh).Properties.Get<std::uint32_t>(
+        GS::PropertyNames::kHalfedgeNext);
+    const auto savedNext = next.Vector();
+    next.Vector().pop_back();
+    const auto metadataReadiness = Runtime::PreviewEditorUvRegenerationCommand(context, command);
+    EXPECT_FALSE(metadataReadiness.Enabled);
+    EXPECT_EQ(metadataReadiness.DisabledReason,
+              "UV regeneration cannot use the selected entity: selected mesh has invalid halfedge/face topology");
+    reject(command, metadataReadiness.DisabledReason);
+    next.Vector() = savedNext;
+
+    // Full ring validation remains command-only and precedes undo-source admission.
+    next[0] = std::numeric_limits<std::uint32_t>::max();
+    EXPECT_EQ(Runtime::PreviewEditorUvRegenerationCommand(context, command).DisabledReason,
+              readiness.DisabledReason);
+    reject(command, "UV regeneration cannot use the selected entity: selected mesh has a face ring that is not a valid polygon");
+    deleted.Vector().resize(vertices.Size(), false);
+    deleted[0] = true;
+    EXPECT_TRUE(Runtime::PreviewEditorUvRegenerationCommand(context, command).Enabled);
+    reject(command, "UV regeneration cannot use the selected entity: selected mesh has a face ring that is not a valid polygon");
+    next.Vector() = savedNext;
+
+    deleted.Vector().resize(vertices.Size(), false);
+    EXPECT_TRUE(Runtime::PreviewEditorUvRegenerationCommand(context, command).Enabled);
+    // Commands revalidate even when the caller retained an enabled preview.
+    deleted.Vector().clear();
+    reject(command, readiness.DisabledReason);
+    vertices.Remove(deleted);
+    EXPECT_TRUE(Runtime::PreviewEditorUvRegenerationCommand(context, command).Enabled);
+
+    // Processing treats a non-Boolean optional mask as absent.
+    (void)vertices.GetOrAdd<std::uint32_t>("v:deleted", 7u);
+    EXPECT_TRUE(Runtime::PreviewEditorUvRegenerationCommand(context, command).Enabled);
+    const auto applied = Runtime::ApplyEditorUvRegenerationCommand(context, command);
+    EXPECT_EQ(applied.Status, Runtime::EditorCommandStatus::Applied) << applied.Diagnostic;
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_TRUE(history.IsDirty());
+}
+
 TEST(SandboxEditorUi, UvRegenerationThatReproducesStoredUvsReportsNoChange)
 {
     ECS::Scene::Registry registry;
@@ -5581,6 +5651,7 @@ TEST(SandboxEditorUi, UvRegenerationDuplicateSubmitUsesExistingActiveJob)
         MakeSelectable(registry, "QueuedUvDuplicateMesh");
     AddTriangleMeshSource(registry, mesh);
     auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
+    auto deleted = vertices.Properties.GetOrAdd<bool>("v:deleted", false);
     auto texcoords = vertices.Properties.Get<glm::vec2>("v:texcoord");
     ASSERT_TRUE(texcoords);
     texcoords[1] = glm::vec2{
@@ -5610,12 +5681,14 @@ TEST(SandboxEditorUi, UvRegenerationDuplicateSubmitUsesExistingActiveJob)
         GS::PropertyNames::kHalfedgeNext);
     const auto savedNext = next[0];
     next[0] = std::numeric_limits<std::uint32_t>::max();
+    deleted.Vector().clear();
     const auto busy = Runtime::PreviewEditorUvRegenerationCommand(context, command);
     EXPECT_FALSE(busy.Enabled);
     const Runtime::EditorUvRegenerationCommandResult duplicate =
         Runtime::ApplyEditorUvRegenerationCommand(context, command, [&](auto) { ++duplicateDeliveries; });
     EXPECT_EQ(busy.DisabledReason, duplicate.Diagnostic);
     next[0] = savedNext;
+    deleted.Vector().resize(vertices.Properties.Size(), false);
     auto invalid = command; invalid.Resolution = 0u;
     EXPECT_EQ(Runtime::ApplyEditorUvRegenerationCommand(context, invalid).Status,
               Runtime::EditorCommandStatus::InvalidProcessingParameters);
@@ -5629,6 +5702,20 @@ TEST(SandboxEditorUi, UvRegenerationDuplicateSubmitUsesExistingActiveJob)
     EXPECT_EQ(deliveries, 1u);
     EXPECT_EQ(duplicateDeliveries, 0u);
     EXPECT_TRUE(Runtime::PreviewEditorUvRegenerationCommand(context, command).Enabled);
+
+    // Once the job is terminal, mask readiness is evaluated again.
+    auto currentDeleted = registry.Raw().get<GS::Vertices>(mesh).Properties.Get<bool>("v:deleted");
+    ASSERT_TRUE(currentDeleted);
+    const auto currentDeletedValues = currentDeleted.Vector();
+    currentDeleted.Vector().clear();
+    const auto malformed = Runtime::PreviewEditorUvRegenerationCommand(context, command);
+    EXPECT_FALSE(malformed.Enabled);
+    EXPECT_NE(malformed.DisabledReason.find("v:deleted must match"), std::string::npos);
+    const auto rejected = Runtime::ApplyEditorUvRegenerationCommand(context, command);
+    EXPECT_EQ(rejected.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_EQ(rejected.Diagnostic, malformed.DisabledReason);
+    EXPECT_EQ(jobs.Snapshot().Entries.size(), 1u);
+    currentDeleted.Vector() = currentDeletedValues;
 
     Runtime::EditorJobQueueSnapshot complete =
         jobs.Snapshot();

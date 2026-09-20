@@ -519,9 +519,11 @@ shares the processing builder's optional Boolean vertex-mask cardinality check
 with topology, curvature and segmentation admission. Topology checks it after
 positions and before soup metadata; curvature checks it after soup metadata,
 and segmentation after edge metadata. Each family retains its diagnostic prefix
-and priority. UV soup ignores the mask; UV execution later requires the processing
-topology snapshot for undo, so malformed masks remain a command-time UV failure
-until that distinct readiness/priority gap is closed.
+and priority. UV preview reuses the same mask predicate after metadata and active-job
+admission, matching the downstream undo-topology diagnostic. UV execution retains
+full soup validation before that undo snapshot; an invalid face ring therefore
+precedes the mask error in apply, while preview reports the mask without scanning
+rings. Cached connectivity readiness remains open under UI-037.
 Duplicate requests return the existing pending job before mesh preparation,
 without adding a result callback. This command does not require config controls.
 
