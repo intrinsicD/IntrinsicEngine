@@ -357,7 +357,10 @@ or catalog queries. `ResolvePointDeletionSource` supplies the shared domain,
 property name and row divisor for this capture, bilateral filtering, descriptors,
 construction and normals. Halfedges inherit the paired edge's deletion flag;
 construction reuses this capture; normal generation retains its additional topology
-mask validation and ownership.
+mask validation and ownership. Normal readiness validates mask metadata and
+captures watches without copying masks or counting live faces. Execution owns
+the graph edge-mask snapshot and mesh reconstruction; empty face topology keeps
+the existing face-output no-op and weighted-vertex fallback behavior.
 `CapturePointNormalInput` composes the same capture for positions and same-domain
 normals. Bilateral filtering, descriptors and supplied-normal Hoppe construction
 share its deletion mapping, compact row order and revision watches. Descriptors

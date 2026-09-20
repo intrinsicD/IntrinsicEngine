@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <memory>
+#include <optional>
 #include <functional>
 #include <array>
 #include <cmath>
@@ -259,6 +260,168 @@ TEST(NormalEstimation, MeshDeletionMasksExcludeFacesAndEdgesWithoutRenumberingOu
         EXPECT_EQ(result.ProcessedFaces, 1);
         EXPECT_EQ(result.FallbackCount, 1);
     }
+}
+
+TEST(NormalEstimation, TopologyMaskMetadataAgreesWithApply)
+{
+    for (const auto domain : {D::MeshVertex, D::GraphNode})
+        for (const auto method : {R::NormalEstimationMethod::MeshFaceWeighted,
+                                 R::NormalEstimationMethod::MeshFaceNormals,
+                                 R::NormalEstimationMethod::GraphNeighborhood})
+        {
+            if (domain == D::GraphNode && method != R::NormalEstimationMethod::GraphNeighborhood)
+                continue;
+            for (const bool faceMask : {false, true})
+            {
+                if (faceMask && method == R::NormalEstimationMethod::GraphNeighborhood)
+                    continue;
+                for (unsigned state = 0; state < 5; ++state)
+                {
+                    if (state == 4 && (faceMask || method == R::NormalEstimationMethod::GraphNeighborhood)) continue;
+                    SCOPED_TRACE(std::to_string(unsigned(domain)) + ":" + R::ToString(method) +
+                                 ":" + std::to_string(faceMask) + ":" + std::to_string(state));
+                    Extrinsic::ECS::Scene::Registry scene;
+                    const auto entity = Make(scene, domain);
+                    auto config = Config(entity, domain);
+                    config.Method = method;
+                    if (method == R::NormalEstimationMethod::MeshFaceNormals)
+                        config.Output = {D::MeshFace, "f:normal", Geometry::PropertyValueKind::Vec3};
+                    const auto maskDomain = faceMask ? D::MeshFace :
+                        (domain == D::MeshVertex ? D::MeshEdge : D::GraphEdge);
+                    auto& props = Properties(scene, entity, maskDomain);
+                    const char* name = faceMask ? "f:deleted" : "e:deleted";
+                    if (auto mask = props.Get<bool>(name)) props.Remove(mask);
+                    if (state == 1) (void)props.GetOrAdd<bool>(name);
+                    if (state == 2) (void)props.GetOrAdd<float>(name);
+                    if (state == 3) props.GetOrAdd<bool>(name).Vector().pop_back();
+                    if (state == 4)
+                    {
+                        auto& halves = Properties(scene, entity, D::MeshHalfedge);
+                        halves.Resize(halves.Size() - 1);
+                    }
+                    const bool valid = state < 2;
+                    R::EditorProcessingContext context{.Scene = &scene};
+                    const auto commands = R::BindEditorProcessingCommands(context);
+                    const auto readiness = R::PreviewEditorNormalEstimationCommand(commands, config);
+                    EXPECT_EQ(readiness.Enabled, valid) << readiness.DisabledReason;
+                    const auto result = R::ApplyEditorNormalEstimationCommand(commands, config);
+                    EXPECT_EQ(result.Succeeded(), valid) << result.Message;
+                    if (!valid)
+                    {
+                        EXPECT_FALSE(readiness.DisabledReason.empty());
+                        EXPECT_EQ(result.Message, readiness.DisabledReason);
+                        EXPECT_FALSE(Properties(scene, entity, config.Output.Domain).Exists(config.Output.Name));
+                    }
+                }
+            }
+        }
+}
+
+TEST(NormalEstimation, EmptyFaceTopologyPreservesNoOpAndVertexFallbackSemantics)
+{
+    for (const auto method : {R::NormalEstimationMethod::MeshFaceNormals,
+                             R::NormalEstimationMethod::MeshFaceWeighted})
+        for (unsigned empty = 0; empty < 3; ++empty)
+            for (const bool existingOutput : {false, true})
+            {
+                SCOPED_TRACE(std::string(R::ToString(method)) + ":" + std::to_string(empty) +
+                             ":" + std::to_string(existingOutput));
+                Extrinsic::ECS::Scene::Registry scene;
+                const auto entity = Make(scene, D::MeshVertex);
+                auto config = Config(entity, D::MeshVertex);
+                config.Method = method;
+                config.FallbackNormal = {0, 2, 0};
+                const bool faceNormals = method == R::NormalEstimationMethod::MeshFaceNormals;
+                if (faceNormals) config.Output = {D::MeshFace, "f:normal", Geometry::PropertyValueKind::Vec3};
+                Properties(scene, entity, D::MeshVertex).GetOrAdd<bool>("v:deleted")[3] = true;
+                auto& faces = Properties(scene, entity, D::MeshFace);
+                auto& edges = Properties(scene, entity, D::MeshEdge);
+                if (empty == 0) std::ranges::fill(faces.GetOrAdd<bool>("f:deleted").Vector(), true);
+                if (empty == 1) std::ranges::fill(edges.GetOrAdd<bool>("e:deleted").Vector(), true);
+                if (empty == 2) faces.Resize(0);
+                auto& output = Properties(scene, entity, config.Output.Domain);
+                const glm::vec3 previous{7, 8, 9};
+                if (existingOutput) (void)output.GetOrAdd<glm::vec3>(config.Output.Name, previous);
+                const auto beforeRevision = existingOutput ? std::as_const(output).Get<glm::vec3>(config.Output.Name).Revision()
+                                                          : Geometry::PropertyRevision{};
+                R::EditorCommandHistory history;
+                R::EditorProcessingContext context{.Scene = &scene, .CommandHistory = &history};
+                const auto commands = R::BindEditorProcessingCommands(context);
+                ASSERT_TRUE(R::PreviewEditorNormalEstimationCommand(commands, config).Enabled);
+                const auto result = R::ApplyEditorNormalEstimationCommand(commands, config);
+                ASSERT_TRUE(result.Succeeded()) << result.Message;
+                EXPECT_EQ(result.ProcessedFaces, 0u);
+                EXPECT_EQ(result.WrittenCount, faceNormals ? 0u : 3u);
+                EXPECT_EQ(result.LiveCount, faceNormals ? 0u : 3u);
+                EXPECT_EQ(result.FallbackCount, faceNormals ? 0u : 3u);
+                EXPECT_EQ(result.Status, faceNormals ? R::EditorCommandStatus::NoChange : R::EditorCommandStatus::Applied);
+                EXPECT_EQ(history.CanUndo(), !faceNormals);
+                EXPECT_EQ(output.Exists(config.Output.Name), existingOutput || !faceNormals);
+                if (auto values = std::as_const(output).Get<glm::vec3>(config.Output.Name))
+                {
+                    if (faceNormals) EXPECT_EQ(values.Revision(), beforeRevision);
+                    for (std::size_t row = 0; row < values.Size(); ++row)
+                        EXPECT_EQ(values[row], faceNormals ? previous :
+                            (row == 3 ? (existingOutput ? previous : glm::vec3(0)) : glm::vec3(0, 1, 0)));
+                }
+            }
+}
+
+TEST(NormalEstimation, GraphNeighborhoodPreservesEdgeDeletionRows)
+{
+    for (const auto domain : {D::MeshVertex, D::GraphNode})
+        for (const bool partial : {false, true})
+    {
+        SCOPED_TRACE(std::to_string(unsigned(domain)) + ":" + std::to_string(partial));
+        Extrinsic::ECS::Scene::Registry scene;
+        const auto entity = Make(scene, domain);
+        auto config = Config(entity, domain);
+        config.Method = R::NormalEstimationMethod::GraphNeighborhood;
+        config.FallbackNormal = {0, 2, 0};
+        auto& edges = Properties(scene, entity, domain == D::MeshVertex ? D::MeshEdge : D::GraphEdge);
+        auto mask = edges.GetOrAdd<bool>("e:deleted");
+        const auto v0 = std::as_const(edges).Get<std::uint32_t>("e:v0");
+        const auto v1 = std::as_const(edges).Get<std::uint32_t>("e:v1");
+        for (std::size_t row = 0; row < mask.Size(); ++row)
+            mask[row] = !partial || v0[row] == 0 || v1[row] == 0;
+        R::EditorProcessingContext context{.Scene = &scene};
+        const auto result = R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config);
+        ASSERT_TRUE(result.Succeeded()) << result.Message;
+        EXPECT_EQ(result.ValidCount, partial ? 3u : 0u);
+        EXPECT_EQ(result.FallbackCount, partial ? 1u : 4u);
+        EXPECT_EQ(result.InvalidEdges, 0u);
+        const auto output = std::as_const(Properties(scene, entity, domain)).Get<glm::vec3>(config.Output.Name);
+        for (std::size_t row = 0; row < output.Size(); ++row)
+            if (!partial || row == 0) EXPECT_EQ(output[row], glm::vec3(0, 1, 0));
+            else EXPECT_NEAR(std::abs(output[row].z), 1.f, 1e-5);
+    }
+}
+
+TEST(NormalEstimation, QueuedEmptyFaceNormalsDoNotPublishOrCreateHistory)
+{
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = Make(scene, D::MeshVertex);
+    auto config = Config(entity, D::MeshVertex);
+    config.Method = R::NormalEstimationMethod::MeshFaceNormals;
+    config.Output = {D::MeshFace, "f:normal", Geometry::PropertyValueKind::Vec3};
+    auto& faces = Properties(scene, entity, D::MeshFace);
+    std::ranges::fill(faces.GetOrAdd<bool>("f:deleted").Vector(), true);
+    Intrinsic::Tests::EditorFeatureTestContext context;
+    context.Scene = &scene;
+    R::EditorCommandHistory history;
+    context.CommandHistory = &history;
+    std::optional<R::EditorNormalEstimationResult> delivered;
+    Extrinsic::Tests::EditorJobHarness jobs;
+    jobs.Attach(context);
+    ASSERT_EQ(R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config,
+        [&](auto result) { delivered = std::move(result); }).Status, R::EditorCommandStatus::Pending);
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    ASSERT_TRUE(delivered);
+    EXPECT_EQ(delivered->Status, R::EditorCommandStatus::NoChange) << delivered->Message;
+    EXPECT_EQ(delivered->LiveCount, 0u);
+    EXPECT_EQ(delivered->WrittenCount, 0u);
+    EXPECT_FALSE(faces.Exists(config.Output.Name));
+    EXPECT_FALSE(history.CanUndo());
 }
 
 TEST(NormalEstimation, RejectsInvalidBindingsAndUnavailableBackendsWithoutMutation)
@@ -705,6 +868,51 @@ TEST(NormalEstimation, QueuedFaceNormalsPublishToFacesAndRejectStaleTopology)
             EXPECT_EQ(std::as_const(faces).Get<glm::vec3>("f:normal").Vector(),
                       (std::vector<glm::vec3>{{0, 0, 1}, {0, 0, 1}}));
     }
+}
+
+TEST(NormalEstimation, QueuedTopologyNormalsGuardDeletionMaskTransitions)
+{
+    for (const auto method : {R::NormalEstimationMethod::MeshFaceNormals,
+                             R::NormalEstimationMethod::MeshFaceWeighted,
+                             R::NormalEstimationMethod::GraphNeighborhood})
+        for (const bool faceMask : {false, true})
+        {
+            if (faceMask && method == R::NormalEstimationMethod::GraphNeighborhood) continue;
+            for (unsigned change = 0; change < 5; ++change)
+            {
+                SCOPED_TRACE(std::string(R::ToString(method)) + ":" + std::to_string(faceMask) +
+                             ":" + std::to_string(change));
+                Extrinsic::ECS::Scene::Registry scene;
+                const auto entity = Make(scene, D::MeshVertex);
+                auto config = Config(entity, D::MeshVertex);
+                config.Method = method;
+                if (method == R::NormalEstimationMethod::MeshFaceNormals)
+                    config.Output = {D::MeshFace, "f:normal", Geometry::PropertyValueKind::Vec3};
+                auto& props = Properties(scene, entity, faceMask ? D::MeshFace : D::MeshEdge);
+                const char* name = faceMask ? "f:deleted" : "e:deleted";
+                auto mask = props.GetOrAdd<bool>(name);
+                if (change == 0) props.Remove(mask);
+                Intrinsic::Tests::EditorFeatureTestContext context;
+                context.Scene = &scene;
+                R::EditorCommandHistory history;
+                context.CommandHistory = &history;
+                std::optional<R::EditorNormalEstimationResult> delivered;
+                Extrinsic::Tests::EditorJobHarness jobs;
+                jobs.Attach(context);
+                ASSERT_EQ(R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config,
+                    [&](auto result) { delivered = std::move(result); }).Status, R::EditorCommandStatus::Pending);
+                if (change == 0) (void)props.GetOrAdd<bool>(name);
+                if (change == 1) mask[0] = true;
+                if (change == 2 || change == 3) props.Remove(mask);
+                if (change == 3) (void)props.GetOrAdd<float>(name);
+                if (change == 4) mask.Vector().pop_back();
+                ASSERT_TRUE(jobs.DrainUntilTerminal());
+                ASSERT_TRUE(delivered);
+                EXPECT_EQ(delivered->Status, R::EditorCommandStatus::StaleEntity) << delivered->Message;
+                EXPECT_FALSE(Properties(scene, entity, config.Output.Domain).Exists(config.Output.Name));
+                EXPECT_FALSE(history.CanUndo());
+            }
+        }
 }
 
 TEST(NormalEstimationConfig, VulkanSelectionRoundTripsAndRejectsInvalidBatchSizes)

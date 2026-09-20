@@ -13,7 +13,7 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, geometry
 ---
 # UI-037 — Linear domain-action readiness and disabled-reason tooltips
 
-Current continuation: see [construction readiness checkpoint and open points](#continuation--shared-construction-readiness-2026-09-19).
+Current continuation: see [normal topology checkpoint and open points](#continuation--normal-topology-readiness-2026-09-20).
 Read that checkpoint plus the initial scope before consulting the historical slices.
 
 ## Remaining closure estimate — 2026-09-19
@@ -29,7 +29,7 @@ slices close cross-family coverage and the task, rather than postponing testing.
 | 1 — complete | Shared cached input readiness for density, density weights and spacing; see the scalar checkpoint. |
 | 2 — complete | Bilateral/descriptor readiness with revision-keyed position-plus-normal validation; see the point/normal checkpoint. |
 | 3 — complete | Point-construction readiness without per-preview point capture; see the construction checkpoint. |
-| 4 | Normal topology readiness without deletion-mask copies/count scans; resolve empty-face semantics against apply. |
+| 4 — complete | Normal topology readiness without deletion-mask copies/count scans; empty-face no-op/fallback semantics retained and tested. |
 | 5 | ICP source/target and point-to-plane normal readiness without repeated captures. |
 | 6 | Close mesh/curvature/UV admission gaps against their existing validators; reuse current metadata previews. |
 | 7 | Runtime-owned parameterization strategy, pin and boundary prerequisites. |
@@ -5300,3 +5300,133 @@ Session boundary: start a fresh session after this checkpoint is verified and
 pushed. Read this section and initial scope, without reloading the historical
 slices. Next recommended slice: normal topology readiness and all-deleted-face
 semantics. Construction-specific readiness work is complete for this slice.
+
+
+## Continuation — normal topology readiness (2026-09-20)
+
+Operator-directed duplication/compilation cleanup from `d664c14a3`, continuing
+with Claude Fable 5.1 and one writer. Slice 4 is complete; eight estimated closure
+slices remain. This is ordinary runtime refactoring, without a timing claim,
+new algorithm, public API, module, cache or control surface. UI-037 remains open.
+
+Reuse decision: the existing normal capture owner already shares point admission
+through `PreparePointInput`/`CapturePointInput`, topology reconstruction through
+`BuildHalfedgeMeshForVertexNormalRecompute`, and revision watches through
+`ObserveGeometryProperty`. Its local `ReadMask` additionally allocated/copied
+face and edge masks for preview and execution, although mesh execution reads
+those masks in the reconstruction owner. Replace that helper with metadata-only
+`CaptureDeletionMetadata`, used by both preview and execution. Keep absent-mask
+watches, bool/cardinality checks, halfedge pairing and diagnostic priority.
+Graph execution copies the edge mask directly into its owned property set after
+the preview return; absent masks retain count-matched all-false storage.
+
+Delete the readiness-only face count: preview returns only enabled/reason,
+and command-time reconstruction supplies the actual surviving-face count.
+With live finite input vertices and no surviving faces, face normals remain a
+successful `NoChange` without publication/history; weighted vertex normals
+retain normalized fallback output and preserve deleted output slots. This covers
+all-deleted face masks, all-deleted edge masks, and zero face slots. Invalid live
+face-ring content remains command-time validation; this slice does not promise
+full connectivity admissibility from metadata alone.
+
+The sole production implementation changes from 660 to 655 physical lines,
+including explicit GLM geometric/vec3 includes in place of the umbrella header.
+Its direct `Geometry.Graph` import now names the existing `Geometry.Graph.Fwd`
+owner of `HalfedgeConnectivity`. `Geometry.Graph.Vertex.Normals` still imports
+`Geometry.Graph` transitively: this is narrower direct dependency spelling,
+not an eliminated transitive closure or a measured compile-time improvement.
+
+Tests add six cases: metadata preview/apply agreement for missing, valid,
+wrong-type and wrong-length face/edge masks; empty-topology output/revision/history
+semantics; graph edge-mask consumption on mesh and graph sources; queued empty-face
+no-op; mask creation/mutation/removal/type replacement during queued work for all
+three topology normal methods (including resized masks); and prepared-frame metadata refresh/cardinality
+rejection without additional shared point scans. Initial versions of the first two tests passed
+against the original implementation before refactoring. Existing deleted-row,
+nonuniform publication, history and cancellation coverage remains in place.
+No output mapping changes were made.
+
+Claude Fable 5.1's bounded plan and fixed-diff reviews found no production
+correctness blocker. Its test suggestions were incorporated: partial edge masks
+with nonuniform normal/fallback rows, post-submit mask resizing, halfedge
+cardinality preview/apply agreement, and an explicit optional include. The
+retained mutable-mask handle is intentional: `PropertyBuffer::operator[]` and
+`Vector()` mark storage modified on access, confirmed in the canonical owner and
+by the stale-result tests. No reacquisition workaround is required.
+
+The pre-merge sweep keeps one runtime intent, existing layer ownership, unchanged
+config/UI/agent paths and immutable worker snapshots. No named-module definition
+moves. Workshop rows 1–3/8 pass; 4–7 are inapplicable. The shared-property scan
+counter covers point verdict reuse; mask-copy removal itself is established by
+the bounded source diff, not an added allocation/timing instrument.
+
+### Verification
+
+Canonical `ci` configured with Clang 23, unsanitized. `IntrinsicTests` built
+successfully. The focused checkpoint passed 163/163 tests, including all 34
+`ProcessingCompilationLocality` guards. After the test-only review additions,
+`IntrinsicTests` was rebuilt and the full exclusion-only CPU gate selected 4,827:
+4,826 passed, one expected ASan-only GLFW lifecycle skip, zero failures (158.15 s).
+This final run includes all focused cases and compilation guards. No GPU or
+sanitizer execution is claimed.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^EditorPointReadiness\.|^NormalEstimation\.|^NormalEstimationConfig\.|^SandboxProcessingPanels\.|^SandboxEditorPresentation\.|^ProcessingCompilationLocality\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+```
+
+Iteration fixes: corrected a test-only const property handle passed to `Remove`.
+An intermediate locality run rejected source metadata after test edits overtook
+its build; rebuilding the fixed source resolved it. Neither was a pre-existing
+repository defect and no guard was weakened.
+
+Strict layering (zero exceptions), test layout, root hygiene, task policy/state
+links, docs synchronization, doc links, skill mirrors and session-brief freshness
+pass. The module inventory regenerates unchanged at 429 modules. Touched source
+documentation has zero errors; 136 pre-existing runtime README advisories are
+outside the changed paragraph. Final source/test/docs self-review is clean.
+
+Evidence directory: `/tmp/intrinsic-normal-topology/` contains `plan.json`,
+`review.json`, fixed `review.diff`, baseline/focused/full-build logs,
+`focused-final.log`, `build-review-tests.log`, `cpu.log` and structural-check logs.
+The final complete patch is saved as `final.diff`; the reviewed production source
+was unchanged by the test-only follow-up.
+
+### Current open points
+
+- [ ] Slice 5 — ICP paired-source and point-to-plane normal readiness: preserve
+      distinct compatible sources, finite/count-matched normals and stale guards.
+- [ ] Slice 6 — Mesh/curvature/UV admission gaps against the existing metadata
+      validators. Inventory command-only connectivity checks and keep preview
+      limits explicit; do not introduce synchronous topology scans in drawing.
+- [ ] Slice 7 — Runtime-owned parameterization strategy, pin and boundary
+      prerequisites, shared with config/apply.
+- [ ] Slice 8 — Texture-bake request-specific property/UV/device/range readiness
+      and shared presentation.
+- [ ] Slice 9 — Service action/backend/variant readiness for K-Means, Progressive
+      Poisson, consolidation and outliers, preserving config/UI/agent validation.
+- [ ] Slice 10 — Common prepared-frame readiness everywhere; remove remaining
+      duplicate app prerequisites and hidden actions.
+- [ ] Slice 11 — Complete the named table-driven
+      `SandboxEditorUi.ActionReadinessDerivesDomainPrerequisiteReasons` matrix,
+      full-family invalidation/lifecycle/supersession and zero-scan coverage.
+- [ ] Slice 12 — Per-action/option enabled-command and disabled-tooltip/no-command
+      ImGui coverage, final stale apply/completion guards, full task-wide checks,
+      review and operational closure. Do not retire UI-037 before these pass.
+- [ ] Optional scalar-catalog tests: both catalogs empty without a command queue;
+      mixed live counts across multiple candidate domains.
+- [ ] Optional point/normal follow-up: avoid the second temporary slot-vector
+      allocation if profiling justifies a wider capture API; explicit paired-size
+      assertions may document the enforced mapping invariant.
+- [ ] Non-gating compilation work: inspect bounded owners and obtain matched
+      compile-time measurements under a build task; preserve named-module type
+      identity and do not reopen completed BUILD-009/RUNTIME-266/267/268 slices.
+- [ ] Non-gating scheduling work: per-drain budgeting/worker only if measured
+      latency warrants it; shared deferred point scanning remains main-thread work.
+
+Session boundary: after this verified checkpoint is committed and pushed, start
+a fresh session to save context and credits. Read this section and the initial
+scope only. Next recommended slice: ICP paired-source readiness (slice 5).

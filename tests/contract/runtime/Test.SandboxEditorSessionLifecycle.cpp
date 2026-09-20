@@ -1917,6 +1917,62 @@ TEST_F(EditorPointReadiness, NormalTopologyReadinessSharesPointVerdictButKeepsLi
     EXPECT_EQ(Stats().ChecksQueued, 1u);
 }
 
+TEST_F(EditorPointReadiness, NormalTopologyMetadataRefreshesWithoutPointRescans)
+{
+    using D = Runtime::GeometryElementDomain;
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0,0,0}), b = mesh.AddVertex({1,0,0}), c = mesh.AddVertex({0,1,0});
+    ASSERT_TRUE(mesh.AddTriangle(a,b,c));
+    GS::PopulateFromMesh(Scene->Raw(), Entity, mesh);
+    Normals.Positions = {D::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};
+    Normals.Output.Domain = D::MeshFace;
+    Normals.Method = Runtime::NormalEstimationMethod::MeshFaceNormals;
+    EXPECT_FALSE(PreviewNormals().Enabled);
+    Drain();
+    ASSERT_TRUE(PreviewNormals().Enabled);
+    auto& faces = Scene->Raw().get<GS::Faces>(Entity).Properties;
+    auto& edges = Scene->Raw().get<GS::Edges>(Entity).Properties;
+    auto& halves = Scene->Raw().get<GS::Halfedges>(Entity).Properties;
+    for (const auto method : {Runtime::NormalEstimationMethod::MeshFaceNormals,
+                             Runtime::NormalEstimationMethod::MeshFaceWeighted,
+                             Runtime::NormalEstimationMethod::GraphNeighborhood})
+    {
+        Normals.Method = method;
+        Normals.Output.Domain = method == Runtime::NormalEstimationMethod::MeshFaceNormals ? D::MeshFace : D::MeshVertex;
+        for (const bool faceMask : {false, true})
+        {
+            if (faceMask && method == Runtime::NormalEstimationMethod::GraphNeighborhood) continue;
+            auto& props = faceMask ? faces : edges;
+            const char* name = faceMask ? "f:deleted" : "e:deleted";
+            if (auto mask = props.Get<bool>(name)) props.Remove(mask);
+            ASSERT_TRUE(PreviewNormals().Enabled);
+            auto mask = props.GetOrAdd<bool>(name);
+            for (int frame = 0; frame < 3; ++frame)
+            {
+                mask[0] = frame % 2 == 0;
+                PrepareFrame();
+                EXPECT_TRUE(PreviewNormals().Enabled);
+            }
+            const auto reason = faceMask ? "Invalid face deletion mask." :
+                (method == Runtime::NormalEstimationMethod::GraphNeighborhood ? "Invalid edge deletion mask." :
+                 "Invalid mesh edge deletion mask or halfedge cardinality.");
+            mask.Vector().pop_back();
+            EXPECT_EQ(PreviewNormals().DisabledReason, reason);
+            props.Remove(mask);
+            auto wrongType = props.GetOrAdd<float>(name);
+            EXPECT_EQ(PreviewNormals().DisabledReason, reason);
+            props.Remove(wrongType);
+            EXPECT_TRUE(PreviewNormals().Enabled);
+            (void)props.GetOrAdd<bool>(name);
+        }
+    }
+    Normals.Method = Runtime::NormalEstimationMethod::MeshFaceWeighted;
+    halves.Resize(halves.Size() - 1);
+    EXPECT_EQ(PreviewNormals().DisabledReason, "Invalid mesh edge deletion mask or halfedge cardinality.");
+    EXPECT_EQ(Stats().PropertyScans, 1u);
+    EXPECT_EQ(Stats().ChecksQueued, 1u);
+}
+
 TEST_F(EditorPointReadiness, NormalBackendReasonFollowsPendingPointValidation)
 {
     Normals.Backend = Runtime::NormalEstimationBackend::VulkanLBVH;

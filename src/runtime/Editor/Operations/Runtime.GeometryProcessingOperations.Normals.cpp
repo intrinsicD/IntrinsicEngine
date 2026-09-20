@@ -13,7 +13,8 @@ module;
 #include <string>
 #include <vector>
 #include <utility>
-#include <glm/glm.hpp>
+#include <glm/geometric.hpp>
+#include <glm/vec3.hpp>
 #include <entt/entity/registry.hpp>
 module Extrinsic.Runtime.NormalOperations;
 import Extrinsic.ECS.Scene.Registry;
@@ -23,7 +24,7 @@ import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.SelectionController;
-import Geometry.Graph;
+import Geometry.Graph.Fwd;
 import Geometry.Graph.Vertex.Normals;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Utils;
@@ -77,21 +78,17 @@ namespace Extrinsic::Runtime
             std::chrono::steady_clock::time_point GpuStarted{};
             EditorNormalEstimationResult Result{};
         };
-        bool ReadMask(const GeometryEntityAvailability &a, D domain, std::string name, std::size_t count,
-                      std::vector<bool> &mask, std::vector<Watch> &watches)
+        bool CaptureDeletionMetadata(const GeometryEntityAvailability &a, D domain, std::string name,
+                                     std::size_t count, std::vector<Watch> &watches)
         {
             const auto *props = ResolveGeometryPropertySet(a, domain);
             if (!props || props->Size() != count)
                 return false;
             watches.push_back(Detail::ObserveGeometryProperty(a, domain, name));
-            mask.assign(count, false);
             if (!props->Exists(name))
                 return true;
             const auto p = props->Get<bool>(name);
-            if (!p || p.Size() != count)
-                return false;
-            mask = p.Vector();
-            return true;
+            return p && p.Size() == count;
         }
         enum class CapturePurpose
         {
@@ -220,16 +217,12 @@ namespace Extrinsic::Runtime
                         return fail("Mesh normals require count-matched halfedge topology.");
                     work->Inputs.push_back(Detail::ObserveGeometryProperty(a, D::MeshHalfedge, name));
                 }
-                std::vector<bool> deletedFaces;
-                if (!ReadMask(a, D::MeshFace, "f:deleted", faces->Size(), deletedFaces, work->Inputs))
+                if (!CaptureDeletionMetadata(a, D::MeshFace, "f:deleted", faces->Size(), work->Inputs))
                     return fail("Invalid face deletion mask.");
                 const auto *edges = ResolveGeometryPropertySet(a, D::MeshEdge);
-                std::vector<bool> deletedEdges;
                 if (!edges || halves->Size() != 2 * edges->Size() ||
-                    !ReadMask(a, D::MeshEdge, "e:deleted", edges->Size(), deletedEdges, work->Inputs))
+                    !CaptureDeletionMetadata(a, D::MeshEdge, "e:deleted", edges->Size(), work->Inputs))
                     return fail("Invalid mesh edge deletion mask or halfedge cardinality.");
-                if (faceNormals)
-                    work->Result.LiveCount = std::ranges::count(deletedFaces, false);
                 if (purpose == CapturePurpose::Readiness)
                     return work;
                 // Snapshot reconstruction is submission work, never a per-frame UI readiness operation.
@@ -255,8 +248,7 @@ namespace Extrinsic::Runtime
                 return fail("Graph-neighborhood normals require count-matched e:v0/e:v1 endpoints.");
             for (auto name : {"e:v0", "e:v1"})
                 work->Inputs.push_back(Detail::ObserveGeometryProperty(a, edgeDomain, name));
-            std::vector<bool> deletedEdges;
-            if (!ReadMask(a, edgeDomain, "e:deleted", edges->Size(), deletedEdges, work->Inputs))
+            if (!CaptureDeletionMetadata(a, edgeDomain, "e:deleted", edges->Size(), work->Inputs))
                 return fail("Invalid edge deletion mask.");
             if (purpose == CapturePurpose::Readiness)
                 return work;
@@ -266,7 +258,10 @@ namespace Extrinsic::Runtime
             work->GraphVertices.GetOrAdd<glm::vec3>(c.Positions.Name).Vector() =
                 props->Get<glm::vec3>(c.Positions.Name).Vector();
             work->GraphVertices.GetOrAdd<bool>("v:deleted").Vector() = work->Deleted;
-            work->GraphEdges.GetOrAdd<bool>("e:deleted").Vector() = deletedEdges;
+            const auto deletedEdges = edges->Get<bool>("e:deleted");
+            auto graphDeletedEdges = work->GraphEdges.GetOrAdd<bool>("e:deleted");
+            if (deletedEdges)
+                graphDeletedEdges.Vector() = deletedEdges.Vector();
             auto connectivity =
                 work->GraphHalfedges.GetOrAdd<Geometry::Graph::HalfedgeConnectivity>("h:connectivity");
             for (std::uint32_t e = 0; e < edges->Size(); ++e)

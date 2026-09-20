@@ -931,7 +931,11 @@ still validates finite geometry, connectivity and publication conflicts. Curvatu
 config parsing and execution share typed binding rules. The common processing
 model carries domain capabilities and enrichment state, with no method-specific
 availability flags or per-method domain lists; normal-estimation readiness stays
-in its own family. K-Means previews and submission reuse the clustering owner's
+in its own family. Normal topology admission checks mask type/cardinality and
+captures revision watches without copying deletion rows; commands reconstruct
+and validate topology before computation. With live input vertices but no
+surviving faces, face normals succeed without publication and weighted vertex
+normals retain their fallback behavior. K-Means previews and submission reuse the clustering owner's
 compiled metadata validator, also used before runtime snapshot capture. Its
 config codec shares typed binding rules. K-Means controls stay visible without a
 selection or default input; catalog rows provide initial bindings and canonical
