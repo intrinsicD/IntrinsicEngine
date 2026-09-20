@@ -126,7 +126,7 @@ namespace Geometry::CurvatureSegmentation
             if (maxPrincipal.size() != mesh.VerticesSize() ||
                 minPrincipal.size() != mesh.VerticesSize())
             {
-                return FeatureEvidenceStatus::CurvatureCountMismatch;
+                return FeatureEvidenceStatus::FeatureCountMismatch;
             }
 
             const double infinity = std::numeric_limits<double>::infinity();
@@ -144,7 +144,7 @@ namespace Geometry::CurvatureSegmentation
                 const double k1 = maxPrincipal[vertex.Index];
                 const double k2 = minPrincipal[vertex.Index];
                 if (!std::isfinite(k1) || !std::isfinite(k2))
-                    return FeatureEvidenceStatus::NonFiniteCurvature;
+                    return FeatureEvidenceStatus::NonFiniteFeature;
                 if (k1 < k2)
                     return FeatureEvidenceStatus::InvalidCurvatureOrder;
             }
@@ -193,7 +193,7 @@ namespace Geometry::CurvatureSegmentation
                 const glm::dvec3 normal = areaNormal / doubleArea;
                 const glm::dvec2 curvature = curvatureSum / 3.0;
                 if (!IsFinite(normal) || !IsFinite(curvature))
-                    return FeatureEvidenceStatus::NonFiniteCurvature;
+                    return FeatureEvidenceStatus::NonFiniteFeature;
 
                 const std::uint32_t sample =
                     static_cast<std::uint32_t>(samples.size());
@@ -419,16 +419,16 @@ namespace Geometry::CurvatureSegmentation
             return "unsupported_submesh_view";
         case FeatureEvidenceStatus::InvalidParameters:
             return "invalid_parameters";
-        case FeatureEvidenceStatus::CurvatureCountMismatch:
-            return "curvature_count_mismatch";
+        case FeatureEvidenceStatus::FeatureCountMismatch:
+            return "feature_count_mismatch";
         case FeatureEvidenceStatus::NonTriangleFace:
             return "non_triangle_face";
         case FeatureEvidenceStatus::NonFinitePosition:
             return "non_finite_position";
         case FeatureEvidenceStatus::DegenerateFace:
             return "degenerate_face";
-        case FeatureEvidenceStatus::NonFiniteCurvature:
-            return "non_finite_curvature";
+        case FeatureEvidenceStatus::NonFiniteFeature:
+            return "non_finite_feature";
         case FeatureEvidenceStatus::InvalidCurvatureOrder:
             return "invalid_curvature_order";
         case FeatureEvidenceStatus::InvalidTopology:

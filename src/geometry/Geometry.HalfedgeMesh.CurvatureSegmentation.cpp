@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -42,8 +43,8 @@ namespace Geometry::CurvatureSegmentation
         struct FaceSample
         {
             FaceHandle Face{};
-            glm::dvec2 SignedCurvature{0.0};
-            glm::dvec2 NormalizedCurvature{0.0};
+            glm::dvec3 Feature{0.0};
+            glm::dvec3 NormalizedFeature{0.0};
             glm::dvec3 UnitNormal{0.0};
         };
 
@@ -74,9 +75,16 @@ namespace Geometry::CurvatureSegmentation
                    std::isfinite(value.z);
         }
 
-        [[nodiscard]] bool IsFinite(const glm::dvec2& value) noexcept
+        [[nodiscard]] bool IsFinite(
+            const glm::dvec3& value,
+            const std::uint32_t dimension) noexcept
         {
-            return std::isfinite(value.x) && std::isfinite(value.y);
+            for (std::uint32_t channel = 0u; channel < dimension; ++channel)
+            {
+                if (!std::isfinite(value[channel]))
+                    return false;
+            }
+            return true;
         }
 
         [[nodiscard]] double Median(std::vector<double> values)
@@ -119,32 +127,27 @@ namespace Geometry::CurvatureSegmentation
 
         [[nodiscard]] SegmentationStatus BuildFaceSamples(
             const HalfedgeMesh::Mesh& mesh,
-            const std::span<const double> maxPrincipal,
-            const std::span<const double> minPrincipal,
+            const std::span<const glm::dvec3> faceFeatures,
+            const std::uint32_t dimension,
             std::vector<FaceSample>& samples,
             std::vector<std::uint32_t>& faceSlotToSample,
             CurvatureSegmentationDiagnostics& diagnostics)
         {
-            if (maxPrincipal.size() != mesh.VerticesSize() ||
-                minPrincipal.size() != mesh.VerticesSize())
-            {
-                return SegmentationStatus::CurvatureCountMismatch;
-            }
+            if (faceFeatures.size() != mesh.FacesSize())
+                return SegmentationStatus::FeatureCountMismatch;
 
             faceSlotToSample.assign(mesh.FacesSize(), kInvalidLabel);
             samples.clear();
             samples.reserve(mesh.FaceCount());
-            std::vector<double> k1Values;
-            std::vector<double> k2Values;
-            k1Values.reserve(mesh.FaceCount());
-            k2Values.reserve(mesh.FaceCount());
+            std::array<std::vector<double>, 3u> channelValues{};
+            for (std::uint32_t channel = 0u; channel < dimension; ++channel)
+                channelValues[channel].reserve(mesh.FaceCount());
 
             for (const FaceHandle face : mesh.LiveFaces())
             {
                 if (mesh.Valence(face) != 3u)
                     return SegmentationStatus::NonTriangleFace;
 
-                glm::dvec2 sum{0.0};
                 std::size_t vertexCount = 0u;
                 for (const VertexHandle vertex :
                      mesh.VerticesAroundFace(face))
@@ -152,15 +155,14 @@ namespace Geometry::CurvatureSegmentation
                     const glm::vec3 position = mesh.Position(vertex);
                     if (!IsFinite(position))
                         return SegmentationStatus::NonFinitePosition;
-                    const double k1 = maxPrincipal[vertex.Index];
-                    const double k2 = minPrincipal[vertex.Index];
-                    if (!std::isfinite(k1) || !std::isfinite(k2))
-                        return SegmentationStatus::NonFiniteCurvature;
-                    sum += glm::dvec2{k1, k2};
                     ++vertexCount;
                 }
                 if (vertexCount != 3u)
                     return SegmentationStatus::NonTriangleFace;
+
+                const glm::dvec3 feature = faceFeatures[face.Index];
+                if (!IsFinite(feature, dimension))
+                    return SegmentationStatus::NonFiniteFeature;
 
                 glm::dvec3 normal = glm::dvec3(
                     MeshUtils::FaceNormal(mesh, face));
@@ -172,41 +174,36 @@ namespace Geometry::CurvatureSegmentation
                 }
                 normal /= normalLength;
 
-                const glm::dvec2 curvature =
-                    sum / static_cast<double>(vertexCount);
-                if (!IsFinite(curvature))
-                    return SegmentationStatus::NonFiniteCurvature;
-
                 faceSlotToSample[face.Index] =
                     static_cast<std::uint32_t>(samples.size());
                 samples.push_back(FaceSample{
                     .Face = face,
-                    .SignedCurvature = curvature,
+                    .Feature = feature,
                     .UnitNormal = normal,
                 });
-                k1Values.push_back(curvature.x);
-                k2Values.push_back(curvature.y);
+                for (std::uint32_t channel = 0u; channel < dimension; ++channel)
+                    channelValues[channel].push_back(feature[channel]);
             }
 
-            const auto k1Normalization = ComputeCurvatureNormalization(k1Values);
-            const auto k2Normalization = ComputeCurvatureNormalization(k2Values);
-            diagnostics.SignedK1Center = k1Normalization.Center;
-            diagnostics.SignedK2Center = k2Normalization.Center;
-            diagnostics.SignedK1Scale = k1Normalization.Scale;
-            diagnostics.SignedK2Scale = k2Normalization.Scale;
+            for (std::uint32_t channel = 0u; channel < dimension; ++channel)
+            {
+                const CurvatureNormalization normalization =
+                    ComputeCurvatureNormalization(channelValues[channel]);
+                diagnostics.FeatureCenter[channel] = normalization.Center;
+                diagnostics.FeatureScale[channel] = normalization.Scale;
+            }
 
             for (FaceSample& sample : samples)
             {
-                sample.NormalizedCurvature = glm::dvec2{
-                    (sample.SignedCurvature.x -
-                     diagnostics.SignedK1Center) /
-                        diagnostics.SignedK1Scale,
-                    (sample.SignedCurvature.y -
-                     diagnostics.SignedK2Center) /
-                        diagnostics.SignedK2Scale,
-                };
-                if (!IsFinite(sample.NormalizedCurvature))
-                    return SegmentationStatus::NonFiniteCurvature;
+                for (std::uint32_t channel = 0u; channel < dimension; ++channel)
+                {
+                    sample.NormalizedFeature[channel] =
+                        (sample.Feature[channel] -
+                         diagnostics.FeatureCenter[channel]) /
+                        diagnostics.FeatureScale[channel];
+                }
+                if (!IsFinite(sample.NormalizedFeature, dimension))
+                    return SegmentationStatus::NonFiniteFeature;
             }
             return SegmentationStatus::Success;
         }
@@ -215,6 +212,7 @@ namespace Geometry::CurvatureSegmentation
             const HalfedgeMesh::Mesh& mesh,
             const std::vector<FaceSample>& samples,
             const std::vector<std::uint32_t>& faceSlotToSample,
+            const std::uint32_t dimension,
             const double featureSensitivity,
             std::vector<std::vector<std::uint32_t>>& incidentDualEdges)
         {
@@ -241,11 +239,16 @@ namespace Geometry::CurvatureSegmentation
                 if (a == kInvalidLabel || b == kInvalidLabel || a == b)
                     continue;
 
-                const glm::dvec2 featureDelta =
-                    samples[a].NormalizedCurvature -
-                    samples[b].NormalizedCurvature;
-                const double featureJump =
-                    glm::dot(featureDelta, featureDelta);
+                double featureJump = 0.0;
+                for (std::uint32_t channel = 0u;
+                     channel < dimension;
+                     ++channel)
+                {
+                    const double delta =
+                        samples[a].NormalizedFeature[channel] -
+                        samples[b].NormalizedFeature[channel];
+                    featureJump += delta * delta;
+                }
                 const double cosine = std::clamp(
                     glm::dot(samples[a].UnitNormal,
                              samples[b].UnitNormal),
@@ -275,6 +278,7 @@ namespace Geometry::CurvatureSegmentation
 
         [[nodiscard]] std::vector<glm::vec3> BuildGmmPoints(
             const std::vector<FaceSample>& samples,
+            const std::uint32_t dimension,
             bool& finite)
         {
             std::vector<glm::vec3> points;
@@ -282,11 +286,14 @@ namespace Geometry::CurvatureSegmentation
             finite = true;
             for (const FaceSample& sample : samples)
             {
-                const glm::vec3 point{
-                    static_cast<float>(sample.NormalizedCurvature.x),
-                    static_cast<float>(sample.NormalizedCurvature.y),
-                    0.0f,
-                };
+                glm::vec3 point{0.0f};
+                for (std::uint32_t channel = 0u;
+                     channel < dimension;
+                     ++channel)
+                {
+                    point[channel] = static_cast<float>(
+                        sample.NormalizedFeature[channel]);
+                }
                 if (!IsFinite(point))
                 {
                     finite = false;
@@ -300,6 +307,7 @@ namespace Geometry::CurvatureSegmentation
         [[nodiscard]] FittedCandidate FitCandidate(
             const std::span<const glm::vec3> points,
             const std::uint32_t componentCount,
+            const std::uint32_t dimension,
             const CurvatureSegmentationParams& params)
         {
             FittedCandidate candidate{};
@@ -346,11 +354,16 @@ namespace Geometry::CurvatureSegmentation
                         responsibilities->begin(), best));
                 const glm::dvec3 mean =
                     candidate.Fit.Mixture.Components[component].Mean;
-                const double dx =
-                    static_cast<double>(point.x) - mean.x;
-                const double dy =
-                    static_cast<double>(point.y) - mean.y;
-                squaredResidual += dx * dx + dy * dy;
+                double pointResidual = 0.0;
+                for (std::uint32_t channel = 0u;
+                     channel < dimension;
+                     ++channel)
+                {
+                    const double delta =
+                        static_cast<double>(point[channel]) - mean[channel];
+                    pointResidual += delta * delta;
+                }
+                squaredResidual += pointResidual;
             }
             candidate.Diagnostics.NormalizedRmsFit = std::sqrt(
                 squaredResidual / static_cast<double>(points.size()));
@@ -358,12 +371,13 @@ namespace Geometry::CurvatureSegmentation
                 candidate.Diagnostics.NormalizedRmsFit <=
                 params.AutomaticFitTolerance;
 
-            // The statistical signal is two-dimensional even though it is
-            // embedded in the repository's 3D GMM carrier. A full-covariance
-            // 2D mixture has 2 means + 3 covariance entries + one independent
-            // weight per component, minus the global weight constraint.
+            // FitEM uses a 3D carrier; model selection counts only the active
+            // signal dimensions and their full covariance entries.
+            const std::uint32_t parametersPerComponent =
+                dimension + dimension * (dimension + 1u) / 2u + 1u;
             const double parameterCount =
-                static_cast<double>(6u * componentCount - 1u);
+                static_cast<double>(
+                    parametersPerComponent * componentCount - 1u);
             candidate.Diagnostics.BayesianInformationCriterion =
                 -2.0 * fit.FinalLogLikelihood +
                 params.AutomaticComplexityWeight * parameterCount *
@@ -804,15 +818,15 @@ namespace Geometry::CurvatureSegmentation
             return "unsupported_submesh_view";
         case SegmentationStatus::InvalidParameters:
             return "invalid_parameters";
-        case SegmentationStatus::CurvatureCountMismatch:
-            return "curvature_count_mismatch";
+        case SegmentationStatus::FeatureCountMismatch:
+            return "feature_count_mismatch";
         case SegmentationStatus::NonTriangleFace:
             return "non_triangle_face";
         case SegmentationStatus::NonFinitePosition:
             return "non_finite_position";
         case SegmentationStatus::DegenerateFace: return "degenerate_face";
-        case SegmentationStatus::NonFiniteCurvature:
-            return "non_finite_curvature";
+        case SegmentationStatus::NonFiniteFeature:
+            return "non_finite_feature";
         case SegmentationStatus::GaussianMixtureFitFailed:
             return "gaussian_mixture_fit_failed";
         case SegmentationStatus::PosteriorEvaluationFailed:
@@ -821,10 +835,10 @@ namespace Geometry::CurvatureSegmentation
         return "unknown";
     }
 
-    CurvatureSegmentationResult Segment(
+    CurvatureSegmentationResult SegmentFaceFeatures(
         const HalfedgeMesh::Mesh& mesh,
-        const std::span<const double> maxPrincipal,
-        const std::span<const double> minPrincipal,
+        const std::span<const glm::dvec3> faceFeatures,
+        const std::uint32_t dimension,
         const CurvatureSegmentationParams& params)
     {
         CurvatureSegmentationResult result{};
@@ -859,7 +873,8 @@ namespace Geometry::CurvatureSegmentation
                 SegmentationStatus::UnsupportedSubmeshView;
             return finish();
         }
-        if (!IsValidSegmentationParams(params))
+        if (dimension < 1u || dimension > 3u ||
+            !IsValidSegmentationParams(params))
         {
             diagnostics.Status = SegmentationStatus::InvalidParameters;
             return finish();
@@ -871,8 +886,8 @@ namespace Geometry::CurvatureSegmentation
             ProfileClock::now();
         diagnostics.Status = BuildFaceSamples(
             mesh,
-            maxPrincipal,
-            minPrincipal,
+            faceFeatures,
+            dimension,
             samples,
             faceSlotToSample,
             diagnostics);
@@ -906,10 +921,10 @@ namespace Geometry::CurvatureSegmentation
 
         bool finiteGmmPoints = false;
         const std::vector<glm::vec3> points = BuildGmmPoints(
-            samples, finiteGmmPoints);
+            samples, dimension, finiteGmmPoints);
         if (!finiteGmmPoints)
         {
-            diagnostics.Status = SegmentationStatus::NonFiniteCurvature;
+            diagnostics.Status = SegmentationStatus::NonFiniteFeature;
             return finish();
         }
 
@@ -924,6 +939,7 @@ namespace Geometry::CurvatureSegmentation
             candidates.push_back(FitCandidate(
                 std::span<const glm::vec3>{points.data(), points.size()},
                 componentCount,
+                dimension,
                 params));
         }
         diagnostics.Timings.GmmFittingMilliseconds =
@@ -967,10 +983,10 @@ namespace Geometry::CurvatureSegmentation
                 .Weight = chosen.Fit.Mixture.Weights[component],
                 .NormalizedK1Mean = gaussian.Mean.x,
                 .NormalizedK2Mean = gaussian.Mean.y,
-                .SignedK1Mean = diagnostics.SignedK1Center +
-                    diagnostics.SignedK1Scale * gaussian.Mean.x,
-                .SignedK2Mean = diagnostics.SignedK2Center +
-                    diagnostics.SignedK2Scale * gaussian.Mean.y,
+                .SignedK1Mean = diagnostics.FeatureCenter[0u] +
+                    diagnostics.FeatureScale[0u] * gaussian.Mean.x,
+                .SignedK2Mean = diagnostics.FeatureCenter[1u] +
+                    diagnostics.FeatureScale[1u] * gaussian.Mean.y,
             });
         }
 
@@ -998,6 +1014,7 @@ namespace Geometry::CurvatureSegmentation
             mesh,
             samples,
             faceSlotToSample,
+            dimension,
             params.FeatureSensitivity,
             incidentDualEdges);
         diagnostics.DualEdgeCount = dualEdges.size();
@@ -1074,6 +1091,60 @@ namespace Geometry::CurvatureSegmentation
         return finish();
     }
 
+    CurvatureSegmentationResult Segment(
+        const HalfedgeMesh::Mesh& mesh,
+        const std::span<const double> maxPrincipal,
+        const std::span<const double> minPrincipal,
+        const CurvatureSegmentationParams& params)
+    {
+        const ProfileClock::time_point totalStart = ProfileClock::now();
+        if (mesh.IsEmpty() || mesh.FaceCount() == 0u ||
+            mesh.IsSubmeshView() || !IsValidSegmentationParams(params) ||
+            maxPrincipal.size() != mesh.VerticesSize() ||
+            minPrincipal.size() != mesh.VerticesSize())
+        {
+            CurvatureSegmentationResult result = SegmentFaceFeatures(
+                mesh, {}, 2u, params);
+            result.Diagnostics.Timings.TotalMilliseconds =
+                ElapsedMilliseconds(totalStart);
+            return result;
+        }
+
+        const ProfileClock::time_point aggregationStart = ProfileClock::now();
+        std::vector<glm::dvec3> faceFeatures(
+            mesh.FacesSize(), glm::dvec3{0.0});
+        for (const FaceHandle face : mesh.LiveFaces())
+        {
+            if (mesh.Valence(face) != 3u)
+                continue;
+
+            glm::dvec3 sum{0.0};
+            std::size_t vertexCount = 0u;
+            for (const VertexHandle vertex : mesh.VerticesAroundFace(face))
+            {
+                sum.x += maxPrincipal[vertex.Index];
+                sum.y += minPrincipal[vertex.Index];
+                ++vertexCount;
+            }
+            if (vertexCount == 3u)
+            {
+                faceFeatures[face.Index] =
+                    sum / static_cast<double>(vertexCount);
+            }
+        }
+        const double aggregationMilliseconds =
+            ElapsedMilliseconds(aggregationStart);
+
+        CurvatureSegmentationResult result = SegmentFaceFeatures(
+            mesh, faceFeatures, 2u, params);
+        result.Diagnostics.Timings
+            .FaceAggregationAndNormalizationMilliseconds +=
+            aggregationMilliseconds;
+        result.Diagnostics.Timings.TotalMilliseconds =
+            ElapsedMilliseconds(totalStart);
+        return result;
+    }
+
     CurvatureSegmentationResult ComputeAndSegment(
         HalfedgeMesh::Mesh& mesh,
         const CurvatureSegmentationParams& params)
@@ -1102,7 +1173,7 @@ namespace Geometry::CurvatureSegmentation
         {
             CurvatureSegmentationResult result{};
             result.Diagnostics.Status =
-                SegmentationStatus::CurvatureCountMismatch;
+                SegmentationStatus::FeatureCountMismatch;
             result.Diagnostics.Timings.CurvatureEstimationMilliseconds =
                 curvatureMilliseconds;
             result.Diagnostics.Timings.TotalMilliseconds =
