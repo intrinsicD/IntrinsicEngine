@@ -177,7 +177,10 @@ TEST(GeodesicsOperations, RejectsMalformedVertexSourcesBeforePublishing)
     Harness h;
     auto positions = h.Properties().Get<glm::vec3>("v:position");
     positions.Vector().push_back({2, 2, 0});
-    EXPECT_FALSE(Runtime::ApplyEditorGeodesicsCommand(h.Commands(), h.Command).Succeeded());
+    const auto malformed = Runtime::ApplyEditorGeodesicsCommand(h.Commands(), h.Command);
+    EXPECT_EQ(malformed.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_EQ(malformed.Message,
+              "Geodesics: selected mesh requires a count-matched vertex position property: v:position");
     EXPECT_FALSE(h.Properties().Exists("v:geodesic_distance"));
     EXPECT_FALSE(h.Properties().Exists("v:is_geodesic_source"));
     positions.Vector().pop_back();

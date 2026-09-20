@@ -2,9 +2,7 @@
 // publication shared by several geometry-operation families. Compiled once as an
 // ordinary translation unit so no family depends on another family module.
 #include "GeometryIntegration/Runtime.GeometryValueComparison.hpp"
-#include <algorithm>
 #include <array>
-#include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -18,7 +16,9 @@
 #include <vector>
 
 #include <entt/entity/registry.hpp>
-#include <glm/glm.hpp>
+#include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 
 import Extrinsic.Core.Error;
 import Extrinsic.ECS.Component.DirtyTags;
@@ -33,7 +33,6 @@ import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.MeshSurfaceTopology;
-import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Utils;
@@ -77,6 +76,12 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
                              std::string{positionProperty};
                 return EditorCommandStatus::InvalidProcessingParameters;
             }
+            if (positions.Vector().size() != view.VertexSource->Properties.Size())
+            {
+                diagnostic = "selected mesh requires a count-matched vertex position property: " +
+                             std::string{positionProperty};
+                return EditorCommandStatus::InvalidProcessingParameters;
+            }
             return EditorCommandStatus::Applied;
         }
     }
@@ -109,8 +114,10 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
                 view.FaceSource->Properties.Get<std::uint32_t>(
                     GS::PropertyNames::kFaceHalfedge);
             if (!toVertices || !nextHalfedges || !halfedgeFaces || !faceHalfedges ||
+                toVertices.Vector().size() != view.HalfedgeSource->Properties.Size() ||
                 toVertices.Vector().size() != nextHalfedges.Vector().size() ||
                 toVertices.Vector().size() != halfedgeFaces.Vector().size() ||
+                faceHalfedges.Vector().size() != view.FaceSource->Properties.Size() ||
                 faceHalfedges.Vector().empty())
             {
                 diagnostic = "selected mesh has invalid halfedge/face topology";

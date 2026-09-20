@@ -933,6 +933,131 @@ TEST(SandboxEditorUi, MeshDenoiseCommandPublishesPositionsAndSupportsUndoRedo)
     EXPECT_TRUE(result.Succeeded());
     EXPECT_EQ(result.WrittenCount, 4u);
 }
+TEST(SandboxEditorUi, MeshAdmissionRejectsStorageOutsideItsElementDomain)
+{
+    // Equal connectivity buffers can still disagree with their owning domain.
+    for (const int defect : {0, 1, 2, 3, 4, 5})
+    {
+        SCOPED_TRACE(defect);
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        Runtime::EditorCommandHistory history;
+        auto context = MakeContext(registry, selection);
+        context.CommandHistory = &history;
+        const auto mesh = MakeSelectable(registry, "Malformed mesh storage");
+        AddDenoiseTetraMeshSource(registry, mesh);
+        const auto id = Runtime::SelectionController::ToStableEntityId(mesh);
+        auto& vertices = registry.Raw().get<GS::Vertices>(mesh).Properties;
+        auto& halfedges = registry.Raw().get<GS::Halfedges>(mesh).Properties;
+        auto& faces = registry.Raw().get<GS::Faces>(mesh).Properties;
+        auto positions = vertices.Get<glm::vec3>(PN::kPosition);
+        if (defect < 2)
+            positions.Vector().resize((defect == 0 ? vertices.Size() - 1u : vertices.Size() + 1u));
+        else if (defect < 4)
+            for (const auto name : {GS::PropertyNames::kHalfedgeToVertex,
+                                   GS::PropertyNames::kHalfedgeNext,
+                                   GS::PropertyNames::kHalfedgeFace})
+                halfedges.Get<std::uint32_t>(name).Vector().resize(
+                    (defect == 2 ? halfedges.Size() - 1u : halfedges.Size() + 1u),
+                    std::numeric_limits<std::uint32_t>::max());
+        else
+            faces.Get<std::uint32_t>(GS::PropertyNames::kFaceHalfedge).Vector().resize(
+                (defect == 4 ? faces.Size() - 1u : faces.Size() + 1u),
+                std::numeric_limits<std::uint32_t>::max());
+        const auto before = positions.Vector();
+        unsigned submitted = 0u;
+        context.JobCommands.Submit = [&](Runtime::JobDesc, Runtime::EditorJobIdentity) {
+            ++submitted;
+            return Runtime::JobToken{};
+        };
+        const auto check = [&](const auto& command, auto preview, auto apply)
+        {
+            const auto readiness = preview(context, command);
+            EXPECT_FALSE(readiness.Enabled);
+            EXPECT_FALSE(readiness.DisabledReason.empty());
+            if (defect < 2)
+                EXPECT_NE(readiness.DisabledReason.find("count-matched"), std::string::npos);
+            const auto result = apply(context, command);
+            EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+            if constexpr (requires { result.Message; })
+                EXPECT_EQ(result.Message, readiness.DisabledReason);
+            else
+                EXPECT_EQ(result.Diagnostic, readiness.DisabledReason);
+            ExpectPositionsExactlyEqual(positions.Vector(), before);
+            EXPECT_EQ(history.UndoCount(), 0u);
+            EXPECT_FALSE(history.IsDirty());
+            EXPECT_EQ(submitted, 0u);
+        };
+        check(Runtime::EditorMeshDenoiseCommand{.StableEntityId = id},
+              Runtime::PreviewEditorMeshDenoiseCommand,
+              [](const auto& c, const auto& r) { return Runtime::ApplyEditorMeshDenoiseCommand(c, r); });
+        check(Runtime::EditorMeshRemeshCommand{.StableEntityId = id},
+              Runtime::PreviewEditorMeshRemeshCommand,
+              [](const auto& c, const auto& r) { return Runtime::ApplyEditorMeshRemeshCommand(c, r); });
+        check(Runtime::EditorMeshSubdivideCommand{.StableEntityId = id},
+              Runtime::PreviewEditorMeshSubdivideCommand,
+              [](const auto& c, const auto& r) { return Runtime::ApplyEditorMeshSubdivideCommand(c, r); });
+        check(Runtime::EditorMeshSimplifyCommand{.StableEntityId = id, .TargetFaces = 1u},
+              Runtime::PreviewEditorMeshSimplifyCommand,
+              [](const auto& c, const auto& r) { return Runtime::ApplyEditorMeshSimplifyCommand(c, r); });
+        check(Runtime::EditorMeshCurvatureCommand{.StableEntityId = id},
+              Runtime::PreviewEditorMeshCurvatureCommand,
+              [](const auto& c, const auto& r) { return Runtime::ApplyEditorMeshCurvatureCommand(c, r); });
+        check(Runtime::EditorCurvatureSegmentationCommand{.StableEntityId = id},
+              Runtime::PreviewEditorCurvatureSegmentationCommand,
+              [](const auto& c, const auto& r) { return Runtime::ApplyEditorCurvatureSegmentationCommand(c, r); });
+        check(Runtime::EditorUvRegenerationCommand{.StableEntityId = id, .Resolution = 64u, .Padding = 2u},
+              Runtime::PreviewEditorUvRegenerationCommand,
+              [](const auto& c, const auto& r) { return Runtime::ApplyEditorUvRegenerationCommand(c, r); });
+    }
+}
+
+TEST(SandboxEditorUi, MeshAdmissionKeepsPolygonAndUnusedSlotSemantics)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    auto context = MakeContext(registry, selection);
+    const auto entity = MakeSelectable(registry, "Sparse quad");
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0.f, 0.f, 0.f});
+    const auto b = mesh.AddVertex({1.f, 0.f, 0.f});
+    const auto c = mesh.AddVertex({1.f, 1.f, 0.f});
+    const auto d = mesh.AddVertex({0.f, 1.f, 0.f});
+    ASSERT_TRUE(mesh.AddQuad(a, b, c, d));
+    GS::PopulateFromMesh(registry.Raw(), entity, mesh);
+    auto& halfedges = registry.Raw().get<GS::Halfedges>(entity).Properties;
+    auto& faces = registry.Raw().get<GS::Faces>(entity).Properties;
+    const auto oldHalfedges = halfedges.Size();
+    halfedges.Resize(oldHalfedges + 2u);
+    constexpr auto invalid = std::numeric_limits<std::uint32_t>::max();
+    for (const auto name : {GS::PropertyNames::kHalfedgeToVertex,
+                           GS::PropertyNames::kHalfedgeNext,
+                           GS::PropertyNames::kHalfedgeFace})
+    {
+        auto values = halfedges.Get<std::uint32_t>(name);
+        values[oldHalfedges] = values[oldHalfedges + 1u] = invalid;
+    }
+    faces.Resize(faces.Size() + 1u);
+    faces.Get<std::uint32_t>(GS::PropertyNames::kFaceHalfedge).Vector().back() = invalid;
+    faces.GetOrAdd<bool>("f:deleted", false).Vector().back() = true;
+    registry.Raw().get<GS::Faces>(entity).NumDeleted = 1u;
+    auto& edges = registry.Raw().get<GS::Edges>(entity);
+    edges.Properties.Resize(edges.Properties.Size() + 1u);
+    edges.Properties.GetOrAdd<bool>("e:deleted", false).Vector().back() = true;
+    edges.NumDeleted = 1u;
+    const auto id = Runtime::SelectionController::ToStableEntityId(entity);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshDenoiseCommand(context, {.StableEntityId = id}).Enabled);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshRemeshCommand(context, {.StableEntityId = id}).Enabled);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshSubdivideCommand(context, {.StableEntityId = id}).Enabled);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshSimplifyCommand(context, {.StableEntityId = id, .TargetFaces = 1u}).Enabled);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshCurvatureCommand(context, {.StableEntityId = id}).Enabled);
+    EXPECT_TRUE(Runtime::PreviewEditorCurvatureSegmentationCommand(context, {.StableEntityId = id}).Enabled);
+    const Runtime::EditorUvRegenerationCommand uv{.StableEntityId = id, .Resolution = 64u, .Padding = 2u};
+    EXPECT_TRUE(Runtime::PreviewEditorUvRegenerationCommand(context, uv).Enabled);
+    const auto result = Runtime::ApplyEditorUvRegenerationCommand(context, uv);
+    EXPECT_TRUE(result.Succeeded()) << result.Diagnostic;
+}
+
 TEST(SandboxEditorUi, MeshTopologyAdmissionSharesCommandValidation)
 {
     ECS::Scene::Registry registry;
@@ -6093,6 +6218,11 @@ TEST(SandboxEditorUi, MeshFieldAdmissionSharesValidationAndMetadata)
         auto& vertices = registry.Raw().get<GS::Vertices>(mesh).Properties;
         auto custom = vertices.GetOrAdd<glm::vec3>("v:custom", {});
         custom.Vector() = vertices.Get<glm::vec3>(PN::kPosition).Vector();
+        ASSERT_TRUE(preview().Enabled);
+        const auto customValues = custom.Vector();
+        custom.Vector().pop_back();
+        rejected(Runtime::EditorCommandStatus::InvalidProcessingParameters);
+        custom.Vector() = customValues;
         ASSERT_TRUE(preview().Enabled);
         const auto firstPosition = custom.Vector().front();
         custom.Vector().front().x = std::numeric_limits<float>::infinity();

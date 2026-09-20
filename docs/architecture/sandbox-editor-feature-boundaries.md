@@ -509,8 +509,14 @@ UV regeneration's shared control builds one request for
 `PreviewEditorUvRegenerationCommand` and apply. Both use the same session,
 parameter, mesh-source metadata and active-job admission checks; the preview
 never builds or copies a mesh. The private `ValidateMeshSoupSourceMetadata`
-also gates soup construction. Full finite/topology validation remains at
-submission, so admission readiness does not certify numerical feasibility.
+also gates soup construction and mesh topology/curvature/segmentation admission.
+It checks actual position, halfedge-connectivity and face-representative buffer
+sizes against their owning property-domain slot counts, including inactive
+slots. Equal connectivity-array lengths alone do not establish this contract.
+Full finite/topology validation remains at submission, so admission readiness
+does not certify numerical feasibility. The processing builder separately
+checks vertex deletion-mask cardinality before topology conversion; UV soup
+construction retains its own source contract.
 Duplicate requests return the existing pending job before mesh preparation,
 without adding a result callback. This command does not require config controls.
 

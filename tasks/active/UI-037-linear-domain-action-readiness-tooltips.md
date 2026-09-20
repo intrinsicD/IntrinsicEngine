@@ -13,7 +13,7 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, geometry
 ---
 # UI-037 — Linear domain-action readiness and disabled-reason tooltips
 
-Current continuation: see [ICP capture checkpoint and open points](#continuation--icp-input-capture-and-readiness-2026-09-20).
+Current continuation: see [mesh admission checkpoint and open points](#continuation--mesh-source-cardinality-admission-2026-09-20).
 Read that checkpoint plus the initial scope before consulting the historical slices.
 
 ## Remaining closure estimate — 2026-09-19
@@ -31,7 +31,7 @@ slices close cross-family coverage and the task, rather than postponing testing.
 | 3 — complete | Point-construction readiness without per-preview point capture; see the construction checkpoint. |
 | 4 — complete | Normal topology readiness without deletion-mask copies/count scans; empty-face no-op/fallback semantics retained and tested. |
 | 5 — partial | Shared ICP source/target/local-normal verdicts and single execution captures; exact transformed-normal preview scan remains open. |
-| 6 | Close mesh/curvature/UV admission gaps against their existing validators; reuse current metadata previews. |
+| 6 — partial | Shared vertex/halfedge/face storage cardinality checks cover all seven actions; deletion-mask admission and remaining connectivity inventory are open. |
 | 7 | Runtime-owned parameterization strategy, pin and boundary prerequisites. |
 | 8 | Texture-bake request-specific property/UV/device/range readiness and shared presentation. |
 | 9 | Close service-action/backend/variant gaps for K-Means, Progressive Poisson, consolidation and outlier actions. |
@@ -5578,3 +5578,119 @@ Session boundary: after this checkpoint passes review/tests and is pushed, start
 fresh to reduce carried context. Read the initial scope and this checkpoint only.
 Next: finish the remaining ICP transformed-normal readiness requirement, or take
 mesh/curvature/UV admission while that numerical optimization is being measured.
+
+
+## Continuation — Mesh source cardinality admission (2026-09-20)
+
+Operator direction: continue duplication and compilation-locality work with
+Claude Fable 5.1. Baseline `9850ed03c`; this is a bounded slice 6 checkpoint,
+not UI-037 retirement. Earlier compile tasks stay complete.
+
+Reuse decision: `ValidateMeshPositionSourceMetadata` and
+`ValidateMeshSoupSourceMetadata` in
+`src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.cpp`
+already own compiled metadata validation for denoise/remesh/subdivide/simplify,
+curvature/segmentation and UV regeneration. Extend these owners with actual
+buffer-to-domain slot-count checks. No new validator, file, service, public
+module or state. Geodesic and parameterization source builders inherit the
+position check. Keep the existing missing/empty diagnostic and introduce a
+separate malformed-cardinality diagnostic. Preserve inactive slots, skipped
+face representatives, polygon triangulation and command-only numerical checks.
+
+The source builder deliberately rechecks metadata after its vertex deletion-mask
+check. Retain those constant-size lookups: changing their order would change the
+first diagnostic. UV soup construction does not have the processing builder's
+vertex deletion-mask requirement. The normal builder has related validation but
+supports different empty/skip semantics; consolidation requires a separate
+contract comparison, not an unconditional replacement in this patch.
+
+Compilation scope: replace `glm/glm.hpp` with the three used vector headers;
+remove unused `<algorithm>`, `<bit>` and the `SelectionController` import from
+this implementation. Public module identities and dependency boundaries remain
+unchanged. Review also identified the geodesics command's later position-count
+check as unreachable after the shared source validator; it is removed and its
+operation-qualified diagnostic is covered in `Test.GeodesicsOperations.cpp`.
+No compilation-time or performance gain is claimed. Affected production physical
+lines total 934 → 938 across the two implementation files; the net four-line
+increase adds three domain checks and a dedicated diagnostic while deleting the
+redundant geodesics check. There are no new adapters or build entries.
+
+Validation: the new six-defect/seven-action cardinality matrix
+failed against the baseline and passed after the fix; existing admission tests
+passed. Final coverage also checks custom position bindings, no job submissions
+or history edits on malformed input, and sparse quad/unused-slot UV execution.
+Claude Fable 5.1 reviewed the plan and fixed diff with no production blocker.
+Review follow-ups implemented: delete the unreachable geodesics count check,
+assert the distinct count-mismatch diagnostic, and make the sparse fixture's
+edge/deletion metadata coherent. The final diff sweep retains runtime ownership,
+existing config/UI entry points, module identity and fail-closed publication.
+Workshop rows 1–3/8 pass; rows 4–7 are inapplicable. Clang 23 is the preset-selected
+toolchain; no Clang 20, sanitizer or GPU execution result is claimed.
+
+Verification in this session (logs `/tmp/intrinsic-mesh-admission/`):
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+ctest --test-dir build/ci --output-on-failure -R '^SandboxEditorUi\.(Mesh|Curvature|Uv|Geodesic|Parameterization)|^ProcessingCompilationLocality\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref HEAD --strict
+python3 tools/agents/generate_session_brief.py --check
+python3 tools/repo/check_root_hygiene.py --root .
+```
+
+The focused run passed 89/89 before the small review follow-ups; the final
+`IntrinsicTests` build and full CPU gate include those fixes: **4,840 passed,
+one expected ASan-only skip, zero failures** (4,841 selected). Structural/docs
+checks passed; module inventory and session brief stayed unchanged. Selected
+source-documentation audit: two implementation files, zero errors/findings.
+
+### Current open points
+
+- [ ] Slice 5: profile and remove/bound exact transformed-normal ICP preview
+      scans while preserving extreme-scale numerical acceptance and transform
+      invalidation. Close paired-source/normal metadata and attachment/world
+      lifecycle gaps in the cross-family matrix.
+- [ ] Slice 6: align processing vertex deletion-mask admission with execution,
+      preserving its priority and the UV soup distinction. Compare the normal
+      builder's separate metadata checks before any consolidation; preserve
+      empty-face fallback/no-op and skipped-ring semantics. Inventory remaining
+      command-only checks (finite positions, ring validity, empty usable surface,
+      mesh conversion, segmentation triangle/edge mapping and duplicate edges)
+      without introducing topology scans into drawing. This checkpoint closes
+      actual position/halfedge/face cardinality gaps only.
+- [ ] Slice 7: shared runtime parameterization strategy, pin and boundary readiness.
+- [ ] Slice 8: texture-bake property/UV/device/range readiness and shared presentation.
+- [ ] Slice 9: K-Means, Progressive Poisson, consolidation and outlier service,
+      backend and variant readiness through config/UI/agent validation.
+- [ ] Slice 10: common prepared-frame readiness, remaining app prerequisite
+      duplication and hidden actions.
+- [ ] Slice 11: full table-driven
+      `SandboxEditorUi.ActionReadinessDerivesDomainPrerequisiteReasons` matrix;
+      family invalidation/lifecycle/supersession and zero-scan coverage.
+- [ ] Slice 12: real ImGui enabled-command and disabled-tooltip/no-command
+      coverage for every action/option; final stale guards, full verification,
+      review and operational closure.
+- [ ] Optional scalar catalog coverage: missing command queue and mixed live
+      counts across candidate domains.
+- [ ] Optional point/normal capture work: second slot-vector allocation and paired
+      size assertions only if profiling or mapping changes justify it.
+- [ ] Optional ICP coverage: mixed-domain/default-source, queued transform
+      staleness and target/face malformed masks; revisit legacy `v:normal`
+      wording/Error codes only when revising that surface. Snapshot/index row
+      alignment and watch-first GPU poll validation need their own verified scope.
+- [ ] Non-gating compilation: matched timing under a build-task owner; retain
+      named-module identity and do not reopen completed compile slices.
+- [ ] Non-gating scheduling: worker/per-drain budgeting only for measured latency;
+      deferred point validation still runs on the main thread.
+
+Session boundary: after review, verification and checkpoint push, start a fresh
+session. Read the initial scope and this checkpoint; older slices are history.
+Next bounded reuse slice: processing deletion-mask admission with identical
+preview/apply diagnostic priority, then the remaining slice 6 inventory.

@@ -92,9 +92,6 @@ namespace Extrinsic::Runtime
                             "Geodesics source vertex is deleted or out of range.");
         auto view = GS::BuildMutableView(raw, *entity);
         auto& properties = view.VertexSource->Properties;
-        if (source.BeforePositions.size() != properties.Size())
-            return fail(EditorCommandStatus::InvalidProcessingParameters,
-                        "Geodesics position property must match the vertex slot count.");
         const std::string distanceName = command.Config.DistanceProperty;
         const std::string sourceName = command.Config.SourceMaskProperty;
         struct State
