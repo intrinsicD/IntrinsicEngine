@@ -1,61 +1,19 @@
-// Typed capture/publication of the optional vertex properties mesh-field
-// methods own; private to this family, included after its Geometry.Properties
-// import. An unauthored property is removed rather than left stale.
+// Mesh-field property capture/restore; include after Geometry.Properties and
+// standard type declarations. Only double and bool have shared instantiations;
+// other field types and all definitions stay in the curvature implementation.
 #pragma once
 
 namespace Extrinsic::Runtime::MeshFieldDetail
 {
-        template <typename T>
-        [[nodiscard]] bool CaptureCurvatureProperty(
-            Geometry::PropertySet& properties,
-            const std::string_view name,
-            const std::size_t expectedCount,
-            bool& hadProperty,
-            std::vector<T>& values,
-            std::string& diagnostic)
-        {
-            hadProperty = false;
-            values.clear();
-            if (!properties.Exists(name))
-                return true;
+    template <typename T>
+    [[nodiscard]] bool CaptureCurvatureProperty(
+        Geometry::PropertySet& properties, std::string_view name,
+        std::size_t expectedCount, bool& hadProperty,
+        std::vector<T>& values, std::string& diagnostic);
 
-            auto property = properties.Get<T>(name);
-            if (!property || property.Vector().size() != expectedCount)
-            {
-                diagnostic = "existing curvature property has an incompatible type or count: ";
-                diagnostic += std::string{name};
-                return false;
-            }
-
-            hadProperty = true;
-            values = property.Vector();
-            return true;
-        }
-
-        template <typename T>
-        [[nodiscard]] bool ApplyCurvatureProperty(
-            Geometry::PropertySet& properties,
-            const std::string_view name,
-            const bool hasProperty,
-            const std::vector<T>& values,
-            const T& defaultValue)
-        {
-            if (!hasProperty)
-            {
-                auto property = properties.Get<T>(name);
-                if (property)
-                {
-                    properties.Remove(property);
-                    return true;
-                }
-                return !properties.Exists(name);
-            }
-
-            auto property =
-                properties.GetOrAdd<T>(std::string{name}, defaultValue);
-            if (!property || property.Vector().size() != values.size())
-                return false;
-            property.Vector() = values;
-            return true;
-        }
+    // An unauthored property is removed rather than left stale.
+    template <typename T>
+    [[nodiscard]] bool ApplyCurvatureProperty(
+        Geometry::PropertySet& properties, std::string_view name,
+        bool hasProperty, const std::vector<T>& values, const T& defaultValue);
 }

@@ -124,6 +124,10 @@ publication; unrelated geometry families need no transform component module.
 UV view request tokens reuse the compiled editor signature byte mixer while
 retaining their own field ordering. The curvature changed-value template and
 topology positive-finite predicate live only in their consuming implementations.
+Mesh-field optional-property capture/restore templates are defined in the curvature execution
+unit; geodesics calls its compiled `double` and `bool` instantiations through
+`Runtime.MeshFieldOperations.Properties.hpp`. Other field types instantiate only
+in the curvature unit. The header carries declarations, not property-copy bodies.
 These headers contain no module imports; each implementation imports the types
 it uses. Helpers retain C++ linkage across their owning operation units.
 `EditorCompilationLocality.Actions` excludes unrelated processing services,

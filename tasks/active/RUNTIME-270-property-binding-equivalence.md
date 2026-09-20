@@ -219,3 +219,77 @@ All 26 `SandboxProcessingPanels` tests pass after the picker identity correction
 Full log: `/tmp/intrinsic-property-binding/full-cpu-verified.log`.
 No test labels, gates or quarantine rules were weakened. RUNTIME-270 remains
 active for the unchecked engine-wide items; UI-037 remains active for readiness.
+
+## 2026-09-20 — Mesh-field property compilation locality
+
+Operator-directed duplication/compile-locality continuation from `beef1cfb8`,
+with Claude Fable review and one checkout writer. This is a bounded preparation
+slice; none of the remaining engine-wide binding acceptance items closes here.
+
+Reuse decision: curvature/segmentation and geodesics already share
+`CaptureCurvatureProperty` / `ApplyCurvatureProperty`, but both execution units
+compiled their template bodies. Keep their private declarations in
+`Runtime.MeshFieldOperations.Properties.hpp`; put unchanged bodies in the
+existing curvature execution owner and explicitly instantiate only the shared
+`double` and `bool` variants there. Other field types remain local instantiations.
+No new file, target, public interface, import or layer edge is introduced. Keep
+the light config facade free of property implementation dependencies.
+
+Claude's planning pass questioned the likely timing benefit; the fixed-diff
+review found no blockers. Its header contract clarification was applied. The
+configured CLI uses `--model fable`; the version suffix is not independently
+attested. No Codex subagents were needed. `nm -C` on the geodesics object shows
+four undefined capture/apply references, resolved by the curvature object at
+link time, rather than duplicate emitted implementations.
+
+The two production files total 2,866 → 2,892 physical lines (+26), due to the
+private declaration/instantiation bookkeeping. This removes repeated template
+compilation, not source lines. No elapsed compile-time improvement is claimed;
+matched timing remains open. Exact type/count validation, absent-property
+removal, diagnostics, history and topology ownership are unchanged.
+
+Verification logs and read-only review are under
+`/tmp/intrinsic-mesh-field-properties/` (ephemeral). Clang 23 `ci` configure,
+focused build and all 120 focused tests pass. Source-documentation audit has
+zero errors; the existing large coherent family unit and the necessary
+absence/restore contract comment are the two review prompts. Full final results
+are recorded below after completion.
+
+### Open points after this slice
+
+- [ ] Complete the exhaustive method/config/UI input/output family matrix.
+- [ ] Extend checked numeric input/output adapters with target storage and
+      alias/ownership guarantees; current output slots still require fixed kinds.
+- [ ] Replace name-derived normal/color interpretation with explicit config in
+      visualization, surface appearance and texture baking.
+- [ ] Migrate geodesics strings to canonical refs and define explicit
+      parameterization corner-UV retirement relationships.
+- [ ] Decide and implement supported feature widths beyond 1–3; keep Vec4 rejected
+      until supported without truncation.
+- [ ] Complete UI-037 readiness, stale-source/invalidation and no-per-frame-scan
+      coverage for bound features.
+- [ ] Add the previously identified Bool/Int32/UInt32 scalar-twin, runtime
+      inactive-slot nonfinite and interactive picker-budget cases.
+- [ ] Clarify topology-only `MissingPositions` naming and extend the optional
+      method-specific structural-name truth-table cases identified above.
+- [ ] Run relevant sanitizer/GPU gates and interactive picker usability checks
+      before making claims in those evidence classes.
+- [ ] Measure compile-time benefit under a matched build-task baseline before
+      treating this relocation as a speedup; reassess if measurements show no value.
+
+Next bounded binding work: inventory and select one checked numeric adapter
+family, using the entry points above. Do not carry this template relocation as
+proof of numeric interoperability or engine-wide completion.
+
+Final slice verification: rebuilt `IntrinsicTests` passes after the header comment
+fix. The default CPU selector exits 0: 4,861 selected, 4,860 passed, zero failures,
+one expected `GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl` capability
+skip, 160.57 seconds. No sanitizer or GPU execution. Strict layering, task policy,
+test layout and explicit-file docs-sync checks pass; links, session-brief
+freshness, root hygiene and `git diff --check` pass. Existing geodesics tests cover
+wrong output storage, no-change history, absent-output undo and redo; curvature
+and segmentation tests exercise the other local field types. The moved bodies
+are identical after whitespace normalization. Four-point review: one property
+compilation intent, unchanged layer/public boundaries, passing existing behavior
+coverage, synchronized ownership docs/task. Start a fresh session at this verified
+checkpoint before the broader binding audit; all open points are listed above.
