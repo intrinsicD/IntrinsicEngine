@@ -40,6 +40,24 @@ namespace Geometry::CurvatureSegmentation
                 ProfileClock::now() - start).count();
         }
 
+        void InitializeResult(
+            const HalfedgeMesh::Mesh& mesh,
+            CurvatureSegmentationResult& result)
+        {
+            CurvatureSegmentationDiagnostics& diagnostics = result.Diagnostics;
+            diagnostics.FaceSlotCount = mesh.FacesSize();
+            diagnostics.LiveFaceCount = mesh.FaceCount();
+            diagnostics.EdgeSlotCount = mesh.EdgesSize();
+            diagnostics.LiveEdgeCount = mesh.EdgeCount();
+            result.FaceComponents.assign(mesh.FacesSize(), kInvalidLabel);
+            result.FaceRegions.assign(mesh.FacesSize(), kInvalidLabel);
+            result.EdgeBoundaries.assign(mesh.EdgesSize(), 0u);
+            result.FaceRegionColors.assign(
+                mesh.FacesSize(), glm::vec4{0.0f});
+            result.EdgeBoundaryColors.assign(
+                mesh.EdgesSize(), glm::vec4{0.0f});
+        }
+
         struct FaceSample
         {
             FaceHandle Face{};
@@ -850,17 +868,8 @@ namespace Geometry::CurvatureSegmentation
                 ElapsedMilliseconds(totalStart);
             return std::move(result);
         };
-        diagnostics.FaceSlotCount = mesh.FacesSize();
-        diagnostics.LiveFaceCount = mesh.FaceCount();
-        diagnostics.EdgeSlotCount = mesh.EdgesSize();
-        diagnostics.LiveEdgeCount = mesh.EdgeCount();
-        result.FaceComponents.assign(mesh.FacesSize(), kInvalidLabel);
-        result.FaceRegions.assign(mesh.FacesSize(), kInvalidLabel);
-        result.EdgeBoundaries.assign(mesh.EdgesSize(), 0u);
-        result.FaceRegionColors.assign(
-            mesh.FacesSize(), glm::vec4{0.0f});
-        result.EdgeBoundaryColors.assign(
-            mesh.EdgesSize(), glm::vec4{0.0f});
+        InitializeResult(mesh, result);
+        diagnostics.FeatureDimension = dimension;
 
         if (mesh.IsEmpty() || mesh.FaceCount() == 0u)
         {
@@ -978,16 +987,22 @@ namespace Geometry::CurvatureSegmentation
         {
             const Gmm::MultivariateGaussian& gaussian =
                 chosen.Fit.Mixture.Components[component];
-            diagnostics.Components.push_back(CurvatureComponentSummary{
+            CurvatureComponentSummary summary{
                 .Component = component,
                 .Weight = chosen.Fit.Mixture.Weights[component],
-                .NormalizedK1Mean = gaussian.Mean.x,
-                .NormalizedK2Mean = gaussian.Mean.y,
-                .SignedK1Mean = diagnostics.FeatureCenter[0u] +
-                    diagnostics.FeatureScale[0u] * gaussian.Mean.x,
-                .SignedK2Mean = diagnostics.FeatureCenter[1u] +
-                    diagnostics.FeatureScale[1u] * gaussian.Mean.y,
-            });
+            };
+            for (std::uint32_t channel = 0u;
+                 channel < dimension;
+                 ++channel)
+            {
+                summary.NormalizedFeatureMean[channel] =
+                    gaussian.Mean[channel];
+                summary.FeatureMean[channel] =
+                    diagnostics.FeatureCenter[channel] +
+                    diagnostics.FeatureScale[channel] *
+                        gaussian.Mean[channel];
+            }
+            diagnostics.Components.push_back(summary);
         }
 
         std::vector<double> dataCosts;
@@ -1111,25 +1126,54 @@ namespace Geometry::CurvatureSegmentation
         }
 
         const ProfileClock::time_point aggregationStart = ProfileClock::now();
+        const auto reject = [&](const SegmentationStatus status)
+        {
+            CurvatureSegmentationResult result{};
+            InitializeResult(mesh, result);
+            result.Diagnostics.FeatureDimension = 2u;
+            result.Diagnostics.Status = status;
+            result.Diagnostics.Timings
+                .FaceAggregationAndNormalizationMilliseconds =
+                ElapsedMilliseconds(aggregationStart);
+            result.Diagnostics.Timings.TotalMilliseconds =
+                ElapsedMilliseconds(totalStart);
+            return result;
+        };
         std::vector<glm::dvec3> faceFeatures(
             mesh.FacesSize(), glm::dvec3{0.0});
         for (const FaceHandle face : mesh.LiveFaces())
         {
             if (mesh.Valence(face) != 3u)
-                continue;
+                return reject(SegmentationStatus::NonTriangleFace);
 
             glm::dvec3 sum{0.0};
             std::size_t vertexCount = 0u;
             for (const VertexHandle vertex : mesh.VerticesAroundFace(face))
             {
-                sum.x += maxPrincipal[vertex.Index];
-                sum.y += minPrincipal[vertex.Index];
+                if (!IsFinite(mesh.Position(vertex)))
+                    return reject(SegmentationStatus::NonFinitePosition);
+                const double k1 = maxPrincipal[vertex.Index];
+                const double k2 = minPrincipal[vertex.Index];
+                if (!std::isfinite(k1) || !std::isfinite(k2))
+                    return reject(SegmentationStatus::NonFiniteFeature);
+                sum.x += k1;
+                sum.y += k2;
                 ++vertexCount;
             }
-            if (vertexCount == 3u)
+            if (vertexCount != 3u)
+                return reject(SegmentationStatus::NonTriangleFace);
+
+            const glm::dvec3 normal{
+                MeshUtils::FaceNormal(mesh, face)};
+            const double normalLength = glm::length(normal);
+            if (!std::isfinite(normalLength) || normalLength <= kTiny)
+                return reject(SegmentationStatus::DegenerateFace);
+
+            faceFeatures[face.Index] =
+                sum / static_cast<double>(vertexCount);
+            if (!IsFinite(faceFeatures[face.Index], 2u))
             {
-                faceFeatures[face.Index] =
-                    sum / static_cast<double>(vertexCount);
+                return reject(SegmentationStatus::NonFiniteFeature);
             }
         }
         const double aggregationMilliseconds =
@@ -1154,6 +1198,7 @@ namespace Geometry::CurvatureSegmentation
         {
             CurvatureSegmentationResult result{};
             result.Diagnostics.Status = SegmentationStatus::EmptyMesh;
+            result.Diagnostics.FeatureDimension = 2u;
             result.Diagnostics.FaceSlotCount = mesh.FacesSize();
             result.Diagnostics.LiveFaceCount = mesh.FaceCount();
             result.Diagnostics.EdgeSlotCount = mesh.EdgesSize();
@@ -1174,6 +1219,7 @@ namespace Geometry::CurvatureSegmentation
             CurvatureSegmentationResult result{};
             result.Diagnostics.Status =
                 SegmentationStatus::FeatureCountMismatch;
+            result.Diagnostics.FeatureDimension = 2u;
             result.Diagnostics.Timings.CurvatureEstimationMilliseconds =
                 curvatureMilliseconds;
             result.Diagnostics.Timings.TotalMilliseconds =
