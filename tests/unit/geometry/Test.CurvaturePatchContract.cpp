@@ -49,7 +49,7 @@ namespace
         Success = 0u,
         EmptyMesh,
         UnsupportedSubmeshView,
-        CurvatureCountMismatch,
+        FeatureCountMismatch,
         HardEvidenceCountMismatch,
         SoftEvidenceCountMismatch,
         InvalidHardEvidence,
@@ -59,7 +59,7 @@ namespace
         NonTriangleFace,
         NonFiniteGeometry,
         DegenerateFace,
-        NonFiniteCurvature,
+        NonFiniteFeature,
         InvalidCurvatureOrder,
     };
 
@@ -118,7 +118,7 @@ namespace
         if (k1.size() != mesh.VerticesSize()
             || k2.size() != mesh.VerticesSize())
         {
-            return EvidenceStatus::CurvatureCountMismatch;
+            return EvidenceStatus::FeatureCountMismatch;
         }
         if (evidence.HardEdgeMask.size() != mesh.EdgesSize())
             return EvidenceStatus::HardEvidenceCountMismatch;
@@ -128,7 +128,7 @@ namespace
         for (std::size_t i = 0u; i < k1.size(); ++i)
         {
             if (!std::isfinite(k1[i]) || !std::isfinite(k2[i]))
-                return EvidenceStatus::NonFiniteCurvature;
+                return EvidenceStatus::NonFiniteFeature;
             if (k1[i] < k2[i])
                 return EvidenceStatus::InvalidCurvatureOrder;
         }
@@ -1592,7 +1592,7 @@ TEST(CurvaturePatchContract,
 
     EXPECT_EQ(
         run({}, fixture.K2, validEvidence, validParams),
-        FeatureDetector::CurvaturePatchStatus::CurvatureCountMismatch);
+        FeatureDetector::CurvaturePatchStatus::FeatureCountMismatch);
     EXPECT_EQ(
         run(
             fixture.K1,
@@ -1628,7 +1628,7 @@ TEST(CurvaturePatchContract,
     fixture.K1.front() = std::numeric_limits<double>::quiet_NaN();
     EXPECT_EQ(
         run(fixture.K1, fixture.K2, validEvidence, validParams),
-        FeatureDetector::CurvaturePatchStatus::NonFiniteCurvature);
+        FeatureDetector::CurvaturePatchStatus::NonFiniteFeature);
     fixture.K1.front() = 0.0;
     fixture.K2.front() = 1.0;
     EXPECT_EQ(
@@ -1859,7 +1859,7 @@ TEST(CurvaturePatchContract, SuppliedEvidenceFailsClosedBeforePatchWork)
             std::span<const double>{},
             fixture.K2,
             valid),
-        EvidenceStatus::CurvatureCountMismatch);
+        EvidenceStatus::FeatureCountMismatch);
     EXPECT_EQ(
         ValidateSuppliedEvidence(
             fixture.Surface,
@@ -1915,7 +1915,7 @@ TEST(CurvaturePatchContract, SuppliedEvidenceFailsClosedBeforePatchWork)
             fixture.K1,
             fixture.K2,
             {fixture.HardEdgeMask, fixture.SoftEdgeConfidence}),
-        EvidenceStatus::NonFiniteCurvature);
+        EvidenceStatus::NonFiniteFeature);
     fixture.K1.front() = -1.0;
     fixture.K2.front() = 1.0;
     EXPECT_EQ(
@@ -2336,13 +2336,13 @@ TEST(CurvaturePatchContract, FeatureDetectorFailsClosedBeforeBoundedSearches)
     expectFailure(
         FeatureDetector::DetectFeatureEvidence(
             fixture.Surface, {}, fixture.K2),
-        FeatureDetector::FeatureEvidenceStatus::CurvatureCountMismatch);
+        FeatureDetector::FeatureEvidenceStatus::FeatureCountMismatch);
     std::vector<double> invalidK1 = fixture.K1;
     invalidK1.front() = std::numeric_limits<double>::quiet_NaN();
     expectFailure(
         FeatureDetector::DetectFeatureEvidence(
             fixture.Surface, invalidK1, fixture.K2),
-        FeatureDetector::FeatureEvidenceStatus::NonFiniteCurvature);
+        FeatureDetector::FeatureEvidenceStatus::NonFiniteFeature);
     invalidK1.front() = -1.0;
     expectFailure(
         FeatureDetector::DetectFeatureEvidence(

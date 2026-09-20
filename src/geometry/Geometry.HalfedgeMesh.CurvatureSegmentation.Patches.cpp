@@ -196,7 +196,7 @@ namespace Geometry::CurvatureSegmentation
             if (maxPrincipal.size() != mesh.VerticesSize() ||
                 minPrincipal.size() != mesh.VerticesSize())
             {
-                return CurvaturePatchStatus::CurvatureCountMismatch;
+                return CurvaturePatchStatus::FeatureCountMismatch;
             }
             if (evidence.HardEdgeMask.size() != mesh.EdgesSize())
                 return CurvaturePatchStatus::HardEvidenceCountMismatch;
@@ -227,7 +227,7 @@ namespace Geometry::CurvatureSegmentation
                 const double k1 = maxPrincipal[vertex.Index];
                 const double k2 = minPrincipal[vertex.Index];
                 if (!std::isfinite(k1) || !std::isfinite(k2))
-                    return CurvaturePatchStatus::NonFiniteCurvature;
+                    return CurvaturePatchStatus::NonFiniteFeature;
                 if (k1 < k2)
                     return CurvaturePatchStatus::InvalidCurvatureOrder;
                 const glm::dvec3 position{storedPosition};
@@ -284,7 +284,7 @@ namespace Geometry::CurvatureSegmentation
                     return CurvaturePatchStatus::DegenerateFace;
                 const glm::dvec2 curvature = curvatureSum / 3.0;
                 if (!IsFinite(curvature))
-                    return CurvaturePatchStatus::NonFiniteCurvature;
+                    return CurvaturePatchStatus::NonFiniteFeature;
 
                 const std::uint32_t sample =
                     static_cast<std::uint32_t>(samples.size());
@@ -305,24 +305,24 @@ namespace Geometry::CurvatureSegmentation
 
             const auto k1Normalization = ComputeCurvatureNormalization(k1Values);
             const auto k2Normalization = ComputeCurvatureNormalization(k2Values);
-            result.Diagnostics.SignedK1Center = k1Normalization.Center;
-            result.Diagnostics.SignedK2Center = k2Normalization.Center;
-            result.Diagnostics.SignedK1Scale = k1Normalization.Scale;
-            result.Diagnostics.SignedK2Scale = k2Normalization.Scale;
+            result.Diagnostics.FeatureCenter[0u] = k1Normalization.Center;
+            result.Diagnostics.FeatureCenter[1u] = k2Normalization.Center;
+            result.Diagnostics.FeatureScale[0u] = k1Normalization.Scale;
+            result.Diagnostics.FeatureScale[1u] = k2Normalization.Scale;
             for (PatchFaceSample& sample : samples)
             {
                 sample.NormalizedCurvature = glm::dvec2{
                     (sample.SignedCurvature.x -
-                     result.Diagnostics.SignedK1Center) /
-                        result.Diagnostics.SignedK1Scale,
+                     result.Diagnostics.FeatureCenter[0u]) /
+                        result.Diagnostics.FeatureScale[0u],
                     (sample.SignedCurvature.y -
-                     result.Diagnostics.SignedK2Center) /
-                        result.Diagnostics.SignedK2Scale,
+                     result.Diagnostics.FeatureCenter[1u]) /
+                        result.Diagnostics.FeatureScale[1u],
                 };
                 if (!IsFinite(sample.Descriptor) ||
                     !IsFinite(sample.NormalizedCurvature))
                 {
-                    return CurvaturePatchStatus::NonFiniteCurvature;
+                    return CurvaturePatchStatus::NonFiniteFeature;
                 }
             }
 
@@ -574,7 +574,7 @@ namespace Geometry::CurvatureSegmentation
                     static_cast<float>(sample.NormalizedCurvature.x),
                     static_cast<float>(sample.NormalizedCurvature.y), 0.0f};
                 if (!IsFinite(point))
-                    return CurvaturePatchStatus::NonFiniteCurvature;
+                    return CurvaturePatchStatus::NonFiniteFeature;
                 points.push_back(point);
             }
 
@@ -633,11 +633,13 @@ namespace Geometry::CurvatureSegmentation
                         .NormalizedK1Mean = gaussian.Mean.x,
                         .NormalizedK2Mean = gaussian.Mean.y,
                         .SignedK1Mean =
-                            result.Diagnostics.SignedK1Center +
-                            result.Diagnostics.SignedK1Scale * gaussian.Mean.x,
+                            result.Diagnostics.FeatureCenter[0u] +
+                            result.Diagnostics.FeatureScale[0u] *
+                                gaussian.Mean.x,
                         .SignedK2Mean =
-                            result.Diagnostics.SignedK2Center +
-                            result.Diagnostics.SignedK2Scale * gaussian.Mean.y,
+                            result.Diagnostics.FeatureCenter[1u] +
+                            result.Diagnostics.FeatureScale[1u] *
+                                gaussian.Mean.y,
                     });
             }
 
@@ -2586,8 +2588,8 @@ namespace Geometry::CurvatureSegmentation
             return "unsupported_submesh_view";
         case CurvaturePatchStatus::InvalidParameters:
             return "invalid_parameters";
-        case CurvaturePatchStatus::CurvatureCountMismatch:
-            return "curvature_count_mismatch";
+        case CurvaturePatchStatus::FeatureCountMismatch:
+            return "feature_count_mismatch";
         case CurvaturePatchStatus::HardEvidenceCountMismatch:
             return "hard_evidence_count_mismatch";
         case CurvaturePatchStatus::SoftEvidenceCountMismatch:
@@ -2606,8 +2608,8 @@ namespace Geometry::CurvatureSegmentation
             return "non_finite_position";
         case CurvaturePatchStatus::DegenerateFace:
             return "degenerate_face";
-        case CurvaturePatchStatus::NonFiniteCurvature:
-            return "non_finite_curvature";
+        case CurvaturePatchStatus::NonFiniteFeature:
+            return "non_finite_feature";
         case CurvaturePatchStatus::InvalidCurvatureOrder:
             return "invalid_curvature_order";
         case CurvaturePatchStatus::InvalidTopology:

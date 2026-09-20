@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <span>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -192,6 +193,25 @@ namespace
         return params;
     }
 
+    [[nodiscard]] std::vector<glm::dvec3> MakeFaceCurvatureFeatures(
+        const CurvatureFixture& fixture)
+    {
+        std::vector<glm::dvec3> features(
+            fixture.Mesh.FacesSize(), glm::dvec3{0.0});
+        for (const Geometry::FaceHandle face : fixture.Mesh.LiveFaces())
+        {
+            glm::dvec3 sum{0.0};
+            for (const Geometry::VertexHandle vertex :
+                 fixture.Mesh.VerticesAroundFace(face))
+            {
+                sum.x += fixture.K1[vertex.Index];
+                sum.y += fixture.K2[vertex.Index];
+            }
+            features[face.Index] = sum / 3.0;
+        }
+        return features;
+    }
+
     [[nodiscard]] bool SamePartition(
         const std::vector<std::uint32_t>& lhs,
         const std::vector<std::uint32_t>& rhs)
@@ -230,6 +250,91 @@ TEST(CurvatureSegmentation, FixedCountFitsSignedPrincipalCurvatureGmm)
         result.FaceComponents.end(),
         [](const std::uint32_t label)
         { return label != Segment::kInvalidLabel; }));
+}
+
+TEST(CurvatureSegmentation, CurvatureAdapterMatchesGenericD2Kernel)
+{
+    const CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
+    const auto params = FixedParams(2u);
+    const auto adapter = Segment::Segment(
+        fixture.Mesh, fixture.K1, fixture.K2, params);
+    const std::vector<glm::dvec3> features =
+        MakeFaceCurvatureFeatures(fixture);
+    const auto generic = Segment::SegmentFaceFeatures(
+        fixture.Mesh, features, 2u, params);
+
+    ASSERT_TRUE(adapter.Succeeded());
+    ASSERT_TRUE(generic.Succeeded());
+    EXPECT_EQ(adapter.FaceComponents, generic.FaceComponents);
+    EXPECT_EQ(adapter.FaceRegions, generic.FaceRegions);
+    EXPECT_EQ(adapter.EdgeBoundaries, generic.EdgeBoundaries);
+    EXPECT_EQ(adapter.FaceRegionColors, generic.FaceRegionColors);
+    EXPECT_EQ(adapter.EdgeBoundaryColors, generic.EdgeBoundaryColors);
+    EXPECT_EQ(adapter.Diagnostics.FeatureCenter,
+              generic.Diagnostics.FeatureCenter);
+    EXPECT_EQ(adapter.Diagnostics.FeatureScale,
+              generic.Diagnostics.FeatureScale);
+    EXPECT_EQ(adapter.Diagnostics.SelectedComponentCount,
+              generic.Diagnostics.SelectedComponentCount);
+    EXPECT_EQ(adapter.Diagnostics.ActiveComponentCount,
+              generic.Diagnostics.ActiveComponentCount);
+    EXPECT_DOUBLE_EQ(adapter.Diagnostics.InitialEnergy,
+                     generic.Diagnostics.InitialEnergy);
+    EXPECT_DOUBLE_EQ(adapter.Diagnostics.FinalEnergy,
+                     generic.Diagnostics.FinalEnergy);
+}
+
+TEST(CurvatureSegmentation, GenericD1UsesOnlyTheDeclaredFeatureChannel)
+{
+    const CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
+    std::vector<glm::dvec3> features(
+        fixture.Mesh.FacesSize(),
+        glm::dvec3{0.0,
+                   std::numeric_limits<double>::quiet_NaN(),
+                   std::numeric_limits<double>::quiet_NaN()});
+    const std::size_t split = features.size() / 2u;
+    for (std::size_t face = 0u; face < features.size(); ++face)
+    {
+        const double noise = 0.01 * static_cast<double>(face % 5u);
+        features[face].x = face < split ? -3.0 + noise : 4.0 + noise;
+    }
+
+    const auto result = Segment::SegmentFaceFeatures(
+        fixture.Mesh, features, 1u, FixedParams(2u));
+    ASSERT_TRUE(result.Succeeded())
+        << Segment::ToString(result.Diagnostics.Status);
+    const std::uint32_t first = result.FaceComponents.front();
+    const std::uint32_t second = result.FaceComponents[split];
+    EXPECT_NE(first, second);
+    for (std::size_t face = 0u; face < split; ++face)
+        EXPECT_EQ(result.FaceComponents[face], first);
+    for (std::size_t face = split; face < features.size(); ++face)
+        EXPECT_EQ(result.FaceComponents[face], second);
+}
+
+TEST(CurvatureSegmentation, GenericD3UsesTheThirdFeatureChannel)
+{
+    const CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
+    std::vector<glm::dvec3> features(
+        fixture.Mesh.FacesSize(), glm::dvec3{2.0, -1.0, 0.0});
+    const std::size_t split = features.size() / 2u;
+    for (std::size_t face = 0u; face < features.size(); ++face)
+    {
+        const double noise = 0.01 * static_cast<double>(face % 5u);
+        features[face].z = face < split ? -5.0 + noise : 6.0 + noise;
+    }
+
+    const auto result = Segment::SegmentFaceFeatures(
+        fixture.Mesh, features, 3u, FixedParams(2u));
+    ASSERT_TRUE(result.Succeeded())
+        << Segment::ToString(result.Diagnostics.Status);
+    const std::uint32_t first = result.FaceComponents.front();
+    const std::uint32_t second = result.FaceComponents[split];
+    EXPECT_NE(first, second);
+    for (std::size_t face = 0u; face < split; ++face)
+        EXPECT_EQ(result.FaceComponents[face], first);
+    for (std::size_t face = split; face < features.size(); ++face)
+        EXPECT_EQ(result.FaceComponents[face], second);
 }
 
 TEST(CurvatureSegmentation, AutomaticModeSelectsSeparatedPopulations)
@@ -522,7 +627,7 @@ TEST(CurvatureSegmentation, FailsClosedOnInvalidInputs)
     CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
     EXPECT_EQ(
         Segment::Segment(fixture.Mesh, {}, fixture.K2).Diagnostics.Status,
-        Segment::SegmentationStatus::CurvatureCountMismatch);
+        Segment::SegmentationStatus::FeatureCountMismatch);
 
     auto badParams = FixedParams(2u);
     badParams.SpatialWeight = -1.0;
@@ -538,7 +643,37 @@ TEST(CurvatureSegmentation, FailsClosedOnInvalidInputs)
             fixture.K1,
             fixture.K2,
             FixedParams(2u)).Diagnostics.Status,
-        Segment::SegmentationStatus::NonFiniteCurvature);
+        Segment::SegmentationStatus::NonFiniteFeature);
+}
+
+TEST(CurvatureSegmentation, GenericFeaturesRejectInvalidShapeAndValues)
+{
+    const CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
+    std::vector<glm::dvec3> features =
+        MakeFaceCurvatureFeatures(fixture);
+
+    EXPECT_EQ(
+        Segment::SegmentFaceFeatures(
+            fixture.Mesh,
+            std::span<const glm::dvec3>{
+                features.data(), features.size() - 1u},
+            2u,
+            FixedParams(2u)).Diagnostics.Status,
+        Segment::SegmentationStatus::FeatureCountMismatch);
+    EXPECT_EQ(
+        Segment::SegmentFaceFeatures(
+            fixture.Mesh, features, 0u, FixedParams(2u)).Diagnostics.Status,
+        Segment::SegmentationStatus::InvalidParameters);
+    EXPECT_EQ(
+        Segment::SegmentFaceFeatures(
+            fixture.Mesh, features, 4u, FixedParams(2u)).Diagnostics.Status,
+        Segment::SegmentationStatus::InvalidParameters);
+
+    features.front().y = std::numeric_limits<double>::infinity();
+    EXPECT_EQ(
+        Segment::SegmentFaceFeatures(
+            fixture.Mesh, features, 2u, FixedParams(2u)).Diagnostics.Status,
+        Segment::SegmentationStatus::NonFiniteFeature);
 }
 
 TEST(CurvatureSegmentation,
@@ -582,6 +717,19 @@ TEST(CurvatureSegmentation,
         result.EdgeBoundaryColors.end(),
         [](const glm::vec4& color) { return color == glm::vec4(0.0f); }));
     EXPECT_EQ(result.Diagnostics.BoundaryEdgeCount, 0u);
+
+    std::vector<glm::dvec3> features(
+        mesh.FacesSize(), glm::dvec3{2.0, -1.0, 0.0});
+    features[0u] = glm::dvec3{
+        std::numeric_limits<double>::quiet_NaN()};
+    const auto generic = Segment::SegmentFaceFeatures(
+        mesh, features, 2u, FixedParams(1u));
+    ASSERT_TRUE(generic.Succeeded())
+        << Segment::ToString(generic.Diagnostics.Status);
+    ASSERT_EQ(generic.FaceComponents.size(), faceSlots);
+    EXPECT_EQ(generic.FaceComponents[0u], Segment::kInvalidLabel);
+    EXPECT_EQ(generic.FaceRegions[0u], Segment::kInvalidLabel);
+    EXPECT_NE(generic.FaceComponents[1u], Segment::kInvalidLabel);
 }
 
 TEST(CurvatureSegmentation, RejectsPolygonAndDegenerateFaces)

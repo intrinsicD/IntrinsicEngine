@@ -2,6 +2,7 @@
 // without importing mesh containers or the algorithms that produce them.
 module;
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -16,11 +17,11 @@ export namespace Geometry::CurvatureSegmentation
         EmptyMesh,
         UnsupportedSubmeshView,
         InvalidParameters,
-        CurvatureCountMismatch,
+        FeatureCountMismatch,
         NonTriangleFace,
         NonFinitePosition,
         DegenerateFace,
-        NonFiniteCurvature,
+        NonFiniteFeature,
         GaussianMixtureFitFailed,
         PosteriorEvaluationFailed,
     };
@@ -76,10 +77,8 @@ export namespace Geometry::CurvatureSegmentation
         std::size_t LiveEdgeCount{0u};
         std::size_t DualEdgeCount{0u};
 
-        double SignedK1Center{0.0};
-        double SignedK2Center{0.0};
-        double SignedK1Scale{1.0};
-        double SignedK2Scale{1.0};
+        std::array<double, 3u> FeatureCenter{};
+        std::array<double, 3u> FeatureScale{1.0, 1.0, 1.0};
 
         std::uint32_t RequestedComponentCount{0u};
         std::uint32_t SelectedComponentCount{0u};
@@ -116,11 +115,11 @@ export namespace Geometry::CurvatureSegmentation
         EmptyMesh,
         UnsupportedSubmeshView,
         InvalidParameters,
-        CurvatureCountMismatch,
+        FeatureCountMismatch,
         NonTriangleFace,
         NonFinitePosition,
         DegenerateFace,
-        NonFiniteCurvature,
+        NonFiniteFeature,
         InvalidCurvatureOrder,
         InvalidTopology,
         HardFeatureClassificationFailed,
@@ -184,7 +183,7 @@ export namespace Geometry::CurvatureSegmentation
         EmptyMesh,
         UnsupportedSubmeshView,
         InvalidParameters,
-        CurvatureCountMismatch,
+        FeatureCountMismatch,
         HardEvidenceCountMismatch,
         SoftEvidenceCountMismatch,
         InvalidHardEvidence,
@@ -194,7 +193,7 @@ export namespace Geometry::CurvatureSegmentation
         NonTriangleFace,
         NonFinitePosition,
         DegenerateFace,
-        NonFiniteCurvature,
+        NonFiniteFeature,
         InvalidCurvatureOrder,
         InvalidTopology,
         GaussianMixtureFitFailed,
@@ -243,10 +242,8 @@ export namespace Geometry::CurvatureSegmentation
         double BoundingBoxDiagonal{0.0};
         double BaseRadiusWorld{0.0};
         double SeedSpacingCost{0.0};
-        double SignedK1Center{0.0};
-        double SignedK2Center{0.0};
-        double SignedK1Scale{1.0};
-        double SignedK2Scale{1.0};
+        std::array<double, 3u> FeatureCenter{};
+        std::array<double, 3u> FeatureScale{1.0, 1.0, 1.0};
 
         std::uint32_t SelectedComponentCount{0u};
         std::size_t SeedCount{0u};

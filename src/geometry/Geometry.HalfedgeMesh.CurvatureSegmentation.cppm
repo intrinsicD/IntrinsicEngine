@@ -1,5 +1,5 @@
-// Exposes signed-curvature GMM segmentation so geometry and runtime share
-// deterministic component selection, region labels, and diagnostics.
+// Exposes bounded face-feature GMM segmentation and curvature adapters so
+// geometry and runtime share deterministic labels and diagnostics.
 module;
 
 #include <cstddef>
@@ -98,6 +98,15 @@ export namespace Geometry::CurvatureSegmentation
         ComponentSelectionMode mode) noexcept;
     [[nodiscard]] const char* ToString(
         SegmentationStatus status) noexcept;
+
+    // Features are face-slot aligned and dimension selects the active leading
+    // channels (1..3). Inactive packed channels and deleted-face slots are
+    // ignored. The kernel does not mutate the mesh.
+    [[nodiscard]] CurvatureSegmentationResult SegmentFaceFeatures(
+        const HalfedgeMesh::Mesh& mesh,
+        std::span<const glm::dvec3> faceFeatures,
+        std::uint32_t dimension,
+        const CurvatureSegmentationParams& params = {});
 
     // Segment a triangle mesh from slot-aligned signed principal curvatures.
     // maxPrincipal[i] is k1 and minPrincipal[i] is k2, with k1 >= k2 under the
