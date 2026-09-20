@@ -62,10 +62,8 @@ export namespace Geometry::CurvatureSegmentation
     {
         std::uint32_t Component{0u};
         double Weight{0.0};
-        double NormalizedK1Mean{0.0};
-        double NormalizedK2Mean{0.0};
-        double SignedK1Mean{0.0};
-        double SignedK2Mean{0.0};
+        std::array<double, 3u> NormalizedFeatureMean{};
+        std::array<double, 3u> FeatureMean{};
     };
 
     struct CurvatureSegmentationDiagnostics
@@ -77,6 +75,9 @@ export namespace Geometry::CurvatureSegmentation
         std::size_t LiveEdgeCount{0u};
         std::size_t DualEdgeCount{0u};
 
+        // Only the leading FeatureDimension lanes of feature diagnostics and
+        // component means participate in the solve.
+        std::uint32_t FeatureDimension{0u};
         std::array<double, 3u> FeatureCenter{};
         std::array<double, 3u> FeatureScale{1.0, 1.0, 1.0};
 
@@ -115,11 +116,11 @@ export namespace Geometry::CurvatureSegmentation
         EmptyMesh,
         UnsupportedSubmeshView,
         InvalidParameters,
-        FeatureCountMismatch,
+        CurvatureCountMismatch,
         NonTriangleFace,
         NonFinitePosition,
         DegenerateFace,
-        NonFiniteFeature,
+        NonFiniteCurvature,
         InvalidCurvatureOrder,
         InvalidTopology,
         HardFeatureClassificationFailed,
@@ -183,7 +184,7 @@ export namespace Geometry::CurvatureSegmentation
         EmptyMesh,
         UnsupportedSubmeshView,
         InvalidParameters,
-        FeatureCountMismatch,
+        CurvatureCountMismatch,
         HardEvidenceCountMismatch,
         SoftEvidenceCountMismatch,
         InvalidHardEvidence,
@@ -193,7 +194,7 @@ export namespace Geometry::CurvatureSegmentation
         NonTriangleFace,
         NonFinitePosition,
         DegenerateFace,
-        NonFiniteFeature,
+        NonFiniteCurvature,
         InvalidCurvatureOrder,
         InvalidTopology,
         GaussianMixtureFitFailed,
@@ -242,8 +243,10 @@ export namespace Geometry::CurvatureSegmentation
         double BoundingBoxDiagonal{0.0};
         double BaseRadiusWorld{0.0};
         double SeedSpacingCost{0.0};
-        std::array<double, 3u> FeatureCenter{};
-        std::array<double, 3u> FeatureScale{1.0, 1.0, 1.0};
+        double SignedK1Center{0.0};
+        double SignedK2Center{0.0};
+        double SignedK1Scale{1.0};
+        double SignedK2Scale{1.0};
 
         std::uint32_t SelectedComponentCount{0u};
         std::size_t SeedCount{0u};

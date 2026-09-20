@@ -274,6 +274,8 @@ TEST(CurvatureSegmentation, CurvatureAdapterMatchesGenericD2Kernel)
               generic.Diagnostics.FeatureCenter);
     EXPECT_EQ(adapter.Diagnostics.FeatureScale,
               generic.Diagnostics.FeatureScale);
+    EXPECT_EQ(adapter.Diagnostics.FeatureDimension, 2u);
+    EXPECT_EQ(generic.Diagnostics.FeatureDimension, 2u);
     EXPECT_EQ(adapter.Diagnostics.SelectedComponentCount,
               generic.Diagnostics.SelectedComponentCount);
     EXPECT_EQ(adapter.Diagnostics.ActiveComponentCount,
@@ -303,6 +305,14 @@ TEST(CurvatureSegmentation, GenericD1UsesOnlyTheDeclaredFeatureChannel)
         fixture.Mesh, features, 1u, FixedParams(2u));
     ASSERT_TRUE(result.Succeeded())
         << Segment::ToString(result.Diagnostics.Status);
+    EXPECT_EQ(result.Diagnostics.FeatureDimension, 1u);
+    for (const auto& component : result.Diagnostics.Components)
+    {
+        EXPECT_EQ(component.NormalizedFeatureMean[1u], 0.0);
+        EXPECT_EQ(component.NormalizedFeatureMean[2u], 0.0);
+        EXPECT_EQ(component.FeatureMean[1u], 0.0);
+        EXPECT_EQ(component.FeatureMean[2u], 0.0);
+    }
     const std::uint32_t first = result.FaceComponents.front();
     const std::uint32_t second = result.FaceComponents[split];
     EXPECT_NE(first, second);
@@ -328,6 +338,14 @@ TEST(CurvatureSegmentation, GenericD3UsesTheThirdFeatureChannel)
         fixture.Mesh, features, 3u, FixedParams(2u));
     ASSERT_TRUE(result.Succeeded())
         << Segment::ToString(result.Diagnostics.Status);
+    EXPECT_EQ(result.Diagnostics.FeatureDimension, 3u);
+    ASSERT_EQ(result.Diagnostics.Components.size(), 2u);
+    std::array<double, 2u> thirdChannelMeans{
+        result.Diagnostics.Components[0u].FeatureMean[2u],
+        result.Diagnostics.Components[1u].FeatureMean[2u]};
+    std::sort(thirdChannelMeans.begin(), thirdChannelMeans.end());
+    EXPECT_NEAR(thirdChannelMeans[0u], -4.98, 0.1);
+    EXPECT_NEAR(thirdChannelMeans[1u], 6.02, 0.1);
     const std::uint32_t first = result.FaceComponents.front();
     const std::uint32_t second = result.FaceComponents[split];
     EXPECT_NE(first, second);
@@ -584,6 +602,7 @@ TEST(CurvatureSegmentation,
     EXPECT_EQ(result.FaceComponents.size(), sphere.FacesSize());
     EXPECT_EQ(result.EdgeBoundaries.size(), sphere.EdgesSize());
     EXPECT_EQ(result.Diagnostics.SelectedComponentCount, 1u);
+    EXPECT_EQ(result.Diagnostics.FeatureDimension, 2u);
     EXPECT_EQ(result.Diagnostics.ConnectedRegionCount, 1u);
     EXPECT_EQ(result.Diagnostics.BoundaryEdgeCount, 0u);
     EXPECT_TRUE(std::isfinite(
@@ -674,6 +693,33 @@ TEST(CurvatureSegmentation, GenericFeaturesRejectInvalidShapeAndValues)
         Segment::SegmentFaceFeatures(
             fixture.Mesh, features, 2u, FixedParams(2u)).Diagnostics.Status,
         Segment::SegmentationStatus::NonFiniteFeature);
+}
+
+TEST(CurvatureSegmentation, CurvatureAdapterPreservesValidationPriority)
+{
+    CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
+    fixture.K1[0u] = std::numeric_limits<double>::quiet_NaN();
+    fixture.Mesh.Position(Geometry::VertexHandle{1u}) = glm::vec3{
+        std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f};
+    EXPECT_EQ(
+        Segment::Segment(
+            fixture.Mesh,
+            fixture.K1,
+            fixture.K2,
+            FixedParams(2u)).Diagnostics.Status,
+        Segment::SegmentationStatus::NonFiniteFeature);
+
+    fixture.K1[0u] = 0.0;
+    fixture.K1[1u] = std::numeric_limits<double>::quiet_NaN();
+    fixture.Mesh.Position(Geometry::VertexHandle{0u}) = glm::vec3{
+        std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f};
+    EXPECT_EQ(
+        Segment::Segment(
+            fixture.Mesh,
+            fixture.K1,
+            fixture.K2,
+            FixedParams(2u)).Diagnostics.Status,
+        Segment::SegmentationStatus::NonFinitePosition);
 }
 
 TEST(CurvatureSegmentation,
