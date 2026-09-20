@@ -4,6 +4,7 @@
 // No public module surface is added.
 #pragma once
 #include "Runtime.GeometryProcessingOperations.MeshSources.hpp"
+#include "Runtime.GeometryProcessingOperations.MeshReadiness.hpp"
 // Job envelope and the shared job/cache/finite-position helpers are declared by
 // the point-field header; this one adds the mesh-snapshot surface on top.
 #include "Runtime.GeometryProcessingOperations.PointFields.hpp"
@@ -19,23 +20,6 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
         using EditorFeatureDetail::ToEditorCommandStatus;
         namespace Dirty = Extrinsic::ECS::Components::DirtyTags;
         namespace GS = Extrinsic::ECS::Components::GeometrySources;
-
-        // Checks property presence/cardinality without traversing or copying buffers.
-        [[nodiscard]] EditorCommandStatus ValidateMeshPositionSourceMetadata(
-            const GS::ConstSourceView& view, std::string& diagnostic,
-            std::string_view positionProperty = GS::PropertyNames::kPosition);
-
-        // Requires successful position metadata validation; callers retain error priority.
-        [[nodiscard]] EditorCommandStatus ValidateMeshVertexDeletionMaskMetadata(
-            const GS::ConstSourceView& view, std::string& diagnostic,
-            std::string_view positionProperty = GS::PropertyNames::kPosition);
-
-        [[nodiscard]] EditorCommandStatus ValidateMeshSoupSourceMetadata(
-            const GS::ConstSourceView& view, std::string& diagnostic,
-            std::string_view positionProperty = GS::PropertyNames::kPosition);
-
-
-
 
         [[nodiscard]] bool SameKnownPropertyValues(
             const Geometry::ConstPropertySet& current,

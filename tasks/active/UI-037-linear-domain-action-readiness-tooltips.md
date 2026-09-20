@@ -13,7 +13,7 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, geometry
 ---
 # UI-037 — Linear domain-action readiness and disabled-reason tooltips
 
-Current continuation: see [UV undo-mask checkpoint and open points](#continuation--uv-undo-mask-readiness-2026-09-20).
+Current continuation: see [UV face-ring checkpoint and open points](#continuation--cached-uv-face-ring-readiness-2026-09-20).
 Read that checkpoint plus the initial scope before consulting the historical slices.
 
 ## Remaining closure estimate — 2026-09-19
@@ -5925,3 +5925,140 @@ Read the initial scope and this latest checkpoint. Next bounded UI-037 work:
 inventory existing cached mesh-connectivity results and implement one family's
 readiness from them; do not reopen the completed metadata predicates. Keep matched
 compilation-time measurements with the BUILD-009 owner.
+
+
+## Continuation — Cached UV face-ring readiness (2026-09-20)
+
+Operator direction: continue duplicate-code and compile-locality work with Claude
+Fable 5.1 from `819118e7c`. This slice advances slice 6; UI-037 remains active.
+The existing contract IDs still apply. No performance or operational claim is
+introduced; source, tests and this checkpoint are the implementation record.
+
+Discovery: no existing cached mesh-connectivity verdict was found. The topology
+signature is a full-buffer stale-source fingerprint, unsuitable for per-frame
+readiness. Reuse decision: extend the existing session input cache with a distinct
+mesh-face-ring kind and reuse its revision watches, command bus, weak entries,
+world-generation/attachment guards and pruning. The compiled soup builder and
+scan-only validator share one `WalkMeshSoupFaces`; no copied ring algorithm.
+
+Right-sizing: a second cache/service would duplicate lifecycle machinery. Two
+present input kinds justify a private enum and shared preparation path, not a
+new framework. The narrow private `MeshReadiness.hpp` keeps the cache free of
+owning halfedge/soup imports; no public module, CMake entry or dependency edge
+is added. The existing opaque point-input state/stat names remain; implementation
+and architecture docs explain that scan counts include mesh rings. Broader naming
+cleanup is not required for correctness or UI-037 closure.
+
+Behavior: UV retains metadata → active-job → ring verdict → undo-mask order.
+Prepared sessions return a pending reason and scan at the next command drain;
+standalone contexts retain synchronous preflight. Ring errors and empty-surface
+errors now agree with apply, including mixed ring/mask defects. Apply always
+rebuilds current source and does not trust preview. Vertex slot counts, not coordinate
+revisions, govern ring validity; masks are checked live without invalidating rings.
+This verdict does not certify finite coordinates, conversion or atlas feasibility.
+
+Tests cover pending/deduplicated requests, zero rescans on repeated frames,
+positive/negative caching, point/ring entry separation, invalid-ring/mask priority,
+stale enabled-preview rejection, repair, skipped/all-empty rings, supersession,
+detach/reattach and world-generation invalidation. Existing polygon/unused-slot,
+UV active-job and full point-readiness regressions remain selected.
+
+Claude Fable reviewed the plan and fixed diff, then reviewed the refinements.
+No blockers remain. Addressed its redundant world-guard, coordinate-only
+invalidation and mesh queue-diagnostic findings; added position-edit, expiry and
+missing-queue assertions. The existing polygon/unused-slot regression already
+covers a quad plus skipped face through both preview and apply. No enqueue-failure
+injection seam was added: typed `CommandBus::Enqueue` creates a valid envelope;
+its normal rejection path accepts only an empty envelope. The private scan helper
+keeps an explicit property argument because its cache caller always supplies one.
+
+Affected production physical lines, including the new private header:
+**2,629 → 2,723 (+94)** across five files. This adds a cached readiness capability
+while sharing the existing ring traversal and cache lifecycle; it is not a net
+line-count reduction. No added imports, public module surface, CMake source entry
+or owning mesh dependency in the point-input cache. Compile-locality regressions
+pass; elapsed compilation improvement is unmeasured.
+
+Source-documentation audit: five production files, zero errors. Seven review
+prompts were inspected: two metadata precondition/cost comments in the narrow
+header and retained lifetime/ownership/snapshot invariants in MeshSupport; the
+existing four-line synopsis is unchanged. Pre-merge sweep: one runtime-owned
+intent, tests and docs synchronized, no compatibility paths or layer exceptions.
+Workshop rows 1–3/8 pass; renderer/recipe/maturity-closure rows 4–7 are inapplicable.
+No module inventory refresh is needed; the session brief remains current.
+
+Verification (preset-selected Clang 23, unsanitized):
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+ctest --test-dir build/ci --output-on-failure -R '^EditorPointReadiness\.|^SandboxEditorUi\.(Uv.*|MeshAdmission.*)$|^ProcessingCompilationLocality\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/agents/generate_session_brief.py --check
+python3 tools/repo/check_root_hygiene.py --root .
+# Explicit touched-file docs-sync and source-documentation audits also passed.
+```
+
+Focused gates passed **97/97**, both before and after review refinements. The
+initial and final-source full CPU gates each passed **4,844 tests**, with one
+expected ASan-only skip and zero failures (4,845 selected). Both `IntrinsicTests`
+builds passed; structural, task, docs and compilation-boundary checks passed.
+No source edits were made during CTest. No sanitizer/GPU execution or measured
+compile-time improvement is claimed. Logs and fixed review packets:
+`/tmp/intrinsic-uv-rings/`.
+
+### Current open points
+
+- [ ] Slice 5: profile and remove/bound exact transformed-normal ICP preview
+      scans while preserving extreme-scale numerical acceptance and transform
+      invalidation. Close paired-source/normal metadata and attachment/world
+      lifecycle gaps in the cross-family matrix.
+- [ ] Slice 6: adopt shared cached ring validation in the remaining processing
+      families where their exact diagnostic order agrees; complete command-only
+      numerical/conversion readiness without per-frame scans. UV ring-versus-mask
+      priority is now closed, but finite input, conversion validity and UV
+      feasibility remain command-only. Preserve distinct normal-builder empty-face
+      fallback/no-op, deleted-face/edge filtering and ring semantics.
+- [ ] Slice 6 follow-up: decide malformed mask type policy consistently with
+      existing property-domain contracts; processing treats absent/non-Boolean
+      `v:deleted` as no mask, whereas normal capture rejects wrong types. Inventory
+      face/edge mask policies per actual consumer before extending validation;
+      UV soup and processing triangulation do not consume those masks.
+- [ ] Slice 7: shared runtime parameterization strategy, pin and boundary readiness.
+- [ ] Slice 8: texture-bake property/UV/device/range readiness and shared presentation.
+- [ ] Slice 9: K-Means, Progressive Poisson, consolidation and outlier service,
+      backend and variant readiness through config/UI/agent validation.
+- [ ] Slice 10: common prepared-frame readiness, remaining app prerequisite
+      duplication and hidden actions.
+- [ ] Slice 11: full table-driven
+      `SandboxEditorUi.ActionReadinessDerivesDomainPrerequisiteReasons` matrix;
+      family invalidation/lifecycle/supersession and zero-scan coverage.
+- [ ] Slice 12: real ImGui enabled-command and disabled-tooltip/no-command
+      coverage for every action/option; final stale guards, full verification,
+      review and operational closure.
+- [ ] Optional scalar catalog coverage: missing command queue and mixed live
+      counts across candidate domains.
+- [ ] Optional point/normal capture work: second slot-vector allocation and paired
+      size assertions only if profiling or mapping changes justify it.
+- [ ] Optional ICP coverage: mixed-domain/default-source, queued transform
+      staleness and target/face malformed masks; revisit legacy `v:normal`
+      wording/Error codes only when revising that surface. Snapshot/index row
+      alignment and watch-first GPU poll validation need their own verified scope.
+- [ ] Non-gating compilation: matched timing under a dedicated build-task owner;
+      retain named-module identity and do not reopen completed compile slices.
+      BUILD-009 is retired; its old baseline is not evidence for this slice.
+- [ ] Non-gating scheduling: worker/per-drain budgeting only for measured latency;
+      deferred point validation still runs on the main thread.
+
+
+Session boundary: after final review, verification and checkpoint push, start a
+fresh session. Read the initial scope and this checkpoint, not the long history.
+Next bounded slice: adopt the compiled cached ring verdict in one processing
+family while preserving its mask/metadata priority; then address its remaining
+numerical/conversion readiness explicitly. Keep compile measurements separately
+owned; fewer repeated bodies or narrower headers do not prove faster compilation.

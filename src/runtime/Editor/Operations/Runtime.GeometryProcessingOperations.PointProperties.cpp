@@ -1,3 +1,5 @@
+// Point captures and session-owned input verdicts; mesh ring checks reuse the
+// same revision, deferred-command and world/attachment lifetime guards.
 #include <functional>
 #include <algorithm>
 #include <array>
@@ -35,11 +37,13 @@ import Extrinsic.Runtime.CommandBus;
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 #include "Editor/internal/Runtime.EditorPointInputReadiness.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshReadiness.hpp"
 
 namespace Extrinsic::Runtime
 {
     extern "C++" struct EditorPointInputReadinessState
     {
+        enum class InputKind { PointRows, MeshFaceRings };
         struct Entry
         {
             ECS::Scene::Registry* Scene{};
@@ -47,6 +51,7 @@ namespace Extrinsic::Runtime
             std::uint64_t WorldGeneration{};
             entt::entity Entity{};
             GeometryPropertyRef Positions{};
+            InputKind Kind{};
             std::vector<GeometryProcessingDetail::PointPropertyWatch> Inputs{};
             std::function<bool()> AttachmentActive{};
             std::function<void()> Invalidate{};
@@ -270,6 +275,37 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
                ScanPointInputRows(a, positions, copyValues, w, diagnostic);
     }
 
+    using InputKind = EditorPointInputReadinessState::InputKind;
+
+    static bool CaptureInputMetadata(
+        InputKind kind, const GeometryEntityAvailability& a, GeometryPropertyRef& positions,
+        PointInputCapture& capture, std::string& diagnostic)
+    {
+        if (kind == InputKind::PointRows)
+            return CapturePointInputMetadata(a, positions, capture, diagnostic);
+        if (MeshSupport::ValidateMeshSoupSourceMetadata(a.SourceView, diagnostic, positions.Name) !=
+            EditorCommandStatus::Applied) return false;
+        capture.Inputs = {
+            ObserveGeometryProperty(a, D::MeshVertex, positions.Name),
+            ObserveGeometryProperty(a, D::MeshHalfedge, std::string{GS::PropertyNames::kHalfedgeToVertex}),
+            ObserveGeometryProperty(a, D::MeshHalfedge, std::string{GS::PropertyNames::kHalfedgeNext}),
+            ObserveGeometryProperty(a, D::MeshHalfedge, std::string{GS::PropertyNames::kHalfedgeFace}),
+            ObserveGeometryProperty(a, D::MeshFace, std::string{GS::PropertyNames::kFaceHalfedge})};
+        // Ring validity depends on vertex slots, not coordinate values.
+        capture.Inputs.front().Revision.reset();
+        return true;
+    }
+
+    static bool ScanInputRows(
+        InputKind kind, const GeometryEntityAvailability& a, const GeometryPropertyRef& positions,
+        PointInputCapture& capture, std::string& diagnostic)
+    {
+        if (kind == InputKind::PointRows)
+            return ScanPointInputRows(a, positions, false, capture, diagnostic);
+        return MeshSupport::ValidateMeshSoupFaceRings(a.SourceView, diagnostic, positions.Name) ==
+               EditorCommandStatus::Applied;
+    }
+
     namespace
     {
         struct CheckPointInputReadiness
@@ -298,13 +334,13 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             auto positions = entry->Positions;
             PointInputCapture capture;
             std::string diagnostic;
-            if (!CapturePointInputMetadata(availability, positions, capture, diagnostic) ||
+            if (!CaptureInputMetadata(entry->Kind, availability, positions, capture, diagnostic) ||
                 capture.Inputs != entry->Inputs)
             {
                 invalidate();
                 return;
             }
-            entry->Accepted = ScanPointInputRows(availability, positions, false, capture, diagnostic);
+            entry->Accepted = ScanInputRows(entry->Kind, availability, positions, capture, diagnostic);
             ++state->Stats.PropertyScans;
             entry->LiveCount = capture.LiveCount;
             entry->ValidLbvh = capture.ValidLbvh;
@@ -330,24 +366,26 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         return context.PointInputReadiness ? context.PointInputReadiness->Stats : EditorPointInputReadinessStats{};
     }
 
-    bool PreparePointInput(
-        const EditorProcessingContext& context, entt::entity entity,
+    static bool PrepareInput(
+        InputKind kind, const EditorProcessingContext& context, entt::entity entity,
         const GeometryEntityAvailability& availability, GeometryPropertyRef& positions,
         PointInputCapture& capture, std::string& diagnostic)
     {
-        if (!CapturePointInputMetadata(availability, positions, capture, diagnostic)) return false;
+        if (!CaptureInputMetadata(kind, availability, positions, capture, diagnostic)) return false;
         if (!context.PointInputReadiness)
-            return ScanPointInputRows(availability, positions, false, capture, diagnostic);
+            return ScanInputRows(kind, availability, positions, capture, diagnostic);
         auto& state = *context.PointInputReadiness;
         if (!state.Commands)
         {
-            diagnostic = "Point-input readiness is unavailable. Attach an editor with a command queue.";
+            diagnostic = kind == InputKind::PointRows
+                ? "Point-input readiness is unavailable. Attach an editor with a command queue."
+                : "Mesh-ring readiness is unavailable. Attach an editor with a command queue.";
             return false;
         }
         const auto generation = state.Jobs ? state.Jobs->WorldGeneration(context.World) : 0;
         auto slot = std::ranges::find_if(state.Entries, [&](const auto& entry) {
             return entry->Scene == context.Scene && entry->World == context.World &&
-                   entry->Entity == entity && entry->Positions == positions;
+                   entry->Entity == entity && entry->Positions == positions && entry->Kind == kind;
         });
         if (slot == state.Entries.end())
             slot = state.Entries.insert(slot, std::shared_ptr<EditorPointInputReadinessState::Entry>{});
@@ -356,7 +394,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             entry = std::make_shared<EditorPointInputReadinessState::Entry>(
                 EditorPointInputReadinessState::Entry{
                     .Scene = context.Scene, .World = context.World, .WorldGeneration = generation,
-                    .Entity = entity, .Positions = positions, .Inputs = capture.Inputs,
+                    .Entity = entity, .Positions = positions, .Kind = kind, .Inputs = capture.Inputs,
                     .AttachmentActive = context.AttachmentActive,
                     .Invalidate = context.InvalidateWorkspaceSnapshotCache});
         entry->RequestedFrame = state.Frame;
@@ -378,9 +416,30 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             if (entry->Queued) ++state.Stats.ChecksQueued;
         }
         diagnostic = entry->Queued
-            ? "Checking live point samples. Wait for input validation."
-            : "Unable to queue point-input validation. Reattach the editor and retry.";
+            ? (kind == InputKind::PointRows
+                ? "Checking live point samples. Wait for input validation."
+                : "Checking mesh face rings. Wait for input validation.")
+            : (kind == InputKind::PointRows
+                ? "Unable to queue point-input validation. Reattach the editor and retry."
+                : "Unable to queue mesh-ring validation. Reattach the editor and retry.");
         return false;
+    }
+
+    bool PreparePointInput(
+        const EditorProcessingContext& context, entt::entity entity,
+        const GeometryEntityAvailability& availability, GeometryPropertyRef& positions,
+        PointInputCapture& capture, std::string& diagnostic)
+    {
+        return PrepareInput(InputKind::PointRows, context, entity, availability, positions, capture, diagnostic);
+    }
+
+    bool MeshSupport::PrepareMeshSoupFaceRings(
+        const EditorProcessingContext& context, entt::entity entity,
+        const GeometryEntityAvailability& availability, std::string& diagnostic)
+    {
+        GeometryPropertyRef positions{D::MeshVertex, std::string{GS::PropertyNames::kPosition}, Geometry::PropertyValueKind::Vec3};
+        PointInputCapture capture;
+        return PrepareInput(InputKind::MeshFaceRings, context, entity, availability, positions, capture, diagnostic);
     }
 
     bool CapturePointNormalInput(

@@ -1136,14 +1136,15 @@ using namespace GeometryProcessingDetail::MeshSupport;
     ActionReadiness PreviewEditorUvRegenerationCommand(
         const EditorProcessingCommands& commands, const EditorUvRegenerationCommand& command)
     {
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         GS::ConstSourceView view{};
-        auto result = ValidateUvRegenerationRequest(
-            EditorProcessingCommandsAccess::Resolve(commands), command, view);
+        auto result = ValidateUvRegenerationRequest(context, command, view);
         if (result.Succeeded())
         {
-            // Apply checks this undo-source prerequisite after full soup validation;
-            // preview reuses its metadata predicate without traversing face rings.
             std::string diagnostic;
+            const auto entity = ResolveStableEntity(context.Scene->Raw(), command.StableEntityId);
+            if (!PrepareMeshSoupFaceRings(context, *entity, BuildGeometryAvailability(view), diagnostic))
+                return {false, "UV regeneration cannot use the selected entity: " + diagnostic};
             if (ValidateMeshVertexDeletionMaskMetadata(view, diagnostic) != EditorCommandStatus::Applied)
                 return {false, "UV regeneration: " + diagnostic};
         }

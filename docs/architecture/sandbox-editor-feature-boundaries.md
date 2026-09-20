@@ -400,7 +400,8 @@ consumers of spatial-index neighborhoods.
 keypoints, outliers, descriptors, construction, normals and registration, independently
 of method result records. Density, spacing and bilateral catalogs require two live samples;
 registration requires three; the generic catalog requires one. Catalog admission does not depend on the requested execution backend.
-Prepared editor sessions own an opaque point-input readiness cache. Catalog,
+Prepared editor sessions own an opaque input-readiness cache in
+`Runtime.GeometryProcessingOperations.PointProperties.cpp`. Catalog,
 density, spacing, density-weight, outlier, keypoint, normal, bilateral, descriptor,
 construction and registration previews inspect point metadata and enqueue a missing verdict on the engine's existing command bus.
 The next main-thread command drain runs the compiled canonical row scan. The
@@ -519,11 +520,23 @@ shares the processing builder's optional Boolean vertex-mask cardinality check
 with topology, curvature and segmentation admission. Topology checks it after
 positions and before soup metadata; curvature checks it after soup metadata,
 and segmentation after edge metadata. Each family retains its diagnostic prefix
-and priority. UV preview reuses the same mask predicate after metadata and active-job
-admission, matching the downstream undo-topology diagnostic. UV execution retains
-full soup validation before that undo snapshot; an invalid face ring therefore
-precedes the mask error in apply, while preview reports the mask without scanning
-rings. Cached connectivity readiness remains open under UI-037.
+and priority. UV preview requests a cached face-ring verdict after metadata and
+active-job admission, then checks the mask, matching the command's error order.
+`MeshSupport.cpp` compiles one ring walk for soup construction and scan-only
+validation; the latter does not copy positions or materialize triangles. A
+`MeshFaceRings` input kind reuses the existing cache, weak queued entries,
+world/attachment guards and frame pruning. Its key includes the bound position
+property's slot count and the four canonical face/halfedge topology properties'
+counts and revisions. Point-row and mesh-ring entries never alias.
+The shared scan counter includes both kinds. Mask-only edits do not rescan rings;
+coordinate-only edits do not invalidate ring validity either. Deferred checks run
+on the main-thread command drain, not the UI frame; standalone contexts retain
+synchronous validation.
+`Runtime.GeometryProcessingOperations.MeshReadiness.hpp` exposes only admission
+and readiness declarations, so the cache does not import owning mesh or soup
+modules. Negative ring verdicts are cached. Finite-input, conversion and UV
+feasibility readiness, plus other mesh families' connectivity verdicts, remain
+open under UI-037.
 Duplicate requests return the existing pending job before mesh preparation,
 without adding a result callback. This command does not require config controls.
 

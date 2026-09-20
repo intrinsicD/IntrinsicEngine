@@ -5073,15 +5073,15 @@ TEST(SandboxEditorUi, UvMaskReadinessPreservesPriorityAndRejectsChangedSource)
     reject(command, metadataReadiness.DisabledReason);
     next.Vector() = savedNext;
 
-    // Full ring validation remains command-only and precedes undo-source admission.
+    // Ring failure precedes undo-source admission in both preview and apply.
     next[0] = std::numeric_limits<std::uint32_t>::max();
-    EXPECT_EQ(Runtime::PreviewEditorUvRegenerationCommand(context, command).DisabledReason,
-              readiness.DisabledReason);
-    reject(command, "UV regeneration cannot use the selected entity: selected mesh has a face ring that is not a valid polygon");
+    const std::string ringReason = "UV regeneration cannot use the selected entity: selected mesh has a face ring that is not a valid polygon";
+    EXPECT_EQ(Runtime::PreviewEditorUvRegenerationCommand(context, command).DisabledReason, ringReason);
+    reject(command, ringReason);
     deleted.Vector().resize(vertices.Size(), false);
     deleted[0] = true;
-    EXPECT_TRUE(Runtime::PreviewEditorUvRegenerationCommand(context, command).Enabled);
-    reject(command, "UV regeneration cannot use the selected entity: selected mesh has a face ring that is not a valid polygon");
+    EXPECT_FALSE(Runtime::PreviewEditorUvRegenerationCommand(context, command).Enabled);
+    reject(command, ringReason);
     next.Vector() = savedNext;
 
     deleted.Vector().resize(vertices.Size(), false);

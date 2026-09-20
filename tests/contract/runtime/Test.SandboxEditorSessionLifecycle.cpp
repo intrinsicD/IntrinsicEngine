@@ -2092,6 +2092,141 @@ TEST_F(EditorPointReadiness, NormalReadinessRetainsPcaMinimumAndBackendLimits)
     EXPECT_EQ(Stats().PropertyScans, 4u);
 }
 
+TEST_F(EditorPointReadiness, UvFaceRingsCacheVerdictsAndPreserveErrorPriority)
+{
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0,0,0}), b = mesh.AddVertex({1,0,0}), c = mesh.AddVertex({0,1,0});
+    ASSERT_TRUE(mesh.AddTriangle(a,b,c));
+    GS::PopulateFromMesh(Scene->Raw(), Entity, mesh);
+    const Runtime::EditorUvRegenerationCommand command{
+        .StableEntityId = Keypoints.StableEntityId, .Resolution = 64u, .Padding = 2u};
+    const auto preview = [&] { return Runtime::PreviewEditorUvRegenerationCommand(Commands, command); };
+    const std::string pending = "UV regeneration cannot use the selected entity: Checking mesh face rings. Wait for input validation.";
+    const std::string invalidRing = "UV regeneration cannot use the selected entity: selected mesh has a face ring that is not a valid polygon";
+    EXPECT_EQ(preview().DisabledReason, pending);
+    EXPECT_EQ(Stats().PropertyScans, 0u);
+    for (int frame = 0; frame < 3; ++frame) { PrepareFrame(); EXPECT_EQ(preview().DisabledReason, pending); }
+    EXPECT_EQ(Stats().ChecksQueued, 1u);
+    Drain();
+    for (int frame = 0; frame < 3; ++frame) { PrepareFrame(); EXPECT_TRUE(preview().Enabled); }
+    EXPECT_EQ(Stats().PropertyScans, 1u);
+
+    // Point-row validation of the same position property must use a separate entry.
+    Normals.Positions = {Runtime::GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};
+    Normals.Output.Domain = Normals.Positions.Domain;
+    Normals.Method = Runtime::NormalEstimationMethod::MeshFaceWeighted;
+    EXPECT_FALSE(PreviewNormals().Enabled);
+    EXPECT_EQ(Stats().ChecksQueued, 2u);
+    Drain();
+    EXPECT_TRUE(PreviewNormals().Enabled);
+    EXPECT_TRUE(preview().Enabled);
+    EXPECT_EQ(Stats().PropertyScans, 2u);
+
+    Properties().Get<glm::vec3>("v:position")[0].x = 0.1f;
+    EXPECT_TRUE(preview().Enabled);
+    EXPECT_EQ(Stats().ChecksQueued, 2u);
+    EXPECT_EQ(Stats().PropertyScans, 2u);
+
+    auto& halves = Scene->Raw().get<GS::Halfedges>(Entity).Properties;
+    auto next = halves.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeNext);
+    const auto savedNext = next.Vector();
+    next[0] = std::numeric_limits<std::uint32_t>::max();
+    // A retained enabled preview cannot bypass current command validation.
+    EXPECT_EQ(Runtime::ApplyEditorUvRegenerationCommand(Commands, command).Diagnostic, invalidRing);
+    auto mask = Properties().GetOrAdd<bool>("v:deleted");
+    mask.Vector().clear();
+    EXPECT_EQ(preview().DisabledReason, pending);
+    Drain();
+    EXPECT_EQ(preview().DisabledReason, invalidRing);
+    EXPECT_EQ(Runtime::ApplyEditorUvRegenerationCommand(Commands, command).Diagnostic, invalidRing);
+    EXPECT_EQ(Stats().PropertyScans, 3u);
+    EXPECT_EQ(Stats().ChecksQueued, 3u);
+
+    next.Vector() = savedNext;
+    EXPECT_EQ(preview().DisabledReason, pending);
+    Drain();
+    EXPECT_EQ(preview().DisabledReason, "UV regeneration: v:deleted must match the bound position property: v:position");
+    mask.Vector().resize(Properties().Size(), false);
+    EXPECT_TRUE(preview().Enabled);
+    EXPECT_EQ(Stats().PropertyScans, 4u);
+    EXPECT_EQ(Stats().ChecksQueued, 4u);
+
+    // No usable face is distinct from an invalid polygon; all consumers share the walk.
+    auto face = Scene->Raw().get<GS::Faces>(Entity).Properties.Get<std::uint32_t>(GS::PropertyNames::kFaceHalfedge);
+    const auto savedFace = face[0];
+    face[0] = std::numeric_limits<std::uint32_t>::max();
+    EXPECT_EQ(preview().DisabledReason, pending);
+    Drain();
+    const auto empty = preview();
+    EXPECT_FALSE(empty.Enabled);
+    EXPECT_EQ(empty.DisabledReason, "UV regeneration cannot use the selected entity: selected mesh has no valid surface faces");
+    EXPECT_EQ(Runtime::ApplyEditorUvRegenerationCommand(Commands, command).Diagnostic, empty.DisabledReason);
+    face[0] = savedFace;
+    EXPECT_EQ(preview().DisabledReason, pending);
+    Drain();
+    EXPECT_TRUE(preview().Enabled);
+    EXPECT_EQ(Stats().PropertyScans, 6u);
+
+    // Closing the panel expires its entry; it cannot scan later or retain a verdict.
+    PrepareFrame();
+    PrepareFrame();
+    Drain();
+    EXPECT_EQ(Stats().PropertyScans, 6u);
+    EXPECT_EQ(preview().DisabledReason, pending);
+    Drain();
+    EXPECT_TRUE(preview().Enabled);
+    EXPECT_EQ(Stats().PropertyScans, 7u);
+
+    Attachment.Detach();
+    ASSERT_TRUE(Engine.Services().Withdraw<Runtime::CommandBus>(Engine.Commands()));
+    Attachment.Attach(Engine.Worlds(), Engine.Services());
+    PrepareFrame();
+    EXPECT_EQ(preview().DisabledReason,
+              "UV regeneration cannot use the selected entity: Mesh-ring readiness is unavailable. Attach an editor with a command queue.");
+    EXPECT_EQ(Stats().ChecksQueued, 0u);
+    EXPECT_EQ(Stats().PropertyScans, 0u);
+}
+
+TEST_F(EditorPointReadiness, UvFaceRingsDiscardSupersededAndDetachedChecks)
+{
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0,0,0}), b = mesh.AddVertex({1,0,0}), c = mesh.AddVertex({0,1,0});
+    ASSERT_TRUE(mesh.AddTriangle(a,b,c));
+    GS::PopulateFromMesh(Scene->Raw(), Entity, mesh);
+    const Runtime::EditorUvRegenerationCommand command{.StableEntityId = Keypoints.StableEntityId};
+    const auto preview = [&] { return Runtime::PreviewEditorUvRegenerationCommand(Commands, command); };
+    EXPECT_FALSE(preview().Enabled);
+    auto next = Scene->Raw().get<GS::Halfedges>(Entity).Properties.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeNext);
+    const auto saved = next.Vector();
+    next[0] = std::numeric_limits<std::uint32_t>::max();
+    EXPECT_FALSE(preview().Enabled);
+    Drain();
+    EXPECT_EQ(Stats().PropertyScans, 1u);
+    EXPECT_EQ(Stats().ChecksQueued, 2u);
+    EXPECT_NE(preview().DisabledReason.find("not a valid polygon"), std::string::npos);
+    next.Vector() = saved;
+    EXPECT_FALSE(preview().Enabled);
+    Attachment.Detach();
+    Attachment.Attach(Engine.Worlds(), Engine.Services());
+    PrepareFrame();
+    Drain();
+    EXPECT_EQ(Stats().PropertyScans, 0u);
+    EXPECT_FALSE(preview().Enabled);
+    Drain();
+    EXPECT_TRUE(preview().Enabled);
+    EXPECT_EQ(Stats().PropertyScans, 1u);
+
+    next[0] = std::numeric_limits<std::uint32_t>::max();
+    EXPECT_FALSE(preview().Enabled);
+    RequiredEngineService<Runtime::JobService>(Engine).AdvanceWorldGeneration(Engine.Worlds().ActiveWorld());
+    Drain();
+    EXPECT_EQ(Stats().PropertyScans, 1u);
+    EXPECT_FALSE(preview().Enabled);
+    Drain();
+    EXPECT_EQ(Stats().PropertyScans, 2u);
+    EXPECT_NE(preview().DisabledReason.find("not a valid polygon"), std::string::npos);
+}
+
 TEST_F(EditorPointReadiness, NormalTopologyReadinessSharesPointVerdictButKeepsLiveTopologyChecks)
 {
     Geometry::HalfedgeMesh::Mesh mesh;

@@ -139,22 +139,25 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             return EditorCommandStatus::Applied;
         }
 
-        [[nodiscard]] MeshSoupFromGeometrySourcesResult BuildMeshSoupFromGeometrySources(
-            const GS::ConstSourceView& view,
-            std::string_view positionProperty)
+    namespace
+    {
+        // A null output validates rings without materializing positions or triangles.
+        [[nodiscard]] EditorCommandStatus WalkMeshSoupFaces(
+            const GS::ConstSourceView& view, std::string_view positionProperty,
+            std::string& diagnostic, MeshSoupFromGeometrySourcesResult* output)
         {
-            MeshSoupFromGeometrySourcesResult result{};
-            result.Status = ValidateMeshSoupSourceMetadata(view, result.Diagnostic, positionProperty);
-            if (!result.Succeeded())
-                return result;
+            const auto status = ValidateMeshSoupSourceMetadata(view, diagnostic, positionProperty);
+            if (status != EditorCommandStatus::Applied) return status;
             const auto positions = view.VertexSource->Properties.Get<glm::vec3>(positionProperty);
             const auto toVertices = view.HalfedgeSource->Properties.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeToVertex);
             const auto nextHalfedges = view.HalfedgeSource->Properties.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeNext);
             const auto halfedgeFaces = view.HalfedgeSource->Properties.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeFace);
             const auto faceHalfedges = view.FaceSource->Properties.Get<std::uint32_t>(GS::PropertyNames::kFaceHalfedge);
 
-            for (const glm::vec3 position : positions.Vector())
-                (void)result.Mesh.AddVertex(position);
+            if (output)
+                for (const glm::vec3 position : positions.Vector())
+                    (void)output->Mesh.AddVertex(position);
+            bool hasFaces = false;
 
             std::vector<std::uint32_t> ring;
             ring.reserve(8u);
@@ -172,29 +175,44 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
                     ring);
                 if (status == MeshFaceRingStatus::Invalid)
                 {
-                    result.Status = EditorCommandStatus::InvalidProcessingParameters;
-                    result.Diagnostic = "selected mesh has a face ring that is not a valid polygon";
-                    return result;
+                    diagnostic = "selected mesh has a face ring that is not a valid polygon";
+                    return EditorCommandStatus::InvalidProcessingParameters;
                 }
                 if (status == MeshFaceRingStatus::Skip)
                     continue;
 
+                hasFaces = true;
+                if (!output) continue;
                 for (std::size_t i = 1u; i + 1u < ring.size(); ++i)
                 {
-                    (void)result.Mesh.AddTriangle(ring[0u], ring[i], ring[i + 1u]);
-                    result.SourceFaceForSoupFace.push_back(
+                    (void)output->Mesh.AddTriangle(ring[0u], ring[i], ring[i + 1u]);
+                    output->SourceFaceForSoupFace.push_back(
                         static_cast<std::uint32_t>(faceIndex));
                 }
             }
 
-            if (result.Mesh.FaceCount() == 0u)
+            if (!hasFaces)
             {
-                result.Status = EditorCommandStatus::InvalidProcessingParameters;
-                result.Diagnostic = "selected mesh has no valid surface faces";
-                return result;
+                diagnostic = "selected mesh has no valid surface faces";
+                return EditorCommandStatus::InvalidProcessingParameters;
             }
 
-            result.Status = EditorCommandStatus::Applied;
+            return EditorCommandStatus::Applied;
+        }
+    }
+
+        EditorCommandStatus ValidateMeshSoupFaceRings(
+            const GS::ConstSourceView& view, std::string& diagnostic,
+            std::string_view positionProperty)
+        {
+            return WalkMeshSoupFaces(view, positionProperty, diagnostic, nullptr);
+        }
+
+        MeshSoupFromGeometrySourcesResult BuildMeshSoupFromGeometrySources(
+            const GS::ConstSourceView& view, std::string_view positionProperty)
+        {
+            MeshSoupFromGeometrySourcesResult result{};
+            result.Status = WalkMeshSoupFaces(view, positionProperty, result.Diagnostic, &result);
             return result;
         }
 
