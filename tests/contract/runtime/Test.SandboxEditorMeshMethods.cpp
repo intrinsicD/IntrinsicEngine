@@ -6290,13 +6290,16 @@ TEST(SandboxEditorUi, CurvatureCustomBindingsUseAlternatePositionsAndUndoOnBothE
         ASSERT_TRUE(Runtime::ApplyEditorMeshCurvatureCommand(context, command).Succeeded());
         const auto canonical = properties.Get<double>(PN::kMeanCurvature).Vector();
         const auto positions = properties.Get<glm::vec3>(PN::kPosition).Vector();
-        auto alternate = properties.GetOrAdd<glm::vec3>("v:rest", {});
+        auto alternate = properties.GetOrAdd<glm::vec3>("rest_samples", {});
         alternate.Vector() = positions;
         for (auto& p : alternate.Vector()) p *= 2.f;
-        command.Positions.Name = "v:rest";
-        for (auto* output : {&command.Mean, &command.Gaussian, &command.MinPrincipal,
-                             &command.MaxPrincipal, &command.Direction1, &command.Direction2})
-            output->Name += "_custom";
+        command.Positions.Name = "rest_samples";
+        command.Mean.Name = "mean";
+        command.Gaussian.Name = "gaussian";
+        command.MinPrincipal.Name = "minimum";
+        command.MaxPrincipal.Name = "maximum";
+        command.Direction1.Name = "direction_one";
+        command.Direction2.Name = "direction_two";
         Extrinsic::Tests::EditorJobHarness jobs;
         if (queued) jobs.Attach(context);
         const auto result = Runtime::ApplyEditorMeshCurvatureCommand(context, command);
@@ -6471,12 +6474,13 @@ TEST(SandboxEditorUi, MeshFieldAdmissionSharesValidationAndMetadata)
 TEST(SandboxEditorUi, MeshCurvatureTypedBindingsMatchConfigValidation)
 {
     using Config = Runtime::MeshCurvatureConfig;
-    const std::array<void(*)(Config&), 9> invalid{{
+    const std::array<void(*)(Config&), 10> invalid{{
         [](Config& c) { c.Mean.Name.clear(); },
-        [](Config& c) { c.Mean.Name = "f:mean"; },
         [](Config& c) { c.Direction2.Name = c.Direction1.Name; },
         [](Config& c) { c.Mean.Name = c.Positions.Name; },
         [](Config& c) { c.Positions.Name = "v:deleted"; },
+        [](Config& c) { c.Positions.Name = "samples"; c.Mean.Name = "v:position"; },
+        [](Config& c) { c.Direction1.Name = "v:connectivity"; },
         [](Config& c) { c.Gaussian.Name.push_back('\0'); },
         [](Config& c) { c.Mean.Domain = Runtime::GeometryElementDomain::MeshFace; },
         [](Config& c) { c.Direction1.ValueKind = Geometry::PropertyValueKind::Double; },
@@ -6511,8 +6515,8 @@ TEST(SandboxEditorUi, MeshCurvatureTypedBindingsMatchConfigValidation)
                        : Runtime::EditorCommandStatus::InvalidProcessingParameters);
     }
     Config custom;
-    custom.Positions.Name = "v:custom_positions";
-    custom.Mean.Name = "v:custom_mean";
+    custom.Positions.Name = "samples";
+    custom.Mean.Name = "mean";
     EXPECT_TRUE(Runtime::IsValidMeshCurvaturePropertyBindings(custom));
     EXPECT_TRUE(Runtime::ValidateMeshCurvatureConfigSection(
         Runtime::SerializeMeshCurvatureConfig(custom), {}, "test").Usable());

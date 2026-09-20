@@ -25,6 +25,12 @@ namespace Extrinsic::Runtime
             Slot{"direction1", &MeshCurvatureConfig::Direction1, "vec3"},
             Slot{"direction2", &MeshCurvatureConfig::Direction2, "vec3"}
         };
+        [[nodiscard]] bool IsStructuralVertexProperty(
+            const std::string_view name) noexcept
+        {
+            return name == "v:position" || name == "v:deleted" ||
+                   name == "v:connectivity" || name == "v:halfedge";
+        }
         Json Encode(const MeshCurvatureConfig& config)
         {
             Json doc{{"entity", config.StableEntityId}, {"output", static_cast<unsigned>(config.Output)},
@@ -54,9 +60,10 @@ namespace Extrinsic::Runtime
             const auto& ref = config.*slots[i].Member;
             if (ref.Domain != GeometryElementDomain::MeshVertex ||
                 ref.ValueKind != (defaults.*slots[i].Member).ValueKind ||
-                !ref.Name.starts_with("v:") || ref.Name.size() < 3 ||
-                ref.Name.find('\0') != std::string::npos || ref.Name == "v:deleted" ||
-                (slots[i].Member != &MeshCurvatureConfig::Positions && ref.Name == "v:position"))
+                ref.Name.empty() || ref.Name.find('\0') != std::string::npos ||
+                (slots[i].Member == &MeshCurvatureConfig::Positions
+                     ? IsStructuralVertexProperty(ref.Name) && ref.Name != "v:position"
+                     : IsStructuralVertexProperty(ref.Name)))
                 return false;
             for (std::size_t j = 0; j < i; ++j)
                 if (ref.Name == (config.*slots[j].Member).Name) return false;
@@ -91,7 +98,7 @@ namespace Extrinsic::Runtime
             (bindings.*slot.Member).Name = ref["name"].get<std::string>();
         }
         if (!IsValidMeshCurvaturePropertyBindings(bindings))
-            return RejectConfigSection(subject, "Curvature property names must be distinct public vertex properties (v:...).");
+            return RejectConfigSection(subject, "Curvature property names must be distinct and must not replace structural vertex storage.");
         result.State=EngineConfigState::Valid;
         result.CanonicalPayloadJson=ConfigDetail::SerializeConfigJson(doc);
         result.ParsedFieldCount=static_cast<std::uint32_t>(doc.size());
