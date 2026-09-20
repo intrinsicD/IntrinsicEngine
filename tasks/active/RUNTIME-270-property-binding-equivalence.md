@@ -443,3 +443,93 @@ and diff whitespace checks pass. No sanitizer or GPU run. The four-point sweep
 confirms one implementation-locality intent, unchanged layer/API contracts,
 existing behavior coverage and synchronized documentation. Ordinary refactoring
 only: no ARA research or performance claim introduced.
+
+## 2026-09-20 — Reuse compiled sandbox test fixture construction
+
+Operator-directed duplicate-code/compilation continuation from `e2e1ae458`,
+following the sandbox-test discovery leads above. The existing
+`tests/support/EditorFeatureTestContext.cpp` / `EditorGeometry` owner now compiles
+`MakeSelectable` and `AddPointCloudSource` for the Visualization, MeshMethods and
+ClusteringMethods contract partitions. Clustering also reuses its existing
+`SetPositions` and `SetTexcoords`. Eight former local bodies were checked equal
+after whitespace normalization before replacement; the two relocated bodies
+only expand existing namespace aliases. Signatures, nodiscard, property resize,
+component construction and call sites retain their contracts.
+
+The Clustering `AddTriangleMeshSource` deliberately stays local: it populates
+through `PopulateFromMesh`, whereas the shared fixture builds raw property arrays.
+A matching name is not proof of equivalent population semantics. Existing support
+objects already link all affected executables; there are no CMake changes, new
+files, production changes, public module changes or new engine dependencies.
+Five implementation-only imports make component ownership explicit. The header
+adds declarations, not bodies. Test-support README records the shared ownership.
+
+Accounting over all five changed C++ files: 49 lines added, 85 removed, net -36;
+production line delta is zero. No elapsed compilation speedup is claimed. Test
+bodies and registration macros from the first TEST in each touched partition are
+byte-identical to the baseline. Existing behavior tests validate fixture linkage
+and behavior; no implementation-mirroring test was added. Source-documentation
+scan of the support header/README has zero errors and one retained review prompt
+for the explicit test-only live-context boundary comment.
+
+### All remaining open points at this checkpoint
+
+- [ ] Exhaustive method/config/UI binding family matrix, including owning edits.
+- [ ] Checked numeric input/output adapters with target storage, aliasing and
+      structural ownership; output slots still require fixed kinds.
+- [ ] Explicit configured normal/color interpretation for visualization,
+      appearance and texture baking instead of source-name inference.
+- [ ] Canonical geodesics refs and explicit parameterization corner-UV retirement.
+- [ ] Feature widths beyond 1–3; keep Vec4 rejected until supported.
+- [ ] UI-037 stale-source, invalidation, prepared-frame readiness and bounded scans.
+- [ ] Bool/Int32/UInt32 scalar-twin, inactive-slot nonfinite and picker-budget tests.
+- [ ] Topology-only `MissingPositions` naming and optional structural-name cases.
+- [ ] Relevant sanitizer/GPU and interactive usability verification before claims
+      in those classes; this continuation verifies CPU behavior only.
+- [ ] Matched compilation measurements for the fixture and earlier locality moves;
+      use controlled source/toolchain/cache baselines, not mixed Ninja timings.
+- [ ] Review the matching `MakeSelectable` / `AddPointCloudSource` pair in
+      `Test.SandboxEditorModels.cpp` for adoption of the compiled owner. Other
+      selection-test helpers need their own component-contract comparison.
+- [ ] Investigate remaining sandbox test imports and repeated fixture bodies;
+      do not replace the Clustering triangle without population-equivalence proof.
+- [ ] Resolve the pre-existing ignored `[[nodiscard]]` result in
+      `AddDenoiseAllBoundaryMeshSource` in `Test.SandboxEditorMeshMethods.cpp`.
+- [ ] Optional Vec3 direction and edge-color exceptional-value history coverage,
+      including a captured NaN compared with itself.
+
+The task remains open. No Codex subagents were needed for this small shared-owner
+change. Logs and the fixed review packet are ephemeral under
+`/tmp/intrinsic-fixture-reuse/`. Resume from this latest checkpoint and its open
+points instead of importing prior conversation transcripts.
+
+Claude CLI `--model fable` reviewed the plan, fixed diff and a source/build-evidence
+follow-up. Exact model suffix 5.1 was not independently attested. The fixed-diff
+review found no correctness defect; conditional include, alias and support-object
+linkage concerns were resolved against existing declarations and the successful
+Clang 23 build. The README wrapping finding was fixed. Testing on older supported
+compiler majors was not performed; the reviewer raised it as a possible CI check,
+not an observed defect. The existing ignored-nodiscard warning remains listed
+above. No approval or additional abstraction was needed.
+
+Verification so far: `cmake --preset ci` and
+`cmake --build --preset ci --target IntrinsicTests` pass with Clang 23;
+`ctest --test-dir build/ci --output-on-failure -R '^SandboxEditorUi\.'
+-LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` passes all 209 tests.
+Strict layering, test-layout, task-policy and explicit-file docs-sync checks pass,
+as do doc links, root hygiene, session-brief freshness and whitespace checks.
+Touched-scope planning was captured; the canonical full CPU gate is the validation
+route for this checkpoint. No sanitizer/GPU or performance evidence is added.
+
+Final default CPU gate:
+`ctest --test-dir build/ci --output-on-failure
+-LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` passes 4,861 tests,
+zero failures, with one expected
+`GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl` capability skip
+(4,862 selected, 159.35 s). Final four-point sweep: one test-fixture reuse intent,
+unchanged engine layering and behavior, original test bodies preserved, compiled
+consumer linkage verified, and support/task documentation synchronized. No source
+edits followed the successful build and tests. Research-manager epilogue: ordinary
+refactoring only; no research event or ARA claim. This is a clean session boundary
+before the next fixture/import investigation; the latest open-point list above
+is the continuation context.

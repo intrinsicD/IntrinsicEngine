@@ -1,6 +1,7 @@
 // Shared runtime editor test context and canonical geometry fixture builders.
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <vector>
@@ -136,6 +137,14 @@ namespace Intrinsic::Tests::EditorGeometry
     namespace PN = GS::PropertyNames;
     inline constexpr std::uint32_t kInvalidIndex =
         std::numeric_limits<std::uint32_t>::max();
+
+    [[nodiscard]] ECS::EntityHandle MakeSelectable(
+        ECS::Scene::Registry& registry,
+        std::string name);
+
+    void AddPointCloudSource(ECS::Scene::Registry& registry,
+                             ECS::EntityHandle entity,
+                             std::size_t pointCount);
 
     void SetPositions(GS::Vertices& vertices,
                       const std::vector<glm::vec3>& positions);

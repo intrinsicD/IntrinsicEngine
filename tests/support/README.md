@@ -3,9 +3,10 @@
 Shared helpers, fixtures, builders, and test-only utilities used by multiple test categories belong here.
 
 `EditorFeatureTestContext.hpp` supplies the editor context and shared canonical
-vertex/UV/topology builders used by the Models, Visualization and MeshMethods
-contract partitions. Its context conversions and geometry builders compile once
-in `EditorFeatureTestContext.cpp`; `EditorFeatureTestSupportObjs` links them into
+vertex/UV/topology builders used by the Models, Visualization, MeshMethods and
+ClusteringMethods contract partitions. Selectable entities and point-cloud
+sources share the same builders. Its context conversions and geometry builders
+compile once in `EditorFeatureTestContext.cpp`; `EditorFeatureTestSupportObjs` links them into
 the runtime contract, editor integration, runtime graphics and Sandbox GPU-smoke
 test executables. The context imports `Graphics.RenderDiagnostics` for copied
 frame statistics; renderer execution consumers import `Graphics.Renderer`

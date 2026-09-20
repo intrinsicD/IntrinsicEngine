@@ -104,6 +104,9 @@ import Geometry.UvAtlas;
 
 #include "MockRHI.hpp"
 
+using Intrinsic::Tests::EditorGeometry::MakeSelectable;
+using Intrinsic::Tests::EditorGeometry::AddPointCloudSource;
+
 namespace Runtime = Extrinsic::Runtime;
 namespace Assets = Extrinsic::Assets;
 namespace Core = Extrinsic::Core;
@@ -138,28 +141,6 @@ namespace
         T* const service = engine.Services().Find<T>();
         EXPECT_NE(service, nullptr);
         return *service;
-    }
-
-[[nodiscard]] ECS::EntityHandle MakeSelectable(
-        ECS::Scene::Registry& registry,
-        std::string name)
-    {
-        const ECS::EntityHandle entity = registry.Create();
-        auto& raw = registry.Raw();
-        raw.emplace<ECSC::MetaData>(entity, std::move(name));
-        raw.emplace<ECSC::Transform::Component>(entity);
-        raw.emplace<ECSC::Transform::WorldMatrix>(entity);
-        raw.emplace<Sel::SelectableTag>(entity);
-        return entity;
-    }
-
-void AddPointCloudSource(ECS::Scene::Registry& registry,
-                             const ECS::EntityHandle entity,
-                             const std::size_t pointCount)
-    {
-        auto& vertices = registry.Raw().emplace<GS::Vertices>(entity);
-        vertices.Properties.Resize(pointCount);
-        registry.Raw().emplace<G::RenderPoints>(entity);
     }
 
     // A small deterministic, asymmetric point lattice — distinct extents per axis

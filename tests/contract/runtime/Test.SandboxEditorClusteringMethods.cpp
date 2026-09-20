@@ -105,6 +105,11 @@ import Geometry.UvAtlas;
 #include "MockRHI.hpp"
 #include "SandboxEditorJobHarness.hpp"
 
+using Intrinsic::Tests::EditorGeometry::MakeSelectable;
+using Intrinsic::Tests::EditorGeometry::AddPointCloudSource;
+using Intrinsic::Tests::EditorGeometry::SetPositions;
+using Intrinsic::Tests::EditorGeometry::SetTexcoords;
+
 namespace Runtime = Extrinsic::Runtime;
 namespace Assets = Extrinsic::Assets;
 namespace Core = Extrinsic::Core;
@@ -146,47 +151,6 @@ void ExpectSameHalfedgeConnectivity(
             EXPECT_EQ(actual[index].Next, expected[index].Next);
             EXPECT_EQ(actual[index].Prev, expected[index].Prev);
         }
-    }
-
-[[nodiscard]] ECS::EntityHandle MakeSelectable(
-        ECS::Scene::Registry& registry,
-        std::string name)
-    {
-        const ECS::EntityHandle entity = registry.Create();
-        auto& raw = registry.Raw();
-        raw.emplace<ECSC::MetaData>(entity, std::move(name));
-        raw.emplace<ECSC::Transform::Component>(entity);
-        raw.emplace<ECSC::Transform::WorldMatrix>(entity);
-        raw.emplace<Sel::SelectableTag>(entity);
-        return entity;
-    }
-
-void AddPointCloudSource(ECS::Scene::Registry& registry,
-                             const ECS::EntityHandle entity,
-                             const std::size_t pointCount)
-    {
-        auto& vertices = registry.Raw().emplace<GS::Vertices>(entity);
-        vertices.Properties.Resize(pointCount);
-        registry.Raw().emplace<G::RenderPoints>(entity);
-    }
-
-void SetPositions(GS::Vertices& vertices,
-                      const std::vector<glm::vec3>& positions)
-    {
-        vertices.Properties.Resize(positions.size());
-        auto pos = vertices.Properties.GetOrAdd<glm::vec3>(
-            std::string{PN::kPosition},
-            glm::vec3{0.0f});
-        pos.Vector() = positions;
-    }
-
-void SetTexcoords(GS::Vertices& vertices,
-                      const std::vector<glm::vec2>& texcoords)
-    {
-        auto uv = vertices.Properties.GetOrAdd<glm::vec2>(
-            "v:texcoord",
-            glm::vec2{0.0f});
-        uv.Vector() = texcoords;
     }
 
     // A small deterministic, asymmetric point lattice — distinct extents per axis

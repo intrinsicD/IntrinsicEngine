@@ -1,5 +1,13 @@
 #include "EditorFeatureTestContext.hpp"
 
+#include <utility>
+
+import Extrinsic.ECS.Component.MetaData;
+import Extrinsic.ECS.Component.Transform;
+import Extrinsic.ECS.Component.Transform.WorldMatrix;
+import Extrinsic.ECS.Components.Selection;
+import Extrinsic.Graphics.Component.RenderGeometry;
+
 namespace Intrinsic::Tests
 {
     std::function<void()> EditorFeatureTestContext::MakeWorkspaceSnapshotCacheInvalidator() const
@@ -127,6 +135,27 @@ namespace Intrinsic::Tests
 
 namespace Intrinsic::Tests::EditorGeometry
 {
+    ECS::EntityHandle MakeSelectable(ECS::Scene::Registry& registry,
+                                    std::string name)
+    {
+        const ECS::EntityHandle entity = registry.Create();
+        auto& raw = registry.Raw();
+        raw.emplace<ECS::Components::MetaData>(entity, std::move(name));
+        raw.emplace<ECS::Components::Transform::Component>(entity);
+        raw.emplace<ECS::Components::Transform::WorldMatrix>(entity);
+        raw.emplace<ECS::Components::Selection::SelectableTag>(entity);
+        return entity;
+    }
+
+    void AddPointCloudSource(ECS::Scene::Registry& registry,
+                             const ECS::EntityHandle entity,
+                             const std::size_t pointCount)
+    {
+        auto& vertices = registry.Raw().emplace<GS::Vertices>(entity);
+        vertices.Properties.Resize(pointCount);
+        registry.Raw().emplace<Graphics::Components::RenderPoints>(entity);
+    }
+
     void SetPositions(GS::Vertices& vertices,
                       const std::vector<glm::vec3>& positions)
     {
