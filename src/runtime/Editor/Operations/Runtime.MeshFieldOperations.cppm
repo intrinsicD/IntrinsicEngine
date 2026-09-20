@@ -96,32 +96,7 @@ export namespace Extrinsic::Runtime
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 
-        [[nodiscard]] bool Succeeded() const noexcept
-        {
-            const bool commandSucceeded =
-                Status == EditorCommandStatus::Applied ||
-                Status == EditorCommandStatus::NoChange;
-            if (!commandSucceeded || RequestedMethod != ActualMethod)
-                return false;
-            if (ActualMethod ==
-                CurvatureSegmentationMethod::FeatureAlignedPatches)
-            {
-                return FeatureDiagnostics.has_value() &&
-                       FeatureDiagnostics->Succeeded() &&
-                       PatchDiagnostics.has_value() &&
-                       PatchDiagnostics->Succeeded();
-            }
-            if (ActualMethod == CurvatureSegmentationMethod::FeatureBoundaryCurves)
-            {
-                return FeatureDiagnostics.has_value() &&
-                       FeatureDiagnostics->Succeeded() &&
-                       BoundaryDiagnostics.has_value() &&
-                       BoundaryDiagnostics->Status == Geometry::CurvatureSegmentation::
-                           BoundaryPartitionStatus::Success;
-            }
-            return ActualMethod == CurvatureSegmentationMethod::CurvatureGmm &&
-                   Diagnostics.Succeeded();
-        }
+        [[nodiscard]] bool Succeeded() const noexcept;
     };
 
     struct EditorGeodesicsCommand

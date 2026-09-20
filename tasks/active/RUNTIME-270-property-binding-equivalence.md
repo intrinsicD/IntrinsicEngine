@@ -362,3 +362,84 @@ Final CPU verification: 4,862 selected, 4,861 passed, zero failures, one expecte
 `GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl` capability skip; 161.77 s.
 No sanitizer or GPU run. This is ordinary refactoring evidence, not a performance
 or research claim; no ARA claim is introduced. All remaining points are above.
+
+## 2026-09-20 — Compile segmentation success evaluation out of line
+
+Operator-directed duplicate-code/compilation continuation from `25fe9b152`.
+Moved `EditorCurvatureSegmentationResult::Succeeded()` from the public mesh-field
+interface into the existing matching implementation unit. The three-method
+branching diagnostic predicate is ordinary compiled runtime implementation;
+small sibling accessors stay in the interface. Reuse decision: use the existing
+module implementation, with no new helper, file, target or dependency edge.
+The body matches the baseline after whitespace normalization. Declaration,
+`[[nodiscard]]`, `const noexcept`, records and imports are unchanged.
+
+Production accounting across both touched files: 27 lines added, 26 removed,
+net +1 (out-of-class definition spacing). This is implementation relocation,
+not duplicate-code reduction or a measured compile-time speedup. Future edits
+to this body can stay in the implementation file. The diagnostics types still
+belong in the interface; no transitive-import reduction is claimed.
+
+Claude CLI `--model fable` reviewed the plan and fixed diff with no blockers;
+the exact 5.1 version suffix was not independently attested. Its final review
+used loose inline/linkage wording: members defined inside a named module are
+not implicitly inline, and exported members remain callable by importers.
+The actual declaration/definition and link validation determine correctness.
+No Codex subagents were needed for this bounded move.
+
+The module inventory was regenerated and has no diff. Architecture documentation
+now locates the predicate in the implementation. Source-documentation audit:
+zero errors, three existing declaration-comment review prompts retained because
+they explain admission versus execution, callback timing and synchronous history
+publication. Layer/ownership review: existing runtime owner, no new exports,
+imports, wiring, state, lifetime or failure paths. No new behavior test is needed
+for an identical body; existing public operation tests exercise GMM, patches and
+boundary diagnostics and verify importer linkage after the move.
+
+Exploratory `compile_hotspots.py --build-dir build/ci --top 8` suggests examining
+`Test.SandboxEditorVisualization.cpp`, `Test.SandboxEditorClusteringMethods.cpp`
+and `Test.SandboxEditorMeshMethods.cpp` next. This mixed historical Ninja log has
+13 unresolved obsolete outputs absent from the current compilation database;
+it is discovery only, not a matched baseline or a performance result. Preserve
+current test semantics and registration when evaluating their shared dependencies.
+Logs and the fixed review diff are ephemeral in
+`/tmp/intrinsic-segmentation-result-locality/`.
+
+### All remaining open points at this checkpoint
+
+- [ ] Exhaustive method/config/UI binding family matrix, including owning edits.
+- [ ] Checked numeric input/output adapters with target storage, aliasing and
+      structural ownership; output slots still require fixed kinds.
+- [ ] Explicit configured normal/color interpretation for visualization,
+      appearance and texture baking instead of source-name inference.
+- [ ] Canonical geodesics refs and explicit parameterization corner-UV retirement.
+- [ ] Feature widths beyond 1–3; keep Vec4 rejected until supported.
+- [ ] UI-037 stale-source, invalidation, prepared-frame readiness and bounded scans.
+- [ ] Bool/Int32/UInt32 scalar-twin, inactive-slot nonfinite and picker-budget tests.
+- [ ] Topology-only `MissingPositions` naming and optional structural-name cases.
+- [ ] Relevant sanitizer/GPU and interactive usability verification before claims
+      in those classes; this continuation verifies CPU behavior only.
+- [ ] Matched compilation measurements for this and the earlier template move;
+      use a controlled source/toolchain/cache baseline, not mixed Ninja timings.
+- [ ] Investigate the sandbox test compilation candidates above before selecting
+      another locality change; no additional extraction is justified yet.
+- [ ] Resolve the pre-existing ignored `[[nodiscard]]` result at
+      `tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp:286` in a test cleanup.
+- [ ] Optional Vec3 direction and edge-color exceptional-value history coverage,
+      including a captured NaN compared with itself.
+
+The broader binding task remains open. A fresh session after final verification
+is a useful boundary before the distinct test-compilation investigation; resume
+from this task note rather than loading previous conversation transcripts.
+
+Final verification: Clang 23 `cmake --preset ci` and
+`cmake --build --preset ci --target IntrinsicTests` pass. The focused selector
+`CurvatureSegmentation|ProcessingCompilationLocality` passes all 70 tests.
+The default full CPU selector passes 4,861 tests with zero failures and one
+expected `GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl` capability skip
+(4,862 selected; 159.51 s). Strict layering, test layout, task policy and
+explicit-file docs-sync pass; doc links, root hygiene, session-brief freshness
+and diff whitespace checks pass. No sanitizer or GPU run. The four-point sweep
+confirms one implementation-locality intent, unchanged layer/API contracts,
+existing behavior coverage and synchronized documentation. Ordinary refactoring
+only: no ARA research or performance claim introduced.

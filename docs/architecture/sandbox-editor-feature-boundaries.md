@@ -647,7 +647,10 @@ selection and its narrower input catalog. `Extrinsic.Runtime.ParameterizationOpe
 owns UV regeneration, surface parameterization and the UV view request/state.
 `Extrinsic.Runtime.MeshFieldOperations` owns curvature, curvature segmentation and
 geodesic distance: fields published onto the mesh that produced them, never a
-topology replacement. `Extrinsic.Runtime.MeshTopologyOperations` owns denoise,
+topology replacement. Segmentation result success evaluation is defined in the
+existing `Runtime.MeshFieldOperations.cpp` implementation unit; its method-specific
+diagnostic branches do not live in the public interface.
+`Extrinsic.Runtime.MeshTopologyOperations` owns denoise,
 remesh, subdivide and simplify, which share one scratch-mesh source, one UV
 preservation/discard contract and one replacement commit; `EditorMeshTexcoordOutcome`
 belongs to that family because it reports what a replacement did to the UVs.
