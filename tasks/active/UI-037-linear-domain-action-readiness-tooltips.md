@@ -13,7 +13,7 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, geometry
 ---
 # UI-037 — Linear domain-action readiness and disabled-reason tooltips
 
-Current continuation: see [normal topology checkpoint and open points](#continuation--normal-topology-readiness-2026-09-20).
+Current continuation: see [ICP capture checkpoint and open points](#continuation--icp-input-capture-and-readiness-2026-09-20).
 Read that checkpoint plus the initial scope before consulting the historical slices.
 
 ## Remaining closure estimate — 2026-09-19
@@ -30,7 +30,7 @@ slices close cross-family coverage and the task, rather than postponing testing.
 | 2 — complete | Bilateral/descriptor readiness with revision-keyed position-plus-normal validation; see the point/normal checkpoint. |
 | 3 — complete | Point-construction readiness without per-preview point capture; see the construction checkpoint. |
 | 4 — complete | Normal topology readiness without deletion-mask copies/count scans; empty-face no-op/fallback semantics retained and tested. |
-| 5 | ICP source/target and point-to-plane normal readiness without repeated captures. |
+| 5 — partial | Shared ICP source/target/local-normal verdicts and single execution captures; exact transformed-normal preview scan remains open. |
 | 6 | Close mesh/curvature/UV admission gaps against their existing validators; reuse current metadata previews. |
 | 7 | Runtime-owned parameterization strategy, pin and boundary prerequisites. |
 | 8 | Texture-bake request-specific property/UV/device/range readiness and shared presentation. |
@@ -5430,3 +5430,151 @@ was unchanged by the test-only follow-up.
 Session boundary: after this verified checkpoint is committed and pushed, start
 a fresh session to save context and credits. Read this section and the initial
 scope only. Next recommended slice: ICP paired-source readiness (slice 5).
+
+## Continuation — ICP input capture and readiness (2026-09-20)
+
+Operator direction continues duplicate-code reduction and compilation locality
+with Claude Fable 5.1. Baseline: clean `8b75c17f8` on
+`codex/mesh-field-diagnostics-locality`. This checkpoint advances slice 5; it does
+not close its synchronous transformed-normal scan or retire UI-037.
+
+### Plan, reuse and implementation
+
+- Reuse `PointProperties.cpp`'s `PreparePointInput`, `CapturePointInput`,
+  `ResolvePointDeletionSource` and `BuildPointInputCatalog(context, id, 3)`.
+  These already own canonical domains, masks, compact row IDs, finite validation
+  and revision-keyed verdicts. ICP retains its existing default-domain order,
+  distinct entities, minimum sample count, variant and transform predicates.
+- Remove the separate registration property snapshot/capture implementation.
+  Preview requests source, target and local-normal verdicts before returning
+  pending. Execution moves one owned capture per binding into the job; it no
+  longer captures each operand again or keeps duplicate local point vectors.
+  Publication still compares values as well as revision watches and row IDs;
+  normal, source and target edits cannot silently publish an old result.
+- Keep local normal squared-norm underflow rejection and exact inverse-transpose
+  world-normal rejection. A private row visitor shares the arithmetic between
+  borrowed preview rows and owned execution rows. The preview allocates no
+  normal-value vector, but its world-normal check remains O(n).
+- Claude's plan review recommended this bounded split over widening the shared
+  cache with transform keys. Right-sizing: the visitor has two present storage
+  callers and stays private to this implementation; no public API, module owner,
+  service, cache type or scheduling surface is added.
+- Replace the GLM umbrella include with the used headers, remove seven unused
+  standard headers and the GeometrySources/WorldMatrix imports. Shared capture
+  stays compiled behind its private declarations. No compilation speedup is
+  claimed without matched measurements.
+- Shared metadata now checks actual vec3 storage cardinality. The existing
+  malformed-normal test exposed that the generic resolver reports property-set
+  size even when a raw vector has been resized; early validation prevents an
+  out-of-bounds scan. ICP preserves a normal-count diagnostic. Canonical reuse
+  also rejects malformed deletion types/counts and odd halfedge cardinality,
+  rather than accepting malformed storage as ICP previously could.
+
+The catalog/preview/apply/config surfaces retain the same command path. The
+existing spatial index still owns transformed target queries and backend
+fallback; query semantics, GPU continuation and solver algorithms are unchanged.
+The task's existing contract IDs remain applicable; no contract is narrowed.
+
+### Acceptance and verification for this checkpoint
+
+- [x] Shared cached source/target/local-normal readiness and three-sample catalog.
+- [x] Single owned execution captures; revision, row-ID and value stale guards.
+- [x] Numerical normal and malformed metadata rejection covered through public commands.
+- [x] Final focused/full CPU and structural verification recorded below.
+- [x] Fixed-diff Claude review addressed; final source/test/docs sweep complete.
+
+Verification commands:
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests -j4
+ctest --test-dir build/ci --output-on-failure -R '^EditorPointReadiness\.|^RegistrationDomains\.|^RegistrationConfig\.|^SandboxEditorUi\..*Registration|^ProcessingCompilationLocality\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+cmake --build --preset ci --target IntrinsicTests -j4
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
+```
+
+Evidence directory: `/tmp/intrinsic-icp-readiness/`. Review packets and logs are
+session evidence, not benchmark artifacts. Initial build needed explicit namespace
+qualification. The first focused run passed 100/101 and exposed the vector-size
+issue described above; the fix retains the failing regression and adds shared
+short/long-storage admission coverage. The corrected focused run passed 102/102,
+including all 34 processing compilation guards. `IntrinsicTests` then built and
+the full exclusion-only CPU gate selected 4,837: 4,836 passed, one expected
+ASan-only GLFW lifecycle skip, zero failures (161.35 s). After Claude's test-only
+suggestions, `IntrinsicTests` rebuilt and the final focused run passed 104/104,
+including all new tests and 34 locality guards (13.21 s). Production is byte-for-byte
+the reviewed and full-CPU-tested diff; only tests/docs changed afterward. No
+sanitizer or GPU execution is claimed.
+
+Strict layering (zero exceptions), test layout, root hygiene, task policy/state
+links, docs synchronization, doc links, skill mirrors and session-brief freshness
+pass. Module inventory remains identical at 429 modules. The touched source-doc
+scan has zero errors and 134 existing runtime README advisories outside the
+rewritten ICP paragraphs. Logs: `configure.log`, `build-count-fix.log`,
+`focused-fixed.log`, `build-full.log`, `cpu.log`, `build-review-tests.log`,
+`focused-final.log` and named structural-check logs. Claude's `review.diff` has
+SHA-256 `b16f943bee3e7f11c06d34be791f437b18e24c75a9a70330b43833b4bcddc659`;
+`review.json` records the independent review. `final.diff` captures the complete
+checkpoint, including the test-only follow-up.
+
+Claude Fable 5.1's fixed-diff review found no blockers. Its targeted normal
+metadata and equal-value mask-remapping test suggestions are included in the
+final coverage pass; unknown operand/normal domains also exercise default
+resolution and cache sharing. Existing registration integration tests already
+cover wrong normal type, short storage and post-submit normal revisions.
+The proposed preview/apply diagnostic discrepancy after an unmarked retained
+borrow is outside the canonical mutation contract: later writes require
+`MarkModified()`. Queued value/row-ID comparisons deliberately retain additional
+stale protection; no new unmarked-borrow cache guarantee is claimed.
+`SameGeometryPositions` uses float component equality, so signed-zero changes
+are equal unless a revision marks them; this matches existing semantics.
+
+The scope/layering/tests/docs sweep retains existing runtime ownership, config
+and UI entry points, named-module types, immutable worker input and backend
+semantics. Workshop rows 1–3/8 pass; rows 4–7 are inapplicable. Production physical
+lines total 1,715 → 1,693 across the two changed implementation files (no new
+production files, adapters or build entries). Timing remains unmeasured.
+
+### Current open points
+
+- [ ] Slice 5 — Remove or bound the remaining exact transformed-normal preview
+      scan without narrowing numerical acceptance or shifting failures to apply.
+      Profile before choosing a cache/fast-accept design; preserve invalidation
+      under target transform edits, including extreme scales. Add prepared ICP
+      cross-domain/normal-metadata and attachment/world lifecycle matrix coverage
+      where the final cross-family matrix reveals gaps.
+- [ ] Slice 6 — Mesh/curvature/UV admission gaps against existing metadata
+      validators; inventory command-only connectivity checks without adding
+      synchronous topology scans to drawing.
+- [ ] Slice 7 — Runtime-owned parameterization strategy, pin and boundary
+      prerequisites, shared with config/apply.
+- [ ] Slice 8 — Texture-bake property/UV/device/range readiness and shared presentation.
+- [ ] Slice 9 — K-Means, Progressive Poisson, consolidation and outlier service,
+      backend and variant readiness through config/UI/agent validation.
+- [ ] Slice 10 — Common prepared-frame readiness; remaining app prerequisite
+      duplication and hidden actions.
+- [ ] Slice 11 — Full table-driven
+      `SandboxEditorUi.ActionReadinessDerivesDomainPrerequisiteReasons` matrix,
+      family invalidation/lifecycle/supersession and zero-scan coverage.
+- [ ] Slice 12 — Real ImGui enabled-command and disabled-tooltip/no-command
+      coverage for each action/option, final stale guards, full verification,
+      review and operational closure.
+- [ ] Optional scalar catalog coverage: missing command queue and mixed live
+      counts across candidate domains.
+- [ ] Optional point/normal capture follow-up: second slot-vector allocation and
+      explicit paired-size assertions only if profiling or mapping changes justify it.
+- [ ] Optional ICP review follow-ups: additional mixed-domain/default-source,
+      queued transform-staleness and target/face malformed-mask cases in the final
+      matrix; clarify legacy `v:normal` diagnostic wording and rejection Error
+      codes if that surface is revised. Inspect snapshot/index row alignment and
+      watch-first GPU poll validation only in a separately verified scope; no
+      correspondence behavior or GPU continuation changed here.
+- [ ] Non-gating compilation: matched timing under an appropriate build task;
+      preserve named-module identity and do not reopen completed compile slices.
+- [ ] Non-gating scheduling: worker/per-drain budgeting only for a measured
+      latency problem; deferred point validation still runs on the main thread.
+
+Session boundary: after this checkpoint passes review/tests and is pushed, start
+fresh to reduce carried context. Read the initial scope and this checkpoint only.
+Next: finish the remaining ICP transformed-normal readiness requirement, or take
+mesh/curvature/UV admission while that numerical optimization is being measured.

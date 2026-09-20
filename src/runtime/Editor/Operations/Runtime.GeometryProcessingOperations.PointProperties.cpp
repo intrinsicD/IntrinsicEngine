@@ -212,6 +212,9 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         const auto* props = ResolveGeometryPropertySet(a, positions.Domain);
         if (!props || !ResolveGeometryProperty(a, positions, props->Size(), false).Resolved())
             return fail("Choose a count-matched vec3 position property on a resolved element domain.");
+        const auto values = props->Get<glm::vec3>(positions.Name);
+        if (!values || values.Size() != props->Size())
+            return fail("Choose a count-matched vec3 position property on a resolved element domain.");
         if (props->Size() > std::numeric_limits<std::uint32_t>::max()) return fail("Input exceeds the supported slot range.");
         w.SlotCount = props->Size();
         w.Inputs.push_back(ObserveGeometryProperty(a, positions.Domain, positions.Name));

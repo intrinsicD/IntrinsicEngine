@@ -762,14 +762,14 @@ no selected-model cache or other session-owned state.
 
 ### Sandbox Editor ICP Registration
 
-`UI-029` adds an `ICP Registration` panel reachable from the `View` menu.
-`ARCH-006` Slice 3 preserves that path through the app-owned stable registration
-`view.registration` rather than a fixed runtime window-kind slot. The Sandbox
-geometry-operation surface exports `EditorICPVariant`,
-`EditorRegistrationCommand`, `EditorRegistrationResult`, and
-`ApplyEditorRegistrationCommand(...)`. The command reads the source and
-target point positions from two selected point-cloud entities, requires both to
-resolve to `GeometrySources` `Domain::PointCloud`, invokes
+The `ICP Registration` panel is reachable from the `View` menu through
+`view.registration`. `Extrinsic.Runtime.RegistrationOperations` owns commands,
+config, readiness, operand catalogs and results. It accepts named float3 bindings
+on compatible point, graph or mesh element domains and requires at least three
+live samples per operand. Prepared sessions reuse the shared deferred point-input
+verdicts for catalogs and local input readiness; execution takes fresh owned
+captures. Point-to-plane preview retains an allocation-free scan to validate
+normal arithmetic under the current target transform. The command invokes
 `Geometry::Registration::AlignICP` through the operation's private trajectory
 collector, selects the requested preview pose, and drives the source entity's
 `Transform::Component` through the same internal
@@ -792,11 +792,11 @@ request when the target-normal span is empty or count-mismatched. Runtime
 preflight prevents that fallback from making requested/effective reporting
 diverge.
 
-Runtime resolves the target's `v:normal` before anything is dispatched or
-mutated and **fails a point-to-plane request closed** rather than degrading it.
-The prerequisites are: a `vec3 v:normal` property on the target point cloud,
-exactly one vector per target point, every value finite and non-zero-length, and
-an invertible target entity transform. Each rejection names its own cause and
+Runtime resolves the configured target-normal binding before dispatch or mutation.
+Point-to-plane requires a count-matched float3 property on the target position
+domain, finite live vectors with positive float squared length, and an invertible
+target transform when present. Position and normal rows share the domain's deletion
+mask; each halfedge pair inherits its edge flag. Each rejection names its own cause and
 suggests estimating normals or selecting point-to-point; none of them mutates
 the source or touches the command history.
 

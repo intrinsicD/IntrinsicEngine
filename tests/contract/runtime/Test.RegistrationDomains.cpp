@@ -244,3 +244,135 @@ TEST(RegistrationDomains, RigidPublicationPreservesSignedNonuniformAndZeroScale)
         EXPECT_EQ(scene.Raw().get<T::Component>(source).Scale,scale);
     }
 }
+
+TEST(RegistrationDomains, HalfedgeNormalsIgnoreBothRowsOfDeletedEdges)
+{
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto source = Make(scene, D::GraphHalfedge, {});
+    const auto target = Make(scene, D::MeshHalfedge, {});
+    auto& props = scene.Raw().get<GS::Halfedges>(target).Properties;
+    auto normals = props.GetOrAdd<glm::vec3>("directions", {0,0,1});
+    normals[0] = {NAN,0,0};
+    normals[1] = {0,0,0};
+    scene.Raw().get<GS::Edges>(target).Properties.GetOrAdd<bool>("e:deleted")[0] = true;
+    R::EditorProcessingContext context{.Scene = &scene};
+    const auto commands = R::BindEditorProcessingCommands(context);
+    const R::EditorRegistrationCommand command{
+        .SourceStableEntityId = R::SelectionController::ToStableEntityId(source),
+        .TargetStableEntityId = R::SelectionController::ToStableEntityId(target),
+        .Variant = R::EditorICPVariant::PointToPlane,
+        .SourcePositions = Ref(D::GraphHalfedge), .TargetPositions = Ref(D::MeshHalfedge),
+        .TargetNormals = {D::MeshHalfedge, "directions", Geometry::PropertyValueKind::Vec3}};
+    const auto ready = R::PreviewEditorRegistrationCommand(commands, command);
+    EXPECT_TRUE(ready.Enabled) << ready.DisabledReason;
+    const auto applied = R::ApplyEditorRegistrationCommand(commands, command);
+    EXPECT_EQ(applied.TargetPointCount, props.Size() - 2);
+    EXPECT_EQ(applied.TargetNormalCount, props.Size() - 2);
+    scene.Raw().get<GS::Edges>(target).Properties.Get<bool>("e:deleted")[0] = false;
+    const auto invalid = R::PreviewEditorRegistrationCommand(commands, command);
+    EXPECT_FALSE(invalid.Enabled);
+    EXPECT_EQ(R::ApplyEditorRegistrationCommand(commands, command).Message, invalid.DisabledReason);
+}
+
+TEST(RegistrationDomains, CanonicalMetadataRejectsMalformedDeletionAndPositionTypes)
+{
+    for (unsigned defect = 0; defect < 4; ++defect)
+    {
+        SCOPED_TRACE(defect);
+        Extrinsic::ECS::Scene::Registry scene;
+        const auto source = Make(scene, D::GraphHalfedge, {});
+        const auto target = Make(scene, D::MeshFace, {});
+        auto& edges = scene.Raw().get<GS::Edges>(source).Properties;
+        auto& halfedges = scene.Raw().get<GS::Halfedges>(source).Properties;
+        R::EditorRegistrationCommand command{
+            .SourceStableEntityId = R::SelectionController::ToStableEntityId(source),
+            .TargetStableEntityId = R::SelectionController::ToStableEntityId(target),
+            .SourcePositions = Ref(D::GraphHalfedge), .TargetPositions = Ref(D::MeshFace)};
+        if (defect == 0)
+        {
+            auto deleted = edges.Get<bool>("e:deleted");
+            if (deleted) edges.Remove(deleted);
+            (void)edges.GetOrAdd<float>("e:deleted");
+        }
+        else if (defect == 1) edges.Get<bool>("e:deleted").Vector().pop_back();
+        else if (defect == 2) halfedges.Resize(halfedges.Size() - 1);
+        else command.SourcePositions = {D::GraphHalfedge, "keep", Geometry::PropertyValueKind::Float};
+        R::EditorProcessingContext context{.Scene = &scene};
+        const auto commands = R::BindEditorProcessingCommands(context);
+        const auto invalid = R::PreviewEditorRegistrationCommand(commands, command);
+        EXPECT_FALSE(invalid.Enabled);
+        EXPECT_EQ(R::ApplyEditorRegistrationCommand(commands, command).Message, invalid.DisabledReason);
+        const auto catalog = R::GetEditorRegistrationInputCatalog(commands, command.SourceStableEntityId);
+        EXPECT_TRUE(std::ranges::none_of(catalog.Entries, [&](const auto& entry) {
+            return entry.Ref == command.SourcePositions;
+        }));
+    }
+}
+
+TEST(RegistrationDomains, QueuedSnapshotsDetectUnversionedValueEditsInEveryOperand)
+{
+    for (unsigned operand = 0; operand < 3; ++operand)
+    {
+        SCOPED_TRACE(operand);
+        Extrinsic::ECS::Scene::Registry scene;
+        const auto source = Make(scene, D::PointCloudPoint, {});
+        const auto target = Make(scene, D::PointCloudPoint, {});
+        auto& targetProps = scene.Raw().get<GS::Vertices>(target).Properties;
+        (void)targetProps.GetOrAdd<glm::vec3>("directions", {0,0,1});
+        auto& changed = operand == 0 ? scene.Raw().get<GS::Vertices>(source).Properties : targetProps;
+        auto& borrowed = changed.Get<glm::vec3>(operand == 2 ? "directions" : "samples").Vector();
+        R::EditorCommandHistory history;
+        R::EditorProcessingContext context{.Scene = &scene, .CommandHistory = &history};
+        Extrinsic::Tests::EditorJobHarness jobs;
+        jobs.Attach(context);
+        const auto commands = R::BindEditorProcessingCommands(context);
+        const R::EditorRegistrationCommand command{
+            .SourceStableEntityId = R::SelectionController::ToStableEntityId(source),
+            .TargetStableEntityId = R::SelectionController::ToStableEntityId(target),
+            .Variant = R::EditorICPVariant::PointToPlane,
+            .SourcePositions = Ref(D::PointCloudPoint), .TargetPositions = Ref(D::PointCloudPoint),
+            .TargetNormals = {D::PointCloudPoint, "directions", Geometry::PropertyValueKind::Vec3}};
+        unsigned completions{};
+        const auto pending = R::ApplyEditorRegistrationCommand(commands, command,
+            [&](const auto&) { ++completions; });
+        ASSERT_EQ(pending.Status, R::EditorCommandStatus::Pending);
+        borrowed[0].x += 0.5f;
+        ASSERT_TRUE(jobs.DrainUntilTerminal());
+        ASSERT_EQ(jobs.Snapshot().Entries.size(), 1u);
+        EXPECT_EQ(jobs.Snapshot().Entries[0].State, R::JobState::StaleDiscarded);
+        EXPECT_EQ(completions, 1u);
+        EXPECT_FALSE(history.CanUndo());
+    }
+}
+
+TEST(RegistrationDomains, QueuedEqualValueMaskRemappingStillDiscardsResults)
+{
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto source = Make(scene, D::PointCloudPoint, {});
+    const auto target = Make(scene, D::PointCloudPoint, {});
+    auto& props = scene.Raw().get<GS::Vertices>(source).Properties;
+    auto samples = props.Get<glm::vec3>("samples");
+    samples[1] = samples[0];
+    samples[4] = points[1];
+    auto& mask = props.Get<bool>("v:deleted").Vector();
+    mask[0] = true;
+    mask[4] = false;
+    R::EditorCommandHistory history;
+    R::EditorProcessingContext context{.Scene = &scene, .CommandHistory = &history};
+    Extrinsic::Tests::EditorJobHarness jobs;
+    jobs.Attach(context);
+    const auto commands = R::BindEditorProcessingCommands(context);
+    const R::EditorRegistrationCommand command{
+        .SourceStableEntityId = R::SelectionController::ToStableEntityId(source),
+        .TargetStableEntityId = R::SelectionController::ToStableEntityId(target),
+        .SourcePositions = Ref(D::PointCloudPoint), .TargetPositions = Ref(D::PointCloudPoint)};
+    ASSERT_EQ(R::ApplyEditorRegistrationCommand(commands, command).Status, R::EditorCommandStatus::Pending);
+    // Deliberately bypass revision marking: compact values/count stay equal,
+    // but the captured source-row mapping must still make publication stale.
+    mask[0] = false;
+    mask[1] = true;
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    ASSERT_EQ(jobs.Snapshot().Entries.size(), 1u);
+    EXPECT_EQ(jobs.Snapshot().Entries[0].State, R::JobState::StaleDiscarded);
+    EXPECT_FALSE(history.CanUndo());
+}

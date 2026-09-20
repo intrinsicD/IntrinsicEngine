@@ -355,7 +355,7 @@ resolves the domain, watches positions and deletion storage, skips deleted rows,
 and preserves ascending source-row IDs without copying values during readiness
 or catalog queries. `ResolvePointDeletionSource` supplies the shared domain,
 property name and row divisor for this capture, bilateral filtering, descriptors,
-construction and normals. Halfedges inherit the paired edge's deletion flag;
+construction, normals and registration. Halfedges inherit the paired edge's deletion flag;
 construction reuses this capture; normal generation retains its additional topology
 mask validation and ownership. Normal readiness validates mask metadata and
 captures watches without copying masks or counting live faces. Execution owns
@@ -368,6 +368,15 @@ reject exact zero normals; Hoppe also requires finite float squared lengths abov
 `1e-16`. The shared scan caches minimum/maximum squared norms, leaving those
 thresholds with the consuming family. LBVH coordinate limits apply to positions,
 not normal components.
+ICP source, target and local-normal readiness reuse the same per-property verdicts.
+Its point-to-plane preview still validates inverse-transpose normal arithmetic on
+borrowed live rows: local finite/length verdicts alone cannot prove float safety
+under the target transform. That exact check performs no value-vector allocation
+but remains a synchronous row scan. Execution captures each operand once into
+`PointInputCapture`; publication compares its property/deletion watches, compact
+source-row IDs and values, alongside the existing entity/transform guards. The
+shared input metadata checks actual vec3 storage size as well as domain size
+before any row access.
 `ValidatePointOutputs` checks the resolved output domain,
 reserved names and existing storage against the validated typed config.
 
@@ -388,12 +397,12 @@ share framed fixed-width kNN pagination; radius pagination retains its separate
 support-membership contract. These declarations live in `RadiusRows.hpp` for
 consumers of spatial-index neighborhoods.
 `BuildPointInputCatalog` shares live-row validation with density, spacing, weights,
-keypoints, outliers, descriptors, construction and normals, independently of method
-result records. Density, spacing and bilateral catalogs require two live samples;
-the generic catalog requires one. Catalog admission does not depend on the requested execution backend.
+keypoints, outliers, descriptors, construction, normals and registration, independently
+of method result records. Density, spacing and bilateral catalogs require two live samples;
+registration requires three; the generic catalog requires one. Catalog admission does not depend on the requested execution backend.
 Prepared editor sessions own an opaque point-input readiness cache. Catalog,
-density, spacing, density-weight, outlier, keypoint, normal, bilateral, descriptor
-and construction previews inspect point metadata and enqueue a missing verdict on the engine's existing command bus.
+density, spacing, density-weight, outlier, keypoint, normal, bilateral, descriptor,
+construction and registration previews inspect point metadata and enqueue a missing verdict on the engine's existing command bus.
 The next main-thread command drain runs the compiled canonical row scan. The
 point-input portion of these previews neither copies nor scans property values. Keys include
 world/epoch, scene, entity, canonical

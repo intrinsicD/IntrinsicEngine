@@ -1128,6 +1128,8 @@ namespace
         Runtime::BilateralFilterConfig Bilateral{};
         Runtime::DescriptorAnalysisConfig Descriptors{};
         Runtime::PointConstructionConfig Construction{};
+        Runtime::EditorRegistrationCommand Registration{};
+        entt::entity RegistrationTarget{};
         PointReadinessFrameProbe* FrameProbe{};
 
         void SetUp() override
@@ -1225,6 +1227,32 @@ namespace
             Construction.Method = Runtime::PointConstructionMethod::Hoppe;
             Construction.EstimateNormals = false;
             Construction.Normals = Bilateral.Normals;
+        }
+        void SetRegistrationInputs()
+        {
+            Scene->Raw().emplace<ECSC::Transform::Component>(Entity);
+            RegistrationTarget = Scene->Create();
+            Scene->Raw().emplace<ECSC::Transform::Component>(RegistrationTarget);
+            auto& props = Scene->Raw().emplace<GS::Vertices>(RegistrationTarget).Properties;
+            props.Resize(5);
+            props.GetOrAdd<glm::vec3>("samples").Vector() =
+                {{0,0,0}, {1,0,0}, {0,1,0}, {1,1,0}, {NAN,0,0}};
+            props.GetOrAdd<glm::vec3>("directions").Vector() =
+                {{0,0,1}, {0,0,1}, {0,0,1}, {0,0,1}, {NAN,0,0}};
+            props.GetOrAdd<bool>("v:deleted")[4] = true;
+            Registration.SourceStableEntityId = Keypoints.StableEntityId;
+            Registration.TargetStableEntityId = Runtime::SelectionController::ToStableEntityId(RegistrationTarget);
+            Registration.SourcePositions = Registration.TargetPositions = Keypoints.Positions;
+            Registration.TargetNormals = {Keypoints.Positions.Domain, "directions", Geometry::PropertyValueKind::Vec3};
+            Registration.Variant = Runtime::EditorICPVariant::PointToPlane;
+        }
+        Geometry::PropertySet& RegistrationProperties()
+        {
+            return Scene->Raw().get<GS::Vertices>(RegistrationTarget).Properties;
+        }
+        Runtime::ActionReadiness PreviewRegistration()
+        {
+            return Runtime::PreviewEditorRegistrationCommand(Commands, Registration);
         }
         void Drain() { Engine.Commands().Drain(*Scene); }
     };
@@ -1823,6 +1851,187 @@ TEST_F(EditorPointReadiness, ConstructionCommandsSubmitWhileReadinessIsPending)
     EXPECT_EQ(Stats().PropertyScans, 0u);
 }
 
+TEST_F(EditorPointReadiness, MalformedPositionStorageIsRejectedBeforeScanning)
+{
+    for (const std::size_t count : {4u, 6u})
+    {
+        Properties().Get<glm::vec3>("samples").Vector().resize(count);
+        const auto invalid = Preview();
+        EXPECT_FALSE(invalid.Enabled);
+        EXPECT_NE(invalid.DisabledReason.find("count-matched"), std::string::npos);
+        EXPECT_TRUE(Runtime::GetEditorPointInputCatalog(Commands, Keypoints.StableEntityId).Empty());
+        EXPECT_EQ(Stats().ChecksQueued, 0u);
+        EXPECT_EQ(Runtime::ApplyEditorKeypointAnalysisCommand(Commands, Keypoints).Message, invalid.DisabledReason);
+        Drain();
+        EXPECT_EQ(Stats().PropertyScans, 0u);
+    }
+}
+
+TEST_F(EditorPointReadiness, RegistrationSharesPairedVerdictsAndCatalogsAcrossFrames)
+{
+    SetRegistrationInputs();
+    Registration.SourcePositions.Domain = Registration.TargetPositions.Domain =
+        Registration.TargetNormals.Domain = Runtime::GeometryElementDomain::Unknown;
+    EXPECT_FALSE(Preview().Enabled);
+    const auto pending = PreviewRegistration();
+    EXPECT_FALSE(pending.Enabled);
+    EXPECT_NE(pending.DisabledReason.find("Checking"), std::string::npos);
+    EXPECT_TRUE(Runtime::GetEditorRegistrationInputCatalog(Commands, Registration.SourceStableEntityId).Empty());
+    EXPECT_TRUE(Runtime::GetEditorRegistrationInputCatalog(Commands, Registration.TargetStableEntityId).Empty());
+    EXPECT_EQ(Stats().ChecksQueued, 3u);
+    EXPECT_EQ(Stats().PropertyScans, 0u);
+    Drain();
+    for (int frame = 0; frame < 4; ++frame)
+    {
+        PrepareFrame();
+        const auto ready = PreviewRegistration();
+        EXPECT_TRUE(ready.Enabled) << ready.DisabledReason;
+        EXPECT_TRUE(Preview().Enabled);
+        EXPECT_EQ(Runtime::GetEditorRegistrationInputCatalog(Commands, Registration.SourceStableEntityId).Size(), 1u);
+        EXPECT_EQ(Runtime::GetEditorRegistrationInputCatalog(Commands, Registration.TargetStableEntityId).Size(), 2u);
+        EXPECT_EQ(Stats().ChecksQueued, 3u);
+        EXPECT_EQ(Stats().PropertyScans, 3u);
+    }
+    Registration.Variant = Runtime::EditorICPVariant::PointToPoint;
+    EXPECT_TRUE(PreviewRegistration().Enabled);
+    EXPECT_EQ(Stats().PropertyScans, 3u);
+}
+
+TEST_F(EditorPointReadiness, RegistrationNormalMetadataRejectsWithoutScanning)
+{
+    SetRegistrationInputs();
+    EXPECT_FALSE(PreviewRegistration().Enabled);
+    Drain();
+    ASSERT_TRUE(PreviewRegistration().Enabled);
+    const auto scans = Stats().PropertyScans;
+    const auto rejects = [&]
+    {
+        const auto invalid = PreviewRegistration();
+        EXPECT_FALSE(invalid.Enabled);
+        EXPECT_NE(invalid.DisabledReason.find("Point-to-plane"), std::string::npos);
+        EXPECT_EQ(Runtime::ApplyEditorRegistrationCommand(Commands, Registration).Message, invalid.DisabledReason);
+        EXPECT_EQ(Stats().PropertyScans, scans);
+    };
+    for (const std::size_t count : {4u, 6u})
+    {
+        RegistrationProperties().Get<glm::vec3>("directions").Vector().resize(count);
+        rejects();
+        EXPECT_NE(PreviewRegistration().DisabledReason.find("one vector per target point"), std::string::npos);
+        const auto catalog = Runtime::GetEditorRegistrationInputCatalog(Commands, Registration.TargetStableEntityId);
+        EXPECT_TRUE(std::ranges::none_of(catalog.Entries, [](const auto& entry) { return entry.Ref.Name == "directions"; }));
+    }
+    RegistrationProperties().Get<glm::vec3>("directions").Vector().resize(5, {0,0,1});
+    Registration.TargetNormals.ValueKind = Geometry::PropertyValueKind::Float;
+    rejects();
+    Registration.TargetNormals.ValueKind = Geometry::PropertyValueKind::Vec3;
+    Registration.TargetNormals.Domain = Runtime::GeometryElementDomain::MeshFace;
+    rejects();
+    Registration.TargetNormals.Domain = Registration.TargetPositions.Domain;
+    Registration.TargetNormals.Name = "missing";
+    rejects();
+}
+
+TEST_F(EditorPointReadiness, RegistrationRejectsNormalValuesAndReusesNegativeVerdicts)
+{
+    SetRegistrationInputs();
+    EXPECT_FALSE(PreviewRegistration().Enabled);
+    Drain();
+    ASSERT_TRUE(PreviewRegistration().Enabled);
+    for (const auto normal : {glm::vec3{NAN,0,0}, glm::vec3{0}, glm::vec3{1e-30f,0,0}})
+    {
+        RegistrationProperties().Get<glm::vec3>("directions")[0] = normal;
+        const auto scans = Stats().PropertyScans;
+        EXPECT_FALSE(PreviewRegistration().Enabled);
+        Drain();
+        const auto invalid = PreviewRegistration();
+        EXPECT_FALSE(invalid.Enabled);
+        EXPECT_NE(invalid.DisabledReason.find("Point-to-plane"), std::string::npos);
+        const auto applied = Runtime::ApplyEditorRegistrationCommand(Commands, Registration);
+        EXPECT_EQ(applied.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+        EXPECT_EQ(applied.Message, invalid.DisabledReason);
+        EXPECT_EQ(PreviewRegistration().DisabledReason, invalid.DisabledReason);
+        EXPECT_EQ(Stats().PropertyScans, scans + 1);
+    }
+}
+
+TEST_F(EditorPointReadiness, RegistrationRechecksTransformedNormalsWithoutCachingTransformVerdicts)
+{
+    SetRegistrationInputs();
+    EXPECT_FALSE(PreviewRegistration().Enabled);
+    Drain();
+    ASSERT_TRUE(PreviewRegistration().Enabled);
+    auto& transform = Scene->Raw().get<ECSC::Transform::Component>(RegistrationTarget);
+    for (const auto scale : {glm::vec3{1,1,0}, glm::vec3{1,1,1e-30f}, glm::vec3{1,1,1e30f}})
+    {
+        transform.Scale = scale;
+        const auto invalid = PreviewRegistration();
+        EXPECT_FALSE(invalid.Enabled) << scale.z;
+        EXPECT_EQ(Runtime::ApplyEditorRegistrationCommand(Commands, Registration).Message, invalid.DisabledReason);
+        EXPECT_EQ(Stats().PropertyScans, 3u);
+    }
+    transform.Scale = {-2,3,4};
+    EXPECT_TRUE(PreviewRegistration().Enabled);
+    Scene->Raw().remove<ECSC::Transform::Component>(RegistrationTarget);
+    EXPECT_TRUE(PreviewRegistration().Enabled); // A missing target transform is identity.
+    EXPECT_EQ(Stats().PropertyScans, 3u);
+}
+
+TEST_F(EditorPointReadiness, RegistrationSupersessionAndDeletionOnlyRescanAffectedInputs)
+{
+    SetRegistrationInputs();
+    EXPECT_FALSE(PreviewRegistration().Enabled);
+    RegistrationProperties().Get<glm::vec3>("directions")[0] = {1,0,0};
+    Drain();
+    EXPECT_EQ(Stats().PropertyScans, 2u);
+    EXPECT_FALSE(PreviewRegistration().Enabled);
+    Drain();
+    ASSERT_TRUE(PreviewRegistration().Enabled);
+    EXPECT_EQ(Stats().PropertyScans, 3u);
+    RegistrationProperties().Get<bool>("v:deleted")[4] = false;
+    EXPECT_FALSE(PreviewRegistration().Enabled);
+    Drain();
+    const auto invalid = PreviewRegistration();
+    EXPECT_FALSE(invalid.Enabled);
+    EXPECT_EQ(invalid.DisabledReason, "Live position samples must be finite.");
+    EXPECT_EQ(Stats().PropertyScans, 5u);
+}
+
+TEST_F(EditorPointReadiness, RegistrationKeepsThreeSampleCatalogGateAndTransformPrecedence)
+{
+    SetRegistrationInputs();
+    Registration.Variant = Runtime::EditorICPVariant::PointToPoint;
+    auto deleted = Properties().Get<bool>("v:deleted");
+    deleted[2] = deleted[3] = true;
+    EXPECT_FALSE(PreviewRegistration().Enabled);
+    Drain();
+    EXPECT_TRUE(Runtime::GetEditorRegistrationInputCatalog(Commands, Registration.SourceStableEntityId).Empty());
+    EXPECT_EQ(PreviewRegistration().DisabledReason, "ICP requires at least three live samples per operand.");
+    EXPECT_EQ(Stats().PropertyScans, 2u);
+    Scene->Raw().remove<ECSC::Transform::Component>(Entity);
+    EXPECT_EQ(PreviewRegistration().DisabledReason, "ICP registration source entity has no Transform to drive.");
+    EXPECT_EQ(Runtime::ApplyEditorRegistrationCommand(Commands, Registration).Status,
+              Runtime::EditorCommandStatus::MissingTransform);
+    Registration.TargetStableEntityId = Registration.SourceStableEntityId;
+    EXPECT_NE(PreviewRegistration().DisabledReason.find("distinct"), std::string::npos);
+    EXPECT_EQ(Stats().PropertyScans, 2u);
+}
+
+TEST_F(EditorPointReadiness, RegistrationCommandsRecaptureAndCanSubmitWhileReadinessIsPending)
+{
+    SetRegistrationInputs();
+    EXPECT_FALSE(PreviewRegistration().Enabled);
+    EXPECT_EQ(Runtime::ApplyEditorRegistrationCommand(Commands, Registration).Status,
+              Runtime::EditorCommandStatus::Pending);
+    EXPECT_EQ(Stats().PropertyScans, 0u);
+    Drain();
+    ASSERT_TRUE(PreviewRegistration().Enabled);
+    RegistrationProperties().Get<glm::vec3>("directions")[0].x = NAN;
+    const auto invalid = Runtime::ApplyEditorRegistrationCommand(Commands, Registration);
+    EXPECT_EQ(invalid.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_NE(invalid.Message.find("Point-to-plane"), std::string::npos);
+    EXPECT_EQ(Stats().PropertyScans, 3u);
+}
+
 TEST_F(EditorPointReadiness, NormalReadinessReusesNegativeVerdictsAndRevalidatesOutputMetadata)
 {
     Normals.Output = Normals.Positions;
@@ -2198,6 +2407,7 @@ TEST_F(EditorPointReadiness, ActiveWorldSwitchRejectsRetainedCommandsAndQueuedWo
 TEST_F(EditorPointReadiness, MissingCommandQueueNeverFallsBackToPanelScanning)
 {
     SetNormalInputs();
+    SetRegistrationInputs();
     Attachment.Detach();
     ASSERT_TRUE(Engine.Services().Withdraw<Runtime::CommandBus>(Engine.Commands()));
     Attachment.Attach(Engine.Worlds(), Engine.Services());
@@ -2217,6 +2427,9 @@ TEST_F(EditorPointReadiness, MissingCommandQueueNeverFallsBackToPanelScanning)
         EXPECT_EQ(oriented.DisabledReason, preview.DisabledReason);
     EXPECT_TRUE(Runtime::GetEditorBilateralFilterInputCatalog(
         Runtime::PrepareEditorPointSetFrame(Attachment).Commands, Bilateral.StableEntityId).Empty());
+    EXPECT_EQ(PreviewRegistration().DisabledReason, preview.DisabledReason);
+    EXPECT_TRUE(Runtime::GetEditorRegistrationInputCatalog(Commands, Registration.SourceStableEntityId).Empty());
+    EXPECT_TRUE(Runtime::GetEditorRegistrationInputCatalog(Commands, Registration.TargetStableEntityId).Empty());
     EXPECT_EQ(Stats().ChecksQueued, 0u);
     EXPECT_EQ(Stats().PropertyScans, 0u);
 }

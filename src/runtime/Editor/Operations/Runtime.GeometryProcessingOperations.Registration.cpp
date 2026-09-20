@@ -4,26 +4,24 @@ module;
 
 #include <algorithm>
 #include <array>
-#include <atomic>
-#include <bit>
-#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <expected>
-#include <limits>
 #include <memory>
 #include <optional>
 #include <span>
 #include <string>
 #include <string_view>
 #include <utility>
-#include <unordered_map>
-#include <variant>
 #include <vector>
 
 #include <entt/entity/registry.hpp>
-#include <glm/glm.hpp>
+#include <glm/geometric.hpp>
+#include <glm/matrix.hpp>
+#include <glm/mat3x3.hpp>
+#include <glm/mat4x4.hpp>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 #include <glm/gtc/quaternion.hpp>
 
 module Extrinsic.Runtime.RegistrationOperations;
@@ -36,7 +34,6 @@ import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Component.Transform;
-import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorJobProjection;
@@ -47,7 +44,6 @@ import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.Properties;
-import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.RHI.Device;
 import Geometry.Registration;
@@ -161,45 +157,52 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
         // part, not by the model matrix itself: under non-uniform scale the
         // two disagree, and using the position transform would tilt every
         // normal off the surface it describes.
-        [[nodiscard]] RegistrationNormalStatus TransformRegistrationNormalsToWorld(
-            const std::vector<glm::vec3>& localNormals,
-            const glm::mat4& model,
-            std::vector<glm::vec3>& out)
+        template <class NormalAt>
+        [[nodiscard]] RegistrationNormalStatus TransformRegistrationNormalRows(
+            std::size_t count, NormalAt normalAt, const glm::mat4& model,
+            std::vector<glm::vec3>* out = nullptr)
         {
-            out.clear();
+            if (out) out->clear();
             const glm::mat3 linear{model};
             const float determinant = glm::determinant(linear);
             if (!std::isfinite(determinant) || determinant == 0.0f)
                 return RegistrationNormalStatus::TargetTransformNotInvertible;
 
-            const glm::mat3 normalMatrix =
-                glm::transpose(glm::inverse(linear));
-            out.reserve(localNormals.size());
-            for (const glm::vec3& local : localNormals)
+            const glm::mat3 normalMatrix = glm::transpose(glm::inverse(linear));
+            if (out) out->reserve(count);
+            for (std::size_t i = 0; i < count; ++i)
             {
-                const glm::vec3 world = normalMatrix * local;
+                const auto local = normalAt(i);
+                if (!local) continue;
+                const glm::vec3 world = normalMatrix * *local;
                 const float lengthSquared = glm::dot(world, world);
                 if (!std::isfinite(lengthSquared))
                 {
-                    out.clear();
+                    if (out) out->clear();
                     return RegistrationNormalStatus::NonFinite;
                 }
                 if (lengthSquared <= 0.0f)
                 {
-                    out.clear();
+                    if (out) out->clear();
                     return RegistrationNormalStatus::ZeroLength;
                 }
                 const glm::vec3 normalized = world / std::sqrt(lengthSquared);
-                if (!std::isfinite(normalized.x) ||
-                    !std::isfinite(normalized.y) ||
-                    !std::isfinite(normalized.z))
+                if (!FinitePosition(normalized))
                 {
-                    out.clear();
+                    if (out) out->clear();
                     return RegistrationNormalStatus::NonFinite;
                 }
-                out.push_back(normalized);
+                if (out) out->push_back(normalized);
             }
             return RegistrationNormalStatus::Ok;
+        }
+
+        [[nodiscard]] RegistrationNormalStatus TransformRegistrationNormalsToWorld(
+            const std::vector<glm::vec3>& normals, const glm::mat4& model,
+            std::vector<glm::vec3>* out = nullptr)
+        {
+            return TransformRegistrationNormalRows(normals.size(),
+                [&](std::size_t i) { return std::optional{normals[i]}; }, model, out);
         }
 
         [[nodiscard]] std::string BuildRegistrationNormalRejectionMessage(
@@ -313,66 +316,15 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
                     if (SupportsGeometryElementDomain(available, domain)) { ref.Domain = domain; break; }
             return ref;
         }
-        // Live finite float3 rows for one binding, with the revisions that make
-        // a later reading comparable. Halfedge rows inherit their edge's
-        // deletion flag, so the divisor maps two halfedges onto one edge slot.
-        struct RegistrationPropertySnapshot
-        {
-            std::vector<glm::vec3> Points{};
-            std::uint64_t Revision{}, DeletedRevision{};
-            std::size_t Size{};
-        };
-
-        bool SameRegistrationSnapshot(const RegistrationPropertySnapshot& a, const RegistrationPropertySnapshot& b)
-        {
-            return a.Revision == b.Revision && a.DeletedRevision == b.DeletedRevision && a.Size == b.Size &&
-                   SameGeometryPositions(a.Points, b.Points);
-        }
-        std::optional<RegistrationPropertySnapshot> CaptureRegistrationProperty(
-            const GeometryEntityAvailability& available, const GeometryPropertyRef& ref)
-        {
-            const auto* properties = ResolveGeometryPropertySet(available, ref.Domain);
-            if (!properties || ref.ValueKind != Geometry::PropertyValueKind::Vec3 ||
-                !ResolveGeometryProperty(available, ref, properties->Size(), false).Resolved()) return {};
-            const auto values = properties->Get<glm::vec3>(ref.Name);
-            std::string_view deletedName = "v:deleted";
-            std::size_t divisor = 1;
-            if (ref.Domain == GeometryElementDomain::MeshFace) deletedName = "f:deleted";
-            if (ref.Domain == GeometryElementDomain::MeshEdge || ref.Domain == GeometryElementDomain::GraphEdge)
-                deletedName = "e:deleted";
-            if (ref.Domain == GeometryElementDomain::MeshHalfedge || ref.Domain == GeometryElementDomain::GraphHalfedge)
-            {
-                if (!available.SourceView.EdgeSource) return {};
-                properties = &available.SourceView.EdgeSource->Properties;
-                deletedName = "e:deleted";
-                divisor = 2;
-            }
-            const auto deleted = properties->Get<bool>(deletedName);
-            if (deleted && deleted.Size()*divisor != values.Size()) return {};
-            RegistrationPropertySnapshot snapshot{.Revision = values.Revision(),
-                .DeletedRevision = deleted ? deleted.Revision() : 0, .Size = values.Size()};
-            for (std::size_t i = 0; i < values.Size(); ++i)
-            {
-                if (deleted && deleted[i/divisor]) continue;
-                const auto point = values[i];
-                if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)) return {};
-                snapshot.Points.push_back(point);
-            }
-            return snapshot;
-        }
-
         struct EditorRegistrationCpuJobState
         {
             std::uint32_t SourceStableEntityId{0u};
             std::uint32_t TargetStableEntityId{0u};
             EditorRegistrationCommand Command{};
-            std::vector<glm::vec3> SourceLocalPoints{};
-            std::vector<glm::vec3> TargetLocalPoints{};
-            // Empty for a point-to-point request. Snapshotted in local
-            // space alongside the positions and converted in the worker, so a
-            // normal edit between submit and apply is caught by the same
-            // staleness comparison the positions get.
-            std::vector<glm::vec3> TargetLocalNormals{};
+            PointInputCapture SourceBinding{}, TargetBinding{};
+            // Point-to-point leaves normals empty. Every binding owns local rows,
+            // source-row IDs and revision watches for publication revalidation.
+            PointInputCapture NormalBinding{};
             ECSC::Transform::Component SourceBeforeTransform{};
             bool TargetHadTransform{false};
             ECSC::Transform::Component TargetBeforeTransform{};
@@ -386,7 +338,6 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
             // refused has to be recorded where it was decided.
             JobApplyValidation LastApplyValidation{JobApplyValidation::Current};
             ECSC::Transform::Component SourceAfterTransform{};
-            RegistrationPropertySnapshot SourceBinding{}, TargetBinding{}, NormalBinding{};
             SpatialIndexHandle TargetIndex{};
             std::shared_ptr<const SpatialIndexSnapshot> IndexSnapshot{};
             std::shared_ptr<SpatialNearestBatch> Batch{};
@@ -428,16 +379,20 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
             if (!sourceEntity.has_value() || !targetEntity.has_value())
                 return JobApplyValidation::MissingTarget;
 
-            const auto source = CaptureRegistrationProperty(BuildGeometryAvailability(raw, *sourceEntity), job.Command.SourcePositions);
-            const auto target = CaptureRegistrationProperty(BuildGeometryAvailability(raw, *targetEntity), job.Command.TargetPositions);
-            if (!source || !target || !SameRegistrationSnapshot(*source, job.SourceBinding) ||
-                !SameRegistrationSnapshot(*target, job.TargetBinding)) return JobApplyValidation::StaleGeneration;
-            if (!job.TargetLocalNormals.empty())
+            const auto current = [&](ECS::EntityHandle entity, GeometryPropertyRef ref,
+                                     const PointInputCapture& before)
             {
-                const auto normals = CaptureRegistrationProperty(BuildGeometryAvailability(raw, *targetEntity), job.Command.TargetNormals);
-                if (!normals || !SameRegistrationSnapshot(*normals, job.NormalBinding))
-                    return JobApplyValidation::StaleGeneration;
-            }
+                PointInputCapture now;
+                std::string diagnostic;
+                return CapturePointInput(BuildGeometryAvailability(raw, entity), ref, true, now, diagnostic) &&
+                       now.Inputs == before.Inputs && now.Slots == before.Slots &&
+                       SameGeometryPositions(now.Points, before.Points);
+            };
+            if (!current(*sourceEntity, job.Command.SourcePositions, job.SourceBinding) ||
+                !current(*targetEntity, job.Command.TargetPositions, job.TargetBinding) ||
+                (!job.NormalBinding.Points.empty() &&
+                 !current(*targetEntity, job.Command.TargetNormals, job.NormalBinding)))
+                return JobApplyValidation::StaleGeneration;
 
             const ECSC::Transform::Component* sourceTransform =
                 raw.try_get<ECSC::Transform::Component>(*sourceEntity);
@@ -510,17 +465,17 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
             const std::shared_ptr<EditorRegistrationCpuJobState>& state)
         {
             EditorRegistrationResult& result = state->Result;
-            result.SourcePointCount = state->SourceLocalPoints.size();
-            result.TargetPointCount = state->TargetLocalPoints.size();
+            result.SourcePointCount = state->SourceBinding.Points.size();
+            result.TargetPointCount = state->TargetBinding.Points.size();
 
             const std::vector<glm::vec3> sourceWorld =
-                TransformPointsToWorld(state->SourceLocalPoints,
+                TransformPointsToWorld(state->SourceBinding.Points,
                                        state->SourceBeforeTransform);
             const std::vector<glm::vec3> targetWorld =
                 state->TargetHadTransform
-                    ? TransformPointsToWorld(state->TargetLocalPoints,
+                    ? TransformPointsToWorld(state->TargetBinding.Points,
                                              state->TargetBeforeTransform)
-                    : state->TargetLocalPoints;
+                    : state->TargetBinding.Points;
 
             const glm::vec3 prealignDelta =
                 ComputePointCentroid(std::span<const glm::vec3>(targetWorld)) -
@@ -532,7 +487,7 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
             prealignPose[3] = glm::vec4(prealignDelta, 1.0f);
 
             std::vector<glm::vec3> targetWorldNormals{};
-            if (!state->TargetLocalNormals.empty())
+            if (!state->NormalBinding.Points.empty())
             {
                 const glm::mat4 targetModel =
                     state->TargetHadTransform
@@ -540,9 +495,9 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
                         : glm::mat4(1.0f);
                 const RegistrationNormalStatus worldStatus =
                     TransformRegistrationNormalsToWorld(
-                        state->TargetLocalNormals,
+                        state->NormalBinding.Points,
                         targetModel,
-                        targetWorldNormals);
+                        &targetWorldNormals);
                 if (worldStatus != RegistrationNormalStatus::Ok)
                 {
                     result.Status =
@@ -793,8 +748,8 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
                 std::max<std::uint32_t>(
                     1u,
                     static_cast<std::uint32_t>(
-                        (std::max(state->SourceLocalPoints.size(),
-                                  state->TargetLocalPoints.size()) +
+                        (std::max(state->SourceBinding.Points.size(),
+                                  state->TargetBinding.Points.size()) +
                          1023u) /
                         1024u));
             return JobDesc{
@@ -835,9 +790,9 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
         SubmitRegistrationCpuJob(
             const EditorProcessingContext& context,
             const EditorRegistrationCommand& command,
-            std::vector<glm::vec3> sourcePoints,
-            std::vector<glm::vec3> targetPoints,
-            std::vector<glm::vec3> targetNormals,
+            PointInputCapture source,
+            PointInputCapture target,
+            PointInputCapture normals,
             const ECSC::Transform::Component& sourceTransform,
             const ECSC::Transform::Component* targetTransform,
             std::function<void(EditorRegistrationResult)> onComplete)
@@ -847,9 +802,9 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
             state->SourceStableEntityId = command.SourceStableEntityId;
             state->TargetStableEntityId = command.TargetStableEntityId;
             state->Command = command;
-            state->SourceLocalPoints = std::move(sourcePoints);
-            state->TargetLocalPoints = std::move(targetPoints);
-            state->TargetLocalNormals = std::move(targetNormals);
+            state->SourceBinding = std::move(source);
+            state->TargetBinding = std::move(target);
+            state->NormalBinding = std::move(normals);
             state->SourceBeforeTransform = sourceTransform;
             if (targetTransform != nullptr)
             {
@@ -857,15 +812,10 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
                 state->TargetBeforeTransform = *targetTransform;
             }
             state->Result = MakeRegistrationBaseResult(command);
-            state->Result.SourcePointCount = state->SourceLocalPoints.size();
-            state->Result.TargetPointCount = state->TargetLocalPoints.size();
+            state->Result.SourcePointCount = state->SourceBinding.Points.size();
+            state->Result.TargetPointCount = state->TargetBinding.Points.size();
 
-            const auto sourceEntity = ResolveStableEntity(context.Scene->Raw(), command.SourceStableEntityId);
             const auto targetEntity = ResolveStableEntity(context.Scene->Raw(), command.TargetStableEntityId);
-            state->SourceBinding = *CaptureRegistrationProperty(BuildGeometryAvailability(context.Scene->Raw(), *sourceEntity), command.SourcePositions);
-            state->TargetBinding = *CaptureRegistrationProperty(BuildGeometryAvailability(context.Scene->Raw(), *targetEntity), command.TargetPositions);
-            if (!state->TargetLocalNormals.empty())
-                state->NormalBinding = *CaptureRegistrationProperty(BuildGeometryAvailability(context.Scene->Raw(), *targetEntity), command.TargetNormals);
             if (command.Backend != RegistrationBackend::CpuKDTree)
             {
                 if (context.SpatialIndices)
@@ -884,7 +834,7 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
                 if (command.Backend == RegistrationBackend::VulkanLBVH)
                 {
                     if (state->IndexSnapshot && context.JobCommands.Available() && context.Device && context.Device->IsOperational() &&
-                        state->TargetLocalPoints.size() <= (1u << 20))
+                        state->TargetBinding.Points.size() <= (1u << 20))
                         state->Result.ActualBackend = RegistrationBackend::VulkanLBVH;
                     else
                     {
@@ -914,8 +864,8 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
                 EditorRegistrationResult pending =
                     MakePendingRegistrationResult(
                         command,
-                        state->SourceLocalPoints.size(),
-                        state->TargetLocalPoints.size(),
+                        state->SourceBinding.Points.size(),
+                        state->TargetBinding.Points.size(),
                         active->Token);
                 pending.Message =
                     BuildActiveDerivedJobMessage("ICP registration CPU", *active);
@@ -936,8 +886,8 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
                     MakeRegistrationBaseResult(command);
                 result.Status =
                     EditorCommandStatus::GeometryProcessingFailed;
-                result.SourcePointCount = state->SourceLocalPoints.size();
-                result.TargetPointCount = state->TargetLocalPoints.size();
+                result.SourcePointCount = state->SourceBinding.Points.size();
+                result.TargetPointCount = state->TargetBinding.Points.size();
                 result.Error = Core::ErrorCode::InvalidState;
                 result.Message          = "ICP registration CPU job submission was rejected by the "
                                           "runtime job lane.";
@@ -1045,36 +995,60 @@ ApplyRegistrationChecked(
             result.Message = "ICP requires compatible source and target element domains.";
             return result;
         }
-        const auto source = CaptureRegistrationProperty(sourceAvailable, command.SourcePositions);
-        const auto target = CaptureRegistrationProperty(targetAvailable, command.TargetPositions);
-        if (!source || !target)
+        GeometryProcessingDetail::PointInputCapture source, target, normals;
+        std::string sourceDiagnostic, targetDiagnostic, normalDiagnostic;
+        const auto capture = [&](entt::entity entity, const GeometryEntityAvailability& available,
+                                 GeometryPropertyRef& ref, GeometryProcessingDetail::PointInputCapture& values, std::string& diagnostic)
+        {
+            if (ref.ValueKind != Geometry::PropertyValueKind::Vec3)
+            {
+                diagnostic = "ICP requires count-matched finite float3 position bindings on live rows.";
+                return false;
+            }
+            return preview ? PreparePointInput(context, entity, available, ref, values, diagnostic)
+                           : CapturePointInput(available, ref, true, values, diagnostic);
+        };
+        const bool sourceReady = capture(*sourceEntity, sourceAvailable, command.SourcePositions, source, sourceDiagnostic);
+        const bool targetReady = capture(*targetEntity, targetAvailable, command.TargetPositions, target, targetDiagnostic);
+        RegistrationNormalStatus normalStatus = RegistrationNormalStatus::Ok;
+        bool normalsReady = true;
+        if (command.Variant == EditorICPVariant::PointToPlane)
+        {
+            if (command.TargetNormals.Domain != command.TargetPositions.Domain)
+                normalStatus = RegistrationNormalStatus::CountMismatch;
+            else
+            {
+                const auto* props = ResolveGeometryPropertySet(targetAvailable, command.TargetNormals.Domain);
+                if (!props || command.TargetNormals.ValueKind != Geometry::PropertyValueKind::Vec3 ||
+                    !ResolveGeometryProperty(targetAvailable, command.TargetNormals, props->Size(), false).Resolved())
+                    normalStatus = RegistrationNormalStatus::Absent;
+                else if (props->Get<glm::vec3>(command.TargetNormals.Name).Size() != props->Size())
+                    normalStatus = RegistrationNormalStatus::CountMismatch;
+                else
+                {
+                    normalsReady = capture(*targetEntity, targetAvailable, command.TargetNormals, normals, normalDiagnostic);
+                    if (normals.HasNonfiniteVectors) normalStatus = RegistrationNormalStatus::Absent;
+                    else if (normalsReady && !(normals.MinimumSquaredNorm > 0))
+                        normalStatus = RegistrationNormalStatus::ZeroLength;
+                }
+            }
+        }
+        if (!sourceReady || !targetReady)
         {
             result.Status = EditorCommandStatus::InvalidProcessingParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message = "ICP requires count-matched finite float3 position bindings on live rows.";
+            result.Message = !sourceReady ? std::move(sourceDiagnostic) : std::move(targetDiagnostic);
             return result;
         }
-        std::optional<std::vector<glm::vec3>> sourcePoints{source->Points}, targetPoints{target->Points};
-        result.SourcePointCount = sourcePoints->size();
-        result.TargetPointCount = targetPoints->size();
-        std::vector<glm::vec3> targetLocalNormals;
-        if (command.Variant == EditorICPVariant::PointToPlane)
+        result.SourcePointCount = source.LiveCount;
+        result.TargetPointCount = target.LiveCount;
+        if (normalStatus != RegistrationNormalStatus::Ok || !normalsReady)
         {
-            const auto normals = CaptureRegistrationProperty(targetAvailable, command.TargetNormals);
-            RegistrationNormalStatus status = RegistrationNormalStatus::Ok;
-            if (!normals) status = RegistrationNormalStatus::Absent;
-            else if (command.TargetNormals.Domain != command.TargetPositions.Domain || normals->Points.size() != target->Points.size())
-                status = RegistrationNormalStatus::CountMismatch;
-            else if (std::ranges::any_of(normals->Points, [](auto n) { return !(glm::dot(n,n) > 0); }))
-                status = RegistrationNormalStatus::ZeroLength;
-            if (status != RegistrationNormalStatus::Ok)
-            {
-                result.Status = EditorCommandStatus::InvalidProcessingParameters;
-                result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message = BuildRegistrationNormalRejectionMessage(status);
-                return result;
-            }
-            targetLocalNormals = normals->Points;
+            result.Status = EditorCommandStatus::InvalidProcessingParameters;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message = normalStatus != RegistrationNormalStatus::Ok
+                ? BuildRegistrationNormalRejectionMessage(normalStatus) : std::move(normalDiagnostic);
+            return result;
         }
 
         ECSC::Transform::Component* transform =
@@ -1091,17 +1065,30 @@ ApplyRegistrationChecked(
         const ECSC::Transform::Component* targetTransform =
             raw.try_get<ECSC::Transform::Component>(*targetEntity);
 
-        if (sourcePoints->size() < 3 || targetPoints->size() < 3)
+        if (source.LiveCount < 3 || target.LiveCount < 3)
         {
             result.Status = EditorCommandStatus::InvalidProcessingParameters;
             result.Message = "ICP requires at least three live samples per operand.";
             return result;
         }
-        if (!targetLocalNormals.empty())
+        if (command.Variant == EditorICPVariant::PointToPlane)
         {
-            std::vector<glm::vec3> worldNormals;
-            const auto status = TransformRegistrationNormalsToWorld(targetLocalNormals,
-                targetTransform ? ModelMatrixFromTransform(*targetTransform) : glm::mat4(1.f), worldNormals);
+            const auto model = targetTransform ? ModelMatrixFromTransform(*targetTransform) : glm::mat4(1.f);
+            RegistrationNormalStatus status;
+            if (preview)
+            {
+                // The cached local verdict cannot prove float safety under an arbitrary
+                // transform. Keep the exact world-space check, borrowing live rows.
+                const auto values = ResolveGeometryPropertySet(targetAvailable, command.TargetNormals.Domain)
+                    ->Get<glm::vec3>(command.TargetNormals.Name);
+                const auto [domain, name, divisor] = GeometryProcessingDetail::ResolvePointDeletionSource(command.TargetNormals.Domain);
+                const auto deleted = ResolveGeometryPropertySet(targetAvailable, domain)->Get<bool>(name);
+                status = TransformRegistrationNormalRows(values.Size(), [&](std::size_t i) -> std::optional<glm::vec3> {
+                    if (deleted && deleted[i / divisor]) return {};
+                    return values[i];
+                }, model);
+            }
+            else status = TransformRegistrationNormalsToWorld(normals.Points, model);
             if (status != RegistrationNormalStatus::Ok)
             {
                 result.Status = EditorCommandStatus::InvalidProcessingParameters;
@@ -1115,7 +1102,7 @@ ApplyRegistrationChecked(
             result.Message = "Ready to register the selected property domains.";
             return result;
         }
-        return SubmitRegistrationCpuJob(context, command, *sourcePoints, *targetPoints, targetLocalNormals,
+        return SubmitRegistrationCpuJob(context, command, std::move(source), std::move(target), std::move(normals),
             *transform, targetTransform, std::move(onComplete));
     }
 
@@ -1147,22 +1134,10 @@ ApplyRegistrationChecked(
         }
         return ApplyEditorRegistrationCommand(commands, *config, std::move(onComplete));
     }
-    // ICP needs at least three live finite samples per operand, so the shared
-    // point-input catalog would offer bindings the solver must reject.
     GeometryPropertyCatalogSnapshot GetEditorRegistrationInputCatalog(
         const EditorProcessingCommands& commands, std::uint32_t stableId)
     {
-        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
-        if (!context.Scene) return {};
-        const auto entity = ResolveStableEntity(context.Scene->Raw(), stableId);
-        if (!entity) return {};
-        const auto available = BuildGeometryAvailability(context.Scene->Raw(), *entity);
-        auto catalog = BuildGeometryPropertyCatalogSnapshot(available, stableId);
-        std::erase_if(catalog.Entries, [&](const auto& entry) {
-            if (entry.Ref.ValueKind != Geometry::PropertyValueKind::Vec3) return true;
-            const auto snapshot = CaptureRegistrationProperty(available, entry.Ref);
-            return !snapshot || snapshot->Points.size() < 3;
-        });
-        return catalog;
+        return GeometryProcessingDetail::BuildPointInputCatalog(
+            EditorProcessingCommandsAccess::Resolve(commands), stableId, 3);
     }
 } // namespace Extrinsic::Runtime
