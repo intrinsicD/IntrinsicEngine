@@ -51,8 +51,6 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
         using EditorFeatureDetail::MixSignature;
         using EditorFeatureDetail::MixSignatureString;
 
-    namespace
-    {
         [[nodiscard]] EditorCommandStatus ValidateMeshPositionSourceMetadata(
             const GS::ConstSourceView& view, std::string& diagnostic,
             const std::string_view positionProperty)
@@ -84,7 +82,21 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             }
             return EditorCommandStatus::Applied;
         }
-    }
+
+        [[nodiscard]] EditorCommandStatus ValidateMeshVertexDeletionMaskMetadata(
+            const GS::ConstSourceView& view, std::string& diagnostic,
+            const std::string_view positionProperty)
+        {
+            const auto positions = view.VertexSource->Properties.Get<glm::vec3>(positionProperty);
+            const auto deleted = view.VertexSource->Properties.Get<bool>("v:deleted");
+            if (deleted && deleted.Vector().size() != positions.Vector().size())
+            {
+                diagnostic = "v:deleted must match the bound position property: " +
+                             std::string{positionProperty};
+                return EditorCommandStatus::InvalidProcessingParameters;
+            }
+            return EditorCommandStatus::Applied;
+        }
 
         [[nodiscard]] EditorCommandStatus ValidateMeshSoupSourceMetadata(
             const GS::ConstSourceView& view, std::string& diagnostic,
@@ -532,14 +544,14 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             const auto positions = view.VertexSource->Properties.Get<glm::vec3>(positionProperty);
             result.BeforePositions = positions.Vector();
             result.DeletedVertices.assign(result.BeforePositions.size(), false);
+            const auto maskStatus = ValidateMeshVertexDeletionMaskMetadata(view, diagnostic, positionProperty);
+            if (maskStatus != EditorCommandStatus::Applied)
+            {
+                fail(maskStatus, std::move(diagnostic));
+                return result;
+            }
             if (const auto deleted = view.VertexSource->Properties.Get<bool>("v:deleted"))
             {
-                if (deleted.Vector().size() != result.BeforePositions.size())
-                {
-                    fail(EditorCommandStatus::InvalidProcessingParameters,
-                         "v:deleted must match the bound position property: " + std::string{positionProperty});
-                    return result;
-                }
                 for (std::size_t i = 0u; i < deleted.Vector().size(); ++i)
                     result.DeletedVertices[i] = deleted.Vector()[i];
             }

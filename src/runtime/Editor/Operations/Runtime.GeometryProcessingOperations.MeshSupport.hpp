@@ -21,6 +21,15 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
         namespace GS = Extrinsic::ECS::Components::GeometrySources;
 
         // Checks property presence/cardinality without traversing or copying buffers.
+        [[nodiscard]] EditorCommandStatus ValidateMeshPositionSourceMetadata(
+            const GS::ConstSourceView& view, std::string& diagnostic,
+            std::string_view positionProperty = GS::PropertyNames::kPosition);
+
+        // Requires successful position metadata validation; callers retain error priority.
+        [[nodiscard]] EditorCommandStatus ValidateMeshVertexDeletionMaskMetadata(
+            const GS::ConstSourceView& view, std::string& diagnostic,
+            std::string_view positionProperty = GS::PropertyNames::kPosition);
+
         [[nodiscard]] EditorCommandStatus ValidateMeshSoupSourceMetadata(
             const GS::ConstSourceView& view, std::string& diagnostic,
             std::string_view positionProperty = GS::PropertyNames::kPosition);

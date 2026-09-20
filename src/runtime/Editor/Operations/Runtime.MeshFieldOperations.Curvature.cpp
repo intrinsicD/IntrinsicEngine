@@ -732,7 +732,10 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                 diagnostic = "Curvature segmentation requires count-matched canonical edge endpoints.";
                 return EditorCommandStatus::InvalidProcessingParameters;
             }
-            return EditorCommandStatus::Applied;
+            const auto maskStatus = ValidateMeshVertexDeletionMaskMetadata(view, diagnostic, positionProperty);
+            if (maskStatus != EditorCommandStatus::Applied)
+                diagnostic = "Curvature segmentation: " + diagnostic;
+            return maskStatus;
         }
 
         [[nodiscard]] MeshCurvatureSegmentationSourceResult
@@ -1892,7 +1895,13 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             }
 
             const auto view = GS::BuildConstView(raw, *entity);
-            const auto status = ValidateMeshSoupSourceMetadata(view, result.Message, command.Positions.Name);
+            auto status = ValidateMeshSoupSourceMetadata(view, result.Message, command.Positions.Name);
+            if (status == EditorCommandStatus::Applied)
+            {
+                status = ValidateMeshVertexDeletionMaskMetadata(view, result.Message, command.Positions.Name);
+                if (status != EditorCommandStatus::Applied)
+                    result.Message = "Mesh curvature: " + result.Message;
+            }
             if (status != EditorCommandStatus::Applied)
             {
                 if (status == EditorCommandStatus::InvalidProcessingParameters)

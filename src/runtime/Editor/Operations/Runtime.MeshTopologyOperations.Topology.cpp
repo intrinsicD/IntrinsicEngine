@@ -2453,8 +2453,13 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             const auto entity = ResolveMeshCommandTarget(context, command, result);
             if (!entity) return {false, std::move(result.Message)};
             std::string diagnostic;
-            const auto status = ValidateMeshSoupSourceMetadata(
-                GS::BuildConstView(context.Scene->Raw(), *entity), diagnostic);
+            const auto view = GS::BuildConstView(context.Scene->Raw(), *entity);
+            auto status = ValidateMeshPositionSourceMetadata(view, diagnostic);
+            // Processing capture checks the mask before soup topology metadata.
+            if (status == EditorCommandStatus::Applied)
+                status = ValidateMeshVertexDeletionMaskMetadata(view, diagnostic);
+            if (status == EditorCommandStatus::Applied)
+                status = ValidateMeshSoupSourceMetadata(view, diagnostic);
             if (status != EditorCommandStatus::Applied)
                 diagnostic = std::string{operationName} + ": " + diagnostic;
             return {status == EditorCommandStatus::Applied, std::move(diagnostic)};

@@ -514,9 +514,14 @@ It checks actual position, halfedge-connectivity and face-representative buffer
 sizes against their owning property-domain slot counts, including inactive
 slots. Equal connectivity-array lengths alone do not establish this contract.
 Full finite/topology validation remains at submission, so admission readiness
-does not certify numerical feasibility. The processing builder separately
-checks vertex deletion-mask cardinality before topology conversion; UV soup
-construction retains its own source contract.
+does not certify numerical feasibility. `ValidateMeshVertexDeletionMaskMetadata`
+shares the processing builder's optional Boolean vertex-mask cardinality check
+with topology, curvature and segmentation admission. Topology checks it after
+positions and before soup metadata; curvature checks it after soup metadata,
+and segmentation after edge metadata. Each family retains its diagnostic prefix
+and priority. UV soup ignores the mask; UV execution later requires the processing
+topology snapshot for undo, so malformed masks remain a command-time UV failure
+until that distinct readiness/priority gap is closed.
 Duplicate requests return the existing pending job before mesh preparation,
 without adding a result callback. This command does not require config controls.
 

@@ -936,7 +936,7 @@ TEST(SandboxEditorUi, MeshDenoiseCommandPublishesPositionsAndSupportsUndoRedo)
 TEST(SandboxEditorUi, MeshAdmissionRejectsStorageOutsideItsElementDomain)
 {
     // Equal connectivity buffers can still disagree with their owning domain.
-    for (const int defect : {0, 1, 2, 3, 4, 5})
+    for (const int defect : {0, 1, 2, 3, 4, 5, 6, 7})
     {
         SCOPED_TRACE(defect);
         ECS::Scene::Registry registry;
@@ -960,10 +960,13 @@ TEST(SandboxEditorUi, MeshAdmissionRejectsStorageOutsideItsElementDomain)
                 halfedges.Get<std::uint32_t>(name).Vector().resize(
                     (defect == 2 ? halfedges.Size() - 1u : halfedges.Size() + 1u),
                     std::numeric_limits<std::uint32_t>::max());
-        else
+        else if (defect < 6)
             faces.Get<std::uint32_t>(GS::PropertyNames::kFaceHalfedge).Vector().resize(
                 (defect == 4 ? faces.Size() - 1u : faces.Size() + 1u),
                 std::numeric_limits<std::uint32_t>::max());
+        else
+            vertices.GetOrAdd<bool>("v:deleted", false).Vector().resize(
+                defect == 6 ? vertices.Size() - 1u : vertices.Size() + 1u);
         const auto before = positions.Vector();
         unsigned submitted = 0u;
         context.JobCommands.Submit = [&](Runtime::JobDesc, Runtime::EditorJobIdentity) {
@@ -977,6 +980,8 @@ TEST(SandboxEditorUi, MeshAdmissionRejectsStorageOutsideItsElementDomain)
             EXPECT_FALSE(readiness.DisabledReason.empty());
             if (defect < 2)
                 EXPECT_NE(readiness.DisabledReason.find("count-matched"), std::string::npos);
+            if (defect >= 6)
+                EXPECT_NE(readiness.DisabledReason.find("v:deleted must match"), std::string::npos);
             const auto result = apply(context, command);
             EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
             if constexpr (requires { result.Message; })
@@ -1006,10 +1011,122 @@ TEST(SandboxEditorUi, MeshAdmissionRejectsStorageOutsideItsElementDomain)
         check(Runtime::EditorCurvatureSegmentationCommand{.StableEntityId = id},
               Runtime::PreviewEditorCurvatureSegmentationCommand,
               [](const auto& c, const auto& r) { return Runtime::ApplyEditorCurvatureSegmentationCommand(c, r); });
-        check(Runtime::EditorUvRegenerationCommand{.StableEntityId = id, .Resolution = 64u, .Padding = 2u},
-              Runtime::PreviewEditorUvRegenerationCommand,
-              [](const auto& c, const auto& r) { return Runtime::ApplyEditorUvRegenerationCommand(c, r); });
+        const Runtime::EditorUvRegenerationCommand uv{
+            .StableEntityId = id, .Resolution = 64u, .Padding = 2u};
+        if (defect < 6)
+            check(uv, Runtime::PreviewEditorUvRegenerationCommand,
+                  [](const auto& c, const auto& r) { return Runtime::ApplyEditorUvRegenerationCommand(c, r); });
+        else
+        {
+            // UV soup ignores masks; its later undo-topology capture rejects them.
+            EXPECT_TRUE(Runtime::PreviewEditorUvRegenerationCommand(context, uv).Enabled);
+            const auto result = Runtime::ApplyEditorUvRegenerationCommand(context, uv);
+            EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+            EXPECT_EQ(result.Diagnostic,
+                      "UV regeneration: v:deleted must match the bound position property: v:position");
+            EXPECT_EQ(submitted, 0u);
+            EXPECT_FALSE(history.IsDirty());
+            ExpectPositionsExactlyEqual(positions.Vector(), before);
+        }
     }
+}
+
+TEST(SandboxEditorUi, MeshDeletionMaskAdmissionPreservesFamilyPriorityAndBindings)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    auto context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    const auto mesh = MakeSelectable(registry, "Mesh mask priority");
+    AddDenoiseTetraMeshSource(registry, mesh);
+    const auto id = Runtime::SelectionController::ToStableEntityId(mesh);
+    auto& vertices = registry.Raw().get<GS::Vertices>(mesh).Properties;
+    auto& halfedges = registry.Raw().get<GS::Halfedges>(mesh).Properties;
+    auto& edges = registry.Raw().get<GS::Edges>(mesh).Properties;
+    const auto before = vertices.Get<glm::vec3>(PN::kPosition).Vector();
+    auto alternate = vertices.GetOrAdd<glm::vec3>("v:sample");
+    alternate.Vector() = before;
+    auto deleted = vertices.GetOrAdd<bool>("v:deleted", false);
+    deleted.Vector().resize(vertices.Size() - 1u);
+    Runtime::EditorMeshCurvatureCommand curvature{.StableEntityId = id};
+    curvature.Positions.Name = "v:sample";
+    Runtime::EditorCurvatureSegmentationCommand segmentation{.StableEntityId = id};
+    segmentation.Config.Positions.Name = "v:sample";
+    const Runtime::EditorMeshDenoiseCommand denoise{.StableEntityId = id};
+    const auto check = [&](const auto& command, auto preview, auto apply, const char* expected)
+    {
+        const auto readiness = preview(context, command);
+        EXPECT_FALSE(readiness.Enabled);
+        EXPECT_EQ(readiness.DisabledReason, expected);
+        const auto result = apply(context, command);
+        EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+        EXPECT_EQ(result.Message, readiness.DisabledReason);
+        EXPECT_FALSE(history.IsDirty());
+        EXPECT_EQ(history.UndoCount(), 0u);
+        ExpectPositionsExactlyEqual(vertices.Get<glm::vec3>(PN::kPosition).Vector(), before);
+    };
+    const auto checkCurvature = [&](const char* expected) {
+        check(curvature, Runtime::PreviewEditorMeshCurvatureCommand,
+              [](const auto& c, const auto& r) { return Runtime::ApplyEditorMeshCurvatureCommand(c, r); }, expected);
+    };
+    const auto checkSegmentation = [&](const char* expected) {
+        check(segmentation, Runtime::PreviewEditorCurvatureSegmentationCommand,
+              Runtime::ApplyEditorCurvatureSegmentationCommand, expected);
+    };
+    checkCurvature("Mesh curvature: v:deleted must match the bound position property: v:sample");
+    EXPECT_EQ(Runtime::ApplyEditorMeshCurvatureCommand(context, curvature).VertexSlotCount, before.size());
+    checkSegmentation("Curvature segmentation: v:deleted must match the bound position property: v:sample");
+
+    auto next = halfedges.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeNext);
+    const auto savedNext = next.Vector();
+    next.Vector().pop_back();
+    check(denoise, Runtime::PreviewEditorMeshDenoiseCommand,
+          [](const auto& c, const auto& r) { return Runtime::ApplyEditorMeshDenoiseCommand(c, r); },
+          "Mesh denoise: v:deleted must match the bound position property: v:position");
+    check(Runtime::EditorMeshSimplifyCommand{.StableEntityId = id, .TargetFaces = 1u},
+          Runtime::PreviewEditorMeshSimplifyCommand,
+          [](const auto& c, const auto& r) { return Runtime::ApplyEditorMeshSimplifyCommand(c, r); },
+          "Mesh simplify: v:deleted must match the bound position property: v:position");
+    const auto rejectedDenoise = Runtime::ApplyEditorMeshDenoiseCommand(context, denoise);
+    EXPECT_EQ(rejectedDenoise.VertexSlotCount, before.size());
+    checkCurvature("selected mesh has invalid halfedge/face topology");
+    checkSegmentation("selected mesh has invalid halfedge/face topology");
+    next.Vector() = savedNext;
+
+    auto v0 = edges.Get<std::uint32_t>(GS::PropertyNames::kEdgeV0);
+    const auto savedV0 = v0.Vector();
+    v0.Vector().pop_back();
+    checkSegmentation("Curvature segmentation requires count-matched canonical edge endpoints.");
+    checkCurvature("Mesh curvature: v:deleted must match the bound position property: v:sample");
+    v0.Vector() = savedV0;
+
+    alternate.Vector().pop_back();
+    checkCurvature("selected mesh requires a count-matched vertex position property: v:sample");
+    checkSegmentation("selected mesh requires a count-matched vertex position property: v:sample");
+    alternate.Vector() = before;
+
+    // A repaired or absent optional mask immediately restores cheap admission.
+    deleted.Vector().resize(vertices.Size(), false);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshDenoiseCommand(context, denoise).Enabled);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshCurvatureCommand(context, curvature).Enabled);
+    EXPECT_TRUE(Runtime::PreviewEditorCurvatureSegmentationCommand(context, segmentation).Enabled);
+    vertices.Remove(deleted);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshDenoiseCommand(context, denoise).Enabled);
+    EXPECT_TRUE(Runtime::PreviewEditorCurvatureSegmentationCommand(context, segmentation).Enabled);
+    const auto result = Runtime::ApplyEditorMeshCurvatureCommand(context, curvature);
+    EXPECT_TRUE(result.Succeeded()) << result.Message;
+
+    // Processing currently treats a non-Boolean mask as absent.
+    auto wrongTypeMask = vertices.GetOrAdd<std::uint32_t>("v:deleted", 7u);
+    const auto maskBefore = wrongTypeMask.Vector();
+    EXPECT_TRUE(Runtime::PreviewEditorMeshDenoiseCommand(context, denoise).Enabled);
+    EXPECT_TRUE(Runtime::PreviewEditorMeshCurvatureCommand(context, curvature).Enabled);
+    const auto historyRevision = history.Snapshot().Revision;
+    const auto repeated = Runtime::ApplyEditorMeshCurvatureCommand(context, curvature);
+    EXPECT_EQ(repeated.Status, Runtime::EditorCommandStatus::NoChange) << repeated.Message;
+    EXPECT_EQ(history.Snapshot().Revision, historyRevision);
+    EXPECT_EQ(wrongTypeMask.Vector(), maskBefore);
 }
 
 TEST(SandboxEditorUi, MeshAdmissionKeepsPolygonAndUnusedSlotSemantics)
