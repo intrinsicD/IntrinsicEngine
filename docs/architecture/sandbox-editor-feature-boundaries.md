@@ -713,6 +713,22 @@ full result arrays and status-string conversion remain with their algorithm owne
 Parameterization and UV regeneration access geometry views and publish through
 the existing mesh-soup owner without importing ECS geometry-population adapters.
 
+Segmentation config schema 2 exposes ordered `Features` property references.
+Empty features explicitly select computed principal curvature. Supplied features
+use the existing GMM and face-dual regularization with one to three numeric
+channels; scalars and vectors contribute their declared component counts.
+`IsSegmentationFeatureBinding` governs config and UI selection, and the canonical
+property resolver validates live kind/cardinality. Vertex samples are averaged
+onto detached faces; face samples follow the retained source-face map. Numeric
+values are widened into the kernel's working storage; integer precision loss and
+non-finite used values fail before publication. Feature properties are not
+rewritten. Four-channel input is unsupported and rejected. The feature-curve
+methods retain their intrinsic curvature inputs and reject supplied GMM features.
+The command captures current values synchronously; deferred finite-feature
+readiness remains owned by UI-037. Inputs, property names and interpretation
+follow the [binding equivalence contract](geometry-api-style.md#equal-dimensional-property-bindings).
+
+
 `ProcessingCompilationLocality.Family`, `.PointFieldResults`, `.PointAnalysis`, `.PointAnalysisTests`,
 `.Normals`, `.NormalTests`, `.MeshSupport`, `.Registration`, `.Parameterization`,
 `.RegistrationTests`, `.MeshField`, `.MeshTopology`, `.MeshFieldTests`,

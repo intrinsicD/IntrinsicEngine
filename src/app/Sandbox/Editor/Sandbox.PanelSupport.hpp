@@ -250,7 +250,9 @@ namespace Extrinsic::Sandbox::Editor
     void DrawProcessingCpuBackend();
 
     bool DrawProcessingPropertyInput(const char* label,
-        const Runtime::EditorPropertyCatalogModel& catalog, Runtime::GeometryPropertyRef& property);
+        const Runtime::EditorPropertyCatalogModel& catalog, Runtime::GeometryPropertyRef& property,
+        bool (*accepts)(const Runtime::GeometryPropertyRef&) = nullptr,
+        std::uint32_t maxComponents = 4u);
     [[nodiscard]] Runtime::EditorCommandStatus ShowProcessingProperty(
         const SandboxEditorContext& context, std::uint32_t entity,
         const Runtime::GeometryPropertyRef& property);

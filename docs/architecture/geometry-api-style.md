@@ -128,6 +128,38 @@ satisfy method vocabulary. Compatibility is determined from value kind,
 component shape, element count/correspondence, mutability, finite-value policy,
 and any topology the method explicitly requires—not from the property prefix.
 
+### Equal-dimensional property bindings
+
+All method inputs are selected by their declared numeric shape and actual
+correspondence, not by property names, prefixes, producer algorithms or semantic
+labels. The same values stored under different names must produce the same
+result under the same explicit method configuration. A curvature-derived field
+is one possible feature input; a field does not need to have been produced by a
+curvature method to be used by a generic segmentation kernel.
+
+Numeric storage differences are handled by checked conversion into the kernel's
+working type at the binding boundary. Never reinterpret storage or silently drop
+channels. Reject an unsupported dimension or unrepresentable value with a useful
+diagnostic. A dimension match does not remove required element correspondence,
+finite-value rules, topology, units or numerical constraints. In particular,
+mesh vertex positions must correspond to mesh vertex slots; face centroids can
+serve as point samples but do not replace that correspondence.
+
+Config validation, live preflight, UI candidate filters and execution share the
+same compatibility rules. Names do not select normal encoding versus RGB,
+curvature estimation versus supplied features, or other interpretation. Those
+choices belong in explicit config/recipe fields. A requested property must never
+be silently ignored in favor of a canonical name or an internally recomputed
+field. Same-cardinality publication preserves its source domain and unrelated
+properties. Output conversion targets the declared writable storage with checked
+representability and aliasing rules; dimension compatibility does not permit
+reinterpreting or silently changing existing storage. Structural topology/deletion
+properties retain their owning-operation rules.
+
+This is the binding contract, not a statement that every legacy consumer already
+complies. [RUNTIME-270](../../tasks/active/RUNTIME-270-property-binding-equivalence.md)
+tracks the implementation audit and remaining exceptions.
+
 ## Property API contract
 
 Geometry properties expose names as `std::string_view` borrowed from the owning

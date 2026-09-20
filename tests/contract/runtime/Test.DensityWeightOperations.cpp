@@ -172,8 +172,10 @@ TEST(DensityWeightOperations, OneSampleAndBackendPreflightPreserveOutputs)
         EXPECT_EQ(std::as_const(props).Get<float>(c.Weights.Name)[0],1);ASSERT_TRUE(history.Undo().Succeeded());EXPECT_FALSE(props.Exists(c.Weights.Name));
     }
     props.GetOrAdd<float>(c.Weights.Name)[0]=77;
-    for(auto name:{"samples","directions","v:deleted","h:connectivity"})
+    for(auto name:{"samples","directions","v:deleted"})
     {auto bad=c;bad.Weights.Name=name;EXPECT_FALSE(R::PreviewEditorDensityWeightCommand(R::BindEditorProcessingCommands(context),bad).Enabled);}
+    auto unrelatedName=c;unrelatedName.Weights.Name="h:connectivity";
+    EXPECT_TRUE(R::PreviewEditorDensityWeightCommand(R::BindEditorProcessingCommands(context),unrelatedName).Enabled);
     c.SupportRadius=double(Geometry::PointLBVH::CoordinateLimit);EXPECT_FALSE(R::PreviewEditorDensityWeightCommand(R::BindEditorProcessingCommands(context),c).Enabled);
     c.SupportRadius=1;c.Backend=R::DensityWeightBackend::VulkanLBVH;
     for(float value:{std::numeric_limits<float>::denorm_min(),-std::numeric_limits<float>::denorm_min()})

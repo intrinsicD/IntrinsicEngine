@@ -293,8 +293,10 @@ TEST(KernelDensityOperations, InvalidUnsupportedAndNumericalFailuresRetainOutput
     Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::PointCloudPoint);auto config=Config(entity,D::PointCloudPoint);
     R::EditorProcessingContext context{.Scene=&scene};
     auto& props=Properties(scene,entity,D::PointCloudPoint);props.GetOrAdd<float>("density").Vector().assign(props.Size(),77);
-    for(const char* name:{"v:deleted","h:next","samples"})
+    for(const char* name:{"v:deleted","samples"})
     {auto bad=config;bad.Density.Name=name;EXPECT_FALSE(R::PreviewEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), bad).Enabled);}
+    auto unrelatedName=config;unrelatedName.Density.Name="h:next";
+    EXPECT_TRUE(R::PreviewEditorKernelDensityCommand(R::BindEditorProcessingCommands(context),unrelatedName).Enabled);
     config.Backend=R::KernelDensityBackend::VulkanLBVH;
     EXPECT_FALSE(R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), config).Succeeded());
     config.Backend=R::KernelDensityBackend::CpuOctree;config.Bandwidth=1e-30f;

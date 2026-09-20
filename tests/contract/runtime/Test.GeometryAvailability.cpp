@@ -594,3 +594,17 @@ TEST(RuntimeGeometryProperty, RefOverloadTreatsUnknownKindAsUnconstrained)
     EXPECT_EQ(Runtime::ResolveGeometryProperty(availability, wrongKind).Status,
               Status::ValueKindMismatch);
 }
+
+
+TEST(RuntimeGeometryProperty, StructuralProtectionUsesDomainIdentityNotPrefixes)
+{
+    using D = Runtime::GeometryElementDomain;
+    EXPECT_TRUE(Runtime::IsTopologyProperty(D::MeshFace, "f:connectivity"));
+    EXPECT_TRUE(Runtime::IsTopologyProperty(D::MeshHalfedge, "h:next"));
+    EXPECT_TRUE(Runtime::IsTopologyProperty(D::GraphEdge, "e:v0"));
+    EXPECT_TRUE(Runtime::IsTopologyProperty(D::PointCloudPoint, "v:deleted"));
+    EXPECT_FALSE(Runtime::IsTopologyProperty(D::MeshVertex, "f:connectivity"));
+    EXPECT_FALSE(Runtime::IsTopologyProperty(D::MeshFace, "v:position"));
+    EXPECT_FALSE(Runtime::IsTopologyProperty(D::PointCloudPoint, "v:connectivity"));
+    EXPECT_FALSE(Runtime::IsTopologyProperty(D::MeshFace, "f:temperature"));
+}

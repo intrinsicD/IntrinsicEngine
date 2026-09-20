@@ -234,8 +234,10 @@ TEST(DescriptorAnalysisOperations, InvalidNormalsScaleAndOutputPreflightRetainDa
     Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::MeshVertex);auto c=Config(entity,D::MeshVertex);
     auto& props=Properties(scene,entity,D::MeshVertex);
     const auto context=R::BindEditorProcessingCommands(R::EditorProcessingContext{.Scene=&scene});
-    for(auto name:{"samples","directions","v:deleted","h:connectivity"})
+    for(auto name:{"samples","directions","v:deleted","v:connectivity"})
     {auto bad=c;bad.Outputs[32].Name=name;EXPECT_FALSE(R::PreviewEditorDescriptorAnalysisCommand(context,bad).Enabled);}
+    auto unrelatedName=c;unrelatedName.Outputs[32].Name="h:connectivity";
+    EXPECT_TRUE(R::PreviewEditorDescriptorAnalysisCommand(context,unrelatedName).Enabled);
     auto gpu=c;gpu.Backend=R::DescriptorAnalysisBackend::VulkanLBVH;EXPECT_FALSE(R::PreviewEditorDescriptorAnalysisCommand(context,gpu).Enabled);
     props.GetOrAdd<float>(c.Outputs[0].Name).Vector().assign(props.Size(),77);
     props.Get<glm::vec3>("directions")[0]={0,0,0};EXPECT_FALSE(R::PreviewEditorDescriptorAnalysisCommand(context,c).Enabled);

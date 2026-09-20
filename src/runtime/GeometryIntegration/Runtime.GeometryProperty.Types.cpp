@@ -1,5 +1,6 @@
 module;
 #include <optional>
+#include <cstdint>
 #include <string>
 #include <string_view>
 module Extrinsic.Runtime.GeometryProperty.Types;
@@ -62,6 +63,47 @@ namespace Extrinsic::Runtime
         return filter.has_value()
                    ? DebugNameForGeometryPropertyValueKind(*filter)
                    : "Any";
+    }
+
+    bool IsTopologyProperty(const GeometryElementDomain domain, const std::string_view name) noexcept
+    {
+        using D = GeometryElementDomain;
+        switch (domain)
+        {
+        case D::MeshVertex: case D::GraphNode:
+            return name == "v:deleted" || name == "v:connectivity" || name == "v:halfedge";
+        case D::PointCloudPoint:
+            return name == "v:deleted";
+        case D::MeshEdge: case D::GraphEdge:
+            return name == "e:deleted" || name == "e:v0" || name == "e:v1" || name == "e:connectivity";
+        case D::MeshHalfedge: case D::GraphHalfedge:
+            return name == "h:deleted" || name == "h:to_vertex" || name == "h:next" ||
+                   name == "h:prev" || name == "h:opposite" || name == "h:face" || name == "h:connectivity";
+        case D::MeshFace:
+            return name == "f:deleted" || name == "f:halfedge" || name == "f:connectivity";
+        case D::Unknown: return false;
+        }
+        return false;
+    }
+
+    bool IsStructuralVertexProperty(const std::string_view name) noexcept
+    {
+        return name == "v:position" || IsTopologyProperty(GeometryElementDomain::MeshVertex, name);
+    }
+
+    std::uint32_t GeometryPropertyComponentCount(const Geometry::PropertyValueKind kind) noexcept
+    {
+        using K = Geometry::PropertyValueKind;
+        switch (kind)
+        {
+        case K::Bool: case K::Int32: case K::UInt32: case K::UInt64:
+        case K::Float: case K::Double: return 1u;
+        case K::Vec2: return 2u;
+        case K::Vec3: return 3u;
+        case K::Vec4: return 4u;
+        case K::Unknown: return 0u;
+        }
+        return 0u;
     }
 
     bool MatchesGeometryPropertyValueKind(

@@ -200,8 +200,10 @@ TEST(OutlierAnalysis, InvalidParametersAndReservedOutputsFailBeforeMutation)
 {
     Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::MeshFace);auto config=Config(entity,D::MeshFace);
     R::EditorProcessingContext context{.Scene=&scene};
-    for(auto name:{"f:halfedge","v:deleted","e:v0"})
+    for(auto name:{"f:halfedge","f:deleted","f:connectivity"})
     {auto c=config;c.Mask.Name=name;EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),c).Enabled);}
+    for(auto name:{"v:deleted","e:v0"})
+    {auto c=config;c.Mask.Name=name;EXPECT_TRUE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),c).Enabled);}
     auto c=config;c.Backend=R::OutlierAnalysisBackend::VulkanLBVH;
     EXPECT_FALSE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),c).Succeeded());
     auto& props=Properties(scene,entity,D::MeshFace);(void)props.GetOrAdd<float>("outliers");

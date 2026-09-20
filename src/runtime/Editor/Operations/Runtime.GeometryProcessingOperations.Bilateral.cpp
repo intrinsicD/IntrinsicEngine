@@ -91,9 +91,7 @@ namespace Extrinsic::Runtime
             {
                 if (output.Domain != c.Positions.Domain || (output.Name == c.Normals.Name && c.Normals.Name != c.Positions.Name))
                     return fail("Filtered positions must share the input domain and cannot overwrite a distinct normal input.");
-                for (const auto* reserved : {"v:deleted", "e:deleted", "h:deleted", "f:deleted", "v:halfedge",
-                     "e:v0", "e:v1", "h:to_vertex", "h:next", "h:prev", "h:opposite", "h:face", "f:halfedge", "h:connectivity"})
-                    if (output.Name == reserved) return fail("Filtered positions cannot replace topology/deletion properties.");
+                if (IsTopologyProperty(output.Domain, output.Name)) return fail("Filtered positions cannot replace topology/deletion properties.");
                 if (props->Exists(output.Name) && !ResolveGeometryProperty(a, output, props->Size(), false).Resolved())
                     return fail("Filtered positions must be absent or count-matched vec3 position properties.");
             }

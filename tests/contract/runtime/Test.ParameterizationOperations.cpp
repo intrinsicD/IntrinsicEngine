@@ -1408,3 +1408,33 @@ TEST(ParameterizationOperations, CustomBindingsPreserveBothTextureChannelsThroug
     ASSERT_TRUE(h.History.Redo().Succeeded());
     EXPECT_TRUE(props.Exists("v:custom_uv"));
 }
+
+
+TEST(ParameterizationOperations, ArbitraryNamesWorkAndStructuralOutputsFailClosed)
+{
+    ParameterizationHarness harness;
+    auto& properties = harness.Vertices().Properties;
+    auto positions = properties.Get<glm::vec3>("v:position");
+    properties.GetOrAdd<glm::vec3>("samples").Vector() = positions.Vector();
+    properties.Remove(positions);
+    Runtime::ParameterizationConfig config;
+    config.Positions.Name = "samples";
+    config.Texcoords.Name = "coordinates";
+    auto result = Runtime::ApplyEditorParameterizationCommand(harness.Context,
+        {.StableEntityId = harness.StableEntityId, .Config = config});
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    ASSERT_TRUE(properties.Get<glm::vec2>("coordinates"));
+    ASSERT_FALSE(properties.Exists("v:position"));
+    const auto history = harness.History.UndoCount();
+    for (const auto* name : {"v:position", "v:deleted", "v:connectivity", "v:halfedge"})
+    {
+        SCOPED_TRACE(name);
+        config.Texcoords.Name = name;
+        const bool existed = properties.Exists(name);
+        result = Runtime::ApplyEditorParameterizationCommand(harness.Context,
+            {.StableEntityId = harness.StableEntityId, .Config = config});
+        EXPECT_FALSE(result.Succeeded());
+        EXPECT_EQ(properties.Exists(name), existed);
+        EXPECT_EQ(harness.History.UndoCount(), history);
+    }
+}

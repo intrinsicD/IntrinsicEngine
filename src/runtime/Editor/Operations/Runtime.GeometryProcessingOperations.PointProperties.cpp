@@ -185,9 +185,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         {
             if (output.Domain != positions.Domain || output.Name == positions.Name)
                 return fail(std::string(outputLabel) + " outputs must be distinct properties on the input domain.");
-            for (const auto* reserved : {"v:deleted", "e:deleted", "h:deleted", "f:deleted", "v:halfedge",
-                 "e:v0", "e:v1", "h:to_vertex", "h:next", "h:prev", "h:opposite", "h:face", "f:halfedge", "h:connectivity"})
-                if (output.Name == reserved) return fail(std::string(outputLabel) + " outputs cannot replace topology/deletion properties.");
+            if (IsTopologyProperty(output.Domain, output.Name)) return fail(std::string(outputLabel) + " outputs cannot replace topology/deletion properties.");
             if (props->Exists(output.Name) && !ResolveGeometryProperty(a, output, props->Size(), false).Resolved())
                 return fail(std::string(outputLabel) + " outputs must be absent or count-matched properties of the configured type.");
         }

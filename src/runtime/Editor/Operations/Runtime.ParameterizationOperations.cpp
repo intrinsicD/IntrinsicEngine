@@ -1106,7 +1106,7 @@ namespace Extrinsic::Runtime
                 command,
                 EditorCommandStatus::InvalidProcessingParameters,
                 Parameterization::ParameterizationStatus::InvalidInput,
-                "Existing v:texcoord has the wrong type, count, or non-finite values."));
+                "The bound UV output has the wrong type, count, or non-finite values."));
         }
         const ParameterizationSourceSnapshot sourceGeneration =
             CaptureParameterizationSourceState(view, command.Config);
@@ -1465,7 +1465,7 @@ namespace Extrinsic::Runtime
         else if (view.VertexSource->Properties.Exists(config.Texcoords.Name))
         {
             model.Message =
-                "Selected mesh v:texcoord has the wrong type, count, or non-finite values.";
+                "The bound mesh UV output has the wrong type, count, or non-finite values.";
         }
         else if (view.HalfedgeSource != nullptr &&
                  view.HalfedgeSource->Properties.Exists(

@@ -154,12 +154,10 @@ namespace Extrinsic::Runtime
                 return fail(MeshSurfaceTopologyStatus::WrongDomain);
             if (view.VertexSource == nullptr)
                 return fail(MeshSurfaceTopologyStatus::MissingPositions);
-            const auto positions = view.VertexSource->Properties.Get<glm::vec3>(
-                PropertyNames::kPosition);
-            if (!positions)
-                return fail(MeshSurfaceTopologyStatus::MissingPositions);
+            // Connectivity indexes vertex slots, independent of whichever
+            // position-valued property a caller binds for geometric work.
             const std::uint32_t vertexCount =
-                static_cast<std::uint32_t>(positions.Vector().size());
+                static_cast<std::uint32_t>(view.VertexSource->Properties.Size());
             if (vertexCount == 0u)
                 return fail(MeshSurfaceTopologyStatus::EmptyMesh);
 

@@ -1054,6 +1054,17 @@ namespace Extrinsic::Runtime
             return true;
         }
 
+        // These values are persisted by the shared codec; changing them requires a schema change.
+        static_assert(static_cast<unsigned>(Geometry::PropertyValueKind::Bool) == 1u &&
+                      static_cast<unsigned>(Geometry::PropertyValueKind::Int32) == 2u &&
+                      static_cast<unsigned>(Geometry::PropertyValueKind::UInt32) == 3u &&
+                      static_cast<unsigned>(Geometry::PropertyValueKind::UInt64) == 4u &&
+                      static_cast<unsigned>(Geometry::PropertyValueKind::Float) == 5u &&
+                      static_cast<unsigned>(Geometry::PropertyValueKind::Double) == 6u &&
+                      static_cast<unsigned>(Geometry::PropertyValueKind::Vec2) == 7u &&
+                      static_cast<unsigned>(Geometry::PropertyValueKind::Vec3) == 8u &&
+                      static_cast<unsigned>(Geometry::PropertyValueKind::Vec4) == 9u);
+
         [[nodiscard]] json EncodePropertyRef(const Runtime::GeometryPropertyRef& ref)
         {
             return {{"domain", Runtime::ToString(ref.Domain)}, {"name", ref.Name},
@@ -1061,7 +1072,7 @@ namespace Extrinsic::Runtime
         }
 
         void ReadPropertyRef(ValidationContext& context, const json& object,
-            const char* key, Runtime::GeometryPropertyRef& ref, const bool chooseDomain = false)
+            const char* key, Runtime::GeometryPropertyRef& ref, const bool chooseDomain = false, const bool chooseKind = false)
         {
             const auto* value = FindMember(object, key);
             if (!value) return;
@@ -1071,6 +1082,10 @@ namespace Extrinsic::Runtime
                     if (value->at("domain") == Runtime::ToString(static_cast<Runtime::GeometryElementDomain>(i)))
                         ref.Domain = static_cast<Runtime::GeometryElementDomain>(i);
             }
+            if (chooseKind && value->is_object() && value->contains("kind") &&
+                value->at("kind").is_number_unsigned() &&
+                value->at("kind").get<std::uint64_t>() <= static_cast<unsigned>(Geometry::PropertyValueKind::Vec4))
+                ref.ValueKind = static_cast<Geometry::PropertyValueKind>(value->at("kind").get<unsigned>());
             const auto expected = EncodePropertyRef(ref);
             if (!value->is_object() || value->size() != 3 || !value->contains("domain") ||
                 value->at("domain") != expected["domain"] || !value->contains("kind") ||
@@ -1191,7 +1206,7 @@ namespace Extrinsic::Runtime
             AddUnknownFieldDiagnostics(
                 context,
                 *object,
-                {"positions", "components", "regions", "region_colors", "boundaries", "boundary_colors", "hard_features", "feature_confidence", "boundary_roles", "feature_colors", "method",
+                {"features", "positions", "components", "regions", "region_colors", "boundaries", "boundary_colors", "hard_features", "feature_confidence", "boundary_roles", "feature_colors", "method",
                  "selection_mode",
                  "fixed_component_count",
                  "automatic_min_components",
@@ -1385,6 +1400,23 @@ namespace Extrinsic::Runtime
                 config.AutomaticMaxComponents =
                     reference.AutomaticMaxComponents;
             }
+            if (const auto* features = FindMember(*object, "features"))
+            {
+                config.Features.clear();
+                if (!features->is_array() || features->size() > 3u)
+                {
+                    config.Features.emplace_back();
+                }
+                else
+                {
+                    for (const auto& item : *features)
+                    {
+                        GeometryPropertyRef ref{};
+                        ReadPropertyRef(context, json{{"features", item}}, "features", ref, true, true);
+                        config.Features.push_back(std::move(ref));
+                    }
+                }
+            }
             ReadPropertyRef(context, *object, "positions", config.Positions);
             ReadPropertyRef(context, *object, "components", config.Components);
             ReadPropertyRef(context, *object, "regions", config.Regions);
@@ -1399,7 +1431,7 @@ namespace Extrinsic::Runtime
             {
                 context.Result->State = Core::Config::EngineConfigState::Invalid;
                 context.Result->Diagnostics.push_back({.Code=Core::Config::EngineConfigDiagnosticCode::InvalidValue,
-                    .Subject=context.Path, .Message="Segmentation requires distinct typed public property bindings."});
+                    .Subject=context.Path, .Message="Segmentation requires distinct typed outputs and at most three numeric feature channels; feature-curve methods require computed curvature."});
             }
             return config;
         }
@@ -2176,9 +2208,9 @@ namespace Extrinsic::Runtime
             }
             ReadPropertyRef(context, *object, "positions", config.Positions);
             ReadPropertyRef(context, *object, "texcoords", config.Texcoords);
-            if ((!config.Positions.Name.starts_with("v:") || config.Positions.Name.size() < 3 ||
-                 !config.Texcoords.Name.starts_with("v:") || config.Texcoords.Name.size() < 3 ||
-                 config.Texcoords.Name == "v:position" || config.Texcoords.Name == "v:deleted" ||
+            if ((config.Positions.Name.empty() || config.Positions.Name.find('\0') != std::string::npos ||
+                 config.Texcoords.Name.empty() ||
+                 IsStructuralVertexProperty(config.Texcoords.Name) ||
                  config.Positions.Name == config.Texcoords.Name || config.Texcoords.Name.find('\0') != std::string::npos) && context.Result)
             {
                 context.Result->State = Core::Config::EngineConfigState::Invalid;
@@ -2295,7 +2327,10 @@ namespace Extrinsic::Runtime
     std::string SerializeCurvatureSegmentationConfig(
         const CurvatureSegmentationConfig& config)
     {
+        json features = json::array();
+        for (const auto& ref : config.Features) features.push_back(EncodePropertyRef(ref));
         return ConfigDetail::SerializeConfigJson(json::object({
+            {"features", std::move(features)},
             {"positions", EncodePropertyRef(config.Positions)},
             {"components", EncodePropertyRef(config.Components)},
             {"regions", EncodePropertyRef(config.Regions)},

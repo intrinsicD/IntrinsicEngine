@@ -47,6 +47,15 @@ export namespace Extrinsic::Runtime
         Geometry::PropertyValueKind kind) noexcept;
     [[nodiscard]] const char* DebugNameForGeometryPropertyValueKindFilter(
         GeometryPropertyValueKindFilter filter) noexcept;
+    [[nodiscard]] bool IsTopologyProperty(GeometryElementDomain domain, std::string_view name) noexcept;
+
+    // Canonical vertex storage belongs to topology/geometry authoring, not field outputs.
+    [[nodiscard]] bool IsStructuralVertexProperty(std::string_view name) noexcept;
+
+    // Shape only; storage conversion and method-specific validity are separate checks.
+    [[nodiscard]] std::uint32_t GeometryPropertyComponentCount(
+        Geometry::PropertyValueKind kind) noexcept;
+
     [[nodiscard]] bool MatchesGeometryPropertyValueKind(
         GeometryPropertyValueKindFilter expected,
         Geometry::PropertyValueKind actual) noexcept;

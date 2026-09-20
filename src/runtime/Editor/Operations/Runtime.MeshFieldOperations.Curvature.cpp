@@ -17,6 +17,7 @@ module;
 #include <string>
 #include <string_view>
 #include <utility>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
 
@@ -863,6 +864,111 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             result.Status = EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             return result;
+        }
+
+        [[nodiscard]] bool ValidateSegmentationFeatureMetadata(
+            const GS::ConstSourceView& view, const CurvatureSegmentationConfig& config,
+            std::string& diagnostic)
+        {
+            const auto availability = BuildGeometryAvailability(view);
+            for (const auto& ref : config.Features)
+            {
+                const auto count = ref.Domain == GeometryElementDomain::MeshVertex
+                    ? view.VertexSource->Properties.Size() : view.FaceSource->Properties.Size();
+                const auto resolution = ResolveGeometryProperty(availability, ref, count);
+                if (!resolution.Resolved())
+                {
+                    diagnostic = "Segmentation feature '" + ref.Name +
+                        "' must exist with its declared numeric type and domain slot count.";
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] bool CaptureSegmentationFaceFeatures(
+            const GS::ConstSourceView& view, const CurvatureSegmentationConfig& config,
+            const MeshCurvatureSegmentationSourceResult& source,
+            std::vector<glm::dvec3>& features, std::uint32_t& dimension,
+            std::string& diagnostic)
+        {
+            features.assign(source.Mesh.FacesSize(), glm::dvec3{0.0});
+            dimension = 0u;
+            for (const auto& ref : config.Features)
+            {
+                const bool vertexInput = ref.Domain == GeometryElementDomain::MeshVertex;
+                const auto& properties = vertexInput ? view.VertexSource->Properties : view.FaceSource->Properties;
+                const auto width = GeometryPropertyComponentCount(ref.ValueKind);
+                const auto capture = [&]<typename T>()
+                {
+                    const auto property = properties.Get<T>(ref.Name);
+                    const auto add = [&](std::size_t row, glm::dvec3& sum)
+                    {
+                        const T value = property.Vector()[row];
+                        glm::dvec3 numeric{0.0};
+                        if constexpr (std::is_arithmetic_v<T>)
+                        {
+                            if constexpr (std::is_same_v<T, std::uint64_t>)
+                            {
+                                // Reject integer precision loss instead of merging distinct features.
+                                const auto bits = std::bit_width(value);
+                                if (bits > std::numeric_limits<double>::digits &&
+                                    (value & ((std::uint64_t{1} << (bits - std::numeric_limits<double>::digits)) - 1u)))
+                                    return false;
+                            }
+                            numeric.x = static_cast<double>(value);
+                        }
+                        else
+                            for (std::uint32_t c = 0; c < width; ++c) numeric[c] = value[c];
+                        for (std::uint32_t c = 0; c < width; ++c)
+                        {
+                            if (!std::isfinite(numeric[c])) return false;
+                            sum[c] += numeric[c];
+                        }
+                        return true;
+                    };
+                    for (const auto face : source.Mesh.LiveFaces())
+                    {
+                        glm::dvec3 sample{0.0};
+                        if (vertexInput)
+                        {
+                            std::size_t count = 0;
+                            for (const auto vertex : source.Mesh.VerticesAroundFace(face))
+                            {
+                                if (!add(vertex.Index, sample)) return false;
+                                ++count;
+                            }
+                            sample /= static_cast<double>(count);
+                        }
+                        else if (!add(source.SourceFaceForMeshFace[face.Index], sample)) return false;
+                        for (std::uint32_t c = 0; c < width; ++c)
+                            features[face.Index][dimension + c] = sample[c];
+                    }
+                    return true;
+                };
+                bool captured = false;
+                using K = Geometry::PropertyValueKind;
+                switch (ref.ValueKind)
+                {
+                case K::Bool: captured = capture.template operator()<bool>(); break;
+                case K::Int32: captured = capture.template operator()<std::int32_t>(); break;
+                case K::UInt32: captured = capture.template operator()<std::uint32_t>(); break;
+                case K::UInt64: captured = capture.template operator()<std::uint64_t>(); break;
+                case K::Float: captured = capture.template operator()<float>(); break;
+                case K::Double: captured = capture.template operator()<double>(); break;
+                case K::Vec2: captured = capture.template operator()<glm::vec2>(); break;
+                case K::Vec3: captured = capture.template operator()<glm::vec3>(); break;
+                case K::Unknown: case K::Vec4: break;
+                }
+                if (!captured)
+                {
+                    diagnostic = "Segmentation feature '" + ref.Name +
+                        "' must contain finite values representable without integer precision loss.";
+                    return false;
+                }
+                dimension += width;
+            }
+            return true;
         }
 
         [[nodiscard]] CurvSeg::FeatureEvidenceParams
@@ -1941,7 +2047,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                     EditorCommandStatus::InvalidProcessingParameters;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 result.Message =
-                    "Curvature segmentation config contains invalid ranges or a component-count interval with max < min.";
+                    "Segmentation requires valid ranges, distinct typed outputs, and at most three numeric feature channels. Feature-curve methods require computed curvature.";
                 return std::nullopt;
             }
 
@@ -1958,10 +2064,17 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                 return std::nullopt;
             }
 
-            const auto status = ValidateSegmentationSourceMetadata(GS::BuildConstView(raw, *entity), command.Config.Positions.Name, result.Message);
+            const auto view = GS::BuildConstView(raw, *entity);
+            const auto status = ValidateSegmentationSourceMetadata(view, command.Config.Positions.Name, result.Message);
             if (status != EditorCommandStatus::Applied)
             {
                 result.Status = status;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                return std::nullopt;
+            }
+            if (!ValidateSegmentationFeatureMetadata(view, command.Config, result.Message))
+            {
+                result.Status = EditorCommandStatus::InvalidProcessingParameters;
                 result.Error = Core::ErrorCode::InvalidArgument;
                 return std::nullopt;
             }
@@ -2254,10 +2367,22 @@ ApplyEditorMeshCurvatureCommand(
         if (command.Config.Method ==
             CurvatureSegmentationMethod::CurvatureGmm)
         {
-            CurvSeg::CurvatureSegmentationResult segmented =
-                CurvSeg::ComputeAndSegment(
-                    source.Mesh,
+            CurvSeg::CurvatureSegmentationResult segmented;
+            if (command.Config.Features.empty())
+                segmented = CurvSeg::ComputeAndSegment(source.Mesh, MakeCurvatureSegmentationParams(command.Config));
+            else
+            {
+                std::vector<glm::dvec3> features;
+                std::uint32_t dimension{};
+                if (!CaptureSegmentationFaceFeatures(constView, command.Config, source, features, dimension, result.Message))
+                {
+                    result.Status = EditorCommandStatus::InvalidProcessingParameters;
+                    result.Error = Core::ErrorCode::InvalidArgument;
+                    return result;
+                }
+                segmented = CurvSeg::SegmentFaceFeatures(source.Mesh, features, dimension,
                     MakeCurvatureSegmentationParams(command.Config));
+            }
             result.Diagnostics = segmented.Diagnostics;
             if (!segmented.Succeeded())
             {
@@ -2270,11 +2395,11 @@ ApplyEditorMeshCurvatureCommand(
                     result.Error = Core::ErrorCode::InvalidArgument;
                     break;
                 case CurvSeg::SegmentationStatus::InvalidParameters:
-                case CurvSeg::SegmentationStatus::CurvatureCountMismatch:
+                case CurvSeg::SegmentationStatus::FeatureCountMismatch:
                 case CurvSeg::SegmentationStatus::NonTriangleFace:
                 case CurvSeg::SegmentationStatus::NonFinitePosition:
                 case CurvSeg::SegmentationStatus::DegenerateFace:
-                case CurvSeg::SegmentationStatus::NonFiniteCurvature:
+                case CurvSeg::SegmentationStatus::NonFiniteFeature:
                     result.Status =
                         EditorCommandStatus::InvalidProcessingParameters;
                     result.Error = Core::ErrorCode::InvalidArgument;
@@ -2288,7 +2413,7 @@ ApplyEditorMeshCurvatureCommand(
                 case CurvSeg::SegmentationStatus::Success:
                     break;
                 }
-                result.Message = "Curvature GMM segmentation failed: ";
+                result.Message = "Property GMM segmentation failed: ";
                 result.Message +=
                     CurvSeg::ToString(segmented.Diagnostics.Status);
                 result.Message += ".";

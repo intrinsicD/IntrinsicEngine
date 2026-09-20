@@ -212,20 +212,29 @@ namespace Extrinsic::Sandbox::Editor
     }
 
     bool DrawProcessingPropertyInput(const char* label,
-        const Runtime::EditorPropertyCatalogModel& catalog, Runtime::GeometryPropertyRef& property)
+        const Runtime::EditorPropertyCatalogModel& catalog, Runtime::GeometryPropertyRef& property,
+        bool (*accepts)(const Runtime::GeometryPropertyRef&), const std::uint32_t maxComponents)
     {
         bool changed = false;
-        if (ImGui::BeginCombo(label, property.Name.c_str()))
+        const auto displayName = [accepts](const Runtime::GeometryPropertyRef& ref) {
+            return accepts ? std::string{Runtime::ToString(ref.Domain)} + ": " + ref.Name : ref.Name;
+        };
+        const std::string selectedName = displayName(property);
+        if (ImGui::BeginCombo(label, selectedName.c_str()))
         {
             for (const auto& row : catalog.Rows)
             {
-                if (!row.Bindable || row.Descriptor.Domain != property.Domain ||
-                    row.ValueKind != property.ValueKind) continue;
-                if (ImGui::Selectable(row.Name.c_str(), row.Descriptor == property))
+                if (!row.Bindable || (accepts ? (!accepts(row.Descriptor) ||
+                    Runtime::GeometryPropertyComponentCount(row.ValueKind) > maxComponents) :
+                    row.Descriptor.Domain != property.Domain || row.ValueKind != property.ValueKind)) continue;
+                if (accepts) ImGui::PushID(static_cast<int>(row.Descriptor.Domain));
+                const std::string rowName = displayName(row.Descriptor);
+                if (ImGui::Selectable(rowName.c_str(), row.Descriptor == property))
                 {
                     property = row.Descriptor;
                     changed = true;
                 }
+                if (accepts) ImGui::PopID();
             }
             ImGui::EndCombo();
         }

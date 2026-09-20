@@ -391,8 +391,10 @@ TEST(PointSpacingOperations, InvalidUnsupportedAndNumericalFailuresRetainOutput)
     Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::PointCloudPoint);auto config=Config(entity,D::PointCloudPoint);
     R::EditorProcessingContext context{.Scene=&scene};
     auto& props=Properties(scene,entity,D::PointCloudPoint);props.GetOrAdd<float>("radii").Vector().assign(props.Size(),77);
-    for(const char* name:{"v:deleted","h:next","samples"})
+    for(const char* name:{"v:deleted","samples"})
     {auto bad=config;bad.Radii.Name=name;EXPECT_FALSE(R::PreviewEditorPointSpacingCommand(R::BindEditorProcessingCommands(context), bad).Enabled);}
+    auto unrelatedName=config;unrelatedName.Radii.Name="h:next";
+    EXPECT_TRUE(R::PreviewEditorPointSpacingCommand(R::BindEditorProcessingCommands(context),unrelatedName).Enabled);
     config.Backend=R::PointSpacingBackend::VulkanLBVH;
     EXPECT_FALSE(R::ApplyEditorPointSpacingCommand(R::BindEditorProcessingCommands(context), config).Succeeded());
     config.Backend=R::PointSpacingBackend::CpuOctree;config.ScaleFactor=std::numeric_limits<float>::max();

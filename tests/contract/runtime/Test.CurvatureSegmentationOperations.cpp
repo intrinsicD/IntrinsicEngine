@@ -4,6 +4,7 @@
 #include <limits>
 #include <string>
 #include <vector>
+#include <utility>
 
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
@@ -582,4 +583,142 @@ TEST(CurvatureSegmentationOperations, CustomBindingsPreserveCanonicalOutputsAndU
     EXPECT_EQ(sentinel.Vector(), before);
     ASSERT_TRUE(h.History.Redo().Succeeded());
     EXPECT_TRUE(h.Faces().Properties.Exists(config.Regions.Name));
+}
+
+TEST(CurvatureSegmentationOperations, SuppliedFeatureShapesAndNamesAreEquivalent)
+{
+    SegmentationHarness harness;
+    auto& faces = harness.Faces().Properties;
+    const auto count = faces.Size();
+    auto scalar = faces.GetOrAdd<float>("temperature");
+    auto wide = faces.GetOrAdd<double>("unrelated_label");
+    auto second = faces.GetOrAdd<float>("second");
+    auto vector = faces.GetOrAdd<glm::vec2>("two_channels");
+    for (std::size_t i = 0; i < count; ++i)
+    {
+        const float value = (i % 2u) == 0u ? -2.0f : 2.0f;
+        scalar[i] = value;
+        wide[i] = value;
+        second[i] = value * 3.0f;
+        vector[i] = {value, value * 3.0f};
+    }
+    auto config = MakeFixedConfig();
+    config.SpatialWeight = 0.0;
+    config.MinimumRegionFaces = 1u;
+    const auto run = [&](std::vector<Runtime::GeometryPropertyRef> features)
+    {
+        config.Features = std::move(features);
+        const Runtime::EditorCurvatureSegmentationCommand command{.StableEntityId = harness.StableEntityId, .Config = config};
+        EXPECT_TRUE(Runtime::PreviewEditorCurvatureSegmentationCommand(harness.Context, command).Enabled);
+        const auto result = Runtime::ApplyEditorCurvatureSegmentationCommand(harness.Context, command);
+        EXPECT_TRUE(result.Succeeded()) << result.Message;
+        return faces.Get<std::uint32_t>(config.Components.Name).Vector();
+    };
+    using D = Runtime::GeometryElementDomain;
+    using K = Geometry::PropertyValueKind;
+    const auto baseline = run({{D::MeshFace, "temperature", K::Float}});
+    EXPECT_EQ(baseline, run({{D::MeshFace, "unrelated_label", K::Double}}));
+    ASSERT_EQ(baseline.size(), count);
+    ASSERT_NE(baseline[0], baseline[1]);
+    for (std::size_t i = 0; i < count; ++i) EXPECT_EQ(baseline[i], baseline[i % 2u]);
+    EXPECT_EQ(run({{D::MeshFace, "two_channels", K::Vec2}}),
+              run({{D::MeshFace, "temperature", K::Float}, {D::MeshFace, "second", K::Float}}));
+
+    // A different field on the same unchanged surface must change the partition.
+    for (std::size_t i = 0; i < count; ++i) scalar[i] = i % 3u == 0u ? -2.0f : 2.0f;
+    const auto changed = run({{D::MeshFace, "temperature", K::Float}});
+    ASSERT_NE(changed[0], changed[1]);
+    EXPECT_EQ(changed[1], changed[2]);
+    EXPECT_NE(baseline[1], baseline[2]);
+    EXPECT_FALSE(harness.Vertices().Properties.Get<double>("v:k1"));
+    EXPECT_EQ(wide[0], -2.0);
+}
+
+TEST(CurvatureSegmentationOperations, VertexFeaturesMatchTheirExplicitFaceAverages)
+{
+    SegmentationHarness harness;
+    auto values = harness.Vertices().Properties.GetOrAdd<float>("samples");
+    for (std::size_t i = 0; i < values.Vector().size(); ++i)
+        values[i] = static_cast<float>(i % 7u);
+    auto faceValues = harness.Faces().Properties.GetOrAdd<double>("averaged");
+    for (const auto face : harness.SourceMesh.LiveFaces())
+    {
+        double sum = 0.0;
+        for (const auto vertex : harness.SourceMesh.VerticesAroundFace(face)) sum += values[vertex.Index];
+        faceValues[face.Index] = sum / 3.0;
+    }
+    auto config = MakeFixedConfig();
+    config.Features = {{Runtime::GeometryElementDomain::MeshVertex, "samples", Geometry::PropertyValueKind::Float}};
+    auto result = Runtime::ApplyEditorCurvatureSegmentationCommand(harness.Context,
+        {.StableEntityId = harness.StableEntityId, .Config = config});
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    const auto expected = harness.Faces().Properties.Get<std::uint32_t>(config.Components.Name).Vector();
+    config.Features = {{Runtime::GeometryElementDomain::MeshFace, "averaged", Geometry::PropertyValueKind::Double}};
+    result = Runtime::ApplyEditorCurvatureSegmentationCommand(harness.Context,
+        {.StableEntityId = harness.StableEntityId, .Config = config});
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_EQ(expected, harness.Faces().Properties.Get<std::uint32_t>(config.Components.Name).Vector());
+}
+
+TEST(CurvatureSegmentationOperations, InvalidFeaturesNeverFallBackToComputedCurvature)
+{
+    SegmentationHarness harness;
+    auto config = MakeFixedConfig();
+    using D = Runtime::GeometryElementDomain;
+    using K = Geometry::PropertyValueKind;
+    config.Features = {{D::MeshFace, "missing", K::Float}};
+    auto command = Runtime::EditorCurvatureSegmentationCommand{.StableEntityId = harness.StableEntityId, .Config = config};
+    EXPECT_FALSE(Runtime::PreviewEditorCurvatureSegmentationCommand(harness.Context, command).Enabled);
+    EXPECT_FALSE(Runtime::ApplyEditorCurvatureSegmentationCommand(harness.Context, command).Succeeded());
+    auto wide = harness.Faces().Properties.GetOrAdd<std::uint64_t>("wide");
+    wide[0] = (std::uint64_t{1} << 53u) + 1u;
+    command.Config.Features = {{D::MeshFace, "wide", K::UInt64}};
+    EXPECT_TRUE(Runtime::PreviewEditorCurvatureSegmentationCommand(harness.Context, command).Enabled);
+    const auto invalid = Runtime::ApplyEditorCurvatureSegmentationCommand(harness.Context, command);
+    EXPECT_FALSE(invalid.Succeeded());
+    EXPECT_NE(invalid.Message.find("precision loss"), std::string::npos);
+    EXPECT_EQ(harness.History.UndoCount(), 0u);
+    EXPECT_FALSE(harness.Faces().Properties.Get<std::uint32_t>(config.Components.Name));
+    command.Config.Features = {{D::MeshFace, "wide", K::Vec4}};
+    EXPECT_FALSE(Runtime::IsValidCurvatureSegmentationConfig(command.Config));
+    command.Config.Features = {{D::MeshFace, "wide", K::UInt64}};
+    command.Config.Method = Runtime::CurvatureSegmentationMethod::FeatureBoundaryCurves;
+    EXPECT_FALSE(Runtime::IsValidCurvatureSegmentationConfig(command.Config));
+}
+
+
+TEST(CurvatureSegmentationOperations, InputPreservationFiniteChecksAndStructuralOutputs)
+{
+    SegmentationHarness harness;
+    auto& faces = harness.Faces().Properties;
+    auto values = faces.GetOrAdd<double>("field");
+    for (std::size_t i = 0; i < faces.Size(); ++i) values[i] = i % 2u ? 1.0 : -1.0;
+    const auto before = values.Vector();
+    auto config = MakeFixedConfig();
+    using D = Runtime::GeometryElementDomain;
+    using K = Geometry::PropertyValueKind;
+    config.Features = {{D::MeshFace, "field", K::Double}};
+    auto command = Runtime::EditorCurvatureSegmentationCommand{.StableEntityId = harness.StableEntityId, .Config = config};
+    const auto result = Runtime::ApplyEditorCurvatureSegmentationCommand(harness.Context, command);
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_EQ(values.Vector(), before);
+    ASSERT_TRUE(harness.History.Undo().Succeeded());
+    EXPECT_EQ(values.Vector(), before);
+    ASSERT_TRUE(harness.History.Redo().Succeeded());
+    EXPECT_EQ(values.Vector(), before);
+    const auto history = harness.History.UndoCount();
+    values[0] = std::numeric_limits<double>::infinity();
+    EXPECT_FALSE(Runtime::ApplyEditorCurvatureSegmentationCommand(harness.Context, command).Succeeded());
+    EXPECT_EQ(harness.History.UndoCount(), history);
+    for (const auto* name : {"f:halfedge", "f:connectivity", "f:deleted"})
+    {
+        command.Config.Components.Name = name;
+        EXPECT_FALSE(Runtime::IsValidCurvatureSegmentationConfig(command.Config));
+    }
+    command.Config = config;
+    command.Config.Components.Name = "field";
+    EXPECT_FALSE(Runtime::IsValidCurvatureSegmentationConfig(command.Config));
+    EXPECT_TRUE(Runtime::IsSegmentationFeatureBinding({D::MeshFace, "any", K::Vec3}));
+    EXPECT_FALSE(Runtime::IsSegmentationFeatureBinding({D::MeshHalfedge, "any", K::Vec3}));
+    EXPECT_FALSE(Runtime::IsSegmentationFeatureBinding({D::MeshFace, "any", K::Vec4}));
 }

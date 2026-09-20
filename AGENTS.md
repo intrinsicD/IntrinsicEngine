@@ -262,6 +262,16 @@ contract in `docs/architecture/geometry-api-style.md`:
   `Position` does not require a property named `v:position`; for example it may
   bind `f:centroid` on mesh faces when that property satisfies the typed
   contract. Do not create compatibility aliases merely to satisfy a slot name.
+- Property binding is name- and provenance-independent across all methods,
+  config/agent paths, and UI pickers. Equal-dimensional numeric properties are
+  interchangeable inputs when their element correspondence and the method's
+  stated numerical constraints match. Resolve storage differences through
+  checked numeric conversion at the binding boundary, never by reinterpreting
+  storage, truncating channels, or silently substituting a named default.
+  Property names do not imply curvature, normals, colors, or other algorithm
+  semantics; such interpretation and derived-input generation are explicit
+  method/config choices. Output mutation still enforces the declared storage
+  type, aliasing rules, and structural-property ownership.
 - A point-set method consumes the compatible typed `Property<T>` /
   `ConstProperty<T>` (or span) it names on any resolved element domain. It must
   not require point-cloud provenance, a `Vertices` component, or a

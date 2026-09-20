@@ -779,7 +779,7 @@ TEST(SandboxConfigSections, CurvatureBindingsRoundTripAndRejectAliasing)
     EXPECT_EQ(rejected.Diagnostics.front().Code, CoreConfig::EngineConfigDiagnosticCode::InvalidValue);
     EXPECT_EQ(rejected.Diagnostics.front().Subject, "curvature");
     EXPECT_EQ(rejected.Diagnostics.front().Message,
-        "Curvature property names must be distinct public vertex properties (v:...).");
+        "Curvature property names must be distinct and must not replace structural vertex storage.");
     auto segmentation = *Runtime::GetCurvatureSegmentationConfig(config);
     segmentation.Regions.Name = "f:region_custom";
     Runtime::SetCurvatureSegmentationConfig(config, segmentation);
@@ -1917,4 +1917,64 @@ TEST(SandboxConfigSections, Vec3PropertyValidationPreservesFamilyRules)
         EXPECT_NE(constructionPayload.find("\"kind\":\"invalid\""), std::string::npos);
         EXPECT_FALSE(construction(constructionPayload, {}, "property-test").Usable());
     }
+}
+
+
+TEST(SandboxConfigSections, SegmentationFeatureBindingsRoundTripAcrossNamesAndStorageKinds)
+{
+    Runtime::CurvatureSegmentationConfig input;
+    using D = Runtime::GeometryElementDomain;
+    using K = Geometry::PropertyValueKind;
+    input.Features = {{D::MeshFace, "temperature", K::Float}, {D::MeshVertex, "custom_vector", K::Vec2}};
+    input.Positions.Name = "samples";
+    input.Regions.Name = "regions";
+    ASSERT_TRUE(Runtime::IsValidCurvatureSegmentationConfig(input));
+    const auto payload = Runtime::SerializeCurvatureSegmentationConfig(input);
+    const auto validation = Runtime::ValidateCurvatureSegmentationConfigSection(payload,
+        Runtime::SerializeCurvatureSegmentationConfig({}), "features");
+    ASSERT_EQ(validation.State, CoreConfig::EngineConfigState::Valid);
+    CoreConfig::EngineConfig engine;
+    Runtime::SetCurvatureSegmentationConfig(engine, input);
+    const auto restored = Runtime::GetCurvatureSegmentationConfig(engine);
+    ASSERT_TRUE(restored);
+    EXPECT_EQ(restored->Features, input.Features);
+    EXPECT_EQ(restored->Positions, input.Positions);
+    EXPECT_EQ(restored->Regions, input.Regions);
+    EXPECT_EQ(Runtime::SerializeCurvatureSegmentationConfig(*restored), payload);
+    input.Features.push_back({D::MeshFace, "extra", K::Double});
+    EXPECT_FALSE(Runtime::IsValidCurvatureSegmentationConfig(input));
+    EXPECT_EQ(Runtime::ValidateCurvatureSegmentationConfigSection(
+        Runtime::SerializeCurvatureSegmentationConfig(input), payload, "features").State,
+        CoreConfig::EngineConfigState::Invalid);
+}
+
+TEST(SandboxConfigSections, ParameterizationAcceptsNamesWithoutDomainPrefixes)
+{
+    Runtime::ParameterizationConfig input;
+    input.Positions.Name = "samples";
+    input.Texcoords.Name = "coordinates";
+    const auto payload = Runtime::SerializeParameterizationConfig(input);
+    const auto validation = Runtime::ValidateParameterizationConfigSection(payload,
+        Runtime::SerializeParameterizationConfig({}), "parameterization");
+    EXPECT_EQ(validation.State, CoreConfig::EngineConfigState::Valid);
+    CoreConfig::EngineConfig engine;
+    Runtime::SetParameterizationConfig(engine, input);
+    const auto restored = Runtime::GetParameterizationConfig(engine);
+    ASSERT_TRUE(restored);
+    EXPECT_EQ(restored->Positions, input.Positions);
+    EXPECT_EQ(restored->Texcoords, input.Texcoords);
+}
+
+
+TEST(SandboxConfigSections, PersistedSegmentationFeatureKindHasStableMeaning)
+{
+    CoreConfig::EngineConfig engine;
+    Runtime::SetCurvatureSegmentationConfig(engine, {});
+    ASSERT_EQ(engine.AppSections.size(), 1u);
+    engine.AppSections.front().PayloadJson = R"({"features":[{"domain":"MeshFace","name":"temperature","kind":5}]})";
+    const auto restored = Runtime::GetCurvatureSegmentationConfig(engine);
+    ASSERT_TRUE(restored);
+    ASSERT_EQ(restored->Features.size(), 1u);
+    EXPECT_EQ(restored->Features.front().ValueKind, Geometry::PropertyValueKind::Float);
+    EXPECT_EQ(restored->Features.front().Name, "temperature");
 }

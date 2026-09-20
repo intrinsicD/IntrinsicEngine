@@ -3,17 +3,13 @@ module;
 #include <limits>
 #include <nlohmann/json.hpp>
 module Extrinsic.Runtime.GeodesicsConfig;
+
+import Extrinsic.Runtime.GeometryProperty.Types;
 namespace Extrinsic::Runtime
 {
     namespace
     {
         using Json = nlohmann::json;
-        [[nodiscard]] bool IsStructuralVertexProperty(
-            const std::string_view name) noexcept
-        {
-            return name == "v:position" || name == "v:deleted" ||
-                   name == "v:connectivity" || name == "v:halfedge";
-        }
         Core::Config::EngineConfigSection Section(const GeodesicsConfig& value)
         {
             return {.Name = std::string{kGeodesicsConfigSectionName},

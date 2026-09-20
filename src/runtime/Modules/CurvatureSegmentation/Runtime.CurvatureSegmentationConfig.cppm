@@ -6,6 +6,7 @@ module;
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 export module Extrinsic.Runtime.CurvatureSegmentationConfig;
 export import Extrinsic.Runtime.GeometryProperty.Types;
@@ -22,7 +23,7 @@ export namespace Extrinsic::Runtime
         kCurvatureSegmentationConfigSectionSchemaId =
             "intrinsic.runtime.sandbox.curvature_segmentation";
     inline constexpr std::uint32_t
-        kCurvatureSegmentationConfigSectionSchemaVersion = 1u;
+        kCurvatureSegmentationConfigSectionSchemaVersion = 2u;
 
     enum class CurvatureSegmentationSelectionMode : std::uint8_t
     {
@@ -74,6 +75,8 @@ export namespace Extrinsic::Runtime
         double FeatureBaseRadiusRatio{0.02};
         double HardDihedralThresholdDegrees{45.0};
         double PatchComplexityCost{0.5};
+        // Empty explicitly selects computed curvature; otherwise channels are bound in order.
+        std::vector<GeometryPropertyRef> Features{};
         GeometryPropertyRef Positions{GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};
         GeometryPropertyRef Components{GeometryElementDomain::MeshFace, "f:curvature_component", Geometry::PropertyValueKind::UInt32};
         GeometryPropertyRef Regions{GeometryElementDomain::MeshFace, "f:curvature_region", Geometry::PropertyValueKind::UInt32};
@@ -86,6 +89,8 @@ export namespace Extrinsic::Runtime
         GeometryPropertyRef FeatureColors{GeometryElementDomain::MeshEdge, "e:curvature_feature_patch_color", Geometry::PropertyValueKind::Vec4};
 
     };
+
+    [[nodiscard]] bool IsSegmentationFeatureBinding(const GeometryPropertyRef& ref) noexcept;
 
     [[nodiscard]] bool IsValidCurvatureSegmentationConfig(
         const CurvatureSegmentationConfig& config) noexcept;

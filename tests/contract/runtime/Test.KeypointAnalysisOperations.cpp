@@ -237,7 +237,9 @@ TEST(KeypointAnalysisOperations, InvalidScaleAndOutputPreflightRetainExistingDat
 {
     Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::MeshVertex);auto c=Config(entity,D::MeshVertex);
     auto& props=Properties(scene,entity,D::MeshVertex);R::EditorProcessingContext context{.Scene=&scene};
-    for(auto name:{"samples","v:deleted","h:connectivity"}){auto bad=c;bad.Score.Name=name;EXPECT_FALSE(R::PreviewEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),bad).Enabled);}
+    for(auto name:{"samples","v:deleted","v:connectivity"}){auto bad=c;bad.Score.Name=name;EXPECT_FALSE(R::PreviewEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),bad).Enabled);}
+    auto unrelatedName=c;unrelatedName.Score.Name="h:connectivity";
+    EXPECT_TRUE(R::PreviewEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),unrelatedName).Enabled);
     auto gpu=c;gpu.Backend=R::KeypointAnalysisBackend::VulkanLBVH;EXPECT_FALSE(R::PreviewEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),gpu).Enabled);
     gpu.Backend=R::KeypointAnalysisBackend::VulkanCompute;
     EXPECT_FALSE(R::PreviewEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),gpu).Enabled);

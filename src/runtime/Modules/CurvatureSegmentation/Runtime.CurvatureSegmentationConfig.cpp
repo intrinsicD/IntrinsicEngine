@@ -3,6 +3,7 @@ module;
 #include <cmath>
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <string>
 
 module Extrinsic.Runtime.CurvatureSegmentationConfig;
@@ -53,7 +54,7 @@ namespace Extrinsic::Runtime
         switch (method)
         {
         case CurvatureSegmentationMethod::CurvatureGmm:
-            return "Curvature GMM (METHOD-037)";
+            return "Property GMM (curvature or bound features)";
         case CurvatureSegmentationMethod::FeatureAlignedPatches:
             return "Feature-aligned patches (METHOD-039)";
         case CurvatureSegmentationMethod::FeatureBoundaryCurves:
@@ -73,6 +74,15 @@ namespace Extrinsic::Runtime
             return "Automatic";
         }
         return "Unknown";
+    }
+
+    bool IsSegmentationFeatureBinding(const GeometryPropertyRef& ref) noexcept
+    {
+        const auto width = GeometryPropertyComponentCount(ref.ValueKind);
+        return (ref.Domain == GeometryElementDomain::MeshVertex ||
+                ref.Domain == GeometryElementDomain::MeshFace) &&
+               width >= 1u && width <= 3u && !ref.Name.empty() &&
+               ref.Name.find('\0') == std::string::npos;
     }
 
     bool IsValidCurvatureSegmentationConfig(
@@ -96,12 +106,27 @@ namespace Extrinsic::Runtime
             const auto& ref = config.*properties[i];
             const auto& expected = defaults.*properties[i];
             if (ref.Domain != expected.Domain || ref.ValueKind != expected.ValueKind ||
-                !ref.Name.starts_with(expected.Name.substr(0, 2)) || ref.Name.size() < 3 ||
-                ref.Name.find('\0') != std::string::npos || ref.Name.ends_with(":deleted") ||
-                ref.Name == "e:v0" || ref.Name == "e:v1" || ref.Name == "f:halfedge") return false;
+                ref.Name.empty() ||
+                ref.Name.find('\0') != std::string::npos) return false;
+            if (IsTopologyProperty(ref.Domain, ref.Name)) return false;
             for (std::size_t j = 0; j < i; ++j)
                 if (ref.Domain == (config.*properties[j]).Domain && ref.Name == (config.*properties[j]).Name) return false;
         }
+        std::uint32_t featureWidth = 0u;
+        for (const auto& feature : config.Features)
+        {
+            if (!IsSegmentationFeatureBinding(feature)) return false;
+            featureWidth += GeometryPropertyComponentCount(feature.ValueKind);
+            if (featureWidth > 3u) return false;
+            for (const auto property : properties)
+            {
+                if (property == &CurvatureSegmentationConfig::Positions) continue;
+                const auto& output = config.*property;
+                if (feature.Domain == output.Domain && feature.Name == output.Name) return false;
+            }
+        }
+        if (!config.Features.empty() && config.Method != CurvatureSegmentationMethod::CurvatureGmm)
+            return false;
         const bool validMethod =
             config.Method == CurvatureSegmentationMethod::CurvatureGmm ||
             config.Method ==

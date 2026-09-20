@@ -129,11 +129,13 @@ contracts:
     source: docs/architecture/geometry-api-style.md
     applies_when:
       - A method or operation consumes a typed property on vertices, halfedges, edges, or faces, or consumes adjacency between those domains, from an ECS geometry entity.
+      - Method input eligibility, numeric shape conversion or property-name-independent binding changes.
       - Runtime or UI eligibility is selected from geometry provenance or element-domain availability.
       - Results are published back to an ECS geometry source or change its topology or cardinality.
     proofs:
       - tests/unit/ecs/Test.ECS.GeometrySourcesPopulate.cpp
       - tests/contract/runtime/Test.GeometryAvailability.cpp
+      - tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp
       - tests/contract/runtime/Test.MeshGeometryExtraction.cpp
       - tests/contract/runtime/Test.GraphGeometryExtraction.cpp
       - tests/contract/runtime/Test.PointCloudGeometryExtraction.cpp

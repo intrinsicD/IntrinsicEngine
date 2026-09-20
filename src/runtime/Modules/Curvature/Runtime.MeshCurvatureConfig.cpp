@@ -25,12 +25,6 @@ namespace Extrinsic::Runtime
             Slot{"direction1", &MeshCurvatureConfig::Direction1, "vec3"},
             Slot{"direction2", &MeshCurvatureConfig::Direction2, "vec3"}
         };
-        [[nodiscard]] bool IsStructuralVertexProperty(
-            const std::string_view name) noexcept
-        {
-            return name == "v:position" || name == "v:deleted" ||
-                   name == "v:connectivity" || name == "v:halfedge";
-        }
         Json Encode(const MeshCurvatureConfig& config)
         {
             Json doc{{"entity", config.StableEntityId}, {"output", static_cast<unsigned>(config.Output)},

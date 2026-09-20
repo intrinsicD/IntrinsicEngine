@@ -900,7 +900,7 @@ namespace Extrinsic::Sandbox::Editor
         const Runtime::EditorDomainWindowModel& model,
         const SandboxEditorContext& context)
     {
-        ImGui::SeparatorText("Curvature segmentation");
+        ImGui::SeparatorText("Property segmentation");
         const auto active = Runtime::GetEditorCurvatureSegmentationConfig(context.MeshFields.Commands);
         // Explicit Apply preserves unfinished edits until Apply or Reload.
         if (active && !Segmentation.Dirty)
@@ -909,6 +909,43 @@ namespace Extrinsic::Sandbox::Editor
         bool changed = false;
         ImGui::SeparatorText("Input properties");
         changed |= DrawProcessingPropertyInput("Positions##Segmentation", model.PropertyCatalog, config.Positions);
+        bool computedCurvature = config.Features.empty();
+        if (ImGui::Checkbox("Compute curvature features##Segmentation", &computedCurvature))
+        {
+            config.Features.clear();
+            if (!computedCurvature) config.Features.emplace_back();
+            changed = true;
+        }
+        const auto featureChannels = [&] {
+            std::uint32_t count = 0u;
+            for (const auto& feature : config.Features)
+                count += Runtime::GeometryPropertyComponentCount(feature.ValueKind);
+            return count;
+        };
+        for (std::size_t i = 0; i < config.Features.size(); ++i)
+        {
+            ImGui::PushID(static_cast<int>(i));
+            changed |= DrawProcessingPropertyInput("Feature##Segmentation", model.PropertyCatalog,
+                config.Features[i], Runtime::IsSegmentationFeatureBinding,
+                3u - std::min(3u, featureChannels() - Runtime::GeometryPropertyComponentCount(config.Features[i].ValueKind)));
+            ImGui::SameLine();
+            if (config.Features.size() > 1u && ImGui::SmallButton("Remove"))
+            {
+                config.Features.erase(config.Features.begin() + static_cast<std::ptrdiff_t>(i));
+                changed = true;
+                ImGui::PopID();
+                break;
+            }
+            ImGui::PopID();
+        }
+        if (!config.Features.empty() && config.Features.size() < 3u && featureChannels() < 3u && ImGui::Button("Add feature##Segmentation"))
+        {
+            config.Features.emplace_back();
+            changed = true;
+        }
+        ImGui::TextWrapped("Property GMM accepts 1–3 numeric channels on mesh vertices or faces. "
+                           "Vertex values are averaged onto faces. Feature-curve methods require computed curvature.");
+
         ImGui::SeparatorText("Output properties");
         changed |= DrawProcessingPropertyName("Components##Segmentation", config.Components.Name);
         changed |= DrawProcessingPropertyName("Regions##Segmentation", config.Regions.Name);
