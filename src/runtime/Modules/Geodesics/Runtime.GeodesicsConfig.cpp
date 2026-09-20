@@ -8,6 +8,12 @@ namespace Extrinsic::Runtime
     namespace
     {
         using Json = nlohmann::json;
+        [[nodiscard]] bool IsStructuralVertexProperty(
+            const std::string_view name) noexcept
+        {
+            return name == "v:position" || name == "v:deleted" ||
+                   name == "v:connectivity" || name == "v:halfedge";
+        }
         Core::Config::EngineConfigSection Section(const GeodesicsConfig& value)
         {
             return {.Name = std::string{kGeodesicsConfigSectionName},
@@ -72,8 +78,11 @@ namespace Extrinsic::Runtime
             if (!doc["position_property"].is_string())
                 return reject("position_property must name a vertex float3 property.");
             config.PositionProperty = doc["position_property"].get<std::string>();
-            if (!config.PositionProperty.starts_with("v:") || config.PositionProperty.size() < 3)
-                return reject("position_property must name a vertex float3 property (v:...).");
+            if (config.PositionProperty.empty() ||
+                config.PositionProperty.find('\0') != std::string::npos ||
+                (IsStructuralVertexProperty(config.PositionProperty) &&
+                 config.PositionProperty != "v:position"))
+                return reject("position_property must name a non-structural vertex float3 property.");
         }
         for (const auto& [key, name] : {std::pair{"distance_property", &config.DistanceProperty},
                                       std::pair{"source_mask_property", &config.SourceMaskProperty}})
@@ -83,9 +92,9 @@ namespace Extrinsic::Runtime
                 if (!doc[key].is_string()) return reject(std::string{key} + " must name a vertex property.");
                 *name = doc[key].get<std::string>();
             }
-            if (!name->starts_with("v:") || name->size() < 3 || name->find('\0') != std::string::npos ||
-                *name == "v:deleted" || *name == "v:position" || *name == config.PositionProperty)
-                return reject("Geodesics outputs must name distinct public vertex properties.");
+            if (name->empty() || name->find('\0') != std::string::npos ||
+                IsStructuralVertexProperty(*name) || *name == config.PositionProperty)
+                return reject("Geodesics outputs must be distinct and must not replace structural vertex storage.");
         }
         if (config.DistanceProperty == config.SourceMaskProperty)
             return reject("Geodesics output properties must be distinct.");
