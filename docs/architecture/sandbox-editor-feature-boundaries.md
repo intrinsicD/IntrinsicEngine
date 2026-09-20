@@ -522,6 +522,8 @@ positions and before soup metadata; curvature checks it after soup metadata,
 and segmentation after edge metadata. Each family retains its diagnostic prefix
 and priority. UV preview requests a cached face-ring verdict after metadata and
 active-job admission, then checks the mask, matching the command's error order.
+The four mesh-topology previews share that cached verdict after position, mask
+and soup metadata admission, preserving their command builder's mask-first order.
 `MeshSupport.cpp` compiles one ring walk for soup construction and scan-only
 validation; the latter does not copy positions or materialize triangles. A
 `MeshFaceRings` input kind reuses the existing cache, weak queued entries,
@@ -535,7 +537,7 @@ synchronous validation.
 `Runtime.GeometryProcessingOperations.MeshReadiness.hpp` exposes only admission
 and readiness declarations, so the cache does not import owning mesh or soup
 modules. Negative ring verdicts are cached. Finite-input, conversion and UV
-feasibility readiness, plus other mesh families' connectivity verdicts, remain
+feasibility readiness, plus mesh-field families' connectivity verdicts, remain
 open under UI-037.
 Duplicate requests return the existing pending job before mesh preparation,
 without adding a result callback. This command does not require config controls.

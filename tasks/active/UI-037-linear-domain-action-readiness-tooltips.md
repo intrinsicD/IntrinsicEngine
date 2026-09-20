@@ -13,7 +13,7 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, geometry
 ---
 # UI-037 — Linear domain-action readiness and disabled-reason tooltips
 
-Current continuation: see [UV face-ring checkpoint and open points](#continuation--cached-uv-face-ring-readiness-2026-09-20).
+Current continuation: see [mesh-topology ring checkpoint and open points](#continuation--shared-mesh-topology-ring-readiness-2026-09-20).
 Read that checkpoint plus the initial scope before consulting the historical slices.
 
 ## Remaining closure estimate — 2026-09-19
@@ -6062,3 +6062,125 @@ Next bounded slice: adopt the compiled cached ring verdict in one processing
 family while preserving its mask/metadata priority; then address its remaining
 numerical/conversion readiness explicitly. Keep compile measurements separately
 owned; fewer repeated bodies or narrower headers do not prove faster compilation.
+
+
+## Continuation — Shared mesh-topology ring readiness (2026-09-20)
+
+Operator direction: continue duplicate-code and compilation-locality work with
+Claude Fable from `e09ce0490`; keep remaining work explicit and end at a verified
+session boundary. This is UI-037 slice 6. Existing contract IDs still apply.
+
+Reuse decision: the four topology-changing actions already share
+`PreviewMeshCommand` and `BuildHalfedgeMeshForProcessing` in the runtime layer.
+Reuse `MeshSupport::PrepareMeshSoupFaceRings` in that preview after position,
+vertex-mask and soup metadata admission. Denoise, remesh, subdivide, simplify and
+UV now share one compiled ring walk and session verdict. No new cache, helper,
+interface, import, CMake source or owning mesh dependency is introduced. The
+preview never uses the cache to authorize apply; every command rebuilds its
+current source before mutation or job submission. Standalone contexts retain
+the existing synchronous fallback.
+
+The new regression covers all four previews sharing one pending request, positive
+and negative verdict reuse across frames, UV sharing, mask-before-ring priority,
+preview/apply diagnostic agreement, stale enabled-preview rejection, repair and
+all-skipped faces. Existing polygon/unused-slot and metadata admission tests stay
+selected. The bound default position contract fits this helper; curvature and
+segmentation require a separate explicit-property extension, not a silent
+hardcoded `v:position` assumption.
+
+Claude Fable CLI provided a read-only plan and fixed-diff review; no blockers.
+The MCP agent endpoint had no configured agent types, so the configured local CLI
+was used with its `fable` model selector. The CLI response does not independently
+attest a version suffix. No Codex subagents were needed for this small slice.
+Claude's optional queue-count/availability coverage suggestions are recorded
+below; existing synchronous and cache-lifecycle tests cover the underlying paths.
+
+Affected production physical lines: **2,833 → 2,836 (+3)** in one implementation
+unit. This adds readiness coverage through reuse; it is not a net line reduction.
+Compilation dependency checks pass, but elapsed compile-time improvement is
+unmeasured. Matched build measurements remain separately owned; retired BUILD-009
+results are not evidence for this change.
+
+Source-documentation audit: one production file, zero errors, one file-size
+review prompt. The implementation remains one coherent topology-replacement
+family; no unrelated split is needed. Pre-merge sweep: one intent, runtime
+ownership and existing dependency edges retained, tests and architecture docs
+synchronized. Workshop rows 1–3/8 pass; rows 4–7 are inapplicable. No module
+inventory or skill mirror regeneration is needed.
+
+Verification (preset-selected Clang 23, unsanitized):
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+ctest --test-dir build/ci --output-on-failure -R '^EditorPointReadiness\.|^SandboxEditorUi\.(Uv.*|Mesh.*)$|^ProcessingCompilationLocality\.' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/agents/generate_session_brief.py --check
+python3 tools/repo/check_root_hygiene.py --root .
+```
+
+Focused gate: **141/141 passed**. Both builds passed. Full CPU gate: **4,845
+passed**, one expected ASan-only skip, zero failures (4,846 selected). Structural,
+task, documentation and compilation-boundary checks passed. No source edits were
+made during CTest. Logs and fixed review packet:
+`/tmp/intrinsic-processing-rings/`. No sanitizer/GPU execution or measured
+compile-time improvement is claimed.
+
+### Current open points
+
+- [ ] Slice 5: profile and remove/bound exact transformed-normal ICP preview
+      scans while preserving extreme-scale numerical acceptance and transform
+      invalidation. Close paired-source/normal metadata and attachment/world
+      lifecycle gaps in the cross-family matrix.
+- [ ] Slice 6: extend cached ring admission to mesh-field consumers with their
+      explicit bound position properties and diagnostic order; complete command-only
+      numerical/conversion readiness without per-frame scans. UV and mesh-topology ring-versus-mask
+      priority are now closed, but finite input, conversion validity and UV
+      feasibility remain command-only. Preserve distinct normal-builder empty-face
+      fallback/no-op, deleted-face/edge filtering and ring semantics.
+- [ ] Slice 6 follow-up: decide malformed mask type policy consistently with
+      existing property-domain contracts; processing treats absent/non-Boolean
+      `v:deleted` as no mask, whereas normal capture rejects wrong types. Inventory
+      face/edge mask policies per actual consumer before extending validation;
+      UV soup and processing triangulation do not consume those masks.
+- [ ] Slice 7: shared runtime parameterization strategy, pin and boundary readiness.
+- [ ] Slice 8: texture-bake property/UV/device/range readiness and shared presentation.
+- [ ] Slice 9: K-Means, Progressive Poisson, consolidation and outlier service,
+      backend and variant readiness through config/UI/agent validation.
+- [ ] Slice 10: common prepared-frame readiness, remaining app prerequisite
+      duplication and hidden actions.
+- [ ] Slice 11: full table-driven
+      `SandboxEditorUi.ActionReadinessDerivesDomainPrerequisiteReasons` matrix;
+      family invalidation/lifecycle/supersession and zero-scan coverage.
+- [ ] Slice 12: real ImGui enabled-command and disabled-tooltip/no-command
+      coverage for every action/option; final stale guards, full verification,
+      review and operational closure.
+- [ ] Optional scalar catalog coverage: missing command queue and mixed live
+      counts across candidate domains.
+- [ ] Optional point/normal capture work: second slot-vector allocation and paired
+      size assertions only if profiling or mapping changes justify it.
+- [ ] Optional ICP coverage: mixed-domain/default-source, queued transform
+      staleness and target/face malformed masks; revisit legacy `v:normal`
+      wording/Error codes only when revising that surface. Snapshot/index row
+      alignment and watch-first GPU poll validation need their own verified scope.
+- [ ] Non-gating compilation: matched timing under a dedicated build-task owner;
+      retain named-module identity and do not reopen completed compile slices.
+      BUILD-009 is retired; its old baseline is not evidence for this slice.
+- [ ] Non-gating scheduling: worker/per-drain budgeting only for measured latency;
+      deferred point validation still runs on the main thread.
+- [ ] Optional topology-cache coverage: per-family missing-queue diagnostic and
+      later invalidation queue-count assertions. Standalone synchronous previews
+      are covered by the existing mesh admission tests; attachment/supersession
+      invalidation is covered by the shared UV cache tests. No duplicated
+      lifecycle suite is required for each caller.
+
+
+Session boundary: after verification and checkpoint push, start a fresh session
+to avoid carrying the large historical task/source context. Read the initial
+scope and this checkpoint. Next bounded slice: explicit-property ring readiness
+for mesh-field consumers, preserving each command's actual validation order.

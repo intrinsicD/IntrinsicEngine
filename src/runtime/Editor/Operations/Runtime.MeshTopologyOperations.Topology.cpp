@@ -2441,8 +2441,8 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             return entity;
         }
 
-        // Cheap admission only: the source builder still checks numerical and
-        // connectivity validity at execution, before any mutation or job submission.
+        // Metadata precedes cached ring admission; conversion and numerical
+        // validity remain command-time checks before mutation or job submission.
         template <typename Result, typename Command>
         [[nodiscard]] ActionReadiness PreviewMeshCommand(
             const EditorProcessingCommands& commands, const Command& command,
@@ -2460,6 +2460,9 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 status = ValidateMeshVertexDeletionMaskMetadata(view, diagnostic);
             if (status == EditorCommandStatus::Applied)
                 status = ValidateMeshSoupSourceMetadata(view, diagnostic);
+            if (status == EditorCommandStatus::Applied &&
+                !PrepareMeshSoupFaceRings(context, *entity, BuildGeometryAvailability(view), diagnostic))
+                return {false, std::string{operationName} + ": " + diagnostic};
             if (status != EditorCommandStatus::Applied)
                 diagnostic = std::string{operationName} + ": " + diagnostic;
             return {status == EditorCommandStatus::Applied, std::move(diagnostic)};

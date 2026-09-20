@@ -2187,6 +2187,98 @@ TEST_F(EditorPointReadiness, UvFaceRingsCacheVerdictsAndPreserveErrorPriority)
     EXPECT_EQ(Stats().PropertyScans, 0u);
 }
 
+TEST_F(EditorPointReadiness, MeshTopologyReadinessSharesRingVerdictsAndKeepsMaskPriority)
+{
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0,0,0}), b = mesh.AddVertex({1,0,0}), c = mesh.AddVertex({0,1,0});
+    ASSERT_TRUE(mesh.AddTriangle(a,b,c));
+    GS::PopulateFromMesh(Scene->Raw(), Entity, mesh);
+    const auto id = Keypoints.StableEntityId;
+    const Runtime::EditorMeshDenoiseCommand denoise{.StableEntityId = id};
+    const Runtime::EditorMeshRemeshCommand remesh{.StableEntityId = id};
+    const Runtime::EditorMeshSubdivideCommand subdivide{.StableEntityId = id};
+    const Runtime::EditorMeshSimplifyCommand simplify{.StableEntityId = id, .TargetFaces = 1u};
+    const auto previews = [&] {
+        return std::array{
+            Runtime::PreviewEditorMeshDenoiseCommand(Commands, denoise),
+            Runtime::PreviewEditorMeshRemeshCommand(Commands, remesh),
+            Runtime::PreviewEditorMeshSubdivideCommand(Commands, subdivide),
+            Runtime::PreviewEditorMeshSimplifyCommand(Commands, simplify)};
+    };
+    const std::array<std::string, 4> names{"Mesh denoise", "Mesh remesh", "Mesh subdivide", "Mesh simplify"};
+    const auto expectBlocked = [&](const std::string& reason) {
+        const auto states = previews();
+        for (std::size_t i = 0; i < states.size(); ++i)
+        {
+            SCOPED_TRACE(names[i]);
+            EXPECT_FALSE(states[i].Enabled);
+            EXPECT_EQ(states[i].DisabledReason, names[i] + ": " + reason);
+        }
+    };
+    const auto expectApplyBlocked = [&] {
+        const auto states = previews();
+        const auto check = [&](const auto& result, std::size_t i) {
+            SCOPED_TRACE(names[i]);
+            EXPECT_FALSE(result.Succeeded());
+            EXPECT_EQ(result.Message, states[i].DisabledReason);
+        };
+        check(Runtime::ApplyEditorMeshDenoiseCommand(Commands, denoise), 0);
+        check(Runtime::ApplyEditorMeshRemeshCommand(Commands, remesh), 1);
+        check(Runtime::ApplyEditorMeshSubdivideCommand(Commands, subdivide), 2);
+        check(Runtime::ApplyEditorMeshSimplifyCommand(Commands, simplify), 3);
+    };
+    const std::string pending = "Checking mesh face rings. Wait for input validation.";
+    expectBlocked(pending);
+    EXPECT_EQ(Stats().ChecksQueued, 1u);
+    EXPECT_EQ(Stats().PropertyScans, 0u);
+    Drain();
+    for (int frame = 0; frame < 3; ++frame)
+    {
+        PrepareFrame();
+        for (const auto& state : previews()) EXPECT_TRUE(state.Enabled) << state.DisabledReason;
+    }
+    EXPECT_EQ(Stats().PropertyScans, 1u);
+    EXPECT_TRUE(Runtime::PreviewEditorUvRegenerationCommand(Commands, {.StableEntityId = id}).Enabled);
+    EXPECT_EQ(Stats().ChecksQueued, 1u);
+
+    auto next = Scene->Raw().get<GS::Halfedges>(Entity).Properties.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeNext);
+    const auto savedNext = next.Vector();
+    next[0] = std::numeric_limits<std::uint32_t>::max();
+    // Previously enabled preview does not authorize a stale command source.
+    const auto stale = Runtime::ApplyEditorMeshDenoiseCommand(Commands, denoise);
+    EXPECT_FALSE(stale.Succeeded());
+    EXPECT_EQ(stale.Message, "Mesh denoise: selected mesh has a face ring that is not a valid polygon");
+    auto mask = Properties().GetOrAdd<bool>("v:deleted");
+    mask.Vector().clear();
+    expectBlocked("v:deleted must match the bound position property: v:position");
+    expectApplyBlocked();
+    EXPECT_EQ(Stats().ChecksQueued, 1u);
+    mask.Vector().resize(Properties().Size(), false);
+    expectBlocked(pending);
+    Drain();
+    expectBlocked("selected mesh has a face ring that is not a valid polygon");
+    expectApplyBlocked();
+    for (int frame = 0; frame < 3; ++frame)
+    {
+        PrepareFrame();
+        expectBlocked("selected mesh has a face ring that is not a valid polygon");
+    }
+    EXPECT_EQ(Stats().PropertyScans, 2u);
+    next.Vector() = savedNext;
+    expectBlocked(pending);
+    Drain();
+    for (const auto& state : previews()) EXPECT_TRUE(state.Enabled) << state.DisabledReason;
+    EXPECT_EQ(Stats().PropertyScans, 3u);
+
+    auto face = Scene->Raw().get<GS::Faces>(Entity).Properties.Get<std::uint32_t>(GS::PropertyNames::kFaceHalfedge);
+    face[0] = std::numeric_limits<std::uint32_t>::max();
+    expectBlocked(pending);
+    Drain();
+    expectBlocked("selected mesh has no valid surface faces");
+    expectApplyBlocked();
+    EXPECT_EQ(Stats().PropertyScans, 4u);
+}
+
 TEST_F(EditorPointReadiness, UvFaceRingsDiscardSupersededAndDetachedChecks)
 {
     Geometry::HalfedgeMesh::Mesh mesh;
