@@ -1,0 +1,99 @@
+{
+  "before": "7bdffefb309d9a3fe1815e371948a899b4a975a1",
+  "after": "1c1903c66a2866ed3cb55097a8bd1e9e71156a22",
+  "counting": "Physical lines, including blank lines, all affected implementation/declaration/caller/support and CMake files; no formatting compression credit. Regression tests shown separately. Documentation and evidence excluded from code totals.",
+  "files": [
+    {
+      "path": "src/geometry/Geometry.HalfedgeMesh.Parameterization.cpp",
+      "before_lines": 655,
+      "after_lines": 606,
+      "delta": -49,
+      "classification": "implementation"
+    },
+    {
+      "path": "src/geometry/Geometry.HalfedgeMesh.Utils.cpp",
+      "before_lines": 2025,
+      "after_lines": 2060,
+      "delta": 35,
+      "classification": "implementation"
+    },
+    {
+      "path": "src/geometry/Geometry.HalfedgeMesh.Utils.cppm",
+      "before_lines": 375,
+      "after_lines": 382,
+      "delta": 7,
+      "classification": "implementation"
+    },
+    {
+      "path": "src/geometry/Geometry.Parameterization.Bff.cpp",
+      "before_lines": 1016,
+      "after_lines": 969,
+      "delta": -47,
+      "classification": "implementation"
+    },
+    {
+      "path": "src/geometry/Geometry.Parameterization.Harmonic.cpp",
+      "before_lines": 514,
+      "after_lines": 460,
+      "delta": -54,
+      "classification": "implementation"
+    },
+    {
+      "path": "tests/support/geometry/MeshBuilders.cpp",
+      "before_lines": 232,
+      "after_lines": 251,
+      "delta": 19,
+      "classification": "regression_tests"
+    },
+    {
+      "path": "tests/support/geometry/Test_MeshBuilders.h",
+      "before_lines": 52,
+      "after_lines": 58,
+      "delta": 6,
+      "classification": "regression_tests"
+    },
+    {
+      "path": "tests/unit/geometry/Test.BoundaryFirstFlattening.cpp",
+      "before_lines": 511,
+      "after_lines": 578,
+      "delta": 67,
+      "classification": "regression_tests"
+    },
+    {
+      "path": "tests/unit/geometry/Test.HarmonicParameterization.cpp",
+      "before_lines": 287,
+      "after_lines": 336,
+      "delta": 49,
+      "classification": "regression_tests"
+    },
+    {
+      "path": "tests/unit/geometry/Test.MeshTopologyUtilities.cpp",
+      "before_lines": 94,
+      "after_lines": 104,
+      "delta": 10,
+      "classification": "regression_tests"
+    },
+    {
+      "path": "tests/unit/geometry/Test_Parameterization.cpp",
+      "before_lines": 150,
+      "after_lines": 196,
+      "delta": 46,
+      "classification": "regression_tests"
+    }
+  ],
+  "implementation": {
+    "before_lines": 4585,
+    "after_lines": 4477,
+    "delta": -108
+  },
+  "regression_tests": {
+    "before_lines": 1326,
+    "after_lines": 1523,
+    "delta": 197
+  },
+  "total": {
+    "before_lines": 5911,
+    "after_lines": 6000,
+    "delta": 89
+  }
+}

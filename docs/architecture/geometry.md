@@ -735,7 +735,10 @@ boundary LSCM solver. It maps a connected disk-topology triangle mesh into the
 plane by pinning the single boundary loop to a convex target and solving a
 sparse SPD Laplacian system for the interior vertices. Disk validation requires
 one boundary loop, manifold connected vertex topology, and Euler characteristic
-one; a punctured positive-genus surface is rejected even though it has only one
+one. BFF, Harmonic/Tutte and LSCM share the compiled
+`MeshUtils::IsConnectedManifoldWithEulerOne` predicate in
+`Geometry.HalfedgeMesh.Utils`; each solver retains its boundary checks and
+validation order. A punctured positive-genus surface is rejected even though it has only one
 boundary loop. `HarmonicWeightType` selects the
 weighting — `Cotangent` (harmonic / Dirichlet-energy minimizing, with optional
 non-convex-weight clamping) or `Uniform` (Tutte barycentric, flip-free for a

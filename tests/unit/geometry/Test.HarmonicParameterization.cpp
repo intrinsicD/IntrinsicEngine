@@ -285,3 +285,52 @@ TEST(HarmonicParameterization, LscmApiRemainsReachable)
     ASSERT_TRUE(lscm.has_value());
     EXPECT_EQ(lscm->UVs.size(), mesh.VerticesSize());
 }
+
+TEST(HarmonicParameterization, DisconnectedClosedComponentIsRejected)
+{
+    auto mesh = MakeDiskAndClosedComponent();
+    ASSERT_EQ(Geometry::MeshUtils::CollectBoundaryLoops(mesh).size(), 1u);
+    const auto result = Geometry::Parameterization::ComputeHarmonic(mesh);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Status, Geometry::Parameterization::HarmonicStatus::NotDiskTopology);
+}
+
+TEST(HarmonicParameterization, NonmanifoldVertexIsRejected)
+{
+    auto mesh = MakeBowtieTriangles();
+    ASSERT_FALSE(mesh.IsManifold(Geometry::VertexHandle{0u}));
+    const auto result = Geometry::Parameterization::ComputeHarmonic(mesh);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Status, Geometry::Parameterization::HarmonicStatus::NotDiskTopology);
+}
+
+TEST(HarmonicParameterization, IsolatedVertexIsRejected)
+{
+    auto mesh = MakeSingleTriangle();
+    (void)mesh.AddVertex({2.0f, 2.0f, 0.0f});
+    const auto result = Geometry::Parameterization::ComputeHarmonic(mesh);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Status, Geometry::Parameterization::HarmonicStatus::NotDiskTopology);
+}
+
+TEST(HarmonicParameterization, DeletedSlotsPreserveLiveDiskUvs)
+{
+    auto mesh = MakeTwoTriangleSquare();
+    mesh.DeleteFace(Geometry::FaceHandle{0u});
+    ASSERT_GT(mesh.VerticesSize(), mesh.VertexCount());
+    ASSERT_GT(mesh.EdgesSize(), mesh.EdgeCount());
+    ASSERT_GT(mesh.FacesSize(), mesh.FaceCount());
+    const auto result = Geometry::Parameterization::ComputeHarmonic(mesh);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result->Status, Geometry::Parameterization::HarmonicStatus::Success);
+    const auto& uvs = result->UVs;
+    ASSERT_EQ(uvs.size(), mesh.VerticesSize());
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        if (!mesh.IsDeleted(Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(i)}))
+        {
+            EXPECT_TRUE(std::isfinite(uvs[i].x));
+            EXPECT_TRUE(std::isfinite(uvs[i].y));
+        }
+    }
+}

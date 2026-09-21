@@ -50,3 +50,9 @@ Geometry::HalfedgeMesh::Mesh MakeEquilateralTriangle();
 
 // Same fixture as MakeTwoTriangleSquare.
 Geometry::HalfedgeMesh::Mesh MakeTwoTriangles();
+
+// A closed tetrahedron and a separate triangle: one boundary, two components.
+Geometry::HalfedgeMesh::Mesh MakeDiskAndClosedComponent();
+
+// Two triangles sharing only their central vertex.
+Geometry::HalfedgeMesh::Mesh MakeBowtieTriangles();

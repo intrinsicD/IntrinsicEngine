@@ -57,6 +57,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-097` — Progressive model-scene UV job publishes a zero atlas (tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md)
 - unblocked: `BUG-149` — Benchmark sealer escapes dotted output directories (tasks/backlog/bugs/BUG-149-benchmark-sealer-dotted-output-directory.md)
 - unblocked: `BUG-193` — Investigate GPU pacing variability and watchdog margin (tasks/backlog/bugs/BUG-193-gpu-pacing-and-watchdog-margin.md)
+- unblocked: `BUG-206` — Stabilize duplicate UV-submit diagnostic phase observation (tasks/backlog/bugs/BUG-206-uv-duplicate-submit-phase-race.md)
 
 ## Theme H — Agentic workflow hardening
 

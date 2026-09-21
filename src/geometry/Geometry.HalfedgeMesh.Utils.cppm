@@ -1,3 +1,5 @@
+// Shared mesh traversal and geometric quantities for geometry algorithms.
+// Nontrivial operations compile once behind this declaration surface.
 module;
 #include <cstddef>
 #include <cstdint>
@@ -108,6 +110,11 @@ export namespace Geometry::MeshUtils
     /// Enumerate all boundary loops in canonical halfedge order.
     /// Deleted edges are skipped; empty/closed meshes return an empty vector.
     [[nodiscard]] std::vector<BoundaryLoopData> CollectBoundaryLoops(const HalfedgeMesh::Mesh& mesh);
+
+    // Requires a valid live seed and valid mesh connectivity. Disk callers must
+    // separately require one boundary loop; this predicate alone is not a disk test.
+    [[nodiscard]] bool IsConnectedManifoldWithEulerOne(
+        const HalfedgeMesh::Mesh& mesh, VertexHandle seed);
 
     // --- Index-buffer mesh utilities ---
 

@@ -78,53 +78,6 @@ namespace Geometry::Parameterization
             return std::atan2(crossLength, glm::dot(a, b));
         }
 
-        [[nodiscard]] bool HasDiskTopology(
-            const HalfedgeMesh::Mesh& mesh,
-            const std::vector<VertexHandle>& boundary)
-        {
-            if (boundary.empty())
-                return false;
-
-            std::vector<std::uint8_t> reached(mesh.VerticesSize(), 0u);
-            std::vector<VertexHandle> pending{boundary.front()};
-            reached[boundary.front().Index] = 1u;
-            while (!pending.empty())
-            {
-                const VertexHandle vertex = pending.back();
-                pending.pop_back();
-                for (const HalfedgeHandle halfedge :
-                     mesh.HalfedgesAroundVertex(vertex))
-                {
-                    const VertexHandle neighbor = mesh.ToVertex(halfedge);
-                    if (mesh.IsDeleted(neighbor)
-                        || reached[neighbor.Index] != 0u)
-                    {
-                        continue;
-                    }
-                    reached[neighbor.Index] = 1u;
-                    pending.push_back(neighbor);
-                }
-            }
-
-            for (std::size_t vi = 0u; vi < mesh.VerticesSize(); ++vi)
-            {
-                const VertexHandle vertex{static_cast<PropertyIndex>(vi)};
-                if (mesh.IsDeleted(vertex))
-                    continue;
-                if (mesh.IsIsolated(vertex) || !mesh.IsManifold(vertex)
-                    || reached[vi] == 0u)
-                {
-                    return false;
-                }
-            }
-
-            const std::int64_t eulerCharacteristic =
-                static_cast<std::int64_t>(mesh.VertexCount())
-                - static_cast<std::int64_t>(mesh.EdgeCount())
-                + static_cast<std::int64_t>(mesh.FaceCount());
-            return eulerCharacteristic == 1;
-        }
-
         [[nodiscard]] BffStatus PrepareDisk(
             const HalfedgeMesh::Mesh& mesh,
             const double epsilon,
@@ -167,7 +120,7 @@ namespace Geometry::Parameterization
                 }
             }
             if (boundaryVertexCount != disk.Boundary.size()
-                || !HasDiskTopology(mesh, disk.Boundary))
+                || !MeshUtils::IsConnectedManifoldWithEulerOne(mesh, disk.Boundary.front()))
             {
                 return BffStatus::NotDiskTopology;
             }

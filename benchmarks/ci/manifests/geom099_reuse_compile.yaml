@@ -1,0 +1,86 @@
+benchmark_id: build.reuse.geom099.v1
+method: build.engine_compile_iteration
+dataset: intrinsicengine.source.geom099_2026_09_21
+params:
+  intent: performance
+  source_revisions:
+    before: 14af21fbaf3590cb96df7f478fd94247224facf3
+    after: 1c1903c66a2866ed3cb55097a8bd1e9e71156a22
+  sample_order:
+  - before
+  - after
+  - before
+  - after
+  - before
+  - after
+  measured_iterations: 3
+  warmup_iterations: 0
+  warmup_scope: No discarded pilots; identical source/dependency input pre-read before
+    every measured sample. Existing protocol establishes resource requirements.
+  preset: ci
+  target: IntrinsicGeometryTests
+  compiler: /usr/bin/clang++-23
+  jobs: 4
+  minimum_interface_importers: 31
+  configure_options:
+  - -DEXTRINSIC_BACKEND=Null
+  - -DINTRINSIC_PLATFORM_BACKEND=Null
+  - -DINTRINSIC_HEADLESS_NO_GLFW=ON
+  - -DINTRINSIC_BUILD_TESTS=ON
+  - -DINTRINSIC_BUILD_BENCHMARKS=OFF
+  - -DINTRINSIC_ENABLE_CCACHE=OFF
+  - -DCMAKE_CXX_COMPILER_LAUNCHER=
+  - -DCMAKE_C_COMPILER_LAUNCHER=
+  - -DVCPKG_MANIFEST_INSTALL=OFF
+  - -DCMAKE_C_COMPILER=/usr/bin/clang-23
+  - -DCMAKE_CXX_COMPILER=/usr/bin/clang++-23
+  - -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-23
+  scenarios:
+    clean: null
+    noop: null
+    bff_impl: src/geometry/Geometry.Parameterization.Bff.cpp
+    harmonic_impl: src/geometry/Geometry.Parameterization.Harmonic.cpp
+    lscm_impl: src/geometry/Geometry.HalfedgeMesh.Parameterization.cpp
+    utils_interface: src/geometry/Geometry.HalfedgeMesh.Utils.cppm
+  invalidation: mtime only; source bytes remain at the exact clean commit; require
+    observed importer fan-out
+  build_storage: Fresh owned disk build /tmp/intrinsic-geom099/build; identical paths
+    for matched arms.
+  dependency_state: identical preinstalled vcpkg packages, no package installation
+    during sampling
+  operating_system_cache: input pre-read, no cache flushing, no cold-filesystem claim
+  memory_measurement: GNU time maximum single-process RSS, not aggregate concurrent
+    memory
+  critical_path: Ninja target DAG weighted by unfiltered per-invocation timings; unmatched
+    meta-edges reported
+  summary: 'Three alternating samples per arm: report median/min/max wall time, compiler-duration
+    sum and fan-out. GEOM-099 operator amendment before after measurements accepts
+    cohesive smaller ownership rather than automatically rejecting a >2% compile increase.
+    No performance speedup claim.'
+  sample_sequence: Clean, noop, BFF implementation, Harmonic implementation, LSCM
+    implementation, Utils interface.
+  noise_scope: Normal desktop host; no CPU affinity/governor/turbo control. No competing
+    compilation or tests; source inspection and remote review may run. Local descriptive
+    comparison, not an isolated-machine or statistical claim.
+  configure_measurement: initial configure only; source iteration cohort deliberately
+    excludes the already-measured reconfigure scenario.
+  probe_sources:
+    utils_interface:
+      before:
+      - src/geometry/Geometry.HalfedgeMesh.Utils.cpp
+      - src/geometry/Geometry.Parameterization.Bff.cpp
+      - src/geometry/Geometry.HalfedgeMesh.Parameterization.cpp
+      after:
+      - src/geometry/Geometry.HalfedgeMesh.Utils.cpp
+      - src/geometry/Geometry.Parameterization.Bff.cpp
+      - src/geometry/Geometry.HalfedgeMesh.Parameterization.cpp
+      - src/geometry/Geometry.Parameterization.Harmonic.cpp
+  source_scope: Exact clean snapshots; before contains all public-solver characterization
+    tests; after adds the shared owner and one direct predicate regression. No speedup
+    claim.
+metrics:
+- build_time_ms
+- configure_time_ms
+- memory_peak_bytes
+- sample_count
+thresholds: {}

@@ -149,57 +149,6 @@ namespace Geometry::Parameterization
             return info;
         }
 
-        // One boundary loop is not sufficient for disk topology: a punctured
-        // positive-genus surface also has one. Require one connected manifold
-        // component and Euler characteristic one, matching the Harmonic/Tutte
-        // contract wrapped by the unified dispatch.
-        [[nodiscard]] bool HasDiskTopology(
-            const HalfedgeMesh::Mesh& mesh,
-            const std::vector<std::size_t>& boundaryVertices)
-        {
-            if (boundaryVertices.empty())
-                return false;
-
-            std::vector<std::uint8_t> reached(mesh.VerticesSize(), 0u);
-            std::vector<VertexHandle> pending;
-            const VertexHandle start{
-                static_cast<PropertyIndex>(boundaryVertices.front())};
-            pending.push_back(start);
-            reached[start.Index] = 1u;
-
-            while (!pending.empty())
-            {
-                const VertexHandle vertex = pending.back();
-                pending.pop_back();
-                for (const HalfedgeHandle halfedge : mesh.HalfedgesAroundVertex(vertex))
-                {
-                    const VertexHandle neighbor = mesh.ToVertex(halfedge);
-                    if (mesh.IsDeleted(neighbor) || reached[neighbor.Index] != 0u)
-                        continue;
-                    reached[neighbor.Index] = 1u;
-                    pending.push_back(neighbor);
-                }
-            }
-
-            for (std::size_t vi = 0; vi < mesh.VerticesSize(); ++vi)
-            {
-                const VertexHandle vertex{static_cast<PropertyIndex>(vi)};
-                if (mesh.IsDeleted(vertex))
-                    continue;
-                if (mesh.IsIsolated(vertex) || !mesh.IsManifold(vertex)
-                    || reached[vi] == 0u)
-                {
-                    return false;
-                }
-            }
-
-            const std::int64_t eulerCharacteristic =
-                static_cast<std::int64_t>(mesh.VertexCount())
-                - static_cast<std::int64_t>(mesh.EdgeCount())
-                + static_cast<std::int64_t>(mesh.FaceCount());
-            return eulerCharacteristic == 1;
-        }
-
         [[nodiscard]] bool HasValidNumericParams(
             const ParameterizationParams& params) noexcept
         {
@@ -277,7 +226,9 @@ namespace Geometry::Parameterization
 
         auto boundary = FindBoundaryLoops(mesh);
         if (boundary.LoopCount != 1
-            || !HasDiskTopology(mesh, boundary.LoopVertices))
+            || boundary.LoopVertices.empty()
+            || !MeshUtils::IsConnectedManifoldWithEulerOne(mesh,
+                VertexHandle{static_cast<PropertyIndex>(boundary.LoopVertices.front())}))
         {
             return std::nullopt;
         }

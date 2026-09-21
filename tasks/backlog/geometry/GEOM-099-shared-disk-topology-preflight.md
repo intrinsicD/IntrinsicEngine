@@ -49,17 +49,17 @@ backend or engine integration changes.
 
 ## Acceptance criteria
 
-- [ ] Use one compiled predicate for all three callers; delete the duplicate
+- [x] Use one compiled predicate for all three callers; delete the duplicate
       traversals. Preserve traversal/handle bounds assumptions, live counts and
       sparse/deleted slots. Do not allocate converted boundary arrays just to call it.
-- [ ] Preserve each caller's validation order, triangle requirement, boundary-loop
+- [x] Preserve each caller's validation order, triangle requirement, boundary-loop
       checks, optional/status failure representation, pin validation and UV output.
       No runtime/ECS publication or config/UI changes.
-- [ ] Keep or add meaningful public-entry regressions for a valid disk, closed mesh,
+- [x] Keep or add meaningful public-entry regressions for a valid disk, closed mesh,
       multiple loops, disconnected components, isolated/nonmanifold vertices,
       deleted slots and a punctured genus-one mesh. Cover BFF, Harmonic/Tutte and
       LSCM/dispatch, retaining each solver's existing numeric checks.
-- [ ] Before extraction, close the public-entry topology coverage gaps: BFF's
+- [x] Before extraction, close the public-entry topology coverage gaps: BFF's
       `BoundaryFirstFlattening.InvalidTopologyAndGeometryFailClosed` currently
       covers empty/closed/quad input, but needs punctured genus, disconnected and
       nonmanifold cases. Harmonic already has `PuncturedGenusOneMeshIsNotDiskTopology`;
@@ -70,7 +70,7 @@ backend or engine integration changes.
       disconnected/nonmanifold checks in `Test_Parameterization.cpp`. Preserve
       BFF's boundary-count-before-predicate ordering and the valid-live-seed
       precondition. Keep this separate from numeric algorithm changes.
-- [ ] Keep solver-heavy imports out of the shared declaration. Update the chosen
+- [x] Keep solver-heavy imports out of the shared declaration. Update the chosen
       owner's synopsis/contracts, geometry documentation if ownership changes,
       and generated module inventory for the Utils public surface change. Add a
       concise canonical reuse owner-route row and synchronize skill mirrors.
@@ -82,11 +82,11 @@ backend or engine integration changes.
 
 ## Size and compilation acceptance
 
-- [ ] Record before/after physical lines for the complete affected implementation,
+- [x] Record before/after physical lines for the complete affected implementation,
       helper, declaration, caller and CMake set, including newly added files.
       Require a net reduction; report added regression tests separately and also
       report the total diff. Moving bodies or compressing formatting is insufficient.
-- [ ] Reuse `tools/analysis/benchmark_compile_iteration.py` with a task-specific
+- [x] Reuse `tools/analysis/benchmark_compile_iteration.py` with a task-specific
       manifest `benchmarks/ci/manifests/geom099_reuse_compile.yaml`, stable ID
       `build.reuse.geom099.v1`, exact clean before/after revisions, identical
       dependencies, Clang >=20, ci-derived Null/headless preset, disabled ccache,
@@ -102,7 +102,7 @@ backend or engine integration changes.
       task's implementation changes, retain the raw runs and a negative decision
       record, and retire explicitly as rejected, not implemented. Do not discard
       unrelated work. Do not infer compile speed from line count.
-- [ ] Run focused tests and the default CPU gate; preserve test names/labels and
+- [x] Run focused tests and the default CPU gate; preserve test names/labels and
       existing assertions. Validate the measured manifest/results. Any repeatable
       performance claim follows AGENTS.md §8/§8b; this task asserts no speedup.
 
@@ -155,3 +155,34 @@ the existing compiled MeshBuilders owner. Review the fixed diff independently.
 Measure identical characterization tests in both final clean source arms with
 Clang 23, ci-derived Null/headless Debug, ccache disabled, four jobs, three
 alternating samples per arm; retain the original pre-edit pilot separately.
+
+## Execution status — 2026-09-21
+
+Implementation and independent review are complete at measured source
+`1c1903c66a2866ed3cb55097a8bd1e9e71156a22`. The shared owner removes 108
+implementation lines; added regressions/fixtures add 197 lines, for a total
+code delta of +89. The 59 focused tests, full unsanitized CPU gate (4,879
+selected entries, zero failures, one expected skip), full ASan gate and direct
+focused UBSan geometry run pass. Claude Sonnet medium found no remaining
+implementation issue after the direct manifold regression was strengthened.
+
+Six alternating compile samples pass result validation. Median clean wall time
+is 185.643 → 186.083 seconds (+0.24%); compiler sum is 713.672 → 715.643
+seconds (+0.28%). The Harmonic implementation probe rises 2.320 → 2.787 seconds
+wall and 0.863 → 1.325 seconds compiler duration; the Utils interface probe is
+90.406 → 90.767 seconds wall with 84 → 85 compiler jobs. This is accepted under
+the operator's prior qualitative amendment, not reported as a compile win.
+See [measurements](../../evidence/GEOM-099/measurements.md) and the
+[implementation review](../../evidence/GEOM-099/implementation-review.md).
+
+Retirement is pending the required full UBSan gate: the unchanged
+`SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob` compares
+queued/running phase strings across two independent job snapshots. The failure
+reproduces on the original implementation as well as the reviewed source.
+[BUG-206](../bugs/BUG-206-uv-duplicate-submit-phase-race.md) owns that independent
+blocker; no assertion, selector or lifecycle code was weakened. Continue the
+remaining independent requested tasks without expanding this implementation.
+
+Remaining repository gate:
+
+- [ ] Resolve the full UBSan gate blocked by baseline BUG-206 before retirement.

@@ -148,3 +148,49 @@ TEST(LSCM, SingleTriangleDiskTopology)
     EXPECT_EQ(result->UVs.size(), 3u);
     EXPECT_TRUE(result->Converged);
 }
+
+TEST(LSCM, DisconnectedClosedComponentIsRejected)
+{
+    auto mesh = MakeDiskAndClosedComponent();
+    ASSERT_EQ(Geometry::MeshUtils::CollectBoundaryLoops(mesh).size(), 1u);
+    const auto result = Geometry::Parameterization::ComputeLSCM(mesh);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST(LSCM, NonmanifoldVertexIsRejected)
+{
+    auto mesh = MakeBowtieTriangles();
+    ASSERT_FALSE(mesh.IsManifold(Geometry::VertexHandle{0u}));
+    const auto result = Geometry::Parameterization::ComputeLSCM(mesh);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST(LSCM, IsolatedVertexIsRejected)
+{
+    auto mesh = MakeSingleTriangle();
+    (void)mesh.AddVertex({2.0f, 2.0f, 0.0f});
+    const auto result = Geometry::Parameterization::ComputeLSCM(mesh);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST(LSCM, DeletedSlotsPreserveLiveDiskUvs)
+{
+    auto mesh = MakeTwoTriangleSquare();
+    mesh.DeleteFace(Geometry::FaceHandle{0u});
+    ASSERT_GT(mesh.VerticesSize(), mesh.VertexCount());
+    ASSERT_GT(mesh.EdgesSize(), mesh.EdgeCount());
+    ASSERT_GT(mesh.FacesSize(), mesh.FaceCount());
+    const auto result = Geometry::Parameterization::ComputeLSCM(mesh);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_TRUE(result->Converged);
+    const auto& uvs = result->UVs;
+    ASSERT_EQ(uvs.size(), mesh.VerticesSize());
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        if (!mesh.IsDeleted(Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(i)}))
+        {
+            EXPECT_TRUE(std::isfinite(uvs[i].x));
+            EXPECT_TRUE(std::isfinite(uvs[i].y));
+        }
+    }
+}

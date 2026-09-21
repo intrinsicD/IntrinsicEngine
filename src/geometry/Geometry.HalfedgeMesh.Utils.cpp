@@ -116,6 +116,41 @@ namespace Geometry::MeshUtils
         }
     }
 
+    bool IsConnectedManifoldWithEulerOne(const HalfedgeMesh::Mesh& mesh, VertexHandle seed)
+    {
+        std::vector<std::uint8_t> reached(mesh.VerticesSize(), 0u);
+        std::vector<VertexHandle> pending{seed};
+        reached[seed.Index] = 1u;
+        while (!pending.empty())
+        {
+            const VertexHandle vertex = pending.back();
+            pending.pop_back();
+            for (const HalfedgeHandle halfedge : mesh.HalfedgesAroundVertex(vertex))
+            {
+                const VertexHandle neighbor = mesh.ToVertex(halfedge);
+                if (mesh.IsDeleted(neighbor) || reached[neighbor.Index] != 0u)
+                    continue;
+                reached[neighbor.Index] = 1u;
+                pending.push_back(neighbor);
+            }
+        }
+
+        for (std::size_t vi = 0; vi < mesh.VerticesSize(); ++vi)
+        {
+            const VertexHandle vertex{static_cast<PropertyIndex>(vi)};
+            if (mesh.IsDeleted(vertex))
+                continue;
+            if (mesh.IsIsolated(vertex) || !mesh.IsManifold(vertex) || reached[vi] == 0u)
+                return false;
+        }
+
+        const std::int64_t eulerCharacteristic =
+            static_cast<std::int64_t>(mesh.VertexCount())
+            - static_cast<std::int64_t>(mesh.EdgeCount())
+            + static_cast<std::int64_t>(mesh.FaceCount());
+        return eulerCharacteristic == 1;
+    }
+
     bool TryGetTriangleFaceView(const HalfedgeMesh::Mesh& mesh, FaceHandle f, TriangleFaceView& out)
     {
         if (!f.IsValid() || mesh.IsDeleted(f))

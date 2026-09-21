@@ -92,3 +92,13 @@ TEST(MeshTopologyUtilities, UpdateEdgeLengthsPublishesCanonicalCache)
     ASSERT_TRUE(cached.IsValid());
     EXPECT_EQ(cached.Vector().size(), mesh.EdgesSize());
 }
+
+TEST(MeshTopologyUtilities, ConnectedEulerOneBowtieStillFailsManifoldPreflight)
+{
+    const auto mesh = MakeBowtieTriangles();
+    ASSERT_EQ(mesh.VertexCount() + mesh.FaceCount(), mesh.EdgeCount() + 1u);
+    ASSERT_EQ(mesh.Valence(Geometry::VertexHandle{0u}), mesh.VertexCount() - 1u);
+    ASSERT_FALSE(mesh.IsManifold(Geometry::VertexHandle{0u}));
+    EXPECT_FALSE(Geometry::MeshUtils::IsConnectedManifoldWithEulerOne(
+        mesh, Geometry::VertexHandle{0u}));
+}

@@ -230,3 +230,22 @@ Geometry::HalfedgeMesh::Mesh MakeTwoTriangles()
 {
     return MakeTwoTriangleSquare();
 }
+
+Geometry::HalfedgeMesh::Mesh MakeDiskAndClosedComponent()
+{
+    auto mesh = MakeTetrahedron();
+    const auto a = mesh.AddVertex({3.0f, 0.0f, 0.0f});
+    const auto b = mesh.AddVertex({4.0f, 0.0f, 0.0f});
+    const auto c = mesh.AddVertex({3.0f, 1.0f, 0.0f});
+    (void)mesh.AddTriangle(a, b, c);
+    return mesh;
+}
+
+Geometry::HalfedgeMesh::Mesh MakeBowtieTriangles()
+{
+    auto mesh = MakeSingleTriangle();
+    const auto a = mesh.AddVertex({-1.0f, 0.0f, 0.0f});
+    const auto b = mesh.AddVertex({0.0f, -1.0f, 0.0f});
+    (void)mesh.AddTriangle(Geometry::VertexHandle{0u}, a, b);
+    return mesh;
+}
