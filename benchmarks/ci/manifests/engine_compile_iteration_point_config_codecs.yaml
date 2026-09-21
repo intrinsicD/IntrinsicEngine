@@ -1,0 +1,106 @@
+benchmark_id: build.engine_compile_iteration.point_config_codecs.v1
+method: build.engine_compile_iteration
+dataset: intrinsicengine.source.point_config_codecs_2026_09_21
+params:
+  intent: performance
+  source_revisions:
+    before: 5dd61178cc935060d6d850b71224e412c9116b18
+    after: 7a177d289d8714482772c2cf7af96001ae4d9459
+  sample_order:
+  - before
+  - after
+  - after
+  - before
+  measured_iterations: 2
+  warmup_iterations: 0
+  warmup_scope: No discarded samples. Identical source/dependency pre-read before
+    every sample; diagnostic compilation is separate from this target-build population.
+  preset: ci
+  target: IntrinsicRuntimeContractTests
+  compiler: /usr/bin/clang++-23
+  jobs: 4
+  minimum_interface_importers: 1
+  configure_options:
+  - -DEXTRINSIC_BACKEND=Null
+  - -DINTRINSIC_PLATFORM_BACKEND=Null
+  - -DINTRINSIC_HEADLESS_NO_GLFW=ON
+  - -DINTRINSIC_BUILD_TESTS=ON
+  - -DINTRINSIC_BUILD_BENCHMARKS=OFF
+  - -DINTRINSIC_ENABLE_CCACHE=OFF
+  - -DCMAKE_CXX_COMPILER_LAUNCHER=
+  - -DCMAKE_C_COMPILER_LAUNCHER=
+  - -DVCPKG_MANIFEST_INSTALL=OFF
+  - -DCMAKE_C_COMPILER=/usr/bin/clang-23
+  - -DCMAKE_CXX_COMPILER=/usr/bin/clang++-23
+  - -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-23
+  scenarios:
+    clean: null
+    noop: null
+    normal_codec:
+      before: src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp
+      after: src/runtime/Config/internal/Runtime.PointNormalsRegistrationConfigCodecs.cpp
+    density_codec:
+      before: src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp
+      after: src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp
+    descriptor_codec:
+      before: src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp
+      after: src/runtime/Config/internal/Runtime.PointFeaturesConfigCodecs.cpp
+    shared_header: src/runtime/Config/internal/Runtime.PointConfigJson.hpp
+    shared_helper: src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+  invalidation: mtime only; source bytes remain at the exact clean commit; require
+    observed importer fan-out
+  build_storage: Fresh owned build at /dev/shm/intrinsic-build011-measure; identical
+    source/build paths across arms.
+  dependency_state: identical preinstalled vcpkg packages, no package installation
+    during sampling
+  operating_system_cache: input pre-read, no cache flushing, no cold-filesystem claim
+  memory_measurement: GNU time maximum single-process RSS, not aggregate concurrent
+    memory
+  critical_path: Ninja target DAG weighted by unfiltered per-invocation timings; unmatched
+    meta-edges reported
+  summary: Median and range of two samples per arm. Acceptance requires >=15% shared-header
+    improvement with nonoverlapping ranges, reduced clean compiler-duration sum, <=2%
+    clean regression and <=50% regression for each normal, density and descriptor
+    codec-edit scenario. Include complete closure, all three receiving owners and
+    links. Local descriptive comparison only.
+  sample_sequence: Configure, clean target build, no-op, normal/density/descriptor
+    codec edits at the actual implementation owner in each arm, shared JSON declaration-header
+    edit, unchanged common helper implementation edit. Fresh build per sample; mtime-only
+    edits.
+  noise_scope: Normal desktop host; no CPU affinity/governor/turbo control. No competing
+    compilation or tests; source inspection and remote review may run. Local descriptive
+    comparison, not an isolated-machine or statistical claim.
+  configure_measurement: initial configure only; source iteration cohort deliberately
+    excludes the already-measured reconfigure scenario.
+  source_scope: Exact before/after commits; ten point config implementation bodies
+    move into three ordinary translation units with globally attached public functions.
+    Config records retain named-module ownership. Benchmark runner supports per-arm
+    relocated paths and verifies complete declared producer sets. Other JSON families
+    remain unchanged.
+  probe_sources:
+    shared_header:
+      before:
+      - src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp
+      - src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp
+      - src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp
+      - src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp
+      - src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp
+      - src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp
+      - src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp
+      - src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cpp
+      - src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp
+      - src/runtime/Modules/Registration/Runtime.RegistrationConfig.cpp
+      - src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+      - src/runtime/Modules/Curvature/Runtime.MeshCurvatureConfig.cpp
+      after:
+      - src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp
+      - src/runtime/Config/internal/Runtime.PointFeaturesConfigCodecs.cpp
+      - src/runtime/Config/internal/Runtime.PointNormalsRegistrationConfigCodecs.cpp
+      - src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+      - src/runtime/Modules/Curvature/Runtime.MeshCurvatureConfig.cpp
+metrics:
+- build_time_ms
+- configure_time_ms
+- memory_peak_bytes
+- sample_count
+thresholds: {}

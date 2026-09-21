@@ -1,0 +1,51 @@
+I could not complete this audit. The session denied every read under `/tmp`, so I never saw the results, summaries or accounting files. This is Claude Fable 5.1 (`claude-fable-5-1`), and I made no edits and ran no builds or tests.
+
+## Blocker: measurement and evidence files were unreadable
+
+- **What was denied:** both `Glob` and `Read` were refused on `/tmp/intrinsic-build011-measurement/` and `/tmp/intrinsic-config-compilation-20260921/`.
+- **No workaround taken:** I did not route the reads through a Codex session. That would bypass a permission boundary, and it would have the audited writer's tool supplying the evidence, which defeats an independent audit.
+- **Not recomputed from results:**
+  - the before/after medians
+  - the worst individual-codec regression
+  - the clean compiler-duration accounting
+  - the acceptance conditions: ≥15% shared-header improvement with non-overlapping ranges, reduced clean compiler-duration sum, clean regression ≤2%, and each codec regression ≤50%
+- **Not checked:**
+  - exact source revisions and `claim_eligible:false` in the four results
+  - toolchain, cache, job count, path and dependency consistency
+  - the no-discard claim
+  - the contents of `source-accounting.json`, `source-identity.json`, `relocated-command-equivalence.json`, `verification.json` and `report-draft.md`
+  - the "seven fewer compiled units" and "42 fewer setup lines" figures
+- **Consequence:** I give no opinion on accepting the batch or retiring the task. To unblock, grant read access to those two directories or copy the files to a readable path, then re-invoke me.
+
+## Verified from the repository (HEAD `7a177d289`)
+
+**1. PointSpacing maps to `Runtime.PointNeighborhoodConfigCodecs.cpp`.**
+- The file imports `Extrinsic.Runtime.PointSpacingConfig` at line 18.
+- The PointSpacing block at lines 184–256 defines the private `ParsePointSpacingConfig` and `MakePointSpacingConfigSection` helpers plus the six exported functions: `ToString`, `Serialize…`, `Validate…Section`, `Get…`, `Set…` and `Make…Registration`.
+- `Modules/PointSpacing/` now holds only the `.cppm`, so no old implementation `.cpp` is left to cause a duplicate definition.
+- All six exported functions are declared `extern "C++"` inside the named module (`Runtime.PointSpacingConfig.cppm:16-31`), while the record type stays module-owned.
+
+**2. PointConstruction maps to `Runtime.PointFeaturesConfigCodecs.cpp`.**
+- The file imports the module at line 19, and lines 279–428 define both `ToString` overloads plus the five other exported functions.
+- `Modules/PointConstruction/` holds only the `.cppm`, and all seven declarations are `extern "C++"` (`cppm:28-55`).
+- The source-accounting half of this mapping is still unverified, because `source-accounting.json` was unreadable.
+
+**3. `src/runtime/CMakeLists.txt:159-161` lists exactly the three shared owner files, and both `.cppm` files remain registered at lines 30 and 35.**
+
+**4. The owner groupings in the file header comments match the manifest `probe_sources`.**
+- Neighborhood: Outlier, KernelDensity, PointSpacing, DensityWeight.
+- Features: Bilateral, Keypoint, Descriptor, PointConstruction.
+- NormalsRegistration: Normal, Registration (checked by its imports; I did not see a header comment for this file).
+- That is ten codecs in three owners, replaced one-for-one in the after probe set. `FeatureConfigCodecs.Detail.cpp` and `MeshCurvatureConfig.cpp` are retained in both arms.
+
+**5. The manifest is internally consistent with the bounded conclusion you described.**
+- ABBA order, `measured_iterations: 2`, no warmup or discard, and `thresholds: {}`.
+- Acceptance is carried in prose as "local descriptive comparison only".
+- The launcher and ccache are disabled, the compiler is pinned to Clang 23, and jobs are 4.
+- The manifest `source_revisions.after` equals HEAD, and `before` equals `HEAD~1` (`5dd61178c`).
+
+## Suggestions (not blockers)
+
+- **Noise wording:** the manifest's `noise_scope` says "source inspection and remote review may run" during sampling. With n=2 per arm, the report should say this plainly next to the clean-build result, because a ≤2% clean margin is within plausible desktop noise. Word it as "small/local, not distinguishable from noise", not as "gain", unless the ranges in the results support more.
+- **Untracked manifest:** the manifest file is untracked in git. Codex should commit it together with the batch so the "frozen" claim can be verified later.
+- **Range condition:** "non-overlapping ranges" with two samples per arm is a weak descriptive condition. Keep it labelled as descriptive, as the manifest already does.

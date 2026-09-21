@@ -1,0 +1,159 @@
+[
+  {
+    "command": [
+      "python3",
+      "tools/agents/check_task_policy.py",
+      "--root",
+      ".",
+      "--strict"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "python3",
+      "tools/agents/check_ara_claims.py",
+      "--root",
+      ".",
+      "--strict"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "python3",
+      "tools/agents/check_task_state_links.py",
+      "--root",
+      ".",
+      "--strict"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "python3",
+      "tools/agents/generate_session_brief.py",
+      "--check"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "python3",
+      "tools/docs/check_doc_links.py",
+      "--root",
+      ".",
+      "--strict"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "python3",
+      "tools/docs/check_docs_sync.py",
+      "--root",
+      ".",
+      "--strict",
+      "--files",
+      "ara/evidence/diagnostics/build011_point_config_codecs/archive-contents.json",
+      "ara/evidence/diagnostics/build011_point_config_codecs/claude-results-final.txt",
+      "ara/evidence/diagnostics/build011_point_config_codecs/claude-results-initial.txt",
+      "ara/evidence/diagnostics/build011_point_config_codecs/cleanup.json",
+      "ara/evidence/diagnostics/build011_point_config_codecs/edit-cooccurrence.json",
+      "ara/evidence/diagnostics/build011_point_config_codecs/evidence-index.json",
+      "ara/evidence/diagnostics/build011_point_config_codecs/final-integrity.py",
+      "ara/evidence/diagnostics/build011_point_config_codecs/integrity-audit.json",
+      "ara/evidence/diagnostics/build011_point_config_codecs/protocol.json",
+      "ara/evidence/diagnostics/build011_point_config_codecs/raw-evidence.tar.gz",
+      "ara/evidence/diagnostics/build011_point_config_codecs/relocated-command-equivalence.json",
+      "ara/evidence/diagnostics/build011_point_config_codecs/results-audit-final-prompt.txt",
+      "ara/evidence/diagnostics/build011_point_config_codecs/results/01-before-1.json",
+      "ara/evidence/diagnostics/build011_point_config_codecs/results/02-after-1.json",
+      "ara/evidence/diagnostics/build011_point_config_codecs/results/03-after-2.json",
+      "ara/evidence/diagnostics/build011_point_config_codecs/results/04-before-2.json",
+      "ara/evidence/diagnostics/build011_point_config_codecs/source-accounting.json",
+      "ara/evidence/diagnostics/build011_point_config_codecs/source-identity.json",
+      "ara/evidence/diagnostics/build011_point_config_codecs/summary.json",
+      "ara/evidence/diagnostics/build011_point_config_codecs/verification.json",
+      "ara/evidence/tables/build011_point_config_codecs_measurement.md",
+      "ara/logic/claims.md",
+      "ara/staging/observations.yaml",
+      "ara/trace/exploration_tree.yaml",
+      "ara/trace/pm_reasoning_log.yaml",
+      "ara/trace/sessions/2026-09-21_001.yaml",
+      "ara/trace/sessions/session_index.yaml",
+      "benchmarks/ci/manifests/engine_compile_iteration_point_config_codecs.yaml",
+      "docs/architecture/sandbox-editor-feature-boundaries.md",
+      "docs/benchmarking/overview.md",
+      "src/runtime/CMakeLists.txt",
+      "src/runtime/Config/internal/Runtime.PointFeaturesConfigCodecs.cpp",
+      "src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp",
+      "src/runtime/Config/internal/Runtime.PointNormalsRegistrationConfigCodecs.cpp",
+      "src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp",
+      "src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cppm",
+      "src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp",
+      "src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cppm",
+      "src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp",
+      "src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cppm",
+      "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp",
+      "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cppm",
+      "src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp",
+      "src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm",
+      "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm",
+      "src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp",
+      "src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm",
+      "src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cpp",
+      "src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cppm",
+      "src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp",
+      "src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cppm",
+      "src/runtime/Modules/Registration/Runtime.RegistrationConfig.cpp",
+      "src/runtime/Modules/Registration/Runtime.RegistrationConfig.cppm",
+      "tasks/done/BUG-205-clang20-fixture-utility-import-order.md",
+      "tasks/done/BUILD-011-point-config-codec-compilation.md",
+      "tasks/done/RETIREMENT-LOG.md",
+      "tests/CMakeLists.txt",
+      "tests/regression/tooling/Test.CompileHotspots.py",
+      "tests/support/EditorFeatureTestContext.cpp",
+      "tests/support/SandboxEditorJobHarness.cpp",
+      "tools/analysis/README.md",
+      "tools/analysis/benchmark_compile_iteration.py"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "python3",
+      "tools/repo/check_root_hygiene.py",
+      "--root",
+      "."
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "python3",
+      "tools/benchmark/validate_benchmark_manifests.py"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "python3",
+      "tools/benchmark/validate_benchmark_results.py",
+      "--root",
+      "ara/evidence/diagnostics/build011_point_config_codecs/results",
+      "--manifests-root",
+      "benchmarks",
+      "--strict"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit_code": 0
+  }
+]

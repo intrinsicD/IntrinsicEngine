@@ -2,10 +2,28 @@ session:
   id: 2026-09-21_001
   date: '2026-09-21'
   started: 2026-09-21T10:19+02:00
-  last_turn: 2026-09-21T12:30+02:00
-  turn_count: 4
-  summary: 'BUILD-010 closed with local consumer savings and owner cost retained; mock and EnTT feasibility candidates rejected without new obligations.'
+  last_turn: 2026-09-21T14:22+02:00
+  turn_count: 5
+  summary: 'BUILD-010 and BUILD-011 closed with local build evidence and regressions retained; BUG-205 repaired; mock and EnTT feasibility candidates rejected.'
 events_logged:
+- turn: 5
+  type: experiment
+  id: N633
+  routing: direct
+  provenance: ai-executed
+  summary: Four point-codec samples pass the frozen gate with all owner and negative costs retained.
+- turn: 5
+  type: decision
+  id: N634
+  routing: direct
+  provenance: ai-executed
+  summary: Retain the batch and close BUILD-011 and independent BUG-205.
+- turn: 5
+  type: observation
+  id: O241
+  routing: crystallized
+  provenance: ai-executed
+  summary: C108 records bounded local observations via the retention decision.
 - turn: 4
   type: dead_end
   id: N632
@@ -61,6 +79,10 @@ events_logged:
   provenance: ai-executed
   summary: C104 bound through retained report.
 ai_actions:
+- turn: 5
+  action: Consolidated ten JSON codec implementations into three owners, repaired two minimum-compiler fixture includes, verified final CPU/Clang20 source and measured ABBA with Claude audits.
+  provenance: ai-executed
+  files_changed: [src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp, src/runtime/Config/internal/Runtime.PointFeaturesConfigCodecs.cpp, src/runtime/Config/internal/Runtime.PointNormalsRegistrationConfigCodecs.cpp]
 - turn: 3
   action: Implemented shared canonical instantiations, verified both Clang versions, ran ABBA target builds and retired bounded work with Claude audits.
   provenance: ai-executed
@@ -77,6 +99,9 @@ ai_actions:
   - ara/evidence/tables/runtime270_fixture_batch_measurement.md
   - benchmarks/ci/manifests/engine_compile_iteration_fixture_batch.yaml
 claims_touched:
+- id: C108
+  action: created
+  turn: 5
 - id: C107
   action: created
   turn: 4
@@ -95,5 +120,5 @@ key_context:
     complete task/handoff records.
 open_threads:
 - RUNTIME-270 product matrix and broader verification remain open.
-- Profile remaining measured expensive consumers before another extraction.
+- No further source batch selected; use retained measurements to attribute expensive editor-test compilation before another extraction. BUILD-006 remains gated by CI-013, CI-014 and BUILD-005.
 ai_suggestions_pending: []

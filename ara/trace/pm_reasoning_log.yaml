@@ -2785,3 +2785,8 @@ entries:
     notes:
     - O240/C107 close a narrow failed suppression hypothesis, not a target performance claim. No new task or source change.
     - Claude estimates remain identified as estimates; the actual three-compile probe is retained. Prior BUILD-010 results are not credited again.
+
+  - turn: 2026-09-21_001#5
+    notes:
+    - N634 supplies artifact commitment for O241/C108; local descriptive results retain all edit regressions, negligible outcomes and uncontrolled-host limits.
+    - Closed BUILD-011 and separately repaired BUG-205 without expanding RUNTIME-270 or reopening rejected experiments. No unrelated staging promoted; no new general heuristic.

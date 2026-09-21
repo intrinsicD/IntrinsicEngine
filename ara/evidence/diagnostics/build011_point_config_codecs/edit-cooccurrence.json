@@ -1,0 +1,174 @@
+{
+  "commits_affecting_selected_codecs": 13,
+  "one_codec_without_shared_header": 1,
+  "multiple_codecs_in_same_commit": 12,
+  "shared_header_commits": 11,
+  "context_only_not_runtime_prediction": true,
+  "rows": [
+    {
+      "commit": "afb37c6ad402201a6d736f744113e3af1ae0c1a8",
+      "selected_codecs": [
+        "src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp",
+        "src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp",
+        "src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp",
+        "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp",
+        "src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp",
+        "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp",
+        "src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp",
+        "src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cpp",
+        "src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp",
+        "src/runtime/Modules/Registration/Runtime.RegistrationConfig.cpp"
+      ],
+      "shared_header": true
+    },
+    {
+      "commit": "ef97deb04b0e17a96e25c9fad4a8d69e9118e671",
+      "selected_codecs": [
+        "src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp",
+        "src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp",
+        "src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp",
+        "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp",
+        "src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp",
+        "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp",
+        "src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp",
+        "src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cpp",
+        "src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp",
+        "src/runtime/Modules/Registration/Runtime.RegistrationConfig.cpp"
+      ],
+      "shared_header": true
+    },
+    {
+      "commit": "83c1326aa0780ff863c15a3f0134c5ccd2f843d1",
+      "selected_codecs": [
+        "src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp",
+        "src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp",
+        "src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp",
+        "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp",
+        "src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp",
+        "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp",
+        "src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp",
+        "src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cpp",
+        "src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp",
+        "src/runtime/Modules/Registration/Runtime.RegistrationConfig.cpp"
+      ],
+      "shared_header": true
+    },
+    {
+      "commit": "731084f664bd569dee6271bb53f188ce76d968e9",
+      "selected_codecs": [
+        "src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp",
+        "src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp",
+        "src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp",
+        "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp",
+        "src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp",
+        "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp",
+        "src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp",
+        "src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cpp",
+        "src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp",
+        "src/runtime/Modules/Registration/Runtime.RegistrationConfig.cpp"
+      ],
+      "shared_header": true
+    },
+    {
+      "commit": "bc6da168d0fa07a16a2d84cbef78444fc81c02df",
+      "selected_codecs": [
+        "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp",
+        "src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cpp",
+        "src/runtime/Modules/Registration/Runtime.RegistrationConfig.cpp"
+      ],
+      "shared_header": true
+    },
+    {
+      "commit": "65408ec83cd54a3f6619841eac825f8fff20c349",
+      "selected_codecs": [
+        "src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp",
+        "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp",
+        "src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp",
+        "src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp",
+        "src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp"
+      ],
+      "shared_header": true
+    },
+    {
+      "commit": "074002e8eb7677de76531d6012c6ff0748a71c6c",
+      "selected_codecs": [
+        "src/runtime/Modules/Registration/Runtime.RegistrationConfig.cpp"
+      ],
+      "shared_header": false
+    },
+    {
+      "commit": "de8011d45057dd70274282e345cc21eee03632b2",
+      "selected_codecs": [
+        "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp",
+        "src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cpp"
+      ],
+      "shared_header": false
+    },
+    {
+      "commit": "6969cf686bf4997092435de9e81d5bdbacb425dd",
+      "selected_codecs": [
+        "src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp",
+        "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp",
+        "src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp",
+        "src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cpp",
+        "src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp"
+      ],
+      "shared_header": true
+    },
+    {
+      "commit": "b92f0aab78f43fd66889bb1b521053eb0b057f63",
+      "selected_codecs": [
+        "src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp",
+        "src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp",
+        "src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp",
+        "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp",
+        "src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp",
+        "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp",
+        "src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp",
+        "src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cpp",
+        "src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp",
+        "src/runtime/Modules/Registration/Runtime.RegistrationConfig.cpp"
+      ],
+      "shared_header": true
+    },
+    {
+      "commit": "a637713ec7160ddf3073641788ce96b4805017c3",
+      "selected_codecs": [
+        "src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp",
+        "src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp",
+        "src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp",
+        "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp",
+        "src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp",
+        "src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp",
+        "src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp"
+      ],
+      "shared_header": true
+    },
+    {
+      "commit": "d909e581614f924e69541139dd257c8abc3bb578",
+      "selected_codecs": [
+        "src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp",
+        "src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp",
+        "src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp",
+        "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp",
+        "src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp",
+        "src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp",
+        "src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp"
+      ],
+      "shared_header": true
+    },
+    {
+      "commit": "cd37ddeacd999e83c48e8216a59daf660107396e",
+      "selected_codecs": [
+        "src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp",
+        "src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp",
+        "src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp",
+        "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp",
+        "src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp",
+        "src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp",
+        "src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp"
+      ],
+      "shared_header": true
+    }
+  ]
+}

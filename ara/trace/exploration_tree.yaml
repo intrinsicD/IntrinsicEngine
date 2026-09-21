@@ -13638,3 +13638,22 @@ tree:
     lesson: Test third-party inline and deduced-return suppression before introducing module dependency costs.
     evidence: [ara/evidence/diagnostics/entt_storage_rejected/README.md]
     status: resolved
+
+  - id: N633
+    type: experiment
+    title: Measure shared point config compilation including edit regressions
+    provenance: ai-executed
+    timestamp: 2026-09-21T14:22+02:00
+    result: Four matched ABBA samples pass BUILD-011's frozen gate; shared-header rebuild improves, clean change is small, individual codec edits regress. Full CPU and fresh Clang20 checks pass; Claude Fable 5.1 source/results reviews resolved.
+    evidence: [ara/evidence/diagnostics/build011_point_config_codecs/summary.json, ara/evidence/diagnostics/build011_point_config_codecs/verification.json]
+    status: resolved
+
+  - id: N634
+    type: decision
+    title: Retain the measured point codec batch and close its obligations
+    provenance: ai-executed
+    timestamp: 2026-09-21T14:22+02:00
+    choice: Retain source 7a177d289 and retire BUILD-011 plus the independently repaired BUG-205; report only this local target population and all codec-edit regressions.
+    alternatives: [Abandon the batch if the frozen gate fails, Extrapolate clean samples to a full-engine speedup]
+    evidence: [O241, ara/evidence/diagnostics/build011_point_config_codecs/claude-results-final.txt]
+    status: resolved

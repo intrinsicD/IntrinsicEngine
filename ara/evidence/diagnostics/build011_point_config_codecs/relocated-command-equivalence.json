@@ -1,0 +1,45 @@
+{
+  "ignored_only": "source, output, dependency file/target and per-TU module-map filenames",
+  "matched_flags": [
+    {
+      "before": "src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp",
+      "after": "src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp"
+    },
+    {
+      "before": "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp",
+      "after": "src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp"
+    },
+    {
+      "before": "src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp",
+      "after": "src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp"
+    },
+    {
+      "before": "src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp",
+      "after": "src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp"
+    },
+    {
+      "before": "src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp",
+      "after": "src/runtime/Config/internal/Runtime.PointFeaturesConfigCodecs.cpp"
+    },
+    {
+      "before": "src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp",
+      "after": "src/runtime/Config/internal/Runtime.PointFeaturesConfigCodecs.cpp"
+    },
+    {
+      "before": "src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp",
+      "after": "src/runtime/Config/internal/Runtime.PointFeaturesConfigCodecs.cpp"
+    },
+    {
+      "before": "src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cpp",
+      "after": "src/runtime/Config/internal/Runtime.PointFeaturesConfigCodecs.cpp"
+    },
+    {
+      "before": "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp",
+      "after": "src/runtime/Config/internal/Runtime.PointNormalsRegistrationConfigCodecs.cpp"
+    },
+    {
+      "before": "src/runtime/Modules/Registration/Runtime.RegistrationConfig.cpp",
+      "after": "src/runtime/Config/internal/Runtime.PointNormalsRegistrationConfigCodecs.cpp"
+    }
+  ]
+}

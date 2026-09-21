@@ -1,0 +1,55 @@
+{
+  "source_commit": "7a177d289",
+  "canonical_ci": {
+    "target": "IntrinsicTests",
+    "full_cpu": {
+      "selected": 4864,
+      "passed": 4863,
+      "failed": 0,
+      "skipped": 1,
+      "seconds": 155.7,
+      "skip": "GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl"
+    },
+    "focused_before_fixture_repair": {
+      "passed": 523,
+      "seconds": 45.85
+    }
+  },
+  "minimum_compiler": {
+    "version": "Clang20",
+    "fresh_cache_disabled": true,
+    "targets": [
+      "IntrinsicRuntimeContractTests",
+      "IntrinsicSandboxEditorIntegrationTests"
+    ],
+    "focused_runtime_passed": 193,
+    "sandbox_config_passed": 25
+  },
+  "tooling_tests_passed": 30,
+  "body_equivalence": "ten namespace bodies unchanged except Parse/Section private helper names",
+  "review": "Claude Fable 5.1 selection/source/guard/bug reviews, valid findings fixed",
+  "structural_checks": [
+    "layering",
+    "test layout",
+    "task policy",
+    "doc links",
+    "docs sync",
+    "root hygiene",
+    "workshop automation",
+    "module inventory regenerated unchanged 429",
+    "source documentation zero objective errors on ten interfaces"
+  ],
+  "manual_workshop": {
+    "layer_imports": "pass",
+    "CMake_edges": "pass",
+    "downward_public_types": "pass",
+    "renderer_ownership": "n/a",
+    "typed_passes": "n/a",
+    "resource_driven_recipes": "n/a",
+    "scaffold_maturity": "n/a",
+    "temporary_exceptions": "n/a"
+  },
+  "sanitizers_executed": false,
+  "gpu_executed": false,
+  "earlier_failed_or_interrupted_verification_attempts_retained": true
+}

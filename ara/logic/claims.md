@@ -2342,3 +2342,14 @@
 - **Dependencies**: []
 - **Tags**: compilation, rejected hypothesis, diagnostic-only, EnTT
 - **From staging**: O240
+
+## C108: Bounded point-config compilation observations
+- **Statement**: For the retained BUILD-011 Clang23 ci Debug Null/headless, cache-disabled, four-job runtime-contract target cohort (ABBA, two samples per arm), shared-header rebuild median is 15.079 → 10.413 s with 12 → 5 compiler invocations. Clean target median is 407.035 → 402.482 s; clean compiler-duration sum is 1,572.323 → 1,553.698 s. Normal/density/descriptor codec edits regress 3.15/8.31/9.89%; no-op increases 2.4 ms and common-helper edit decreases 46.9 ms. All predeclared acceptance conditions pass, including every receiving owner and link cost.
+- **Status**: supported — descriptive observations of these exact local samples only, not a repeatable, statistical, full-engine, publication-qualified, cross-host/compiler, runtime, sanitizer or GPU speedup claim. Canonical results remain claim_eligible:false. The 1.12% clean difference is small and may reflect desktop noise; two disjoint ranges do not prove significance.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Recalculation disagrees with retained raw samples or gate predicates, source/toolchain/dependency/cache/job/path identities differ, or shared-owner/archive/link costs were omitted. Compiler-duration sums must not be described as CPU time or end-to-end target wall time.
+- **Proof**: [ara/evidence/diagnostics/build011_point_config_codecs/summary.json, ara/evidence/diagnostics/build011_point_config_codecs/evidence-index.json, ara/evidence/diagnostics/build011_point_config_codecs/raw-evidence.tar.gz, ara/evidence/diagnostics/build011_point_config_codecs/claude-results-final.txt, benchmarks/ci/manifests/engine_compile_iteration_point_config_codecs.yaml]
+- **Dependencies**: []
+- **Tags**: compilation, JSON codecs, local matched observations, edit regression
+- **From staging**: O241

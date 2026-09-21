@@ -1,0 +1,6 @@
+{
+  "removed_owned_measurement_build": "/dev/shm/intrinsic-build011-measure",
+  "removed_clean_detached_source_worktree": "/tmp/intrinsic-build011-source",
+  "raw_evidence_retained": true,
+  "borrowed_dependency_symlink_targets_preserved": true
+}

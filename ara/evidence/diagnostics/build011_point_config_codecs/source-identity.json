@@ -1,0 +1,126 @@
+{
+  "before": "5dd61178cc935060d6d850b71224e412c9116b18",
+  "after": "7a177d289d8714482772c2cf7af96001ae4d9459",
+  "baseline_repairs": [
+    "748612b4b",
+    "5dd61178c"
+  ],
+  "source_hashes": {
+    "src/runtime/CMakeLists.txt": {
+      "before": "a583095a23a18a9a5ea76ee5adad7fe49561925225023d477a812d504206c83f",
+      "after": "e4ef06dc0d04b472e056022bdd7fa18257fa2449c34c533a041bde8d02d8bc6b"
+    },
+    "src/runtime/Config/internal/Runtime.PointFeaturesConfigCodecs.cpp": {
+      "before": null,
+      "after": "0cdc427fd26881963d4b2397c359fc9580cfcd2298e66f95f827acffb6cc4df8"
+    },
+    "src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp": {
+      "before": null,
+      "after": "e6b66671059219ee40256b9893b96604d8cc43b6d3b97471c39bec0b26161705"
+    },
+    "src/runtime/Config/internal/Runtime.PointNormalsRegistrationConfigCodecs.cpp": {
+      "before": null,
+      "after": "2688401bfe6da8136a0fbaeec7e369c49707a811f576b46ca968c061159aec1d"
+    },
+    "src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp": {
+      "before": "b4cc9fcf4b8882198ef9dc20ccbea291ec0a86dd698df2c3afac7f55612f3513",
+      "after": null
+    },
+    "src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cppm": {
+      "before": "53d6aea1d682d0cc8da3577242ab6e1e3d27867b8e71f076fbb4e10bd04ffc3a",
+      "after": "aaa8903400b55312f0cef6e1ead1e7aecc203c17e645493e080919007038b000"
+    },
+    "src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp": {
+      "before": "1642eb87a21f4c911eb94236d672031aeb4a23caea2f9c57209162066f2dbe4d",
+      "after": null
+    },
+    "src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cppm": {
+      "before": "0cbcaffdfea566e2efc72ff643b9b0c623e891970f2f53b207fc24c5a0558914",
+      "after": "cb30fd491f83e9eb94c7a2a5262a18988a9a941e9486df7d3ad4d1fc57260e36"
+    },
+    "src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp": {
+      "before": "d1641ad6a6dc9f939323dfb846ecfe9f9e9440f20cffc485ef53d589ed42a5d5",
+      "after": null
+    },
+    "src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cppm": {
+      "before": "db18a76f2cbd688ce4537385732dba678f685ecdea3a4b7087c8528f4906e504",
+      "after": "d0ccb1d1143395a37f65384ca8fb64994950ea25e86bfd95a8fe90b3d7851009"
+    },
+    "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp": {
+      "before": "87e9fe7cebfd51da04270dccbf3d3b6389fafdee57f2429b9bc462f92c7ebf08",
+      "after": null
+    },
+    "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cppm": {
+      "before": "cc36e3e91c18350865306072327e1bafa2620471d2a04fb38d15b223dc740d19",
+      "after": "09ad4196df72d5b3ad98c9b6b8f66c0c2af10d81775bbb8dcc417a77237ad57e"
+    },
+    "src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp": {
+      "before": "5e31d61a75edb0e34306f068241b9a68b1ec85a245d945e5ad138058e6c2b0c0",
+      "after": null
+    },
+    "src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm": {
+      "before": "ec7e4c4f406185a50062fc4309d73b85e2502f10c94db9db3cdd76ef9f7dca0f",
+      "after": "ae1d59ad4479e2d825ea7c69dd191d3c953dfba6214b6c058da264ba28828197"
+    },
+    "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp": {
+      "before": "e4f9cac7f021c91ee582fc46da3e9b70d253953e1495d9696fc52a52b5eeb632",
+      "after": null
+    },
+    "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm": {
+      "before": "a9acd3b2e283b8da5654acec003539767b41e833e837eab6f3759ae2dfff924e",
+      "after": "cae058049f7f732b001beb026c5c6d8e038edb9e1b398d09431f47028662ee99"
+    },
+    "src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp": {
+      "before": "c574e73ba12340505fc33f53123f8e8686967f36dc92e186b35643dac659804a",
+      "after": null
+    },
+    "src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm": {
+      "before": "1fdf2717141ad6baa1e578f016ef36908279466db0e448416b500c4c85b282af",
+      "after": "3987332e186b79f8141f5f9c5e5f197e88ff4eefdf76d349877f81d29de22abd"
+    },
+    "src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cpp": {
+      "before": "975be7ed7aa010061752cbc5acfbfde74ec23fb2652353ceba666925385880ce",
+      "after": null
+    },
+    "src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cppm": {
+      "before": "6e81ae38e6598fa3dc040c7f9468c09bf797bb92cf25347e26b510eb74d34363",
+      "after": "f863fa71f560fce77c46df7aa81b53c8764b35050f430b780e33b9b468b7e9bc"
+    },
+    "src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp": {
+      "before": "8103e4a0b08824a840249c5d3e9c856fecb339fb193ddbc88bd75cb02aa56afc",
+      "after": null
+    },
+    "src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cppm": {
+      "before": "8c3687a42b9d8a28565790da14dcd0072470d4cc7d77ea072e6605b9359a3fbd",
+      "after": "647bfeb4e819dc311d84bfa99a63845d316f63805671e998845aa19fa308d799"
+    },
+    "src/runtime/Modules/Registration/Runtime.RegistrationConfig.cpp": {
+      "before": "15671073fda6065ed6cd9f81a5a7ad9aece90eb4f53fcfecfc48d2f30745d845",
+      "after": null
+    },
+    "src/runtime/Modules/Registration/Runtime.RegistrationConfig.cppm": {
+      "before": "f63148e6da0f8be98ca22c270af1dbc09be0f66792ce3a45f17cc390afed4463",
+      "after": "da76428692a41c0d6df9cc62e3d7bbe971806c61a85d84d13f7baed801d0ac58"
+    },
+    "tests/CMakeLists.txt": {
+      "before": "cf8a10343b5a44c22b7d2132d62a8b06b1b36c62cefb12207f8f05b1ea6fb8d2",
+      "after": "d969948e06cbe3d1a53d55ee4f38e1c9fca0df2544068a0352ada1c6e833c96f"
+    },
+    "tests/regression/tooling/Test.CompileHotspots.py": {
+      "before": "913f1cf401694fe2257ccf82901b726dbbe28b3bce61aa6bc8bad4de3f9b10dd",
+      "after": "632193c8144ec7cfca91fb9cd2e10f0f741f29fd7165d64efb2ce1ff4c333bad"
+    },
+    "tools/analysis/README.md": {
+      "before": "9e2f8c52636194711ba4b02470c1cf54af0ea0c39cd934f484bad6d1853eb511",
+      "after": "72584d5650bd3bd57fb7fdb1088c9b377381ba6e30d1e532d9c53072ec69be78"
+    },
+    "tools/analysis/benchmark_compile_iteration.py": {
+      "before": "3b7633a17709306c5875b1feb82c95c1b7d4d0a649bbe5347acffa7c1d79fae0",
+      "after": "541e9671497614c811d3e399134843a533411fb73f9c59be618081d45c679bfb"
+    }
+  },
+  "same_fixture_bytes_in_both_arms": {
+    "tests/support/EditorFeatureTestContext.cpp": "bbd09f4fb0cf9f7cf84b56c76194f0b693919cbf7561c16b5f5868158cd2c09b",
+    "tests/support/SandboxEditorJobHarness.cpp": "85302ac25b667f34d990d637fc797a8526075884661876b735b526ae52a60fdd"
+  }
+}

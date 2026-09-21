@@ -1,0 +1,71 @@
+# BUILD-011 results audit
+
+**Model:** Claude Fable 5.1 (`claude-fable-5-1`). I worked read-only: no edits, builds, tests, `/tmp` access or transcript reads.
+
+**Verdict:** No blocker to accepting the bounded batch or retiring the task. There are no findings, only two wording notes and two optional accounting tweaks at the end.
+
+## Medians recomputed from the four canonical results
+All 28 per-scenario timings in `summary.json` match the `metrics.build_time_ms` values in the results exactly.
+
+| Scenario | Before median (s) | After median (s) | Change |
+|---|---|---|---|
+| clean | 407.035 | 402.482 | −4.553 s (−1.12%) |
+| shared_header | 15.0789 | 10.4134 | −4.665 s (−30.94%) |
+| normal_codec | 7.3428 | 7.5744 | +3.15% |
+| density_codec | 7.0792 | 7.6676 | +8.31% |
+| descriptor_codec | 7.2081 | 7.9208 | +9.89% (worst) |
+| shared_helper | 7.8735 | 7.8265 | −0.60% |
+| noop | 0.0964 | 0.0988 | +2.5% (2.4 ms) |
+
+- **shared_header:** the ranges are disjoint (before 15.061–15.097 s, after 10.410–10.417 s).
+- **Worst codec regression:** the largest single before/after pairing is descriptor 7.9415 s against 7.1324 s, which is +11.3%. That is far below the 50% limit.
+
+## Clean compiler-duration accounting
+- **Totals:** before 1571.698 and 1572.948 s, after 1553.644 and 1553.751 s. The arms differ by about 18.6 s (−1.18%) with disjoint ranges.
+- **Moved owners:** the ten removed owners sum to 33.85 s and the three receiving owners to 12.10 s (4.2425, 4.0015 and 3.853). That is about 21.75 s saved locally. The remaining ~3.1 s against the total is drift in unrelated units, which fits "small/local".
+- **Invocations:** 878 before and 871 after, so 7 fewer. Timed outputs drop from 3099 to 3078, which is 21, or 7 units × 3 edges.
+- **Shared-header fan-out:** 12 before and 5 after in both samples, matching the declared `probe_sources`.
+- **Other edits:** the codec and helper edits are 1 invocation each, and noop is 0.
+- **Links:** the normal_codec sample I read has a critical path of compile, `lib/libExtrinsicRuntime.a` (139 ms), then `bin/IntrinsicRuntimeContractTests` (3767 ms). I read that path in one after-arm sample only, but every edit-scenario timing is the wall time of a full `--target` build, so archive and link are counted throughout.
+
+## Acceptance conditions
+All four recompute true:
+- The header improvement is at least 15% with separated ranges.
+- Clean did not regress; it improved.
+- The clean compiler-duration sum is reduced.
+- Each codec regression is within 50%.
+
+`accepted: true` is supported.
+
+## Identity and consistency
+- **Revisions:** both before results (`01`, `04`) carry `5dd61178cc93…` and both after results (`02`, `03`) carry `7a177d289d87…`, all `clean_commit`. They match the manifest, `protocol.json` and `source-identity.json`.
+- **Order:** positions 1–4 are before, after, after, before. Start timestamps were read for `01`–`03` only and are in order; `04` was not checked. `warmup_iterations` is 0 and the manifest states no sample was discarded.
+- **Hashes:**
+  - Manifest SHA `b45fffba…` is identical across all four results and `protocol.json`.
+  - `config_digest` `94dc0954…` was read in `01`, `02` and `04`; `03` was not checked.
+  - Runner SHA `541e9671…` equals the after-arm `benchmark_compile_iteration.py` hash. One runner drove both arms.
+- **Environment:**
+  - All four results record `/usr/bin/clang++-23` and `jobs` 4.
+  - The three results whose build command I read (`01`–`03`) use `/dev/shm/intrinsic-build011-measure` with `--parallel 4`; `04` was not checked.
+  - The source path is the same for both arms, and ccache and compiler launchers are disabled.
+  - `VCPKG_MANIFEST_INSTALL=OFF`.
+- **Commands:** `summary.json` reports 1147 identical common commands, with exactly the ten owners before-only and the three owners after-only.
+- **Claim scope:** `claim_eligible: false` in all four results.
+
+## PointSpacing and PointConstruction mapping
+- **Evidence file:** `source-accounting.json` lists only file sets, not per-codec pairs. The pairwise mapping is in `relocated-command-equivalence.json`: PointSpacing maps to `Runtime.PointNeighborhoodConfigCodecs.cpp` and PointConstruction maps to `Runtime.PointFeaturesConfigCodecs.cpp`.
+- **Final files agree:**
+  - `Runtime.PointNeighborhoodConfigCodecs.cpp:18` imports `Extrinsic.Runtime.PointSpacingConfig`, and lines 184–255 define Parse, Serialize, Validate, Get, Set and registration.
+  - `Runtime.PointFeaturesConfigCodecs.cpp:19` imports `Extrinsic.Runtime.PointConstructionConfig`, and lines 279–427 define the same set.
+  - A repo-wide search for `SerializePointSpacingConfig` and `SerializePointConstructionConfig` found one definition each, in those two files. The only other hits are the `extern "C++"` declarations in the two `.cppm` files, which supports the "global attachment, records stay module-owned" wording.
+- **Line count:** 1103 − 1061 = 42 lines.
+
+## Wording notes (non-blocking)
+1. Load average before the first clean sample was 0.59. For the other three clean samples it was 2.4–2.6. The order effect runs against the before arm, so it does not inflate the gain, and the prompt's "uncontrolled desktop" wording already covers it. Do not describe the 1.1% clean gain as more than descriptive.
+2. `noop` regressed 2.5% (2.4 ms). It is ungated and negligible, so do not claim no-op parity beyond that.
+
+## Optional accounting tweaks
+- In `source-accounting.json`, `retained_prior_clean_selected_compiler_sum_s` is 34.4545, which is not this cohort's ten-owner sum of 33.85 s. Label where that number comes from, or replace it with this cohort's figures (33.85 s before, 12.10 s after).
+- Point the mapping claim at `relocated-command-equivalence.json`, not `source-accounting.json`.
+
+Per your instruction, I recommend no additional experiments.

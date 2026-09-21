@@ -1,0 +1,31 @@
+{
+  "before_files": [
+    "src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp",
+    "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp",
+    "src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp",
+    "src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp",
+    "src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp",
+    "src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp",
+    "src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp",
+    "src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cpp",
+    "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp",
+    "src/runtime/Modules/Registration/Runtime.RegistrationConfig.cpp"
+  ],
+  "after_files": [
+    "src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp",
+    "src/runtime/Config/internal/Runtime.PointFeaturesConfigCodecs.cpp",
+    "src/runtime/Config/internal/Runtime.PointNormalsRegistrationConfigCodecs.cpp"
+  ],
+  "before_physical_cpp_lines": 1103,
+  "after_physical_cpp_lines": 1061,
+  "new_wrappers": 0,
+  "new_modules": 0,
+  "retained_prior_clean_selected_compiler_sum_s": 34.4545,
+  "scope": "source relocation and public function attachment only; no runtime algorithms change",
+  "retained_prior_clean_selected_compiler_sum_origin": "Retained BUILD-010 clean data used only to select this candidate; not the BUILD-011 matched population.",
+  "matched_clean_selected_compiler_sum_s": {
+    "before": 33.8495,
+    "after": 12.097,
+    "statistic": "sum of per-source medians; accumulated compiler elapsed duration, not CPU or target wall time"
+  }
+}

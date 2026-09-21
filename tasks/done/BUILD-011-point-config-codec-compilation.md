@@ -22,7 +22,7 @@ This source batch is independent of BUILD-006 and RUNTIME-270.
 - [x] Ten existing codecs compile in three runtime-private owners; remove the
       superseded implementation units, preserve exact function bodies, schemas,
       diagnostics and module-owned records. No forwarding wrappers or new API.
-- [ ] Matched ABBA target builds include complete clean closure, no-op, individual
+- [x] Matched ABBA target builds include complete clean closure, no-op, individual
       normal, density and descriptor codec edits, shared JSON declaration-header edits and
       the unchanged shared-helper implementation. Four jobs, cache disabled,
       Clang23 ci Debug Null/headless; retained commands and source identities.
@@ -31,7 +31,7 @@ This source batch is independent of BUILD-006 and RUNTIME-270.
       Improved ranges must not overlap; local descriptive results only.
 - [x] Default CPU gate, focused config tests, minimum Clang20 build/link and
       focused tests, layering/docs checks and independent Claude review pass.
-- [ ] Commit implementation and evidence, then retire this bounded task.
+- [x] Commit implementation and evidence, then retire this bounded task.
 
 ## Selection and stop rule
 Selection baseline `cf60c60e7`; matched baseline `5dd61178c` includes the
@@ -41,7 +41,7 @@ Fresh Registration/NormalEstimation traces show about 0.98 s JSON header parsing
 and 0.74 s comparison instantiation per source (nested totals are not additive).
 Reuse FeatureConfigCodecs.Detail's ordinary translation unit and globally
 attached declarations; retain the existing PointConfigJson shared helpers.
-Ten point-config sources currently repeat this work. Mesh curvature/geodesics
+At selection, ten point-config sources repeated this work. Mesh curvature/geodesics
 have different binding/validation owners and are outside this point cohort.
 Three groups preserve neighborhood, feature and normal/registration locality.
 No semantic helper cleanup is mixed into this relocation. Stop if module
@@ -74,3 +74,12 @@ and workshop checks pass; manual API/layer rows pass and rendering/scaffold
 rows are not applicable. Module inventory is unchanged at 429 modules.
 The pre-existing fixture build failure is isolated in BUG-205 and repaired in
 both measurement arms. No sanitizer/GPU execution claim.
+
+## Completion
+Retired 2026-09-21 at CPUContracted. PR/commit: `7a177d289`; evidence and retirement
+are in the enclosing commit. C108's four matched samples pass every frozen gate:
+shared-header 15.079 → 10.413 s, clean 407.035 → 402.482 s, and individual
+codec edits 3.15–9.89% slower. Clean improvement is small and local; no broader
+speedup claim. Full costs, regressions, raw samples, final checks and Claude's
+independent results audit are in the [measurement report](../../ara/evidence/tables/build011_point_config_codecs_measurement.md).
+No deferred work in this scope; BUILD-006 and RUNTIME-270 remain independent.

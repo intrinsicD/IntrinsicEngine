@@ -634,12 +634,13 @@ sessions:
 
 - id: 2026-09-21_001
   date: '2026-09-21'
-  summary: 'BUILD-010 closed with local consumer savings and owner cost retained; mock and EnTT feasibility candidates rejected without new obligations.'
-  turn_count: 4
-  events_count: 9
+  summary: 'BUILD-010 and BUILD-011 closed with local build evidence and regressions retained; BUG-205 repaired; mock and EnTT feasibility candidates rejected.'
+  turn_count: 5
+  events_count: 12
   claims_touched:
   - C104
   - C105
   - C106
   - C107
+  - C108
   open_threads: 2

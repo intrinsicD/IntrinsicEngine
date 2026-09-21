@@ -1,0 +1,22 @@
+{
+  "all_four_sample_identities_commands_timings_and_flags_verified": true,
+  "all_source_hashes_verified_against_git": true,
+  "same_dependency_fingerprint_all_four": {
+    "sha256": "0ecb7332b14479eabffbc061dba9d94492bfb494a936e9be5bf2caf384e97c54",
+    "file_count": 1728
+  },
+  "chronological_clean_starts": [
+    "2026-09-21T11:45:54.145409+00:00",
+    "2026-09-21T11:53:35.411264+00:00",
+    "2026-09-21T12:01:09.139133+00:00",
+    "2026-09-21T12:08:42.903477+00:00"
+  ],
+  "compiler_duration_sums_from_raw_hotspots_abba": [
+    1571.698,
+    1553.644,
+    1553.751,
+    1572.948
+  ],
+  "canonical_result_count": 4,
+  "manifest_and_runner_hashes_verified": true
+}

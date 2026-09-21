@@ -4076,3 +4076,15 @@ observations:
     promoted_to: logic/claims.md:C107
     crystallized_via: topic-abandonment
     stale: false
+
+  - id: O241
+    timestamp: 2026-09-21T14:22+02:00
+    provenance: ai-executed
+    content: Ten point config implementations compile in three owners; the local shared-header gate passes, clean wall change is small, and individual codec edits regress 3.15–9.89 percent.
+    context: ABBA two samples per arm, Clang23 ci Null/headless runtime-contract closure, cache off and four jobs; all owner/link costs included. N634 retains the completed batch.
+    potential_type: claim
+    bound_to: [N633, N634]
+    promoted: true
+    promoted_to: logic/claims.md:C108
+    crystallized_via: artifact-commitment
+    stale: false

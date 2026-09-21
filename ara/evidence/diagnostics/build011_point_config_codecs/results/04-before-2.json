@@ -1,0 +1,1494 @@
+{
+  "schema_version": 2,
+  "benchmark_id": "build.engine_compile_iteration.point_config_codecs.v1",
+  "run_id": "intrinsic-build011-measurement",
+  "attempt_id": "04-before-2",
+  "method": "build.engine_compile_iteration",
+  "backend": "external_baseline",
+  "dataset": "intrinsicengine.source.point_config_codecs_2026_09_21",
+  "commit": "5dd61178cc935060d6d850b71224e412c9116b18",
+  "source": {
+    "revision": "5dd61178cc935060d6d850b71224e412c9116b18",
+    "state": "clean_commit"
+  },
+  "claim_eligible": false,
+  "manifest": {
+    "path": "benchmarks/ci/manifests/engine_compile_iteration_point_config_codecs.yaml",
+    "sha256": "b45fffbafbda25f3c2ab90cb580e003d9eab1ea81b81b50d6c06e4ab24e1159e"
+  },
+  "resolved_params": {
+    "intent": "performance",
+    "source_revisions": {
+      "before": "5dd61178cc935060d6d850b71224e412c9116b18",
+      "after": "7a177d289d8714482772c2cf7af96001ae4d9459"
+    },
+    "sample_order": [
+      "before",
+      "after",
+      "after",
+      "before"
+    ],
+    "measured_iterations": 2,
+    "warmup_iterations": 0,
+    "warmup_scope": "No discarded samples. Identical source/dependency pre-read before every sample; diagnostic compilation is separate from this target-build population.",
+    "preset": "ci",
+    "target": "IntrinsicRuntimeContractTests",
+    "compiler": "/usr/bin/clang++-23",
+    "jobs": 4,
+    "minimum_interface_importers": 1,
+    "configure_options": [
+      "-DEXTRINSIC_BACKEND=Null",
+      "-DINTRINSIC_PLATFORM_BACKEND=Null",
+      "-DINTRINSIC_HEADLESS_NO_GLFW=ON",
+      "-DINTRINSIC_BUILD_TESTS=ON",
+      "-DINTRINSIC_BUILD_BENCHMARKS=OFF",
+      "-DINTRINSIC_ENABLE_CCACHE=OFF",
+      "-DCMAKE_CXX_COMPILER_LAUNCHER=",
+      "-DCMAKE_C_COMPILER_LAUNCHER=",
+      "-DVCPKG_MANIFEST_INSTALL=OFF",
+      "-DCMAKE_C_COMPILER=/usr/bin/clang-23",
+      "-DCMAKE_CXX_COMPILER=/usr/bin/clang++-23",
+      "-DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-23"
+    ],
+    "scenarios": {
+      "clean": null,
+      "noop": null,
+      "normal_codec": {
+        "before": "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp",
+        "after": "src/runtime/Config/internal/Runtime.PointNormalsRegistrationConfigCodecs.cpp"
+      },
+      "density_codec": {
+        "before": "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp",
+        "after": "src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp"
+      },
+      "descriptor_codec": {
+        "before": "src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp",
+        "after": "src/runtime/Config/internal/Runtime.PointFeaturesConfigCodecs.cpp"
+      },
+      "shared_header": "src/runtime/Config/internal/Runtime.PointConfigJson.hpp",
+      "shared_helper": "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp"
+    },
+    "invalidation": "mtime only; source bytes remain at the exact clean commit; require observed importer fan-out",
+    "build_storage": "Fresh owned build at /dev/shm/intrinsic-build011-measure; identical source/build paths across arms.",
+    "dependency_state": "identical preinstalled vcpkg packages, no package installation during sampling",
+    "operating_system_cache": "input pre-read, no cache flushing, no cold-filesystem claim",
+    "memory_measurement": "GNU time maximum single-process RSS, not aggregate concurrent memory",
+    "critical_path": "Ninja target DAG weighted by unfiltered per-invocation timings; unmatched meta-edges reported",
+    "summary": "Median and range of two samples per arm. Acceptance requires >=15% shared-header improvement with nonoverlapping ranges, reduced clean compiler-duration sum, <=2% clean regression and <=50% regression for each normal, density and descriptor codec-edit scenario. Include complete closure, all three receiving owners and links. Local descriptive comparison only.",
+    "sample_sequence": "Configure, clean target build, no-op, normal/density/descriptor codec edits at the actual implementation owner in each arm, shared JSON declaration-header edit, unchanged common helper implementation edit. Fresh build per sample; mtime-only edits.",
+    "noise_scope": "Normal desktop host; no CPU affinity/governor/turbo control. No competing compilation or tests; source inspection and remote review may run. Local descriptive comparison, not an isolated-machine or statistical claim.",
+    "configure_measurement": "initial configure only; source iteration cohort deliberately excludes the already-measured reconfigure scenario.",
+    "source_scope": "Exact before/after commits; ten point config implementation bodies move into three ordinary translation units with globally attached public functions. Config records retain named-module ownership. Benchmark runner supports per-arm relocated paths and verifies complete declared producer sets. Other JSON families remain unchanged.",
+    "probe_sources": {
+      "shared_header": {
+        "before": [
+          "src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp",
+          "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp",
+          "src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp",
+          "src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp",
+          "src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp",
+          "src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp",
+          "src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp",
+          "src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cpp",
+          "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp",
+          "src/runtime/Modules/Registration/Runtime.RegistrationConfig.cpp",
+          "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp",
+          "src/runtime/Modules/Curvature/Runtime.MeshCurvatureConfig.cpp"
+        ],
+        "after": [
+          "src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp",
+          "src/runtime/Config/internal/Runtime.PointFeaturesConfigCodecs.cpp",
+          "src/runtime/Config/internal/Runtime.PointNormalsRegistrationConfigCodecs.cpp",
+          "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp",
+          "src/runtime/Modules/Curvature/Runtime.MeshCurvatureConfig.cpp"
+        ]
+      }
+    }
+  },
+  "config_digest": "94dc0954984e60e5baf7508500bab7cae159d4d4ac1efdd70612ac120aa47b69",
+  "warmup_policy": {
+    "measured_iterations": 2,
+    "warmup_iterations": 0,
+    "warmup_scope": "No discarded samples. Identical source/dependency pre-read before every sample; diagnostic compilation is separate from this target-build population."
+  },
+  "metrics": {
+    "build_time_ms": {
+      "clean": 407024.56251799595,
+      "noop": 96.243221021723,
+      "normal_codec": 7345.639923994895,
+      "density_codec": 7117.507853981806,
+      "descriptor_codec": 7283.851312007755,
+      "shared_header": 15096.600538992789,
+      "shared_helper": 7865.168099000584
+    },
+    "configure_time_ms": {
+      "initial": 5631.733636982972
+    },
+    "memory_peak_bytes": {
+      "clean": 2979708928,
+      "noop": 28176384,
+      "normal_codec": 2439364608,
+      "density_codec": 2439319552,
+      "descriptor_codec": 2438995968,
+      "shared_header": 2439692288,
+      "shared_helper": 2439610368
+    },
+    "sample_count": 1
+  },
+  "diagnostics": {
+    "arm": "before",
+    "position": 4,
+    "sample": 2,
+    "toolchain_backend": "/usr/bin/clang++-23",
+    "scenarios": {
+      "clean": {
+        "execution": {
+          "cpu_user_s": 1524.35,
+          "cpu_system_s": 89.01,
+          "max_single_process_rss_kib": 2909872,
+          "wall_ms": 407024.56251799595,
+          "started_at": "2026-09-21T12:08:42.903477+00:00",
+          "exit_code": 0,
+          "command": [
+            "cmake",
+            "--build",
+            "/dev/shm/intrinsic-build011-measure",
+            "--target",
+            "IntrinsicRuntimeContractTests",
+            "--parallel",
+            "4"
+          ],
+          "loadavg_before": [
+            2.265625,
+            3.43603515625,
+            3.43115234375
+          ]
+        },
+        "compiler_invocations": 878,
+        "critical_path": {
+          "duration_ms": 47615,
+          "timed_path": [
+            {
+              "output": "src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.CurvatureExtrema.cpp.o.ddi",
+              "duration_ms": 74
+            },
+            {
+              "output": "src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Linalg.cppm.o.modmap",
+              "duration_ms": 15
+            },
+            {
+              "output": "src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Linalg.pcm",
+              "duration_ms": 2054
+            },
+            {
+              "output": "src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.Properties.pcm",
+              "duration_ms": 1695
+            },
+            {
+              "output": "src/ecs/CMakeFiles/ExtrinsicECS.dir/Extrinsic.ECS.Components.GeometrySources.pcm",
+              "duration_ms": 1317
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.GeometryAvailability.pcm",
+              "duration_ms": 1651
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.VisualizationRecipes.pcm",
+              "duration_ms": 2457
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.RenderExtraction.pcm",
+              "duration_ms": 5883
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.SceneInteractionModule.pcm",
+              "duration_ms": 7622
+            },
+            {
+              "output": "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorMeshMethods.cpp.o",
+              "duration_ms": 21046
+            },
+            {
+              "output": "bin/IntrinsicRuntimeContractTests",
+              "duration_ms": 3801
+            }
+          ],
+          "timed_output_count": 3099,
+          "unlabelled_ancillary_outputs": 17,
+          "unmapped_ancillary_outputs": [
+            "/dev/shm/intrinsic-build011-measure/CMakeFiles/IntrinsicProgressivePoissonReference.dir/CXXModules.json",
+            "/dev/shm/intrinsic-build011-measure/CMakeFiles/tinygltf.dir/CXXModules.json",
+            "/dev/shm/intrinsic-build011-measure/tests/CMakeFiles/EditorFeatureTestSupportObjs.dir/CXXModules.json",
+            "/dev/shm/intrinsic-build011-measure/tests/CMakeFiles/MockRhiTestSupportObjs.dir/CXXModules.json",
+            "/dev/shm/intrinsic-build011-measure/tests/CMakeFiles/RuntimeContractTestObjs.dir/CXXModules.json",
+            "/dev/shm/intrinsic-build011-measure/tests/CMakeFiles/RuntimeTestModuleSupportObjs.dir/CXXModules.json",
+            "/dev/shm/intrinsic-build011-measure/tests/CMakeFiles/TestSupportObjs.dir/CXXModules.json",
+            "src/assets/CMakeFiles/ExtrinsicAssets.dir/Extrinsic.Asset.OperationStatus.pcm",
+            "src/core/CMakeFiles/ExtrinsicCore.dir/Extrinsic.Core.Memory-LinearArena.Impl.pcm",
+            "src/core/CMakeFiles/ExtrinsicCore.dir/Extrinsic.Core.Memory-Polymorphic.Impl.pcm",
+            "src/core/CMakeFiles/ExtrinsicCore.dir/Extrinsic.Core.Memory-ScopeStack.Impl.pcm",
+            "src/core/CMakeFiles/ExtrinsicCore.dir/Extrinsic.Core.RingBuffer.pcm",
+            "src/core/CMakeFiles/ExtrinsicCore.dir/Extrinsic.Core.Tasks-Internal.Impl.pcm",
+            "src/core/CMakeFiles/ExtrinsicCore.dir/Extrinsic.Core.Tasks-LocalTask.impl.pcm",
+            "src/ecs/CMakeFiles/ExtrinsicECS.dir/Extrinsic.ECS.Component.Culling.Proxy.pcm",
+            "src/ecs/CMakeFiles/ExtrinsicECS.dir/Extrinsic.ECS.Events.pcm",
+            "src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.pcm"
+          ],
+          "unmapped_meta_outputs": [
+            "/dev/shm/intrinsic-build011-measure/CMakeFiles/cmake.verify_globs"
+          ]
+        },
+        "top_producers": [
+          {
+            "edge_id": "d5fc3cb4fedc0011e63d5499a0e311643e0863094834f5f347af57b509fbe966",
+            "physical_identity": {
+              "start_ms": 372109,
+              "end_ms": 393155,
+              "command_hash": "8b444951d3d19c0e",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 21046,
+            "output": "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorMeshMethods.cpp.o",
+            "outputs": [
+              "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorMeshMethods.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp",
+            "source_root": "tests",
+            "resolution": {
+              "source": "tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorMeshMethods.cpp.o"
+              ],
+              "candidates": [
+                "tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp"
+              ]
+            },
+            "source_lines": 6408,
+            "includes": 28,
+            "imports": 85,
+            "exports": 0
+          },
+          {
+            "edge_id": "7d44aac684ce35ad544fa818be439cef0e81c3b9b6c42b1ccb3b6d0afca4820b",
+            "physical_identity": {
+              "start_ms": 371721,
+              "end_ms": 390186,
+              "command_hash": "fb47d7b11fca7a65",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 18465,
+            "output": "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorClusteringMethods.cpp.o",
+            "outputs": [
+              "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorClusteringMethods.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp",
+            "source_root": "tests",
+            "resolution": {
+              "source": "tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorClusteringMethods.cpp.o"
+              ],
+              "candidates": [
+                "tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp"
+              ]
+            },
+            "source_lines": 3474,
+            "includes": 27,
+            "imports": 73,
+            "exports": 0
+          },
+          {
+            "edge_id": "2732bc017bdac03bbc6dd1cf49389e961fc9b02895758a691d866f9830361815",
+            "physical_identity": {
+              "start_ms": 285515,
+              "end_ms": 303552,
+              "command_hash": "78d8a3b37e67f36",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 18037,
+            "output": "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.AssetImportFormatCoverage.cpp.o",
+            "outputs": [
+              "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.AssetImportFormatCoverage.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "tests/contract/runtime/Test.AssetImportFormatCoverage.cpp",
+            "source_root": "tests",
+            "resolution": {
+              "source": "tests/contract/runtime/Test.AssetImportFormatCoverage.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.AssetImportFormatCoverage.cpp.o"
+              ],
+              "candidates": [
+                "tests/contract/runtime/Test.AssetImportFormatCoverage.cpp"
+              ]
+            },
+            "source_lines": 3887,
+            "includes": 30,
+            "imports": 51,
+            "exports": 0
+          },
+          {
+            "edge_id": "53b61d3fd22c006d09fafbbd7c93f1623343b8fe9f995ac402524891b7c86e8d",
+            "physical_identity": {
+              "start_ms": 369005,
+              "end_ms": 386824,
+              "command_hash": "403f2092a81b6480",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 17819,
+            "output": "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorSceneCommands.cpp.o",
+            "outputs": [
+              "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorSceneCommands.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp",
+            "source_root": "tests",
+            "resolution": {
+              "source": "tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorSceneCommands.cpp.o"
+              ],
+              "candidates": [
+                "tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp"
+              ]
+            },
+            "source_lines": 3602,
+            "includes": 27,
+            "imports": 81,
+            "exports": 0
+          },
+          {
+            "edge_id": "14e2117c3631bd42e5b7f6741b0f2c5d16d7a8b81dcc9a7f95bb5886e3593912",
+            "physical_identity": {
+              "start_ms": 386824,
+              "end_ms": 401853,
+              "command_hash": "cf6638cc9356bdac",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 15029,
+            "output": "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp.o",
+            "outputs": [
+              "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp",
+            "source_root": "tests",
+            "resolution": {
+              "source": "tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp.o"
+              ],
+              "candidates": [
+                "tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp"
+              ]
+            },
+            "source_lines": 2626,
+            "includes": 23,
+            "imports": 48,
+            "exports": 0
+          },
+          {
+            "edge_id": "f3fc324f79a2110b8a667837e41321bf9c9de2a7f328bc2ef1b6d67ab6f51638",
+            "physical_identity": {
+              "start_ms": 367578,
+              "end_ms": 381724,
+              "command_hash": "20fe301b8e7d756d",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 14146,
+            "output": "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorModels.cpp.o",
+            "outputs": [
+              "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorModels.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "tests/contract/runtime/Test.SandboxEditorModels.cpp",
+            "source_root": "tests",
+            "resolution": {
+              "source": "tests/contract/runtime/Test.SandboxEditorModels.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorModels.cpp.o"
+              ],
+              "candidates": [
+                "tests/contract/runtime/Test.SandboxEditorModels.cpp"
+              ]
+            },
+            "source_lines": 4007,
+            "includes": 24,
+            "imports": 57,
+            "exports": 0
+          },
+          {
+            "edge_id": "4a7f2d9e0b720402bcafa1805ead1460886d0f2e9517275fbf15c2e252e919bf",
+            "physical_identity": {
+              "start_ms": 278480,
+              "end_ms": 292067,
+              "command_hash": "4bae8aec45b76143",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 13587,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderExtraction.Internal.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.RenderExtraction-Internal.pcm",
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderExtraction.Internal.cpp.o"
+            ],
+            "edge_kind": "module-implementation",
+            "source": "src/runtime/Rendering/Runtime.RenderExtraction.Internal.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Rendering/Runtime.RenderExtraction.Internal.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderExtraction.Internal.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Rendering/Runtime.RenderExtraction.Internal.cpp"
+              ]
+            },
+            "source_lines": 342,
+            "includes": 10,
+            "imports": 25,
+            "exports": 0
+          },
+          {
+            "edge_id": "dc86b9702e66320cfbf419a8dd61704b3d1c92444aee54c2ad7536b3a5b0aaf4",
+            "physical_identity": {
+              "start_ms": 381724,
+              "end_ms": 394912,
+              "command_hash": "d80d8807ee65b501",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 13188,
+            "output": "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorVisualization.cpp.o",
+            "outputs": [
+              "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorVisualization.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "tests/contract/runtime/Test.SandboxEditorVisualization.cpp",
+            "source_root": "tests",
+            "resolution": {
+              "source": "tests/contract/runtime/Test.SandboxEditorVisualization.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorVisualization.cpp.o"
+              ],
+              "candidates": [
+                "tests/contract/runtime/Test.SandboxEditorVisualization.cpp"
+              ]
+            },
+            "source_lines": 2201,
+            "includes": 24,
+            "imports": 55,
+            "exports": 0
+          },
+          {
+            "edge_id": "ddaabeb44e7842bfa78cf0d9be9b65a0226f1bb4db8639b5887768da45bd5f26",
+            "physical_identity": {
+              "start_ms": 285551,
+              "end_ms": 298613,
+              "command_hash": "7a78d633822918c0",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 13062,
+            "output": "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.AssetWorkflowModule.cpp.o",
+            "outputs": [
+              "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.AssetWorkflowModule.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "tests/contract/runtime/Test.AssetWorkflowModule.cpp",
+            "source_root": "tests",
+            "resolution": {
+              "source": "tests/contract/runtime/Test.AssetWorkflowModule.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.AssetWorkflowModule.cpp.o"
+              ],
+              "candidates": [
+                "tests/contract/runtime/Test.AssetWorkflowModule.cpp"
+              ]
+            },
+            "source_lines": 2617,
+            "includes": 21,
+            "imports": 43,
+            "exports": 0
+          },
+          {
+            "edge_id": "61820e67dd2cd091415909703cf68849d28bf72827c27e8287f8969d0487e1f9",
+            "physical_identity": {
+              "start_ms": 44784,
+              "end_ms": 56779,
+              "command_hash": "c7c6853b8de9e2f1",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 11995,
+            "output": "src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.CurvatureExtrema.cpp.o",
+            "outputs": [
+              "src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.CurvatureExtrema.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/geometry/Geometry.HalfedgeMesh.CurvatureExtrema.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/geometry/Geometry.HalfedgeMesh.CurvatureExtrema.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.CurvatureExtrema.cpp.o"
+              ],
+              "candidates": [
+                "src/geometry/Geometry.HalfedgeMesh.CurvatureExtrema.cpp"
+              ]
+            },
+            "source_lines": 863,
+            "includes": 16,
+            "imports": 2,
+            "exports": 0
+          },
+          {
+            "edge_id": "454cdd18f2f18fb57de6db5f88764b50b5a0eb906146c73cd8f9be7e109b406a",
+            "physical_identity": {
+              "start_ms": 267935,
+              "end_ms": 278573,
+              "command_hash": "3b6a23036f50af94",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 10638,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp"
+              ]
+            },
+            "source_lines": 2343,
+            "includes": 24,
+            "imports": 54,
+            "exports": 0
+          },
+          {
+            "edge_id": "12754e22a9f9486a26df9cb4860601ad942267fefa421741462b0ae8907df0e7",
+            "physical_identity": {
+              "start_ms": 140969,
+              "end_ms": 151600,
+              "command_hash": "88a9f2afdf38ed0b",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 10631,
+            "output": "src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.Renderer.cpp.o",
+            "outputs": [
+              "src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.Renderer.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/graphics/renderer/Graphics.Renderer.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/graphics/renderer/Graphics.Renderer.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.Renderer.cpp.o"
+              ],
+              "candidates": [
+                "src/graphics/renderer/Graphics.Renderer.cpp"
+              ]
+            },
+            "source_lines": 10968,
+            "includes": 21,
+            "imports": 74,
+            "exports": 0
+          }
+        ]
+      },
+      "noop": {
+        "execution": {
+          "cpu_user_s": 0.07,
+          "cpu_system_s": 0.02,
+          "max_single_process_rss_kib": 27516,
+          "wall_ms": 96.243221021723,
+          "started_at": "2026-09-21T12:15:30.621607+00:00",
+          "exit_code": 0,
+          "command": [
+            "cmake",
+            "--build",
+            "/dev/shm/intrinsic-build011-measure",
+            "--target",
+            "IntrinsicRuntimeContractTests",
+            "--parallel",
+            "4"
+          ],
+          "loadavg_before": [
+            3.814453125,
+            3.8662109375,
+            3.6533203125
+          ]
+        },
+        "compiler_invocations": 0,
+        "critical_path": {
+          "duration_ms": 0,
+          "timed_path": [],
+          "timed_output_count": 1,
+          "unlabelled_ancillary_outputs": 17,
+          "unmapped_ancillary_outputs": [],
+          "unmapped_meta_outputs": [
+            "/dev/shm/intrinsic-build011-measure/CMakeFiles/cmake.verify_globs"
+          ]
+        },
+        "top_producers": []
+      },
+      "normal_codec": {
+        "execution": {
+          "cpu_user_s": 6.08,
+          "cpu_system_s": 1.31,
+          "max_single_process_rss_kib": 2382192,
+          "wall_ms": 7345.639923994895,
+          "started_at": "2026-09-21T12:15:31.088651+00:00",
+          "exit_code": 0,
+          "command": [
+            "cmake",
+            "--build",
+            "/dev/shm/intrinsic-build011-measure",
+            "--target",
+            "IntrinsicRuntimeContractTests",
+            "--parallel",
+            "4"
+          ],
+          "loadavg_before": [
+            3.814453125,
+            3.8662109375,
+            3.6533203125
+          ]
+        },
+        "compiler_invocations": 1,
+        "critical_path": {
+          "duration_ms": 7235,
+          "timed_path": [
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp.o.ddi",
+              "duration_ms": 59
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/CXX.dd",
+              "duration_ms": 27
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp.o",
+              "duration_ms": 3198
+            },
+            {
+              "output": "lib/libExtrinsicRuntime.a",
+              "duration_ms": 146
+            },
+            {
+              "output": "bin/IntrinsicRuntimeContractTests",
+              "duration_ms": 3805
+            }
+          ],
+          "timed_output_count": 340,
+          "unlabelled_ancillary_outputs": 17,
+          "unmapped_ancillary_outputs": [
+            "/dev/shm/intrinsic-build011-measure/tests/CMakeFiles/EditorFeatureTestSupportObjs.dir/CXXModules.json",
+            "/dev/shm/intrinsic-build011-measure/tests/CMakeFiles/RuntimeContractTestObjs.dir/CXXModules.json",
+            "/dev/shm/intrinsic-build011-measure/tests/CMakeFiles/RuntimeTestModuleSupportObjs.dir/CXXModules.json"
+          ],
+          "unmapped_meta_outputs": [
+            "/dev/shm/intrinsic-build011-measure/CMakeFiles/cmake.verify_globs"
+          ]
+        },
+        "top_producers": [
+          {
+            "edge_id": "8853a8da1112bf6486a25e743dd7a74110cd9817f9c2d1301005850a2a300736",
+            "physical_identity": {
+              "start_ms": 186,
+              "end_ms": 3384,
+              "command_hash": "374073c69c468f93",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 3198,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp"
+              ]
+            },
+            "source_lines": 184,
+            "includes": 10,
+            "imports": 0,
+            "exports": 0
+          }
+        ]
+      },
+      "density_codec": {
+        "execution": {
+          "cpu_user_s": 5.84,
+          "cpu_system_s": 1.33,
+          "max_single_process_rss_kib": 2382148,
+          "wall_ms": 7117.507853981806,
+          "started_at": "2026-09-21T12:15:38.825393+00:00",
+          "exit_code": 0,
+          "command": [
+            "cmake",
+            "--build",
+            "/dev/shm/intrinsic-build011-measure",
+            "--target",
+            "IntrinsicRuntimeContractTests",
+            "--parallel",
+            "4"
+          ],
+          "loadavg_before": [
+            3.38134765625,
+            3.771484375,
+            3.6240234375
+          ]
+        },
+        "compiler_invocations": 1,
+        "critical_path": {
+          "duration_ms": 7016,
+          "timed_path": [
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp.o.ddi",
+              "duration_ms": 63
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp.o.modmap",
+              "duration_ms": 31
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp.o",
+              "duration_ms": 2931
+            },
+            {
+              "output": "lib/libExtrinsicRuntime.a",
+              "duration_ms": 145
+            },
+            {
+              "output": "bin/IntrinsicRuntimeContractTests",
+              "duration_ms": 3846
+            }
+          ],
+          "timed_output_count": 340,
+          "unlabelled_ancillary_outputs": 17,
+          "unmapped_ancillary_outputs": [
+            "/dev/shm/intrinsic-build011-measure/tests/CMakeFiles/EditorFeatureTestSupportObjs.dir/CXXModules.json",
+            "/dev/shm/intrinsic-build011-measure/tests/CMakeFiles/RuntimeContractTestObjs.dir/CXXModules.json",
+            "/dev/shm/intrinsic-build011-measure/tests/CMakeFiles/RuntimeTestModuleSupportObjs.dir/CXXModules.json"
+          ],
+          "unmapped_meta_outputs": [
+            "/dev/shm/intrinsic-build011-measure/CMakeFiles/cmake.verify_globs"
+          ]
+        },
+        "top_producers": [
+          {
+            "edge_id": "8494c284b03579db91a88cffb2ea786ec9151d20c904a9f5deaad6d70ca2515c",
+            "physical_identity": {
+              "start_ms": 188,
+              "end_ms": 3119,
+              "command_hash": "8e7080114ee6c0e3",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 2931,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp"
+              ]
+            },
+            "source_lines": 83,
+            "includes": 8,
+            "imports": 0,
+            "exports": 0
+          }
+        ]
+      },
+      "descriptor_codec": {
+        "execution": {
+          "cpu_user_s": 6.01,
+          "cpu_system_s": 1.33,
+          "max_single_process_rss_kib": 2381832,
+          "wall_ms": 7283.851312007755,
+          "started_at": "2026-09-21T12:15:46.337918+00:00",
+          "exit_code": 0,
+          "command": [
+            "cmake",
+            "--build",
+            "/dev/shm/intrinsic-build011-measure",
+            "--target",
+            "IntrinsicRuntimeContractTests",
+            "--parallel",
+            "4"
+          ],
+          "loadavg_before": [
+            3.1904296875,
+            3.72509765625,
+            3.60986328125
+          ]
+        },
+        "compiler_invocations": 1,
+        "critical_path": {
+          "duration_ms": 7186,
+          "timed_path": [
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp.o.ddi",
+              "duration_ms": 61
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp.o.modmap",
+              "duration_ms": 28
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp.o",
+              "duration_ms": 3070
+            },
+            {
+              "output": "lib/libExtrinsicRuntime.a",
+              "duration_ms": 143
+            },
+            {
+              "output": "bin/IntrinsicRuntimeContractTests",
+              "duration_ms": 3884
+            }
+          ],
+          "timed_output_count": 340,
+          "unlabelled_ancillary_outputs": 17,
+          "unmapped_ancillary_outputs": [
+            "/dev/shm/intrinsic-build011-measure/tests/CMakeFiles/EditorFeatureTestSupportObjs.dir/CXXModules.json",
+            "/dev/shm/intrinsic-build011-measure/tests/CMakeFiles/RuntimeContractTestObjs.dir/CXXModules.json",
+            "/dev/shm/intrinsic-build011-measure/tests/CMakeFiles/RuntimeTestModuleSupportObjs.dir/CXXModules.json"
+          ],
+          "unmapped_meta_outputs": [
+            "/dev/shm/intrinsic-build011-measure/CMakeFiles/cmake.verify_globs"
+          ]
+        },
+        "top_producers": [
+          {
+            "edge_id": "41d14e0c4d5e28e7056c4d3b883e49dff99381745929e98bd38831398f9e0690",
+            "physical_identity": {
+              "start_ms": 179,
+              "end_ms": 3249,
+              "command_hash": "3e19050bff6c9cd9",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 3070,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp"
+              ]
+            },
+            "source_lines": 108,
+            "includes": 11,
+            "imports": 0,
+            "exports": 0
+          }
+        ]
+      },
+      "shared_header": {
+        "execution": {
+          "cpu_user_s": 41.96,
+          "cpu_system_s": 3.18,
+          "max_single_process_rss_kib": 2382512,
+          "wall_ms": 15096.600538992789,
+          "started_at": "2026-09-21T12:15:54.014512+00:00",
+          "exit_code": 0,
+          "command": [
+            "cmake",
+            "--build",
+            "/dev/shm/intrinsic-build011-measure",
+            "--target",
+            "IntrinsicRuntimeContractTests",
+            "--parallel",
+            "4"
+          ],
+          "loadavg_before": [
+            2.9267578125,
+            3.6513671875,
+            3.5869140625
+          ]
+        },
+        "compiler_invocations": 12,
+        "critical_path": {
+          "duration_ms": 8143,
+          "timed_path": [
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Curvature/Runtime.MeshCurvatureConfig.cpp.o.ddi",
+              "duration_ms": 65
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp.o.modmap",
+              "duration_ms": 28
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp.o",
+              "duration_ms": 4137
+            },
+            {
+              "output": "lib/libExtrinsicRuntime.a",
+              "duration_ms": 146
+            },
+            {
+              "output": "bin/IntrinsicRuntimeContractTests",
+              "duration_ms": 3767
+            }
+          ],
+          "timed_output_count": 362,
+          "unlabelled_ancillary_outputs": 17,
+          "unmapped_ancillary_outputs": [
+            "/dev/shm/intrinsic-build011-measure/tests/CMakeFiles/EditorFeatureTestSupportObjs.dir/CXXModules.json",
+            "/dev/shm/intrinsic-build011-measure/tests/CMakeFiles/RuntimeContractTestObjs.dir/CXXModules.json",
+            "/dev/shm/intrinsic-build011-measure/tests/CMakeFiles/RuntimeTestModuleSupportObjs.dir/CXXModules.json"
+          ],
+          "unmapped_meta_outputs": [
+            "/dev/shm/intrinsic-build011-measure/CMakeFiles/cmake.verify_globs"
+          ]
+        },
+        "top_producers": [
+          {
+            "edge_id": "f2a67ec52d409f77a43af0b294a04c29b0aef4322ddd5338f7d6caadae9f576d",
+            "physical_identity": {
+              "start_ms": 7038,
+              "end_ms": 11175,
+              "command_hash": "80677e058f615584",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 4137,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp"
+              ]
+            },
+            "source_lines": 2860,
+            "includes": 15,
+            "imports": 8,
+            "exports": 0
+          },
+          {
+            "edge_id": "8853a8da1112bf6486a25e743dd7a74110cd9817f9c2d1301005850a2a300736",
+            "physical_identity": {
+              "start_ms": 6979,
+              "end_ms": 10484,
+              "command_hash": "374073c69c468f93",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 3505,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp"
+              ]
+            },
+            "source_lines": 184,
+            "includes": 10,
+            "imports": 0,
+            "exports": 0
+          },
+          {
+            "edge_id": "7a84bc8781938924ca32ba8f1e57e047819149855f3a80d8e8bf1bbdeeae348c",
+            "physical_identity": {
+              "start_ms": 3528,
+              "end_ms": 6990,
+              "command_hash": "f5c3a52bd6a5d5f4",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 3462,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp"
+              ]
+            },
+            "source_lines": 94,
+            "includes": 10,
+            "imports": 0,
+            "exports": 0
+          },
+          {
+            "edge_id": "38afae260b21d2c9302f26660e58f8b0130f20b2b8c684a8a9f571e02cbdd848",
+            "physical_identity": {
+              "start_ms": 6131,
+              "end_ms": 9593,
+              "command_hash": "d6eabcc64de49410",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 3462,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/PointConstruction/Runtime.PointConstructionConfig.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/PointConstruction/Runtime.PointConstructionConfig.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/PointConstruction/Runtime.PointConstructionConfig.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cpp"
+              ]
+            },
+            "source_lines": 161,
+            "includes": 8,
+            "imports": 0,
+            "exports": 0
+          },
+          {
+            "edge_id": "1146055a4f028a964366e5c8b6f7c0621570b40d5441fb6b77957189d0edd994",
+            "physical_identity": {
+              "start_ms": 311,
+              "end_ms": 3713,
+              "command_hash": "338209c2e135f9cc",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 3402,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp"
+              ]
+            },
+            "source_lines": 96,
+            "includes": 8,
+            "imports": 0,
+            "exports": 0
+          },
+          {
+            "edge_id": "41d14e0c4d5e28e7056c4d3b883e49dff99381745929e98bd38831398f9e0690",
+            "physical_identity": {
+              "start_ms": 3629,
+              "end_ms": 6979,
+              "command_hash": "3e19050bff6c9cd9",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 3350,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp"
+              ]
+            },
+            "source_lines": 108,
+            "includes": 11,
+            "imports": 0,
+            "exports": 0
+          },
+          {
+            "edge_id": "78f252f36f5daae78f12af649b70a0b1bdd5700b08ab73bea36346baae7a75ba",
+            "physical_identity": {
+              "start_ms": 3713,
+              "end_ms": 7038,
+              "command_hash": "81dade394ef0a0b8",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 3325,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp"
+              ]
+            },
+            "source_lines": 91,
+            "includes": 11,
+            "imports": 0,
+            "exports": 0
+          },
+          {
+            "edge_id": "725eb969f5a285c08110492d1f73dbe6a0f2f856bc4be28e592177727f1adce7",
+            "physical_identity": {
+              "start_ms": 311,
+              "end_ms": 3629,
+              "command_hash": "4fe4b8929892f11d",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 3318,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp"
+              ]
+            },
+            "source_lines": 83,
+            "includes": 8,
+            "imports": 0,
+            "exports": 0
+          },
+          {
+            "edge_id": "34b4cc071e3d2f405cc45eecc3db8df4da85cc2f502ea22b4389bd2a267a9483",
+            "physical_identity": {
+              "start_ms": 6990,
+              "end_ms": 10285,
+              "command_hash": "74611426c28ffd99",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 3295,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Registration/Runtime.RegistrationConfig.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Registration/Runtime.RegistrationConfig.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Modules/Registration/Runtime.RegistrationConfig.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Modules/Registration/Runtime.RegistrationConfig.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Registration/Runtime.RegistrationConfig.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Modules/Registration/Runtime.RegistrationConfig.cpp"
+              ]
+            },
+            "source_lines": 117,
+            "includes": 10,
+            "imports": 0,
+            "exports": 0
+          },
+          {
+            "edge_id": "fa678f78a62ece713e00c176488176b80600912ab9e91075f6c47667b05610c1",
+            "physical_identity": {
+              "start_ms": 2846,
+              "end_ms": 6131,
+              "command_hash": "784a27c19a09c579",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 3285,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp"
+              ]
+            },
+            "source_lines": 86,
+            "includes": 8,
+            "imports": 0,
+            "exports": 0
+          },
+          {
+            "edge_id": "8494c284b03579db91a88cffb2ea786ec9151d20c904a9f5deaad6d70ca2515c",
+            "physical_identity": {
+              "start_ms": 311,
+              "end_ms": 3528,
+              "command_hash": "8e7080114ee6c0e3",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 3217,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp"
+              ]
+            },
+            "source_lines": 83,
+            "includes": 8,
+            "imports": 0,
+            "exports": 0
+          },
+          {
+            "edge_id": "a318d65f5e3ca6f33ace6609fab45df094355cb22cf92537c6efa4b8452c0140",
+            "physical_identity": {
+              "start_ms": 310,
+              "end_ms": 2846,
+              "command_hash": "24732b0c52fd5ad3",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 2536,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Curvature/Runtime.MeshCurvatureConfig.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Curvature/Runtime.MeshCurvatureConfig.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Modules/Curvature/Runtime.MeshCurvatureConfig.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Modules/Curvature/Runtime.MeshCurvatureConfig.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Curvature/Runtime.MeshCurvatureConfig.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Modules/Curvature/Runtime.MeshCurvatureConfig.cpp"
+              ]
+            },
+            "source_lines": 119,
+            "includes": 10,
+            "imports": 0,
+            "exports": 0
+          }
+        ]
+      },
+      "shared_helper": {
+        "execution": {
+          "cpu_user_s": 6.62,
+          "cpu_system_s": 1.29,
+          "max_single_process_rss_kib": 2382432,
+          "wall_ms": 7865.168099000584,
+          "started_at": "2026-09-21T12:16:09.499369+00:00",
+          "exit_code": 0,
+          "command": [
+            "cmake",
+            "--build",
+            "/dev/shm/intrinsic-build011-measure",
+            "--target",
+            "IntrinsicRuntimeContractTests",
+            "--parallel",
+            "4"
+          ],
+          "loadavg_before": [
+            2.92431640625,
+            3.61865234375,
+            3.57763671875
+          ]
+        },
+        "compiler_invocations": 1,
+        "critical_path": {
+          "duration_ms": 7763,
+          "timed_path": [
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp.o.ddi",
+              "duration_ms": 60
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp.o.modmap",
+              "duration_ms": 27
+            },
+            {
+              "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp.o",
+              "duration_ms": 3750
+            },
+            {
+              "output": "lib/libExtrinsicRuntime.a",
+              "duration_ms": 146
+            },
+            {
+              "output": "bin/IntrinsicRuntimeContractTests",
+              "duration_ms": 3780
+            }
+          ],
+          "timed_output_count": 340,
+          "unlabelled_ancillary_outputs": 17,
+          "unmapped_ancillary_outputs": [
+            "/dev/shm/intrinsic-build011-measure/tests/CMakeFiles/EditorFeatureTestSupportObjs.dir/CXXModules.json",
+            "/dev/shm/intrinsic-build011-measure/tests/CMakeFiles/RuntimeContractTestObjs.dir/CXXModules.json",
+            "/dev/shm/intrinsic-build011-measure/tests/CMakeFiles/RuntimeTestModuleSupportObjs.dir/CXXModules.json"
+          ],
+          "unmapped_meta_outputs": [
+            "/dev/shm/intrinsic-build011-measure/CMakeFiles/cmake.verify_globs"
+          ]
+        },
+        "top_producers": [
+          {
+            "edge_id": "f2a67ec52d409f77a43af0b294a04c29b0aef4322ddd5338f7d6caadae9f576d",
+            "physical_identity": {
+              "start_ms": 181,
+              "end_ms": 3931,
+              "command_hash": "80677e058f615584",
+              "ninja_log_version": 5
+            },
+            "duration_ms": 3750,
+            "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp.o",
+            "outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp.o"
+            ],
+            "edge_kind": "translation-unit",
+            "source": "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp",
+            "source_root": "src",
+            "resolution": {
+              "source": "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp",
+              "status": "resolved",
+              "reason": "compile-command-output",
+              "mapped_outputs": [
+                "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp.o"
+              ],
+              "candidates": [
+                "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp"
+              ]
+            },
+            "source_lines": 2860,
+            "includes": 15,
+            "imports": 8,
+            "exports": 0
+          }
+        ]
+      }
+    },
+    "source_clean_before_after": true
+  },
+  "thresholds": {},
+  "threshold_disposition": [],
+  "execution_status": "passed",
+  "status": "passed"
+}
