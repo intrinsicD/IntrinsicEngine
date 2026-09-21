@@ -41,6 +41,12 @@ the related readiness work.
 The four reuse tasks do not authorize an unrelated lifecycle rewrite. This
 record preserves the newly observed failure; no assertion or label is weakened.
 
+The subsequent GEOIO-004 full unsanitized ci run also reproduced exactly the
+same queued/running comparison for job `0:1`. Of 4,886 selected tests, this
+was the only failure, alongside the expected GLFW skip. See [ci evidence](../../evidence/BUG-206/ci-phase-race.log).
+Thus this race is not specific to UBSan. The PLY extraction's 224 focused
+GeometryIO cases and expanded 319-case locality selection pass.
+
 ## Acceptance criteria
 - [ ] Reproduce the phase-observation race and pin the intended preview/apply contract.
 - [ ] Control worker progress for exact phase-string equality, or compare stable

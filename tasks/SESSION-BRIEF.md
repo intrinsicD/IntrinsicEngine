@@ -37,10 +37,6 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `PHYSICS-006` — Vulkan particle-spring reference integration (tasks/backlog/physics/PHYSICS-006-vulkan-particle-spring.md)
 - unblocked: `PHYSICS-007` — Vulkan XPBD cloth constraints and integration (tasks/backlog/physics/PHYSICS-007-vulkan-xpbd-cloth.md)
 
-## Theme E — Geometry IO completion
-
-- unblocked: `GEOIO-004` — Share the compiled PLY header parser (tasks/backlog/geometry/GEOIO-004-shared-compiled-ply-header-parser.md)
-
 ## Theme F — Architecture/runtime/UI foundation seeds
 
 - unblocked: `ASSETIO-010` — Async model companion preflight (tasks/backlog/assets/ASSETIO-010-async-model-companion-preflight.md)

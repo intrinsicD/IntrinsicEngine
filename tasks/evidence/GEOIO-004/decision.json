@@ -1,0 +1,20 @@
+{
+  "disposition": "rejected",
+  "reason": "Confirmed private-header compiler-duration regression beyond frozen 2% allowance",
+  "candidate_source": "478e32e0a27b9f7569710d8ddd0f503c5840d60a",
+  "baseline_source": "6975abfc14c5e5b55f62de77b5b022d1f9eda5b6",
+  "baseline_compiler_ms": {
+    "median": 4967,
+    "min": 4961,
+    "max": 4983
+  },
+  "candidate_compiler_ms": {
+    "median": 6174,
+    "min": 5969,
+    "max": 6187
+  },
+  "compiler_delta_percent": 24.300382524662773,
+  "allowed_compiler_delta_percent": 2,
+  "all_candidate_samples_exceed_baseline_max_plus_allowance": true,
+  "restoration": "Restore all task source, regression tests, CMake and owner-route changes; preserve complete rejected experiment in evidence."
+}

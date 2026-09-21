@@ -83,7 +83,6 @@ ready. Task front-matter owns prerequisite state.
 | Material/visualization authority consolidation | [GRAPHICS-105](../active/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md) |
 | Stale shaders after material-authority decisions | [LEGACY-043](rendering/LEGACY-043-retire-stale-multiset-shaders.md) |
 | Build/cache backend comparison | [BUILD-006](process/BUILD-006-cxx23-module-build-backend-bakeoff.md) |
-| Shared PLY header parsing | [GEOIO-004](geometry/GEOIO-004-shared-compiled-ply-header-parser.md) |
 | Shared parameterization topology checks | [GEOM-099](geometry/GEOM-099-shared-disk-topology-preflight.md) |
 | Compiled property-domain test fixtures | [RUNTIME-272](runtime/RUNTIME-272-compiled-property-domain-test-fixtures.md) |
 | Shared graphics command-recording test double | [GRAPHICS-146](rendering/GRAPHICS-146-reuse-command-recording-test-double.md) |

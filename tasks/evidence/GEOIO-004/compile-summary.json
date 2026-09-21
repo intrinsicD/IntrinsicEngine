@@ -1,0 +1,552 @@
+{
+  "benchmark_id": "build.reuse.geoio004.v1",
+  "source_revisions": {
+    "before": "6975abfc14c5e5b55f62de77b5b022d1f9eda5b6",
+    "after": "478e32e0a27b9f7569710d8ddd0f503c5840d60a"
+  },
+  "scenarios": {
+    "clean": {
+      "before": {
+        "count": 3,
+        "samples": [
+          {
+            "wall_ms": 99976.87922697514,
+            "compiler_ms": 359291,
+            "compiler_invocations": 297,
+            "source_count": 297,
+            "sample": "01-before-1"
+          },
+          {
+            "wall_ms": 99579.75919998717,
+            "compiler_ms": 358268,
+            "compiler_invocations": 297,
+            "source_count": 297,
+            "sample": "03-before-2"
+          },
+          {
+            "wall_ms": 99246.74310800037,
+            "compiler_ms": 356651,
+            "compiler_invocations": 297,
+            "source_count": 297,
+            "sample": "05-before-3"
+          }
+        ],
+        "wall_ms": {
+          "median": 99579.75919998717,
+          "min": 99246.74310800037,
+          "max": 99976.87922697514
+        },
+        "compiler_ms": {
+          "median": 358268,
+          "min": 356651,
+          "max": 359291
+        },
+        "compiler_invocations": {
+          "median": 297,
+          "min": 297,
+          "max": 297
+        },
+        "source_count": {
+          "median": 297,
+          "min": 297,
+          "max": 297
+        }
+      },
+      "after": {
+        "count": 3,
+        "samples": [
+          {
+            "wall_ms": 100192.07141399966,
+            "compiler_ms": 360285,
+            "compiler_invocations": 298,
+            "source_count": 298,
+            "sample": "02-after-1"
+          },
+          {
+            "wall_ms": 99417.80119598843,
+            "compiler_ms": 357474,
+            "compiler_invocations": 298,
+            "source_count": 298,
+            "sample": "04-after-2"
+          },
+          {
+            "wall_ms": 99796.09682099544,
+            "compiler_ms": 358811,
+            "compiler_invocations": 298,
+            "source_count": 298,
+            "sample": "06-after-3"
+          }
+        ],
+        "wall_ms": {
+          "median": 99796.09682099544,
+          "min": 99417.80119598843,
+          "max": 100192.07141399966
+        },
+        "compiler_ms": {
+          "median": 358811,
+          "min": 357474,
+          "max": 360285
+        },
+        "compiler_invocations": {
+          "median": 298,
+          "min": 298,
+          "max": 298
+        },
+        "source_count": {
+          "median": 298,
+          "min": 298,
+          "max": 298
+        }
+      },
+      "delta": {
+        "wall_ms": {
+          "absolute_ms": 216.3376210082788,
+          "percent": 0.21725059665368893,
+          "allowance_ms": 1991.5951839997433,
+          "exceeds_original_allowance": false
+        },
+        "compiler_ms": {
+          "absolute_ms": 543,
+          "percent": 0.15156251744504115,
+          "allowance_ms": 7165.360000000001,
+          "exceeds_original_allowance": false
+        }
+      }
+    },
+    "noop": {
+      "before": {
+        "count": 3,
+        "samples": [
+          {
+            "wall_ms": 57.71236098371446,
+            "compiler_ms": 0,
+            "compiler_invocations": 0,
+            "source_count": 0,
+            "sample": "01-before-1"
+          },
+          {
+            "wall_ms": 58.473022014368325,
+            "compiler_ms": 0,
+            "compiler_invocations": 0,
+            "source_count": 0,
+            "sample": "03-before-2"
+          },
+          {
+            "wall_ms": 55.198843008838594,
+            "compiler_ms": 0,
+            "compiler_invocations": 0,
+            "source_count": 0,
+            "sample": "05-before-3"
+          }
+        ],
+        "wall_ms": {
+          "median": 57.71236098371446,
+          "min": 55.198843008838594,
+          "max": 58.473022014368325
+        },
+        "compiler_ms": {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "compiler_invocations": {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "source_count": {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        }
+      },
+      "after": {
+        "count": 3,
+        "samples": [
+          {
+            "wall_ms": 73.67813200107776,
+            "compiler_ms": 0,
+            "compiler_invocations": 0,
+            "source_count": 0,
+            "sample": "02-after-1"
+          },
+          {
+            "wall_ms": 57.05683198175393,
+            "compiler_ms": 0,
+            "compiler_invocations": 0,
+            "source_count": 0,
+            "sample": "04-after-2"
+          },
+          {
+            "wall_ms": 59.283563983626664,
+            "compiler_ms": 0,
+            "compiler_invocations": 0,
+            "source_count": 0,
+            "sample": "06-after-3"
+          }
+        ],
+        "wall_ms": {
+          "median": 59.283563983626664,
+          "min": 57.05683198175393,
+          "max": 73.67813200107776
+        },
+        "compiler_ms": {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "compiler_invocations": {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "source_count": {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        }
+      },
+      "delta": {
+        "wall_ms": {
+          "absolute_ms": 1.5712029999122024,
+          "percent": 2.722472228012941,
+          "allowance_ms": 100,
+          "exceeds_original_allowance": false
+        },
+        "compiler_ms": {
+          "absolute_ms": 0,
+          "percent": null,
+          "allowance_ms": 0.0,
+          "exceeds_original_allowance": false
+        }
+      }
+    },
+    "mesh_loader": {
+      "before": {
+        "count": 3,
+        "samples": [
+          {
+            "wall_ms": 2531.621856993297,
+            "compiler_ms": 2020,
+            "compiler_invocations": 1,
+            "source_count": 1,
+            "sample": "01-before-1"
+          },
+          {
+            "wall_ms": 2546.194619993912,
+            "compiler_ms": 2041,
+            "compiler_invocations": 1,
+            "source_count": 1,
+            "sample": "03-before-2"
+          },
+          {
+            "wall_ms": 2498.9977910008747,
+            "compiler_ms": 2007,
+            "compiler_invocations": 1,
+            "source_count": 1,
+            "sample": "05-before-3"
+          }
+        ],
+        "wall_ms": {
+          "median": 2531.621856993297,
+          "min": 2498.9977910008747,
+          "max": 2546.194619993912
+        },
+        "compiler_ms": {
+          "median": 2020,
+          "min": 2007,
+          "max": 2041
+        },
+        "compiler_invocations": {
+          "median": 1,
+          "min": 1,
+          "max": 1
+        },
+        "source_count": {
+          "median": 1,
+          "min": 1,
+          "max": 1
+        }
+      },
+      "after": {
+        "count": 3,
+        "samples": [
+          {
+            "wall_ms": 2517.827428993769,
+            "compiler_ms": 2016,
+            "compiler_invocations": 1,
+            "source_count": 1,
+            "sample": "02-after-1"
+          },
+          {
+            "wall_ms": 2480.7087990047876,
+            "compiler_ms": 1984,
+            "compiler_invocations": 1,
+            "source_count": 1,
+            "sample": "04-after-2"
+          },
+          {
+            "wall_ms": 2578.8574619800784,
+            "compiler_ms": 2084,
+            "compiler_invocations": 1,
+            "source_count": 1,
+            "sample": "06-after-3"
+          }
+        ],
+        "wall_ms": {
+          "median": 2517.827428993769,
+          "min": 2480.7087990047876,
+          "max": 2578.8574619800784
+        },
+        "compiler_ms": {
+          "median": 2016,
+          "min": 1984,
+          "max": 2084
+        },
+        "compiler_invocations": {
+          "median": 1,
+          "min": 1,
+          "max": 1
+        },
+        "source_count": {
+          "median": 1,
+          "min": 1,
+          "max": 1
+        }
+      },
+      "delta": {
+        "wall_ms": {
+          "absolute_ms": -13.794427999528125,
+          "percent": -0.5448850096400731,
+          "allowance_ms": 100,
+          "exceeds_original_allowance": false
+        },
+        "compiler_ms": {
+          "absolute_ms": -4,
+          "percent": -0.19801980198019803,
+          "allowance_ms": 40.4,
+          "exceeds_original_allowance": false
+        }
+      }
+    },
+    "cloud_loader": {
+      "before": {
+        "count": 3,
+        "samples": [
+          {
+            "wall_ms": 2040.704512008233,
+            "compiler_ms": 1551,
+            "compiler_invocations": 1,
+            "source_count": 1,
+            "sample": "01-before-1"
+          },
+          {
+            "wall_ms": 2016.4085979922675,
+            "compiler_ms": 1523,
+            "compiler_invocations": 1,
+            "source_count": 1,
+            "sample": "03-before-2"
+          },
+          {
+            "wall_ms": 2016.1257330037188,
+            "compiler_ms": 1521,
+            "compiler_invocations": 1,
+            "source_count": 1,
+            "sample": "05-before-3"
+          }
+        ],
+        "wall_ms": {
+          "median": 2016.4085979922675,
+          "min": 2016.1257330037188,
+          "max": 2040.704512008233
+        },
+        "compiler_ms": {
+          "median": 1523,
+          "min": 1521,
+          "max": 1551
+        },
+        "compiler_invocations": {
+          "median": 1,
+          "min": 1,
+          "max": 1
+        },
+        "source_count": {
+          "median": 1,
+          "min": 1,
+          "max": 1
+        }
+      },
+      "after": {
+        "count": 3,
+        "samples": [
+          {
+            "wall_ms": 2004.8174989933614,
+            "compiler_ms": 1508,
+            "compiler_invocations": 1,
+            "source_count": 1,
+            "sample": "02-after-1"
+          },
+          {
+            "wall_ms": 2022.3013480135705,
+            "compiler_ms": 1531,
+            "compiler_invocations": 1,
+            "source_count": 1,
+            "sample": "04-after-2"
+          },
+          {
+            "wall_ms": 1999.6377539937384,
+            "compiler_ms": 1507,
+            "compiler_invocations": 1,
+            "source_count": 1,
+            "sample": "06-after-3"
+          }
+        ],
+        "wall_ms": {
+          "median": 2004.8174989933614,
+          "min": 1999.6377539937384,
+          "max": 2022.3013480135705
+        },
+        "compiler_ms": {
+          "median": 1508,
+          "min": 1507,
+          "max": 1531
+        },
+        "compiler_invocations": {
+          "median": 1,
+          "min": 1,
+          "max": 1
+        },
+        "source_count": {
+          "median": 1,
+          "min": 1,
+          "max": 1
+        }
+      },
+      "delta": {
+        "wall_ms": {
+          "absolute_ms": -11.59109899890609,
+          "percent": -0.5748388005510052,
+          "allowance_ms": 100,
+          "exceeds_original_allowance": false
+        },
+        "compiler_ms": {
+          "absolute_ms": -15,
+          "percent": -0.9848982271831911,
+          "allowance_ms": 30.46,
+          "exceeds_original_allowance": false
+        }
+      }
+    },
+    "private_header": {
+      "before": {
+        "count": 3,
+        "samples": [
+          {
+            "wall_ms": 2570.167125988519,
+            "compiler_ms": 4983,
+            "compiler_invocations": 3,
+            "source_count": 3,
+            "sample": "01-before-1"
+          },
+          {
+            "wall_ms": 2598.7690539914183,
+            "compiler_ms": 4961,
+            "compiler_invocations": 3,
+            "source_count": 3,
+            "sample": "03-before-2"
+          },
+          {
+            "wall_ms": 2571.380018023774,
+            "compiler_ms": 4967,
+            "compiler_invocations": 3,
+            "source_count": 3,
+            "sample": "05-before-3"
+          }
+        ],
+        "wall_ms": {
+          "median": 2571.380018023774,
+          "min": 2570.167125988519,
+          "max": 2598.7690539914183
+        },
+        "compiler_ms": {
+          "median": 4967,
+          "min": 4961,
+          "max": 4983
+        },
+        "compiler_invocations": {
+          "median": 3,
+          "min": 3,
+          "max": 3
+        },
+        "source_count": {
+          "median": 3,
+          "min": 3,
+          "max": 3
+        }
+      },
+      "after": {
+        "count": 3,
+        "samples": [
+          {
+            "wall_ms": 2682.7782799955457,
+            "compiler_ms": 6187,
+            "compiler_invocations": 4,
+            "source_count": 4,
+            "sample": "02-after-1"
+          },
+          {
+            "wall_ms": 2560.3378050145693,
+            "compiler_ms": 5969,
+            "compiler_invocations": 4,
+            "source_count": 4,
+            "sample": "04-after-2"
+          },
+          {
+            "wall_ms": 2653.7774699972942,
+            "compiler_ms": 6174,
+            "compiler_invocations": 4,
+            "source_count": 4,
+            "sample": "06-after-3"
+          }
+        ],
+        "wall_ms": {
+          "median": 2653.7774699972942,
+          "min": 2560.3378050145693,
+          "max": 2682.7782799955457
+        },
+        "compiler_ms": {
+          "median": 6174,
+          "min": 5969,
+          "max": 6187
+        },
+        "compiler_invocations": {
+          "median": 4,
+          "min": 4,
+          "max": 4
+        },
+        "source_count": {
+          "median": 4,
+          "min": 4,
+          "max": 4
+        }
+      },
+      "delta": {
+        "wall_ms": {
+          "absolute_ms": 82.39745197352022,
+          "percent": 3.2044058597315583,
+          "allowance_ms": 100,
+          "exceeds_original_allowance": false
+        },
+        "compiler_ms": {
+          "absolute_ms": 1207,
+          "percent": 24.300382524662773,
+          "allowance_ms": 99.34,
+          "exceeds_original_allowance": true
+        }
+      }
+    }
+  },
+  "gate_failures": [
+    "private_header.compiler_ms"
+  ]
+}

@@ -7,6 +7,19 @@ relative to `tasks/done/`, which sits at the same depth as `tasks/active/`,
 so blocks moved from the old active-README history work verbatim.
 
 
+## 2026-09-22 — GEOIO-004 rejected on its frozen compile gate
+
+Retired [GEOIO-004](GEOIO-004-shared-compiled-ply-header-parser.md) as **rejected**.
+The reviewed shared-parser candidate `478e32e0` preserves its 224 focused IO
+cases, but private-header compiler work rises 4.967 → 6.174 seconds (+24.30%)
+against a frozen 2% allowance, with separated sample ranges. All source and
+regression-test changes are restored; retained code delta is zero. The
+[negative evidence](../evidence/GEOIO-004/measurements.md) preserves the full
+experiment, attempted -74 implementation-line change and +150 test lines.
+BUG-206 continues to own the unrelated full-ci/UBSan phase-string race. No
+shared parser implementation or new capability claim landed.
+
+
 ## 2026-09-21 — BUG-204 and bounded fixture compilation closure
 
 Retired [BUG-204](BUG-204-compile-benchmark-header-probes.md): `defaafeac` fixes

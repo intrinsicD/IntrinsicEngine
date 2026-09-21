@@ -1,0 +1,66 @@
+{
+  "before": "8ce2858adeaba92afc2065212e01bd7b25504a89",
+  "after": "478e32e0a27b9f7569710d8ddd0f503c5840d60a",
+  "counting": "Physical lines, including blank lines, all affected implementation/declaration/caller/support and CMake files; no formatting compression credit. Regression tests shown separately. Documentation and evidence excluded from code totals.",
+  "files": [
+    {
+      "path": "src/geometry/CMakeLists.txt",
+      "before_lines": 254,
+      "after_lines": 255,
+      "delta": 1,
+      "classification": "implementation"
+    },
+    {
+      "path": "src/geometry/Geometry.HalfedgeMesh.IO.cpp",
+      "before_lines": 2905,
+      "after_lines": 2803,
+      "delta": -102,
+      "classification": "implementation"
+    },
+    {
+      "path": "src/geometry/Geometry.IOText.cpp",
+      "before_lines": 0,
+      "after_lines": 126,
+      "delta": 126,
+      "classification": "implementation"
+    },
+    {
+      "path": "src/geometry/Geometry.IOText.hpp",
+      "before_lines": 308,
+      "after_lines": 324,
+      "delta": 16,
+      "classification": "implementation"
+    },
+    {
+      "path": "src/geometry/Geometry.PointCloud.IO.cpp",
+      "before_lines": 2454,
+      "after_lines": 2339,
+      "delta": -115,
+      "classification": "implementation"
+    },
+    {
+      "path": "tests/unit/geometry/Test.GeometryIO.cpp",
+      "before_lines": 6119,
+      "after_lines": 6269,
+      "delta": 150,
+      "classification": "regression_tests"
+    }
+  ],
+  "implementation": {
+    "before_lines": 5921,
+    "after_lines": 5847,
+    "delta": -74
+  },
+  "regression_tests": {
+    "before_lines": 6119,
+    "after_lines": 6269,
+    "delta": 150
+  },
+  "total": {
+    "before_lines": 12040,
+    "after_lines": 12116,
+    "delta": 76
+  },
+  "disposition": "rejected",
+  "retained_code_delta": 0
+}
