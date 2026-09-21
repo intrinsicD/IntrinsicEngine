@@ -29,12 +29,17 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `GRAPHICS-126` — Bandwidth-priced frame-recipe trace model (tasks/backlog/rendering/GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md)
 - blocked by `GRAPHICS-137`: `GRAPHICS-136` — Rename `Pipeline*` to `GraphicsState*` at the RHI boundary (tasks/backlog/rendering/GRAPHICS-136-rename-pipeline-to-graphics-state-rhi-boundary.md)
 - unblocked: `GRAPHICS-137` — Shader-object realization spike (ADR-0028 killing experiment) (tasks/backlog/rendering/GRAPHICS-137-shader-object-realization-spike.md)
+- unblocked: `GRAPHICS-146` — Reuse the compiled graphics command-recording test double (tasks/backlog/rendering/GRAPHICS-146-reuse-command-recording-test-double.md)
 
 ## Theme C — Physics readiness
 
 - unblocked: `PHYSICS-005` — Vulkan SPH fluid reference integration (tasks/backlog/physics/PHYSICS-005-vulkan-sph-fluid.md)
 - unblocked: `PHYSICS-006` — Vulkan particle-spring reference integration (tasks/backlog/physics/PHYSICS-006-vulkan-particle-spring.md)
 - unblocked: `PHYSICS-007` — Vulkan XPBD cloth constraints and integration (tasks/backlog/physics/PHYSICS-007-vulkan-xpbd-cloth.md)
+
+## Theme E — Geometry IO completion
+
+- unblocked: `GEOIO-004` — Share the compiled PLY header parser (tasks/backlog/geometry/GEOIO-004-shared-compiled-ply-header-parser.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
@@ -44,6 +49,7 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `GRAPHICS-105`: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RUNTIME-269` — Shared Vulkan sparse solve kernels for existing methods (tasks/backlog/runtime/RUNTIME-269-shared-vulkan-sparse-solve-kernels.md)
+- unblocked: `RUNTIME-272` — Compile shared property-domain test fixtures once (tasks/backlog/runtime/RUNTIME-272-compiled-property-domain-test-fixtures.md)
 
 ## Theme G — Active bugs
 
@@ -102,6 +108,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `GEOM-096` — Vulkan ICP accumulation and solve assessment (tasks/backlog/geometry/GEOM-096-vulkan-icp-accumulation-and-solve-assessment.md)
 - blocked by `GEOM-086`: `GEOM-097` — Vulkan continuous LOP projection (tasks/backlog/geometry/GEOM-097-vulkan-continuous-lop-projection.md)
 - unblocked: `GEOM-098` — Vulkan anisotropic WLOP and EAR stages (tasks/backlog/geometry/GEOM-098-vulkan-anisotropic-wlop-and-ear.md)
+- unblocked: `GEOM-099` — Share parameterization disk-topology preflight (tasks/backlog/geometry/GEOM-099-shared-disk-topology-preflight.md)
 - blocked by `METHOD-014`: `HARDEN-084` — Localized CPU/GPU parity signatures (tasks/backlog/methods/HARDEN-084-localized-cpu-gpu-parity-signatures.md)
 - unblocked: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
 - unblocked: `METHOD-003A` — Spatial-query CPU-reference integration intake (tasks/backlog/methods/METHOD-003A-spatial-query-reference-integration-intake.md)

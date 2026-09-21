@@ -15,6 +15,7 @@ its dependencies, conditional gates, scope and verification.
 - [GRAPHICS-135 — Measure current render-prep scheduling and material-sync overhead](GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md)
 - [GRAPHICS-136 — Rename `Pipeline*` to `GraphicsState*` at the RHI boundary](GRAPHICS-136-rename-pipeline-to-graphics-state-rhi-boundary.md)
 - [GRAPHICS-137 — Shader-object realization spike (ADR-0028 killing experiment)](GRAPHICS-137-shader-object-realization-spike.md)
+- [GRAPHICS-146 — Reuse the compiled graphics command-recording test double](GRAPHICS-146-reuse-command-recording-test-double.md)
 - [LEGACY-043 — Retire stale multi-descriptor-set shader sources](LEGACY-043-retire-stale-multiset-shaders.md)
 
 GRAPHICS-137 requires its ADR-0028 trigger; GRAPHICS-136 also requires the
