@@ -19,7 +19,6 @@
 #include <variant>
 #include <vector>
 
-#include "ProgressivePoissonReference.hpp"
 #include <entt/entity/entity.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <gtest/gtest.h>
@@ -35,61 +34,26 @@ import Extrinsic.Runtime.PointSetOperations;
 import Extrinsic.Runtime.PointConstructionOperations;
 import Extrinsic.Runtime.PointCloudServiceOperations;
 import Extrinsic.Asset.ImportRouter;
-import Extrinsic.Asset.ModelTexturePayload;
-import Extrinsic.Asset.Registry;
-import Extrinsic.Asset.Service;
 import Extrinsic.Core.Config.Engine;
-import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
-import Extrinsic.Core.Geometry2D;
-import Extrinsic.Core.Logging;
-import Extrinsic.ECS.Component.Culling.Local;
-import Extrinsic.ECS.Component.Culling.World;
-import Extrinsic.ECS.Component.Hierarchy;
-import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
-import Extrinsic.ECS.Component.Transform.WorldMatrix;
-import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Components.Selection;
-import Extrinsic.ECS.Hierarchy.Mutation;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
-import Extrinsic.Graphics.Colormap;
-import Extrinsic.Graphics.Component.VisualizationConfig;
-import Extrinsic.Graphics.Material;
-import Extrinsic.Graphics.Component.RenderGeometry;
-import Extrinsic.Graphics.CurrentRendererContractAdapter;
-import Extrinsic.Graphics.RenderFrameInput;
-import Extrinsic.Graphics.RenderGraph;
-import Extrinsic.Graphics.RenderRecipeConfig;
-import Extrinsic.Graphics.RenderingContract;
-import Extrinsic.Graphics.Renderer;
-import Extrinsic.Platform.Input;
-import Extrinsic.Platform.Window;
-import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AsyncWorkModule;
-import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.EditorPropertyWidgets;
-import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
-import Extrinsic.Runtime.AssetWorkflowModule;
-import Extrinsic.Runtime.EngineConfigControl;
-import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.CommandBus;
-import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
-import Extrinsic.Runtime.RenderArtifactPublication;
-import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.ParameterizationOperations;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
@@ -99,25 +63,15 @@ import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SceneDocumentModule;
-import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.WorldRegistry;
-import Extrinsic.Runtime.VertexAttributeBinding;
-import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Graph;
-import Geometry.Graph.Vertex.Normals;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
-import Geometry.HalfedgeMesh.Vertices.Normals;
-import Geometry.KMeans;
-import Geometry.PointCloud.Normals;
 import Geometry.Properties;
-import Geometry.Smoothing;
-import Geometry.UvAtlas;
 
-#include "MockRHI.hpp"
 #include "RuntimeTestModule.hpp"
 
 namespace Runtime = Extrinsic::Runtime;
@@ -125,19 +79,7 @@ namespace Assets = Extrinsic::Assets;
 namespace Core = Extrinsic::Core;
 namespace ECS = Extrinsic::ECS;
 namespace ECSC = Extrinsic::ECS::Components;
-namespace Dirty = Extrinsic::ECS::Components::DirtyTags;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
-namespace Sel = Extrinsic::ECS::Components::Selection;
-namespace G = Extrinsic::Graphics::Components;
-namespace Graphics = Extrinsic::Graphics;
-namespace Plat = Extrinsic::Platform;
-namespace PN = Extrinsic::ECS::Components::GeometrySources::PropertyNames;
-namespace GN = Geometry::HalfedgeMesh::VertexNormals;
-namespace GVN = Geometry::Graph::VertexNormals;
-namespace PCN = Geometry::PointCloud::Normals;
-namespace Smooth = Geometry::Smoothing;
-namespace PPR = Intrinsic::Methods::Geometry::ProgressivePoissonReference;
-namespace Tests = Extrinsic::Tests;
 
 namespace
 {
