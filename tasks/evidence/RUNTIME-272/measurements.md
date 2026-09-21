@@ -49,7 +49,8 @@ accessor callers; the corrected candidate was reviewed and fully reverified
 before any after-arm timing. No source changed during the six matched samples.
 
 The full ci suite selected 4,879 tests with zero failures; full ASan selected
-3,230 with zero failures. Both retain the expected GLFW lifetime skip. Fresh
+3,230 with zero failures. The GLFW lifetime check skips in ci and passes under
+ASan; all 3,230 ASan entries ran. Fresh
 Clang 20 compiled the support producer and runtime executable, with 101 selected
 contract cases passing and unchanged dependency fingerprints. The 226 focused
 ci cases passed before and after extraction. Full UBSan failed only the

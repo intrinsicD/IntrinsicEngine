@@ -182,8 +182,8 @@ consumer edit wall -0.73%, compiler sum -2.28%; declaration scope rebuilds
 cost is reported separately. These local measurements make no speedup claim.
 
 Focused ci cases (226), fresh Clang 20 cases (101), full ci (4,879 selected)
-and full ASan (3,230 selected) pass, with the expected GLFW skip in the full
-suites. Full UBSan fails only the independently baseline-reproduced
+and full ASan (3,230 selected) pass. The expected GLFW skip applies to ci;
+the GLFW lifetime check passes under ASan, where all selected tests run. Full UBSan fails only the independently baseline-reproduced
 [BUG-206](../bugs/BUG-206-uv-duplicate-submit-phase-race.md). No unrelated
 lifecycle or assertion change is included.
 
