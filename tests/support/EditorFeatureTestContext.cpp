@@ -1,6 +1,7 @@
-#include "EditorFeatureTestContext.hpp"
-
+// Clang 20 needs these standard declarations before the fixture's module imports.
 #include <utility>
+
+#include "EditorFeatureTestContext.hpp"
 
 import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Component.Transform;
