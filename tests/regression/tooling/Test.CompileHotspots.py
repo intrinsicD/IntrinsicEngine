@@ -946,5 +946,34 @@ class CompileIterationMeasurementTests(unittest.TestCase):
 
 
 
+class CompileIterationProbeTests(unittest.TestCase):
+    def test_header_requires_every_declared_consumer(self):
+        params = {"probe_sources": {"header": ["a.cpp", "b.cpp"]}}
+        rows = [{"source": name} for name in ("a.cpp", "b.cpp", "extra.cpp")]
+        bench.validate_probe_sources(params, "header", "shared.hpp", rows)
+        for missing in ("a.cpp", "b.cpp"):
+            with self.subTest(missing=missing), self.assertRaisesRegex(
+                AssertionError, "declared target sources"
+            ):
+                bench.validate_probe_sources(
+                    params, "header", "shared.hpp",
+                    [row for row in rows if row["source"] != missing],
+                )
+
+    def test_header_without_consumers_fails_closed(self):
+        for params in ({}, {"probe_sources": {"header": []}}):
+            with self.subTest(params=params), self.assertRaisesRegex(
+                AssertionError, "declared target sources"
+            ):
+                bench.validate_probe_sources(
+                    params, "header", "shared.hpp", [{"source": "a.cpp"}]
+                )
+
+    def test_source_probe_defaults_to_touched_source(self):
+        bench.validate_probe_sources({}, "edit", "a.cpp", [{"source": "a.cpp"}])
+        with self.assertRaisesRegex(AssertionError, "declared target sources"):
+            bench.validate_probe_sources({}, "edit", "a.cpp", [{"source": "b.cpp"}])
+
+
 if __name__ == "__main__":
     unittest.main()

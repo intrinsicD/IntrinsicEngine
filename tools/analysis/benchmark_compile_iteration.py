@@ -130,6 +130,14 @@ def critical_path(dot: str, log: bytes) -> dict:
             "unmapped_ancillary_outputs": sorted(ancillary), "unmapped_meta_outputs": sorted(meta)}
 
 
+
+def validate_probe_sources(params: dict, scenario: str, path: str, rows: list[dict]) -> None:
+    """Require every declared consumer; headers cannot satisfy the source default."""
+    expected = params.get("probe_sources", {}).get(scenario, [path])
+    assert expected and set(expected) <= {row["source"] for row in rows}, \
+        "Probe did not compile its declared target sources"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
@@ -254,7 +262,7 @@ def main() -> None:
                     for entry in hotspots.parse_ninja_log(window_path, build)]
             assert not any(row["resolution"]["status"] in {"unresolved", "ambiguous", "outside-declared-roots"} for row in rows)
             if path and scenario != "reconfigure":
-                assert any(row["source"] == path for row in rows), "Probe did not compile its target"
+                validate_probe_sources(params, scenario, path, rows)
             if scenario.endswith("interface"):
                 fanout = {row["source"] for row in rows if row["source"] != path}
                 assert len(fanout) >= params["minimum_interface_importers"], "Interface probe did not invalidate importers"

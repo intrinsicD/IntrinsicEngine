@@ -9,7 +9,11 @@ Static analysis and performance analysis tooling.
   directory. It reuses the hotspot parser and result sealer, preserves each
   command's log window, and reports dependency-path timings and single-process
   memory. Configure disables vcpkg package installation; the preinstalled dependency
-  tree is fingerprinted before sampling, after configure and after each build. It validates sealed results before writing them. See
+  tree is fingerprinted before sampling, after configure and after each build. It validates sealed results before writing them.
+  Header-touch scenarios declare their expected consuming translation units in
+  `params.probe_sources`; every declared source must appear in the measured rebuild.
+  Other touch scenarios require the touched source itself to compile. Empty consumer
+  declarations and missing consumers fail closed. See
   `benchmarks/ci/manifests/engine_compile_iteration_overnight.yaml` and the
   [matched overnight measurements](../../ara/evidence/tables/build007_overnight_compile_measurement.md).
 
