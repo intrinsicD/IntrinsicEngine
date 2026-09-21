@@ -1,6 +1,10 @@
 module;
 
 #include <atomic>
+#include <cstdint>
+#include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 #include <memory>
 #include <optional>
 #include <ostream>
@@ -300,4 +304,37 @@ namespace Geometry
     {
         return os << "Node(" << n.Index << ")";
     }
+}
+
+namespace Geometry
+{
+    // Common property storage compiles here; other element types remain generic.
+    template class Internal::PropertyStorage<bool>;
+    template class Internal::PropertyStorage<std::int32_t>;
+    template class Internal::PropertyStorage<std::uint32_t>;
+    template class Internal::PropertyStorage<std::uint64_t>;
+    template class Internal::PropertyStorage<float>;
+    template class Internal::PropertyStorage<double>;
+    template class Internal::PropertyStorage<glm::vec2>;
+    template class Internal::PropertyStorage<glm::vec3>;
+    template class Internal::PropertyStorage<glm::vec4>;
+
+    template std::optional<PropertyBuffer<bool>>
+        PropertyRegistry::Add<bool>(std::string, bool);
+    template std::optional<PropertyBuffer<std::int32_t>>
+        PropertyRegistry::Add<std::int32_t>(std::string, std::int32_t);
+    template std::optional<PropertyBuffer<std::uint32_t>>
+        PropertyRegistry::Add<std::uint32_t>(std::string, std::uint32_t);
+    template std::optional<PropertyBuffer<std::uint64_t>>
+        PropertyRegistry::Add<std::uint64_t>(std::string, std::uint64_t);
+    template std::optional<PropertyBuffer<float>>
+        PropertyRegistry::Add<float>(std::string, float);
+    template std::optional<PropertyBuffer<double>>
+        PropertyRegistry::Add<double>(std::string, double);
+    template std::optional<PropertyBuffer<glm::vec2>>
+        PropertyRegistry::Add<glm::vec2>(std::string, glm::vec2);
+    template std::optional<PropertyBuffer<glm::vec3>>
+        PropertyRegistry::Add<glm::vec3>(std::string, glm::vec3);
+    template std::optional<PropertyBuffer<glm::vec4>>
+        PropertyRegistry::Add<glm::vec4>(std::string, glm::vec4);
 }

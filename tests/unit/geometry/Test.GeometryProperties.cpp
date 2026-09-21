@@ -50,6 +50,75 @@ static_assert(HasMutableData<Geometry::Property<float>>);
 static_assert(HasConstSpan<Geometry::ConstProperty<float>>);
 static_assert(HasConstData<Geometry::ConstProperty<float>>);
 
+TEST(GeometryPropertiesContract, CanonicalStorageCrossesCompiledOwnerBoundary)
+{
+    const auto check = []<class T>(T initial, T changed,
+                                  Geometry::PropertyValueKind kind)
+    {
+        Geometry::PropertySet source;
+        source.Resize(2u);
+        auto values = source.Add<T>("sample", initial);
+        ASSERT_TRUE(values.IsValid());
+        const auto initialRevision = source.Revision();
+        values[1] = changed;
+        EXPECT_GT(source.Revision(), initialRevision);
+
+        Geometry::PropertySet copy = source;
+        const auto copied = std::as_const(copy).Get<T>("sample");
+        ASSERT_TRUE(copied.IsValid());
+        EXPECT_EQ(copied[0], initial);
+        EXPECT_EQ(copied[1], changed);
+        const auto descriptors = copy.Descriptors();
+        ASSERT_EQ(descriptors.size(), 1u);
+        EXPECT_EQ(descriptors.front().ValueKind, kind);
+        EXPECT_EQ(descriptors.front().ElementCount, 2u);
+        EXPECT_EQ(descriptors.front().Type, source.Descriptors().front().Type);
+
+        source.Resize(3u);
+        EXPECT_EQ(values[2], initial);
+        EXPECT_EQ(copy.Size(), 2u);
+        EXPECT_FALSE(source.Add<T>("sample", initial).IsValid());
+    };
+    using Kind = Geometry::PropertyValueKind;
+    check(false, true, Kind::Bool);
+    check(std::int32_t{-2}, std::int32_t{3}, Kind::Int32);
+    check(std::uint32_t{2}, std::uint32_t{3}, Kind::UInt32);
+    check(std::uint64_t{2}, std::uint64_t{3}, Kind::UInt64);
+    check(2.0f, 3.0f, Kind::Float);
+    check(2.0, 3.0, Kind::Double);
+    check(glm::vec2{2.0f}, glm::vec2{3.0f}, Kind::Vec2);
+    check(glm::vec3{2.0f}, glm::vec3{3.0f}, Kind::Vec3);
+    check(glm::vec4{2.0f}, glm::vec4{3.0f}, Kind::Vec4);
+
+    Geometry::PropertySet source;
+    (void)source.Add<float>("typed", 1.0f);
+    EXPECT_FALSE(source.Get<double>("typed").IsValid());
+}
+
+TEST(GeometryPropertiesContract, CustomStorageRetainsGenericCreationAndClone)
+{
+    struct CustomValue
+    {
+        int Code;
+        bool operator==(const CustomValue&) const = default;
+    };
+    Geometry::PropertySet source;
+    source.Resize(2u);
+    auto values = source.GetOrAdd<CustomValue>("custom", CustomValue{7});
+    ASSERT_TRUE(values.IsValid());
+    values[1] = CustomValue{9};
+
+    Geometry::PropertySet copy = source;
+    const auto copied = std::as_const(copy).Get<CustomValue>("custom");
+    ASSERT_TRUE(copied.IsValid());
+    EXPECT_EQ(copied[0], CustomValue{7});
+    EXPECT_EQ(copied[1], CustomValue{9});
+    EXPECT_EQ(copy.Descriptors().front().ValueKind, Geometry::PropertyValueKind::Unknown);
+    EXPECT_FALSE(copy.Get<std::int32_t>("custom").IsValid());
+    values[0] = CustomValue{11};
+    EXPECT_EQ(copied[0], CustomValue{7});
+}
+
 TEST(GeometryPropertiesContract, NameAccessorsReturnStableStringView)
 {
     Geometry::PropertySet properties;

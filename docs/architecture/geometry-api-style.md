@@ -162,6 +162,11 @@ tracks the implementation audit and remaining exceptions.
 
 ## Property API contract
 
+`Geometry.Properties.cpp` explicitly instantiates property allocation and storage
+for the nine canonical value kinds. The module interface retains generic template
+definitions for custom element types; callers use the same typed API in both cases.
+
+
 Geometry properties expose names as `std::string_view` borrowed from the owning
 property storage. Property handles may copy the view cheaply, but callers must
 not retain it past the lifetime of the owning `PropertySet`/domain object.

@@ -1261,3 +1261,35 @@ export namespace Geometry
     using Faces = PropertySet;
     using Nodes = PropertySet;
 } // namespace Geometry
+
+namespace Geometry
+{
+    extern template class Internal::PropertyStorage<bool>;
+    extern template class Internal::PropertyStorage<std::int32_t>;
+    extern template class Internal::PropertyStorage<std::uint32_t>;
+    extern template class Internal::PropertyStorage<std::uint64_t>;
+    extern template class Internal::PropertyStorage<float>;
+    extern template class Internal::PropertyStorage<double>;
+    extern template class Internal::PropertyStorage<glm::vec2>;
+    extern template class Internal::PropertyStorage<glm::vec3>;
+    extern template class Internal::PropertyStorage<glm::vec4>;
+
+    extern template std::optional<PropertyBuffer<bool>>
+        PropertyRegistry::Add<bool>(std::string, bool);
+    extern template std::optional<PropertyBuffer<std::int32_t>>
+        PropertyRegistry::Add<std::int32_t>(std::string, std::int32_t);
+    extern template std::optional<PropertyBuffer<std::uint32_t>>
+        PropertyRegistry::Add<std::uint32_t>(std::string, std::uint32_t);
+    extern template std::optional<PropertyBuffer<std::uint64_t>>
+        PropertyRegistry::Add<std::uint64_t>(std::string, std::uint64_t);
+    extern template std::optional<PropertyBuffer<float>>
+        PropertyRegistry::Add<float>(std::string, float);
+    extern template std::optional<PropertyBuffer<double>>
+        PropertyRegistry::Add<double>(std::string, double);
+    extern template std::optional<PropertyBuffer<glm::vec2>>
+        PropertyRegistry::Add<glm::vec2>(std::string, glm::vec2);
+    extern template std::optional<PropertyBuffer<glm::vec3>>
+        PropertyRegistry::Add<glm::vec3>(std::string, glm::vec3);
+    extern template std::optional<PropertyBuffer<glm::vec4>>
+        PropertyRegistry::Add<glm::vec4>(std::string, glm::vec4);
+}
