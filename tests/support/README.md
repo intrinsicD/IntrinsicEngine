@@ -5,7 +5,10 @@ Shared helpers, fixtures, builders, and test-only utilities used by multiple tes
 `EditorFeatureTestContext.hpp` supplies the editor context and shared canonical
 vertex/UV/topology builders used by the Models, Visualization, MeshMethods and
 ClusteringMethods contract partitions. Selectable entities and point-cloud
-sources share the same builders. Its context conversions and geometry builders
+sources share the same builders. Fixed three-vertex graph and icosahedron fixtures
+also compile in that owner; graph/mesh construction imports stay in its implementation.
+Context construction and presentation recipe/state
+fixtures also share compiled helpers. Its context conversions and geometry builders
 compile once in `EditorFeatureTestContext.cpp`; `EditorFeatureTestSupportObjs` links them into
 the runtime contract, editor integration, runtime graphics and Sandbox GPU-smoke
 test executables. The context imports `Graphics.RenderDiagnostics` for copied
@@ -19,6 +22,8 @@ format conversion. The bodies compile once in `GraphicsTestSupport.cpp` through
 smoke executables. The `GraphicsTestSupport` CPU suite checks first-match lookup,
 channel order, sRGB conversion and alpha preservation. `MockRHI.hpp` owns the
 mock backbuffer-barrier query; expected pixels and packet setup stay in callers.
+`MockDevice` construction and destruction compile in `MockRHI.cpp` alongside
+the recorded-command methods, linked through `MockRhiTestSupportObjs`.
 
 `SandboxEditorJobHarness.hpp` declares the shared editor-job fixture. Its
 snapshot, command callbacks, drain loop and scheduler lifecycle compile once in

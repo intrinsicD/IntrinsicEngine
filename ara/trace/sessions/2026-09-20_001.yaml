@@ -1,0 +1,46 @@
+session:
+  id: 2026-09-20_001
+  date: '2026-09-20'
+  started: 2026-09-20T23:48+02:00
+  last_turn: 2026-09-20T23:48+02:00
+  turn_count: 1
+  summary: Measured recent compilation cleanup; no clean-build benefit, modest caller rebuild savings, shared fixture
+    rebuild cost retained.
+events_logged:
+- turn: 1
+  type: experiment
+  id: N626
+  routing: direct
+  provenance: ai-executed
+  summary: Four exact-source ABBA samples and correctness checks completed.
+- turn: 1
+  type: decision
+  id: N627
+  routing: direct
+  provenance: ai-executed
+  summary: Retain report with bounded C103 and negative results.
+- turn: 1
+  type: observation
+  id: O236
+  routing: crystallized
+  provenance: ai-executed
+  summary: Local observations crystallized through report binding.
+ai_actions:
+- turn: 1
+  action: Reused existing runner, added declared header consumers, retained raw results and rejected attempt, verified
+    baseline runtime and current full CPU suites.
+  provenance: ai-executed
+  files_changed:
+  - ara/evidence/tables/runtime270_recent_locality_measurement.md
+  - tools/analysis/benchmark_compile_iteration.py
+claims_touched:
+- id: C103
+  action: created
+  turn: 1
+key_context:
+- turn: 1
+  excerpt: 'User requested: Measure Compilation-time savings. Recent four-commit batch chosen after optional clarification
+    received no reply.'
+open_threads:
+- RUNTIME-270 product work remains open; measurement covers the recent batch only.
+ai_suggestions_pending: []

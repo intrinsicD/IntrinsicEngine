@@ -2756,3 +2756,17 @@ entries:
     - The resumed checkout already had the source merged to main; the requested fast-forward
       pull added backlog-only changes. Verification recording uses a separate worktree rather
       than mutating the clean operator checkout.
+
+  - turn: 2026-09-20_001#1
+    notes:
+    - C103 records local measurements only, as prior compilation ledger entries do; canonical results remain non-claim-eligible.
+      N627 report binding supplies artifact commitment for O236.
+    - No unrelated observations promoted; existing open topics keep their owners. Shared-owner regression and rejected
+      attempt retained, no causal attribution to individual commits.
+
+  - turn: 2026-09-21_001#1
+    notes:
+    - N629 provides artifact commitment for O237/C104. These local descriptive observations remain non-claim-eligible,
+      as prior compilation rows do.
+    - No unrelated staging was promoted or rewritten; shared-owner regression and uncontrolled host load are retained.
+      This measures a distinct accumulated working batch, not C103 again.

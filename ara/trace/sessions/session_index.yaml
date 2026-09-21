@@ -621,3 +621,23 @@ sessions:
   events_count: 1
   claims_touched: []
   open_threads: 10
+
+- id: 2026-09-20_001
+  date: '2026-09-20'
+  summary: Measured recent compilation cleanup; no clean-build benefit, modest caller rebuild savings, shared fixture
+    rebuild cost retained.
+  turn_count: 1
+  events_count: 3
+  claims_touched:
+  - C103
+  open_threads: 1
+
+- id: 2026-09-21_001
+  date: '2026-09-21'
+  summary: 'Measured accumulated fixture batch: selected incremental savings, increased owner cost, no meaningful
+    general clean-build conclusion; verified CPU gate.'
+  turn_count: 1
+  events_count: 3
+  claims_touched:
+  - C104
+  open_threads: 2

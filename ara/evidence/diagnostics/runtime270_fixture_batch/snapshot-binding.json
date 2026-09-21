@@ -1,0 +1,18 @@
+{
+  "before": "b3c18fd17add1a555540b57ba388d62726d39e87",
+  "after": "887415fb7e6df4c04caa154f06f64f04a422b731",
+  "parent_verified": true,
+  "diff_sha256": "f691b630a8c393613e5cc887e67bcf90738aa0582896a6757a12369e53c3f1e2",
+  "source_files": [
+    "tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp",
+    "tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp",
+    "tests/contract/runtime/Test.SandboxEditorModels.cpp",
+    "tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp",
+    "tests/contract/runtime/Test.SandboxEditorVisualization.cpp",
+    "tests/support/EditorFeatureTestContext.cpp",
+    "tests/support/EditorFeatureTestContext.hpp",
+    "tests/support/MockRHI.cpp",
+    "tests/support/MockRHI.hpp",
+    "tests/support/README.md"
+  ]
+}

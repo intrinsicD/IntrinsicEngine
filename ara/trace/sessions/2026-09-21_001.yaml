@@ -1,0 +1,47 @@
+session:
+  id: 2026-09-21_001
+  date: '2026-09-21'
+  started: 2026-09-21T10:19+02:00
+  last_turn: 2026-09-21T10:19+02:00
+  turn_count: 1
+  summary: 'Measured accumulated fixture batch: selected incremental savings, increased owner cost, no meaningful
+    general clean-build conclusion; verified CPU gate.'
+events_logged:
+- turn: 1
+  type: experiment
+  id: N628
+  routing: direct
+  provenance: ai-executed
+  summary: Four matched samples and fresh correctness verification.
+- turn: 1
+  type: decision
+  id: N629
+  routing: direct
+  provenance: ai-executed
+  summary: Bind full local population and limitations.
+- turn: 1
+  type: observation
+  id: O237
+  routing: crystallized
+  provenance: ai-executed
+  summary: C104 bound through retained report.
+ai_actions:
+- turn: 1
+  action: Reused runner, isolated source snapshot, retained raw evidence, collaborated with Claude and verified
+    current CPU gate.
+  provenance: ai-executed
+  files_changed:
+  - ara/evidence/tables/runtime270_fixture_batch_measurement.md
+  - benchmarks/ci/manifests/engine_compile_iteration_fixture_batch.yaml
+claims_touched:
+- id: C104
+  action: created
+  turn: 1
+key_context:
+- turn: 1
+  excerpt: User explicitly prioritized compilation and duplicate-code work, measured batches, Claude review and
+    complete task/handoff records.
+open_threads:
+- RUNTIME-270 product matrix and broader verification remain open.
+- Profile remaining measured expensive consumers before another extraction.
+ai_suggestions_pending: []

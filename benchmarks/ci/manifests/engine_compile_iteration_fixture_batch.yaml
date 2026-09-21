@@ -1,0 +1,90 @@
+benchmark_id: build.engine_compile_iteration.fixture_batch.v1
+method: build.engine_compile_iteration
+dataset: intrinsicengine.source.fixture_batch_2026_09_21
+params:
+  intent: performance
+  source_revisions:
+    before: b3c18fd17add1a555540b57ba388d62726d39e87
+    after: 887415fb7e6df4c04caa154f06f64f04a422b731
+  sample_order:
+  - before
+  - after
+  - after
+  - before
+  measured_iterations: 2
+  warmup_iterations: 0
+  warmup_scope: No discarded pilots; identical source/dependency input pre-read before
+    every measured sample. Existing protocol establishes resource requirements.
+  preset: ci
+  target: IntrinsicRuntimeContractTests
+  compiler: /usr/bin/clang++-23
+  jobs: 4
+  minimum_interface_importers: 1
+  configure_options:
+  - -DEXTRINSIC_BACKEND=Null
+  - -DINTRINSIC_PLATFORM_BACKEND=Null
+  - -DINTRINSIC_HEADLESS_NO_GLFW=ON
+  - -DINTRINSIC_BUILD_TESTS=ON
+  - -DINTRINSIC_BUILD_BENCHMARKS=OFF
+  - -DINTRINSIC_ENABLE_CCACHE=OFF
+  - -DCMAKE_CXX_COMPILER_LAUNCHER=
+  - -DCMAKE_C_COMPILER_LAUNCHER=
+  - -DVCPKG_MANIFEST_INSTALL=OFF
+  - -DCMAKE_C_COMPILER=/usr/bin/clang-23
+  - -DCMAKE_CXX_COMPILER=/usr/bin/clang++-23
+  - -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-23
+  scenarios:
+    clean: null
+    noop: null
+    clusteringmethods_test: tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+    meshmethods_test: tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+    models_test: tests/contract/runtime/Test.SandboxEditorModels.cpp
+    scenecommands_test: tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp
+    visualization_test: tests/contract/runtime/Test.SandboxEditorVisualization.cpp
+    fixture_impl: tests/support/EditorFeatureTestContext.cpp
+    mock_impl: tests/support/MockRHI.cpp
+    fixture_header: tests/support/EditorFeatureTestContext.hpp
+    mock_header: tests/support/MockRHI.hpp
+  invalidation: mtime only; source bytes remain at the exact clean commit; require
+    observed importer fan-out
+  build_storage: Fresh owned build at /dev/shm/intrinsic-fixture-build-20260921; identical
+    disposable source and build paths across both arms.
+  dependency_state: identical preinstalled vcpkg packages, no package installation
+    during sampling
+  operating_system_cache: input pre-read, no cache flushing, no cold-filesystem claim
+  memory_measurement: GNU time maximum single-process RSS, not aggregate concurrent
+    memory
+  critical_path: Ninja target DAG weighted by unfiltered per-invocation timings; unmatched
+    meta-edges reported
+  summary: Descriptive median and min/max of two samples per arm. Runtime contract
+    executable and its dependency closure only; not a full-engine build or statistical
+    speedup claim. Retain all raw timings and negative outcomes.
+  sample_sequence: Configure, clean build, no-op, five consumer edits, fixture implementation,
+    mock implementation, fixture header, mock header. Only mtimes change; fresh build
+    tree per sample.
+  noise_scope: Normal desktop host; no CPU affinity/governor/turbo control. No competing
+    compilation or tests; source inspection and remote review may run. Local descriptive
+    comparison, not an isolated-machine or statistical claim.
+  configure_measurement: initial configure only; source iteration cohort deliberately
+    excludes the already-measured reconfigure scenario.
+  probe_sources:
+    fixture_header:
+    - tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+    - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+    - tests/contract/runtime/Test.SandboxEditorModels.cpp
+    - tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp
+    - tests/contract/runtime/Test.SandboxEditorVisualization.cpp
+    - tests/support/EditorFeatureTestContext.cpp
+    mock_header:
+    - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+    - tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+    - tests/support/MockRHI.cpp
+  source_scope: Before is current HEAD; after is an isolated local snapshot commit
+    of the existing tests-only working diff. Neither arm is publication-claim eligible.
+    No production code changes.
+metrics:
+- build_time_ms
+- configure_time_ms
+- memory_peak_bytes
+- sample_count
+thresholds: {}

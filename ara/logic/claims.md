@@ -2287,3 +2287,25 @@
 - **Dependencies**: []
 - **Tags**: compilation, C++23 modules, editor dependencies, prepared-frame lifetime, local matched observations
 - **From staging**: O235
+
+## C103: Bounded recent mesh-field and fixture compilation observations
+- **Statement**: The retained Clang23 Debug Null/headless ABBA comparison from beef1cfb8 to b3c18fd17 has clean runtime-contract-target medians 428.356 to 428.861 seconds, with 878 compiler invocations in every clean build. Geodesics implementation rebuild median falls 5.21%; clustering, mesh-methods and visualization test rebuild medians fall 2.06%, 4.72% and 3.10%. Shared fixture implementation rebuild median rises 12.21%. Shared property-header rebuilds remain effectively unchanged and mesh-field interface rebuild median falls only 0.76% with unchanged 12-compiler fanout.
+- **Status**: supported — descriptive local observations only; four records remain claim_eligible:false. No meaningful clean-build saving, statistical/general, full-repository, publication-qualified, cross-host/compiler, runtime/GPU or per-commit causal conclusion. Two observations per arm; rejected header-probe attempt excluded and retained.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Recomputed retained samples disagree with the medians/counts, source/compiler/dependency identities differ, or the new shared fixture implementation cost is omitted. Single-file target walls include relinking and must not be reported as compiler-only durations.
+- **Proof**: [ara/evidence/tables/runtime270_recent_locality_measurement.md, ara/evidence/diagnostics/runtime270_recent_locality/summary.json, ara/evidence/diagnostics/runtime270_recent_locality/evidence-index.json, ara/evidence/diagnostics/runtime270_recent_locality/raw-evidence.tar.gz, benchmarks/ci/manifests/engine_compile_iteration_recent_locality.yaml]
+- **Dependencies**: []
+- **Tags**: compilation, local matched observations, shared fixtures, mesh-field helpers
+- **From staging**: O236
+
+## C104: Bounded accumulated fixture-batch compilation observations
+- **Statement**: The retained Clang23 Debug Null/headless four-job ABBA comparison from b3c18fd17 to local snapshot 887415fb7 has runtime-contract-target clean medians 428.676 to 426.548 seconds (0.50% lower), with 878 compiler invocations per clean build. Models and Visualization incremental medians fall 25.37% and 21.01%; fixture-header and mock-header rebuild medians fall 13.84% and 34.10%. Mock-header fanout falls from 11 to 8; fixture-header fanout remains 20. Shared fixture implementation rebuild cost rises 18.00%.
+- **Status**: supported — descriptive local observations only; four single-sample results, n=2 per arm, all claim_eligible:false. No meaningful/general clean-build, full-repository, publication-qualified, cross-host/compiler, runtime/GPU or individual-slice causal conclusion. Host load differs and remains uncontrolled; all small/negative results retained.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Recalculation disagrees with retained medians or source sets; source, compiler, cache, parallelism or package controls differ; shared-owner costs are omitted; or source changes invalidate the behavior checks. Target wall times include scanning/linking and are not compiler-only durations.
+- **Proof**: [ara/evidence/tables/runtime270_fixture_batch_measurement.md, ara/evidence/diagnostics/runtime270_fixture_batch/summary.json, ara/evidence/diagnostics/runtime270_fixture_batch/verification.json, ara/evidence/diagnostics/runtime270_fixture_batch/evidence-index.json, ara/evidence/diagnostics/runtime270_fixture_batch/raw-evidence.tar.gz, benchmarks/ci/manifests/engine_compile_iteration_fixture_batch.yaml]
+- **Dependencies**: []
+- **Tags**: compilation, local matched observations, shared test fixtures, header invalidation
+- **From staging**: O237

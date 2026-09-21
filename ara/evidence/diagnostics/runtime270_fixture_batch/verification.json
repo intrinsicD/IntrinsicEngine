@@ -1,0 +1,26 @@
+{
+  "configure": "cmake --preset ci",
+  "build": "cmake --build --preset ci --target IntrinsicTests -j 4",
+  "cpu_command": "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60",
+  "cpu": {
+    "selected": 4862,
+    "passed": 4861,
+    "skipped": 1,
+    "failed": 0,
+    "elapsed_s": 162.88
+  },
+  "baseline": {
+    "selected": 1195,
+    "passed": 1193,
+    "skipped": 2,
+    "failed": 0
+  },
+  "traits": {
+    "before_exit_code": 0,
+    "after_exit_code": 0
+  },
+  "benchmark_results_validated": 4,
+  "benchmark_manifests_validated": 103,
+  "compile_tooling_tests_passed": 26,
+  "sanitizer_gpu_executed": false
+}

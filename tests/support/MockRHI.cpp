@@ -3,6 +3,10 @@
 
 namespace Extrinsic::Tests
 {
+    // Keep the device's container construction and cleanup in the compiled owner.
+    MockDevice::MockDevice() noexcept = default;
+    MockDevice::~MockDevice() noexcept = default;
+
     RHI::TransferToken MockTransferQueue::UploadBuffer(
         RHI::BufferHandle buffer,
         const void* data,

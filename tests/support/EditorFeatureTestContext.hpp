@@ -23,6 +23,7 @@ import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.EditorCommon;
+import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorJobProjection;
@@ -128,6 +129,18 @@ namespace Intrinsic::Tests
 
         [[nodiscard]] operator Runtime::EditorWorkspaceSnapshotContext() const;
     };
+
+    [[nodiscard]] EditorFeatureTestContext MakeContext(
+        Extrinsic::ECS::Scene::Registry& registry,
+        Runtime::SelectionController& selection,
+        bool imguiAvailable = true,
+        const std::optional<Runtime::PrimitiveSelectionResult>* lastPrimitive = nullptr,
+        Extrinsic::RHI::IDevice* device = nullptr);
+
+    [[nodiscard]] Runtime::GeometryPresentationRecipe MakeGeometryPresentationRecipe();
+    [[nodiscard]] Runtime::GeometryPresentationRuntimeState MakeGeometryPresentationRuntimeState();
+    void AttachGeometryPresentation(Extrinsic::ECS::Scene::Registry& registry,
+                                    Extrinsic::ECS::EntityHandle entity);
 } // namespace Intrinsic::Tests
 
 namespace Intrinsic::Tests::EditorGeometry
@@ -163,6 +176,10 @@ namespace Intrinsic::Tests::EditorGeometry
 
     void SetFaces(GS::Faces& faces,
                   const std::vector<std::uint32_t>& faceHalfedge);
+
+    void AddGraphSource(ECS::Scene::Registry& registry, ECS::EntityHandle entity);
+
+    void AddIcosahedronMeshSource(ECS::Scene::Registry& registry, ECS::EntityHandle entity);
 
     void AddTriangleMeshSource(ECS::Scene::Registry& registry,
                                const ECS::EntityHandle entity);

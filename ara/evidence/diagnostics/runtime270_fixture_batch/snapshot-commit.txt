@@ -1,0 +1,6 @@
+tree 6091c88b72cc44a90d80122e8c3e6a617b23222a
+parent b3c18fd17add1a555540b57ba388d62726d39e87
+author intrinsicD <intrinsicd@posteo.de> 1789975671 +0200
+committer intrinsicD <intrinsicd@posteo.de> 1789975671 +0200
+
+Snapshot test support locality batch for local measurement

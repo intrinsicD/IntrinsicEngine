@@ -13555,3 +13555,55 @@ tree:
     - tasks/backlog/runtime/RUNTIME-211-kmeans-property-domain-integration.md
     - tasks/backlog/ui/UI-043-kmeans-property-domain-panel.md
     status: resolved
+
+  - id: N626
+    type: experiment
+    title: Measure recent mesh-field and fixture compilation changes
+    provenance: ai-executed
+    timestamp: 2026-09-20T23:48+02:00
+    result: Completed four ABBA samples; clean target median 428.356 to 428.861 seconds. Header-probe harness failure
+      preserved separately; corrected runner checks declared consumers.
+    evidence:
+    - ara/evidence/tables/runtime270_recent_locality_measurement.md
+    - ara/evidence/diagnostics/runtime270_recent_locality/raw-evidence.tar.gz
+    status: resolved
+  - id: N627
+    type: decision
+    title: Retain bounded compilation observations and the shared-owner cost
+    provenance: ai-executed
+    timestamp: 2026-09-20T23:48+02:00
+    choice: Bind C103 to the full local population and report, including slower fixture implementation and no clean-build
+      saving. No whole-engine or general speedup claim.
+    alternatives:
+    - Infer speedup from removed duplication
+    - Report caller savings without shared-owner cost
+    evidence:
+    - O236
+    - ara/evidence/tables/runtime270_recent_locality_measurement.md
+    status: resolved
+
+  - id: N628
+    type: experiment
+    title: Measure accumulated fixture and mock locality batch
+    provenance: ai-executed
+    timestamp: 2026-09-21T10:19+02:00
+    result: Four ABBA samples completed, with shared-owner costs and full header source sets retained; current CPU
+      gate and baseline runtime tests pass.
+    evidence:
+    - ara/evidence/tables/runtime270_fixture_batch_measurement.md
+    - ara/evidence/diagnostics/runtime270_fixture_batch/raw-evidence.tar.gz
+    status: resolved
+  - id: N629
+    type: decision
+    title: Bind bounded fixture measurements without general clean-build claim
+    provenance: ai-executed
+    timestamp: 2026-09-21T10:19+02:00
+    choice: Record C104 and O237 with all negative outcomes, unchanged fixture-header fanout, lower mock-header fanout
+      and no whole-engine inference.
+    alternatives:
+    - Infer broad speedup from deleted duplicate code
+    - Report consumer savings without owner cost
+    evidence:
+    - O237
+    - ara/evidence/tables/runtime270_fixture_batch_measurement.md
+    status: resolved

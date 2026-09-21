@@ -4011,3 +4011,32 @@ observations:
     promoted_to: logic/claims.md:C102
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O236
+    timestamp: 2026-09-20T23:48+02:00
+    provenance: ai-executed
+    content: Local ABBA comparison has no meaningful clean-build saving; geodesics and three test callers rebuild
+      modestly faster, while shared fixture implementation rebuild is slower.
+    context: Exact recent four-commit batch; two observations per arm. N627 binds the bounded report; all results
+      remain claim_eligible:false.
+    potential_type: claim
+    bound_to:
+    - N626
+    promoted: true
+    promoted_to: logic/claims.md:C103
+    crystallized_via: artifact-commitment
+    stale: false
+
+  - id: O237
+    timestamp: 2026-09-21T10:19+02:00
+    provenance: ai-executed
+    content: Matched fixture batch lowers selected consumer/header rebuilds; shared fixture owner costs more and clean
+      target median changes only 0.50%.
+    context: N629 binds all four local non-claim-eligible samples, including negative costs and host-load limitation.
+    potential_type: claim
+    bound_to:
+    - N628
+    promoted: true
+    promoted_to: logic/claims.md:C104
+    crystallized_via: artifact-commitment
+    stale: false

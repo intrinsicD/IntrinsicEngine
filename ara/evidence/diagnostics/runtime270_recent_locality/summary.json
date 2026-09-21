@@ -1,0 +1,171 @@
+{
+  "benchmark_id": "build.engine_compile_iteration.recent_locality.v1",
+  "rows": [
+    {
+      "scenario": "clean",
+      "before_s": [
+        428.1643080609938,
+        428.5486502499989
+      ],
+      "after_s": [
+        428.54046159100835,
+        429.1821552640031
+      ],
+      "before_median_s": 428.35647915549634,
+      "after_median_s": 428.8613084275057,
+      "saved_s": -0.5048292720093741,
+      "saved_percent": -0.11785260561592151
+    },
+    {
+      "scenario": "noop",
+      "before_s": [
+        0.10590144900197629,
+        0.10505082900635898
+      ],
+      "after_s": [
+        0.0998429320025025,
+        0.10258123200037517
+      ],
+      "before_median_s": 0.10547613900416763,
+      "after_median_s": 0.10121208200143883,
+      "saved_s": 0.004264057002728805,
+      "saved_percent": 4.04267452618864
+    },
+    {
+      "scenario": "curvature_impl",
+      "before_s": [
+        8.642481066010077,
+        8.624125243004528
+      ],
+      "after_s": [
+        8.676406308994046,
+        8.62613467600022
+      ],
+      "before_median_s": 8.633303154507303,
+      "after_median_s": 8.651270492497133,
+      "saved_s": -0.017967337989830412,
+      "saved_percent": -0.2081166115480373
+    },
+    {
+      "scenario": "geodesics_impl",
+      "before_s": [
+        6.8805991760018514,
+        6.88232101900212
+      ],
+      "after_s": [
+        6.530948060011724,
+        6.514692925004056
+      ],
+      "before_median_s": 6.881460097501986,
+      "after_median_s": 6.52282049250789,
+      "saved_s": 0.35863960499409586,
+      "saved_percent": 5.211678915704014
+    },
+    {
+      "scenario": "mesh_field_impl",
+      "before_s": [
+        5.134807527007069,
+        5.147539195997524
+      ],
+      "after_s": [
+        5.1786764029966434,
+        5.180156836009701
+      ],
+      "before_median_s": 5.141173361502297,
+      "after_median_s": 5.179416619503172,
+      "saved_s": -0.03824325800087536,
+      "saved_percent": -0.7438624475736476
+    },
+    {
+      "scenario": "clustering_test",
+      "before_s": [
+        22.249669154989533,
+        22.321344284995575
+      ],
+      "after_s": [
+        21.849358920007944,
+        21.802956252999138
+      ],
+      "before_median_s": 22.285506719992554,
+      "after_median_s": 21.82615758650354,
+      "saved_s": 0.4593491334890132,
+      "saved_percent": 2.0612012069571946
+    },
+    {
+      "scenario": "mesh_test",
+      "before_s": [
+        26.029360422005993,
+        25.924113619999844
+      ],
+      "after_s": [
+        24.739579355999012,
+        24.762321551999776
+      ],
+      "before_median_s": 25.97673702100292,
+      "after_median_s": 24.750950453999394,
+      "saved_s": 1.2257865670035244,
+      "saved_percent": 4.718785758243777
+    },
+    {
+      "scenario": "visualization_test",
+      "before_s": [
+        21.862892630990245,
+        21.925733860000037
+      ],
+      "after_s": [
+        21.221012515001348,
+        21.209759938996285
+      ],
+      "before_median_s": 21.89431324549514,
+      "after_median_s": 21.215386226998817,
+      "saved_s": 0.6789270184963243,
+      "saved_percent": 3.1009285876368686
+    },
+    {
+      "scenario": "fixture_impl",
+      "before_s": [
+        7.648231546001625,
+        7.664400894995197
+      ],
+      "after_s": [
+        8.597347443006583,
+        8.585643562008045
+      ],
+      "before_median_s": 7.656316220498411,
+      "after_median_s": 8.591495502507314,
+      "saved_s": -0.9351792820089031,
+      "saved_percent": -12.214480894939117
+    },
+    {
+      "scenario": "properties_header",
+      "before_s": [
+        8.659126062004361,
+        8.63777377200313
+      ],
+      "after_s": [
+        8.663871747005032,
+        8.652835766988574
+      ],
+      "before_median_s": 8.648449917003745,
+      "after_median_s": 8.658353756996803,
+      "saved_s": -0.009903839993057773,
+      "saved_percent": -0.11451578130302635
+    },
+    {
+      "scenario": "mesh_field_interface",
+      "before_s": [
+        39.604133927990915,
+        39.55562259200087
+      ],
+      "after_s": [
+        39.29420995801047,
+        39.26010111400683
+      ],
+      "before_median_s": 39.579878259995894,
+      "after_median_s": 39.27715553600865,
+      "saved_s": 0.30272272398724454,
+      "saved_percent": 0.7648399573103587
+    }
+  ],
+  "interpretation": "Local descriptive ABBA comparison; two observations per arm; no general or statistical speedup claim."
+}

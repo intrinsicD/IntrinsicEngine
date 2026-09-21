@@ -23,7 +23,6 @@
 #include <entt/entity/entity.hpp>
 #include <gtest/gtest.h>
 #include <glm/gtc/quaternion.hpp>
-#include "ProgressivePoissonReference.hpp"
 
 #include "EditorFeatureTestContext.hpp"
 
@@ -35,18 +34,11 @@ import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
-import Extrinsic.Core.Logging;
-import Extrinsic.ECS.Component.Culling.Local;
-import Extrinsic.ECS.Component.Culling.World;
 import Extrinsic.ECS.Component.Hierarchy;
-import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
-import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
-import Extrinsic.ECS.Components.GeometrySourcesPopulate;
-import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Hierarchy.Mutation;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
@@ -61,18 +53,14 @@ import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Graphics.RenderDiagnostics;
 import Extrinsic.Graphics.RenderCommandRouter;
-import Extrinsic.Platform.Input;
-import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Profiler;
 import Extrinsic.RHI.QueueAffinity;
-import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorPropertyWidgets;
 import Extrinsic.Runtime.EditorWindowRegistry;
-import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.MeshPrimitiveView;
@@ -94,25 +82,21 @@ import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
-import Geometry.Graph.Vertex.Normals;
-import Geometry.Graph;
-import Geometry.HalfedgeMesh;
-import Geometry.HalfedgeMesh.Builder;
-import Geometry.HalfedgeMesh.Vertices.Normals;
-import Geometry.KMeans;
-import Geometry.PointCloud.Normals;
 import Geometry.Properties;
-import Geometry.Smoothing;
-import Geometry.UvAtlas;
 
-#include "MockRHI.hpp"
+using Intrinsic::Tests::MakeContext;
+using Intrinsic::Tests::MakeGeometryPresentationRecipe;
+using Intrinsic::Tests::MakeGeometryPresentationRuntimeState;
+using Intrinsic::Tests::AttachGeometryPresentation;
+using Intrinsic::Tests::EditorGeometry::MakeSelectable;
+using Intrinsic::Tests::EditorGeometry::AddGraphSource;
+using Intrinsic::Tests::EditorGeometry::AddPointCloudSource;
 
 namespace Runtime = Extrinsic::Runtime;
 namespace Assets = Extrinsic::Assets;
 namespace Core = Extrinsic::Core;
 namespace ECS = Extrinsic::ECS;
 namespace ECSC = Extrinsic::ECS::Components;
-namespace Dirty = Extrinsic::ECS::Components::DirtyTags;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
 using Intrinsic::Tests::EditorGeometry::SetPositions;
 using Intrinsic::Tests::EditorGeometry::SetTexcoords;
@@ -120,18 +104,10 @@ using Intrinsic::Tests::EditorGeometry::SetEdges;
 using Intrinsic::Tests::EditorGeometry::SetHalfedges;
 using Intrinsic::Tests::EditorGeometry::SetFaces;
 using Intrinsic::Tests::EditorGeometry::AddTriangleMeshSource;
-namespace Sel = Extrinsic::ECS::Components::Selection;
 namespace G = Extrinsic::Graphics::Components;
 namespace Graphics = Extrinsic::Graphics;
 namespace RHI = Extrinsic::RHI;
-namespace Plat = Extrinsic::Platform;
 namespace PN = Extrinsic::ECS::Components::GeometrySources::PropertyNames;
-namespace GN = Geometry::HalfedgeMesh::VertexNormals;
-namespace GVN = Geometry::Graph::VertexNormals;
-namespace PCN = Geometry::PointCloud::Normals;
-namespace Smooth = Geometry::Smoothing;
-namespace PPR = Intrinsic::Methods::Geometry::ProgressivePoissonReference;
-namespace Tests = Extrinsic::Tests;
 
 namespace
 {
@@ -274,27 +250,6 @@ namespace
         return it == model.Artifacts.end() ? nullptr : &*it;
     }
 
-[[nodiscard]] ECS::EntityHandle MakeSelectable(
-        ECS::Scene::Registry& registry,
-        std::string name)
-    {
-        const ECS::EntityHandle entity = registry.Create();
-        auto& raw = registry.Raw();
-        raw.emplace<ECSC::MetaData>(entity, std::move(name));
-        raw.emplace<ECSC::Transform::Component>(entity);
-        raw.emplace<ECSC::Transform::WorldMatrix>(entity);
-        raw.emplace<Sel::SelectableTag>(entity);
-        return entity;
-    }
-
-void AddPointCloudSource(ECS::Scene::Registry& registry,
-                             const ECS::EntityHandle entity,
-                             const std::size_t pointCount)
-    {
-        auto& vertices = registry.Raw().emplace<GS::Vertices>(entity);
-        vertices.Properties.Resize(pointCount);
-        registry.Raw().emplace<G::RenderPoints>(entity);
-    }
 
     // A small deterministic, asymmetric point lattice — distinct extents per axis
     // give ICP a well-conditioned correspondence problem (UI-029).
@@ -357,76 +312,6 @@ void AddPointCloudSource(ECS::Scene::Registry& registry,
         return nullptr;
     }
 
-[[nodiscard]] Runtime::GeometryPresentationRecipe
-    MakeGeometryPresentationRecipe()
-    {
-        Runtime::GeometryPresentationSlotRecipe albedo{};
-        albedo.Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo;
-        albedo.SourceKind = Runtime::GeometryPresentationSourceKind::UniformDefault;
-        albedo.UniformDefault = Runtime::GeometryPresentationDefaultValue{
-            .Kind = Geometry::PropertyValueKind::Vec4,
-            .Vector = glm::vec4{0.2f, 0.4f, 0.8f, 1.0f},
-        };
-        Runtime::GeometryPresentationSlotRecipe normal{};
-        normal.Semantic = Runtime::GeometryPresentationSlotSemantic::Normal;
-        normal.SourceKind = Runtime::GeometryPresentationSourceKind::PropertyBake;
-        normal.Property = Runtime::GeometryPropertyRef{
-            .Domain = Runtime::GeometryElementDomain::MeshVertex,
-            .Name = "v:normal",
-            .ValueKind = Geometry::PropertyValueKind::Vec3,
-        };
-        normal.GeneratedPolicy =
-            Runtime::GeometryGeneratedOutputPolicy::DeterministicChildAsset;
-
-        return Runtime::GeometryPresentationRecipe{
-            .Shape = Runtime::GeometryPresentationShape::Mesh,
-            .Lanes = {
-                Runtime::GeometryPresentationLaneRecipe{
-                    .Lane = Runtime::GeometryRenderLane::Surface,
-                    .PresentationKey = "mesh.surface",
-                },
-            },
-            .Presentations = {
-                Runtime::GeometryPresentationBindingRecipe{
-                    .Key = "mesh.surface",
-                    .Kind = Runtime::GeometryPresentationKind::SurfaceMaterial,
-                    .Slots = {albedo, normal},
-                },
-            },
-        };
-    }
-
-    [[nodiscard]] Runtime::GeometryPresentationRuntimeState
-    MakeGeometryPresentationRuntimeState()
-    {
-        return Runtime::GeometryPresentationRuntimeState{
-            .RecipeGeneration = 7u,
-            .Slots = {
-                Runtime::GeometryPresentationSlotStatus{
-                    .PresentationKey = "mesh.surface",
-                    .Semantic =
-                        Runtime::GeometryPresentationSlotSemantic::Normal,
-                    .Readiness =
-                        Runtime::GeometryPresentationReadiness::Pending,
-                    .Provenance =
-                        Runtime::GeometryPresentationProvenance::PropertyBinding,
-                    .Diagnostic = "waiting for normal bake",
-                },
-            },
-        };
-    }
-
-    void AttachGeometryPresentation(
-        ECS::Scene::Registry& registry,
-        const ECS::EntityHandle entity)
-    {
-        registry.Raw().emplace<Runtime::GeometryPresentationRecipe>(
-            entity,
-            MakeGeometryPresentationRecipe());
-        registry.Raw().emplace<Runtime::GeometryPresentationRuntimeState>(
-            entity,
-            MakeGeometryPresentationRuntimeState());
-    }
 
 [[nodiscard]] const Runtime::EditorGeometryPresentationSlotModel*
     FindGeometryPresentationSlot(
@@ -442,39 +327,8 @@ void AddPointCloudSource(ECS::Scene::Registry& registry,
         return nullptr;
     }
 
-void AddGraphSource(ECS::Scene::Registry& registry,
-                        const ECS::EntityHandle entity)
-    {
-        auto& raw = registry.Raw();
-        Geometry::Graph::Graph graph{};
-        const auto v0 = graph.AddVertex({0.0f, 0.0f, 0.0f});
-        const auto v1 = graph.AddVertex({1.0f, 0.0f, 0.0f});
-        const auto v2 = graph.AddVertex({2.0f, 0.0f, 0.0f});
-        (void)graph.AddEdge(v0, v1);
-        (void)graph.AddEdge(v1, v2);
-        GS::PopulateFromGraph(raw, entity, graph);
-        raw.emplace<G::RenderEdges>(entity);
-        raw.emplace<G::RenderPoints>(entity);
-    }
 
-[[nodiscard]] Intrinsic::Tests::EditorFeatureTestContext MakeContext(
-        ECS::Scene::Registry& registry,
-        Runtime::SelectionController& selection,
-        const bool imguiAvailable = true,
-        const std::optional<Runtime::PrimitiveSelectionResult>* lastPrimitive = nullptr,
-        Extrinsic::RHI::IDevice* device = nullptr)
-    {
-        return Intrinsic::Tests::EditorFeatureTestContext{
-            .Scene = &registry,
-            .Selection = &selection,
-            .LastRefinedPrimitive = lastPrimitive,
-            .Device = device,
-            .ImGuiAdapterAvailable = imguiAvailable,
-            .AssetImportCommandsAvailable = false,
-            .CameraRenderCommandsAvailable = false,
-            .VisualizationCommandsAvailable = false,
-        };
-    }
+
 
     void AttachJobSnapshot(
         Intrinsic::Tests::EditorFeatureTestContext& context,

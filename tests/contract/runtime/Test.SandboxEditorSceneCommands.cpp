@@ -22,7 +22,6 @@
 #include <variant>
 #include <vector>
 
-#include "ProgressivePoissonReference.hpp"
 #include <entt/entity/entity.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <gtest/gtest.h>
@@ -81,7 +80,6 @@ import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
-import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.JobService;
@@ -113,7 +111,7 @@ import Geometry.Properties;
 import Geometry.Smoothing;
 import Geometry.UvAtlas;
 
-#include "MockRHI.hpp"
+using Intrinsic::Tests::MakeContext;
 
 namespace Runtime = Extrinsic::Runtime;
 namespace Assets = Extrinsic::Assets;
@@ -131,8 +129,6 @@ namespace GN = Geometry::HalfedgeMesh::VertexNormals;
 namespace GVN = Geometry::Graph::VertexNormals;
 namespace PCN = Geometry::PointCloud::Normals;
 namespace Smooth = Geometry::Smoothing;
-namespace PPR = Intrinsic::Methods::Geometry::ProgressivePoissonReference;
-namespace Tests = Extrinsic::Tests;
 
 namespace
 {
@@ -400,24 +396,6 @@ void ExpectEnabledFileImportPayloadOptions(
                            std::istreambuf_iterator<char>{}};
     }
 
-[[nodiscard]] Intrinsic::Tests::EditorFeatureTestContext MakeContext(
-        ECS::Scene::Registry& registry,
-        Runtime::SelectionController& selection,
-        const bool imguiAvailable = true,
-        const std::optional<Runtime::PrimitiveSelectionResult>* lastPrimitive = nullptr,
-        Extrinsic::RHI::IDevice* device = nullptr)
-    {
-        return Intrinsic::Tests::EditorFeatureTestContext{
-            .Scene = &registry,
-            .Selection = &selection,
-            .LastRefinedPrimitive = lastPrimitive,
-            .Device = device,
-            .ImGuiAdapterAvailable = imguiAvailable,
-            .AssetImportCommandsAvailable = false,
-            .CameraRenderCommandsAvailable = false,
-            .VisualizationCommandsAvailable = false,
-        };
-    }
 
     class OneFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
     {

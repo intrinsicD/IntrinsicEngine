@@ -1,0 +1,34 @@
+**Blockers: none.** The proposed conclusions match the raw data.
+
+**Recomputed from the four `raw-result.json` files**
+- All 44 timings match the `seconds` arrays in `summary.json` exactly. Commits, arms and positions show ABBA order, one sample per file.
+- Percent change in the after-arm median, negative means faster:
+
+| Scenario | Before median (s) | After median (s) | Change |
+|---|---|---|---|
+| Models | 23.7481 | 17.7233 | −25.37% |
+| Visualization | 21.2532 | 16.7871 | −21.01% |
+| `mock_header` | 53.3640 | 35.1661 | −34.10% |
+| `fixture_header` | 67.9016 | 58.5027 | −13.84% |
+| `fixture_impl` | 8.5701 | 10.1123 | +18.00% (+1.54 s) |
+| Clean | 428.6757 | 426.5478 | −0.50% |
+
+- `mock_header` compiler invocations are 11 before and 8 after in both samples. `fixture_header` is 20 in all four. Clean is 878 in all four.
+- The arms do not overlap in any quoted scenario. For clean, the after samples differ by 1.50 s and the saving is 2.13 s, so "no clean-build win established" is the right wording.
+
+**Coverage and controls**
+- All required probe sources appear in the header fan-outs of both arms.
+- Models, SceneCommands and Visualization are absent from both after `mock_header.hotspots.json` files. Their only appearance in the after `mock_header.ninja_log` is the shared 26 ms `.modmap` collation edge, which is not a compile.
+- The dependency hash `0ecb7332…`, 1728 files, is identical in all four runs.
+- All four `CMakeCache.txt` files are identical on the audited keys: Debug with `-g`, clang-23, empty compiler launchers, ccache off, sanitizers off, Null backends, and the same source and build paths.
+- The manifest YAML matches `protocol.json`. I could not recompute `manifest_sha256` because no hashing tool was available.
+- Both trait `compile.log` files are empty, which is consistent with a silent `-fsyntax-only` pass. No exit code is stored there, so the pass rests on your verification.
+
+**Wording and accounting gaps (non-blocking)**
+1. The negative-outcome list leaves out `mock_impl` at +0.51% (+26 ms), although the manifest says to retain all negative outcomes. Report the remaining small deltas too: Clustering −2.21%, MeshMethods −3.19%, SceneCommands −0.98%.
+2. State that the `fixture_header` saving comes from cheaper TUs at unchanged fan-out. The +1.54 s owner cost then breaks even after a single Models or Visualization edit.
+3. Each `raw-result.json` reports `sample_count: 1`, so say "n=2 per arm across four single-sample results".
+4. The first run's clean build started at a load average of 0.80, against roughly 2.6–2.7 for the other three. This is descriptive only and favours the before arm.
+5. Peak RSS for Models and Visualization drops from 2.75 GB to 2.52 GB. This is a single-process maximum and should not be claimed.
+
+The no-op, scope, snapshot-ineligibility and unmeasured-area statements are consistent with the protocol. Nothing pre-claims the CI or CPU-suite results.

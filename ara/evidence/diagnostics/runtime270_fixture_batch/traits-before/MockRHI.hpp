@@ -303,9 +303,6 @@ namespace Extrinsic::Tests
     class MockDevice final : public RHI::IDevice
     {
     public:
-        MockDevice() noexcept;
-        ~MockDevice() noexcept override;
-
         [[nodiscard]] bool HasBackbufferBarrier(
             const RHI::TextureLayout before,
             const RHI::TextureLayout after) const noexcept;

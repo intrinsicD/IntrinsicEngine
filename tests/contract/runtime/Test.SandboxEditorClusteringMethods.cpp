@@ -94,7 +94,6 @@ import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Graph;
 import Geometry.Graph.Vertex.Normals;
 import Geometry.HalfedgeMesh;
-import Geometry.HalfedgeMesh.Builder;
 import Geometry.HalfedgeMesh.Vertices.Normals;
 import Geometry.KMeans;
 import Geometry.PointCloud.Normals;
@@ -106,9 +105,12 @@ import Geometry.UvAtlas;
 #include "SandboxEditorJobHarness.hpp"
 
 using Intrinsic::Tests::EditorGeometry::MakeSelectable;
+using Intrinsic::Tests::EditorGeometry::AddIcosahedronMeshSource;
 using Intrinsic::Tests::EditorGeometry::AddPointCloudSource;
 using Intrinsic::Tests::EditorGeometry::SetPositions;
 using Intrinsic::Tests::EditorGeometry::SetTexcoords;
+
+using Intrinsic::Tests::MakeContext;
 
 namespace Runtime = Extrinsic::Runtime;
 namespace Assets = Extrinsic::Assets;
@@ -224,33 +226,8 @@ void AddGraphSource(
         registry.Raw().emplace<G::RenderEdges>(entity);
     }
 
-void AddIcosahedronMeshSource(ECS::Scene::Registry& registry,
-                                  const ECS::EntityHandle entity)
-    {
-        Geometry::HalfedgeMesh::Mesh mesh =
-            Geometry::HalfedgeMesh::MakeMeshIcosahedron();
-        GS::PopulateFromMesh(registry.Raw(), entity, mesh);
-        registry.Raw().emplace_or_replace<G::RenderSurface>(entity);
-    }
 
-[[nodiscard]] Intrinsic::Tests::EditorFeatureTestContext MakeContext(
-        ECS::Scene::Registry& registry,
-        Runtime::SelectionController& selection,
-        const bool imguiAvailable = true,
-        const std::optional<Runtime::PrimitiveSelectionResult>* lastPrimitive = nullptr,
-        Extrinsic::RHI::IDevice* device = nullptr)
-    {
-        return Intrinsic::Tests::EditorFeatureTestContext{
-            .Scene = &registry,
-            .Selection = &selection,
-            .LastRefinedPrimitive = lastPrimitive,
-            .Device = device,
-            .ImGuiAdapterAvailable = imguiAvailable,
-            .AssetImportCommandsAvailable = false,
-            .CameraRenderCommandsAvailable = false,
-            .VisualizationCommandsAvailable = false,
-        };
-    }
+
 
 // BUG-096: a planar target whose points lie in z = 0. Point-to-plane only
 // penalizes residual along the supplied normal, so which normal is supplied

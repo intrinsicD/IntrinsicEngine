@@ -7,6 +7,10 @@ import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.ECS.Components.GeometrySourcesPopulate;
+import Geometry.Graph;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
 
 namespace Intrinsic::Tests
 {
@@ -246,5 +250,122 @@ namespace Intrinsic::Tests::EditorGeometry
                      {0u, 0u, 0u, kInvalidIndex, kInvalidIndex, kInvalidIndex});
         auto& faces = raw.emplace<GS::Faces>(entity);
         SetFaces(faces, {0u});
+    }
+
+    void AddGraphSource(ECS::Scene::Registry& registry,
+                        const ECS::EntityHandle entity)
+    {
+        auto& raw = registry.Raw();
+        Geometry::Graph::Graph graph{};
+        const auto v0 = graph.AddVertex({0.0f, 0.0f, 0.0f});
+        const auto v1 = graph.AddVertex({1.0f, 0.0f, 0.0f});
+        const auto v2 = graph.AddVertex({2.0f, 0.0f, 0.0f});
+        (void)graph.AddEdge(v0, v1);
+        (void)graph.AddEdge(v1, v2);
+        GS::PopulateFromGraph(raw, entity, graph);
+        raw.emplace<Extrinsic::Graphics::Components::RenderEdges>(entity);
+        raw.emplace<Extrinsic::Graphics::Components::RenderPoints>(entity);
+    }
+
+    void AddIcosahedronMeshSource(ECS::Scene::Registry& registry,
+                                  const ECS::EntityHandle entity)
+    {
+        Geometry::HalfedgeMesh::Mesh mesh =
+            Geometry::HalfedgeMesh::MakeMeshIcosahedron();
+        GS::PopulateFromMesh(registry.Raw(), entity, mesh);
+        registry.Raw().emplace_or_replace<Extrinsic::Graphics::Components::RenderSurface>(entity);
+    }
+}
+
+namespace Intrinsic::Tests
+{
+    [[nodiscard]] Intrinsic::Tests::EditorFeatureTestContext MakeContext(
+        Extrinsic::ECS::Scene::Registry& registry,
+        Runtime::SelectionController& selection,
+        const bool imguiAvailable,
+        const std::optional<Runtime::PrimitiveSelectionResult>* lastPrimitive,
+        Extrinsic::RHI::IDevice* device)
+    {
+        return Intrinsic::Tests::EditorFeatureTestContext{
+            .Scene = &registry,
+            .Selection = &selection,
+            .LastRefinedPrimitive = lastPrimitive,
+            .Device = device,
+            .ImGuiAdapterAvailable = imguiAvailable,
+            .AssetImportCommandsAvailable = false,
+            .CameraRenderCommandsAvailable = false,
+            .VisualizationCommandsAvailable = false,
+        };
+    }
+
+    [[nodiscard]] Runtime::GeometryPresentationRecipe
+    MakeGeometryPresentationRecipe()
+    {
+        Runtime::GeometryPresentationSlotRecipe albedo{};
+        albedo.Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo;
+        albedo.SourceKind = Runtime::GeometryPresentationSourceKind::UniformDefault;
+        albedo.UniformDefault = Runtime::GeometryPresentationDefaultValue{
+            .Kind = Geometry::PropertyValueKind::Vec4,
+            .Vector = glm::vec4{0.2f, 0.4f, 0.8f, 1.0f},
+        };
+        Runtime::GeometryPresentationSlotRecipe normal{};
+        normal.Semantic = Runtime::GeometryPresentationSlotSemantic::Normal;
+        normal.SourceKind = Runtime::GeometryPresentationSourceKind::PropertyBake;
+        normal.Property = Runtime::GeometryPropertyRef{
+            .Domain = Runtime::GeometryElementDomain::MeshVertex,
+            .Name = "v:normal",
+            .ValueKind = Geometry::PropertyValueKind::Vec3,
+        };
+        normal.GeneratedPolicy =
+            Runtime::GeometryGeneratedOutputPolicy::DeterministicChildAsset;
+
+        return Runtime::GeometryPresentationRecipe{
+            .Shape = Runtime::GeometryPresentationShape::Mesh,
+            .Lanes = {
+                Runtime::GeometryPresentationLaneRecipe{
+                    .Lane = Runtime::GeometryRenderLane::Surface,
+                    .PresentationKey = "mesh.surface",
+                },
+            },
+            .Presentations = {
+                Runtime::GeometryPresentationBindingRecipe{
+                    .Key = "mesh.surface",
+                    .Kind = Runtime::GeometryPresentationKind::SurfaceMaterial,
+                    .Slots = {albedo, normal},
+                },
+            },
+        };
+    }
+
+    [[nodiscard]] Runtime::GeometryPresentationRuntimeState
+    MakeGeometryPresentationRuntimeState()
+    {
+        return Runtime::GeometryPresentationRuntimeState{
+            .RecipeGeneration = 7u,
+            .Slots = {
+                Runtime::GeometryPresentationSlotStatus{
+                    .PresentationKey = "mesh.surface",
+                    .Semantic =
+                        Runtime::GeometryPresentationSlotSemantic::Normal,
+                    .Readiness =
+                        Runtime::GeometryPresentationReadiness::Pending,
+                    .Provenance =
+                        Runtime::GeometryPresentationProvenance::PropertyBinding,
+                    .Diagnostic = "waiting for normal bake",
+                },
+            },
+        };
+    }
+
+    void AttachGeometryPresentation(
+        Extrinsic::ECS::Scene::Registry& registry,
+        const Extrinsic::ECS::EntityHandle entity)
+    {
+        registry.Raw().emplace<Runtime::GeometryPresentationRecipe>(
+            entity,
+            MakeGeometryPresentationRecipe());
+        registry.Raw().emplace<Runtime::GeometryPresentationRuntimeState>(
+            entity,
+            MakeGeometryPresentationRuntimeState());
     }
 }

@@ -21,7 +21,6 @@
 #include <variant>
 #include <vector>
 
-#include "ProgressivePoissonReference.hpp"
 #include <entt/entity/entity.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <gtest/gtest.h>
@@ -74,7 +73,6 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorPropertyWidgets;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
-import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.InputActions;
 import Extrinsic.Runtime.JobService;
@@ -120,7 +118,13 @@ import Geometry.UvAtlas;
 #include "SandboxEditorJobHarness.hpp"
 
 using Intrinsic::Tests::EditorGeometry::MakeSelectable;
+using Intrinsic::Tests::EditorGeometry::AddIcosahedronMeshSource;
 using Intrinsic::Tests::EditorGeometry::AddPointCloudSource;
+
+using Intrinsic::Tests::MakeContext;
+using Intrinsic::Tests::MakeGeometryPresentationRecipe;
+using Intrinsic::Tests::MakeGeometryPresentationRuntimeState;
+using Intrinsic::Tests::AttachGeometryPresentation;
 
 namespace Runtime = Extrinsic::Runtime;
 namespace Assets = Extrinsic::Assets;
@@ -144,7 +148,6 @@ namespace GN = Geometry::HalfedgeMesh::VertexNormals;
 namespace GVN = Geometry::Graph::VertexNormals;
 namespace PCN = Geometry::PointCloud::Normals;
 namespace Smooth = Geometry::Smoothing;
-namespace PPR = Intrinsic::Methods::Geometry::ProgressivePoissonReference;
 namespace Tests = Extrinsic::Tests;
 
 namespace
@@ -264,19 +267,12 @@ void AddDenoiseAllBoundaryMeshSource(ECS::Scene::Registry& registry,
         const Geometry::VertexHandle a = mesh.AddVertex(glm::vec3{0.0f, 0.0f, 0.0f});
         const Geometry::VertexHandle b = mesh.AddVertex(glm::vec3{1.0f, 0.0f, 0.0f});
         const Geometry::VertexHandle c = mesh.AddVertex(glm::vec3{0.0f, 1.0f, 0.35f});
-        mesh.AddTriangle(a, b, c);
+        ASSERT_TRUE(mesh.AddTriangle(a, b, c).has_value());
         GS::PopulateFromMesh(registry.Raw(), entity, mesh);
         registry.Raw().emplace_or_replace<G::RenderSurface>(entity);
     }
 
-void AddIcosahedronMeshSource(ECS::Scene::Registry& registry,
-                                  const ECS::EntityHandle entity)
-    {
-        Geometry::HalfedgeMesh::Mesh mesh =
-            Geometry::HalfedgeMesh::MakeMeshIcosahedron();
-        GS::PopulateFromMesh(registry.Raw(), entity, mesh);
-        registry.Raw().emplace_or_replace<G::RenderSurface>(entity);
-    }
+
 
 struct MeshCounts
     {
@@ -378,97 +374,6 @@ void ExpectColorsExactlyEqual(
         return false;
     }
 
-[[nodiscard]] Runtime::GeometryPresentationRecipe
-    MakeGeometryPresentationRecipe()
-    {
-        Runtime::GeometryPresentationSlotRecipe albedo{};
-        albedo.Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo;
-        albedo.SourceKind = Runtime::GeometryPresentationSourceKind::UniformDefault;
-        albedo.UniformDefault = Runtime::GeometryPresentationDefaultValue{
-            .Kind = Geometry::PropertyValueKind::Vec4,
-            .Vector = glm::vec4{0.2f, 0.4f, 0.8f, 1.0f},
-        };
-        Runtime::GeometryPresentationSlotRecipe normal{};
-        normal.Semantic = Runtime::GeometryPresentationSlotSemantic::Normal;
-        normal.SourceKind = Runtime::GeometryPresentationSourceKind::PropertyBake;
-        normal.Property = Runtime::GeometryPropertyRef{
-            .Domain = Runtime::GeometryElementDomain::MeshVertex,
-            .Name = "v:normal",
-            .ValueKind = Geometry::PropertyValueKind::Vec3,
-        };
-        normal.GeneratedPolicy =
-            Runtime::GeometryGeneratedOutputPolicy::DeterministicChildAsset;
-
-        return Runtime::GeometryPresentationRecipe{
-            .Shape = Runtime::GeometryPresentationShape::Mesh,
-            .Lanes = {
-                Runtime::GeometryPresentationLaneRecipe{
-                    .Lane = Runtime::GeometryRenderLane::Surface,
-                    .PresentationKey = "mesh.surface",
-                },
-            },
-            .Presentations = {
-                Runtime::GeometryPresentationBindingRecipe{
-                    .Key = "mesh.surface",
-                    .Kind = Runtime::GeometryPresentationKind::SurfaceMaterial,
-                    .Slots = {albedo, normal},
-                },
-            },
-        };
-    }
-
-    [[nodiscard]] Runtime::GeometryPresentationRuntimeState
-    MakeGeometryPresentationRuntimeState()
-    {
-        return Runtime::GeometryPresentationRuntimeState{
-            .RecipeGeneration = 7u,
-            .Slots = {
-                Runtime::GeometryPresentationSlotStatus{
-                    .PresentationKey = "mesh.surface",
-                    .Semantic =
-                        Runtime::GeometryPresentationSlotSemantic::Normal,
-                    .Readiness =
-                        Runtime::GeometryPresentationReadiness::Pending,
-                    .Provenance =
-                        Runtime::GeometryPresentationProvenance::PropertyBinding,
-                    .Diagnostic = "waiting for normal bake",
-                },
-            },
-        };
-    }
-
-    void AttachGeometryPresentation(
-        ECS::Scene::Registry& registry,
-        const ECS::EntityHandle entity)
-    {
-        registry.Raw().emplace<Runtime::GeometryPresentationRecipe>(
-            entity,
-            MakeGeometryPresentationRecipe());
-        registry.Raw().emplace<Runtime::GeometryPresentationRuntimeState>(
-            entity,
-            MakeGeometryPresentationRuntimeState());
-    }
-
-
-
-[[nodiscard]] Intrinsic::Tests::EditorFeatureTestContext MakeContext(
-        ECS::Scene::Registry& registry,
-        Runtime::SelectionController& selection,
-        const bool imguiAvailable = true,
-        const std::optional<Runtime::PrimitiveSelectionResult>* lastPrimitive = nullptr,
-        Extrinsic::RHI::IDevice* device = nullptr)
-    {
-        return Intrinsic::Tests::EditorFeatureTestContext{
-            .Scene = &registry,
-            .Selection = &selection,
-            .LastRefinedPrimitive = lastPrimitive,
-            .Device = device,
-            .ImGuiAdapterAvailable = imguiAvailable,
-            .AssetImportCommandsAvailable = false,
-            .CameraRenderCommandsAvailable = false,
-            .VisualizationCommandsAvailable = false,
-        };
-    }
 
     template <typename Command, typename Apply, typename Check>
     void ExpectDirectAndQueuedMeshCommand(Command command, Apply apply, Check check,
@@ -696,7 +601,6 @@ void ExpectColorsExactlyEqual(
         engine.Initialize();
         InstallSandboxDefaultRuntimePolicies(engine);
     }
-
 
 
 struct TmpFile
