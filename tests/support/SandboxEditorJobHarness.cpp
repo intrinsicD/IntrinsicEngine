@@ -1,10 +1,11 @@
-#include "SandboxEditorJobHarness.hpp"
-
 #include <cstdint>
 #include <optional>
 #include <thread>
 #include <utility>
 #include <vector>
+
+// Standard declarations precede the import-bearing fixture for Clang 20.
+#include "SandboxEditorJobHarness.hpp"
 
 import Extrinsic.Core.Tasks;
 

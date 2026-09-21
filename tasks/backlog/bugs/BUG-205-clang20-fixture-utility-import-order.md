@@ -17,14 +17,14 @@ contract_review: Test-only include ordering; no engine API, ownership or catalog
 Restore the editor fixture producer on the supported minimum compiler. A fresh,
 cache-disabled ci-derived Clang20 Null/headless build during BUILD-011 rejects
 libstdc++14's deleted `std::as_const` overload with a misplaced `lifetimebound`
-attribute. The unchanged EditorFeatureTestContext.cpp includes utility after its
-import-bearing fixture header. Its compiler module map contains none of the ten
+attribute. The unchanged EditorFeatureTestContext.cpp and SandboxEditorJobHarness.cpp
+include utility after their import-bearing fixture headers. The editor-context compiler module map contains none of the ten
 config interfaces changed by BUILD-011. This is a separate pre-existing producer
 failure, not evidence against the codec relocation.
 
 ## Acceptance criteria
 - [x] Exact Clang20 command reproduces the failure before and compiles after moving
-      the existing utility include before the import-bearing header. No body or
+      the existing standard includes before the import-bearing headers. No body or
       signature changes; no suppressed diagnostics or altered test selection.
 - [ ] Runtime-contract target links and focused checks execute under Clang20;
       canonical ci rebuild and relevant CPU checks pass.
