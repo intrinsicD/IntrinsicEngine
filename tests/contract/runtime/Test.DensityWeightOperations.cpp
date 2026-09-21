@@ -10,6 +10,7 @@
 #include <gtest/gtest.h>
 #include "EditorFeatureTestContext.hpp"
 #include "SandboxEditorJobHarness.hpp"
+#include "PointDomainFixture.hpp"
 
 import Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.Runtime.SpatialIndexCache;
@@ -24,51 +25,17 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
-import Extrinsic.ECS.Components.GeometrySourcesPopulate;
-import Geometry.HalfedgeMesh;
-import Geometry.Graph;
 
 namespace R = Extrinsic::Runtime;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
 using D = R::GeometryElementDomain;
+using Intrinsic::Tests::PointDomainProperties;
 namespace
 {
-    constexpr std::array<glm::vec3, 4> plane{{{0, 0, 0}, {2, 0, 0}, {0, 3, 0}, {2, 3, 0}}};
-    Geometry::PropertySet &Properties(Extrinsic::ECS::Scene::Registry &scene, entt::entity entity, D domain)
-    {
-        return *const_cast<Geometry::PropertySet *>(
-            R::ResolveGeometryPropertySet(R::BuildGeometryAvailability(scene.Raw(), entity), domain));
-    }
     entt::entity Make(Extrinsic::ECS::Scene::Registry &scene, D domain)
     {
-        auto entity = scene.Create();
-        if (domain >= D::MeshVertex && domain <= D::MeshFace)
-        {
-            Geometry::HalfedgeMesh::Mesh mesh;
-            auto a = mesh.AddVertex(plane[0]), b = mesh.AddVertex(plane[1]), c = mesh.AddVertex(plane[2]),
-                 d = mesh.AddVertex(plane[3]);
-            (void)mesh.AddTriangle(a, b, c);
-            (void)mesh.AddTriangle(c, b, d);
-            GS::PopulateFromMesh(scene.Raw(), entity, mesh);
-            if (domain == D::MeshFace)
-                scene.Raw().get<GS::Faces>(entity).Properties.Resize(4);
-        }
-        else if (domain != D::PointCloudPoint)
-        {
-            Geometry::Graph::Graph graph;
-            auto a = graph.AddVertex(plane[0]), b = graph.AddVertex(plane[1]), c = graph.AddVertex(plane[2]),
-                 d = graph.AddVertex(plane[3]);
-            (void)graph.AddEdge(a, b);
-            (void)graph.AddEdge(a, c);
-            (void)graph.AddEdge(a, d);
-            (void)graph.AddEdge(b, c);
-            (void)graph.AddEdge(b, d);
-            (void)graph.AddEdge(c, d);
-            GS::PopulateFromGraph(scene.Raw(), entity, graph);
-        }
-        else
-            scene.Raw().emplace<GS::Vertices>(entity).Properties.Resize(5);
-        auto &props = Properties(scene, entity, domain);
+        auto entity = Intrinsic::Tests::MakePointDomainSource(scene, domain);
+        auto &props = PointDomainProperties(scene, entity, domain);
         auto samples = props.GetOrAdd<glm::vec3>("samples");
         for (std::size_t i = 0; i < samples.Size(); ++i)
             samples[i] = {float(i%3),float(i/3),.15f*float(int(i%3)-1)};
@@ -101,7 +68,7 @@ TEST(DensityWeightConfig, RoundTripAndSharedPreviewApplyRun)
     context.PreviewEngineConfigDocument=[&](const auto& document,const auto& origin){++previews;return C::PreviewEngineConfig(document,state.ActiveConfig,{origin,&registry});};
     context.ApplyEngineConfigHotSubset=[&](const auto& preview){++applies;state.ActiveConfig=preview.Preview.Config;return R::RuntimeEngineConfigApplyResult{.Status=R::RuntimeEngineConfigApplyStatus::Applied};};
     auto commands=R::BindEditorProcessingCommands(context);
-    ASSERT_TRUE(R::PreviewEditorDensityWeightCommand(commands,c).Enabled);EXPECT_FALSE(Properties(scene,entity,D::MeshFace).Exists(c.Weights.Name));
+    ASSERT_TRUE(R::PreviewEditorDensityWeightCommand(commands,c).Enabled);EXPECT_FALSE(PointDomainProperties(scene,entity,D::MeshFace).Exists(c.Weights.Name));
     ASSERT_TRUE(R::ApplyEditorDensityWeightConfig(commands,c).Succeeded());ASSERT_TRUE(R::GetEditorDensityWeightConfig(commands));
     EXPECT_EQ(R::SerializeDensityWeightConfig(*R::GetEditorDensityWeightConfig(commands)),R::SerializeDensityWeightConfig(c));
     ASSERT_TRUE(R::ApplyEditorConfiguredDensityWeight(commands).Succeeded());EXPECT_EQ(previews,1);EXPECT_EQ(applies,1);
@@ -123,7 +90,7 @@ TEST(DensityWeightOperations, EveryDomainKernelModeCacheHistoryAndDeletedRows)
         SCOPED_TRACE(mode);
         R::WorldRegistry worlds;const auto world=worlds.CreateWorld("weights");auto& scene=*worlds.Get(world);R::SpatialIndexCache cache(worlds);
         const auto entity=Make(scene,D(d));auto c=Config(entity,D(d));c.Kernel=decltype(c.Kernel)(kernel);c.Mode=decltype(c.Mode)(mode);
-        auto& props=Properties(scene,entity,D(d));const auto size=props.Size();const bool half=D(d)==D::MeshHalfedge || D(d)==D::GraphHalfedge;
+        auto& props=PointDomainProperties(scene,entity,D(d));const auto size=props.Size();const bool half=D(d)==D::MeshHalfedge || D(d)==D::GraphHalfedge;
         if(half)scene.Raw().get<GS::Edges>(entity).Properties.GetOrAdd<bool>("e:deleted")[1]=true;
         else props.GetOrAdd<bool>(D(d)==D::MeshFace?"f:deleted":(D(d)==D::MeshEdge || D(d)==D::GraphEdge)?"e:deleted":"v:deleted")[2]=true;
         props.GetOrAdd<float>(c.Weights.Name).Vector().assign(size,77);
@@ -148,7 +115,7 @@ TEST(DensityWeightOperations, JobsRejectChangedSourceOutputAndCancellation)
     for(unsigned change=0;change<5;++change)
     {
         SCOPED_TRACE(change);Extrinsic::ECS::Scene::Registry scene;const auto entity=Make(scene,D::MeshVertex);auto c=Config(entity,D::MeshVertex);
-        auto& props=Properties(scene,entity,D::MeshVertex);Intrinsic::Tests::EditorFeatureTestContext context;context.Scene=&scene;
+        auto& props=PointDomainProperties(scene,entity,D::MeshVertex);Intrinsic::Tests::EditorFeatureTestContext context;context.Scene=&scene;
         R::EditorCommandHistory history;context.CommandHistory=&history;std::optional<R::EditorDensityWeightResult> delivered;
         std::function<void(R::EditorDensityWeightResult)> sink=[&](auto r){delivered=std::move(r);};Extrinsic::Tests::EditorJobHarness jobs;jobs.Attach(context);
         ASSERT_EQ(R::ApplyEditorDensityWeightCommand(R::BindEditorProcessingCommands(context),c, sink).Status,R::EditorCommandStatus::Pending);
@@ -163,7 +130,7 @@ TEST(DensityWeightOperations, JobsRejectChangedSourceOutputAndCancellation)
 TEST(DensityWeightOperations, OneSampleAndBackendPreflightPreserveOutputs)
 {
     R::WorldRegistry worlds;const auto world=worlds.CreateWorld("weights");auto& scene=*worlds.Get(world);R::SpatialIndexCache cache(worlds);
-    const auto entity=Make(scene,D::PointCloudPoint);auto c=Config(entity,D::PointCloudPoint);auto& props=Properties(scene,entity,D::PointCloudPoint);
+    const auto entity=Make(scene,D::PointCloudPoint);auto c=Config(entity,D::PointCloudPoint);auto& props=PointDomainProperties(scene,entity,D::PointCloudPoint);
     props.Resize(1);props.Get<glm::vec3>("samples")[0]={0,0,0};R::EditorCommandHistory history;
     R::EditorProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
     for(auto backend:{R::DensityWeightBackend::CpuKDTree,R::DensityWeightBackend::CpuLBVH})
@@ -192,7 +159,7 @@ TEST(DensityWeightOperations, PublicationUndoAndRedoAdvancePropertyWithoutInvali
         Extrinsic::ECS::Scene::Registry scene;
         const auto entity = Make(scene, D::PointCloudPoint);
         const auto config = Config(entity, D::PointCloudPoint);
-        auto& props = Properties(scene, entity, D::PointCloudPoint);
+        auto& props = PointDomainProperties(scene, entity, D::PointCloudPoint);
         if (existing) props.GetOrAdd<float>(config.Weights.Name).Vector().assign(props.Size(), 77);
         R::EditorCommandHistory history;
         unsigned invalidations = 0;
@@ -239,7 +206,7 @@ TEST(DensityWeightOperations, ReplacedStorageRejectsHistoryWithoutNotifications)
         Extrinsic::ECS::Scene::Registry scene;
         const auto entity = Make(scene, D::PointCloudPoint);
         const auto config = Config(entity, D::PointCloudPoint);
-        auto& props = Properties(scene, entity, D::PointCloudPoint);
+        auto& props = PointDomainProperties(scene, entity, D::PointCloudPoint);
         props.GetOrAdd<float>(config.Weights.Name).Vector().assign(props.Size(), 77);
         R::EditorCommandHistory history;
         unsigned invalidations = 0;
@@ -292,7 +259,7 @@ TEST(DensityWeightOperations, InvalidDeletionSourcesRejectPreviewAndExecution)
         const auto config = Config(entity, D(domain));
         const bool half = D(domain) == D::MeshHalfedge || D(domain) == D::GraphHalfedge;
         const auto deletionDomain = half ? (D(domain) == D::MeshHalfedge ? D::MeshEdge : D::GraphEdge) : D(domain);
-        auto& deletionProps = Properties(scene, entity, deletionDomain);
+        auto& deletionProps = PointDomainProperties(scene, entity, deletionDomain);
         const auto* name = deletionDomain == D::MeshFace ? "f:deleted" :
             (deletionDomain == D::MeshEdge || deletionDomain == D::GraphEdge) ? "e:deleted" : "v:deleted";
         auto deleted = deletionProps.GetOrAdd<bool>(name);
@@ -307,7 +274,7 @@ TEST(DensityWeightOperations, InvalidDeletionSourcesRejectPreviewAndExecution)
         EXPECT_FALSE(R::PreviewEditorDensityWeightCommand(R::BindEditorProcessingCommands(context), config).Enabled);
         EXPECT_EQ(R::ApplyEditorDensityWeightCommand(R::BindEditorProcessingCommands(context), config).Status, R::EditorCommandStatus::InvalidProcessingParameters);
         EXPECT_FALSE(history.CanUndo());
-        EXPECT_FALSE(Properties(scene, entity, D(domain)).Exists(config.Weights.Name));
+        EXPECT_FALSE(PointDomainProperties(scene, entity, D(domain)).Exists(config.Weights.Name));
     }
 }
 

@@ -13,6 +13,7 @@
 #include <gtest/gtest.h>
 #include "EditorFeatureTestContext.hpp"
 #include "SandboxEditorJobHarness.hpp"
+#include "PointDomainFixture.hpp"
 
 import Extrinsic.Runtime.NormalOperations;
 import Extrinsic.ECS.Component.DirtyTags;
@@ -30,49 +31,18 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Geometry.HalfedgeMesh;
-import Geometry.Graph;
 
 namespace R = Extrinsic::Runtime;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
 using D = R::GeometryElementDomain;
+using Intrinsic::Tests::PointDomainProperties;
 namespace
 {
     constexpr std::array<glm::vec3, 4> plane{{{0, 0, 0}, {2, 0, 0}, {0, 3, 0}, {2, 3, 0}}};
-    Geometry::PropertySet &Properties(Extrinsic::ECS::Scene::Registry &scene, entt::entity entity, D domain)
-    {
-        return *const_cast<Geometry::PropertySet *>(
-            R::ResolveGeometryPropertySet(R::BuildGeometryAvailability(scene.Raw(), entity), domain));
-    }
     entt::entity Make(Extrinsic::ECS::Scene::Registry &scene, D domain)
     {
-        auto entity = scene.Create();
-        if (domain >= D::MeshVertex && domain <= D::MeshFace)
-        {
-            Geometry::HalfedgeMesh::Mesh mesh;
-            auto a = mesh.AddVertex(plane[0]), b = mesh.AddVertex(plane[1]), c = mesh.AddVertex(plane[2]),
-                 d = mesh.AddVertex(plane[3]);
-            (void)mesh.AddTriangle(a, b, c);
-            (void)mesh.AddTriangle(c, b, d);
-            GS::PopulateFromMesh(scene.Raw(), entity, mesh);
-            if (domain == D::MeshFace)
-                scene.Raw().get<GS::Faces>(entity).Properties.Resize(4);
-        }
-        else if (domain != D::PointCloudPoint)
-        {
-            Geometry::Graph::Graph graph;
-            auto a = graph.AddVertex(plane[0]), b = graph.AddVertex(plane[1]), c = graph.AddVertex(plane[2]),
-                 d = graph.AddVertex(plane[3]);
-            (void)graph.AddEdge(a, b);
-            (void)graph.AddEdge(a, c);
-            (void)graph.AddEdge(a, d);
-            (void)graph.AddEdge(b, c);
-            (void)graph.AddEdge(b, d);
-            (void)graph.AddEdge(c, d);
-            GS::PopulateFromGraph(scene.Raw(), entity, graph);
-        }
-        else
-            scene.Raw().emplace<GS::Vertices>(entity).Properties.Resize(5);
-        auto &props = Properties(scene, entity, domain);
+        auto entity = Intrinsic::Tests::MakePointDomainSource(scene, domain);
+        auto &props = PointDomainProperties(scene, entity, domain);
         auto samples = props.GetOrAdd<glm::vec3>("samples");
         for (std::size_t i = 0; i < samples.Size(); ++i)
             samples[i] = plane[i % 4];
@@ -109,7 +79,7 @@ TEST(NormalEstimation, EveryCanonicalDomainPublishesNamedNormalsAndSupportsUndoR
             const auto entity = Make(scene, D(d));
             auto config = Config(entity, D(d));
             config.Backend = backend;
-            auto &props = Properties(scene, entity, D(d));
+            auto &props = PointDomainProperties(scene, entity, D(d));
             const auto slots = props.Size();
             R::EditorCommandHistory history;
             R::EditorProcessingContext context{
@@ -152,7 +122,7 @@ TEST(NormalEstimation, PreservesDeletedRowsAndUnrelatedEditsButGuardsOutputHisto
 {
     Extrinsic::ECS::Scene::Registry scene;
     const auto entity = Make(scene, D::PointCloudPoint);
-    auto &props = Properties(scene, entity, D::PointCloudPoint);
+    auto &props = PointDomainProperties(scene, entity, D::PointCloudPoint);
     std::ranges::fill(props.GetOrAdd<glm::vec3>("estimated").Vector(), glm::vec3(7, 8, 9));
     props.Get<glm::vec3>("estimated")[4].x = std::numeric_limits<float>::quiet_NaN();
     R::EditorCommandHistory history;
@@ -184,7 +154,7 @@ TEST(NormalEstimation, SharedCapturePreservesDeletedVertexAndPairedHalfedgeOutpu
         const auto entity = Make(scene, domain);
         auto config = Config(entity, domain);
         config.Method = method;
-        auto& props = Properties(scene, entity, domain);
+        auto& props = PointDomainProperties(scene, entity, domain);
         const bool halfedges = domain == D::GraphHalfedge || domain == D::MeshHalfedge;
         auto& deletion = halfedges ? scene.Raw().get<GS::Edges>(entity).Properties : props;
         const auto maskName = halfedges ? "e:deleted" : "v:deleted";
@@ -229,7 +199,7 @@ TEST(NormalEstimation, TopologyVariantsConsumeCustomPositionsAndGraphMethodAccep
             ASSERT_TRUE(result.Succeeded()) << result.Message;
             EXPECT_EQ(result.ValidCount, 4);
             EXPECT_EQ(result.FallbackCount, 0);
-            auto normal = std::as_const(Properties(scene, entity, domain)).Get<glm::vec3>("estimated");
+            auto normal = std::as_const(PointDomainProperties(scene, entity, domain)).Get<glm::vec3>("estimated");
             for (std::size_t i = 0; i < normal.Size(); ++i)
                 EXPECT_NEAR(std::abs(normal[i].z), 1.f, 1e-5);
             if (method == R::NormalEstimationMethod::MeshFaceWeighted)
@@ -288,7 +258,7 @@ TEST(NormalEstimation, TopologyMaskMetadataAgreesWithApply)
                         config.Output = {D::MeshFace, "f:normal", Geometry::PropertyValueKind::Vec3};
                     const auto maskDomain = faceMask ? D::MeshFace :
                         (domain == D::MeshVertex ? D::MeshEdge : D::GraphEdge);
-                    auto& props = Properties(scene, entity, maskDomain);
+                    auto& props = PointDomainProperties(scene, entity, maskDomain);
                     const char* name = faceMask ? "f:deleted" : "e:deleted";
                     if (auto mask = props.Get<bool>(name)) props.Remove(mask);
                     if (state == 1) (void)props.GetOrAdd<bool>(name);
@@ -296,7 +266,7 @@ TEST(NormalEstimation, TopologyMaskMetadataAgreesWithApply)
                     if (state == 3) props.GetOrAdd<bool>(name).Vector().pop_back();
                     if (state == 4)
                     {
-                        auto& halves = Properties(scene, entity, D::MeshHalfedge);
+                        auto& halves = PointDomainProperties(scene, entity, D::MeshHalfedge);
                         halves.Resize(halves.Size() - 1);
                     }
                     const bool valid = state < 2;
@@ -310,7 +280,7 @@ TEST(NormalEstimation, TopologyMaskMetadataAgreesWithApply)
                     {
                         EXPECT_FALSE(readiness.DisabledReason.empty());
                         EXPECT_EQ(result.Message, readiness.DisabledReason);
-                        EXPECT_FALSE(Properties(scene, entity, config.Output.Domain).Exists(config.Output.Name));
+                        EXPECT_FALSE(PointDomainProperties(scene, entity, config.Output.Domain).Exists(config.Output.Name));
                     }
                 }
             }
@@ -333,13 +303,13 @@ TEST(NormalEstimation, EmptyFaceTopologyPreservesNoOpAndVertexFallbackSemantics)
                 config.FallbackNormal = {0, 2, 0};
                 const bool faceNormals = method == R::NormalEstimationMethod::MeshFaceNormals;
                 if (faceNormals) config.Output = {D::MeshFace, "f:normal", Geometry::PropertyValueKind::Vec3};
-                Properties(scene, entity, D::MeshVertex).GetOrAdd<bool>("v:deleted")[3] = true;
-                auto& faces = Properties(scene, entity, D::MeshFace);
-                auto& edges = Properties(scene, entity, D::MeshEdge);
+                PointDomainProperties(scene, entity, D::MeshVertex).GetOrAdd<bool>("v:deleted")[3] = true;
+                auto& faces = PointDomainProperties(scene, entity, D::MeshFace);
+                auto& edges = PointDomainProperties(scene, entity, D::MeshEdge);
                 if (empty == 0) std::ranges::fill(faces.GetOrAdd<bool>("f:deleted").Vector(), true);
                 if (empty == 1) std::ranges::fill(edges.GetOrAdd<bool>("e:deleted").Vector(), true);
                 if (empty == 2) faces.Resize(0);
-                auto& output = Properties(scene, entity, config.Output.Domain);
+                auto& output = PointDomainProperties(scene, entity, config.Output.Domain);
                 const glm::vec3 previous{7, 8, 9};
                 if (existingOutput) (void)output.GetOrAdd<glm::vec3>(config.Output.Name, previous);
                 const auto beforeRevision = existingOutput ? std::as_const(output).Get<glm::vec3>(config.Output.Name).Revision()
@@ -378,7 +348,7 @@ TEST(NormalEstimation, GraphNeighborhoodPreservesEdgeDeletionRows)
         auto config = Config(entity, domain);
         config.Method = R::NormalEstimationMethod::GraphNeighborhood;
         config.FallbackNormal = {0, 2, 0};
-        auto& edges = Properties(scene, entity, domain == D::MeshVertex ? D::MeshEdge : D::GraphEdge);
+        auto& edges = PointDomainProperties(scene, entity, domain == D::MeshVertex ? D::MeshEdge : D::GraphEdge);
         auto mask = edges.GetOrAdd<bool>("e:deleted");
         const auto v0 = std::as_const(edges).Get<std::uint32_t>("e:v0");
         const auto v1 = std::as_const(edges).Get<std::uint32_t>("e:v1");
@@ -390,7 +360,7 @@ TEST(NormalEstimation, GraphNeighborhoodPreservesEdgeDeletionRows)
         EXPECT_EQ(result.ValidCount, partial ? 3u : 0u);
         EXPECT_EQ(result.FallbackCount, partial ? 1u : 4u);
         EXPECT_EQ(result.InvalidEdges, 0u);
-        const auto output = std::as_const(Properties(scene, entity, domain)).Get<glm::vec3>(config.Output.Name);
+        const auto output = std::as_const(PointDomainProperties(scene, entity, domain)).Get<glm::vec3>(config.Output.Name);
         for (std::size_t row = 0; row < output.Size(); ++row)
             if (!partial || row == 0) EXPECT_EQ(output[row], glm::vec3(0, 1, 0));
             else EXPECT_NEAR(std::abs(output[row].z), 1.f, 1e-5);
@@ -404,7 +374,7 @@ TEST(NormalEstimation, QueuedEmptyFaceNormalsDoNotPublishOrCreateHistory)
     auto config = Config(entity, D::MeshVertex);
     config.Method = R::NormalEstimationMethod::MeshFaceNormals;
     config.Output = {D::MeshFace, "f:normal", Geometry::PropertyValueKind::Vec3};
-    auto& faces = Properties(scene, entity, D::MeshFace);
+    auto& faces = PointDomainProperties(scene, entity, D::MeshFace);
     std::ranges::fill(faces.GetOrAdd<bool>("f:deleted").Vector(), true);
     Intrinsic::Tests::EditorFeatureTestContext context;
     context.Scene = &scene;
@@ -430,7 +400,7 @@ TEST(NormalEstimation, RejectsInvalidBindingsAndUnavailableBackendsWithoutMutati
     const auto entity = Make(scene, D::PointCloudPoint);
     R::EditorProcessingContext context{.Scene = &scene};
     const auto base = Config(entity, D::PointCloudPoint);
-    auto &props = Properties(scene, entity, D::PointCloudPoint);
+    auto &props = PointDomainProperties(scene, entity, D::PointCloudPoint);
     for (unsigned invalid = 0; invalid < 7; ++invalid)
     {
         auto config = base;
@@ -506,7 +476,7 @@ TEST(NormalEstimation, QueuedJobsGuardInputsTopologyDeletionAndOutputButAllowUnr
         auto entity = Make(scene, D::MeshVertex);
         auto config = Config(entity, D::MeshVertex);
         config.Method = R::NormalEstimationMethod::GraphNeighborhood;
-        auto &props = Properties(scene, entity, D::MeshVertex);
+        auto &props = PointDomainProperties(scene, entity, D::MeshVertex);
         Intrinsic::Tests::EditorFeatureTestContext context;
         context.Scene = &scene;
         R::EditorCommandHistory history;
@@ -630,7 +600,7 @@ TEST(NormalEstimationConfig, RoundTripAndSharedPreviewApplyRun)
               invalidMethod.DisabledReason);
     EXPECT_EQ(R::ResolveEditorProcessingActionReadiness({}, invalidMethod).DisabledReason,
               unavailable.DisabledReason);
-    EXPECT_FALSE(Properties(scene, entity, D::MeshFace).Exists("estimated"));
+    EXPECT_FALSE(PointDomainProperties(scene, entity, D::MeshFace).Exists("estimated"));
     ASSERT_TRUE(R::ApplyEditorNormalEstimationConfig(commands, config).Succeeded());
     ASSERT_TRUE(R::GetEditorNormalEstimationConfig(commands));
     EXPECT_EQ(R::SerializeNormalEstimationConfig(*R::GetEditorNormalEstimationConfig(commands)),
@@ -721,7 +691,7 @@ TEST(NormalEstimation, TopologyCatalogRetainsSmallGraphsAndReportsPcaMinimum)
 {
     Extrinsic::ECS::Scene::Registry scene;
     auto entity = Make(scene, D::GraphNode);
-    auto &vertices = Properties(scene, entity, D::GraphNode);
+    auto &vertices = PointDomainProperties(scene, entity, D::GraphNode);
     vertices.Resize(2);
     R::EditorProcessingContext context{.Scene = &scene};
     auto config = Config(entity, D::GraphNode);
@@ -740,7 +710,7 @@ TEST(NormalEstimation, GraphPositionSlotMayBindAnExistingNormalNamedProperty)
 {
     Extrinsic::ECS::Scene::Registry scene;
     auto entity = Make(scene, D::GraphNode);
-    auto &vertices = Properties(scene, entity, D::GraphNode);
+    auto &vertices = PointDomainProperties(scene, entity, D::GraphNode);
     vertices.GetOrAdd<glm::vec3>("v:normal").Vector() =
         std::as_const(vertices).Get<glm::vec3>("samples").Vector();
     const auto revision = std::as_const(vertices).Get<glm::vec3>("v:normal").Revision();
@@ -770,8 +740,8 @@ TEST(NormalEstimation, FaceNormalsUseFullPolygonRingAndPublishOnlyFaceOutput)
                c = mesh.AddVertex({3, 1, 0});
     ASSERT_TRUE(mesh.AddTriangle(a, b, c)); // -X from winding.
     GS::PopulateFromMesh(scene.Raw(), entity, mesh);
-    auto &vertices = Properties(scene, entity, D::MeshVertex);
-    auto &faces = Properties(scene, entity, D::MeshFace);
+    auto &vertices = PointDomainProperties(scene, entity, D::MeshVertex);
+    auto &faces = PointDomainProperties(scene, entity, D::MeshFace);
     (void)vertices.GetOrAdd<glm::vec3>("v:normal", {0, 1, 0});
     (void)faces.GetOrAdd<float>("keep", 42.f);
     const auto positions = std::as_const(vertices).Get<glm::vec3>("v:position");
@@ -813,7 +783,7 @@ TEST(NormalEstimation, FaceNormalsPreserveDeletedSlotsAndReportDegenerateFallbac
 {
     Extrinsic::ECS::Scene::Registry scene;
     const auto entity = Make(scene, D::MeshVertex);
-    auto &faces = Properties(scene, entity, D::MeshFace);
+    auto &faces = PointDomainProperties(scene, entity, D::MeshFace);
     faces.GetOrAdd<bool>("f:deleted")[0] = true;
     faces.Get<std::uint32_t>("f:halfedge")[0] = std::numeric_limits<std::uint32_t>::max();
     (void)faces.GetOrAdd<glm::vec3>("f:normal", {0, -1, 0});
@@ -827,7 +797,7 @@ TEST(NormalEstimation, FaceNormalsPreserveDeletedSlotsAndReportDegenerateFallbac
     EXPECT_EQ(result.SlotCount, 2u);
     EXPECT_EQ(std::as_const(faces).Get<glm::vec3>("f:normal")[0], (glm::vec3{0, -1, 0}));
     EXPECT_EQ(std::as_const(faces).Get<glm::vec3>("f:normal")[1], (glm::vec3{0, 0, 1}));
-    Properties(scene, entity, D::MeshVertex).Get<glm::vec3>("samples").Vector() =
+    PointDomainProperties(scene, entity, D::MeshVertex).Get<glm::vec3>("samples").Vector() =
         {{0, 0, 0}, {1, 0, 0}, {2, 0, 0}, {3, 0, 0}};
     config.FallbackNormal = {0, 2, 0};
     result = R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config);
@@ -856,14 +826,14 @@ TEST(NormalEstimation, QueuedFaceNormalsPublishToFacesAndRejectStaleTopology)
         Extrinsic::Tests::EditorJobHarness jobs;
         jobs.Attach(context);
         ASSERT_EQ(R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config, onComplete).Status, R::EditorCommandStatus::Pending);
-        auto &faces = Properties(scene, entity, D::MeshFace);
+        auto &faces = PointDomainProperties(scene, entity, D::MeshFace);
         if (stale)
             faces.GetOrAdd<bool>("f:deleted")[0] = true;
         ASSERT_TRUE(jobs.DrainUntilTerminal());
         ASSERT_TRUE(delivered);
         EXPECT_EQ(delivered->Succeeded(), !stale) << delivered->Message;
         EXPECT_EQ(faces.Exists("f:normal"), !stale);
-        EXPECT_FALSE(Properties(scene, entity, D::MeshVertex).Exists("f:normal"));
+        EXPECT_FALSE(PointDomainProperties(scene, entity, D::MeshVertex).Exists("f:normal"));
         if (!stale)
             EXPECT_EQ(std::as_const(faces).Get<glm::vec3>("f:normal").Vector(),
                       (std::vector<glm::vec3>{{0, 0, 1}, {0, 0, 1}}));
@@ -888,7 +858,7 @@ TEST(NormalEstimation, QueuedTopologyNormalsGuardDeletionMaskTransitions)
                 config.Method = method;
                 if (method == R::NormalEstimationMethod::MeshFaceNormals)
                     config.Output = {D::MeshFace, "f:normal", Geometry::PropertyValueKind::Vec3};
-                auto& props = Properties(scene, entity, faceMask ? D::MeshFace : D::MeshEdge);
+                auto& props = PointDomainProperties(scene, entity, faceMask ? D::MeshFace : D::MeshEdge);
                 const char* name = faceMask ? "f:deleted" : "e:deleted";
                 auto mask = props.GetOrAdd<bool>(name);
                 if (change == 0) props.Remove(mask);
@@ -909,7 +879,7 @@ TEST(NormalEstimation, QueuedTopologyNormalsGuardDeletionMaskTransitions)
                 ASSERT_TRUE(jobs.DrainUntilTerminal());
                 ASSERT_TRUE(delivered);
                 EXPECT_EQ(delivered->Status, R::EditorCommandStatus::StaleEntity) << delivered->Message;
-                EXPECT_FALSE(Properties(scene, entity, config.Output.Domain).Exists(config.Output.Name));
+                EXPECT_FALSE(PointDomainProperties(scene, entity, config.Output.Domain).Exists(config.Output.Name));
                 EXPECT_FALSE(history.CanUndo());
             }
         }
@@ -949,7 +919,7 @@ TEST(NormalEstimation, VulkanUnavailablePreservesOutputsOnEveryDomain)
         EXPECT_EQ(result.RequestedBackend, R::NormalEstimationBackend::VulkanLBVH);
         EXPECT_FALSE(result.Succeeded());
         EXPECT_TRUE(result.ActualBackend.empty());
-        EXPECT_FALSE(Properties(scene, entity, D(d)).Exists(config.Output.Name));
+        EXPECT_FALSE(PointDomainProperties(scene, entity, D(d)).Exists(config.Output.Name));
     }
 }
 
@@ -976,7 +946,7 @@ TEST(NormalEstimation, CanonicalVariantsRetainWeightingPublicationAndUndoWithout
             EXPECT_EQ(callbacks, 0u);
             EXPECT_EQ(result.ValidCount, 4u);
             EXPECT_EQ(result.ChangedCount, 4u);
-            auto& props = Properties(scene, entity, domain);
+            auto& props = PointDomainProperties(scene, entity, domain);
             const auto values = std::as_const(props).Get<glm::vec3>("v:normal").Vector();
             for (std::size_t i = 0; i < 4; ++i)
             {
@@ -1027,7 +997,7 @@ TEST(NormalEstimation, EveryVariantQueuesOnceAndReportsNoChangeWithoutAdditional
         EXPECT_EQ(firstCallbacks, 2u);
         ASSERT_TRUE(history.Undo().Succeeded());
         EXPECT_FALSE(history.CanUndo());
-        EXPECT_FALSE(Properties(scene, entity, domain).Exists(config.Output.Name));
+        EXPECT_FALSE(PointDomainProperties(scene, entity, domain).Exists(config.Output.Name));
     }
 }
 

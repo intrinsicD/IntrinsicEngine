@@ -10,6 +10,7 @@
 #include <gtest/gtest.h>
 #include "EditorFeatureTestContext.hpp"
 #include "SandboxEditorJobHarness.hpp"
+#include "PointDomainFixture.hpp"
 
 import Extrinsic.Runtime.PointSetOperations;
 import Extrinsic.Runtime.EditorProcessing;
@@ -24,51 +25,18 @@ import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
-import Extrinsic.ECS.Components.GeometrySourcesPopulate;
-import Geometry.HalfedgeMesh;
-import Geometry.Graph;
 
 namespace R = Extrinsic::Runtime;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
 using D = R::GeometryElementDomain;
+using Intrinsic::Tests::PointDomainProperties;
 namespace
 {
     constexpr std::array<glm::vec3, 4> plane{{{0, 0, 0}, {2, 0, 0}, {0, 3, 0}, {2, 3, 0}}};
-    Geometry::PropertySet &Properties(Extrinsic::ECS::Scene::Registry &scene, entt::entity entity, D domain)
-    {
-        return *const_cast<Geometry::PropertySet *>(
-            R::ResolveGeometryPropertySet(R::BuildGeometryAvailability(scene.Raw(), entity), domain));
-    }
     entt::entity Make(Extrinsic::ECS::Scene::Registry &scene, D domain)
     {
-        auto entity = scene.Create();
-        if (domain >= D::MeshVertex && domain <= D::MeshFace)
-        {
-            Geometry::HalfedgeMesh::Mesh mesh;
-            auto a = mesh.AddVertex(plane[0]), b = mesh.AddVertex(plane[1]), c = mesh.AddVertex(plane[2]),
-                 d = mesh.AddVertex(plane[3]);
-            (void)mesh.AddTriangle(a, b, c);
-            (void)mesh.AddTriangle(c, b, d);
-            GS::PopulateFromMesh(scene.Raw(), entity, mesh);
-            if (domain == D::MeshFace)
-                scene.Raw().get<GS::Faces>(entity).Properties.Resize(4);
-        }
-        else if (domain != D::PointCloudPoint)
-        {
-            Geometry::Graph::Graph graph;
-            auto a = graph.AddVertex(plane[0]), b = graph.AddVertex(plane[1]), c = graph.AddVertex(plane[2]),
-                 d = graph.AddVertex(plane[3]);
-            (void)graph.AddEdge(a, b);
-            (void)graph.AddEdge(a, c);
-            (void)graph.AddEdge(a, d);
-            (void)graph.AddEdge(b, c);
-            (void)graph.AddEdge(b, d);
-            (void)graph.AddEdge(c, d);
-            GS::PopulateFromGraph(scene.Raw(), entity, graph);
-        }
-        else
-            scene.Raw().emplace<GS::Vertices>(entity).Properties.Resize(5);
-        auto &props = Properties(scene, entity, domain);
+        auto entity = Intrinsic::Tests::MakePointDomainSource(scene, domain);
+        auto &props = PointDomainProperties(scene, entity, domain);
         auto samples = props.GetOrAdd<glm::vec3>("samples");
         for (std::size_t i = 0; i < samples.Size(); ++i)
             samples[i] = {float(i%3),float(i/3),.15f*float(int(i%3)-1)};
@@ -101,7 +69,7 @@ TEST(BilateralFilterOperations, InputCatalogPreservesPropertyRevisionsAcrossOthe
         SCOPED_TRACE(domain);
         Extrinsic::ECS::Scene::Registry scene;
         const auto entity = Make(scene, D(domain));
-        auto& props = Properties(scene, entity, D(domain));
+        auto& props = PointDomainProperties(scene, entity, D(domain));
         const auto config = Config(entity, D(domain));
         R::EditorProcessingContext context{.Scene = &scene};
         const auto commands = R::BindEditorProcessingCommands(context);
@@ -148,7 +116,7 @@ TEST(BilateralFilterConfig, RoundTripAndSharedPreviewApplyRun)
     };
     auto commands = R::BindEditorProcessingCommands(context);
     ASSERT_TRUE(R::PreviewEditorBilateralFilterCommand(commands, config).Enabled);
-    EXPECT_FALSE(Properties(scene, entity, D::MeshFace).Exists("filtered"));
+    EXPECT_FALSE(PointDomainProperties(scene, entity, D::MeshFace).Exists("filtered"));
     ASSERT_TRUE(R::ApplyEditorBilateralFilterConfig(commands, config).Succeeded());
     ASSERT_TRUE(R::GetEditorBilateralFilterConfig(commands));
     EXPECT_EQ(R::SerializeBilateralFilterConfig(*R::GetEditorBilateralFilterConfig(commands)),
@@ -172,7 +140,7 @@ TEST(BilateralFilterOperations, CopiedDiagnosticsDescribeTheLastLiveSamplePass)
     auto& scene = *worlds.Get(world);
     R::SpatialIndexCache cache(worlds);
     const auto entity = Make(scene, D::PointCloudPoint);
-    auto& props = Properties(scene, entity, D::PointCloudPoint);
+    auto& props = PointDomainProperties(scene, entity, D::PointCloudPoint);
     std::ranges::copy(plane, props.Get<glm::vec3>("samples").Vector().begin());
     props.Get<glm::vec3>("directions")[0] = {};
     auto config = Config(entity, D::PointCloudPoint);
@@ -207,7 +175,7 @@ TEST(BilateralFilterOperations, EveryDomainCopyAndInPlaceHistory)
         SCOPED_TRACE(inPlace);
         R::WorldRegistry worlds;auto world=worlds.CreateWorld("bilateral");auto& scene=*worlds.Get(world);
         R::SpatialIndexCache cache(worlds);auto entity=Make(scene,D(d));auto config=Config(entity,D(d));
-        auto& props=Properties(scene,entity,D(d));const auto size=props.Size();
+        auto& props=PointDomainProperties(scene,entity,D(d));const auto size=props.Size();
         const bool half=D(d)==D::MeshHalfedge || D(d)==D::GraphHalfedge;
         if(half)scene.Raw().get<GS::Edges>(entity).Properties.GetOrAdd<bool>("e:deleted")[1]=true;
         else props.GetOrAdd<bool>(D(d)==D::MeshFace?"f:deleted":(D(d)==D::MeshEdge || D(d)==D::GraphEdge)?"e:deleted":"v:deleted")[2]=true;
@@ -248,7 +216,7 @@ TEST(BilateralFilterOperations, JobsRejectChangedInputsOutputsAndCancellation)
     for(unsigned change=0;change<6;++change)
     {
         SCOPED_TRACE(change);Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::MeshVertex);auto config=Config(entity,D::MeshVertex);
-        auto& props=Properties(scene,entity,D::MeshVertex);
+        auto& props=PointDomainProperties(scene,entity,D::MeshVertex);
         Intrinsic::Tests::EditorFeatureTestContext context;context.Scene=&scene;R::EditorCommandHistory history;context.CommandHistory=&history;
         std::optional<R::EditorBilateralFilterResult> delivered;int deliveries=0;
         auto onComplete=[&](R::EditorBilateralFilterResult r){++deliveries;delivered=std::move(r);};
@@ -265,7 +233,7 @@ TEST(BilateralFilterOperations, JobsRejectChangedInputsOutputsAndCancellation)
 TEST(BilateralFilterOperations, ZeroPassAndOutputPreflight)
 {
     Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::MeshVertex);auto config=Config(entity,D::MeshVertex);
-    auto& props=Properties(scene,entity,D::MeshVertex);
+    auto& props=PointDomainProperties(scene,entity,D::MeshVertex);
     const auto context=R::BindEditorProcessingCommands(R::EditorProcessingContext{.Scene=&scene});
     config.Iterations=0;const auto result=R::ApplyEditorBilateralFilterCommand(context,config);ASSERT_TRUE(result.Succeeded());EXPECT_EQ(result.CompletedIterations,0);
     EXPECT_EQ(std::as_const(props).Get<glm::vec3>("filtered").Vector(),std::as_const(props).Get<glm::vec3>("samples").Vector());

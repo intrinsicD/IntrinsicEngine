@@ -51,33 +51,33 @@ substitutability remain binding; no new method integration is proposed.
 
 ## Acceptance criteria
 
-- [ ] All eight topology callers and the ninth property-access caller use the
+- [x] All eight topology callers and the ninth property-access caller use the
       compiled common helpers;
       delete their copied bodies. Keep differing positions, property names,
       normals, masks, fault injection and method configs visible at each test.
-- [ ] Preserve exact vertex/edge/halfedge/face counts, resized face-property slots,
+- [x] Preserve exact vertex/edge/halfedge/face counts, resized face-property slots,
       five-slot cloud setup, deleted NaN sample behavior, unrelated `keep` values,
       source revisions and history/undo expectations. Add no render components.
       Move the existing property-access const_cast unchanged; no unrelated
       const-correctness rewrite.
-- [ ] Keep all existing assertions and domain/backend iterations, including
+- [x] Keep all existing assertions and domain/backend iterations, including
       negative preview/apply and stale/cancelled-job cases. Shared fixture setup
       does not call the method under test to construct expected answers.
-- [ ] Reuse existing test-support CMake ownership; remove now-unused heavy
+- [x] Reuse existing test-support CMake ownership; remove now-unused heavy
       imports from callers only after checking other tests in each file. Preserve
       standard-header-before-module ordering fixed by BUG-205; build the affected
       producer and runtime-contract target with supported Clang 20 as well as ci.
-- [ ] Preserve existing compiler-dependency guardrails, test names, labels and
+- [x] Preserve existing compiler-dependency guardrails, test names, labels and
       registration. Add a concise canonical owner-route row for the new fixture,
       synchronize skill mirrors and document its narrow header boundary.
 
 ## Size and compilation acceptance
 
-- [ ] Record before/after physical lines for the complete affected implementation,
+- [x] Record before/after physical lines for the complete affected implementation,
       helper, declaration, caller and CMake set, including newly added files.
       Require a net reduction; report added regression tests separately and also
       report the total diff. Moving bodies or compressing formatting is insufficient.
-- [ ] Reuse `tools/analysis/benchmark_compile_iteration.py` with a task-specific
+- [x] Reuse `tools/analysis/benchmark_compile_iteration.py` with a task-specific
       manifest `benchmarks/ci/manifests/runtime272_reuse_compile.yaml`, stable ID
       `build.reuse.runtime272.v1`, exact clean before/after revisions, identical
       dependencies, Clang >=20, ci-derived Null/headless preset, disabled ccache,
@@ -99,7 +99,7 @@ substitutability remain binding; no new method integration is proposed.
       task's implementation changes, retain the raw runs and a negative decision
       record, and retire explicitly as rejected, not implemented. Do not discard
       unrelated work. Do not infer compile speed from line count.
-- [ ] Run focused tests and the default CPU gate; preserve test names/labels and
+- [x] Run focused tests and the default CPU gate; preserve test names/labels and
       existing assertions. Validate the measured manifest/results. Any repeatable
       performance claim follows AGENTS.md §8/§8b; this task asserts no speedup.
 
@@ -135,3 +135,58 @@ Codex and Claude Code reached consensus on 2026-09-21 before this task was
 filed. The [shared planning review](../../evidence/GEOM-099/claude-planning-review.md)
 records the agreed scope, corrections, rejected job-lifecycle candidate and
 compile-regression stop rules. Implementation and timing evidence remain due.
+
+## Execution plan — 2026-09-21
+
+Current-source comparison confirms that all eight 27-line topology blocks are
+identical: four plane vertices, two mesh triangles, all six graph edges, or five
+cloud slots; MeshFace alone resizes its property set to four. The ninth caller
+keeps its tetrahedron/ring topology and shares only property access. Existing
+method-specific samples, masks, backend/domain loops and all assertions remain
+in the nine test files. The shared const_cast moves unchanged.
+
+Add only `PointDomainFixture.hpp/.cpp` in `EditorFeatureTestSupportObjs`, with
+standard headers before module imports, and remove unused graph/mesh/populate
+imports after checking each complete caller. NormalEstimation retains its
+mesh/populate imports for later tests. Update support documentation and the
+canonical reuse route. Existing domain contract suites provide the behavioral
+characterization; run them before extraction and on both supported toolchains
+specified above afterward. Review the fixed diff with Claude Sonnet at medium.
+
+Freeze the ci-derived Clang 23, Null/headless, Debug, four-job, disabled-ccache
+measurement identity before edits; retain a pre-edit pilot and three alternating
+matched samples per arm. The broad-before/narrow-after declaration probes are
+explicitly different compilation scopes. New fixture implementation edit cost
+is supplemental only. All original stop thresholds remain unchanged.
+
+The fresh Clang 20 check additionally sets `-DVCPKG_MANIFEST_INSTALL=OFF` so
+it uses the already resolved packages without replacing the shared ci vcpkg
+installation used by the frozen Clang 23 measurements. All project modules,
+the support producer and runtime contract executable still compile with Clang
+20. This protects dependency identity rather than changing the header-order
+or producer-linkage check.
+
+## Implementation and gate disposition — 2026-09-21
+
+The reviewed implementation is preserved in exact source
+`5f2f99ef0f5c05218ca4ed67b28da87ee9a2df32`. Eight topology consumers and nine
+property-access consumers now share the compiled fixture; all differing test
+inputs and assertions remain local. The complete affected code footprint is
+7,099 → 6,923 lines (-176), with no added regression tests.
+
+The [independent implementation review](../../evidence/RUNTIME-272/implementation-review.md)
+found no actionable defects. The [six-sample compile comparison](../../evidence/RUNTIME-272/measurements.md)
+passes every original frozen limit: clean wall -0.08%, compiler sum -0.02%;
+consumer edit wall -0.73%, compiler sum -2.28%; declaration scope rebuilds
+20 → 10 compiler jobs. No-op compiler work stays zero. The new helper edit
+cost is reported separately. These local measurements make no speedup claim.
+
+Focused ci cases (226), fresh Clang 20 cases (101), full ci (4,879 selected)
+and full ASan (3,230 selected) pass, with the expected GLFW skip in the full
+suites. Full UBSan fails only the independently baseline-reproduced
+[BUG-206](../bugs/BUG-206-uv-duplicate-submit-phase-race.md). No unrelated
+lifecycle or assertion change is included.
+
+- [ ] Required full UBSan repository gate resolved. Keep this task open and do
+      not retire while this limitation remains; continue the next independent
+      operator-selected task under the authorized blocker procedure.

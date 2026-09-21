@@ -1344,7 +1344,9 @@ if(TARGET ExtrinsicRuntime)
     )
 
     intrinsic_test_object_lib(EditorFeatureTestSupportObjs
-        SOURCES support/EditorFeatureTestContext.cpp
+        SOURCES
+            support/EditorFeatureTestContext.cpp
+            support/PointDomainFixture.cpp
         DEPS ExtrinsicRuntime
     )
 

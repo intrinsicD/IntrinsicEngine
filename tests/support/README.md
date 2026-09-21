@@ -16,6 +16,11 @@ frame statistics; renderer execution consumers import `Graphics.Renderer`
 themselves. Asset import uses command callbacks; the context does not borrow the
 live asset service. Tests that use that service import its module directly.
 
+`PointDomainFixture.hpp` exposes the narrow shared source builder and property-set
+accessor for runtime point-domain contracts. Its mesh/graph construction and domain
+resolution compile in `PointDomainFixture.cpp` through `EditorFeatureTestSupportObjs`;
+method-specific samples, expected values and failure injection stay in each test.
+
 `GraphicsTestSupport.hpp` declares command-pass inspection and exact readback
 format conversion. The bodies compile once in `GraphicsTestSupport.cpp` through
 `GraphicsTestSupportObjs`, linked into the graphics CPU contract and Vulkan

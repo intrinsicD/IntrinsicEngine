@@ -6,6 +6,7 @@
 #include <limits>
 #include <vector>
 #include "SandboxEditorJobHarness.hpp"
+#include "PointDomainFixture.hpp"
 import Extrinsic.Runtime.RegistrationOperations;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.WorldRegistry;
@@ -47,8 +48,7 @@ namespace
             GS::PopulateFromGraph(scene.Raw(), entity, graph);
         }
         else scene.Raw().emplace<GS::Vertices>(entity).Properties.Resize(5);
-        auto available=R::BuildGeometryAvailability(scene.Raw(), entity);
-        auto* properties=const_cast<Geometry::PropertySet*>(R::ResolveGeometryPropertySet(available,domain));
+        auto* properties = &Intrinsic::Tests::PointDomainProperties(scene, entity, domain);
         auto samples=properties->GetOrAdd<glm::vec3>("samples");
         for (std::size_t i=0; i<samples.Size(); ++i) samples[i]=points[i%4]+offset;
         auto keep=properties->GetOrAdd<float>("keep");

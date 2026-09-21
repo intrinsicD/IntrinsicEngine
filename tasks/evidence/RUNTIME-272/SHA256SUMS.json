@@ -1,0 +1,9 @@
+{
+  "code-footprint.json": "653552f89d6077c2e760f0299703ea94c1cfaf9ad8ba950e844b3c9f00c6d5b5",
+  "compile-summary.json": "6605a3266677ab0009a84aa9733cba089975fcef2bc8fa21b8d8f3f41ea53c01",
+  "implementation-review.md": "f1c31939a0525b8530d9d6079c5cf27550b17caffa0d96910d1e9ac1b164b0b1",
+  "implementation.patch.gz": "235e47ddf8a75d2cf06efe3195f1131f0ba4f23ff0a078dbfd04610d86af4680",
+  "measurements.md": "2f8d838fe2219014bc5e896f7093eeef2a5663a5246a87fcc928002357b3348c",
+  "raw-evidence.tar.gz": "875d3295bc96f8b33f5dad3b0b487293b098c7bdd87a3410d53a9e461ce1a930",
+  "sources.bundle": "5a2822bf4b2844f58389b96f813ce7ce144755f8acd626417f2153f87e9ae44d"
+}

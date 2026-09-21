@@ -1,0 +1,106 @@
+{
+  "before": "549c2d4b70a64a5bfeb8f1e6dd636fc86ee706f2",
+  "after": "5f2f99ef0f5c05218ca4ed67b28da87ee9a2df32",
+  "counting": "Physical lines, including blank lines, all affected implementation/declaration/caller/support and CMake files; no formatting compression credit. Regression tests shown separately. Documentation and evidence excluded from code totals.",
+  "files": [
+    {
+      "path": "tests/CMakeLists.txt",
+      "before_lines": 2837,
+      "after_lines": 2839,
+      "delta": 2,
+      "classification": "implementation"
+    },
+    {
+      "path": "tests/contract/runtime/Test.BilateralFilterOperations.cpp",
+      "before_lines": 275,
+      "after_lines": 243,
+      "delta": -32,
+      "classification": "implementation"
+    },
+    {
+      "path": "tests/contract/runtime/Test.DensityWeightOperations.cpp",
+      "before_lines": 349,
+      "after_lines": 316,
+      "delta": -33,
+      "classification": "implementation"
+    },
+    {
+      "path": "tests/contract/runtime/Test.DescriptorAnalysisOperations.cpp",
+      "before_lines": 276,
+      "after_lines": 244,
+      "delta": -32,
+      "classification": "implementation"
+    },
+    {
+      "path": "tests/contract/runtime/Test.KernelDensityOperations.cpp",
+      "before_lines": 447,
+      "after_lines": 414,
+      "delta": -33,
+      "classification": "implementation"
+    },
+    {
+      "path": "tests/contract/runtime/Test.KeypointAnalysisOperations.cpp",
+      "before_lines": 305,
+      "after_lines": 273,
+      "delta": -32,
+      "classification": "implementation"
+    },
+    {
+      "path": "tests/contract/runtime/Test.NormalEstimation.cpp",
+      "before_lines": 1106,
+      "after_lines": 1076,
+      "delta": -30,
+      "classification": "implementation"
+    },
+    {
+      "path": "tests/contract/runtime/Test.OutlierAnalysis.cpp",
+      "before_lines": 649,
+      "after_lines": 616,
+      "delta": -33,
+      "classification": "implementation"
+    },
+    {
+      "path": "tests/contract/runtime/Test.PointSpacingOperations.cpp",
+      "before_lines": 477,
+      "after_lines": 445,
+      "delta": -32,
+      "classification": "implementation"
+    },
+    {
+      "path": "tests/contract/runtime/Test.RegistrationDomains.cpp",
+      "before_lines": 378,
+      "after_lines": 378,
+      "delta": 0,
+      "classification": "implementation"
+    },
+    {
+      "path": "tests/support/PointDomainFixture.cpp",
+      "before_lines": 0,
+      "after_lines": 58,
+      "delta": 58,
+      "classification": "implementation"
+    },
+    {
+      "path": "tests/support/PointDomainFixture.hpp",
+      "before_lines": 0,
+      "after_lines": 21,
+      "delta": 21,
+      "classification": "implementation"
+    }
+  ],
+  "implementation": {
+    "before_lines": 7099,
+    "after_lines": 6923,
+    "delta": -176
+  },
+  "regression_tests": {
+    "before_lines": 0,
+    "after_lines": 0,
+    "delta": 0
+  },
+  "total": {
+    "before_lines": 7099,
+    "after_lines": 6923,
+    "delta": -176
+  }
+}

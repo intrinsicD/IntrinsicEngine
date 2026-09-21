@@ -10,6 +10,7 @@
 #include <gtest/gtest.h>
 #include "EditorFeatureTestContext.hpp"
 #include "SandboxEditorJobHarness.hpp"
+#include "PointDomainFixture.hpp"
 
 import Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.Runtime.EditorProcessing;
@@ -24,52 +25,19 @@ import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
-import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.Graphics.Component.VisualizationConfig;
-import Geometry.HalfedgeMesh;
-import Geometry.Graph;
 
 namespace R = Extrinsic::Runtime;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
 using D = R::GeometryElementDomain;
+using Intrinsic::Tests::PointDomainProperties;
 namespace
 {
     constexpr std::array<glm::vec3, 4> plane{{{0, 0, 0}, {2, 0, 0}, {0, 3, 0}, {2, 3, 0}}};
-    Geometry::PropertySet &Properties(Extrinsic::ECS::Scene::Registry &scene, entt::entity entity, D domain)
-    {
-        return *const_cast<Geometry::PropertySet *>(
-            R::ResolveGeometryPropertySet(R::BuildGeometryAvailability(scene.Raw(), entity), domain));
-    }
     entt::entity Make(Extrinsic::ECS::Scene::Registry &scene, D domain)
     {
-        auto entity = scene.Create();
-        if (domain >= D::MeshVertex && domain <= D::MeshFace)
-        {
-            Geometry::HalfedgeMesh::Mesh mesh;
-            auto a = mesh.AddVertex(plane[0]), b = mesh.AddVertex(plane[1]), c = mesh.AddVertex(plane[2]),
-                 d = mesh.AddVertex(plane[3]);
-            (void)mesh.AddTriangle(a, b, c);
-            (void)mesh.AddTriangle(c, b, d);
-            GS::PopulateFromMesh(scene.Raw(), entity, mesh);
-            if (domain == D::MeshFace)
-                scene.Raw().get<GS::Faces>(entity).Properties.Resize(4);
-        }
-        else if (domain != D::PointCloudPoint)
-        {
-            Geometry::Graph::Graph graph;
-            auto a = graph.AddVertex(plane[0]), b = graph.AddVertex(plane[1]), c = graph.AddVertex(plane[2]),
-                 d = graph.AddVertex(plane[3]);
-            (void)graph.AddEdge(a, b);
-            (void)graph.AddEdge(a, c);
-            (void)graph.AddEdge(a, d);
-            (void)graph.AddEdge(b, c);
-            (void)graph.AddEdge(b, d);
-            (void)graph.AddEdge(c, d);
-            GS::PopulateFromGraph(scene.Raw(), entity, graph);
-        }
-        else
-            scene.Raw().emplace<GS::Vertices>(entity).Properties.Resize(5);
-        auto &props = Properties(scene, entity, domain);
+        auto entity = Intrinsic::Tests::MakePointDomainSource(scene, domain);
+        auto &props = PointDomainProperties(scene, entity, domain);
         auto samples = props.GetOrAdd<glm::vec3>("samples");
         for (std::size_t i = 0; i < samples.Size(); ++i)
             samples[i] = {float(i%3),float(i/3),.15f*float(int(i%3)-1)};
@@ -117,7 +85,7 @@ TEST(DescriptorAnalysisConfig, RoundTripAndSharedPreviewApplyRun)
     };
     auto commands = R::BindEditorProcessingCommands(context);
     ASSERT_TRUE(R::PreviewEditorDescriptorAnalysisCommand(commands, config).Enabled);
-    EXPECT_FALSE(Properties(scene, entity, D::MeshFace).Exists("descriptor.alpha0"));
+    EXPECT_FALSE(PointDomainProperties(scene, entity, D::MeshFace).Exists("descriptor.alpha0"));
     ASSERT_TRUE(R::ApplyEditorDescriptorAnalysisConfig(commands, config).Succeeded());
     ASSERT_TRUE(R::GetEditorDescriptorAnalysisConfig(commands));
     EXPECT_EQ(R::SerializeDescriptorAnalysisConfig(*R::GetEditorDescriptorAnalysisConfig(commands)),
@@ -145,7 +113,7 @@ TEST(DescriptorAnalysisOperations, EveryDomainReferenceCacheHistoryAndDeletedRow
         SCOPED_TRACE(d);
         R::WorldRegistry worlds;auto world=worlds.CreateWorld("descriptors");auto& scene=*worlds.Get(world);
         R::SpatialIndexCache cache(worlds);auto entity=Make(scene,D(d));auto c=Config(entity,D(d));
-        auto& props=Properties(scene,entity,D(d));const auto size=props.Size();
+        auto& props=PointDomainProperties(scene,entity,D(d));const auto size=props.Size();
         const bool half=D(d)==D::MeshHalfedge || D(d)==D::GraphHalfedge;
         if(half)scene.Raw().get<GS::Edges>(entity).Properties.GetOrAdd<bool>("e:deleted")[1]=true;
         else props.GetOrAdd<bool>(D(d)==D::MeshFace?"f:deleted":(D(d)==D::MeshEdge || D(d)==D::GraphEdge)?"e:deleted":"v:deleted")[2]=true;
@@ -212,7 +180,7 @@ TEST(DescriptorAnalysisOperations, JobsRejectChangedNormalsEveryOutputAndCancell
     for(unsigned change=0;change<7;++change)
     {
         SCOPED_TRACE(change);Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::MeshVertex);auto c=Config(entity,D::MeshVertex);
-        auto& props=Properties(scene,entity,D::MeshVertex);
+        auto& props=PointDomainProperties(scene,entity,D::MeshVertex);
         Intrinsic::Tests::EditorFeatureTestContext context;context.Scene=&scene;R::EditorCommandHistory history;context.CommandHistory=&history;
         std::optional<R::EditorDescriptorAnalysisResult> delivered;int deliveries=0;
         auto onComplete=[&](R::EditorDescriptorAnalysisResult r){++deliveries;delivered=std::move(r);};
@@ -232,7 +200,7 @@ TEST(DescriptorAnalysisOperations, JobsRejectChangedNormalsEveryOutputAndCancell
 TEST(DescriptorAnalysisOperations, InvalidNormalsScaleAndOutputPreflightRetainData)
 {
     Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::MeshVertex);auto c=Config(entity,D::MeshVertex);
-    auto& props=Properties(scene,entity,D::MeshVertex);
+    auto& props=PointDomainProperties(scene,entity,D::MeshVertex);
     const auto context=R::BindEditorProcessingCommands(R::EditorProcessingContext{.Scene=&scene});
     for(auto name:{"samples","directions","v:deleted","v:connectivity"})
     {auto bad=c;bad.Outputs[32].Name=name;EXPECT_FALSE(R::PreviewEditorDescriptorAnalysisCommand(context,bad).Enabled);}
@@ -255,7 +223,7 @@ TEST(DescriptorAnalysisOperations, ResolvedScaleDiagnosticsPreserveAutomaticAndE
     auto& scene=*worlds.Get(world);
     R::SpatialIndexCache cache(worlds);
     const auto entity=Make(scene,D::PointCloudPoint);
-    auto positions=Properties(scene,entity,D::PointCloudPoint).Get<glm::vec3>("samples");
+    auto positions=PointDomainProperties(scene,entity,D::PointCloudPoint).Get<glm::vec3>("samples");
     for(std::size_t i=0;i<plane.size();++i)positions[i]=plane[i];
     const auto commands=R::BindEditorProcessingCommands(R::EditorProcessingContext{
         .Scene=&scene,.World=world,.SpatialIndices=&cache});

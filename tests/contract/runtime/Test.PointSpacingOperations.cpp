@@ -10,6 +10,7 @@
 #include <gtest/gtest.h>
 #include "EditorFeatureTestContext.hpp"
 #include "SandboxEditorJobHarness.hpp"
+#include "PointDomainFixture.hpp"
 
 import Extrinsic.Runtime.PointFieldOperations;
 import Extrinsic.Runtime.SpatialIndexCache;
@@ -23,52 +24,19 @@ import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
-import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.Graphics.Component.VisualizationConfig;
-import Geometry.HalfedgeMesh;
-import Geometry.Graph;
 
 namespace R = Extrinsic::Runtime;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
 using D = R::GeometryElementDomain;
+using Intrinsic::Tests::PointDomainProperties;
 namespace
 {
     constexpr std::array<glm::vec3, 4> plane{{{0, 0, 0}, {2, 0, 0}, {0, 3, 0}, {2, 3, 0}}};
-    Geometry::PropertySet &Properties(Extrinsic::ECS::Scene::Registry &scene, entt::entity entity, D domain)
-    {
-        return *const_cast<Geometry::PropertySet *>(
-            R::ResolveGeometryPropertySet(R::BuildGeometryAvailability(scene.Raw(), entity), domain));
-    }
     entt::entity Make(Extrinsic::ECS::Scene::Registry &scene, D domain)
     {
-        auto entity = scene.Create();
-        if (domain >= D::MeshVertex && domain <= D::MeshFace)
-        {
-            Geometry::HalfedgeMesh::Mesh mesh;
-            auto a = mesh.AddVertex(plane[0]), b = mesh.AddVertex(plane[1]), c = mesh.AddVertex(plane[2]),
-                 d = mesh.AddVertex(plane[3]);
-            (void)mesh.AddTriangle(a, b, c);
-            (void)mesh.AddTriangle(c, b, d);
-            GS::PopulateFromMesh(scene.Raw(), entity, mesh);
-            if (domain == D::MeshFace)
-                scene.Raw().get<GS::Faces>(entity).Properties.Resize(4);
-        }
-        else if (domain != D::PointCloudPoint)
-        {
-            Geometry::Graph::Graph graph;
-            auto a = graph.AddVertex(plane[0]), b = graph.AddVertex(plane[1]), c = graph.AddVertex(plane[2]),
-                 d = graph.AddVertex(plane[3]);
-            (void)graph.AddEdge(a, b);
-            (void)graph.AddEdge(a, c);
-            (void)graph.AddEdge(a, d);
-            (void)graph.AddEdge(b, c);
-            (void)graph.AddEdge(b, d);
-            (void)graph.AddEdge(c, d);
-            GS::PopulateFromGraph(scene.Raw(), entity, graph);
-        }
-        else
-            scene.Raw().emplace<GS::Vertices>(entity).Properties.Resize(5);
-        auto &props = Properties(scene, entity, domain);
+        auto entity = Intrinsic::Tests::MakePointDomainSource(scene, domain);
+        auto &props = PointDomainProperties(scene, entity, domain);
         auto samples = props.GetOrAdd<glm::vec3>("samples");
         for (std::size_t i = 0; i < samples.Size(); ++i)
             samples[i] = {float(i)*0.01f,0,0};
@@ -100,7 +68,7 @@ TEST(PointSpacingOperations, CopiedSummaryDescribesOnlyLiveSamples)
     auto& scene = *worlds.Get(world);
     R::SpatialIndexCache cache(worlds);
     const auto entity = Make(scene, D::PointCloudPoint);
-    auto samples = Properties(scene, entity, D::PointCloudPoint).Get<glm::vec3>("samples");
+    auto samples = PointDomainProperties(scene, entity, D::PointCloudPoint).Get<glm::vec3>("samples");
     std::ranges::copy(plane, samples.Vector().begin());
     auto config = Config(entity, D::PointCloudPoint);
     const R::EditorProcessingContext context{.Scene = &scene, .World = world, .SpatialIndices = &cache};
@@ -133,7 +101,7 @@ TEST(PointSpacingOperations, DeletionMaskValidationPreservesPreviewApplyRejectio
             const auto config = Config(entity, D(domain));
             const bool halfedge = D(domain) == D::MeshHalfedge || D(domain) == D::GraphHalfedge;
             if (fault >= 3 && !halfedge) continue;
-            auto& input = Properties(scene, entity, D(domain));
+            auto& input = PointDomainProperties(scene, entity, D(domain));
             auto& masks = halfedge ? scene.Raw().get<GS::Edges>(entity).Properties : input;
             const char* name = halfedge || D(domain) == D::MeshEdge || D(domain) == D::GraphEdge
                 ? "e:deleted" : D(domain) == D::MeshFace ? "f:deleted" : "v:deleted";
@@ -173,7 +141,7 @@ TEST(PointSpacingOperations, InputCatalogsShareRevisionMetadataWithoutChangingEl
         SCOPED_TRACE(domain);
         Extrinsic::ECS::Scene::Registry scene;
         const auto entity = Make(scene, D(domain));
-        auto& props = Properties(scene, entity, D(domain));
+        auto& props = PointDomainProperties(scene, entity, D(domain));
         const auto config = Config(entity, D(domain));
         R::EditorProcessingContext context{.Scene = &scene};
         const auto commands = R::BindEditorProcessingCommands(context);
@@ -226,7 +194,7 @@ TEST(PointSpacingOperations, SingleSampleRemainsDiscoverableOnlyForCompatibleMet
 {
     Extrinsic::ECS::Scene::Registry scene;
     const auto entity = Make(scene, D::PointCloudPoint);
-    auto& props = Properties(scene, entity, D::PointCloudPoint);
+    auto& props = PointDomainProperties(scene, entity, D::PointCloudPoint);
     props.Resize(1);
     const auto config = Config(entity, D::PointCloudPoint);
     R::EditorProcessingContext context{.Scene = &scene};
@@ -244,7 +212,7 @@ TEST(PointSpacingOperations, QueuedJobsRejectStaleInputsOutputsAndCancellation)
     {
         SCOPED_TRACE(change);
         Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::MeshVertex);auto config=Config(entity,D::MeshVertex);
-        auto& props=Properties(scene,entity,D::MeshVertex);
+        auto& props=PointDomainProperties(scene,entity,D::MeshVertex);
         Intrinsic::Tests::EditorFeatureTestContext context;context.Scene=&scene;
         R::EditorCommandHistory history;context.CommandHistory=&history;
         std::optional<R::EditorPointSpacingResult> delivered;
@@ -293,7 +261,7 @@ TEST(PointSpacingConfig, RoundTripAndSharedPreviewApplyRun)
     };
     auto commands = R::BindEditorProcessingCommands(context);
     ASSERT_TRUE(R::PreviewEditorPointSpacingCommand(commands, config).Enabled);
-    EXPECT_FALSE(Properties(scene, entity, D::MeshFace).Exists("radii"));
+    EXPECT_FALSE(PointDomainProperties(scene, entity, D::MeshFace).Exists("radii"));
     ASSERT_TRUE(R::ApplyEditorPointSpacingConfig(commands, config).Succeeded());
     ASSERT_TRUE(R::GetEditorPointSpacingConfig(commands));
     EXPECT_EQ(R::SerializePointSpacingConfig(*R::GetEditorPointSpacingConfig(commands)),
@@ -319,7 +287,7 @@ TEST(PointSpacingOperations, EveryDomainPublishesNamedRadiiAndPreservesDeletedRo
         SCOPED_TRACE(k);
         R::WorldRegistry worlds;auto world=worlds.CreateWorld("radii");auto& scene=*worlds.Get(world);
         R::SpatialIndexCache cache(worlds);auto entity=Make(scene,D(d));auto config=Config(entity,D(d));config.ScaleFactor=scale;config.KNeighbors=k;
-        auto& props=Properties(scene,entity,D(d));
+        auto& props=PointDomainProperties(scene,entity,D(d));
         if (D(d) == D::PointCloudPoint)
         {
             props.Resize(70);
@@ -390,7 +358,7 @@ TEST(PointSpacingOperations, InvalidUnsupportedAndNumericalFailuresRetainOutput)
 {
     Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::PointCloudPoint);auto config=Config(entity,D::PointCloudPoint);
     R::EditorProcessingContext context{.Scene=&scene};
-    auto& props=Properties(scene,entity,D::PointCloudPoint);props.GetOrAdd<float>("radii").Vector().assign(props.Size(),77);
+    auto& props=PointDomainProperties(scene,entity,D::PointCloudPoint);props.GetOrAdd<float>("radii").Vector().assign(props.Size(),77);
     for(const char* name:{"v:deleted","samples"})
     {auto bad=config;bad.Radii.Name=name;EXPECT_FALSE(R::PreviewEditorPointSpacingCommand(R::BindEditorProcessingCommands(context), bad).Enabled);}
     auto unrelatedName=config;unrelatedName.Radii.Name="h:next";
@@ -410,7 +378,7 @@ TEST(PointSpacingOperations, NewOutputUndoAndPositionEditsRebuildTheCache)
     config.Backend=R::PointSpacingBackend::CpuLBVH;config.KNeighbors=std::numeric_limits<std::uint32_t>::max();
     R::EditorCommandHistory history;
     R::EditorProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
-    auto& props=Properties(scene,entity,D::PointCloudPoint);
+    auto& props=PointDomainProperties(scene,entity,D::PointCloudPoint);
     ASSERT_TRUE(R::ApplyEditorPointSpacingCommand(R::BindEditorProcessingCommands(context), config).Succeeded());
     ASSERT_TRUE(history.Undo().Succeeded());EXPECT_FALSE(props.Exists("radii"));
     ASSERT_TRUE(history.Redo().Succeeded());EXPECT_TRUE(props.Exists("radii"));
@@ -426,7 +394,7 @@ TEST(PointSpacingOperations, ReplacedStorageRejectsUndo)
         Extrinsic::ECS::Scene::Registry scene;
         auto entity = Make(scene, D::PointCloudPoint);
         auto config = Config(entity, D::PointCloudPoint);
-        auto& props = Properties(scene, entity, D::PointCloudPoint);
+        auto& props = PointDomainProperties(scene, entity, D::PointCloudPoint);
         R::EditorCommandHistory history;
         R::EditorProcessingContext context{.Scene=&scene, .CommandHistory=&history};
         ASSERT_TRUE(R::ApplyEditorPointSpacingCommand(R::BindEditorProcessingCommands(context), config).Succeeded());
