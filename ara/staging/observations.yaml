@@ -4064,3 +4064,15 @@ observations:
     promoted_to: logic/claims.md:C106
     crystallized_via: empirical-resolution
     stale: false
+
+  - id: O240
+    timestamp: 2026-09-21T12:30+02:00
+    provenance: ai-executed
+    content: EnTT member and class extern probes retain the allocation chain; class extern removes only part. No source batch opened.
+    context: Three standalone Clang23 compiles; no target or module measurements. Claude independently recommends against implementation.
+    potential_type: claim
+    bound_to: [N632]
+    promoted: true
+    promoted_to: logic/claims.md:C107
+    crystallized_via: topic-abandonment
+    stale: false

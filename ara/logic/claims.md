@@ -2331,3 +2331,14 @@
 - **Dependencies**: []
 - **Tags**: compilation, named modules, canonical property storage, local matched observations
 - **From staging**: O239
+
+## C107: Rejected EnTT allocation-boundary feasibility hypothesis
+- **Statement**: Extern declarations for EnTT's assure member or storage/mixin classes suppress the repeated mutable-read allocation/storage instantiation chain sufficiently to justify a component-owner implementation batch.
+- **Status**: refuted — the stated chain-suppression feasibility gate fails in a standalone Clang23 probe. Class extern declarations suppress only part of the chain. No engine source changed; named-module feasibility, owner cost and target clean/incremental performance remain unmeasured. This does not reject every possible EnTT optimization.
+- **Provenance**: ai-suggested
+- **Crystallized via**: topic-abandonment
+- **Falsification criteria**: Candidate consumer still instantiates assure and allocate_shared/storage construction after the extern declaration. Both tested variants do; no target-speed claim follows from diagnostic durations.
+- **Proof**: [ara/evidence/diagnostics/entt_storage_rejected/README.md, ara/evidence/diagnostics/entt_storage_rejected/summary.json, ara/evidence/diagnostics/entt_storage_rejected/evidence-index.json, ara/evidence/diagnostics/entt_storage_rejected/raw-evidence.tar.gz]
+- **Dependencies**: []
+- **Tags**: compilation, rejected hypothesis, diagnostic-only, EnTT
+- **From staging**: O240

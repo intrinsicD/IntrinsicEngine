@@ -634,11 +634,12 @@ sessions:
 
 - id: 2026-09-21_001
   date: '2026-09-21'
-  summary: 'Fixture and canonical-property batches measured; mock pilot rejected; BUILD-010 closed with local consumer savings and owner cost retained.'
-  turn_count: 3
-  events_count: 7
+  summary: 'BUILD-010 closed with local consumer savings and owner cost retained; mock and EnTT feasibility candidates rejected without new obligations.'
+  turn_count: 4
+  events_count: 9
   claims_touched:
   - C104
   - C105
   - C106
+  - C107
   open_threads: 2

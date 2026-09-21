@@ -1,0 +1,158 @@
+{
+  "source_commit": "6c4e8164f847b719a3a6334122ebbd0a479bd72d",
+  "repository_source_changed": false,
+  "kind": "standalone feasibility diagnostic, not target benchmark",
+  "compiler": "Ubuntu clang version 23.0.0 (++20260614081921+80b1dddb5a24-1~exp1~20260614202044.1664)",
+  "variants": [
+    {
+      "name": "baseline",
+      "argv": [
+        "/usr/bin/clang++-23",
+        "-std=c++23",
+        "-O0",
+        "-g",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-isystem",
+        "/home/alex/Documents/IntrinsicEngine/external/vcpkg-installed/ci/x64-linux/include",
+        "-ftime-trace=/tmp/intrinsic-entt-assessment-20260921/baseline.json",
+        "-c",
+        "/tmp/intrinsic-entt-assessment-20260921/baseline.cpp",
+        "-o",
+        "/tmp/intrinsic-entt-assessment-20260921/baseline.o"
+      ],
+      "elapsed": 1.4521490109909791,
+      "returncode": 0,
+      "source_sha256": "aab113cd040448c9714fb7ede4cd9a88c12f66761f7c45c8e4940af1a6adac37",
+      "assure_events": [
+        {
+          "pid": 1032803,
+          "tid": 1032803,
+          "ts": 797668,
+          "ph": "X",
+          "dur": 12459,
+          "name": "InstantiateFunction",
+          "args": {
+            "detail": "entt::basic_registry<>::assure<Component>"
+          }
+        }
+      ],
+      "allocation_events": [
+        {
+          "pid": 1032803,
+          "tid": 1032803,
+          "ts": 1091084,
+          "ph": "X",
+          "dur": 79368,
+          "name": "InstantiateFunction",
+          "args": {
+            "detail": "std::allocate_shared<entt::basic_sigh_mixin<entt::basic_storage<Component>, entt::basic_registry<>>, std::allocator<entt::entity>, std::allocator<entt::entity>>"
+          }
+        }
+      ]
+    },
+    {
+      "name": "assure",
+      "argv": [
+        "/usr/bin/clang++-23",
+        "-std=c++23",
+        "-O0",
+        "-g",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-isystem",
+        "/home/alex/Documents/IntrinsicEngine/external/vcpkg-installed/ci/x64-linux/include",
+        "-ftime-trace=/tmp/intrinsic-entt-assessment-20260921/assure.json",
+        "-c",
+        "/tmp/intrinsic-entt-assessment-20260921/assure.cpp",
+        "-o",
+        "/tmp/intrinsic-entt-assessment-20260921/assure.o"
+      ],
+      "elapsed": 1.284234129008837,
+      "returncode": 0,
+      "source_sha256": "a62992d4ef573b2c6d6a92a032b7578c59cd15d68846db65e6f1c4450a2168ca",
+      "assure_events": [
+        {
+          "pid": 1032805,
+          "tid": 1032805,
+          "ts": 797996,
+          "ph": "X",
+          "dur": 12534,
+          "name": "InstantiateFunction",
+          "args": {
+            "detail": "entt::basic_registry<>::assure<Component>"
+          }
+        }
+      ],
+      "allocation_events": [
+        {
+          "pid": 1032805,
+          "tid": 1032805,
+          "ts": 1097385,
+          "ph": "X",
+          "dur": 78056,
+          "name": "InstantiateFunction",
+          "args": {
+            "detail": "std::allocate_shared<entt::basic_sigh_mixin<entt::basic_storage<Component>, entt::basic_registry<>>, std::allocator<entt::entity>, std::allocator<entt::entity>>"
+          }
+        }
+      ]
+    },
+    {
+      "name": "storage",
+      "argv": [
+        "/usr/bin/clang++-23",
+        "-std=c++23",
+        "-O0",
+        "-g",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-isystem",
+        "/home/alex/Documents/IntrinsicEngine/external/vcpkg-installed/ci/x64-linux/include",
+        "-ftime-trace=/tmp/intrinsic-entt-assessment-20260921/storage.json",
+        "-c",
+        "/tmp/intrinsic-entt-assessment-20260921/storage.cpp",
+        "-o",
+        "/tmp/intrinsic-entt-assessment-20260921/storage.o"
+      ],
+      "elapsed": 1.399109119985951,
+      "returncode": 0,
+      "source_sha256": "453b3e528a9a305fb1411fb3fd40389b15d69ca8278bdeae39669212cc93df44",
+      "assure_events": [
+        {
+          "pid": 1032808,
+          "tid": 1032808,
+          "ts": 803970,
+          "ph": "X",
+          "dur": 12417,
+          "name": "InstantiateFunction",
+          "args": {
+            "detail": "entt::basic_registry<>::assure<Component>"
+          }
+        }
+      ],
+      "allocation_events": [
+        {
+          "pid": 1032808,
+          "tid": 1032808,
+          "ts": 1099995,
+          "ph": "X",
+          "dur": 48556,
+          "name": "InstantiateFunction",
+          "args": {
+            "detail": "std::allocate_shared<entt::basic_sigh_mixin<entt::basic_storage<Component>, entt::registry>, std::allocator<entt::entity>, std::allocator<entt::entity>>"
+          }
+        }
+      ]
+    }
+  ],
+  "dependency_hashes": {
+    "external/vcpkg-installed/ci/x64-linux/include/entt/entity/registry.hpp": "189c865b5fcba86b8939e82732b86adbe5dd1352d17d51d13d88e489afe58e1d",
+    "external/vcpkg-installed/ci/x64-linux/include/entt/entity/storage.hpp": "8557204c1af0a6c250dcbdf703530610acac87185473a7693d71e89ceee73fb4",
+    "external/vcpkg-installed/ci/x64-linux/include/entt/entity/mixin.hpp": "aeca7040702a43af934d50d2ba8358e8f40453de5ece54bfae0cf611aff5f14d"
+  },
+  "retained_trace_hashes": {
+    "/tmp/intrinsic-compile-graph/property-instantiation-after/Test.SandboxEditorMeshMethods.cpp.json": "731ec4c5067aab18f382e410cc58c98593b7921ea3ec5ea7113457fddfd5d9c9",
+    "/tmp/intrinsic-compile-graph/property-instantiation-after/Test.SandboxEditorClusteringMethods.cpp.json": "ff0015782cf0de03f4051a796892f94fc5a5d17c0586cb6f84e5daebb18ba758"
+  }
+}

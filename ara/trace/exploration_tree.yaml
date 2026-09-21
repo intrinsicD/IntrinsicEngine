@@ -13627,3 +13627,14 @@ tree:
     result: BUILD-010 accepted via matched consumer rebuilds; clean below its threshold and owner regression retained. Source a9e0bc149, full CPU and Clang20 property checks pass; no deferred task.
     evidence: [ara/evidence/tables/build010_canonical_property_measurement.md]
     status: resolved
+
+  - id: N632
+    type: dead_end
+    title: Reject EnTT allocation boundary before repository edits
+    provenance: ai-executed
+    timestamp: 2026-09-21T12:30+02:00
+    hypothesis: Extern declarations suppress mutable-read allocation chains in canonical component consumers.
+    failure_mode: Deduced-return assure and allocation chain remain; storage constructors still instantiate. Added interface dependency has no justified net benefit.
+    lesson: Test third-party inline and deduced-return suppression before introducing module dependency costs.
+    evidence: [ara/evidence/diagnostics/entt_storage_rejected/README.md]
+    status: resolved

@@ -2780,3 +2780,8 @@ entries:
     notes:
     - O239/C106 crystallize through the completed ABBA experiment; consumer gate passes, clean gate does not, owner regression retained.
     - BUILD-010 is retired independently of RUNTIME-270 and BUILD-006. No broader performance claim or new open obligation; historical frequency is contextual only.
+
+  - turn: 2026-09-21_001#4
+    notes:
+    - O240/C107 close a narrow failed suppression hypothesis, not a target performance claim. No new task or source change.
+    - Claude estimates remain identified as estimates; the actual three-compile probe is retained. Prior BUILD-010 results are not credited again.
