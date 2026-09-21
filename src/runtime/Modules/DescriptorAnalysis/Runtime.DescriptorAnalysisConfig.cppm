@@ -14,8 +14,8 @@ export namespace Extrinsic::Runtime
     inline constexpr std::string_view kDescriptorAnalysisConfigSectionName="sandbox.descriptor_analysis";
     inline constexpr std::string_view kDescriptorAnalysisConfigSectionSchemaId="intrinsic.runtime.sandbox.descriptor_analysis";
     enum class DescriptorAnalysisBackend : std::uint8_t { CpuKDTree, CpuLBVH, VulkanLBVH };
-    [[nodiscard]] const char* ToString(DescriptorAnalysisBackend) noexcept;
-    [[nodiscard]] std::array<GeometryPropertyRef,33> MakeDescriptorOutputProperties(
+    extern "C++" [[nodiscard]] const char* ToString(DescriptorAnalysisBackend) noexcept;
+    extern "C++" [[nodiscard]] std::array<GeometryPropertyRef,33> MakeDescriptorOutputProperties(
         GeometryElementDomain domain=GeometryElementDomain::Unknown,std::string_view prefix="fpfh");
     struct DescriptorAnalysisConfig
     {
@@ -27,10 +27,10 @@ export namespace Extrinsic::Runtime
         std::uint32_t MaxNeighbors{}, GpuQueryBatchSize{4096}, GpuRadiusCapacity{256};
         float FeatureRadius{};
     };
-    [[nodiscard]] std::string SerializeDescriptorAnalysisConfig(const DescriptorAnalysisConfig&);
-    [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateDescriptorAnalysisConfigSection(
+    extern "C++" [[nodiscard]] std::string SerializeDescriptorAnalysisConfig(const DescriptorAnalysisConfig&);
+    extern "C++" [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateDescriptorAnalysisConfigSection(
         std::string_view payload,std::string_view reference,std::string_view subject);
-    [[nodiscard]] std::optional<DescriptorAnalysisConfig> GetDescriptorAnalysisConfig(const Core::Config::EngineConfig&);
-    void SetDescriptorAnalysisConfig(Core::Config::EngineConfig&,const DescriptorAnalysisConfig&);
-    [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeDescriptorAnalysisConfigSectionRegistration();
+    extern "C++" [[nodiscard]] std::optional<DescriptorAnalysisConfig> GetDescriptorAnalysisConfig(const Core::Config::EngineConfig&);
+    extern "C++" void SetDescriptorAnalysisConfig(Core::Config::EngineConfig&,const DescriptorAnalysisConfig&);
+    extern "C++" [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeDescriptorAnalysisConfigSectionRegistration();
 }

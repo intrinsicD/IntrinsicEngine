@@ -138,14 +138,6 @@ target_sources(${target_name}
         Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp
         Modules/Curvature/Runtime.MeshCurvatureConfig.cpp
         Modules/Geodesics/Runtime.GeodesicsConfig.cpp
-        Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp
-        Modules/KernelDensity/Runtime.KernelDensityConfig.cpp
-        Modules/PointSpacing/Runtime.PointSpacingConfig.cpp
-        Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp
-        Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp
-        Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp
-        Modules/DensityWeight/Runtime.DensityWeightConfig.cpp
-        Modules/PointConstruction/Runtime.PointConstructionConfig.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Density.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Spacing.cpp
@@ -158,14 +150,15 @@ target_sources(${target_name}
         Editor/Operations/Runtime.GeometryProcessingOperations.DensityWeights.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Construction.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.cpp
-        Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp
-        Modules/Registration/Runtime.RegistrationConfig.cpp
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cpp
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp
         Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+        Config/internal/Runtime.PointNormalsRegistrationConfigCodecs.cpp
+        Config/internal/Runtime.PointFeaturesConfigCodecs.cpp
+        Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp
         Editor/Runtime.EditorCommandHistory.cpp
         Editor/Runtime.EditorCommon.Public.cpp
         Editor/Runtime.EditorWorkspaceAttachment.cpp

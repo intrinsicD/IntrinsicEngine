@@ -13,7 +13,7 @@ export namespace Extrinsic::Runtime
     inline constexpr std::string_view kBilateralFilterConfigSectionName="sandbox.bilateral_filter";
     inline constexpr std::string_view kBilateralFilterConfigSectionSchemaId="intrinsic.runtime.sandbox.bilateral_filter";
     enum class BilateralFilterBackend : std::uint8_t { CpuOctree, CpuLBVH, VulkanLBVH };
-    [[nodiscard]] const char* ToString(BilateralFilterBackend) noexcept;
+    extern "C++" [[nodiscard]] const char* ToString(BilateralFilterBackend) noexcept;
     struct BilateralFilterConfig
     {
         std::uint32_t StableEntityId{};
@@ -25,10 +25,10 @@ export namespace Extrinsic::Runtime
         float SpatialSigma{}, NormalSigma{.25f};
         std::uint32_t Iterations{1};
     };
-    [[nodiscard]] std::string SerializeBilateralFilterConfig(const BilateralFilterConfig&);
-    [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateBilateralFilterConfigSection(
+    extern "C++" [[nodiscard]] std::string SerializeBilateralFilterConfig(const BilateralFilterConfig&);
+    extern "C++" [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateBilateralFilterConfigSection(
         std::string_view payload,std::string_view reference,std::string_view subject);
-    [[nodiscard]] std::optional<BilateralFilterConfig> GetBilateralFilterConfig(const Core::Config::EngineConfig&);
-    void SetBilateralFilterConfig(Core::Config::EngineConfig&,const BilateralFilterConfig&);
-    [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeBilateralFilterConfigSectionRegistration();
+    extern "C++" [[nodiscard]] std::optional<BilateralFilterConfig> GetBilateralFilterConfig(const Core::Config::EngineConfig&);
+    extern "C++" void SetBilateralFilterConfig(Core::Config::EngineConfig&,const BilateralFilterConfig&);
+    extern "C++" [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeBilateralFilterConfigSectionRegistration();
 }

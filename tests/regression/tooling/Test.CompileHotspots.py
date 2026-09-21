@@ -969,6 +969,20 @@ class CompileIterationProbeTests(unittest.TestCase):
                     params, "header", "shared.hpp", [{"source": "a.cpp"}]
                 )
 
+    def test_relocated_consumers_use_the_measured_arm_and_fail_closed(self):
+        params = {"probe_sources": {"header": {
+            "before": ["one.cpp", "two.cpp"], "after": ["shared.cpp"]}}}
+        bench.validate_probe_sources(params, "header", "shared.hpp",
+                                     [{"source": "shared.cpp"}], arm="after")
+        with self.assertRaises(AssertionError):
+            bench.validate_probe_sources(params, "header", "shared.hpp",
+                                         [{"source": "one.cpp"}], arm="before")
+        with self.assertRaises(AssertionError):
+            bench.validate_probe_sources(params, "header", "shared.hpp",
+                                         [{"source": "shared.cpp"}], arm="before")
+        with self.assertRaises(KeyError):
+            bench.validate_probe_sources(params, "header", "shared.hpp", [], arm="missing")
+
     def test_source_probe_defaults_to_touched_source(self):
         bench.validate_probe_sources({}, "edit", "a.cpp", [{"source": "a.cpp"}])
         with self.assertRaisesRegex(AssertionError, "declared target sources"):

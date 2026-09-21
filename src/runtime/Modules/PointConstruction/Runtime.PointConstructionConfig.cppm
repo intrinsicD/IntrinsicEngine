@@ -25,8 +25,8 @@ export namespace Extrinsic::Runtime
         CpuLBVH,
         VulkanLBVH
     };
-    [[nodiscard]] const char* ToString(PointConstructionMethod) noexcept;
-    [[nodiscard]] const char* ToString(PointConstructionBackend) noexcept;
+    extern "C++" [[nodiscard]] const char* ToString(PointConstructionMethod) noexcept;
+    extern "C++" [[nodiscard]] const char* ToString(PointConstructionBackend) noexcept;
     struct PointConstructionConfig
     {
         std::uint32_t StableEntityId{};
@@ -45,13 +45,13 @@ export namespace Extrinsic::Runtime
         float BoundingBoxPadding{0.1f}, NormalAgreementPower{2}, KernelSigmaScale{2};
         float MinDistanceEpsilon{1e-12f};
     };
-    [[nodiscard]] std::string SerializePointConstructionConfig(const PointConstructionConfig&);
-    [[nodiscard]] Core::Config::EngineConfigSectionValidationResult
+    extern "C++" [[nodiscard]] std::string SerializePointConstructionConfig(const PointConstructionConfig&);
+    extern "C++" [[nodiscard]] Core::Config::EngineConfigSectionValidationResult
     ValidatePointConstructionConfigSection(std::string_view payload, std::string_view reference,
                                            std::string_view subject);
-    [[nodiscard]] std::optional<PointConstructionConfig>
+    extern "C++" [[nodiscard]] std::optional<PointConstructionConfig>
     GetPointConstructionConfig(const Core::Config::EngineConfig&);
-    void SetPointConstructionConfig(Core::Config::EngineConfig&, const PointConstructionConfig&);
-    [[nodiscard]] Core::Config::EngineConfigSectionRegistration
+    extern "C++" void SetPointConstructionConfig(Core::Config::EngineConfig&, const PointConstructionConfig&);
+    extern "C++" [[nodiscard]] Core::Config::EngineConfigSectionRegistration
     MakePointConstructionConfigSectionRegistration();
 } // namespace Extrinsic::Runtime

@@ -14,7 +14,7 @@ export namespace Extrinsic::Runtime
     inline constexpr std::string_view kDensityWeightConfigSectionName="sandbox.density_weights";
     inline constexpr std::string_view kDensityWeightConfigSectionSchemaId="intrinsic.runtime.sandbox.density_weights";
     enum class DensityWeightBackend : std::uint8_t { CpuKDTree, CpuLBVH, VulkanLBVH };
-    [[nodiscard]] const char* ToString(DensityWeightBackend) noexcept;
+    extern "C++" [[nodiscard]] const char* ToString(DensityWeightBackend) noexcept;
     struct DensityWeightConfig
     {
         std::uint32_t StableEntityId{};
@@ -26,10 +26,10 @@ export namespace Extrinsic::Runtime
         Geometry::PointCloud::Kernels::DensityWeightMode Mode{Geometry::PointCloud::Kernels::DensityWeightMode::Direct};
         std::uint32_t GpuQueryBatchSize{4096},GpuRadiusCapacity{256};
     };
-    [[nodiscard]] std::string SerializeDensityWeightConfig(const DensityWeightConfig&);
-    [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateDensityWeightConfigSection(
+    extern "C++" [[nodiscard]] std::string SerializeDensityWeightConfig(const DensityWeightConfig&);
+    extern "C++" [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateDensityWeightConfigSection(
         std::string_view payload,std::string_view reference,std::string_view subject);
-    [[nodiscard]] std::optional<DensityWeightConfig> GetDensityWeightConfig(const Core::Config::EngineConfig&);
-    void SetDensityWeightConfig(Core::Config::EngineConfig&,const DensityWeightConfig&);
-    [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeDensityWeightConfigSectionRegistration();
+    extern "C++" [[nodiscard]] std::optional<DensityWeightConfig> GetDensityWeightConfig(const Core::Config::EngineConfig&);
+    extern "C++" void SetDensityWeightConfig(Core::Config::EngineConfig&,const DensityWeightConfig&);
+    extern "C++" [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeDensityWeightConfigSectionRegistration();
 }

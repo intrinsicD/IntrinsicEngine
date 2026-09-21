@@ -43,3 +43,8 @@ The fixtures exercise paginated complete
 rows, capacity rejection, stale/cancelled work and history; EAR includes insertion
 and anisotropic methods include an additional estimated-normal request.
 These are opt-in correctness smoke timings, not a grid comparison or speedup.
+
+Compile-iteration manifests may map scenario paths and `probe_sources` by source
+arm when implementations move. Each arm touches the current owner and verifies
+its declared producers; target timings include every shared owner and link. See
+[analysis runner](../../tools/analysis/README.md).

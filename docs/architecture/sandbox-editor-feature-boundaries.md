@@ -150,15 +150,21 @@ implementation owner and is declared only in the private
 The config interface, shared codec and Sandbox config registration producers
 exclude the segmentation algorithm through
 `ConfigCompilationLocality.CurvatureInterface`. Consolidation token functions
-retain their feature implementation owner. Seven point-processing config
-implementations also reuse the shared TU's string-token property encoder,
-validator and name/domain decoder through `Runtime.PointConfigJson.hpp`.
+retain their feature implementation owner. Ten point-processing schemas likewise
+own globally attached functions compiled by three ordinary private translation
+units: `Runtime.PointNeighborhoodConfigCodecs.cpp` (outlier, density, spacing and
+weights), `Runtime.PointFeaturesConfigCodecs.cpp` (bilateral, keypoint, descriptor
+and construction), and `Runtime.PointNormalsRegistrationConfigCodecs.cpp`.
+These units share JSON header parsing and template instantiation within each
+cohort; they retain the original typed schemas, validators and token functions.
+They reuse the shared TU's string-token property encoder, validator and name/domain
+decoder through `Runtime.PointConfigJson.hpp`.
 Validation distinguishes malformed references from unknown domain tokens;
 five families reuse `ValidatePointConfigPropertyRefs` for their matching ordered
 per-field diagnostics. Each supplied field exists in the merged defaults; the
 first invalid reference wins before family-specific property relationship checks.
 Other families retain their own diagnostic wording and classification.
-Decoding retains the caller's expected value kind; family parsers stay feature-owned.
+Decoding retains the caller's expected value kind; each parser preserves its family's schema and diagnostics.
 The numeric-kind property codec and vec3-only
 encoders remain separate contracts. Visualization operation declarations and
 implementations have no UV-atlas dependency, enforced by

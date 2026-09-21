@@ -15,9 +15,9 @@ export namespace Extrinsic::Runtime
     enum class OutlierAnalysisMethod : std::uint8_t { Statistical, Radius, LocalDistanceRatio };
     enum class OutlierAnalysisBackend : std::uint8_t { CpuOctree, CpuLBVH, VulkanLBVH };
     enum class OutlierAnalysisOperation : std::uint8_t { Analyze, RemoveMarked };
-    [[nodiscard]] const char* ToString(OutlierAnalysisMethod) noexcept;
-    [[nodiscard]] const char* ToString(OutlierAnalysisBackend) noexcept;
-    [[nodiscard]] const char* ToString(OutlierAnalysisOperation) noexcept;
+    extern "C++" [[nodiscard]] const char* ToString(OutlierAnalysisMethod) noexcept;
+    extern "C++" [[nodiscard]] const char* ToString(OutlierAnalysisBackend) noexcept;
+    extern "C++" [[nodiscard]] const char* ToString(OutlierAnalysisOperation) noexcept;
     struct OutlierAnalysisConfig
     {
         std::uint32_t StableEntityId{};
@@ -30,10 +30,10 @@ export namespace Extrinsic::Runtime
         std::uint32_t KNeighbors{16}, MinimumNeighbors{4}, GpuQueryBatchSize{4096};
         float StdDevMultiplier{1}, Radius{1}, ScoreThreshold{2};
     };
-    [[nodiscard]] std::string SerializeOutlierAnalysisConfig(const OutlierAnalysisConfig&);
-    [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateOutlierAnalysisConfigSection(
+    extern "C++" [[nodiscard]] std::string SerializeOutlierAnalysisConfig(const OutlierAnalysisConfig&);
+    extern "C++" [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateOutlierAnalysisConfigSection(
         std::string_view payload,std::string_view reference,std::string_view subject);
-    [[nodiscard]] std::optional<OutlierAnalysisConfig> GetOutlierAnalysisConfig(const Core::Config::EngineConfig&);
-    void SetOutlierAnalysisConfig(Core::Config::EngineConfig&,const OutlierAnalysisConfig&);
-    [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeOutlierAnalysisConfigSectionRegistration();
+    extern "C++" [[nodiscard]] std::optional<OutlierAnalysisConfig> GetOutlierAnalysisConfig(const Core::Config::EngineConfig&);
+    extern "C++" void SetOutlierAnalysisConfig(Core::Config::EngineConfig&,const OutlierAnalysisConfig&);
+    extern "C++" [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeOutlierAnalysisConfigSectionRegistration();
 }

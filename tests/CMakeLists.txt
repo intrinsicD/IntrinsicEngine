@@ -34,29 +34,22 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.ConfigPropertyT
         --check-source src/runtime/GeometryIntegration/Runtime.GeometryProperty.Types.cpp
         --check-source src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm
         --check-source src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cppm
-        --check-source src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cpp
+        --check-source src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp
         --check-source src/runtime/Modules/Curvature/Runtime.MeshCurvatureConfig.cppm
         --check-source src/runtime/Modules/Curvature/Runtime.MeshCurvatureConfig.cpp
         --check-source src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cppm
-        --check-source src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cpp
         --check-source src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm
-        --check-source src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp
+        --check-source src/runtime/Config/internal/Runtime.PointNormalsRegistrationConfigCodecs.cpp
         --check-source src/runtime/Modules/Registration/Runtime.RegistrationConfig.cppm
-        --check-source src/runtime/Modules/Registration/Runtime.RegistrationConfig.cpp
         --check-source src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cppm
-        --check-source src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp
+        --check-source src/runtime/Config/internal/Runtime.PointFeaturesConfigCodecs.cpp
         --check-source src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm
-        --check-source src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp
         --check-source src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cppm
         --check-source src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cppm
-        --check-source src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cpp
         --check-source src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm
         --check-source src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cppm
-        --check-source src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp
         --check-source src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cppm
-        --check-source src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp
         --check-source src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm
-        --check-source src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp
         --forbid-module Geometry.Properties
         --forbid-module Extrinsic.Runtime.GeometryAvailability
         --forbid-module Extrinsic.ECS.Components.GeometrySources
@@ -115,7 +108,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointFieldResul
         --forbid-module Geometry.PointCloud)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointSetResults
         --check-source src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cppm
-        --check-source src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp
+        --check-source src/runtime/Config/internal/Runtime.PointFeaturesConfigCodecs.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointSetOperations.Frame.cpp
@@ -123,11 +116,10 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointSetResults
         --forbid-module Geometry.PointCloud)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.PointAnalysisResults
         --check-source src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm
-        --check-source src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp
+        --check-source src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp
         --check-source src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm
-        --check-source src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp
+        --check-source src/runtime/Config/internal/Runtime.PointFeaturesConfigCodecs.cpp
         --check-source src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cppm
-        --check-source src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Frame.cpp
@@ -212,7 +204,7 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.DensityWeightCo
         --check-source src/geometry/Geometry.PointCloud.Kernels.Types.cppm
         --check-source src/geometry/Geometry.PointCloud.Kernels.Types.cpp
         --check-source src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cppm
-        --check-source src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp
+        --check-source src/runtime/Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Frame.cpp
@@ -248,7 +240,7 @@ set_tests_properties(ProcessingCompilationLocality.ParameterizationContracts
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.NormalContracts
         --check-source src/geometry/Geometry.NormalEstimation.Types.cppm
         --check-source src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm
-        --check-source src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp
+        --check-source src/runtime/Config/internal/Runtime.PointNormalsRegistrationConfigCodecs.cpp
         --check-source src/runtime/Editor/Operations/Runtime.NormalOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.NormalOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.NormalOperations.Frame.cpp

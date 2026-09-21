@@ -28,8 +28,8 @@ export namespace Extrinsic::Runtime
         CpuLBVH,
         VulkanLBVH
     };
-    [[nodiscard]] const char *ToString(NormalEstimationMethod method) noexcept;
-    [[nodiscard]] const char *ToString(NormalEstimationBackend backend) noexcept;
+    extern "C++" [[nodiscard]] const char *ToString(NormalEstimationMethod method) noexcept;
+    extern "C++" [[nodiscard]] const char *ToString(NormalEstimationBackend backend) noexcept;
     struct NormalEstimationConfig
     {
         std::uint32_t StableEntityId{};
@@ -53,12 +53,12 @@ export namespace Extrinsic::Runtime
             Geometry::HalfedgeMesh::VertexNormals::AveragingMode::AreaWeighted};
         bool OrientTowardFallback{true};
     };
-    [[nodiscard]] std::string SerializeNormalEstimationConfig(const NormalEstimationConfig &config);
-    [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateNormalEstimationConfigSection(
+    extern "C++" [[nodiscard]] std::string SerializeNormalEstimationConfig(const NormalEstimationConfig &config);
+    extern "C++" [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateNormalEstimationConfigSection(
         std::string_view payload, std::string_view reference, std::string_view subject);
-    [[nodiscard]] std::optional<NormalEstimationConfig> GetNormalEstimationConfig(
+    extern "C++" [[nodiscard]] std::optional<NormalEstimationConfig> GetNormalEstimationConfig(
         const Core::Config::EngineConfig &config);
-    void SetNormalEstimationConfig(Core::Config::EngineConfig &config, const NormalEstimationConfig &value);
-    [[nodiscard]] Core::Config::EngineConfigSectionRegistration
+    extern "C++" void SetNormalEstimationConfig(Core::Config::EngineConfig &config, const NormalEstimationConfig &value);
+    extern "C++" [[nodiscard]] Core::Config::EngineConfigSectionRegistration
     MakeNormalEstimationConfigSectionRegistration();
 } // namespace Extrinsic::Runtime

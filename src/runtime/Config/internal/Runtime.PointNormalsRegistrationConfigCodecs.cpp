@@ -1,4 +1,4 @@
-module;
+// Compiles NormalEstimation, Registration config codecs together to share JSON work.
 #include <cmath>
 #include <cstdint>
 #include <initializer_list>
@@ -8,14 +8,21 @@ module;
 #include <string>
 #include <string_view>
 #include <utility>
-module Extrinsic.Runtime.NormalEstimationConfig;
+
+import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.EngineLoad;
+
+import Extrinsic.Runtime.NormalEstimationConfig;
+import Extrinsic.Runtime.RegistrationConfig;
+
 #include "Config/internal/Runtime.PointConfigJson.hpp"
+
 namespace Extrinsic::Runtime
 {
     namespace
     {
         using Json = nlohmann::json;
-        NormalEstimationConfig Parse(const Json &d)
+        NormalEstimationConfig ParseNormalEstimationConfig(const Json &d)
         {
             NormalEstimationConfig c;
             c.StableEntityId = d.at("entity");
@@ -43,7 +50,7 @@ namespace Extrinsic::Runtime
             c.OrientTowardFallback = d.at("orient_toward_fallback");
             return c;
         }
-        Core::Config::EngineConfigSection Section(const NormalEstimationConfig &c)
+        Core::Config::EngineConfigSection MakeNormalEstimationConfigSection(const NormalEstimationConfig &c)
         {
             return {.Name = std::string{kNormalEstimationConfigSectionName},
                     .SchemaId = std::string{kNormalEstimationConfigSectionSchemaId},
@@ -161,7 +168,7 @@ namespace Extrinsic::Runtime
                  d["positions"]["name"] == d["output"]["name"])
             return RejectConfigSection(subject, "Normals must use a distinct output property on the input domain.");
         result.State = EngineConfigState::Valid;
-        result.CanonicalPayloadJson = SerializeNormalEstimationConfig(Parse(d));
+        result.CanonicalPayloadJson = SerializeNormalEstimationConfig(ParseNormalEstimationConfig(d));
         result.ParsedFieldCount = input.size();
         return result;
     }
@@ -171,14 +178,120 @@ namespace Extrinsic::Runtime
             c, kNormalEstimationConfigSectionName, kNormalEstimationConfigSectionSchemaId, 1u,
             nullptr, ValidateNormalEstimationConfigSection);
         if (!payload) return {};
-        return Parse(ConfigDetail::ParseConfigJson(*payload, true));
+        return ParseNormalEstimationConfig(ConfigDetail::ParseConfigJson(*payload, true));
     }
     void SetNormalEstimationConfig(Core::Config::EngineConfig &c, const NormalEstimationConfig &v)
     {
-        Core::Config::UpsertEngineConfigSection(c.AppSections, Section(v));
+        Core::Config::UpsertEngineConfigSection(c.AppSections, MakeNormalEstimationConfigSection(v));
     }
     Core::Config::EngineConfigSectionRegistration MakeNormalEstimationConfigSectionRegistration()
     {
-        return {.DefaultSection = Section({}), .Validate = ValidateNormalEstimationConfigSection};
+        return {.DefaultSection = MakeNormalEstimationConfigSection({}), .Validate = ValidateNormalEstimationConfigSection};
     }
 } // namespace Extrinsic::Runtime
+
+namespace Extrinsic::Runtime
+{
+    namespace
+    {
+        using Json = nlohmann::json;
+        RegistrationConfig ParseRegistrationConfig(const Json& doc)
+        {
+            RegistrationConfig c;
+            c.SourceStableEntityId = doc.at("source_entity");
+            c.TargetStableEntityId = doc.at("target_entity");
+            c.Variant = doc.at("variant") == "point_to_plane" ? EditorICPVariant::PointToPlane : EditorICPVariant::PointToPoint;
+            c.Backend = doc.at("backend") == "vulkan_lbvh" ? RegistrationBackend::VulkanLBVH :
+                        doc.at("backend") == "cpu_lbvh" ? RegistrationBackend::CpuLBVH : RegistrationBackend::CpuKDTree;
+            c.MaxIterations = doc.at("max_iterations");
+            c.MaxCorrespondenceDistance = doc.at("max_correspondence_distance");
+            c.InlierRatio = doc.at("inlier_ratio");
+            c.ConvergenceThreshold = doc.at("convergence_threshold");
+            c.TrajectoryStep = doc.at("trajectory_step");
+            ConfigDetail::DecodePointPropertyRef(doc.at("source_positions"), c.SourcePositions);
+            ConfigDetail::DecodePointPropertyRef(doc.at("target_positions"), c.TargetPositions);
+            ConfigDetail::DecodePointPropertyRef(doc.at("target_normals"), c.TargetNormals);
+            return c;
+        }
+        Core::Config::EngineConfigSection MakeRegistrationConfigSection(const RegistrationConfig& value)
+        {
+            return {.Name = std::string{kRegistrationConfigSectionName},
+                    .SchemaId = std::string{kRegistrationConfigSectionSchemaId}, .SchemaVersion = 1,
+                    .PayloadJson = SerializeRegistrationConfig(value)};
+        }
+    }
+    const char* ToString(RegistrationBackend backend) noexcept
+    {
+        switch (backend)
+        {
+        case RegistrationBackend::CpuKDTree: return "cpu_kdtree";
+        case RegistrationBackend::CpuLBVH: return "cpu_lbvh";
+        case RegistrationBackend::VulkanLBVH: return "vulkan_lbvh";
+        }
+        return "invalid";
+    }
+    std::string SerializeRegistrationConfig(const RegistrationConfig& c)
+    {
+        return ConfigDetail::SerializeConfigJson(Json{{"source_entity", c.SourceStableEntityId}, {"target_entity", c.TargetStableEntityId},
+            {"source_positions", ConfigDetail::EncodeVec3PointPropertyRef(c.SourcePositions)}, {"target_positions", ConfigDetail::EncodeVec3PointPropertyRef(c.TargetPositions)},
+            {"target_normals", ConfigDetail::EncodeVec3PointPropertyRef(c.TargetNormals)}, {"backend", ToString(c.Backend)},
+            {"variant", c.Variant == EditorICPVariant::PointToPlane ? "point_to_plane" :
+                        c.Variant == EditorICPVariant::PointToPoint ? "point_to_point" : "invalid"},
+            {"max_iterations", c.MaxIterations}, {"max_correspondence_distance", c.MaxCorrespondenceDistance},
+            {"inlier_ratio", c.InlierRatio}, {"trajectory_step", c.TrajectoryStep},
+            {"convergence_threshold", c.ConvergenceThreshold}});
+    }
+    Core::Config::EngineConfigSectionValidationResult ValidateRegistrationConfigSection(
+        std::string_view payload, std::string_view, std::string_view subject)
+    {
+        using namespace Core::Config;
+        using ConfigDetail::RejectConfigSection;
+        EngineConfigSectionValidationResult result;
+        const auto input = ConfigDetail::ParseConfigJson(payload, false);
+        auto doc = ConfigDetail::ParseConfigJson(SerializeRegistrationConfig({}), true);
+        if (auto error = ConfigDetail::ValidatePointConfigFields(
+            input, doc, "Registration config must be an object.", "Unknown registration field: ",
+            {"source_entity", "target_entity", "max_iterations", "trajectory_step"}))
+            return RejectConfigSection(subject, std::move(*error));
+        if (doc["max_iterations"] == 0) return RejectConfigSection(subject, "max_iterations must be positive.");
+        for (auto key : {"max_correspondence_distance", "inlier_ratio", "convergence_threshold"})
+            if (!doc[key].is_number() || !std::isfinite(doc[key].get<double>()))
+                return RejectConfigSection(subject, std::string(key) + " must be finite.");
+        if (doc["inlier_ratio"] <= 0 || doc["inlier_ratio"] > 1 || doc["convergence_threshold"] < 0)
+            return RejectConfigSection(subject, "inlier_ratio must be in (0,1]; convergence_threshold must be nonnegative.");
+        if (doc["variant"] != "point_to_point" && doc["variant"] != "point_to_plane")
+            return RejectConfigSection(subject, "variant must be point_to_point or point_to_plane.");
+        if (doc["backend"] != "cpu_kdtree" && doc["backend"] != "cpu_lbvh" && doc["backend"] != "vulkan_lbvh")
+            return RejectConfigSection(subject, "backend must be cpu_kdtree, cpu_lbvh or vulkan_lbvh.");
+        for (auto key : {"source_positions", "target_positions", "target_normals"})
+        {
+            const auto& ref = doc[key];
+            using ConfigDetail::PointPropertyValidation;
+            const auto validation = ConfigDetail::ValidatePointPropertyRef(ref, Geometry::PropertyValueKind::Vec3);
+            if (validation == PointPropertyValidation::InvalidReference || !ref["domain"].is_string())
+                return RejectConfigSection(subject, std::string(key) + " requires domain, name and kind=vec3.");
+            if (validation == PointPropertyValidation::UnknownDomain)
+                return RejectConfigSection(subject, std::string(key) + " has an unknown element domain.");
+        }
+        result.State = EngineConfigState::Valid;
+        result.CanonicalPayloadJson = SerializeRegistrationConfig(ParseRegistrationConfig(doc));
+        result.ParsedFieldCount = static_cast<std::uint32_t>(input.size());
+        return result;
+    }
+    std::optional<RegistrationConfig> GetRegistrationConfig(const Core::Config::EngineConfig& config)
+    {
+        const auto payload = ConfigDetail::FindValidatedCanonicalPayload(
+            config, kRegistrationConfigSectionName, kRegistrationConfigSectionSchemaId, 1u,
+            nullptr, ValidateRegistrationConfigSection);
+        if (!payload) return {};
+        return ParseRegistrationConfig(ConfigDetail::ParseConfigJson(*payload, true));
+    }
+    void SetRegistrationConfig(Core::Config::EngineConfig& config, const RegistrationConfig& value)
+    {
+        Core::Config::UpsertEngineConfigSection(config.AppSections, MakeRegistrationConfigSection(value));
+    }
+    Core::Config::EngineConfigSectionRegistration MakeRegistrationConfigSectionRegistration()
+    {
+        return {.DefaultSection = MakeRegistrationConfigSection({}), .Validate = ValidateRegistrationConfigSection};
+    }
+}

@@ -13,7 +13,7 @@ export namespace Extrinsic::Runtime
     inline constexpr std::string_view kKeypointAnalysisConfigSectionName="sandbox.keypoint_analysis";
     inline constexpr std::string_view kKeypointAnalysisConfigSectionSchemaId="intrinsic.runtime.sandbox.keypoint_analysis";
     enum class KeypointAnalysisBackend : std::uint8_t { CpuKDTree, CpuLBVH, VulkanLBVH, VulkanCompute };
-    [[nodiscard]] const char* ToString(KeypointAnalysisBackend) noexcept;
+    extern "C++" [[nodiscard]] const char* ToString(KeypointAnalysisBackend) noexcept;
     struct KeypointAnalysisConfig
     {
         std::uint32_t StableEntityId{};
@@ -25,10 +25,10 @@ export namespace Extrinsic::Runtime
         float SalientRadius{}, NonMaxRadius{};
         double Gamma21{.975}, Gamma32{.975};
     };
-    [[nodiscard]] std::string SerializeKeypointAnalysisConfig(const KeypointAnalysisConfig&);
-    [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateKeypointAnalysisConfigSection(
+    extern "C++" [[nodiscard]] std::string SerializeKeypointAnalysisConfig(const KeypointAnalysisConfig&);
+    extern "C++" [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateKeypointAnalysisConfigSection(
         std::string_view payload,std::string_view reference,std::string_view subject);
-    [[nodiscard]] std::optional<KeypointAnalysisConfig> GetKeypointAnalysisConfig(const Core::Config::EngineConfig&);
-    void SetKeypointAnalysisConfig(Core::Config::EngineConfig&,const KeypointAnalysisConfig&);
-    [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeKeypointAnalysisConfigSectionRegistration();
+    extern "C++" [[nodiscard]] std::optional<KeypointAnalysisConfig> GetKeypointAnalysisConfig(const Core::Config::EngineConfig&);
+    extern "C++" void SetKeypointAnalysisConfig(Core::Config::EngineConfig&,const KeypointAnalysisConfig&);
+    extern "C++" [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeKeypointAnalysisConfigSectionRegistration();
 }

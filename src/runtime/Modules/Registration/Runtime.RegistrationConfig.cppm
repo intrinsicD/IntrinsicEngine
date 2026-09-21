@@ -14,7 +14,7 @@ export namespace Extrinsic::Runtime
     inline constexpr std::string_view kRegistrationConfigSectionName = "sandbox.registration";
     inline constexpr std::string_view kRegistrationConfigSectionSchemaId = "intrinsic.runtime.sandbox.registration";
     enum class RegistrationBackend : std::uint8_t { CpuKDTree, CpuLBVH, VulkanLBVH };
-    [[nodiscard]] const char* ToString(RegistrationBackend backend) noexcept;
+    extern "C++" [[nodiscard]] const char* ToString(RegistrationBackend backend) noexcept;
     enum class EditorICPVariant : std::uint8_t
     {
         PointToPoint,
@@ -42,10 +42,10 @@ export namespace Extrinsic::Runtime
         double ConvergenceThreshold{1e-6};
     };
 
-    [[nodiscard]] std::string SerializeRegistrationConfig(const RegistrationConfig& config);
-    [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateRegistrationConfigSection(
+    extern "C++" [[nodiscard]] std::string SerializeRegistrationConfig(const RegistrationConfig& config);
+    extern "C++" [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateRegistrationConfigSection(
         std::string_view payload, std::string_view reference, std::string_view subject);
-    [[nodiscard]] std::optional<RegistrationConfig> GetRegistrationConfig(const Core::Config::EngineConfig& config);
-    void SetRegistrationConfig(Core::Config::EngineConfig& config, const RegistrationConfig& value);
-    [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeRegistrationConfigSectionRegistration();
+    extern "C++" [[nodiscard]] std::optional<RegistrationConfig> GetRegistrationConfig(const Core::Config::EngineConfig& config);
+    extern "C++" void SetRegistrationConfig(Core::Config::EngineConfig& config, const RegistrationConfig& value);
+    extern "C++" [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeRegistrationConfigSectionRegistration();
 }

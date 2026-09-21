@@ -13,7 +13,9 @@ Static analysis and performance analysis tooling.
   Header-touch scenarios declare their expected consuming translation units in
   `params.probe_sources`; every declared source must appear in the measured rebuild.
   Other touch scenarios require the touched source itself to compile. Empty consumer
-  declarations and missing consumers fail closed. See
+  declarations and missing consumers fail closed. Relocated-code comparisons can
+  map scenario paths and expected consumers by arm (`before`/`after`); missing
+  arm entries fail closed. See
   `benchmarks/ci/manifests/engine_compile_iteration_overnight.yaml` and the
   [matched overnight measurements](../../ara/evidence/tables/build007_overnight_compile_measurement.md).
 

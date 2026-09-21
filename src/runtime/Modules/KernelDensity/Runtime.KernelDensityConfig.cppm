@@ -13,7 +13,7 @@ export namespace Extrinsic::Runtime
     inline constexpr std::string_view kKernelDensityConfigSectionName="sandbox.kernel_density";
     inline constexpr std::string_view kKernelDensityConfigSectionSchemaId="intrinsic.runtime.sandbox.kernel_density";
     enum class KernelDensityBackend : std::uint8_t { CpuOctree, CpuLBVH, VulkanLBVH };
-    [[nodiscard]] const char* ToString(KernelDensityBackend) noexcept;
+    extern "C++" [[nodiscard]] const char* ToString(KernelDensityBackend) noexcept;
     struct KernelDensityConfig
     {
         std::uint32_t StableEntityId{};
@@ -23,10 +23,10 @@ export namespace Extrinsic::Runtime
         std::uint32_t KNeighbors{15}, GpuQueryBatchSize{4096};
         float Bandwidth{0};
     };
-    [[nodiscard]] std::string SerializeKernelDensityConfig(const KernelDensityConfig&);
-    [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateKernelDensityConfigSection(
+    extern "C++" [[nodiscard]] std::string SerializeKernelDensityConfig(const KernelDensityConfig&);
+    extern "C++" [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateKernelDensityConfigSection(
         std::string_view payload,std::string_view reference,std::string_view subject);
-    [[nodiscard]] std::optional<KernelDensityConfig> GetKernelDensityConfig(const Core::Config::EngineConfig&);
-    void SetKernelDensityConfig(Core::Config::EngineConfig&,const KernelDensityConfig&);
-    [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeKernelDensityConfigSectionRegistration();
+    extern "C++" [[nodiscard]] std::optional<KernelDensityConfig> GetKernelDensityConfig(const Core::Config::EngineConfig&);
+    extern "C++" void SetKernelDensityConfig(Core::Config::EngineConfig&,const KernelDensityConfig&);
+    extern "C++" [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeKernelDensityConfigSectionRegistration();
 }

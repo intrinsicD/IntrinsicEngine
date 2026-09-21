@@ -13,7 +13,7 @@ export namespace Extrinsic::Runtime
     inline constexpr std::string_view kPointSpacingConfigSectionName="sandbox.point_spacing";
     inline constexpr std::string_view kPointSpacingConfigSectionSchemaId="intrinsic.runtime.sandbox.point_spacing";
     enum class PointSpacingBackend : std::uint8_t { CpuOctree, CpuLBVH, VulkanLBVH };
-    [[nodiscard]] const char* ToString(PointSpacingBackend) noexcept;
+    extern "C++" [[nodiscard]] const char* ToString(PointSpacingBackend) noexcept;
     struct PointSpacingConfig
     {
         std::uint32_t StableEntityId{};
@@ -23,10 +23,10 @@ export namespace Extrinsic::Runtime
         std::uint32_t KNeighbors{6}, GpuQueryBatchSize{4096};
         float ScaleFactor{1};
     };
-    [[nodiscard]] std::string SerializePointSpacingConfig(const PointSpacingConfig&);
-    [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidatePointSpacingConfigSection(
+    extern "C++" [[nodiscard]] std::string SerializePointSpacingConfig(const PointSpacingConfig&);
+    extern "C++" [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidatePointSpacingConfigSection(
         std::string_view payload,std::string_view reference,std::string_view subject);
-    [[nodiscard]] std::optional<PointSpacingConfig> GetPointSpacingConfig(const Core::Config::EngineConfig&);
-    void SetPointSpacingConfig(Core::Config::EngineConfig&,const PointSpacingConfig&);
-    [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakePointSpacingConfigSectionRegistration();
+    extern "C++" [[nodiscard]] std::optional<PointSpacingConfig> GetPointSpacingConfig(const Core::Config::EngineConfig&);
+    extern "C++" void SetPointSpacingConfig(Core::Config::EngineConfig&,const PointSpacingConfig&);
+    extern "C++" [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakePointSpacingConfigSectionRegistration();
 }

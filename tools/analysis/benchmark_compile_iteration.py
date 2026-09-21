@@ -131,9 +131,12 @@ def critical_path(dot: str, log: bytes) -> dict:
 
 
 
-def validate_probe_sources(params: dict, scenario: str, path: str, rows: list[dict]) -> None:
+def validate_probe_sources(params: dict, scenario: str, path: str, rows: list[dict],
+                          *, arm: str | None = None) -> None:
     """Require every declared consumer; headers cannot satisfy the source default."""
     expected = params.get("probe_sources", {}).get(scenario, [path])
+    if isinstance(expected, dict):
+        expected = expected[arm]
     assert expected and set(expected) <= {row["source"] for row in rows}, \
         "Probe did not compile its declared target sources"
 
@@ -243,6 +246,8 @@ def main() -> None:
         timings, configure_times, rss, details = {}, {}, {}, {}
         configure_times["initial"] = initial_configure["wall_ms"]
         for scenario, path in params["scenarios"].items():
+            if isinstance(path, dict):
+                path = path[arm]
             subprocess.run(["ninja", "-C", str(build), "-t", "recompact"],
                            check=True, stdout=subprocess.DEVNULL)
             if path and scenario != "reconfigure":
@@ -262,7 +267,7 @@ def main() -> None:
                     for entry in hotspots.parse_ninja_log(window_path, build)]
             assert not any(row["resolution"]["status"] in {"unresolved", "ambiguous", "outside-declared-roots"} for row in rows)
             if path and scenario != "reconfigure":
-                validate_probe_sources(params, scenario, path, rows)
+                validate_probe_sources(params, scenario, path, rows, arm=arm)
             if scenario.endswith("interface"):
                 fanout = {row["source"] for row in rows if row["source"] != path}
                 assert len(fanout) >= params["minimum_interface_importers"], "Interface probe did not invalidate importers"
