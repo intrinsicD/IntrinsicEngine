@@ -2309,3 +2309,14 @@
 - **Dependencies**: []
 - **Tags**: compilation, local matched observations, shared test fixtures, header invalidation
 - **From staging**: O237
+
+## C105: Rejected remaining mock lifetime extraction hypothesis
+- **Statement**: Moving the remaining three RHI mock classes' special members into the existing compiled owner is a worthwhile next compilation optimization for the mesh/clustering consumers.
+- **Status**: refuted — candidate rejected at the diagnostic feasibility gate; the proposed target-build thresholds remain unmeasured, not refuted. Single traced compiler samples show no useful consumer reduction and a higher owner duration. No clean-build, end-to-end incremental, statistical or general speedup/regression claim.
+- **Provenance**: ai-suggested
+- **Crystallized via**: topic-abandonment
+- **Falsification criteria**: Fresh traces show insufficient removable work or the pilot shows no useful consumer reduction; otherwise require matched target rebuilds improving at least 5% and 0.5 seconds with clean cost regressing at most 2%, including the shared owner. The first gate rejected this candidate; later gates were not run.
+- **Proof**: [ara/evidence/diagnostics/mock_lifetime_rejected/README.md, ara/evidence/diagnostics/mock_lifetime_rejected/summary.json, ara/evidence/diagnostics/mock_lifetime_rejected/evidence-index.json, ara/evidence/diagnostics/mock_lifetime_rejected/raw-evidence.tar.gz]
+- **Dependencies**: []
+- **Tags**: compilation, rejected hypothesis, diagnostic-only, shared test mocks
+- **From staging**: O238

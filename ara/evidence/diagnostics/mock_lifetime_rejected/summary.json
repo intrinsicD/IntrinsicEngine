@@ -1,0 +1,42 @@
+{
+  "kind": "rejected diagnostic feasibility pilot; not target-build benchmark",
+  "before": [
+    {
+      "file": "Test.SandboxEditorMeshMethods.cpp",
+      "elapsed": 20.372378036001464,
+      "returncode": 0
+    },
+    {
+      "file": "Test.SandboxEditorClusteringMethods.cpp",
+      "elapsed": 17.794077622995246,
+      "returncode": 0
+    },
+    {
+      "file": "MockRHI.cpp",
+      "elapsed": 1.1595706260122824,
+      "returncode": 0
+    }
+  ],
+  "after": [
+    {
+      "file": "Test.SandboxEditorMeshMethods.cpp",
+      "elapsed": 20.557260836008936,
+      "returncode": 0
+    },
+    {
+      "file": "Test.SandboxEditorClusteringMethods.cpp",
+      "elapsed": 17.77244873199379,
+      "returncode": 0
+    },
+    {
+      "file": "MockRHI.cpp",
+      "elapsed": 1.434342895023292,
+      "returncode": 0
+    }
+  ],
+  "baseline_commit": "e11c7c37f67e4f6e76e6ceb7dbaabdf408ca74cc",
+  "source_restored": true,
+  "clean_build_measured": false,
+  "target_incremental_measured": false,
+  "claim_eligible": false
+}

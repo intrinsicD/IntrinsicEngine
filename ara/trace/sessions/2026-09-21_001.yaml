@@ -2,11 +2,23 @@ session:
   id: 2026-09-21_001
   date: '2026-09-21'
   started: 2026-09-21T10:19+02:00
-  last_turn: 2026-09-21T10:19+02:00
-  turn_count: 1
+  last_turn: 2026-09-21T11:09+02:00
+  turn_count: 2
   summary: 'Measured accumulated fixture batch: selected incremental savings, increased owner cost, no meaningful
     general clean-build conclusion; verified CPU gate.'
 events_logged:
+- turn: 2
+  type: dead_end
+  id: N630
+  routing: direct
+  provenance: ai-executed
+  summary: Rejected mock lifetime pilot; source restored, no task opened.
+- turn: 2
+  type: observation
+  id: O238
+  routing: crystallized
+  provenance: ai-executed
+  summary: C105 records diagnostic rejection; target thresholds unmeasured.
 - turn: 1
   type: experiment
   id: N628
@@ -26,6 +38,10 @@ events_logged:
   provenance: ai-executed
   summary: C104 bound through retained report.
 ai_actions:
+- turn: 2
+  action: Profiled two expensive consumers and mock owner, preserved traits, obtained Claude Fable 5.1 reviews, restored source after failed pilot.
+  provenance: ai-executed
+  files_changed: [ara/evidence/diagnostics/mock_lifetime_rejected/README.md]
 - turn: 1
   action: Reused runner, isolated source snapshot, retained raw evidence, collaborated with Claude and verified
     current CPU gate.
@@ -34,6 +50,9 @@ ai_actions:
   - ara/evidence/tables/runtime270_fixture_batch_measurement.md
   - benchmarks/ci/manifests/engine_compile_iteration_fixture_batch.yaml
 claims_touched:
+- id: C105
+  action: created
+  turn: 2
 - id: C104
   action: created
   turn: 1

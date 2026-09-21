@@ -13607,3 +13607,14 @@ tree:
     - O237
     - ara/evidence/tables/runtime270_fixture_batch_measurement.md
     status: resolved
+
+  - id: N630
+    type: dead_end
+    title: Abandon remaining mock lifetime extraction at diagnostic gate
+    provenance: ai-executed
+    timestamp: 2026-09-21T11:09+02:00
+    hypothesis: Existing MockRHI owner can eliminate worthwhile remaining repeated lifetime compilation.
+    failure_mode: Trace attribution too small; pilot consumers effectively unchanged, owner more expensive. All source edits restored.
+    lesson: Attribute removable instantiation before extrapolating header parse cost or include fanout.
+    evidence: [ara/evidence/diagnostics/mock_lifetime_rejected/README.md]
+    status: resolved

@@ -2770,3 +2770,8 @@ entries:
       as prior compilation rows do.
     - No unrelated staging was promoted or rewritten; shared-owner regression and uncontrolled host load are retained.
       This measures a distinct accumulated working batch, not C103 again.
+
+  - turn: 2026-09-21_001#2
+    notes:
+    - C105/O238 close only the abandoned diagnostic hypothesis; target thresholds remain unmeasured. No new task or RUNTIME-270 appendix.
+    - Retained six compiler samples, rejected patch and reviews; source restored. No earlier experiments repeated or gains credited to this turn.

@@ -4040,3 +4040,15 @@ observations:
     promoted_to: logic/claims.md:C104
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O238
+    timestamp: 2026-09-21T11:09+02:00
+    provenance: ai-executed
+    content: Remaining mock lifetime pilot showed no useful consumer reduction; shared owner duration increased. Source restored exactly.
+    context: Six direct compiler samples with tracing, one per arm/source; no target or clean-build measurements. Candidate abandoned at diagnostic gate.
+    potential_type: claim
+    bound_to: [N630]
+    promoted: true
+    promoted_to: logic/claims.md:C105
+    crystallized_via: topic-abandonment
+    stale: false

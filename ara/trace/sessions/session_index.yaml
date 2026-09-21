@@ -636,8 +636,9 @@ sessions:
   date: '2026-09-21'
   summary: 'Measured accumulated fixture batch: selected incremental savings, increased owner cost, no meaningful
     general clean-build conclusion; verified CPU gate.'
-  turn_count: 1
-  events_count: 3
+  turn_count: 2
+  events_count: 5
   claims_touched:
   - C104
+  - C105
   open_threads: 2
