@@ -7,6 +7,23 @@ relative to `tasks/done/`, which sits at the same depth as `tasks/active/`,
 so blocks moved from the old active-README history work verbatim.
 
 
+## 2026-09-21 — BUG-204 and bounded fixture compilation closure
+
+Retired [BUG-204](BUG-204-compile-benchmark-header-probes.md): `defaafeac` fixes
+header-probe consumer accounting with positive and negative regression coverage.
+29 tooling tests and eight retained canonical results pass. No open harness work.
+
+Integrated the previously measured fixture batch in `e804afc24`: compiled shared
+fixture/mock lifetime ownership and unused consumer dependencies; C103/C104
+[reports](../../ara/evidence/tables/runtime270_fixture_batch_measurement.md) retain
+all gains, owner regressions and negligible clean-build results. Separate
+SessionLifecycle cleanup `8affd8dcc` makes no target-build timing claim.
+Canonical ci build and CPU gate pass (4,861 passes, zero failures, one expected
+skip); Claude Fable 5.1 reviewed the fixed diffs. RUNTIME-270 stays active for its
+property-binding acceptance criteria; this closes its existing compilation
+measurement/integration obligations, not the product task. No sanitizer/GPU claim.
+
+
 ## 2026-09-16 — RUNTIME-267 and BUG-199: config editor locality
 
 Retired [RUNTIME-267](RUNTIME-267-processing-config-consumer-locality.md) at

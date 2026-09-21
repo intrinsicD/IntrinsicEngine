@@ -85,7 +85,11 @@ summary.json. Other executables sharing these owners have not been timed.
 The bundle retains exact runner bytes and snapshot commit metadata; the source
 patch reconstructs the after tree from its baseline even if the local snapshot
 commit is later pruned. The original measurement session left the working branch uncommitted.
-Integration references are recorded in the active RUNTIME-270 task.
+The ten-file batch was integrated as `e804afc24`; separate SessionLifecycle
+commit `8affd8dcc` is outside its measurement. Closure verification used the
+combined tree: ci IntrinsicTests build, 459 focused tests, 4,861 full CPU passes,
+zero failures and one expected capability skip. Claude Fable 5.1 accepted the
+fixed source diff.
 
 Reproduce the exact protocol with the fixture_batch manifest and retained
 `runtime270_fixture_batch/runner.py`, a detached disposable worktree,
