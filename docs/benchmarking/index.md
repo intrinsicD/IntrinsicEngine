@@ -17,6 +17,10 @@ This section defines how IntrinsicEngine benchmarks are authored, executed, vali
 
 - [UV atlas remap allocation regression](bug159-atlas-remap-diagnostics.md)
 
+## Local compilation measurements
+
+- [Canonical property instantiation: consumer savings and owner cost](../../ara/evidence/tables/build010_canonical_property_measurement.md)
+
 ## Related process docs
 
 - [Agent benchmark workflow](../agent/benchmark-workflow.md)

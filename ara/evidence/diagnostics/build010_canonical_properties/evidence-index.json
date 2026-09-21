@@ -1,0 +1,12 @@
+{
+  "claude-results-audit.txt": "e23201e92ccc06adaa944a8e0aee6489c3d001eaccfbd78248dc5038fb2eb3cb",
+  "protocol.json": "9cc558eb2bc62cd61dc7c75c8db031f243e65453b3a0058923cf6216f0ffd73c",
+  "raw-evidence.tar.gz": "014699eacbd899264d709c8be3248f46eb55f2c83a2d3dc0725a9c9385ad91da",
+  "results/01-before-1.json": "0f2f2ef29152cedd156120a30cd248d3cf5d60ba0a7dbcb4f611ba43d08ad33d",
+  "results/02-after-1.json": "b0a0f80edb25c9c0ead7dcd1fc35018544e7e4a6b1f8ec109547bcf709b40242",
+  "results/03-after-2.json": "4ab5176124f9eba0d6efde9d2343d4b2a12380540cb89c27a64e74b4f92d35ed",
+  "results/04-before-2.json": "8ea4ea69e328ffff14691b90697b1fc27724e689b9ea9b0de807e005c65244ba",
+  "source-identity.json": "a412277e3d3d41a939f53a139a95cfa13bbae44fd9d3628d5dd5840bc34cdcbf",
+  "summary.json": "9bd8d0d1048ac7484182d6e0e3613683905574c52bda90e286701cf4209e3476",
+  "verification.json": "94a297b5965538c376f71b4e2670b5f9dda3b267eb3f878f5a1835ea470b773a"
+}

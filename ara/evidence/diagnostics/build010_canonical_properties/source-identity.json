@@ -1,0 +1,22 @@
+{
+  "before": "367a38fb4e5d49df17a3457d9f6a977beb447ebe",
+  "after": "a9e0bc149a6c0d65553c78eb630d05c874ae7903",
+  "commits": {
+    "before": "commit 367a38fb4e5d49df17a3457d9f6a977beb447ebe\ntree f95c64f1c6295e77af4e2d3de76f41bb44695e03\nparent e11c7c37f67e4f6e76e6ceb7dbaabdf408ca74cc\nauthor intrinsicD <intrinsicd@posteo.de> 1789981805 +0200\ncommitter intrinsicD <intrinsicd@posteo.de> 1789981805 +0200\n\n    Reject ineffective mock lifetime compilation extraction\n    \n    Abandon the bounded candidate at the diagnostic gate and restore all C++ source. Retain the rejected patch, six traced compiler samples, owner cost, source identities and Claude Fable 5.1 reviews so this experiment is not repeated. No target-build or clean-build improvement is claimed.\n    \n    Verification: all six diagnostic compiles passed; 44 lifetime traits match; restored source matches HEAD; evidence hashes, strict ARA claims, relative links, YAML parsing, root hygiene and whitespace checks pass. No tests rerun because the final change is evidence only.\n",
+    "after": "commit a9e0bc149a6c0d65553c78eb630d05c874ae7903\ntree 0393394b822b128be52ed33dbf027fae9a6d117f\nparent 367a38fb4e5d49df17a3457d9f6a977beb447ebe\nauthor intrinsicD <intrinsicd@posteo.de> 1789982899 +0200\ncommitter intrinsicD <intrinsicd@posteo.de> 1789982899 +0200\n\n    Compile canonical property storage in the shared module owner\n    \n    BUILD-010: explicitly instantiate canonical allocation and storage templates in Geometry.Properties.cpp. Preserve generic custom types, module identity, layouts and algorithm bodies; no new translation unit or dependency edge. Add cross-owner canonical and custom-type clone coverage.\n    \n    Verified canonical ci IntrinsicTests build, 226 focused cases, full CPU gate (4863 pass, one expected skip), and Clang20 geometry build with 16 property cases. Layering, task, docs and test-layout checks pass. Claude Fable 5.1 fixed-diff review found no blockers. Consumer traces show no canonical Add/make_unique instantiation; matched target timing remains pending under BUILD-010.\n"
+  },
+  "source_hashes": {
+    "src/geometry/Geometry.Properties.cppm": {
+      "before": "6059a8bca614832d0685208062226939cbdf675936d7f418e177ea6036cff6fe",
+      "after": "25b7147cea53cce3db23d36bbfd3a4c00156e275c8b925c5e547984cec32a1cb"
+    },
+    "src/geometry/Geometry.Properties.cpp": {
+      "before": "d0e9f648e3a8f5c12bf2b9fb4cbb2adc4e37d7e87ca8b18dee304480b768564b",
+      "after": "f1eff64f18589d24c87cec8a6035068732a473162f19bffcfd8d61ea9b60dfbc"
+    },
+    "tests/unit/geometry/Test.GeometryProperties.cpp": {
+      "before": "99c3b67108a4ab7a6f8fb0f470b7f691019ad3f72abe10d6240dab47b4ab1524",
+      "after": "b12822fc28c916f6e9349167b867176f3c9f7068a73ede34d0bae880d746ae47"
+    }
+  }
+}

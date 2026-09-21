@@ -1,0 +1,53 @@
+**Verdict: acceptance is earned on the consumer gate only. I found no blocker.** I'm Claude Fable 5.1 (`claude-fable-5-1`). This was read-only, with no builds, tests or edits. I recomputed everything from the four `results/*.json` files and cross-checked against the `/tmp` raw samples.
+
+**Medians recomputed from the four raw files**
+
+| Scenario | Before median [range] | After median [range] | Δ |
+|---|---|---|---|
+| clean | 422.439 s [421.779, 423.099] | 414.635 s [414.520, 414.751] | −7.80 s, **−1.85%** |
+| noop | 100.4 ms [98.7, 102.0] | 100.5 ms [100.45, 100.54] | +0.1 ms, overlapping, zero effect |
+| meshmethods_test | 24.151 s [24.005, 24.297] | 22.953 s [22.919, 22.987] | **−1.198 s, −4.96%** |
+| clusteringmethods_test | 21.514 s [21.475, 21.553] | 20.659 s [20.653, 20.664] | **−0.855 s, −3.97%** |
+| scene_serialization_impl | 11.287 s [11.284, 11.291] | 10.989 s [10.975, 11.002] | −0.299 s, −2.65% |
+| properties_impl (owner) | 5.074 s [5.067, 5.081] | 5.587 s [5.579, 5.594] | **+0.513 s, +10.10%** |
+
+`summary.json` matches these numbers to the digit.
+
+**Criteria**
+- **Clean ≥2% gate fails.** The saving is 1.85%. The ranges do not overlap and the direction is an improvement, but it must not be described as meeting the clean gate.
+- **Consumer gate passes.** Both representative consumers exceed 3% and 0.5 s, with non-overlapping improved ranges.
+- **Clean regression ≤2% passes trivially**, because clean improved.
+- The criteria were frozen before measurement. They are in the task file committed in a9e0bc149 at 09:28:19 UTC, and the first sample started at 09:28:45.
+
+**Owner regression**
+- The edge timings show the `Geometry.Properties.cpp` compile going from 806 ms to about 1491 ms, so +0.69 s compile and +0.51 s wall; the rest was not broken out. It is non-overlapping and must be reported.
+- In the clean build the same compile goes from 868 ms to 1653 ms. That cost is already inside the clean totals.
+
+**Scope limits**
+- **Scene serialization** fails both consumer thresholds (2.65%, 0.30 s). It is an incidental downstream effect and does not count towards acceptance.
+- **Noop** has zero effect. Neither scenario should be presented as a gain.
+
+**Controls checked**
+- **Arms and order:** all four results carry the exact revisions 367a38fb4 and a9e0bc149 as `clean_commit` with `source_clean_before_after` true. The order is ABBA (positions 1 to 4).
+- **Configuration:** every arm uses Clang 23, Debug, Null backend, `--parallel 4`, empty compiler launchers and ccache OFF, with the same `/tmp` source and `/dev/shm` build paths.
+- **Identical inputs across arms:** the CMakeCache hash, the `compile_commands.json` hash (1157 entries), the dependency digest (1728 files) and the config digest all match.
+- **Invalidation:** the runner uses `os.utime` only, with a git-porcelain clean assertion before and after.
+- **Relink and owner costs are included:** consumer logs show scan, dyndep, compile and test relink. The owner log shows compile, `libIntrinsicGeometry.a` and the test link.
+- **No additional TU:** clean has 878 compiler invocations in all four arms, and noop has 0.
+- **Hashes:** every entry in `evidence-index.json` verifies.
+  - The manifest and runner sha256 match the protocol (runner `3b7633a1…`).
+  - The `runner.py` in the archive has that hash.
+  - All 178 measurement files in the archive are byte-identical to `/tmp`.
+  - The three source hashes match `git show` at both revisions.
+- **Ownership:** the diff touches only `Properties.cppm`, `Properties.cpp`, its unit test, docs and the task file. CMake is untouched.
+- All results carry `claim_eligible:false`.
+
+**Caveats that do not block**
+1. n=2 per arm on an uncontrolled desktop. The first clean sample started at loadavg 0.76 against about 2.1 for the others, and that favoured "before". The result is descriptive only.
+2. About 1.06 s of the 1.20 s mesh saving is TU compile and the rest was not broken out.
+3. `edit-frequency.json` (13 and 5 edits in 100 commits for the two consumers, 0 for the owner `.cpp`) was written at 11:38, mid-run. It supports the choice of consumers and the low weight given to the owner cost, but it was not pre-registered.
+4. I did not re-run the 4863 CPU passes with one expected skip, the 226 focused cases, or the Clang 20 build with 16 tests. Those are not audited here beyond the logs being present in the archive. No sanitizer, GPU, runtime or whole-engine claim is supported.
+
+The task checkbox wording should say "accepted via consumer gate; clean 1.85% is below the gate; owner edit +10.1% (+0.51 s); scene-serialization and no-op not claimed".
+
+I wrote no plan file, because the audit is the deliverable and you asked for no edits.

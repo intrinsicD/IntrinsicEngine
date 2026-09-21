@@ -1,0 +1,33 @@
+{
+  "source_commit": "a9e0bc149",
+  "canonical_preset": "ci",
+  "build_target": "IntrinsicTests",
+  "focused_passed": 226,
+  "full_cpu": {
+    "selected": 4864,
+    "passed": 4863,
+    "failed": 0,
+    "skipped": 1,
+    "seconds": 159.28,
+    "skip": "GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl"
+  },
+  "clang20": {
+    "target": "IntrinsicGeometryTests",
+    "property_cases_passed": 16
+  },
+  "source_review": "Claude Fable 5.1 fixed diff; no blockers",
+  "results_review": "Claude Fable 5.1; accepted consumer gate only",
+  "sanitizer_run": false,
+  "gpu_run": false,
+  "final_cpp_diff_matches_review": true,
+  "structural_checks": [
+    "strict layering",
+    "test layout",
+    "task policy",
+    "docs sync",
+    "relative links",
+    "workshop automation",
+    "source documentation: zero objective errors; existing comments unchanged",
+    "module inventory: unchanged 429"
+  ]
+}

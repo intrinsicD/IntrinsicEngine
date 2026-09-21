@@ -4052,3 +4052,15 @@ observations:
     promoted_to: logic/claims.md:C105
     crystallized_via: topic-abandonment
     stale: false
+
+  - id: O239
+    timestamp: 2026-09-21T12:07+02:00
+    provenance: ai-executed
+    content: Canonical property instantiation passes the local consumer build gate; clean saving is below its gate and owner edit is slower.
+    context: Four matched samples at exact commits, full CPU verification and independent source/results reviews; BUILD-010 closed with all limitations.
+    potential_type: claim
+    bound_to: [N631]
+    promoted: true
+    promoted_to: logic/claims.md:C106
+    crystallized_via: empirical-resolution
+    stale: false

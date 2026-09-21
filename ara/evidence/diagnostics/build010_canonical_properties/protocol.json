@@ -1,0 +1,82 @@
+{
+  "manifest": {
+    "benchmark_id": "build.engine_compile_iteration.canonical_properties.v1",
+    "method": "build.engine_compile_iteration",
+    "dataset": "intrinsicengine.source.canonical_properties_2026_09_21",
+    "params": {
+      "intent": "performance",
+      "source_revisions": {
+        "before": "367a38fb4e5d49df17a3457d9f6a977beb447ebe",
+        "after": "a9e0bc149a6c0d65553c78eb630d05c874ae7903"
+      },
+      "sample_order": [
+        "before",
+        "after",
+        "after",
+        "before"
+      ],
+      "measured_iterations": 2,
+      "warmup_iterations": 0,
+      "warmup_scope": "No discarded samples. Identical source/dependency pre-read before every sample; diagnostic compilation is separate from this target-build population.",
+      "preset": "ci",
+      "target": "IntrinsicRuntimeContractTests",
+      "compiler": "/usr/bin/clang++-23",
+      "jobs": 4,
+      "minimum_interface_importers": 1,
+      "configure_options": [
+        "-DEXTRINSIC_BACKEND=Null",
+        "-DINTRINSIC_PLATFORM_BACKEND=Null",
+        "-DINTRINSIC_HEADLESS_NO_GLFW=ON",
+        "-DINTRINSIC_BUILD_TESTS=ON",
+        "-DINTRINSIC_BUILD_BENCHMARKS=OFF",
+        "-DINTRINSIC_ENABLE_CCACHE=OFF",
+        "-DCMAKE_CXX_COMPILER_LAUNCHER=",
+        "-DCMAKE_C_COMPILER_LAUNCHER=",
+        "-DVCPKG_MANIFEST_INSTALL=OFF",
+        "-DCMAKE_C_COMPILER=/usr/bin/clang-23",
+        "-DCMAKE_CXX_COMPILER=/usr/bin/clang++-23",
+        "-DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-23"
+      ],
+      "scenarios": {
+        "clean": null,
+        "noop": null,
+        "meshmethods_test": "tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp",
+        "clusteringmethods_test": "tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp",
+        "scene_serialization_impl": "src/runtime/Scene/Runtime.SceneSerialization.cpp",
+        "properties_impl": "src/geometry/Geometry.Properties.cpp"
+      },
+      "invalidation": "mtime only; source bytes remain at the exact clean commit; require observed importer fan-out",
+      "build_storage": "Fresh owned build at /dev/shm/intrinsic-build010-measure; identical source/build paths across all arms.",
+      "dependency_state": "identical preinstalled vcpkg packages, no package installation during sampling",
+      "operating_system_cache": "input pre-read, no cache flushing, no cold-filesystem claim",
+      "memory_measurement": "GNU time maximum single-process RSS, not aggregate concurrent memory",
+      "critical_path": "Ninja target DAG weighted by unfiltered per-invocation timings; unmatched meta-edges reported",
+      "summary": "Median and range of two samples per arm. Acceptance requires >=2% clean improvement or >=3% and >=0.5s representative consumer improvement, nonoverlapping improved arm ranges, and <=2% clean regression. All owner costs and negative results retained. Not a full-engine or statistical claim.",
+      "sample_sequence": "Configure, clean build, no-op, mesh/clustering consumer edits, scene-serialization edit, shared property implementation edit. Fresh build per sample, mtime-only edits.",
+      "noise_scope": "Normal desktop host; no CPU affinity/governor/turbo control. No competing compilation or tests; source inspection and remote review may run. Local descriptive comparison, not an isolated-machine or statistical claim.",
+      "configure_measurement": "initial configure only; source iteration cohort deliberately excludes the already-measured reconfigure scenario.",
+      "source_scope": "Clean exact before and after commits. Only canonical property instantiation source, its behavior tests and documentation differ; test consumers are unchanged. Local descriptive evidence, not publication-qualified."
+    },
+    "metrics": [
+      "build_time_ms",
+      "configure_time_ms",
+      "memory_peak_bytes",
+      "sample_count"
+    ],
+    "thresholds": {}
+  },
+  "manifest_sha256": "992cdf4bbea4d4ea11301a0953389fef954ec17ee6fe5e8157219a57cfc03845",
+  "source": "/tmp/intrinsic-build010-source",
+  "build": "/dev/shm/intrinsic-build010-measure",
+  "runner_sha256": "3b7633a17709306c5875b1feb82c95c1b7d4d0a649bbe5347acffa7c1d79fae0",
+  "host": {
+    "system": "Linux",
+    "release": "6.14.0-37-generic",
+    "machine": "x86_64",
+    "logical_cpus": 16,
+    "compiler": "Ubuntu clang version 23.0.0 (++20260614081921+80b1dddb5a24-1~exp1~20260614202044.1664)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/lib/llvm-23/bin\n",
+    "cmake": "cmake version 3.28.3\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake).\n",
+    "ninja": "1.11.1\n",
+    "cpu_model": "11th Gen Intel(R) Core(TM) i9-11900KF @ 3.50GHz"
+  }
+}

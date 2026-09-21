@@ -13618,3 +13618,12 @@ tree:
     lesson: Attribute removable instantiation before extrapolating header parse cost or include fanout.
     evidence: [ara/evidence/diagnostics/mock_lifetime_rejected/README.md]
     status: resolved
+
+  - id: N631
+    type: experiment
+    title: Compile canonical property allocation and storage once
+    provenance: ai-executed
+    timestamp: 2026-09-21T12:07+02:00
+    result: BUILD-010 accepted via matched consumer rebuilds; clean below its threshold and owner regression retained. Source a9e0bc149, full CPU and Clang20 property checks pass; no deferred task.
+    evidence: [ara/evidence/tables/build010_canonical_property_measurement.md]
+    status: resolved

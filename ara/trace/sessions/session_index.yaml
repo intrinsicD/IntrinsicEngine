@@ -634,11 +634,11 @@ sessions:
 
 - id: 2026-09-21_001
   date: '2026-09-21'
-  summary: 'Measured accumulated fixture batch: selected incremental savings, increased owner cost, no meaningful
-    general clean-build conclusion; verified CPU gate.'
-  turn_count: 2
-  events_count: 5
+  summary: 'Fixture and canonical-property batches measured; mock pilot rejected; BUILD-010 closed with local consumer savings and owner cost retained.'
+  turn_count: 3
+  events_count: 7
   claims_touched:
   - C104
   - C105
+  - C106
   open_threads: 2

@@ -24,13 +24,13 @@ RUNTIME-270's property-binding product contract.
       generic custom types, bool storage, type identity and revision behavior remain valid.
 - [x] A diagnostic pilot proves importer instantiation suppression before the
       matched target experiment; abandon if suppression fails or owner cost dominates.
-- [ ] Matched Clang23 ci Debug Null/headless, cache-disabled, four-job ABBA results
+- [x] Matched Clang23 ci Debug Null/headless, cache-disabled, four-job ABBA results
       include clean runtime-contract closure, consumer edits and shared-owner edit.
       Accept >=2% clean median saving or >=3% and >=0.5 s consumer incremental saving,
       with <=2% clean regression and non-overlapping before/after ranges for the
       accepted improvement. These local samples are descriptive, not statistical
       proof. Retain negative/negligible results and source identities.
-- [ ] Focused behavior checks, default CPU gate, structural checks and independent
+- [x] Focused behavior checks, default CPU gate, structural checks and independent
       Claude fixed-diff review pass; commit the bounded source/evidence and retire.
 
 ## Design and baseline
@@ -69,3 +69,19 @@ Layering, test layout, task policy, docs sync, links and workshop automation pas
 Workshop manual rows: public API direction passes; renderer/pass/recipe and
 scaffold closure rows are not applicable; no temporary exceptions. Module
 inventory regenerated unchanged (429 modules). No sanitizer/GPU execution claim.
+
+## Completion — 2026-09-21
+Reached CPUContracted, the intended development-cost/CPU correctness endpoint.
+PR/commit: `a9e0bc149` (implementation); the enclosing evidence/retirement
+commit closes the batch.
+Accepted via the consumer gate: MeshMethods -4.96% (-1.198 s), ClusteringMethods
+-3.97% (-0.855 s), with non-overlapping ranges. Clean -1.85% is below its 2% gate;
+owner edit +10.10% (+0.513 s); scene serialization and no-op are not claimed as
+useful gains. Four local non-claim-eligible results validated; Claude independently
+audited the raw measurements and accepted the accounting. All 1,157 configured
+commands and dependency fingerprints match. Source/test verification above covers
+the exact integrated C++ diff; only evidence/task/docs changed afterward.
+
+[Report and limits](../../ara/evidence/tables/build010_canonical_property_measurement.md)
+(C106). No deferred work or new follow-up task. Other executables, Release,
+sanitizer/GPU and runtime timing are outside this bounded task.

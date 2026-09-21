@@ -2,11 +2,22 @@ session:
   id: 2026-09-21_001
   date: '2026-09-21'
   started: 2026-09-21T10:19+02:00
-  last_turn: 2026-09-21T11:09+02:00
-  turn_count: 2
-  summary: 'Measured accumulated fixture batch: selected incremental savings, increased owner cost, no meaningful
-    general clean-build conclusion; verified CPU gate.'
+  last_turn: 2026-09-21T12:07+02:00
+  turn_count: 3
+  summary: 'Fixture and canonical-property batches measured; mock pilot rejected; BUILD-010 closed with local consumer savings and owner cost retained.'
 events_logged:
+- turn: 3
+  type: experiment
+  id: N631
+  routing: direct
+  provenance: ai-executed
+  summary: Implemented and measured canonical property instantiation; BUILD-010 closed.
+- turn: 3
+  type: observation
+  id: O239
+  routing: crystallized
+  provenance: ai-executed
+  summary: C106 records consumer-gate acceptance and all small/negative outcomes.
 - turn: 2
   type: dead_end
   id: N630
@@ -38,6 +49,10 @@ events_logged:
   provenance: ai-executed
   summary: C104 bound through retained report.
 ai_actions:
+- turn: 3
+  action: Implemented shared canonical instantiations, verified both Clang versions, ran ABBA target builds and retired bounded work with Claude audits.
+  provenance: ai-executed
+  files_changed: [src/geometry/Geometry.Properties.cppm, src/geometry/Geometry.Properties.cpp, tests/unit/geometry/Test.GeometryProperties.cpp]
 - turn: 2
   action: Profiled two expensive consumers and mock owner, preserved traits, obtained Claude Fable 5.1 reviews, restored source after failed pilot.
   provenance: ai-executed
@@ -50,6 +65,9 @@ ai_actions:
   - ara/evidence/tables/runtime270_fixture_batch_measurement.md
   - benchmarks/ci/manifests/engine_compile_iteration_fixture_batch.yaml
 claims_touched:
+- id: C106
+  action: created
+  turn: 3
 - id: C105
   action: created
   turn: 2

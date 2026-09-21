@@ -2320,3 +2320,14 @@
 - **Dependencies**: []
 - **Tags**: compilation, rejected hypothesis, diagnostic-only, shared test mocks
 - **From staging**: O238
+
+## C106: Bounded canonical property instantiation build observations
+- **Statement**: BUILD-010's Clang23 ci Debug Null/headless four-job ABBA comparison from 367a38fb4 to a9e0bc149 lowers runtime-contract-target MeshMethods edit median from 24.151 to 22.953 seconds (4.96%) and ClusteringMethods from 21.514 to 20.659 seconds (3.97%), with non-overlapping arm ranges. Clean median changes 422.439 to 414.635 seconds (1.85%); shared property-owner edit rises 5.074 to 5.587 seconds (10.10%). All clean builds execute 878 compiler invocations; no new translation unit.
+- **Status**: supported — local descriptive observations only; four results remain claim_eligible:false, n=2 per arm. Acceptance is the consumer gate; clean does not meet the 2% improvement gate. Scene serialization and no-op do not count as useful gains. No full-engine, Release/sanitizer-build, runtime/GPU, aggregate-memory, statistical/general or publication-qualified conclusion; host load is uncontrolled.
+- **Provenance**: ai-executed
+- **Crystallized via**: empirical-resolution
+- **Falsification criteria**: Recomputed raw medians/ranges/counts disagree, source/config/command/package identities are unmatched, relinking or receiving-owner cost is omitted, or final source differs from the verified implementation. The frozen consumer gate requires at least 3% and 0.5 seconds with non-overlapping ranges and at most 2% clean regression.
+- **Proof**: [ara/evidence/tables/build010_canonical_property_measurement.md, ara/evidence/diagnostics/build010_canonical_properties/summary.json, ara/evidence/diagnostics/build010_canonical_properties/protocol.json, ara/evidence/diagnostics/build010_canonical_properties/source-identity.json, ara/evidence/diagnostics/build010_canonical_properties/evidence-index.json, ara/evidence/diagnostics/build010_canonical_properties/raw-evidence.tar.gz, benchmarks/ci/manifests/engine_compile_iteration_canonical_properties.yaml, tasks/done/BUILD-010-canonical-property-instantiation.md]
+- **Dependencies**: []
+- **Tags**: compilation, named modules, canonical property storage, local matched observations
+- **From staging**: O239
