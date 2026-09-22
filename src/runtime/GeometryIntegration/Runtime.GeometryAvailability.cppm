@@ -50,7 +50,9 @@ export namespace Extrinsic::Runtime
         GeometryScalarPropertySnapshot&, Geometry::PropertyValueKind,
         std::size_t count, std::span<const std::uint32_t> slots, std::span<const std::uint32_t> values,
         GeometryScalarNonfinitePolicy nonfinite = GeometryScalarNonfinitePolicy::Reject);
-    void ApplyGeometryScalarProperty(Geometry::PropertySet&, const GeometryPropertyRef&,
+    [[nodiscard]] bool CanApplyGeometryScalarProperty(const Geometry::PropertySet&, const GeometryPropertyRef&,
+                                                      const GeometryScalarPropertySnapshot&) noexcept;
+    [[nodiscard]] bool ApplyGeometryScalarProperty(Geometry::PropertySet&, const GeometryPropertyRef&,
                                      const GeometryScalarPropertySnapshot&);
 
     namespace GeometrySources = Extrinsic::ECS::Components::GeometrySources;
