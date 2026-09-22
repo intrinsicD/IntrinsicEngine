@@ -180,9 +180,14 @@ GetEditorGeometryProcessingMenuItems(
         case EditorGeometryProcessingAlgorithm::Geodesics:
             return Domain::MeshVertices;
         case EditorGeometryProcessingAlgorithm::KMeans:
-            return Domain::MeshVertices |
-                   Domain::GraphVertices |
-                   Domain::PointCloudPoints;
+        case EditorGeometryProcessingAlgorithm::NormalEstimation:
+        case EditorGeometryProcessingAlgorithm::Registration:
+        case EditorGeometryProcessingAlgorithm::BilateralFilter:
+        case EditorGeometryProcessingAlgorithm::OutlierEstimation:
+        case EditorGeometryProcessingAlgorithm::KernelDensity:
+        case EditorGeometryProcessingAlgorithm::ProgressivePoissonSampling:
+            return Domain::MeshVertices | Domain::MeshEdges | Domain::MeshHalfedges | Domain::MeshFaces |
+                   Domain::GraphVertices | Domain::GraphEdges | Domain::GraphHalfedges | Domain::PointCloudPoints;
         case EditorGeometryProcessingAlgorithm::MeshDenoise:
         case EditorGeometryProcessingAlgorithm::Curvature:
             return Domain::MeshVertices;
@@ -194,10 +199,6 @@ GetEditorGeometryProcessingMenuItems(
         case EditorGeometryProcessingAlgorithm::Subdivision:
         case EditorGeometryProcessingAlgorithm::Repair:
             return kMeshTopologyDomains;
-        case EditorGeometryProcessingAlgorithm::NormalEstimation:
-            return Domain::MeshVertices |
-                   Domain::GraphVertices |
-                   Domain::PointCloudPoints;
         case EditorGeometryProcessingAlgorithm::ShortestPath:
             return Domain::MeshVertices | Domain::GraphVertices;
         case EditorGeometryProcessingAlgorithm::ConvexHull:
@@ -212,17 +213,9 @@ GetEditorGeometryProcessingMenuItems(
             return Domain::MeshVertices | Domain::MeshFaces;
         case EditorGeometryProcessingAlgorithm::BooleanCSG:
             return Domain::MeshVertices | Domain::MeshFaces;
-        case EditorGeometryProcessingAlgorithm::Registration:
-        case EditorGeometryProcessingAlgorithm::BilateralFilter:
-        case EditorGeometryProcessingAlgorithm::OutlierEstimation:
-        case EditorGeometryProcessingAlgorithm::KernelDensity:
         case EditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval:
         case EditorGeometryProcessingAlgorithm::RadiusOutlierRemoval:
             return Domain::PointCloudPoints;
-        case EditorGeometryProcessingAlgorithm::ProgressivePoissonSampling:
-            return Domain::MeshVertices |
-                   Domain::GraphVertices |
-                   Domain::PointCloudPoints;
         }
         return Domain::None;
     }

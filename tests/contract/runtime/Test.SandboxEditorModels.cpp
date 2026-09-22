@@ -1998,37 +1998,28 @@ TEST(SandboxEditorUi, GeometryProcessingSupportedDomainsMatchPromotedEditorContr
     using Algorithm = Runtime::EditorGeometryProcessingAlgorithm;
     using Domain = Runtime::EditorGeometryProcessingDomain;
 
-    const Domain kmeans =
-        Runtime::GetEditorSupportedGeometryProcessingDomains(
-            Algorithm::KMeans);
-    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
-        kmeans,
-        Domain::MeshVertices));
-    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
-        kmeans,
-        Domain::GraphVertices));
-    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
-        kmeans,
-        Domain::PointCloudPoints));
-    EXPECT_FALSE(Runtime::HasAnyEditorGeometryProcessingDomain(
-        kmeans,
-        Domain::MeshEdges));
-
-    const Domain normals =
-        Runtime::GetEditorSupportedGeometryProcessingDomains(
-            Algorithm::NormalEstimation);
-    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
-        normals,
-        Domain::MeshVertices));
-    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
-        normals,
-        Domain::GraphVertices));
-    EXPECT_TRUE(Runtime::HasAnyEditorGeometryProcessingDomain(
-        normals,
-        Domain::PointCloudPoints));
-    EXPECT_FALSE(Runtime::HasAnyEditorGeometryProcessingDomain(
-        normals,
-        Domain::MeshEdges));
+    // Executor coverage: NormalEstimation.EveryCanonicalDomain*, RegistrationDomains.EveryCanonicalPointDomain*,
+    // BilateralFilterOperations.EveryDomain*, OutlierAnalysis.EveryDomain*, KernelDensityOperations,
+    // ClusteringModule.EveryPointDomain* and SandboxEditorUi.ProgressivePoissonBindsMeshFaceSamples*.
+    for (const auto algorithm : {Algorithm::KMeans, Algorithm::NormalEstimation, Algorithm::Registration,
+         Algorithm::BilateralFilter, Algorithm::OutlierEstimation, Algorithm::KernelDensity,
+         Algorithm::ProgressivePoissonSampling, Algorithm::SurfaceReconstruction, Algorithm::KnnGraphConstruction})
+    for (const auto domain : {Domain::MeshVertices, Domain::MeshEdges, Domain::MeshHalfedges,
+         Domain::MeshFaces, Domain::GraphVertices, Domain::GraphEdges,
+         Domain::GraphHalfedges, Domain::PointCloudPoints})
+    {
+        SCOPED_TRACE(static_cast<unsigned>(algorithm));
+        SCOPED_TRACE(static_cast<unsigned>(domain));
+        EXPECT_TRUE(Runtime::SupportsEditorGeometryProcessingDomain(algorithm, domain));
+        const auto entries = Runtime::ResolveEditorGeometryProcessingEntries(
+            Runtime::EditorGeometryProcessingCapabilities{.Domains = domain});
+        const auto found = std::ranges::find_if(entries, [algorithm](const auto& entry) { return entry.Algorithm == algorithm; });
+        ASSERT_NE(found, entries.end());
+        EXPECT_EQ(found->Domains, domain);
+    }
+    // Owning removals are deliberately restricted to topology-free point clouds.
+    for (const auto algorithm : {Algorithm::StatisticalOutlierRemoval, Algorithm::RadiusOutlierRemoval})
+        EXPECT_EQ(Runtime::GetEditorSupportedGeometryProcessingDomains(algorithm), Domain::PointCloudPoints);
 
     const Domain denoise =
         Runtime::GetEditorSupportedGeometryProcessingDomains(
@@ -2135,23 +2126,15 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
 
     const std::vector<Runtime::EditorGeometryProcessingEntry> meshEntries =
         Runtime::ResolveEditorGeometryProcessingEntries(meshCaps);
-    ASSERT_EQ(meshEntries.size(), 19u);
-    EXPECT_EQ(meshEntries[0].Algorithm, Algorithm::KMeans);
-    EXPECT_EQ(meshEntries[1].Algorithm, Algorithm::NormalEstimation);
-    EXPECT_EQ(meshEntries[2].Algorithm, Algorithm::MeshDenoise);
-    EXPECT_EQ(meshEntries[3].Algorithm, Algorithm::Curvature);
-    EXPECT_EQ(meshEntries[4].Algorithm, Algorithm::CurvatureSegmentation);
-    EXPECT_EQ(meshEntries[5].Algorithm, Algorithm::ProgressivePoissonSampling);
-    EXPECT_EQ(meshEntries[6].Algorithm, Algorithm::ShortestPath);
-    EXPECT_EQ(meshEntries[7].Algorithm, Algorithm::VectorHeat);
-    EXPECT_EQ(meshEntries[8].Algorithm, Algorithm::Parameterization);
-    EXPECT_EQ(meshEntries[9].Algorithm, Algorithm::ConvexHull);
-    EXPECT_EQ(meshEntries[10].Algorithm, Algorithm::SurfaceReconstruction);
-    EXPECT_EQ(meshEntries[11].Algorithm, Algorithm::KnnGraphConstruction);
-    EXPECT_EQ(meshEntries[12].Algorithm, Algorithm::BooleanCSG);
-    EXPECT_EQ(meshEntries[13].Algorithm, Algorithm::Remeshing);
-    EXPECT_EQ(meshEntries[17].Algorithm, Algorithm::Repair);
-    EXPECT_EQ(meshEntries[18].Algorithm, Algorithm::Geodesics);
+    const auto expectedMesh = std::array{Algorithm::KMeans, Algorithm::NormalEstimation, Algorithm::MeshDenoise,
+        Algorithm::Curvature, Algorithm::CurvatureSegmentation, Algorithm::Registration, Algorithm::BilateralFilter,
+        Algorithm::OutlierEstimation, Algorithm::KernelDensity, Algorithm::ProgressivePoissonSampling,
+        Algorithm::ShortestPath, Algorithm::VectorHeat, Algorithm::Parameterization, Algorithm::ConvexHull,
+        Algorithm::SurfaceReconstruction, Algorithm::KnnGraphConstruction, Algorithm::BooleanCSG,
+        Algorithm::Remeshing, Algorithm::Simplification, Algorithm::Smoothing, Algorithm::Subdivision,
+        Algorithm::Repair, Algorithm::Geodesics};
+    ASSERT_EQ(meshEntries.size(), expectedMesh.size());
+    for (std::size_t i = 0; i < expectedMesh.size(); ++i) EXPECT_EQ(meshEntries[i].Algorithm, expectedMesh[i]);
 
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
     Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
@@ -2203,13 +2186,12 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
         Domain::MeshVertices));
     const std::vector<Runtime::EditorGeometryProcessingEntry> graphEntries =
         Runtime::ResolveEditorGeometryProcessingEntries(registry, graph);
-    ASSERT_EQ(graphEntries.size(), 6u);
-    EXPECT_EQ(graphEntries[0].Algorithm, Algorithm::KMeans);
-    EXPECT_EQ(graphEntries[1].Algorithm, Algorithm::NormalEstimation);
-    EXPECT_EQ(graphEntries[2].Algorithm, Algorithm::ProgressivePoissonSampling);
-    EXPECT_EQ(graphEntries[3].Algorithm, Algorithm::ShortestPath);
-    EXPECT_EQ(graphEntries[4].Algorithm, Algorithm::SurfaceReconstruction);
-    EXPECT_EQ(graphEntries[5].Algorithm, Algorithm::KnnGraphConstruction);
+    const auto expectedGraph = std::array{Algorithm::KMeans, Algorithm::NormalEstimation, Algorithm::Registration,
+        Algorithm::BilateralFilter, Algorithm::OutlierEstimation, Algorithm::KernelDensity,
+        Algorithm::ProgressivePoissonSampling, Algorithm::ShortestPath, Algorithm::SurfaceReconstruction,
+        Algorithm::KnnGraphConstruction};
+    ASSERT_EQ(graphEntries.size(), expectedGraph.size());
+    for (std::size_t i = 0; i < expectedGraph.size(); ++i) EXPECT_EQ(graphEntries[i].Algorithm, expectedGraph[i]);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
     const Runtime::EditorDomainWindowModel graphModel =
         Runtime::BuildEditorDomainWindowModel(
