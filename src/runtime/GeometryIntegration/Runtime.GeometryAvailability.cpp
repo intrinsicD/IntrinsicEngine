@@ -137,9 +137,28 @@ namespace Extrinsic::Runtime
         Geometry::PropertyValueKind kind, std::size_t count,
         std::span<const std::uint32_t> slots, std::span<const std::uint32_t> values, GeometryScalarNonfinitePolicy nonfinite)
     { return PrepareScalar(snapshot, kind, count, slots, values, nonfinite); }
-    void ApplyGeometryScalarProperty(Geometry::PropertySet& properties,
+    bool CanApplyGeometryScalarProperty(const Geometry::PropertySet& properties,
+        const GeometryPropertyRef& ref, const GeometryScalarPropertySnapshot& snapshot) noexcept
+    {
+        if (ref.Name.empty()) return false;
+        const auto actual = DetectGeometryPropertyValueKind(properties, ref.Name);
+        if (properties.Exists(ref.Name) && actual != ref.ValueKind) return false;
+        return VisitScalarKind(ref.ValueKind, [&]<class T>() {
+            if constexpr (std::is_void_v<T>) return false;
+            else
+            {
+                const auto current = properties.Get<T>(ref.Name);
+                if (current && current.Size() != properties.Size()) return false;
+                if (!snapshot.Exists) return true;
+                const auto* values = std::get_if<std::vector<T>>(&snapshot.Values);
+                return values && values->size() == properties.Size();
+            }
+        });
+    }
+    bool ApplyGeometryScalarProperty(Geometry::PropertySet& properties,
         const GeometryPropertyRef& ref, const GeometryScalarPropertySnapshot& snapshot)
     {
+        if (!CanApplyGeometryScalarProperty(properties, ref, snapshot)) return false;
         VisitScalarKind(ref.ValueKind, [&]<class T>() {
             if constexpr (!std::is_void_v<T>)
             {
@@ -147,6 +166,7 @@ namespace Extrinsic::Runtime
                 else if (auto property = properties.Get<T>(ref.Name)) properties.Remove(property);
             }
         });
+        return true;
     }
 
     namespace GS = GeometrySources;
