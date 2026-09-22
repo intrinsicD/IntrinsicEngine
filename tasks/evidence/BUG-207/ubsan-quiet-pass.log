@@ -1,0 +1,12 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-ubsan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-ubsan
+    Start 3302: IntrinsicGeometryCurvatureExtremaTests.Grouped
+1/1 Test #3302: IntrinsicGeometryCurvatureExtremaTests.Grouped ...   Passed   78.31 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+geometry    =  78.31 sec*proc (1 test)
+unit        =  78.31 sec*proc (1 test)
+
+Total Test time (real) =  78.69 sec

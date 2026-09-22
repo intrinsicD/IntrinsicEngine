@@ -7,6 +7,17 @@ relative to `tasks/done/`, which sits at the same depth as `tasks/active/`,
 so blocks moved from the old active-README history work verbatim.
 
 
+## 2026-09-22 — BUG-207 loaded UBSan timeout retired
+
+Retired [BUG-207](BUG-207-loaded-ubsan-curvature-timeout.md) at the
+CPUContracted verification endpoint. The unchanged curvature group passed its
+quiet focused recheck and full UBSan selector under the existing timeout; all
+3,288 selected tests passed or capability-skipped as expected. Concurrent build
+contention explains the observed transient timeout. No gate was weakened and no
+source fix or performance claim was introduced. Enclosing retirement commit;
+no deferred work.
+
+
 ## 2026-09-22 — BUG-172 CPU load completion retired
 
 Retired [BUG-172](BUG-172-synchronous-cpu-load-completion-race.md) at the CPU

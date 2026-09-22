@@ -1,0 +1,23 @@
+3283/3285 Test #3302: IntrinsicGeometryCurvatureExtremaTests.Grouped ...............................................................***Timeout 120.01 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+[==========] Running 10 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 10 tests from CurvatureExtrema
+[ RUN      ] CurvatureExtrema.GaussianExtrusionFindsGeometricTransverseExtremum
+[       OK ] CurvatureExtrema.GaussianExtrusionFindsGeometricTransverseExtremum (11559 ms)
+[ RUN      ] CurvatureExtrema.PlaneHasNoArtificialCurves
+[       OK ] CurvatureExtrema.PlaneHasNoArtificialCurves (5314 ms)
+[ RUN      ] CurvatureExtrema.OrientationReversalExchangesRidgeValley
+[       OK ] CurvatureExtrema.OrientationReversalExchangesRidgeValley (17941 ms)
+[ RUN      ] CurvatureExtrema.RetriangulationAndRefinementRetainCenterCurve
+[       OK ] CurvatureExtrema.RetriangulationAndRefinementRetainCenterCurve (74649 ms)
+[ RUN      ] CurvatureExtrema.ScaleTranslationAndSourcePreservation
+[       OK ] CurvatureExtrema.ScaleTranslationAndSourcePreservation (5667 ms)
+[ RUN      ] CurvatureExtrema.InvalidInputsAndWorkLimitHaveNoPartialCurves
+[       OK ] CurvatureExtrema.InvalidInputsAndWorkLimitHaveNoPartialCurves (19 ms)
+[ RUN      ] CurvatureExtrema.ConstantCurvatureCylinderHasNoInteriorCreases
+[       OK ] CurvatureExtrema.ConstantCurvatureCylinderHasNoInteriorCreases (1474 ms)
+[ RUN      ] CurvatureExtrema.SphereRejectsUmbilicPrincipalDirections
+[       OK ] CurvatureExtrema.SphereRejectsUmbilicPrincipalDirections (2547 ms)
+[ RUN      ] CurvatureExtrema.NoisyExtrusionRetainsDominantCenter
+
