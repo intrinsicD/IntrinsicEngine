@@ -421,6 +421,11 @@ full CPU, sanitizer, or capability-specific gates.
 
 ## Research claim and evidence protocol
 
+Before automatic bookkeeping reads, apply the
+[relevance gate](../../../../../docs/agent/ara-evidence-policy.md#research-bookkeeping-relevance) from the
+conversation. Ordinary engineering does not load ARA ledgers for an epilogue;
+eligible research and explicit ARA work retain the requirements below.
+
 Research, performance, parity, and capability statements are tracked in the Agent-Native Research
 Artifact under `ara/`. `ara/logic/claims.md` is the claim ledger: each `C<NN>` row carries a
 statement, a disposition, a falsification criterion, and a `Proof` binding to artifacts that exist

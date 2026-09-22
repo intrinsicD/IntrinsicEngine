@@ -9,6 +9,35 @@ promoting a claim into `README.md`, `docs/`, a method report, or a task status l
 policy and runs in `ci-docs.yml`. It cannot judge whether a sentence overstates its artifact —
 that is the `intrinsicengine-results-audit` skill.
 
+## Research-bookkeeping relevance
+
+Before automatic research-manager bookkeeping, decide from the current request
+and conversation already available. Do not inspect `ara/`, read old observations,
+or load recording references merely to decide whether this turn qualifies. The
+presence of an ARA directory or a method/benchmark filename alone is insufficient.
+
+- Research hypotheses/decisions, method formulation or implementation, scientific
+  experiments, benchmark findings, research-result claims, evidence changes, and
+  explicit confirmation/refutation of a research observation qualify. A short
+  affirmation qualifies when its research referent is clear. Mixed turns record
+  only their research portion.
+- Ordinary implementation/refactoring, routine correctness tests, CI/setup,
+  docs/task/config/skill maintenance, and operational workflow measurements without
+  research findings do not qualify. Exit silently before ledger reads, maturity
+  sweeps, briefing, or empty session/reasoning-log writes.
+- Explicit ARA inspection, maintenance, initialization, validation, or research
+  resumption follows the requested scope. Read-only work does not itself create a
+  new research event. A generic request to continue engineering is not research
+  resumption.
+
+For eligible research, the recording procedure, provenance, staged observations,
+closure signals, and evidence bindings remain required. Unlogged ordinary turns
+are not evidence of topic abandonment; defer promotion when the closure signal
+cannot be established. Automatic recording runs at the end of an eligible turn.
+This gate never delays required claim rows until after publication, suppresses
+explicit ARA work, or skips repository validators. It changes when
+bookkeeping loads, not the research obligations below.
+
 ## Why the ledger exists
 
 The engine contract already requires benchmarks to use declared manifests and baselines

@@ -22,7 +22,7 @@ preserving correctness, engineering contracts, and completed-task quality.
 - Status: in-progress. Owner: Codex. Branch: `codex/proc-034-token-efficiency`.
 - Operator explicitly requested this process work outside the Framework24 P0
   selection focus on 2026-09-22, with four slices and immediate completion of
-  slice 1 only; the operator subsequently authorized slice 2. Slices 3–4 remain planned.
+  slice 1 only; the operator subsequently authorized slices 2 and 3. Slice 4 remains planned.
 - The preceding local audit identified large repeated contexts as the leading
   candidate. Byte reductions are instruction-size measurements, not demonstrated
   token, credit, latency, or completed-task savings.
@@ -58,7 +58,7 @@ preserving correctness, engineering contracts, and completed-task quality.
   and the mandatory full workflow read are removed, and structural checks pass.
 - [x] Slice 2: bounded output and fewer redundant calls preserve access to full
   evidence and required verification; representative task measurements recorded.
-- [ ] Slice 3: ordinary engineering avoids research-ledger loading while research
+- [x] Slice 3: ordinary engineering avoids research-ledger loading while research
   work still records and validates required evidence.
 - [ ] Slice 4: reasoning choices are justified by matched completed-task results;
   any settings changed are validated and residual uncertainty is explicit.
@@ -104,6 +104,31 @@ nonzero producer exit and a diagnostic outside the tail, then recover that
 diagnostic from the retained log. Exercise a running terminal handle with one
 completion wait. These are output/transport checks, not matched end-to-end model
 or credit benchmarks; slice 4 owns that comparison.
+
+Slice 3 (research applicability and installed skill): run the structural commands
+above, plus:
+
+```bash
+python3 /home/alex/.codex/skills/.system/skill-creator/scripts/quick_validate.py /home/alex/.codex/skills/research-manager
+git -C /home/alex/.codex/skills/research-manager apply --reverse --check "$PWD/tools/agents/patches/research-manager-2.1.0-relevance.patch"
+```
+
+Before editing, compare the installed skill with its cached package source and
+record provenance. Keep the package cache unchanged. Verify that the compact
+entry point gates all recording/briefing reads, reference links resolve, and
+the recording schemas, provenance rules, evidence bindings, and closure-signal
+requirements survive the split. Exercise ordinary engineering, research results,
+research affirmation, and explicit ARA maintenance/briefing cases; unrelated
+work must not load ledgers just because `ara/` exists. Reload the skill catalog
+through `skills/list` with `forceReload: true` and confirm the installed trigger.
+Do not create research records for this workflow-maintenance turn.
+
+The [portable local-skill patch](../../tools/agents/patches/research-manager-2.1.0-relevance.patch)
+targets the research-manager skill from `@orchestra-research/ara-skills` 0.2.0
+(skill metadata 2.1.0). To reproduce after reinstall, run `git apply --check`
+and then `git apply` with the absolute patch path from the installed
+research-manager directory. A newer upstream version requires reviewing/rebasing
+the patch first. The reverse check above verifies the already-patched installation.
 
 ## Log
 
@@ -155,3 +180,46 @@ or credit benchmarks; slice 4 owns that comparison.
 - All applicable structural/configuration checks and the four-point review
   passed. No reasoning defaults, global settings, or research-manager behavior
   changed. Slices 3–4 remain open.
+- 2026-09-22 — Slice 3 completed against pre-slice revision `80ceeac33`.
+  The installed user-scope skill at `/home/alex/.codex/skills/research-manager`
+  matched the cached `@orchestra-research/ara-skills` 0.2.0 package byte-for-byte
+  (skill metadata 2.1.0; original `SKILL.md` SHA-256
+  `9f17eea8da5bcc97e76466bcd3ca400ee6a65c8ff7a9b1a7853f7088ddb3e4cf`).
+  Updated that installation to `2.1.0-local.1`; retained the package cache and
+  installation metadata. The portable patch above reproduces all three skill
+  files exactly from the cached baseline and passes a reverse check against the
+  installed copy. No duplicate discoverable repository skill was added.
+- The skill now decides relevance from conversation before references or ledger
+  reads. Ordinary engineering skips silently; research events and explicit ARA
+  work retain scoped recording, briefing, and validation. A clear contextual
+  confirmation still qualifies. Required claim rows precede publication, and
+  unrecorded engineering turns cannot establish topic abandonment. Repository
+  policy and generated mirrors expose the same gate.
+- Split the detailed recording procedure into an on-demand reference. The entry
+  point decreased from 16,317 to 2,735 bytes (83.2%); this is source size, not
+  measured token or credit savings. Exact comparisons preserved seven schema,
+  crystallization, contradiction, stale-flagging, provenance, ID, and evidence
+  sections; five local links resolve. Removed inherited unsupported frontmatter
+  keys so skill validation passes. Codex's forced catalog reload finds one
+  enabled user-scope skill with the new description.
+- Independent skill forward tests used isolated synthetic fixtures: ordinary
+  engineering with an existing ARA directory made zero ledger reads/writes;
+  a research result recorded an experiment and promoted its observation with
+  evidence; explicit pending-observation inspection read only staging and wrote
+  nothing; contextual affirmation promoted the existing observation without
+  duplicating the earlier experiment. YAML, provenance, bindings, and duplicate
+  assertions passed. Reports: `/tmp/proc-034-forward-cdv2tul0/REPORT.md` and
+  `/tmp/proc-034-forward-final-oybhp7ga/REPORT.md`.
+- Resolved the forward review's ambiguous skipped-turn output and acknowledgment
+  wording, then reran ordinary engineering and contextual affirmation against the
+  final skill. The latter also obeyed a fixture-local repository proof-format
+  rule; existing validator checks for claim fields, status, proof paths, and
+  staging IDs passed. The minimal fixture has no claim dependencies or complete
+  repository scaffold; full repository validation separately passed all 108
+  existing claims. No actual repository research records changed.
+- Task policy, all 4,037 relative doc links, docs sync, skill mirrors, session
+  brief, Codex config, ARA structure, root hygiene, skill validation, patch
+  round-trip, and whitespace checks passed. The four-point review found one
+  workflow intent, unchanged engine layering, verified routing behavior, and
+  synchronized docs/task state. Slice 4 remains open; reasoning defaults are
+  unchanged.

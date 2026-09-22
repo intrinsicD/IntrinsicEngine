@@ -205,6 +205,11 @@ repository workflow metadata, not the runtime setting for this limit. Loaded
 threads may retain prior settings until configuration is reloaded. See the
 [official configuration reference](https://developers.openai.com/codex/config-reference).
 
+At turn end, apply the [research-bookkeeping relevance gate](../../../../../docs/agent/ara-evidence-policy.md#research-bookkeeping-relevance)
+from the conversation before loading recording references or ledgers. Ordinary
+engineering finishes without a research epilogue. Explicit ARA work and required
+research evidence remain in scope.
+
 # When CI fails
 
 - **Your change caused it** → fix it in the same PR; never weaken a gate, relax an assertion, or add a quarantine label to reach green without a diagnosis.

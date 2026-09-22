@@ -201,6 +201,11 @@ and [ARA policy](docs/agent/ara-evidence-policy.md); use
 `intrinsicengine-results-audit` when its review trigger applies. Run
 `python3 tools/agents/check_ara_claims.py --root . --strict` when touching this scope.
 
+Apply [research-bookkeeping relevance](docs/agent/ara-evidence-policy.md#research-bookkeeping-relevance)
+from the conversation before loading research-manager references or ARA ledgers.
+Ordinary engineering exits without a research epilogue; research events and
+explicit ARA work still follow the required evidence/recording path.
+
 ## 9. Documentation sync protocol
 
 When code, structure, or policy changes:
