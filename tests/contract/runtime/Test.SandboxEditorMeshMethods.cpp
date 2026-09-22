@@ -6410,3 +6410,80 @@ TEST(SandboxEditorUi, MeshCurvatureTypedBindingsMatchConfigValidation)
     EXPECT_TRUE(Runtime::ValidateMeshCurvatureConfigSection(
         Runtime::SerializeMeshCurvatureConfig(custom), {}, "test").Usable());
 }
+
+TEST(SandboxEditorUi, MeshCurvatureScalarStorageRoundTripsAndRestoresExactHistory)
+{
+    for (const bool queued : {false, true})
+    {
+        SCOPED_TRACE(queued);
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        Runtime::EditorCommandHistory history;
+        auto context = MakeContext(registry, selection);
+        context.CommandHistory = &history;
+        const auto mesh = MakeSelectable(registry, "Scalar curvature");
+        AddDenoiseAllBoundaryMeshSource(registry, mesh);
+        auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
+        Runtime::EditorMeshCurvatureCommand command{.StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh)};
+        using K = Geometry::PropertyValueKind;
+        command.Mean.ValueKind = K::UInt64;
+        command.Gaussian.ValueKind = K::Float;
+        command.MinPrincipal.ValueKind = K::Bool;
+        command.MaxPrincipal.ValueKind = K::Int32;
+        auto original = properties.GetOrAdd<std::uint64_t>(command.Mean.Name);
+        for (std::size_t i = 0; i < original.Size(); ++i) original[i] = std::numeric_limits<std::uint64_t>::max() - i;
+        const auto before = original.Vector();
+        constexpr std::uint32_t nanBits = 0x7fc12345u;
+        properties.GetOrAdd<float>(command.Gaussian.Name)[0] = std::bit_cast<float>(nanBits);
+        Core::Config::EngineConfig persisted;
+        Runtime::SetMeshCurvatureConfig(persisted, command);
+        const auto decoded = Runtime::GetMeshCurvatureConfig(persisted);
+        ASSERT_TRUE(decoded);
+        EXPECT_EQ(Runtime::SerializeMeshCurvatureConfig(*decoded), Runtime::SerializeMeshCurvatureConfig(command));
+        Extrinsic::Tests::EditorJobHarness jobs;
+        if (queued) jobs.Attach(context);
+        const auto result = Runtime::ApplyEditorMeshCurvatureCommand(context, command);
+        if (queued) { ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending); ASSERT_TRUE(jobs.DrainUntilTerminal()); }
+        else ASSERT_TRUE(result.Succeeded()) << result.Message;
+        ASSERT_TRUE(properties.Get<float>(command.Gaussian.Name));
+        EXPECT_TRUE(properties.Get<bool>(command.MinPrincipal.Name));
+        EXPECT_TRUE(properties.Get<std::int32_t>(command.MaxPrincipal.Name));
+        for (const auto value : properties.Get<std::uint64_t>(command.Mean.Name).Vector()) EXPECT_EQ(value, 0u);
+        ASSERT_TRUE(history.Undo().Succeeded());
+        EXPECT_EQ(properties.Get<std::uint64_t>(command.Mean.Name).Vector(), before);
+        EXPECT_EQ(std::bit_cast<std::uint32_t>(properties.Get<float>(command.Gaussian.Name)[0]), nanBits);
+        ASSERT_TRUE(history.Redo().Succeeded());
+        EXPECT_TRUE(properties.Get<float>(command.Gaussian.Name));
+    }
+}
+
+TEST(SandboxEditorUi, MeshCurvatureRejectsInexactScalarOutputBeforeAnyPublication)
+{
+    for (const bool queued : {false, true})
+    {
+        SCOPED_TRACE(queued);
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        Runtime::EditorCommandHistory history;
+        auto context = MakeContext(registry, selection);
+        context.CommandHistory = &history;
+        const auto mesh = MakeSelectable(registry, "Unrepresentable curvature");
+        AddDenoiseTetraMeshSource(registry, mesh);
+        auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
+        Runtime::EditorMeshCurvatureCommand command{.StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh)};
+        command.Mean.ValueKind = Geometry::PropertyValueKind::UInt64;
+        Extrinsic::Tests::EditorJobHarness jobs;
+        if (queued) jobs.Attach(context);
+        std::optional<Runtime::EditorMeshCurvatureResult> completion;
+        const auto result = Runtime::ApplyEditorMeshCurvatureCommand(context, command,
+            [&](auto value) { completion = std::move(value); });
+        if (queued) { ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending); ASSERT_TRUE(jobs.DrainUntilTerminal()); ASSERT_TRUE(completion); }
+        const auto& rejected = queued ? *completion : result;
+        EXPECT_EQ(rejected.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+        EXPECT_NE(rejected.Message.find("exactly representable"), std::string::npos);
+        EXPECT_EQ(history.UndoCount(), 0u);
+        EXPECT_FALSE(properties.Exists(command.Mean.Name));
+        EXPECT_FALSE(properties.Exists(command.Gaussian.Name));
+        EXPECT_FALSE(properties.Exists(command.Direction1.Name));
+    }
+}

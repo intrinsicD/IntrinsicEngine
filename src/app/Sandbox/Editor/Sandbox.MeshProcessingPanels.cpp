@@ -820,10 +820,10 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::SeparatorText("Input properties");
         changed |= DrawProcessingPropertyInput("Positions##MeshCurvature", model.PropertyCatalog, config.Positions);
         ImGui::SeparatorText("Output properties");
-        changed |= DrawProcessingPropertyName("Mean curvature", config.Mean.Name);
-        changed |= DrawProcessingPropertyName("Gaussian curvature", config.Gaussian.Name);
-        changed |= DrawProcessingPropertyName("Minimum principal curvature", config.MinPrincipal.Name);
-        changed |= DrawProcessingPropertyName("Maximum principal curvature", config.MaxPrincipal.Name);
+        changed |= DrawProcessingScalarOutput("Mean curvature", config.Mean);
+        changed |= DrawProcessingScalarOutput("Gaussian curvature", config.Gaussian);
+        changed |= DrawProcessingScalarOutput("Minimum principal curvature", config.MinPrincipal);
+        changed |= DrawProcessingScalarOutput("Maximum principal curvature", config.MaxPrincipal);
         changed |= DrawProcessingPropertyName("First principal direction", config.Direction1.Name);
         changed |= DrawProcessingPropertyName("Second principal direction", config.Direction2.Name);
         if (ImGui::BeginCombo("Output##MeshCurvature", Runtime::DebugNameForEditorMeshCurvatureOutput(config.Output)))
@@ -947,14 +947,14 @@ namespace Extrinsic::Sandbox::Editor
                            "Vertex values are averaged onto faces. Feature-curve methods require computed curvature.");
 
         ImGui::SeparatorText("Output properties");
-        changed |= DrawProcessingPropertyName("Components##Segmentation", config.Components.Name);
-        changed |= DrawProcessingPropertyName("Regions##Segmentation", config.Regions.Name);
+        changed |= DrawProcessingScalarOutput("Components##Segmentation", config.Components);
+        changed |= DrawProcessingScalarOutput("Regions##Segmentation", config.Regions);
         changed |= DrawProcessingPropertyName("RegionColors##Segmentation", config.RegionColors.Name);
-        changed |= DrawProcessingPropertyName("Boundaries##Segmentation", config.Boundaries.Name);
+        changed |= DrawProcessingScalarOutput("Boundaries##Segmentation", config.Boundaries);
         changed |= DrawProcessingPropertyName("BoundaryColors##Segmentation", config.BoundaryColors.Name);
-        changed |= DrawProcessingPropertyName("HardFeatures##Segmentation", config.HardFeatures.Name);
-        changed |= DrawProcessingPropertyName("FeatureConfidence##Segmentation", config.FeatureConfidence.Name);
-        changed |= DrawProcessingPropertyName("BoundaryRoles##Segmentation", config.BoundaryRoles.Name);
+        changed |= DrawProcessingScalarOutput("HardFeatures##Segmentation", config.HardFeatures);
+        changed |= DrawProcessingScalarOutput("FeatureConfidence##Segmentation", config.FeatureConfidence);
+        changed |= DrawProcessingScalarOutput("BoundaryRoles##Segmentation", config.BoundaryRoles);
         changed |= DrawProcessingPropertyName("FeatureColors##Segmentation", config.FeatureColors.Name);
 
         if (ImGui::BeginCombo(

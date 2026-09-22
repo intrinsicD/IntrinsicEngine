@@ -745,9 +745,23 @@ values are widened into the kernel's working storage; integer precision loss and
 non-finite used values fail before publication. Feature properties are not
 rewritten. Four-channel input is unsupported and rejected. The feature-curve
 methods retain their intrinsic curvature inputs and reject supplied GMM features.
-The command captures current values synchronously; deferred finite-feature
-readiness remains owned by UI-037. Inputs, property names and interpretation
-follow the [binding equivalence contract](geometry-api-style.md#equal-dimensional-property-bindings).
+The command captures current values synchronously; attached preview readiness
+uses the session's deferred bound-field verdict described above. Inputs, property
+names and interpretation follow the
+[binding equivalence contract](geometry-api-style.md#equal-dimensional-property-bindings).
+
+Curvature and segmentation scalar outputs accept the six numeric scalar storage
+kinds through the same full references in config, runtime and UI. Kernel results
+are staged with checked exact conversion before any output is published; an
+unrepresentable value rejects the whole output transaction. Existing target
+storage must match the declared kind. History retains raw typed snapshots,
+including UInt64 values beyond double precision and floating exceptional values,
+so undo does not convert previously authored data. Direction/color outputs retain
+their Vec3/Vec4 contracts, and aliasing plus structural-property restrictions
+remain enforced. Segmentation preserves existing values at unconsumed face/edge
+slots, including exceptional floating values and full-width integers. Newly
+created label properties use the UInt32 invalid-label sentinel for unused slots;
+a target type unable to represent that value is rejected.
 
 
 `ProcessingCompilationLocality.Family`, `.PointFieldResults`, `.PointAnalysis`, `.PointAnalysisTests`,

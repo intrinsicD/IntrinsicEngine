@@ -105,7 +105,10 @@ namespace Extrinsic::Runtime
         {
             const auto& ref = config.*properties[i];
             const auto& expected = defaults.*properties[i];
-            if (ref.Domain != expected.Domain || ref.ValueKind != expected.ValueKind ||
+            if (ref.Domain != expected.Domain ||
+                (GeometryPropertyComponentCount(expected.ValueKind) == 1u
+                    ? GeometryPropertyComponentCount(ref.ValueKind) != 1u
+                    : ref.ValueKind != expected.ValueKind) ||
                 ref.Name.empty() ||
                 ref.Name.find('\0') != std::string::npos) return false;
             if (IsTopologyProperty(ref.Domain, ref.Name)) return false;

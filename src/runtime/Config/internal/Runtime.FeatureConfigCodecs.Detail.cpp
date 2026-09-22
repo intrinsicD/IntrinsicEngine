@@ -1429,14 +1429,14 @@ namespace Extrinsic::Runtime
                 }
             }
             ReadPropertyRef(context, *object, "positions", config.Positions);
-            ReadPropertyRef(context, *object, "components", config.Components);
-            ReadPropertyRef(context, *object, "regions", config.Regions);
+            ReadPropertyRef(context, *object, "components", config.Components, false, true);
+            ReadPropertyRef(context, *object, "regions", config.Regions, false, true);
             ReadPropertyRef(context, *object, "region_colors", config.RegionColors);
-            ReadPropertyRef(context, *object, "boundaries", config.Boundaries);
+            ReadPropertyRef(context, *object, "boundaries", config.Boundaries, false, true);
             ReadPropertyRef(context, *object, "boundary_colors", config.BoundaryColors);
-            ReadPropertyRef(context, *object, "hard_features", config.HardFeatures);
-            ReadPropertyRef(context, *object, "feature_confidence", config.FeatureConfidence);
-            ReadPropertyRef(context, *object, "boundary_roles", config.BoundaryRoles);
+            ReadPropertyRef(context, *object, "hard_features", config.HardFeatures, false, true);
+            ReadPropertyRef(context, *object, "feature_confidence", config.FeatureConfidence, false, true);
+            ReadPropertyRef(context, *object, "boundary_roles", config.BoundaryRoles, false, true);
             ReadPropertyRef(context, *object, "feature_colors", config.FeatureColors);
             if (!Runtime::IsValidCurvatureSegmentationConfig(config) && context.Result)
             {

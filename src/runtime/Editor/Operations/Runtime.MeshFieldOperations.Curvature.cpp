@@ -12,6 +12,8 @@ module;
 #include <bit>
 #include <limits>
 #include <memory>
+#include <numeric>
+#include <variant>
 #include <optional>
 #include <span>
 #include <string>
@@ -168,19 +170,66 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                 EditorMeshCurvatureOutput::PrincipalDirections,
             }};
 
+        [[nodiscard]] bool CaptureMeshScalarProperty(
+            const Geometry::PropertySet& properties, const GeometryPropertyRef& ref,
+            std::size_t count, GeometryScalarPropertySnapshot& snapshot, std::string& diagnostic)
+        {
+            snapshot = CaptureGeometryScalarProperty(properties, ref);
+            if (!properties.Exists(ref.Name) ||
+                (snapshot.Exists && GeometryScalarPropertySize(snapshot) == count)) return true;
+            diagnostic = "existing curvature property has an incompatible type or count: " + ref.Name;
+            return false;
+        }
+
+        [[nodiscard]] std::size_t CountChangedValues(
+            const GeometryScalarPropertySnapshot& before, const GeometryScalarPropertySnapshot& after) noexcept
+        {
+            if (!after.Exists) return GeometryScalarPropertySize(before);
+            if (!before.Exists) return GeometryScalarPropertySize(after);
+            return std::visit([&](const auto& values) -> std::size_t {
+                using Values = std::decay_t<decltype(values)>;
+                const auto* previous = std::get_if<Values>(&before.Values);
+                if (!previous || previous->size() != values.size()) return values.size();
+                std::size_t changed = 0u;
+                for (std::size_t i = 0; i < values.size(); ++i)
+                {
+                    bool same = values[i] == (*previous)[i];
+                    using T = typename Values::value_type;
+                    if constexpr (std::is_floating_point_v<T>)
+                    {
+                        using Bits = std::conditional_t<sizeof(T) == 4, std::uint32_t, std::uint64_t>;
+                        same = same || std::bit_cast<Bits>(values[i]) == std::bit_cast<Bits>((*previous)[i]);
+                    }
+                    changed += !same;
+                }
+                return changed;
+            }, after.Values);
+        }
+
+        template <typename T>
+        [[nodiscard]] bool StageMeshScalarProperty(
+            GeometryScalarPropertySnapshot& snapshot, const GeometryPropertyRef& ref,
+            const std::vector<T>& values, std::span<const std::uint32_t> liveSlots = {})
+        {
+            std::vector<std::uint32_t> allSlots;
+            if (!snapshot.Exists || liveSlots.empty())
+            {
+                allSlots.resize(values.size());
+                std::iota(allSlots.begin(), allSlots.end(), 0u);
+                liveSlots = allSlots;
+            }
+            return PrepareGeometryScalarProperty(snapshot, ref.ValueKind, values.size(), liveSlots, std::span<const T>{values});
+        }
+
         struct MeshCurvaturePropertyState
         {
             MeshCurvatureConfig Bindings{};
-            bool HadMean{false};
-            bool HadGaussian{false};
-            bool HadMinPrincipal{false};
-            bool HadMaxPrincipal{false};
             bool HadDir1{false};
             bool HadDir2{false};
-            std::vector<double> Mean{};
-            std::vector<double> Gaussian{};
-            std::vector<double> MinPrincipal{};
-            std::vector<double> MaxPrincipal{};
+            GeometryScalarPropertySnapshot Mean{};
+            GeometryScalarPropertySnapshot Gaussian{};
+            GeometryScalarPropertySnapshot MinPrincipal{};
+            GeometryScalarPropertySnapshot MaxPrincipal{};
             std::vector<glm::vec3> Dir1{};
             std::vector<glm::vec3> Dir2{};
         };
@@ -192,17 +241,10 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             const MeshCurvaturePropertyState& before,
             const MeshCurvaturePropertyState& after) noexcept
         {
-            return CountChangedValues(before.HadMean, before.Mean, after.Mean) +
-                   CountChangedValues(
-                       before.HadGaussian, before.Gaussian, after.Gaussian) +
-                   CountChangedValues(
-                       before.HadMinPrincipal,
-                       before.MinPrincipal,
-                       after.MinPrincipal) +
-                   CountChangedValues(
-                       before.HadMaxPrincipal,
-                       before.MaxPrincipal,
-                       after.MaxPrincipal) +
+            return CountChangedValues(before.Mean, after.Mean) +
+                   CountChangedValues(before.Gaussian, after.Gaussian) +
+                   CountChangedValues(before.MinPrincipal, after.MinPrincipal) +
+                   CountChangedValues(before.MaxPrincipal, after.MaxPrincipal) +
                    CountChangedValues(before.HadDir1, before.Dir1, after.Dir1) +
                    CountChangedValues(before.HadDir2, before.Dir2, after.Dir2);
         }
@@ -264,42 +306,24 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             const MeshCurvaturePropertyState& lhs,
             const MeshCurvaturePropertyState& rhs) noexcept
         {
-            return lhs.HadMean == rhs.HadMean &&
-                   lhs.HadGaussian == rhs.HadGaussian &&
-                   lhs.HadMinPrincipal == rhs.HadMinPrincipal &&
-                   lhs.HadMaxPrincipal == rhs.HadMaxPrincipal &&
-                   lhs.HadDir1 == rhs.HadDir1 &&
-                   lhs.HadDir2 == rhs.HadDir2 &&
-                   lhs.Mean == rhs.Mean &&
-                   lhs.Gaussian == rhs.Gaussian &&
-                   lhs.MinPrincipal == rhs.MinPrincipal &&
-                   lhs.MaxPrincipal == rhs.MaxPrincipal &&
-                   lhs.Dir1 == rhs.Dir1 &&
-                   lhs.Dir2 == rhs.Dir2;
+            return SameGeometryScalarPropertySnapshot(lhs.Mean, rhs.Mean) &&
+                   SameGeometryScalarPropertySnapshot(lhs.Gaussian, rhs.Gaussian) &&
+                   SameGeometryScalarPropertySnapshot(lhs.MinPrincipal, rhs.MinPrincipal) &&
+                   SameGeometryScalarPropertySnapshot(lhs.MaxPrincipal, rhs.MaxPrincipal) &&
+                   lhs.HadDir1 == rhs.HadDir1 && lhs.HadDir2 == rhs.HadDir2 &&
+                   lhs.Dir1 == rhs.Dir1 && lhs.Dir2 == rhs.Dir2;
         }
 
         [[nodiscard]] bool MeshCurvaturePropertyStateMatchesCount(
             const MeshCurvaturePropertyState& state,
             const std::size_t expectedCount) noexcept
         {
-            return (state.HadMean
-                        ? state.Mean.size() == expectedCount
-                        : state.Mean.empty()) &&
-                   (state.HadGaussian
-                        ? state.Gaussian.size() == expectedCount
-                        : state.Gaussian.empty()) &&
-                   (state.HadMinPrincipal
-                        ? state.MinPrincipal.size() == expectedCount
-                        : state.MinPrincipal.empty()) &&
-                   (state.HadMaxPrincipal
-                        ? state.MaxPrincipal.size() == expectedCount
-                        : state.MaxPrincipal.empty()) &&
-                   (state.HadDir1
-                        ? state.Dir1.size() == expectedCount
-                        : state.Dir1.empty()) &&
-                   (state.HadDir2
-                        ? state.Dir2.size() == expectedCount
-                        : state.Dir2.empty());
+            return GeometryScalarPropertySize(state.Mean) == (state.Mean.Exists ? expectedCount : 0u) &&
+                   GeometryScalarPropertySize(state.Gaussian) == (state.Gaussian.Exists ? expectedCount : 0u) &&
+                   GeometryScalarPropertySize(state.MinPrincipal) == (state.MinPrincipal.Exists ? expectedCount : 0u) &&
+                   GeometryScalarPropertySize(state.MaxPrincipal) == (state.MaxPrincipal.Exists ? expectedCount : 0u) &&
+                   (state.HadDir1 ? state.Dir1.size() == expectedCount : state.Dir1.empty()) &&
+                   (state.HadDir2 ? state.Dir2.size() == expectedCount : state.Dir2.empty());
         }
 
         [[nodiscard]] bool CaptureMeshCurvaturePropertyState(
@@ -310,90 +334,28 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             const MeshCurvatureConfig& bindings)
         {
             out.Bindings = bindings;
-            return CaptureCurvatureProperty<double>(
-                       properties,
-                       bindings.Mean.Name,
-                       expectedCount,
-                       out.HadMean,
-                       out.Mean,
-                       diagnostic) &&
-                   CaptureCurvatureProperty<double>(
-                       properties,
-                       bindings.Gaussian.Name,
-                       expectedCount,
-                       out.HadGaussian,
-                       out.Gaussian,
-                       diagnostic) &&
-                   CaptureCurvatureProperty<double>(
-                       properties,
-                       bindings.MinPrincipal.Name,
-                       expectedCount,
-                       out.HadMinPrincipal,
-                       out.MinPrincipal,
-                       diagnostic) &&
-                   CaptureCurvatureProperty<double>(
-                       properties,
-                       bindings.MaxPrincipal.Name,
-                       expectedCount,
-                       out.HadMaxPrincipal,
-                       out.MaxPrincipal,
-                       diagnostic) &&
-                   CaptureCurvatureProperty<glm::vec3>(
-                       properties,
-                       bindings.Direction1.Name,
-                       expectedCount,
-                       out.HadDir1,
-                       out.Dir1,
-                       diagnostic) &&
-                   CaptureCurvatureProperty<glm::vec3>(
-                       properties,
-                       bindings.Direction2.Name,
-                       expectedCount,
-                       out.HadDir2,
-                       out.Dir2,
-                       diagnostic);
+            return CaptureMeshScalarProperty(properties, bindings.Mean, expectedCount, out.Mean, diagnostic) &&
+                   CaptureMeshScalarProperty(properties, bindings.Gaussian, expectedCount, out.Gaussian, diagnostic) &&
+                   CaptureMeshScalarProperty(properties, bindings.MinPrincipal, expectedCount, out.MinPrincipal, diagnostic) &&
+                   CaptureMeshScalarProperty(properties, bindings.MaxPrincipal, expectedCount, out.MaxPrincipal, diagnostic) &&
+                   CaptureCurvatureProperty<glm::vec3>(properties, bindings.Direction1.Name, expectedCount, out.HadDir1, out.Dir1, diagnostic) &&
+                   CaptureCurvatureProperty<glm::vec3>(properties, bindings.Direction2.Name, expectedCount, out.HadDir2, out.Dir2, diagnostic);
         }
 
         [[nodiscard]] bool ApplyMeshCurvaturePropertyState(
             Geometry::PropertySet& properties,
             const MeshCurvaturePropertyState& state)
         {
-            return ApplyCurvatureProperty<double>(
-                       properties,
-                       state.Bindings.Mean.Name,
-                       state.HadMean,
-                       state.Mean,
-                       0.0) &&
-                   ApplyCurvatureProperty<double>(
-                       properties,
-                       state.Bindings.Gaussian.Name,
-                       state.HadGaussian,
-                       state.Gaussian,
-                       0.0) &&
-                   ApplyCurvatureProperty<double>(
-                       properties,
-                       state.Bindings.MinPrincipal.Name,
-                       state.HadMinPrincipal,
-                       state.MinPrincipal,
-                       0.0) &&
-                   ApplyCurvatureProperty<double>(
-                       properties,
-                       state.Bindings.MaxPrincipal.Name,
-                       state.HadMaxPrincipal,
-                       state.MaxPrincipal,
-                       0.0) &&
-                   ApplyCurvatureProperty<glm::vec3>(
-                       properties,
-                       state.Bindings.Direction1.Name,
-                       state.HadDir1,
-                       state.Dir1,
-                       glm::vec3{0.0f}) &&
-                   ApplyCurvatureProperty<glm::vec3>(
-                       properties,
-                       state.Bindings.Direction2.Name,
-                       state.HadDir2,
-                       state.Dir2,
-                       glm::vec3{0.0f});
+            if (!CanApplyGeometryScalarProperty(properties, state.Bindings.Mean, state.Mean) ||
+                !CanApplyGeometryScalarProperty(properties, state.Bindings.Gaussian, state.Gaussian) ||
+                !CanApplyGeometryScalarProperty(properties, state.Bindings.MinPrincipal, state.MinPrincipal) ||
+                !CanApplyGeometryScalarProperty(properties, state.Bindings.MaxPrincipal, state.MaxPrincipal)) return false;
+            return ApplyGeometryScalarProperty(properties, state.Bindings.Mean, state.Mean) &&
+                   ApplyGeometryScalarProperty(properties, state.Bindings.Gaussian, state.Gaussian) &&
+                   ApplyGeometryScalarProperty(properties, state.Bindings.MinPrincipal, state.MinPrincipal) &&
+                   ApplyGeometryScalarProperty(properties, state.Bindings.MaxPrincipal, state.MaxPrincipal) &&
+                   ApplyCurvatureProperty<glm::vec3>(properties, state.Bindings.Direction1.Name, state.HadDir1, state.Dir1, glm::vec3{0.0f}) &&
+                   ApplyCurvatureProperty<glm::vec3>(properties, state.Bindings.Direction2.Name, state.HadDir2, state.Dir2, glm::vec3{0.0f});
         }
 
         [[nodiscard]] std::size_t CountNonFiniteScalars(
@@ -462,33 +424,24 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                    count(curvature.MaxPrincipalCurvatureProperty.Vector());
         }
 
-        void StageMeshCurvatureScalars(
+        [[nodiscard]] bool StageMeshCurvatureScalars(
             const Curv::CurvatureField& curvature,
             MeshCurvaturePropertyState& after,
             EditorMeshCurvatureResult& result)
         {
-            const std::vector<double>& mean =
-                curvature.MeanCurvatureProperty.Vector();
-            const std::vector<double>& gaussian =
-                curvature.GaussianCurvatureProperty.Vector();
-            const std::vector<double>& minPrincipal =
-                curvature.MinPrincipalCurvatureProperty.Vector();
-            const std::vector<double>& maxPrincipal =
-                curvature.MaxPrincipalCurvatureProperty.Vector();
-
-            after.HadMean = true;
-            after.Mean = mean;
-            after.HadGaussian = true;
-            after.Gaussian = gaussian;
-            after.HadMinPrincipal = true;
-            after.MinPrincipal = minPrincipal;
-            after.HadMaxPrincipal = true;
-            after.MaxPrincipal = maxPrincipal;
-
+            if (!StageMeshScalarProperty(after.Mean, after.Bindings.Mean, curvature.MeanCurvatureProperty.Vector()) ||
+                !StageMeshScalarProperty(after.Gaussian, after.Bindings.Gaussian, curvature.GaussianCurvatureProperty.Vector()) ||
+                !StageMeshScalarProperty(after.MinPrincipal, after.Bindings.MinPrincipal, curvature.MinPrincipalCurvatureProperty.Vector()) ||
+                !StageMeshScalarProperty(after.MaxPrincipal, after.Bindings.MaxPrincipal, curvature.MaxPrincipalCurvatureProperty.Vector()))
+            {
+                result.Status = EditorCommandStatus::InvalidProcessingParameters;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message = "Curvature outputs are not exactly representable in their declared scalar storage.";
+                return false;
+            }
             result.ScalarPropertyCount = 4u;
-            result.ScalarWrittenCount = mean.size() + gaussian.size() +
-                                        minPrincipal.size() +
-                                        maxPrincipal.size();
+            result.ScalarWrittenCount = 4u * GeometryScalarPropertySize(after.Mean);
+            return true;
         }
 
         [[nodiscard]] EditorCommandHistoryStatus ApplyMeshCurvatureState(
@@ -1058,23 +1011,17 @@ namespace Extrinsic::Runtime::MeshFieldDetail
         struct MeshCurvatureSegmentationPropertyState
         {
             CurvatureSegmentationConfig Bindings{};
-            bool HadComponent{false};
-            bool HadRegion{false};
             bool HadRegionColor{false};
-            bool HadBoundary{false};
             bool HadBoundaryColor{false};
-            bool HadHardFeature{false};
-            bool HadSoftFeatureConfidence{false};
-            bool HadBoundaryRole{false};
             bool HadFeaturePatchColor{false};
-            std::vector<std::uint32_t> Components{};
-            std::vector<std::uint32_t> Regions{};
+            GeometryScalarPropertySnapshot Components{};
+            GeometryScalarPropertySnapshot Regions{};
             std::vector<glm::vec4> RegionColors{};
-            std::vector<bool> Boundaries{};
+            GeometryScalarPropertySnapshot Boundaries{};
             std::vector<glm::vec4> BoundaryColors{};
-            std::vector<bool> HardFeatures{};
-            std::vector<double> SoftFeatureConfidences{};
-            std::vector<std::uint32_t> BoundaryRoles{};
+            GeometryScalarPropertySnapshot HardFeatures{};
+            GeometryScalarPropertySnapshot SoftFeatureConfidences{};
+            GeometryScalarPropertySnapshot BoundaryRoles{};
             std::vector<glm::vec4> FeaturePatchColors{};
         };
 
@@ -1086,27 +1033,15 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             const MeshCurvatureSegmentationPropertyState& lhs,
             const MeshCurvatureSegmentationPropertyState& rhs) noexcept
         {
-            return lhs.HadComponent == rhs.HadComponent &&
-                   lhs.HadRegion == rhs.HadRegion &&
-                   lhs.HadRegionColor == rhs.HadRegionColor &&
-                   lhs.HadBoundary == rhs.HadBoundary &&
-                   lhs.HadBoundaryColor == rhs.HadBoundaryColor &&
-                   lhs.HadHardFeature == rhs.HadHardFeature &&
-                   lhs.HadSoftFeatureConfidence ==
-                       rhs.HadSoftFeatureConfidence &&
-                   lhs.HadBoundaryRole == rhs.HadBoundaryRole &&
-                   lhs.HadFeaturePatchColor ==
-                       rhs.HadFeaturePatchColor &&
-                   lhs.Components == rhs.Components &&
-                   lhs.Regions == rhs.Regions &&
-                   lhs.RegionColors == rhs.RegionColors &&
-                   lhs.Boundaries == rhs.Boundaries &&
-                   lhs.BoundaryColors == rhs.BoundaryColors &&
-                   lhs.HardFeatures == rhs.HardFeatures &&
-                   lhs.SoftFeatureConfidences ==
-                       rhs.SoftFeatureConfidences &&
-                   lhs.BoundaryRoles == rhs.BoundaryRoles &&
-                   lhs.FeaturePatchColors == rhs.FeaturePatchColors;
+            return SameGeometryScalarPropertySnapshot(lhs.Components, rhs.Components) &&
+                   SameGeometryScalarPropertySnapshot(lhs.Regions, rhs.Regions) &&
+                   SameGeometryScalarPropertySnapshot(lhs.Boundaries, rhs.Boundaries) &&
+                   SameGeometryScalarPropertySnapshot(lhs.HardFeatures, rhs.HardFeatures) &&
+                   SameGeometryScalarPropertySnapshot(lhs.SoftFeatureConfidences, rhs.SoftFeatureConfidences) &&
+                   SameGeometryScalarPropertySnapshot(lhs.BoundaryRoles, rhs.BoundaryRoles) &&
+                   lhs.HadRegionColor == rhs.HadRegionColor && lhs.RegionColors == rhs.RegionColors &&
+                   lhs.HadBoundaryColor == rhs.HadBoundaryColor && lhs.BoundaryColors == rhs.BoundaryColors &&
+                   lhs.HadFeaturePatchColor == rhs.HadFeaturePatchColor && lhs.FeaturePatchColors == rhs.FeaturePatchColors;
         }
 
         [[nodiscard]] bool
@@ -1115,33 +1050,15 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             const std::size_t faceCount,
             const std::size_t edgeCount) noexcept
         {
-            return (state.HadComponent
-                        ? state.Components.size() == faceCount
-                        : state.Components.empty()) &&
-                   (state.HadRegion
-                        ? state.Regions.size() == faceCount
-                        : state.Regions.empty()) &&
-                   (state.HadRegionColor
-                        ? state.RegionColors.size() == faceCount
-                        : state.RegionColors.empty()) &&
-                   (state.HadBoundary
-                        ? state.Boundaries.size() == edgeCount
-                        : state.Boundaries.empty()) &&
-                   (state.HadBoundaryColor
-                        ? state.BoundaryColors.size() == edgeCount
-                        : state.BoundaryColors.empty()) &&
-                   (state.HadHardFeature
-                        ? state.HardFeatures.size() == edgeCount
-                        : state.HardFeatures.empty()) &&
-                   (state.HadSoftFeatureConfidence
-                        ? state.SoftFeatureConfidences.size() == edgeCount
-                        : state.SoftFeatureConfidences.empty()) &&
-                   (state.HadBoundaryRole
-                        ? state.BoundaryRoles.size() == edgeCount
-                        : state.BoundaryRoles.empty()) &&
-                   (state.HadFeaturePatchColor
-                        ? state.FeaturePatchColors.size() == edgeCount
-                        : state.FeaturePatchColors.empty());
+            return GeometryScalarPropertySize(state.Components) == (state.Components.Exists ? faceCount : 0u) &&
+                   GeometryScalarPropertySize(state.Regions) == (state.Regions.Exists ? faceCount : 0u) &&
+                   GeometryScalarPropertySize(state.Boundaries) == (state.Boundaries.Exists ? edgeCount : 0u) &&
+                   GeometryScalarPropertySize(state.HardFeatures) == (state.HardFeatures.Exists ? edgeCount : 0u) &&
+                   GeometryScalarPropertySize(state.SoftFeatureConfidences) == (state.SoftFeatureConfidences.Exists ? edgeCount : 0u) &&
+                   GeometryScalarPropertySize(state.BoundaryRoles) == (state.BoundaryRoles.Exists ? edgeCount : 0u) &&
+                   (state.HadRegionColor ? state.RegionColors.size() == faceCount : state.RegionColors.empty()) &&
+                   (state.HadBoundaryColor ? state.BoundaryColors.size() == edgeCount : state.BoundaryColors.empty()) &&
+                   (state.HadFeaturePatchColor ? state.FeaturePatchColors.size() == edgeCount : state.FeaturePatchColors.empty());
         }
 
         [[nodiscard]] bool CaptureMeshCurvatureSegmentationPropertyState(
@@ -1153,69 +1070,15 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             std::string& diagnostic, const CurvatureSegmentationConfig& bindings)
         {
             out.Bindings = bindings;
-            return CaptureCurvatureProperty<std::uint32_t>(
-                       faceProperties,
-                       bindings.Components.Name,
-                       faceCount,
-                       out.HadComponent,
-                       out.Components,
-                       diagnostic) &&
-                   CaptureCurvatureProperty<std::uint32_t>(
-                       faceProperties,
-                       bindings.Regions.Name,
-                       faceCount,
-                       out.HadRegion,
-                       out.Regions,
-                       diagnostic) &&
-                   CaptureCurvatureProperty<glm::vec4>(
-                       faceProperties,
-                       bindings.RegionColors.Name,
-                       faceCount,
-                       out.HadRegionColor,
-                       out.RegionColors,
-                       diagnostic) &&
-                   CaptureCurvatureProperty<bool>(
-                       edgeProperties,
-                       bindings.Boundaries.Name,
-                       edgeCount,
-                       out.HadBoundary,
-                       out.Boundaries,
-                       diagnostic) &&
-                   CaptureCurvatureProperty<glm::vec4>(
-                       edgeProperties,
-                       bindings.BoundaryColors.Name,
-                       edgeCount,
-                       out.HadBoundaryColor,
-                       out.BoundaryColors,
-                       diagnostic) &&
-                   CaptureCurvatureProperty<bool>(
-                       edgeProperties,
-                       bindings.HardFeatures.Name,
-                       edgeCount,
-                       out.HadHardFeature,
-                       out.HardFeatures,
-                       diagnostic) &&
-                   CaptureCurvatureProperty<double>(
-                       edgeProperties,
-                       bindings.FeatureConfidence.Name,
-                       edgeCount,
-                       out.HadSoftFeatureConfidence,
-                       out.SoftFeatureConfidences,
-                       diagnostic) &&
-                   CaptureCurvatureProperty<std::uint32_t>(
-                       edgeProperties,
-                       bindings.BoundaryRoles.Name,
-                       edgeCount,
-                       out.HadBoundaryRole,
-                       out.BoundaryRoles,
-                       diagnostic) &&
-                   CaptureCurvatureProperty<glm::vec4>(
-                       edgeProperties,
-                       bindings.FeatureColors.Name,
-                       edgeCount,
-                       out.HadFeaturePatchColor,
-                       out.FeaturePatchColors,
-                       diagnostic);
+            return CaptureMeshScalarProperty(faceProperties, bindings.Components, faceCount, out.Components, diagnostic) &&
+                   CaptureMeshScalarProperty(faceProperties, bindings.Regions, faceCount, out.Regions, diagnostic) &&
+                   CaptureMeshScalarProperty(edgeProperties, bindings.Boundaries, edgeCount, out.Boundaries, diagnostic) &&
+                   CaptureMeshScalarProperty(edgeProperties, bindings.HardFeatures, edgeCount, out.HardFeatures, diagnostic) &&
+                   CaptureMeshScalarProperty(edgeProperties, bindings.FeatureConfidence, edgeCount, out.SoftFeatureConfidences, diagnostic) &&
+                   CaptureMeshScalarProperty(edgeProperties, bindings.BoundaryRoles, edgeCount, out.BoundaryRoles, diagnostic) &&
+                   CaptureCurvatureProperty<glm::vec4>(faceProperties, bindings.RegionColors.Name, faceCount, out.HadRegionColor, out.RegionColors, diagnostic) &&
+                   CaptureCurvatureProperty<glm::vec4>(edgeProperties, bindings.BoundaryColors.Name, edgeCount, out.HadBoundaryColor, out.BoundaryColors, diagnostic) &&
+                   CaptureCurvatureProperty<glm::vec4>(edgeProperties, bindings.FeatureColors.Name, edgeCount, out.HadFeaturePatchColor, out.FeaturePatchColors, diagnostic);
         }
 
         [[nodiscard]] bool ApplyMeshCurvatureSegmentationPropertyState(
@@ -1223,60 +1086,21 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             Geometry::PropertySet& edgeProperties,
             const MeshCurvatureSegmentationPropertyState& state)
         {
-            return ApplyCurvatureProperty<std::uint32_t>(
-                       faceProperties,
-                       state.Bindings.Components.Name,
-                       state.HadComponent,
-                       state.Components,
-                       CurvSeg::kInvalidLabel) &&
-                   ApplyCurvatureProperty<std::uint32_t>(
-                       faceProperties,
-                       state.Bindings.Regions.Name,
-                       state.HadRegion,
-                       state.Regions,
-                       CurvSeg::kInvalidLabel) &&
-                   ApplyCurvatureProperty<glm::vec4>(
-                       faceProperties,
-                       state.Bindings.RegionColors.Name,
-                       state.HadRegionColor,
-                       state.RegionColors,
-                       glm::vec4{0.0f}) &&
-                   ApplyCurvatureProperty<bool>(
-                       edgeProperties,
-                       state.Bindings.Boundaries.Name,
-                       state.HadBoundary,
-                       state.Boundaries,
-                       false) &&
-                   ApplyCurvatureProperty<glm::vec4>(
-                       edgeProperties,
-                       state.Bindings.BoundaryColors.Name,
-                       state.HadBoundaryColor,
-                       state.BoundaryColors,
-                       glm::vec4{0.0f}) &&
-                   ApplyCurvatureProperty<bool>(
-                       edgeProperties,
-                       state.Bindings.HardFeatures.Name,
-                       state.HadHardFeature,
-                       state.HardFeatures,
-                       false) &&
-                   ApplyCurvatureProperty<double>(
-                       edgeProperties,
-                       state.Bindings.FeatureConfidence.Name,
-                       state.HadSoftFeatureConfidence,
-                       state.SoftFeatureConfidences,
-                       0.0) &&
-                   ApplyCurvatureProperty<std::uint32_t>(
-                       edgeProperties,
-                       state.Bindings.BoundaryRoles.Name,
-                       state.HadBoundaryRole,
-                       state.BoundaryRoles,
-                       0u) &&
-                   ApplyCurvatureProperty<glm::vec4>(
-                       edgeProperties,
-                       state.Bindings.FeatureColors.Name,
-                       state.HadFeaturePatchColor,
-                       state.FeaturePatchColors,
-                       glm::vec4{0.0f});
+            if (!CanApplyGeometryScalarProperty(faceProperties, state.Bindings.Components, state.Components) ||
+                !CanApplyGeometryScalarProperty(faceProperties, state.Bindings.Regions, state.Regions) ||
+                !CanApplyGeometryScalarProperty(edgeProperties, state.Bindings.Boundaries, state.Boundaries) ||
+                !CanApplyGeometryScalarProperty(edgeProperties, state.Bindings.HardFeatures, state.HardFeatures) ||
+                !CanApplyGeometryScalarProperty(edgeProperties, state.Bindings.FeatureConfidence, state.SoftFeatureConfidences) ||
+                !CanApplyGeometryScalarProperty(edgeProperties, state.Bindings.BoundaryRoles, state.BoundaryRoles)) return false;
+            return ApplyGeometryScalarProperty(faceProperties, state.Bindings.Components, state.Components) &&
+                   ApplyGeometryScalarProperty(faceProperties, state.Bindings.Regions, state.Regions) &&
+                   ApplyGeometryScalarProperty(edgeProperties, state.Bindings.Boundaries, state.Boundaries) &&
+                   ApplyGeometryScalarProperty(edgeProperties, state.Bindings.HardFeatures, state.HardFeatures) &&
+                   ApplyGeometryScalarProperty(edgeProperties, state.Bindings.FeatureConfidence, state.SoftFeatureConfidences) &&
+                   ApplyGeometryScalarProperty(edgeProperties, state.Bindings.BoundaryRoles, state.BoundaryRoles) &&
+                   ApplyCurvatureProperty<glm::vec4>(faceProperties, state.Bindings.RegionColors.Name, state.HadRegionColor, state.RegionColors, glm::vec4{0.0f}) &&
+                   ApplyCurvatureProperty<glm::vec4>(edgeProperties, state.Bindings.BoundaryColors.Name, state.HadBoundaryColor, state.BoundaryColors, glm::vec4{0.0f}) &&
+                   ApplyCurvatureProperty<glm::vec4>(edgeProperties, state.Bindings.FeatureColors.Name, state.HadFeaturePatchColor, state.FeaturePatchColors, glm::vec4{0.0f});
         }
 
         [[nodiscard]] std::size_t
@@ -1284,42 +1108,15 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             const MeshCurvatureSegmentationPropertyState& before,
             const MeshCurvatureSegmentationPropertyState& after) noexcept
         {
-            return (before.HadComponent && !after.HadComponent
-                        ? before.Components.size()
-                        : CountChangedValues(before.HadComponent,
-                                             before.Components, after.Components)) +
-                   CountChangedValues(
-                       before.HadRegion,
-                       before.Regions,
-                       after.Regions) +
-                   CountChangedValues(
-                       before.HadRegionColor,
-                       before.RegionColors,
-                       after.RegionColors) +
-                   CountChangedValues(
-                       before.HadBoundary,
-                       before.Boundaries,
-                       after.Boundaries) +
-                   CountChangedValues(
-                       before.HadBoundaryColor,
-                       before.BoundaryColors,
-                       after.BoundaryColors) +
-                   CountChangedValues(
-                       before.HadHardFeature,
-                       before.HardFeatures,
-                       after.HardFeatures) +
-                   CountChangedValues(
-                       before.HadSoftFeatureConfidence,
-                       before.SoftFeatureConfidences,
-                       after.SoftFeatureConfidences) +
-                   CountChangedValues(
-                       before.HadBoundaryRole,
-                       before.BoundaryRoles,
-                       after.BoundaryRoles) +
-                   CountChangedValues(
-                       before.HadFeaturePatchColor,
-                       before.FeaturePatchColors,
-                       after.FeaturePatchColors);
+            return CountChangedValues(before.Components, after.Components) +
+                   CountChangedValues(before.Regions, after.Regions) +
+                   CountChangedValues(before.Boundaries, after.Boundaries) +
+                   CountChangedValues(before.HardFeatures, after.HardFeatures) +
+                   CountChangedValues(before.SoftFeatureConfidences, after.SoftFeatureConfidences) +
+                   CountChangedValues(before.BoundaryRoles, after.BoundaryRoles) +
+                   CountChangedValues(before.HadRegionColor, before.RegionColors, after.RegionColors) +
+                   CountChangedValues(before.HadBoundaryColor, before.BoundaryColors, after.BoundaryColors) +
+                   CountChangedValues(before.HadFeaturePatchColor, before.FeaturePatchColors, after.FeaturePatchColors);
         }
 
         struct MeshCurvatureSegmentationMutationGeneration
@@ -1718,10 +1515,8 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             }
 
             state->CurvatureAfter = state->CurvatureBefore;
-            StageMeshCurvatureScalars(
-                curvature,
-                state->CurvatureAfter,
-                result);
+            if (!StageMeshCurvatureScalars(curvature, state->CurvatureAfter, result))
+                return JobResultEnvelope::Make<EditorJobResult>(EditorJobResult{.Diagnostic = result.Message});
 
             if (result.DirectionsRequested &&
                 result.DirectionsAvailable)
@@ -1984,6 +1779,21 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                 handle);
         }
 
+        [[nodiscard]] bool ValidateMeshFieldOutputMetadata(
+            const GS::ConstSourceView& view, std::span<const GeometryPropertyRef> outputs, std::string& diagnostic)
+        {
+            const auto availability = BuildGeometryAvailability(view);
+            for (const auto& ref : outputs)
+            {
+                const auto* properties = ResolveGeometryPropertySet(availability, ref.Domain);
+                if (properties && (!properties->Exists(ref.Name) ||
+                    ResolveGeometryProperty(availability, ref, properties->Size(), false).Resolved())) continue;
+                diagnostic = "existing curvature property has an incompatible type or count: " + ref.Name;
+                return false;
+            }
+            return true;
+        }
+
         [[nodiscard]] std::optional<ECS::EntityHandle> ResolveMeshFieldCommandTarget(
             const EditorProcessingContext& context, const EditorMeshCurvatureCommand& command,
             EditorMeshCurvatureResult& result)
@@ -2055,6 +1865,14 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                 result.Error = Core::ErrorCode::InvalidArgument;
                 return std::nullopt;
             }
+            const std::array outputs{command.Mean, command.Gaussian, command.MinPrincipal,
+                                     command.MaxPrincipal, command.Direction1, command.Direction2};
+            if (!ValidateMeshFieldOutputMetadata(view, outputs, result.Message))
+            {
+                result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::TypeMismatch;
+                return std::nullopt;
+            }
             return entity;
         }
 
@@ -2114,6 +1932,16 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             {
                 result.Status = EditorCommandStatus::InvalidProcessingParameters;
                 result.Error = Core::ErrorCode::InvalidArgument;
+                return std::nullopt;
+            }
+            const auto& config = command.Config;
+            const std::array outputs{config.Components, config.Regions, config.RegionColors,
+                config.Boundaries, config.BoundaryColors, config.HardFeatures, config.FeatureConfidence,
+                config.BoundaryRoles, config.FeatureColors};
+            if (!ValidateMeshFieldOutputMetadata(view, outputs, result.Message))
+            {
+                result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::TypeMismatch;
                 return std::nullopt;
             }
             return entity;
@@ -2302,7 +2130,7 @@ ApplyEditorMeshCurvatureCommand(
         }
 
         MeshCurvaturePropertyState after = before;
-        StageMeshCurvatureScalars(curvature, after, result);
+        if (!StageMeshCurvatureScalars(curvature, after, result)) return result;
 
         if (result.DirectionsRequested &&
             result.DirectionsAvailable)
@@ -2714,33 +2542,26 @@ ApplyEditorMeshCurvatureCommand(
         }
 
         MeshCurvatureSegmentationPropertyState after = before;
-        after.HadComponent =
+        const bool publishComponents =
             command.Config.Method != CurvatureSegmentationMethod::FeatureBoundaryCurves;
-        after.HadRegion = true;
         after.HadRegionColor = true;
-        after.HadBoundary = true;
         after.HadBoundaryColor = true;
-        after.HadHardFeature = true;
-        after.HadSoftFeatureConfidence = true;
-        after.HadBoundaryRole = true;
         after.HadFeaturePatchColor = true;
         // A boundary partition has no fitted curvature components. Remove an
         // earlier method-owned component field in the same undo transaction.
-        after.Components.clear();
-        if (after.HadComponent)
-            after.Components.assign(source.FaceSlotCount, CurvSeg::kInvalidLabel);
-        after.Regions.assign(
-            source.FaceSlotCount, CurvSeg::kInvalidLabel);
-        after.RegionColors.assign(
+        std::vector<std::uint32_t> publishedComponents;
+        if (publishComponents)
+            publishedComponents.assign(source.FaceSlotCount, CurvSeg::kInvalidLabel);
+        std::vector<std::uint32_t> publishedRegions(source.FaceSlotCount, CurvSeg::kInvalidLabel);
+        after.RegionColors.resize(
             source.FaceSlotCount, glm::vec4{0.0f});
-        after.Boundaries.assign(source.EdgeSlotCount, false);
-        after.BoundaryColors.assign(
+        std::vector<std::uint32_t> publishedBoundaries(source.EdgeSlotCount, 0u);
+        after.BoundaryColors.resize(
             source.EdgeSlotCount, glm::vec4{0.0f});
-        after.HardFeatures.assign(source.EdgeSlotCount, false);
-        after.SoftFeatureConfidences.assign(
-            source.EdgeSlotCount, 0.0);
-        after.BoundaryRoles.assign(source.EdgeSlotCount, 0u);
-        after.FeaturePatchColors.assign(
+        std::vector<std::uint32_t> publishedHardFeatures(source.EdgeSlotCount, 0u);
+        std::vector<double> publishedSoftFeatureConfidences(source.EdgeSlotCount, 0.0);
+        std::vector<std::uint32_t> publishedBoundaryRoles(source.EdgeSlotCount, 0u);
+        after.FeaturePatchColors.resize(
             source.EdgeSlotCount, glm::vec4{0.0f});
 
         for (std::size_t meshFace = 0u;
@@ -2758,9 +2579,9 @@ ApplyEditorMeshCurvatureCommand(
                     "Curvature segmentation produced an invalid source-face cross-reference.";
                 return result;
             }
-            if (after.HadComponent)
-                after.Components[sourceFace] = faceComponents[meshFace];
-            after.Regions[sourceFace] =
+            if (publishComponents)
+                publishedComponents[sourceFace] = faceComponents[meshFace];
+            publishedRegions[sourceFace] =
                 faceRegions[meshFace];
             after.RegionColors[sourceFace] =
                 faceRegionColors[meshFace];
@@ -2782,18 +2603,35 @@ ApplyEditorMeshCurvatureCommand(
                     "Curvature segmentation produced an invalid source-edge cross-reference.";
                 return result;
             }
-            after.Boundaries[sourceEdge] =
+            publishedBoundaries[sourceEdge] =
                 edgeBoundaries[meshEdge] != 0u;
             after.BoundaryColors[sourceEdge] =
                 edgeBoundaryColors[meshEdge];
-            after.HardFeatures[sourceEdge] =
+            publishedHardFeatures[sourceEdge] =
                 hardFeatureMask[meshEdge] != 0u;
-            after.SoftFeatureConfidences[sourceEdge] =
+            publishedSoftFeatureConfidences[sourceEdge] =
                 softFeatureConfidence[meshEdge];
-            after.BoundaryRoles[sourceEdge] =
+            publishedBoundaryRoles[sourceEdge] =
                 edgeBoundaryRoles[meshEdge];
             after.FeaturePatchColors[sourceEdge] =
                 featurePatchColors[meshEdge];
+        }
+
+        std::vector<std::uint32_t> liveEdges;
+        for (const auto slot : source.SourceEdgeForMeshEdge)
+            if (slot != CurvSeg::kInvalidLabel) liveEdges.push_back(slot);
+        if (!publishComponents) after.Components = {};
+        if ((publishComponents && !StageMeshScalarProperty(after.Components, command.Config.Components, publishedComponents, source.SourceFaceForMeshFace)) ||
+            !StageMeshScalarProperty(after.Regions, command.Config.Regions, publishedRegions, source.SourceFaceForMeshFace) ||
+            !StageMeshScalarProperty(after.Boundaries, command.Config.Boundaries, publishedBoundaries, liveEdges) ||
+            !StageMeshScalarProperty(after.HardFeatures, command.Config.HardFeatures, publishedHardFeatures, liveEdges) ||
+            !StageMeshScalarProperty(after.SoftFeatureConfidences, command.Config.FeatureConfidence, publishedSoftFeatureConfidences, liveEdges) ||
+            !StageMeshScalarProperty(after.BoundaryRoles, command.Config.BoundaryRoles, publishedBoundaryRoles, liveEdges))
+        {
+            result.Status = EditorCommandStatus::InvalidProcessingParameters;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message = "Segmentation outputs are not exactly representable in their declared scalar storage.";
+            return result;
         }
 
         result.ChangedValueCount =

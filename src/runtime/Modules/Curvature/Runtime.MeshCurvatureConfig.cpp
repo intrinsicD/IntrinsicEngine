@@ -15,27 +15,24 @@ namespace Extrinsic::Runtime
     namespace
     {
         using Json = nlohmann::json;
-        struct Slot { const char* Key; GeometryPropertyRef MeshCurvatureConfig::* Member; const char* Kind; };
+        struct Slot { const char* Key; GeometryPropertyRef MeshCurvatureConfig::* Member; };
         constexpr std::array slots{
-            Slot{"positions", &MeshCurvatureConfig::Positions, "vec3"},
-            Slot{"mean", &MeshCurvatureConfig::Mean, "double"},
-            Slot{"gaussian", &MeshCurvatureConfig::Gaussian, "double"},
-            Slot{"min_principal", &MeshCurvatureConfig::MinPrincipal, "double"},
-            Slot{"max_principal", &MeshCurvatureConfig::MaxPrincipal, "double"},
-            Slot{"direction1", &MeshCurvatureConfig::Direction1, "vec3"},
-            Slot{"direction2", &MeshCurvatureConfig::Direction2, "vec3"}
+            Slot{"positions", &MeshCurvatureConfig::Positions},
+            Slot{"mean", &MeshCurvatureConfig::Mean},
+            Slot{"gaussian", &MeshCurvatureConfig::Gaussian},
+            Slot{"min_principal", &MeshCurvatureConfig::MinPrincipal},
+            Slot{"max_principal", &MeshCurvatureConfig::MaxPrincipal},
+            Slot{"direction1", &MeshCurvatureConfig::Direction1},
+            Slot{"direction2", &MeshCurvatureConfig::Direction2}
         };
         Json Encode(const MeshCurvatureConfig& config)
         {
             Json doc{{"entity", config.StableEntityId}, {"output", static_cast<unsigned>(config.Output)},
                      {"publish_directions", config.PublishPrincipalDirections}};
-            const MeshCurvatureConfig defaults;
             for (const auto& slot : slots)
             {
                 const auto& ref = config.*slot.Member;
-                doc[slot.Key] = {{"domain", ToString(ref.Domain)},
-                                 {"name", ref.Name},
-                                 {"kind", ref.ValueKind == (defaults.*slot.Member).ValueKind ? slot.Kind : "invalid"}};
+                doc[slot.Key] = ConfigDetail::EncodePointPropertyRef(ref);
             }
             return doc;
         }
@@ -53,7 +50,9 @@ namespace Extrinsic::Runtime
         {
             const auto& ref = config.*slots[i].Member;
             if (ref.Domain != GeometryElementDomain::MeshVertex ||
-                ref.ValueKind != (defaults.*slots[i].Member).ValueKind ||
+                (GeometryPropertyComponentCount((defaults.*slots[i].Member).ValueKind) == 1u
+                    ? GeometryPropertyComponentCount(ref.ValueKind) != 1u
+                    : ref.ValueKind != (defaults.*slots[i].Member).ValueKind) ||
                 ref.Name.empty() || ref.Name.find('\0') != std::string::npos ||
                 (slots[i].Member == &MeshCurvatureConfig::Positions
                      ? IsStructuralVertexProperty(ref.Name) && ref.Name != "v:position"
@@ -87,9 +86,10 @@ namespace Extrinsic::Runtime
         {
             const auto& ref = doc[slot.Key];
             if (!ref.is_object() || ref.size() != 3 || !ref.contains("domain") || ref["domain"] != ToString(GeometryElementDomain::MeshVertex) ||
-                !ref.contains("kind") || ref["kind"] != slot.Kind || !ref.contains("name") || !ref["name"].is_string())
+                ConfigDetail::ValidatePointPropertyRef(ref, (bindings.*slot.Member).ValueKind, true) !=
+                    ConfigDetail::PointPropertyValidation::Valid)
                 return RejectConfigSection(subject, "Curvature requires typed mesh vertex bindings.");
-            (bindings.*slot.Member).Name = ref["name"].get<std::string>();
+            ConfigDetail::DecodePointPropertyRef(ref, bindings.*slot.Member);
         }
         if (!IsValidMeshCurvaturePropertyBindings(bindings))
             return RejectConfigSection(subject, "Curvature property names must be distinct and must not replace structural vertex storage.");
@@ -109,7 +109,7 @@ namespace Extrinsic::Runtime
         result.StableEntityId=doc["entity"];
         result.Output=static_cast<EditorMeshCurvatureOutput>(doc["output"].get<unsigned>());
         result.PublishPrincipalDirections=doc["publish_directions"];
-        for (const auto& slot : slots) (result.*slot.Member).Name=doc[slot.Key]["name"];
+        for (const auto& slot : slots) ConfigDetail::DecodePointPropertyRef(doc[slot.Key], result.*slot.Member);
         return result;
     }
     void SetMeshCurvatureConfig(Core::Config::EngineConfig& config, const MeshCurvatureConfig& value)

@@ -12,6 +12,7 @@
 
 #include "EditorFeatureTestContext.hpp"
 
+import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
@@ -817,4 +818,118 @@ TEST(CurvatureSegmentationOperations, SkippedFaceFeaturesAreNotNumericalInputs)
     const auto result = Runtime::ApplyEditorCurvatureSegmentationCommand(harness.Context, command);
     EXPECT_TRUE(result.Succeeded()) << result.Message;
     EXPECT_TRUE(std::isnan(values[skipped]));
+}
+
+TEST(CurvatureSegmentationOperations, ScalarOutputStorageConvertsAndRestoresExactHistory)
+{
+    SegmentationHarness harness;
+    auto config = MakeFixedConfig();
+    using K = Geometry::PropertyValueKind;
+    config.Components.ValueKind = K::Float;
+    config.Regions.ValueKind = K::Double;
+    config.Boundaries.ValueKind = K::UInt64;
+    config.HardFeatures.ValueKind = K::Int32;
+    config.FeatureConfidence.ValueKind = K::Float;
+    config.BoundaryRoles.ValueKind = K::UInt32;
+    auto before = harness.Edges().Properties.GetOrAdd<std::uint64_t>(config.Boundaries.Name);
+    for (std::size_t i = 0; i < before.Size(); ++i) before[i] = std::numeric_limits<std::uint64_t>::max() - i;
+    const auto original = before.Vector();
+    const Runtime::EditorCurvatureSegmentationCommand command{.StableEntityId = harness.StableEntityId, .Config = config};
+    EXPECT_TRUE(Runtime::IsValidCurvatureSegmentationConfig(config));
+    EXPECT_TRUE(Runtime::ValidateCurvatureSegmentationConfigSection(
+        Runtime::SerializeCurvatureSegmentationConfig(config), {}, "scalar output").Usable());
+    Extrinsic::Core::Config::EngineConfig persisted;
+    Runtime::SetCurvatureSegmentationConfig(persisted, config);
+    const auto decoded = Runtime::GetCurvatureSegmentationConfig(persisted);
+    ASSERT_TRUE(decoded);
+    EXPECT_EQ(Runtime::SerializeCurvatureSegmentationConfig(*decoded), Runtime::SerializeCurvatureSegmentationConfig(config));
+    const auto result = Runtime::ApplyEditorCurvatureSegmentationCommand(harness.Context, command);
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_TRUE(harness.Faces().Properties.Get<float>(config.Components.Name));
+    EXPECT_TRUE(harness.Faces().Properties.Get<double>(config.Regions.Name));
+    const auto published = harness.Edges().Properties.Get<std::uint64_t>(config.Boundaries.Name).Vector();
+    for (const auto value : published) EXPECT_LE(value, 1u);
+    EXPECT_EQ(Runtime::ApplyEditorCurvatureSegmentationCommand(harness.Context, command).Status,
+              Runtime::EditorCommandStatus::NoChange);
+    ASSERT_TRUE(harness.History.Undo().Succeeded());
+    EXPECT_EQ(harness.Edges().Properties.Get<std::uint64_t>(config.Boundaries.Name).Vector(), original);
+    EXPECT_FALSE(harness.Faces().Properties.Exists(config.Components.Name));
+    ASSERT_TRUE(harness.History.Redo().Succeeded());
+    EXPECT_EQ(harness.Edges().Properties.Get<std::uint64_t>(config.Boundaries.Name).Vector(), published);
+}
+
+TEST(CurvatureSegmentationOperations, InexactScalarOutputConversionPublishesNothing)
+{
+    SegmentationHarness harness;
+    auto& faces = harness.Faces().Properties;
+    const auto skipped = faces.Size();
+    faces.Resize(skipped + 1);
+    faces.Get<std::uint32_t>(GS::PropertyNames::kFaceHalfedge)[skipped] = std::numeric_limits<std::uint32_t>::max();
+    auto config = MakeFixedConfig();
+    config.Components.ValueKind = Geometry::PropertyValueKind::Float;
+    const auto result = Runtime::ApplyEditorCurvatureSegmentationCommand(harness.Context,
+        {.StableEntityId = harness.StableEntityId, .Config = config});
+    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_NE(result.Message.find("exactly representable"), std::string::npos);
+    EXPECT_EQ(harness.History.UndoCount(), 0u);
+    EXPECT_FALSE(faces.Exists(config.Components.Name));
+    EXPECT_FALSE(faces.Exists(config.Regions.Name));
+    EXPECT_FALSE(harness.Edges().Properties.Exists(config.Boundaries.Name));
+}
+
+TEST(CurvatureSegmentationOperations, ExistingSkippedScalarRowsRetainRawValues)
+{
+    SegmentationHarness harness;
+    auto& faces = harness.Faces().Properties;
+    auto& edges = harness.Edges().Properties;
+    const auto skippedFace = faces.Size(), skippedEdge = edges.Size();
+    faces.Resize(skippedFace + 1);
+    edges.Resize(skippedEdge + 1);
+    faces.Get<std::uint32_t>(GS::PropertyNames::kFaceHalfedge)[skippedFace] = std::numeric_limits<std::uint32_t>::max();
+    edges.GetOrAdd<bool>("e:deleted")[skippedEdge] = true;
+    auto config = MakeFixedConfig();
+    using K = Geometry::PropertyValueKind;
+    config.Components.ValueKind = K::Float;
+    config.Regions.ValueKind = K::UInt64;
+    config.Boundaries.ValueKind = K::UInt64;
+    config.FeatureConfidence.ValueKind = K::Float;
+    faces.GetOrAdd<float>(config.Components.Name)[skippedFace] = std::numeric_limits<float>::quiet_NaN();
+    faces.GetOrAdd<std::uint64_t>(config.Regions.Name)[skippedFace] = std::numeric_limits<std::uint64_t>::max();
+    edges.GetOrAdd<std::uint64_t>(config.Boundaries.Name)[skippedEdge] = std::numeric_limits<std::uint64_t>::max() - 1u;
+    edges.GetOrAdd<float>(config.FeatureConfidence.Name)[skippedEdge] = std::numeric_limits<float>::infinity();
+    faces.GetOrAdd<glm::vec4>(config.RegionColors.Name)[skippedFace] = glm::vec4{0.2f,0.3f,0.4f,0.5f};
+    const Runtime::EditorCurvatureSegmentationCommand command{.StableEntityId = harness.StableEntityId, .Config = config};
+    const auto result = Runtime::ApplyEditorCurvatureSegmentationCommand(harness.Context, command);
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    const auto verifySkipped = [&] {
+        EXPECT_TRUE(std::isnan(faces.Get<float>(config.Components.Name)[skippedFace]));
+        EXPECT_EQ(faces.Get<std::uint64_t>(config.Regions.Name)[skippedFace], std::numeric_limits<std::uint64_t>::max());
+        EXPECT_EQ(edges.Get<std::uint64_t>(config.Boundaries.Name)[skippedEdge], std::numeric_limits<std::uint64_t>::max() - 1u);
+        EXPECT_EQ(edges.Get<float>(config.FeatureConfidence.Name)[skippedEdge], std::numeric_limits<float>::infinity());
+        EXPECT_EQ(faces.Get<glm::vec4>(config.RegionColors.Name)[skippedFace], (glm::vec4{0.2f,0.3f,0.4f,0.5f}));
+    };
+    verifySkipped();
+    EXPECT_EQ(Runtime::ApplyEditorCurvatureSegmentationCommand(harness.Context, command).Status,
+              Runtime::EditorCommandStatus::NoChange);
+    ASSERT_TRUE(harness.History.Undo().Succeeded());
+    verifySkipped();
+    ASSERT_TRUE(harness.History.Redo().Succeeded());
+    verifySkipped();
+}
+
+TEST(CurvatureSegmentationOperations, DeclaredOutputStorageConflictDisablesPreviewWithoutMutation)
+{
+    SegmentationHarness harness;
+    auto config = MakeFixedConfig();
+    config.Components.ValueKind = Geometry::PropertyValueKind::Float;
+    (void)harness.Faces().Properties.GetOrAdd<std::uint32_t>(config.Components.Name);
+    const Runtime::EditorCurvatureSegmentationCommand command{.StableEntityId = harness.StableEntityId, .Config = config};
+    const auto preview = Runtime::PreviewEditorCurvatureSegmentationCommand(harness.Context, command);
+    EXPECT_FALSE(preview.Enabled);
+    const auto rejected = Runtime::ApplyEditorCurvatureSegmentationCommand(harness.Context, command);
+    EXPECT_EQ(rejected.Status, Runtime::EditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_EQ(rejected.Message, preview.DisabledReason);
+    EXPECT_EQ(harness.History.UndoCount(), 0u);
+    EXPECT_TRUE(harness.Faces().Properties.Get<std::uint32_t>(config.Components.Name));
+    EXPECT_FALSE(harness.Faces().Properties.Get<float>(config.Components.Name));
 }
