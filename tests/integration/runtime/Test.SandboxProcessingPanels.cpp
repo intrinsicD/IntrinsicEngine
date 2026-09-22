@@ -2572,3 +2572,76 @@ TEST(SandboxProcessingPanels, KMeansAdmissionKeepsControlsVisibleAndRetriesRejec
     EXPECT_TRUE(completed);
     EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
 }
+
+TEST(SandboxProcessingPanels, ConsolidationNormalsRequireExplicitSelectionAndSurvivePositionChanges)
+{
+    for (const std::string normalName : {"v:normal", "directions"})
+    {
+        SCOPED_TRACE(normalName);
+        PanelHarness h;
+        auto& scene = h.Scene();
+        const auto entity = scene.Create();
+        auto& props = scene.Raw().emplace<GS::Vertices>(entity).Properties;
+        props.Resize(3);
+        props.GetOrAdd<glm::vec3>("v:position", {}).Vector() = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
+        props.GetOrAdd<glm::vec3>("alternate_samples", {}).Vector() = props.Get<glm::vec3>("v:position").Vector();
+        props.GetOrAdd<glm::vec3>(normalName, {0, 0, 1});
+        ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+        ASSERT_TRUE(h.Shell.SetEditorWindowOpen("pointcloud.processing.consolidation", true));
+        const auto label = [](const std::string& name) {
+            return std::string{R::DebugNameForEditorPropertyCatalogDomain(R::EditorPropertyCatalogDomain::PointCloudPoints)} +
+                " / " + name + " (3)";
+        };
+        unsigned step = 0, frames = 0;
+        bool completed = false;
+        h.Driver->OnFrame = [&](R::Engine& engine) {
+            if (++frames > 80) { ADD_FAILURE() << "Consolidation binding test timed out"; engine.RequestExit(); return; }
+            auto* window = ImGui::FindWindowByName("PointCloud / Processing / Consolidate (LOP/WLOP/CLOP/EAR)");
+            if (!window) return;
+            ImGui::SetWindowSize(window, {850, 2000});
+            ImGui::SetWindowPos(window, {0, 0});
+            if (step == 1) { ImGui::FocusWindow(window); ImGui::SetScrollY(window, 0); }
+            if (step == 3 || step == 23)
+            {
+                ImGui::GetCurrentContext()->LogBuffer.clear();
+                ImGui::LogToBuffer();
+                ImGui::GetCurrentContext()->LogWindow = nullptr;
+            }
+            if (step == 5)
+            {
+                const std::string log{ImGui::GetCurrentContext()->LogBuffer.c_str()};
+                ImGui::LogFinish();
+                EXPECT_NE(log.find("None (estimate when needed)"), std::string::npos);
+                EXPECT_EQ(log.find("Output Normal"), std::string::npos);
+            }
+            if (step == 7)
+                ImGui::ActivateItemByID(window->GetID("Normal (optional)##PointCloudConsolidation"));
+            if (step == 9 || step == 19)
+            {
+                auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+                ASSERT_FALSE(popups.empty());
+                ASSERT_NE(popups.back().Window, nullptr);
+                const auto option = label(step == 9 ? normalName : "alternate_samples");
+                ImGui::ActivateItemByID(popups.back().Window->GetID(option.c_str()));
+            }
+            if (step == 13)
+                ImGui::ActivateItemByID(window->GetID("Publish normals##PointCloudConsolidation"));
+            if (step == 17)
+                ImGui::ActivateItemByID(window->GetID("Position##PointCloudConsolidation"));
+            if (step == 25)
+            {
+                const std::string log{ImGui::GetCurrentContext()->LogBuffer.c_str()};
+                ImGui::LogFinish();
+                EXPECT_EQ(log.find("None (estimate when needed)"), std::string::npos);
+                EXPECT_NE(log.find(label(normalName)), std::string::npos);
+                EXPECT_NE(log.find(label("alternate_samples")), std::string::npos);
+                EXPECT_NE(log.find("Output Normal"), std::string::npos);
+                completed = true;
+                engine.RequestExit();
+            }
+            ++step;
+        };
+        h.Engine->Run();
+        EXPECT_TRUE(completed);
+    }
+}

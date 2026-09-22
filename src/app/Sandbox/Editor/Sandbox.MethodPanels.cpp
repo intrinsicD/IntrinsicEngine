@@ -345,25 +345,6 @@ namespace Extrinsic::Sandbox::Editor
                    row.Name != positions.Name;
         }
 
-        [[nodiscard]] const Runtime::EditorPropertyCatalogRow*
-        FindPreferredPointSetNormal(
-            const Runtime::EditorPropertyCatalogModel& catalog,
-            const Runtime::EditorPropertyCatalogRow& positions)
-        {
-            for (const Runtime::EditorPropertyCatalogRow& row : catalog.Rows)
-            {
-                if (!IsCompatiblePointSetNormal(row, positions))
-                    continue;
-                if (row.Name == "v:normal" || row.Name == "p:normal" ||
-                    row.Name == "f:normal" ||
-                    row.Name.find("normal") != std::string::npos)
-                {
-                    return &row;
-                }
-            }
-            return nullptr;
-        }
-
         [[nodiscard]] std::string PointSetPropertyLabel(
             const Runtime::EditorPropertyCatalogRow& row)
         {
@@ -1217,18 +1198,9 @@ namespace Extrinsic::Sandbox::Editor
                 state.OutputPositionName,
                 positions.Descriptor.Name);
 
-            const Runtime::EditorPropertyCatalogRow* normals =
-                FindPreferredPointSetNormal(catalog, positions);
-            if (normals != nullptr)
-            {
-                state.Properties.InputNormals = normals->Descriptor;
-                state.Properties.OutputNormals = normals->Descriptor;
-                SetPropertyNameBuffer(
-                    state.OutputNormalName,
-                    normals->Descriptor.Name);
-                state.PublishNormals = true;
-            }
-            else
+            const auto* normals = state.Properties.InputNormals
+                ? FindPointSetProperty(catalog, *state.Properties.InputNormals) : nullptr;
+            if (normals == nullptr || !IsCompatiblePointSetNormal(*normals, positions))
             {
                 state.Properties.InputNormals.reset();
                 state.Properties.OutputNormals.reset();
@@ -1264,7 +1236,8 @@ namespace Extrinsic::Sandbox::Editor
                 state.BoundStableEntityId != stableEntityId ||
                 positions == nullptr)
             {
-                ClearPointCloudConsolidationBindings(state, stableEntityId);
+                if (!state.BindingsInitialized || state.BoundStableEntityId != stableEntityId)
+                    ClearPointCloudConsolidationBindings(state, stableEntityId);
                 positions = FindPreferredPointSetPosition(catalog);
                 if (positions != nullptr)
                 {
@@ -1272,6 +1245,10 @@ namespace Extrinsic::Sandbox::Editor
                         state,
                         catalog,
                         *positions);
+                }
+                else
+                {
+                    ClearPointCloudConsolidationBindings(state, stableEntityId);
                 }
                 return;
             }
