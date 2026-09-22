@@ -22,7 +22,7 @@ preserving correctness, engineering contracts, and completed-task quality.
 - Status: in-progress. Owner: Codex. Branch: `codex/proc-034-token-efficiency`.
 - Operator explicitly requested this process work outside the Framework24 P0
   selection focus on 2026-09-22, with four slices and immediate completion of
-  slice 1 only. Slices 2–4 remain planned.
+  slice 1 only; the operator subsequently authorized slice 2. Slices 3–4 remain planned.
 - The preceding local audit identified large repeated contexts as the leading
   candidate. Byte reductions are instruction-size measurements, not demonstrated
   token, credit, latency, or completed-task savings.
@@ -56,7 +56,7 @@ preserving correctness, engineering contracts, and completed-task quality.
 - [x] Slice 1: root instructions fit comfortably below 32 KiB, detailed contract
   requirements remain reachable under explicit scope triggers, duplicate reads
   and the mandatory full workflow read are removed, and structural checks pass.
-- [ ] Slice 2: bounded output and fewer redundant calls preserve access to full
+- [x] Slice 2: bounded output and fewer redundant calls preserve access to full
   evidence and required verification; representative task measurements recorded.
 - [ ] Slice 3: ordinary engineering avoids research-ledger loading while research
   work still records and validates required evidence.
@@ -88,6 +88,23 @@ method, setup, and unattended scopes. Define concrete matched-run commands for
 each later slice before starting it; do not use C++ builds as evidence for this
 documentation-only slice.
 
+Slice 2 (configuration and workflow): run the structural commands above, plus:
+
+```bash
+python3 -c 'import pathlib, tomllib; d = tomllib.loads(pathlib.Path(".codex/config.toml").read_text()); assert d == {"tool_output_token_limit": 3000}'
+codex app-server generate-json-schema --out /tmp/proc-034-codex-schema
+```
+
+Use the generated `config/read` schema to read the effective repository limit
+without starting a model turn. Execute a representative independent structural
+verification bundle once, retain every full log, and compare its raw output size
+with the bounded summary of the same results; record command/status equivalence
+and presentation-call counts. Check the documented pipeline with a deliberate
+nonzero producer exit and a diagnostic outside the tail, then recover that
+diagnostic from the retained log. Exercise a running terminal handle with one
+completion wait. These are output/transport checks, not matched end-to-end model
+or credit benchmarks; slice 4 owns that comparison.
+
 ## Log
 
 - 2026-09-22 — Slice 1 completed against pre-slice revision `a56574f44`.
@@ -109,3 +126,32 @@ documentation-only slice.
   The review found no layer/compatibility/verification-policy changes. No engine
   code, user settings, output limits, research-manager triggers, or reasoning
   defaults changed. Slices 2–4 remain open in this task.
+- 2026-09-22 — Slice 2 completed against pre-slice revision `901a2d564`.
+  Added the repository runtime setting `.codex/config.toml` with
+  `tool_output_token_limit = 3000`; Codex 0.153.4 accepted strict configuration
+  and `config/read` returned 3000 with this project's `.codex` directory as its
+  origin. The read used `cwd` equal to the repository and `includeLayers: true`,
+  without starting a model turn. Existing loaded threads may need configuration
+  reload; explicit per-call budgets can override the default.
+- Reused shell `mktemp`/`tee`/`pipefail` and existing tool wait/orchestration APIs;
+  no new execution wrapper or polling service. The canonical workflow now names
+  output budgets, full-log/response retention, failure and truncation handling,
+  independent batching, and completion/change-aware waits. Root/core links and
+  generated mirrors expose the same procedure. Verification commands, gate
+  selectors, write isolation, and progress-update requirements are preserved.
+- Representative same-result presentation measurement: eight actual structural
+  checks executed with four independent workers and returned in one batch, all
+  exit 0. Full command output totaled 1,675 bytes; named exit-status/log-path
+  summaries totaled 634 bytes (62.1% smaller). All eight full logs were retained
+  under `/tmp/proc-034-verification-alv826hs/`; `results.json` records commands,
+  statuses, sizes, and timings. This is a local presentation comparison, not a
+  before/after model task or token/credit savings claim.
+- The documented pipeline preserved an intentional producer exit of 23 and
+  complete stdout/stderr: 2,149 raw bytes versus a 660-byte, 60-line tail. The
+  first diagnostic was outside the excerpt and was recovered from the full log
+  (`/tmp/proc-034-output-probe-n0mshmum/`). This was an expected probe, not a
+  failing repository check. The real doc-link checker used one launch and one
+  completion wait on its existing terminal handle; all 4,031 links passed.
+- All applicable structural/configuration checks and the four-point review
+  passed. No reasoning defaults, global settings, or research-manager behavior
+  changed. Slices 3–4 remain open.

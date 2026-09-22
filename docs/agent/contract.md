@@ -392,6 +392,10 @@ For each change:
 
 ### Focused verification guidance
 
+For bounded result presentation, full-log retention, independent batching, and
+completion-aware waits, follow [Tool output and waits](prompt/prompt.md#tool-output-and-waits).
+These rules do not alter the required commands or verification gates above.
+
 When a task needs a non-headless backend sanity check, prefer the smallest direct
 target that proves the touched seam. For Vulkan renderer integration, use focused
 CPU contract tests plus a direct `ExtrinsicBackendsVulkan` build before attempting

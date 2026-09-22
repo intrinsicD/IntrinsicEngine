@@ -24,6 +24,11 @@ Edit canonical `docs/agent/*` sources, then run
 `references/` mirrors. Read `tasks/SESSION-BRIEF.md` and `tasks/backlog/README.md`
 only when selecting backlog work.
 
+For tool execution, follow the workflow's
+[output and wait procedure](docs/agent/prompt/prompt.md#tool-output-and-waits):
+bound routine results, preserve full evidence, batch independent reads, and wait
+on completion or meaningful changes without redundant polling.
+
 ## Shared optional session setup
 
 Before provisioning a toolchain, dependencies, or the optional knowledge graph,

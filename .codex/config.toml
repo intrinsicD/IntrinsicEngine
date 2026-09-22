@@ -1,0 +1,3 @@
+# Routine history budget; save noisy command output before presenting excerpts.
+# Explicit per-call limits may override this default when the task needs more.
+tool_output_token_limit = 3000

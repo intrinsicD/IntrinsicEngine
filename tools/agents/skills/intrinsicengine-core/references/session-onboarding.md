@@ -150,7 +150,60 @@ python3 tools/repo/check_test_layout.py --root . --strict
 
 If the task note lists additional or stricter verification commands, run those too — note-level verification supersedes these defaults. `workflow_evidence.py validate` and `experiment_custody.py validate` apply when overnight evidence or custody state is touched.
 
-Hygiene: for noisy commands use `set -o pipefail`, `tee /tmp/<name>.log`, and a bounded `tail`. Do not trust non-default build trees unless their compiler satisfies the C++23 requirement. `Testing/Temporary/LastTestsFailed.log` is historical; current state comes from the CTest run you just executed. Only the labels `gpu|vulkan|slow|flaky-quarantine` are exempt by default policy.
+Hygiene: preserve noisy output and exit status using [Tool output and waits](#tool-output-and-waits). Do not trust non-default build trees unless their compiler satisfies the C++23 requirement. `Testing/Temporary/LastTestsFailed.log` is historical; current state comes from the CTest run you just executed. Only the labels `gpu|vulkan|slow|flaky-quarantine` are exempt by default policy.
+
+# Tool output and waits
+
+Keep evidence available while limiting what enters model history. This procedure
+changes presentation and scheduling, not the commands, gates, or evidence owed.
+
+- **Choose output before running.** Routine reads/checks use a 1,500–3,000-token
+  response budget when the tool supports one. Search paths/symbols/headings first
+  and read relevant sections. Raise the budget deliberately when needed to
+  inspect complete contracts, diffs, or diagnostics; do not omit necessary review.
+- **Save noisy output first.** Keep complete stdout/stderr in a unique task log
+  outside tracked source, then return command identity, exit status, log path,
+  and a bounded tail or selected diagnostics. On failure, search the full log
+  for the first cause and relevant context; an empty/truncated excerpt is not a
+  passing result. A running process has no final verdict. Example:
+
+  ```bash
+  verify_log=$(mktemp /tmp/intrinsic-verify.XXXXXX.log) || exit 1
+  printf 'Full log: %s\n' "$verify_log"
+  set -o pipefail
+  ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 2>&1 | tee "$verify_log" | tail -n 60
+  ```
+
+  The final pipeline retains CTest's failure status. If adding summary commands
+  afterward, capture the status immediately and exit with it. Durable task/claim
+  evidence still uses its required artifact location; temporary logs do not
+  replace that evidence. Do not upload or print secrets from logs.
+- **Project structured results.** For large MCP/JSON responses, return only the
+  fields needed for the decision, including failure/truncation/pagination state.
+  Retain the full response or its retrieval handle for follow-up. Search tool
+  metadata by name/description and fetch only selected schemas; do not dump the
+  whole catalog. A tool's `isError` still needs inspection even if its call resolves.
+- **Batch independent work.** Put independent reads/checks in one orchestration
+  call (`Promise.allSettled` where available), preserve a named result/status for
+  each, and inspect every outcome. Keep dependencies, writes, approvals, and
+  operations sharing a build directory sequential. Do not use a shell command
+  list whose last success conceals an earlier failure.
+- **Wait for useful state.** Reuse the returned process/cell/thread handle. Prefer
+  completion/change notifications or a supported 30–60-second blocking wait,
+  bounded by the tool's limit and the next progress update. Work independently
+  while it runs. Avoid repeated short polls, sleep-then-status loops, or rereading
+  an unchanged log. A short poll is justified by expected near-term completion
+  or an imminent decision; unchanged results call for a longer wait. Honor tool
+  prerequisites (`wait` only for a yielded cell) and keep each blocking wait at
+  most 60 seconds so progress updates and steering remain timely. Preserve
+  required progress communication; report new evidence, not repeated status.
+
+Codex uses `.codex/config.toml` for this repository's
+`tool_output_token_limit = 3000` history default. Explicit per-call budgets may
+override it; saving full evidence is still necessary. `.codex/config.yaml` is
+repository workflow metadata, not the runtime setting for this limit. Loaded
+threads may retain prior settings until configuration is reloaded. See the
+[official configuration reference](https://developers.openai.com/codex/config-reference).
 
 # When CI fails
 
