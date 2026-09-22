@@ -1,18 +1,15 @@
-#pragma once
-
 // Include-only implementation detail for Runtime.ClusteringModule. Include
 // after the module's RHI, runtime, and Geometry.KMeans imports.
+#pragma once
 
 namespace Extrinsic::Runtime
 {
     struct KMeansOutputPropertyState
     {
-        bool HadLabels{false};
         bool HadColors{false};
-        bool HadScalarLabels{false};
-        std::vector<std::uint32_t> Labels{};
+        GeometryScalarPropertySnapshot Labels{};
         std::vector<glm::vec4> Colors{};
-        std::vector<float> ScalarLabels{};
+        GeometryScalarPropertySnapshot ScalarLabels{};
     };
 
     struct KMeansSnapshot
@@ -21,6 +18,8 @@ namespace Extrinsic::Runtime
         WorldHandle World{};
         CommandCorrelationId Correlation{};
         std::vector<glm::vec3> Points{};
+        std::vector<std::uint32_t> Slots{};
+        std::size_t SlotCount{};
         KMeansOutputPropertyState BeforeOutputs{};
         Geometry::KMeans::KMeansParams Params{};
         std::string BackendDiagnostic{};

@@ -13,20 +13,6 @@ namespace Extrinsic::Runtime
 {
     namespace
     {
-        [[nodiscard]] bool IsExecutionDomain(
-            const GeometryElementDomain domain) noexcept
-        {
-            switch (domain)
-            {
-            case GeometryElementDomain::MeshVertex:
-            case GeometryElementDomain::GraphNode:
-            case GeometryElementDomain::PointCloudPoint:
-                return true;
-            default: break;
-            }
-            return false;
-        }
-
         [[nodiscard]] bool HasExpectedPropertyKinds(
             const KMeansPropertyRefs& refs) noexcept
         {
@@ -38,8 +24,7 @@ namespace Extrinsic::Runtime
                        Geometry::PropertyValueKind::Vec3 &&
                    refs.OutputLabels.Domain == domain &&
                    refs.OutputLabels.HasName() &&
-                   refs.OutputLabels.ValueKind ==
-                       Geometry::PropertyValueKind::UInt32 &&
+                   GeometryPropertyComponentCount(refs.OutputLabels.ValueKind) == 1 &&
                    refs.OutputColors.Domain == domain &&
                    refs.OutputColors.HasName() &&
                    refs.OutputColors.ValueKind ==
@@ -47,8 +32,7 @@ namespace Extrinsic::Runtime
                    (!refs.OutputScalarLabels.has_value() ||
                     (refs.OutputScalarLabels->Domain == domain &&
                      refs.OutputScalarLabels->HasName() &&
-                     refs.OutputScalarLabels->ValueKind ==
-                         Geometry::PropertyValueKind::Float));
+                     GeometryPropertyComponentCount(refs.OutputScalarLabels->ValueKind) == 1));
         }
 
         [[nodiscard]] bool HasDistinctPropertyNames(
@@ -91,7 +75,18 @@ namespace Extrinsic::Runtime
 
     bool IsValidKMeansPropertyBindings(const KMeansPropertyRefs& properties) noexcept
     {
-        return HasExpectedPropertyKinds(properties) && HasDistinctPropertyNames(properties);
+        const auto writable = [](const GeometryPropertyRef& ref) {
+            return ref.Name.find('\0') == std::string::npos &&
+                   !IsTopologyProperty(ref.Domain, ref.Name) &&
+                   !(ref.Name == "v:position" &&
+                     (ref.Domain == GeometryElementDomain::MeshVertex ||
+                      ref.Domain == GeometryElementDomain::GraphNode ||
+                      ref.Domain == GeometryElementDomain::PointCloudPoint));
+        };
+        return HasExpectedPropertyKinds(properties) && HasDistinctPropertyNames(properties) &&
+               properties.InputPositions.Name.find('\0') == std::string::npos &&
+               writable(properties.OutputLabels) && writable(properties.OutputColors) &&
+               (!properties.OutputScalarLabels || writable(*properties.OutputScalarLabels));
     }
 
     std::optional<KMeansRunCompleted> ValidateKMeansRequest(
@@ -113,12 +108,11 @@ namespace Extrinsic::Runtime
         if (registry == nullptr)
             return reject(KMeansRunStatus::MissingScene, Core::ErrorCode::InvalidState,
                 "Active world is unavailable for K-Means.");
-        if (!IsExecutionDomain(command.Properties.InputPositions.Domain) ||
-            !IsValidKMeansPropertyBindings(command.Properties) ||
+        if (!IsValidKMeansPropertyBindings(command.Properties) ||
             command.Parameters.ClusterCount == 0u || command.Parameters.MaxIterations == 0u ||
             command.Backend == ClusteringBackend::None)
             return reject(KMeansRunStatus::InvalidProcessingParameters, Core::ErrorCode::InvalidArgument,
-                "K-Means requires one supported input/output property domain, the canonical vec3/uint32/vec4/float value kinds, distinct property names, a concrete backend, and positive cluster and iteration counts.");
+                "K-Means requires one supported input/output property domain, vec3 positions, scalar label storage, vec4 colors, distinct property names, a concrete backend, and positive cluster and iteration counts.");
 
         const auto entity = SelectionController::ToEntityHandle(command.StableEntityId);
         if (!registry->valid(entity))
