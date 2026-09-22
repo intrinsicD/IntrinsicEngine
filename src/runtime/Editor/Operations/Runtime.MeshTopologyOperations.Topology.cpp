@@ -20,6 +20,8 @@ module;
 #include <string_view>
 #include <utility>
 #include <vector>
+#include <variant>
+#include <type_traits>
 
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
@@ -446,6 +448,8 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             // no later reading may match. See `MeshTopologyValueSignature`.
             std::optional<std::uint64_t> TopologySignature{};
             MeshTopologySnapshot Mesh{};
+            std::optional<GeometryPropertyRef> FeatureRef{};
+            GeometryScalarPropertySnapshot FeatureValues{};
         };
 
         [[nodiscard]] bool SameStoredMeshTopology(
@@ -508,13 +512,26 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
         }
 
 
+        [[nodiscard]] GeometryScalarPropertySnapshot CaptureMeshFeature(
+            const entt::registry& raw, std::uint32_t stableId,
+            const std::optional<GeometryPropertyRef>& ref)
+        {
+            if (!ref) return {};
+            const auto entity = ResolveStableEntity(raw, stableId);
+            if (!entity) return {};
+            const auto view = GS::BuildConstView(raw, *entity);
+            return view.EdgeSource ? CaptureGeometryScalarProperty(view.EdgeSource->Properties, *ref)
+                                   : GeometryScalarPropertySnapshot{};
+        }
+
         [[nodiscard]] EditorCommandStatus CommitMeshTopologyReplacement(
             const EditorProcessingContext& context,
             const std::uint32_t stableEntityId,
             const char* label,
             const std::uint64_t expectedGeometryMetadataSignature,
             Geometry::HalfedgeMesh::Mesh before,
-            Geometry::HalfedgeMesh::Mesh after)
+            Geometry::HalfedgeMesh::Mesh after,
+            std::optional<GeometryPropertyRef> feature = std::nullopt)
         {
             if (before.HasGarbage())
                 before.GarbageCollection();
@@ -553,6 +570,8 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                                 expectedGeometryMetadataSignature,
                             .TopologySignature = beforeTopology,
                             .Mesh = beforeState,
+                            .FeatureRef = feature,
+                            .FeatureValues = CaptureMeshFeature(context.Scene->Raw(), stableEntityId, feature),
                         },
                         beforeState,
                         afterState,
@@ -598,7 +617,9 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                                 !SameMeshVertexState(view, *expected.Mesh) ||
                                 !SameStoredMeshTopology(
                                     view,
-                                    expected.TopologySignature))
+                                    expected.TopologySignature) ||
+                                (expected.FeatureRef && !SameGeometryScalarPropertySnapshot(
+                                    expected.FeatureValues, CaptureMeshFeature(raw, identity.StableEntityId, expected.FeatureRef))))
                             {
                                 return EditorCommandHistoryStatus::StaleEntity;
                             }
@@ -620,7 +641,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                         },
                         [](
                             const MeshPropertyMutationIdentity& identity,
-                            const MeshTopologyMutationGeneration&,
+                            const MeshTopologyMutationGeneration& expected,
                             const MeshTopologySnapshot& target)
                         {
                             entt::registry& raw = identity.Scene->Raw();
@@ -648,6 +669,8 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                                               GS::BuildConstView(raw, *entity))
                                         : std::nullopt,
                                 .Mesh = target,
+                                .FeatureRef = expected.FeatureRef,
+                                .FeatureValues = CaptureMeshFeature(raw, identity.StableEntityId, expected.FeatureRef),
                             };
                         });
                 return ToEditorCommandStatus(history.Status);
@@ -1110,6 +1133,7 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             EditorMeshDenoiseCommand DenoiseCommand{};
             EditorMeshRemeshCommand RemeshCommand{};
             EditorMeshSubdivideCommand SubdivideCommand{};
+            GeometryScalarPropertySnapshot SubdivideFeatureSource{};
             EditorMeshSimplifyCommand SimplifyCommand{};
             EditorMeshDenoiseResult DenoiseResult{};
             EditorMeshRemeshResult RemeshResult{};
@@ -1171,6 +1195,11 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                     return JobApplyValidation::StaleGeneration;
                 }
             }
+
+            if (job.Kind == EditorMeshCpuJobKind::Subdivide && job.SubdivideCommand.PreserveLoopFeatureEdges &&
+                !SameGeometryScalarPropertySnapshot(job.SubdivideFeatureSource,
+                    CaptureMeshFeature(context.Scene->Raw(), job.StableEntityId, job.SubdivideCommand.FeatureEdges)))
+                return JobApplyValidation::StaleGeneration;
 
             return JobApplyValidation::Current;
         }
@@ -1358,6 +1387,88 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             return true;
         }
 
+        [[nodiscard]] bool SubdivisionFeatureValues(const GeometryScalarPropertySnapshot& snapshot,
+                                                     std::vector<std::uint32_t>& values)
+        {
+            if (!snapshot.Exists) return false;
+            return std::visit([&](const auto& source) {
+                values.resize(source.size());
+                for (std::size_t i = 0; i < source.size(); ++i)
+                {
+                    if (source[i] != 0 && source[i] != 1) return false;
+                    values[i] = source[i] == 1 ? 1u : 0u;
+                }
+                return true;
+            }, snapshot.Values);
+        }
+
+        [[nodiscard]] bool ConvertSubdivisionFeatureStorage(
+            Geometry::HalfedgeMesh::Mesh& mesh, const GeometryPropertyRef& input,
+            const GeometryPropertyRef& output)
+        {
+            auto& properties = mesh.EdgeProperties();
+            const auto captured = CaptureGeometryScalarProperty(properties, input);
+            std::vector<std::uint32_t> values;
+            if (!SubdivisionFeatureValues(captured, values)) return false;
+            std::vector<std::uint32_t> slots(values.size());
+            for (std::size_t i = 0; i < slots.size(); ++i) slots[i] = std::uint32_t(i);
+            GeometryScalarPropertySnapshot converted;
+            if (!PrepareGeometryScalarProperty(converted, output.ValueKind, values.size(), slots, values)) return false;
+            auto absent = captured;
+            absent.Exists = false;
+            return ApplyGeometryScalarProperty(properties, input, absent) &&
+                   ApplyGeometryScalarProperty(properties, output, converted);
+        }
+
+        [[nodiscard]] bool CaptureSubdivisionFeatures(const GS::ConstSourceView& view,
+            const EditorMeshSubdivideCommand& command, Geometry::HalfedgeMesh::Mesh& mesh,
+            EditorMeshSubdivideResult& result)
+        {
+            if (!command.PreserveLoopFeatureEdges) return true;
+            const auto fail = [&](const char* message) {
+                result.Status = EditorCommandStatus::InvalidProcessingParameters;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message = message;
+                return false;
+            };
+            const auto& properties = view.EdgeSource->Properties;
+            const auto source = CaptureGeometryScalarProperty(properties, command.FeatureEdges);
+            const auto starts = properties.Get<std::uint32_t>("e:v0");
+            const auto ends = properties.Get<std::uint32_t>("e:v1");
+            const auto deleted = properties.Get<bool>("e:deleted");
+            if (!starts || !ends || starts.Size() != properties.Size() || ends.Size() != properties.Size() ||
+                (properties.Exists("e:deleted") && (!deleted || deleted.Size() != properties.Size())))
+                return fail("Subdivision feature edges require count-matched endpoint and deletion properties.");
+            GeometryScalarPropertySnapshot target;
+            target.Exists = true;
+            std::vector<bool> mapped(mesh.EdgesSize());
+            const bool captured = std::visit([&](const auto& field) {
+                if (field.size() != properties.Size()) return false;
+                using Values = std::decay_t<decltype(field)>;
+                Values values(mesh.EdgesSize());
+                for (std::size_t i = 0; i < field.size(); ++i)
+                {
+                    if (deleted && deleted[i]) continue;
+                    if (starts[i] >= mesh.VerticesSize() || ends[i] >= mesh.VerticesSize()) return false;
+                    const auto halfedge = mesh.FindHalfedge(Geometry::VertexHandle{starts[i]}, Geometry::VertexHandle{ends[i]});
+                    // Source edges outside the surviving surface do not enter the method.
+                    if (!halfedge) continue;
+                    if (field[i] != 0 && field[i] != 1) return false;
+                    const auto edge = mesh.Edge(*halfedge).Index;
+                    if (mapped[edge]) return false;
+                    mapped[edge] = true;
+                    values[edge] = field[i];
+                }
+                target.Values = std::move(values);
+                return true;
+            }, source.Values);
+            if (!captured || std::ranges::find(mapped, false) != mapped.end())
+                return fail("Subdivision feature values must be finite, exactly zero or one, and match the surviving edges.");
+            if (!ApplyGeometryScalarProperty(mesh.EdgeProperties(), command.FeatureEdges, target))
+                return fail("Subdivision feature storage cannot represent the selected edge flags.");
+            return true;
+        }
+
         [[nodiscard]] bool ComputeMeshSubdivide(
             const EditorMeshSubdivideCommand& command,
             Geometry::HalfedgeMesh::Mesh& mesh,
@@ -1376,8 +1487,17 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                     command.MaxOutputFaces;
                 params.PreserveFeatureEdges =
                     command.PreserveLoopFeatureEdges;
-                params.FeatureEdgePropertyName =
-                    command.FeatureEdgePropertyName;
+                params.FeatureEdgePropertyName = command.FeatureEdges.Name;
+                auto booleanRef = command.FeatureEdges;
+                booleanRef.ValueKind = Geometry::PropertyValueKind::Bool;
+                if (command.PreserveLoopFeatureEdges &&
+                    !ConvertSubdivisionFeatureStorage(mesh, command.FeatureEdges, booleanRef))
+                {
+                    result.Status = EditorCommandStatus::InvalidProcessingParameters;
+                    result.Error = Core::ErrorCode::InvalidArgument;
+                    result.Message = "Subdivision feature flags cannot be converted exactly to bool.";
+                    return false;
+                }
                 const std::optional<LoopSubdivide::SubdivisionResult>
                     subdivision =
                         LoopSubdivide::Subdivide(mesh, output, params);
@@ -1388,6 +1508,14 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                     result.Error = Core::ErrorCode::InvalidArgument;
                     result.Message = "Geometry.Subdivision Loop subdivision failed for the "
                                      "selected mesh and parameters.";
+                    return false;
+                }
+                if (command.PreserveLoopFeatureEdges &&
+                    !ConvertSubdivisionFeatureStorage(output, booleanRef, command.FeatureEdges))
+                {
+                    result.Status = EditorCommandStatus::InvalidProcessingParameters;
+                    result.Error = Core::ErrorCode::InvalidArgument;
+                    result.Message = "Subdivision output flags cannot be represented in the declared scalar storage.";
                     return false;
                 }
                 result.IterationsPerformed =
@@ -1662,7 +1790,8 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                     "Subdivide mesh",
                     job.GeometryMetadataSignature,
                     std::move(job.BeforeMesh),
-                    std::move(job.Mesh));
+                    std::move(job.Mesh),
+                    job.SubdivideCommand.PreserveLoopFeatureEdges ? std::optional{job.SubdivideCommand.FeatureEdges} : std::nullopt);
             if (commitStatus != EditorCommandStatus::Applied)
             {
                 result.Status = commitStatus;
@@ -2031,6 +2160,8 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                     : std::nullopt;
             state->Mesh = std::move(source.Mesh);
             state->SubdivideCommand = command;
+            if (command.PreserveLoopFeatureEdges)
+                state->SubdivideFeatureSource = CaptureMeshFeature(context.Scene->Raw(), command.StableEntityId, command.FeatureEdges);
             state->SubdivideResult = MakeMeshSubdivideBaseResult(command);
             state->SubdivideResult.TexcoordOutcome = texcoordOutcome;
             state->SubdivideResult.InputVertexCount =
@@ -2368,7 +2499,9 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
             if (!ValidMeshSubdivideOperator(command.Operator) ||
                 command.Iterations == 0u ||
                 (command.PreserveLoopFeatureEdges &&
-                 command.FeatureEdgePropertyName.empty()))
+                 (!command.FeatureEdges.HasName() || command.FeatureEdges.Domain != GeometryElementDomain::MeshEdge ||
+                  GeometryPropertyComponentCount(command.FeatureEdges.ValueKind) != 1 ||
+                  IsTopologyProperty(command.FeatureEdges.Domain, command.FeatureEdges.Name))))
             {
                 result.Status =
                     EditorCommandStatus::InvalidProcessingParameters;
@@ -2438,6 +2571,18 @@ namespace Extrinsic::Runtime::MeshTopologyDetail
                 return std::nullopt;
             }
 
+            if (command.PreserveLoopFeatureEdges)
+            {
+                const auto available = BuildGeometryAvailability(raw, *entity);
+                const auto* properties = ResolveGeometryPropertySet(available, command.FeatureEdges.Domain);
+                if (!properties || !ResolveGeometryProperty(available, command.FeatureEdges, properties->Size(), false).Resolved())
+                {
+                    result.Status = EditorCommandStatus::InvalidProcessingParameters;
+                    result.Error = Core::ErrorCode::InvalidArgument;
+                    result.Message = "Choose an existing, count-matched scalar feature property on mesh edges.";
+                    return std::nullopt;
+                }
+            }
             return entity;
         }
 
@@ -2696,6 +2841,8 @@ ApplyEditorMeshSubdivideCommand(
             return result;
         }
 
+        if (!CaptureSubdivisionFeatures(view, command, source.Mesh, result)) return result;
+
         // Remesh and subdivide replace the topology with one whose
         // corners have no source UV, so they cannot carry the parameterization
         // and the publish step removes it. Report that instead of leaving the
@@ -2731,7 +2878,8 @@ ApplyEditorMeshSubdivideCommand(
                 "Subdivide mesh",
                 GeometryMetadataSignatureForEntity(raw, *entity),
                 std::move(before),
-                std::move(source.Mesh));
+                std::move(source.Mesh),
+                    command.PreserveLoopFeatureEdges ? std::optional{command.FeatureEdges} : std::nullopt);
         if (commitStatus != EditorCommandStatus::Applied)
         {
             result.Status = commitStatus;
