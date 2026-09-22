@@ -608,3 +608,75 @@ TEST(RuntimeGeometryProperty, StructuralProtectionUsesDomainIdentityNotPrefixes)
     EXPECT_FALSE(Runtime::IsTopologyProperty(D::PointCloudPoint, "v:connectivity"));
     EXPECT_FALSE(Runtime::IsTopologyProperty(D::MeshFace, "f:temperature"));
 }
+
+TEST(GeometryScalarPublication, ConvertsOnlyLiveRowsAndPreservesExactUndoStorage)
+{
+    Geometry::PropertySet properties;
+    properties.Resize(3);
+    const Runtime::GeometryPropertyRef ref{Runtime::GeometryElementDomain::MeshFace,
+        "arbitrary", Geometry::PropertyValueKind::UInt64};
+    properties.GetOrAdd<std::uint64_t>(ref.Name).Vector() = {9, UINT64_MAX, 8};
+    const auto before = Runtime::CaptureGeometryScalarProperty(properties, ref);
+    auto after = before;
+    const std::vector<std::uint32_t> slots{0,2};
+    const std::vector<double> values{1, std::numeric_limits<double>::quiet_NaN(), 2};
+    ASSERT_TRUE(Runtime::PrepareGeometryScalarProperty(after, ref.ValueKind, 3, slots, values));
+    Runtime::ApplyGeometryScalarProperty(properties, ref, after);
+    EXPECT_EQ(properties.Get<std::uint64_t>(ref.Name).Vector(),
+        (std::vector<std::uint64_t>{1, UINT64_MAX, 2}));
+    Runtime::ApplyGeometryScalarProperty(properties, ref, before);
+    EXPECT_EQ(properties.Get<std::uint64_t>(ref.Name).Vector(),
+        (std::vector<std::uint64_t>{9, UINT64_MAX, 8}));
+}
+
+TEST(GeometryScalarPublication, RejectsInexactNonfiniteAndOutOfRangeBeforePublication)
+{
+    using K = Geometry::PropertyValueKind;
+    const std::vector<std::uint32_t> slots{0};
+    for (const auto [kind, value] : std::vector<std::pair<K,double>>{
+        {K::Bool,2}, {K::Int32,0.5}, {K::Int32,2147483648.0}, {K::UInt32,-1},
+        {K::UInt64,18446744073709551616.0}, {K::Float,16777217.0},
+        {K::Double,std::numeric_limits<double>::infinity()},
+        {K::Float,std::numeric_limits<double>::quiet_NaN()}})
+    {
+        SCOPED_TRACE(int(kind));
+        Runtime::GeometryScalarPropertySnapshot state;
+        const std::vector<double> values{value};
+        EXPECT_FALSE(Runtime::PrepareGeometryScalarProperty(state,kind,1,slots,values));
+        EXPECT_FALSE(state.Exists);
+    }
+    for (const auto kind : {K::Bool,K::Int32,K::UInt32,K::UInt64,K::Float,K::Double})
+    {
+        Geometry::PropertySet properties;
+        properties.Resize(1);
+        Runtime::GeometryScalarPropertySnapshot state;
+        const std::vector<double> values{1};
+        ASSERT_TRUE(Runtime::PrepareGeometryScalarProperty(state,kind,1,slots,values));
+        const Runtime::GeometryPropertyRef ref{Runtime::GeometryElementDomain::MeshFace,"field",kind};
+        Runtime::ApplyGeometryScalarProperty(properties,ref,state);
+        EXPECT_EQ(Runtime::DetectGeometryPropertyValueKind(properties,ref.Name),kind);
+    }
+}
+
+TEST(GeometryScalarPublication, SentinelPolicyAndSnapshotEqualityAreExplicit)
+{
+    Geometry::PropertySet properties;
+    properties.Resize(2);
+    Runtime::GeometryPropertyRef ref{Runtime::GeometryElementDomain::MeshVertex,"distance",Geometry::PropertyValueKind::Double};
+    properties.GetOrAdd<double>(ref.Name).Vector()={0,std::numeric_limits<double>::quiet_NaN()};
+    const auto before=Runtime::CaptureGeometryScalarProperty(properties,ref);
+    auto after=before;
+    EXPECT_TRUE(Runtime::SameGeometryScalarPropertySnapshot(before,after));
+    EXPECT_EQ(Runtime::GeometryScalarPropertySize(before),2u);
+    const std::vector<std::uint32_t> slots{0};
+    const std::vector<double> values{std::numeric_limits<double>::infinity(),0};
+    EXPECT_FALSE(Runtime::PrepareGeometryScalarProperty(after,ref.ValueKind,2,slots,values));
+    EXPECT_TRUE(Runtime::SameGeometryScalarPropertySnapshot(before,after));
+    ASSERT_TRUE(Runtime::PrepareGeometryScalarProperty(after,ref.ValueKind,2,slots,values,
+        Runtime::GeometryScalarNonfinitePolicy::AllowInfinity));
+    EXPECT_FALSE(Runtime::SameGeometryScalarPropertySnapshot(before,after));
+    Runtime::ApplyGeometryScalarProperty(properties,ref,after);
+    Runtime::ApplyGeometryScalarProperty(properties,ref,before);
+    EXPECT_TRUE(Runtime::SameGeometryScalarPropertySnapshot(before,
+        Runtime::CaptureGeometryScalarProperty(properties,ref)));
+}

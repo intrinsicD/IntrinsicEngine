@@ -29,19 +29,27 @@ export namespace Extrinsic::Runtime
                      std::vector<std::uint32_t>, std::vector<std::uint64_t>,
                      std::vector<float>, std::vector<double>> Values{};
     };
+    enum class GeometryScalarNonfinitePolicy { Reject, AllowInfinity };
+    [[nodiscard]] std::size_t GeometryScalarPropertySize(const GeometryScalarPropertySnapshot&) noexcept;
+    [[nodiscard]] bool SameGeometryScalarPropertySnapshot(
+        const GeometryScalarPropertySnapshot&, const GeometryScalarPropertySnapshot&) noexcept;
     [[nodiscard]] GeometryScalarPropertySnapshot CaptureGeometryScalarProperty(
         const Geometry::PropertySet&, const GeometryPropertyRef&);
     // Values are indexed by source slot. Failure leaves the snapshot unchanged;
-    // non-finite, out-of-range and inexact converted live values are rejected.
+    // out-of-range and inexact converted live values are rejected. Infinity needs
+    // explicit opt-in for sentinel-valued fields; NaN is never a live output.
     [[nodiscard]] bool PrepareGeometryScalarProperty(
         GeometryScalarPropertySnapshot&, Geometry::PropertyValueKind,
-        std::size_t count, std::span<const std::uint32_t> slots, std::span<const float> values);
+        std::size_t count, std::span<const std::uint32_t> slots, std::span<const float> values,
+        GeometryScalarNonfinitePolicy nonfinite = GeometryScalarNonfinitePolicy::Reject);
     [[nodiscard]] bool PrepareGeometryScalarProperty(
         GeometryScalarPropertySnapshot&, Geometry::PropertyValueKind,
-        std::size_t count, std::span<const std::uint32_t> slots, std::span<const double> values);
+        std::size_t count, std::span<const std::uint32_t> slots, std::span<const double> values,
+        GeometryScalarNonfinitePolicy nonfinite = GeometryScalarNonfinitePolicy::Reject);
     [[nodiscard]] bool PrepareGeometryScalarProperty(
         GeometryScalarPropertySnapshot&, Geometry::PropertyValueKind,
-        std::size_t count, std::span<const std::uint32_t> slots, std::span<const std::uint32_t> values);
+        std::size_t count, std::span<const std::uint32_t> slots, std::span<const std::uint32_t> values,
+        GeometryScalarNonfinitePolicy nonfinite = GeometryScalarNonfinitePolicy::Reject);
     void ApplyGeometryScalarProperty(Geometry::PropertySet&, const GeometryPropertyRef&,
                                      const GeometryScalarPropertySnapshot&);
 
