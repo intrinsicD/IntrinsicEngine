@@ -1184,3 +1184,165 @@ TEST(ClusteringModule, MetadataAdmissionRejectsInvalidBindingsAndSourcesWithoutS
     properties.Remove(input);
     expectRejected(Runtime::KMeansRunStatus::UnsupportedGeometryDomain);
 }
+
+namespace
+{
+    class KMeansElementDomainApp final : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        explicit KMeansElementDomainApp(Runtime::GeometryElementDomain domain, bool rejectConversion = false)
+            : Domain(domain), RejectConversion(rejectConversion) {}
+        void Resolve() override
+        {
+            auto& engine = Kernel();
+            auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+            Entity = scene.Create();
+            auto& raw = scene.Raw();
+            auto& vertices = raw.emplace<GS::Vertices>(Entity);
+            SetPositions(vertices, std::vector<glm::vec3>(6, {0, 0, 0}));
+            const bool mesh = Domain >= Runtime::GeometryElementDomain::MeshVertex &&
+                              Domain <= Runtime::GeometryElementDomain::MeshFace;
+            const bool graph = Domain >= Runtime::GeometryElementDomain::GraphNode &&
+                               Domain <= Runtime::GeometryElementDomain::GraphEdge;
+            if (mesh || graph)
+            {
+                raw.emplace<GS::Edges>(Entity).Properties.Resize(6);
+                raw.emplace<GS::Halfedges>(Entity).Properties.Resize(12);
+            }
+            if (mesh) raw.emplace<GS::Faces>(Entity).Properties.Resize(6);
+            auto& props = Properties(scene);
+            auto samples = props.GetOrAdd<glm::vec3>("samples", {});
+            for (std::size_t i = 0; i < props.Size(); ++i)
+                samples[i] = {static_cast<float>(i / 2) * 10.f, static_cast<float>(i % 2), 0.f};
+            auto& deletion = (Domain == Runtime::GeometryElementDomain::MeshHalfedge ||
+                              Domain == Runtime::GeometryElementDomain::GraphHalfedge)
+                ? raw.get<GS::Edges>(Entity).Properties : props;
+            const char* deletionName = (Domain == Runtime::GeometryElementDomain::MeshFace) ? "f:deleted" :
+                (Domain == Runtime::GeometryElementDomain::MeshEdge || Domain == Runtime::GeometryElementDomain::GraphEdge ||
+                 Domain == Runtime::GeometryElementDomain::MeshHalfedge || Domain == Runtime::GeometryElementDomain::GraphHalfedge)
+                    ? "e:deleted" : "v:deleted";
+            deletion.GetOrAdd<bool>(deletionName, false)[0] = true;
+            props.GetOrAdd<std::uint64_t>("labels", 9223372036854775809ull);
+            props.GetOrAdd<glm::vec4>("colors", glm::vec4(0.25f));
+            if (RejectConversion) props.GetOrAdd<bool>("scalar_labels", true);
+            else props.GetOrAdd<double>("scalar_labels", -3.0);
+            auto* service = engine.Services().Find<Runtime::ClusteringService>();
+            Subscription = service->SubscribeRunCompleted([this](const auto& completion) { Completion = completion; });
+            auto command = MakePointCloudRequest(Runtime::SelectionController::ToStableEntityId(Entity));
+            command.Properties = Runtime::MakeKMeansPropertyRefs(Domain);
+            command.Properties.InputPositions.Name = "samples";
+            command.Properties.OutputLabels = {Domain, "labels", Geometry::PropertyValueKind::UInt64};
+            command.Properties.OutputColors.Name = "colors";
+            command.Properties.OutputScalarLabels = Runtime::GeometryPropertyRef{Domain, "scalar_labels",
+                RejectConversion ? Geometry::PropertyValueKind::Bool : Geometry::PropertyValueKind::Double};
+            command.Parameters.ClusterCount = RejectConversion ? 3u : 2u;
+            command.Parameters.Initialization = Runtime::KMeansInitialization::Hierarchical;
+            (void)service->RunKMeans(command);
+        }
+        Geometry::PropertySet& Properties(ECS::Scene::Registry& scene)
+        {
+            auto& raw = scene.Raw();
+            switch (Domain)
+            {
+            case Runtime::GeometryElementDomain::MeshFace: return raw.get<GS::Faces>(Entity).Properties;
+            case Runtime::GeometryElementDomain::MeshEdge:
+            case Runtime::GeometryElementDomain::GraphEdge: return raw.get<GS::Edges>(Entity).Properties;
+            case Runtime::GeometryElementDomain::MeshHalfedge:
+            case Runtime::GeometryElementDomain::GraphHalfedge: return raw.get<GS::Halfedges>(Entity).Properties;
+            default: return raw.get<GS::Vertices>(Entity).Properties;
+            }
+        }
+        void Frame(double, double) override
+        {
+            if (Completion || ++Ticks > 240u) Kernel().RequestExit();
+        }
+        void Shutdown() override {}
+        Runtime::GeometryElementDomain Domain;
+        bool RejectConversion;
+        ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
+        Runtime::KernelEventSubscription Subscription{};
+        std::optional<Runtime::KMeansRunCompleted> Completion;
+        unsigned Ticks{};
+    };
+}
+
+TEST(ClusteringModule, EveryPointDomainPreservesDeletedSlotsAndExactScalarUndo)
+{
+    for (const auto domain : {Runtime::GeometryElementDomain::MeshVertex, Runtime::GeometryElementDomain::MeshEdge,
+                             Runtime::GeometryElementDomain::MeshHalfedge, Runtime::GeometryElementDomain::MeshFace,
+                             Runtime::GeometryElementDomain::GraphNode, Runtime::GeometryElementDomain::GraphEdge,
+                             Runtime::GeometryElementDomain::GraphHalfedge, Runtime::GeometryElementDomain::PointCloudPoint})
+    {
+        SCOPED_TRACE(static_cast<int>(domain));
+        auto app = std::make_unique<KMeansElementDomainApp>(domain);
+        auto* state = app.get();
+        Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(app));
+        engine.EmplaceModule<Runtime::ClusteringModule>();
+        engine.EmplaceModule<Runtime::SceneDocumentModule>();
+        engine.Initialize();
+        engine.Run();
+        ASSERT_TRUE(state->Completion);
+        ASSERT_TRUE(state->Completion->Succeeded()) << state->Completion->Message;
+        auto& props = state->Properties(*engine.Worlds().Get(engine.ActiveWorld()));
+        const auto labels = props.Get<std::uint64_t>("labels").Vector();
+        EXPECT_EQ(labels[0], 9223372036854775809ull);
+        EXPECT_EQ(props.Get<double>("scalar_labels")[0], -3.0);
+        EXPECT_EQ(props.Get<glm::vec4>("colors")[0], glm::vec4(0.25f));
+        const std::size_t firstLive = domain == Runtime::GeometryElementDomain::MeshHalfedge ||
+                                      domain == Runtime::GeometryElementDomain::GraphHalfedge ? 2 : 1;
+        EXPECT_LT(labels[firstLive], 2u);
+        EXPECT_EQ(props.Get<double>("scalar_labels")[firstLive], static_cast<double>(labels[firstLive]));
+        auto* history = engine.Services().Find<Runtime::EditorCommandHistory>();
+        ASSERT_NE(history, nullptr);
+        ASSERT_TRUE(history->Undo().Succeeded());
+        EXPECT_EQ(props.Get<std::uint64_t>("labels")[firstLive], 9223372036854775809ull);
+        EXPECT_EQ(props.Get<double>("scalar_labels")[firstLive], -3.0);
+        ASSERT_TRUE(history->Redo().Succeeded());
+        EXPECT_EQ(props.Get<std::uint64_t>("labels").Vector(), labels);
+        engine.Shutdown();
+    }
+}
+
+TEST(ClusteringModule, UnrepresentableScalarLabelRejectsAllOutputPublication)
+{
+    auto app = std::make_unique<KMeansElementDomainApp>(Runtime::GeometryElementDomain::MeshFace, true);
+    auto* state = app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig(), std::move(app));
+    engine.EmplaceModule<Runtime::ClusteringModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.Initialize();
+    engine.Run();
+    ASSERT_TRUE(state->Completion);
+    EXPECT_FALSE(state->Completion->Succeeded());
+    auto& props = state->Properties(*engine.Worlds().Get(engine.ActiveWorld()));
+    for (std::size_t i = 0; i < props.Size(); ++i)
+    {
+        EXPECT_EQ(props.Get<std::uint64_t>("labels")[i], 9223372036854775809ull);
+        EXPECT_TRUE(props.Get<bool>("scalar_labels")[i]);
+        EXPECT_EQ(props.Get<glm::vec4>("colors")[i], glm::vec4(0.25f));
+    }
+    EXPECT_EQ(engine.Services().Find<Runtime::EditorCommandHistory>()->UndoCount(), 0u);
+    engine.Shutdown();
+}
+
+
+TEST(ClusteringModule, ScalarOutputKindsAndPointDomainsRoundTripCanonically)
+{
+    for (const auto kind : {Geometry::PropertyValueKind::Bool, Geometry::PropertyValueKind::Int32,
+                           Geometry::PropertyValueKind::UInt32, Geometry::PropertyValueKind::UInt64,
+                           Geometry::PropertyValueKind::Float, Geometry::PropertyValueKind::Double})
+    {
+        Runtime::ClusteringConfig config;
+        config.Properties = Runtime::MakeKMeansPropertyRefs(Runtime::GeometryElementDomain::MeshFace);
+        config.Properties->InputPositions.Name = "centers";
+        config.Properties->OutputLabels.ValueKind = kind;
+        config.Properties->OutputScalarLabels->ValueKind = kind;
+        CoreConfig::EngineConfig engine;
+        Runtime::SetClusteringConfig(engine, config);
+        const auto decoded = Runtime::GetClusteringConfig(engine);
+        ASSERT_TRUE(decoded);
+        ASSERT_TRUE(decoded->Properties);
+        EXPECT_EQ(decoded->Properties->OutputLabels, config.Properties->OutputLabels);
+        EXPECT_EQ(decoded->Properties->OutputScalarLabels, config.Properties->OutputScalarLabels);
+    }
+}

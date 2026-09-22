@@ -21,6 +21,8 @@ module;
 
 module Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.GeometryAvailability;
+import Extrinsic.Runtime.EditorProcessing;
+import Extrinsic.Runtime.EditorJobProjection;
 
 import Extrinsic.Runtime.Module;
 import Extrinsic.Core.Error;
@@ -40,7 +42,7 @@ import Extrinsic.Runtime.WorldRegistry;
 import Geometry.KMeans;
 import Geometry.Properties;
 
-#include "GeometryIntegration/Runtime.GeometryPositionCapture.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 #include "Modules/Clustering/Runtime.ClusteringGpuState.Internal.hpp"
 #include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
 
@@ -70,6 +72,11 @@ namespace Extrinsic::Runtime
             switch (domain)
             {
             case GeometryElementDomain::MeshVertex: return "mesh vertices";
+            case GeometryElementDomain::MeshEdge: return "mesh edges";
+            case GeometryElementDomain::MeshHalfedge: return "mesh halfedges";
+            case GeometryElementDomain::MeshFace: return "mesh faces";
+            case GeometryElementDomain::GraphEdge: return "graph edges";
+            case GeometryElementDomain::GraphHalfedge: return "graph halfedges";
             case GeometryElementDomain::GraphNode: return "graph nodes";
             case GeometryElementDomain::PointCloudPoint:
                 return "point-cloud points";
@@ -112,48 +119,9 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] bool SourceViewSupportsDomain(
-            const GS::MutableSourceView& view,
-            const GeometryElementDomain domain) noexcept
-        {
-            const GS::SourceAvailability sources =
-                GS::BuildSourceAvailability(view);
-            switch (domain)
-            {
-            case GeometryElementDomain::MeshVertex:
-                return sources.ProvenanceDomain == GS::Domain::Mesh &&
-                       sources.Has(GS::SourceCapability::Vertices);
-            case GeometryElementDomain::GraphNode:
-                return sources.ProvenanceDomain == GS::Domain::Graph &&
-                       sources.Has(GS::SourceCapability::Vertices);
-            case GeometryElementDomain::PointCloudPoint:
-                return sources.ProvenanceDomain == GS::Domain::PointCloud &&
-                       sources.Has(GS::SourceCapability::Vertices);
-            default: break;
-            }
-            return false;
-        }
-
-        [[nodiscard]] Geometry::PropertySet* TargetProperties(
-            GS::MutableSourceView& view,
-            const GeometryElementDomain domain) noexcept
-        {
-            switch (domain)
-            {
-            case GeometryElementDomain::MeshVertex:
-            case GeometryElementDomain::PointCloudPoint:
-                return view.VertexSource != nullptr
-                    ? &view.VertexSource->Properties
-                    : nullptr;
-            case GeometryElementDomain::GraphNode:
-                return view.VertexSource != nullptr ? &view.VertexSource->Properties
-                                                  : nullptr;
-            default: break;
-            }
-            return nullptr;
-        }
-
-        using GeometryProcessingDetail::MeshSupport::CollectFiniteGeometryPositions;
+        using GeometryProcessingDetail::CapturePointInput;
+        using GeometryProcessingDetail::PointInputCapture;
+        using GeometryProcessingDetail::MutableGeometryProperties;
 
         [[nodiscard]] glm::vec4 LabelColor(const std::uint32_t label)
         {
@@ -214,26 +182,16 @@ namespace Extrinsic::Runtime
             KMeansOutputPropertyState& out)
         {
             out = {};
-            if (!CaptureOutputProperty<std::uint32_t>(
-                    properties,
-                    refs.OutputLabels.Name,
-                    out.HadLabels,
-                    out.Labels) ||
-                !CaptureOutputProperty<glm::vec4>(
-                    properties,
-                    refs.OutputColors.Name,
-                    out.HadColors,
-                    out.Colors))
-            {
+            out.Labels = CaptureGeometryScalarProperty(properties, refs.OutputLabels);
+            if (properties.Exists(refs.OutputLabels.Name) &&
+                (!out.Labels.Exists || GeometryScalarPropertySize(out.Labels) != properties.Size()))
                 return false;
-            }
-            if (!refs.OutputScalarLabels.has_value())
-                return true;
-            return CaptureOutputProperty<float>(
-                properties,
-                refs.OutputScalarLabels->Name,
-                out.HadScalarLabels,
-                out.ScalarLabels);
+            if (!CaptureOutputProperty<glm::vec4>(properties, refs.OutputColors.Name,
+                                                 out.HadColors, out.Colors)) return false;
+            if (!refs.OutputScalarLabels) return true;
+            out.ScalarLabels = CaptureGeometryScalarProperty(properties, *refs.OutputScalarLabels);
+            return !properties.Exists(refs.OutputScalarLabels->Name) ||
+                   (out.ScalarLabels.Exists && GeometryScalarPropertySize(out.ScalarLabels) == properties.Size());
         }
 
         using GeometryValueComparison::BitEqual;
@@ -242,47 +200,36 @@ namespace Extrinsic::Runtime
             const KMeansOutputPropertyState& lhs,
             const KMeansOutputPropertyState& rhs) noexcept
         {
-            return lhs.HadLabels == rhs.HadLabels &&
-                   lhs.HadColors == rhs.HadColors &&
-                   lhs.HadScalarLabels == rhs.HadScalarLabels &&
-                   lhs.Labels == rhs.Labels &&
-                   BitEqual(lhs.Colors, rhs.Colors) &&
-                   BitEqual(lhs.ScalarLabels, rhs.ScalarLabels);
+            return lhs.HadColors == rhs.HadColors && BitEqual(lhs.Colors, rhs.Colors) &&
+                   SameGeometryScalarPropertySnapshot(lhs.Labels, rhs.Labels) &&
+                   SameGeometryScalarPropertySnapshot(lhs.ScalarLabels, rhs.ScalarLabels);
         }
 
         [[nodiscard]] std::optional<KMeansOutputPropertyState>
         BuildKMeansOutputPropertyState(
             const Geometry::PropertySet& properties,
             const KMeansPropertyRefs& refs,
-            const GK::KMeansResult& result)
+            const GK::KMeansResult& result,
+            const std::span<const std::uint32_t> slots)
         {
-            if (result.Labels.empty() ||
-                result.Labels.size() != properties.Size())
+            if (result.Labels.empty() || result.Labels.size() != slots.size()) return std::nullopt;
+            std::vector<std::uint32_t> labels(properties.Size());
+            for (std::size_t i = 0; i < slots.size(); ++i)
             {
-                return std::nullopt;
+                if (slots[i] >= labels.size()) return std::nullopt;
+                labels[slots[i]] = result.Labels[i];
             }
-
-            KMeansOutputPropertyState state{
-                .HadLabels = true,
-                .HadColors = true,
-                .HadScalarLabels =
-                    refs.OutputScalarLabels.has_value(),
-                .Labels = result.Labels,
-            };
-            state.Colors.reserve(result.Labels.size());
-            state.ScalarLabels.reserve(
-                refs.OutputScalarLabels.has_value()
-                    ? result.Labels.size()
-                    : 0u);
-            for (const std::uint32_t label : result.Labels)
-            {
-                state.Colors.push_back(LabelColor(label));
-                if (refs.OutputScalarLabels.has_value())
-                {
-                    state.ScalarLabels.push_back(
-                        static_cast<float>(label));
-                }
-            }
+            KMeansOutputPropertyState state;
+            if (!CaptureKMeansOutputPropertyState(properties, refs, state) ||
+                !PrepareGeometryScalarProperty(state.Labels, refs.OutputLabels.ValueKind,
+                    properties.Size(), slots, labels)) return std::nullopt;
+            if (refs.OutputScalarLabels &&
+                !PrepareGeometryScalarProperty(state.ScalarLabels, refs.OutputScalarLabels->ValueKind,
+                    properties.Size(), slots, labels)) return std::nullopt;
+            state.HadColors = true;
+            state.Colors.resize(properties.Size(), glm::vec4(1.0f));
+            for (std::size_t i = 0; i < slots.size(); ++i)
+                state.Colors[slots[i]] = LabelColor(result.Labels[i]);
             return state;
         }
 
@@ -323,39 +270,12 @@ namespace Extrinsic::Runtime
             const KMeansOutputPropertyState& state)
         {
             Geometry::PropertySet staged = properties;
-            if (!ApplyOutputProperty<std::uint32_t>(
-                    staged,
-                    refs.OutputLabels.Name,
-                    state.HadLabels,
-                    state.Labels,
-                    0u) ||
-                !ApplyOutputProperty<glm::vec4>(
-                    staged,
-                    refs.OutputColors.Name,
-                    state.HadColors,
-                    state.Colors,
-                    glm::vec4{1.0f}))
-            {
-                return false;
-            }
-
-            if (refs.OutputScalarLabels.has_value())
-            {
-                if (!ApplyOutputProperty<float>(
-                        staged,
-                        refs.OutputScalarLabels->Name,
-                        state.HadScalarLabels,
-                        state.ScalarLabels,
-                        0.0f))
-                {
-                    return false;
-                }
-            }
-            else if (state.HadScalarLabels ||
-                     !state.ScalarLabels.empty())
-            {
-                return false;
-            }
+            ApplyGeometryScalarProperty(staged, refs.OutputLabels, state.Labels);
+            if (!ApplyOutputProperty<glm::vec4>(staged, refs.OutputColors.Name,
+                    state.HadColors, state.Colors, glm::vec4{1.0f})) return false;
+            if (refs.OutputScalarLabels)
+                ApplyGeometryScalarProperty(staged, *refs.OutputScalarLabels, state.ScalarLabels);
+            else if (state.ScalarLabels.Exists) return false;
 
             properties = std::move(staged);
             return true;
@@ -400,19 +320,14 @@ namespace Extrinsic::Runtime
                 scene.Raw(), SelectionController::ToEntityHandle(command.StableEntityId));
             const auto* properties = ResolveGeometryPropertySet(
                 availability, command.Properties.InputPositions.Domain);
-            std::optional<std::vector<glm::vec3>> points =
-                CollectFiniteGeometryPositions(
-                    *properties,
-                    command.Properties.InputPositions.Name);
-            if (!points.has_value())
+            PointInputCapture input;
+            auto positionRef = command.Properties.InputPositions;
+            std::string diagnostic;
+            if (!CapturePointInput(availability, positionRef, true, input, diagnostic) || input.Points.empty())
             {
-                failure = MakeCompletion(
-                    command,
-                    world,
-                    correlation,
-                    KMeansRunStatus::UnsupportedGeometryDomain,
-                    Core::ErrorCode::InvalidArgument,
-                    "Selected entity does not expose the requested non-empty, finite K-Means input position property.");
+                failure = MakeCompletion(command, world, correlation,
+                    KMeansRunStatus::UnsupportedGeometryDomain, Core::ErrorCode::InvalidArgument,
+                    "K-Means input: " + diagnostic);
                 return std::nullopt;
             }
 
@@ -446,7 +361,9 @@ namespace Extrinsic::Runtime
                 .Command = command,
                 .World = world,
                 .Correlation = correlation,
-                .Points = std::move(*points),
+                .Points = std::move(input.Points),
+                .Slots = std::move(input.Slots),
+                .SlotCount = input.SlotCount,
                 .BeforeOutputs = std::move(beforeOutputs),
                 .Params = params,
             };
@@ -560,7 +477,7 @@ namespace Extrinsic::Runtime
         }
 
         using KMeansPointSnapshot =
-            std::shared_ptr<const std::vector<glm::vec3>>;
+            std::shared_ptr<const PointInputCapture>;
         using KMeansOutputPropertySnapshot =
             std::shared_ptr<const KMeansOutputPropertyState>;
 
@@ -595,12 +512,12 @@ namespace Extrinsic::Runtime
             const GeometryElementDomain domain =
                 identity.Properties.InputPositions.Domain;
             if (!view.Valid() ||
-                !SourceViewSupportsDomain(view, domain))
+                !SupportsGeometryElementDomain(BuildGeometryAvailability(raw, entity), domain))
             {
                 return EditorCommandHistoryStatus::UnsupportedOperation;
             }
             Geometry::PropertySet* properties =
-                TargetProperties(view, domain);
+                MutableGeometryProperties(raw, entity, domain);
             if (properties == nullptr)
                 return EditorCommandHistoryStatus::UnsupportedOperation;
 
@@ -630,12 +547,8 @@ namespace Extrinsic::Runtime
             if (entity == ECS::InvalidEntityHandle)
                 return EditorCommandHistoryStatus::StaleEntity;
 
-            GS::MutableSourceView view =
-                GS::BuildMutableView(raw, entity);
             Geometry::PropertySet* properties =
-                TargetProperties(
-                    view,
-                    snapshot.Command.Properties.InputPositions.Domain);
+                MutableGeometryProperties(raw, entity, snapshot.Command.Properties.InputPositions.Domain);
             if (properties == nullptr)
                 return EditorCommandHistoryStatus::UnsupportedOperation;
 
@@ -643,7 +556,7 @@ namespace Extrinsic::Runtime
                 BuildKMeansOutputPropertyState(
                     *properties,
                     snapshot.Command.Properties,
-                    clustered);
+                    clustered, snapshot.Slots);
             if (!after.has_value())
                 return EditorCommandHistoryStatus::CommandFailed;
 
@@ -656,8 +569,8 @@ namespace Extrinsic::Runtime
             if (history != nullptr)
             {
                 const KMeansPointSnapshot points =
-                    std::make_shared<std::vector<glm::vec3>>(
-                        snapshot.Points);
+                    std::make_shared<PointInputCapture>(PointInputCapture{
+                        .Points = snapshot.Points, .Slots = snapshot.Slots, .SlotCount = snapshot.SlotCount});
                 const KMeansOutputPropertySnapshot beforeState =
                     std::make_shared<KMeansOutputPropertyState>(
                         snapshot.BeforeOutputs);
@@ -713,35 +626,28 @@ namespace Extrinsic::Runtime
                                const GeometryElementDomain domain =
                                    mutation.Properties.InputPositions.Domain;
                                if (!currentView.Valid() ||
-                                   !SourceViewSupportsDomain(
-                                       currentView,
-                                       domain))
+                                   !SupportsGeometryElementDomain(BuildGeometryAvailability(currentRaw, currentEntity), domain))
                                {
                                    return EditorCommandHistoryStatus::
                                        UnsupportedOperation;
                                }
                                Geometry::PropertySet* currentProperties =
-                                   TargetProperties(
-                                       currentView,
-                                       domain);
+                                   MutableGeometryProperties(currentRaw, currentEntity, domain);
                                if (currentProperties == nullptr)
                                {
                                    return EditorCommandHistoryStatus::
                                        UnsupportedOperation;
                                }
 
-                               const std::optional<
-                                   std::vector<glm::vec3>>
-                                   currentPoints =
-                                       CollectFiniteGeometryPositions(
-                                           *currentProperties,
-                                           mutation.Properties
-                                               .InputPositions.Name);
+                               PointInputCapture currentPoints;
+                               auto positionRef = mutation.Properties.InputPositions;
+                               std::string diagnostic;
                                KMeansOutputPropertyState currentOutputs{};
-                               if (!currentPoints.has_value() ||
-                                   !GeometryValueComparison::BitEqual(
-                                       *currentPoints,
-                                       *expected.Points) ||
+                               if (!CapturePointInput(BuildGeometryAvailability(currentRaw, currentEntity),
+                                       positionRef, true, currentPoints, diagnostic) ||
+                                   currentPoints.SlotCount != expected.Points->SlotCount ||
+                                   currentPoints.Slots != expected.Points->Slots ||
+                                   !BitEqual(currentPoints.Points, expected.Points->Points) ||
                                    !CaptureKMeansOutputPropertyState(
                                        *currentProperties,
                                        mutation.Properties,
@@ -753,8 +659,8 @@ namespace Extrinsic::Runtime
                                    return EditorCommandHistoryStatus::
                                        StaleEntity;
                                }
-                               if (target->HadLabels &&
-                                   target->Labels.size() !=
+                               if (target->Labels.Exists &&
+                                   GeometryScalarPropertySize(target->Labels) !=
                                        currentProperties->Size())
                                {
                                    return EditorCommandHistoryStatus::
@@ -870,8 +776,7 @@ namespace Extrinsic::Runtime
 
             GS::MutableSourceView view = GS::BuildMutableView(raw, entity);
             if (!view.Valid() ||
-                !SourceViewSupportsDomain(
-                    view,
+                !SupportsGeometryElementDomain(BuildGeometryAvailability(raw, entity),
                     job.Snapshot.Command.Properties.InputPositions.Domain))
             {
                 stats.CommitsDropped += 1u;
@@ -885,9 +790,7 @@ namespace Extrinsic::Runtime
             }
 
             Geometry::PropertySet* properties =
-                TargetProperties(
-                    view,
-                    job.Snapshot.Command.Properties.InputPositions.Domain);
+                MutableGeometryProperties(raw, entity, job.Snapshot.Command.Properties.InputPositions.Domain);
             if (properties == nullptr)
             {
                 stats.CommitsDropped += 1u;
@@ -900,12 +803,12 @@ namespace Extrinsic::Runtime
                 return;
             }
 
-            std::optional<std::vector<glm::vec3>> current =
-                CollectFiniteGeometryPositions(
-                    *properties,
-                    job.Snapshot.Command.Properties.InputPositions.Name);
-            if (!current.has_value() ||
-                !GeometryValueComparison::BitEqual(*current, job.Snapshot.Points))
+            PointInputCapture current;
+            auto positionRef = job.Snapshot.Command.Properties.InputPositions;
+            std::string diagnostic;
+            if (!CapturePointInput(BuildGeometryAvailability(raw, entity), positionRef, true, current, diagnostic) ||
+                current.SlotCount != job.Snapshot.SlotCount || current.Slots != job.Snapshot.Slots ||
+                !BitEqual(current.Points, job.Snapshot.Points))
             {
                 stats.CommitsDropped += 1u;
                 KMeansRunCompleted dropped = job.Completion;

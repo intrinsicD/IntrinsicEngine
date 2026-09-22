@@ -1711,7 +1711,7 @@ namespace Extrinsic::Sandbox::Editor
                 KMeans.Dirty = true;
             }
             ImGui::SeparatorText("Output properties");
-            KMeans.Dirty |= DrawProcessingPropertyName("Labels##KMeans", KMeans.Properties.OutputLabels.Name);
+            KMeans.Dirty |= DrawProcessingScalarOutput("Labels##KMeans", KMeans.Properties.OutputLabels);
             KMeans.Dirty |= DrawProcessingPropertyName("Colors##KMeans", KMeans.Properties.OutputColors.Name);
             bool scalarLabels = KMeans.Properties.OutputScalarLabels.has_value();
             if (ImGui::Checkbox("Publish scalar labels##KMeans", &scalarLabels))
@@ -1721,7 +1721,7 @@ namespace Extrinsic::Sandbox::Editor
                 else KMeans.Properties.OutputScalarLabels.reset();
                 KMeans.Dirty = true;
             }
-            if (scalarLabels) KMeans.Dirty |= DrawProcessingPropertyName("Scalar labels##KMeans", KMeans.Properties.OutputScalarLabels->Name);
+            if (scalarLabels) KMeans.Dirty |= DrawProcessingScalarOutput("Scalar labels##KMeans", *KMeans.Properties.OutputScalarLabels);
 
             KMeans.Backend = std::clamp(
                 KMeans.Backend,

@@ -30,6 +30,7 @@ import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Types;
 import :GpuBackend;
 import Geometry.KMeans;
+import Extrinsic.Runtime.GeometryAvailability;
 
 #include "Modules/Clustering/Runtime.ClusteringGpuState.Internal.hpp"
 

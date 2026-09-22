@@ -1181,13 +1181,13 @@ namespace Extrinsic::Runtime
                 {
                     auto properties = config.Properties.value_or(KMeansPropertyRefs{});
                     ReadPropertyRef(context, *bindings, "positions", properties.InputPositions, true);
-                    ReadPropertyRef(context, *bindings, "labels", properties.OutputLabels, true);
+                    ReadPropertyRef(context, *bindings, "labels", properties.OutputLabels, true, true);
                     ReadPropertyRef(context, *bindings, "colors", properties.OutputColors, true);
                     if (bindings->contains("scalar_labels") && !bindings->at("scalar_labels").is_null())
                     {
                         properties.OutputScalarLabels = Runtime::GeometryPropertyRef{
                             properties.InputPositions.Domain, "v:kmeans_scalar_label", Geometry::PropertyValueKind::Float};
-                        ReadPropertyRef(context, *bindings, "scalar_labels", *properties.OutputScalarLabels, true);
+                        ReadPropertyRef(context, *bindings, "scalar_labels", *properties.OutputScalarLabels, true, true);
                     }
                     else properties.OutputScalarLabels.reset();
                     const bool valid = bindings->is_object() && IsValidKMeansPropertyBindings(properties);
