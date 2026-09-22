@@ -284,7 +284,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
             const Geometry::PropertySet* properties,
             const std::size_t deletedCount,
             const std::uint64_t domainTag,
-            const std::span<const std::string_view> propertyNames)
+            const std::span<const std::string_view> propertyNames,
+            const std::string_view deletionProperty)
         {
             MixSignature(signature, domainTag);
             if (properties == nullptr)
@@ -294,6 +295,17 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
                          static_cast<std::uint64_t>(properties->Size()));
             MixSignature(signature,
                          static_cast<std::uint64_t>(deletedCount));
+            // Equal deletion counts can still select different source rows.
+            const bool hasMask = properties->Exists(deletionProperty);
+            MixSignature(signature, hasMask ? 1u : 0u);
+            if (hasMask)
+            {
+                const auto mask = properties->Get<bool>(deletionProperty);
+                if (!mask || mask.Size() != properties->Size())
+                    return false;
+                for (const bool deleted : mask.Vector())
+                    MixSignature(signature, deleted ? 1u : 0u);
+            }
             for (const std::string_view name : propertyNames)
             {
                 const auto values = properties->Get<std::uint32_t>(name);
@@ -335,7 +347,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
                     view.EdgeSource != nullptr ? view.EdgeSource->NumDeleted
                                                : 0u,
                     1u,
-                    kEdgeNames) ||
+                    kEdgeNames, "e:deleted") ||
                 !AppendTopologyValueSignature(
                     signature,
                     view.HalfedgeSource != nullptr
@@ -343,7 +355,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
                         : nullptr,
                     0u,
                     2u,
-                    kHalfedgeNames) ||
+                    kHalfedgeNames, "h:deleted") ||
                 !AppendTopologyValueSignature(
                     signature,
                     view.FaceSource != nullptr ? &view.FaceSource->Properties
@@ -351,7 +363,14 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
                     view.FaceSource != nullptr ? view.FaceSource->NumDeleted
                                                : 0u,
                     3u,
-                    kFaceNames))
+                    kFaceNames, "f:deleted") ||
+                !AppendTopologyValueSignature(
+                    signature,
+                    view.VertexSource != nullptr ? &view.VertexSource->Properties
+                                                 : nullptr,
+                    view.VertexSource != nullptr ? view.VertexSource->NumDeleted
+                                                 : 0u,
+                    4u, {}, "v:deleted"))
             {
                 return std::nullopt;
             }
