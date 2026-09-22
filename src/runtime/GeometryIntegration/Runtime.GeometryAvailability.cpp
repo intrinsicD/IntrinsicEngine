@@ -3,6 +3,10 @@ module;
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <bit>
+#include <variant>
+#include <span>
+#include <vector>
 #include <limits>
 #include <type_traits>
 #include <string_view>
@@ -35,7 +39,8 @@ namespace Extrinsic::Runtime
         }
         template<class Input> bool PrepareScalar(
             GeometryScalarPropertySnapshot& snapshot, Geometry::PropertyValueKind kind,
-            std::size_t count, std::span<const std::uint32_t> slots, std::span<const Input> values)
+            std::size_t count, std::span<const std::uint32_t> slots, std::span<const Input> values,
+            GeometryScalarNonfinitePolicy nonfinite)
         {
             return VisitScalarKind(kind, [&]<class T>() {
                 if constexpr (std::is_void_v<T>) return false;
@@ -48,7 +53,15 @@ namespace Extrinsic::Runtime
                     {
                         if (slot >= count || slot >= values.size()) return false;
                         const long double value = values[slot];
-                        if (!std::isfinite(value)) return false;
+                        if (!std::isfinite(value))
+                        {
+                            if constexpr (std::is_floating_point_v<T>)
+                            {
+                                if (nonfinite == GeometryScalarNonfinitePolicy::AllowInfinity && std::isinf(value))
+                                { output[slot] = static_cast<T>(value); continue; }
+                            }
+                            return false;
+                        }
                         if constexpr (std::is_integral_v<T>)
                         {
                             // The exclusive power-of-two bound avoids rounding UINT64_MAX
@@ -70,6 +83,34 @@ namespace Extrinsic::Runtime
         }
     }
 
+    std::size_t GeometryScalarPropertySize(const GeometryScalarPropertySnapshot& snapshot) noexcept
+    {
+        return snapshot.Exists ? std::visit([](const auto& values) { return values.size(); }, snapshot.Values) : 0;
+    }
+    bool SameGeometryScalarPropertySnapshot(const GeometryScalarPropertySnapshot& lhs,
+                                            const GeometryScalarPropertySnapshot& rhs) noexcept
+    {
+        if (lhs.Exists != rhs.Exists) return false;
+        if (!lhs.Exists) return true;
+        if (lhs.Values.index() != rhs.Values.index()) return false;
+        return std::visit([&](const auto& values) {
+            using Vector = std::decay_t<decltype(values)>;
+            using T = typename Vector::value_type;
+            const auto& other = std::get<Vector>(rhs.Values);
+            if (values.size() != other.size()) return false;
+            for (std::size_t i = 0; i < values.size(); ++i)
+            {
+                if constexpr (std::is_floating_point_v<T>)
+                {
+                    using Bits = std::conditional_t<sizeof(T) == 4, std::uint32_t, std::uint64_t>;
+                    if (std::bit_cast<Bits>(values[i]) != std::bit_cast<Bits>(other[i])) return false;
+                }
+                else if (values[i] != other[i]) return false;
+            }
+            return true;
+        }, lhs.Values);
+    }
+
     GeometryScalarPropertySnapshot CaptureGeometryScalarProperty(
         const Geometry::PropertySet& properties, const GeometryPropertyRef& ref)
     {
@@ -86,16 +127,16 @@ namespace Extrinsic::Runtime
     }
     bool PrepareGeometryScalarProperty(GeometryScalarPropertySnapshot& snapshot,
         Geometry::PropertyValueKind kind, std::size_t count,
-        std::span<const std::uint32_t> slots, std::span<const float> values)
-    { return PrepareScalar(snapshot, kind, count, slots, values); }
+        std::span<const std::uint32_t> slots, std::span<const float> values, GeometryScalarNonfinitePolicy nonfinite)
+    { return PrepareScalar(snapshot, kind, count, slots, values, nonfinite); }
     bool PrepareGeometryScalarProperty(GeometryScalarPropertySnapshot& snapshot,
         Geometry::PropertyValueKind kind, std::size_t count,
-        std::span<const std::uint32_t> slots, std::span<const double> values)
-    { return PrepareScalar(snapshot, kind, count, slots, values); }
+        std::span<const std::uint32_t> slots, std::span<const double> values, GeometryScalarNonfinitePolicy nonfinite)
+    { return PrepareScalar(snapshot, kind, count, slots, values, nonfinite); }
     bool PrepareGeometryScalarProperty(GeometryScalarPropertySnapshot& snapshot,
         Geometry::PropertyValueKind kind, std::size_t count,
-        std::span<const std::uint32_t> slots, std::span<const std::uint32_t> values)
-    { return PrepareScalar(snapshot, kind, count, slots, values); }
+        std::span<const std::uint32_t> slots, std::span<const std::uint32_t> values, GeometryScalarNonfinitePolicy nonfinite)
+    { return PrepareScalar(snapshot, kind, count, slots, values, nonfinite); }
     void ApplyGeometryScalarProperty(Geometry::PropertySet& properties,
         const GeometryPropertyRef& ref, const GeometryScalarPropertySnapshot& snapshot)
     {
