@@ -14,6 +14,7 @@ module;
 #include <limits>
 #include <memory>
 #include <optional>
+#include <numeric>
 #include <span>
 #include <string>
 #include <string_view>
@@ -84,13 +85,6 @@ namespace Extrinsic::Runtime
         using MeshSupport::FindActiveEditorJob;
         using MeshSupport::InvalidateSelectedModelCache;
 
-        inline constexpr std::array<std::string_view, 4>
-            kObsoleteProgressivePoissonProperties{
-                "p:poisson_level",
-                "p:poisson_phase",
-                "p:poisson_splat_radius",
-                "p:poisson_prefix_visible",
-            };
         inline constexpr const char* kProgressivePoissonCpuBackendDisplayName =
             "CPU reference";
         inline constexpr const char* kProgressivePoissonGpuBackendId =
@@ -216,10 +210,10 @@ namespace Extrinsic::Runtime
             const std::uint32_t prefixCount, const ProgressivePoissonPlaygroundConfig& config)
         {
             const std::size_t pointCount = properties.Size();
-            std::vector<float> levels(pointCount, -1.0f);
-            std::vector<float> ranks(pointCount, -1.0f);
-            std::vector<float> splatRadii(pointCount, 0.0f);
-            std::vector<float> prefixVisible(pointCount, 0.0f);
+            std::vector<double> levels(pointCount, -1.0);
+            std::vector<double> ranks(pointCount, -1.0);
+            std::vector<double> splatRadii(pointCount, 0.0);
+            std::vector<double> prefixVisible(pointCount, 0.0);
 
             for (std::size_t level = 0u;
                  level + 1u < method.LevelOffsets.size();
@@ -235,43 +229,30 @@ namespace Extrinsic::Runtime
                     if (pointIndex >= pointCount)
                         return false;
 
-                    levels[pointIndex] = static_cast<float>(level);
-                    ranks[pointIndex] = static_cast<float>(rank);
+                    levels[pointIndex] = static_cast<double>(level);
+                    ranks[pointIndex] = static_cast<double>(rank);
                     if (rank < method.SplatRadii.size())
                         splatRadii[pointIndex] = method.SplatRadii[rank];
                     prefixVisible[pointIndex] = rank < prefixCount ? 1.0f : 0.0f;
                 }
             }
 
-            auto levelProp = properties.GetOrAdd<float>(
-                config.Level.Name,
-                -1.0f);
-            auto rankProp = properties.GetOrAdd<float>(
-                config.Rank.Name,
-                -1.0f);
-            auto splatProp = properties.GetOrAdd<float>(
-                config.SplatRadius.Name,
-                0.0f);
-            auto prefixProp = properties.GetOrAdd<float>(
-                config.PrefixVisible.Name,
-                0.0f);
-            if (!levelProp || !rankProp || !splatProp || !prefixProp)
-                return false;
-
-            levelProp.Vector() = std::move(levels);
-            rankProp.Vector() = std::move(ranks);
-            splatProp.Vector() = std::move(splatRadii);
-            prefixProp.Vector() = std::move(prefixVisible);
-            const ProgressivePoissonPlaygroundConfig defaults;
-            const bool canonicalOutputs = config.Level.Name == defaults.Level.Name && config.Rank.Name == defaults.Rank.Name &&
-                config.SplatRadius.Name == defaults.SplatRadius.Name && config.PrefixVisible.Name == defaults.PrefixVisible.Name;
-            if (canonicalOutputs)
-            for (const std::string_view obsolete :
-                 kObsoleteProgressivePoissonProperties)
+            const std::array refs{&config.Level, &config.Rank, &config.SplatRadius, &config.PrefixVisible};
+            const std::array values{&levels, &ranks, &splatRadii, &prefixVisible};
+            std::vector<std::uint32_t> slots(pointCount);
+            std::iota(slots.begin(), slots.end(), 0u);
+            std::array<GeometryScalarPropertySnapshot, 4> outputs;
+            for (std::size_t i = 0; i < refs.size(); ++i)
             {
-                if (const auto id = properties.Registry().Find(obsolete))
-                    (void)properties.Registry().Remove(*id);
+                outputs[i] = CaptureGeometryScalarProperty(properties, *refs[i]);
+                if ((properties.Exists(refs[i]->Name) && !outputs[i].Exists) ||
+                    !PrepareGeometryScalarProperty(outputs[i], refs[i]->ValueKind, pointCount, slots, *values[i]))
+                    return false;
             }
+            Geometry::PropertySet staged = properties;
+            for (std::size_t i = 0; i < refs.size(); ++i)
+                if (!ApplyGeometryScalarProperty(staged, *refs[i], outputs[i])) return false;
+            properties = std::move(staged);
             return true;
         }
 
@@ -458,7 +439,7 @@ namespace Extrinsic::Runtime
                     EditorCommandStatus::GeometryProcessingFailed;
                 result.Error = Core::ErrorCode::InvalidState;
                 result.Message =
-                    "Progressive Poisson property publication failed.";
+                    "Progressive Poisson output storage cannot represent the result or has an incompatible shape.";
                 return result;
             }
 
@@ -1270,6 +1251,22 @@ namespace Extrinsic::Runtime
                     Core::ErrorCode::InvalidArgument,
                     "Progressive Poisson sampling requires a non-empty vec3 position property at source cardinality.");
                 return std::nullopt;
+            }
+            for (const auto* output : {&command.Config.Level, &command.Config.Rank,
+                                       &command.Config.SplatRadius, &command.Config.PrefixVisible})
+            {
+                auto ref = *output;
+                ref.Domain = *vertexDomain;
+                if (IsTopologyProperty(ref.Domain, ref.Name) ||
+                    ((ref.Domain == GeometryElementDomain::MeshVertex || ref.Domain == GeometryElementDomain::GraphNode ||
+                      ref.Domain == GeometryElementDomain::PointCloudPoint) && ref.Name == "v:position") ||
+                    (properties->Exists(ref.Name) && !ResolveGeometryProperty(availability, ref, properties->Size(), false).Resolved()))
+                {
+                    result = MakeProgressivePoissonResult(EditorCommandStatus::InvalidProcessingParameters,
+                        command.Config.Channel, Core::ErrorCode::InvalidArgument,
+                        "Progressive Poisson outputs require non-structural, count-matched storage of the declared scalar kind.");
+                    return std::nullopt;
+                }
             }
             return ProgressivePoissonInput{*entity, *vertexDomain, properties};
         }

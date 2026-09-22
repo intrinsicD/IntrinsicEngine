@@ -504,7 +504,7 @@ TEST(SandboxEditorUi,
             properties.Get<float>("v:test_weight").Vector(),
             weights);
         EXPECT_FALSE(properties.Exists("p:poisson_level"));
-        EXPECT_FALSE(properties.Exists("p:poisson_phase"));
+        EXPECT_EQ(properties.Get<float>("p:poisson_phase")[0], 9.0f);
 
         std::size_t rejectedCount = 0u;
         for (std::size_t index = 0u; index < positions.size(); ++index)
@@ -3470,5 +3470,97 @@ TEST(SandboxEditorUi, KMeansBindingPredicateMatchesConfigKindsNamesAndDomains)
         EXPECT_FALSE(Runtime::ValidateClusteringConfigSection(
             Runtime::SerializeClusteringConfig(config), Runtime::SerializeClusteringConfig({}),
             "test.clustering").Usable());
+    }
+}
+
+TEST(SandboxEditorUi, ProgressivePoissonScalarKindsRoundTripPublishAndUndoExactly)
+{
+    for (const bool queued : {false, true})
+    {
+        SCOPED_TRACE(queued);
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        Runtime::EditorCommandHistory history;
+        auto context = MakeContext(registry, selection);
+        context.CommandHistory = &history;
+        const auto cloud = MakePointCloudEntity(registry, "TypedPoisson",
+            {{0.f, 0.f, 0.f}, {1.f, 0.f, 0.f}, {0.f, 1.f, 0.f}, {1.f, 1.f, 0.f}});
+        auto& props = registry.Raw().get<GS::Vertices>(cloud).Properties;
+        props.GetOrAdd<std::int32_t>("levels", -9);
+        props.GetOrAdd<double>("ranks", -8.0);
+        props.GetOrAdd<double>("radii", -7.0);
+        props.GetOrAdd<bool>("visible", true);
+        props.GetOrAdd<std::uint64_t>("unrelated", 9223372036854775809ull);
+        Runtime::EditorProgressivePoissonCommand command{
+            .StableEntityId = Runtime::SelectionController::ToStableEntityId(cloud)};
+        command.Config.Level = {Runtime::GeometryElementDomain::PointCloudPoint, "levels", Geometry::PropertyValueKind::Int32};
+        command.Config.Rank = {Runtime::GeometryElementDomain::PointCloudPoint, "ranks", Geometry::PropertyValueKind::Double};
+        command.Config.SplatRadius = {Runtime::GeometryElementDomain::PointCloudPoint, "radii", Geometry::PropertyValueKind::Double};
+        command.Config.PrefixVisible = {Runtime::GeometryElementDomain::PointCloudPoint, "visible", Geometry::PropertyValueKind::Bool};
+        command.Config.Positions.Domain = Runtime::GeometryElementDomain::PointCloudPoint;
+        command.Config.PrefixCount = 1;
+        Core::Config::EngineConfig config;
+        Runtime::SetProgressivePoissonPlaygroundConfig(config, command.Config);
+        const auto decoded = Runtime::GetProgressivePoissonPlaygroundConfig(config);
+        ASSERT_TRUE(decoded);
+        EXPECT_EQ(decoded->Level, command.Config.Level);
+        EXPECT_EQ(decoded->Rank, command.Config.Rank);
+        EXPECT_EQ(decoded->SplatRadius, command.Config.SplatRadius);
+        EXPECT_EQ(decoded->PrefixVisible, command.Config.PrefixVisible);
+        Extrinsic::Tests::EditorJobHarness jobs;
+        if (queued) jobs.Attach(context);
+        const auto run = [&] {
+            const auto result = Runtime::ApplyEditorProgressivePoissonCommand(context, command);
+            if (queued) { EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::Pending); EXPECT_TRUE(jobs.DrainUntilTerminal()); }
+            else EXPECT_TRUE(result.Succeeded()) << result.Message;
+        };
+        run();
+        auto current = [&]() -> Geometry::PropertySet& { return registry.Raw().get<GS::Vertices>(cloud).Properties; };
+        const auto publishedLevels = current().Get<std::int32_t>("levels").Vector();
+        const auto publishedRanks = current().Get<double>("ranks").Vector();
+        EXPECT_EQ(std::count(current().Get<bool>("visible").Vector().begin(),
+                             current().Get<bool>("visible").Vector().end(), true), 1);
+        ASSERT_TRUE(history.Undo().Succeeded());
+        EXPECT_EQ(current().Get<std::int32_t>("levels").Vector(), std::vector<std::int32_t>(4, -9));
+        EXPECT_EQ(current().Get<double>("ranks").Vector(), std::vector<double>(4, -8.0));
+        EXPECT_EQ(current().Get<double>("radii").Vector(), std::vector<double>(4, -7.0));
+        EXPECT_EQ(current().Get<bool>("visible").Vector(), std::vector<bool>(4, true));
+        ASSERT_TRUE(history.Redo().Succeeded());
+        EXPECT_EQ(current().Get<std::int32_t>("levels").Vector(), publishedLevels);
+        EXPECT_EQ(current().Get<double>("ranks").Vector(), publishedRanks);
+        command.Config.PrefixCount = 2;
+        run();
+        EXPECT_EQ(std::count(current().Get<bool>("visible").Vector().begin(),
+                             current().Get<bool>("visible").Vector().end(), true), 2);
+        EXPECT_EQ(current().Get<std::uint64_t>("unrelated")[0], 9223372036854775809ull);
+    }
+}
+
+TEST(SandboxEditorUi, ProgressivePoissonRejectsUnrepresentableOutputsWithoutPartialPublication)
+{
+    for (unsigned failure = 0; failure < 3; ++failure)
+    {
+        SCOPED_TRACE(failure);
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        Runtime::EditorCommandHistory history;
+        auto context = MakeContext(registry, selection);
+        context.CommandHistory = &history;
+        const auto cloud = MakePointCloudEntity(registry, "RejectedTypedPoisson",
+            {{0.f, 0.f, 0.f}, {1.f, 0.f, 0.f}, {0.f, 1.f, 0.f}, {1.f, 1.f, 0.f}, {0.f, 0.f, 0.f}});
+        auto& props = registry.Raw().get<GS::Vertices>(cloud).Properties;
+        const auto before = props.Get<glm::vec3>(PN::kPosition).Vector();
+        Runtime::EditorProgressivePoissonCommand command{
+            .StableEntityId = Runtime::SelectionController::ToStableEntityId(cloud)};
+        if (failure == 0) command.Config.Rank.ValueKind = Geometry::PropertyValueKind::Bool;
+        if (failure == 1) command.Config.Level.ValueKind = Geometry::PropertyValueKind::UInt64;
+        if (failure == 2) command.Config.SplatRadius.ValueKind = Geometry::PropertyValueKind::UInt32;
+        const auto result = Runtime::ApplyEditorProgressivePoissonCommand(context, command);
+        EXPECT_FALSE(result.Succeeded());
+        EXPECT_EQ(history.UndoCount(), 0u);
+        for (const auto* output : {&command.Config.Level, &command.Config.Rank,
+                                   &command.Config.SplatRadius, &command.Config.PrefixVisible})
+            EXPECT_FALSE(registry.Raw().get<GS::Vertices>(cloud).Properties.Exists(output->Name));
+        EXPECT_EQ(registry.Raw().get<GS::Vertices>(cloud).Properties.Get<glm::vec3>(PN::kPosition).Vector(), before);
     }
 }

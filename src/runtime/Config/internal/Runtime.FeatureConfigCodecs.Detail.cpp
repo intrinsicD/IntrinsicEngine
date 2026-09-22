@@ -1824,10 +1824,10 @@ namespace Extrinsic::Runtime
                 CountParsed(context);
             }
             ReadPropertyRef(context, *object, "positions", config.Positions, true);
-            ReadPropertyRef(context, *object, "level_property", config.Level, true);
-            ReadPropertyRef(context, *object, "rank_property", config.Rank, true);
-            ReadPropertyRef(context, *object, "splat_radius_property", config.SplatRadius, true);
-            ReadPropertyRef(context, *object, "prefix_visible_property", config.PrefixVisible, true);
+            ReadPropertyRef(context, *object, "level_property", config.Level, true, true);
+            ReadPropertyRef(context, *object, "rank_property", config.Rank, true, true);
+            ReadPropertyRef(context, *object, "splat_radius_property", config.SplatRadius, true, true);
+            ReadPropertyRef(context, *object, "prefix_visible_property", config.PrefixVisible, true, true);
             if (!IsValidProgressivePoissonPropertyBindings(config) && context.Result)
             {
                 context.Result->State = Core::Config::EngineConfigState::Invalid;
@@ -2407,10 +2407,11 @@ namespace Extrinsic::Runtime
         {
             const auto& ref = *refs[i];
             if (!ref.HasName() || ref.Name.find('\0') != std::string::npos ||
-                ref.Name.ends_with(":deleted") ||
+                IsTopologyProperty(ref.Domain, ref.Name) ||
+                (ref.Domain == GeometryElementDomain::Unknown && ref.Name == "v:deleted") ||
                 ref.Domain > GeometryElementDomain::PointCloudPoint ||
-                ref.ValueKind != (i == 0 ? Geometry::PropertyValueKind::Vec3
-                                        : Geometry::PropertyValueKind::Float))
+                (i == 0 ? ref.ValueKind != Geometry::PropertyValueKind::Vec3
+                        : GeometryPropertyComponentCount(ref.ValueKind) != 1))
                 return false;
             if (i != 0 && ref.Domain != GeometryElementDomain::Unknown &&
                 ref.Domain != config.Positions.Domain)
