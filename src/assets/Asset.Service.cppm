@@ -35,7 +35,7 @@ export namespace Extrinsic::Assets
     class AssetService
     {
     public:
-        AssetService();
+        explicit AssetService(AssetLoadPipelineTestHooks testHooks = {});
         ~AssetService();
         AssetService(const AssetService&) = delete;
         AssetService& operator=(const AssetService&) = delete;
@@ -67,6 +67,7 @@ export namespace Extrinsic::Assets
 
         Core::Result Destroy(AssetId id);
         void Tick();
+        // Main-thread completion joins state/event publication before draining callbacks.
         Core::Result CompleteCpuLoadAndFlushEvent(AssetId id);
 
         template <class T>

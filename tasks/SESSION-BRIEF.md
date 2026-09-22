@@ -8,6 +8,7 @@ picking backlog work; theme priorities and rationale live in
 
 ## Active tasks
 
+- `BUG-172` — Synchronous CPU completion can observe an unfinished or stale load transition (tasks/active/BUG-172-synchronous-cpu-load-completion-race.md)
 - `BUG-194` — Large-mesh property display and geodesic controls (tasks/active/BUG-194-large-mesh-property-display.md)
 - `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/active/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
@@ -141,7 +142,6 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BENCH-001` — Framework24 golden-workflow comparison harness (tasks/backlog/benchmarks/BENCH-001-framework24-golden-workflow-comparison-harness.md)
 - unblocked: `BUG-160` — FastStaged fixed seed planes fragment smooth meshes into tiny charts (tasks/backlog/bugs/BUG-160-fast-staged-atlas-chart-fragmentation.md)
 - unblocked: `BUG-171` — Required development receipts cannot be superseded by a passing rerun (tasks/backlog/bugs/BUG-171-required-command-receipt-supersession.md)
-- unblocked: `BUG-172` — Synchronous CPU completion can observe an unfinished or stale load transition (tasks/backlog/bugs/BUG-172-synchronous-cpu-load-completion-race.md)
 - unblocked: `GRAPHICS-135` — Measure current render-prep scheduling and material-sync overhead (tasks/backlog/rendering/GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md)
 - blocked by `BENCH-001`: `REVIEW-004` — Framework24 product-convergence audit (tasks/backlog/architecture/REVIEW-004-framework24-product-convergence-audit.md)
 - unblocked: `RUNTIME-218` — Nothing in the scene is ever lit: add default lighting and light authoring (tasks/backlog/runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md)

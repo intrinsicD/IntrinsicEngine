@@ -1,16 +1,20 @@
 #include <gtest/gtest.h>
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdlib>
 #include <expected>
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
  
 import Extrinsic.Asset.Service;
+import Extrinsic.Asset.LoadPipeline;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.EventBus;
 import Extrinsic.Asset.PayloadStore;
@@ -109,6 +113,119 @@ namespace
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
     }
+
+    struct PausedCpuCompletion
+    {
+        std::mutex mutex;
+        std::condition_variable changed;
+        bool entered = false;
+        bool released = false;
+        bool completionStarted = false;
+        bool completionReturned = false;
+
+        void Pause()
+        {
+            std::unique_lock lock(mutex);
+            entered = true;
+            changed.notify_all();
+            changed.wait(lock, [&] { return released; });
+        }
+
+        void Release()
+        {
+            std::scoped_lock lock(mutex);
+            released = true;
+            changed.notify_all();
+        }
+    };
+
+    template <class Operation>
+    Core::Result RunWhileWinnerPaused(const std::shared_ptr<PausedCpuCompletion>& pause,
+                                     Operation operation)
+    {
+        bool returnedWhilePaused = false;
+        std::thread controller([&]
+        {
+            std::unique_lock lock(pause->mutex);
+            pause->changed.wait(lock, [&] { return pause->completionStarted; });
+            // The winner is deterministically stopped inside its transition.
+            // This bounded observation checks that completion cannot return
+            // before release; it is not a budget for finishing the load.
+            returnedWhilePaused = pause->changed.wait_for(
+                lock, std::chrono::milliseconds(100),
+                [&] { return pause->completionReturned; });
+            pause->released = true;
+            pause->changed.notify_all();
+        });
+
+        {
+            std::scoped_lock lock(pause->mutex);
+            pause->completionStarted = true;
+            pause->changed.notify_all();
+        }
+        const auto completed = operation();
+        {
+            std::scoped_lock lock(pause->mutex);
+            pause->completionReturned = true;
+            pause->changed.notify_all();
+        }
+        controller.join();
+
+        EXPECT_FALSE(returnedWhilePaused);
+        return completed;
+    }
+
+    void VerifyCompleteCpuLoadJoinsWinner(const bool pauseBeforeReadyEvent)
+    {
+        ASSERT_FALSE(Tasks::Scheduler::IsInitialized());
+        SchedulerScope scheduler(1u);
+        ASSERT_TRUE(scheduler.Owned());
+
+        auto pause = std::make_shared<PausedCpuCompletion>();
+        AssetLoadPipelineTestHooks hooks;
+        auto pauseWinner = [pause](AssetId) { pause->Pause(); };
+        if (pauseBeforeReadyEvent)
+            hooks.BeforeCpuReadyEvent = pauseWinner;
+        else
+            hooks.AfterCpuDecodeClaim = pauseWinner;
+
+        AssetService svc(std::move(hooks));
+        TmpFile file(pauseBeforeReadyEvent
+            ? "svc_complete_paused_ready_event.bin"
+            : "svc_complete_paused_decode_claim.bin");
+        std::vector<AssetEvent> events;
+        (void)svc.SubscribeAll([&](AssetId, AssetEvent event)
+        {
+            events.push_back(event);
+        });
+
+        auto id = svc.Load<Mesh>(file.path.string(), MeshLoader(10));
+        if (!id.has_value())
+            pause->Release();
+        ASSERT_TRUE(id.has_value());
+
+        bool entered = false;
+        {
+            std::unique_lock lock(pause->mutex);
+            entered = pause->changed.wait_for(lock, std::chrono::seconds(2),
+                [&] { return pause->entered; });
+        }
+        if (!entered)
+            pause->Release();
+        ASSERT_TRUE(entered);
+
+        const auto completed = RunWhileWinnerPaused(pause, [&]
+        {
+            return svc.CompleteCpuLoadAndFlushEvent(*id);
+        });
+        ASSERT_TRUE(completed.has_value());
+        EXPECT_EQ(svc.GetMeta(*id).value().state, AssetState::Ready);
+        ASSERT_EQ(events.size(), 1u);
+        EXPECT_EQ(events.front(), AssetEvent::Ready);
+        svc.Tick();
+        EXPECT_EQ(events.size(), 1u);
+    }
+
 }
  
 // -----------------------------------------------------------------------------
@@ -182,6 +299,174 @@ TEST(AssetService, CompleteCpuLoadAndFlushEventIgnoresUnrelatedSchedulerWork)
     EXPECT_TRUE(blockerFinished.load(std::memory_order_acquire));
 }
  
+TEST(AssetService, CompleteCpuLoadAndFlushEventWaitsForClaimedDecode)
+{
+    VerifyCompleteCpuLoadJoinsWinner(false);
+}
+
+TEST(AssetService, CompleteCpuLoadAndFlushEventWaitsForReadyPublication)
+{
+    VerifyCompleteCpuLoadJoinsWinner(true);
+}
+
+TEST(AssetService, CompleteCpuLoadAndFlushEventRejectsFailedAsset)
+{
+    ASSERT_FALSE(Tasks::Scheduler::IsInitialized());
+    TmpFile file("svc_complete_failed.bin");
+    AssetService svc;
+    const auto id = svc.Load<Mesh>(file.path.string(), MeshLoader(10));
+    ASSERT_TRUE(id.has_value());
+    ASSERT_TRUE(svc.ForceAssetState(*id, AssetState::Ready, AssetState::Failed).has_value());
+
+    const auto completed = svc.CompleteCpuLoadAndFlushEvent(*id);
+    ASSERT_FALSE(completed.has_value());
+    EXPECT_EQ(completed.error(), ErrorCode::InvalidState);
+    EXPECT_EQ(svc.GetMeta(*id).value().state, AssetState::Failed);
+}
+
+TEST(AssetService, CompleteCpuLoadAndFlushEventRejectsDestroyedAndStaleIds)
+{
+    ASSERT_FALSE(Tasks::Scheduler::IsInitialized());
+    TmpFile file("svc_complete_stale.bin");
+    AssetService svc;
+    const auto id = svc.Load<Mesh>(file.path.string(), MeshLoader(10));
+    ASSERT_TRUE(id.has_value());
+    ASSERT_TRUE(svc.Destroy(*id).has_value());
+
+    const auto destroyed = svc.CompleteCpuLoadAndFlushEvent(*id);
+    ASSERT_FALSE(destroyed.has_value());
+    EXPECT_EQ(destroyed.error(), ErrorCode::ResourceNotFound);
+
+    const auto replacement = svc.Load<Mesh>(file.path.string(), MeshLoader(20));
+    ASSERT_TRUE(replacement.has_value());
+    ASSERT_EQ(replacement->Index, id->Index);
+    ASSERT_NE(replacement->Generation, id->Generation);
+    const auto stale = svc.CompleteCpuLoadAndFlushEvent(*id);
+    ASSERT_FALSE(stale.has_value());
+    EXPECT_EQ(stale.error(), ErrorCode::ResourceNotFound);
+    EXPECT_TRUE(svc.CompleteCpuLoadAndFlushEvent(*replacement).has_value());
+}
+
+TEST(AssetService, DestroyWaitsForReadyPublication)
+{
+    ASSERT_FALSE(Tasks::Scheduler::IsInitialized());
+    SchedulerScope scheduler(1u);
+    auto pause = std::make_shared<PausedCpuCompletion>();
+    AssetLoadPipelineTestHooks hooks;
+    hooks.BeforeCpuReadyEvent = [pause](AssetId) { pause->Pause(); };
+    AssetService svc(std::move(hooks));
+    TmpFile file("svc_destroy_paused_ready_event.bin");
+    std::vector<AssetEvent> events;
+    bool destroyReturned = false;
+    (void)svc.SubscribeAll([&](AssetId, AssetEvent event)
+    {
+        if (event == AssetEvent::Ready)
+            EXPECT_FALSE(destroyReturned);
+        events.push_back(event);
+    });
+    const auto id = svc.Load<Mesh>(file.path.string(), MeshLoader(10));
+    if (!id.has_value())
+        pause->Release();
+    ASSERT_TRUE(id.has_value());
+    bool entered = false;
+    {
+        std::unique_lock lock(pause->mutex);
+        entered = pause->changed.wait_for(lock, std::chrono::seconds(2),
+            [&] { return pause->entered; });
+    }
+    if (!entered)
+        pause->Release();
+    ASSERT_TRUE(entered);
+
+    const auto destroyed = RunWhileWinnerPaused(pause, [&]
+    {
+        const auto result = svc.Destroy(*id);
+        destroyReturned = true;
+        return result;
+    });
+    ASSERT_TRUE(destroyed.has_value());
+    ASSERT_EQ(events.size(), 1u);
+    EXPECT_EQ(events[0], AssetEvent::Ready);
+    // Ensure the scheduled winner has exited before checking for late events.
+    Tasks::Scheduler::WaitForAll();
+    svc.Tick();
+    ASSERT_EQ(events.size(), 2u);
+    EXPECT_EQ(events[1], AssetEvent::Destroyed);
+    EXPECT_FALSE(svc.IsAlive(*id));
+}
+
+TEST(AssetService, MarkFailedWaitsForClaimedDecode)
+{
+    ASSERT_FALSE(Tasks::Scheduler::IsInitialized());
+    SchedulerScope scheduler(1u);
+    auto pause = std::make_shared<PausedCpuCompletion>();
+    AssetLoadPipelineTestHooks hooks;
+    hooks.AfterCpuDecodeClaim = [pause](AssetId) { pause->Pause(); };
+    AssetRegistry registry;
+    AssetEventBus bus;
+    AssetLoadPipeline pipeline(std::move(hooks));
+    pipeline.BindRegistry(&registry);
+    pipeline.BindEventBus(&bus);
+    const auto id = registry.Create(0u, 0u).value();
+    std::vector<AssetEvent> events;
+    (void)bus.SubscribeAll([&](AssetId, AssetEvent event) { events.push_back(event); });
+    const auto queued = pipeline.EnqueueIO(LoadRequest{.id = id});
+    bool entered = false;
+    {
+        std::unique_lock lock(pause->mutex);
+        entered = pause->changed.wait_for(lock, std::chrono::seconds(2),
+            [&] { return pause->entered; });
+    }
+    if (!entered)
+        pause->Release();
+    ASSERT_TRUE(entered);
+    const auto failed = RunWhileWinnerPaused(pause, [&] { return pipeline.MarkFailed(id); });
+    ASSERT_TRUE(queued.has_value());
+    ASSERT_TRUE(failed.has_value());
+    bus.Flush();
+    EXPECT_EQ(registry.GetState(id).value(), AssetState::Failed);
+    EXPECT_FALSE(pipeline.IsInFlight(id));
+    EXPECT_EQ(events, (std::vector<AssetEvent>{AssetEvent::Ready, AssetEvent::Failed}));
+}
+
+TEST(AssetService, CompleteCpuLoadRejectsCanceledQueuedRequest)
+{
+    ASSERT_FALSE(Tasks::Scheduler::IsInitialized());
+    SchedulerScope scheduler(1u);
+    auto blocker = std::make_shared<PausedCpuCompletion>();
+    Tasks::Scheduler::Dispatch([blocker] { blocker->Pause(); });
+    bool entered = false;
+    {
+        std::unique_lock lock(blocker->mutex);
+        entered = blocker->changed.wait_for(lock, std::chrono::seconds(2),
+            [&] { return blocker->entered; });
+    }
+    if (!entered)
+        blocker->Release();
+    ASSERT_TRUE(entered);
+
+    AssetRegistry registry;
+    AssetEventBus bus;
+    AssetLoadPipeline pipeline;
+    pipeline.BindRegistry(&registry);
+    pipeline.BindEventBus(&bus);
+    const auto id = registry.Create(0u, 0u);
+    if (!id.has_value())
+        blocker->Release();
+    ASSERT_TRUE(id.has_value());
+    const auto queued = pipeline.EnqueueIO(LoadRequest{.id = *id});
+    pipeline.Cancel(*id);
+    const auto completed = pipeline.CompleteCpuLoad(*id);
+    blocker->Release();
+    Tasks::Scheduler::WaitForAll();
+
+    ASSERT_TRUE(queued.has_value());
+    ASSERT_FALSE(completed.has_value());
+    EXPECT_EQ(completed.error(), ErrorCode::InvalidState);
+    EXPECT_FALSE(pipeline.IsInFlight(*id));
+    EXPECT_EQ(bus.PendingCount(), 0u);
+}
+
 TEST(AssetService, LoadSamePathReturnsSameId)
 {
     TmpFile f("svc_load_same.bin");

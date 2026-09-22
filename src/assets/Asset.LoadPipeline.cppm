@@ -10,6 +10,7 @@ module;
 #include <chrono>
 #include <vector>
 #include <deque>
+#include <functional>
 
 export module Extrinsic.Asset.LoadPipeline;
 
@@ -29,6 +30,13 @@ export namespace Extrinsic::Assets
         AssetEvent queuedEvent = AssetEvent::Ready;
     };
 
+    struct AssetLoadPipelineTestHooks
+    {
+        // Completion-thread pause seams; callbacks must not re-enter the pipeline.
+        std::function<void(AssetId)> AfterCpuDecodeClaim{};
+        std::function<void(AssetId)> BeforeCpuReadyEvent{};
+    };
+
     class AssetLoadPipeline
     {
     public:
@@ -46,7 +54,7 @@ export namespace Extrinsic::Assets
             std::chrono::steady_clock::time_point timestamp{};
         };
 
-        AssetLoadPipeline();
+        explicit AssetLoadPipeline(AssetLoadPipelineTestHooks testHooks = {});
         ~AssetLoadPipeline();
         AssetLoadPipeline(const AssetLoadPipeline&) = delete;
         AssetLoadPipeline& operator=(const AssetLoadPipeline&) = delete;
@@ -56,6 +64,9 @@ export namespace Extrinsic::Assets
 
         Core::Result EnqueueIO(LoadRequest req);
         Core::Result OnCpuDecoded(AssetId id);
+        // Advances or joins CPU completion; success requires Ready after publication.
+        // A GPU request can advance to QueuedGPU and still report InvalidState.
+        Core::Result CompleteCpuLoad(AssetId id);
         Core::Result OnGpuUploaded(AssetId id);
         Core::Result ArmGpuFence(AssetId id, uint64_t fenceValue);
         uint32_t CompleteGpuFence(uint64_t fenceValue);
@@ -80,8 +91,10 @@ export namespace Extrinsic::Assets
 
         static void AppendStageStamp(InFlightEntry& entry, Stage stage);
         void ArchiveTrailUnlocked(AssetId id);
+        Core::Result OnCpuDecodedUnlocked(AssetId id);
         void Shutdown();
 
+        AssetLoadPipelineTestHooks m_TestHooks{};
         mutable std::mutex m_Mutex{};
         static constexpr std::size_t kCompletedTrailCapacity = 256;
         bool m_Accepting{true};

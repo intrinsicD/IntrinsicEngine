@@ -17,6 +17,22 @@
 - Allowed: `core`.
 - Disallowed: direct dependency on graphics/runtime/app layers.
 
+## Load completion and event ordering
+
+`AssetLoadPipeline` serializes each lifecycle transition with its existing mutex,
+including registry updates, queued-event publication and in-flight archival.
+`CompleteCpuLoad` joins a scheduled or direct transition before deciding whether
+the asset is Ready. Cancellation and failure updates use the same lock, so a
+completing transition cannot publish a late Ready event after cancellation returns.
+Actual payload loaders execute outside this state-transition lock.
+
+`AssetService::CompleteCpuLoadAndFlushEvent` then drains that asset's callbacks
+on the main thread, outside pipeline locks. Success follows Ready publication;
+it does not require waiting for unrelated scheduler jobs. Registry/event-queue
+operations do not invoke listeners while holding the pipeline lock. Constructor
+test hooks pause completion at the decode claim and before Ready-event publication;
+these hooks must not re-enter the pipeline.
+
 ## Geometry-format capability authority
 
 `src/core/Core.GeometryFormatCatalog.inc` declares the geometry format kinds,

@@ -144,7 +144,7 @@ inventories with the aggregate file, CTest JSON discovery, and each included
 GoogleTest executable's expanded case list. It fails closed on source/case
 duplication, label or aggregate drift, missing binaries, and missing or extra
 CTest cases. `Test.TestGateRouting.baseline.tsv` additionally pins the exact
-221 BUG-106 affected target/case identities so deleting or renaming a test
+233 BUG-106 affected target/case identities so deleting or renaming a test
 cannot shrink both live inventories into a false green:
 
 ```bash

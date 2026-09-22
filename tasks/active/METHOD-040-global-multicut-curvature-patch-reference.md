@@ -346,7 +346,7 @@ python3 tools/agents/check_ara_claims.py --root . --strict
 - The first full CPU run failed one existing authored-normal import test.
   One hundred isolated repetitions passed. Independent read-only review found
   plausible pre-existing completion races, recorded without proven attribution
-  in [BUG-172](../backlog/bugs/BUG-172-synchronous-cpu-load-completion-race.md).
+  in [BUG-172](BUG-172-synchronous-cpu-load-completion-race.md).
   The final CPU rerun passes; the original intermittent failure remains open.
 
 - Required-gate corrections are tracked separately: BUG-173 fixes two runtime

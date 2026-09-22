@@ -3,6 +3,7 @@ module;
 #include <mutex>
 #include <chrono>
 #include <algorithm>
+#include <utility>
 
 module Extrinsic.Asset.LoadPipeline;
 
@@ -18,8 +19,8 @@ namespace Extrinsic::Assets
 
     namespace
     {
-        // Registry transitions occur without m_Mutex because the registry owns
-        // another lock; this fixed acquisition order prevents cross-lock deadlock.
+        // Pipeline transitions hold m_Mutex before registry/event-queue locks.
+        // Neither callee invokes listeners; event flushing stays outside this lock.
         Core::Result SetStateChecked(AssetRegistry* registry, AssetId id, AssetState from, AssetState to)
         {
             return registry->SetState(id, from, to);
@@ -27,8 +28,8 @@ namespace Extrinsic::Assets
 
     }
 
-    AssetLoadPipeline::AssetLoadPipeline()
-        : m_AsyncState(std::make_shared<AsyncState>())
+    AssetLoadPipeline::AssetLoadPipeline(AssetLoadPipelineTestHooks testHooks)
+        : m_TestHooks(std::move(testHooks)), m_AsyncState(std::make_shared<AsyncState>())
     {
         m_AsyncState->Owner = this;
     }
@@ -107,26 +108,18 @@ namespace Extrinsic::Assets
         const AssetId id = req.id;
         const bool publishQueuedEvent = req.publishQueuedEvent;
         const AssetEvent queuedEvent = req.queuedEvent;
-        AssetRegistry* registry = nullptr;
-        AssetEventBus* eventBus = nullptr;
         {
             std::scoped_lock lock(m_Mutex);
             if (!m_Accepting || m_Registry == nullptr)
             {
                 return Core::Err(Core::ErrorCode::InvalidState);
             }
-            registry = m_Registry;
-            eventBus = m_EventBus;
-        }
+            if (auto state = SetStateChecked(m_Registry, id, AssetState::Unloaded, AssetState::QueuedIO);
+                !state.has_value())
+            {
+                return state;
+            }
 
-        if (auto state = SetStateChecked(registry, id, AssetState::Unloaded, AssetState::QueuedIO); !state.
-            has_value())
-        {
-            return state;
-        }
-
-        {
-            std::scoped_lock lock(m_Mutex);
             auto& entry = m_AssetsInFlight[id];
             entry.request = std::move(req);
             entry.stages.clear();
@@ -134,11 +127,8 @@ namespace Extrinsic::Assets
             entry.uploadDone = false;
             entry.finalized = false;
             AppendStageStamp(entry, Stage::AssetIO);
-        }
-
-        if (publishQueuedEvent && eventBus != nullptr)
-        {
-            eventBus->Publish(id, queuedEvent);
+            if (publishQueuedEvent && m_EventBus != nullptr)
+                m_EventBus->Publish(id, queuedEvent);
         }
 
         if (Core::Tasks::Scheduler::IsInitialized())
@@ -160,12 +150,36 @@ namespace Extrinsic::Assets
 
     Core::Result AssetLoadPipeline::OnCpuDecoded(AssetId id)
     {
+        std::scoped_lock lock(m_Mutex);
+        return OnCpuDecodedUnlocked(id);
+    }
+
+    Core::Result AssetLoadPipeline::CompleteCpuLoad(AssetId id)
+    {
+        // Joining the transition also joins event publication and archival.
+        // Ready alone is insufficient while another completion still owns the lock.
+        std::scoped_lock lock(m_Mutex);
+        if (m_Registry == nullptr)
+            return Core::Err(Core::ErrorCode::InvalidState);
+        if (m_AssetsInFlight.contains(id))
+        {
+            if (auto result = OnCpuDecodedUnlocked(id); !result.has_value())
+                return result;
+        }
+        const auto state = m_Registry->GetState(id);
+        if (!state.has_value())
+            return Core::Err(state.error());
+        return *state == AssetState::Ready
+            ? Core::Ok() : Core::Err(Core::ErrorCode::InvalidState);
+    }
+
+    Core::Result AssetLoadPipeline::OnCpuDecodedUnlocked(AssetId id)
+    {
         AssetRegistry* registry = nullptr;
         AssetEventBus* eventBus = nullptr;
         bool needsGpu = false;
 
         {
-            std::scoped_lock lock(m_Mutex);
             if (m_Registry == nullptr)
             {
                 return Core::Err(Core::ErrorCode::InvalidState);
@@ -187,9 +201,11 @@ namespace Extrinsic::Assets
             it->second.decodeDone = true;
         }
 
+        if (m_TestHooks.AfterCpuDecodeClaim)
+            m_TestHooks.AfterCpuDecodeClaim(id);
+
         if (auto toCpu = SetStateChecked(registry, id, AssetState::QueuedIO, AssetState::LoadedCPU); !toCpu.has_value())
         {
-            std::scoped_lock lock(m_Mutex);
             ArchiveTrailUnlocked(id);
             return toCpu;
         }
@@ -203,7 +219,6 @@ namespace Extrinsic::Assets
                 {
                     eventBus->Publish(id, AssetEvent::Failed);
                 }
-                std::scoped_lock lock(m_Mutex);
                 ArchiveTrailUnlocked(id);
                 return q;
             }
@@ -211,7 +226,6 @@ namespace Extrinsic::Assets
         }
 
         {
-            std::scoped_lock lock(m_Mutex);
             const auto it = m_AssetsInFlight.find(id);
             if (it == m_AssetsInFlight.end() || !it->second.decodeDone)
             {
@@ -228,29 +242,30 @@ namespace Extrinsic::Assets
             {
                 eventBus->Publish(id, AssetEvent::Failed);
             }
-            std::scoped_lock lock(m_Mutex);
             ArchiveTrailUnlocked(id);
             return ready;
         }
+
+        if (m_TestHooks.BeforeCpuReadyEvent)
+            m_TestHooks.BeforeCpuReadyEvent(id);
 
         if (eventBus != nullptr)
         {
             eventBus->Publish(id, AssetEvent::Ready);
         }
 
-        std::scoped_lock lock(m_Mutex);
         ArchiveTrailUnlocked(id);
         return Core::Ok();
     }
 
     Core::Result AssetLoadPipeline::OnGpuUploaded(AssetId id)
     {
+        std::scoped_lock lock(m_Mutex);
         AssetRegistry* registry = nullptr;
         AssetEventBus* eventBus = nullptr;
         AssetState stateBefore = AssetState::Unloaded;
 
         {
-            std::scoped_lock lock(m_Mutex);
             if (m_Registry == nullptr)
             {
                 return Core::Err(Core::ErrorCode::InvalidState);
@@ -272,7 +287,6 @@ namespace Extrinsic::Assets
         }
 
         {
-            std::scoped_lock lock(m_Mutex);
             const auto it = m_AssetsInFlight.find(id);
             if (it == m_AssetsInFlight.end())
             {
@@ -296,7 +310,6 @@ namespace Extrinsic::Assets
                 eventBus->Publish(id, AssetEvent::Failed);
             }
 
-            std::scoped_lock lock(m_Mutex);
             ArchiveTrailUnlocked(id);
             return ready;
         }
@@ -306,7 +319,6 @@ namespace Extrinsic::Assets
             eventBus->Publish(id, AssetEvent::Ready);
         }
 
-        std::scoped_lock lock(m_Mutex);
         ArchiveTrailUnlocked(id);
         return Core::Ok();
     }
@@ -354,10 +366,10 @@ namespace Extrinsic::Assets
 
     Core::Result AssetLoadPipeline::MarkFailed(AssetId id)
     {
+        std::scoped_lock lock(m_Mutex);
         AssetRegistry* registry = nullptr;
         AssetEventBus* eventBus = nullptr;
         {
-            std::scoped_lock lock(m_Mutex);
             if (m_Registry == nullptr)
             {
                 return Core::Err(Core::ErrorCode::InvalidState);
@@ -377,7 +389,6 @@ namespace Extrinsic::Assets
             }
             if (meta->state == AssetState::Failed)
             {
-                std::scoped_lock lock(m_Mutex);
                 ArchiveTrailUnlocked(id);
                 return Core::Ok();
             }
@@ -388,7 +399,6 @@ namespace Extrinsic::Assets
                 {
                     eventBus->Publish(id, AssetEvent::Failed);
                 }
-                std::scoped_lock lock(m_Mutex);
                 ArchiveTrailUnlocked(id);
                 return Core::Ok();
             }
