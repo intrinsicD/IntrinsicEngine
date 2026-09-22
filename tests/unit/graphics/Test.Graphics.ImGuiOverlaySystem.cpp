@@ -114,9 +114,10 @@ TEST(GraphicsImGuiOverlaySystem, SubmitFrameAggregatesValidDrawData)
     EXPECT_EQ(userPc.Flags & Graphics::kImGuiOverlayPushFlagUserTexture,
               Graphics::kImGuiOverlayPushFlagUserTexture);
     EXPECT_FLOAT_EQ(pc.Scale[0], 2.0f / 1280.0f);
-    EXPECT_FLOAT_EQ(pc.Scale[1], 2.0f / 720.0f);
+    // Backbuffer composition: display y = 0 maps to clip-space +1.
+    EXPECT_FLOAT_EQ(pc.Scale[1], -2.0f / 720.0f);
     EXPECT_FLOAT_EQ(pc.Translate[0], -1.0f);
-    EXPECT_FLOAT_EQ(pc.Translate[1], -1.0f);
+    EXPECT_FLOAT_EQ(pc.Translate[1], 1.0f);
 }
 
 TEST(GraphicsImGuiOverlaySystem, DisabledOrInvalidFramesHaveNoOverlayWork)

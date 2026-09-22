@@ -3263,7 +3263,17 @@ namespace Extrinsic::Graphics
                     const FramePassId passId = passIndex < compiled->PassIds.size()
                         ? compiled->PassIds[passIndex]
                         : FramePassId{};
-                    const ActiveRenderPassDesc activeRenderPass = BuildActiveRenderPassDesc(*compiled, passIndex);
+                    ActiveRenderPassDesc activeRenderPass = BuildActiveRenderPassDesc(*compiled, passIndex);
+                    const bool targetsBackbuffer = std::any_of(
+                        activeRenderPass.ColorAttachments.begin(),
+                        activeRenderPass.ColorAttachments.end(),
+                        [backbufferHandle](const RHI::ColorAttachment& attachment) {
+                            return backbufferHandle.IsValid() && attachment.Target == backbufferHandle;
+                        });
+                    // The imported backbuffer's graph desc has no real format;
+                    // pipeline variants must match the swapchain format.
+                    if (targetsBackbuffer)
+                        activeRenderPass.FirstColorFormat = m_BackbufferFormat;
                     const auto bindFrameSampledTextureByResource =
                         [&](const FrameResourceId resourceId,
                             const std::uint32_t descriptorSlot) -> bool
@@ -3344,12 +3354,6 @@ namespace Extrinsic::Graphics
                             .ColorTargets = {activeRenderPass.ColorAttachments.data(), activeRenderPass.ColorAttachments.size()},
                             .Depth = activeRenderPass.DepthAttachment,
                         });
-                        const bool targetsBackbuffer = std::any_of(
-                            activeRenderPass.ColorAttachments.begin(),
-                            activeRenderPass.ColorAttachments.end(),
-                            [backbufferHandle](const RHI::ColorAttachment& attachment) {
-                                return backbufferHandle.IsValid() && attachment.Target == backbufferHandle;
-                            });
                         // Scene passes render at the scene-rectangle extent;
                         // Present places that image into the backbuffer and
                         // later backbuffer writers (ImGui) cover the window.
