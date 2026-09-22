@@ -89,7 +89,7 @@ TEST(GeodesicsOperations, AcceptsAlternateVertexPositionsAndRejectsWrongTypes)
     alternate.Vector() = h.Properties().Get<glm::vec3>("v:position").Vector();
     for (auto& p : alternate.Vector())
         p *= 2;
-    h.Command.Config.PositionProperty = "rest_samples";
+    h.Command.Config.PositionProperty.Name = "rest_samples";
     auto result = Runtime::ApplyEditorGeodesicsCommand(h.Commands(), h.Command);
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     EXPECT_NEAR(result.Diagnostics.Distances[2], std::sqrt(8.), 1e-6);
@@ -109,7 +109,7 @@ TEST(GeodesicsOperations, SourceDiagnosticsNameTheOperationAndBoundPositionPrope
     {
         SCOPED_TRACE(malformedDeletionMask);
         Harness h;
-        h.Command.Config.PositionProperty = "v:rest";
+        h.Command.Config.PositionProperty.Name = "v:rest";
         if (malformedDeletionMask)
         {
             auto positions = h.Properties().GetOrAdd<glm::vec3>("v:rest", {});
@@ -133,15 +133,27 @@ TEST(GeodesicsOperations, SourceDiagnosticsNameTheOperationAndBoundPositionPrope
 TEST(GeodesicsOperations, ConfigRoundTripsAndRejectsInvalidPayloads)
 {
     Config::EngineConfig engine;
-    Runtime::GeodesicsConfig config{{0, 3}, 5000, "rest_samples", "distance", "sources"};
+    Runtime::GeodesicsConfig config;
+    config.SourceVertices = {0, 3};
+    config.MaxHalfedgeExpansions = 5000;
+    config.PositionProperty.Name = "rest_samples";
+    config.DistanceProperty.Name = "distance";
+    config.SourceMaskProperty.Name = "sources";
     Runtime::SetGeodesicsConfig(engine, config);
     auto decoded = Runtime::GetGeodesicsConfig(engine);
     ASSERT_TRUE(decoded);
     EXPECT_EQ(decoded->SourceVertices, config.SourceVertices);
     EXPECT_EQ(decoded->MaxHalfedgeExpansions, 5000);
-    EXPECT_EQ(decoded->PositionProperty, "rest_samples");
-    EXPECT_EQ(decoded->DistanceProperty, "distance");
-    EXPECT_EQ(decoded->SourceMaskProperty, "sources");
+    EXPECT_EQ(decoded->PositionProperty.Name, "rest_samples");
+    EXPECT_EQ(decoded->DistanceProperty.Name, "distance");
+    EXPECT_EQ(decoded->SourceMaskProperty.Name, "sources");
+    EXPECT_EQ(decoded->PositionProperty, config.PositionProperty);
+    EXPECT_EQ(decoded->DistanceProperty, config.DistanceProperty);
+    EXPECT_EQ(decoded->SourceMaskProperty, config.SourceMaskProperty);
+    const auto* section = Config::FindEngineConfigSection(
+        engine.AppSections, Runtime::kGeodesicsConfigSectionName);
+    ASSERT_NE(section, nullptr);
+    EXPECT_EQ(section->SchemaVersion, 2u);
     for (const auto payload : {R"({"source_vertices":[-1]})", R"({"source_vertices":[1.5]})",
                                R"({"max_halfedge_expansions":0})",
                                R"({"position_property":""})", R"({"backend":"gpu"})"})
@@ -149,16 +161,61 @@ TEST(GeodesicsOperations, ConfigRoundTripsAndRejectsInvalidPayloads)
             << payload;
 }
 
+TEST(GeodesicsOperations, RejectsWrongBindingDomainsAndKindsBeforeMutation)
+{
+    for (auto member : {&Runtime::GeodesicsConfig::PositionProperty,
+                        &Runtime::GeodesicsConfig::DistanceProperty,
+                        &Runtime::GeodesicsConfig::SourceMaskProperty})
+    {
+        for (const bool wrongDomain : {false, true})
+        {
+            Harness h;
+            auto& ref = h.Command.Config.*member;
+            if (wrongDomain)
+                ref.Domain = Runtime::GeometryElementDomain::MeshFace;
+            else
+                ref.ValueKind = Geometry::PropertyValueKind::Vec4;
+            const auto result = Runtime::ApplyEditorGeodesicsCommand(h.Commands(), h.Command);
+            EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+            EXPECT_EQ(h.History.UndoCount(), 0u);
+            EXPECT_FALSE(h.Properties().Exists("v:geodesic_distance"));
+            EXPECT_FALSE(h.Properties().Exists("v:is_geodesic_source"));
+        }
+    }
+}
+
+TEST(GeodesicsOperations, RejectsIncompleteAndLegacyPropertyReferences)
+{
+    for (const auto payload : {
+             R"({"position_property":"v:position"})",
+             R"({"distance_property":{"name":"distance","kind":"double"}})",
+             R"({"source_mask_property":{"domain":"mesh_vertex","name":"sources"}})"})
+        EXPECT_FALSE(Runtime::ValidateGeodesicsConfigSection(payload, {}, "geodesics").Usable());
+    Config::EngineConfig engine;
+    Runtime::SetGeodesicsConfig(engine, {});
+    auto* section = Config::FindEngineConfigSection(engine.AppSections, Runtime::kGeodesicsConfigSectionName);
+    ASSERT_NE(section, nullptr);
+    // A schema-1 name-only section must not be interpreted as canonical references.
+    auto legacy = *section;
+    legacy.SchemaVersion = 1u;
+    Config::UpsertEngineConfigSection(engine.AppSections, legacy);
+    EXPECT_FALSE(Runtime::GetGeodesicsConfig(engine));
+}
+
 TEST(GeodesicsOperations, RejectsStructuralOutputStorageWithoutUsingNamePrefixes)
 {
-    Runtime::GeodesicsConfig config{{0}, 5000, "rest_samples", "distance", "sources"};
+    Runtime::GeodesicsConfig config;
+    config.SourceVertices = {0};
+    config.PositionProperty.Name = "rest_samples";
+    config.DistanceProperty.Name = "distance";
+    config.SourceMaskProperty.Name = "sources";
     EXPECT_TRUE(Runtime::ValidateGeodesicsConfigSection(
         Runtime::SerializeGeodesicsConfig(config), {}, "geodesics").Usable());
     for (const std::string structural :
          {"v:position", "v:deleted", "v:connectivity", "v:halfedge"})
     {
         SCOPED_TRACE(structural);
-        config.DistanceProperty = structural;
+        config.DistanceProperty.Name = structural;
         EXPECT_FALSE(Runtime::ValidateGeodesicsConfigSection(
             Runtime::SerializeGeodesicsConfig(config), {}, "geodesics").Usable());
     }
@@ -255,24 +312,24 @@ TEST(GeodesicsOperations, UsesSharedPreviewApplyAndConfiguredCommand)
 TEST(GeodesicsOperations, CustomOutputBindingsRoundTripAndUndoWithoutTouchingDefaults)
 {
     Harness h;
-    h.Command.Config.DistanceProperty = "distance_custom";
-    h.Command.Config.SourceMaskProperty = "sources_custom";
+    h.Command.Config.DistanceProperty.Name = "distance_custom";
+    h.Command.Config.SourceMaskProperty.Name = "sources_custom";
     Config::EngineConfig engine;
     Runtime::SetGeodesicsConfig(engine, h.Command.Config);
     const auto decoded = Runtime::GetGeodesicsConfig(engine);
     ASSERT_TRUE(decoded);
-    EXPECT_EQ(decoded->DistanceProperty, h.Command.Config.DistanceProperty);
-    EXPECT_EQ(decoded->SourceMaskProperty, h.Command.Config.SourceMaskProperty);
+    EXPECT_EQ(decoded->DistanceProperty.Name, h.Command.Config.DistanceProperty.Name);
+    EXPECT_EQ(decoded->SourceMaskProperty.Name, h.Command.Config.SourceMaskProperty.Name);
     ASSERT_TRUE(Runtime::ApplyEditorGeodesicsCommand(h.Commands(), h.Command).Succeeded());
-    EXPECT_NEAR(h.Properties().Get<double>(decoded->DistanceProperty).Vector()[2], std::sqrt(2.), 1e-6);
-    EXPECT_TRUE(h.Properties().Get<bool>(decoded->SourceMaskProperty).Vector()[0]);
+    EXPECT_NEAR(h.Properties().Get<double>(decoded->DistanceProperty.Name).Vector()[2], std::sqrt(2.), 1e-6);
+    EXPECT_TRUE(h.Properties().Get<bool>(decoded->SourceMaskProperty.Name).Vector()[0]);
     EXPECT_FALSE(h.Properties().Exists("v:geodesic_distance"));
     ASSERT_TRUE(h.History.Undo().Succeeded());
-    EXPECT_FALSE(h.Properties().Exists(decoded->DistanceProperty));
+    EXPECT_FALSE(h.Properties().Exists(decoded->DistanceProperty.Name));
     ASSERT_TRUE(h.History.Redo().Succeeded());
-    EXPECT_TRUE(h.Properties().Exists(decoded->DistanceProperty));
+    EXPECT_TRUE(h.Properties().Exists(decoded->DistanceProperty.Name));
     auto invalid = *decoded;
-    invalid.DistanceProperty = invalid.SourceMaskProperty;
+    invalid.DistanceProperty.Name = invalid.SourceMaskProperty.Name;
     EXPECT_FALSE(Runtime::ValidateGeodesicsConfigSection(
         Runtime::SerializeGeodesicsConfig(invalid), {}, "geodesics").Usable());
 }
@@ -283,14 +340,13 @@ TEST(GeodesicsOperations, UnreachableVertexDoesNotHideReachableDistanceField)
     const auto result = Runtime::ApplyEditorGeodesicsCommand(h.Commands(), h.Command);
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     ASSERT_EQ(result.Diagnostics.UnreachableVertexCount, 1u);
-    const auto distance = h.Properties().Get<double>(h.Command.Config.DistanceProperty);
+    const auto distance = h.Properties().Get<double>(h.Command.Config.DistanceProperty.Name);
     ASSERT_TRUE(distance);
     ASSERT_TRUE(std::isinf(distance.Vector().back()));
     const auto encoded = Runtime::EncodeVisualizationRecipe(
         Runtime::BuildGeometryAvailability(h.Scene.Raw(), h.Entity),
         {.Data = Runtime::ScalarVisualizationRecipe{
-            .Source = {Runtime::GeometryElementDomain::MeshVertex,
-                       h.Command.Config.DistanceProperty, Geometry::PropertyValueKind::Double}}});
+            .Source = h.Command.Config.DistanceProperty}});
     EXPECT_TRUE(encoded.Succeeded()) << static_cast<int>(encoded.Status);
     ASSERT_EQ(encoded.Batch.Scalars.size(), 1u);
     EXPECT_EQ(encoded.Batch.Scalars.front().ElementCount, 5u);

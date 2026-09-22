@@ -2439,8 +2439,7 @@ TEST(RuntimeRenderExtraction, PublishedAnalysisPropertiesReuseMeshGeometry)
             command.Config.SourceVertices = {0u};
             const auto result = R::ApplyEditorGeodesicsCommand(commands, command);
             ASSERT_TRUE(result.Succeeded()) << result.Message;
-            output = {R::GeometryElementDomain::MeshVertex, command.Config.DistanceProperty,
-                      Geometry::PropertyValueKind::Double};
+            output = command.Config.DistanceProperty;
         }
         else if (method == 0)
         {

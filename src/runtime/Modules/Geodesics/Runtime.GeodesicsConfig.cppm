@@ -6,6 +6,7 @@ module;
 #include <string_view>
 #include <vector>
 export module Extrinsic.Runtime.GeodesicsConfig;
+export import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 export namespace Extrinsic::Runtime
@@ -18,9 +19,9 @@ export namespace Extrinsic::Runtime
         std::vector<std::uint32_t> SourceVertices{};
         std::uint32_t MaxHalfedgeExpansions{10000000};
         // Vertex-domain float3 binding; topology still comes from the mesh.
-        std::string PositionProperty{"v:position"};
-        std::string DistanceProperty{"v:geodesic_distance"};
-        std::string SourceMaskProperty{"v:is_geodesic_source"};
+        GeometryPropertyRef PositionProperty{GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};
+        GeometryPropertyRef DistanceProperty{GeometryElementDomain::MeshVertex, "v:geodesic_distance", Geometry::PropertyValueKind::Double};
+        GeometryPropertyRef SourceMaskProperty{GeometryElementDomain::MeshVertex, "v:is_geodesic_source", Geometry::PropertyValueKind::Bool};
     };
     [[nodiscard]] std::string SerializeGeodesicsConfig(const GeodesicsConfig& config);
     [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateGeodesicsConfigSection(
