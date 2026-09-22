@@ -14,5 +14,4 @@ ignore:
   - ".git/**"
 
 agent:
-  reasoning_effort: xhigh
   enable_compaction: true

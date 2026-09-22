@@ -22,7 +22,8 @@ preserving correctness, engineering contracts, and completed-task quality.
 - Status: in-progress. Owner: Codex. Branch: `codex/proc-034-token-efficiency`.
 - Operator explicitly requested this process work outside the Framework24 P0
   selection focus on 2026-09-22, with four slices and immediate completion of
-  slice 1 only; the operator subsequently authorized slices 2 and 3. Slice 4 remains planned.
+  slice 1 only; the operator subsequently authorized slices 2, 3, and 4, with
+  retirement after all acceptance criteria are satisfied.
 - The preceding local audit identified large repeated contexts as the leading
   candidate. Byte reductions are instruction-size measurements, not demonstrated
   token, credit, latency, or completed-task savings.
@@ -60,7 +61,7 @@ preserving correctness, engineering contracts, and completed-task quality.
   evidence and required verification; representative task measurements recorded.
 - [x] Slice 3: ordinary engineering avoids research-ledger loading while research
   work still records and validates required evidence.
-- [ ] Slice 4: reasoning choices are justified by matched completed-task results;
+- [x] Slice 4: reasoning choices are justified by matched completed-task results;
   any settings changed are validated and residual uncertainty is explicit.
 
 ## Verification
@@ -130,7 +131,51 @@ and then `git apply` with the absolute patch path from the installed
 research-manager directory. A newer upstream version requires reviewing/rebasing
 the patch first. The reverse check above verifies the already-patched installation.
 
+Slice 4: run the structural checks above. Replay the captured functional checks
+without new model calls:
+
+```bash
+python3 - <<'PY'
+import hashlib, json
+from pathlib import Path
+bundle = json.loads(Path('tasks/evidence/PROC-034/reasoning-trial.json').read_text())
+source = bundle['evaluator_source']
+assert hashlib.sha256(source.encode()).hexdigest() == bundle['evaluator_sha256']
+# Load only scorer definitions; never execute the model-run loop during replay.
+prefix = source.split('if len(sys.argv)>1', 1)[0]
+prefix = prefix.replace("MANIFEST = json.loads((ROOT/'manifest.json').read_text())", 'MANIFEST = {}')
+scope = {'__file__': '/tmp/proc-034-offline-replay.py'}
+exec(compile(prefix, '<captured-scorer>', 'exec'), scope)
+assert len(bundle['results']) == 8
+for run in bundle['results']:
+    for attempt in run['attempts']:
+        assert scope['verify'](run['task'], attempt['source']) == attempt['score']['checks']
+print('8 captured completions passed: 87 routine / 94 harder checks per run')
+PY
+python3 -c 'import pathlib, tomllib; p = pathlib.Path.home()/".codex/intrinsic-routine.config.toml"; assert tomllib.loads(p.read_text()) == {"model": "gpt-6-astra", "model_reasoning_effort": "medium"}'
+```
+
+For live profile validation, start `codex --profile intrinsic-routine --strict-config`
+in this repository, confirm the status shows `gpt-6-astra medium`, then exit
+without submitting a prompt. `app-server` does not accept this profile selector;
+`debug prompt-input` ignores it and is not valid evidence of profile resolution.
+The [measurement bundle](../evidence/PROC-034/reasoning-trial.json) retains exact
+prompts, run order, commands, evaluator source, every candidate, usage, and checks.
+Its runner can be extracted into a fresh temporary directory with the manifest
+and workspace instructions to repeat the paid/model portion deliberately.
+
 ## Log
+
+- Slice 4 evaluation plan (fixed before runs): GPT-6 Astra, requested service
+  tier `default`, `medium` versus the current `xhigh`; two repetitions each of
+  a routine path-normalization repair and a harder atomic graph transaction.
+  Each run starts from an identical self-contained prompt and isolated context;
+  effort order is counterbalanced. Fixed functional checks determine completion.
+  Include all attempts, at most one repair attempt per run, input/cache/output
+  tokens, elapsed time, defects, and tool calls. These small Python tasks do not
+  establish C++/Vulkan or whole-repository efficiency. Retain deep effort outside
+  the demonstrated scope. Reuse Codex CLI JSON telemetry and Python's standard
+  library; targeted searches found no existing matched reasoning evaluator.
 
 - 2026-09-22 — Slice 1 completed against pre-slice revision `a56574f44`.
   `AGENTS.md` decreased from 41,626 to 17,628 bytes. Mandatory startup sources
@@ -223,3 +268,47 @@ the patch first. The reverse check above verifies the already-patched installati
   workflow intent, unchanged engine layering, verified routing behavior, and
   synchronized docs/task state. Slice 4 remains open; reasoning defaults are
   unchanged.
+- 2026-09-22 — Slice 4 completed against `35b1f8140`. The current thread and
+  effective base configuration use GPT-6 Astra at `xhigh`, requested tier
+  `default`; the runtime output limit remains 3,000. Compared `medium`/`xhigh`
+  with identical user prompts, counterbalanced order, two repetitions of each
+  task/effort, and one allowed repair attempt per run. All eight completions
+  passed first try, with zero model tool calls and zero detected defects across
+  87 normalization checks or 94 transaction checks per run. The task checks
+  cover ordered/case-sensitive normalization, final-graph validation, revision
+  checks, invalid inputs, atomicity, and independent result ownership.
+
+  | Task / effort | Runs passed | Input tokens | Cached input | Output tokens | Reasoning subset | Total seconds |
+  | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+  | Routine / medium | 2/2 | 30,958 | 23,040 | 172 | 0 | 14.720 |
+  | Routine / xhigh | 2/2 | 28,282 | 25,472 | 298 | 122 | 19.386 |
+  | Harder / medium | 2/2 | 28,694 | 23,040 | 1,745 | 362 | 62.263 |
+  | Harder / xhigh | 2/2 | 28,694 | 23,040 | 4,444 | 3,104 | 144.718 |
+
+- These are aggregate CLI counters over verified completions, including all
+  attempts; reasoning is already included in output. Medium used 42.3% fewer
+  output tokens in the routine trial and 60.7% fewer in the harder trial.
+  The harder trial's input/cache counts matched, giving 8.1% fewer raw
+  input-plus-output tokens. No quality advantage for xhigh appeared in these
+  checks. The first routine run had 2,676 extra input tokens of unknown origin,
+  and routine caching differed; neither pair of routine runs establishes a
+  clean total-cost comparison. Delivered tier and credit charges are unavailable.
+  The trial itself consumed 123,287 input-plus-output tokens. Results do not
+  establish general engine-task, subscription-credit, or end-to-end savings.
+- Decision: offer `medium` for bounded routine work with explicit acceptance
+  checks, retaining `xhigh` for unmeasured complex work and escalation. Installed
+  the opt-in `/home/alex/.codex/intrinsic-routine.config.toml` profile and verified
+  live Codex 0.153.4 startup reports `gpt-6-astra medium`, without a model turn.
+  Base user defaults, requested service tier, project output limit, and existing
+  thread effort remain unchanged. Removed the misleading unconditional
+  `reasoning_effort: xhigh` workflow-metadata entry from `.codex/config.yaml`;
+  it was not a runtime setting. The canonical workflow documents the selection,
+  escalation, profile reconstruction, measurement limits, and official source;
+  the core route and generated mirror expose it.
+- All eight captured completions replayed successfully from the committed-data
+  candidate; prompt hashes, aggregate counters, and profile contents matched.
+  Structural task policy, all 4,040 relative doc links, docs sync, skill mirrors,
+  session brief, Codex configuration, ARA structure, root hygiene, and whitespace
+  checks passed. Four-point review: one workflow intent; no engine layering or
+  source changes; measured behavior and installed profile verified; current
+  docs/task state and explicit limits. No engine research claims were created.

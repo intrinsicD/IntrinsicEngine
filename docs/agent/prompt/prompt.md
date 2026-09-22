@@ -210,6 +210,34 @@ from the conversation before loading recording references or ledgers. Ordinary
 engineering finishes without a research epilogue. Explicit ARA work and required
 research evidence remain in scope.
 
+# Reasoning effort
+
+Choose effort for the task when the client exposes that choice. For GPT-6 Astra,
+`medium` is a measured starting point for bounded routine work with explicit
+acceptance checks. Keep `xhigh` available for uncertain diagnosis, architecture,
+concurrency, numerical methods, and broad changes; the small PROC-034 trial does
+not establish their cheapest reliable setting. If a routine attempt fails for a
+reason that needs deeper analysis, escalate and count the failed attempt in its
+completed-task cost. Effort never substitutes for verification.
+
+The local `intrinsic-routine` CLI profile selects Astra at `medium`; use
+`codex --profile intrinsic-routine` for eligible work. To reproduce it, create
+`~/.codex/intrinsic-routine.config.toml` containing:
+
+```toml
+model = "gpt-6-astra"
+model_reasoning_effort = "medium"
+```
+
+This is opt-in: base user settings, service tier, project output limit, and
+existing thread settings remain unchanged. For app work, select the effort when
+starting the task; do not assume a CLI profile changes an existing app thread.
+Inspect effective settings before comparisons. Record model, requested/observed
+tier, input/cache/output tokens, retries, defects, and time through verified
+completion. Input-context or caching differences preclude a clean cost claim.
+See [OpenAI's profile documentation](https://learn.chatgpt.com/docs/config-file/config-advanced#profiles)
+and the [PROC-034 trial](../../../tasks/active/PROC-034-agent-token-efficiency.md).
+
 # When CI fails
 
 - **Your change caused it** → fix it in the same PR; never weaken a gate, relax an assertion, or add a quarantine label to reach green without a diagnosis.

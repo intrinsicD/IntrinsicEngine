@@ -1,0 +1,300 @@
+{
+  "schema_version": 1,
+  "kind": "workflow-calibration",
+  "date": "2026-09-22",
+  "cli_version": "codex-cli 0.153.4",
+  "scope": "Self-contained synthetic Python tasks; no repository edits or tool use by evaluated models. Operational workflow measurement, not an engine/research benchmark.",
+  "base_revision": "35b1f8140ed54c2ddb9ed244248754487728cad5",
+  "manifest": {
+    "root": "/tmp/proc-034-reasoning-y2_qwpk7",
+    "source_revision": "35b1f8140",
+    "model": "gpt-6-astra",
+    "service_tier_requested": "default",
+    "efforts": [
+      "medium",
+      "xhigh"
+    ],
+    "order": [
+      [
+        "routine",
+        "medium"
+      ],
+      [
+        "routine",
+        "xhigh"
+      ],
+      [
+        "routine",
+        "xhigh"
+      ],
+      [
+        "routine",
+        "medium"
+      ],
+      [
+        "harder",
+        "xhigh"
+      ],
+      [
+        "harder",
+        "medium"
+      ],
+      [
+        "harder",
+        "medium"
+      ],
+      [
+        "harder",
+        "xhigh"
+      ]
+    ],
+    "max_retries_per_run": 1,
+    "timeout_seconds_per_attempt": 180,
+    "tasks": {
+      "routine": "Implement normalize_paths(lines) in Python 3. Return the complete function source only, without Markdown fences. No tools or imports are needed.\nContract: lines is a list of strings. Strip leading/trailing whitespace; ignore empty lines and lines whose first non-whitespace character is #. Replace backslashes with forward slashes, then remove every leading ./ prefix. Ignore a path if that leaves it empty. Return unique resulting strings in first-appearance order, using case-sensitive equality. Do not resolve .. segments or access the filesystem. Do not mutate lines. A # inside a path is literal.\nCurrent buggy implementation:\ndef normalize_paths(lines):\n    return sorted(set(line.strip().lower() for line in lines if line.strip()))\n",
+      "harder": "Implement apply_changes(state, operations) in Python 3. Return complete source only, without Markdown fences. No tools or external dependencies. This bounded transaction helper must implement all requirements below.\nstate is a valid directed acyclic graph: dict[str, dict], each record has revision (non-negative int) and deps (list[str] naming existing nodes). Inputs use ordinary JSON-compatible values. Names are nonempty strings. Do not mutate state or operations, including on failure. Success returns a fully independent graph, including every deps list (even untouched nodes).\nEach operation is either {\"kind\":\"put\",\"id\":name,\"expected\":revision_or_None,\"deps\":list_of_names} or {\"kind\":\"delete\",\"id\":name,\"expected\":revision}. Reject unknown/missing fields, invalid names/types, duplicate operation IDs, duplicate dependencies, or self-dependency with ValueError. bool is not an integer revision. Expected revisions are compared to ORIGINAL state, never an intermediate graph. Existing-node put/delete requires an exact matching non-negative integer expected revision; new-node put requires expected=None. Deleting an absent node is invalid. Put yields revision original+1 for an existing node, or 0 for a new node; dependency lists in the result are sorted. Untouched nodes retain their original values.\nValidate references and cycles only on the FINAL graph after all operations: forward references, deleting a node while removing its references, and jointly replacing edges that would produce a transient cycle are legal. Reject dangling references or cycles with ValueError. Empty operations returns an independent copy. Operation order must not affect the result for valid unique-ID operations. The caller's state remains byte-for-byte equal after every call. Use ordinary Python dictionaries/lists and free functions, not a framework.\n"
+    }
+  },
+  "workspace_instructions": "This is an isolated, self-contained model evaluation. Solve only the supplied task. Do not use tools, inspect other files, invoke skills or agents, create records, or modify the filesystem. Return only the requested Python source. The parent evaluator runs the returned code against fixed checks.\n",
+  "evaluator_source": "import ast, copy, hashlib, itertools, json, pathlib, random, subprocess, sys, time\nROOT = pathlib.Path(__file__).parent\nMANIFEST = json.loads((ROOT/'manifest.json').read_text())\n\ndef verify(kind, source):\n    tree=ast.parse(source)\n    for node in ast.walk(tree):\n        if isinstance(node,(ast.Import,ast.ImportFrom)):\n            names=[a.name for a in node.names] if isinstance(node,ast.Import) else [node.module]\n            assert all(n in ('copy','collections') for n in names), 'unexpected import'\n        if isinstance(node,ast.Name):\n            assert node.id not in {'open','eval','exec','compile','__import__','globals','locals'}, 'unexpected dynamic execution'\n    ns={};exec(compile(tree,'candidate.py','exec'),ns)\n    count=0\n    if kind=='routine':\n        f=ns['normalize_paths']\n        cases=[([],[]),([' a ','a','A','b','a'],['a','A','b']),([' # ignore','', '  ', 'x#y'],['x#y']),(['././a','a','./','././'],['a']),(['.\\\\foo','foo','..\\\\bar','a/../b'],['foo','../bar','a/../b']),(['b','a','c'],['b','a','c']),(['./#literal','#comment','.../a'],['#literal','.../a'])]\n        rng=random.Random(34)\n        for _ in range(80):\n            names=rng.sample(['a','B','z/../q','c#d','../UP','folder/child'],rng.randrange(1,7))\n            lines=[]\n            for name in names:\n                lines.extend(['  '+'./'*rng.randrange(3)+name.replace('/','\\\\')+' ',name,'# ignored',''])\n            cases.append((lines,names))\n        for lines,expected in cases:\n            before=copy.deepcopy(lines)\n            assert f(lines)==expected, f'normalization mismatch: {lines!r}'\n            assert lines==before,'input mutation';count+=1\n    else:\n        f=ns['apply_changes']\n        def record(rev=0,deps=()):return {'revision':rev,'deps':list(deps)}\n        def put(id,expected,deps):return {'kind':'put','id':id,'expected':expected,'deps':deps}\n        def delete(id,expected):return {'kind':'delete','id':id,'expected':expected}\n        def case(state,ops,expected=None,invalid=False):\n            nonlocal count\n            before=copy.deepcopy(state);ops_before=copy.deepcopy(ops)\n            try:out=f(state,ops)\n            except ValueError:\n                assert invalid,'unexpected rejection'\n            else:\n                assert not invalid,'invalid transaction accepted'\n                assert out==expected,f'result mismatch: expected {expected!r}; got {out!r}'\n                for rec in out.values():rec['deps'].append('alias-probe')\n                out['alias-probe']={}\n            assert state==before,'state mutated/aliased'\n            assert ops==ops_before,'operations mutated/aliased';count+=1\n        base={'a':record(2),'b':record(3,['a']),'c':record(0,['b'])}\n        case(base,[],base)\n        valid=[({},[put('a',None,['b']),put('b',None,[])],{'a':record(0,['b']),'b':record()}),\n               (base,[delete('a',2),put('b',3,[])],{'b':record(4),'c':record(0,['b'])}),\n               ({'a':record(),'b':record(0,['a'])},[put('a',0,['b']),put('b',0,[])],{'a':record(1,['b']),'b':record(1)}),\n               ({'a':record(),'b':record(),'c':record()},[put('c',0,['b','a'])],{'a':record(),'b':record(),'c':record(1,['a','b'])})]\n        for state,ops,expected in valid:\n            for ordering in itertools.permutations(ops):case(state,list(ordering),expected)\n        bad=[[delete('a',2)],[put('a',1,[])],[put('d',0,[])],[delete('d',0)],[put('a',2,['c'])],[put('a',2,['a'])],[put('a',2,['x'])],[put('a',2,['b','b'])],[put('a',2,[]),delete('a',2)],[put('d',None,['e']),put('e',None,['d'])]]\n        for ops in bad:case(base,ops,invalid=True)\n        for field,values in [('expected',[None,True,False,-1,2.0,'2',[],{}]),('id',['',None,False,2,[],{}]),('deps',[None,'a',2,False,{},[1],[None],[''],[True]])]:\n            for val in values:\n                op=put('a',2,[]);op[field]=val;case(base,[op],invalid=True)\n        for key in ['kind','id','expected','deps']:\n            op=put('a',2,[]);del op[key];case(base,[op],invalid=True)\n        op=put('a',2,[]);op['extra']=1;case(base,[op],invalid=True)\n        for op in [{'kind':'noop','id':'a','expected':2},{'kind':'delete','id':'a','expected':2,'deps':[]},{'kind':'delete','id':'b','expected':True},{'kind':'delete','id':'a'},None,[],0]:case(base,[op],invalid=True)\n        for size in range(1,15):\n            ops=[put(str(i),None,[str(i-1)] if i else []) for i in range(size)]\n            expected={str(i):record(0,[str(i-1)] if i else []) for i in range(size)}\n            case({},ops,expected);case({},list(reversed(ops)),expected)\n            if size>1:\n                ops[0]['deps']=[str(size-1)];case({},ops,invalid=True)\n    return count\n\ndef score_file(kind,path):\n    try:print(json.dumps({'passed':True,'checks':verify(kind,pathlib.Path(path).read_text())}))\n    except Exception as e:print(json.dumps({'passed':False,'error':type(e).__name__+': '+str(e)}))\n\nif len(sys.argv)>1 and sys.argv[1]=='score':\n    score_file(sys.argv[2],sys.argv[3]);raise SystemExit()\n\nresults=[]\nfor number,(kind,effort) in enumerate(MANIFEST['order'],1):\n    prompt=MANIFEST['tasks'][kind]\n    row={'run':number,'task':kind,'effort':effort,'attempts':[],'passed':False}\n    for attempt in range(1,MANIFEST['max_retries_per_run']+2):\n        stem=ROOT/f'{number:02d}-{kind}-{effort}-{attempt}'\n        prompt_path=stem.with_suffix('.prompt.txt');prompt_path.write_text(prompt)\n        output_path=stem.with_suffix('.py')\n        cmd=['codex','exec','--ignore-user-config','--strict-config','--ephemeral','--skip-git-repo-check','--sandbox','read-only','--disable','multi_agent','--cd',str(ROOT/'workspace'),'--model',MANIFEST['model'],'-c',f'model_reasoning_effort=\"{effort}\"','-c','service_tier=\"default\"','--json','--output-last-message',str(output_path),'-']\n        started=time.monotonic()\n        with stem.with_suffix('.jsonl').open('w') as out,stem.with_suffix('.stderr.log').open('w') as err:\n            try:r=subprocess.run(cmd,input=prompt,text=True,stdout=out,stderr=err,timeout=MANIFEST['timeout_seconds_per_attempt']);exitcode=r.returncode\n            except subprocess.TimeoutExpired:exitcode=124\n        elapsed=time.monotonic()-started\n        events=[json.loads(line) for line in stem.with_suffix('.jsonl').read_text().splitlines() if line.startswith('{')]\n        completed=[e for e in events if e.get('type')=='turn.completed']\n        usage=completed[-1].get('usage') if completed else None\n        toolcalls=sum(e.get('type')=='item.completed' and e.get('item',{}).get('type') in ('command_execution','mcp_tool_call','web_search','file_change','collab_tool_call') for e in events)\n        if exitcode==0 and output_path.exists():\n            try:\n                check=subprocess.run([sys.executable,__file__,'score',kind,str(output_path)],capture_output=True,text=True,timeout=5)\n                score=json.loads(check.stdout)\n            except Exception as e:score={'passed':False,'error':type(e).__name__+': '+str(e)}\n        else:score={'passed':False,'error':f'CLI exit {exitcode}'}\n        if toolcalls:score={'passed':False,'error':'unexpected tool use'}\n        record={'attempt':attempt,'exit_code':exitcode,'elapsed_seconds':round(elapsed,3),'usage':usage,'tool_calls':toolcalls,'score':score,'prompt_sha256':hashlib.sha256(prompt.encode()).hexdigest(),'source':output_path.read_text() if output_path.exists() else None}\n        row['attempts'].append(record)\n        print(json.dumps({'run':number,'task':kind,'effort':effort,**{k:record[k] for k in ('attempt','exit_code','elapsed_seconds','usage','tool_calls','score')}}),flush=True)\n        if score['passed']:\n            row['passed']=True;break\n        if not completed:\n            row['blocked']=True;break\n        prompt=MANIFEST['tasks'][kind]+'\\nYour previous attempt failed verification: '+score['error']+'\\nRepair it and return complete source only. Previous attempt:\\n'+record['source']\n    results.append(row)\n    (ROOT/'results.json').write_text(json.dumps({'manifest':MANIFEST,'results':results},indent=2)+'\\n')\n    if row.get('blocked'):\n        print('Transport/configuration blocked; stop instead of spending further calls.',flush=True);break\n",
+  "evaluator_sha256": "d190b55791654d97be240b40542bf60743fea7a9038272a5a7c8c463394eca01",
+  "results": [
+    {
+      "run": 1,
+      "task": "routine",
+      "effort": "medium",
+      "attempts": [
+        {
+          "attempt": 1,
+          "exit_code": 0,
+          "elapsed_seconds": 7.735,
+          "usage": {
+            "input_tokens": 16817,
+            "cached_input_tokens": 11520,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 86,
+            "reasoning_output_tokens": 0
+          },
+          "tool_calls": 0,
+          "score": {
+            "passed": true,
+            "checks": 87
+          },
+          "prompt_sha256": "cd886fe668d3dffec2f98ae927861e570f6ee7e766266007e1310e0ac2e1d275",
+          "source": "def normalize_paths(lines):\n    result = []\n    seen = set()\n    for line in lines:\n        path = line.strip()\n        if not path or path.startswith(\"#\"):\n            continue\n        path = path.replace(\"\\\\\", \"/\")\n        while path.startswith(\"./\"):\n            path = path[2:]\n        if path and path not in seen:\n            seen.add(path)\n            result.append(path)\n    return result"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "run": 2,
+      "task": "routine",
+      "effort": "xhigh",
+      "attempts": [
+        {
+          "attempt": 1,
+          "exit_code": 0,
+          "elapsed_seconds": 9.543,
+          "usage": {
+            "input_tokens": 14141,
+            "cached_input_tokens": 11520,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 129,
+            "reasoning_output_tokens": 41
+          },
+          "tool_calls": 0,
+          "score": {
+            "passed": true,
+            "checks": 87
+          },
+          "prompt_sha256": "cd886fe668d3dffec2f98ae927861e570f6ee7e766266007e1310e0ac2e1d275",
+          "source": "def normalize_paths(lines):\n    result = []\n    seen = set()\n    for line in lines:\n        path = line.strip()\n        if not path or path.startswith(\"#\"):\n            continue\n        path = path.replace(\"\\\\\", \"/\")\n        while path.startswith(\"./\"):\n            path = path[2:]\n        if path and path not in seen:\n            seen.add(path)\n            result.append(path)\n    return result"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "run": 3,
+      "task": "routine",
+      "effort": "xhigh",
+      "attempts": [
+        {
+          "attempt": 1,
+          "exit_code": 0,
+          "elapsed_seconds": 9.843,
+          "usage": {
+            "input_tokens": 14141,
+            "cached_input_tokens": 13952,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 169,
+            "reasoning_output_tokens": 81
+          },
+          "tool_calls": 0,
+          "score": {
+            "passed": true,
+            "checks": 87
+          },
+          "prompt_sha256": "cd886fe668d3dffec2f98ae927861e570f6ee7e766266007e1310e0ac2e1d275",
+          "source": "def normalize_paths(lines):\n    result = []\n    seen = set()\n    for line in lines:\n        path = line.strip()\n        if not path or path.startswith(\"#\"):\n            continue\n        path = path.replace(\"\\\\\", \"/\")\n        while path.startswith(\"./\"):\n            path = path[2:]\n        if path and path not in seen:\n            seen.add(path)\n            result.append(path)\n    return result"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "run": 4,
+      "task": "routine",
+      "effort": "medium",
+      "attempts": [
+        {
+          "attempt": 1,
+          "exit_code": 0,
+          "elapsed_seconds": 6.985,
+          "usage": {
+            "input_tokens": 14141,
+            "cached_input_tokens": 11520,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 86,
+            "reasoning_output_tokens": 0
+          },
+          "tool_calls": 0,
+          "score": {
+            "passed": true,
+            "checks": 87
+          },
+          "prompt_sha256": "cd886fe668d3dffec2f98ae927861e570f6ee7e766266007e1310e0ac2e1d275",
+          "source": "def normalize_paths(lines):\n    result = []\n    seen = set()\n    for line in lines:\n        path = line.strip()\n        if not path or path.startswith(\"#\"):\n            continue\n        path = path.replace(\"\\\\\", \"/\")\n        while path.startswith(\"./\"):\n            path = path[2:]\n        if path and path not in seen:\n            seen.add(path)\n            result.append(path)\n    return result"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "run": 5,
+      "task": "harder",
+      "effort": "xhigh",
+      "attempts": [
+        {
+          "attempt": 1,
+          "exit_code": 0,
+          "elapsed_seconds": 73.049,
+          "usage": {
+            "input_tokens": 14347,
+            "cached_input_tokens": 11520,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 2197,
+            "reasoning_output_tokens": 1552
+          },
+          "tool_calls": 0,
+          "score": {
+            "passed": true,
+            "checks": 94
+          },
+          "prompt_sha256": "462adc82995eb94428ea51da58a0d9071b575b89f3a04f4332d57ddf702da94f",
+          "source": "from copy import deepcopy\n\n\ndef apply_changes(state, operations):\n    if not isinstance(operations, list):\n        raise ValueError(\"operations must be a list\")\n\n    changes = {}\n\n    for operation in operations:\n        if not isinstance(operation, dict):\n            raise ValueError(\"each operation must be a dictionary\")\n\n        kind = operation.get(\"kind\")\n        if kind == \"put\":\n            required = {\"kind\", \"id\", \"expected\", \"deps\"}\n        elif kind == \"delete\":\n            required = {\"kind\", \"id\", \"expected\"}\n        else:\n            raise ValueError(\"unknown operation kind\")\n\n        if set(operation) != required:\n            raise ValueError(\"operation has missing or unknown fields\")\n\n        name = operation[\"id\"]\n        if not isinstance(name, str) or not name:\n            raise ValueError(\"operation ID must be a nonempty string\")\n        if name in changes:\n            raise ValueError(\"duplicate operation ID\")\n\n        expected = operation[\"expected\"]\n        exists = name in state\n\n        if exists:\n            if (\n                not isinstance(expected, int)\n                or isinstance(expected, bool)\n                or expected < 0\n                or expected != state[name][\"revision\"]\n            ):\n                raise ValueError(\"expected revision does not match original state\")\n        elif kind == \"delete\":\n            raise ValueError(\"cannot delete an absent node\")\n        elif expected is not None:\n            raise ValueError(\"a new node requires expected=None\")\n\n        if kind == \"delete\":\n            changes[name] = None\n            continue\n\n        deps = operation[\"deps\"]\n        if not isinstance(deps, list):\n            raise ValueError(\"dependencies must be a list\")\n\n        seen = set()\n        for dependency in deps:\n            if not isinstance(dependency, str) or not dependency:\n                raise ValueError(\"dependency names must be nonempty strings\")\n            if dependency == name:\n                raise ValueError(\"self-dependency is invalid\")\n            if dependency in seen:\n                raise ValueError(\"duplicate dependency\")\n            seen.add(dependency)\n\n        changes[name] = {\n            \"revision\": state[name][\"revision\"] + 1 if exists else 0,\n            \"deps\": sorted(deps),\n        }\n\n    result = deepcopy(state)\n\n    for name in sorted(changes):\n        replacement = changes[name]\n        if replacement is None:\n            del result[name]\n        else:\n            result[name] = replacement\n\n    incoming = {name: 0 for name in result}\n    for record in result.values():\n        for dependency in record[\"deps\"]:\n            if dependency not in result:\n                raise ValueError(\"final graph contains a dangling reference\")\n            incoming[dependency] += 1\n\n    ready = [name for name, count in incoming.items() if count == 0]\n    visited = 0\n\n    while ready:\n        name = ready.pop()\n        visited += 1\n        for dependency in result[name][\"deps\"]:\n            incoming[dependency] -= 1\n            if incoming[dependency] == 0:\n                ready.append(dependency)\n\n    if visited != len(result):\n        raise ValueError(\"final graph contains a cycle\")\n\n    return result"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "run": 6,
+      "task": "harder",
+      "effort": "medium",
+      "attempts": [
+        {
+          "attempt": 1,
+          "exit_code": 0,
+          "elapsed_seconds": 32.31,
+          "usage": {
+            "input_tokens": 14347,
+            "cached_input_tokens": 11520,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 916,
+            "reasoning_output_tokens": 223
+          },
+          "tool_calls": 0,
+          "score": {
+            "passed": true,
+            "checks": 94
+          },
+          "prompt_sha256": "462adc82995eb94428ea51da58a0d9071b575b89f3a04f4332d57ddf702da94f",
+          "source": "from copy import deepcopy\n\n\ndef apply_changes(state, operations):\n    if not isinstance(operations, list):\n        raise ValueError(\"operations must be a list\")\n\n    seen = set()\n    validated = []\n\n    for operation in operations:\n        if not isinstance(operation, dict):\n            raise ValueError(\"each operation must be a dictionary\")\n\n        kind = operation.get(\"kind\")\n        if kind == \"put\":\n            required = {\"kind\", \"id\", \"expected\", \"deps\"}\n        elif kind == \"delete\":\n            required = {\"kind\", \"id\", \"expected\"}\n        else:\n            raise ValueError(\"unknown operation kind\")\n\n        if set(operation) != required:\n            raise ValueError(\"unknown or missing operation fields\")\n\n        name = operation[\"id\"]\n        if not isinstance(name, str) or not name:\n            raise ValueError(\"invalid operation ID\")\n        if name in seen:\n            raise ValueError(\"duplicate operation ID\")\n        seen.add(name)\n\n        expected = operation[\"expected\"]\n        exists = name in state\n\n        if kind == \"delete\" or exists:\n            if (\n                not isinstance(expected, int)\n                or isinstance(expected, bool)\n                or expected < 0\n            ):\n                raise ValueError(\"expected must be a non-negative integer\")\n            if not exists:\n                raise ValueError(\"cannot delete an absent node\")\n            if expected != state[name][\"revision\"]:\n                raise ValueError(\"revision mismatch\")\n        elif expected is not None:\n            raise ValueError(\"new nodes require expected=None\")\n\n        if kind == \"put\":\n            deps = operation[\"deps\"]\n            if not isinstance(deps, list):\n                raise ValueError(\"deps must be a list\")\n\n            dependency_names = set()\n            for dependency in deps:\n                if not isinstance(dependency, str) or not dependency:\n                    raise ValueError(\"invalid dependency name\")\n                if dependency == name:\n                    raise ValueError(\"self-dependency\")\n                if dependency in dependency_names:\n                    raise ValueError(\"duplicate dependency\")\n                dependency_names.add(dependency)\n\n            validated.append((kind, name, sorted(deps)))\n        else:\n            validated.append((kind, name, None))\n\n    result = deepcopy(state)\n\n    for kind, name, deps in validated:\n        if kind == \"delete\":\n            del result[name]\n        else:\n            if name in state:\n                record = result[name]\n                record[\"revision\"] = state[name][\"revision\"] + 1\n                record[\"deps\"] = deps\n            else:\n                result[name] = {\"revision\": 0, \"deps\": deps}\n\n    remaining = {}\n    dependents = {name: [] for name in result}\n\n    for name, record in result.items():\n        remaining[name] = len(record[\"deps\"])\n        for dependency in record[\"deps\"]:\n            if dependency not in result:\n                raise ValueError(\"dangling dependency\")\n            dependents[dependency].append(name)\n\n    ready = [name for name, count in remaining.items() if count == 0]\n    visited = 0\n\n    while ready:\n        name = ready.pop()\n        visited += 1\n        for dependent in dependents[name]:\n            remaining[dependent] -= 1\n            if remaining[dependent] == 0:\n                ready.append(dependent)\n\n    if visited != len(result):\n        raise ValueError(\"cycle in final graph\")\n\n    return result"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "run": 7,
+      "task": "harder",
+      "effort": "medium",
+      "attempts": [
+        {
+          "attempt": 1,
+          "exit_code": 0,
+          "elapsed_seconds": 29.953,
+          "usage": {
+            "input_tokens": 14347,
+            "cached_input_tokens": 11520,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 829,
+            "reasoning_output_tokens": 139
+          },
+          "tool_calls": 0,
+          "score": {
+            "passed": true,
+            "checks": 94
+          },
+          "prompt_sha256": "462adc82995eb94428ea51da58a0d9071b575b89f3a04f4332d57ddf702da94f",
+          "source": "from copy import deepcopy\n\n\ndef _valid_name(value):\n    return isinstance(value, str) and bool(value)\n\n\ndef _valid_revision(value):\n    return isinstance(value, int) and not isinstance(value, bool) and value >= 0\n\n\ndef apply_changes(state, operations):\n    if not isinstance(operations, list):\n        raise ValueError(\"operations must be a list\")\n\n    seen = set()\n    validated = []\n\n    for operation in operations:\n        if not isinstance(operation, dict):\n            raise ValueError(\"each operation must be a dictionary\")\n\n        kind = operation.get(\"kind\")\n        if kind == \"put\":\n            required = {\"kind\", \"id\", \"expected\", \"deps\"}\n        elif kind == \"delete\":\n            required = {\"kind\", \"id\", \"expected\"}\n        else:\n            raise ValueError(\"unknown operation kind\")\n\n        if set(operation) != required:\n            raise ValueError(\"unknown or missing operation fields\")\n\n        name = operation[\"id\"]\n        if not _valid_name(name):\n            raise ValueError(\"invalid operation ID\")\n        if name in seen:\n            raise ValueError(\"duplicate operation ID\")\n        seen.add(name)\n\n        expected = operation[\"expected\"]\n        exists = name in state\n\n        if exists:\n            if (\n                not _valid_revision(expected)\n                or expected != state[name][\"revision\"]\n            ):\n                raise ValueError(\"expected revision does not match\")\n        elif kind == \"delete\":\n            raise ValueError(\"cannot delete an absent node\")\n        elif expected is not None:\n            raise ValueError(\"new nodes require expected=None\")\n\n        if kind == \"put\":\n            deps = operation[\"deps\"]\n            if not isinstance(deps, list):\n                raise ValueError(\"dependencies must be a list\")\n\n            unique_deps = set()\n            for dependency in deps:\n                if not _valid_name(dependency):\n                    raise ValueError(\"invalid dependency name\")\n                if dependency == name:\n                    raise ValueError(\"self-dependency\")\n                if dependency in unique_deps:\n                    raise ValueError(\"duplicate dependency\")\n                unique_deps.add(dependency)\n\n            revision = state[name][\"revision\"] + 1 if exists else 0\n            validated.append(\n                (kind, name, {\"revision\": revision, \"deps\": sorted(deps)})\n            )\n        else:\n            validated.append((kind, name, None))\n\n    result = deepcopy(state)\n    for kind, name, record in validated:\n        if kind == \"delete\":\n            del result[name]\n        else:\n            result[name] = record\n\n    remaining = {}\n    dependents = {name: [] for name in result}\n\n    for name, record in result.items():\n        deps = record[\"deps\"]\n        remaining[name] = len(deps)\n        for dependency in deps:\n            if dependency not in result:\n                raise ValueError(\"dangling dependency\")\n            dependents[dependency].append(name)\n\n    ready = [name for name, count in remaining.items() if count == 0]\n    visited = 0\n\n    while ready:\n        name = ready.pop()\n        visited += 1\n        for dependent in dependents[name]:\n            remaining[dependent] -= 1\n            if remaining[dependent] == 0:\n                ready.append(dependent)\n\n    if visited != len(result):\n        raise ValueError(\"final graph contains a cycle\")\n\n    return result"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "run": 8,
+      "task": "harder",
+      "effort": "xhigh",
+      "attempts": [
+        {
+          "attempt": 1,
+          "exit_code": 0,
+          "elapsed_seconds": 71.669,
+          "usage": {
+            "input_tokens": 14347,
+            "cached_input_tokens": 11520,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 2247,
+            "reasoning_output_tokens": 1552
+          },
+          "tool_calls": 0,
+          "score": {
+            "passed": true,
+            "checks": 94
+          },
+          "prompt_sha256": "462adc82995eb94428ea51da58a0d9071b575b89f3a04f4332d57ddf702da94f",
+          "source": "from copy import deepcopy\n\n\ndef apply_changes(state, operations):\n    if not isinstance(operations, list):\n        raise ValueError(\"operations must be a list\")\n\n    changes = {}\n\n    for operation in operations:\n        if not isinstance(operation, dict):\n            raise ValueError(\"each operation must be a dictionary\")\n\n        kind = operation.get(\"kind\")\n        if kind == \"put\":\n            required = {\"kind\", \"id\", \"expected\", \"deps\"}\n        elif kind == \"delete\":\n            required = {\"kind\", \"id\", \"expected\"}\n        else:\n            raise ValueError(\"invalid operation kind\")\n\n        if set(operation) != required:\n            raise ValueError(\"unknown or missing operation fields\")\n\n        node_id = operation[\"id\"]\n        if not isinstance(node_id, str) or not node_id:\n            raise ValueError(\"invalid operation ID\")\n        if node_id in changes:\n            raise ValueError(\"duplicate operation ID\")\n\n        expected = operation[\"expected\"]\n        exists = node_id in state\n\n        if exists:\n            if (\n                not isinstance(expected, int)\n                or isinstance(expected, bool)\n                or expected < 0\n                or expected != state[node_id][\"revision\"]\n            ):\n                raise ValueError(\"expected revision does not match\")\n        elif kind == \"delete\":\n            raise ValueError(\"cannot delete an absent node\")\n        elif expected is not None:\n            raise ValueError(\"new nodes require expected=None\")\n\n        if kind == \"delete\":\n            changes[node_id] = None\n            continue\n\n        deps = operation[\"deps\"]\n        if not isinstance(deps, list):\n            raise ValueError(\"deps must be a list\")\n\n        seen = set()\n        for dependency in deps:\n            if not isinstance(dependency, str) or not dependency:\n                raise ValueError(\"invalid dependency name\")\n            if dependency == node_id:\n                raise ValueError(\"self-dependency\")\n            if dependency in seen:\n                raise ValueError(\"duplicate dependency\")\n            seen.add(dependency)\n\n        changes[node_id] = {\n            \"revision\": state[node_id][\"revision\"] + 1 if exists else 0,\n            \"deps\": sorted(deps),\n        }\n\n    result = deepcopy(state)\n\n    # Apply in a stable order, including insertion order for new nodes.\n    for node_id in sorted(changes):\n        replacement = changes[node_id]\n        if replacement is None:\n            del result[node_id]\n        else:\n            result[node_id] = replacement\n\n    # Validate only the completed graph.\n    remaining = {}\n    dependents = {node_id: [] for node_id in result}\n\n    for node_id, record in result.items():\n        remaining[node_id] = len(record[\"deps\"])\n        for dependency in record[\"deps\"]:\n            if dependency not in result:\n                raise ValueError(\"dangling dependency\")\n            dependents[dependency].append(node_id)\n\n    ready = [\n        node_id\n        for node_id, dependency_count in remaining.items()\n        if dependency_count == 0\n    ]\n    visited = 0\n\n    while ready:\n        node_id = ready.pop()\n        visited += 1\n        for dependent in dependents[node_id]:\n            remaining[dependent] -= 1\n            if remaining[dependent] == 0:\n                ready.append(dependent)\n\n    if visited != len(result):\n        raise ValueError(\"cycle in final graph\")\n\n    return result"
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "profile_validation": {
+    "installed_profile": "/home/alex/.codex/intrinsic-routine.config.toml",
+    "profile_toml": {
+      "model": "gpt-6-astra",
+      "model_reasoning_effort": "medium"
+    },
+    "validation_command": "TERM=xterm-256color codex --profile intrinsic-routine --strict-config --no-alt-screen",
+    "observed_status": "gpt-6-astra medium \u00b7 ~/Documents/IntrinsicEngine",
+    "model_calls": 0,
+    "note": "Observed the live CLI startup status, then exited without submitting a prompt. app-server/debug dry probes were unsuitable for profile selection and are not used as evidence."
+  },
+  "limits": [
+    "Two repetitions of two tasks; checks cannot establish absence of all defects.",
+    "Identical user prompt hashes within each task; full server-provided context was not captured. First routine/medium run reports 2676 more input tokens; cause unestablished.",
+    "Requested service tier default in every run; delivered tier and monetary/credit charges are not exposed in CLI events.",
+    "Routine caching varies; harder runs match input and cached-input counts. Counterbalanced order does not eliminate warm-cache or time-of-day effects.",
+    "CLI output_tokens includes reasoning_output_tokens; do not sum reasoning again.",
+    "Latency includes CLI startup and service time; no broad C++/Vulkan or completed-repository-task savings claim.",
+    "Eight measured calls consumed 123287 input-plus-output tokens in aggregate; this calibration cost is not hidden or included in per-task savings.",
+    "CLI app-server/debug probes do not establish profile loading; live CLI startup status verified the installed profile without a model request."
+  ]
+}

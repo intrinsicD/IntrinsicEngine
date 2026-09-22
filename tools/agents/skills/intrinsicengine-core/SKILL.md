@@ -32,6 +32,7 @@ and bounded read; do not load the whole file to use one section.
 | Choosing work | `Work selection` |
 | Selecting/running verification | `Verification` |
 | Running tools, presenting large results, or waiting on work | `Tool output and waits` |
+| Selecting reasoning effort or comparing completed-task cost | `Reasoning effort` |
 | A failed check | `When CI fails` |
 | Committing or opening a PR | `Commit and PR hygiene` |
 | Filing an offered deferred hint | `Deferred-hint ledger` |
