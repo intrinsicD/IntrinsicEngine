@@ -2466,7 +2466,7 @@ TEST(SandboxProcessingPanels, SegmentationFeaturePickerReusesPreparedLargeCatalo
     PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
     auto& faces = scene.Raw().get<GS::Faces>(entity).Properties;
     for (unsigned i = 0; i < 512; ++i)
-        faces.GetOrAdd<float>("f:feature_" + std::to_string(i), 1.0f);
+        (void)faces.GetOrAdd<float>("f:feature_" + std::to_string(i), 1.0f);
     auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
     auto segmentation = *R::GetCurvatureSegmentationConfig(config);
     segmentation.Features = {{R::GeometryElementDomain::MeshFace, "f:feature_0", Geometry::PropertyValueKind::Float}};
@@ -2508,8 +2508,11 @@ TEST(SandboxProcessingPanels, SegmentationFeaturePickerReusesPreparedLargeCatalo
             EXPECT_EQ(readiness.ChecksQueued, baseline.ChecksQueued);
             const auto& stats = h.Shell.GetLastFrame().ModelBuildStats;
             EXPECT_EQ(stats.PropertyCatalogModelBuilds, 0u);
-            EXPECT_EQ(stats.DomainWindowModelBuilds, 0u);
-            EXPECT_GT(stats.DomainWindowModelCacheHits, 0u);
+            // The panel owns a fresh domain wrapper each frame; its catalog
+            // metadata comes from the persistent selected-analysis cache.
+            EXPECT_EQ(stats.DomainWindowModelBuilds, 1u);
+            EXPECT_EQ(stats.SelectedAnalysisCacheMisses, 0u);
+            EXPECT_GT(stats.SelectedAnalysisCacheHits, 0u);
         }
         if (step == 20) { completed = true; engine.RequestExit(); }
     };
