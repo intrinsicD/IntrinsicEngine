@@ -6403,9 +6403,31 @@ FindRuntime190Record(
     return found != snapshot.Textures.end() ? &*found : nullptr;
 }
 
+// Use identical exactly representable values so storage cannot select semantics.
+void SetRuntime190ScalarValues(Geometry::PropertySet& properties,
+                              Geometry::PropertyValueKind kind, bool rebaked)
+{
+    const auto set = [&]<typename T>() {
+        auto values = properties.GetOrAdd<T>("v:runtime190_scalar");
+        values.Vector().assign(properties.Size(), static_cast<T>(rebaked));
+    };
+    switch (kind)
+    {
+    case Geometry::PropertyValueKind::Bool: set.operator()<bool>(); break;
+    case Geometry::PropertyValueKind::Int32: set.operator()<std::int32_t>(); break;
+    case Geometry::PropertyValueKind::UInt32: set.operator()<std::uint32_t>(); break;
+    case Geometry::PropertyValueKind::UInt8: set.operator()<std::uint8_t>(); break;
+    case Geometry::PropertyValueKind::Float: set.operator()<float>(); break;
+    case Geometry::PropertyValueKind::Double: set.operator()<double>(); break;
+    default: FAIL() << "Expected a scalar storage kind";
+    }
+}
+
 class Runtime190PropertyTextureBakeApp final : public Intrinsic::Tests::RuntimeTestModule
 {
 public:
+    explicit Runtime190PropertyTextureBakeApp(Geometry::PropertyValueKind kind)
+        : m_ScalarKind(kind) {}
     void Resolve() override
     {
         auto& engine = Kernel();
@@ -6645,6 +6667,7 @@ public:
     std::uint64_t RebakedVertexCacheGeneration{0u};
 
 private:
+    Geometry::PropertyValueKind m_ScalarKind;
     enum class Stage : std::uint8_t
     {
         WaitingToSchedule,
@@ -6705,18 +6728,17 @@ private:
             RT::GeometryPresentationSlotSemantic::Albedo;
         command.SourceDomain =
             RT::GeometryElementDomain::MeshVertex;
-        command.ExpectedValueKind =
-            Geometry::PropertyValueKind::Float;
+        command.ExpectedValueKind = m_ScalarKind;
         command.PropertyName = "v:runtime190_scalar";
         command.RangePolicy =
             RT::PropertyTextureBakeRangePolicy::Manual;
-        command.RangeMin = 0.0f;
-        command.RangeMax = 1.0f;
+        command.RangeMin = -1.0f;
+        command.RangeMax = 3.0f;
         command.Width = kRuntime190BakeExtent;
         command.Height = kRuntime190BakeExtent;
         command.OutputName = std::string{kRuntime190VertexOutput};
         command.Storage =
-            RT::PropertyTextureBakeStorage::RawFloat;
+            RT::PropertyTextureBakeStorage::Auto;
         command.Targets = Targets(colormap);
         command.BindGeneratedTexture = true;
         return command;
@@ -6800,9 +6822,9 @@ private:
                     MaterialAlbedoTextureInterpretation::Scalar &&
             bindings->AlbedoScalarColormap ==
                 Extrinsic::Graphics::Colormap::Type::Viridis &&
-            std::abs(bindings->AlbedoScalarRangeMin - 0.0f) <
+            std::abs(bindings->AlbedoScalarRangeMin + 1.0f) <
                 1.0e-6f &&
-            std::abs(bindings->AlbedoScalarRangeMax - 1.0f) <
+            std::abs(bindings->AlbedoScalarRangeMax - 3.0f) <
                 1.0e-6f;
         if (!InitialViridisBindingObserved)
             Fail("Ready raw scalar texture did not bind as Viridis albedo.");
@@ -6906,11 +6928,8 @@ private:
             return false;
         }
 
-        auto& values = m_Scene->Raw()
-            .get<gs::Vertices>(m_Target)
-            .Properties.Get<float>("v:runtime190_scalar")
-            .Vector();
-        values = {0.75f, 0.75f, 0.75f};
+        SetRuntime190ScalarValues(m_Scene->Raw().get<gs::Vertices>(m_Target).Properties,
+                                  m_ScalarKind, true);
         const RT::EditorTextureBakeCommandResult rebake =
             RT::ApplyEditorTextureBakeCommand(
                 CommandContext(),
@@ -7185,10 +7204,9 @@ private:
 }
 } // namespace
 
-TEST(RuntimeSandboxAcceptanceGpuSmoke,
-     PropertyTextureModuleBakesRebindsRebakesAndRemovesOnVulkan)
+void CheckPropertyTextureScalarStorageOnVulkan(Geometry::PropertyValueKind kind)
 {
-    auto app = std::make_unique<Runtime190PropertyTextureBakeApp>();
+    auto app = std::make_unique<Runtime190PropertyTextureBakeApp>(kind);
     auto* const appPtr = app.get();
     auto bootstrap =
         BootstrapDefaultSandboxAppEngineWithApp(std::move(app));
@@ -7207,9 +7225,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
     auto& raw = scene.Raw();
     auto& vertices = raw.get<gs::Vertices>(triangle);
     ASSERT_EQ(vertices.Properties.Size(), 3u);
-    vertices.Properties
-        .GetOrAdd<float>("v:runtime190_scalar", 0.25f)
-        .Vector() = {0.25f, 0.25f, 0.25f};
+    SetRuntime190ScalarValues(vertices.Properties, kind, false);
     vertices.Properties
         .GetOrAdd<glm::vec3>(
             std::string{pn::kNormal},
@@ -7435,11 +7451,11 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
 
     EXPECT_NEAR(
         ReadRuntime190FloatTexel(bakeBytes[0], 8u, 8u),
-        0.25f,
+        0.0f,
         1.0e-5f);
     EXPECT_NEAR(
         ReadRuntime190FloatTexel(bakeBytes[1], 8u, 8u),
-        0.75f,
+        1.0f,
         1.0e-5f);
 
     const Extrinsic::Core::Extent2D bakeExtent{
@@ -7562,6 +7578,36 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
         << run.After.OperationalGateFailure;
 
     engine.Shutdown();
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, PropertyTextureModuleBakesRebindsRebakesAndRemovesOnVulkan)
+{
+    CheckPropertyTextureScalarStorageOnVulkan(Geometry::PropertyValueKind::Float);
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, PropertyTextureDoubleStorageBakesAndRebakesOnVulkan)
+{
+    CheckPropertyTextureScalarStorageOnVulkan(Geometry::PropertyValueKind::Double);
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, PropertyTextureBoolStorageBakesAndRebakesOnVulkan)
+{
+    CheckPropertyTextureScalarStorageOnVulkan(Geometry::PropertyValueKind::Bool);
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, PropertyTextureInt32StorageBakesAndRebakesOnVulkan)
+{
+    CheckPropertyTextureScalarStorageOnVulkan(Geometry::PropertyValueKind::Int32);
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, PropertyTextureUInt32StorageBakesAndRebakesOnVulkan)
+{
+    CheckPropertyTextureScalarStorageOnVulkan(Geometry::PropertyValueKind::UInt32);
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, PropertyTextureUInt8StorageBakesAndRebakesOnVulkan)
+{
+    CheckPropertyTextureScalarStorageOnVulkan(Geometry::PropertyValueKind::UInt8);
 }
 
 // BUG-137 slice B — `Operational` proof for the corner-UV upload path.
@@ -8001,7 +8047,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
   auto &vertices = scene.Raw().get<gs::Vertices>(triangle).Properties;
   (void)vertices.GetOrAdd<float>("v:runtime190_scalar", 0.5f);
   vertices.GetOrAdd<glm::vec3>("v:normal", {}).Vector() =
-      std::vector<glm::vec3>(vertices.Size(), glm::vec3{-2, 0, 0});
+      std::vector<glm::vec3>(vertices.Size(),
+                             glm::vec3{-std::numeric_limits<float>::max(), 0, 0});
   vertices.GetOrAdd<glm::vec4>("v:appearance_red", glm::vec4{1, 0, 0, 1})
       .Vector() =
       std::vector<glm::vec4>(vertices.Size(), glm::vec4{1, 0, 0, 1});
