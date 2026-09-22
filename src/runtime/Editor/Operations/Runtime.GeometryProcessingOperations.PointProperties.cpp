@@ -493,11 +493,12 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         if (output.Domain == D::Unknown) output.Domain = positions.Domain;
         if (!ValidatePointOutputs(a, positions, std::span(&output, 1), outputLabel, diagnostic)) return false;
         w.OutputWatch = ObserveGeometryProperty(a, output.Domain, output.Name);
+        w.Output = output;
         if (copyValues)
         {
             const auto* props = ResolveGeometryPropertySet(a, output.Domain);
-            if (w.OutputWatch.Revision) w.BeforeValues = props->Get<float>(output.Name).Vector();
-            w.AfterValues = w.OutputWatch.Revision ? w.BeforeValues : std::vector<float>(w.SlotCount);
+            w.BeforeValues = CaptureGeometryScalarProperty(*props, output);
+            w.AfterValues.resize(w.SlotCount);
         }
         return true;
     }
@@ -514,19 +515,21 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         const EditorProcessingContext& context, entt::entity entity,
         const PointScalarCapture& w, std::string label)
     {
-        struct State { bool Exists{}; std::vector<float> Values{}; };
-        auto before = std::make_shared<State>(State{bool(w.OutputWatch.Revision), w.BeforeValues});
-        auto after = std::make_shared<State>(State{true, w.AfterValues});
+        using State = GeometryScalarPropertySnapshot;
+        auto before = std::make_shared<State>(w.BeforeValues);
+        auto after = std::make_shared<State>(*before);
+        if (!PrepareGeometryScalarProperty(*after, w.Output.ValueKind, w.SlotCount, w.Slots, w.AfterValues))
+            return EditorCommandHistoryStatus::InvalidCommand;
         auto revisions = std::make_shared<std::array<PointPropertyWatch, 1>>(std::array{w.OutputWatch});
-        const auto mutate = [context, entity, inputs=w.Inputs, revisions](const State& target)
+        const auto mutate = [context, entity, inputs=w.Inputs, ref=w.Output, revisions](const State& target)
         {
             if (!GeometryPropertiesCurrent(context, entity, inputs) ||
                 !GeometryPropertiesCurrent(context, entity, *revisions))
                 return EditorCommandHistoryStatus::StaleEntity;
             const auto& output = revisions->front();
             auto* props = MutableGeometryProperties(context.Scene->Raw(), entity, output.Domain);
-            if (target.Exists) props->GetOrAdd<float>(output.Name).Vector() = target.Values;
-            else if (auto p = props->Get<float>(output.Name)) props->Remove(p);
+            if (!ApplyGeometryScalarProperty(*props, ref, target))
+                return EditorCommandHistoryStatus::InvalidCommand;
             const auto a = BuildGeometryAvailability(context.Scene->Raw(), entity);
             *revisions = {ObserveGeometryProperty(a, output.Domain, output.Name)};
             // Scalar buffers follow their property revision. They do not alter

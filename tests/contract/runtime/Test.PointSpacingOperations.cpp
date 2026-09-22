@@ -443,3 +443,78 @@ TEST(PointSpacingOperations, ExpiredAttachmentRejectsQueuedPublicationAndDeliver
     EXPECT_FALSE(history.CanUndo());
     EXPECT_FALSE(commands.IsBound());
 }
+
+TEST(PointSpacingOperations, ScalarStorageChoicesRoundTripAndUndo)
+{
+    using K = Geometry::PropertyValueKind;
+    for (const auto kind : {K::Bool,K::Int32,K::UInt32,K::UInt64,K::Float,K::Double})
+    {
+        SCOPED_TRACE(int(kind));
+        R::WorldRegistry worlds;
+        const auto world=worlds.CreateWorld("scalar outputs");
+        auto& scene=*worlds.Get(world);
+        const auto entity=Make(scene,D::PointCloudPoint);
+        auto& props=PointDomainProperties(scene,entity,D::PointCloudPoint);
+        auto samples=props.Get<glm::vec3>("samples");
+        for(unsigned i=0;i<4;++i)samples[i]={float(i),0,0};
+        auto config=Config(entity,D::PointCloudPoint);
+        config.KNeighbors=1;
+        config.ScaleFactor=1;
+        config.Radii.ValueKind=kind;
+        const auto payload=R::SerializePointSpacingConfig(config);
+        EXPECT_TRUE(R::ValidatePointSpacingConfigSection(payload,{},R::kPointSpacingConfigSectionName).Usable());
+        Extrinsic::Core::Config::EngineConfig document;
+        R::SetPointSpacingConfig(document,config);
+        const auto decoded=R::GetPointSpacingConfig(document);
+        ASSERT_TRUE(decoded);
+        EXPECT_EQ(decoded->Radii,config.Radii);
+        R::EditorCommandHistory history;
+        const R::EditorProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history};
+        const auto result=R::ApplyEditorPointSpacingCommand(R::BindEditorProcessingCommands(context),config);
+        ASSERT_TRUE(result.Succeeded())<<result.Message;
+        EXPECT_EQ(R::DetectGeometryPropertyValueKind(props,"radii"),kind);
+        EXPECT_EQ(history.Undo().Status,R::EditorCommandHistoryStatus::Undone);
+        EXPECT_FALSE(props.Exists("radii"));
+        EXPECT_EQ(history.Redo().Status,R::EditorCommandHistoryStatus::Redone);
+    }
+}
+
+TEST(PointSpacingOperations, InexactIntegerOutputFailsWithoutCreatingPropertyOrHistory)
+{
+    R::WorldRegistry worlds;
+    const auto world=worlds.CreateWorld("inexact output");
+    auto& scene=*worlds.Get(world);
+    const auto entity=Make(scene,D::PointCloudPoint);
+    auto config=Config(entity,D::PointCloudPoint);
+    config.Radii.ValueKind=Geometry::PropertyValueKind::Int32;
+    R::EditorCommandHistory history;
+    const R::EditorProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history};
+    EXPECT_FALSE(R::ApplyEditorPointSpacingCommand(R::BindEditorProcessingCommands(context),config).Succeeded());
+    EXPECT_FALSE(PointDomainProperties(scene,entity,D::PointCloudPoint).Exists("radii"));
+    EXPECT_EQ(history.Undo().Status,R::EditorCommandHistoryStatus::EmptyUndoStack);
+}
+
+TEST(PointSpacingOperations, DoubleOutputUndoPreservesDeletedNanAndUnrelatedEdits)
+{
+    R::WorldRegistry worlds;
+    const auto world=worlds.CreateWorld("exact history");
+    auto& scene=*worlds.Get(world);
+    const auto entity=Make(scene,D::PointCloudPoint);
+    auto& props=PointDomainProperties(scene,entity,D::PointCloudPoint);
+    props.GetOrAdd<double>("radii").Vector().assign(props.Size(),77.0);
+    props.Get<double>("radii")[4]=std::numeric_limits<double>::quiet_NaN();
+    auto config=Config(entity,D::PointCloudPoint);
+    config.Radii.ValueKind=Geometry::PropertyValueKind::Double;
+    R::EditorCommandHistory history;
+    const R::EditorProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history};
+    const auto result=R::ApplyEditorPointSpacingCommand(R::BindEditorProcessingCommands(context),config);
+    ASSERT_TRUE(result.Succeeded())<<result.Message;
+    EXPECT_TRUE(std::isnan(std::as_const(props).Get<double>("radii")[4]));
+    props.Get<float>("keep")[0]=99;
+    ASSERT_TRUE(history.Undo().Succeeded());
+    EXPECT_EQ(std::as_const(props).Get<double>("radii")[0],77);
+    EXPECT_TRUE(std::isnan(std::as_const(props).Get<double>("radii")[4]));
+    ASSERT_TRUE(history.Redo().Succeeded());
+    EXPECT_EQ(std::as_const(props).Get<float>("keep")[0],99);
+    EXPECT_TRUE(std::isnan(std::as_const(props).Get<double>("radii")[4]));
+}

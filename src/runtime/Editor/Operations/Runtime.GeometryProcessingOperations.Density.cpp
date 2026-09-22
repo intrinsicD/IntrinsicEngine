@@ -142,8 +142,12 @@ namespace Extrinsic::Runtime
             {r.Status=EditorCommandStatus::StaleEntity; r.Message="Density input or output changed before publication."; return r;}
             if (r.Status!=EditorCommandStatus::Applied) return r;
             const auto status = PublishPointScalarField(context, w->Entity, *w, "Estimate kernel density");
-            r.Status=EditorFeatureDetail::ToEditorCommandStatus(status);
-            if (!r.Succeeded()) r.Message="Density publication rejected by history checks.";
+            r.Status = status == EditorCommandHistoryStatus::InvalidCommand
+                ? EditorCommandStatus::InvalidProcessingParameters
+                : EditorFeatureDetail::ToEditorCommandStatus(status);
+            if (!r.Succeeded()) r.Message = status == EditorCommandHistoryStatus::InvalidCommand
+                ? "Output values are not exactly representable in the selected scalar storage."
+                : "Density publication rejected by history checks.";
             return r;
         }
     }

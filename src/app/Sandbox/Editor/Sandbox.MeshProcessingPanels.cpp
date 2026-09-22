@@ -1881,7 +1881,7 @@ namespace Extrinsic::Sandbox::Editor
             changed = true;
         }
         for (auto [label, ref] : {std::pair{"Mask property", &config.Mask}, std::pair{"Score property", &config.Score}})
-            changed |= DrawProcessingPropertyName(label, ref->Name);
+            changed |= DrawProcessingScalarOutput(label, *ref);
         int method=int(config.Method), backend=int(config.Backend);
         if(ImGui::Combo("Method",&method,"Statistical\0Radius\0Local distance ratio\0")) {config.Method=Runtime::OutlierAnalysisMethod(method);changed=true;}
         if(ImGui::Combo("Acceleration",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::OutlierAnalysisBackend(backend);changed=true;}
@@ -1982,7 +1982,7 @@ namespace Extrinsic::Sandbox::Editor
             changed = true;
         }
         for (auto [label, ref] : {std::pair{"Mask property", &config.Mask}, std::pair{"Saliency property", &config.Score}})
-            changed |= DrawProcessingPropertyName(label, ref->Name);
+            changed |= DrawProcessingScalarOutput(label, *ref);
         if(config.Backend!=Runtime::KeypointAnalysisBackend::VulkanCompute)
         {
             int backend=int(config.Backend);
@@ -2076,7 +2076,7 @@ namespace Extrinsic::Sandbox::Editor
             for(unsigned i=0;i<33;++i)
             {
                 const auto label=std::string(blocks[i/11])+" bin "+std::to_string(i%11);
-                changed |= DrawProcessingPropertyName(label.c_str(), config.Outputs[i].Name);
+                changed |= DrawProcessingScalarOutput(label.c_str(), config.Outputs[i]);
             }
             ImGui::TreePop();
         }
@@ -2152,7 +2152,7 @@ namespace Extrinsic::Sandbox::Editor
             config.Density.Domain = config.Positions.Domain;
             changed = true;
         }
-        changed |= DrawProcessingPropertyName("Density property", config.Density.Name);
+        changed |= DrawProcessingScalarOutput("Density property", config.Density);
         int backend=int(config.Backend);
         if(ImGui::Combo("Acceleration",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::KernelDensityBackend(backend);changed=true;}
         changed |= ImGui::InputScalar("Neighbors k",ImGuiDataType_U32,&config.KNeighbors);
@@ -2210,7 +2210,7 @@ namespace Extrinsic::Sandbox::Editor
             changed = true;
         }
         for (auto [label, ref] : {std::pair{"Weight property", &config.Weights}})
-            changed |= DrawProcessingPropertyName(label, ref->Name);
+            changed |= DrawProcessingScalarOutput(label, *ref);
         int backend=int(config.Backend);
         if(ImGui::Combo("Acceleration",&backend,"CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::DensityWeightBackend(backend);changed=true;}
         changed |= ImGui::InputDouble("Support radius",&config.SupportRadius);
@@ -2404,7 +2404,7 @@ namespace Extrinsic::Sandbox::Editor
             config.Radii.Domain = config.Positions.Domain;
             changed = true;
         }
-        changed |= DrawProcessingPropertyName("Radii property", config.Radii.Name);
+        changed |= DrawProcessingScalarOutput("Radii property", config.Radii);
         int backend=int(config.Backend);
         if(ImGui::Combo("Acceleration",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::PointSpacingBackend(backend);changed=true;}
         changed |= ImGui::InputScalar("Neighbors k",ImGuiDataType_U32,&config.KNeighbors);

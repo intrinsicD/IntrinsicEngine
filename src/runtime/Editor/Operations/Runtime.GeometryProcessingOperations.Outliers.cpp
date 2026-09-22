@@ -13,6 +13,7 @@ module;
 #include <string>
 #include <string_view>
 #include <vector>
+#include <variant>
 #include <utility>
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
@@ -65,8 +66,9 @@ namespace Extrinsic::Runtime
             OutlierAnalysisConfig Config{};
             entt::entity Entity{};
             PointPropertyWatch MaskWatch{}, ScoreWatch{};
-            std::vector<std::uint32_t> BeforeMask{}, AfterMask{}, Counts{}, NeighborIds{};
-            std::vector<float> BeforeScore{}, AfterScore{};
+            GeometryScalarPropertySnapshot BeforeMask{}, BeforeScore{};
+            std::vector<std::uint32_t> AfterMask{}, Counts{}, NeighborIds{};
+            std::vector<float> AfterScore{};
             std::shared_ptr<const SpatialIndexSnapshot> Index{};
             SpatialIndexHandle GpuIndex{};
             std::shared_ptr<SpatialNearestBatch> Batch{};
@@ -148,10 +150,10 @@ namespace Extrinsic::Runtime
             }
             if (purpose == CapturePurpose::Execute)
             {
-                if (w->MaskWatch.Revision) w->BeforeMask = props->Get<std::uint32_t>(c.Mask.Name).Vector();
-                if (w->ScoreWatch.Revision) w->BeforeScore = props->Get<float>(c.Score.Name).Vector();
-                w->AfterMask = w->MaskWatch.Revision ? w->BeforeMask : std::vector<std::uint32_t>(props->Size());
-                w->AfterScore = w->ScoreWatch.Revision ? w->BeforeScore : std::vector<float>(props->Size());
+                w->BeforeMask = CaptureGeometryScalarProperty(*props, c.Mask);
+                w->BeforeScore = CaptureGeometryScalarProperty(*props, c.Score);
+                w->AfterMask.resize(props->Size());
+                w->AfterScore.resize(props->Size());
             }
             return w;
         }
@@ -316,26 +318,28 @@ namespace Extrinsic::Runtime
             if (r.Status!=EditorCommandStatus::Applied) return r;
             struct State
             {
-                bool MaskExists{}, ScoreExists{};
-                std::vector<std::uint32_t> Mask{};
-                std::vector<float> Score{};
+                GeometryScalarPropertySnapshot Mask{}, Score{};
                 std::optional<AnalysisStamp> Stamp{};
             };
             std::optional<AnalysisStamp> oldStamp;
             if (auto* stamp=context.Scene->Raw().try_get<AnalysisStamp>(w->Entity)) oldStamp=*stamp;
-            auto before=std::make_shared<State>(State{bool(w->MaskWatch.Revision),bool(w->ScoreWatch.Revision),w->BeforeMask,w->BeforeScore,oldStamp});
-            auto after=std::make_shared<State>(State{true,true,w->AfterMask,w->AfterScore,
-                AnalysisStamp{w->Config.Positions,w->Config.Mask,w->Inputs,w->MaskWatch}});
+            auto before=std::make_shared<State>(State{w->BeforeMask,w->BeforeScore,oldStamp});
+            auto after=std::make_shared<State>(*before);
+            after->Stamp = AnalysisStamp{w->Config.Positions,w->Config.Mask,w->Inputs,w->MaskWatch};
+            if (!PrepareGeometryScalarProperty(after->Mask, w->Config.Mask.ValueKind, w->SlotCount, w->Slots, w->AfterMask) ||
+                !PrepareGeometryScalarProperty(after->Score, w->Config.Score.ValueKind, w->SlotCount, w->Slots, w->AfterScore))
+            { r.Status=EditorCommandStatus::InvalidProcessingParameters; r.Message="Output values are not exactly representable in the selected scalar storage."; return r; }
             auto revisions=std::make_shared<std::array<PointPropertyWatch,2>>(std::array{w->MaskWatch,w->ScoreWatch});
             const auto mutate=[context,entity=w->Entity,inputs=w->Inputs,c=w->Config,revisions](const State& target)
             {
                 if (!GeometryPropertiesCurrent(context,entity,inputs) || !GeometryPropertiesCurrent(context,entity,*revisions))
                     return EditorCommandHistoryStatus::StaleEntity;
                 auto* props=MutableGeometryProperties(context.Scene->Raw(),entity,c.Positions.Domain);
-                if (target.MaskExists) props->GetOrAdd<std::uint32_t>(c.Mask.Name).Vector()=target.Mask;
-                else if (auto p=props->Get<std::uint32_t>(c.Mask.Name)) props->Remove(p);
-                if (target.ScoreExists) props->GetOrAdd<float>(c.Score.Name).Vector()=target.Score;
-                else if (auto p=props->Get<float>(c.Score.Name)) props->Remove(p);
+                if (!CanApplyGeometryScalarProperty(*props, c.Mask, target.Mask) ||
+                    !CanApplyGeometryScalarProperty(*props, c.Score, target.Score))
+                    return EditorCommandHistoryStatus::InvalidCommand;
+                (void)ApplyGeometryScalarProperty(*props, c.Mask, target.Mask);
+                (void)ApplyGeometryScalarProperty(*props, c.Score, target.Score);
                 const auto a=BuildGeometryAvailability(context.Scene->Raw(),entity);
                 *revisions={ObserveGeometryProperty(a,c.Mask.Domain,c.Mask.Name),ObserveGeometryProperty(a,c.Score.Domain,c.Score.Name)};
                 RestoreStamp(context,entity,target.Stamp,false,&c.Mask);
@@ -344,7 +348,9 @@ namespace Extrinsic::Runtime
             };
             const auto status=context.CommandHistory ? context.CommandHistory->Execute({.Label="Detect outliers",
                 .Redo=[mutate,after]{return mutate(*after);},.Undo=[mutate,before]{return mutate(*before);}}).Status : mutate(*after);
-            r.Status=EditorFeatureDetail::ToEditorCommandStatus(status);
+            r.Status = status == EditorCommandHistoryStatus::InvalidCommand
+                ? EditorCommandStatus::InvalidProcessingParameters
+                : EditorFeatureDetail::ToEditorCommandStatus(status);
             if (!r.Succeeded()) r.Message="Outlier publication rejected by history checks.";
             return r;
         }
@@ -355,12 +361,12 @@ namespace Extrinsic::Runtime
             auto* props=MutableGeometryProperties(context.Scene->Raw(),w->Entity,D::PointCloudPoint);
             auto before=std::make_shared<Geometry::PropertySet>(*props);
             auto after=std::make_shared<Geometry::PropertySet>(*props);
-            const auto mask=std::as_const(*before).Get<std::uint32_t>(w->Config.Mask.Name);
+            const auto mask=CaptureGeometryScalarProperty(*before, w->Config.Mask);
             const auto deleted=std::as_const(*before).Get<bool>("v:deleted");
             std::size_t kept=0;
             for (std::size_t i=0;i<before->Size();++i)
             {
-                if ((!deleted || !deleted[i]) && mask[i]==1) {++r.RejectedCount;continue;}
+                if ((!deleted || !deleted[i]) && std::visit([i](const auto& values) { return values[i] == 1; }, mask.Values)) {++r.RejectedCount;continue;}
                 if (kept!=i) after->Swap(kept,i);
                 ++kept;
             }
@@ -392,7 +398,9 @@ namespace Extrinsic::Runtime
             };
             const auto status=context.CommandHistory ? context.CommandHistory->Execute({.Label="Remove marked points",
                 .Redo=[mutate,after]{return mutate(*after,{});},.Undo=[mutate,before,stamp]{return mutate(*before,stamp);}}).Status : mutate(*after,{});
-            r.Status=EditorFeatureDetail::ToEditorCommandStatus(status);
+            r.Status = status == EditorCommandHistoryStatus::InvalidCommand
+                ? EditorCommandStatus::InvalidProcessingParameters
+                : EditorFeatureDetail::ToEditorCommandStatus(status);
             r.WrittenCount=kept;
             r.Message=r.Succeeded()?"Marked points removed; all surviving properties retained in source order.":"Removal rejected by history checks.";
             return r;
