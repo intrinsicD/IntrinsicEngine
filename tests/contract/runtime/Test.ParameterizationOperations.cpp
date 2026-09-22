@@ -950,8 +950,11 @@ TEST(ParameterizationOperations, RetiresSupersededCornerUvsAndUndoRestoresThem)
         .Vector() = authoredCorners;
     ASSERT_TRUE(harness.CornerUvs().has_value());
 
-    const Runtime::EditorParameterizationResult result =
-        Apply(harness, Runtime::ParameterizationStrategyKind::TutteUniform);
+    auto config = MakeConfig(Runtime::ParameterizationStrategyKind::TutteUniform);
+    config.CornerTexcoordsToRetire = Runtime::GeometryPropertyRef{
+        Runtime::GeometryElementDomain::MeshHalfedge, "h:texcoord", Geometry::PropertyValueKind::Vec2};
+    const auto result = Runtime::ApplyEditorParameterizationCommand(harness.Context,
+        {.StableEntityId = harness.StableEntityId, .Config = config});
     ASSERT_TRUE(result.Succeeded()) << result.Message;
 
     ASSERT_TRUE(harness.Uvs().has_value());
@@ -1437,4 +1440,81 @@ TEST(ParameterizationOperations, ArbitraryNamesWorkAndStructuralOutputsFailClose
         EXPECT_EQ(properties.Exists(name), existed);
         EXPECT_EQ(harness.History.UndoCount(), history);
     }
+}
+
+TEST(ParameterizationOperations, ExplicitCornerBindingRetiresOnlyItsPropertyAndRoundTrips)
+{
+    ParameterizationHarness h;
+    auto& corners = h.Halfedges().Properties;
+    auto untouched = corners.GetOrAdd<glm::vec2>("h:texcoord", {0.9f, 0.3f});
+    const auto originalUntouched = untouched.Vector();
+    const auto originalRetired = corners.GetOrAdd<glm::vec2>("atlas_corners", {0.2f, 0.7f}).Vector();
+    auto config = MakeConfig(Runtime::ParameterizationStrategyKind::TutteUniform);
+    config.Texcoords.Name = "custom_uv";
+    config.CornerTexcoordsToRetire = Runtime::GeometryPropertyRef{
+        Runtime::GeometryElementDomain::MeshHalfedge, "atlas_corners", Geometry::PropertyValueKind::Vec2};
+    Config::EngineConfig engine;
+    Runtime::SetParameterizationConfig(engine, config);
+    const auto decoded = Runtime::GetParameterizationConfig(engine);
+    ASSERT_TRUE(decoded);
+    EXPECT_EQ(decoded->CornerTexcoordsToRetire, config.CornerTexcoordsToRetire);
+    ASSERT_TRUE(Runtime::ApplyEditorParameterizationCommand(h.Context,
+        {.StableEntityId = h.StableEntityId, .Config = *decoded}).Succeeded());
+    EXPECT_FALSE(corners.Exists("atlas_corners"));
+    EXPECT_EQ(corners.Get<glm::vec2>("h:texcoord").Vector(), originalUntouched);
+    ASSERT_TRUE(h.History.Undo().Succeeded());
+    EXPECT_EQ(corners.Get<glm::vec2>("atlas_corners").Vector(), originalRetired);
+    EXPECT_EQ(corners.Get<glm::vec2>("h:texcoord").Vector(), originalUntouched);
+    ASSERT_TRUE(h.History.Redo().Succeeded());
+    EXPECT_FALSE(corners.Exists("atlas_corners"));
+}
+
+TEST(ParameterizationOperations, CornerRetirementRejectsWrongDomainKindAndStructuralStorage)
+{
+    for (const auto ref : {
+             Runtime::GeometryPropertyRef{Runtime::GeometryElementDomain::MeshVertex, "v:texcoord", Geometry::PropertyValueKind::Vec2},
+             Runtime::GeometryPropertyRef{Runtime::GeometryElementDomain::MeshHalfedge, "corners", Geometry::PropertyValueKind::Vec3},
+             Runtime::GeometryPropertyRef{Runtime::GeometryElementDomain::MeshHalfedge, "h:face", Geometry::PropertyValueKind::Vec2},
+             Runtime::GeometryPropertyRef{Runtime::GeometryElementDomain::MeshHalfedge, "", Geometry::PropertyValueKind::Vec2}})
+    {
+        ParameterizationHarness h;
+        auto config = MakeConfig(Runtime::ParameterizationStrategyKind::TutteUniform);
+        config.CornerTexcoordsToRetire = ref;
+        const auto result = Runtime::ApplyEditorParameterizationCommand(h.Context,
+            {.StableEntityId = h.StableEntityId, .Config = config});
+        EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+        EXPECT_FALSE(h.Uvs());
+        EXPECT_EQ(h.History.UndoCount(), 0u);
+    }
+}
+
+TEST(ParameterizationOperations, PlainConfigPreservesCornersAndDefaultSectionAuthorsRetirement)
+{
+    Runtime::ParameterizationConfig config;
+    EXPECT_FALSE(config.CornerTexcoordsToRetire);
+    const auto registration = Runtime::MakeParameterizationConfigSectionRegistration();
+    Config::EngineConfig engine;
+    Config::UpsertEngineConfigSection(engine.AppSections, registration.DefaultSection);
+    const auto authored = Runtime::GetParameterizationConfig(engine);
+    ASSERT_TRUE(authored);
+    ASSERT_TRUE(authored->CornerTexcoordsToRetire);
+    EXPECT_EQ(authored->CornerTexcoordsToRetire->Domain, Runtime::GeometryElementDomain::MeshHalfedge);
+    EXPECT_EQ(authored->CornerTexcoordsToRetire->Name, "h:texcoord");
+    EXPECT_EQ(authored->CornerTexcoordsToRetire->ValueKind, Geometry::PropertyValueKind::Vec2);
+}
+
+TEST(ParameterizationOperations, UndoRejectsChangesToTheRetiredCornerBinding)
+{
+    ParameterizationHarness h;
+    auto& corners = h.Halfedges().Properties;
+    corners.GetOrAdd<glm::vec2>("retired_uv", {0.2f, 0.7f});
+    auto config = MakeConfig(Runtime::ParameterizationStrategyKind::TutteUniform);
+    config.CornerTexcoordsToRetire = Runtime::GeometryPropertyRef{
+        Runtime::GeometryElementDomain::MeshHalfedge, "retired_uv", Geometry::PropertyValueKind::Vec2};
+    ASSERT_TRUE(Runtime::ApplyEditorParameterizationCommand(h.Context,
+        {.StableEntityId = h.StableEntityId, .Config = config}).Succeeded());
+    corners.GetOrAdd<glm::vec2>("retired_uv", {0.8f, 0.1f});
+    EXPECT_FALSE(h.History.Undo().Succeeded());
+    EXPECT_TRUE(h.Uvs());
+    EXPECT_EQ(corners.Get<glm::vec2>("retired_uv")[0], glm::vec2(0.8f, 0.1f));
 }

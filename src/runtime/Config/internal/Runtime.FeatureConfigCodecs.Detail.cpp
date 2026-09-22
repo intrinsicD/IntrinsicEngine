@@ -1840,7 +1840,7 @@ namespace Extrinsic::Runtime
             AddUnknownFieldDiagnostics(
                 context,
                 *object,
-                {"positions", "texcoords", "strategy", "lscm", "harmonic", "bff", "view"});
+                {"positions", "texcoords", "corner_texcoords_to_retire", "strategy", "lscm", "harmonic", "bff", "view"});
             const ParameterizationLscmConfig referenceLscm = config.Lscm;
             const ParameterizationBffConfig referenceBff = config.Bff;
 
@@ -2208,6 +2208,27 @@ namespace Extrinsic::Runtime
             }
             ReadPropertyRef(context, *object, "positions", config.Positions);
             ReadPropertyRef(context, *object, "texcoords", config.Texcoords);
+            if (const auto* corner = FindMember(*object, "corner_texcoords_to_retire"))
+            {
+                config.CornerTexcoordsToRetire.reset();
+                if (!corner->is_null())
+                {
+                    GeometryPropertyRef ref{GeometryElementDomain::MeshHalfedge, "h:texcoord", Geometry::PropertyValueKind::Vec2};
+                    ReadPropertyRef(context, *object, "corner_texcoords_to_retire", ref);
+                    config.CornerTexcoordsToRetire = std::move(ref);
+                }
+            }
+            if (config.CornerTexcoordsToRetire && context.Result)
+            {
+                const auto& ref = *config.CornerTexcoordsToRetire;
+                if (ref.Name.empty() || ref.Name.find('\0') != std::string::npos ||
+                    IsTopologyProperty(ref.Domain, ref.Name))
+                {
+                    context.Result->State = Core::Config::EngineConfigState::Invalid;
+                    context.Result->Diagnostics.push_back({.Code=Core::Config::EngineConfigDiagnosticCode::InvalidValue,
+                        .Subject=context.Path, .Message="Corner UV retirement requires a non-structural halfedge vec2 property."});
+                }
+            }
             if ((config.Positions.Name.empty() || config.Positions.Name.find('\0') != std::string::npos ||
                  config.Texcoords.Name.empty() ||
                  IsStructuralVertexProperty(config.Texcoords.Name) ||
@@ -2422,6 +2443,8 @@ namespace Extrinsic::Runtime
         return ConfigDetail::SerializeConfigJson(json::object({
             {"positions", EncodePropertyRef(config.Positions)},
             {"texcoords", EncodePropertyRef(config.Texcoords)},
+            {"corner_texcoords_to_retire", config.CornerTexcoordsToRetire
+                ? EncodePropertyRef(*config.CornerTexcoordsToRetire) : json(nullptr)},
             {"strategy", std::string{ToConfigString(config.Strategy)}},
             {"view",
              json::object({
@@ -2835,11 +2858,14 @@ namespace Extrinsic::Runtime
     MakeParameterizationConfigSectionRegistration(
         Core::Config::EngineConfigSectionChangedCallback onChanged)
     {
+        ParameterizationConfig defaults;
+        defaults.CornerTexcoordsToRetire = GeometryPropertyRef{
+            GeometryElementDomain::MeshHalfedge, "h:texcoord", Geometry::PropertyValueKind::Vec2};
         return MakeSectionRegistration(
             kParameterizationConfigSectionName,
             kParameterizationConfigSectionSchemaId,
             kParameterizationConfigSectionSchemaVersion,
-            SerializeParameterizationConfig(ParameterizationConfig{}),
+            SerializeParameterizationConfig(defaults),
             ValidateParameterizationConfigSection,
             std::move(onChanged));
     }
