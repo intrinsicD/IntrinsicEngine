@@ -6474,6 +6474,57 @@ TEST(SandboxEditorUi, MeshCurvatureScalarStorageRoundTripsAndRestoresExactHistor
     }
 }
 
+TEST(SandboxEditorUi, MeshCurvatureRejectsDeletionMaskSwapsBeforeDeliveryAndUndo)
+{
+    for (const bool queued : {false, true})
+    {
+        SCOPED_TRACE(queued);
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        Runtime::EditorCommandHistory history;
+        auto context = MakeContext(registry, selection);
+        context.CommandHistory = &history;
+        const auto mesh = MakeSelectable(registry, "Curvature deletion mask");
+        AddDenoiseAllBoundaryMeshSource(registry, mesh);
+        auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
+        auto& properties = vertices.Properties;
+        const auto first = properties.Size();
+        properties.Resize(first + 2u);
+        auto deleted = properties.GetOrAdd<bool>("v:deleted");
+        deleted[first] = true;
+        vertices.NumDeleted = 1u;
+        Runtime::EditorMeshCurvatureCommand command{.StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh)};
+        Extrinsic::Tests::EditorJobHarness jobs;
+        if (queued) jobs.Attach(context);
+        std::optional<Runtime::EditorMeshCurvatureResult> completion;
+        const auto result = Runtime::ApplyEditorMeshCurvatureCommand(context, command,
+            [&](auto value) { completion = std::move(value); });
+        if (queued) ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
+        else ASSERT_TRUE(result.Succeeded()) << result.Message;
+        const auto before = queued ? std::vector<double>{} : properties.Get<double>(command.Mean.Name).Vector();
+        deleted[first] = false;
+        deleted[first + 1u] = true;
+        if (queued)
+        {
+            ASSERT_TRUE(jobs.DrainUntilTerminal());
+            ASSERT_TRUE(completion);
+            EXPECT_EQ(completion->Status, Runtime::EditorCommandStatus::StaleEntity);
+            EXPECT_FALSE(properties.Exists(command.Mean.Name));
+            EXPECT_FALSE(properties.Exists(command.Gaussian.Name));
+            EXPECT_EQ(history.UndoCount(), 0u);
+        }
+        else
+        {
+            EXPECT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::StaleEntity);
+            EXPECT_EQ(properties.Get<double>(command.Mean.Name).Vector(), before);
+            EXPECT_EQ(history.UndoCount(), 1u);
+        }
+        EXPECT_FALSE(deleted[first]);
+        EXPECT_TRUE(deleted[first + 1u]);
+        EXPECT_EQ(vertices.NumDeleted, 1u);
+    }
+}
+
 TEST(SandboxEditorUi, MeshCurvatureRejectsInexactScalarOutputBeforeAnyPublication)
 {
     for (const bool queued : {false, true})

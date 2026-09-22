@@ -299,8 +299,18 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             std::uint64_t GeometryMetadataSignature{0u};
             std::size_t VertexSlotCount{0u};
             MeshPositionState Positions{};
+            std::shared_ptr<const std::vector<bool>> DeletedVertices{};
             MeshCurvaturePropertySnapshot Properties{};
         };
+
+        [[nodiscard]] bool SameCurvatureDeletionMask(
+            const Geometry::PropertySet& properties, const std::vector<bool>& expected)
+        {
+            const auto current = properties.Get<bool>("v:deleted");
+            return (!properties.Exists("v:deleted") || current) &&
+                (current ? current.Vector() == expected
+                         : std::ranges::none_of(expected, [](bool deleted) { return deleted; }));
+        }
 
         [[nodiscard]] bool SameMeshCurvaturePropertyState(
             const MeshCurvaturePropertyState& lhs,
@@ -495,6 +505,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             const EditorProcessingContext& context,
             const std::uint32_t stableEntityId,
             std::vector<glm::vec3> positions,
+            std::vector<bool> deletedVertices,
             MeshCurvaturePropertyState before,
             MeshCurvaturePropertyState after)
         {
@@ -535,6 +546,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                                     entity),
                             .VertexSlotCount = positionState->size(),
                             .Positions = positionState,
+                            .DeletedVertices = std::make_shared<const std::vector<bool>>(std::move(deletedVertices)),
                             .Properties = beforeState,
                         },
                         beforeState,
@@ -589,7 +601,9 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                             const auto currentPositions =
                                 view.VertexSource->Properties.Get<glm::vec3>(
                                     expected.Properties->Bindings.Positions.Name);
-                            if (!currentPositions ||
+                            if (!expected.DeletedVertices ||
+                                !SameCurvatureDeletionMask(view.VertexSource->Properties, *expected.DeletedVertices) ||
+                                !currentPositions ||
                                 !SameGeometryPositions(
                                     currentPositions.Vector(),
                                     *expected.Positions))
@@ -645,6 +659,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                                         entity),
                                 .VertexSlotCount = expected.VertexSlotCount,
                                 .Positions = expected.Positions,
+                                .DeletedVertices = expected.DeletedVertices,
                                 .Properties = target,
                             };
                         });
@@ -1446,6 +1461,9 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                 return JobApplyValidation::StaleGeneration;
             }
 
+            if (!SameCurvatureDeletionMask(mutableView.VertexSource->Properties, job.SnapshotDeletedVertices))
+                return JobApplyValidation::StaleGeneration;
+
             MeshCurvaturePropertyState currentCurvature{};
             std::string diagnostic{};
             if (!CaptureMeshCurvaturePropertyState(
@@ -1612,6 +1630,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                     context,
                     job.StableEntityId,
                     std::move(job.SnapshotPositions),
+                    std::move(job.SnapshotDeletedVertices),
                     std::move(job.CurvatureBefore),
                     std::move(job.CurvatureAfter));
             if (commitStatus != EditorCommandStatus::Applied)
@@ -2199,6 +2218,7 @@ ApplyEditorMeshCurvatureCommand(
                 context,
                 command.StableEntityId,
                 std::move(source.BeforePositions),
+                std::move(source.DeletedVertices),
                 std::move(before),
                 std::move(after));
         if (commitStatus != EditorCommandStatus::Applied)
