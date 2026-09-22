@@ -6198,3 +6198,9 @@ unrelated property edits retain it. Prepared frames reuse verdicts, and supersed
 checks, detach and world-generation changes cannot publish stale readiness.
 See `Test.SandboxEditorSessionLifecycle.cpp` for this bounded coverage. UI-037's
 remaining service/readiness inventory stays under its existing acceptance criteria.
+
+The actual segmentation combo with 512 feature properties also holds numerical
+scan/queue counters unchanged, with zero catalog rebuilds or selected-analysis
+cache misses. One domain wrapper is deliberately constructed per frame from the
+cached analysis snapshot; metadata copying and ImGui enumeration remain linear
+in property count and are not a latency improvement claim.

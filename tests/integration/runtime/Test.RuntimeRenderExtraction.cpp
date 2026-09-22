@@ -880,8 +880,14 @@ TEST(RuntimeRenderExtraction, AnalysisDisplayCommandsShareAppearanceAndRecover)
             context, {.StableEntityId = stableId,
                       .Recipe = {.Data = Runtime::ScalarVisualizationRecipe{
                           .Source = {.Domain = domain, .Name = "keypoint_mask", .ValueKind = Kind::UInt32}}}}),
+            Runtime::EditorCommandStatus::Applied);
+        EXPECT_FLOAT_EQ(prepare().ScalarRangeMin, 0.0f);
+        EXPECT_EQ(Runtime::ApplyEditorVisualizationRecipeCommand(
+            context, {.StableEntityId = stableId,
+                      .Recipe = {.Data = Runtime::ScalarVisualizationRecipe{
+                          .Source = {.Domain = domain, .Name = "keypoint_mask", .ValueKind = Kind::Double}}}}),
             Runtime::EditorCommandStatus::InvalidVisualizationProperty);
-        EXPECT_FLOAT_EQ(prepare().ScalarRangeMin, -2.0f);
+        EXPECT_FLOAT_EQ(prepare().ScalarRangeMin, 0.0f);
         ASSERT_EQ(Runtime::ApplyEditorVisualizationPropertyCommand(
             context, {.StableEntityId = stableId, .Target = target,
                       .Domain = propertyDomain,
@@ -1886,12 +1892,12 @@ TEST(RuntimeRenderExtraction, MeshColorVisualizationPropertyBufferFailsClosed)
     const auto missing = scene.Create();
     ConfigureMeshColorVisualization(scene, missing, "missing:color");
 
-    const auto wrongType = scene.Create();
-    ConfigureMeshColorVisualization(scene, wrongType, "v:bad_color");
+    const auto invalidLabels = scene.Create();
+    ConfigureMeshColorVisualization(scene, invalidLabels, "v:bad_color");
     auto& vertices =
-        scene.Raw().get<ECS::Components::GeometrySources::Vertices>(wrongType);
+        scene.Raw().get<ECS::Components::GeometrySources::Vertices>(invalidLabels);
     vertices.Properties.GetOrAdd<float>("v:bad_color", 0.0f).Vector() =
-        {0.0f, 1.0f, 2.0f};
+        {0.0f, 1.5f, 2.0f};
 
     const auto stats = fixture.Extract(scene);
     const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
@@ -1900,7 +1906,7 @@ TEST(RuntimeRenderExtraction, MeshColorVisualizationPropertyBufferFailsClosed)
     EXPECT_EQ(stats.VisualizationRecipePacketAppendCount, 0u);
     EXPECT_EQ(stats.VisualizationColorPacketCount, 0u);
     EXPECT_EQ(stats.VisualizationRecipeMissingSourceCount, 1u);
-    EXPECT_EQ(stats.VisualizationRecipeUnsupportedSourceTypeCount, 1u);
+    EXPECT_EQ(stats.VisualizationRecipeNonFiniteValueCount, 1u);
     EXPECT_TRUE(world.Visualization.Colors.empty());
     EXPECT_EQ(world.Visualization.PropertyBufferDiagnostics.InputBufferCount, 0u);
     EXPECT_EQ(world.Visualization.Diagnostics.InputPacketCount, 0u);

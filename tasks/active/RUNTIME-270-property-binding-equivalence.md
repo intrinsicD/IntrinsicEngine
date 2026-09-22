@@ -111,11 +111,11 @@ an execution-completeness claim:
 | K-Means | ClusteringTypes/ClusteringModule; remove provenance-only execution domain restrictions and retain deleted-slot correspondence; checked scalar outputs. |
 | LOP/WLOP/CLOP/EAR | Existing canonical Vec3 inputs and same-domain publication; preserve cardinality/normal policy. |
 | Progressive Poisson | Four scalar outputs and owning permutation; checked publication must retain reordering/structural invariants. |
-| Graph normals | Real adjacency requirements remain; structural connectivity types are not arbitrary scalar slots. ShortestPath/VectorHeat have menu metadata but no executable runtime binders. |
+| Graph normals | Real adjacency requirements remain; structural connectivity types are not arbitrary scalar slots. ShortestPath/VectorHeat/ConvexHull have menu metadata but no executable runtime binders. |
 | Curvature and segmentation | Existing mesh-field capture/history; checked scalar targets, alias protection and cached bound-feature readiness. |
 | Geodesics | Full canonical config refs; checked distance/mask publication, including unreachable-distance infinity semantics. |
 | Parameterization | Explicit optional corner-UV retirement ref, preserving unrelated corners and exact undo. |
-| Owning topology edits | Denoise/smoothing/remesh/simplify/subdivide/repair/CSG/reconstruction/hull/construction retain explicit owning mutations and dependent-data handling. |
+| Owning topology edits | Denoise/smoothing/remesh/simplify/subdivide/repair/CSG/reconstruction/construction retain explicit owning mutations and dependent-data handling. |
 | Visualization, surface appearance and bake | Explicit normal interpretation, name-independent catalogs and consistent scalar storage admission. |
 
 GMM deliberately supports one to three numeric channels. Wider feature vectors,
@@ -157,13 +157,14 @@ Representability is a value-dependent runtime condition: for example a general
 Double geodesic distance need not fit Float exactly. Such failure rejects the
 whole cohort without partial output or history. Vector catalog storage remains
 float Vec2/Vec3/Vec4, so equal vector shape already has one canonical storage.
-Existing skipped slots preserve exact storage, including NaNs and signed zero;
-new skipped slots initialize to zero. Structural topology storage and explicitly
+Existing skipped scalar slots preserve exact storage, including NaNs and signed zero;
+new skipped scalar slots initialize to zero. Curvature direction vectors retain
+the existing finite, full-slot publication contract. Structural topology storage and explicitly
 owning topology edits remain outside same-cardinality publication rules.
 
 All executable point/graph/mesh binder families in the matrix were inspected
 across metadata, codecs where present, commands, publication and panel owners.
-ShortestPath/VectorHeat are catalog metadata with no runtime executors; this task
+ShortestPath/VectorHeat/ConvexHull are catalog metadata with no runtime executors; this task
 adds no missing algorithms. Subdivision retains its existing typed command/UI
 surface; no persisted subdivision section existed to migrate. GMM width limits,
 mesh correspondence and structural-property ownership are deliberate constraints.
@@ -177,7 +178,10 @@ never chooses a normal input merely because its name contains “normal”.
 
 The UI-037 overlap uses its existing verdict cache for selected mesh features,
 with mutation invalidation, prepared-frame reuse and detach/world guards. The
-remaining UI-037 service inventory is independent of this task. No new
+remaining UI-037 service inventory is independent of this task. The 512-property
+picker reuses selected-analysis metadata and catalog data without numeric scans;
+it constructs one lightweight domain wrapper per frame. Existing metadata copies
+and ImGui row enumeration remain linear in catalog size under UI-037. No new
 performance, solver-parity or backend-maturity claim is introduced.
 
 ## Review and verification log — 2026-09-22
@@ -243,3 +247,9 @@ probe tests were fixed. No sanitizer/GPU run or new performance claim this sessi
 
 Historical implementation notes are preserved in `e804afc24`; this current
 summary replaces repeated chronological checklists without dropping open scope.
+
+Independent review endpoint: Claude reported no blockers for the frozen combined
+diff through `40cfd093c`; a separate agent cross-reviewed subdivision through
+`ec3a0efba` with no blockers. Cross-reviews also covered scalar publication and
+the later skipped-face/capability corrections. Reviews did not substitute for
+execution gates below.
