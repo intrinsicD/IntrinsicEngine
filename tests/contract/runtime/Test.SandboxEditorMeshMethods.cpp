@@ -5578,7 +5578,19 @@ TEST(SandboxEditorUi, UvRegenerationDuplicateSubmitUsesExistingActiveJob)
     EXPECT_FALSE(busy.Enabled);
     const Runtime::EditorUvRegenerationCommandResult duplicate =
         Runtime::ApplyEditorUvRegenerationCommand(context, command, [&](auto) { ++duplicateDeliveries; });
-    EXPECT_EQ(busy.DisabledReason, duplicate.Diagnostic);
+    // Workers may advance the same job between these observations; only the
+    // main-thread drain can publish it. Both diagnostics must name that job
+    // and a phase reachable before the first drain.
+    const auto token = queued.Entries[0].Token;
+    const std::string jobSuffix = " job (job " + std::to_string(token.Index) + ":" +
+        std::to_string(token.Generation) + ").";
+    for (const auto& diagnostic : {busy.DisabledReason, duplicate.Diagnostic})
+    {
+        EXPECT_TRUE(diagnostic == "UV regeneration CPU already has an active queued" + jobSuffix ||
+                    diagnostic == "UV regeneration CPU already has an active running" + jobSuffix ||
+                    diagnostic == "UV regeneration CPU already has an active awaiting-gate" + jobSuffix)
+            << diagnostic;
+    }
     next[0] = savedNext;
     deleted.Vector().resize(vertices.Properties.Size(), false);
     auto invalid = command; invalid.Resolution = 0u;
@@ -5588,7 +5600,9 @@ TEST(SandboxEditorUi, UvRegenerationDuplicateSubmitUsesExistingActiveJob)
     EXPECT_NE(duplicate.Diagnostic.find("already has an active"),
               std::string::npos);
     EXPECT_NE(duplicate.Diagnostic.find("job 0:1"), std::string::npos);
-    EXPECT_EQ(jobs.Snapshot().Entries.size(), 1u);
+    const auto duplicateSnapshot = jobs.Snapshot();
+    ASSERT_EQ(duplicateSnapshot.Entries.size(), 1u);
+    EXPECT_EQ(duplicateSnapshot.Entries[0].Token, token);
 
     ASSERT_TRUE(jobs.DrainUntilTerminal());
     EXPECT_EQ(deliveries, 1u);
