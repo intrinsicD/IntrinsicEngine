@@ -45,12 +45,10 @@ on 2026-09-20; this task owns the broader change, while UI-037 retains readiness
 - [ ] Extend checked numeric adapters across remaining input and output bindings.
       A compatible output shape may require checked conversion into the declared
       target storage; never reinterpret existing storage, silently narrow values,
-      or weaken output aliasing/ownership rules. Current fixed-kind output slots
-      are not yet universal dimension-based publication.
+      or weaken output aliasing/ownership rules. Conversion failure preserves the entire publication cohort.
 - [ ] Migrate geodesics string slots to canonical property refs. Make
-      parameterization corner-UV binding/retirement explicit: today it retires
-      `h:texcoord` only when publishing `v:texcoord`, preserving unrelated corner
-      UVs for custom output names. Do not replace this with unconditional deletion.
+      parameterization corner-UV binding/retirement an explicit optional ref;
+      preserve unrelated corner UVs and restore retired values through history.
 - [ ] Decide supported feature widths beyond the existing GMM's 1–3 channels;
       Vec4 is rejected until an implementation supports it, never truncated.
 - [ ] Close stale-source, invalidation, no-per-frame-scan and prepared-frame
@@ -85,8 +83,10 @@ The source-label audit found unnecessary prefix gates in curvature,
 parameterization and geodesics, and name-derived normal interpretation in
 visualization/baking. Point-input catalogs and sampled executors already use
 full property refs; mesh-correspondence and topology-changing domain restrictions
-are legitimate and must stay. Geodesics' legacy string slots remain a canonical
-ref migration follow-up; string names alone do not justify restricting names.
+are legitimate and must stay. Geodesics now uses full canonical refs; parameterization retires only its
+explicit optional corner ref. Subdivision copies selected scalar edge markers by
+endpoint correspondence into its Boolean kernel field, then republishes the
+declared storage after its owning topology mutation.
 
 The operator was asked whether numeric storage kinds should interoperate.
 Pending a different preference, use checked numeric conversion as the stated
@@ -111,7 +111,7 @@ an execution-completeness claim:
 | K-Means | ClusteringTypes/ClusteringModule; remove provenance-only execution domain restrictions and retain deleted-slot correspondence; checked scalar outputs. |
 | LOP/WLOP/CLOP/EAR | Existing canonical Vec3 inputs and same-domain publication; preserve cardinality/normal policy. |
 | Progressive Poisson | Four scalar outputs and owning permutation; checked publication must retain reordering/structural invariants. |
-| Graph normals, shortest path | Real adjacency requirements remain; structural index/mask kinds are not arbitrary scalar slots. |
+| Graph normals | Real adjacency requirements remain; structural connectivity types are not arbitrary scalar slots. ShortestPath/VectorHeat have menu metadata but no executable runtime binders. |
 | Curvature and segmentation | Existing mesh-field capture/history; checked scalar targets, alias protection and cached bound-feature readiness. |
 | Geodesics | Full canonical config refs; checked distance/mask publication, including unreachable-distance infinity semantics. |
 | Parameterization | Explicit optional corner-UV retirement ref, preserving unrelated corners and exact undo. |
@@ -144,33 +144,55 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 python3 tools/agents/generate_session_brief.py
 ```
 
-## Current implementation and remaining scope
+## Implementation scope and limits
 
 Generic GMM uses `SegmentFaceFeatures` with one to three ordered numeric channels,
 including Vec2 or paired scalars. Vertex features average onto incident faces;
-face features preserve correspondence. Config schema 2 stores full refs; an empty
-feature list explicitly selects computed curvature. There is no schema-1 reader.
-Curvature-specific methods retain their actual curvature requirements. Conversion
-rejects integer precision loss, but averaging and GMM arithmetic are not exact.
+face features preserve correspondence. Empty feature lists explicitly select
+computed curvature. Unsupported Vec4 input fails without truncation. Curvature
+methods retain their real curvature requirements.
 
-The existing runtime property-types owner provides component counts and
-per-domain structural-property protection. Curvature, segmentation,
-parameterization and geodesics no longer gate inputs by name prefix. Private
-compiled adapters retain correspondence, aliasing and publication ownership.
+Scalar publication uses checked conversions for all six scalar storage kinds.
+Representability is a value-dependent runtime condition: for example a general
+Double geodesic distance need not fit Float exactly. Such failure rejects the
+whole cohort without partial output or history. Vector catalog storage remains
+float Vec2/Vec3/Vec4, so equal vector shape already has one canonical storage.
+Existing skipped slots preserve exact storage, including NaNs and signed zero;
+new skipped slots initialize to zero. Structural topology storage and explicitly
+owning topology edits remain outside same-cardinality publication rules.
 
-The unchecked acceptance criteria above are the authoritative remaining scope.
-Additional coverage still owed: Bool/Int32/UInt32 scalar twins, unused/deleted-slot
-nonfinite runtime inputs, interactive picker budgets, and optional Vec3 direction /
-edge-color exceptional-value history cases. Clarify topology-only
-`MeshSurfaceTopologyStatus::MissingPositions` while preserving position validation
-at geometry extraction. GPU, sanitizer and interactive usability evidence remain
-separate from CPU verification; no universal property-binding completion is claimed.
+All executable point/graph/mesh binder families in the matrix were inspected
+across metadata, codecs where present, commands, publication and panel owners.
+ShortestPath/VectorHeat are catalog metadata with no runtime executors; this task
+adds no missing algorithms. Subdivision retains its existing typed command/UI
+surface; no persisted subdivision section existed to migrate. GMM width limits,
+mesh correspondence and structural-property ownership are deliberate constraints.
 
-Start the binder audit at visualization recipes/actions and TextureBake normal
-interpretation, EditorFeatureContextAdapters catalog filters, Parameterization
-corner-UV retirement, and GeodesicsConfig string slots. Inventory accepted shape,
-storage, correspondence, catalog predicate, codec and executor together; do not
-mechanically weaken exact-kind checks before checked publication owns conversion.
+Display projection is distinct from output mutation: shader data uses float,
+rejects out-of-range values and inexact integers, while finite Double display
+values may round. Source storage is untouched. All scalar kinds have the same
+raw linear bake default; label palettes and normal directions are explicit
+interpretations. Interpretation participates in buffer identity. Consolidation
+never chooses a normal input merely because its name contains “normal”.
+
+The UI-037 overlap uses its existing verdict cache for selected mesh features,
+with mutation invalidation, prepared-frame reuse and detach/world guards. The
+remaining UI-037 service inventory is independent of this task. No new
+performance, solver-parity or backend-maturity claim is introduced.
+
+## Review and verification log — 2026-09-22
+
+- Claude reviewed the plan and fixed source diffs. Findings fixed: explicit-recipe
+  normal buffer identity, negative interpretation tests, accidental scalar color
+  emission from vector recipes, range checking before floating conversion, and
+  fallback key collision. Exact Float geodesic rejection is intentional under the
+  checked-publication contract and has a nontrivial rejection regression.
+- Isolated agents reviewed binders and implemented point, mesh, geodesic and
+  subdivision slices. Cross-review identified skipped-slot initialization and
+  stale point-family capability masks; combined verification follows those fixes.
+- An initial sanitizer compilation overlapped a source rewrite and failed while
+  lexing TextureBake. The build was interrupted; frozen-source rebuilds with
+  ccache disabled supersede that invalid run. No source workaround was added.
 
 ## Closed development-cost batch — 2026-09-21
 

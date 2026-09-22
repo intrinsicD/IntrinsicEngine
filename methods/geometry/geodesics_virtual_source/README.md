@@ -14,19 +14,23 @@ The vertex float3 position binding is selected from the property catalog.
 {
   "source_vertices": [0, 12],
   "max_halfedge_expansions": 10000000,
-  "position_property": "v:position"
+  "position_property": {"domain": "MeshVertex", "name": "v:position", "kind": "vec3"},
+  "distance_property": {"domain": "MeshVertex", "name": "v:geodesic_distance", "kind": "double"},
+  "source_mask_property": {"domain": "MeshVertex", "name": "v:is_geodesic_source", "kind": "bool"}
 }
 ```
 
 This is the payload of app section `sandbox.geodesics`, schema
-`intrinsic.runtime.sandbox.geodesics`, version 1. Empty source lists can be
+`intrinsic.runtime.sandbox.geodesics`, version 2. Empty source lists can be
 stored while preparing an operation, but computation requires a nonempty set.
 `ApplyEditorGeodesicsCommand` also accepts an explicit config, and
 `ApplyEditorConfiguredGeodesicsCommand` uses the active config.
 
-Publication changes only `v:geodesic_distance` (double) and
-`v:is_geodesic_source` (bool) on the originating mesh. Sources are exactly zero;
-unreachable/deleted slots are infinity. Undo/redo preserves unrelated
+Publication changes only the two configured scalar properties on the originating
+mesh (defaults: `v:geodesic_distance` Double and `v:is_geodesic_source` Bool).
+Conversion to the declared storage must be exact before either output changes.
+Sources are exactly zero; unreachable distances are infinity and require floating
+storage. Existing deleted slots retain their values; new deleted slots are zero. Undo/redo preserves unrelated
 properties and topology and rejects stale geometry or conflicting output edits.
 The result reports `cpu_reference`, propagation counts, and unreachable count.
 A failed computation leaves existing output properties unchanged.

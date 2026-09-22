@@ -3463,7 +3463,7 @@ TEST(SandboxEditorUi, KMeansBindingPredicateMatchesConfigKindsNamesAndDomains)
         case 5: refs.OutputScalarLabels = {refs.InputPositions.Domain, refs.OutputColors.Name,
                     Geometry::PropertyValueKind::Float}; break;
         case 6: refs.OutputScalarLabels = {refs.InputPositions.Domain, "p:scalar",
-                    Geometry::PropertyValueKind::UInt32}; break;
+                    Geometry::PropertyValueKind::Vec3}; break;
         case 7: refs = Runtime::MakeKMeansPropertyRefs(Runtime::GeometryElementDomain::Unknown); break;
         case 8: refs = Runtime::MakeKMeansPropertyRefs(static_cast<Runtime::GeometryElementDomain>(255)); break;
         }

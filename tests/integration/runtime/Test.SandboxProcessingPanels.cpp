@@ -2166,6 +2166,7 @@ TEST(SandboxProcessingPanels, TopologyVariantWidgetsReachCommandsAndClearLoopOnl
         auto& scene = h.Scene();
         const auto entity = scene.Create();
         PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+        (void)scene.Raw().get<GS::Edges>(entity).Properties.GetOrAdd<bool>("e:feature", false);
         ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
         ASSERT_TRUE(h.Shell.SetEditorWindowOpen(
             remesh ? "mesh.processing.remesh" : "mesh.processing.subdivide", true));

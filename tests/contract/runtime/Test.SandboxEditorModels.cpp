@@ -2487,7 +2487,7 @@ TEST(SandboxEditorUi, PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection)
     ASSERT_NE(position, nullptr);
     EXPECT_EQ(position->ValueKind, Kind::Vec3);
     EXPECT_TRUE(position->Internal);
-    EXPECT_TRUE(position->Connectivity);
+    EXPECT_FALSE(position->Connectivity);
     EXPECT_TRUE(position->Bindable);
     EXPECT_TRUE(position->Preview.HasValue);
     EXPECT_EQ(position->Preview.ElementIndex, 1u);
@@ -2515,15 +2515,10 @@ TEST(SandboxEditorUi, PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection)
     const auto* unsupported =
         FindCatalogProperty(catalog, Domain::MeshVertices, "v:unsupported_int");
     ASSERT_NE(unsupported, nullptr);
-    // RUNTIME-192 B4: the catalog now reports the property's true kind instead
-    // of collapsing every non-bindable type to Unknown, which the retired
-    // editor-local enum could not represent. Bindability is still gated by
-    // Supported/UnsupportedReason, so the contract that matters is unchanged --
-    // an int32 property remains unbindable, it is just named accurately now.
     EXPECT_EQ(unsupported->ValueKind, Kind::Int32);
-    EXPECT_FALSE(unsupported->Supported);
-    EXPECT_FALSE(unsupported->Bindable);
-    EXPECT_FALSE(unsupported->UnsupportedReason.empty());
+    EXPECT_TRUE(unsupported->Supported);
+    EXPECT_TRUE(unsupported->Bindable);
+    EXPECT_TRUE(unsupported->UnsupportedReason.empty());
 
     const auto* edgeV0 =
         FindCatalogProperty(catalog, Domain::MeshEdges, std::string{PN::kEdgeV0});

@@ -927,8 +927,12 @@ TEST(SandboxConfigSections,
             Runtime::CurvatureSegmentationConfig{}),
         Runtime::SerializeProgressivePoissonPlaygroundConfig(
             Runtime::ProgressivePoissonPlaygroundConfig{}),
-        Runtime::SerializeParameterizationConfig(
-            Runtime::ParameterizationConfig{}),
+        Runtime::SerializeParameterizationConfig([] {
+            Runtime::ParameterizationConfig defaults;
+            defaults.CornerTexcoordsToRetire = Runtime::GeometryPropertyRef{
+                Runtime::GeometryElementDomain::MeshHalfedge, "h:texcoord", Geometry::PropertyValueKind::Vec2};
+            return defaults;
+        }()),
         Runtime::SerializePointCloudConsolidationConfig(
             Runtime::PointCloudConsolidationConfig{}),
     };
