@@ -7,6 +7,19 @@ relative to `tasks/done/`, which sits at the same depth as `tasks/active/`,
 so blocks moved from the old active-README history work verbatim.
 
 
+## 2026-09-22 — PROC-034 agent token efficiency retired
+
+Retired [PROC-034](PROC-034-agent-token-efficiency.md) at its workflow-maintenance
+endpoint, with all four slices complete through `043312937`. Scoped instruction
+loading, bounded tool output, research-bookkeeping relevance, and an opt-in
+Astra/medium routine profile are implemented and verified. Eight synthetic
+completions passed their fixed checks; the task records every token counter,
+cache/context mismatch, and the limits of those measurements. Base reasoning
+defaults remain unchanged. Structural checks and live profile startup passed.
+Broader engine-task and credit savings remain unmeasured; no follow-up work
+remains for this workflow endpoint.
+The enclosing commit records retirement.
+
 ## 2026-09-22 — RUNTIME-270 property-binding equivalence retired
 
 Retired [RUNTIME-270](RUNTIME-270-property-binding-equivalence.md) at the intended

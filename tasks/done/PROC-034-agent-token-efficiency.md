@@ -19,7 +19,11 @@ preserving correctness, engineering contracts, and completed-task quality.
 
 ## Context
 
-- Status: in-progress. Owner: Codex. Branch: `codex/proc-034-token-efficiency`.
+- Status: done. Maturity: Retired (workflow-maintenance endpoint).
+  Completed: 2026-09-22. Owner: Codex. Branch: `codex/proc-034-token-efficiency`.
+  Final implementation commit: `043312937`; earlier slices:
+  `901a2d564`, `80ceeac33`, `35b1f8140`;
+  the enclosing retirement commit records lifecycle closure.
 - Operator explicitly requested this process work outside the Framework24 P0
   selection focus on 2026-09-22, with four slices and immediate completion of
   slice 1 only; the operator subsequently authorized slices 2, 3, and 4, with
@@ -312,3 +316,8 @@ and workspace instructions to repeat the paid/model portion deliberately.
   checks passed. Four-point review: one workflow intent; no engine layering or
   source changes; measured behavior and installed profile verified; current
   docs/task state and explicit limits. No engine research claims were created.
+- 2026-09-22 — Retired after all four slices met their acceptance criteria.
+  Larger representative C++/Vulkan comparisons and credit-efficiency estimates
+  remain unestablished limitations, not deferred acceptance work. No blanket
+  runtime effort change is justified by this pilot; the installed routine
+  profile is explicitly opt-in. No follow-up task is required for this endpoint.

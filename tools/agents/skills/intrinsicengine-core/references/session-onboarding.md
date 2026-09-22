@@ -236,7 +236,7 @@ Inspect effective settings before comparisons. Record model, requested/observed
 tier, input/cache/output tokens, retries, defects, and time through verified
 completion. Input-context or caching differences preclude a clean cost claim.
 See [OpenAI's profile documentation](https://learn.chatgpt.com/docs/config-file/config-advanced#profiles)
-and the [PROC-034 trial](../../../../../tasks/active/PROC-034-agent-token-efficiency.md).
+and the [PROC-034 trial](../../../../../tasks/done/PROC-034-agent-token-efficiency.md).
 
 # When CI fails
 
