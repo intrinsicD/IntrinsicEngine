@@ -7,6 +7,8 @@ module;
 #include <string>
 #include <string_view>
 #include <vector>
+#include <variant>
+#include <span>
 
 #include <entt/entity/fwd.hpp>
 
@@ -19,6 +21,30 @@ export import Geometry.Properties;
 
 export namespace Extrinsic::Runtime
 {
+    // Exact storage snapshots keep untouched/deleted values and undo data unchanged.
+    struct GeometryScalarPropertySnapshot
+    {
+        bool Exists{};
+        std::variant<std::vector<bool>, std::vector<std::int32_t>,
+                     std::vector<std::uint32_t>, std::vector<std::uint64_t>,
+                     std::vector<float>, std::vector<double>> Values{};
+    };
+    [[nodiscard]] GeometryScalarPropertySnapshot CaptureGeometryScalarProperty(
+        const Geometry::PropertySet&, const GeometryPropertyRef&);
+    // Values are indexed by source slot. Failure leaves the snapshot unchanged;
+    // non-finite, out-of-range and inexact converted live values are rejected.
+    [[nodiscard]] bool PrepareGeometryScalarProperty(
+        GeometryScalarPropertySnapshot&, Geometry::PropertyValueKind,
+        std::size_t count, std::span<const std::uint32_t> slots, std::span<const float> values);
+    [[nodiscard]] bool PrepareGeometryScalarProperty(
+        GeometryScalarPropertySnapshot&, Geometry::PropertyValueKind,
+        std::size_t count, std::span<const std::uint32_t> slots, std::span<const double> values);
+    [[nodiscard]] bool PrepareGeometryScalarProperty(
+        GeometryScalarPropertySnapshot&, Geometry::PropertyValueKind,
+        std::size_t count, std::span<const std::uint32_t> slots, std::span<const std::uint32_t> values);
+    void ApplyGeometryScalarProperty(Geometry::PropertySet&, const GeometryPropertyRef&,
+                                     const GeometryScalarPropertySnapshot&);
+
     namespace GeometrySources = Extrinsic::ECS::Components::GeometrySources;
     namespace RenderComponents = Extrinsic::Graphics::Components;
 
