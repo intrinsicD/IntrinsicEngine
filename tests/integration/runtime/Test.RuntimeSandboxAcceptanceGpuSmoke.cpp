@@ -6416,7 +6416,7 @@ void SetRuntime190ScalarValues(Geometry::PropertySet& properties,
     case Geometry::PropertyValueKind::Bool: set.operator()<bool>(); break;
     case Geometry::PropertyValueKind::Int32: set.operator()<std::int32_t>(); break;
     case Geometry::PropertyValueKind::UInt32: set.operator()<std::uint32_t>(); break;
-    case Geometry::PropertyValueKind::UInt8: set.operator()<std::uint8_t>(); break;
+    case Geometry::PropertyValueKind::UInt64: set.operator()<std::uint64_t>(); break;
     case Geometry::PropertyValueKind::Float: set.operator()<float>(); break;
     case Geometry::PropertyValueKind::Double: set.operator()<double>(); break;
     default: FAIL() << "Expected a scalar storage kind";
@@ -7605,9 +7605,9 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, PropertyTextureUInt32StorageBakesAndRebak
     CheckPropertyTextureScalarStorageOnVulkan(Geometry::PropertyValueKind::UInt32);
 }
 
-TEST(RuntimeSandboxAcceptanceGpuSmoke, PropertyTextureUInt8StorageBakesAndRebakesOnVulkan)
+TEST(RuntimeSandboxAcceptanceGpuSmoke, PropertyTextureUInt64StorageBakesAndRebakesOnVulkan)
 {
-    CheckPropertyTextureScalarStorageOnVulkan(Geometry::PropertyValueKind::UInt8);
+    CheckPropertyTextureScalarStorageOnVulkan(Geometry::PropertyValueKind::UInt64);
 }
 
 // BUG-137 slice B — `Operational` proof for the corner-UV upload path.
