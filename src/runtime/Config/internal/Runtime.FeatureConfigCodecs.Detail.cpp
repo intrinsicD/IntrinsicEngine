@@ -117,6 +117,10 @@ namespace Extrinsic::Runtime::ConfigDetail
         case Geometry::PropertyValueKind::Vec3: return "vec3";
         case Geometry::PropertyValueKind::UInt32: return "uint32";
         case Geometry::PropertyValueKind::Float: return "float";
+        case Geometry::PropertyValueKind::Double: return "double";
+        case Geometry::PropertyValueKind::Bool: return "bool";
+        case Geometry::PropertyValueKind::Int32: return "int32";
+        case Geometry::PropertyValueKind::UInt64: return "uint64";
         default: return "invalid";
         }
     }
@@ -137,11 +141,15 @@ namespace Extrinsic::Runtime::ConfigDetail
     }
 
     PointPropertyValidation ValidatePointPropertyRef(
-        const nlohmann::json& ref, const Geometry::PropertyValueKind kind)
+        const nlohmann::json& ref, const Geometry::PropertyValueKind kind, const bool allowScalarConversion)
     {
+        bool matchingKind = ref.is_object() && ref.contains("kind") && ref["kind"] == PointPropertyKindToken(kind);
+        if (allowScalarConversion && GeometryPropertyComponentCount(kind) == 1 && ref.is_object() && ref.contains("kind"))
+            for (unsigned i = unsigned(Geometry::PropertyValueKind::Bool); i <= unsigned(Geometry::PropertyValueKind::Double); ++i)
+                matchingKind |= ref["kind"] == PointPropertyKindToken(Geometry::PropertyValueKind(i));
         if (!ref.is_object() || ref.size() != 3 || !ref.contains("domain") ||
             !ref.contains("name") || !ref.contains("kind") ||
-            ref["kind"] != PointPropertyKindToken(kind) || !ref["name"].is_string() ||
+            !matchingKind || !ref["name"].is_string() ||
             ref["name"].get<std::string>().empty())
             return PointPropertyValidation::InvalidReference;
         for (unsigned i = 0; i <= unsigned(GeometryElementDomain::PointCloudPoint); ++i)
@@ -156,7 +164,7 @@ namespace Extrinsic::Runtime::ConfigDetail
     {
         for (const auto& [key, kind] : fields)
         {
-            const auto validation = ValidatePointPropertyRef(values.at(std::string(key)), kind);
+            const auto validation = ValidatePointPropertyRef(values.at(std::string(key)), kind, true);
             if (validation == PointPropertyValidation::InvalidReference)
                 return std::string(key) + " needs a canonical typed property reference.";
             if (validation == PointPropertyValidation::UnknownDomain)
@@ -168,6 +176,9 @@ namespace Extrinsic::Runtime::ConfigDetail
     void DecodePointPropertyRef(const nlohmann::json& value, GeometryPropertyRef& ref)
     {
         ref.Name = value.at("name");
+        for (unsigned i = unsigned(Geometry::PropertyValueKind::Bool); i <= unsigned(Geometry::PropertyValueKind::Vec4); ++i)
+            if (value.at("kind") == PointPropertyKindToken(Geometry::PropertyValueKind(i)))
+                ref.ValueKind = Geometry::PropertyValueKind(i);
         for (unsigned i = 0; i <= unsigned(GeometryElementDomain::PointCloudPoint); ++i)
             if (value.at("domain") == ToString(GeometryElementDomain(i)))
                 ref.Domain = GeometryElementDomain(i);

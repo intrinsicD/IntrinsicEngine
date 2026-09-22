@@ -3,6 +3,8 @@ module;
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
+#include <type_traits>
 #include <string_view>
 #include <tuple>
 #include <utility>
@@ -15,6 +17,97 @@ module Extrinsic.Runtime.GeometryAvailability;
 
 namespace Extrinsic::Runtime
 {
+    namespace
+    {
+        template<class F> decltype(auto) VisitScalarKind(Geometry::PropertyValueKind kind, F&& visitor)
+        {
+            using K = Geometry::PropertyValueKind;
+            switch (kind)
+            {
+            case K::Bool: return visitor.template operator()<bool>();
+            case K::Int32: return visitor.template operator()<std::int32_t>();
+            case K::UInt32: return visitor.template operator()<std::uint32_t>();
+            case K::UInt64: return visitor.template operator()<std::uint64_t>();
+            case K::Float: return visitor.template operator()<float>();
+            case K::Double: return visitor.template operator()<double>();
+            default: return visitor.template operator()<void>();
+            }
+        }
+        template<class Input> bool PrepareScalar(
+            GeometryScalarPropertySnapshot& snapshot, Geometry::PropertyValueKind kind,
+            std::size_t count, std::span<const std::uint32_t> slots, std::span<const Input> values)
+        {
+            return VisitScalarKind(kind, [&]<class T>() {
+                if constexpr (std::is_void_v<T>) return false;
+                else
+                {
+                    auto next = snapshot.Exists ? std::get_if<std::vector<T>>(&snapshot.Values) : nullptr;
+                    if (snapshot.Exists && (!next || next->size() != count)) return false;
+                    std::vector<T> output = next ? *next : std::vector<T>(count);
+                    for (const auto slot : slots)
+                    {
+                        if (slot >= count || slot >= values.size()) return false;
+                        const long double value = values[slot];
+                        if (!std::isfinite(value)) return false;
+                        if constexpr (std::is_integral_v<T>)
+                        {
+                            // The exclusive power-of-two bound avoids rounding UINT64_MAX
+                            // upward on hosts whose long double has only 53 mantissa bits.
+                            const long double upper = std::ldexp(1.0L, std::numeric_limits<T>::digits);
+                            const long double lower = std::is_signed_v<T> ? -upper : 0.0L;
+                            if (value < lower || value >= upper || std::trunc(value) != value) return false;
+                        }
+                        else if (value < -std::numeric_limits<T>::max() || value > std::numeric_limits<T>::max()) return false;
+                        const T converted = static_cast<T>(value);
+                        if (static_cast<long double>(converted) != value) return false;
+                        output[slot] = converted;
+                    }
+                    snapshot.Values = std::move(output);
+                    snapshot.Exists = true;
+                    return true;
+                }
+            });
+        }
+    }
+
+    GeometryScalarPropertySnapshot CaptureGeometryScalarProperty(
+        const Geometry::PropertySet& properties, const GeometryPropertyRef& ref)
+    {
+        return VisitScalarKind(ref.ValueKind, [&]<class T>() {
+            GeometryScalarPropertySnapshot snapshot;
+            if constexpr (!std::is_void_v<T>)
+            {
+                const auto property = properties.Get<T>(ref.Name);
+                snapshot.Exists = bool(property);
+                snapshot.Values = property ? property.Vector() : std::vector<T>{};
+            }
+            return snapshot;
+        });
+    }
+    bool PrepareGeometryScalarProperty(GeometryScalarPropertySnapshot& snapshot,
+        Geometry::PropertyValueKind kind, std::size_t count,
+        std::span<const std::uint32_t> slots, std::span<const float> values)
+    { return PrepareScalar(snapshot, kind, count, slots, values); }
+    bool PrepareGeometryScalarProperty(GeometryScalarPropertySnapshot& snapshot,
+        Geometry::PropertyValueKind kind, std::size_t count,
+        std::span<const std::uint32_t> slots, std::span<const double> values)
+    { return PrepareScalar(snapshot, kind, count, slots, values); }
+    bool PrepareGeometryScalarProperty(GeometryScalarPropertySnapshot& snapshot,
+        Geometry::PropertyValueKind kind, std::size_t count,
+        std::span<const std::uint32_t> slots, std::span<const std::uint32_t> values)
+    { return PrepareScalar(snapshot, kind, count, slots, values); }
+    void ApplyGeometryScalarProperty(Geometry::PropertySet& properties,
+        const GeometryPropertyRef& ref, const GeometryScalarPropertySnapshot& snapshot)
+    {
+        VisitScalarKind(ref.ValueKind, [&]<class T>() {
+            if constexpr (!std::is_void_v<T>)
+            {
+                if (snapshot.Exists) properties.GetOrAdd<T>(ref.Name).Vector() = std::get<std::vector<T>>(snapshot.Values);
+                else if (auto property = properties.Get<T>(ref.Name)) properties.Remove(property);
+            }
+        });
+    }
+
     namespace GS = GeometrySources;
     namespace G = RenderComponents;
 
