@@ -139,7 +139,9 @@ void main()
         const float scale = max(abs(value.x), max(abs(value.y), abs(value.z)));
         const vec3 scaled = value.xyz / max(scale, 1.0e-20);
         const float scaledLength = length(scaled);
-        const vec3 normal = scaledLength > 0.0 && scale > 1.0e-6 / scaledLength
+        // Vertex directions were uniformly scaled before interpolation.
+        const float cutoff = push.Domain == DomainVertex ? 1.25e-7 : 1.0e-6;
+        const vec3 normal = scaledLength > 0.0 && scale > cutoff / scaledLength
             ? scaled / scaledLength
             : vec3(0.0, 0.0, 1.0);
         outValue = vec4(normal * 0.5 + 0.5, 1.0);

@@ -35,6 +35,11 @@ void main()
     fragVertexValue = push.Domain == 0u
         ? properties.value[gl_VertexIndex]
         : vec4(0.0);
+    // A common power-of-two scale preserves magnitude-weighted interpolation
+    // while leaving headroom for finite near-FLT_MAX direction components.
+    // The fragment normal encoder uses the correspondingly scaled cutoff.
+    if (push.Domain == 0u && push.Encoding == 1u)
+        fragVertexValue.xyz *= 0.125;
 
     const vec2 ndc = vec2(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
     gl_Position = vec4(ndc, 0.0, 1.0);
