@@ -17,6 +17,12 @@ contract_review: "Build-directory discovery coordination has no current catalog 
 ---
 # BUG-176 — Concurrent CTest discovery can duplicate generated registrations
 
+## Completion — 2026-09-22
+
+Retired (tooling correctness endpoint). Implementation commit: `84384187972da72f9398b2e8077b8771f2020db0`.
+All acceptance criteria are verified below; no blocking dependencies or deferred
+implementation remain. No GPU/backend capability or performance claim is made.
+
 ## Goal
 - Prevent concurrent local test discovery from corrupting the same build
   directory's generated PRE_TEST registration files.
@@ -41,23 +47,23 @@ contract_review: "Build-directory discovery coordination has no current catalog 
   no repository coordination guard is implemented yet.
 
 ## Required changes
-- [ ] Reproduce concurrent discovery in an isolated synthetic CMake project and
+- [x] Reproduce concurrent discovery in an isolated synthetic CMake project and
       inspect the generated-file write sequence.
-- [ ] Select a bounded coordination mechanism for repository-owned discovery
+- [x] Select a bounded coordination mechanism for repository-owned discovery
       callers, or document an upstream fix with a supported CMake migration.
-- [ ] Keep discovery serialized until that mechanism exists; show-only CTest
+- [x] Keep discovery serialized until that mechanism exists; show-only CTest
       commands are potentially mutating when registration files are stale.
 
 ## Tests
-- [ ] Concurrent discovery yields exactly one registration per source case.
-- [ ] Real duplicate source cases still fail the strict routing validator.
+- [x] Concurrent discovery yields exactly one registration per source case.
+- [x] Real duplicate source cases still fail the strict routing validator.
 
 ## Docs
-- [ ] Document the ownership and scope of discovery synchronization.
+- [x] Document the ownership and scope of discovery synchronization.
 
 ## Acceptance criteria
-- [ ] Deterministic reproduction fails before and passes after the coordination fix.
-- [ ] Individual/grouped registration and complete CPU selection are unchanged.
+- [x] Deterministic reproduction fails before and passes after the coordination fix.
+- [x] Individual/grouped registration and complete CPU selection are unchanged.
 
 ## Verification
 ```bash

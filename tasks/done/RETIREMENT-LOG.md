@@ -7,6 +7,20 @@ relative to `tasks/done/`, which sits at the same depth as `tasks/active/`,
 so blocks moved from the old active-README history work verbatim.
 
 
+## 2026-09-22 — BUG-176 concurrent CTest discovery retired
+
+Retired [BUG-176](BUG-176-concurrent-ctest-discovery.md) at its tooling
+correctness endpoint. Commit `84384187972da72f9398b2e8077b8771f2020db0` brackets generated
+registration loading with a build-local lock and releases it before tests run.
+The deterministic unguarded control reproduces chunked-write duplication;
+guarded discovery preserves exact registrations, genuine duplicates and nested
+CTest queries. Canonical CPU verification selected 4,880 entries with zero
+failures and one existing skip; individual/grouped registries preserve all
+4,783 logical CPU cases. Claude and Codex reviews found no blocking issues.
+No blocker or implementation follow-up remains; concurrent builds and test
+result writers retain the existing one-writer rule.
+
+
 ## 2026-09-22 — GEOM-099, RUNTIME-272 and GRAPHICS-146 accepted
 
 Retired [GEOM-099](GEOM-099-shared-disk-topology-preflight.md),

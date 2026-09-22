@@ -8,7 +8,6 @@ picking backlog work; theme priorities and rationale live in
 
 ## Active tasks
 
-- `BUG-176` — Concurrent CTest discovery can duplicate generated registrations (tasks/active/BUG-176-concurrent-ctest-discovery.md)
 - `BUG-194` — Large-mesh property display and geodesic controls (tasks/active/BUG-194-large-mesh-property-display.md)
 - `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/active/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)

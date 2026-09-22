@@ -180,7 +180,7 @@ and bounded health, not segmentation quality.
   smoke, fixed in [BUG-175](../../../tasks/done/BUG-175-uv-atlas-smoke-test-routing.md).
   Concurrent CTest discovery also corrupted two generated registration files;
   serial regeneration restored exact parity. The coordination gap remains
-  [BUG-176](../../../tasks/active/BUG-176-concurrent-ctest-discovery.md).
+  [BUG-176](../../../tasks/done/BUG-176-concurrent-ctest-discovery.md).
   [BUG-174](../../../tasks/done/BUG-174-synthetic-lsan-control-timeout.md)
   fixes the synthetic LSan timeout: inherited debuginfod lookup stalled its
   symbolizer. The harness now uses local debug symbols; all twenty complete
