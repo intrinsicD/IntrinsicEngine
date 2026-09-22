@@ -161,6 +161,7 @@ jobs:
 
       - name: Validate test build aggregate policy
         run: |
+          python3 tests/regression/tooling/Test.ConcurrentCTestDiscovery.py
           python3 tests/regression/tooling/Test.TestBuildAggregates.py
           python3 tests/regression/tooling/Test_CiPrerequisiteGuards.py
 

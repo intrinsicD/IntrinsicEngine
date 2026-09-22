@@ -154,6 +154,24 @@ python3 tests/regression/tooling/Test.TestGateRouting.py \
   --build-dir build/ci-vulkan --aggregate IntrinsicGpuVulkanTests
 ```
 
+## Concurrent CTest discovery
+
+CTest registration loading is serialized per test build directory by
+`cmake/IntrinsicTestDiscovery.cmake`. Its lock brackets the directory's
+`TEST_INCLUDE_FILES`, including GoogleTest freshness checks, PRE_TEST writes,
+registration reads, and canonical property fixups. This also covers plain
+`ctest` and `--show-only` calls made by validators. Contention fails after 90
+seconds; errors remain visible. The lock is released before test execution,
+so tests may run nested CTest registry queries. Separate build directories
+remain independent.
+
+This lock does not coordinate CMake regeneration, builds, or concurrent test
+execution/report output; those retain the one-writer rule. It does not repair
+previously corrupted generated files. Preserve failure evidence and regenerate
+affected discovery files serially before using such a tree. The synthetic
+`Test.ConcurrentCTestDiscovery.py` regression exercises concurrent writers,
+exact registration, and nested discovery without requiring engine binaries.
+
 ## Grouped CTest execution and worker budgets
 
 `INTRINSIC_GROUP_PURE_CTEST` defaults to `OFF`, so a normal local `ci`

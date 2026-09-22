@@ -2837,3 +2837,6 @@ if(_intrinsic_registered_test_targets)
     file(GENERATE OUTPUT "${_intrinsic_property_fixup_file}" CONTENT "${_intrinsic_property_fixup_script}")
     set_property(DIRECTORY APPEND PROPERTY TEST_INCLUDE_FILES "${_intrinsic_property_fixup_file}")
 endif()
+
+include(${CMAKE_SOURCE_DIR}/cmake/IntrinsicTestDiscovery.cmake)
+intrinsic_serialize_test_discovery()

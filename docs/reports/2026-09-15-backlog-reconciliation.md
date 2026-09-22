@@ -77,7 +77,7 @@ Task links retain detailed acceptance criteria, source references and evidence.
 | [BUG-160](../../tasks/backlog/bugs/BUG-160-fast-staged-atlas-chart-fragmentation.md) | Keep | FastStaged fixed seed planes fragment smooth meshes into tiny charts. |
 | [BUG-171](../../tasks/backlog/bugs/BUG-171-required-command-receipt-supersession.md) | Keep | Required development receipts cannot be superseded by a passing rerun. |
 | [BUG-172](../../tasks/backlog/bugs/BUG-172-synchronous-cpu-load-completion-race.md) | Keep | Synchronous CPU completion can observe an unfinished or stale load transition. |
-| [BUG-176](../../tasks/backlog/bugs/BUG-176-concurrent-ctest-discovery.md) | Keep | Concurrent CTest discovery can duplicate generated registrations. |
+| [BUG-176](../../tasks/active/BUG-176-concurrent-ctest-discovery.md) | Keep | Concurrent CTest discovery can duplicate generated registrations. |
 | [BUG-178](../../tasks/backlog/bugs/BUG-178-clang23-incremental-module-ice.md) | Keep | Clang 23 crashes during an incremental module rebuild. |
 | [BUG-180](../../tasks/backlog/bugs/BUG-180-framed-icp-leak-enabled-process-retention.md) | Keep | Leak-enabled framed ICP process reports 240 retained bytes. |
 | [BUG-182](../../tasks/backlog/bugs/BUG-182-framed-knn-unavailable-device-timeout.md) | Keep | Framed kNN smoke times out when promoted Vulkan is not compiled. |
