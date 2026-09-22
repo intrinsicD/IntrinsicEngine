@@ -6424,6 +6424,9 @@ TEST(SandboxEditorUi, MeshCurvatureScalarStorageRoundTripsAndRestoresExactHistor
         const auto mesh = MakeSelectable(registry, "Scalar curvature");
         AddDenoiseAllBoundaryMeshSource(registry, mesh);
         auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
+        const auto deletedSlot = properties.Size();
+        properties.Resize(deletedSlot + 1u);
+        properties.GetOrAdd<bool>("v:deleted")[deletedSlot] = true;
         Runtime::EditorMeshCurvatureCommand command{.StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh)};
         using K = Geometry::PropertyValueKind;
         command.Mean.ValueKind = K::UInt64;
@@ -6435,6 +6438,7 @@ TEST(SandboxEditorUi, MeshCurvatureScalarStorageRoundTripsAndRestoresExactHistor
         const auto before = original.Vector();
         constexpr std::uint32_t nanBits = 0x7fc12345u;
         properties.GetOrAdd<float>(command.Gaussian.Name)[0] = std::bit_cast<float>(nanBits);
+        properties.Get<float>(command.Gaussian.Name)[deletedSlot] = std::bit_cast<float>(nanBits);
         Core::Config::EngineConfig persisted;
         Runtime::SetMeshCurvatureConfig(persisted, command);
         const auto decoded = Runtime::GetMeshCurvatureConfig(persisted);
@@ -6448,11 +6452,21 @@ TEST(SandboxEditorUi, MeshCurvatureScalarStorageRoundTripsAndRestoresExactHistor
         ASSERT_TRUE(properties.Get<float>(command.Gaussian.Name));
         EXPECT_TRUE(properties.Get<bool>(command.MinPrincipal.Name));
         EXPECT_TRUE(properties.Get<std::int32_t>(command.MaxPrincipal.Name));
-        for (const auto value : properties.Get<std::uint64_t>(command.Mean.Name).Vector()) EXPECT_EQ(value, 0u);
+        for (std::size_t i = 0; i < deletedSlot; ++i)
+            EXPECT_EQ(properties.Get<std::uint64_t>(command.Mean.Name)[i], 0u);
+        const auto verifyDeleted = [&] {
+            EXPECT_EQ(properties.Get<std::uint64_t>(command.Mean.Name)[deletedSlot], before[deletedSlot]);
+            EXPECT_EQ(std::bit_cast<std::uint32_t>(properties.Get<float>(command.Gaussian.Name)[deletedSlot]), nanBits);
+        };
+        verifyDeleted();
+        EXPECT_EQ(properties.Get<bool>(command.MinPrincipal.Name)[deletedSlot], false);
+        EXPECT_EQ(properties.Get<std::int32_t>(command.MaxPrincipal.Name)[deletedSlot], 0);
         ASSERT_TRUE(history.Undo().Succeeded());
+        verifyDeleted();
         EXPECT_EQ(properties.Get<std::uint64_t>(command.Mean.Name).Vector(), before);
         EXPECT_EQ(std::bit_cast<std::uint32_t>(properties.Get<float>(command.Gaussian.Name)[0]), nanBits);
         ASSERT_TRUE(history.Redo().Succeeded());
+        verifyDeleted();
         EXPECT_TRUE(properties.Get<float>(command.Gaussian.Name));
     }
 }

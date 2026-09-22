@@ -758,7 +758,9 @@ storage must match the declared kind. History retains raw typed snapshots,
 including UInt64 values beyond double precision and floating exceptional values,
 so undo does not convert previously authored data. Direction/color outputs retain
 their Vec3/Vec4 contracts, and aliasing plus structural-property restrictions
-remain enforced. Segmentation preserves existing values at unconsumed face/edge
+remain enforced. Curvature scalar outputs preserve deleted vertex slots, while
+its Vec3 direction outputs retain their full-slot publication contract.
+Segmentation preserves existing values at unconsumed face/edge
 slots, including exceptional floating values and full-width integers. Newly
 created scalar properties initialize unconsumed slots to zero; only participating
 outputs must be exactly representable in the selected storage.

@@ -426,13 +426,17 @@ namespace Extrinsic::Runtime::MeshFieldDetail
 
         [[nodiscard]] bool StageMeshCurvatureScalars(
             const Curv::CurvatureField& curvature,
+            const std::vector<bool>& deletedVertices,
             MeshCurvaturePropertyState& after,
             EditorMeshCurvatureResult& result)
         {
-            if (!StageMeshScalarProperty(after.Mean, after.Bindings.Mean, curvature.MeanCurvatureProperty.Vector()) ||
-                !StageMeshScalarProperty(after.Gaussian, after.Bindings.Gaussian, curvature.GaussianCurvatureProperty.Vector()) ||
-                !StageMeshScalarProperty(after.MinPrincipal, after.Bindings.MinPrincipal, curvature.MinPrincipalCurvatureProperty.Vector()) ||
-                !StageMeshScalarProperty(after.MaxPrincipal, after.Bindings.MaxPrincipal, curvature.MaxPrincipalCurvatureProperty.Vector()))
+            std::vector<std::uint32_t> liveSlots;
+            for (std::size_t i = 0; i < deletedVertices.size(); ++i)
+                if (!deletedVertices[i]) liveSlots.push_back(static_cast<std::uint32_t>(i));
+            if (!StageMeshScalarProperty(after.Mean, after.Bindings.Mean, curvature.MeanCurvatureProperty.Vector(), liveSlots) ||
+                !StageMeshScalarProperty(after.Gaussian, after.Bindings.Gaussian, curvature.GaussianCurvatureProperty.Vector(), liveSlots) ||
+                !StageMeshScalarProperty(after.MinPrincipal, after.Bindings.MinPrincipal, curvature.MinPrincipalCurvatureProperty.Vector(), liveSlots) ||
+                !StageMeshScalarProperty(after.MaxPrincipal, after.Bindings.MaxPrincipal, curvature.MaxPrincipalCurvatureProperty.Vector(), liveSlots))
             {
                 result.Status = EditorCommandStatus::InvalidProcessingParameters;
                 result.Error = Core::ErrorCode::InvalidArgument;
@@ -440,7 +444,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                 return false;
             }
             result.ScalarPropertyCount = 4u;
-            result.ScalarWrittenCount = 4u * GeometryScalarPropertySize(after.Mean);
+            result.ScalarWrittenCount = 4u * liveSlots.size();
             return true;
         }
 
@@ -1387,6 +1391,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             std::uint32_t StableEntityId{0u};
             std::uint64_t GeometryMetadataSignature{0u};
             std::vector<glm::vec3> SnapshotPositions{};
+            std::vector<bool> SnapshotDeletedVertices{};
             Geometry::HalfedgeMesh::Mesh Mesh{};
             MeshCurvaturePropertyState CurvatureBefore{};
             MeshCurvaturePropertyState CurvatureAfter{};
@@ -1515,7 +1520,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             }
 
             state->CurvatureAfter = state->CurvatureBefore;
-            if (!StageMeshCurvatureScalars(curvature, state->CurvatureAfter, result))
+            if (!StageMeshCurvatureScalars(curvature, state->SnapshotDeletedVertices, state->CurvatureAfter, result))
                 return JobResultEnvelope::Make<EditorJobResult>(EditorJobResult{.Diagnostic = result.Message});
 
             if (result.DirectionsRequested &&
@@ -1724,6 +1729,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->SnapshotPositions =
                 std::move(source.BeforePositions);
+            state->SnapshotDeletedVertices = std::move(source.DeletedVertices);
             state->Mesh = std::move(source.Mesh);
             state->CurvatureBefore = std::move(before);
             state->CurvatureAfter = state->CurvatureBefore;
@@ -2130,7 +2136,7 @@ ApplyEditorMeshCurvatureCommand(
         }
 
         MeshCurvaturePropertyState after = before;
-        if (!StageMeshCurvatureScalars(curvature, after, result)) return result;
+        if (!StageMeshCurvatureScalars(curvature, source.DeletedVertices, after, result)) return result;
 
         if (result.DirectionsRequested &&
             result.DirectionsAvailable)
