@@ -40,6 +40,7 @@ import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.DeviceBootstrap;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.Module;
@@ -214,13 +215,6 @@ namespace Extrinsic::Runtime
                 return found == outputs->Records.end() ? nullptr : &*found;
             }
 
-            [[nodiscard]] static bool IsScalarProperty(
-                const Geometry::PropertyValueKind kind) noexcept
-            {
-                return kind == Geometry::PropertyValueKind::Float ||
-                       kind == Geometry::PropertyValueKind::Double;
-            }
-
             static void ClearGeneratedMaterialTarget(
                 Graphics::MaterialTextureAssetBindings& bindings,
                 const GeometryPresentationSlotSemantic semantic,
@@ -283,7 +277,7 @@ namespace Extrinsic::Runtime
                 case GeometryPresentationSlotSemantic::ScalarField:
                     bindings.Albedo = output.Texture;
                     bindings.AlbedoInterpretation =
-                        IsScalarProperty(output.Source.ValueKind) &&
+                        GeometryPropertyComponentCount(output.Source.ValueKind) == 1u &&
                                 output.Storage ==
                                     PropertyTextureBakeStorage::RawFloat
                             ? Graphics::MaterialAlbedoTextureInterpretation::

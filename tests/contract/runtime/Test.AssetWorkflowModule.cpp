@@ -1161,23 +1161,37 @@ TEST(AssetWorkflowModule,
             .RoughnessFromRed = true,
         });
 
-    pipeline->RunFrameMaintenance();
+    for (const auto kind : {Geometry::PropertyValueKind::Bool,
+                           Geometry::PropertyValueKind::Int32,
+                           Geometry::PropertyValueKind::UInt32,
+                           Geometry::PropertyValueKind::UInt64,
+                           Geometry::PropertyValueKind::Float,
+                           Geometry::PropertyValueKind::Double})
+    {
+        SCOPED_TRACE(static_cast<int>(kind));
+        auto& recipe = scene->Raw().get<Runtime::GeometryPresentationRecipe>(entity);
+        recipe.Presentations[0].Slots[0].Property.ValueKind = kind;
+        outputs.Records[0].Source.ValueKind = kind;
+        ++outputs.Records[0].Generation;
+        pipeline->RunFrameMaintenance();
 
-    const auto ready =
-        harness.Extraction.GetMaterialTextureAssetBindings(stableId);
-    ASSERT_TRUE(ready.has_value());
-    EXPECT_EQ(ready->Albedo, *albedoTexture);
-    EXPECT_EQ(ready->AlbedoInterpretation,
-              Graphics::MaterialAlbedoTextureInterpretation::Scalar);
-    EXPECT_EQ(ready->AlbedoScalarColormap, Graphics::Colormap::Type::Inferno);
-    EXPECT_FLOAT_EQ(ready->AlbedoScalarRangeMin, -2.0f);
-    EXPECT_FLOAT_EQ(ready->AlbedoScalarRangeMax, 3.0f);
-    EXPECT_EQ(ready->Normal, *normalTexture);
-    EXPECT_EQ(ready->NormalSpace,
-              Graphics::MaterialNormalTextureSpace::WorldSpaceNormal);
-    EXPECT_EQ(ready->MetallicRoughness, unrelatedMetallicRoughness);
-    EXPECT_EQ(ready->Emissive, unrelatedEmissive);
-    EXPECT_TRUE(ready->RoughnessFromRed);
+        const auto ready =
+            harness.Extraction.GetMaterialTextureAssetBindings(stableId);
+        ASSERT_TRUE(ready.has_value());
+        EXPECT_EQ(ready->Albedo, *albedoTexture);
+        EXPECT_EQ(ready->AlbedoInterpretation,
+                  Graphics::MaterialAlbedoTextureInterpretation::Scalar);
+        EXPECT_EQ(ready->AlbedoScalarColormap, Graphics::Colormap::Type::Inferno);
+        EXPECT_FLOAT_EQ(ready->AlbedoScalarRangeMin, -2.0f);
+        EXPECT_FLOAT_EQ(ready->AlbedoScalarRangeMax, 3.0f);
+        EXPECT_EQ(ready->Normal, *normalTexture);
+        EXPECT_EQ(ready->NormalSpace,
+                  Graphics::MaterialNormalTextureSpace::WorldSpaceNormal);
+        EXPECT_EQ(ready->MetallicRoughness, unrelatedMetallicRoughness);
+        EXPECT_EQ(ready->Emissive, unrelatedEmissive);
+        EXPECT_TRUE(ready->RoughnessFromRed);
+
+    }
 
     outputs.Records[0].State = Runtime::PropertyTextureBakeOutputState::Pending;
     outputs.Records[0].Diagnostic = "rebake pending";
