@@ -317,6 +317,19 @@ namespace Extrinsic::Runtime
         }
     }
 
+    PropertyTextureBakeEncoding ResolveSurfaceAppearanceEncoding(
+        const Graphics::Components::VisualizationConfig& config,
+        const Geometry::PropertyValueKind kind) noexcept
+    {
+        using Config = Graphics::Components::VisualizationConfig;
+        if (config.Source == Config::ColorSource::ScalarField)
+            return PropertyTextureBakeEncoding::ScalarColormap;
+        if (config.Interpretation == Config::ColorInterpretation::NormalDirection)
+            return PropertyTextureBakeEncoding::Normal;
+        return kind == Geometry::PropertyValueKind::UInt32 || kind == Geometry::PropertyValueKind::Bool
+            ? PropertyTextureBakeEncoding::LabelPalette : PropertyTextureBakeEncoding::RgbaColor;
+    }
+
     PropertyTextureBakeRepresentation ResolvePropertyTextureBakeRepresentation(
         const Geometry::PropertyValueKind valueKind,
         const PropertyTextureBakeStorage requestedStorage,
@@ -2515,11 +2528,7 @@ namespace Extrinsic::Runtime
                 property.ValueKind = resolved.ResolvedValueKind;
                 const auto rangePolicy = config->Scalar.AutoRange
                     ? PropertyTextureBakeRangePolicy::AutoFinite : PropertyTextureBakeRangePolicy::Manual;
-                const auto encoding = scalar
-                    ? PropertyTextureBakeEncoding::ScalarColormap
-                    : ((property.Name == GS::PropertyNames::kNormal || property.Name == "f:normal") &&
-                       property.ValueKind == Geometry::PropertyValueKind::Vec3
-                           ? PropertyTextureBakeEncoding::Normal : PropertyTextureBakeEncoding::RgbaColor);
+                const auto encoding = ResolveSurfaceAppearanceEncoding(*config, property.ValueKind);
                 if (const auto* outputs = raw.try_get<PropertyTextureBakeOutputs>(entity))
                 {
                     const auto record = std::ranges::find(outputs->Records,

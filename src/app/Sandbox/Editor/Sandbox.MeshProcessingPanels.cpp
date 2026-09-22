@@ -1820,14 +1820,15 @@ namespace Extrinsic::Sandbox::Editor
                      .Target = Runtime::EditorVisualizationTarget::Surface,
                      .Domain = Runtime::EditorVisualizationPropertyDomain::MeshFaces,
                      .Preset = Runtime::EditorVisualizationPropertyPreset::ColorBuffer,
-                     .PropertyName = outputProperty.Name});
+                     .PropertyName = outputProperty.Name,
+                     .Interpretation = decltype(Runtime::EditorVisualizationPropertyCommand{}.Interpretation)::NormalDirection});
                 (void)hint;
                 Normals.VisualizationDiagnostic = Runtime::DebugNameForEditorCommandStatus(status);
             }
         }
         else if (ImGui::Button("Show normals"))
         {
-            const auto status = ShowProcessingProperty(context, config.StableEntityId, outputProperty);
+            const auto status = ShowProcessingProperty(context, config.StableEntityId, outputProperty, true);
             Normals.VisualizationDiagnostic = Runtime::DebugNameForEditorCommandStatus(status);
         }
         if (!Normals.VisualizationDiagnostic.empty())

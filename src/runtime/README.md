@@ -827,8 +827,8 @@ or RGB/RGBA color properties. The surface source domain selects either the verte
 or face property set; changing it clears the previous property selection with
 undo support. Face values are expanded through the surface triangulation's
 source-face map, so a polygon keeps one constant value across all its triangles.
-Vertex and face normals (`v:normal`, `f:normal`) display object-space
-directions as `0.5 * normalize(normal) + 0.5` in both attribute and baked form;
+The explicit Normal direction color interpretation displays any bound Vec3
+as `0.5 * normalize(value) + 0.5` in both attribute and baked form;
 the source property is preserved. Selections use
 independent visualization lane overrides.
 Color mapping controls expose the selected scalar property's range and colormap;

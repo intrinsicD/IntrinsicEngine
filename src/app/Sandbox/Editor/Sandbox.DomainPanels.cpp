@@ -595,6 +595,15 @@ void DrawDomainVisualizationControls(const EditorDomainWindowModel &model,
                          model.VisualizationControlsAvailable;
   ImGui::BeginDisabled(!available);
   DrawVisualizationPropertyDropdown(model, context, lastStatus);
+  if (visualization.HasConfig && static_cast<int>(visualization.Source) >= 3) {
+    int interpretation = static_cast<int>(visualization.Interpretation);
+    if (ImGui::Combo("Color interpretation", &interpretation, "Components\0Normal direction\0")) {
+      auto command = MakeVisualizationConfigCommandFromModel(
+          model.SelectedStableId, visualization, model.VisualizationTarget);
+      command.Interpretation = static_cast<decltype(command.Interpretation)>(interpretation);
+      lastStatus = ApplyEditorVisualizationConfigCommand(context.VisualizationCommands, command);
+    }
+  }
   DrawUniformVisualizationColorEdit(visualization, context,
                                     model.SelectedStableId,
                                     model.VisualizationTarget, available);

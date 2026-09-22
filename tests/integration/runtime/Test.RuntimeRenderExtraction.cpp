@@ -2359,6 +2359,7 @@ TEST(RuntimeRenderExtraction, PolygonFacePropertiesRepeatAcrossTheirTriangles)
         vis.ScalarDomain = V::Domain::Face;
         vis.ScalarFieldName = "f:heat";
         vis.ColorBufferName = "f:normal";
+        vis.Interpretation = decltype(vis.Interpretation)::NormalDirection;
         const auto verify = [&](std::size_t triangleCount) {
             const auto stats = fixture.Extract(scene);
             EXPECT_EQ(stats.VisualizationRecipeInvalidBufferCount, 0u);

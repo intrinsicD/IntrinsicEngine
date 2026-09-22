@@ -7916,7 +7916,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
               .Target = RT::EditorVisualizationTarget::Surface,
               .Domain = RT::EditorVisualizationPropertyDomain::MeshVertices,
               .Preset = RT::EditorVisualizationPropertyPreset::ColorBuffer,
-              .PropertyName = "v:normal"});
+              .PropertyName = "v:normal",
+              .Interpretation = G::VisualizationConfig::ColorInterpretation::NormalDirection});
       commandFailed |= status != RT::EditorCommandStatus::Applied;
       phase = 8u;
     } else if (phase == 9u) {
@@ -7925,6 +7926,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
           .Target = RT::EditorVisualizationTarget::Surface,
           .Source = G::VisualizationConfig::ColorSource::PerVertexBuffer,
           .ColorBufferName = "v:normal",
+          .Interpretation = G::VisualizationConfig::ColorInterpretation::NormalDirection,
           .UseBakedTexture = false});
       engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer(readbacks[5]);
       phase = 10u;
@@ -7958,7 +7960,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
           .StableEntityId = stableId,
           .Target = RT::EditorVisualizationTarget::Surface,
           .Source = G::VisualizationConfig::ColorSource::PerFaceBuffer,
-          .ColorBufferName = "f:normal", .UseBakedTexture = true});
+          .ColorBufferName = "f:normal",
+          .Interpretation = G::VisualizationConfig::ColorInterpretation::NormalDirection, .UseBakedTexture = true});
       phase = 11u;
     } else if (phase == 12u) {
       const auto world = engine.GetRenderer().ExtractRenderWorld({});
@@ -7968,7 +7971,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
           .StableEntityId = stableId,
           .Target = RT::EditorVisualizationTarget::Surface,
           .Source = G::VisualizationConfig::ColorSource::PerFaceBuffer,
-          .ColorBufferName = "f:normal", .UseBakedTexture = false});
+          .ColorBufferName = "f:normal",
+          .Interpretation = G::VisualizationConfig::ColorInterpretation::NormalDirection, .UseBakedTexture = false});
       engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer(readbacks[7]);
       phase = 13u;
       settle = 4u;

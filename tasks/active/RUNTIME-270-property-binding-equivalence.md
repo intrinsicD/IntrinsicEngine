@@ -93,6 +93,42 @@ Pending a different preference, use checked numeric conversion as the stated
 implementation assumption; exact storage identity remains part of property
 resolution and output mutation, not a substitute for feature shape.
 
+## Retirement implementation plan — 2026-09-22
+
+The operator explicitly authorized completion through retirement, including actual
+blockers, Claude review and isolated subagents. UI-037's unrelated ICP, bake and
+service workflows are not dependencies of this task; this task closes its bound
+mesh-feature readiness overlap using that task's existing cache lifecycle.
+
+The source audit covers canonical reference owners, processing operations, codecs
+and both Sandbox method-panel owners. This is the implementation inventory, not
+an execution-completeness claim:
+
+| Binding family | Existing owners and remaining closure |
+| --- | --- |
+| Point normals, bilateral, registration, construction | PointProperties capture; Vec3 is the sole catalogued three-component storage. Preserve correspondence and selected domains. |
+| Density, spacing, weights, outliers, keypoints, descriptors | Existing point publication/history; extend scalar storage conversion before widening config/UI. |
+| K-Means | ClusteringTypes/ClusteringModule; remove provenance-only execution domain restrictions and retain deleted-slot correspondence; checked scalar outputs. |
+| LOP/WLOP/CLOP/EAR | Existing canonical Vec3 inputs and same-domain publication; preserve cardinality/normal policy. |
+| Progressive Poisson | Four scalar outputs and owning permutation; checked publication must retain reordering/structural invariants. |
+| Graph normals, shortest path | Real adjacency requirements remain; structural index/mask kinds are not arbitrary scalar slots. |
+| Curvature and segmentation | Existing mesh-field capture/history; checked scalar targets, alias protection and cached bound-feature readiness. |
+| Geodesics | Full canonical config refs; checked distance/mask publication, including unreachable-distance infinity semantics. |
+| Parameterization | Explicit optional corner-UV retirement ref, preserving unrelated corners and exact undo. |
+| Owning topology edits | Denoise/smoothing/remesh/simplify/subdivide/repair/CSG/reconstruction/hull/construction retain explicit owning mutations and dependent-data handling. |
+| Visualization, surface appearance and bake | Explicit normal interpretation, name-independent catalogs and consistent scalar storage admission. |
+
+GMM deliberately supports one to three numeric channels. Wider feature vectors,
+including Vec4, remain explicitly rejected without truncation; extending the
+numerical algorithm is unnecessary to establish truthful binding equivalence.
+
+Reuse/right-sizing: retain the existing GeometryAvailability owner for exact
+scalar snapshots and checked conversion, then reuse it across point and mesh
+publication. One plain snapshot plus compiled functions serves current callers;
+no service, registry or forwarding layer. Readiness extends the existing
+session-owned verdict cache. Appearance adds one persisted interpretation field
+and a shared bake-encoding mapping; cache identity includes interpretation.
+
 ## Verification
 
 ```bash

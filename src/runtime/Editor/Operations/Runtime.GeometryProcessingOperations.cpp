@@ -916,6 +916,7 @@ namespace Extrinsic::Runtime
                    current.ScalarFieldName == expected.ScalarFieldName &&
                    current.ScalarDomain == expected.ScalarDomain &&
                    current.ColorBufferName == expected.ColorBufferName &&
+                   current.Interpretation == expected.Interpretation &&
                    current.Scalar.Map == expected.Scalar.Map &&
                    current.Scalar.AutoRange == expected.Scalar.AutoRange &&
                    SameProgressivePoissonValue(

@@ -55,6 +55,7 @@ namespace Extrinsic::Runtime
             float VectorScale{1.0f};
             glm::vec4 VectorColor{1.0f};
             bool DepthTested{true};
+            Graphics::Components::VisualizationConfig::ColorInterpretation Interpretation{};
         };
 
         [[nodiscard]] bool IsFinite(const float value) noexcept
@@ -459,20 +460,21 @@ namespace Extrinsic::Runtime
                                             : options.OutputName;
           const std::string bufferSourceKey =
               options.PropertyBufferSourceKey.empty()
-                  ? sourceKey
+                  ? sourceKey + (options.Interpretation == Graphics::Components::VisualizationConfig::ColorInterpretation::NormalDirection ? ".normal" : "")
                   : options.PropertyBufferSourceKey;
           if (options.ColorBufferBDA == 0u) {
             std::vector<std::byte> payload;
             if constexpr (std::is_same_v<T, glm::vec3>) {
               std::vector<glm::vec4> colors;
               colors.reserve(values.size());
-              const bool normals = (options.SourceName == GeometrySources::PropertyNames::kNormal || options.SourceName == "f:normal");
+              const bool normals = options.Interpretation == Graphics::Components::VisualizationConfig::ColorInterpretation::NormalDirection;
               for (const auto value : values) {
                 if (normals) {
                   // Match the normal bake encoder without applying an entity transform.
-                  const float lengthSquared = glm::dot(value, value);
-                  const glm::vec3 normal = lengthSquared > 1.0e-12f
-                      ? value / std::sqrt(lengthSquared) : glm::vec3{0, 0, 1};
+                  const glm::dvec3 precise{value};
+                  const double lengthSquared = glm::dot(precise, precise);
+                  const glm::vec3 normal = lengthSquared > 1.0e-12
+                      ? glm::vec3{precise / std::sqrt(lengthSquared)} : glm::vec3{0, 0, 1};
                   colors.emplace_back(normal * 0.5f + 0.5f, 1.0f);
                 } else
                   colors.emplace_back(value, 1.0f);
@@ -685,6 +687,16 @@ namespace Extrinsic::Runtime
             if (options.SourceName.empty())
             {
                 ++diagnostics.MissingSourceCount;
+                return;
+            }
+
+            using Interpretation = Graphics::Components::VisualizationConfig::ColorInterpretation;
+            if ((options.Interpretation != Interpretation::Components &&
+                 options.Interpretation != Interpretation::NormalDirection) ||
+                (options.Interpretation == Interpretation::NormalDirection &&
+                 !properties.Get<glm::vec3>(options.SourceName).IsValid()))
+            {
+                ++diagnostics.UnsupportedSourceTypeCount;
                 return;
             }
 
@@ -901,6 +913,8 @@ namespace Extrinsic::Runtime
                 else if constexpr (std::is_same_v<Lhs, ColorVisualizationRecipe> ||
                                    std::is_same_v<Lhs, LabelVisualizationRecipe>)
                 {
+                    if constexpr (std::is_same_v<Lhs, ColorVisualizationRecipe>)
+                        if (a.Interpretation != b.Interpretation) return false;
                     return sameRef(a.Source, b.Source) &&
                            a.OutputName == b.OutputName &&
                            a.BufferBDA == b.BufferBDA &&
@@ -1073,6 +1087,9 @@ namespace Extrinsic::Runtime
                 else if constexpr (std::is_same_v<Recipe, ColorVisualizationRecipe> ||
                                    std::is_same_v<Recipe, LabelVisualizationRecipe>)
                 {
+                    auto interpretation = Graphics::Components::VisualizationConfig::ColorInterpretation::Components;
+                    if constexpr (std::is_same_v<Recipe, ColorVisualizationRecipe>)
+                        interpretation = authored.Interpretation;
                     (void)appendPropertyRecipe(
                         authored.Source,
                         VisualizationEncodingOptions{
@@ -1080,6 +1097,7 @@ namespace Extrinsic::Runtime
                             .ColorBufferBDA = authored.BufferBDA,
                             .PropertyBufferSourceKey = authored.BufferSourceKey,
                             .DirtyStamp = authored.DirtyStamp,
+                            .Interpretation = interpretation,
                         },
                         EncodeColorProperty);
                 }

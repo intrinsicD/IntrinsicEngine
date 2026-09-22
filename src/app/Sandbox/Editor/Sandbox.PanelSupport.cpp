@@ -243,13 +243,16 @@ namespace Extrinsic::Sandbox::Editor
 
     Runtime::EditorCommandStatus ShowProcessingProperty(
         const SandboxEditorContext& context, const std::uint32_t entity,
-        const Runtime::GeometryPropertyRef& property)
+        const Runtime::GeometryPropertyRef& property, const bool normalDirection)
     {
         Runtime::VisualizationRecipe recipe;
         using Kind = Geometry::PropertyValueKind;
         if (property.ValueKind == Kind::Vec2 || property.ValueKind == Kind::Vec3 ||
             property.ValueKind == Kind::Vec4)
-            recipe.Data = Runtime::ColorVisualizationRecipe{.Source=property, .OutputName=property.Name+".colors"};
+            recipe.Data = Runtime::ColorVisualizationRecipe{.Source=property, .OutputName=property.Name+".colors",
+                .Interpretation = normalDirection
+                    ? decltype(Runtime::ColorVisualizationRecipe{}.Interpretation)::NormalDirection
+                    : decltype(Runtime::ColorVisualizationRecipe{}.Interpretation)::Components};
         else if (property.ValueKind == Kind::Bool || property.ValueKind == Kind::UInt32 ||
                  property.ValueKind == Kind::Int32)
             recipe.Data = Runtime::LabelVisualizationRecipe{.Source=property, .OutputName=property.Name+".colors"};
@@ -1566,6 +1569,7 @@ namespace Extrinsic::Sandbox::Editor
             .ScalarFieldName = model.ScalarFieldName,
             .ScalarDomain = model.ScalarDomain,
             .ColorBufferName = model.ColorBufferName,
+            .Interpretation = model.Interpretation,
             .ScalarAutoRange = model.ScalarAutoRange,
             .ScalarRangeMin = model.ScalarRangeMin,
             .ScalarRangeMax = model.ScalarRangeMax,

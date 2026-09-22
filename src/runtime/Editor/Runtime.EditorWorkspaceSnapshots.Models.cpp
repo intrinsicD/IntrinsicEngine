@@ -140,6 +140,7 @@ namespace {
                 .ScalarFieldName = config.ScalarFieldName,
                 .ScalarDomain = config.ScalarDomain,
                 .ColorBufferName = config.ColorBufferName,
+                .Interpretation = config.Interpretation,
                 .ScalarAutoRange = config.Scalar.AutoRange,
                 .ScalarRangeMin = config.Scalar.RangeMin,
                 .ScalarRangeMax = config.Scalar.RangeMax,
@@ -1763,6 +1764,7 @@ namespace {
             MixSignature(signature,
                          static_cast<std::uint64_t>(config->ScalarDomain));
             MixSignatureString(signature, config->ColorBufferName);
+            MixSignature(signature, static_cast<std::uint64_t>(config->Interpretation));
             MixSignature(signature, config->Scalar.AutoRange ? 1u : 0u);
             MixSignatureFloat(signature, config->Scalar.RangeMin);
             MixSignatureFloat(signature, config->Scalar.RangeMax);

@@ -395,6 +395,7 @@ export namespace Extrinsic::Runtime
         Graphics::Components::VisualizationConfig::Domain ScalarDomain{
             Graphics::Components::VisualizationConfig::Domain::Vertex};
         std::string ColorBufferName{};
+        Graphics::Components::VisualizationConfig::ColorInterpretation Interpretation{};
         bool ScalarAutoRange{true};
         float ScalarRangeMin{0.0f};
         float ScalarRangeMax{1.0f};
@@ -477,6 +478,7 @@ export namespace Extrinsic::Runtime
         Graphics::Components::VisualizationConfig::Domain ScalarDomain{
             Graphics::Components::VisualizationConfig::Domain::Vertex};
         std::string ColorBufferName{};
+        Graphics::Components::VisualizationConfig::ColorInterpretation Interpretation{};
         bool ScalarAutoRange{true};
         float ScalarRangeMin{0.0f};
         float ScalarRangeMax{1.0f};
@@ -498,6 +500,7 @@ export namespace Extrinsic::Runtime
         EditorVisualizationPropertyDomain Domain{EditorVisualizationPropertyDomain::MeshVertices};
         EditorVisualizationPropertyPreset Preset{EditorVisualizationPropertyPreset::Scalar};
         std::string PropertyName{};
+        Graphics::Components::VisualizationConfig::ColorInterpretation Interpretation{};
         bool ScalarAutoRange{true};
         float ScalarRangeMin{0.0f};
         float ScalarRangeMax{1.0f};

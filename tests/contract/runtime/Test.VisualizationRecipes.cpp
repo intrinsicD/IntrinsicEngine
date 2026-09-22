@@ -820,7 +820,8 @@ TEST(VisualizationRecipes, VertexNormalsMapObjectSpaceDirectionsToRgb) {
           .Data = R::ColorVisualizationRecipe{
               .Source = {.Domain = R::GeometryElementDomain::MeshVertex,
                          .Name = "v:normal",
-                         .ValueKind = Geometry::PropertyValueKind::Vec3}}});
+                         .ValueKind = Geometry::PropertyValueKind::Vec3},
+              .Interpretation = decltype(R::ColorVisualizationRecipe{}.Interpretation)::NormalDirection}});
   ASSERT_TRUE(encoded.Succeeded());
   ASSERT_EQ(encoded.Batch.PropertyBufferPayloads.size(), 1u);
   const auto &payload = encoded.Batch.PropertyBufferPayloads.front();
@@ -912,4 +913,35 @@ TEST(VisualizationRecipes, InfiniteScalarSamplesPreserveSlotsWithoutPoisoningRan
             .Source = {R::GeometryElementDomain::MeshFace, "heat", Geometry::PropertyValueKind::Double}}});
     EXPECT_EQ(empty.Status, R::VisualizationRecipeStatus::NonFiniteValue);
     EXPECT_TRUE(empty.Batch.Scalars.empty());
+}
+
+TEST(VisualizationRecipes, ColorInterpretationIsExplicitAndIndependentOfPropertyName)
+{
+    RecipeSourceFixture source;
+    using Interpretation = decltype(R::ColorVisualizationRecipe{}.Interpretation);
+    for (const auto* name : {"v:normal", "unrelated_samples"})
+        source.Vertices.Properties.Add<glm::vec3>(name, {}).Vector() =
+            {{-2, 0, 0}, {0, 3, 0}, {0, 0, -4}, {0, 0, 0}};
+    R::VisualizationRecipe raw{.Data = R::ColorVisualizationRecipe{
+        .Source = {R::GeometryElementDomain::MeshVertex, "v:normal", Geometry::PropertyValueKind::Vec3}}};
+    auto normal = raw;
+    std::get<R::ColorVisualizationRecipe>(normal.Data).Interpretation = Interpretation::NormalDirection;
+    EXPECT_FALSE(R::SameVisualizationRecipe(raw, normal));
+    auto renamed = normal;
+    std::get<R::ColorVisualizationRecipe>(renamed.Data).Source.Name = "unrelated_samples";
+    const auto rawResult = R::EncodeVisualizationRecipe(source.Availability, raw);
+    const auto normalResult = R::EncodeVisualizationRecipe(source.Availability, normal);
+    const auto renamedResult = R::EncodeVisualizationRecipe(source.Availability, renamed);
+    ASSERT_TRUE(rawResult.Succeeded());
+    ASSERT_TRUE(normalResult.Succeeded());
+    ASSERT_TRUE(renamedResult.Succeeded());
+    EXPECT_EQ(normalResult.Batch.PropertyBufferPayloads, renamedResult.Batch.PropertyBufferPayloads);
+    EXPECT_NE(rawResult.Batch.PropertyBufferPayloads, normalResult.Batch.PropertyBufferPayloads);
+    glm::vec4 first{};
+    std::memcpy(&first, rawResult.Batch.PropertyBufferPayloads.front().data(), sizeof(first));
+    EXPECT_EQ(first, glm::vec4(-2, 0, 0, 1));
+    source.Vertices.Properties.Add<glm::vec4>("rgba", glm::vec4{1});
+    std::get<R::ColorVisualizationRecipe>(normal.Data).Source =
+        {R::GeometryElementDomain::MeshVertex, "rgba", Geometry::PropertyValueKind::Vec4};
+    EXPECT_FALSE(R::EncodeVisualizationRecipe(source.Availability, normal).Succeeded());
 }

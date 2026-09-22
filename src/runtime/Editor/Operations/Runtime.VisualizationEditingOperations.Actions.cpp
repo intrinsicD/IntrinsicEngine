@@ -85,6 +85,7 @@ namespace {
             config.ScalarFieldName = command.ScalarFieldName;
             config.ScalarDomain = command.ScalarDomain;
             config.ColorBufferName = command.ColorBufferName;
+            config.Interpretation = command.Interpretation;
             config.UseBakedTexture = command.UseBakedTexture;
             config.Scalar.AutoRange = command.ScalarAutoRange;
             config.Scalar.RangeMin = command.ScalarRangeMin;
@@ -179,6 +180,7 @@ namespace {
                    lhs.ScalarFieldName == rhs.ScalarFieldName &&
                    lhs.ScalarDomain == rhs.ScalarDomain &&
                    lhs.ColorBufferName == rhs.ColorBufferName &&
+                   lhs.Interpretation == rhs.Interpretation &&
                    lhs.UseBakedTexture == rhs.UseBakedTexture &&
                    lhs.Scalar.Map == rhs.Scalar.Map &&
                    lhs.Scalar.AutoRange == rhs.Scalar.AutoRange &&
@@ -1444,6 +1446,31 @@ ApplyEditorRenderHintCommand(
         if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
             return EditorCommandStatus::StaleEntity;
 
+        using Interpretation = G::VisualizationConfig::ColorInterpretation;
+        if (command.Interpretation != Interpretation::Components &&
+            command.Interpretation != Interpretation::NormalDirection)
+            return EditorCommandStatus::InvalidVisualizationProperty;
+        if (command.EnableConfig && command.Interpretation == Interpretation::NormalDirection)
+        {
+            if (command.Source != G::VisualizationConfig::ColorSource::PerVertexBuffer &&
+                command.Source != G::VisualizationConfig::ColorSource::PerEdgeBuffer &&
+                command.Source != G::VisualizationConfig::ColorSource::PerFaceBuffer)
+                return EditorCommandStatus::InvalidVisualizationProperty;
+            const auto availability = BuildGeometryAvailability(raw, entity);
+            const auto provenance = availability.Sources.ProvenanceDomain;
+            const auto domain = command.Source == G::VisualizationConfig::ColorSource::PerFaceBuffer
+                ? GeometryElementDomain::MeshFace
+                : command.Source == G::VisualizationConfig::ColorSource::PerEdgeBuffer
+                    ? (provenance == GS::Domain::Graph ? GeometryElementDomain::GraphEdge : GeometryElementDomain::MeshEdge)
+                    : provenance == GS::Domain::Graph ? GeometryElementDomain::GraphNode
+                    : provenance == GS::Domain::PointCloud ? GeometryElementDomain::PointCloudPoint
+                    : GeometryElementDomain::MeshVertex;
+            if (!ResolveGeometryProperty(availability,
+                    GeometryPropertyRef{domain, command.ColorBufferName, Geometry::PropertyValueKind::Vec3},
+                    ResolveGeometryElementCount(availability, domain)).Resolved())
+                return EditorCommandStatus::InvalidVisualizationProperty;
+        }
+
         const std::optional<G::VisualizationConfig> before =
             StoredVisualizationConfigForTarget(raw, entity, command.Target);
         const std::optional<G::VisualizationConfig> effectiveBefore =
@@ -1510,14 +1537,7 @@ ApplyEditorRenderHintCommand(
                   .SourceDomain = sourceDomain,
                   .ExpectedValueKind = resolved.ResolvedValueKind,
                   .PropertyName = name,
-                  .Encoder = scalar
-                                 ? PropertyTextureBakeEncoding::ScalarColormap
-                                 : ((name == GS::PropertyNames::kNormal || name == "f:normal") &&
-                                    resolved.ResolvedValueKind == Geometry::PropertyValueKind::Vec3
-                                        ? PropertyTextureBakeEncoding::Normal
-                                        : (resolved.ResolvedValueKind == Geometry::PropertyValueKind::UInt32
-                                               ? PropertyTextureBakeEncoding::LabelPalette
-                                               : PropertyTextureBakeEncoding::RgbaColor)),
+                  .Encoder = ResolveSurfaceAppearanceEncoding(*after, resolved.ResolvedValueKind),
                   .RangePolicy =
                       command.ScalarAutoRange
                           ? PropertyTextureBakeRangePolicy::AutoFinite
@@ -1614,6 +1634,7 @@ ApplyEditorRenderHintCommand(
             .ScalarFieldName = command.PropertyName,
             .ScalarDomain = ToVisualizationConfigDomain(command.Domain),
             .ColorBufferName = command.PropertyName,
+            .Interpretation = command.Interpretation,
             .ScalarAutoRange = command.ScalarAutoRange,
             .ScalarRangeMin = command.ScalarRangeMin,
             .ScalarRangeMax = command.ScalarRangeMax,
@@ -1752,6 +1773,8 @@ ApplyEditorRenderHintCommand(
                             config.IsolineValues = existing->Scalar.Isolines.Values;
                             config.IsolineValueCount = existing->Scalar.Isolines.ValueCount;
                         }
+                        if constexpr (std::is_same_v<T, ColorVisualizationRecipe>)
+                            config.Interpretation = resolved.Interpretation;
                         if constexpr (std::is_same_v<T, ScalarVisualizationRecipe>)
                         {
                             config.Source = G::VisualizationConfig::ColorSource::ScalarField;

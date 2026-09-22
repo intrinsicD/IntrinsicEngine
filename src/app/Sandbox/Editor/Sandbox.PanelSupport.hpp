@@ -255,7 +255,8 @@ namespace Extrinsic::Sandbox::Editor
         std::uint32_t maxComponents = 4u);
     [[nodiscard]] Runtime::EditorCommandStatus ShowProcessingProperty(
         const SandboxEditorContext& context, std::uint32_t entity,
-        const Runtime::GeometryPropertyRef& property);
+        const Runtime::GeometryPropertyRef& property,
+        bool normalDirection = false);
     bool DrawProcessingPropertyShowButton(const SandboxEditorContext& context,
         std::uint32_t entity, const Runtime::GeometryPropertyRef& property,
         std::string& diagnostic);

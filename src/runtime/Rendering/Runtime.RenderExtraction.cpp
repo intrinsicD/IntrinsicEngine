@@ -281,6 +281,7 @@ namespace Extrinsic::Runtime
                 },
                 .OutputName = visualization->ColorBufferName,
                 .BufferSourceKey = std::move(bufferSourceKey),
+                .Interpretation = visualization->Interpretation,
             }};
         }
 
@@ -1155,7 +1156,8 @@ namespace Extrinsic::Runtime
                     : surfaceConfig->Source == Graphics::Components::VisualizationConfig::ColorSource::PerFaceBuffer;
                 if (record != outputs->Records.end() && record->State == PropertyTextureBakeOutputState::Ready &&
                     record->Source.Name == (scalar ? surfaceConfig->ScalarFieldName : surfaceConfig->ColorBufferName) &&
-                    record->Source.Domain == (face ? GeometryElementDomain::MeshFace : GeometryElementDomain::MeshVertex))
+                    record->Source.Domain == (face ? GeometryElementDomain::MeshFace : GeometryElementDomain::MeshVertex) &&
+                    record->Encoding == ResolveSurfaceAppearanceEncoding(*surfaceConfig, record->Source.ValueKind))
                 {
                     textureBindings.Albedo = record->Texture;
                     textureBindings.AlbedoInterpretation = Graphics::MaterialAlbedoTextureInterpretation::Color;
@@ -1772,7 +1774,9 @@ namespace Extrinsic::Runtime
                 {
                     return BuildVisualizationPropertySourceKey(
                         stableId,
-                        canonicalMeshLane ? "color.canonical" : "color",
+                        config->Interpretation == Graphics::Components::VisualizationConfig::ColorInterpretation::NormalDirection
+                            ? (canonicalMeshLane ? "color.normal.canonical" : "color.normal")
+                            : (canonicalMeshLane ? "color.canonical" : "color"),
                         config->ColorBufferName);
                 }
                 return std::string{};

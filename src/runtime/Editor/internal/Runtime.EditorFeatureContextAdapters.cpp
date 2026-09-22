@@ -860,7 +860,6 @@ ScopedEditorStatTimer::~ScopedEditorStatTimer()
         const std::string& name) noexcept
     {
         return name == GS::PropertyNames::kPosition ||
-               name == GS::PropertyNames::kNormal ||
                name == GS::PropertyNames::kVertexConnectivity ||
                name == GS::PropertyNames::kEdgeV0 ||
                name == GS::PropertyNames::kEdgeV1 ||
@@ -875,9 +874,7 @@ ScopedEditorStatTimer::~ScopedEditorStatTimer()
                // Same reserved property, on the domain that can
                // carry a seam.
                name == "h:texcoord" ||
-               name == "h:normal" ||
-               name == "p:position" ||
-               name == "p:normal";
+               name == "p:position";
     }
 
     [[nodiscard]] bool IsConnectivityVisualizationProperty(
@@ -898,7 +895,6 @@ ScopedEditorStatTimer::~ScopedEditorStatTimer()
                // Same reserved property, on the domain that can
                // carry a seam.
                name == "h:texcoord" ||
-               name == "h:normal" ||
                name == "p:position";
     }
 
@@ -984,7 +980,7 @@ ScopedEditorStatTimer::~ScopedEditorStatTimer()
             const bool scalar =
                 !internal && IsScalarVisualizationKind(kind);
             const bool color =
-                (!internal || name == GS::PropertyNames::kNormal) &&
+                !internal &&
                 (kind == Geometry::PropertyValueKind::Vec2 ||
                  kind == Geometry::PropertyValueKind::Vec3 ||
                  kind == Geometry::PropertyValueKind::Vec4);

@@ -1,3 +1,4 @@
+// Property visualization recipes separate authored interpretation from source identity.
 module;
 
 #include <cstddef>
@@ -15,6 +16,7 @@ export module Extrinsic.Runtime.VisualizationRecipes;
 import Geometry.Properties;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Graphics.Colormap;
+import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.Runtime.JobService;
 export import Extrinsic.Runtime.GeometryAvailability;
@@ -87,6 +89,7 @@ export namespace Extrinsic::Runtime
         std::uint64_t BufferBDA{0u};
         std::string BufferSourceKey{};
         std::uint64_t DirtyStamp{0u};
+        Graphics::Components::VisualizationConfig::ColorInterpretation Interpretation{};
     };
 
     struct LabelVisualizationRecipe

@@ -218,6 +218,7 @@ namespace
         G::VisualizationLaneOverrides overrides{};
         overrides.Surface = visualization;
         overrides.Surface->UseBakedTexture = true;
+        overrides.Surface->Interpretation = decltype(visualization.Interpretation)::NormalDirection;
         overrides.Points = visualization;
         overrides.Points->Source = G::VisualizationConfig::ColorSource::UniformColor;
         overrides.Points->Color = glm::vec4{0.0f, 0.75f, 0.25f, 1.0f};
@@ -393,6 +394,7 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesPromotedSandboxSceneDa
               glm::vec4(0.0f, 0.75f, 0.25f, 1.0f));
     ASSERT_TRUE(overrides.Surface.has_value());
     EXPECT_TRUE(overrides.Surface->UseBakedTexture);
+    EXPECT_EQ(overrides.Surface->Interpretation, decltype(visualization.Interpretation)::NormalDirection);
     EXPECT_FALSE(overrides.Points->UseBakedTexture);
     EXPECT_FALSE(overrides.Edges.has_value());
 

@@ -14,6 +14,7 @@ export module Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Error;
 import Extrinsic.Graphics.Colormap;
+import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.ModuleLifecycle;
@@ -77,6 +78,10 @@ namespace Extrinsic::Runtime
         Normal,
         RgbaColor,
     };
+
+    export [[nodiscard]] PropertyTextureBakeEncoding ResolveSurfaceAppearanceEncoding(
+        const Graphics::Components::VisualizationConfig& config,
+        Geometry::PropertyValueKind kind) noexcept;
 
     export enum class PropertyTextureBakeRangePolicy : std::uint8_t
     {

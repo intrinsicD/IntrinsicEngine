@@ -800,6 +800,7 @@ namespace Extrinsic::Runtime
                 {"scalarFieldName", config.ScalarFieldName},
                 {"scalarDomain", VisualizationDomainToString(config.ScalarDomain)},
                 {"colorBufferName", config.ColorBufferName},
+                {"colorInterpretation", config.Interpretation == G::VisualizationConfig::ColorInterpretation::NormalDirection ? "normal_direction" : "components"},
                 {"useBakedTexture", config.UseBakedTexture},
                 {"scalar", json{
                     {"map", ColormapToString(config.Scalar.Map)},
@@ -841,6 +842,17 @@ namespace Extrinsic::Runtime
 
             if (value.contains("color") && !TryReadVec4(value["color"], config.Color))
                 return false;
+
+            if (value.contains("colorInterpretation"))
+            {
+                const auto& interpretation = value["colorInterpretation"];
+                if (interpretation == "components")
+                    config.Interpretation = G::VisualizationConfig::ColorInterpretation::Components;
+                else if (interpretation == "normal_direction")
+                    config.Interpretation = G::VisualizationConfig::ColorInterpretation::NormalDirection;
+                else
+                    return false;
+            }
 
             if (value.contains("useBakedTexture"))
             {

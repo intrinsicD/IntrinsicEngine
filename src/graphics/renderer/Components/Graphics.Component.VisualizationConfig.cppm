@@ -67,6 +67,12 @@ export namespace Extrinsic::Graphics::Components
             PerFaceBuffer,    ///< Raw RGBA vec4 per face from a named buffer.
         };
 
+        enum class ColorInterpretation : std::uint8_t
+        {
+            Components,
+            NormalDirection,
+        };
+
         ColorSource Source = ColorSource::Material;
 
         // ----- UniformColor -------------------------------------------------
@@ -94,6 +100,7 @@ export namespace Extrinsic::Graphics::Components
         /// Used when Source is PerVertex/Edge/FaceBuffer.
         /// e.g. "colors", "edge_colors", "face_colors".
         std::string ColorBufferName;
+        ColorInterpretation Interpretation{ColorInterpretation::Components};
 
         // Surface rendering may use a baked copy of the selected property.
         bool UseBakedTexture{false};
