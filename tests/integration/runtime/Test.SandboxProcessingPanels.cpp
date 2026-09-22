@@ -2458,6 +2458,66 @@ TEST(SandboxProcessingPanels, MeshFieldAdmissionBlocksMissingInputsAndRunsChosen
     }
 }
 
+TEST(SandboxProcessingPanels, SegmentationFeaturePickerReusesPreparedLargeCatalog)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+    auto& faces = scene.Raw().get<GS::Faces>(entity).Properties;
+    for (unsigned i = 0; i < 512; ++i)
+        faces.GetOrAdd<float>("f:feature_" + std::to_string(i), 1.0f);
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto segmentation = *R::GetCurvatureSegmentationConfig(config);
+    segmentation.Features = {{R::GeometryElementDomain::MeshFace, "f:feature_0", Geometry::PropertyValueKind::Float}};
+    R::SetCurvatureSegmentationConfig(config, segmentation);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("mesh.processing.segmentation", true));
+    R::EditorPointInputReadinessStats readiness{};
+    const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id = "test.segmentation_picker_budget", .MenuPath = {"View"}, .Title = "Segmentation picker budget",
+        .OpenByDefault = true,
+        .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
+            readiness = R::GetEditorPointInputReadinessStats(context.MeshFields.Commands);
+        }});
+    int frames = 0, step = 0;
+    bool completed = false;
+    R::EditorPointInputReadinessStats baseline{};
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frames > 100) { ADD_FAILURE() << "Segmentation picker did not finish"; engine.RequestExit(); return; }
+        auto* window = ImGui::FindWindowByName("Mesh / Processing / Curvature Segmentation");
+        if (!window) return;
+        ImGui::SetWindowSize(window, {900, 2200});
+        ImGui::SetWindowPos(window, {0, 0});
+        ++step;
+        if (step == 10)
+        {
+            ASSERT_GT(readiness.PropertyScans, 0u);
+            baseline = readiness;
+            const int featureIndex = 0;
+            const auto featureScope = ImHashData(&featureIndex, sizeof(featureIndex), window->IDStack.back());
+            ImGui::ActivateItemByID(ImHashStr("Feature##Segmentation", 0, featureScope));
+        }
+        if (step >= 13 && step <= 20)
+        {
+            const auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+            ASSERT_FALSE(popups.empty());
+            ASSERT_NE(popups.back().Window, nullptr);
+            EXPECT_EQ(readiness.PropertyScans, baseline.PropertyScans);
+            EXPECT_EQ(readiness.ChecksQueued, baseline.ChecksQueued);
+            const auto& stats = h.Shell.GetLastFrame().ModelBuildStats;
+            EXPECT_EQ(stats.PropertyCatalogModelBuilds, 0u);
+            EXPECT_EQ(stats.DomainWindowModelBuilds, 0u);
+            EXPECT_GT(stats.DomainWindowModelCacheHits, 0u);
+        }
+        if (step == 20) { completed = true; engine.RequestExit(); }
+    };
+    h.Engine->Run();
+    EXPECT_TRUE(completed);
+    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
+}
+
 TEST(SandboxProcessingPanels, KMeansAdmissionKeepsControlsVisibleAndRetriesRejectedDraft)
 {
     bool reject = false;
