@@ -811,3 +811,152 @@ TEST(ParameterizationOptimize, PublicRecordsAreRevalidatedBeforeIndexing)
             Param::ProxyEnergy::Arap).Status,
         Param::OptimizationStatus::InvalidProxyInput);
 }
+
+TEST(ParameterizationOptimize, AreaPriorityEnergyVanishesOnlyOnAuthalicSimilarity)
+{
+    const auto mesh = MakeRightTriangle();
+    const Param::OptimizationReference reference =
+        Param::PrepareOptimizationReference(mesh);
+    ASSERT_TRUE(reference.Succeeded());
+    const std::vector<glm::dvec2> isometric = IdentityTriangleUvs();
+    const Param::AreaPriorityEnergyResult identity =
+        Param::EvaluateAreaPriorityEnergy(reference, isometric, 0.1);
+    ASSERT_TRUE(identity.Succeeded());
+    EXPECT_NEAR(identity.TotalEnergy, 0.0, kTolerance);
+    EXPECT_NEAR(identity.MaxConformalRatio, 1.0, kTolerance);
+    for (const glm::dvec2 gradient : identity.Gradient)
+    {
+        EXPECT_NEAR(gradient.x, 0.0, kTolerance);
+        EXPECT_NEAR(gradient.y, 0.0, kTolerance);
+    }
+
+    // An area-preserving shear diag(2, 1/2) has ln det J = 0: only the MIPS
+    // regularizer contributes, mu * ((4 + 1/4) / 2 - 1) per unit area.
+    const std::vector<glm::dvec2> shear{
+        glm::dvec2{0.0, 0.0},
+        glm::dvec2{2.0, 0.0},
+        glm::dvec2{0.0, 0.5},
+    };
+    const Param::AreaPriorityEnergyResult sheared =
+        Param::EvaluateAreaPriorityEnergy(reference, shear, 0.1);
+    ASSERT_TRUE(sheared.Succeeded());
+    EXPECT_NEAR(sheared.AreaTerm, 0.0, kTolerance);
+    EXPECT_NEAR(sheared.ConformalTerm, 0.5 * 0.1 * (4.25 / 2.0 - 1.0), kTolerance);
+    EXPECT_NEAR(sheared.MaxConformalRatio, 4.0, kTolerance);
+
+    // A uniform scale by 2 is conformal: only (ln 4)^2 per unit area.
+    const std::vector<glm::dvec2> doubled{
+        glm::dvec2{0.0, 0.0},
+        glm::dvec2{2.0, 0.0},
+        glm::dvec2{0.0, 2.0},
+    };
+    const Param::AreaPriorityEnergyResult scaled =
+        Param::EvaluateAreaPriorityEnergy(reference, doubled, 0.1);
+    ASSERT_TRUE(scaled.Succeeded());
+    EXPECT_NEAR(scaled.ConformalTerm, 0.0, kTolerance);
+    EXPECT_NEAR(scaled.AreaTerm, 0.5 * std::log(4.0) * std::log(4.0), kTolerance);
+    EXPECT_NEAR(scaled.MaxAbsLogDeterminant, std::log(4.0), kTolerance);
+}
+
+TEST(ParameterizationOptimize, AreaPriorityGradientMatchesFiniteDifference)
+{
+    const auto mesh = MakeRightTriangle();
+    const Param::OptimizationReference reference =
+        Param::PrepareOptimizationReference(mesh);
+    std::vector<glm::dvec2> uvs{
+        glm::dvec2{0.1, 0.2},
+        glm::dvec2{1.5, 0.1},
+        glm::dvec2{0.2, 1.2},
+    };
+    constexpr double mu = 0.3;
+    const Param::AreaPriorityEnergyResult analytic =
+        Param::EvaluateAreaPriorityEnergy(reference, uvs, mu);
+    ASSERT_TRUE(analytic.Succeeded());
+
+    constexpr double epsilon = 1.0e-6;
+    for (std::size_t vertex = 0u; vertex < uvs.size(); ++vertex)
+    {
+        for (std::size_t coordinate = 0u; coordinate < 2u; ++coordinate)
+        {
+            std::vector<glm::dvec2> plus = uvs;
+            std::vector<glm::dvec2> minus = uvs;
+            plus[vertex][coordinate] += epsilon;
+            minus[vertex][coordinate] -= epsilon;
+            const Param::AreaPriorityEnergyResult plusResult =
+                Param::EvaluateAreaPriorityEnergy(reference, plus, mu);
+            const Param::AreaPriorityEnergyResult minusResult =
+                Param::EvaluateAreaPriorityEnergy(reference, minus, mu);
+            ASSERT_TRUE(plusResult.Succeeded());
+            ASSERT_TRUE(minusResult.Succeeded());
+            const double finiteDifference =
+                (plusResult.TotalEnergy - minusResult.TotalEnergy)
+                / (2.0 * epsilon);
+            EXPECT_NEAR(
+                analytic.Gradient[vertex][coordinate],
+                finiteDifference,
+                2.0e-6)
+                << "vertex=" << vertex << " coordinate=" << coordinate;
+        }
+    }
+}
+
+TEST(ParameterizationOptimize, AreaPriorityRejectsFlipsAndInvalidWeights)
+{
+    const auto mesh = MakeRightTriangle();
+    const Param::OptimizationReference reference =
+        Param::PrepareOptimizationReference(mesh);
+    const std::vector<glm::dvec2> reflected{
+        glm::dvec2{0.0, 0.0},
+        glm::dvec2{0.0, 1.0},
+        glm::dvec2{1.0, 0.0},
+    };
+    const Param::AreaPriorityEnergyResult flipped =
+        Param::EvaluateAreaPriorityEnergy(reference, reflected, 0.1);
+    EXPECT_EQ(flipped.Status, Param::OptimizationStatus::NonInjectiveInput);
+    EXPECT_EQ(flipped.BarrierFace, 0u);
+
+    const std::vector<glm::dvec2> identity = IdentityTriangleUvs();
+    EXPECT_EQ(
+        Param::EvaluateAreaPriorityEnergy(reference, identity, 0.0).Status,
+        Param::OptimizationStatus::InvalidProxyInput);
+    EXPECT_EQ(
+        Param::EvaluateAreaPriorityEnergy(
+            reference, identity, std::numeric_limits<double>::quiet_NaN())
+            .Status,
+        Param::OptimizationStatus::InvalidProxyInput);
+}
+
+TEST(ParameterizationOptimize, AreaPriorityLineSearchDecreasesEnergyWithoutFlips)
+{
+    const auto mesh = MakeTwoTriangleSquare();
+    const Param::OptimizationReference reference =
+        Param::PrepareOptimizationReference(mesh);
+    ASSERT_TRUE(reference.Succeeded());
+    // Stretch the square to twice its area; descent must shrink it.
+    std::vector<glm::dvec2> uvs(mesh.VerticesSize());
+    for (std::size_t vertex = 0u; vertex < uvs.size(); ++vertex)
+    {
+        const glm::vec3 p =
+            mesh.Position(Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(vertex)});
+        uvs[vertex] = glm::dvec2{2.0 * p.x, p.y};
+    }
+    const Param::AreaPriorityEnergyResult before =
+        Param::EvaluateAreaPriorityEnergy(reference, uvs, 0.1);
+    ASSERT_TRUE(before.Succeeded());
+    std::vector<glm::dvec2> direction(uvs.size());
+    for (std::size_t vertex = 0u; vertex < uvs.size(); ++vertex)
+        direction[vertex] = -before.Gradient[vertex];
+
+    const Param::InjectiveLineSearchResult step =
+        Param::FindInjectiveAreaPriorityStep(reference, uvs, direction, 0.1);
+    ASSERT_TRUE(step.Succeeded());
+    EXPECT_GT(step.Step, 0.0);
+    EXPECT_LT(step.AcceptedEnergy, before.TotalEnergy);
+    std::vector<glm::dvec2> moved = uvs;
+    for (std::size_t vertex = 0u; vertex < uvs.size(); ++vertex)
+        moved[vertex] += step.Step * direction[vertex];
+    const Param::AreaPriorityEnergyResult after =
+        Param::EvaluateAreaPriorityEnergy(reference, moved, 0.1);
+    ASSERT_TRUE(after.Succeeded());
+    ExpectSameBits(after.TotalEnergy, step.AcceptedEnergy);
+}

@@ -1507,6 +1507,7 @@ set(_geometry_test_files
     Test.ParameterizationDispatch.cpp
     Test.BoundaryFirstFlattening.cpp
     Test.UvAtlas.cpp
+    Test.UvAtlasQuality.cpp
     Test_AdaptiveRemeshing.cpp
     Test_ConvexHull.cpp
     Test_PointCloud.cpp

@@ -1252,107 +1252,255 @@ namespace Geometry::Parameterization
         return result;
     }
 
+    namespace
+    {
+        // Shared bounded Armijo search. Evaluate(uvs) must return a record
+        // with Status, TotalEnergy and a storage-aligned Gradient, and must
+        // fail (never succeed) on non-positive orientation.
+        template <class EvaluateEnergy>
+        [[nodiscard]] InjectiveLineSearchResult FindInjectiveStep(
+            const OptimizationReference& reference,
+            const std::span<const glm::dvec2> uvs,
+            const std::span<const glm::dvec2> direction,
+            const InjectiveLineSearchParams& params,
+            const EvaluateEnergy& evaluate)
+        {
+            InjectiveLineSearchResult result{};
+            if (!IsFinite(params.MaximumStep) || params.MaximumStep <= 0.0
+                || !IsFinite(params.SafetyFactor)
+                || params.SafetyFactor <= 0.0 || params.SafetyFactor >= 1.0
+                || !IsFinite(params.DecreaseFactor)
+                || params.DecreaseFactor <= 0.0 || params.DecreaseFactor >= 1.0
+                || !IsFinite(params.ArmijoCoefficient)
+                || params.ArmijoCoefficient <= 0.0
+                || params.ArmijoCoefficient >= 1.0
+                || !IsFinite(params.MinimumStep) || params.MinimumStep <= 0.0
+                || params.MaxIterations == 0u
+                || !IsFinite(params.DeterminantEpsilon)
+                || params.DeterminantEpsilon <= 0.0)
+            {
+                result.Status = OptimizationStatus::InvalidProxyInput;
+                return result;
+            }
+
+            const auto initial = evaluate(uvs);
+            if (!initial.Succeeded())
+            {
+                result.Status = initial.Status;
+                return result;
+            }
+            if (direction.size() != initial.Gradient.size())
+            {
+                result.Status = OptimizationStatus::SizeMismatch;
+                return result;
+            }
+
+            double directionalDerivative = 0.0;
+            for (std::size_t vertex = 0u; vertex < direction.size(); ++vertex)
+            {
+                if (!IsFinite(direction[vertex]))
+                {
+                    result.Status = OptimizationStatus::NonFiniteInput;
+                    return result;
+                }
+                directionalDerivative +=
+                    glm::dot(initial.Gradient[vertex], direction[vertex]);
+            }
+            result.InitialEnergy = initial.TotalEnergy;
+            result.AcceptedEnergy = initial.TotalEnergy;
+            result.InitialDirectionalDerivative = directionalDerivative;
+            if (!IsFinite(directionalDerivative) || directionalDerivative >= 0.0)
+            {
+                result.Status = OptimizationStatus::NoDescentDirection;
+                return result;
+            }
+
+            const InjectiveStepResult boundary = MaxInjectiveStep(
+                reference,
+                uvs,
+                direction,
+                params.MaximumStep,
+                std::numeric_limits<double>::min());
+            if (!boundary.Succeeded())
+            {
+                result.Status = boundary.Status;
+                return result;
+            }
+            result.InjectiveBoundary = boundary.MaximumStep;
+            result.LimitingFace = boundary.LimitingFace;
+            double step = boundary.LimitedByTriangle
+                ? std::min(1.0, params.SafetyFactor * boundary.MaximumStep)
+                : std::min(1.0, boundary.MaximumStep);
+            std::vector<glm::dvec2> candidate(uvs.begin(), uvs.end());
+
+            for (std::size_t iteration = 0u;
+                 iteration < params.MaxIterations && step >= params.MinimumStep;
+                 ++iteration)
+            {
+                for (std::size_t vertex = 0u; vertex < candidate.size(); ++vertex)
+                    candidate[vertex] = uvs[vertex] + step * direction[vertex];
+                const auto evaluated = evaluate(
+                    std::span<const glm::dvec2>{candidate});
+                result.Iterations = iteration + 1u;
+                if (evaluated.Succeeded()
+                    && evaluated.TotalEnergy
+                        <= initial.TotalEnergy
+                            + params.ArmijoCoefficient
+                                * step * directionalDerivative)
+                {
+                    result.Status = OptimizationStatus::Success;
+                    result.Step = step;
+                    result.AcceptedEnergy = evaluated.TotalEnergy;
+                    return result;
+                }
+                step *= params.DecreaseFactor;
+            }
+
+            result.Status = OptimizationStatus::NoAcceptableStep;
+            return result;
+        }
+    } // namespace
+
     InjectiveLineSearchResult FindInjectiveDirichletStep(
         const OptimizationReference& reference,
         const std::span<const glm::dvec2> uvs,
         const std::span<const glm::dvec2> direction,
         const InjectiveLineSearchParams& params)
     {
-        InjectiveLineSearchResult result{};
-        if (!IsFinite(params.MaximumStep) || params.MaximumStep <= 0.0
-            || !IsFinite(params.SafetyFactor)
-            || params.SafetyFactor <= 0.0 || params.SafetyFactor >= 1.0
-            || !IsFinite(params.DecreaseFactor)
-            || params.DecreaseFactor <= 0.0 || params.DecreaseFactor >= 1.0
-            || !IsFinite(params.ArmijoCoefficient)
-            || params.ArmijoCoefficient <= 0.0
-            || params.ArmijoCoefficient >= 1.0
-            || !IsFinite(params.MinimumStep) || params.MinimumStep <= 0.0
-            || params.MaxIterations == 0u
-            || !IsFinite(params.DeterminantEpsilon)
-            || params.DeterminantEpsilon <= 0.0)
+        return FindInjectiveStep(
+            reference,
+            uvs,
+            direction,
+            params,
+            [&reference, &params](const std::span<const glm::dvec2> candidate)
+            {
+                return EvaluateSymmetricDirichlet(
+                    reference, candidate, params.DeterminantEpsilon);
+            });
+    }
+
+    AreaPriorityEnergyResult EvaluateAreaPriorityEnergy(
+        const OptimizationReference& reference,
+        const std::span<const glm::dvec2> uvs,
+        const double conformalWeight,
+        const double determinantEpsilon)
+    {
+        AreaPriorityEnergyResult result{};
+        if (!IsFinite(determinantEpsilon) || determinantEpsilon <= 0.0)
+        {
+            result.Status = OptimizationStatus::NonInjectiveInput;
+            return result;
+        }
+        if (!IsFinite(conformalWeight) || conformalWeight <= 0.0)
         {
             result.Status = OptimizationStatus::InvalidProxyInput;
             return result;
         }
-
-        const SymmetricDirichletResult initial =
-            EvaluateSymmetricDirichlet(
-                reference, uvs, params.DeterminantEpsilon);
-        if (!initial.Succeeded())
-        {
-            result.Status = initial.Status;
+        if (!ValidateReference(reference, result.Status))
             return result;
-        }
-        if (direction.size() != initial.Gradient.size())
-        {
-            result.Status = OptimizationStatus::SizeMismatch;
+        result.FaceEnergy.assign(reference.FaceStorageCount, 0.0);
+        result.Gradient.assign(reference.VertexStorageCount, glm::dvec2{0.0});
+        if (!ValidateUvs(reference, uvs, result.Status))
             return result;
-        }
 
-        double directionalDerivative = 0.0;
-        for (std::size_t vertex = 0u; vertex < direction.size(); ++vertex)
+        for (std::size_t faceIndex = 0u;
+             faceIndex < reference.Faces.size();
+             ++faceIndex)
         {
-            if (!IsFinite(direction[vertex]))
+            const OptimizationTriangleReference& face =
+                reference.Faces[faceIndex];
+            if (!face.Active)
+                continue;
+
+            const glm::dmat2 jacobian = ComputeJacobian(face, uvs);
+            const double determinant = Determinant(jacobian);
+            const double signedArea = SignedUvArea(
+                uvs[face.Vertices[0u]],
+                uvs[face.Vertices[1u]],
+                uvs[face.Vertices[2u]]);
+            if (!IsFinite(jacobian) || !IsFinite(determinant)
+                || !IsFinite(signedArea))
             {
                 result.Status = OptimizationStatus::NonFiniteInput;
+                result.BarrierFace = faceIndex;
                 return result;
             }
-            directionalDerivative +=
-                glm::dot(initial.Gradient[vertex], direction[vertex]);
-        }
-        result.InitialEnergy = initial.TotalEnergy;
-        result.AcceptedEnergy = initial.TotalEnergy;
-        result.InitialDirectionalDerivative = directionalDerivative;
-        if (!IsFinite(directionalDerivative) || directionalDerivative >= 0.0)
-        {
-            result.Status = OptimizationStatus::NoDescentDirection;
-            return result;
+            if (determinant <= determinantEpsilon || signedArea <= 0.0)
+            {
+                result.Status = OptimizationStatus::NonInjectiveInput;
+                result.BarrierFace = faceIndex;
+                return result;
+            }
+
+            // d ln(det J)/dJ = J^-T and
+            // d(||J||^2 / (2 det J))/dJ = J / det J - M J^-T.
+            const double logDeterminant = std::log(determinant);
+            const double frobeniusSquared = FrobeniusSquared(jacobian);
+            const double mips = frobeniusSquared / (2.0 * determinant);
+            const glm::dmat2 inverseTranspose =
+                glm::transpose(Inverse(jacobian, determinant));
+            const double areaTerm = logDeterminant * logDeterminant;
+            const double conformalTerm = conformalWeight * (mips - 1.0);
+            const double faceEnergy = areaTerm + conformalTerm;
+            const glm::dmat2 jacobianGradient =
+                2.0 * logDeterminant * inverseTranspose
+                + conformalWeight
+                    * (jacobian / determinant - mips * inverseTranspose);
+            if (!IsFinite(faceEnergy) || !IsFinite(jacobianGradient))
+            {
+                result.Status = OptimizationStatus::NumericalFailure;
+                result.BarrierFace = faceIndex;
+                return result;
+            }
+
+            // Singular-value ratio from M = (r + 1/r) / 2.
+            const double conformalRatio =
+                mips + std::sqrt(std::max(0.0, mips * mips - 1.0));
+            result.FaceEnergy[faceIndex] = faceEnergy;
+            result.TotalEnergy += face.Area * faceEnergy;
+            result.AreaTerm += face.Area * areaTerm;
+            result.ConformalTerm += face.Area * conformalTerm;
+            result.MaxAbsLogDeterminant = std::max(
+                result.MaxAbsLogDeterminant, std::abs(logDeterminant));
+            result.MaxConformalRatio =
+                std::max(result.MaxConformalRatio, conformalRatio);
+            for (std::size_t corner = 0u; corner < 3u; ++corner)
+            {
+                result.Gradient[face.Vertices[corner]] +=
+                    face.Area * jacobianGradient * face.Gradients[corner];
+            }
+            ++result.ActiveFaceCount;
         }
 
-        const InjectiveStepResult boundary = MaxInjectiveStep(
+        if (result.ActiveFaceCount == 0u || !IsFinite(result.TotalEnergy))
+        {
+            result.Status = OptimizationStatus::NumericalFailure;
+            return result;
+        }
+        result.Status = OptimizationStatus::Success;
+        return result;
+    }
+
+    InjectiveLineSearchResult FindInjectiveAreaPriorityStep(
+        const OptimizationReference& reference,
+        const std::span<const glm::dvec2> uvs,
+        const std::span<const glm::dvec2> direction,
+        const double conformalWeight,
+        const InjectiveLineSearchParams& params)
+    {
+        return FindInjectiveStep(
             reference,
             uvs,
             direction,
-            params.MaximumStep,
-            std::numeric_limits<double>::min());
-        if (!boundary.Succeeded())
-        {
-            result.Status = boundary.Status;
-            return result;
-        }
-        result.InjectiveBoundary = boundary.MaximumStep;
-        result.LimitingFace = boundary.LimitingFace;
-        double step = boundary.LimitedByTriangle
-            ? std::min(1.0, params.SafetyFactor * boundary.MaximumStep)
-            : std::min(1.0, boundary.MaximumStep);
-        std::vector<glm::dvec2> candidate(uvs.begin(), uvs.end());
-
-        for (std::size_t iteration = 0u;
-             iteration < params.MaxIterations && step >= params.MinimumStep;
-             ++iteration)
-        {
-            for (std::size_t vertex = 0u; vertex < candidate.size(); ++vertex)
-                candidate[vertex] = uvs[vertex] + step * direction[vertex];
-            const SymmetricDirichletResult evaluated =
-                EvaluateSymmetricDirichlet(
-                    reference, candidate, params.DeterminantEpsilon);
-            result.Iterations = iteration + 1u;
-            if (evaluated.Succeeded()
-                && evaluated.TotalEnergy
-                    <= initial.TotalEnergy
-                        + params.ArmijoCoefficient
-                            * step * directionalDerivative)
+            params,
+            [&reference, &params, conformalWeight](
+                const std::span<const glm::dvec2> candidate)
             {
-                result.Status = OptimizationStatus::Success;
-                result.Step = step;
-                result.AcceptedEnergy = evaluated.TotalEnergy;
-                return result;
-            }
-            step *= params.DecreaseFactor;
-        }
-
-        result.Status = OptimizationStatus::NoAcceptableStep;
-        return result;
+                return EvaluateAreaPriorityEnergy(
+                    reference,
+                    candidate,
+                    conformalWeight,
+                    params.DeterminantEpsilon);
+            });
     }
 } // namespace Geometry::Parameterization

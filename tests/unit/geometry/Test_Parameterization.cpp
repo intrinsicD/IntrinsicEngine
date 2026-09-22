@@ -194,3 +194,20 @@ TEST(LSCM, DeletedSlotsPreserveLiveDiskUvs)
         }
     }
 }
+
+TEST(LSCM, DirectSolverIsExactOnPlanarStrip)
+{
+    // A planar disk has an exact similarity map; the direct solve must
+    // reproduce it up to round-off instead of a CG residual tolerance.
+    auto mesh = MakeTriangleStrip(24);
+    Geometry::Parameterization::ParameterizationParams params;
+    params.UseDirectSolver = true;
+    const auto result = Geometry::Parameterization::ComputeLSCM(mesh, params);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_TRUE(result->Converged);
+    EXPECT_EQ(result->CGIterations, 0u);
+    EXPECT_EQ(result->FlippedTriangleCount, 0u);
+    EXPECT_NEAR(result->MaxConformalDistortion, 1.0, 1.0e-5);
+    EXPECT_NEAR(result->Diagnostics.MaxAreaRatio / result->Diagnostics.MinAreaRatio,
+                1.0, 1.0e-4);
+}

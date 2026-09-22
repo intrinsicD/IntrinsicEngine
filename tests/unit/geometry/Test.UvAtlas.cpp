@@ -136,6 +136,7 @@ FakeBackend(const Geometry::UvAtlas::UvAtlasInput &input,
   result.Diagnostics.Status = result.Status;
   result.Diagnostics.Provenance = result.Provenance;
   result.Diagnostics.BackendName = "fake";
+  result.Diagnostics.ActualDistortion = options.Distortion;
 
   result.SourceVertexForOutputVertex.reserve(input.Positions.size());
   for (std::size_t i = 0; i < input.Positions.size(); ++i) {
@@ -541,6 +542,8 @@ TEST(UvAtlas, FastStagedFailingBackendFallsBackToXAtlasWhenAllowed) {
   options.PreserveValidAuthoredUvs = false;
   options.Method = Geometry::UvAtlas::UvAtlasMethod::FastStaged;
   options.AllowXAtlasFallback = true;
+  // xatlas can only honor the angle objective, so only it may fall back.
+  options.Distortion = Geometry::UvAtlas::UvAtlasDistortion::Angle;
 
   const auto result = Geometry::UvAtlas::ResolveUvAtlas(
       Geometry::UvAtlas::BorrowInput(mesh), options, &failingFast);
@@ -577,6 +580,24 @@ TEST(UvAtlas, FastStagedFailingBackendFailsClosedWhenXAtlasFallbackDisabled) {
   EXPECT_EQ(result.Diagnostics.ActualMethod,
             Geometry::UvAtlas::UvAtlasMethod::FastStaged);
   EXPECT_FALSE(result.Diagnostics.UsedFallback);
+}
+
+TEST(UvAtlas, FallbackIsNotAttemptedWhenXAtlasCannotHonorTheObjective) {
+  auto mesh = MakeSquareMesh();
+  const Geometry::UvAtlas::UvAtlasBackend failingFast{
+      .Name = "failing-fast", .Generate = &FailingFastBackend};
+
+  Geometry::UvAtlas::UvAtlasOptions options{};
+  options.PreserveValidAuthoredUvs = false;
+  options.AllowXAtlasFallback = true;
+  options.Distortion = Geometry::UvAtlas::UvAtlasDistortion::Both;
+
+  const auto result = Geometry::UvAtlas::ResolveUvAtlas(
+      Geometry::UvAtlas::BorrowInput(mesh), options, &failingFast);
+
+  EXPECT_EQ(result.Status, Geometry::UvAtlas::UvAtlasStatus::BackendFailed);
+  EXPECT_FALSE(result.Diagnostics.UsedFallback);
+  EXPECT_NE(result.Diagnostics.FallbackReason.find("angle"), std::string::npos);
 }
 
 TEST(UvAtlas, FastStagedRequestCanUseCallerSuppliedBackend) {
@@ -672,6 +693,7 @@ TEST(UvAtlas, ExplicitXAtlasMethodGeneratesFiniteNormalizedUvs) {
   Geometry::UvAtlas::UvAtlasOptions options{};
   options.PreserveValidAuthoredUvs = true;
   options.Method = Geometry::UvAtlas::UvAtlasMethod::XAtlas;
+  options.Distortion = Geometry::UvAtlas::UvAtlasDistortion::Angle;
   options.BackendName = "xatlas";
   options.Resolution = 64u;
   options.Padding = 1u;
