@@ -157,7 +157,7 @@ and bounded health, not segmentation quality.
   expected unsanitized GLFW/LSan skip. The first run had one existing asset-import
   failure; 100 isolated repetitions passed. Its independently identified
   completion race remains tracked in
-  [BUG-172](../../../tasks/active/BUG-172-synchronous-cpu-load-completion-race.md),
+  [BUG-172](../../../tasks/done/BUG-172-synchronous-cpu-load-completion-race.md),
   without proven attribution of that particular intermittent failure.
 - The first full ASan gate exposed two fixture-ordering defects, an overloaded
   geometry group, and a synthetic leak-control timeout. The fixture fixes are

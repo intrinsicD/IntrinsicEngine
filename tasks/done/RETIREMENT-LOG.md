@@ -7,6 +7,24 @@ relative to `tasks/done/`, which sits at the same depth as `tasks/active/`,
 so blocks moved from the old active-README history work verbatim.
 
 
+## 2026-09-22 — BUG-172 CPU load completion retired
+
+Retired [BUG-172](BUG-172-synchronous-cpu-load-completion-race.md) at the CPU
+lifecycle correctness endpoint. Commit `ac146df2bc65340a0fe027f54130a7925a5a0706` joins short
+pipeline transitions through Ready-event publication and archival, replacing the
+service's bounded yield loop. Cancellation/failure share the same synchronization;
+main-thread listener callbacks remain outside pipeline locks.
+
+Both original race windows failed under controlled pauses before the fix. Seven
+new regressions cover completion, cancellation, failure and stale identities;
+nine selected cases passed 100 repetitions each. Full CPU verification passed
+4,887 entries; isolated ASan and UBSan gates each passed 3,238 grouped-plan
+entries. CPU/UBSan retained the existing GLFW/LSan skip. Claude and Codex reviews
+found no remaining findings. No blocker or implementation follow-up remains; the
+historical METHOD-040 failure evidence stays unchanged and its exact cause is
+not retrospectively asserted.
+
+
 ## 2026-09-22 — BUG-176 concurrent CTest discovery retired
 
 Retired [BUG-176](BUG-176-concurrent-ctest-discovery.md) at its tooling

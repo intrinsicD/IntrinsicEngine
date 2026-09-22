@@ -17,6 +17,12 @@ contract_review: "The current catalog has no asset-load synchronization contract
 ---
 # BUG-172 — Synchronous CPU completion can observe an unfinished or stale load transition
 
+## Completion — 2026-09-22
+
+Retired at the CPU lifecycle correctness endpoint. Implementation commit:
+`ac146df2bc65340a0fe027f54130a7925a5a0706`. All acceptance criteria passed; no blocker or
+deferred implementation remains. Verification and review are recorded below.
+
 ## Goal
 - Coordinate scheduled and direct CPU completion so a successful import cannot
   return a stale InvalidState, and success includes publication of its Ready event.
@@ -49,28 +55,28 @@ contract_review: "The current catalog has no asset-load synchronization contract
   possible but has not been observed in this run.
 
 ## Required changes
-- [ ] Establish a deterministic winning-worker pause seam around decode claim
+- [x] Establish a deterministic winning-worker pause seam around decode claim
       and around Ready-state publication; reproduce stale failure or missing
       event delivery without relying on scheduler timing.
-- [ ] Coordinate the entire completion transition, including event publication
+- [x] Coordinate the entire completion transition, including event publication
       and archival, while preserving independence from unrelated scheduler jobs.
-- [ ] Keep errors for true decode, cancellation, and stale-load failures explicit.
+- [x] Keep errors for true decode, cancellation, and stale-load failures explicit.
 
 ## Tests
-- [ ] Scheduled completion winning over direct completion returns success and
+- [x] Scheduled completion winning over direct completion returns success and
       delivers exactly one Ready event after the winning transition completes.
-- [ ] Pausing between registry Ready and event publication cannot produce early
+- [x] Pausing between registry Ready and event publication cannot produce early
       successful completion without that event.
-- [ ] Existing unrelated-scheduler-work contract and authored-normal import pass.
+- [x] Existing unrelated-scheduler-work contract and authored-normal import pass.
 
 ## Docs
-- [ ] Document the proven cause and synchronization ownership at implementation;
+- [x] Document the proven cause and synchronization ownership at implementation;
       retain the original failure and discriminating repro evidence.
 
 ## Acceptance criteria
-- [ ] Deterministic before/after evidence establishes the fixed race.
-- [ ] Exactly-once completion/event semantics and unrelated-job independence pass.
-- [ ] Canonical CPU and isolated sanitizer gates pass without threshold changes.
+- [x] Deterministic before/after evidence establishes the fixed race.
+- [x] Exactly-once completion/event semantics and unrelated-job independence pass.
+- [x] Canonical CPU and isolated sanitizer gates pass without threshold changes.
 
 ## Verification
 ```bash

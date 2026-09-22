@@ -76,7 +76,7 @@ Task links retain detailed acceptance criteria, source references and evidence.
 | [BUG-149](../../tasks/backlog/bugs/BUG-149-benchmark-sealer-dotted-output-directory.md) | Revised | Fix output-root classification; exit-status propagation already exists. |
 | [BUG-160](../../tasks/backlog/bugs/BUG-160-fast-staged-atlas-chart-fragmentation.md) | Keep | FastStaged fixed seed planes fragment smooth meshes into tiny charts. |
 | [BUG-171](../../tasks/backlog/bugs/BUG-171-required-command-receipt-supersession.md) | Keep | Required development receipts cannot be superseded by a passing rerun. |
-| [BUG-172](../../tasks/active/BUG-172-synchronous-cpu-load-completion-race.md) | Keep | Synchronous CPU completion can observe an unfinished or stale load transition. |
+| [BUG-172](../../tasks/done/BUG-172-synchronous-cpu-load-completion-race.md) | Keep | Synchronous CPU completion can observe an unfinished or stale load transition. |
 | [BUG-176](../../tasks/done/BUG-176-concurrent-ctest-discovery.md) | Keep | Concurrent CTest discovery can duplicate generated registrations. |
 | [BUG-178](../../tasks/backlog/bugs/BUG-178-clang23-incremental-module-ice.md) | Keep | Clang 23 crashes during an incremental module rebuild. |
 | [BUG-180](../../tasks/backlog/bugs/BUG-180-framed-icp-leak-enabled-process-retention.md) | Keep | Leak-enabled framed ICP process reports 240 retained bytes. |
