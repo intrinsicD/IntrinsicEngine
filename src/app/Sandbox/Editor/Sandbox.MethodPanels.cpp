@@ -2036,10 +2036,10 @@ namespace Extrinsic::Sandbox::Editor
                 configChanged = true;
             }
             ImGui::SeparatorText("Output properties");
-            configChanged |= DrawProcessingPropertyName("Level##ProgressivePoisson", ProgressivePoisson.Draft.Level.Name);
-            configChanged |= DrawProcessingPropertyName("Rank##ProgressivePoisson", ProgressivePoisson.Draft.Rank.Name);
-            configChanged |= DrawProcessingPropertyName("SplatRadius##ProgressivePoisson", ProgressivePoisson.Draft.SplatRadius.Name);
-            configChanged |= DrawProcessingPropertyName("PrefixVisible##ProgressivePoisson", ProgressivePoisson.Draft.PrefixVisible.Name);
+            configChanged |= DrawProcessingScalarOutput("Level##ProgressivePoisson", ProgressivePoisson.Draft.Level);
+            configChanged |= DrawProcessingScalarOutput("Rank##ProgressivePoisson", ProgressivePoisson.Draft.Rank);
+            configChanged |= DrawProcessingScalarOutput("SplatRadius##ProgressivePoisson", ProgressivePoisson.Draft.SplatRadius);
+            configChanged |= DrawProcessingScalarOutput("PrefixVisible##ProgressivePoisson", ProgressivePoisson.Draft.PrefixVisible);
 
             if (ImGui::BeginCombo(
                     "Dimension##ProgressivePoisson",
