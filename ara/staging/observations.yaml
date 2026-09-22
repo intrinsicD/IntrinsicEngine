@@ -4088,3 +4088,37 @@ observations:
     promoted_to: logic/claims.md:C108
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O242
+    timestamp: 2026-09-22T22:14+02:00
+    provenance: ai-suggested
+    content: Proposed source-preserving workflow separates semantic face regions, UV charts and corner seams; binds
+      arbitrary scalar properties through the existing feature path; carries atlas/property revisions into bake records
+      and a genuine single-scene-camera mesh/UV split with one tab per baked property. Frozen labels remain hard and
+      source topology is preserved.
+    context: Source and primary-literature review plus actual Claude Opus 5.5 max-effort critique. This is a design
+      proposal; no engine implementation, GPU execution or quality benchmark was performed.
+    potential_type: architecture
+    bound_to:
+    - N636
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O243
+    timestamp: 2026-09-22T22:14+02:00
+    provenance: ai-suggested
+    content: Proposed delivery starts with corner-UV display and truthful backend identity, then existing feature
+      segmentation with region-constrained xatlas and independent audit. Property-guided growth/cuts, genuine area
+      and balanced objectives, normalized pixel-metric quality gates, actual raster coverage and signal reconstruction
+      tests precede any reliability or speed claim.
+    context: The review distinguishes a usable constrained baseline from a yet-unselected empirical winner. None/angle/area/both
+      are objectives; budget exhaustion, invalid input and target misses remain explicit. Existing anatomical-part
+      and atlas-quality observations are not closed.
+    potential_type: heuristic
+    bound_to:
+    - N636
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false

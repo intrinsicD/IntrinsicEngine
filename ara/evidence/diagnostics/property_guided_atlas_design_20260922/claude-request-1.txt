@@ -1,0 +1,27 @@
+You are Claude Opus 5.5, requested explicitly by the operator for a substantive design discussion with Codex at max effort. Perform a READ-ONLY design review grounded in this repository. Do not edit any files, run builds, invoke agents, or inspect credentials/configuration or unrelated personal data. AGENTS.md is the authoritative repository contract. Existing completed experiment/evidence history is frozen. This is an advisory discussion, not implementation approval or a result claim.
+
+Operator request: "Please discuss with Claude opus 5.5 on max effort how to implement a proper usable in the wild segmentation algorithm for meshes ... decompose any mesh reliably into parts guided by a property like curvature or mesh saliency or any other similar scalar property and then be parameterized (select one of multiple plausible methods) with low distortion (none or angle or area or both) to create a reliable fast uv atlas ... texture baking of properties. The ui should be updated too ... via split screen the uv wireframe atlas is visible on the right or left side of the selected mesh when the atlas is computed. Also for each baked texture there should be a tab in the wireframe split screen showing the baked texture values of the parts in the atlas layout."
+
+Useful source starting points (read definitions, relevant callers and tests rather than trusting names):
+- src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation*.cpp[m], Geometry.CurvatureSegmentation.Diagnostics.cppm
+- src/geometry/Geometry.UvAtlas.cpp[m], Geometry.UvAtlas.Types.cppm, Geometry.Parameterization*.cpp[m]
+- src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp[m], Runtime.GeometryProcessingOperations.Uv.cpp, Runtime.MeshFieldOperations.Curvature.cpp
+- src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp[m]
+- src/graphics/renderer/Graphics.PropertyTextureBake.cpp[m]
+- src/runtime/Config and editor panels/view models for parameterization, UV view and texture baking (discover by Grep/Glob)
+- tests/unit/geometry/Test.UvAtlas.cpp, tests/contract/runtime/Test.ParameterizationOperations.cpp, Test.TextureBakeModule.cpp, tests/contract/graphics/Test.PropertyTextureBake.cpp
+- tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md, METHOD-044-feature-aware-atlas-merge-experiment.md, METHOD-045-baseline-preserving-atlas-cuts.md
+- docs/architecture/parameterization-mapping-roadmap.md, geometry-api-style.md and relevant owner docs.
+
+My initial hypothesis to challenge: Keep source face semantic region IDs distinct from UV chart IDs and seam/corner duplication. Use property-guided scalable connected region growth as the production starting point, with hard user/semantic boundaries and chart refinement for topology and distortion. Do not adopt global multicut or the offline prototypes simply because they already exist. Retain xatlas as measured baseline/fallback while guaranteeing that any fallback obeys region constraints. Offer meaningful UV objective presets (unconstrained valid mapping; conformal/angle; authalic/area; balanced) with explicit error metrics and infeasibility outcomes. Exact zero angle+area distortion cannot be promised on arbitrary curved meshes. Reuse existing runtime operations, async/stale-source guards, and CPU bake/graphics texture ownership; present a single selected-entity split workspace with UV/wireframe tab and baked-texture tabs.
+
+Please investigate independently, then give:
+1. Concrete current implemented capabilities and gaps with source paths/symbols; distinguish source inspection from runtime-tested results.
+2. Two or three viable segmentation/charting directions, recommendation, mathematical objective and dimensional/scalar normalization, boundary semantics, deterministic handling of disconnected/non-manifold/degenerate/high-genus/very large input; explicit limits of "any mesh".
+3. Exact parameterization choices and initialization/validity strategy. Explain flips versus global overlaps, intrinsic metrics/Jacobians, global scale/packing, bounded retries, failure/fallback semantics. Define what "none/angle/area/both" can truthfully mean.
+4. Property baking correspondence, corner seams, face/vertex fields, invalid values, interpolation, gutters and mips, texel density, stale baked tabs.
+5. Concrete UI interaction plan and minimal existing-layer ownership, including automatic left/right split, tabs per bake, pan/zoom, linked chart selection, job lifecycle and persistence.
+6. Incremental implementation slices and falsifiable acceptance tests/corpus/metrics before claiming reliable/fast. Identify a first <=one-day vertical slice.
+7. Pointed objections to my initial hypothesis, unresolved decisions, and what should NOT be built yet.
+
+Use substantive detail but keep the answer focused (roughly 1800-2500 words); source facts with paths. Make recommendations rather than pretend an empirical winner is established. Do not fabricate performance, runtime verification, literature guarantees, or existing features.

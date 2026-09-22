@@ -1,0 +1,55 @@
+session:
+  id: 2026-09-22_002
+  date: '2026-09-22'
+  started: 2026-09-22T21:44+02:00
+  last_turn: 2026-09-22T22:20+02:00
+  turn_count: 1
+  summary: Completed two Opus 5.5 max-effort design rounds; retained corrections and staged the property-guided
+    atlas/baking/UI proposal without implementation or adoption.
+events_logged:
+- turn: 1
+  type: question
+  id: N636
+  routing: direct
+  provenance: user
+  summary: Opened a source-grounded design inquiry for property-guided regions, distortion-controlled atlases, baking
+    and a mesh/atlas workspace.
+- turn: 1
+  type: observation
+  id: O242
+  routing: staged
+  provenance: ai-suggested
+  summary: Proposed distinct semantic regions/charts/corners and source-bound atlas/bake revisions with a genuine
+    split view.
+- turn: 1
+  type: observation
+  id: O243
+  routing: staged
+  provenance: ai-suggested
+  summary: Proposed constrained baseline, independent quality gates and later reference solvers; no empirical winner
+    or adoption claimed.
+ai_actions:
+- turn: 1
+  action: Reviewed current source and original-method documentation; ran two completed claude-opus-5-5 max-effort
+    design calls and independently checked central source findings. A resumed follow-up timed out, then a compact
+    retry completed. No engine build, test, benchmark or GPU run.
+  provenance: ai-executed
+  files_changed:
+  - ara/evidence/diagnostics/property_guided_atlas_design_20260922
+  - ara/trace/exploration_tree.yaml
+  - ara/staging/observations.yaml
+claims_touched: []
+key_context:
+- turn: 1
+  excerpt: User requested a real discussion with Claude Opus 5.5 at max effort about reliable scalar-guided mesh
+    parts, none/angle/area/both UV objectives, property baking, and a left/right mesh-atlas split with a tab per
+    baked texture.
+open_threads:
+- Confirm implementation scope; existing METHOD-040/044/045 history and adoption gates remain unchanged.
+- Fix corner-UV display and backend reporting; establish region-constrained input, atlas revision and independent
+  acceptance contracts.
+- Select genuine area/reference growth formulations and numerical budgets from fixed-corpus evidence; raw scalar
+  filtering and the real scene viewport remain final-scope requirements.
+ai_suggestions_pending:
+- 'O242 and O243 remain unadopted AI proposals. No earlier observation is promoted: source inspection and review
+  are not empirical closure or user approval.'

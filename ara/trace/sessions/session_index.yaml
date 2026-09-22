@@ -653,3 +653,12 @@ sessions:
   events_count: 1
   claims_touched: []
   open_threads: 3
+
+- id: 2026-09-22_002
+  date: '2026-09-22'
+  summary: Completed two Opus 5.5 max-effort design rounds; retained corrections and staged the property-guided
+    atlas/baking/UI proposal without implementation or adoption.
+  turn_count: 1
+  events_count: 3
+  claims_touched: []
+  open_threads: 3

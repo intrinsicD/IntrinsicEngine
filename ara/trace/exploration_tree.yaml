@@ -13670,3 +13670,18 @@ tree:
     - tasks/done/RUNTIME-270-property-binding-equivalence.md
     - tasks/evidence/RUNTIME-270/verification.md
     status: resolved
+
+  - id: N636
+    type: question
+    title: Design a property-guided mesh atlas and baked-property workspace
+    provenance: user
+    timestamp: 2026-09-22T22:14+02:00
+    description: How should arbitrary scalar-guided mesh regions, constrained low-distortion UV charting, reliable
+      property baking and a genuine left/right mesh-atlas split with per-bake tabs compose in IntrinsicEngine? Operator
+      requested actual Claude Opus 5.5 discussion at max effort; no algorithm adoption or implementation verdict is
+      implied.
+    evidence:
+    - ara/evidence/diagnostics/property_guided_atlas_design_20260922/proposal.md
+    - ara/evidence/diagnostics/property_guided_atlas_design_20260922/claude-response-1.md
+    - ara/evidence/diagnostics/property_guided_atlas_design_20260922/record.json
+    status: open

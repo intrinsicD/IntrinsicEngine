@@ -2799,3 +2799,12 @@ entries:
       UI-037/BUG-193 scopes remain explicit.
     - Preserved initial failures and final corrections; historical report link repairs update Markdown hashes only,
       leaving raw measurement artifacts unchanged.
+
+  - turn: 2026-09-22_002#1
+    notes:
+    - Recorded the actual source/literature review as AI actions and the user inquiry as N636; interpretive architecture
+      and adoption advice remain staged O242/O243.
+    - No code, benchmark or GPU result, no claim-row advancement and no task retirement. The written proposal is not
+      adoption or empirical closure.
+    - Preserved both completed responses, the timeout and the final Codex qualifications. Existing atlas/part observations
+      remain unresolved; unrelated historical staging was not swept or promoted.
