@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <string_view>
 
+#include "MockRHI.hpp"
+
 import Extrinsic.Graphics.RenderDiagnostics;
 
 #include "GraphicsTestSupport.hpp"
@@ -70,4 +72,35 @@ TEST(GraphicsTestSupport, SrgbConversionRetainsUnormAndLinearAlpha)
     for (unsigned value = 1; value < 256; ++value)
         EXPECT_GE(SrgbByteToLinearByte(static_cast<std::uint8_t>(value)),
                   SrgbByteToLinearByte(static_cast<std::uint8_t>(value - 1)));
+}
+
+TEST(GraphicsTestSupport, IndirectCountRecordingKeepsIndependentArgumentsAndOffsets)
+{
+    using namespace Extrinsic;
+    Tests::MockCommandContext cmd;
+    const RHI::BufferHandle arguments{11u, 3u};
+    const RHI::BufferHandle count{12u, 4u};
+    const RHI::BufferHandle indexedArguments{21u, 5u};
+    const RHI::BufferHandle indexedCount{22u, 6u};
+    cmd.DrawIndirectCount(arguments, 16u, count, 32u, 7u);
+    cmd.DrawIndexedIndirectCount(indexedArguments, 48u, indexedCount, 64u, 9u);
+
+    const auto& plain = cmd.LastDrawIndirectCount;
+    EXPECT_EQ(plain.ArgumentBuffer, arguments);
+    EXPECT_EQ(plain.ArgumentOffset, 16u);
+    EXPECT_EQ(plain.CountBuffer, count);
+    EXPECT_EQ(plain.CountOffset, 32u);
+    EXPECT_EQ(plain.MaxDrawCount, 7u);
+    const auto& indexed = cmd.LastDrawIndexedIndirectCount;
+    EXPECT_EQ(indexed.ArgumentBuffer, indexedArguments);
+    EXPECT_EQ(indexed.ArgumentOffset, 48u);
+    EXPECT_EQ(indexed.CountBuffer, indexedCount);
+    EXPECT_EQ(indexed.CountOffset, 64u);
+    EXPECT_EQ(indexed.MaxDrawCount, 9u);
+    EXPECT_EQ(cmd.DrawIndirectCountCalls, 1);
+    EXPECT_EQ(cmd.DrawIndexedIndirectCountCalls, 1);
+    EXPECT_EQ(cmd.LastMaxDrawCount, 9u);
+    ASSERT_EQ(cmd.Events.size(), 2u);
+    EXPECT_EQ(cmd.Events[0], Tests::MockCommandContext::EventKind::DrawIndirectCount);
+    EXPECT_EQ(cmd.Events[1], Tests::MockCommandContext::EventKind::DrawIndexedIndirectCount);
 }

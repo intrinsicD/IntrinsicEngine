@@ -22,7 +22,6 @@ its dependencies, conditional gates, scope and verification.
 - [GEOM-074 — Graph property and adjacency contracts](GEOM-074-graph-property-adjacency-contracts.md)
 - [GEOM-076 — Evidence-gated curvature-region UV atlas cuts](GEOM-076-curvature-region-guided-uv-atlas-cuts.md)
 - [GEOM-078 — Intrinsic surface-sample point cloud with contiguous face ranges](GEOM-078-intrinsic-surface-sample-point-cloud.md)
-- [GEOM-099 — Share parameterization disk-topology preflight](GEOM-099-shared-disk-topology-preflight.md)
 
 ## Vulkan candidates
 

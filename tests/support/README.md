@@ -29,6 +29,9 @@ channel order, sRGB conversion and alpha preservation. `MockRHI.hpp` owns the
 mock backbuffer-barrier query; expected pixels and packet setup stay in callers.
 `MockDevice` construction and destruction compile in `MockRHI.cpp` alongside
 the recorded-command methods, linked through `MockRhiTestSupportObjs`.
+The command context retains independent last-call arguments and byte offsets
+for indexed and nonindexed indirect-count draws, alongside the full ordered
+event stream and submission-ordered push-constant payloads.
 
 `SandboxEditorJobHarness.hpp` declares the shared editor-job fixture. Its
 snapshot, command callbacks, drain loop and scheduler lifecycle compile once in

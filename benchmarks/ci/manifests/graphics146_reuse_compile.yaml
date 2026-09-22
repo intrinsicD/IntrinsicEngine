@@ -1,0 +1,88 @@
+benchmark_id: build.reuse.graphics146.v1
+method: build.engine_compile_iteration
+dataset: intrinsicengine.source.graphics146_2026_09_21
+params:
+  intent: performance
+  source_revisions:
+    before: d82d87d765400961b1c2870fbf3d871eafdad2df
+    after: 33f6e4427c9ba3dbb050c5d81fe0e5d177ebf46a
+  sample_order:
+  - before
+  - after
+  - before
+  - after
+  - before
+  - after
+  measured_iterations: 3
+  warmup_iterations: 0
+  warmup_scope: No discarded pilots; identical source/dependency input pre-read before
+    every measured sample. Existing protocol establishes resource requirements.
+  preset: ci
+  target: IntrinsicTests
+  compiler: /usr/bin/clang++-23
+  jobs: 4
+  minimum_interface_importers: 1
+  configure_options:
+  - -DEXTRINSIC_BACKEND=Null
+  - -DINTRINSIC_PLATFORM_BACKEND=Null
+  - -DINTRINSIC_HEADLESS_NO_GLFW=ON
+  - -DINTRINSIC_BUILD_TESTS=ON
+  - -DINTRINSIC_BUILD_BENCHMARKS=OFF
+  - -DINTRINSIC_ENABLE_CCACHE=OFF
+  - -DCMAKE_CXX_COMPILER_LAUNCHER=
+  - -DCMAKE_C_COMPILER_LAUNCHER=
+  - -DVCPKG_MANIFEST_INSTALL=OFF
+  - -DCMAKE_C_COMPILER=/usr/bin/clang-23
+  - -DCMAKE_CXX_COMPILER=/usr/bin/clang++-23
+  - -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-23
+  scenarios:
+    clean: null
+    noop: null
+    consumer_impl: tests/contract/graphics/Test.SurfacePassContracts.cpp
+    mock_impl: tests/support/MockRHI.cpp
+    mock_header: tests/support/MockRHI.hpp
+  invalidation: mtime only; source bytes remain at the exact clean commit; require
+    observed importer fan-out
+  build_storage: Fresh owned disk build /tmp/intrinsic-graphics146/build; identical
+    source and build paths for both arms.
+  dependency_state: identical preinstalled vcpkg packages, no package installation
+    during sampling
+  operating_system_cache: input pre-read, no cache flushing, no cold-filesystem claim
+  memory_measurement: GNU time maximum single-process RSS, not aggregate concurrent
+    memory
+  critical_path: Ninja target DAG weighted by unfiltered per-invocation timings; unmatched
+    meta-edges reported
+  summary: Pre-edit baseline pilot retained; final protocol requires before/after/before/after/before/after,
+    medians and min/max, frozen clean wall and compiler sum +2%; edit/noop wall max(2%,100ms),
+    edit compiler sum +2%, zero noop compiler work. Overlapping or unstable evidence
+    is inconclusive; repeat unchanged matched samples to resolve, never relax thresholds.
+  sample_sequence: Clean, noop, then task-specific implementation and declaration
+    probes in manifest order.
+  noise_scope: Normal desktop host; no CPU affinity/governor/turbo control. No competing
+    compilation or tests; source inspection and remote review may run. Local descriptive
+    comparison, not an isolated-machine or statistical claim.
+  configure_measurement: initial configure only; source iteration cohort deliberately
+    excludes the already-measured reconfigure scenario.
+  probe_sources:
+    mock_header:
+    - tests/support/MockRHI.cpp
+    - tests/contract/graphics/Test.SurfacePassContracts.cpp
+    - tests/contract/graphics/Test.LinePointPassContracts.cpp
+    - tests/contract/graphics/Test.SelectionPassContracts.cpp
+    - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+  source_scope: Exact clean local source commits. No speedup claim. Before/after source
+    identities retain all task-specific behavioral characterization.
+  frozen_gate:
+    clean_wall_relative: 0.02
+    edit_noop_wall_relative: 0.02
+    edit_noop_wall_floor_ms: 100
+    compiler_duration_relative: 0.02
+    noop_compiler_invocations: 0
+    new_fixture_impl: supplemental after-only cost, before null probe is a settled
+      no-op; excluded from matched regression comparison
+metrics:
+- build_time_ms
+- configure_time_ms
+- memory_peak_bytes
+- sample_count
+thresholds: {}

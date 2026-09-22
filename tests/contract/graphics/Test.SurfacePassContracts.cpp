@@ -22,81 +22,11 @@ import Extrinsic.RHI.Types;
 
 using namespace Extrinsic;
 using Tests::MockDevice;
+using Tests::MockCommandContext;
 
 namespace
 {
-    enum class EventKind
-    {
-        BindPipeline,
-        BindIndexBuffer,
-        PushConstants,
-        DrawIndexedIndirectCount,
-    };
-
-    struct Event
-    {
-        EventKind Kind{};
-    };
-
-    class RecordingCommandContext final : public RHI::ICommandContext
-    {
-    public:
-        std::vector<Event> Events;
-        RHI::PipelineHandle LastPipeline{};
-        RHI::BufferHandle LastIndexBuffer{};
-        RHI::BufferHandle LastIndirectArgs{};
-        RHI::BufferHandle LastIndirectCount{};
-        std::uint32_t LastMaxDrawCount = 0;
-        std::vector<std::byte> LastPushConstants{};
-
-        void Begin() override {}
-        void End() override {}
-        void BeginRenderPass(const RHI::RenderPassDesc&) override {}
-        void EndRenderPass() override {}
-        void SetViewport(float, float, float, float, float, float) override {}
-        void SetScissor(std::int32_t, std::int32_t, std::uint32_t, std::uint32_t) override {}
-        void BindPipeline(RHI::PipelineHandle pipeline) override
-        {
-            Events.push_back({.Kind = EventKind::BindPipeline});
-            LastPipeline = pipeline;
-        }
-        void BindIndexBuffer(RHI::BufferHandle buffer, std::uint64_t, RHI::IndexType) override
-        {
-            Events.push_back({.Kind = EventKind::BindIndexBuffer});
-            LastIndexBuffer = buffer;
-        }
-        void PushConstants(const void* data, std::uint32_t size, std::uint32_t) override
-        {
-            Events.push_back({.Kind = EventKind::PushConstants});
-            LastPushConstants.resize(size);
-            if (size > 0u && data != nullptr)
-            {
-                std::memcpy(LastPushConstants.data(), data, size);
-            }
-        }
-        void Draw(std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t) override {}
-        void DrawIndexed(std::uint32_t, std::uint32_t, std::uint32_t, std::int32_t, std::uint32_t) override {}
-        void DrawIndirect(RHI::BufferHandle, std::uint64_t, std::uint32_t) override {}
-        void DrawIndexedIndirect(RHI::BufferHandle, std::uint64_t, std::uint32_t) override {}
-        void DrawIndexedIndirectCount(RHI::BufferHandle argBuffer, std::uint64_t,
-                                      RHI::BufferHandle countBuffer, std::uint64_t,
-                                      std::uint32_t maxDrawCount) override
-        {
-            Events.push_back({.Kind = EventKind::DrawIndexedIndirectCount});
-            LastIndirectArgs = argBuffer;
-            LastIndirectCount = countBuffer;
-            LastMaxDrawCount = maxDrawCount;
-        }
-        void DrawIndirectCount(RHI::BufferHandle, std::uint64_t, RHI::BufferHandle, std::uint64_t, std::uint32_t) override {}
-        void Dispatch(std::uint32_t, std::uint32_t, std::uint32_t) override {}
-        void DispatchIndirect(RHI::BufferHandle, std::uint64_t) override {}
-        void TextureBarrier(RHI::TextureHandle, RHI::TextureLayout, RHI::TextureLayout) override {}
-        void BufferBarrier(RHI::BufferHandle, RHI::MemoryAccess, RHI::MemoryAccess) override {}
-        void SubmitBarriers(const RHI::BarrierBatchDesc&) override {}
-        void FillBuffer(RHI::BufferHandle, std::uint64_t, std::uint64_t, std::uint32_t) override {}
-        void CopyBuffer(RHI::BufferHandle, RHI::BufferHandle, std::uint64_t, std::uint64_t, std::uint64_t) override {}
-        void CopyBufferToTexture(RHI::BufferHandle, std::uint64_t, RHI::TextureHandle, std::uint32_t, std::uint32_t) override {}
-    };
+    using EventKind = MockCommandContext::EventKind;
 
     Graphics::GpuWorld::InitDesc TinyWorldDesc()
     {
@@ -109,31 +39,32 @@ namespace
         return init;
     }
 
-    void ExpectSurfaceBucketDraw(const RecordingCommandContext& cmd,
+    void ExpectSurfaceBucketDraw(const MockCommandContext& cmd,
                                  const Graphics::GpuWorld& world,
                                  const Graphics::CullingSystem& culling,
                                  const RHI::PipelineHandle pipeline,
                                  const std::uint32_t frameIndex)
     {
         ASSERT_EQ(cmd.Events.size(), 4u);
-        EXPECT_EQ(cmd.Events[0].Kind, EventKind::BindPipeline);
-        EXPECT_EQ(cmd.Events[1].Kind, EventKind::BindIndexBuffer);
-        EXPECT_EQ(cmd.Events[2].Kind, EventKind::PushConstants);
-        EXPECT_EQ(cmd.Events[3].Kind, EventKind::DrawIndexedIndirectCount);
+        EXPECT_EQ(cmd.Events[0], EventKind::BindPipeline);
+        EXPECT_EQ(cmd.Events[1], EventKind::BindIndexBuffer);
+        EXPECT_EQ(cmd.Events[2], EventKind::PushConstants);
+        EXPECT_EQ(cmd.Events[3], EventKind::DrawIndexedIndirectCount);
 
-        EXPECT_EQ(cmd.LastPipeline, pipeline);
+        EXPECT_EQ(cmd.LastBoundPipeline, pipeline);
         EXPECT_EQ(cmd.LastIndexBuffer, world.GetManagedIndexBuffer());
 
-        ASSERT_EQ(cmd.LastPushConstants.size(), sizeof(RHI::GpuScenePushConstants));
+        ASSERT_EQ(cmd.PushConstantPayloads.size(), 1u);
+        ASSERT_EQ(cmd.PushConstantPayloads.back().size(), sizeof(RHI::GpuScenePushConstants));
         RHI::GpuScenePushConstants pc{};
-        std::memcpy(&pc, cmd.LastPushConstants.data(), sizeof(pc));
+        std::memcpy(&pc, cmd.PushConstantPayloads.back().data(), sizeof(pc));
         EXPECT_EQ(pc.SceneTableBDA, world.GetSceneTableBDA());
         EXPECT_EQ(pc.FrameIndex, frameIndex);
         EXPECT_EQ(pc.DrawBucket, static_cast<std::uint32_t>(RHI::GpuDrawBucketKind::SurfaceOpaque));
 
         const auto& bucket = culling.GetBucket(RHI::GpuDrawBucketKind::SurfaceOpaque);
-        EXPECT_EQ(cmd.LastIndirectArgs, bucket.IndexedArgsBuffer);
-        EXPECT_EQ(cmd.LastIndirectCount, bucket.CountBuffer);
+        EXPECT_EQ(cmd.LastDrawIndexedIndirectCount.ArgumentBuffer, bucket.IndexedArgsBuffer);
+        EXPECT_EQ(cmd.LastDrawIndexedIndirectCount.CountBuffer, bucket.CountBuffer);
         EXPECT_EQ(cmd.LastMaxDrawCount, bucket.Capacity);
     }
 }
@@ -154,7 +85,7 @@ TEST(GraphicsSurfacePassContracts, DepthPrepassRecordsSurfaceOpaqueIndirectDraw)
     ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/instance_cull.comp"));
 
     Graphics::DepthPrepassPass pass;
-    RecordingCommandContext noPipelineCmd;
+    MockCommandContext noPipelineCmd;
     RHI::CameraUBO camera{};
     pass.Execute(noPipelineCmd, camera, world, culling, 3u);
     EXPECT_TRUE(noPipelineCmd.Events.empty());
@@ -162,7 +93,7 @@ TEST(GraphicsSurfacePassContracts, DepthPrepassRecordsSurfaceOpaqueIndirectDraw)
     const RHI::PipelineHandle pipeline{101u, 1u};
     pass.SetPipeline(pipeline);
 
-    RecordingCommandContext cmd;
+    MockCommandContext cmd;
     pass.Execute(cmd, camera, world, culling, 3u);
     ExpectSurfaceBucketDraw(cmd, world, culling, pipeline, 3u);
 
@@ -189,12 +120,12 @@ TEST(GraphicsSurfacePassContracts, ForwardSurfaceRequiresInitializedSystemAndRec
     pass.SetPipeline(pipeline);
 
     RHI::CameraUBO camera{};
-    RecordingCommandContext uninitializedCmd;
+    MockCommandContext uninitializedCmd;
     pass.Execute(uninitializedCmd, camera, world, culling, 4u);
     EXPECT_TRUE(uninitializedCmd.Events.empty());
 
     forward.Initialize();
-    RecordingCommandContext cmd;
+    MockCommandContext cmd;
     pass.Execute(cmd, camera, world, culling, 4u);
     ExpectSurfaceBucketDraw(cmd, world, culling, pipeline, 4u);
 
@@ -222,12 +153,12 @@ TEST(GraphicsSurfacePassContracts, DeferredGBufferRequiresInitializedSystemAndRe
     pass.SetPipeline(pipeline);
 
     RHI::CameraUBO camera{};
-    RecordingCommandContext uninitializedCmd;
+    MockCommandContext uninitializedCmd;
     pass.Execute(uninitializedCmd, camera, world, culling, 5u);
     EXPECT_TRUE(uninitializedCmd.Events.empty());
 
     deferred.Initialize();
-    RecordingCommandContext cmd;
+    MockCommandContext cmd;
     pass.Execute(cmd, camera, world, culling, 5u);
     ExpectSurfaceBucketDraw(cmd, world, culling, pipeline, 5u);
 

@@ -1,0 +1,12 @@
+{
+  "disposition": "accepted",
+  "candidate_commit": "33f6e4427c9ba3dbb050c5d81fe0e5d177ebf46a",
+  "thresholds_changed": false,
+  "samples_per_arm": 3,
+  "gate_failures": [],
+  "implementation_line_delta": -202,
+  "regression_test_line_delta": 33,
+  "retained_code_delta": -169,
+  "full_cpu_and_sanitizer_gates": "passed",
+  "unrelated_open_bug": "BUG-206"
+}

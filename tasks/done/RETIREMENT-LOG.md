@@ -7,6 +7,27 @@ relative to `tasks/done/`, which sits at the same depth as `tasks/active/`,
 so blocks moved from the old active-README history work verbatim.
 
 
+## 2026-09-22 — GEOM-099, RUNTIME-272 and GRAPHICS-146 accepted
+
+Retired [GEOM-099](GEOM-099-shared-disk-topology-preflight.md),
+[RUNTIME-272](RUNTIME-272-compiled-property-domain-test-fixtures.md) and
+[GRAPHICS-146](GRAPHICS-146-reuse-command-recording-test-double.md) as implemented.
+They share the existing topology owner, compile identical domain fixtures once,
+and reuse the existing compiled command recorder. Implementation footprints are
+-108, -176 and -202 lines; regression additions are +197, 0 and +33, respectively.
+Including those tests, the retained combined code delta is -256 lines.
+
+GEOM-099's measured Harmonic edit cost is explicitly accepted under the operator's
+prior consistency-first amendment. RUNTIME-272 and GRAPHICS-146 pass every frozen
+compile allowance. All three fixed implementations pass independent Claude Sonnet
+medium review; bounded review limitations remain in their evidence records.
+The final combined source `33f6e4427` passes full CPU, ASan and UBSan gates, resolving
+the earlier geometry/runtime verification obligations through unchanged-source
+identity checks. [Final measurements and gates](../evidence/GRAPHICS-146/measurements.md)
+preserve the evidence. BUG-206 remains open; no lifecycle fix or new capability
+maturity is claimed. GEOIO-004 remains separately retired as rejected below.
+
+
 ## 2026-09-22 — GEOIO-004 rejected on its frozen compile gate
 
 Retired [GEOIO-004](GEOIO-004-shared-compiled-ply-header-parser.md) as **rejected**.

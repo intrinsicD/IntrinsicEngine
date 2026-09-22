@@ -6,11 +6,35 @@ template: micro
 workflow_schema: 1
 workflow_profile: micro
 evidence: not_applicable
-evidence_skip_reason: interactive backlog planning; implementation evidence is the diff, tests and matched compile measurements
+evidence_skip_reason: interactive consolidation; exact source identities, independent review, tests and matched compile measurements are retained
 contract_schema: 1
 contracts: [repo.source-documentation, geometry.element-domain-sources]
 ---
 # RUNTIME-272 — Compile shared property-domain test fixtures once
+
+## Completion — 2026-09-22
+
+Implemented and accepted. Implementation commit: `563be93dba09b7b2a37062731aeafa252480e98e`;
+measured source: `5f2f99ef0f5c05218ca4ed67b28da87ee9a2df32`.
+The existing EditorFeatureTestSupportObjs producer compiles the shared topology
+builder and property accessor once. Eight topology consumers and nine property
+consumers use it, retaining their method-specific data, topology differences and
+assertions. Complete code footprint decreases by 176 lines, with no new tests.
+
+All six matched samples pass the frozen allowances: clean wall -0.08%, compiler
+sum -0.02%; the declaration probe changes from broad context to narrow fixture
+scope and rebuilds 20 → 10 jobs. The report keeps those probe scopes explicit.
+The 226 focused cases and 101 fresh Clang 20 cases pass. Claude Sonnet medium
+found no actionable implementation defects.
+
+The earlier full-UBSan blocker is resolved for this task by the required final
+combined-source gates at `33f6e4427c9ba3dbb050c5d81fe0e5d177ebf46a`: CPU 4,880
+selected, ASan 3,231 and UBSan 3,231, all with zero failures. CPU and UBSan each
+have one expected GLFW lifetime skip; ASan runs every selected entry. All task
+code/build files remain byte-identical to the reviewed source. The
+[combined verification and source hashes](../evidence/GRAPHICS-146/measurements.md)
+preserve that reuse basis. BUG-206 remains open; this refactor does not fix it
+or promote any engine capability's maturity.
 
 ## Goal
 
@@ -132,9 +156,9 @@ git diff --check
 ## Planning review
 
 Codex and Claude Code reached consensus on 2026-09-21 before this task was
-filed. The [shared planning review](../../evidence/GEOM-099/claude-planning-review.md)
+filed. The [shared planning review](../evidence/GEOM-099/claude-planning-review.md)
 records the agreed scope, corrections, rejected job-lifecycle candidate and
-compile-regression stop rules. Implementation and timing evidence remain due.
+compile-regression stop rules. Implementation and timing evidence are recorded in the completion section above.
 
 ## Execution plan — 2026-09-21
 
@@ -166,7 +190,7 @@ the support producer and runtime contract executable still compile with Clang
 20. This protects dependency identity rather than changing the header-order
 or producer-linkage check.
 
-## Implementation and gate disposition — 2026-09-21
+## Initial implementation and gate disposition — 2026-09-21
 
 The reviewed implementation is preserved in exact source
 `5f2f99ef0f5c05218ca4ed67b28da87ee9a2df32`. Eight topology consumers and nine
@@ -174,8 +198,8 @@ property-access consumers now share the compiled fixture; all differing test
 inputs and assertions remain local. The complete affected code footprint is
 7,099 → 6,923 lines (-176), with no added regression tests.
 
-The [independent implementation review](../../evidence/RUNTIME-272/implementation-review.md)
-found no actionable defects. The [six-sample compile comparison](../../evidence/RUNTIME-272/measurements.md)
+The [independent implementation review](../evidence/RUNTIME-272/implementation-review.md)
+found no actionable defects. The [six-sample compile comparison](../evidence/RUNTIME-272/measurements.md)
 passes every original frozen limit: clean wall -0.08%, compiler sum -0.02%;
 consumer edit wall -0.73%, compiler sum -2.28%; declaration scope rebuilds
 20 → 10 compiler jobs. No-op compiler work stays zero. The new helper edit
@@ -183,10 +207,10 @@ cost is reported separately. These local measurements make no speedup claim.
 
 Focused ci cases (226), fresh Clang 20 cases (101), full ci (4,879 selected)
 and full ASan (3,230 selected) pass. The expected GLFW skip applies to ci;
-the GLFW lifetime check passes under ASan, where all selected tests run. Full UBSan fails only the independently baseline-reproduced
-[BUG-206](../bugs/BUG-206-uv-duplicate-submit-phase-race.md). No unrelated
+the GLFW lifetime check passes under ASan, where all selected tests run. The initial full UBSan run failed only the independently baseline-reproduced
+[BUG-206](../backlog/bugs/BUG-206-uv-duplicate-submit-phase-race.md). No unrelated
 lifecycle or assertion change is included.
 
-- [ ] Required full UBSan repository gate resolved. Keep this task open and do
-      not retire while this limitation remains; continue the next independent
-      operator-selected task under the authorized blocker procedure.
+- [x] Required full UBSan gate passes on the final combined source, with every
+      task code/build file unchanged. BUG-206 remains independently open; see
+      the completion evidence above.

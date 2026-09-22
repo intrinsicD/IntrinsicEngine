@@ -171,17 +171,21 @@ namespace Extrinsic::Tests
         Events.push_back(EventKind::DrawIndexed);
     }
 
-    void MockCommandContext::DrawIndexedIndirectCount(RHI::BufferHandle, std::uint64_t, RHI::BufferHandle,
-        std::uint64_t, std::uint32_t maxDrawCount)
+    void MockCommandContext::DrawIndexedIndirectCount(RHI::BufferHandle argumentBuffer,
+        std::uint64_t argumentOffset, RHI::BufferHandle countBuffer,
+        std::uint64_t countOffset, std::uint32_t maxDrawCount)
     {
+        LastDrawIndexedIndirectCount = {argumentBuffer, argumentOffset, countBuffer, countOffset, maxDrawCount};
         ++DrawIndexedIndirectCountCalls;
         LastMaxDrawCount = maxDrawCount;
         Events.push_back(EventKind::DrawIndexedIndirectCount);
     }
 
-    void MockCommandContext::DrawIndirectCount(RHI::BufferHandle, std::uint64_t, RHI::BufferHandle,
-        std::uint64_t, std::uint32_t maxDrawCount)
+    void MockCommandContext::DrawIndirectCount(RHI::BufferHandle argumentBuffer,
+        std::uint64_t argumentOffset, RHI::BufferHandle countBuffer,
+        std::uint64_t countOffset, std::uint32_t maxDrawCount)
     {
+        LastDrawIndirectCount = {argumentBuffer, argumentOffset, countBuffer, countOffset, maxDrawCount};
         ++DrawIndirectCountCalls;
         LastMaxDrawCount = maxDrawCount;
         Events.push_back(EventKind::DrawIndirectCount);

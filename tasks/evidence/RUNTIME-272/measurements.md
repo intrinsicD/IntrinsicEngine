@@ -57,3 +57,16 @@ ci cases passed before and after extraction. Full UBSan failed only the
 independently baseline-reproduced [BUG-206](../../backlog/bugs/BUG-206-uv-duplicate-submit-phase-race.md).
 This repository-gate limitation remains explicit; the implementation review
 and compile comparison do not imply that the task has retired.
+
+## Final combined-source gate closure — 2026-09-22
+
+The required GRAPHICS-146 verification on exact combined source
+`33f6e4427c9ba3dbb050c5d81fe0e5d177ebf46a` passes full CPU (4,880 selected),
+ASan (3,231) and UBSan (3,231), with zero failures. CPU and UBSan each have one
+expected GLFW lifetime skip; ASan runs every selected entry. All code/build
+files affected by this task are byte-identical to its reviewed/measured source.
+[GRAPHICS-146's evidence](../GRAPHICS-146/measurements.md) includes the exact
+logs, configurations and per-file source hashes. This required verification of
+a new graphics diff resolves this task's earlier full-gate obligation without
+weakening or retrying the unchanged failing assertion. BUG-206 remains open
+and is not claimed fixed. The earlier negative runs remain in this archive.

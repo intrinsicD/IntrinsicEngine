@@ -147,6 +147,15 @@ namespace Extrinsic::Tests
             std::uint32_t FirstInstance = 0;
         };
 
+        struct IndirectCountRecord
+        {
+            RHI::BufferHandle ArgumentBuffer{};
+            std::uint64_t ArgumentOffset = 0;
+            RHI::BufferHandle CountBuffer{};
+            std::uint64_t CountOffset = 0;
+            std::uint32_t MaxDrawCount = 0;
+        };
+
         struct DrawIndexedRecord
         {
             std::uint32_t IndexCount = 0;
@@ -285,6 +294,8 @@ namespace Extrinsic::Tests
         int DrawIndexedCalls = 0;
         int DrawIndexedIndirectCountCalls = 0;
         int DrawIndirectCountCalls = 0;
+        IndirectCountRecord LastDrawIndexedIndirectCount{};
+        IndirectCountRecord LastDrawIndirectCount{};
         DrawRecord LastDraw{};
         DrawIndexedRecord LastDrawIndexed{};
         ScissorRecord LastScissor{};

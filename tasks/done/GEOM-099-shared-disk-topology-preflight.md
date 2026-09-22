@@ -6,11 +6,36 @@ template: micro
 workflow_schema: 1
 workflow_profile: micro
 evidence: not_applicable
-evidence_skip_reason: interactive backlog planning; implementation evidence is the diff, tests and matched compile measurements
+evidence_skip_reason: interactive consolidation; exact source identities, independent review, tests and matched compile measurements are retained
 contract_schema: 1
 contracts: [repo.source-documentation]
 ---
 # GEOM-099 — Share parameterization disk-topology preflight
+
+## Completion — 2026-09-22
+
+Implemented and accepted. Implementation commit: `66976e593b9562e5f0c34688e937d741016768cd`;
+measured source: `1c1903c66a2866ed3cb55097a8bd1e9e71156a22`.
+The existing MeshUtils owner now supplies the shared connected/manifold/Euler-one
+preflight to BFF, Harmonic and LSCM; caller-specific validation and failure order
+remain local. Implementation footprint is -108 lines, added regression coverage
+is +197, and total code change is +89.
+
+The six-sample clean-wall delta is +0.24% and compiler-sum delta is +0.28%.
+The Harmonic implementation edit costs +20.14% wall and +53.53% compiler time;
+that explicit cost is accepted under the operator amendment recorded below,
+not represented as passing the original 2% limit. Claude Sonnet medium accepted
+the corrected fixed diff after the direct manifold characterization was added.
+
+The earlier full-UBSan blocker is resolved for this task by the required final
+combined-source gates at `33f6e4427c9ba3dbb050c5d81fe0e5d177ebf46a`: CPU 4,880
+selected, ASan 3,231 and UBSan 3,231, all with zero failures. CPU and UBSan each
+have one expected GLFW lifetime skip; ASan runs every selected entry. Every
+code/build file affected by this task is byte-identical to its reviewed source.
+The [combined verification and source hashes](../evidence/GRAPHICS-146/measurements.md)
+retain the exact evidence. This was verification of the new graphics diff,
+not an unchanged retry. BUG-206 remains open and is not claimed fixed.
+No new capability or maturity promotion is claimed by this refactor.
 
 ## Goal
 
@@ -133,9 +158,9 @@ git diff --check
 ## Planning review
 
 Codex and Claude Code reached consensus on 2026-09-21 before this task was
-filed. The [shared planning review](../../evidence/GEOM-099/claude-planning-review.md)
+filed. The [shared planning review](../evidence/GEOM-099/claude-planning-review.md)
 records the agreed scope, corrections, rejected job-lifecycle candidate and
-compile-regression stop rules. Implementation and timing evidence remain due.
+compile-regression stop rules. Implementation and timing evidence are recorded in the completion section above.
 
 ## Execution plan and operator amendment — 2026-09-21
 
@@ -156,7 +181,7 @@ Measure identical characterization tests in both final clean source arms with
 Clang 23, ci-derived Null/headless Debug, ccache disabled, four jobs, three
 alternating samples per arm; retain the original pre-edit pilot separately.
 
-## Execution status — 2026-09-21
+## Initial execution status — 2026-09-21
 
 Implementation and independent review are complete at measured source
 `1c1903c66a2866ed3cb55097a8bd1e9e71156a22`. The shared owner removes 108
@@ -172,17 +197,18 @@ seconds (+0.28%). The Harmonic implementation probe rises 2.320 → 2.787 second
 wall and 0.863 → 1.325 seconds compiler duration; the Utils interface probe is
 90.406 → 90.767 seconds wall with 84 → 85 compiler jobs. This is accepted under
 the operator's prior qualitative amendment, not reported as a compile win.
-See [measurements](../../evidence/GEOM-099/measurements.md) and the
-[implementation review](../../evidence/GEOM-099/implementation-review.md).
+See [measurements](../evidence/GEOM-099/measurements.md) and the
+[implementation review](../evidence/GEOM-099/implementation-review.md).
 
-Retirement is pending the required full UBSan gate: the unchanged
+At this stage, retirement was pending the required full UBSan gate: the unchanged
 `SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob` compares
 queued/running phase strings across two independent job snapshots. The failure
 reproduces on the original implementation as well as the reviewed source.
-[BUG-206](../bugs/BUG-206-uv-duplicate-submit-phase-race.md) owns that independent
+[BUG-206](../backlog/bugs/BUG-206-uv-duplicate-submit-phase-race.md) owns that independent
 blocker; no assertion, selector or lifecycle code was weakened. Continue the
 remaining independent requested tasks without expanding this implementation.
 
-Remaining repository gate:
+Repository gate closure:
 
-- [ ] Resolve the full UBSan gate blocked by baseline BUG-206 before retirement.
+- [x] Final combined-source full UBSan gate passes; unchanged task source and
+      the independent BUG-206 limitation are recorded in the completion section.

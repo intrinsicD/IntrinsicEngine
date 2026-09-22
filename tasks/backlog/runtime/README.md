@@ -46,7 +46,6 @@ and their paired UI or method work are recorded there, not here.
 
 ## Compilation locality
 
-- [RUNTIME-272 — Compile shared property-domain test fixtures once](RUNTIME-272-compiled-property-domain-test-fixtures.md)
 
 BUILD-009 and RUNTIME-266/267/268 are complete. Existing config and prepared-frame
 ownership contracts remain authoritative; further changes require a measured

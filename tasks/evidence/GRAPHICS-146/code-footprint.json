@@ -1,0 +1,64 @@
+{
+  "before": "d82d87d765400961b1c2870fbf3d871eafdad2df",
+  "after": "33f6e4427c9ba3dbb050c5d81fe0e5d177ebf46a",
+  "counting": "Physical lines, including blank lines, all affected implementation/declaration/caller/support and CMake files; no formatting compression credit. Regression tests shown separately. Documentation and evidence excluded from code totals.",
+  "files": [
+    {
+      "path": "tests/contract/graphics/Test.GraphicsTestSupport.cpp",
+      "before_lines": 73,
+      "after_lines": 106,
+      "delta": 33,
+      "classification": "regression_tests"
+    },
+    {
+      "path": "tests/contract/graphics/Test.LinePointPassContracts.cpp",
+      "before_lines": 224,
+      "after_lines": 146,
+      "delta": -78,
+      "classification": "implementation"
+    },
+    {
+      "path": "tests/contract/graphics/Test.SelectionPassContracts.cpp",
+      "before_lines": 260,
+      "after_lines": 190,
+      "delta": -70,
+      "classification": "implementation"
+    },
+    {
+      "path": "tests/contract/graphics/Test.SurfacePassContracts.cpp",
+      "before_lines": 238,
+      "after_lines": 169,
+      "delta": -69,
+      "classification": "implementation"
+    },
+    {
+      "path": "tests/support/MockRHI.cpp",
+      "before_lines": 714,
+      "after_lines": 718,
+      "delta": 4,
+      "classification": "implementation"
+    },
+    {
+      "path": "tests/support/MockRHI.hpp",
+      "before_lines": 578,
+      "after_lines": 589,
+      "delta": 11,
+      "classification": "implementation"
+    }
+  ],
+  "implementation": {
+    "before_lines": 2014,
+    "after_lines": 1812,
+    "delta": -202
+  },
+  "regression_tests": {
+    "before_lines": 73,
+    "after_lines": 106,
+    "delta": 33
+  },
+  "total": {
+    "before_lines": 2087,
+    "after_lines": 1918,
+    "delta": -169
+  }
+}
