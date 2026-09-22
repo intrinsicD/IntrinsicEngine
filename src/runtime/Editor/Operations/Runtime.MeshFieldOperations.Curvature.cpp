@@ -209,16 +209,16 @@ namespace Extrinsic::Runtime::MeshFieldDetail
         template <typename T>
         [[nodiscard]] bool StageMeshScalarProperty(
             GeometryScalarPropertySnapshot& snapshot, const GeometryPropertyRef& ref,
-            const std::vector<T>& values, std::span<const std::uint32_t> liveSlots = {})
+            const std::vector<T>& values, std::optional<std::span<const std::uint32_t>> liveSlots = std::nullopt)
         {
             std::vector<std::uint32_t> allSlots;
-            if (!snapshot.Exists || liveSlots.empty())
+            if (!liveSlots)
             {
                 allSlots.resize(values.size());
                 std::iota(allSlots.begin(), allSlots.end(), 0u);
                 liveSlots = allSlots;
             }
-            return PrepareGeometryScalarProperty(snapshot, ref.ValueKind, values.size(), liveSlots, std::span<const T>{values});
+            return PrepareGeometryScalarProperty(snapshot, ref.ValueKind, values.size(), *liveSlots, std::span<const T>{values});
         }
 
         struct MeshCurvaturePropertyState

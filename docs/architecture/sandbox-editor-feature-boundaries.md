@@ -760,8 +760,8 @@ so undo does not convert previously authored data. Direction/color outputs retai
 their Vec3/Vec4 contracts, and aliasing plus structural-property restrictions
 remain enforced. Segmentation preserves existing values at unconsumed face/edge
 slots, including exceptional floating values and full-width integers. Newly
-created label properties use the UInt32 invalid-label sentinel for unused slots;
-a target type unable to represent that value is rejected.
+created scalar properties initialize unconsumed slots to zero; only participating
+outputs must be exactly representable in the selected storage.
 
 
 `ProcessingCompilationLocality.Family`, `.PointFieldResults`, `.PointAnalysis`, `.PointAnalysisTests`,
