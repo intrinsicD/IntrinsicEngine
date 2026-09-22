@@ -546,9 +546,17 @@ on the main-thread command drain, not the UI frame; standalone contexts retain
 synchronous validation.
 `Runtime.GeometryProcessingOperations.MeshReadiness.hpp` exposes only admission
 and readiness declarations, so the cache does not import owning mesh or soup
-modules. Negative ring verdicts are cached. Finite-input, conversion and UV
-feasibility readiness, plus mesh-field families' connectivity verdicts, remain
-open under UI-037.
+modules. Negative ring verdicts are cached. Curvature and segmentation use their
+explicit bound position ref for ring readiness. Separate mesh-field verdicts
+reuse this session lifecycle and defer the execution owner's mesh conversion
+and supplied-feature capture to the command drain. Their keys include ordered
+feature refs and the revisions/counts of bound positions, features, masks and
+consumed connectivity. Coordinate edits invalidate numeric verdicts while leaving
+ring verdicts reusable. Feature capture validates only the rows consumed by the
+command, including its vertex-to-face averaging and checked numeric conversion.
+Prepared-frame command handles expose these previews for the current config
+draft; execution always captures current inputs again. Solver feasibility and
+UV numerical readiness remain open under UI-037.
 Duplicate requests return the existing pending job before mesh preparation,
 without adding a result callback. This command does not require config controls.
 

@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstddef>
+#include <cmath>
 #include <cstdint>
 #include <limits>
 #include <string>
@@ -698,7 +699,7 @@ TEST(CurvatureSegmentationOperations, InvalidFeaturesNeverFallBackToComputedCurv
     auto wide = harness.Faces().Properties.GetOrAdd<std::uint64_t>("wide");
     wide[0] = (std::uint64_t{1} << 53u) + 1u;
     command.Config.Features = {{D::MeshFace, "wide", K::UInt64}};
-    EXPECT_TRUE(Runtime::PreviewEditorCurvatureSegmentationCommand(harness.Context, command).Enabled);
+    EXPECT_FALSE(Runtime::PreviewEditorCurvatureSegmentationCommand(harness.Context, command).Enabled);
     const auto invalid = Runtime::ApplyEditorCurvatureSegmentationCommand(harness.Context, command);
     EXPECT_FALSE(invalid.Succeeded());
     EXPECT_NE(invalid.Message.find("precision loss"), std::string::npos);
@@ -746,4 +747,74 @@ TEST(CurvatureSegmentationOperations, InputPreservationFiniteChecksAndStructural
     EXPECT_TRUE(Runtime::IsSegmentationFeatureBinding({D::MeshFace, "any", K::Vec3}));
     EXPECT_FALSE(Runtime::IsSegmentationFeatureBinding({D::MeshHalfedge, "any", K::Vec3}));
     EXPECT_FALSE(Runtime::IsSegmentationFeatureBinding({D::MeshFace, "any", K::Vec4}));
+}
+
+TEST(CurvatureSegmentationOperations, BooleanAndIntegerScalarTwinsPreserveLabels)
+{
+    SegmentationHarness harness;
+    auto config = MakeFixedConfig();
+    using D = Runtime::GeometryElementDomain;
+    using K = Geometry::PropertyValueKind;
+    auto& properties = harness.Faces().Properties;
+    auto boolean = properties.GetOrAdd<bool>("boolean");
+    auto signedValues = properties.GetOrAdd<std::int32_t>("signed");
+    auto unsignedValues = properties.GetOrAdd<std::uint32_t>("unsigned");
+    for (std::size_t i = 0; i < properties.Size(); ++i)
+    {
+        boolean[i] = i % 2u;
+        signedValues[i] = unsignedValues[i] = i % 2u;
+    }
+    std::vector<std::uint32_t> expected;
+    for (const auto& ref : {Runtime::GeometryPropertyRef{D::MeshFace, "boolean", K::Bool},
+                          {D::MeshFace, "signed", K::Int32}, {D::MeshFace, "unsigned", K::UInt32}})
+    {
+        config.Features = {ref};
+        const auto result = Runtime::ApplyEditorCurvatureSegmentationCommand(harness.Context,
+            {.StableEntityId = harness.StableEntityId, .Config = config});
+        ASSERT_TRUE(result.Succeeded()) << result.Message;
+        const auto labels = properties.Get<std::uint32_t>(config.Components.Name).Vector();
+        if (expected.empty()) expected = labels;
+        else EXPECT_EQ(labels, expected);
+    }
+}
+
+TEST(CurvatureSegmentationOperations, UnusedVertexFeaturesDoNotBlockReadinessOrExecution)
+{
+    SegmentationHarness harness;
+    auto& properties = harness.Vertices().Properties;
+    const auto unused = properties.Size();
+    properties.Resize(unused + 1);
+    properties.Get<glm::vec3>("v:position")[unused] = {0,0,0};
+    auto values = properties.GetOrAdd<double>("observations");
+    for (std::size_t i = 0; i < unused; ++i) values[i] = i % 2u;
+    values[unused] = std::numeric_limits<double>::infinity();
+    auto config = MakeFixedConfig();
+    config.Features = {{Runtime::GeometryElementDomain::MeshVertex, "observations", Geometry::PropertyValueKind::Double}};
+    const Runtime::EditorCurvatureSegmentationCommand command{.StableEntityId = harness.StableEntityId, .Config = config};
+    EXPECT_TRUE(Runtime::PreviewEditorCurvatureSegmentationCommand(harness.Context, command).Enabled);
+    const auto result = Runtime::ApplyEditorCurvatureSegmentationCommand(harness.Context, command);
+    EXPECT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_EQ(values[unused], std::numeric_limits<double>::infinity());
+    properties.GetOrAdd<bool>("v:deleted")[unused] = true;
+    EXPECT_TRUE(Runtime::PreviewEditorCurvatureSegmentationCommand(harness.Context, command).Enabled);
+    EXPECT_TRUE(Runtime::ApplyEditorCurvatureSegmentationCommand(harness.Context, command).Succeeded());
+}
+
+TEST(CurvatureSegmentationOperations, SkippedFaceFeaturesAreNotNumericalInputs)
+{
+    SegmentationHarness harness;
+    auto& faces = harness.Faces().Properties;
+    const auto skipped = faces.Size();
+    faces.Resize(skipped + 1);
+    faces.Get<std::uint32_t>(GS::PropertyNames::kFaceHalfedge)[skipped] = std::numeric_limits<std::uint32_t>::max();
+    auto values = faces.GetOrAdd<double>("observations");
+    for (std::size_t i = 0; i < skipped; ++i) values[i] = i % 2u;
+    values[skipped] = std::numeric_limits<double>::quiet_NaN();
+    auto config = MakeFixedConfig();
+    config.Features = {{Runtime::GeometryElementDomain::MeshFace, "observations", Geometry::PropertyValueKind::Double}};
+    const Runtime::EditorCurvatureSegmentationCommand command{.StableEntityId = harness.StableEntityId, .Config = config};
+    EXPECT_TRUE(Runtime::PreviewEditorCurvatureSegmentationCommand(harness.Context, command).Enabled);
+    const auto result = Runtime::ApplyEditorCurvatureSegmentationCommand(harness.Context, command);
+    EXPECT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_TRUE(std::isnan(values[skipped]));
 }

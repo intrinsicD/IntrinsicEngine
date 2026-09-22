@@ -145,8 +145,8 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] EditorMeshFieldPreparedFrame
     PrepareEditorMeshFieldFrame(const EditorWorkspaceAttachment&);
 
-    // Admission checks configuration and source metadata. Execution still checks
-    // numerical values, connectivity and publication conflicts.
+    // Admission checks configuration/metadata and cached bound-input verdicts.
+    // Execution recaptures inputs and checks solver/publication constraints.
     [[nodiscard]] ActionReadiness PreviewEditorMeshCurvatureCommand(
         const EditorProcessingCommands&, const EditorMeshCurvatureCommand&);
     [[nodiscard]] ActionReadiness PreviewEditorCurvatureSegmentationCommand(

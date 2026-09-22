@@ -61,6 +61,14 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     [[nodiscard]] bool GeometryPropertiesCurrent(const EditorProcessingContext&, entt::entity,
                                                std::span<const PointPropertyWatch>);
 
+    // Deferred mesh-field validation shares session lifetime and revision guards.
+    [[nodiscard]] bool PrepareMeshFieldInput(
+        const EditorProcessingContext&, entt::entity, const GeometryEntityAvailability&,
+        const GeometryPropertyRef& positions, bool segmentation, std::vector<GeometryPropertyRef> bindings,
+        std::vector<PointPropertyWatch> inputs,
+        std::function<bool(const GeometryEntityAvailability&, std::string&)> validate,
+        std::string& diagnostic);
+
     struct PointDeletionSource
     {
         GeometryElementDomain Domain{};

@@ -1040,7 +1040,11 @@ TEST(SandboxEditorUi, MeshAdmissionKeepsPolygonAndUnusedSlotSemantics)
     EXPECT_TRUE(Runtime::PreviewEditorMeshSubdivideCommand(context, {.StableEntityId = id}).Enabled);
     EXPECT_TRUE(Runtime::PreviewEditorMeshSimplifyCommand(context, {.StableEntityId = id, .TargetFaces = 1u}).Enabled);
     EXPECT_TRUE(Runtime::PreviewEditorMeshCurvatureCommand(context, {.StableEntityId = id}).Enabled);
-    EXPECT_TRUE(Runtime::PreviewEditorCurvatureSegmentationCommand(context, {.StableEntityId = id}).Enabled);
+    const auto segmentation = Runtime::PreviewEditorCurvatureSegmentationCommand(context, {.StableEntityId = id});
+    EXPECT_FALSE(segmentation.Enabled);
+    EXPECT_NE(segmentation.DisabledReason.find("triangle source faces"), std::string::npos);
+    EXPECT_EQ(Runtime::ApplyEditorCurvatureSegmentationCommand(context, {.StableEntityId = id}).Message,
+              segmentation.DisabledReason);
     const Runtime::EditorUvRegenerationCommand uv{.StableEntityId = id, .Resolution = 64u, .Padding = 2u};
     EXPECT_TRUE(Runtime::PreviewEditorUvRegenerationCommand(context, uv).Enabled);
     const auto result = Runtime::ApplyEditorUvRegenerationCommand(context, uv);

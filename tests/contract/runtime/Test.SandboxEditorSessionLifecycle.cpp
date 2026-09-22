@@ -2624,3 +2624,104 @@ TEST_F(EditorPointReadiness, IdleRuntimeFramesAndSelectedModelsReuseTheVerdict)
     FrameProbe->OnFrame = {};
     EXPECT_EQ(frames, 4u);
 }
+
+TEST_F(EditorPointReadiness, BoundMeshFieldsReuseVerdictsAndRevalidateChangedFeatures)
+{
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0,0,0}), b = mesh.AddVertex({1,0,0}), c = mesh.AddVertex({0,1,0});
+    ASSERT_TRUE(mesh.AddTriangle(a,b,c));
+    GS::PopulateFromMesh(Scene->Raw(), Entity, mesh);
+    using D = Runtime::GeometryElementDomain;
+    using K = Geometry::PropertyValueKind;
+    Properties().GetOrAdd<glm::vec3>("alternate").Vector() = Properties().Get<glm::vec3>("v:position").Vector();
+    auto& faces = Scene->Raw().get<GS::Faces>(Entity).Properties;
+    faces.GetOrAdd<std::uint64_t>("signal")[0] = 1u;
+    Runtime::EditorCurvatureSegmentationCommand command{.StableEntityId = Keypoints.StableEntityId};
+    command.Config.Positions = {D::MeshVertex, "alternate", K::Vec3};
+    command.Config.Features = {{D::MeshFace, "signal", K::UInt64}};
+    command.Config.SelectionMode = Runtime::CurvatureSegmentationSelectionMode::FixedCount;
+    command.Config.FixedComponentCount = 1;
+    const auto preview = [&] {
+        return Runtime::PreviewEditorCurvatureSegmentationCommand(
+            Runtime::PrepareEditorMeshFieldFrame(Attachment).Commands, command);
+    };
+    EXPECT_FALSE(preview().Enabled);
+    EXPECT_EQ(Stats().PropertyScans, 0u);
+    Drain();
+    EXPECT_FALSE(preview().Enabled);
+    EXPECT_EQ(Stats().PropertyScans, 1u);
+    Drain();
+    ASSERT_TRUE(preview().Enabled);
+    const auto readyScans = Stats().PropertyScans;
+    for (int frame = 0; frame < 3; ++frame) { PrepareFrame(); EXPECT_TRUE(preview().Enabled); }
+    EXPECT_EQ(Stats().PropertyScans, readyScans);
+    faces.GetOrAdd<float>("unrelated")[0] = NAN;
+    EXPECT_TRUE(preview().Enabled);
+    EXPECT_EQ(Stats().PropertyScans, readyScans);
+    faces.Get<std::uint64_t>("signal")[0] = (std::uint64_t{1} << 53u) + 1u;
+    const auto rejected = Runtime::ApplyEditorCurvatureSegmentationCommand(
+        Runtime::PrepareEditorMeshFieldFrame(Attachment).Commands, command);
+    EXPECT_FALSE(rejected.Succeeded());
+    EXPECT_FALSE(faces.Exists(command.Config.Components.Name));
+    EXPECT_FALSE(preview().Enabled);
+    EXPECT_EQ(Stats().PropertyScans, readyScans);
+    Drain();
+    EXPECT_NE(preview().DisabledReason.find("precision loss"), std::string::npos);
+    faces.Get<std::uint64_t>("signal")[0] = 2u;
+    EXPECT_FALSE(preview().Enabled);
+    Drain();
+    EXPECT_TRUE(preview().Enabled);
+    faces.GetOrAdd<glm::vec2>("paired")[0] = {NAN, 0};
+    command.Config.Features = {{D::MeshFace, "paired", K::Vec2}};
+    EXPECT_FALSE(preview().Enabled);
+    Drain();
+    EXPECT_FALSE(preview().Enabled);
+    command.Config.Features = {{D::MeshFace, "signal", K::UInt64}};
+    EXPECT_TRUE(preview().Enabled);
+    Properties().Get<glm::vec3>("alternate")[0].x = NAN;
+    EXPECT_FALSE(preview().Enabled);
+    Drain();
+    EXPECT_FALSE(preview().Enabled);
+}
+
+TEST_F(EditorPointReadiness, BoundMeshFieldsDiscardSupersededAndDetachedChecks)
+{
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0,0,0}), b = mesh.AddVertex({1,0,0}), c = mesh.AddVertex({0,1,0});
+    ASSERT_TRUE(mesh.AddTriangle(a,b,c));
+    GS::PopulateFromMesh(Scene->Raw(), Entity, mesh);
+    auto& faces = Scene->Raw().get<GS::Faces>(Entity).Properties;
+    faces.GetOrAdd<double>("signal")[0] = 1.;
+    Runtime::EditorCurvatureSegmentationCommand command{.StableEntityId = Keypoints.StableEntityId};
+    command.Config.Features = {{Runtime::GeometryElementDomain::MeshFace, "signal", Geometry::PropertyValueKind::Double}};
+    const auto preview = [&] { return Runtime::PreviewEditorCurvatureSegmentationCommand(
+        Runtime::PrepareEditorMeshFieldFrame(Attachment).Commands, command); };
+    EXPECT_FALSE(preview().Enabled);
+    Drain();
+    EXPECT_FALSE(preview().Enabled);
+    faces.Get<double>("signal")[0] = NAN;
+    EXPECT_FALSE(preview().Enabled);
+    Drain();
+    EXPECT_EQ(Stats().PropertyScans, 2u);
+    EXPECT_FALSE(preview().Enabled);
+    faces.Get<double>("signal")[0] = 1.;
+    EXPECT_FALSE(preview().Enabled);
+    const auto expired = Runtime::PrepareEditorMeshFieldFrame(Attachment);
+    Attachment.Detach();
+    Attachment.Attach(Engine.Worlds(), Engine.Services());
+    PrepareFrame();
+    Drain();
+    EXPECT_EQ(Stats().PropertyScans, 0u);
+    EXPECT_FALSE(Runtime::PreviewEditorCurvatureSegmentationCommand(expired.Commands, command).Enabled);
+    EXPECT_FALSE(preview().Enabled);
+    Drain();
+    EXPECT_FALSE(preview().Enabled);
+    RequiredEngineService<Runtime::JobService>(Engine).AdvanceWorldGeneration(Engine.Worlds().ActiveWorld());
+    Drain();
+    EXPECT_EQ(Stats().PropertyScans, 1u);
+    EXPECT_FALSE(preview().Enabled);
+    Drain();
+    EXPECT_FALSE(preview().Enabled);
+    Drain();
+    EXPECT_TRUE(preview().Enabled);
+}

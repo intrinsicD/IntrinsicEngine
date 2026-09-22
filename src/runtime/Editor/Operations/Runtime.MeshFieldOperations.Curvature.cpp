@@ -61,6 +61,7 @@ import Geometry.Properties;
 
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.hpp"
 #include "Editor/Operations/Runtime.MeshFieldOperations.Properties.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 
 namespace Extrinsic::Runtime::MeshFieldDetail
 {
@@ -942,6 +943,13 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             std::vector<glm::dvec3>& features, std::uint32_t& dimension,
             std::string& diagnostic)
         {
+            for (const auto face : source.Mesh.LiveFaces())
+                for (const auto vertex : source.Mesh.VerticesAroundFace(face))
+                    if (!GeometryProcessingDetail::FinitePosition(source.Mesh.Position(vertex)))
+                    {
+                        diagnostic = "Segmentation requires finite positions on participating face vertices.";
+                        return false;
+                    }
             features.assign(source.Mesh.FacesSize(), glm::dvec3{0.0});
             dimension = 0u;
             for (const auto& ref : config.Features)
@@ -992,7 +1000,10 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                         }
                         else if (!add(source.SourceFaceForMeshFace[face.Index], sample)) return false;
                         for (std::uint32_t c = 0; c < width; ++c)
+                        {
+                            if (!std::isfinite(sample[c])) return false;
                             features[face.Index][dimension + c] = sample[c];
+                        }
                     }
                     return true;
                 };
@@ -2108,6 +2119,58 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             return entity;
         }
 
+    [[nodiscard]] bool PrepareBoundMeshFields(
+        const EditorProcessingContext& context, entt::entity entity,
+        const GeometryPropertyRef& positions, const CurvatureSegmentationConfig* segmentation,
+        std::string& diagnostic)
+    {
+        using namespace GeometryProcessingDetail;
+        using D = GeometryElementDomain;
+        const auto availability = BuildGeometryAvailability(context.Scene->Raw(), entity);
+        if (!PrepareMeshSoupFaceRings(context, entity, availability, diagnostic, positions))
+        {
+            diagnostic = std::string{segmentation ? "Curvature segmentation: " : "Mesh curvature: "} + diagnostic;
+            return false;
+        }
+        std::vector<PointPropertyWatch> inputs;
+        const auto watch = [&](D domain, std::string_view name) {
+            inputs.push_back(ObserveGeometryProperty(availability, domain, std::string{name}));
+        };
+        watch(D::MeshVertex, positions.Name);
+        watch(D::MeshVertex, "v:deleted");
+        watch(D::MeshHalfedge, GS::PropertyNames::kHalfedgeToVertex);
+        watch(D::MeshHalfedge, GS::PropertyNames::kHalfedgeNext);
+        watch(D::MeshHalfedge, GS::PropertyNames::kHalfedgeFace);
+        watch(D::MeshFace, GS::PropertyNames::kFaceHalfedge);
+        std::vector<GeometryPropertyRef> bindings;
+        if (segmentation)
+        {
+            bindings = segmentation->Features;
+            watch(D::MeshEdge, GS::PropertyNames::kEdgeV0);
+            watch(D::MeshEdge, GS::PropertyNames::kEdgeV1);
+            watch(D::MeshEdge, "e:deleted");
+            for (const auto& ref : bindings) watch(ref.Domain, ref.Name);
+        }
+        const auto validate = [positions, config = segmentation
+            ? std::optional<CurvatureSegmentationConfig>{*segmentation} : std::nullopt](
+                const GeometryEntityAvailability& current, std::string& why) {
+            if (!config)
+            {
+                auto source = BuildHalfedgeMeshForProcessing(current.SourceView, "Mesh curvature", positions.Name);
+                why = std::move(source.Diagnostic);
+                return source.Succeeded();
+            }
+            auto source = BuildHalfedgeMeshForCurvatureSegmentation(current.SourceView, positions.Name);
+            if (!source.Succeeded()) { why = std::move(source.Diagnostic); return false; }
+            if (config->Features.empty()) return true;
+            std::vector<glm::dvec3> features;
+            std::uint32_t dimension{};
+            return CaptureSegmentationFaceFeatures(current.SourceView, *config, source, features, dimension, why);
+        };
+        return PrepareMeshFieldInput(context, entity, availability, positions, segmentation != nullptr, std::move(bindings),
+                                     std::move(inputs), validate, diagnostic);
+    }
+
 } // namespace Extrinsic::Runtime::MeshFieldDetail
 
 namespace Extrinsic::Runtime
@@ -2120,7 +2183,9 @@ namespace Extrinsic::Runtime
         EditorMeshCurvatureResult result{};
         const auto entity = ResolveMeshFieldCommandTarget(
             EditorProcessingCommandsAccess::Resolve(commands), command, result);
-        return {entity.has_value(), std::move(result.Message)};
+        const bool ready = entity && PrepareBoundMeshFields(
+            EditorProcessingCommandsAccess::Resolve(commands), *entity, command.Positions, nullptr, result.Message);
+        return {ready, std::move(result.Message)};
     }
 
     ActionReadiness PreviewEditorCurvatureSegmentationCommand(
@@ -2129,7 +2194,9 @@ namespace Extrinsic::Runtime
         EditorCurvatureSegmentationResult result{};
         const auto entity = ResolveMeshFieldCommandTarget(
             EditorProcessingCommandsAccess::Resolve(commands), command, result);
-        return {entity.has_value(), std::move(result.Message)};
+        const bool ready = entity && PrepareBoundMeshFields(
+            EditorProcessingCommandsAccess::Resolve(commands), *entity, command.Config.Positions, &command.Config, result.Message);
+        return {ready, std::move(result.Message)};
     }
 
     EditorMeshCurvatureResult

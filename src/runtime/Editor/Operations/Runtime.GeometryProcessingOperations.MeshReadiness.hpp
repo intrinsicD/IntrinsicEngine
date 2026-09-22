@@ -27,6 +27,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
 
     [[nodiscard]] bool PrepareMeshSoupFaceRings(
         const EditorProcessingContext&, entt::entity,
-        const GeometryEntityAvailability&, std::string& diagnostic);
+        const GeometryEntityAvailability&, std::string& diagnostic,
+        GeometryPropertyRef positions = {GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3});
 }
 }
