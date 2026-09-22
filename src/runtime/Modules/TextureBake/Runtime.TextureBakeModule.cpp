@@ -132,8 +132,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] bool IsScalar(
             const Geometry::PropertyValueKind kind) noexcept
         {
-            return kind == Geometry::PropertyValueKind::Float ||
-                   kind == Geometry::PropertyValueKind::Double;
+            return GeometryPropertyComponentCount(kind) == 1u;
         }
 
         [[nodiscard]] PropertyTextureBakeStatus StatusForResolution(
@@ -233,6 +232,7 @@ namespace Extrinsic::Runtime
             const Geometry::ConstPropertySet& properties,
             const std::string& name,
             const Geometry::PropertyValueKind kind,
+            const bool labels,
             std::vector<glm::vec4>& values)
         {
             values.clear();
@@ -243,40 +243,39 @@ namespace Extrinsic::Runtime
                     values.push_back(convert(value));
             };
 
+            const auto scalar = [&]<class T>() {
+                const auto property = properties.Get<T>(name);
+                if (!property) return false;
+                for (const T value : property.Vector())
+                {
+                    const long double precise = value;
+                    if (!std::isfinite(precise)) return false;
+                    float converted{};
+                    if (labels)
+                    {
+                        if (precise < 0 || precise > std::numeric_limits<std::uint32_t>::max() ||
+                            std::trunc(precise) != precise) return false;
+                        converted = std::bit_cast<float>(static_cast<std::uint32_t>(precise));
+                    }
+                    else
+                    {
+                        converted = static_cast<float>(value);
+                        if (!std::isfinite(converted)) return false;
+                        if constexpr (std::is_integral_v<T>)
+                            if (static_cast<long double>(converted) != precise) return false;
+                    }
+                    values.emplace_back(converted, 0.f, 0.f, 1.f);
+                }
+                return true;
+            };
             switch (kind)
             {
-            case Geometry::PropertyValueKind::Float:
-                if (const auto property = properties.Get<float>(name))
-                {
-                    append(property.Vector(), [](const float value)
-                    {
-                        return glm::vec4{value, 0.0f, 0.0f, 1.0f};
-                    });
-                    return true;
-                }
-                break;
-            case Geometry::PropertyValueKind::Double:
-                if (const auto property = properties.Get<double>(name))
-                {
-                    append(property.Vector(), [](const double value)
-                    {
-                        return glm::vec4{
-                            static_cast<float>(value), 0.0f, 0.0f, 1.0f};
-                    });
-                    return true;
-                }
-                break;
-            case Geometry::PropertyValueKind::UInt32:
-                if (const auto property = properties.Get<std::uint32_t>(name))
-                {
-                    append(property.Vector(), [](const std::uint32_t value)
-                    {
-                        return glm::vec4{
-                            std::bit_cast<float>(value), 0.0f, 0.0f, 1.0f};
-                    });
-                    return true;
-                }
-                break;
+            case Geometry::PropertyValueKind::Bool: return scalar.template operator()<bool>();
+            case Geometry::PropertyValueKind::Int32: return scalar.template operator()<std::int32_t>();
+            case Geometry::PropertyValueKind::UInt32: return scalar.template operator()<std::uint32_t>();
+            case Geometry::PropertyValueKind::UInt64: return scalar.template operator()<std::uint64_t>();
+            case Geometry::PropertyValueKind::Float: return scalar.template operator()<float>();
+            case Geometry::PropertyValueKind::Double: return scalar.template operator()<double>();
             case Geometry::PropertyValueKind::Vec2:
                 if (const auto property = properties.Get<glm::vec2>(name))
                 {
@@ -308,9 +307,6 @@ namespace Extrinsic::Runtime
                 }
                 break;
             case Geometry::PropertyValueKind::Unknown:
-            case Geometry::PropertyValueKind::Bool:
-            case Geometry::PropertyValueKind::Int32:
-            case Geometry::PropertyValueKind::UInt64:
                 break;
             }
             return false;
@@ -342,7 +338,7 @@ namespace Extrinsic::Runtime
         if (representation.Storage == PropertyTextureBakeStorage::Auto)
         {
             representation.Storage =
-                valueKind == Geometry::PropertyValueKind::UInt32
+                (valueKind == Geometry::PropertyValueKind::UInt32 || requestedEncoding == PropertyTextureBakeEncoding::LabelPalette)
                 ? PropertyTextureBakeStorage::EncodedRgba
                 : PropertyTextureBakeStorage::RawFloat;
         }
@@ -351,6 +347,9 @@ namespace Extrinsic::Runtime
 
         switch (valueKind)
         {
+        case Geometry::PropertyValueKind::Bool:
+        case Geometry::PropertyValueKind::Int32:
+        case Geometry::PropertyValueKind::UInt64:
         case Geometry::PropertyValueKind::Float:
         case Geometry::PropertyValueKind::Double:
             representation.Encoding =
@@ -373,9 +372,6 @@ namespace Extrinsic::Runtime
                 PropertyTextureBakeEncoding::RgbaColor;
             break;
         case Geometry::PropertyValueKind::Unknown:
-        case Geometry::PropertyValueKind::Bool:
-        case Geometry::PropertyValueKind::Int32:
-        case Geometry::PropertyValueKind::UInt64:
             break;
         }
         return representation;
@@ -392,58 +388,28 @@ namespace Extrinsic::Runtime
             return false;
         }
 
-        if (storage == PropertyTextureBakeStorage::RawFloat)
-        {
-            switch (valueKind)
-            {
-            case Geometry::PropertyValueKind::Float:
-            case Geometry::PropertyValueKind::Double:
-                return encoding ==
-                    PropertyTextureBakeEncoding::LinearScalar;
-            case Geometry::PropertyValueKind::Vec2:
-                return encoding == PropertyTextureBakeEncoding::Vector2;
-            case Geometry::PropertyValueKind::Vec3:
-                return encoding == PropertyTextureBakeEncoding::Vector3;
-            case Geometry::PropertyValueKind::Vec4:
-                return encoding == PropertyTextureBakeEncoding::RgbaColor;
-            case Geometry::PropertyValueKind::UInt32:
-            case Geometry::PropertyValueKind::Unknown:
-            case Geometry::PropertyValueKind::Bool:
-            case Geometry::PropertyValueKind::Int32:
-            case Geometry::PropertyValueKind::UInt64:
-                return false;
-            }
-        }
-
-        if (storage != PropertyTextureBakeStorage::EncodedRgba)
+        if (GeometryPropertyComponentCount(valueKind) == 1u)
+            return storage == PropertyTextureBakeStorage::RawFloat
+                ? encoding == PropertyTextureBakeEncoding::LinearScalar
+                : storage == PropertyTextureBakeStorage::EncodedRgba &&
+                  (encoding == PropertyTextureBakeEncoding::LinearScalar ||
+                   encoding == PropertyTextureBakeEncoding::ScalarColormap ||
+                   encoding == PropertyTextureBakeEncoding::LabelPalette);
+        if (storage != PropertyTextureBakeStorage::RawFloat && storage != PropertyTextureBakeStorage::EncodedRgba)
             return false;
         switch (valueKind)
         {
-        case Geometry::PropertyValueKind::Float:
-        case Geometry::PropertyValueKind::Double:
-            return encoding ==
-                       PropertyTextureBakeEncoding::LinearScalar ||
-                   encoding ==
-                       PropertyTextureBakeEncoding::ScalarColormap;
-        case Geometry::PropertyValueKind::UInt32:
-            return encoding ==
-                PropertyTextureBakeEncoding::LabelPalette;
         case Geometry::PropertyValueKind::Vec2:
             return encoding == PropertyTextureBakeEncoding::Vector2 ||
-                   encoding == PropertyTextureBakeEncoding::RgbaColor;
+                   (storage == PropertyTextureBakeStorage::EncodedRgba && encoding == PropertyTextureBakeEncoding::RgbaColor);
         case Geometry::PropertyValueKind::Vec3:
             return encoding == PropertyTextureBakeEncoding::Vector3 ||
-                   encoding == PropertyTextureBakeEncoding::RgbaColor ||
-                   encoding == PropertyTextureBakeEncoding::Normal;
+                   (storage == PropertyTextureBakeStorage::EncodedRgba &&
+                    (encoding == PropertyTextureBakeEncoding::RgbaColor || encoding == PropertyTextureBakeEncoding::Normal));
         case Geometry::PropertyValueKind::Vec4:
             return encoding == PropertyTextureBakeEncoding::RgbaColor;
-        case Geometry::PropertyValueKind::Unknown:
-        case Geometry::PropertyValueKind::Bool:
-        case Geometry::PropertyValueKind::Int32:
-        case Geometry::PropertyValueKind::UInt64:
-            return false;
+        default: return false;
         }
-        return false;
     }
 
     const char* DebugNameForPropertyTextureBakeStatus(
@@ -1026,11 +992,12 @@ namespace Extrinsic::Runtime
                     Geometry::ConstPropertySet{*propertySet},
                     request.Source.Name,
                     prepared.ValueKind,
+                    ResolvePropertyTextureBakeRepresentation(prepared.ValueKind, request.Storage, request.Encoding).Encoding == PropertyTextureBakeEncoding::LabelPalette,
                     prepared.Values))
             {
                 return PrepareFailure(
-                    PropertyTextureBakeStatus::MissingProperty,
-                    "texture bake source property is missing or has changed type");
+                    PropertyTextureBakeStatus::NonFinitePropertyValue,
+                    "texture bake source values are nonfinite or cannot be represented by the selected scalar or label encoding");
             }
             if (prepared.Values.size() != prepared.ExpectedElementCount)
             {
@@ -1038,7 +1005,7 @@ namespace Extrinsic::Runtime
                     PropertyTextureBakeStatus::MismatchedPropertyCount,
                     "texture bake source property count changed during preparation");
             }
-            if (prepared.ValueKind != Geometry::PropertyValueKind::UInt32 &&
+            if (ResolvePropertyTextureBakeRepresentation(prepared.ValueKind, request.Storage, request.Encoding).Encoding != PropertyTextureBakeEncoding::LabelPalette &&
                 !std::ranges::all_of(
                     prepared.Values,
                     [](const glm::vec4 value) noexcept
@@ -1296,14 +1263,14 @@ namespace Extrinsic::Runtime
 
             switch (prepared.ValueKind)
             {
+            case Geometry::PropertyValueKind::Bool:
+            case Geometry::PropertyValueKind::Int32:
+            case Geometry::PropertyValueKind::UInt64:
+            case Geometry::PropertyValueKind::UInt32:
             case Geometry::PropertyValueKind::Float:
             case Geometry::PropertyValueKind::Double:
                 prepared.GpuValueKind =
                     Graphics::PropertyTextureBakeValueKind::Scalar;
-                break;
-            case Geometry::PropertyValueKind::UInt32:
-                prepared.GpuValueKind =
-                    Graphics::PropertyTextureBakeValueKind::Label;
                 break;
             case Geometry::PropertyValueKind::Vec2:
                 prepared.GpuValueKind =
@@ -1318,9 +1285,6 @@ namespace Extrinsic::Runtime
                     Graphics::PropertyTextureBakeValueKind::Vector4;
                 break;
             case Geometry::PropertyValueKind::Unknown:
-            case Geometry::PropertyValueKind::Bool:
-            case Geometry::PropertyValueKind::Int32:
-            case Geometry::PropertyValueKind::UInt64:
                 return PrepareFailure(
                     PropertyTextureBakeStatus::UnsupportedPropertyType,
                     "texture bake property type is not GPU-rasterizable");
@@ -1333,6 +1297,8 @@ namespace Extrinsic::Runtime
                     request.Encoding);
             prepared.Storage = representation.Storage;
             prepared.Encoder = representation.Encoding;
+            if (prepared.Encoder == PropertyTextureBakeEncoding::LabelPalette)
+                prepared.GpuValueKind = Graphics::PropertyTextureBakeValueKind::Label;
             prepared.EncodingColormap = request.EncodingColormap;
             if (!IsPropertyTextureBakeRepresentationCompatible(
                     prepared.ValueKind,
@@ -1357,6 +1323,9 @@ namespace Extrinsic::Runtime
                     Graphics::PropertyTextureBakeEncoding::Raw;
                 switch (prepared.ValueKind)
                 {
+                case Geometry::PropertyValueKind::Bool:
+                case Geometry::PropertyValueKind::Int32:
+                case Geometry::PropertyValueKind::UInt64:
                 case Geometry::PropertyValueKind::Float:
                 case Geometry::PropertyValueKind::Double:
                 case Geometry::PropertyValueKind::UInt32:
@@ -1370,9 +1339,6 @@ namespace Extrinsic::Runtime
                     prepared.Format = RHI::Format::RGBA32_FLOAT;
                     break;
                 case Geometry::PropertyValueKind::Unknown:
-                case Geometry::PropertyValueKind::Bool:
-                case Geometry::PropertyValueKind::Int32:
-                case Geometry::PropertyValueKind::UInt64:
                     break;
                 }
             }
@@ -1410,7 +1376,7 @@ namespace Extrinsic::Runtime
 
             prepared.RangeMin = request.RangeMin;
             prepared.RangeMax = request.RangeMax;
-            if (IsScalar(prepared.ValueKind))
+            if (IsScalar(prepared.ValueKind) && prepared.Encoder != PropertyTextureBakeEncoding::LabelPalette)
             {
                 if (request.RangePolicy ==
                     PropertyTextureBakeRangePolicy::AutoFinite)

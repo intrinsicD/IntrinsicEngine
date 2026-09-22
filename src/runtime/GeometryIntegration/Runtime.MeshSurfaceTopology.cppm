@@ -25,7 +25,7 @@ export namespace Extrinsic::Runtime
     {
         Success,
         WrongDomain,
-        MissingPositions,
+        MissingVertexSource,
         MissingHalfedgeTopology,
         MissingFaceTopology,
         EmptyMesh,

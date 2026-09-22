@@ -358,6 +358,7 @@ TEST(SandboxDomainPanels, SharedScalarControlsPreserveStylingAndEditAuthority)
             EXPECT_EQ(config.Color, model.Color);
             EXPECT_EQ(config.ScalarFieldName, model.ScalarFieldName);
             EXPECT_EQ(config.ColorBufferName, model.ColorBufferName);
+            EXPECT_EQ(config.Interpretation, model.Interpretation);
             EXPECT_EQ(config.ScalarDomain, model.ScalarDomain);
             EXPECT_FLOAT_EQ(config.Scalar.RangeMin, model.ScalarRangeMin);
             EXPECT_FLOAT_EQ(config.Scalar.RangeMax, model.ScalarRangeMax);

@@ -32,9 +32,6 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
     [[nodiscard]] bool IsInternalVisualizationProperty(
         const std::string& name) noexcept;
 
-    [[nodiscard]] bool IsConnectivityVisualizationProperty(
-        const std::string& name) noexcept;
-
     [[nodiscard]] GeometryElementDomain ToGeometryElementDomain(
         const EditorVisualizationPropertyDomain domain) noexcept;
 

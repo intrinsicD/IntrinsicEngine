@@ -2770,8 +2770,8 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::EndCombo();
         }
         ImGui::SeparatorText("Output properties");
-        changed |= DrawProcessingPropertyName("Distance property", config.DistanceProperty.Name);
-        changed |= DrawProcessingPropertyName("Source mask property", config.SourceMaskProperty.Name);
+        changed |= DrawProcessingScalarOutput("Distance property", config.DistanceProperty);
+        changed |= DrawProcessingScalarOutput("Source mask property", config.SourceMaskProperty);
         if (ImGui::InputScalar("Expansion budget", ImGuiDataType_U32,
                                &config.MaxHalfedgeExpansions))
             changed = true;

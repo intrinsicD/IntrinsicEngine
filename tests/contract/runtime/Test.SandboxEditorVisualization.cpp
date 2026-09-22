@@ -2199,3 +2199,44 @@ TEST(SandboxEditorUi, AppearanceSelectsBooleanMasksAndUvProperties)
              .Preset=Runtime::EditorVisualizationPropertyPreset::ColorBuffer, .PropertyName=name}),
             Runtime::EditorCommandStatus::Applied) << name;
 }
+
+TEST(SandboxEditorUi, NormalInterpretationRejectsInvalidBindingsBeforeMutation)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const auto mesh = MakeSelectable(registry, "ExplicitInterpretation");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    auto context = MakeContext(registry, selection);
+    context.VisualizationCommandsAvailable = true;
+    auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
+    properties.GetOrAdd<glm::vec3>("directions", glm::vec3{0, 0, 1});
+    properties.GetOrAdd<glm::vec4>("rgba", glm::vec4{1});
+    Runtime::EditorVisualizationConfigCommand command{
+        .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
+        .Target = Runtime::EditorVisualizationTarget::Surface,
+        .Source = G::VisualizationConfig::ColorSource::PerVertexBuffer,
+        .ColorBufferName = "directions",
+        .Interpretation = G::VisualizationConfig::ColorInterpretation::NormalDirection,
+    };
+    ASSERT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(context, command), Runtime::EditorCommandStatus::Applied);
+    for (const auto source : {G::VisualizationConfig::ColorSource::ScalarField, G::VisualizationConfig::ColorSource::UniformColor})
+    {
+        auto invalid = command;
+        invalid.Source = source;
+        EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(context, invalid), Runtime::EditorCommandStatus::InvalidVisualizationProperty);
+    }
+    for (const auto* name : {"rgba", "absent"})
+    {
+        auto invalid = command;
+        invalid.ColorBufferName = name;
+        invalid.UseBakedTexture = true;
+        EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(context, invalid), Runtime::EditorCommandStatus::InvalidVisualizationProperty);
+    }
+    const auto& stored = registry.Raw().get<G::VisualizationLaneOverrides>(mesh).Surface;
+    ASSERT_TRUE(stored);
+    EXPECT_EQ(stored->ColorBufferName, "directions");
+    EXPECT_EQ(stored->Interpretation, G::VisualizationConfig::ColorInterpretation::NormalDirection);
+    EXPECT_FALSE(stored->UseBakedTexture);
+    EXPECT_FALSE(registry.Raw().all_of<Runtime::PropertyTextureBakeOutputs>(mesh));
+}

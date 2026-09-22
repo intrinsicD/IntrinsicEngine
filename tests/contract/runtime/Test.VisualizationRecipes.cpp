@@ -945,3 +945,45 @@ TEST(VisualizationRecipes, ColorInterpretationIsExplicitAndIndependentOfProperty
         {R::GeometryElementDomain::MeshVertex, "rgba", Geometry::PropertyValueKind::Vec4};
     EXPECT_FALSE(R::EncodeVisualizationRecipe(source.Availability, normal).Succeeded());
 }
+
+TEST(VisualizationRecipes, NumericScalarTwinsShareScalarIsolineAndLabelEncoding)
+{
+    RecipeSourceFixture source;
+    auto& props = source.Vertices.Properties;
+    props.Add<bool>("booleans", false).Vector() = {false, true, false, true};
+    props.Add<std::int32_t>("signed", 0).Vector() = {0, 1, 0, 1};
+    props.Add<std::uint32_t>("unsigned", 0).Vector() = {0, 1, 0, 1};
+    props.Add<std::uint64_t>("wide", 0).Vector() = {0, 1, 0, 1};
+    props.Add<float>("floating", 0).Vector() = {0, 1, 0, 1};
+    props.Add<double>("precise", 0).Vector() = {0, 1, 0, 1};
+    std::vector<std::vector<std::byte>> scalarBaseline, labelBaseline, isolineBaseline;
+    for (const auto* name : {"booleans", "signed", "unsigned", "wide", "floating", "precise"})
+    {
+        R::GeometryPropertyRef ref{R::GeometryElementDomain::MeshVertex, name,
+            R::DetectGeometryPropertyValueKind(props, name)};
+        const auto scalar = R::EncodeVisualizationRecipe(source.Availability,
+            {.Data=R::ScalarVisualizationRecipe{.Source=ref}});
+        const auto label = R::EncodeVisualizationRecipe(source.Availability,
+            {.Data=R::LabelVisualizationRecipe{.Source=ref}});
+        const auto isoline = R::EncodeVisualizationRecipe(source.Availability,
+            {.Data=R::IsolineVisualizationRecipe{.Source=ref, .IsoValueCount=3}});
+        ASSERT_TRUE(scalar.Succeeded()) << name;
+        ASSERT_TRUE(label.Succeeded()) << name;
+        ASSERT_TRUE(isoline.Succeeded()) << name;
+        if (scalarBaseline.empty())
+        {
+            scalarBaseline = scalar.Batch.PropertyBufferPayloads;
+            labelBaseline = label.Batch.PropertyBufferPayloads;
+            isolineBaseline = isoline.Batch.PropertyBufferPayloads;
+        }
+        EXPECT_EQ(scalar.Batch.PropertyBufferPayloads, scalarBaseline);
+        EXPECT_EQ(label.Batch.PropertyBufferPayloads, labelBaseline);
+        EXPECT_EQ(isoline.Batch.PropertyBufferPayloads, isolineBaseline);
+    }
+    props.Get<std::uint64_t>("wide").Vector()[0] = (1ull << 40) + 1;
+    const R::GeometryPropertyRef wide{R::GeometryElementDomain::MeshVertex, "wide", Geometry::PropertyValueKind::UInt64};
+    EXPECT_FALSE(R::EncodeVisualizationRecipe(source.Availability,
+        {.Data=R::ScalarVisualizationRecipe{.Source=wide}}).Succeeded());
+    EXPECT_FALSE(R::EncodeVisualizationRecipe(source.Availability,
+        {.Data=R::LabelVisualizationRecipe{.Source=wide}}).Succeeded());
+}

@@ -135,9 +135,12 @@ void main()
     }
     if (push.Encoding == EncodingNormal)
     {
-        const float lengthSquared = dot(value.xyz, value.xyz);
-        const vec3 normal = lengthSquared > 1.0e-12
-            ? value.xyz * inversesqrt(lengthSquared)
+        // Normalize finite directions without overflowing the squared length.
+        const float scale = max(abs(value.x), max(abs(value.y), abs(value.z)));
+        const vec3 scaled = value.xyz / max(scale, 1.0e-20);
+        const float scaledLength = length(scaled);
+        const vec3 normal = scaledLength > 0.0 && scale > 1.0e-6 / scaledLength
+            ? scaled / scaledLength
             : vec3(0.0, 0.0, 1.0);
         outValue = vec4(normal * 0.5 + 0.5, 1.0);
         return;

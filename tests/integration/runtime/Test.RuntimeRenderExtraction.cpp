@@ -2389,12 +2389,28 @@ TEST(RuntimeRenderExtraction, PolygonFacePropertiesRepeatAcrossTheirTriangles)
                 {
                     glm::vec4 value;
                     std::memcpy(&value, write->Data.data() + i * sizeof(value), sizeof(value));
-                    EXPECT_EQ(value, i < triangleCount - 1 ? glm::vec4(.5f, .5f, 1, 1)
-                                                          : glm::vec4(0, .5f, .5f, 1));
+                    if (vis.Interpretation == V::ColorInterpretation::NormalDirection)
+                        EXPECT_EQ(value, i < triangleCount - 1 ? glm::vec4(.5f, .5f, 1, 1)
+                                                              : glm::vec4(0, .5f, .5f, 1));
+                    else
+                        EXPECT_EQ(value, i < triangleCount - 1 ? glm::vec4(0, 0, 1, 1)
+                                                              : glm::vec4(-1, 0, 0, 1));
                 }
             }
         };
         verify(3);
+        if (!scalar)
+        {
+            // The same source revision must acquire a different encoded residency.
+            vis.Interpretation = V::ColorInterpretation::Components;
+            fixture.Extraction.SetVisualizationRecipe(StableId(entity), {
+                .Data = Runtime::ColorVisualizationRecipe{
+                    .Source = {Runtime::GeometryElementDomain::MeshFace, "f:normal", Geometry::PropertyValueKind::Vec3},
+                    .Interpretation = V::ColorInterpretation::NormalDirection}});
+            verify(3);
+            vis.Interpretation = V::ColorInterpretation::NormalDirection;
+            verify(3);
+        }
         EXPECT_EQ(faces.Size(), 2u);
         // Remove a corner from the first polygon without changing the property contents.
         auto &halves = raw.get<GS::Halfedges>(entity).Properties;

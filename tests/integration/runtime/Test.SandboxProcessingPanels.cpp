@@ -478,6 +478,7 @@ TEST(SandboxProcessingPanels, FaceOutputsDisplayWithTheirCanonicalDomain)
                     {
                         EXPECT_EQ(surface.Source, G::VisualizationConfig::ColorSource::PerFaceBuffer);
                         EXPECT_EQ(surface.ColorBufferName, "f:normal");
+                        EXPECT_EQ(surface.Interpretation, decltype(surface.Interpretation)::NormalDirection);
                         EXPECT_TRUE(faces.Exists("f:normal"));
                     }
                     else

@@ -1884,9 +1884,13 @@ namespace Extrinsic::Runtime
                                   std::is_same_v<T, LabelVisualizationRecipe>)
                     {
                         if (value.BufferSourceKey.empty())
-                            value.BufferSourceKey = BuildVisualizationPropertySourceKey(
-                                stableId, std::is_same_v<T, ScalarVisualizationRecipe> ? "scalar" : "color",
-                                value.Source.Name);
+                        {
+                            std::string_view lane = std::is_same_v<T, ScalarVisualizationRecipe> ? "scalar" : "color";
+                            if constexpr (std::is_same_v<T, ColorVisualizationRecipe>)
+                                if (value.Interpretation == Graphics::Components::VisualizationConfig::ColorInterpretation::NormalDirection)
+                                    lane = "color.normal";
+                            value.BufferSourceKey = BuildVisualizationPropertySourceKey(stableId, lane, value.Source.Name);
+                        }
                     }
                 }, recipe.Data);
                 AppendVisualizationRecipe(

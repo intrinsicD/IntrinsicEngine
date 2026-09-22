@@ -78,7 +78,7 @@ namespace Extrinsic::Runtime
         {
             if (doc.contains(key))
             {
-                if (ConfigDetail::ValidatePointPropertyRef(doc[key], ref->ValueKind) !=
+                if (ConfigDetail::ValidatePointPropertyRef(doc[key], ref->ValueKind, ref != &config.PositionProperty) !=
                         ConfigDetail::PointPropertyValidation::Valid ||
                     doc[key]["domain"] != ToString(GeometryElementDomain::MeshVertex))
                     return reject(std::string{key} + " requires a typed mesh vertex property reference.");

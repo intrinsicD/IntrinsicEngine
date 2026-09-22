@@ -92,22 +92,26 @@ namespace Extrinsic::Runtime
                             "Geodesics source vertex is deleted or out of range.");
         auto view = GS::BuildMutableView(raw, *entity);
         auto& properties = view.VertexSource->Properties;
-        const std::string distanceName = command.Config.DistanceProperty.Name;
-        const std::string sourceName = command.Config.SourceMaskProperty.Name;
+        const auto distanceRef = command.Config.DistanceProperty;
+        const auto sourceRef = command.Config.SourceMaskProperty;
         struct State
         {
-            bool HadDistance{false}, HadSource{false};
-            std::vector<double> Distance;
-            std::vector<bool> Source;
-            bool operator==(const State&) const = default;
+            GeometryScalarPropertySnapshot Distance, Source;
+            bool operator==(const State& other) const
+            {
+                return SameGeometryScalarPropertySnapshot(Distance, other.Distance) &&
+                       SameGeometryScalarPropertySnapshot(Source, other.Source);
+            }
         };
-        auto capture = [distanceName, sourceName](Geometry::PropertySet& props, State& state) {
-            std::string diagnostic;
-            return CaptureCurvatureProperty<double>(props, distanceName, props.Size(),
-                                                    state.HadDistance, state.Distance,
-                                                    diagnostic) &&
-                   CaptureCurvatureProperty<bool>(props, sourceName, props.Size(), state.HadSource,
-                                                  state.Source, diagnostic);
+        auto capture = [distanceRef, sourceRef](Geometry::PropertySet& props, State& state) {
+            state.Distance = CaptureGeometryScalarProperty(props, distanceRef);
+            state.Source = CaptureGeometryScalarProperty(props, sourceRef);
+            const auto valid = [&](const GeometryPropertyRef& ref, const GeometryScalarPropertySnapshot& snapshot) {
+                return !props.Exists(ref.Name) ||
+                    (snapshot.Exists && GeometryScalarPropertySize(snapshot) == props.Size());
+            };
+            if (!valid(distanceRef, state.Distance) || !valid(sourceRef, state.Source)) return false;
+            return true;
         };
         State before;
         if (!capture(properties, before))
@@ -125,10 +129,19 @@ namespace Extrinsic::Runtime
                 result.Diagnostics.Distances[v] = std::numeric_limits<double>::infinity();
                 --result.Diagnostics.UnreachableVertexCount;
             }
-        State after{true, true, result.Diagnostics.Distances,
-                    std::vector<bool>(source.Mesh.VerticesSize(), false)};
-        for (auto v : sources)
-            after.Source[v] = true;
+        State after = before;
+        std::vector<std::uint32_t> slots;
+        std::vector<std::uint32_t> sourceMask(source.Mesh.VerticesSize(), 0u);
+        for (std::size_t v = 0; v < source.DeletedVertices.size(); ++v)
+            if (!source.DeletedVertices[v]) slots.push_back(static_cast<std::uint32_t>(v));
+        for (auto v : sources) sourceMask[v] = 1u;
+        if (!PrepareGeometryScalarProperty(after.Distance, distanceRef.ValueKind,
+                properties.Size(), slots, std::span<const double>{result.Diagnostics.Distances},
+                GeometryScalarNonfinitePolicy::AllowInfinity) ||
+            !PrepareGeometryScalarProperty(after.Source, sourceRef.ValueKind,
+                properties.Size(), slots, std::span<const std::uint32_t>{sourceMask}))
+            return fail(EditorCommandStatus::InvalidProcessingParameters,
+                        "Geodesics outputs cannot be represented exactly in the selected storage.");
         if (before == after)
         {
             result.Status = EditorCommandStatus::NoChange;
@@ -145,7 +158,7 @@ namespace Extrinsic::Runtime
             std::make_shared<const std::vector<bool>>(std::move(source.DeletedVertices));
         const auto mutate = [scene = context.Scene, entity = *entity, signature, positions,
                              deletedVertices,
-                             distanceName, sourceName,
+                             distanceRef, sourceRef,
                              positionProperty = command.Config.PositionProperty.Name, capture,
                              invalidate = context.InvalidateWorkspaceSnapshotCache](
                                 const State& expected, const State& target) {
@@ -168,11 +181,11 @@ namespace Extrinsic::Runtime
                 currentPositions.Vector() != *positions ||
                 !capture(props, current) || current != expected)
                 return EditorCommandHistoryStatus::StaleEntity;
-            if (!ApplyCurvatureProperty<double>(props, distanceName, target.HadDistance,
-                                                target.Distance, 0.0) ||
-                !ApplyCurvatureProperty<bool>(props, sourceName, target.HadSource, target.Source,
-                                              false))
+            if (!CanApplyGeometryScalarProperty(props, distanceRef, target.Distance) ||
+                !CanApplyGeometryScalarProperty(props, sourceRef, target.Source))
                 return EditorCommandHistoryStatus::CommandFailed;
+            (void)ApplyGeometryScalarProperty(props, distanceRef, target.Distance);
+            (void)ApplyGeometryScalarProperty(props, sourceRef, target.Source);
             if (invalidate)
                 invalidate();
             return EditorCommandHistoryStatus::Applied;

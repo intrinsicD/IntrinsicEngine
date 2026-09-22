@@ -153,7 +153,7 @@ namespace Extrinsic::Runtime
             if (BuildSourceAvailability(view).ProvenanceDomain != Domain::Mesh)
                 return fail(MeshSurfaceTopologyStatus::WrongDomain);
             if (view.VertexSource == nullptr)
-                return fail(MeshSurfaceTopologyStatus::MissingPositions);
+                return fail(MeshSurfaceTopologyStatus::MissingVertexSource);
             // Connectivity indexes vertex slots, independent of whichever
             // position-valued property a caller binds for geometric work.
             const std::uint32_t vertexCount =
@@ -338,8 +338,8 @@ namespace Extrinsic::Runtime
             return "MeshTopology.Success";
         case MeshSurfaceTopologyStatus::WrongDomain:
             return "MeshTopology.WrongDomain";
-        case MeshSurfaceTopologyStatus::MissingPositions:
-            return "MeshTopology.MissingPositions";
+        case MeshSurfaceTopologyStatus::MissingVertexSource:
+            return "MeshTopology.MissingVertexSource";
         case MeshSurfaceTopologyStatus::MissingHalfedgeTopology:
             return "MeshTopology.MissingHalfedgeTopology";
         case MeshSurfaceTopologyStatus::MissingFaceTopology:

@@ -1,6 +1,7 @@
 // Config, source binding, publication, and undo coverage for mesh geodesics.
 #include <array>
 #include <cmath>
+#include <limits>
 #include <string>
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
@@ -352,4 +353,62 @@ TEST(GeodesicsOperations, UnreachableVertexDoesNotHideReachableDistanceField)
     EXPECT_EQ(encoded.Batch.Scalars.front().ElementCount, 5u);
     EXPECT_FLOAT_EQ(encoded.Batch.Scalars.front().RangeMin, 0.0f);
     EXPECT_NEAR(encoded.Batch.Scalars.front().RangeMax, std::sqrt(2.0), 1e-6);
+}
+
+TEST(GeodesicsOperations, ScalarStorageSelectionRoundTripsAndPublishesAtomically)
+{
+    using K = Geometry::PropertyValueKind;
+    for (const auto kind : {K::Bool, K::Int32, K::UInt32, K::UInt64, K::Float, K::Double})
+    {
+        Harness h;
+        h.Command.Config.SourceVertices = {0, 1, 2, 3};
+        h.Command.Config.DistanceProperty.ValueKind = kind;
+        h.Command.Config.SourceMaskProperty.ValueKind = kind;
+        Config::EngineConfig config;
+        Runtime::SetGeodesicsConfig(config, h.Command.Config);
+        const auto decoded = Runtime::GetGeodesicsConfig(config);
+        ASSERT_TRUE(decoded);
+        EXPECT_EQ(decoded->DistanceProperty.ValueKind, kind);
+        EXPECT_EQ(decoded->SourceMaskProperty.ValueKind, kind);
+        const auto result = Runtime::ApplyEditorGeodesicsCommand(h.Commands(), h.Command);
+        ASSERT_TRUE(result.Succeeded()) << result.Message;
+        EXPECT_EQ(Runtime::DetectGeometryPropertyValueKind(h.Properties(), h.Command.Config.DistanceProperty.Name), kind);
+        EXPECT_EQ(Runtime::DetectGeometryPropertyValueKind(h.Properties(), h.Command.Config.SourceMaskProperty.Name), kind);
+        ASSERT_TRUE(h.History.Undo().Succeeded());
+        EXPECT_FALSE(h.Properties().Exists(h.Command.Config.DistanceProperty.Name));
+        EXPECT_FALSE(h.Properties().Exists(h.Command.Config.SourceMaskProperty.Name));
+        ASSERT_TRUE(h.History.Redo().Succeeded());
+    }
+    Harness h;
+    h.Command.Config.DistanceProperty.ValueKind = K::UInt32;
+    h.Command.Config.SourceMaskProperty.ValueKind = K::Float;
+    h.Properties().GetOrAdd<float>(h.Command.Config.SourceMaskProperty.Name).Vector().assign(4, 7.f);
+    const auto result = Runtime::ApplyEditorGeodesicsCommand(h.Commands(), h.Command);
+    EXPECT_FALSE(result.Succeeded());
+    EXPECT_FALSE(h.Properties().Exists(h.Command.Config.DistanceProperty.Name));
+    EXPECT_EQ(h.Properties().Get<float>(h.Command.Config.SourceMaskProperty.Name).Vector(), std::vector<float>(4, 7.f));
+    EXPECT_EQ(h.History.UndoCount(), 0u);
+}
+
+TEST(GeodesicsOperations, FloatingOutputsPreserveUnreachableInfinityAndDeletedStorage)
+{
+    Harness h(true);
+    h.Command.Config.SourceVertices = {0, 1, 2, 3};
+    h.Command.Config.DistanceProperty.ValueKind = Geometry::PropertyValueKind::Float;
+    auto result = Runtime::ApplyEditorGeodesicsCommand(h.Commands(), h.Command);
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_TRUE(std::isinf(h.Properties().Get<float>(h.Command.Config.DistanceProperty.Name).Vector()[4]));
+    ASSERT_TRUE(h.History.Undo().Succeeded());
+    auto mask = h.Properties().GetOrAdd<bool>("v:deleted", false);
+    mask.Vector()[4] = true;
+    auto distance = h.Properties().GetOrAdd<float>(h.Command.Config.DistanceProperty.Name);
+    distance.Vector().assign(5, 9.f);
+    distance.Vector()[4] = std::numeric_limits<float>::quiet_NaN();
+    result = Runtime::ApplyEditorGeodesicsCommand(h.Commands(), h.Command);
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_TRUE(std::isnan(distance.Vector()[4]));
+    ASSERT_TRUE(h.History.Undo().Succeeded());
+    EXPECT_EQ(distance.Vector()[0], 9.f);
+    EXPECT_TRUE(std::isnan(distance.Vector()[4]));
+    ASSERT_TRUE(h.History.Redo().Succeeded());
 }

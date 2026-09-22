@@ -271,8 +271,7 @@ namespace
     [[nodiscard]] bool IsScalarVisualizationKind(
         const Geometry::PropertyValueKind kind) noexcept
     {
-        return kind == Geometry::PropertyValueKind::Float ||
-               kind == Geometry::PropertyValueKind::Double;
+        return GeometryPropertyComponentCount(kind) == 1u;
     }
 
     [[nodiscard]] bool DomainSupportsVisualizationConfig(
@@ -877,27 +876,6 @@ ScopedEditorStatTimer::~ScopedEditorStatTimer()
                name == "p:position";
     }
 
-    [[nodiscard]] bool IsConnectivityVisualizationProperty(
-        const std::string& name) noexcept
-    {
-        return name == GS::PropertyNames::kPosition ||
-               name == GS::PropertyNames::kVertexConnectivity ||
-               name == GS::PropertyNames::kEdgeV0 ||
-               name == GS::PropertyNames::kEdgeV1 ||
-               name == GS::PropertyNames::kHalfedgeToVertex ||
-               name == GS::PropertyNames::kHalfedgeNext ||
-               name == GS::PropertyNames::kHalfedgeFace ||
-               name == GS::PropertyNames::kHalfedgeConnectivity ||
-               name == GS::PropertyNames::kFaceHalfedge ||
-               name == "v:point" ||
-               name == "v:tex" ||
-               name == "v:texcoord" ||
-               // Same reserved property, on the domain that can
-               // carry a seam.
-               name == "h:texcoord" ||
-               name == "p:position";
-    }
-
     [[nodiscard]] GeometryElementDomain ToGeometryElementDomain(
         const EditorVisualizationPropertyDomain domain) noexcept
     {
@@ -965,30 +943,24 @@ ScopedEditorStatTimer::~ScopedEditorStatTimer()
 
         for (const std::string& name : properties.Properties())
         {
-            // Kinds outside the visualization-capable set (Bool, Int32,
-            // UInt64, Vec2) fall through every predicate below and are
-            // skipped, exactly as the retired editor-local enum did by
-            // returning nullopt for them.
             const Geometry::PropertyValueKind kind =
                 DetectGeometryPropertyValueKind(properties, name);
             if (kind == Geometry::PropertyValueKind::Unknown)
                 continue;
 
-            const bool internal = IsInternalVisualizationProperty(name);
             const bool connectivity =
-                IsConnectivityVisualizationProperty(name);
+                IsTopologyProperty(ToGeometryElementDomain(domain), name);
             const bool scalar =
-                !internal && IsScalarVisualizationKind(kind);
+                !connectivity && IsScalarVisualizationKind(kind);
             const bool color =
-                !internal &&
+                !connectivity &&
                 (kind == Geometry::PropertyValueKind::Vec2 ||
                  kind == Geometry::PropertyValueKind::Vec3 ||
                  kind == Geometry::PropertyValueKind::Vec4);
             const bool vector =
                 !connectivity && kind == Geometry::PropertyValueKind::Vec3;
             const bool integer =
-                !internal && !connectivity &&
-                (kind == Geometry::PropertyValueKind::UInt32 || kind == Geometry::PropertyValueKind::Bool);
+                !connectivity && IsScalarVisualizationKind(kind);
             if (!scalar && !color && !vector && !integer)
             {
                 continue;
@@ -1055,6 +1027,9 @@ ScopedEditorStatTimer::~ScopedEditorStatTimer()
     {
         switch (kind)
         {
+        case Geometry::PropertyValueKind::Bool:
+        case Geometry::PropertyValueKind::Int32:
+        case Geometry::PropertyValueKind::UInt64:
         case Geometry::PropertyValueKind::Float:
         case Geometry::PropertyValueKind::Double:
         case Geometry::PropertyValueKind::UInt32:
@@ -1063,9 +1038,6 @@ ScopedEditorStatTimer::~ScopedEditorStatTimer()
         case Geometry::PropertyValueKind::Vec4:
             return true;
         case Geometry::PropertyValueKind::Unknown:
-        case Geometry::PropertyValueKind::Bool:
-        case Geometry::PropertyValueKind::Int32:
-        case Geometry::PropertyValueKind::UInt64:
             break;
         }
         return false;

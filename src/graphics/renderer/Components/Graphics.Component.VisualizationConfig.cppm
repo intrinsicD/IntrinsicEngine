@@ -70,7 +70,7 @@ export namespace Extrinsic::Graphics::Components
         enum class ColorInterpretation : std::uint8_t
         {
             Components,
-            NormalDirection,
+            NormalDirection, // Vec3 direction normalized and mapped from [-1, 1] to RGB [0, 1].
         };
 
         ColorSource Source = ColorSource::Material;

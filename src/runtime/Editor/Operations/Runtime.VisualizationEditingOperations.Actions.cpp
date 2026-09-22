@@ -1096,15 +1096,6 @@ namespace {
                    domain == EditorPropertyCatalogDomain::MeshFaces;
         }
 
-        [[nodiscard]] bool IsNonBakeableMeshAttribute(
-            const std::string& name) noexcept
-        {
-            return name == GS::PropertyNames::kPosition ||
-                   name == "v:point" ||
-                   name == "v:texcoord" ||
-                   name == "v:tex";
-        }
-
         [[nodiscard]] EditorTextureBakeSourceRow BuildTextureBakeSourceRow(
             const EditorPropertyCatalogRow& row)
         {
@@ -1125,16 +1116,10 @@ namespace {
                     "texture baking supports mesh vertex, edge, and face properties";
                 return out;
             }
-            if (row.Connectivity || IsNonBakeableMeshAttribute(row.Name))
+            if (row.Connectivity)
             {
-                out.Category = row.Connectivity
-                    ? EditorTextureBakeSourceCategory::Connectivity
-                    : EditorTextureBakeSourceCategory::Internal;
-                out.DisabledReason =
-                    row.Connectivity
-                        ? "connectivity properties are visible but not texture-bake sources"
-                        : "internal mesh coordinate properties are visible but not bake "
-                          "sources";
+                out.Category = EditorTextureBakeSourceCategory::Connectivity;
+                out.DisabledReason = "connectivity properties are visible but not texture-bake sources";
                 return out;
             }
             if (!row.Supported ||
@@ -2118,8 +2103,7 @@ ApplyEditorRenderHintCommand(
             return false;
         }
         const bool raw = storage == PropertyTextureBakeStorage::RawFloat;
-        const bool scalar = valueKind == Geometry::PropertyValueKind::Float ||
-                            valueKind == Geometry::PropertyValueKind::Double;
+        const bool scalar = GeometryPropertyComponentCount(valueKind) == 1u;
         switch (target.Semantic)
         {
         case GeometryPresentationSlotSemantic::Normal:
@@ -2137,19 +2121,15 @@ ApplyEditorRenderHintCommand(
                      encoding == PropertyTextureBakeEncoding::LinearScalar ||
                      encoding ==
                          PropertyTextureBakeEncoding::ScalarColormap)) ||
-                   (valueKind == Geometry::PropertyValueKind::UInt32 && !raw &&
+                   (scalar && !raw &&
                     encoding == PropertyTextureBakeEncoding::LabelPalette);
         case GeometryPresentationSlotSemantic::Albedo:
             if (scalar)
             {
                 return raw ||
                        encoding == PropertyTextureBakeEncoding::LinearScalar ||
-                       encoding == PropertyTextureBakeEncoding::ScalarColormap;
-            }
-            if (valueKind == Geometry::PropertyValueKind::UInt32)
-            {
-                return !raw &&
-                       encoding == PropertyTextureBakeEncoding::LabelPalette;
+                       encoding == PropertyTextureBakeEncoding::ScalarColormap ||
+                       (!raw && encoding == PropertyTextureBakeEncoding::LabelPalette);
             }
             if (valueKind == Geometry::PropertyValueKind::Vec2)
             {
@@ -2260,8 +2240,7 @@ ResolveEditorTextureBakeTargetRepresentation(
                 encoding = PropertyTextureBakeEncoding::Normal;
             }
             else if (hasLinearPbrTarget &&
-                     (valueKind == Geometry::PropertyValueKind::Float ||
-                      valueKind == Geometry::PropertyValueKind::Double))
+                     (GeometryPropertyComponentCount(valueKind) == 1u))
             {
                 encoding = PropertyTextureBakeEncoding::LinearScalar;
             }

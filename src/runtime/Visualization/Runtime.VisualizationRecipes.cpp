@@ -165,6 +165,8 @@ namespace Extrinsic::Runtime
             if (!IsFinite(converted))
                 return false;
 
+            if constexpr (std::is_integral_v<T>)
+                if (static_cast<long double>(converted) != static_cast<long double>(value)) return false;
             out = converted;
             return true;
         }
@@ -316,12 +318,11 @@ namespace Extrinsic::Runtime
         // and payloads, but derive the range from finite samples; shaders use a
         // no-data color. NaNs and finite values outside float range still fail.
         template <typename T>
-        bool AppendScalarPacket(const Geometry::ConstProperty<T>& property,
+        bool AppendScalarPacket(const std::span<const T> values,
                                 VisualizationEncodingBatch& out,
                                 const VisualizationEncodingOptions& options,
                                 VisualizationEncodingDiagnostics& stats)
         {
-            const std::span<const T> values = property.Span();
             if (values.empty())
             {
                 ++stats.EmptySourceCount;
@@ -470,7 +471,7 @@ namespace Extrinsic::Runtime
               const bool normals = options.Interpretation == Graphics::Components::VisualizationConfig::ColorInterpretation::NormalDirection;
               for (const auto value : values) {
                 if (normals) {
-                  // Match the normal bake encoder without applying an entity transform.
+                  // Map object-space directions; double accumulation avoids overflow for finite float vectors.
                   const glm::dvec3 precise{value};
                   const double lengthSquared = glm::dot(precise, precise);
                   const glm::vec3 normal = lengthSquared > 1.0e-12
@@ -520,12 +521,11 @@ namespace Extrinsic::Runtime
         }
 
         template <typename T>
-        bool AppendIsolinePacket(const Geometry::ConstProperty<T>& property,
+        bool AppendIsolinePacket(const std::span<const T> values,
                                  VisualizationEncodingBatch& out,
                                  const VisualizationEncodingOptions& options,
                                  VisualizationEncodingDiagnostics& stats)
         {
-            const std::span<const T> values = property.Span();
             if (!ValidateFiniteScalarSource(values, stats))
                 return false;
 
@@ -662,16 +662,37 @@ namespace Extrinsic::Runtime
             if (const auto property = properties.Get<float>(options.SourceName);
                 property.IsValid())
             {
-                (void)AppendScalarPacket(property, out, options, diagnostics);
+                (void)AppendScalarPacket(property.Span(), out, options, diagnostics);
                 return;
             }
             if (const auto property = properties.Get<double>(options.SourceName);
                 property.IsValid())
             {
-                (void)AppendScalarPacket(property, out, options, diagnostics);
+                (void)AppendScalarPacket(property.Span(), out, options, diagnostics);
                 return;
             }
 
+            if (const auto property = properties.Get<std::int32_t>(options.SourceName); property.IsValid())
+            {
+                (void)AppendScalarPacket(property.Span(), out, options, diagnostics);
+                return;
+            }
+            if (const auto property = properties.Get<std::uint32_t>(options.SourceName); property.IsValid())
+            {
+                (void)AppendScalarPacket(property.Span(), out, options, diagnostics);
+                return;
+            }
+            if (const auto property = properties.Get<std::uint64_t>(options.SourceName); property.IsValid())
+            {
+                (void)AppendScalarPacket(property.Span(), out, options, diagnostics);
+                return;
+            }
+            if (const auto property = properties.Get<bool>(options.SourceName); property.IsValid())
+            {
+                const std::vector<std::uint32_t> values(property.Vector().begin(), property.Vector().end());
+                (void)AppendScalarPacket(std::span<const std::uint32_t>{values}, out, options, diagnostics);
+                return;
+            }
             if (properties.Exists(options.SourceName))
                 ++diagnostics.UnsupportedSourceTypeCount;
             else
@@ -733,6 +754,30 @@ namespace Extrinsic::Runtime
                 return;
             }
 
+            const auto appendLabels = [&](const auto& property) {
+                std::vector<std::uint32_t> labels;
+                labels.reserve(property.Vector().size());
+                for (const auto value : property.Vector())
+                {
+                    const long double number = value;
+                    if (!std::isfinite(number) || number < 0 ||
+                        number > std::numeric_limits<std::uint32_t>::max() || std::trunc(number) != number)
+                    {
+                        ++diagnostics.NonFiniteValueCount;
+                        return;
+                    }
+                    labels.push_back(static_cast<std::uint32_t>(number));
+                }
+                (void)AppendColorPacket(std::span<const std::uint32_t>{labels}, out, options, diagnostics);
+            };
+            if (const auto property = properties.Get<std::int32_t>(options.SourceName); property.IsValid())
+            { appendLabels(property); return; }
+            if (const auto property = properties.Get<std::uint64_t>(options.SourceName); property.IsValid())
+            { appendLabels(property); return; }
+            if (const auto property = properties.Get<float>(options.SourceName); property.IsValid())
+            { appendLabels(property); return; }
+            if (const auto property = properties.Get<double>(options.SourceName); property.IsValid())
+            { appendLabels(property); return; }
             if (properties.Exists(options.SourceName))
                 ++diagnostics.UnsupportedSourceTypeCount;
             else
@@ -758,6 +803,30 @@ namespace Extrinsic::Runtime
                 return;
             }
 
+            const auto appendLabels = [&](const auto& property) {
+                std::vector<std::uint32_t> labels;
+                labels.reserve(property.Vector().size());
+                for (const auto value : property.Vector())
+                {
+                    const long double number = value;
+                    if (!std::isfinite(number) || number < 0 ||
+                        number > std::numeric_limits<std::uint32_t>::max() || std::trunc(number) != number)
+                    {
+                        ++diagnostics.NonFiniteValueCount;
+                        return;
+                    }
+                    labels.push_back(static_cast<std::uint32_t>(number));
+                }
+                (void)AppendColorPacket(std::span<const std::uint32_t>{labels}, out, options, diagnostics);
+            };
+            if (const auto property = properties.Get<std::int32_t>(options.SourceName); property.IsValid())
+            { appendLabels(property); return; }
+            if (const auto property = properties.Get<std::uint64_t>(options.SourceName); property.IsValid())
+            { appendLabels(property); return; }
+            if (const auto property = properties.Get<float>(options.SourceName); property.IsValid())
+            { appendLabels(property); return; }
+            if (const auto property = properties.Get<double>(options.SourceName); property.IsValid())
+            { appendLabels(property); return; }
             if (properties.Exists(options.SourceName))
                 ++diagnostics.UnsupportedSourceTypeCount;
             else
@@ -779,16 +848,37 @@ namespace Extrinsic::Runtime
             if (const auto property = properties.Get<float>(options.SourceName);
                 property.IsValid())
             {
-                (void)AppendIsolinePacket(property, out, options, diagnostics);
+                (void)AppendIsolinePacket(property.Span(), out, options, diagnostics);
                 return;
             }
             if (const auto property = properties.Get<double>(options.SourceName);
                 property.IsValid())
             {
-                (void)AppendIsolinePacket(property, out, options, diagnostics);
+                (void)AppendIsolinePacket(property.Span(), out, options, diagnostics);
                 return;
             }
 
+            if (const auto property = properties.Get<std::int32_t>(options.SourceName); property.IsValid())
+            {
+                (void)AppendIsolinePacket(property.Span(), out, options, diagnostics);
+                return;
+            }
+            if (const auto property = properties.Get<std::uint32_t>(options.SourceName); property.IsValid())
+            {
+                (void)AppendIsolinePacket(property.Span(), out, options, diagnostics);
+                return;
+            }
+            if (const auto property = properties.Get<std::uint64_t>(options.SourceName); property.IsValid())
+            {
+                (void)AppendIsolinePacket(property.Span(), out, options, diagnostics);
+                return;
+            }
+            if (const auto property = properties.Get<bool>(options.SourceName); property.IsValid())
+            {
+                const std::vector<std::uint32_t> values(property.Vector().begin(), property.Vector().end());
+                (void)AppendIsolinePacket(std::span<const std::uint32_t>{values}, out, options, diagnostics);
+                return;
+            }
             if (properties.Exists(options.SourceName))
                 ++diagnostics.UnsupportedSourceTypeCount;
             else

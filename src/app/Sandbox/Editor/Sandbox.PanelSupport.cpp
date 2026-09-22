@@ -267,9 +267,6 @@ namespace Extrinsic::Sandbox::Editor
                 .Interpretation = normalDirection
                     ? decltype(Runtime::ColorVisualizationRecipe{}.Interpretation)::NormalDirection
                     : decltype(Runtime::ColorVisualizationRecipe{}.Interpretation)::Components};
-        else if (property.ValueKind == Kind::Bool || property.ValueKind == Kind::UInt32 ||
-                 property.ValueKind == Kind::Int32)
-            recipe.Data = Runtime::LabelVisualizationRecipe{.Source=property, .OutputName=property.Name+".colors"};
         else
             recipe.Data = Runtime::ScalarVisualizationRecipe{.Source=property, .OutputName=property.Name+".colors"};
         return Runtime::ApplyEditorVisualizationRecipeCommand(context.VisualizationCommands,
@@ -1274,10 +1271,7 @@ namespace Extrinsic::Sandbox::Editor
                 const bool rawScalar =
                     record.Storage ==
                         PropertyTextureBakeStorage::RawFloat &&
-                    (record.Source.ValueKind ==
-                         Geometry::PropertyValueKind::Float ||
-                     record.Source.ValueKind ==
-                         Geometry::PropertyValueKind::Double);
+                    Runtime::GeometryPropertyComponentCount(record.Source.ValueKind) == 1u;
                 if (rawScalar)
                 {
                     int recordColormap = 0;

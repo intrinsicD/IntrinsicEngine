@@ -130,7 +130,7 @@ namespace Extrinsic::Runtime
             {
             case MeshSurfaceTopologyStatus::WrongDomain:
                 return Failure(MeshPackStatus::WrongDomain, outBuffer);
-            case MeshSurfaceTopologyStatus::MissingPositions:
+            case MeshSurfaceTopologyStatus::MissingVertexSource:
                 return Failure(MeshPackStatus::MissingPositions, outBuffer);
             case MeshSurfaceTopologyStatus::MissingHalfedgeTopology:
                 return Failure(

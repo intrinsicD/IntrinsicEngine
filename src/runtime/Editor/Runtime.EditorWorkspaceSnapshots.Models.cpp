@@ -292,31 +292,6 @@ namespace {
             EditorDiagnosticCode code,
             std::string message);
 
-        [[nodiscard]] std::uint8_t ComponentCountForPropertyCatalogKind(
-            const Geometry::PropertyValueKind kind) noexcept
-        {
-            using Kind = Geometry::PropertyValueKind;
-            switch (kind)
-            {
-            case Kind::Float:
-            case Kind::Double:
-            case Kind::UInt32:
-                return 1u;
-            case Kind::Vec2:
-                return 2u;
-            case Kind::Vec3:
-                return 3u;
-            case Kind::Vec4:
-                return 4u;
-            case Kind::Unknown:
-            case Kind::Bool:
-            case Kind::Int32:
-            case Kind::UInt64:
-                break;
-            }
-            return 0u;
-        }
-
         [[nodiscard]] bool IsGeneratedCatalogProperty(
             const std::string& name) noexcept
         {
@@ -363,6 +338,18 @@ namespace {
             using Kind = Geometry::PropertyValueKind;
             switch (kind)
             {
+            case Kind::Bool:
+                if (const auto prop = properties.Get<bool>(name); prop)
+                    preview.Text = prop.Vector()[*index] ? "true" : "false";
+                break;
+            case Kind::Int32:
+                if (const auto prop = properties.Get<std::int32_t>(name); prop)
+                    preview.Text = std::to_string(prop.Vector()[*index]);
+                break;
+            case Kind::UInt64:
+                if (const auto prop = properties.Get<std::uint64_t>(name); prop)
+                    preview.Text = std::to_string(prop.Vector()[*index]);
+                break;
             case Kind::Float:
                 if (const auto prop = properties.Get<float>(name); prop)
                     preview.Text = std::to_string(prop.Vector()[*index]);
@@ -388,9 +375,6 @@ namespace {
                     preview.Text = FormatVec4(prop.Vector()[*index]);
                 break;
             case Kind::Unknown:
-            case Kind::Bool:
-            case Kind::Int32:
-            case Kind::UInt64:
                 preview.HasValue = false;
                 break;
             }
@@ -469,12 +453,12 @@ namespace {
                     .Domain = domain,
                     .ValueKind = kind,
                     .ElementCount = properties.Size(),
-                    .ComponentCount = ComponentCountForPropertyCatalogKind(kind),
+                    .ComponentCount = static_cast<std::uint8_t>(GeometryPropertyComponentCount(kind)),
                     .Supported = supported,
                     .Bindable = supported,
                     .Canonical = IsInternalVisualizationProperty(name),
                     .Internal = IsInternalVisualizationProperty(name),
-                    .Connectivity = IsConnectivityVisualizationProperty(name),
+                    .Connectivity = IsTopologyProperty(ToGeometryElementDomain(domain), name),
                     .Generated = IsGeneratedCatalogProperty(name),
                     .Descriptor = GeometryPropertyRef{
                         .Domain = ToGeometryElementDomain(domain),

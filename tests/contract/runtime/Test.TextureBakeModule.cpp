@@ -160,3 +160,21 @@ TEST(RuntimeTextureBakeModule, ServiceFailsClosedWithoutGpuComposition)
         result.Status,
         Runtime::PropertyTextureBakeStatus::NonOperationalBackend);
 }
+
+TEST(RuntimeTextureBakeModule, ScalarStorageKindsShareExplicitRepresentations)
+{
+    using K = Geometry::PropertyValueKind;
+    using S = Runtime::PropertyTextureBakeStorage;
+    using E = Runtime::PropertyTextureBakeEncoding;
+    const Runtime::EditorTextureBakeTarget albedo{
+        .PresentationKey = "mesh.surface",
+        .Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo};
+    for (const auto kind : {K::Bool, K::Int32, K::UInt32, K::UInt64, K::Float, K::Double})
+    {
+        EXPECT_TRUE(Runtime::IsPropertyTextureBakeRepresentationCompatible(kind, S::RawFloat, E::LinearScalar));
+        EXPECT_TRUE(Runtime::IsPropertyTextureBakeRepresentationCompatible(kind, S::EncodedRgba, E::ScalarColormap));
+        EXPECT_TRUE(Runtime::IsPropertyTextureBakeRepresentationCompatible(kind, S::EncodedRgba, E::LabelPalette));
+        EXPECT_TRUE(Runtime::IsEditorTextureBakeTargetCompatible(albedo, kind, S::EncodedRgba, E::LabelPalette));
+        EXPECT_FALSE(Runtime::IsPropertyTextureBakeRepresentationCompatible(kind, S::EncodedRgba, E::Normal));
+    }
+}
