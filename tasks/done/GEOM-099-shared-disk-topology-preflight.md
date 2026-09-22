@@ -204,7 +204,7 @@ At this stage, retirement was pending the required full UBSan gate: the unchange
 `SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob` compares
 queued/running phase strings across two independent job snapshots. The failure
 reproduces on the original implementation as well as the reviewed source.
-[BUG-206](../backlog/bugs/BUG-206-uv-duplicate-submit-phase-race.md) owns that independent
+[BUG-206](BUG-206-uv-duplicate-submit-phase-race.md) owns that independent
 blocker; no assertion, selector or lifecycle code was weakened. Continue the
 remaining independent requested tasks without expanding this implementation.
 

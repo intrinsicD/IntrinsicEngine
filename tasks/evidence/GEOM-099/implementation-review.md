@@ -42,7 +42,7 @@ ASan gate (3,230 entries, zero failures). Fresh UBSan build succeeded, but its
 full gate failed the unchanged UV duplicate-submit diagnostic phase comparison.
 Repeated execution passed three times and failed on the fourth with the same
 queued/running mismatch for job 0:1; no sanitizer diagnostic occurred. This is
-tracked as [BUG-206](../../backlog/bugs/BUG-206-uv-duplicate-submit-phase-race.md).
+tracked as [BUG-206](../../done/BUG-206-uv-duplicate-submit-phase-race.md).
 No unrelated lifecycle or assertion change is included in GEOM-099.
 
 The original topology implementation reproduced BUG-206 on its first UBSan

@@ -7,6 +7,16 @@ relative to `tasks/done/`, which sits at the same depth as `tasks/active/`,
 so blocks moved from the old active-README history work verbatim.
 
 
+## 2026-09-22 — BUG-206 duplicate UV observation race retired
+
+Retired [BUG-206](BUG-206-uv-duplicate-submit-phase-race.md) at the
+CPUContracted test endpoint. Commit `1a578a1aa` checks stable duplicate-job
+identity across valid pre-drain worker phases, retaining all admission and
+single-delivery assertions. Each ci/ASan/UBSan focused test passed 100 repetitions;
+full CPU and both sanitizer selectors pass. Independently reviewed; no production
+lifecycle change or deferred work. Enclosing retirement commit records closure.
+
+
 ## 2026-09-22 — BUG-207 loaded UBSan timeout retired
 
 Retired [BUG-207](BUG-207-loaded-ubsan-curvature-timeout.md) at the

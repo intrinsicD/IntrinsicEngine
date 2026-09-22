@@ -1,0 +1,212 @@
+Source: 1a578a1aa
+Command: ctest --test-dir build/ci-ubsan -R SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob --repeat until-fail:100 --output-on-failure
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-ubsan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-ubsan
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.04 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+    Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+    Start 1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+1/1 Test #1316: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ...   Passed    0.05 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+contract    =   0.05 sec*proc (1 test)
+runtime     =   0.05 sec*proc (1 test)
+
+Total Test time (real) =   4.91 sec

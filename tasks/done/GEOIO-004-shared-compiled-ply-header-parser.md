@@ -31,7 +31,7 @@ lines, +76 total. No replacement implementation is part of this retirement.
 
 The candidate passed 224 GeometryIO cases before/after, the expanded 319-case
 selection and all 3,237 ASan entries. Full ci and UBSan each failed only the
-baseline-reproduced [BUG-206](../backlog/bugs/BUG-206-uv-duplicate-submit-phase-race.md).
+baseline-reproduced [BUG-206](BUG-206-uv-duplicate-submit-phase-race.md).
 That independent gate defect remains owned by BUG-206 and is not represented
 as fixed by this rejected experiment. The task is retired as **rejected**, not
 implemented; no new geometry capability or maturity claim is made.

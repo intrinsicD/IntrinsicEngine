@@ -208,7 +208,7 @@ cost is reported separately. These local measurements make no speedup claim.
 Focused ci cases (226), fresh Clang 20 cases (101), full ci (4,879 selected)
 and full ASan (3,230 selected) pass. The expected GLFW skip applies to ci;
 the GLFW lifetime check passes under ASan, where all selected tests run. The initial full UBSan run failed only the independently baseline-reproduced
-[BUG-206](../backlog/bugs/BUG-206-uv-duplicate-submit-phase-race.md). No unrelated
+[BUG-206](BUG-206-uv-duplicate-submit-phase-race.md). No unrelated
 lifecycle or assertion change is included.
 
 - [x] Required full UBSan gate passes on the final combined source, with every

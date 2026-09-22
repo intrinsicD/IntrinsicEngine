@@ -54,7 +54,7 @@ ASan; all 3,230 ASan entries ran. Fresh
 Clang 20 compiled the support producer and runtime executable, with 101 selected
 contract cases passing and unchanged dependency fingerprints. The 226 focused
 ci cases passed before and after extraction. Full UBSan failed only the
-independently baseline-reproduced [BUG-206](../../backlog/bugs/BUG-206-uv-duplicate-submit-phase-race.md).
+independently baseline-reproduced [BUG-206](../../done/BUG-206-uv-duplicate-submit-phase-race.md).
 This repository-gate limitation remains explicit; the implementation review
 and compile comparison do not imply that the task has retired.
 

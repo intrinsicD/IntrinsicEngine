@@ -18,4 +18,4 @@ Claude Sonnet 5, medium, read-only bounded source review.
 After this review, the original topology implementation reproduced the same
 queued/running mismatch on the first UBSan repetition. See
 [baseline output](baseline-ubsan-repeat.log) and the source identities in the
-[bug note](../../backlog/bugs/BUG-206-uv-duplicate-submit-phase-race.md).
+[bug note](../../done/BUG-206-uv-duplicate-submit-phase-race.md).

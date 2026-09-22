@@ -46,7 +46,7 @@ They explain unchecked assumptions that the enum/reference types do not encode.
 Full ci selected 4,879 tests with zero failures and the expected GLFW lifetime
 skip; full ASan selected 3,230 with zero failures. The full UBSan run selected
 3,230 and failed only the previously reproduced
-[BUG-206](../../backlog/bugs/BUG-206-uv-duplicate-submit-phase-race.md).
+[BUG-206](../../done/BUG-206-uv-duplicate-submit-phase-race.md).
 No sanitizer diagnostic was reported: the queued/running message comparison
 raced while retaining the same active job identity. The task remains subject
 to the unresolved repository gate; no unrelated lifecycle change is included.

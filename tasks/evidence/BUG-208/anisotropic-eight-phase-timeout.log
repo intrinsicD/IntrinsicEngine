@@ -1,0 +1,38 @@
+Source fixture: 1aa094436 (unchanged in RUNTIME-270 before correction)
+GPU: RTX3050 driver590.48.01 display Disabled, P8 graphics210MHz memory405MHz observed near failure.
+Command: ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 120
+89/95 Test #4139: PointCloudConsolidationGpuParity.VulkanLbvhAnisotropicWlopAcrossDomainsAndFailures ..........................***Failed  304.01 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = PointCloudConsolidationGpuParity.VulkanLbvhAnisotropicWlopAcrossDomainsAndFailures
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from PointCloudConsolidationGpuParity
+[ RUN      ] PointCloudConsolidationGpuParity.VulkanLbvhAnisotropicWlopAcrossDomainsAndFailures
+[32m[INFO] Initialized Scheduler with 15 worker threads.[0m
+[33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+[33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+[33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+[31m[ERR]  [JobService] Job 'Consolidation Vulkan neighborhoods' completion publisher rejected result type 'std::string_view Extrinsic::Runtime::JobResultTypeNameOf() [TResult = bool]'; completion dropped.[0m
+[31m[ERR]  [JobService] Job 'Consolidation Vulkan neighborhoods' completion publisher rejected result type 'std::string_view Extrinsic::Runtime::JobResultTypeNameOf() [TResult = bool]'; completion dropped.[0m
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp:1031: Failure
+Value of: observed->TimedOut
+  Actual: true
+Expected: false
+phase=7 results=0/1 submitted=true mutated=false phaseElapsedMs=34997.913562000002 phaseDurationsMs={ 68652.906904000003, 68000.984182, 7000.0598950000003, 4000.555292, 3996.2554399999999, 45000.584176999997, 69002.540322000001 }
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp:1037: Failure
+Value of: observed->Done
+  Actual: false
+Expected: true
+
+[  FAILED  ] PointCloudConsolidationGpuParity.VulkanLbvhAnisotropicWlopAcrossDomainsAndFailures (303973 ms)
+[----------] 1 test from PointCloudConsolidationGpuParity (303973 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (303973 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] PointCloudConsolidationGpuParity.VulkanLbvhAnisotropicWlopAcrossDomainsAndFailures
+
+ 1 FAILED TEST
+

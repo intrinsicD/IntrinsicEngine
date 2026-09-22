@@ -68,7 +68,7 @@ failed, reviewed and final candidate commits, requiring existing history at
 The original and extracted loaders each pass all 224 GeometryIO cases; the
 expanded locality selection passes 319. Full ASan passes all 3,237 selected
 entries. Full ci (4,886 selected) and UBSan (3,237 selected) fail only on the
-independently baseline-reproduced [BUG-206](../../backlog/bugs/BUG-206-uv-duplicate-submit-phase-race.md),
+independently baseline-reproduced [BUG-206](../../done/BUG-206-uv-duplicate-submit-phase-race.md),
 with the expected GLFW lifetime skip in those two runs. That check passes under
 ASan. Neither failing run reports a sanitizer diagnostic. No unrelated fix or
 weakened assertion is included. The independent review and compile measurements

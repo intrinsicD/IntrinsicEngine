@@ -45,7 +45,7 @@ The full ci run selects 4,886 entries and fails only BUG-206; the full ASan run
 passes all 3,237 entries, including the GLFW lifetime check. The full UBSan run
 selects 3,237 entries and fails only BUG-206, with the expected GLFW skip.
 Both failures are the unchanged queued/running message comparison for the same
-job identity, with no sanitizer diagnostic. The [blocker record](../../backlog/bugs/BUG-206-uv-duplicate-submit-phase-race.md)
+job identity, with no sanitizer diagnostic. The [blocker record](../../done/BUG-206-uv-duplicate-submit-phase-race.md)
 retains baseline and unsanitized reproductions. No unrelated fix or weakened
 assertion is included. All strict structural gates pass; the workflow-evidence
 validator retains its 105 historical warnings and reports zero errors.
