@@ -17,6 +17,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -252,6 +253,7 @@ void AddDenoiseTetraMeshSource(ECS::Scene::Registry& registry,
     {
         Geometry::HalfedgeMesh::Mesh mesh =
             Geometry::HalfedgeMesh::MakeMeshTetrahedron();
+        (void)mesh.EdgeProperties().GetOrAdd<bool>("e:feature", false);
         mesh.Position(Geometry::VertexHandle{0u}) +=
             glm::vec3{0.35f, -0.15f, 0.20f};
         GS::PopulateFromMesh(registry.Raw(), entity, mesh);
@@ -3307,6 +3309,7 @@ TEST(SandboxEditorUi, MeshRemeshAndSubdivideStaleDiscardsReportTerminalResults)
     const ECS::EntityHandle subdivideMesh =
         MakeSelectable(registry, "StaleSubdivide");
     AddIcosahedronMeshSource(registry, subdivideMesh);
+    (void)registry.Raw().get<GS::Edges>(subdivideMesh).Properties.GetOrAdd<bool>("e:feature", false);
 
     ASSERT_EQ(Runtime::ApplyEditorMeshRemeshCommand(
                   context,
@@ -3973,7 +3976,7 @@ TEST(SandboxEditorUi,
                 .Operator =
                     Runtime::EditorMeshSubdivideOperator::Loop,
                 .Iterations = 1u,
-                .PreserveLoopFeatureEdges = true,
+                .PreserveLoopFeatureEdges = false,
             });
     ASSERT_TRUE(edited.Succeeded()) << edited.Message;
 
@@ -6485,5 +6488,132 @@ TEST(SandboxEditorUi, MeshCurvatureRejectsInexactScalarOutputBeforeAnyPublicatio
         EXPECT_FALSE(properties.Exists(command.Mean.Name));
         EXPECT_FALSE(properties.Exists(command.Gaussian.Name));
         EXPECT_FALSE(properties.Exists(command.Direction1.Name));
+    }
+}
+
+TEST(SandboxEditorUi, SubdivisionFeatureScalarTwinsPreserveStorageAndUndo)
+{
+    using K=Geometry::PropertyValueKind;
+    std::vector<glm::vec3> reference;
+    for(const auto kind:{K::Bool,K::Int32,K::UInt32,K::UInt64,K::Float,K::Double})
+    {
+        SCOPED_TRACE(int(kind));
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        Runtime::EditorCommandHistory history;
+        auto context=MakeContext(registry,selection);
+        context.CommandHistory=&history;
+        const auto entity=MakeSelectable(registry,"feature subdivision");
+        AddDenoiseTetraMeshSource(registry,entity);
+        auto& edges=registry.Raw().get<GS::Edges>(entity).Properties;
+        const Runtime::GeometryPropertyRef ref{Runtime::GeometryElementDomain::MeshEdge,"unrelated crease signal",kind};
+        std::vector<std::uint32_t> values(edges.Size()),slots(edges.Size());
+        values[0]=1;
+        for(std::size_t i=0;i<slots.size();++i)slots[i]=std::uint32_t(i);
+        Runtime::GeometryScalarPropertySnapshot source;
+        ASSERT_TRUE(Runtime::PrepareGeometryScalarProperty(source,kind,edges.Size(),slots,values));
+        ASSERT_TRUE(Runtime::ApplyGeometryScalarProperty(edges,ref,source));
+        if(kind==K::Float)edges.Get<float>(ref.Name)[1]=-0.0f;
+        if(kind==K::Double)edges.Get<double>(ref.Name)[1]=-0.0;
+        const auto before=SourceMeshCounts(registry,entity);
+        const Runtime::EditorMeshSubdivideCommand command{
+            .StableEntityId=Runtime::SelectionController::ToStableEntityId(entity),
+            .PreserveLoopFeatureEdges=true,.FeatureEdges=ref};
+        ASSERT_TRUE(Runtime::PreviewEditorMeshSubdivideCommand(context,command).Enabled);
+        const auto result=Runtime::ApplyEditorMeshSubdivideCommand(context,command);
+        ASSERT_TRUE(result.Succeeded())<<result.Message;
+        const auto positions=MeshVertexPositions(registry,entity);
+        if(reference.empty())reference=positions;
+        EXPECT_EQ(positions,reference);
+        auto& output=registry.Raw().get<GS::Edges>(entity).Properties;
+        EXPECT_EQ(Runtime::DetectGeometryPropertyValueKind(output,ref.Name),kind);
+        const auto published=Runtime::CaptureGeometryScalarProperty(output,ref);
+        EXPECT_EQ(std::visit([](const auto& flags){return std::count(flags.begin(),flags.end(),1);},published.Values),2);
+        ASSERT_TRUE(history.Undo().Succeeded());
+        ExpectMeshCountsEqual(SourceMeshCounts(registry,entity),before);
+        EXPECT_EQ(Runtime::DetectGeometryPropertyValueKind(registry.Raw().get<GS::Edges>(entity).Properties,ref.Name),kind);
+        const auto restored=Runtime::CaptureGeometryScalarProperty(registry.Raw().get<GS::Edges>(entity).Properties,ref);
+        std::visit([&](const auto& restoredValues) {
+            using T=typename std::decay_t<decltype(restoredValues)>::value_type;
+            if constexpr(std::is_floating_point_v<T>)
+                EXPECT_EQ(std::count_if(restoredValues.begin(),restoredValues.end(),[](T value){return std::signbit(value);}),1);
+        },restored.Values);
+        ASSERT_TRUE(history.Redo().Succeeded());
+        EXPECT_EQ(MeshVertexPositions(registry,entity),reference);
+    }
+}
+
+TEST(SandboxEditorUi, SubdivisionRejectsMissingMismatchedAndNonBooleanNumericFeatures)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    auto context=MakeContext(registry,selection);
+    context.CommandHistory=&history;
+    const auto entity=MakeSelectable(registry,"invalid feature subdivision");
+    AddDenoiseTetraMeshSource(registry,entity);
+    auto& edges=registry.Raw().get<GS::Edges>(entity).Properties;
+    auto field=edges.GetOrAdd<double>("signal");
+    Runtime::EditorMeshSubdivideCommand command{
+        .StableEntityId=Runtime::SelectionController::ToStableEntityId(entity),
+        .PreserveLoopFeatureEdges=true,
+        .FeatureEdges={Runtime::GeometryElementDomain::MeshEdge,"signal",Geometry::PropertyValueKind::Double}};
+    const auto before=SourceMeshCounts(registry,entity);
+    for(const auto invalid:{2.0,0.5,std::numeric_limits<double>::infinity(),std::numeric_limits<double>::quiet_NaN(),9007199254740992.0})
+    {
+        field[0]=invalid;
+        EXPECT_FALSE(Runtime::ApplyEditorMeshSubdivideCommand(context,command).Succeeded());
+        ExpectMeshCountsEqual(SourceMeshCounts(registry,entity),before);
+        EXPECT_FALSE(history.CanUndo());
+    }
+    field[0]=1;
+    for(const auto& ref:std::array{
+        Runtime::GeometryPropertyRef{Runtime::GeometryElementDomain::MeshEdge,"missing",Geometry::PropertyValueKind::Bool},
+        Runtime::GeometryPropertyRef{Runtime::GeometryElementDomain::MeshEdge,"signal",Geometry::PropertyValueKind::Float},
+        Runtime::GeometryPropertyRef{Runtime::GeometryElementDomain::MeshFace,"signal",Geometry::PropertyValueKind::Double},
+        Runtime::GeometryPropertyRef{Runtime::GeometryElementDomain::MeshEdge,"e:deleted",Geometry::PropertyValueKind::Bool}})
+    {
+        command.FeatureEdges=ref;
+        EXPECT_FALSE(Runtime::PreviewEditorMeshSubdivideCommand(context,command).Enabled);
+        EXPECT_FALSE(Runtime::ApplyEditorMeshSubdivideCommand(context,command).Succeeded());
+        EXPECT_FALSE(history.CanUndo());
+    }
+}
+
+TEST(SandboxEditorUi, SubdivisionFeatureEditsInvalidateQueuedPublicationAndUndo)
+{
+    for(const bool queued:{false,true})
+    {
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        Runtime::EditorCommandHistory history;
+        auto context=MakeContext(registry,selection);
+        context.CommandHistory=&history;
+        const auto entity=MakeSelectable(registry,"feature stale guard");
+        AddDenoiseTetraMeshSource(registry,entity);
+        auto flags=registry.Raw().get<GS::Edges>(entity).Properties.Get<bool>("e:feature");
+        flags[0]=true;
+        Runtime::EditorMeshSubdivideCommand command{
+            .StableEntityId=Runtime::SelectionController::ToStableEntityId(entity),
+            .PreserveLoopFeatureEdges=true};
+        Extrinsic::Tests::EditorJobHarness jobs;
+        if(queued)jobs.Attach(context);
+        const auto before=SourceMeshCounts(registry,entity);
+        const auto result=Runtime::ApplyEditorMeshSubdivideCommand(context,command);
+        if(queued)
+        {
+            ASSERT_EQ(result.Status,Runtime::EditorCommandStatus::Pending);
+            flags[0]=false;
+            ASSERT_TRUE(jobs.DrainUntilTerminal());
+            ExpectMeshCountsEqual(SourceMeshCounts(registry,entity),before);
+            EXPECT_FALSE(history.CanUndo());
+        }
+        else
+        {
+            ASSERT_TRUE(result.Succeeded())<<result.Message;
+            auto output=registry.Raw().get<GS::Edges>(entity).Properties.Get<bool>("e:feature");
+            output[0]=!output[0];
+            EXPECT_FALSE(history.Undo().Succeeded());
+        }
     }
 }

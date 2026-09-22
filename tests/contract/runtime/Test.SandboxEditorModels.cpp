@@ -2177,7 +2177,7 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
         context, {.StableEntityId = meshModel.SelectedStableId, .Operator = Runtime::EditorMeshSubdivideOperator::CatmullClark}).Enabled);
     EXPECT_TRUE(Runtime::PreviewEditorMeshSubdivideCommand(
         context, {.StableEntityId = meshModel.SelectedStableId, .Operator = Runtime::EditorMeshSubdivideOperator::Sqrt3}).Enabled);
-    EXPECT_TRUE(Runtime::PreviewEditorMeshSubdivideCommand(
+    EXPECT_FALSE(Runtime::PreviewEditorMeshSubdivideCommand(
         context, {.StableEntityId = meshModel.SelectedStableId, .PreserveLoopFeatureEdges = true}).Enabled);
     EXPECT_TRUE(Runtime::PreviewEditorMeshSimplifyCommand(
         context, {.StableEntityId = meshModel.SelectedStableId, .TargetFaces = 1u}).Enabled);

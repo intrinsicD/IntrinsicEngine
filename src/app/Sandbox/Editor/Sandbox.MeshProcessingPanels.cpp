@@ -261,6 +261,7 @@ namespace Extrinsic::Sandbox::Editor
             std::int32_t Operator{0};
             std::int32_t Iterations{1};
             bool PreserveLoopFeatures{false};
+            Runtime::GeometryPropertyRef FeatureEdges{Runtime::GeometryElementDomain::MeshEdge, "e:feature", Geometry::PropertyValueKind::Bool};
         };
 
         struct SimplifyState
@@ -1476,8 +1477,16 @@ namespace Extrinsic::Sandbox::Editor
         const auto op = FromIndex(kMeshSubdivideOperators, Subdivide.Operator);
         if (op != Runtime::EditorMeshSubdivideOperator::Loop)
             Subdivide.PreserveLoopFeatures = false;
+        if (op == Runtime::EditorMeshSubdivideOperator::Loop)
+            DrawProcessingPropertyInput("Feature edges##MeshSubdivide", model.PropertyCatalog,
+                Subdivide.FeatureEdges, [](const Runtime::GeometryPropertyRef& ref) {
+                    return ref.Domain == Runtime::GeometryElementDomain::MeshEdge &&
+                        Runtime::GeometryPropertyComponentCount(ref.ValueKind) == 1 &&
+                        !Runtime::IsTopologyProperty(ref.Domain, ref.Name);
+                });
         const auto feature = preview({.StableEntityId = model.SelectedStableId,
-            .Operator = op, .PreserveLoopFeatureEdges = !Subdivide.PreserveLoopFeatures});
+            .Operator = op, .PreserveLoopFeatureEdges = !Subdivide.PreserveLoopFeatures,
+            .FeatureEdges = Subdivide.FeatureEdges});
         ImGui::BeginDisabled(!feature.Enabled);
         ImGui::Checkbox("Preserve Loop features##MeshSubdivide", &Subdivide.PreserveLoopFeatures);
         ImGui::EndDisabled();
@@ -1488,6 +1497,7 @@ namespace Extrinsic::Sandbox::Editor
             .Operator = op,
             .Iterations = static_cast<std::uint32_t>(Subdivide.Iterations),
             .PreserveLoopFeatureEdges = Subdivide.PreserveLoopFeatures,
+            .FeatureEdges = Subdivide.FeatureEdges,
         };
         if (DrawProcessingActionButton("Subdivide##MeshSubdivide", preview(command)))
         {

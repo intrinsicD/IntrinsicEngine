@@ -10,6 +10,7 @@ module;
 export module Extrinsic.Runtime.MeshTopologyOperations;
 export import Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.EditorCommon;
+export import Extrinsic.Runtime.GeometryProperty.Types;
 export import Extrinsic.Core.Error;
 export import Geometry.Smoothing.Types;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
@@ -184,7 +185,8 @@ export namespace Extrinsic::Runtime
         std::uint32_t Iterations{1u};
         bool PreserveLoopFeatureEdges{false};
         std::uint32_t MaxOutputFaces{0u};
-        std::string FeatureEdgePropertyName{"e:feature"};
+        // Active Loop crease flags are exact 0/1 scalars; refined flags retain this storage kind.
+        GeometryPropertyRef FeatureEdges{GeometryElementDomain::MeshEdge, "e:feature", Geometry::PropertyValueKind::Bool};
     };
 
     struct EditorMeshSubdivideResult
