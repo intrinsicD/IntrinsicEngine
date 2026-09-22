@@ -973,3 +973,58 @@ TEST(CurvatureSegmentationOperations, DeclaredOutputStorageConflictDisablesPrevi
     EXPECT_TRUE(harness.Faces().Properties.Get<std::uint32_t>(config.Components.Name));
     EXPECT_FALSE(harness.Faces().Properties.Get<float>(config.Components.Name));
 }
+
+TEST(CurvatureSegmentationOperations, HistoryRejectsSameCountDeletionMaskSwaps)
+{
+    for (const auto domain : {0u, 1u, 2u})
+    {
+        SCOPED_TRACE(domain);
+        SegmentationHarness harness;
+        Geometry::PropertySet* properties = nullptr;
+        const char* maskName = nullptr;
+        if (domain == 0u)
+        {
+            properties = &harness.Vertices().Properties;
+            maskName = "v:deleted";
+            harness.Vertices().NumDeleted = 1u;
+        }
+        else if (domain == 1u)
+        {
+            properties = &harness.Edges().Properties;
+            maskName = "e:deleted";
+            harness.Edges().NumDeleted = 1u;
+        }
+        else
+        {
+            properties = &harness.Faces().Properties;
+            maskName = "f:deleted";
+            harness.Faces().NumDeleted = 1u;
+        }
+        const auto skipped = properties->Size();
+        properties->Resize(skipped + 1u);
+        auto mask = properties->GetOrAdd<bool>(maskName, false);
+        mask[skipped] = true;
+        ASSERT_TRUE(Apply(harness).Succeeded());
+        const auto config = MakeFixedConfig();
+        const auto published = harness.Faces().Properties.Get<std::uint32_t>(config.Regions.Name).Vector();
+        const auto appliedRevision = harness.History.Snapshot().Revision;
+        mask[skipped] = false;
+        mask[0] = true;
+        EXPECT_EQ(harness.History.Undo().Status, Runtime::EditorCommandHistoryStatus::StaleEntity);
+        EXPECT_EQ(harness.History.Snapshot().Revision, appliedRevision);
+        EXPECT_EQ(harness.Faces().Properties.Get<std::uint32_t>(config.Regions.Name).Vector(), published);
+        mask[0] = false;
+        mask[skipped] = true;
+        ASSERT_TRUE(harness.History.Undo().Succeeded());
+        const auto undoneRevision = harness.History.Snapshot().Revision;
+        mask[skipped] = false;
+        mask[0] = true;
+        EXPECT_EQ(harness.History.Redo().Status, Runtime::EditorCommandHistoryStatus::StaleEntity);
+        EXPECT_EQ(harness.History.Snapshot().Revision, undoneRevision);
+        EXPECT_FALSE(harness.Faces().Properties.Exists(config.Regions.Name));
+        mask[0] = false;
+        mask[skipped] = true;
+        ASSERT_TRUE(harness.History.Redo().Succeeded());
+        EXPECT_EQ(harness.Faces().Properties.Get<std::uint32_t>(config.Regions.Name).Vector(), published);
+    }
+}
