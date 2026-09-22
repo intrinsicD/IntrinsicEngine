@@ -161,6 +161,9 @@ namespace Extrinsic::Runtime
             if (!std::isfinite(static_cast<double>(value)))
                 return false;
 
+            if (static_cast<long double>(value) < -std::numeric_limits<float>::max() ||
+                static_cast<long double>(value) > std::numeric_limits<float>::max())
+                return false;
             const float converted = static_cast<float>(value);
             if (!IsFinite(converted))
                 return false;
@@ -461,7 +464,8 @@ namespace Extrinsic::Runtime
                                             : options.OutputName;
           const std::string bufferSourceKey =
               options.PropertyBufferSourceKey.empty()
-                  ? sourceKey + (options.Interpretation == Graphics::Components::VisualizationConfig::ColorInterpretation::NormalDirection ? ".normal" : "")
+                  ? (options.Interpretation == Graphics::Components::VisualizationConfig::ColorInterpretation::NormalDirection
+                         ? "color.normal:" : "color.components:") + sourceKey
                   : options.PropertyBufferSourceKey;
           if (options.ColorBufferBDA == 0u) {
             std::vector<std::byte> payload;
@@ -803,30 +807,6 @@ namespace Extrinsic::Runtime
                 return;
             }
 
-            const auto appendLabels = [&](const auto& property) {
-                std::vector<std::uint32_t> labels;
-                labels.reserve(property.Vector().size());
-                for (const auto value : property.Vector())
-                {
-                    const long double number = value;
-                    if (!std::isfinite(number) || number < 0 ||
-                        number > std::numeric_limits<std::uint32_t>::max() || std::trunc(number) != number)
-                    {
-                        ++diagnostics.NonFiniteValueCount;
-                        return;
-                    }
-                    labels.push_back(static_cast<std::uint32_t>(number));
-                }
-                (void)AppendColorPacket(std::span<const std::uint32_t>{labels}, out, options, diagnostics);
-            };
-            if (const auto property = properties.Get<std::int32_t>(options.SourceName); property.IsValid())
-            { appendLabels(property); return; }
-            if (const auto property = properties.Get<std::uint64_t>(options.SourceName); property.IsValid())
-            { appendLabels(property); return; }
-            if (const auto property = properties.Get<float>(options.SourceName); property.IsValid())
-            { appendLabels(property); return; }
-            if (const auto property = properties.Get<double>(options.SourceName); property.IsValid())
-            { appendLabels(property); return; }
             if (properties.Exists(options.SourceName))
                 ++diagnostics.UnsupportedSourceTypeCount;
             else

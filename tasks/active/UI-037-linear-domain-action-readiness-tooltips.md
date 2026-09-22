@@ -6188,3 +6188,13 @@ Session boundary: after verification and checkpoint push, start a fresh session
 to avoid carrying the large historical task/source context. Read the initial
 scope and this checkpoint. Next bounded slice: explicit-property ring readiness
 for mesh-field consumers, preserving each command's actual validation order.
+
+## RUNTIME-270 bound mesh-feature readiness integration — 2026-09-22
+
+RUNTIME-270 extends the existing session verdict cache to selected segmentation
+feature fields. Metadata admission and deferred numeric validation share canonical
+refs and feature-width rules. Selected-property mutations invalidate the verdict;
+unrelated property edits retain it. Prepared frames reuse verdicts, and superseded
+checks, detach and world-generation changes cannot publish stale readiness.
+See `Test.SandboxEditorSessionLifecycle.cpp` for this bounded coverage. UI-037's
+remaining service/readiness inventory stays under its existing acceptance criteria.

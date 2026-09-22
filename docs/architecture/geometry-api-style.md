@@ -154,7 +154,16 @@ field. Same-cardinality publication preserves its source domain and unrelated
 properties. Output conversion targets the declared writable storage with checked
 representability and aliasing rules; dimension compatibility does not permit
 reinterpreting or silently changing existing storage. Structural topology/deletion
-properties retain their owning-operation rules.
+properties retain their owning-operation rules. Runtime scalar publication uses the shared
+`GeometryScalarPropertySnapshot` conversion path for Bool, Int32, UInt32, UInt64,
+Float and Double targets. A publication cohort is prepared and checked before
+mutation. Existing unselected/deleted slots retain their exact values, and history
+compares floating storage bitwise. Positive/negative infinity is admitted only
+by an explicit floating-target policy (for unreachable geodesic distances).
+GMM feature bindings currently support one to three channels; Vec4 is rejected.
+Normal-direction visualization is selected by `ColorInterpretation`, independently
+of property names, and participates in buffer identity.
+
 
 This is the binding contract, not a statement that every legacy consumer already
 complies. [RUNTIME-270](../../tasks/active/RUNTIME-270-property-binding-equivalence.md)

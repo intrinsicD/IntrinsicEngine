@@ -60,7 +60,7 @@ TEST(RuntimeTextureBakeModule, RepresentationDefaultsPreserveRawScalarData)
         representation.Encoding));
 }
 
-TEST(RuntimeTextureBakeModule, NormalAndLabelDefaultsChooseEncodedStorage)
+TEST(RuntimeTextureBakeModule, NormalTargetAndExplicitLabelEncodingChooseEncodedStorage)
 {
     const std::vector<Runtime::EditorTextureBakeTarget> normalTargets{
         Runtime::EditorTextureBakeTarget{
@@ -98,7 +98,7 @@ TEST(RuntimeTextureBakeModule, NormalAndLabelDefaultsChooseEncodedStorage)
         Runtime::ResolveEditorTextureBakeTargetRepresentation(
             Geometry::PropertyValueKind::UInt32,
             Runtime::PropertyTextureBakeStorage::Auto,
-            Runtime::PropertyTextureBakeEncoding::Auto,
+            Runtime::PropertyTextureBakeEncoding::LabelPalette,
             albedoTargets);
     EXPECT_EQ(
         label.Storage,
@@ -171,6 +171,9 @@ TEST(RuntimeTextureBakeModule, ScalarStorageKindsShareExplicitRepresentations)
         .Semantic = Runtime::GeometryPresentationSlotSemantic::Albedo};
     for (const auto kind : {K::Bool, K::Int32, K::UInt32, K::UInt64, K::Float, K::Double})
     {
+        const auto defaults = Runtime::ResolvePropertyTextureBakeRepresentation(kind, S::Auto, E::Auto);
+        EXPECT_EQ(defaults.Storage, S::RawFloat);
+        EXPECT_EQ(defaults.Encoding, E::LinearScalar);
         EXPECT_TRUE(Runtime::IsPropertyTextureBakeRepresentationCompatible(kind, S::RawFloat, E::LinearScalar));
         EXPECT_TRUE(Runtime::IsPropertyTextureBakeRepresentationCompatible(kind, S::EncodedRgba, E::ScalarColormap));
         EXPECT_TRUE(Runtime::IsPropertyTextureBakeRepresentationCompatible(kind, S::EncodedRgba, E::LabelPalette));

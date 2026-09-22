@@ -259,6 +259,8 @@ namespace Extrinsic::Runtime
                     }
                     else
                     {
+                        if (precise < -std::numeric_limits<float>::max() ||
+                            precise > std::numeric_limits<float>::max()) return false;
                         converted = static_cast<float>(value);
                         if (!std::isfinite(converted)) return false;
                         if constexpr (std::is_integral_v<T>)
@@ -322,7 +324,7 @@ namespace Extrinsic::Runtime
             return PropertyTextureBakeEncoding::ScalarColormap;
         if (config.Interpretation == Config::ColorInterpretation::NormalDirection)
             return PropertyTextureBakeEncoding::Normal;
-        return kind == Geometry::PropertyValueKind::UInt32 || kind == Geometry::PropertyValueKind::Bool
+        return GeometryPropertyComponentCount(kind) == 1u
             ? PropertyTextureBakeEncoding::LabelPalette : PropertyTextureBakeEncoding::RgbaColor;
     }
 
@@ -338,7 +340,7 @@ namespace Extrinsic::Runtime
         if (representation.Storage == PropertyTextureBakeStorage::Auto)
         {
             representation.Storage =
-                (valueKind == Geometry::PropertyValueKind::UInt32 || requestedEncoding == PropertyTextureBakeEncoding::LabelPalette)
+                (requestedEncoding == PropertyTextureBakeEncoding::LabelPalette)
                 ? PropertyTextureBakeStorage::EncodedRgba
                 : PropertyTextureBakeStorage::RawFloat;
         }
@@ -350,14 +352,11 @@ namespace Extrinsic::Runtime
         case Geometry::PropertyValueKind::Bool:
         case Geometry::PropertyValueKind::Int32:
         case Geometry::PropertyValueKind::UInt64:
+        case Geometry::PropertyValueKind::UInt32:
         case Geometry::PropertyValueKind::Float:
         case Geometry::PropertyValueKind::Double:
             representation.Encoding =
                 PropertyTextureBakeEncoding::LinearScalar;
-            break;
-        case Geometry::PropertyValueKind::UInt32:
-            representation.Encoding =
-                PropertyTextureBakeEncoding::LabelPalette;
             break;
         case Geometry::PropertyValueKind::Vec2:
             representation.Encoding =

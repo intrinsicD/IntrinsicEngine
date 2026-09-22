@@ -611,16 +611,6 @@ TEST(SandboxEditorUi, VisualizationPropertyPresetCommandRoutesThroughConfig)
                       .StableEntityId = stableId,
                       .Domain = Domain::MeshVertices,
                       .Preset = Preset::Scalar,
-                      .PropertyName = "v:kmeans_label",
-                  }),
-              Runtime::EditorCommandStatus::InvalidVisualizationProperty);
-
-    EXPECT_EQ(Runtime::ApplyEditorVisualizationPropertyCommand(
-                  context,
-                  Runtime::EditorVisualizationPropertyCommand{
-                      .StableEntityId = stableId,
-                      .Domain = Domain::MeshVertices,
-                      .Preset = Preset::Scalar,
                       .PropertyName = "missing",
                   }),
               Runtime::EditorCommandStatus::InvalidVisualizationProperty);
@@ -661,6 +651,16 @@ TEST(SandboxEditorUi, VisualizationPropertyPresetCommandRoutesThroughConfig)
                   }),
               Runtime::EditorCommandStatus::MissingVisualizationCommands);
     expectVisualizationConfigUnchanged();
+
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationPropertyCommand(
+                  context,
+                  Runtime::EditorVisualizationPropertyCommand{
+                      .StableEntityId = stableId,
+                      .Domain = Domain::MeshVertices,
+                      .Preset = Preset::Scalar,
+                      .PropertyName = "v:kmeans_label",
+                  }),
+              Runtime::EditorCommandStatus::Applied);
 
     EXPECT_STREQ(Runtime::DebugNameForEditorVisualizationPropertyPreset(
                      Preset::ColorBuffer),
@@ -2210,8 +2210,8 @@ TEST(SandboxEditorUi, NormalInterpretationRejectsInvalidBindingsBeforeMutation)
     auto context = MakeContext(registry, selection);
     context.VisualizationCommandsAvailable = true;
     auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
-    properties.GetOrAdd<glm::vec3>("directions", glm::vec3{0, 0, 1});
-    properties.GetOrAdd<glm::vec4>("rgba", glm::vec4{1});
+    (void)properties.GetOrAdd<glm::vec3>("directions", glm::vec3{0, 0, 1});
+    (void)properties.GetOrAdd<glm::vec4>("rgba", glm::vec4{1});
     Runtime::EditorVisualizationConfigCommand command{
         .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
         .Target = Runtime::EditorVisualizationTarget::Surface,

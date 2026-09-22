@@ -704,7 +704,10 @@ count, project-to-surface, and mean-curvature versus error-bounded Taubin sizing
 selection. Uniform mode calls `Geometry.Remeshing`; adaptive mode calls
 `Geometry.HalfedgeMesh.AdaptiveRemeshing`, mapping the editor target length to a
 bounded adaptive sizing range. The subdivide window exposes Loop, Catmull-Clark,
-and Sqrt(3) operators, iteration count, and Loop feature-edge preservation.
+and Sqrt(3) operators, iteration count, and Loop feature-edge preservation with
+an explicit mesh-edge scalar property. Selected feature values must be exactly
+representable as Boolean markers; topology replacement republishes the selected
+storage kind.
 Each backing kernel and option has an explicit `SandboxEditorContext` feature
 gate, so unavailable operators return deterministic diagnostics without
 mutating `GeometrySources`.
@@ -752,7 +755,10 @@ count-matched output, and publishes the configured UV property (default
 shared editor mutation transaction. Each initial apply, undo, and redo
 revalidates geometry metadata plus the exact semantic triangle topology,
 finite values from the configured position property, and the optional UV property consumed by the
-solver. Custom UV outputs preserve existing vertex and corner texture coordinates.
+solver. Schema-2 config carries full position/UV refs and an optional
+`CornerTexcoordsToRetire` ref. Only that explicitly selected corner property is
+retired; other corner fields remain intact. The registered default selects
+`h:texcoord`, and changing the UV output in the panel clears that choice.
 Undo restores the prior UV values or removes a newly introduced
 property; redo restores the generated values. An intervening position,
 topology, or UV edit returns `StaleEntity` without changing geometry or the
@@ -1052,7 +1058,10 @@ and point-cloud rows, and calls the exact `TextureBakeService` published by
 `AssetService`, or touches graphics/RHI residency directly. The controls expose
 the UV property, output identity/name and extent, raw-float versus encoded-RGBA
 storage, encoder, encoding colormap, and every compatible caller-owned
-presentation target. Raw scalar textures retain their numeric values and select the
+presentation target. All scalar kinds default to raw linear encoding; palette
+and normal-direction interpretation are explicit choices. Integer projection
+rejects float precision loss; floating-point display values use the GPU float
+representation without changing source storage. Raw scalar textures select the
 albedo/scalar colormap at render time, so changing Viridis/Inferno does not
 rebake. A baked texture can feed multiple compatible targets, while one
 physical material channel has only one entity-wide owner. Catalog rows report
@@ -2006,5 +2015,8 @@ Mesh virtual-source geodesics uses the shared GeometryProcessingOperations comma
 surface and the `sandbox.geodesics` config section. It publishes only vertex
 distance/source properties and supports guarded undo/redo. The app panel collects
 picked or entered source vertices, selects a vertex float3 position property,
-and names the distance/mask outputs. Each output has an independent Show action.
+and selects the distance/mask output names and scalar storage kinds. Schema-2
+config stores canonical refs. Publication checks representability before changing
+either output; unreachable distances require floating-point storage. Each output
+has an independent Show action.
 See [method integration](../../methods/geometry/geodesics_virtual_source/README.md).

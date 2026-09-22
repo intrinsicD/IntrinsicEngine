@@ -379,8 +379,10 @@ TEST(GeodesicsOperations, ScalarStorageSelectionRoundTripsAndPublishesAtomically
         EXPECT_FALSE(h.Properties().Exists(h.Command.Config.SourceMaskProperty.Name));
         ASSERT_TRUE(h.History.Redo().Succeeded());
     }
+    for (const auto target : {K::UInt32, K::Float})
+    {
     Harness h;
-    h.Command.Config.DistanceProperty.ValueKind = K::UInt32;
+    h.Command.Config.DistanceProperty.ValueKind = target;
     h.Command.Config.SourceMaskProperty.ValueKind = K::Float;
     h.Properties().GetOrAdd<float>(h.Command.Config.SourceMaskProperty.Name).Vector().assign(4, 7.f);
     const auto result = Runtime::ApplyEditorGeodesicsCommand(h.Commands(), h.Command);
@@ -388,6 +390,7 @@ TEST(GeodesicsOperations, ScalarStorageSelectionRoundTripsAndPublishesAtomically
     EXPECT_FALSE(h.Properties().Exists(h.Command.Config.DistanceProperty.Name));
     EXPECT_EQ(h.Properties().Get<float>(h.Command.Config.SourceMaskProperty.Name).Vector(), std::vector<float>(4, 7.f));
     EXPECT_EQ(h.History.UndoCount(), 0u);
+    }
 }
 
 TEST(GeodesicsOperations, FloatingOutputsPreserveUnreachableInfinityAndDeletedStorage)

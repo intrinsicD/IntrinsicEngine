@@ -235,7 +235,7 @@ TEST(SandboxCurvatureSegmentationPanel,
     ASSERT_NE(segmentationBegin, std::string::npos);
     const auto curvature = source.substr(curvatureBegin, segmentationBegin - curvatureBegin);
     EXPECT_EQ(curvature.find("DrawCurvatureSegmentationControls(model"), std::string::npos);
-    EXPECT_NE(curvature.find("config.Mean.Name"), std::string::npos);
+    EXPECT_NE(curvature.find("DrawProcessingScalarOutput(\"Mean curvature\", config.Mean)"), std::string::npos);
     EXPECT_NE(curvature.find("config.Direction2.Name"), std::string::npos);
 
 }

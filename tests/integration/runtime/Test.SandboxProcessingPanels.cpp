@@ -348,9 +348,9 @@ TEST(SandboxProcessingPanels, ShowButtonsApplyAppearancePropertiesOnMeshGraphAnd
         struct ShowAction { const char* Window; const char* Title; const char* Button; std::string Property; bool Scalar; };
         const std::array actions{
             ShowAction{"view.normal_estimation", "Normal Estimation", "Show normals", "v:normal", false},
-            ShowAction{"view.outlier_analysis", "Outlier Analysis", "Show mask", "outlier_mask", false},
+            ShowAction{"view.outlier_analysis", "Outlier Analysis", "Show mask", "outlier_mask", true},
             ShowAction{"view.outlier_analysis", "Outlier Analysis", "Show score", "outlier_score", true},
-            ShowAction{"view.keypoint_analysis", "ISS Keypoint Analysis", "Show mask", "keypoint_mask", false},
+            ShowAction{"view.keypoint_analysis", "ISS Keypoint Analysis", "Show mask", "keypoint_mask", true},
             ShowAction{"view.keypoint_analysis", "ISS Keypoint Analysis", "Show saliency", "keypoint_saliency", true},
             ShowAction{"view.descriptor_analysis", "FPFH Descriptor Analysis", "Show histogram bin", descriptors[0].Name, true},
             ShowAction{"view.kernel_density", "Kernel Density", "Show density", "density", true},
@@ -2586,7 +2586,7 @@ TEST(SandboxProcessingPanels, ConsolidationNormalsRequireExplicitSelectionAndSur
         props.Resize(3);
         props.GetOrAdd<glm::vec3>("v:position", {}).Vector() = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
         props.GetOrAdd<glm::vec3>("alternate_samples", {}).Vector() = props.Get<glm::vec3>("v:position").Vector();
-        props.GetOrAdd<glm::vec3>(normalName, {0, 0, 1});
+        (void)props.GetOrAdd<glm::vec3>(normalName, {0, 0, 1});
         ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
         ASSERT_TRUE(h.Shell.SetEditorWindowOpen("pointcloud.processing.consolidation", true));
         const auto label = [](const std::string& name) {

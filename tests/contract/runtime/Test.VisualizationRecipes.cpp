@@ -940,7 +940,7 @@ TEST(VisualizationRecipes, ColorInterpretationIsExplicitAndIndependentOfProperty
     glm::vec4 first{};
     std::memcpy(&first, rawResult.Batch.PropertyBufferPayloads.front().data(), sizeof(first));
     EXPECT_EQ(first, glm::vec4(-2, 0, 0, 1));
-    source.Vertices.Properties.Add<glm::vec4>("rgba", glm::vec4{1});
+    (void)source.Vertices.Properties.Add<glm::vec4>("rgba", glm::vec4{1});
     std::get<R::ColorVisualizationRecipe>(normal.Data).Source =
         {R::GeometryElementDomain::MeshVertex, "rgba", Geometry::PropertyValueKind::Vec4};
     EXPECT_FALSE(R::EncodeVisualizationRecipe(source.Availability, normal).Succeeded());
@@ -967,6 +967,11 @@ TEST(VisualizationRecipes, NumericScalarTwinsShareScalarIsolineAndLabelEncoding)
             {.Data=R::LabelVisualizationRecipe{.Source=ref}});
         const auto isoline = R::EncodeVisualizationRecipe(source.Availability,
             {.Data=R::IsolineVisualizationRecipe{.Source=ref, .IsoValueCount=3}});
+        const auto vector = R::EncodeVisualizationRecipe(source.Availability,
+            {.Data=R::VectorFieldVisualizationRecipe{.Source=ref}});
+        EXPECT_FALSE(vector.Succeeded()) << name;
+        EXPECT_TRUE(vector.Batch.Colors.empty());
+        EXPECT_TRUE(vector.Batch.VectorFields.empty());
         ASSERT_TRUE(scalar.Succeeded()) << name;
         ASSERT_TRUE(label.Succeeded()) << name;
         ASSERT_TRUE(isoline.Succeeded()) << name;

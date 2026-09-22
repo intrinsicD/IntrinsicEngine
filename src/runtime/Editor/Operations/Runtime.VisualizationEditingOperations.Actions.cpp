@@ -2228,8 +2228,7 @@ ResolveEditorTextureBakeTargetRepresentation(
                            GeometryPresentationSlotSemantic::Metallic;
             });
         if (storage == PropertyTextureBakeStorage::Auto &&
-            (hasNormalTarget ||
-             valueKind == Geometry::PropertyValueKind::UInt32))
+            hasNormalTarget)
         {
             storage = PropertyTextureBakeStorage::EncodedRgba;
         }

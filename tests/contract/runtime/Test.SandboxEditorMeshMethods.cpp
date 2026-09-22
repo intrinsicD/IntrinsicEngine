@@ -5871,10 +5871,10 @@ TEST(SandboxEditorUi, TextureBakeControlsReportUvSourcesAndRequireRuntimeModule)
     const Runtime::EditorTextureBakeSourceRow* position =
         FindTextureBakeSource(bake, std::string{PN::kPosition});
     ASSERT_NE(position, nullptr);
-    EXPECT_FALSE(position->Bakeable);
+    EXPECT_TRUE(position->Bakeable);
     EXPECT_EQ(position->Category,
-              Runtime::EditorTextureBakeSourceCategory::Connectivity);
-    EXPECT_FALSE(position->DisabledReason.empty());
+              Runtime::EditorTextureBakeSourceCategory::Internal);
+    EXPECT_TRUE(position->DisabledReason.empty());
 
     const std::uint32_t stableId =
         Runtime::SelectionController::ToStableEntityId(mesh);

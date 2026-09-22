@@ -2352,7 +2352,7 @@ TEST(SandboxEditorUi, VisualizationModelEnumeratesPromotedGeometryProperties)
         Runtime::BuildEditorWorkspaceSnapshot(context);
     const auto& properties = meshFrame.Visualization.Properties;
 
-    EXPECT_EQ(FindVisualizationProperty(properties, Domain::MeshVertices, "v:position"),
+    EXPECT_NE(FindVisualizationProperty(properties, Domain::MeshVertices, "v:position"),
               nullptr);
     ASSERT_NE(FindVisualizationProperty(properties, Domain::MeshVertices, "v:temperature"),
               nullptr);
@@ -2361,7 +2361,7 @@ TEST(SandboxEditorUi, VisualizationModelEnumeratesPromotedGeometryProperties)
     EXPECT_EQ(scalar->ValueKind, Kind::Float);
     EXPECT_TRUE(scalar->ScalarPresetAvailable);
     EXPECT_TRUE(scalar->IsolinePresetAvailable);
-    EXPECT_FALSE(scalar->ColorBufferPresetAvailable);
+    EXPECT_TRUE(scalar->ColorBufferPresetAvailable);
 
     const auto* color =
         FindVisualizationProperty(properties, Domain::MeshVertices, "v:kmeans_color");
@@ -2374,7 +2374,7 @@ TEST(SandboxEditorUi, VisualizationModelEnumeratesPromotedGeometryProperties)
         FindVisualizationProperty(properties, Domain::MeshVertices, "v:kmeans_label");
     ASSERT_NE(label, nullptr);
     EXPECT_EQ(label->ValueKind, Kind::UInt32);
-    EXPECT_FALSE(label->ScalarPresetAvailable);
+    EXPECT_TRUE(label->ScalarPresetAvailable);
     EXPECT_TRUE(label->ColorBufferPresetAvailable);
 
     const auto* normal =
