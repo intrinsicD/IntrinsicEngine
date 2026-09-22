@@ -5,19 +5,43 @@ description: Entry point for IntrinsicEngine repository work and workflow questi
 
 # IntrinsicEngine Core
 
-`AGENTS.md` at the repository root owns the engineering contract and takes
-precedence over this router. Read it and
-`references/session-onboarding.md` at session start, then the task note being
-continued, if one exists. Read each source once; use either a canonical doc
-or its generated reference, never both. Do not reload material already read
-in the current session unless it changed.
+`AGENTS.md` owns the engineering contract and takes precedence over this router.
+Startup reading is the root contract, this skill, and the task being continued
+when one exists. Current, complete text supplied in context counts as read;
+fetch only missing, truncated, or changed sections. Use a canonical document or
+its generated reference, never both. Do not reload unchanged material.
 
-The onboarding document owns postures, authorization, work selection,
-isolation, verification, and commit hygiene. Read `tasks/SESSION-BRIEF.md`
-and `tasks/backlog/README.md` only when selecting backlog work. Interactive
-work uses the micro lane when a persistent note is needed; task claims,
-work graphs, and completion reports belong to unattended or opt-in custody
-work. Research claims still follow `AGENTS.md` §8b in every posture.
+Follow the root contract's scoped links into `docs/agent/contract.md` (or
+`references/contract.md`) before acting on the matching scope. Those detailed
+requirements are mandatory; neither expanded contract nor full session workflow
+is a startup prerequisite. Re-evaluate reading routes when scope changes.
+Read `tasks/SESSION-BRIEF.md` and `tasks/backlog/README.md` only for work selection.
+
+## Workflow sections
+
+`references/session-onboarding.md` mirrors `docs/agent/prompt/prompt.md` and owns
+the expanded session procedure. Select the named section with a heading search
+and bounded read; do not load the whole file to use one section.
+
+| Trigger | Section to read |
+| --- | --- |
+| Giving hints, asking a material question, or observing the human's work | `Pair (default)` |
+| Bounded implementation hand-off | `Delegate (on explicit hand-off)` |
+| Asked for direction or method selection | `Advisor (when they are stuck or ask for direction)` |
+| Authorization/scope decision or a new risk signal | `Risk gates` |
+| Choosing work | `Work selection` |
+| Selecting/running verification | `Verification` |
+| A failed check | `When CI fails` |
+| Committing or opening a PR | `Commit and PR hygiene` |
+| Filing an offered deferred hint | `Deferred-hint ledger` |
+| Unattended execution | `Unattended overnight mode`, plus the applicable selection/verification/commit sections |
+| Blocked work or unexpected state | `When stuck` |
+
+Task notes and audits use their specialist routes below. Workflow-policy edits
+also read the affected sections and `Anti-patterns to refuse`. Interactive work
+uses the micro lane for persistent notes; claims/work graphs/completion reports
+belong to unattended or opt-in custody work. Research evidence still follows
+`AGENTS.md` §8b in every posture.
 
 ## Specialist routing
 
@@ -57,7 +81,7 @@ source and with `tools/repo/check_layering.py`. If unavailable, use source
 search. Read `references/contract.md` §"Knowledge-graph discovery aid
 (optional)" for query details only when needed.
 
-- `references/session-onboarding.md` — the session loop and risk decisions.
+- `references/session-onboarding.md` — only the workflow sections triggered above.
 - `references/contract.md` — expanded engineering rationale and setup details;
-  consult for contract changes or questions not answered by `AGENTS.md`.
+  mandatory sections selected by `AGENTS.md`, also used for contract changes.
 - `references/roles.md` — responsibilities by posture and lane.

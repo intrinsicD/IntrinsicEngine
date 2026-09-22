@@ -112,6 +112,15 @@ normally visible to an agent; the full procedure loads when its trigger matches
 the work. This preserves a single authoritative contract while avoiding the
 cost and conflict of loading every specialist checklist into every session.
 
+Startup reading consists of the root contract, core skill, and the task being
+continued. Complete current instructions already supplied in context count as
+read. The root selects mandatory sections of the
+[expanded contract](contract.md) by touched scope; the core skill selects
+sections of the [session workflow](prompt/prompt.md) by action. Agents fetch
+missing or changed sections without rereading unchanged text or both a source
+and its generated mirror. The engineering requirements and verification gates
+still apply; the expanded documents are not loaded in full at startup.
+
 The skill inventory has three tiers:
 
 | Tier | Role | Examples |

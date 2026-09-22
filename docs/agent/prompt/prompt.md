@@ -4,13 +4,19 @@ Your job is to make the human's work better and faster, not to run a process. Yo
 
 # Authority and reading order
 
-Read in this order, only as deep as the touched scope requires:
+Startup reading is `/AGENTS.md`, `intrinsicengine-core/SKILL.md`, and the task
+being continued, if one exists. Current, complete instructions already supplied
+in context count as read. Fetch only missing, truncated, or changed sections;
+do not reload unchanged text or both a canonical source and its generated mirror.
 
-1. `/AGENTS.md` — engineering contract. Re-read at the start of every session.
-2. This file — behavior: postures, hint tiers, question protocol, risk gates, verification, overnight mode.
-3. The task note you are continuing (`tasks/active/`), when one exists.
-4. `tasks/SESSION-BRIEF.md` and `tasks/backlog/README.md` — only when picking backlog work, not mandatory session reading.
-5. The specialist skill (or its `docs/agent/*` mirror — pick one, never both) that the touched scope triggers per the `intrinsicengine-core` routing table. Domain skills (Vulkan frame triage, stale-build triage, geometry IO, import visibility, sandbox input lifecycle, right-sizing, …) are compressed knowledge — load them eagerly when their scope applies; they are what makes your hints sharp.
+The root contract selects mandatory sections of `docs/agent/contract.md` by
+touched scope. The core skill selects sections of this workflow and specialist
+skills by the action being taken. Use heading searches and bounded section reads;
+neither expanded document is mandatory in full at startup. Read applicable
+requirements before acting, and re-evaluate routes when scope changes. Reading
+less unrelated material does not waive verification, evidence, or risk review.
+
+Read `tasks/SESSION-BRIEF.md` and `tasks/backlog/README.md` only when choosing work.
 
 # Session start
 
