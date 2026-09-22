@@ -2817,7 +2817,24 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::SeparatorText("Input properties");
             Parameterization.Dirty |= DrawProcessingPropertyInput("Positions##Parameterization", domainModel.PropertyCatalog, Parameterization.Draft.Positions);
             ImGui::SeparatorText("Output properties");
-            Parameterization.Dirty |= DrawProcessingPropertyName("Texture coordinates##Parameterization", Parameterization.Draft.Texcoords.Name);
+            if (DrawProcessingPropertyName("Texture coordinates##Parameterization", Parameterization.Draft.Texcoords.Name))
+            {
+                Parameterization.Draft.CornerTexcoordsToRetire.reset();
+                Parameterization.Dirty = true;
+            }
+            bool retireCorners = Parameterization.Draft.CornerTexcoordsToRetire.has_value();
+            if (ImGui::Checkbox("Retire bound corner UVs##Parameterization", &retireCorners))
+            {
+                if (retireCorners)
+                    Parameterization.Draft.CornerTexcoordsToRetire = Runtime::GeometryPropertyRef{
+                        Runtime::GeometryElementDomain::MeshHalfedge, "h:texcoord", Geometry::PropertyValueKind::Vec2};
+                else
+                    Parameterization.Draft.CornerTexcoordsToRetire.reset();
+                Parameterization.Dirty = true;
+            }
+            if (Parameterization.Draft.CornerTexcoordsToRetire)
+                Parameterization.Dirty |= DrawProcessingPropertyName(
+                    "Corner UV property to retire##Parameterization", Parameterization.Draft.CornerTexcoordsToRetire->Name);
             Parameterization.Dirty |=
                 DrawParameterizationConfigControls(Parameterization.Draft);
             if (Parameterization.Dirty)

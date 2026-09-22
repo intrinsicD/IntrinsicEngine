@@ -20,7 +20,7 @@ export namespace Extrinsic::Runtime
     inline constexpr std::string_view kParameterizationConfigSectionSchemaId =
         "intrinsic.runtime.sandbox.parameterization";
     inline constexpr std::uint32_t kParameterizationConfigSectionSchemaVersion =
-        1u;
+        2u;
 
     enum class ParameterizationStrategyKind : std::uint32_t
     {
@@ -112,7 +112,8 @@ export namespace Extrinsic::Runtime
         ParameterizationViewConfig View{};
         GeometryPropertyRef Positions{GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};
         GeometryPropertyRef Texcoords{GeometryElementDomain::MeshVertex, "v:texcoord", Geometry::PropertyValueKind::Vec2};
-
+        // Null preserves corner storage; a bound property is retired with undo.
+        std::optional<GeometryPropertyRef> CornerTexcoordsToRetire{};
     };
 
     // Defined by the shared config codec translation unit, which compiles the
