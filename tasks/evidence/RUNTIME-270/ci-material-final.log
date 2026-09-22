@@ -1,0 +1,11 @@
+Source: 70b1d2f35
+Retained CTest result summary; commands are in the retired task verification section.
+100% tests passed, 0 tests failed out of 87
+
+Label Time Summary:
+contract       =   1.41 sec*proc (51 tests)
+graphics       =   2.71 sec*proc (36 tests)
+integration    =   2.71 sec*proc (36 tests)
+runtime        =   4.12 sec*proc (87 tests)
+
+Total Test time (real) =   4.52 sec

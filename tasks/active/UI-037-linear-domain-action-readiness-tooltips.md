@@ -14,7 +14,7 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, geometry
 # UI-037 — Linear domain-action readiness and disabled-reason tooltips
 
 Current continuation: see [mesh-topology ring checkpoint and open points](#continuation--shared-mesh-topology-ring-readiness-2026-09-20).
-Operator correction: [RUNTIME-270](RUNTIME-270-property-binding-equivalence.md)
+Operator correction: [RUNTIME-270](../done/RUNTIME-270-property-binding-equivalence.md)
 owns general property-feature segmentation and engine-wide binding equivalence.
 Do not implement the next mesh-field readiness slice around curvature-only input
 assumptions; its supplied feature bindings must participate in readiness.

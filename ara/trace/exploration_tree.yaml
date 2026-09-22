@@ -13657,3 +13657,16 @@ tree:
     alternatives: [Abandon the batch if the frozen gate fails, Extrapolate clean samples to a full-engine speedup]
     evidence: [O241, ara/evidence/diagnostics/build011_point_config_codecs/claude-results-final.txt]
     status: resolved
+
+  - id: N635
+    type: experiment
+    title: Verify and retire the property-binding contract and observed gate blockers
+    provenance: ai-executed
+    timestamp: 2026-09-22T13:14+02:00
+    result: RUNTIME-270 retired through source 7dbe421e8 after canonical CPU, ASan, UBSan and corrected Vulkan regressions;
+      BUG-206/207/208 retired. Full Vulkan initial run had six failures; final rebuilt selection passes all fifteen
+      including each failure. This records implementation verification, not a performance or backend-maturity claim.
+    evidence:
+    - tasks/done/RUNTIME-270-property-binding-equivalence.md
+    - tasks/evidence/RUNTIME-270/verification.md
+    status: resolved

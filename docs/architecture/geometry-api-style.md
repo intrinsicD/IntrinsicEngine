@@ -165,9 +165,11 @@ Normal-direction visualization is selected by `ColorInterpretation`, independent
 of property names, and participates in buffer identity.
 
 
-This is the binding contract, not a statement that every legacy consumer already
-complies. [RUNTIME-270](../../tasks/active/RUNTIME-270-property-binding-equivalence.md)
-tracks the implementation audit and remaining exceptions.
+[RUNTIME-270](../../tasks/done/RUNTIME-270-property-binding-equivalence.md)
+records the executable point, graph-neighborhood, mesh-correspondence and owning
+topology binder audit. Its family matrix distinguishes deliberate numerical and
+structural constraints from interchangeable property shape; catalog-only methods
+without runtime executors are outside that implementation inventory.
 
 ## Property API contract
 

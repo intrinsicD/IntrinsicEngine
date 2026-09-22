@@ -2790,3 +2790,12 @@ entries:
     notes:
     - N634 supplies artifact commitment for O241/C108; local descriptive results retain all edit regressions, negligible outcomes and uncontrolled-host limits.
     - Closed BUILD-011 and separately repaired BUG-205 without expanding RUNTIME-270 or reopening rejected experiments. No unrelated staging promoted; no new general heuristic.
+
+  - turn: 2026-09-22_001#1
+    notes:
+    - Recorded implementation verification as one direct journey fact plus AI actions; AGENTS ordinary-implementation
+      exemption applies, so no new claim rows or staged knowledge.
+    - No unrelated observation was promoted or research direction reopened. Existing numerical limits and separate
+      UI-037/BUG-193 scopes remain explicit.
+    - Preserved initial failures and final corrections; historical report link repairs update Markdown hashes only,
+      leaving raw measurement artifacts unchanged.

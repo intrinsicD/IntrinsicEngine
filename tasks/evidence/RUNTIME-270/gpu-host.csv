@@ -1,0 +1,2 @@
+name, driver_version, pstate, clocks.current.graphics [MHz], clocks.current.memory [MHz], power.draw [W], utilization.gpu [%], display_active
+NVIDIA GeForce RTX 3050, 590.48.01, P8, 210 MHz, 405 MHz, 7.82 W, 0 %, Disabled

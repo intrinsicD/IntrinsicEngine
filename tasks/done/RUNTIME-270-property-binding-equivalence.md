@@ -1,7 +1,7 @@
 ---
 id: RUNTIME-270
 theme: F
-depends_on: []
+depends_on: [BUG-208]
 template: micro
 workflow_schema: 1
 workflow_profile: micro
@@ -37,21 +37,21 @@ on 2026-09-20; this task owns the broader change, while UI-037 retains readiness
       parameterization and geodesics; retain topology/correspondence, output
       aliasing and structural storage requirements. Regression tests use names
       unrelated to position, curvature or domain prefixes.
-- [ ] Audit every method/config/UI binder against a family matrix, including
+- [x] Audit every method/config/UI binder against a family matrix, including
       point-set, graph-neighborhood, mesh-correspondence and owning topology edits.
       Sampled clean paths are not an exhaustive engine-wide compliance claim.
-- [ ] Replace source-name-derived normal/color interpretation in visualization,
+- [x] Replace source-name-derived normal/color interpretation in visualization,
       surface appearance and texture baking with explicit recipe/config choices.
-- [ ] Extend checked numeric adapters across remaining input and output bindings.
+- [x] Extend checked numeric adapters across remaining input and output bindings.
       A compatible output shape may require checked conversion into the declared
       target storage; never reinterpret existing storage, silently narrow values,
       or weaken output aliasing/ownership rules. Conversion failure preserves the entire publication cohort.
-- [ ] Migrate geodesics string slots to canonical property refs. Make
+- [x] Migrate geodesics string slots to canonical property refs. Make
       parameterization corner-UV binding/retirement an explicit optional ref;
       preserve unrelated corner UVs and restore retired values through history.
-- [ ] Decide supported feature widths beyond the existing GMM's 1–3 channels;
+- [x] Decide supported feature widths beyond the existing GMM's 1–3 channels;
       Vec4 is rejected until an implementation supports it, never truncated.
-- [ ] Close stale-source, invalidation, no-per-frame-scan and prepared-frame
+- [x] Close stale-source, invalidation, no-per-frame-scan and prepared-frame
       readiness coverage with UI-037, including newly bound feature fields.
 - [x] Full relevant tests, layering/docs checks and independent fixed-diff review
       pass; record remaining limitations without claiming universal completion.
@@ -88,10 +88,9 @@ explicit optional corner ref. Subdivision copies selected scalar edge markers by
 endpoint correspondence into its Boolean kernel field, then republishes the
 declared storage after its owning topology mutation.
 
-The operator was asked whether numeric storage kinds should interoperate.
-Pending a different preference, use checked numeric conversion as the stated
-implementation assumption; exact storage identity remains part of property
-resolution and output mutation, not a substitute for feature shape.
+Checked numeric conversion is the implementation choice for cross-storage
+numeric shape. Exact storage identity remains part of property resolution and
+output mutation; feature compatibility also checks numeric shape and values.
 
 ## Retirement implementation plan — 2026-09-22
 
@@ -104,11 +103,11 @@ The source audit covers canonical reference owners, processing operations, codec
 and both Sandbox method-panel owners. This is the implementation inventory, not
 an execution-completeness claim:
 
-| Binding family | Existing owners and remaining closure |
+| Binding family | Audited implementation |
 | --- | --- |
 | Point normals, bilateral, registration, construction | PointProperties capture; Vec3 is the sole catalogued three-component storage. Preserve correspondence and selected domains. |
-| Density, spacing, weights, outliers, keypoints, descriptors | Existing point publication/history; extend scalar storage conversion before widening config/UI. |
-| K-Means | ClusteringTypes/ClusteringModule; remove provenance-only execution domain restrictions and retain deleted-slot correspondence; checked scalar outputs. |
+| Density, spacing, weights, outliers, keypoints, descriptors | Existing point publication/history uses shared checked scalar conversion; config/UI admit the same scalar kinds. |
+| K-Means | ClusteringTypes/ClusteringModule supports all eight canonical domains with deleted-slot correspondence and checked scalar outputs. |
 | LOP/WLOP/CLOP/EAR | Existing canonical Vec3 inputs and same-domain publication; preserve cardinality/normal policy. |
 | Progressive Poisson | Four scalar outputs and owning permutation; checked publication must retain reordering/structural invariants. |
 | Graph normals | Real adjacency requirements remain; structural connectivity types are not arbitrary scalar slots. ShortestPath/VectorHeat/ConvexHull have menu metadata but no executable runtime binders. |
@@ -142,6 +141,15 @@ python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 python3 tools/agents/generate_session_brief.py
+cmake --preset ci-asan -DINTRINSIC_GROUP_PURE_CTEST=ON
+cmake --build --preset ci-asan --target IntrinsicCpuTests
+ctest --test-dir build/ci-asan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1
+cmake --preset ci-ubsan -DINTRINSIC_GROUP_PURE_CTEST=ON
+cmake --build --preset ci-ubsan --target IntrinsicCpuTests
+ctest --test-dir build/ci-ubsan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target IntrinsicTests
+ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 120
 ```
 
 ## Implementation scope and limits
@@ -198,6 +206,83 @@ performance, solver-parity or backend-maturity claim is introduced.
   lexing TextureBake. The build was interrupted; frozen-source rebuilds with
   ccache disabled supersede that invalid run. No source workaround was added.
 
+## Final verification — 2026-09-22
+
+Independent review endpoint: Claude reported no blockers for the frozen combined
+diff through `40cfd093c`; a separate agent cross-reviewed subdivision through
+`ec3a0efba` with no blockers. Cross-reviews also covered scalar publication and
+the later skipped-face/capability corrections. Reviews did not substitute for
+execution gates below.
+
+Combined source through `384823134`: canonical `ci` builds `IntrinsicTests`;
+full exclusion-only CPU selector passes 4,937 selected tests (4,936 passes, one
+expected GLFW/LSan capability skip), zero failures, 159.39 seconds. The latest
+curvature queued/history connectivity and deletion-mask guards use the shared
+mesh topology signature and have independent review plus negative regressions.
+
+Clean `ci-asan` rebuild (ccache disabled for the clean rebuild) and full grouped
+CPU selector pass all 3,288 tests, zero failures or skips, 656.22 seconds. This
+supersedes the interrupted/inconsistent early sanitizer build. The final
+curvature-extrema group completes in 92.05 seconds under its unchanged limit.
+
+The first combined Vulkan run exposed a remaining material-reconciliation scalar
+predicate that admitted only Float/Double after a successful raw bake. The
+existing owner now uses the canonical component-count helper; its CPU regression
+covers all six scalar kinds, colormap/range preservation and unrelated channels.
+The same run exposed interpolation overflow for finite extreme normal vectors;
+this is distinct from squared-length overflow during normalization. Both failures
+are closed by the final passing Vulkan regression run.
+
+BUG-206 reproduced in the full UBSan selector as queued/running diagnostics for
+the same UV job. Commit `1a578a1aa` compares the exact stable job token while
+allowing only phases reachable before main-thread draining. Independent review
+confirmed that single-job, one-delivery, no-second-sink and admission assertions
+remain intact. Focused ci, ASan and UBSan each passed 100 consecutive repetitions.
+
+BUG-208 records the remaining Vulkan gate blocker: anisotropic WLOP executes the
+same eight-phase normal-estimation sequence as EAR but had the seven-phase
+watchdog allowance. The existing eight-phase allowance now follows the same
+`UsesNormals()` predicate as termination, with independent review and all
+assertions unchanged. Its complete serial recheck passes; BUG-208 is retired.
+BUG-193 retains the separate controlled presentation-pacing investigation.
+
+Final review sweep: scope remains the audited property-binding families and the
+observed verification blockers; no new solver/backend was added. Shared scalar
+conversion stays in GeometryAvailability, material reconciliation reuses the
+canonical component-count helper, and runtime retains all composition ownership.
+Layering and test-layout checks pass. Config/schema, source documentation,
+architecture constraints and task links are synchronized; module inventory still
+contains 429 interfaces. Claude's final bounded review cleared scalar material
+reconciliation and topology/history guards and approved the normal interpolation
+approach; an independent agent reviewed the exact shader and watchdog diffs.
+
+
+## Completion — 2026-09-22
+Retired at the intended CPUContracted property-binding endpoint, with additional
+named Vulkan execution regressions; this task does not promote an algorithm or
+backend maturity. PR/commit: implementation through `7dbe421e8`, with this
+retirement recorded by the enclosing commit. Every acceptance criterion is closed.
+
+Final canonical ci build and CPU selector: 4,937 selected, 4,936 passed and one
+expected GLFW/LSan capability skip. Full ASan: 3,288 passed. Full UBSan: 3,287
+passed and one expected GLFW/LSan skip. The final material reconciliation change
+also passes 87 focused ci cases and 47 cases in each sanitizer build.
+The full Vulkan run passed 89 of 95 cases before final fixes; all six diagnosed
+failures and adjacent consumers pass in the final rebuilt 15-case selection.
+The full run includes the passing Vulkan shutdown LeakSanitizer contract.
+See [retained verification and exact commands](../evidence/RUNTIME-270/verification.md).
+
+Blocking verification defects [BUG-206](BUG-206-uv-duplicate-submit-phase-race.md),
+[BUG-207](BUG-207-loaded-ubsan-curvature-timeout.md) and
+[BUG-208](BUG-208-anisotropic-eight-phase-watchdog.md) are retired.
+UI-037's broader service-readiness and metadata-copy work and BUG-193's controlled
+presentation-pacing investigation remain independent. GMM's explicit 1–3-channel
+limit, value-dependent exact publication conversion, canonical float vector
+storage and structural topology ownership are the intentional contract limits
+listed above, not unfinished retirement criteria. No next-maturity follow-up is
+needed for this binding-contract endpoint.
+
+
 ## Closed development-cost batch — 2026-09-21
 
 The operator explicitly prioritized duplicate-code and compilation-time closure
@@ -247,9 +332,3 @@ probe tests were fixed. No sanitizer/GPU run or new performance claim this sessi
 
 Historical implementation notes are preserved in `e804afc24`; this current
 summary replaces repeated chronological checklists without dropping open scope.
-
-Independent review endpoint: Claude reported no blockers for the frozen combined
-diff through `40cfd093c`; a separate agent cross-reviewed subdivision through
-`ec3a0efba` with no blockers. Cross-reviews also covered scalar publication and
-the later skipped-face/capability corrections. Reviews did not substitute for
-execution gates below.

@@ -644,3 +644,12 @@ sessions:
   - C107
   - C108
   open_threads: 2
+
+- id: 2026-09-22_001
+  date: '2026-09-22'
+  summary: Retired RUNTIME-270 and BUG-206/207/208 after checked binding implementation, Claude/subagent reviews
+    and CPU/sanitizer/Vulkan verification.
+  turn_count: 1
+  events_count: 1
+  claims_touched: []
+  open_threads: 3

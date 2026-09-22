@@ -7,6 +7,29 @@ relative to `tasks/done/`, which sits at the same depth as `tasks/active/`,
 so blocks moved from the old active-README history work verbatim.
 
 
+## 2026-09-22 — RUNTIME-270 property-binding equivalence retired
+
+Retired [RUNTIME-270](RUNTIME-270-property-binding-equivalence.md) at the intended
+CPUContracted binding endpoint. Checked scalar publication, canonical geodesic
+and subdivision refs, explicit corner-UV retirement and normal interpretation,
+all-domain point consumers, stale/history guards and cached bound-feature
+readiness are integrated. Claude and independent agents reviewed the changes.
+Full CPU and both sanitizer selectors pass; all six failures from the full
+Vulkan run pass in the final 15-case regression selection. Source through
+`7dbe421e8`; enclosing commit records retirement. BUG-206/207/208 are closed;
+UI-037 and BUG-193 retain their separate broader scopes. Numerical/storage limits
+are explicit in the task; no new benchmark or backend-maturity claim.
+
+## 2026-09-22 — BUG-208 eight-phase watchdog retired
+
+Retired [BUG-208](BUG-208-anisotropic-eight-phase-watchdog.md), commit
+`7dbe421e8`: anisotropic consolidation now uses the existing eight-phase allowance
+selected by the same predicate as its phase count. Serial Vulkan execution
+completes all phases in 335.93 seconds, preserving every result/history/backend
+assertion. Independent review cleared the correction. Test-fixture endpoint;
+BUG-193 retains the separate display/pacing investigation.
+
+
 ## 2026-09-22 — BUG-206 duplicate UV observation race retired
 
 Retired [BUG-206](BUG-206-uv-duplicate-submit-phase-race.md) at the

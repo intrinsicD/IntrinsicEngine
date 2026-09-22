@@ -1,0 +1,26 @@
+Source: 1a578a1aa
+Retained CTest result summary; commands are in the retired task verification section.
+100% tests passed, 0 tests failed out of 3288
+
+Label Time Summary:
+assets         =   0.21 sec*proc (91 tests)
+benchmark      =   1.04 sec*proc (1 test)
+build          =  31.34 sec*proc (95 tests)
+contract       = 141.32 sec*proc (1967 tests)
+core           =   5.00 sec*proc (298 tests)
+ecs            =   0.81 sec*proc (133 tests)
+geometry       = 121.11 sec*proc (347 tests)
+glfw           =   0.01 sec*proc (1 test)
+graphics       =  43.07 sec*proc (901 tests)
+headless       =   0.99 sec*proc (7 tests)
+integration    =  34.58 sec*proc (350 tests)
+physics        =   0.17 sec*proc (7 tests)
+platform       =   0.02 sec*proc (5 tests)
+regression     =   1.05 sec*proc (2 tests)
+runtime        = 144.80 sec*proc (1593 tests)
+unit           = 126.29 sec*proc (973 tests)
+
+Total Test time (real) = 296.05 sec
+
+The following tests did not run:
+	3306 - GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl (Skipped)

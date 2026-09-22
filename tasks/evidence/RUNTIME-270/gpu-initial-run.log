@@ -1,0 +1,692 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+      Start    3: IntrinsicKMeansGpuBenchmarkSmoke.Run
+ 1/95 Test    #3: IntrinsicKMeansGpuBenchmarkSmoke.Run ........................................................................   Passed   25.06 sec
+      Start    4: IntrinsicKMeansGpuBenchmarkSmoke.Validate
+ 2/95 Test    #4: IntrinsicKMeansGpuBenchmarkSmoke.Validate ...................................................................   Passed    0.16 sec
+      Start    5: IntrinsicLopFamilyGpuBenchmarkSmoke.Run
+ 3/95 Test    #5: IntrinsicLopFamilyGpuBenchmarkSmoke.Run .....................................................................   Passed   56.40 sec
+      Start    6: IntrinsicLopFamilyGpuBenchmarkSmoke.UnavailableEnvironmentFailsClosed
+ 4/95 Test    #6: IntrinsicLopFamilyGpuBenchmarkSmoke.UnavailableEnvironmentFailsClosed .......................................   Passed    3.01 sec
+      Start    7: IntrinsicLopFamilyGpuBenchmarkSmoke.Validate
+ 5/95 Test    #7: IntrinsicLopFamilyGpuBenchmarkSmoke.Validate ................................................................   Passed    0.16 sec
+      Start    9: PointLBVHGpuSmoke.VulkanBuildAndQueriesMatchExhaustiveCpuAndReuseAllocations
+ 6/95 Test    #9: PointLBVHGpuSmoke.VulkanBuildAndQueriesMatchExhaustiveCpuAndReuseAllocations ................................   Passed   14.68 sec
+      Start   10: PointLBVHGpuSmoke.FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve
+ 7/95 Test   #10: PointLBVHGpuSmoke.FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve ................................   Passed   46.89 sec
+      Start   11: PointLBVHGpuSmoke.KNearestAndExclusionMatchExhaustiveOracle
+ 8/95 Test   #11: PointLBVHGpuSmoke.KNearestAndExclusionMatchExhaustiveOracle .................................................   Passed   14.25 sec
+      Start   12: PointLBVHGpuSmoke.FramedKNearestReusesBuffersAndRejectsStaleTarget
+ 9/95 Test   #12: PointLBVHGpuSmoke.FramedKNearestReusesBuffersAndRejectsStaleTarget ..........................................   Passed   16.99 sec
+      Start   13: PointLBVHGpuSmoke.FramedRadiusPreservesOverflowExclusionAndBufferReuse
+10/95 Test   #13: PointLBVHGpuSmoke.FramedRadiusPreservesOverflowExclusionAndBufferReuse ......................................   Passed   16.72 sec
+      Start   14: PointLBVHGpuSmoke.NormalNeighborhoodsPublishAcrossDomainsAndRejectIncompleteSupport
+11/95 Test   #14: PointLBVHGpuSmoke.NormalNeighborhoodsPublishAcrossDomainsAndRejectIncompleteSupport .........................   Passed   43.72 sec
+      Start   15: PointLBVHGpuSmoke.OutlierNeighborhoodsPublishAcrossDomainsAndCountDenseSupport
+12/95 Test   #15: PointLBVHGpuSmoke.OutlierNeighborhoodsPublishAcrossDomainsAndCountDenseSupport ..............................   Passed   44.84 sec
+      Start   16: PointLBVHGpuSmoke.LocalDistanceRatioPublishesAcrossDomains
+13/95 Test   #16: PointLBVHGpuSmoke.LocalDistanceRatioPublishesAcrossDomains ..................................................   Passed   44.83 sec
+      Start   17: PointLBVHGpuSmoke.KernelDensityPublishesAcrossDomainsAndPreservesCandidatePolicy
+14/95 Test   #17: PointLBVHGpuSmoke.KernelDensityPublishesAcrossDomainsAndPreservesCandidatePolicy ............................   Passed   44.86 sec
+      Start   18: PointLBVHGpuSmoke.PointSpacingPublishesAcrossDomainsAndPreservesCandidatePolicy
+15/95 Test   #18: PointLBVHGpuSmoke.PointSpacingPublishesAcrossDomainsAndPreservesCandidatePolicy .............................   Passed   44.76 sec
+      Start   19: PointLBVHGpuSmoke.BilateralPublishesMovingPassesAcrossDomains
+16/95 Test   #19: PointLBVHGpuSmoke.BilateralPublishesMovingPassesAcrossDomains ...............................................   Passed   60.82 sec
+      Start   20: PointLBVHGpuSmoke.BilateralRejectsStaleAndCancelledPasses
+17/95 Test   #20: PointLBVHGpuSmoke.BilateralRejectsStaleAndCancelledPasses ...................................................   Passed   37.75 sec
+      Start   21: PointLBVHGpuSmoke.KeypointPublishesAcrossDomainsWithCompleteSupport
+18/95 Test   #21: PointLBVHGpuSmoke.KeypointPublishesAcrossDomainsWithCompleteSupport .........................................   Passed   24.81 sec
+      Start   22: PointLBVHGpuSmoke.KeypointRejectsStaleCancellationAndRadiusOverflow
+19/95 Test   #22: PointLBVHGpuSmoke.KeypointRejectsStaleCancellationAndRadiusOverflow .........................................   Passed   16.75 sec
+      Start   23: PointLBVHGpuSmoke.KeypointVulkanComputePublishesAcrossDomains
+20/95 Test   #23: PointLBVHGpuSmoke.KeypointVulkanComputePublishesAcrossDomains ...............................................   Passed   18.80 sec
+      Start   24: PointLBVHGpuSmoke.KeypointVulkanComputeRejectsStaleCancellationAndOverflow
+21/95 Test   #24: PointLBVHGpuSmoke.KeypointVulkanComputeRejectsStaleCancellationAndOverflow ..................................   Passed   15.78 sec
+      Start   25: PointLBVHGpuSmoke.KeypointVulkanComputePlanarZeroScoresAndIsotropicFloor
+22/95 Test   #25: PointLBVHGpuSmoke.KeypointVulkanComputePlanarZeroScoresAndIsotropicFloor ....................................   Passed   18.80 sec
+      Start   26: PointLBVHGpuSmoke.DescriptorPublishesAcrossDomainsWithCompleteSupport
+23/95 Test   #26: PointLBVHGpuSmoke.DescriptorPublishesAcrossDomainsWithCompleteSupport .......................................   Passed   24.83 sec
+      Start   27: PointLBVHGpuSmoke.DescriptorRejectsStaleCancellationAndRadiusOverflow
+24/95 Test   #27: PointLBVHGpuSmoke.DescriptorRejectsStaleCancellationAndRadiusOverflow .......................................   Passed   16.80 sec
+      Start   28: PointLBVHGpuSmoke.DescriptorLowestIdCapSupportsDenseRadius
+25/95 Test   #28: PointLBVHGpuSmoke.DescriptorLowestIdCapSupportsDenseRadius ..................................................   Passed   45.67 sec
+      Start   29: PointLBVHGpuSmoke.DensityWeightPublishesAllKernelsAcrossDomains
+26/95 Test   #29: PointLBVHGpuSmoke.DensityWeightPublishesAllKernelsAcrossDomains .............................................   Passed   45.79 sec
+      Start   30: PointLBVHGpuSmoke.DensityWeightRejectsStaleCancellationOverflowAndSubmission
+27/95 Test   #30: PointLBVHGpuSmoke.DensityWeightRejectsStaleCancellationOverflowAndSubmission ................................   Passed   16.82 sec
+      Start   31: PointLBVHGpuSmoke.DensityWeightTinySupportAndOneSample
+28/95 Test   #31: PointLBVHGpuSmoke.DensityWeightTinySupportAndOneSample ......................................................   Passed   21.77 sec
+      Start   32: PointConstructionGpuSmoke.QueriesMatchReferenceAcrossDomainsAndGeneratedGeometryRenders
+29/95 Test   #32: PointConstructionGpuSmoke.QueriesMatchReferenceAcrossDomainsAndGeneratedGeometryRenders .....................   Passed  130.75 sec
+      Start   33: PointConstructionGpuSmoke.StaleCancelledAndPartialSubmissionCreateNoEntity
+30/95 Test   #33: PointConstructionGpuSmoke.StaleCancelledAndPartialSubmissionCreateNoEntity ..................................   Passed   24.02 sec
+      Start 4081: BufferReadbackGpuSmoke.TransferQueueDownloadsDeviceLocalBufferWithoutWaitIdle
+31/95 Test #4081: BufferReadbackGpuSmoke.TransferQueueDownloadsDeviceLocalBufferWithoutWaitIdle ...............................   Passed    1.84 sec
+      Start 4082: ComputeParallelPrimitivesGpuSmoke.VulkanScanAndCompactionMatchCpuReference
+32/95 Test #4082: ComputeParallelPrimitivesGpuSmoke.VulkanScanAndCompactionMatchCpuReference ..................................   Passed   23.31 sec
+      Start 4083: GpuTransferFacadeGpuSmoke.UploadThenReadbackRoundTripsThroughFacadeWithoutWaitIdle
+33/95 Test #4083: GpuTransferFacadeGpuSmoke.UploadThenReadbackRoundTripsThroughFacadeWithoutWaitIdle ..........................   Passed    4.24 sec
+      Start 4084: TextureReadbackGpuSmoke.TransferQueueDownloadsTextureSubresourceWithoutWaitIdle
+34/95 Test #4084: TextureReadbackGpuSmoke.TransferQueueDownloadsTextureSubresourceWithoutWaitIdle .............................   Passed    2.86 sec
+      Start 4085: DefaultRecipeSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream
+35/95 Test #4085: DefaultRecipeSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream ............................   Passed    5.20 sec
+      Start 4086: DefaultRecipeSurfaceGpuSmoke.NativeGpuTimestampsResolveNamedPassesAfterSlotReuse
+36/95 Test #4086: DefaultRecipeSurfaceGpuSmoke.NativeGpuTimestampsResolveNamedPassesAfterSlotReuse ............................   Passed    9.35 sec
+      Start 4087: DefaultRecipeSurfaceGpuSmoke.ReferenceTriangleDebugViewReadbackMatchesMinimalHarnessSamples
+37/95 Test #4087: DefaultRecipeSurfaceGpuSmoke.ReferenceTriangleDebugViewReadbackMatchesMinimalHarnessSamples .................   Passed    6.34 sec
+      Start 4088: DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation
+38/95 Test #4088: DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation ...........................   Passed   13.81 sec
+      Start 4089: DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialAsyncComputeReadbackWithValidation
+39/95 Test #4089: DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialAsyncComputeReadbackWithValidation ...............   Passed   13.79 sec
+      Start 4090: DefaultRecipeSurfaceGpuSmoke.TransientAliasingMatchesFallbackReadbackAndReducesMemory
+40/95 Test #4090: DefaultRecipeSurfaceGpuSmoke.TransientAliasingMatchesFallbackReadbackAndReducesMemory .......................   Passed    7.81 sec
+      Start 4091: DefaultRecipeSurfaceGpuSmoke.VulkanRenderContractPublishesDeclaredArtifactMetadata
+41/95 Test #4091: DefaultRecipeSurfaceGpuSmoke.VulkanRenderContractPublishesDeclaredArtifactMetadata ..........................   Passed    6.36 sec
+      Start 4092: DefaultRecipeSurfaceGpuSmoke.VulkanResourceSlotsRecycleAfterRetirementWindow
+42/95 Test #4092: DefaultRecipeSurfaceGpuSmoke.VulkanResourceSlotsRecycleAfterRetirementWindow ................................   Passed   10.36 sec
+      Start 4093: DefaultRecipeSurfaceGpuSmoke.AsyncComputeHistogramQueueReadbackMatchesMinimalHarnessSamples
+43/95 Test #4093: DefaultRecipeSurfaceGpuSmoke.AsyncComputeHistogramQueueReadbackMatchesMinimalHarnessSamples .................   Passed    6.30 sec
+      Start 4094: HzbOcclusionConservatismGpuSmoke.TwoPhasePredicateMatchesCpuContractOnOperationalVulkan
+44/95 Test #4094: HzbOcclusionConservatismGpuSmoke.TwoPhasePredicateMatchesCpuContractOnOperationalVulkan .....................   Passed    6.29 sec
+      Start 4095: ImGuiSurfaceGpuSmoke.UserTextureImageRecordsOnOperationalVulkanCommandStream
+45/95 Test #4095: ImGuiSurfaceGpuSmoke.UserTextureImageRecordsOnOperationalVulkanCommandStream ................................   Passed    5.13 sec
+      Start 4096: ImGuiSurfaceGpuSmoke.LargeSelectedEntityPayloadRetainsAtlasOnOperationalVulkan
+46/95 Test #4096: ImGuiSurfaceGpuSmoke.LargeSelectedEntityPayloadRetainsAtlasOnOperationalVulkan ..............................   Passed    7.29 sec
+      Start 4097: ImGuiSurfaceGpuSmoke.DrawListPixelsReachBackbufferOnOperationalVulkan
+47/95 Test #4097: ImGuiSurfaceGpuSmoke.DrawListPixelsReachBackbufferOnOperationalVulkan .......................................   Passed    5.13 sec
+      Start 4098: TransientDebugSurfaceGpuSmoke.MixedLanesRecordOnOperationalVulkanCommandStream
+48/95 Test #4098: TransientDebugSurfaceGpuSmoke.MixedLanesRecordOnOperationalVulkanCommandStream ..............................   Passed    6.26 sec
+      Start 4099: TransientDebugSurfaceGpuSmoke.MixedLanesReadBackExpectedSampleColors
+49/95 Test #4099: TransientDebugSurfaceGpuSmoke.MixedLanesReadBackExpectedSampleColors ........................................   Passed    6.17 sec
+      Start 4100: UvViewGpuSmoke.RetainedBackgroundModesReadBackOnOperationalVulkan
+50/95 Test #4100: UvViewGpuSmoke.RetainedBackgroundModesReadBackOnOperationalVulkan ...........................................   Passed    9.71 sec
+      Start 4101: VisualizationOverlaySurfaceGpuSmoke.PropertyBuffersPublishBdasBeforeOperationalVulkanCommandStream
+51/95 Test #4101: VisualizationOverlaySurfaceGpuSmoke.PropertyBuffersPublishBdasBeforeOperationalVulkanCommandStream ..........   Passed    6.31 sec
+      Start 4102: VisualizationOverlaySurfaceGpuSmoke.MixedLanesReadBackExpectedSampleColors
+52/95 Test #4102: VisualizationOverlaySurfaceGpuSmoke.MixedLanesReadBackExpectedSampleColors ..................................   Passed    6.33 sec
+      Start 4103: VulkanBootstrapSmoke.InitializeCreatesPerFrameResourcesOrFailsCleanly
+53/95 Test #4103: VulkanBootstrapSmoke.InitializeCreatesPerFrameResourcesOrFailsCleanly .......................................   Passed    1.97 sec
+      Start 4104: RuntimeSandboxAcceptanceGpuSmoke.AcceptanceSceneReachesOperationalDefaultRecipePresent
+54/95 Test #4104: RuntimeSandboxAcceptanceGpuSmoke.AcceptanceSceneReachesOperationalDefaultRecipePresent ......................   Passed    5.26 sec
+      Start 4105: RuntimeSandboxAcceptanceGpuSmoke.GeometryPresentationReachesOperationalFrame
+55/95 Test #4105: RuntimeSandboxAcceptanceGpuSmoke.GeometryPresentationReachesOperationalFrame ................................   Passed    5.28 sec
+      Start 4106: RuntimeSandboxAcceptanceGpuSmoke.ExtrinsicSandboxDefaultConfigProducesVisibleFrameWithValidation
+56/95 Test #4106: RuntimeSandboxAcceptanceGpuSmoke.ExtrinsicSandboxDefaultConfigProducesVisibleFrameWithValidation ............   Passed    6.02 sec
+      Start 4107: RuntimeSandboxAcceptanceGpuSmoke.ParameterizationUvViewWindowUsesOperationalGpuTargetThroughRuntimePath
+57/95 Test #4107: RuntimeSandboxAcceptanceGpuSmoke.ParameterizationUvViewWindowUsesOperationalGpuTargetThroughRuntimePath .....   Passed    6.07 sec
+      Start 4108: RuntimeSandboxAcceptanceGpuSmoke.ExtrinsicSandboxDefaultConfigPresentsReferenceTriangleAtFrameCenter
+58/95 Test #4108: RuntimeSandboxAcceptanceGpuSmoke.ExtrinsicSandboxDefaultConfigPresentsReferenceTriangleAtFrameCenter ........   Passed    5.99 sec
+      Start 4109: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleVertexColorStreamShadesDeferredSurface
+59/95 Test #4109: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleVertexColorStreamShadesDeferredSurface ....................   Passed    6.03 sec
+      Start 4110: RuntimeSandboxAcceptanceGpuSmoke.VertexColorDirtyChannelPartiallyUploadsAndShadesDeferredSurface
+60/95 Test #4110: RuntimeSandboxAcceptanceGpuSmoke.VertexColorDirtyChannelPartiallyUploadsAndShadesDeferredSurface ............   Passed    5.93 sec
+      Start 4111: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleMeshConfiguredLineWidthAndPointDrawLanesPresent
+61/95 Test #4111: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleMeshConfiguredLineWidthAndPointDrawLanesPresent ...........   Passed    5.99 sec
+      Start 4112: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleScalarFieldColormapResolvesOnLineAndPointLanes
+62/95 Test #4112: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleScalarFieldColormapResolvesOnLineAndPointLanes ............   Passed    6.02 sec
+      Start 4113: RuntimeSandboxAcceptanceGpuSmoke.AnalysisMaskSaliencyAndAppearanceRecoveryReachGpu
+63/95 Test #4113: RuntimeSandboxAcceptanceGpuSmoke.AnalysisMaskSaliencyAndAppearanceRecoveryReachGpu ..........................   Passed   19.71 sec
+      Start 4114: RuntimeSandboxAcceptanceGpuSmoke.UnreachableVertexPreservesReachableScalarGradient
+64/95 Test #4114: RuntimeSandboxAcceptanceGpuSmoke.UnreachableVertexPreservesReachableScalarGradient ..........................   Passed    6.05 sec
+      Start 4115: RuntimeSandboxAcceptanceGpuSmoke.UnreachableScalarRegionUsesGray
+65/95 Test #4115: RuntimeSandboxAcceptanceGpuSmoke.UnreachableScalarRegionUsesGray ............................................   Passed    6.30 sec
+      Start 4116: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleScalarFieldSurfaceAndIsolinesResolveOnGpu
+66/95 Test #4116: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleScalarFieldSurfaceAndIsolinesResolveOnGpu .................   Passed    5.95 sec
+      Start 4117: RuntimeSandboxAcceptanceGpuSmoke.InspectorTransformEditShiftsReferenceTrianglePixels
+67/95 Test #4117: RuntimeSandboxAcceptanceGpuSmoke.InspectorTransformEditShiftsReferenceTrianglePixels ........................   Passed   10.29 sec
+      Start 4118: RuntimeSandboxAcceptanceGpuSmoke.ImportedOffOriginObjTriangleAutoFramesAtCenter
+68/95 Test #4118: RuntimeSandboxAcceptanceGpuSmoke.ImportedOffOriginObjTriangleAutoFramesAtCenter .............................   Passed    6.21 sec
+      Start 4119: RuntimeSandboxAcceptanceGpuSmoke.DirectMeshEnrichmentPendingRendersGeometryOnlyImport
+69/95 Test #4119: RuntimeSandboxAcceptanceGpuSmoke.DirectMeshEnrichmentPendingRendersGeometryOnlyImport .......................   Passed    7.36 sec
+      Start 4120: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+70/95 Test #4120: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture .................   Passed    7.37 sec
+      Start 4121: RuntimeSandboxAcceptanceGpuSmoke.ClickPickReadbackSelectsReferenceTriangleAndBackgroundClears
+71/95 Test #4121: RuntimeSandboxAcceptanceGpuSmoke.ClickPickReadbackSelectsReferenceTriangleAndBackgroundClears ...............   Passed    8.00 sec
+      Start 4122: RuntimeSandboxAcceptanceGpuSmoke.ImportedModelSceneIsVisibleAndClickPickable
+72/95 Test #4122: RuntimeSandboxAcceptanceGpuSmoke.ImportedModelSceneIsVisibleAndClickPickable ................................   Passed   10.28 sec
+      Start 4123: RuntimeSandboxAcceptanceGpuSmoke.ImportedModelSceneReplacementIsVisibleAndClickPickable
+73/95 Test #4123: RuntimeSandboxAcceptanceGpuSmoke.ImportedModelSceneReplacementIsVisibleAndClickPickable .....................   Passed   10.35 sec
+      Start 4124: RuntimeSandboxAcceptanceGpuSmoke.HierarchySelectionKeepsDefaultSandboxVisibleWithOutline
+74/95 Test #4124: RuntimeSandboxAcceptanceGpuSmoke.HierarchySelectionKeepsDefaultSandboxVisibleWithOutline ....................   Passed    5.95 sec
+      Start 4125: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice
+75/95 Test #4125: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice .............   Passed   11.40 sec
+      Start 4126: RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureModuleBakesRebindsRebakesAndRemovesOnVulkan
+76/95 Test #4126: RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureModuleBakesRebindsRebakesAndRemovesOnVulkan .................   Passed   25.62 sec
+      Start 4127: RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureDoubleStorageBakesAndRebakesOnVulkan
+77/95 Test #4127: RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureDoubleStorageBakesAndRebakesOnVulkan ........................   Passed   25.63 sec
+      Start 4128: RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureBoolStorageBakesAndRebakesOnVulkan
+78/95 Test #4128: RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureBoolStorageBakesAndRebakesOnVulkan ..........................***Failed    9.58 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureBoolStorageBakesAndRebakesOnVulkan
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from RuntimeSandboxAcceptanceGpuSmoke
+[ RUN      ] RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureBoolStorageBakesAndRebakesOnVulkan
+[32m[INFO] Initialized Scheduler with 15 worker threads.[0m
+[33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+[33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+[33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7434: Failure
+Value of: appPtr->FailureReason.empty()
+  Actual: false
+Expected: true
+Ready raw scalar texture did not bind as Viridis albedo.
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7438: Failure
+Value of: appPtr->RebakeReadbackRecorded
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7440: Failure
+Value of: appPtr->InitialViridisBindingObserved
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7441: Failure
+Value of: appPtr->InfernoBindingObserved
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7442: Failure
+Value of: appPtr->ColormapChangedWithoutRebake
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7443: Failure
+Value of: appPtr->RenamePreservedOldAsset
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7444: Failure
+Value of: appPtr->RebakeReusedAsset
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7445: Failure
+Value of: appPtr->AssetsDestroyedObserved
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7446: Failure
+Value of: appPtr->PropertyBufferFallbackObserved
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7450: Failure
+Expected: (appPtr->RebakedVertexCacheGeneration) > (appPtr->InitialVertexCacheGeneration), actual: 0 vs 1
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7459: Failure
+The difference between ReadRuntime190FloatTexel(bakeBytes[1], 8u, 8u) and 1.0f is 1, which exceeds 1.0e-5f, where
+ReadRuntime190FloatTexel(bakeBytes[1], 8u, 8u) evaluates to 0,
+1.0f evaluates to 1, and
+1.0e-5f evaluates to 9.9999997473787516e-06.
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7553: Failure
+Expected: (viridisPixel.R) < (viridisPixel.G), actual: '\0' vs '\0'
+Tone-mapped Viridis frame center=(0,0,0) source LUT=(58,81,139)
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7556: Failure
+Expected: (viridisPixel.G) < (viridisPixel.B), actual: '\0' vs '\0'
+Tone-mapped Viridis frame center=(0,0,0) source LUT=(58,81,139)
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7559: Failure
+Expected: (infernoPixel.G) < (infernoPixel.R), actual: '\0' vs '\0'
+Tone-mapped Inferno frame center=(0,0,0) source LUT=(85,15,108)
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7562: Failure
+Expected: (infernoPixel.R) < (infernoPixel.B), actual: '\0' vs '\0'
+Tone-mapped Inferno frame center=(0,0,0) source LUT=(85,15,108)
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7565: Failure
+Expected: (RgbDistance(viridisPixel, infernoPixel)) > (24), actual: 0 vs 24
+Render-time colormap edit did not visibly change the raw scalar texture: Viridis=(0,0,0) Inferno=(0,0,0)
+
+[  FAILED  ] RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureBoolStorageBakesAndRebakesOnVulkan (9534 ms)
+[----------] 1 test from RuntimeSandboxAcceptanceGpuSmoke (9534 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (9535 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureBoolStorageBakesAndRebakesOnVulkan
+
+ 1 FAILED TEST
+
+      Start 4129: RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureInt32StorageBakesAndRebakesOnVulkan
+79/95 Test #4129: RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureInt32StorageBakesAndRebakesOnVulkan .........................***Failed    9.57 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureInt32StorageBakesAndRebakesOnVulkan
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from RuntimeSandboxAcceptanceGpuSmoke
+[ RUN      ] RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureInt32StorageBakesAndRebakesOnVulkan
+[32m[INFO] Initialized Scheduler with 15 worker threads.[0m
+[33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+[33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+[33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7434: Failure
+Value of: appPtr->FailureReason.empty()
+  Actual: false
+Expected: true
+Ready raw scalar texture did not bind as Viridis albedo.
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7438: Failure
+Value of: appPtr->RebakeReadbackRecorded
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7440: Failure
+Value of: appPtr->InitialViridisBindingObserved
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7441: Failure
+Value of: appPtr->InfernoBindingObserved
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7442: Failure
+Value of: appPtr->ColormapChangedWithoutRebake
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7443: Failure
+Value of: appPtr->RenamePreservedOldAsset
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7444: Failure
+Value of: appPtr->RebakeReusedAsset
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7445: Failure
+Value of: appPtr->AssetsDestroyedObserved
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7446: Failure
+Value of: appPtr->PropertyBufferFallbackObserved
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7450: Failure
+Expected: (appPtr->RebakedVertexCacheGeneration) > (appPtr->InitialVertexCacheGeneration), actual: 0 vs 1
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7459: Failure
+The difference between ReadRuntime190FloatTexel(bakeBytes[1], 8u, 8u) and 1.0f is 1, which exceeds 1.0e-5f, where
+ReadRuntime190FloatTexel(bakeBytes[1], 8u, 8u) evaluates to 0,
+1.0f evaluates to 1, and
+1.0e-5f evaluates to 9.9999997473787516e-06.
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7553: Failure
+Expected: (viridisPixel.R) < (viridisPixel.G), actual: '\0' vs '\0'
+Tone-mapped Viridis frame center=(0,0,0) source LUT=(58,81,139)
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7556: Failure
+Expected: (viridisPixel.G) < (viridisPixel.B), actual: '\0' vs '\0'
+Tone-mapped Viridis frame center=(0,0,0) source LUT=(58,81,139)
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7559: Failure
+Expected: (infernoPixel.G) < (infernoPixel.R), actual: '\0' vs '\0'
+Tone-mapped Inferno frame center=(0,0,0) source LUT=(85,15,108)
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7562: Failure
+Expected: (infernoPixel.R) < (infernoPixel.B), actual: '\0' vs '\0'
+Tone-mapped Inferno frame center=(0,0,0) source LUT=(85,15,108)
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7565: Failure
+Expected: (RgbDistance(viridisPixel, infernoPixel)) > (24), actual: 0 vs 24
+Render-time colormap edit did not visibly change the raw scalar texture: Viridis=(0,0,0) Inferno=(0,0,0)
+
+[  FAILED  ] RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureInt32StorageBakesAndRebakesOnVulkan (9521 ms)
+[----------] 1 test from RuntimeSandboxAcceptanceGpuSmoke (9521 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (9521 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureInt32StorageBakesAndRebakesOnVulkan
+
+ 1 FAILED TEST
+
+      Start 4130: RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureUInt32StorageBakesAndRebakesOnVulkan
+80/95 Test #4130: RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureUInt32StorageBakesAndRebakesOnVulkan ........................***Failed    9.57 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureUInt32StorageBakesAndRebakesOnVulkan
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from RuntimeSandboxAcceptanceGpuSmoke
+[ RUN      ] RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureUInt32StorageBakesAndRebakesOnVulkan
+[32m[INFO] Initialized Scheduler with 15 worker threads.[0m
+[33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+[33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+[33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7434: Failure
+Value of: appPtr->FailureReason.empty()
+  Actual: false
+Expected: true
+Ready raw scalar texture did not bind as Viridis albedo.
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7438: Failure
+Value of: appPtr->RebakeReadbackRecorded
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7440: Failure
+Value of: appPtr->InitialViridisBindingObserved
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7441: Failure
+Value of: appPtr->InfernoBindingObserved
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7442: Failure
+Value of: appPtr->ColormapChangedWithoutRebake
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7443: Failure
+Value of: appPtr->RenamePreservedOldAsset
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7444: Failure
+Value of: appPtr->RebakeReusedAsset
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7445: Failure
+Value of: appPtr->AssetsDestroyedObserved
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7446: Failure
+Value of: appPtr->PropertyBufferFallbackObserved
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7450: Failure
+Expected: (appPtr->RebakedVertexCacheGeneration) > (appPtr->InitialVertexCacheGeneration), actual: 0 vs 1
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7459: Failure
+The difference between ReadRuntime190FloatTexel(bakeBytes[1], 8u, 8u) and 1.0f is 1, which exceeds 1.0e-5f, where
+ReadRuntime190FloatTexel(bakeBytes[1], 8u, 8u) evaluates to 0,
+1.0f evaluates to 1, and
+1.0e-5f evaluates to 9.9999997473787516e-06.
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7553: Failure
+Expected: (viridisPixel.R) < (viridisPixel.G), actual: '\0' vs '\0'
+Tone-mapped Viridis frame center=(0,0,0) source LUT=(58,81,139)
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7556: Failure
+Expected: (viridisPixel.G) < (viridisPixel.B), actual: '\0' vs '\0'
+Tone-mapped Viridis frame center=(0,0,0) source LUT=(58,81,139)
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7559: Failure
+Expected: (infernoPixel.G) < (infernoPixel.R), actual: '\0' vs '\0'
+Tone-mapped Inferno frame center=(0,0,0) source LUT=(85,15,108)
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7562: Failure
+Expected: (infernoPixel.R) < (infernoPixel.B), actual: '\0' vs '\0'
+Tone-mapped Inferno frame center=(0,0,0) source LUT=(85,15,108)
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7565: Failure
+Expected: (RgbDistance(viridisPixel, infernoPixel)) > (24), actual: 0 vs 24
+Render-time colormap edit did not visibly change the raw scalar texture: Viridis=(0,0,0) Inferno=(0,0,0)
+
+[  FAILED  ] RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureUInt32StorageBakesAndRebakesOnVulkan (9517 ms)
+[----------] 1 test from RuntimeSandboxAcceptanceGpuSmoke (9517 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (9517 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureUInt32StorageBakesAndRebakesOnVulkan
+
+ 1 FAILED TEST
+
+      Start 4131: RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureUInt64StorageBakesAndRebakesOnVulkan
+81/95 Test #4131: RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureUInt64StorageBakesAndRebakesOnVulkan ........................***Failed    9.57 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureUInt64StorageBakesAndRebakesOnVulkan
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from RuntimeSandboxAcceptanceGpuSmoke
+[ RUN      ] RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureUInt64StorageBakesAndRebakesOnVulkan
+[32m[INFO] Initialized Scheduler with 15 worker threads.[0m
+[33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+[33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+[33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7434: Failure
+Value of: appPtr->FailureReason.empty()
+  Actual: false
+Expected: true
+Ready raw scalar texture did not bind as Viridis albedo.
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7438: Failure
+Value of: appPtr->RebakeReadbackRecorded
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7440: Failure
+Value of: appPtr->InitialViridisBindingObserved
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7441: Failure
+Value of: appPtr->InfernoBindingObserved
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7442: Failure
+Value of: appPtr->ColormapChangedWithoutRebake
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7443: Failure
+Value of: appPtr->RenamePreservedOldAsset
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7444: Failure
+Value of: appPtr->RebakeReusedAsset
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7445: Failure
+Value of: appPtr->AssetsDestroyedObserved
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7446: Failure
+Value of: appPtr->PropertyBufferFallbackObserved
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7450: Failure
+Expected: (appPtr->RebakedVertexCacheGeneration) > (appPtr->InitialVertexCacheGeneration), actual: 0 vs 1
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7459: Failure
+The difference between ReadRuntime190FloatTexel(bakeBytes[1], 8u, 8u) and 1.0f is 1, which exceeds 1.0e-5f, where
+ReadRuntime190FloatTexel(bakeBytes[1], 8u, 8u) evaluates to 0,
+1.0f evaluates to 1, and
+1.0e-5f evaluates to 9.9999997473787516e-06.
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7553: Failure
+Expected: (viridisPixel.R) < (viridisPixel.G), actual: '\0' vs '\0'
+Tone-mapped Viridis frame center=(0,0,0) source LUT=(58,81,139)
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7556: Failure
+Expected: (viridisPixel.G) < (viridisPixel.B), actual: '\0' vs '\0'
+Tone-mapped Viridis frame center=(0,0,0) source LUT=(58,81,139)
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7559: Failure
+Expected: (infernoPixel.G) < (infernoPixel.R), actual: '\0' vs '\0'
+Tone-mapped Inferno frame center=(0,0,0) source LUT=(85,15,108)
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7562: Failure
+Expected: (infernoPixel.R) < (infernoPixel.B), actual: '\0' vs '\0'
+Tone-mapped Inferno frame center=(0,0,0) source LUT=(85,15,108)
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:7565: Failure
+Expected: (RgbDistance(viridisPixel, infernoPixel)) > (24), actual: 0 vs 24
+Render-time colormap edit did not visibly change the raw scalar texture: Viridis=(0,0,0) Inferno=(0,0,0)
+
+[  FAILED  ] RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureUInt64StorageBakesAndRebakesOnVulkan (9516 ms)
+[----------] 1 test from RuntimeSandboxAcceptanceGpuSmoke (9516 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (9516 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureUInt64StorageBakesAndRebakesOnVulkan
+
+ 1 FAILED TEST
+
+      Start 4132: RuntimeSandboxAcceptanceGpuSmoke.SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface
+82/95 Test #4132: RuntimeSandboxAcceptanceGpuSmoke.SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface .............   Passed    7.32 sec
+      Start 4133: RuntimeSandboxAcceptanceGpuSmoke.SurfaceAppearanceBakesSelectedPropertyAndRestoresAttributes
+83/95 Test #4133: RuntimeSandboxAcceptanceGpuSmoke.SurfaceAppearanceBakesSelectedPropertyAndRestoresAttributes ................***Failed   68.55 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = RuntimeSandboxAcceptanceGpuSmoke.SurfaceAppearanceBakesSelectedPropertyAndRestoresAttributes
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from RuntimeSandboxAcceptanceGpuSmoke
+[ RUN      ] RuntimeSandboxAcceptanceGpuSmoke.SurfaceAppearanceBakesSelectedPropertyAndRestoresAttributes
+[32m[INFO] Initialized Scheduler with 15 worker threads.[0m
+[33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+[33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+[33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:8095: Failure
+Expected: (pixels[i].G) > (pixels[i].R + 30u), actual: '\xE8' (232) vs 262
+(232,232,245)
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:8074: phase=13 settle=0 frames=64 ready-at-frame=63
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:8096: Failure
+Expected: (pixels[i].B) > (pixels[i].R + 30u), actual: '\xF5' (245) vs 262
+(232,232,245)
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:8074: phase=13 settle=0 frames=64 ready-at-frame=63
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:8097: Failure
+The difference between pixels[i].G and pixels[i].B is 13, which exceeds 3, where
+pixels[i].G evaluates to 232,
+pixels[i].B evaluates to 245, and
+3 evaluates to 3.
+(232,232,245)
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:8074: phase=13 settle=0 frames=64 ready-at-frame=63
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:8099: Failure
+The difference between pixels[4].R and pixels[5].R is 232, which exceeds 3, where
+pixels[4].R evaluates to 232,
+pixels[5].R evaluates to 0, and
+3 evaluates to 3.
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:8074: phase=13 settle=0 frames=64 ready-at-frame=63
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:8101: Failure
+The difference between pixels[4].B and pixels[5].B is 13, which exceeds 3, where
+pixels[4].B evaluates to 245,
+pixels[5].B evaluates to 232, and
+3 evaluates to 3.
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp:8074: phase=13 settle=0 frames=64 ready-at-frame=63
+
+[  FAILED  ] RuntimeSandboxAcceptanceGpuSmoke.SurfaceAppearanceBakesSelectedPropertyAndRestoresAttributes (68500 ms)
+[----------] 1 test from RuntimeSandboxAcceptanceGpuSmoke (68500 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (68500 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] RuntimeSandboxAcceptanceGpuSmoke.SurfaceAppearanceBakesSelectedPropertyAndRestoresAttributes
+
+ 1 FAILED TEST
+
+      Start 4134: ClusteringServiceGpuSmoke.VulkanExecutionMatchesCpuReferenceAndCommitsCanonicalProperties
+84/95 Test #4134: ClusteringServiceGpuSmoke.VulkanExecutionMatchesCpuReferenceAndCommitsCanonicalProperties ...................   Passed    8.25 sec
+      Start 4135: PointCloudConsolidationGpuParity.VulkanLopAndIsotropicWlopMatchFrozenCpuReferencesAndRepeat
+85/95 Test #4135: PointCloudConsolidationGpuParity.VulkanLopAndIsotropicWlopMatchFrozenCpuReferencesAndRepeat .................   Passed   28.71 sec
+      Start 4136: PointCloudConsolidationGpuParity.VulkanAutoProcessesChildMeshPositionsAndPublishesDisplacement
+86/95 Test #4136: PointCloudConsolidationGpuParity.VulkanAutoProcessesChildMeshPositionsAndPublishesDisplacement ..............   Passed   26.21 sec
+      Start 4137: PointCloudConsolidationGpuParity.VulkanLbvhMovingStepsAcrossDomainsAndFailures
+87/95 Test #4137: PointCloudConsolidationGpuParity.VulkanLbvhMovingStepsAcrossDomainsAndFailures ..............................   Passed  164.83 sec
+      Start 4138: PointCloudConsolidationGpuParity.VulkanLbvhWlopAcrossDomainsAndFailures
+88/95 Test #4138: PointCloudConsolidationGpuParity.VulkanLbvhWlopAcrossDomainsAndFailures .....................................   Passed  263.10 sec
+      Start 4139: PointCloudConsolidationGpuParity.VulkanLbvhAnisotropicWlopAcrossDomainsAndFailures
+89/95 Test #4139: PointCloudConsolidationGpuParity.VulkanLbvhAnisotropicWlopAcrossDomainsAndFailures ..........................***Failed  304.01 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = PointCloudConsolidationGpuParity.VulkanLbvhAnisotropicWlopAcrossDomainsAndFailures
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from PointCloudConsolidationGpuParity
+[ RUN      ] PointCloudConsolidationGpuParity.VulkanLbvhAnisotropicWlopAcrossDomainsAndFailures
+[32m[INFO] Initialized Scheduler with 15 worker threads.[0m
+[33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+[33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+[33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+[31m[ERR]  [JobService] Job 'Consolidation Vulkan neighborhoods' completion publisher rejected result type 'std::string_view Extrinsic::Runtime::JobResultTypeNameOf() [TResult = bool]'; completion dropped.[0m
+[31m[ERR]  [JobService] Job 'Consolidation Vulkan neighborhoods' completion publisher rejected result type 'std::string_view Extrinsic::Runtime::JobResultTypeNameOf() [TResult = bool]'; completion dropped.[0m
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp:1031: Failure
+Value of: observed->TimedOut
+  Actual: true
+Expected: false
+phase=7 results=0/1 submitted=true mutated=false phaseElapsedMs=34997.913562000002 phaseDurationsMs={ 68652.906904000003, 68000.984182, 7000.0598950000003, 4000.555292, 3996.2554399999999, 45000.584176999997, 69002.540322000001 }
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp:1037: Failure
+Value of: observed->Done
+  Actual: false
+Expected: true
+
+[  FAILED  ] PointCloudConsolidationGpuParity.VulkanLbvhAnisotropicWlopAcrossDomainsAndFailures (303973 ms)
+[----------] 1 test from PointCloudConsolidationGpuParity (303973 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (303973 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] PointCloudConsolidationGpuParity.VulkanLbvhAnisotropicWlopAcrossDomainsAndFailures
+
+ 1 FAILED TEST
+
+      Start 4140: PointCloudConsolidationGpuParity.VulkanLbvhClopAcrossDomainsAndFailures
+90/95 Test #4140: PointCloudConsolidationGpuParity.VulkanLbvhClopAcrossDomainsAndFailures .....................................   Passed  138.88 sec
+      Start 4141: PointCloudConsolidationGpuParity.VulkanLbvhEarAcrossDomainsInsertionAndFailures
+91/95 Test #4141: PointCloudConsolidationGpuParity.VulkanLbvhEarAcrossDomainsInsertionAndFailures .............................   Passed  360.96 sec
+      Start 4142: ProgressivePoissonGpuResultReadbackGpuSmoke.VulkanBatchTransportsReferenceShapedResultWithoutBlockingRead
+92/95 Test #4142: ProgressivePoissonGpuResultReadbackGpuSmoke.VulkanBatchTransportsReferenceShapedResultWithoutBlockingRead ...   Passed    1.76 sec
+      Start 4143: GpuResultReadbackGpuSmoke.SharedBatchParksJobAndReleasesDerivedUpload
+93/95 Test #4143: GpuResultReadbackGpuSmoke.SharedBatchParksJobAndReleasesDerivedUpload .......................................   Passed    1.76 sec
+      Start 5041: ExtrinsicSandbox.FramePacingDiagnosticCapture
+94/95 Test #5041: ExtrinsicSandbox.FramePacingDiagnosticCapture ...............................................................   Passed    9.71 sec
+      Start 5042: ExtrinsicSandbox.VulkanShutdownLsanContract
+95/95 Test #5042: ExtrinsicSandbox.VulkanShutdownLsanContract .................................................................   Passed    7.28 sec
+
+94% tests passed, 6 tests failed out of 95
+
+Label Time Summary:
+benchmark      =  84.79 sec*proc (5 tests)
+geometry       = 1381.51 sec*proc (14 tests)
+gpu            = 2758.14 sec*proc (95 tests)
+graphics       = 1376.63 sec*proc (81 tests)
+integration    = 2493.93 sec*proc (66 tests)
+regression     =   7.28 sec*proc (1 test)
+runtime        = 1733.50 sec*proc (47 tests)
+slow           =   1.76 sec*proc (1 test)
+vulkan         = 2758.14 sec*proc (95 tests)
+
+Total Test time (real) = 2760.02 sec
+
+The following tests FAILED:
+	4128 - RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureBoolStorageBakesAndRebakesOnVulkan (Failed)
+	4129 - RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureInt32StorageBakesAndRebakesOnVulkan (Failed)
+	4130 - RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureUInt32StorageBakesAndRebakesOnVulkan (Failed)
+	4131 - RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureUInt64StorageBakesAndRebakesOnVulkan (Failed)
+	4133 - RuntimeSandboxAcceptanceGpuSmoke.SurfaceAppearanceBakesSelectedPropertyAndRestoresAttributes (Failed)
+	4139 - PointCloudConsolidationGpuParity.VulkanLbvhAnisotropicWlopAcrossDomainsAndFailures (Failed)
+Errors while running CTest
