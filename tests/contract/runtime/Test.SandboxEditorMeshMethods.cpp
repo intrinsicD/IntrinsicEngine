@@ -6522,6 +6522,64 @@ TEST(SandboxEditorUi, MeshCurvatureRejectsDeletionMaskSwapsBeforeDeliveryAndUndo
     }
 }
 
+TEST(SandboxEditorUi, MeshCurvatureRejectsConnectivityEditsBeforeDeliveryUndoAndRedo)
+{
+    for (const int phase : {0, 1, 2})
+    {
+        SCOPED_TRACE(phase);
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        Runtime::EditorCommandHistory history;
+        auto context = MakeContext(registry, selection);
+        context.CommandHistory = &history;
+        const auto mesh = MakeSelectable(registry, "Curvature topology guard");
+        AddDenoiseAllBoundaryMeshSource(registry, mesh);
+        auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
+        auto next = registry.Raw().get<GS::Halfedges>(mesh).Properties.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeNext);
+        ASSERT_TRUE(next);
+        ASSERT_GE(next.Size(), 2u);
+        ASSERT_NE(next[0], next[1]);
+        Runtime::EditorMeshCurvatureCommand command{.StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh)};
+        Extrinsic::Tests::EditorJobHarness jobs;
+        if (phase == 0) jobs.Attach(context);
+        std::optional<Runtime::EditorMeshCurvatureResult> completion;
+        const auto result = Runtime::ApplyEditorMeshCurvatureCommand(context, command,
+            [&](auto value) { completion = std::move(value); });
+        if (phase == 0) ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
+        else ASSERT_TRUE(result.Succeeded()) << result.Message;
+        if (phase == 2) ASSERT_TRUE(history.Undo().Succeeded());
+        const auto before = phase == 1 ? properties.Get<double>(command.Mean.Name).Vector() : std::vector<double>{};
+        const auto first = next[0], second = next[1];
+        next[0] = second;
+        next[1] = first;
+        if (phase == 0)
+        {
+            ASSERT_TRUE(jobs.DrainUntilTerminal());
+            ASSERT_TRUE(completion);
+            EXPECT_EQ(completion->Status, Runtime::EditorCommandStatus::StaleEntity);
+            EXPECT_EQ(history.UndoCount(), 0u);
+        }
+        else if (phase == 1)
+        {
+            EXPECT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::StaleEntity);
+            EXPECT_EQ(properties.Get<double>(command.Mean.Name).Vector(), before);
+            EXPECT_EQ(history.UndoCount(), 1u);
+        }
+        else
+        {
+            EXPECT_EQ(history.Redo().Status, Runtime::EditorCommandHistoryStatus::StaleEntity);
+            EXPECT_EQ(history.UndoCount(), 0u);
+        }
+        if (phase != 1)
+        {
+            EXPECT_FALSE(properties.Exists(command.Mean.Name));
+            EXPECT_FALSE(properties.Exists(command.Gaussian.Name));
+        }
+        EXPECT_EQ(next[0], second);
+        EXPECT_EQ(next[1], first);
+    }
+}
+
 TEST(SandboxEditorUi, MeshCurvatureRejectsInexactScalarOutputBeforeAnyPublication)
 {
     for (const bool queued : {false, true})

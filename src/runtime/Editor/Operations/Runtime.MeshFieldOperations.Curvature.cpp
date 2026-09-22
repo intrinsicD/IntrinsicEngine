@@ -299,18 +299,9 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             std::uint64_t GeometryMetadataSignature{0u};
             std::size_t VertexSlotCount{0u};
             MeshPositionState Positions{};
-            std::shared_ptr<const std::vector<bool>> DeletedVertices{};
+            std::optional<std::uint64_t> TopologySignature{};
             MeshCurvaturePropertySnapshot Properties{};
         };
-
-        [[nodiscard]] bool SameCurvatureDeletionMask(
-            const Geometry::PropertySet& properties, const std::vector<bool>& expected)
-        {
-            const auto current = properties.Get<bool>("v:deleted");
-            return (!properties.Exists("v:deleted") || current) &&
-                (current ? current.Vector() == expected
-                         : std::ranges::none_of(expected, [](bool deleted) { return deleted; }));
-        }
 
         [[nodiscard]] bool SameMeshCurvaturePropertyState(
             const MeshCurvaturePropertyState& lhs,
@@ -505,7 +496,6 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             const EditorProcessingContext& context,
             const std::uint32_t stableEntityId,
             std::vector<glm::vec3> positions,
-            std::vector<bool> deletedVertices,
             MeshCurvaturePropertyState before,
             MeshCurvaturePropertyState after)
         {
@@ -546,7 +536,8 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                                     entity),
                             .VertexSlotCount = positionState->size(),
                             .Positions = positionState,
-                            .DeletedVertices = std::make_shared<const std::vector<bool>>(std::move(deletedVertices)),
+                            .TopologySignature = StoredMeshTopologySignatureForEntity(
+                                context.Scene->Raw(), stableEntityId),
                             .Properties = beforeState,
                         },
                         beforeState,
@@ -601,8 +592,8 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                             const auto currentPositions =
                                 view.VertexSource->Properties.Get<glm::vec3>(
                                     expected.Properties->Bindings.Positions.Name);
-                            if (!expected.DeletedVertices ||
-                                !SameCurvatureDeletionMask(view.VertexSource->Properties, *expected.DeletedVertices) ||
+                            if (!expected.TopologySignature ||
+                                StoredMeshTopologySignatureForEntity(raw, identity.StableEntityId) != expected.TopologySignature ||
                                 !currentPositions ||
                                 !SameGeometryPositions(
                                     currentPositions.Vector(),
@@ -659,7 +650,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                                         entity),
                                 .VertexSlotCount = expected.VertexSlotCount,
                                 .Positions = expected.Positions,
-                                .DeletedVertices = expected.DeletedVertices,
+                                .TopologySignature = expected.TopologySignature,
                                 .Properties = target,
                             };
                         });
@@ -1407,6 +1398,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             std::uint64_t GeometryMetadataSignature{0u};
             std::vector<glm::vec3> SnapshotPositions{};
             std::vector<bool> SnapshotDeletedVertices{};
+            std::optional<std::uint64_t> TopologySignature{};
             Geometry::HalfedgeMesh::Mesh Mesh{};
             MeshCurvaturePropertyState CurvatureBefore{};
             MeshCurvaturePropertyState CurvatureAfter{};
@@ -1461,7 +1453,8 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                 return JobApplyValidation::StaleGeneration;
             }
 
-            if (!SameCurvatureDeletionMask(mutableView.VertexSource->Properties, job.SnapshotDeletedVertices))
+            if (!job.TopologySignature ||
+                StoredMeshTopologySignatureForEntity(raw, job.StableEntityId) != job.TopologySignature)
                 return JobApplyValidation::StaleGeneration;
 
             MeshCurvaturePropertyState currentCurvature{};
@@ -1630,7 +1623,6 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                     context,
                     job.StableEntityId,
                     std::move(job.SnapshotPositions),
-                    std::move(job.SnapshotDeletedVertices),
                     std::move(job.CurvatureBefore),
                     std::move(job.CurvatureAfter));
             if (commitStatus != EditorCommandStatus::Applied)
@@ -1749,6 +1741,8 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             state->SnapshotPositions =
                 std::move(source.BeforePositions);
             state->SnapshotDeletedVertices = std::move(source.DeletedVertices);
+            state->TopologySignature = StoredMeshTopologySignatureForEntity(
+                context.Scene->Raw(), command.StableEntityId);
             state->Mesh = std::move(source.Mesh);
             state->CurvatureBefore = std::move(before);
             state->CurvatureAfter = state->CurvatureBefore;
@@ -2218,7 +2212,6 @@ ApplyEditorMeshCurvatureCommand(
                 context,
                 command.StableEntityId,
                 std::move(source.BeforePositions),
-                std::move(source.DeletedVertices),
                 std::move(before),
                 std::move(after));
         if (commitStatus != EditorCommandStatus::Applied)
