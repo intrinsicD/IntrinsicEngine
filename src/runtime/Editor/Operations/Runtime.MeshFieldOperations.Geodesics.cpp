@@ -70,7 +70,7 @@ namespace Extrinsic::Runtime
         if (!entity)
             return fail(EditorCommandStatus::StaleEntity, "Geodesics target is stale.");
         auto source = BuildHalfedgeMeshForProcessing(GS::BuildConstView(raw, *entity), "Geodesics",
-                                                  command.Config.PositionProperty);
+                                                  command.Config.PositionProperty.Name);
         if (!source.Succeeded())
             return fail(source.Status, std::move(source.Diagnostic));
         for (auto face : source.Mesh.LiveFaces())
@@ -92,8 +92,8 @@ namespace Extrinsic::Runtime
                             "Geodesics source vertex is deleted or out of range.");
         auto view = GS::BuildMutableView(raw, *entity);
         auto& properties = view.VertexSource->Properties;
-        const std::string distanceName = command.Config.DistanceProperty;
-        const std::string sourceName = command.Config.SourceMaskProperty;
+        const std::string distanceName = command.Config.DistanceProperty.Name;
+        const std::string sourceName = command.Config.SourceMaskProperty.Name;
         struct State
         {
             bool HadDistance{false}, HadSource{false};
@@ -146,7 +146,7 @@ namespace Extrinsic::Runtime
         const auto mutate = [scene = context.Scene, entity = *entity, signature, positions,
                              deletedVertices,
                              distanceName, sourceName,
-                             positionProperty = command.Config.PositionProperty, capture,
+                             positionProperty = command.Config.PositionProperty.Name, capture,
                              invalidate = context.InvalidateWorkspaceSnapshotCache](
                                 const State& expected, const State& target) {
             auto& raw = scene->Raw();

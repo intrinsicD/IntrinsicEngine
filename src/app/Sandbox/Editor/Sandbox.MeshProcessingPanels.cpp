@@ -2753,7 +2753,7 @@ namespace Extrinsic::Sandbox::Editor
         for (auto vertex : config.SourceVertices)
             sourceText += " " + std::to_string(vertex);
         ImGui::TextWrapped("%s", sourceText.c_str());
-        if (ImGui::BeginCombo("Position property", config.PositionProperty.c_str()))
+        if (ImGui::BeginCombo("Position property", config.PositionProperty.Name.c_str()))
         {
             for (const auto& row : model.PropertyCatalog.Rows)
             {
@@ -2761,17 +2761,17 @@ namespace Extrinsic::Sandbox::Editor
                     row.ValueKind != decltype(row.ValueKind)::Vec3 || !row.Bindable)
                     continue;
                 if (ImGui::Selectable(row.Name.c_str(),
-                                      row.Name == config.PositionProperty))
+                                      row.Name == config.PositionProperty.Name))
                 {
-                    config.PositionProperty = row.Name;
+                    config.PositionProperty.Name = row.Name;
                     changed = true;
                 }
             }
             ImGui::EndCombo();
         }
         ImGui::SeparatorText("Output properties");
-        changed |= DrawProcessingPropertyName("Distance property", config.DistanceProperty);
-        changed |= DrawProcessingPropertyName("Source mask property", config.SourceMaskProperty);
+        changed |= DrawProcessingPropertyName("Distance property", config.DistanceProperty.Name);
+        changed |= DrawProcessingPropertyName("Source mask property", config.SourceMaskProperty.Name);
         if (ImGui::InputScalar("Expansion budget", ImGuiDataType_U32,
                                &config.MaxHalfedgeExpansions))
             changed = true;
@@ -2791,9 +2791,9 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::SeparatorText("Display output properties");
         ImGui::TextDisabled("Unreachable distances are shown in gray.");
         DrawProcessingPropertyShowButton(context, model.SelectedStableId,
-            {Runtime::GeometryElementDomain::MeshVertex, config.DistanceProperty, Geometry::PropertyValueKind::Double}, Geodesics.VisualizationDiagnostic);
+            config.DistanceProperty, Geodesics.VisualizationDiagnostic);
         DrawProcessingPropertyShowButton(context, model.SelectedStableId,
-            {Runtime::GeometryElementDomain::MeshVertex, config.SourceMaskProperty, Geometry::PropertyValueKind::Bool}, Geodesics.VisualizationDiagnostic);
+            config.SourceMaskProperty, Geodesics.VisualizationDiagnostic);
         if (!Geodesics.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Geodesics.ConfigDiagnostic.c_str());
         if (!Geodesics.VisualizationDiagnostic.empty()) ImGui::TextWrapped("%s", Geodesics.VisualizationDiagnostic.c_str());
         if (Geodesics.LastResult)

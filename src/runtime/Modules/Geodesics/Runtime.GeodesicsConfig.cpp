@@ -1,10 +1,12 @@
 module;
 #include <algorithm>
 #include <limits>
+#include <initializer_list>
+#include <utility>
 #include <nlohmann/json.hpp>
 module Extrinsic.Runtime.GeodesicsConfig;
 
-import Extrinsic.Runtime.GeometryProperty.Types;
+#include "Config/internal/Runtime.PointConfigJson.hpp"
 namespace Extrinsic::Runtime
 {
     namespace
@@ -14,7 +16,7 @@ namespace Extrinsic::Runtime
         {
             return {.Name = std::string{kGeodesicsConfigSectionName},
                     .SchemaId = std::string{kGeodesicsConfigSectionSchemaId},
-                    .SchemaVersion = 1u,
+                    .SchemaVersion = 2u,
                     .PayloadJson = SerializeGeodesicsConfig(value)};
         }
     }
@@ -22,9 +24,9 @@ namespace Extrinsic::Runtime
     {
         return Json{{"source_vertices", config.SourceVertices},
                     {"max_halfedge_expansions", config.MaxHalfedgeExpansions},
-                    {"position_property", config.PositionProperty},
-                    {"distance_property", config.DistanceProperty},
-                    {"source_mask_property", config.SourceMaskProperty}}
+                    {"position_property", ConfigDetail::EncodePointPropertyRef(config.PositionProperty)},
+                    {"distance_property", ConfigDetail::EncodePointPropertyRef(config.DistanceProperty)},
+                    {"source_mask_property", ConfigDetail::EncodePointPropertyRef(config.SourceMaskProperty)}}
             .dump();
     }
     Core::Config::EngineConfigSectionValidationResult ValidateGeodesicsConfigSection(
@@ -69,31 +71,28 @@ namespace Extrinsic::Runtime
                     "max_halfedge_expansions must be a positive unsigned 32-bit integer.");
             config.MaxHalfedgeExpansions = limit.get<std::uint32_t>();
         }
-        if (doc.contains("position_property"))
-        {
-            if (!doc["position_property"].is_string())
-                return reject("position_property must name a vertex float3 property.");
-            config.PositionProperty = doc["position_property"].get<std::string>();
-            if (config.PositionProperty.empty() ||
-                config.PositionProperty.find('\0') != std::string::npos ||
-                (IsStructuralVertexProperty(config.PositionProperty) &&
-                 config.PositionProperty != "v:position"))
-                return reject("position_property must name a non-structural vertex float3 property.");
-        }
-        for (const auto& [key, name] : {std::pair{"distance_property", &config.DistanceProperty},
-                                      std::pair{"source_mask_property", &config.SourceMaskProperty}})
+        for (const auto& [key, ref] : {
+                 std::pair{"position_property", &config.PositionProperty},
+                 std::pair{"distance_property", &config.DistanceProperty},
+                 std::pair{"source_mask_property", &config.SourceMaskProperty}})
         {
             if (doc.contains(key))
             {
-                if (!doc[key].is_string()) return reject(std::string{key} + " must name a vertex property.");
-                *name = doc[key].get<std::string>();
+                if (ConfigDetail::ValidatePointPropertyRef(doc[key], ref->ValueKind) !=
+                        ConfigDetail::PointPropertyValidation::Valid ||
+                    doc[key]["domain"] != ToString(GeometryElementDomain::MeshVertex))
+                    return reject(std::string{key} + " requires a typed mesh vertex property reference.");
+                ConfigDetail::DecodePointPropertyRef(doc[key], *ref);
             }
-            if (name->empty() || name->find('\0') != std::string::npos ||
-                IsStructuralVertexProperty(*name) || *name == config.PositionProperty)
-                return reject("Geodesics outputs must be distinct and must not replace structural vertex storage.");
+            const bool input = ref == &config.PositionProperty;
+            if (ref->Name.empty() || ref->Name.find('\0') != std::string::npos ||
+                (IsStructuralVertexProperty(ref->Name) && (!input || ref->Name != "v:position")))
+                return reject("Geodesics bindings must not replace structural vertex storage.");
         }
-        if (config.DistanceProperty == config.SourceMaskProperty)
-            return reject("Geodesics output properties must be distinct.");
+        if (config.DistanceProperty.Name == config.SourceMaskProperty.Name ||
+            config.DistanceProperty.Name == config.PositionProperty.Name ||
+            config.SourceMaskProperty.Name == config.PositionProperty.Name)
+            return reject("Geodesics input and output properties must be distinct.");
         result.State = EngineConfigState::Valid;
         result.CanonicalPayloadJson = SerializeGeodesicsConfig(config);
         result.ParsedFieldCount = static_cast<std::uint32_t>(doc.size());
@@ -104,18 +103,20 @@ namespace Extrinsic::Runtime
         const auto* section =
             Core::Config::FindEngineConfigSection(config.AppSections, kGeodesicsConfigSectionName);
         if (!section || section->SchemaId != kGeodesicsConfigSectionSchemaId ||
-            section->SchemaVersion != 1u)
+            section->SchemaVersion != 2u)
             return std::nullopt;
         const auto validated =
             ValidateGeodesicsConfigSection(section->PayloadJson, {}, kGeodesicsConfigSectionName);
         if (!validated.Usable())
             return std::nullopt;
         const auto doc = Json::parse(validated.CanonicalPayloadJson);
-        return GeodesicsConfig{doc["source_vertices"].get<std::vector<std::uint32_t>>(),
-                               doc["max_halfedge_expansions"].get<std::uint32_t>(),
-                               doc["position_property"].get<std::string>(),
-                               doc["distance_property"].get<std::string>(),
-                               doc["source_mask_property"].get<std::string>()};
+        GeodesicsConfig result;
+        result.SourceVertices = doc["source_vertices"].get<std::vector<std::uint32_t>>();
+        result.MaxHalfedgeExpansions = doc["max_halfedge_expansions"].get<std::uint32_t>();
+        ConfigDetail::DecodePointPropertyRef(doc["position_property"], result.PositionProperty);
+        ConfigDetail::DecodePointPropertyRef(doc["distance_property"], result.DistanceProperty);
+        ConfigDetail::DecodePointPropertyRef(doc["source_mask_property"], result.SourceMaskProperty);
+        return result;
     }
     void SetGeodesicsConfig(Core::Config::EngineConfig& config, const GeodesicsConfig& value)
     {

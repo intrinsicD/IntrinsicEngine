@@ -544,12 +544,8 @@ TEST(SandboxProcessingPanels, NamedMeshOutputsUseAppearanceWithoutRecomputing)
                           &segmentation.Boundaries, &segmentation.BoundaryColors, &segmentation.HardFeatures,
                           &segmentation.FeatureConfidence, &segmentation.BoundaryRoles, &segmentation.FeatureColors})
         add("mesh.processing.segmentation", "Mesh / Processing / Curvature Segmentation", *property);
-    R::GeometryPropertyRef distance{R::GeometryElementDomain::MeshVertex, geodesics.DistanceProperty, Geometry::PropertyValueKind::Double};
-    R::GeometryPropertyRef source{R::GeometryElementDomain::MeshVertex, geodesics.SourceMaskProperty, Geometry::PropertyValueKind::Bool};
-    add("mesh.processing.geodesics", "Mesh / Geodesics / Virtual Source Propagation", distance);
-    add("mesh.processing.geodesics", "Mesh / Geodesics / Virtual Source Propagation", source);
-    geodesics.DistanceProperty = distance.Name;
-    geodesics.SourceMaskProperty = source.Name;
+    add("mesh.processing.geodesics", "Mesh / Geodesics / Virtual Source Propagation", geodesics.DistanceProperty);
+    add("mesh.processing.geodesics", "Mesh / Geodesics / Virtual Source Propagation", geodesics.SourceMaskProperty);
     for (auto* property : {&clustering.Properties->OutputLabels, &clustering.Properties->OutputColors})
         add("mesh.processing.kmeans", "Mesh / Processing / K-Means", *property);
     add("mesh.processing.parameterize_uv", "Mesh / Processing / Parameterize (UV)", parameterization.Texcoords);
@@ -660,8 +656,8 @@ TEST(SandboxProcessingPanels, GeodesicsFollowsEntityAndResetsMeshLocalSources)
             ImGui::ActivateItemByID(window->GetID("Compute geodesics"));
         if (frame == 6)
         {
-            EXPECT_TRUE(scene.Raw().get<GS::Vertices>(first).Properties.Exists(geodesics.DistanceProperty));
-            EXPECT_FALSE(scene.Raw().get<GS::Vertices>(second).Properties.Exists(geodesics.DistanceProperty));
+            EXPECT_TRUE(scene.Raw().get<GS::Vertices>(first).Properties.Exists(geodesics.DistanceProperty.Name));
+            EXPECT_FALSE(scene.Raw().get<GS::Vertices>(second).Properties.Exists(geodesics.DistanceProperty.Name));
             EXPECT_TRUE(h.Selection().SetSelectedEntity(scene, second));
         }
         if (frame == 9)
@@ -671,7 +667,7 @@ TEST(SandboxProcessingPanels, GeodesicsFollowsEntityAndResetsMeshLocalSources)
         }
         if (frame == 15)
         {
-            EXPECT_TRUE(scene.Raw().get<GS::Vertices>(second).Properties.Exists(geodesics.DistanceProperty));
+            EXPECT_TRUE(scene.Raw().get<GS::Vertices>(second).Properties.Exists(geodesics.DistanceProperty.Name));
             h.Selection().ClearSelection(scene);
         }
         if (++frame == 19) engine.RequestExit();
@@ -2021,21 +2017,21 @@ TEST(SandboxProcessingPanels, GeodesicsRetriesDraftAndKeepsRejectedEntityReset)
         if (step == 16)
         {
             EXPECT_GT(rejections, firstRejections);
-            EXPECT_FALSE(firstProps.Exists(geodesics.DistanceProperty));
+            EXPECT_FALSE(firstProps.Exists(geodesics.DistanceProperty.Name));
             reject = false;
             run();
         }
         if (step == 20)
         {
             EXPECT_EQ(active().MaxHalfedgeExpansions, 1234u);
-            auto distance = firstProps.Get<double>(geodesics.DistanceProperty);
+            auto distance = firstProps.Get<double>(geodesics.DistanceProperty.Name);
             ASSERT_TRUE(distance);
             expectedDistance = distance[0]; distance[0] = 123.0;
             run();
         }
         if (step == 24)
         {
-            EXPECT_EQ(firstProps.Get<double>(geodesics.DistanceProperty)[0], expectedDistance);
+            EXPECT_EQ(firstProps.Get<double>(geodesics.DistanceProperty.Name)[0], expectedDistance);
             reject = true;
             ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, second));
         }
@@ -2046,16 +2042,16 @@ TEST(SandboxProcessingPanels, GeodesicsRetriesDraftAndKeepsRejectedEntityReset)
         }
         if (step == 32)
         {
-            EXPECT_FALSE(secondProps.Exists(geodesics.DistanceProperty));
+            EXPECT_FALSE(secondProps.Exists(geodesics.DistanceProperty.Name));
             reject = false;
             ImGui::ActivateItemByID(window->GetID("Add source"));
         }
         if (step == 36) run();
         if (step == 40)
         {
-            EXPECT_TRUE(secondProps.Exists(geodesics.DistanceProperty));
+            EXPECT_TRUE(secondProps.Exists(geodesics.DistanceProperty.Name));
             auto external = h.Control().GetEngineConfigControlState().ActiveConfig;
-            auto updated = active(); updated.DistanceProperty = "v:external_distance";
+            auto updated = active(); updated.DistanceProperty.Name = "v:external_distance";
             R::SetGeodesicsConfig(external, updated);
             ASSERT_TRUE(h.Apply(external));
         }
@@ -2063,7 +2059,7 @@ TEST(SandboxProcessingPanels, GeodesicsRetriesDraftAndKeepsRejectedEntityReset)
         if (step == 48)
         {
             EXPECT_TRUE(secondProps.Exists("v:external_distance"));
-            EXPECT_EQ(active().DistanceProperty, "v:external_distance");
+            EXPECT_EQ(active().DistanceProperty.Name, "v:external_distance");
             completed = true;
             engine.RequestExit();
         }
