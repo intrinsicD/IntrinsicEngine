@@ -2822,8 +2822,8 @@ if(_intrinsic_registered_test_targets)
         "endif()\n"
         "if(DEFINED IntrinsicRuntimePointCloudConsolidationGpuParityTests_TESTS)\n"
         "  set_tests_properties(PointCloudConsolidationGpuParity.VulkanLbvhMovingStepsAcrossDomainsAndFailures PROPERTIES TIMEOUT 300)\n"
-        "  set_tests_properties(PointCloudConsolidationGpuParity.VulkanLbvhWlopAcrossDomainsAndFailures PointCloudConsolidationGpuParity.VulkanLbvhAnisotropicWlopAcrossDomainsAndFailures PointCloudConsolidationGpuParity.VulkanLbvhClopAcrossDomainsAndFailures PROPERTIES TIMEOUT 360)\n"
-        "  set_tests_properties(PointCloudConsolidationGpuParity.VulkanLbvhEarAcrossDomainsInsertionAndFailures PROPERTIES TIMEOUT 540)\n"
+        "  set_tests_properties(PointCloudConsolidationGpuParity.VulkanLbvhWlopAcrossDomainsAndFailures PointCloudConsolidationGpuParity.VulkanLbvhClopAcrossDomainsAndFailures PROPERTIES TIMEOUT 360)\n"
+        "  set_tests_properties(PointCloudConsolidationGpuParity.VulkanLbvhAnisotropicWlopAcrossDomainsAndFailures PointCloudConsolidationGpuParity.VulkanLbvhEarAcrossDomainsInsertionAndFailures PROPERTIES TIMEOUT 540)\n"
         "endif()\n"
     )
     # The surface-appearance sequence keeps a 90 s watchdog; leave time for its

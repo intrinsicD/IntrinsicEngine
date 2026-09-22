@@ -876,9 +876,10 @@ namespace
         {
             if(::testing::Test::HasFatalFailure()){Kernel().RequestExit();return;}
             SCOPED_TRACE("projection phase "+std::to_string(Phase));
-            // Account for every phase when presentation paces frames at about one second.
+            // Normal-consuming variants run an eighth estimation phase; both
+            // anisotropic WLOP and EAR need its allowance at one-second frame pacing.
             const auto budget=Strategy==Runtime::PointCloudConsolidationStrategy::Lop?240:
-                Strategy==Runtime::PointCloudConsolidationStrategy::Ear?480:300;
+                UsesNormals()?480:300;
             if(std::chrono::steady_clock::now()-Started>std::chrono::seconds(budget)){TimedOut=true;Kernel().RequestExit();return;}
             if(!Kernel().GetDevice().IsOperational())return;
             if(Submitted && (Phase==3 || Phase==4) && !Mutated)
