@@ -270,11 +270,13 @@ namespace Extrinsic::Runtime
             const KMeansOutputPropertyState& state)
         {
             Geometry::PropertySet staged = properties;
-            ApplyGeometryScalarProperty(staged, refs.OutputLabels, state.Labels);
+            if (!ApplyGeometryScalarProperty(staged, refs.OutputLabels, state.Labels)) return false;
             if (!ApplyOutputProperty<glm::vec4>(staged, refs.OutputColors.Name,
                     state.HadColors, state.Colors, glm::vec4{1.0f})) return false;
             if (refs.OutputScalarLabels)
-                ApplyGeometryScalarProperty(staged, *refs.OutputScalarLabels, state.ScalarLabels);
+            {
+                if (!ApplyGeometryScalarProperty(staged, *refs.OutputScalarLabels, state.ScalarLabels)) return false;
+            }
             else if (state.ScalarLabels.Exists) return false;
 
             properties = std::move(staged);
