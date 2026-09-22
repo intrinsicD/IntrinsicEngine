@@ -86,48 +86,10 @@ namespace Extrinsic::Runtime
             return static_cast<std::uint32_t>(clamped);
         }
 
-        [[nodiscard]] bool CursorInsideViewport(
-            const Platform::Input::Context::XY cursor,
-            const Core::Extent2D viewport) noexcept
-        {
-            return viewport.Width > 0 &&
-                   viewport.Height > 0 &&
-                   std::isfinite(cursor.x) &&
-                   std::isfinite(cursor.y) &&
-                   cursor.x >= 0.0f &&
-                   cursor.y >= 0.0f &&
-                   cursor.x < static_cast<float>(viewport.Width) &&
-                   cursor.y < static_cast<float>(viewport.Height);
-        }
-
-        [[nodiscard]] Platform::Input::Context::XY
-        WindowToFramebufferCursor(
-            const Platform::Input::Context::XY cursor,
-            const Core::Extent2D windowExtent,
-            const Core::Extent2D framebufferExtent) noexcept
-        {
-            if (windowExtent.Width <= 0 || windowExtent.Height <= 0 ||
-                framebufferExtent.Width <= 0 ||
-                framebufferExtent.Height <= 0)
-            {
-                return cursor;
-            }
-            const float scaleX =
-                static_cast<float>(framebufferExtent.Width) /
-                static_cast<float>(windowExtent.Width);
-            const float scaleY =
-                static_cast<float>(framebufferExtent.Height) /
-                static_cast<float>(windowExtent.Height);
-            return Platform::Input::Context::XY{
-                cursor.x * scaleX,
-                cursor.y * scaleY,
-            };
-        }
-
         void SubmitViewportSelectionClickForFrame(
             SelectionController& selection,
             const Platform::Input::Context& input,
-            const Core::Extent2D windowExtent,
+            const SceneViewportCursor cursor,
             const Core::Extent2D viewport,
             const bool imguiCapturesMouse,
             const bool gizmoCapturesMouse) noexcept
@@ -139,12 +101,7 @@ namespace Extrinsic::Runtime
                 return;
             }
 
-            const Platform::Input::Context::XY cursor =
-                WindowToFramebufferCursor(
-                    input.GetMousePosition(),
-                    windowExtent,
-                    viewport);
-            if (!CursorInsideViewport(cursor, viewport))
+            if (!cursor.Inside)
                 return;
 
             const auto mode = (input.IsKeyPressed(Platform::Input::Key::LeftControl) ||
@@ -154,8 +111,8 @@ namespace Extrinsic::Runtime
                    input.IsKeyPressed(Platform::Input::Key::RightShift))
                     ? SelectionPickMode::Add : SelectionPickMode::Replace;
             selection.RequestClickPick(
-                ClampCursorPixel(cursor.x, viewport.Width),
-                ClampCursorPixel(cursor.y, viewport.Height), mode);
+                ClampCursorPixel(cursor.X, viewport.Width),
+                ClampCursorPixel(cursor.Y, viewport.Height), mode);
         }
 
         [[nodiscard]] std::uint32_t BuildGizmoModifierMask(
@@ -190,7 +147,7 @@ namespace Extrinsic::Runtime
             EditorCommandHistory* const history,
             const Platform::Input::Context& input,
             const Graphics::CameraViewInput& cameraInput,
-            const Core::Extent2D windowExtent,
+            const SceneViewportCursor cursor,
             const Core::Extent2D viewport,
             const bool imguiCapturesInput,
             std::span<const ECS::EntityHandle> selected)
@@ -212,15 +169,10 @@ namespace Extrinsic::Runtime
                 return;
             }
 
-            const Platform::Input::Context::XY cursor =
-                WindowToFramebufferCursor(
-                    input.GetMousePosition(),
-                    windowExtent,
-                    viewport);
             const std::uint32_t pixelX =
-                ClampCursorPixel(cursor.x, viewport.Width);
+                ClampCursorPixel(cursor.X, viewport.Width);
             const std::uint32_t pixelY =
-                ClampCursorPixel(cursor.y, viewport.Height);
+                ClampCursorPixel(cursor.Y, viewport.Height);
             const Graphics::CameraViewSnapshot camera =
                 Graphics::BuildCameraViewSnapshot(
                     cameraInput,
@@ -245,12 +197,13 @@ namespace Extrinsic::Runtime
                 .Direction = camera.PickRayDirection,
             };
 
-            if (input.IsMouseButtonJustPressed(kGizmoMouseButton))
+            if (input.IsMouseButtonJustPressed(kGizmoMouseButton) &&
+                cursor.Inside)
             {
                 const GizmoHitResult hit =
                     gizmo.HitTest(scene,
                                   camera,
-                                  glm::vec2{cursor.x, cursor.y},
+                                  glm::vec2{cursor.X, cursor.Y},
                                   viewport,
                                   selected);
                 if (hit.Hit)
@@ -492,6 +445,17 @@ namespace Extrinsic::Runtime
                     inputWindow.GetInput();
                 const Platform::Extent2D windowExtent =
                     inputWindow.GetWindowExtent();
+                const Platform::Input::Context::XY mouse =
+                    input.GetMousePosition();
+                const SceneViewportCursor cursor =
+                    MapWindowCursorToSceneViewport(
+                        mouse.x,
+                        mouse.y,
+                        windowExtent,
+                        Core::IsEmpty(context.FramebufferExtent)
+                            ? context.Viewport
+                            : context.FramebufferExtent,
+                        Core::Rect2D{context.ViewportOrigin, context.Viewport});
                 if (Selection.GetConfig().Interaction.Target != SelectionTarget::Entity)
                 {
                     if (Gizmo.IsDragging()) Gizmo.DragCancel(*BoundRegistry);
@@ -504,14 +468,14 @@ namespace Extrinsic::Runtime
                     History,
                     input,
                     context.RenderInput.Camera,
-                    windowExtent,
+                    cursor,
                     context.Viewport,
                     context.EditorCapture.CapturesViewportInput(),
                     GizmoSelectedEntities);
                 SubmitViewportSelectionClickForFrame(
                     Selection,
                     input,
-                    windowExtent,
+                    cursor,
                     context.Viewport,
                     context.EditorCapture.CapturesViewportInput(),
                     Gizmo.IsDragging());

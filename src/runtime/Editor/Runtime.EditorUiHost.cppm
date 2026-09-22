@@ -4,12 +4,14 @@ module;
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string_view>
 #include <vector>
 
 export module Extrinsic.Runtime.EditorUiHost;
 
 export import Extrinsic.Runtime.EditorWindowRegistry;
+import Extrinsic.Runtime.Module;
 
 export namespace Extrinsic::Runtime
 {
@@ -114,6 +116,17 @@ public:
     [[nodiscard]] bool IsVisible() const noexcept;
     [[nodiscard]] bool IsOperational() const noexcept;
     [[nodiscard]] const EditorUiDiagnostics& GetDiagnostics() const noexcept;
+
+    // A frame contribution claims the scene rectangle (window coordinates)
+    // for the current UI frame; the claim resets before each frame's
+    // contributions run, so a closed layout returns the scene to the window.
+    void SetSceneViewport(EditorSceneViewportRect rect) noexcept;
+    [[nodiscard]] std::optional<EditorSceneViewportRect>
+    SceneViewport() const noexcept;
+    // The claim of the previous completed UI frame, which is the rectangle
+    // the engine is presenting while this frame's contributions run.
+    [[nodiscard]] std::optional<EditorSceneViewportRect>
+    PresentedSceneViewport() const noexcept;
 
     [[nodiscard]] EditorWindowRegistry& Windows() noexcept;
     [[nodiscard]] const EditorWindowRegistry& Windows() const noexcept;

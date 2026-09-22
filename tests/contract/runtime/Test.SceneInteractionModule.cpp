@@ -293,7 +293,9 @@ namespace
                 capture = {},
             const Platform::Extent2D viewport = {
                 .Width = 64,
-                .Height = 32})
+                .Height = 32},
+            const Core::Offset2D viewportOrigin = {},
+            const Platform::Extent2D framebufferExtent = {})
         {
             Core::Config::EngineConfig config = HeadlessConfig();
             Runtime::SetSelectionInteractionConfig(config, SelectionSettings);
@@ -306,6 +308,8 @@ namespace
                 .Viewport = viewport,
                 .EditorCapture = capture,
                 .RenderInput = renderInput,
+                .ViewportOrigin = viewportOrigin,
+                .FramebufferExtent = framebufferExtent,
             };
             ViewportHooks.at(index)(context);
         }
@@ -1589,4 +1593,37 @@ TEST(SceneInteractionModule, PrimitiveClicksReachSharedSelectionAndRejectChanged
     EXPECT_TRUE(selection.ReadPrimitives(scene, id, Runtime::GeometryElementDomain::MeshVertex).Indices.empty());
     harness.InvokeFrameHook(0, capture, pacing);
     EXPECT_TRUE(selection.PrimitiveSnapshots(scene).empty());
+}
+
+// METHOD-047: with an editor pane beside the scene, a click is picked only
+// inside the scene rectangle and in rectangle-local framebuffer pixels.
+TEST(SceneInteractionModule, ClickPickUsesSceneRectangleLocalPixels)
+{
+    DirectHarness harness;
+    ASSERT_TRUE(harness.Start().has_value());
+    auto& selection = *harness.Services.Find<Runtime::SelectionController>();
+    auto& window = harness.InputWindow();
+    const Platform::Extent2D framebuffer = window.GetFramebufferExtent();
+    ASSERT_EQ(framebuffer.Width, window.GetWindowExtent().Width);
+    const Core::Offset2D origin{.X = framebuffer.Width / 2, .Y = 0};
+    const Platform::Extent2D scene{.Width = framebuffer.Width - origin.X, .Height = framebuffer.Height};
+
+    auto click = [&](const double x, const double y) {
+        window.QueueMouseButton(0, false);
+        window.PollEvents();
+        window.QueueCursor(x, y);
+        window.QueueMouseButton(0, true);
+        window.PollEvents();
+        Graphics::RenderFrameInput input{};
+        harness.InvokeViewportHook(0u, input, {}, scene, origin, framebuffer);
+    };
+
+    click(static_cast<double>(origin.X) - 10.0, 40.0);
+    EXPECT_FALSE(selection.HasPendingPick()) << "clicks over the atlas pane must not pick";
+
+    click(static_cast<double>(origin.X) + 25.0, 40.0);
+    const auto pick = selection.PeekPendingPick();
+    ASSERT_TRUE(pick.has_value());
+    EXPECT_EQ(pick->PixelX, 25u);
+    EXPECT_EQ(pick->PixelY, 40u);
 }

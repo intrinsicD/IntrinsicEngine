@@ -160,6 +160,10 @@ namespace Extrinsic::Graphics
         /// viewport-dependent resource sizing and aspect ratio.
         Core::Extent2D Viewport{};
 
+        /// Scene rectangle origin inside the backbuffer (framebuffer pixels);
+        /// only presentation into the backbuffer consumes it.
+        Core::Offset2D ViewportOffset{};
+
         /// Interpolation alpha forwarded for motion-vector / TAA use.
         double Alpha{0.0};
 

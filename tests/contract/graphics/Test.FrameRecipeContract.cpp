@@ -354,8 +354,10 @@ TEST(FrameRecipeContract, DefaultRecipeBuildsCanonicalPassOrder)
         // GRAPHICS-040C — AA passes are no longer default structural
         // no-ops. The recipe selector instantiates only the passes required
         // by the selected AA mode; NoAA keeps the default chain lean.
-        "ImGuiPass",
+        // Present places the scene at the scene rectangle; the editor
+        // overlay then composites over the whole backbuffer.
         "Present",
+        "ImGuiPass",
     };
     EXPECT_EQ(OrderedPassNames(*compiled), expected);
     EXPECT_EQ(build.DeclaredPassCount, expected.size());
@@ -1108,8 +1110,10 @@ TEST(FrameRecipeContract, DefaultOverlayContributionsProjectLegacyOverlayShape)
     ASSERT_NE(imgui, nullptr);
     EXPECT_TRUE(imgui->Enabled);
     EXPECT_TRUE(imgui->Contributed);
-    EXPECT_TRUE(Contains(imgui->Reads, "FrameRecipe.PresentSource"));
-    EXPECT_TRUE(Contains(imgui->Writes, "FrameRecipe.PresentSource"));
+    EXPECT_TRUE(imgui->FinalizesBackbuffer);
+    EXPECT_TRUE(Contains(imgui->Reads, "Backbuffer"));
+    EXPECT_TRUE(Contains(imgui->Writes, "Backbuffer"));
+    EXPECT_FALSE(Contains(imgui->Writes, "FrameRecipe.PresentSource"));
 }
 
 TEST(FrameRecipeContract, ExplicitDefaultOverlayContributionsMatchDefaultBuildShape)
@@ -1269,7 +1273,7 @@ TEST(FrameRecipeContract, DefaultRecipeUsesResourceDependenciesWithoutLinearChai
     ExpectPassBefore(*compiled, "PostProcessAAResolvePass", "SelectionOutlinePass");
     ExpectPassBefore(*compiled, "SelectionOutlinePass", "DebugViewPass");
     ExpectPassBefore(*compiled, "DebugViewPass", "ImGuiPass");
-    ExpectPassBefore(*compiled, "ImGuiPass", "Present");
+    ExpectPassBefore(*compiled, "Present", "ImGuiPass");
 }
 
 TEST(FrameRecipeContract, DependencyDrivenDefaultRecipeKeepsBarrierPacketsTopological)
@@ -2198,11 +2202,13 @@ TEST(FrameRecipeContract, ClusterPassesRequestAsyncComputeAndDemoteToGraphics)
     ExpectPassBefore(*compiled, "ClusterGridBuildPass", "LightClusterAssignmentPass");
 }
 
-TEST(FrameRecipeContract, BackbufferIsFinalizedOnlyByPresentDeclaration)
+TEST(FrameRecipeContract, BackbufferIsFinalizedByPresentThenEditorOverlay)
 {
     const FrameRecipeIntrospection description = DescribeDefaultFrameRecipe(FrameRecipeFeatures{});
 
-    std::uint32_t finalizerCount = 0u;
+    // Present places the scene image at the scene rectangle; the ImGui
+    // overlay is the only other backbuffer writer and always runs after it.
+    std::vector<FrameRecipePassKind> finalizers{};
     for (const FrameRecipePassDeclaration& pass : description.Passes)
     {
         if (!pass.FinalizesBackbuffer)
@@ -2210,13 +2216,12 @@ TEST(FrameRecipeContract, BackbufferIsFinalizedOnlyByPresentDeclaration)
             continue;
         }
 
-        ++finalizerCount;
-        EXPECT_EQ(pass.Kind, FrameRecipePassKind::Present);
-        EXPECT_EQ(pass.Name, std::string_view{"Present"});
+        finalizers.push_back(pass.Kind);
         EXPECT_TRUE(pass.Enabled);
     }
 
-    EXPECT_EQ(finalizerCount, 1u);
+    EXPECT_EQ(finalizers,
+              (std::vector<FrameRecipePassKind>{FrameRecipePassKind::Present, FrameRecipePassKind::ImGui}));
 
     std::uint32_t backbufferResourceCount = 0u;
     for (const FrameRecipeResourceDeclaration& resource : description.Resources)

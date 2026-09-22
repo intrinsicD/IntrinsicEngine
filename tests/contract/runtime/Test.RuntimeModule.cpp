@@ -2,6 +2,7 @@
 
 #include <concepts>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -583,4 +584,65 @@ TEST(EngineSetup, RetainsOnlyRegistrationPhaseFrameAndViewportRegistrars)
                     .has_value());
     EXPECT_EQ(frameRegistrations, 1u);
     EXPECT_EQ(viewportRegistrations, 1u);
+}
+
+// METHOD-047: the authoritative scene rectangle is the published editor
+// rectangle scaled window->framebuffer and clipped, or the whole framebuffer.
+TEST(RuntimeSceneViewport, ResolvesPublishedRectangleWithHiDpiScaleAndClipping)
+{
+    const Core::Extent2D window{.Width = 400, .Height = 300};
+    const Core::Extent2D framebuffer{.Width = 800, .Height = 600};
+
+    const Core::Rect2D whole = Runtime::ResolveSceneViewportPixels(window, framebuffer, {});
+    EXPECT_EQ(whole.Offset.X, 0);
+    EXPECT_EQ(whole.Offset.Y, 0);
+    EXPECT_EQ(whole.Extent.Width, 800);
+    EXPECT_EQ(whole.Extent.Height, 600);
+
+    Runtime::EditorInputCaptureSnapshot capture{};
+    capture.HasSceneViewport = true;
+    capture.SceneViewport = {.X = 100.0f, .Y = 20.0f, .Width = 200.0f, .Height = 250.0f};
+    const Core::Rect2D scaled = Runtime::ResolveSceneViewportPixels(window, framebuffer, capture);
+    EXPECT_EQ(scaled.Offset.X, 200);
+    EXPECT_EQ(scaled.Offset.Y, 40);
+    EXPECT_EQ(scaled.Extent.Width, 400);
+    EXPECT_EQ(scaled.Extent.Height, 500);
+
+    capture.SceneViewport = {.X = 300.0f, .Y = -10.0f, .Width = 500.0f, .Height = 100.0f};
+    const Core::Rect2D clipped = Runtime::ResolveSceneViewportPixels(window, framebuffer, capture);
+    EXPECT_EQ(clipped.Offset.X, 600);
+    EXPECT_EQ(clipped.Offset.Y, 0);
+    EXPECT_EQ(clipped.Extent.Width, 200);
+    EXPECT_EQ(clipped.Extent.Height, 180);
+
+    for (const Runtime::EditorSceneViewportRect invalid : {
+             Runtime::EditorSceneViewportRect{.X = 0.0f, .Y = 0.0f, .Width = 0.0f, .Height = 10.0f},
+             Runtime::EditorSceneViewportRect{.X = std::numeric_limits<float>::quiet_NaN(), .Width = 10.0f, .Height = 10.0f},
+             Runtime::EditorSceneViewportRect{.X = 500.0f, .Y = 0.0f, .Width = 10.0f, .Height = 10.0f},
+         })
+    {
+        capture.SceneViewport = invalid;
+        const Core::Rect2D fallback = Runtime::ResolveSceneViewportPixels(window, framebuffer, capture);
+        EXPECT_EQ(fallback.Offset.X, 0);
+        EXPECT_EQ(fallback.Extent.Width, 800);
+        EXPECT_EQ(fallback.Extent.Height, 600);
+    }
+}
+
+TEST(RuntimeSceneViewport, MapsWindowCursorToSceneLocalFramebufferPixels)
+{
+    const Core::Extent2D window{.Width = 400, .Height = 300};
+    const Core::Extent2D framebuffer{.Width = 800, .Height = 600};
+    const Core::Rect2D scene{{200, 40}, {400, 500}};
+
+    const Runtime::SceneViewportCursor inside =
+        Runtime::MapWindowCursorToSceneViewport(150.0f, 30.0f, window, framebuffer, scene);
+    EXPECT_TRUE(inside.Inside);
+    EXPECT_FLOAT_EQ(inside.X, 100.0f);
+    EXPECT_FLOAT_EQ(inside.Y, 20.0f);
+
+    EXPECT_FALSE(Runtime::MapWindowCursorToSceneViewport(50.0f, 30.0f, window, framebuffer, scene).Inside);
+    EXPECT_FALSE(Runtime::MapWindowCursorToSceneViewport(350.0f, 30.0f, window, framebuffer, scene).Inside);
+    EXPECT_FALSE(Runtime::MapWindowCursorToSceneViewport(
+        std::numeric_limits<float>::infinity(), 30.0f, window, framebuffer, scene).Inside);
 }

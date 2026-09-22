@@ -694,3 +694,71 @@ TEST(GraphicsUvViewContract, GeometryRecordLookupReturnsResidentDataAndRejectsFr
     EXPECT_FALSE(fixture.World.TryGetGeometryRecord(geometry, record));
     EXPECT_TRUE(fixture.World.TryGetGeometryRecord(replacement, record));
 }
+
+// METHOD-047: an explicit baked texture reaches the shader with its raw
+// display range and colormap, and navigation replaces the automatic fit.
+TEST(GraphicsUvViewContract, BakedTextureDisplayAndNavigationReachTheShaderContract)
+{
+    UvViewFixture fixture;
+    ASSERT_TRUE(fixture.Initialize());
+    const auto geometry = fixture.World.UploadGeometry(TriangleUpload());
+    ASSERT_TRUE(geometry.IsValid());
+
+    auto request = ValidRequest(geometry);
+    request.RequestToken = 300u;
+    request.Background = Graphics::UvViewBackgroundMode::BakedTexture;
+    request.BakedTexture = Graphics::UvViewTextureDisplay{
+        .Texture = 43u,
+        .Mode = Graphics::UvViewTextureDisplayMode::ScalarColormap,
+        .RangeMin = -2.0f,
+        .RangeMax = 0.0f,
+        .ColormapLut = 44u,
+    };
+    request.Navigation = Graphics::UvViewNavigation{.CenterU = 0.25f, .CenterV = 0.75f, .HalfExtentV = 0.1f};
+    fixture.View.Submit(request);
+    fixture.View.Prepare(fixture.World);
+
+    const auto& output = fixture.View.GetOutput();
+    ASSERT_EQ(output.Status, Graphics::UvViewStatus::Ready);
+    EXPECT_EQ(output.ActiveBackground, Graphics::UvViewBackgroundMode::BakedTexture);
+    EXPECT_TRUE(output.Diagnostic.empty()) << output.Diagnostic;
+
+    fixture.View.Record(fixture.Device.CommandContext);
+    Graphics::UvViewPushConstants constants{};
+    const auto& payload = fixture.Device.CommandContext.PushConstantPayloads.back();
+    ASSERT_EQ(payload.size(), sizeof(constants));
+    std::memcpy(&constants, payload.data(), sizeof(constants));
+    EXPECT_EQ(constants.BackgroundMode,
+              static_cast<std::uint32_t>(Graphics::UvViewBackgroundMode::BakedTexture));
+    EXPECT_EQ(constants.BackgroundTextureBindlessIndex, 43u);
+    EXPECT_EQ(constants.TextureDisplayMode,
+              static_cast<std::uint32_t>(Graphics::UvViewTextureDisplayMode::ScalarColormap));
+    EXPECT_FLOAT_EQ(constants.TextureRangeMin, -2.0f);
+    EXPECT_FLOAT_EQ(constants.TextureRangeMax, 0.0f);
+    EXPECT_EQ(constants.ColormapBindlessIndex, 44u);
+    EXPECT_FLOAT_EQ(constants.UvCenterX, 0.25f);
+    EXPECT_FLOAT_EQ(constants.UvCenterY, 0.75f);
+    EXPECT_FLOAT_EQ(constants.UvHalfExtentY, 0.1f);
+    EXPECT_FLOAT_EQ(constants.UvHalfExtentX, 0.1f * 320.0f / 192.0f);
+    fixture.View.CompleteFrame(false);
+
+    // Missing colormap, reversed range and a missing texture fail closed to
+    // the checker with an explicit diagnostic instead of sampling garbage.
+    const std::array<Graphics::UvViewTextureDisplay, 3> invalid{{
+        {.Texture = 43u, .Mode = Graphics::UvViewTextureDisplayMode::ScalarColormap},
+        {.Texture = 43u, .Mode = Graphics::UvViewTextureDisplayMode::VectorRange, .RangeMin = 1.0f, .RangeMax = 0.0f},
+        {.Texture = RHI::kInvalidBindlessIndex, .Mode = Graphics::UvViewTextureDisplayMode::Color},
+    }};
+    for (const Graphics::UvViewTextureDisplay& display : invalid)
+    {
+        request.BakedTexture = display;
+        ++request.RequestToken;
+        fixture.View.Submit(request);
+        fixture.View.Prepare(fixture.World);
+        const auto& fallback = fixture.View.GetOutput();
+        ASSERT_EQ(fallback.Status, Graphics::UvViewStatus::Ready);
+        EXPECT_EQ(fallback.RequestedBackground, Graphics::UvViewBackgroundMode::BakedTexture);
+        EXPECT_EQ(fallback.ActiveBackground, Graphics::UvViewBackgroundMode::Checker);
+        EXPECT_NE(fallback.Diagnostic.find("Baked texture display fell back"), std::string::npos);
+    }
+}

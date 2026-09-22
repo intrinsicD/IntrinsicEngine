@@ -320,6 +320,13 @@ namespace Extrinsic::Runtime
         m_Impl->Adapter->EndFrame();
         context.Pacing.ImGuiEndMicros = ElapsedMicros(end);
         context.EditorCapture = m_Impl->Adapter->CaptureSnapshot();
+        // A hidden editor draws no layout, so its stale claim never applies.
+        if (const auto scene = m_Impl->Host.SceneViewport();
+            scene.has_value() && m_Impl->Host.IsVisible())
+        {
+            context.EditorCapture.HasSceneViewport = true;
+            context.EditorCapture.SceneViewport = *scene;
+        }
 
         const ImGuiAdapterDiagnostics& diagnostics =
             m_Impl->Adapter->GetDiagnostics();

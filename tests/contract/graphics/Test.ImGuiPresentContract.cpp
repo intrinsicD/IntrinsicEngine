@@ -8,11 +8,13 @@
 #include <string_view>
 #include <vector>
 
+import Extrinsic.Core.Geometry2D;
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Graphics.ImGuiUploadHelper;
 import Extrinsic.Graphics.Pass.ImGui;
 import Extrinsic.Graphics.Pass.Present;
+import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Bindless;
@@ -156,17 +158,21 @@ namespace
     }
 }
 
-TEST(GraphicsImGuiPresentContract, FrameRecipeKeepsImGuiOffBackbufferAndPresentFinalizes)
+TEST(GraphicsImGuiPresentContract, FrameRecipeCompositesImGuiOverPresentedBackbuffer)
 {
     const Graphics::FrameRecipeIntrospection description = Graphics::DescribeDefaultFrameRecipe(Graphics::FrameRecipeFeatures{});
 
+    // The editor overlay spans the whole window while the scene image only
+    // covers the scene rectangle, so ImGui loads and finalizes the
+    // backbuffer after Present instead of drawing into the scene-sized
+    // present source.
     const auto* imgui = FindPass(description, Graphics::FrameRecipePassKind::ImGui);
     ASSERT_NE(imgui, nullptr);
     EXPECT_TRUE(imgui->Enabled);
-    EXPECT_FALSE(imgui->FinalizesBackbuffer);
-    EXPECT_TRUE(Contains(imgui->Reads, "FrameRecipe.PresentSource"));
-    EXPECT_TRUE(Contains(imgui->Writes, "FrameRecipe.PresentSource"));
-    EXPECT_FALSE(Contains(imgui->Writes, "Backbuffer"));
+    EXPECT_TRUE(imgui->FinalizesBackbuffer);
+    EXPECT_TRUE(Contains(imgui->Reads, "Backbuffer"));
+    EXPECT_TRUE(Contains(imgui->Writes, "Backbuffer"));
+    EXPECT_FALSE(Contains(imgui->Writes, "FrameRecipe.PresentSource"));
 
     const auto* present = FindPass(description, Graphics::FrameRecipePassKind::Present);
     ASSERT_NE(present, nullptr);
@@ -201,7 +207,7 @@ TEST(GraphicsImGuiPresentContract, RenderGraphRejectsNonPresentBackbufferWrites)
     EXPECT_TRUE(reportedBadPass);
 }
 
-TEST(GraphicsImGuiPresentContract, DefaultFrameRecipeBuildsPresentAsOnlyBackbufferUse)
+TEST(GraphicsImGuiPresentContract, DefaultFrameRecipeBuildsPresentBeforeOverlayFinalizer)
 {
     Graphics::RenderGraph graph;
     const Graphics::FrameRecipeBuildResult build = Graphics::BuildDefaultFrameRecipe(
@@ -215,8 +221,9 @@ TEST(GraphicsImGuiPresentContract, DefaultFrameRecipeBuildsPresentAsOnlyBackbuff
     const auto& compileResult = graph.GetLastCompileValidationResult();
     ASSERT_TRUE(compiled.has_value())
         << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
-    ASSERT_FALSE(compiled->PassNames.empty());
-    EXPECT_EQ(compiled->PassNames.back(), "Present");
+    ASSERT_GE(compiled->PassNames.size(), 2u);
+    EXPECT_EQ(compiled->PassNames[compiled->PassNames.size() - 2u], "Present");
+    EXPECT_EQ(compiled->PassNames.back(), "ImGuiPass");
 }
 
 TEST(GraphicsImGuiPresentContract, ImGuiPassRecordsOverlayDrawDataOnlyWhenReady)
@@ -305,4 +312,41 @@ TEST(GraphicsImGuiPresentContract, PresentPassRecordsFullscreenFinalizationOnlyW
     EXPECT_EQ(cmd.Events[1].Kind, EventKind::Draw);
     EXPECT_EQ(cmd.LastPipeline, pipeline);
     EXPECT_EQ(cmd.LastDrawVertexCount, 3u);
+}
+
+// METHOD-047: scene passes rasterize at the scene extent, Present places the
+// scene image at the scene rectangle, and the overlay spans the backbuffer.
+TEST(GraphicsImGuiPresentContract, FramePassViewportPlacesSceneRectangle)
+{
+    const Core::Extent2D backbuffer{.Width = 1600, .Height = 900};
+    const Core::Extent2D scene{.Width = 800, .Height = 860};
+    const Core::Offset2D offset{.X = 800, .Y = 40};
+
+    const Core::Rect2D sceneTarget = Graphics::ResolveFramePassViewport(
+        Graphics::FramePassViewportPlacement::SceneTarget, backbuffer, scene, offset);
+    EXPECT_EQ(sceneTarget.Offset.X, 0);
+    EXPECT_EQ(sceneTarget.Offset.Y, 0);
+    EXPECT_EQ(sceneTarget.Extent.Width, 800);
+    EXPECT_EQ(sceneTarget.Extent.Height, 860);
+
+    const Core::Rect2D present = Graphics::ResolveFramePassViewport(
+        Graphics::FramePassViewportPlacement::BackbufferSceneRect, backbuffer, scene, offset);
+    EXPECT_EQ(present.Offset.X, 800);
+    EXPECT_EQ(present.Offset.Y, 40);
+    EXPECT_EQ(present.Extent.Width, 800);
+    EXPECT_EQ(present.Extent.Height, 860);
+
+    const Core::Rect2D overlay = Graphics::ResolveFramePassViewport(
+        Graphics::FramePassViewportPlacement::BackbufferFull, backbuffer, scene, offset);
+    EXPECT_EQ(overlay.Offset.X, 0);
+    EXPECT_EQ(overlay.Extent.Width, 1600);
+    EXPECT_EQ(overlay.Extent.Height, 900);
+
+    // A stale layout after a window shrink is clipped to the attachment.
+    const Core::Rect2D stale = Graphics::ResolveFramePassViewport(
+        Graphics::FramePassViewportPlacement::BackbufferSceneRect,
+        Core::Extent2D{.Width = 1000, .Height = 500}, scene, offset);
+    EXPECT_EQ(stale.Offset.X, 800);
+    EXPECT_EQ(stale.Extent.Width, 200);
+    EXPECT_EQ(stale.Extent.Height, 460);
 }

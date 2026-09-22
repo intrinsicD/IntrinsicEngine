@@ -44,6 +44,7 @@ import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetWorkflowRecipePolicies;
 import Extrinsic.Runtime.EditorUiHost;
+import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Geometry.Properties;
@@ -1572,6 +1573,7 @@ namespace
             case Graphics::UvViewBackgroundMode::TexelDensity:
                 return ConfigMode::TexelDensity;
             case Graphics::UvViewBackgroundMode::Texture:
+            case Graphics::UvViewBackgroundMode::BakedTexture:
                 return ConfigMode::Texture;
             }
             return ConfigMode::Grid;
@@ -1788,6 +1790,27 @@ namespace
             return state;
         }
 
+        // Camera commands issued from the UI frame match the scene rectangle
+        // the engine is currently presenting, not the whole framebuffer.
+        [[nodiscard]] Core::Extent2D PresentedSceneViewportExtent(
+            const Platform::IWindow* const window,
+            const EditorUiHost* const host) noexcept
+        {
+            if (window == nullptr)
+                return {};
+            EditorInputCaptureSnapshot capture{};
+            if (host != nullptr && host->IsVisible())
+            {
+                if (const auto presented = host->PresentedSceneViewport())
+                {
+                    capture.HasSceneViewport = true;
+                    capture.SceneViewport = *presented;
+                }
+            }
+            return ResolveSceneViewportPixels(
+                window->GetWindowExtent(), window->GetFramebufferExtent(), capture).Extent;
+        }
+
         [[nodiscard]] EditorFeatureBindings BuildContextFromRuntime(WorldRegistry& worlds,
                                                                    ServiceRegistry& services)
         {
@@ -1814,10 +1837,7 @@ namespace
                 .LastRefinedPrimitiveGeneration =
                     interaction != nullptr ? interaction->LastRefinedPrimitiveGeneration() : 0u,
                 .CameraControllers = services.Find<CameraControllerRegistry>(),
-                .CameraViewport    = window != nullptr
-                                         ? Core::Extent2D{window->GetFramebufferExtent().Width,
-                                                       window->GetFramebufferExtent().Height}
-                                         : Core::Extent2D{},
+                .CameraViewport    = PresentedSceneViewportExtent(window, services.Find<EditorUiHost>()),
                 .Device            = device,
                 .TextureBake       = textureBake,
                 .AssetImportCommands =
