@@ -1210,6 +1210,7 @@ namespace
                 raw.emplace<GS::Halfedges>(Entity).Properties.Resize(12);
             }
             if (mesh) raw.emplace<GS::Faces>(Entity).Properties.Resize(6);
+            if (graph) raw.emplace<GS::HasGraphTopology>(Entity);
             auto& props = Properties(scene);
             auto samples = props.GetOrAdd<glm::vec3>("samples", {});
             for (std::size_t i = 0; i < props.Size(); ++i)

@@ -1318,9 +1318,9 @@ namespace
 
 // The publisher runs after a successful apply gate, so its own refusals are the
 // only failures left that must still answer the caller exactly once. An output
-// name already held by an incompatible type is the reachable public lever: the
-// property publication refuses, nothing is committed, and the editor gets one
-// terminal failure instead of a row stuck on "queued".
+// declaration using bool rank storage passes metadata admission, but ranks above
+// one cannot be represented after computation. Publication refuses, nothing is
+// committed, and the editor receives exactly one terminal failure.
 TEST(SandboxEditorUi, ProgressivePoissonPublishRejectionReportsOneTerminalFailure)
 {
     ECS::Scene::Registry registry;
@@ -1344,11 +1344,12 @@ TEST(SandboxEditorUi, ProgressivePoissonPublishRejectionReportsOneTerminalFailur
     AddPointCloudSource(registry, cloud, positions.size());
     SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
 
-    const Runtime::ProgressivePoissonPlaygroundConfig config = MakePoissonJobConfig();
-    // Same name, incompatible type: the float rank channel cannot be published.
+    Runtime::ProgressivePoissonPlaygroundConfig config = MakePoissonJobConfig();
+    config.Rank.ValueKind = Geometry::PropertyValueKind::Bool;
+    // Matching storage passes preflight; computed non-binary ranks must fail publication.
     auto blocker = registry.Raw()
                        .get<GS::Vertices>(cloud)
-                       .Properties.GetOrAdd<double>(config.Rank.Name, 0.0);
+                       .Properties.GetOrAdd<bool>(config.Rank.Name, true);
     ASSERT_TRUE(static_cast<bool>(blocker));
 
     const Runtime::EditorProgressivePoissonResult queued =
@@ -1378,6 +1379,7 @@ TEST(SandboxEditorUi, ProgressivePoissonPublishRejectionReportsOneTerminalFailur
     auto& properties = registry.Raw().get<GS::Vertices>(cloud).Properties;
     EXPECT_FALSE(properties.Exists(config.Level.Name));
     EXPECT_FALSE(properties.Exists(config.SplatRadius.Name));
+    EXPECT_EQ(properties.Get<bool>(config.Rank.Name).Vector(), std::vector<bool>(positions.size(), true));
     EXPECT_EQ(properties.Get<glm::vec3>(PN::kPosition).Vector(), positions);
 }
 
@@ -3547,7 +3549,7 @@ TEST(SandboxEditorUi, ProgressivePoissonRejectsUnrepresentableOutputsWithoutPart
         auto context = MakeContext(registry, selection);
         context.CommandHistory = &history;
         const auto cloud = MakePointCloudEntity(registry, "RejectedTypedPoisson",
-            {{0.f, 0.f, 0.f}, {1.f, 0.f, 0.f}, {0.f, 1.f, 0.f}, {1.f, 1.f, 0.f}, {0.f, 0.f, 0.f}});
+            {{0.f, 0.f, 0.f}, {0.25f, 0.f, 0.f}, {0.f, 0.25f, 0.f}, {0.25f, 0.25f, 0.f}, {0.f, 0.f, 0.f}});
         auto& props = registry.Raw().get<GS::Vertices>(cloud).Properties;
         const auto before = props.Get<glm::vec3>(PN::kPosition).Vector();
         Runtime::EditorProgressivePoissonCommand command{
