@@ -242,3 +242,29 @@ TEST(DescriptorAnalysisOperations, ResolvedScaleDiagnosticsPreserveAutomaticAndE
         }
     }
 }
+
+TEST(DescriptorAnalysis, DoubleOutputColumnsRoundTripAndPublishAsOneHistoryEntry)
+{
+    R::WorldRegistry worlds;
+    const auto world=worlds.CreateWorld("typed descriptor columns");
+    auto& scene=*worlds.Get(world);
+    const auto entity=Make(scene,D::MeshFace);
+    auto config=Config(entity,D::MeshFace);
+    for(auto& output:config.Outputs)output.ValueKind=Geometry::PropertyValueKind::Double;
+    Extrinsic::Core::Config::EngineConfig document;
+    R::SetDescriptorAnalysisConfig(document,config);
+    const auto decoded=R::GetDescriptorAnalysisConfig(document);
+    ASSERT_TRUE(decoded);
+    EXPECT_EQ(decoded->Outputs,config.Outputs);
+    R::EditorCommandHistory history;
+    R::SpatialIndexCache cache(worlds);
+    const R::EditorProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
+    const auto result=R::ApplyEditorDescriptorAnalysisCommand(R::BindEditorProcessingCommands(context),config);
+    ASSERT_TRUE(result.Succeeded())<<result.Message;
+    auto& props=PointDomainProperties(scene,entity,D::MeshFace);
+    for(const auto& output:config.Outputs)EXPECT_TRUE(std::as_const(props).Get<double>(output.Name));
+    ASSERT_TRUE(history.Undo().Succeeded());
+    for(const auto& output:config.Outputs)EXPECT_FALSE(props.Exists(output.Name));
+    ASSERT_TRUE(history.Redo().Succeeded());
+    for(const auto& output:config.Outputs)EXPECT_TRUE(std::as_const(props).Get<double>(output.Name));
+}

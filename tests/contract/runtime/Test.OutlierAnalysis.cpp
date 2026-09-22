@@ -614,3 +614,51 @@ TEST(OutlierAnalysis, RadiusParametersAndMissingSceneFailBeforeAnyMutation)
     EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(unbound, config).Enabled);
     EXPECT_FALSE(PointDomainProperties(scene, entity, D::PointCloudPoint).Exists("outliers"));
 }
+
+TEST(OutlierAnalysis, BoolMaskAndDoubleScorePreserveDeletedSamplesAndSupportRemoval)
+{
+    R::WorldRegistry worlds;
+    const auto world=worlds.CreateWorld("typed outliers");
+    auto& scene=*worlds.Get(world);
+    const auto entity=Make(scene,D::PointCloudPoint);
+    auto& props=PointDomainProperties(scene,entity,D::PointCloudPoint);
+    auto config=Config(entity,D::PointCloudPoint);
+    config.Mask.ValueKind=Geometry::PropertyValueKind::Bool;
+    config.Score.ValueKind=Geometry::PropertyValueKind::Double;
+    props.GetOrAdd<double>(config.Score.Name).Vector().assign(props.Size(),42.0);
+    props.Get<double>(config.Score.Name)[4]=std::numeric_limits<double>::quiet_NaN();
+    R::EditorCommandHistory history;
+    const R::EditorProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history};
+    const auto command=R::BindEditorProcessingCommands(context);
+    const auto result=R::ApplyEditorOutlierAnalysisCommand(command,config);
+    ASSERT_TRUE(result.Succeeded())<<result.Message;
+    EXPECT_TRUE(std::as_const(props).Get<bool>(config.Mask.Name)[3]);
+    EXPECT_TRUE(std::isnan(std::as_const(props).Get<double>(config.Score.Name)[4]));
+    ASSERT_TRUE(history.Undo().Succeeded());
+    EXPECT_FALSE(props.Exists(config.Mask.Name));
+    EXPECT_EQ(std::as_const(props).Get<double>(config.Score.Name)[0],42.0);
+    EXPECT_TRUE(std::isnan(std::as_const(props).Get<double>(config.Score.Name)[4]));
+    ASSERT_TRUE(history.Redo().Succeeded());
+    config.Operation=R::OutlierAnalysisOperation::RemoveMarked;
+    const auto removed=R::ApplyEditorOutlierAnalysisCommand(command,config);
+    ASSERT_TRUE(removed.Succeeded())<<removed.Message;
+    EXPECT_EQ(props.Size(),4u);
+}
+
+TEST(OutlierAnalysis, UnrepresentableScoreDoesNotPartiallyPublishMask)
+{
+    R::WorldRegistry worlds;
+    const auto world=worlds.CreateWorld("atomic typed outliers");
+    auto& scene=*worlds.Get(world);
+    const auto entity=Make(scene,D::PointCloudPoint);
+    auto config=Config(entity,D::PointCloudPoint);
+    config.Score.ValueKind=Geometry::PropertyValueKind::Bool;
+    R::EditorCommandHistory history;
+    const R::EditorProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history};
+    const auto result=R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config);
+    EXPECT_FALSE(result.Succeeded());
+    const auto& props=PointDomainProperties(scene,entity,D::PointCloudPoint);
+    EXPECT_FALSE(props.Exists(config.Mask.Name));
+    EXPECT_FALSE(props.Exists(config.Score.Name));
+    EXPECT_FALSE(history.CanUndo());
+}

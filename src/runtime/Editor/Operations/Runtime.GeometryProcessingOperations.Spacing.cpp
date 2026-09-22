@@ -146,8 +146,12 @@ namespace Extrinsic::Runtime
             {r.Status=EditorCommandStatus::StaleEntity; r.Message="Radii input or output changed before publication."; return r;}
             if (r.Status!=EditorCommandStatus::Applied) return r;
             const auto status = PublishPointScalarField(context, w->Entity, *w, "Estimate point spacing and radii");
-            r.Status=EditorFeatureDetail::ToEditorCommandStatus(status);
-            if (!r.Succeeded()) r.Message="Radii publication rejected by history checks.";
+            r.Status = status == EditorCommandHistoryStatus::InvalidCommand
+                ? EditorCommandStatus::InvalidProcessingParameters
+                : EditorFeatureDetail::ToEditorCommandStatus(status);
+            if (!r.Succeeded()) r.Message = status == EditorCommandHistoryStatus::InvalidCommand
+                ? "Output values are not exactly representable in the selected scalar storage."
+                : "Radii publication rejected by history checks.";
             return r;
         }
     }

@@ -142,7 +142,14 @@ namespace Extrinsic::Runtime
             if(r.Status!=EditorCommandStatus::Applied)return r;
             const auto status = Detail::PublishPointScalarField(context, w->Entity, *w,
                                                                "Compute compact density weights");
-            r.Status=EditorFeatureDetail::ToEditorCommandStatus(status);if(!r.Succeeded())r.Message="Density publication rejected by history checks.";return r;
+            r.Status = status == EditorCommandHistoryStatus::InvalidCommand
+                ? EditorCommandStatus::InvalidProcessingParameters
+                : EditorFeatureDetail::ToEditorCommandStatus(status);
+            if(!r.Succeeded())
+                r.Message = status == EditorCommandHistoryStatus::InvalidCommand
+                    ? "Output values are not exactly representable in the selected scalar storage."
+                    : "Density publication rejected by history checks.";
+            return r;
         }
     }
     ActionReadiness PreviewEditorDensityWeightCommand(const EditorProcessingCommands& commands,const DensityWeightConfig& config)

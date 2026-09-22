@@ -412,3 +412,27 @@ TEST(KernelDensityOperations, ExpiredAttachmentRejectsQueuedPublicationAndDelive
     EXPECT_FALSE(history.CanUndo());
     EXPECT_FALSE(commands.IsBound());
 }
+
+TEST(KernelDensity, DoubleTargetUsesSharedCheckedScalarPublication)
+{
+    R::WorldRegistry worlds;
+    const auto world=worlds.CreateWorld("typed scalar output");
+    auto& scene=*worlds.Get(world);
+    const auto entity=Make(scene,D::MeshFace);
+    auto config=Config(entity,D::MeshFace);
+    config.Density.ValueKind=Geometry::PropertyValueKind::Double;
+    Extrinsic::Core::Config::EngineConfig document;
+    R::SetKernelDensityConfig(document,config);
+    const auto decoded=R::GetKernelDensityConfig(document);
+    ASSERT_TRUE(decoded);
+    EXPECT_EQ(decoded->Density,config.Density);
+    R::EditorCommandHistory history;
+    R::SpatialIndexCache cache(worlds);
+    const R::EditorProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
+    const auto result=R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(context),config);
+    ASSERT_TRUE(result.Succeeded())<<result.Message;
+    const auto& props=PointDomainProperties(scene,entity,D::MeshFace);
+    EXPECT_TRUE(props.Get<double>(config.Density.Name));
+    ASSERT_TRUE(history.Undo().Succeeded());
+    EXPECT_FALSE(props.Exists(config.Density.Name));
+}

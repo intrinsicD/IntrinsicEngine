@@ -233,6 +233,7 @@ namespace Extrinsic::Sandbox::Editor
         std::optional<Runtime::GeometryElementDomain> domain = std::nullopt);
 
     bool DrawProcessingPropertyName(const char* label, std::string& name);
+    bool DrawProcessingScalarOutput(const char* label, Runtime::GeometryPropertyRef& ref);
     struct ProcessingEntityInput
     {
         std::uint32_t Entity{};

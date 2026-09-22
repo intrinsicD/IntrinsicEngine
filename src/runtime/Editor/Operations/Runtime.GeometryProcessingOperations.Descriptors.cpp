@@ -53,7 +53,8 @@ namespace Extrinsic::Runtime
             entt::entity Entity{};
             std::array<PointPropertyWatch,33> OutputWatches{};
             GeometryProcessingDetail::PointRadiusRows Rows{};
-            std::array<std::vector<float>,33> BeforeOutputs{}, AfterOutputs{};
+            std::array<GeometryScalarPropertySnapshot,33> BeforeOutputs{};
+            std::array<std::vector<float>,33> AfterOutputs{};
             std::shared_ptr<const SpatialIndexSnapshot> Index{};
             SpatialIndexHandle GpuIndex{};
             bool Abandoned{};
@@ -118,8 +119,8 @@ namespace Extrinsic::Runtime
             {
                 for(unsigned i=0;i<33;++i)
                 {
-                    if(w->OutputWatches[i].Revision)w->BeforeOutputs[i]=props->Get<float>(c.Outputs[i].Name).Vector();
-                    w->AfterOutputs[i]=w->OutputWatches[i].Revision?w->BeforeOutputs[i]:std::vector<float>(props->Size());
+                    w->BeforeOutputs[i]=CaptureGeometryScalarProperty(*props,c.Outputs[i]);
+                    w->AfterOutputs[i].resize(props->Size());
                 }
             }
             return w;
@@ -218,12 +219,14 @@ namespace Extrinsic::Runtime
             if (r.Status!=EditorCommandStatus::Applied) return r;
             struct State
             {
-                std::array<bool,33> Exists{};
-                std::array<std::vector<float>,33> Columns{};
+                std::array<GeometryScalarPropertySnapshot,33> Columns{};
             };
             auto before=std::make_shared<State>();before->Columns=w->BeforeOutputs;
-            auto after=std::make_shared<State>();after->Columns=w->AfterOutputs;after->Exists.fill(true);
-            for(unsigned i=0;i<33;++i)before->Exists[i]=bool(w->OutputWatches[i].Revision);
+            auto after=std::make_shared<State>(*before);
+            for(unsigned i=0;i<33;++i)
+                if (!PrepareGeometryScalarProperty(after->Columns[i], w->Config.Outputs[i].ValueKind,
+                    w->SlotCount, w->Slots, w->AfterOutputs[i]))
+                { r.Status=EditorCommandStatus::InvalidProcessingParameters; r.Message="Descriptor output cannot be represented exactly in the selected scalar storage."; return r; }
             auto revisions=std::make_shared<std::array<PointPropertyWatch,33>>(w->OutputWatches);
             const auto mutate=[context,entity=w->Entity,inputs=w->Inputs,c=w->Config,revisions](const State& target)
             {
@@ -231,9 +234,11 @@ namespace Extrinsic::Runtime
                     return EditorCommandHistoryStatus::StaleEntity;
                 auto* props=MutableGeometryProperties(context.Scene->Raw(),entity,c.Positions.Domain);
                 for(unsigned i=0;i<33;++i)
+                    if (!CanApplyGeometryScalarProperty(*props,c.Outputs[i],target.Columns[i]))
+                        return EditorCommandHistoryStatus::InvalidCommand;
+                for(unsigned i=0;i<33;++i)
                 {
-                    if(target.Exists[i])props->GetOrAdd<float>(c.Outputs[i].Name).Vector()=target.Columns[i];
-                    else if(auto property=props->Get<float>(c.Outputs[i].Name))props->Remove(property);
+                    (void)ApplyGeometryScalarProperty(*props,c.Outputs[i],target.Columns[i]);
                     (*revisions)[i].Revision=props->FindPropertyRevision(c.Outputs[i].Name);
                 }
                 if(context.InvalidateWorkspaceSnapshotCache)context.InvalidateWorkspaceSnapshotCache();
@@ -241,7 +246,9 @@ namespace Extrinsic::Runtime
             };
             const auto status=context.CommandHistory ? context.CommandHistory->Execute({.Label="Compute FPFH descriptors",
                 .Redo=[mutate,after]{return mutate(*after);},.Undo=[mutate,before]{return mutate(*before);}}).Status : mutate(*after);
-            r.Status=EditorFeatureDetail::ToEditorCommandStatus(status);
+            r.Status = status == EditorCommandHistoryStatus::InvalidCommand
+                ? EditorCommandStatus::InvalidProcessingParameters
+                : EditorFeatureDetail::ToEditorCommandStatus(status);
             if (!r.Succeeded()) r.Message="Descriptor publication rejected by history checks.";
             return r;
         }

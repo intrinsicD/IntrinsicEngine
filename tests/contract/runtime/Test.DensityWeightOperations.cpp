@@ -314,3 +314,27 @@ TEST(DensityWeightOperations, SynchronousOutcomeIsReturnedWithoutQueuedDelivery)
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     EXPECT_EQ(deliveries, 0u);
 }
+
+TEST(DensityWeight, DoubleTargetUsesSharedCheckedScalarPublication)
+{
+    R::WorldRegistry worlds;
+    const auto world=worlds.CreateWorld("typed scalar output");
+    auto& scene=*worlds.Get(world);
+    const auto entity=Make(scene,D::MeshFace);
+    auto config=Config(entity,D::MeshFace);
+    config.Weights.ValueKind=Geometry::PropertyValueKind::Double;
+    Extrinsic::Core::Config::EngineConfig document;
+    R::SetDensityWeightConfig(document,config);
+    const auto decoded=R::GetDensityWeightConfig(document);
+    ASSERT_TRUE(decoded);
+    EXPECT_EQ(decoded->Weights,config.Weights);
+    R::EditorCommandHistory history;
+    R::SpatialIndexCache cache(worlds);
+    const R::EditorProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
+    const auto result=R::ApplyEditorDensityWeightCommand(R::BindEditorProcessingCommands(context),config);
+    ASSERT_TRUE(result.Succeeded())<<result.Message;
+    const auto& props=PointDomainProperties(scene,entity,D::MeshFace);
+    EXPECT_TRUE(props.Get<double>(config.Weights.Name));
+    ASSERT_TRUE(history.Undo().Succeeded());
+    EXPECT_FALSE(props.Exists(config.Weights.Name));
+}

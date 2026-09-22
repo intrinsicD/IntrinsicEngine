@@ -99,7 +99,9 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     struct PointScalarCapture : PointInputCapture
     {
         PointPropertyWatch OutputWatch{};
-        std::vector<float> BeforeValues{}, AfterValues{};
+        GeometryPropertyRef Output{};
+        GeometryScalarPropertySnapshot BeforeValues{};
+        std::vector<float> AfterValues{};
     };
 
     // Metadata-only vec3 candidates; callers retain method-specific admission.

@@ -176,6 +176,20 @@ namespace Extrinsic::Sandbox::Editor
         }
     }
 
+    bool DrawProcessingScalarOutput(const char* label, Runtime::GeometryPropertyRef& ref)
+    {
+        bool changed = DrawProcessingPropertyName(label, ref.Name);
+        ImGui::PushID(label);
+        using K = decltype(ref.ValueKind);
+        constexpr std::array kinds{K::Bool, K::Int32, K::UInt32, K::UInt64, K::Float, K::Double};
+        int selected = -1;
+        for (unsigned i = 0; i < kinds.size(); ++i) if (ref.ValueKind == kinds[i]) selected = int(i);
+        if (ImGui::Combo("Storage", &selected, "Bool\0Int32\0UInt32\0UInt64\0Float\0Double\0"))
+        { ref.ValueKind = kinds[unsigned(selected)]; changed = true; }
+        ImGui::PopID();
+        return changed;
+    }
+
     bool DrawProcessingPropertyName(const char* label, std::string& name)
     {
         std::array<char, 512> buffer{};

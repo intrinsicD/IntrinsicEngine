@@ -271,3 +271,31 @@ TEST(KeypointAnalysisOperations, ResolvedScaleDiagnosticsPreserveAutomaticAndExp
         }
     }
 }
+
+TEST(KeypointAnalysis, AlternateScalarStoragePublishesAndRestoresBothOutputs)
+{
+    R::WorldRegistry worlds;
+    const auto world=worlds.CreateWorld("typed keypoint outputs");
+    auto& scene=*worlds.Get(world);
+    const auto entity=Make(scene,D::MeshFace);
+    auto config=Config(entity,D::MeshFace);
+    config.Mask.ValueKind=Geometry::PropertyValueKind::Int32;
+    config.Score.ValueKind=Geometry::PropertyValueKind::Double;
+    Extrinsic::Core::Config::EngineConfig document;
+    R::SetKeypointAnalysisConfig(document,config);
+    const auto decoded=R::GetKeypointAnalysisConfig(document);
+    ASSERT_TRUE(decoded);
+    EXPECT_EQ(decoded->Mask,config.Mask);
+    EXPECT_EQ(decoded->Score,config.Score);
+    R::EditorCommandHistory history;
+    R::SpatialIndexCache cache(worlds);
+    const R::EditorProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
+    const auto result=R::ApplyEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),config);
+    ASSERT_TRUE(result.Succeeded())<<result.Message;
+    const auto& props=PointDomainProperties(scene,entity,D::MeshFace);
+    EXPECT_TRUE(props.Get<std::int32_t>(config.Mask.Name));
+    EXPECT_TRUE(props.Get<double>(config.Score.Name));
+    ASSERT_TRUE(history.Undo().Succeeded());
+    EXPECT_FALSE(props.Exists(config.Mask.Name));
+    EXPECT_FALSE(props.Exists(config.Score.Name));
+}

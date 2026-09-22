@@ -254,7 +254,7 @@ namespace Extrinsic::Runtime
         for(unsigned i=0;i<33;++i)
         {
             const auto& ref=data["outputs"][i];
-            if(ConfigDetail::ValidatePointPropertyRef(ref,Geometry::PropertyValueKind::Float) != PointPropertyValidation::Valid || ref["domain"]!=data["positions"]["domain"] ||
+            if(ConfigDetail::ValidatePointPropertyRef(ref,Geometry::PropertyValueKind::Float, true) != PointPropertyValidation::Valid || ref["domain"]!=data["positions"]["domain"] ||
                ref["name"]==data["positions"]["name"] || ref["name"]==data["normals"]["name"])
                 return RejectConfigSection(subject, "Descriptor outputs must be float properties on the input domain, distinct from inputs.");
             for(unsigned j=0;j<i;++j)if(ref["name"]==data["outputs"][j]["name"])

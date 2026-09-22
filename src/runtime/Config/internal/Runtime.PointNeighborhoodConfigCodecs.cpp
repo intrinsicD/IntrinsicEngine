@@ -315,7 +315,7 @@ namespace Extrinsic::Runtime
         if(data["mode"]!="direct" && data["mode"]!="reciprocal")return RejectConfigSection(subject, "Unknown density weight mode.");
         using ConfigDetail::PointPropertyValidation;
         if(ConfigDetail::ValidatePointPropertyRef(data["positions"],Geometry::PropertyValueKind::Vec3) != PointPropertyValidation::Valid ||
-           ConfigDetail::ValidatePointPropertyRef(data["weights"],Geometry::PropertyValueKind::Float) != PointPropertyValidation::Valid ||
+           ConfigDetail::ValidatePointPropertyRef(data["weights"],Geometry::PropertyValueKind::Float, true) != PointPropertyValidation::Valid ||
            data["positions"]["domain"]!=data["weights"]["domain"] || data["positions"]["name"]==data["weights"]["name"])
             return RejectConfigSection(subject, "Position and weight bindings need distinct canonical vec3/float properties on the same domain.");
         result.State=EngineConfigState::Valid;result.CanonicalPayloadJson=SerializeDensityWeightConfig(ParseDensityWeightConfig(data));result.ParsedFieldCount=input.size();return result;
