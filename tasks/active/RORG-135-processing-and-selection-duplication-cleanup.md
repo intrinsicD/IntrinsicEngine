@@ -29,9 +29,15 @@ contracts: [runtime.processing-compilation-locality, repo.source-documentation, 
 
 | Slice | Production files before → after | Physical lines before → after |
 | --- | --- | --- |
-| 1 Density/Spacing TUs | 2 → 1 | 564 → 400 (plus 2 CMake list lines removed) |
+| 1 Density/Spacing TUs | 2 → 1 | 564 → 403 after the `Join` reserve fix (plus 2 CMake list lines removed) |
 | 2 Selection-ID passes | 8 → 2 | 325 → 155; `Graphics.Renderer.cpp` −47 net, pass CMake −6 |
 | 3 Outliers/Bilateral/Normals + RadiusRows owner | 5 → 5 | 1,858 → 1,846; four existing clients rename the state enum only |
+- Contract review: `runtime.spatial-query-locality` (source `docs/architecture/spatial-indices.md`) was read and is not declared. `Runtime.SpatialIndexCache.cppm` module dependencies, the cache's GPU query integration (`QueueGpuKNearest`/`QueueGpuRadius`, frame participant, readback ordering) and its borrowed `WorldRegistry` declaration are unchanged. Only consumer-side batch pagination moved into the private RadiusRows owner. Consumer query kinds, metrics, exclusions, capacities, overflow handling and invalidation are unchanged, so `docs/architecture/spatial-index-consumers.md` needs no update.
+
+## Review and verification received
+- Independent Codex review of `5fde1bbb8`, `76bc5d6b3` and `fa4022715` (2026-09-23) found the slices bounded and behavior-preserving. The slice-2 surface removals (no-op two-argument `Execute` overloads, legacy alias test) are accepted under the no-compatibility policy. The slice-3 private template (compile-time per-batch lambdas, no type erasure, no per-neighbor callbacks) is accepted, with its modest line saving as recorded above. One requested fix: slice 1 `Join` reserves the summed part length once; committed separately.
+- Completed by Codex before the reserve fix and slice 3 were integrated: baseline `9831bc4fc` passed 241 focused CPU/locality tests, the full CPU gate (5,012 tests, 0 failures, 1 expected unsanitized LSan skip) and 11 impacted ci-vulkan ASan+UBSan tests on a real RTX 3050 (0 skips). With slices 1+2 (`76bc5d6b3`), `IntrinsicRuntimeContractTests` and `IntrinsicGraphicsContractCpuTests` built with the Clang 23 `ci` preset. 176 focused CPU/locality tests passed. Fresh grouped `ci-asan`/`ci-ubsan` `IntrinsicCpuTests` builds succeeded, and 169 focused ASan tests passed. Strict layering, task policy, docs sync, doc links, skill mirrors and whitespace checks passed.
+- Pending: combined-tree builds and tests including slice 3 and the reserve fix; full CPU, separate full ASan/UBSan and full Vulkan/readback gates; final review and clean-workshop scorecard.
 
 ## Acceptance criteria
 - [ ] Density/spacing public behavior, job identity/guard, GPU prerequisite ordering, terminal delivery/cancellation, expired-attachment suppression, staleness, deleted slots and checked conversion are unchanged (focused density/spacing contracts and GPU smokes pass).
@@ -56,3 +62,4 @@ git diff --check
 
 ## Log
 - 2026-09-23: Opened with slice 1. C++ builds and tests are run by Codex in the main checkout; the writer worktree runs structural checks only.
+- 2026-09-23: Slices committed as `5fde1bbb8`, `76bc5d6b3` and `fa4022715`; review received; `Join` reserve fix committed separately.

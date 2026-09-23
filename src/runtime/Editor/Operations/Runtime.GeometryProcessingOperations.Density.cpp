@@ -46,7 +46,10 @@ namespace Extrinsic::Runtime
 
         std::string Join(std::initializer_list<std::string_view> parts)
         {
+            std::size_t size = 0;
+            for (const auto part : parts) size += part.size();
             std::string text;
+            text.reserve(size);
             for (const auto part : parts) text += part;
             return text;
         }
