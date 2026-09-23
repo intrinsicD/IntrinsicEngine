@@ -404,7 +404,11 @@ apply, undo and redo. Density, spacing and local-distance-ratio outliers share
 compact indices. Each adapter chooses its width and retains its numerical kernel;
 statistical outliers keep their self-excluding queries. Density and spacing also
 share framed fixed-width kNN pagination; radius pagination retains its separate
-support-membership contract. These declarations live in `RadiusRows.hpp` for
+support-membership contract. Their capture, index admission, job lifecycle and
+publication are one TU-local template in
+`Runtime.GeometryProcessingOperations.Density.cpp`, instantiated for two typed
+method records that keep config, statistics, wording and self-neighbor floors
+(`max(k,2)+1` for density, `max(k,1)+1` for spacing). These declarations live in `RadiusRows.hpp` for
 consumers of spatial-index neighborhoods.
 `BuildPointInputCatalog` shares live-row validation with density, spacing, weights,
 keypoints, outliers, descriptors, construction, normals and registration, independently

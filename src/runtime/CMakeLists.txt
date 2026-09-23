@@ -140,7 +140,6 @@ target_sources(${target_name}
         Modules/Geodesics/Runtime.GeodesicsConfig.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Density.cpp
-        Editor/Operations/Runtime.GeometryProcessingOperations.Spacing.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.cpp

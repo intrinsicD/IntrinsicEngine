@@ -84,7 +84,6 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.Family
         --check-source src/runtime/Editor/Operations/Runtime.PointFieldOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.PointFieldOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Density.cpp
-        --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Spacing.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp
         --check-source src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.cpp
         --forbid-module Extrinsic.ECS.Component.Transform

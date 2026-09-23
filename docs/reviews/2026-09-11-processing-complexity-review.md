@@ -59,7 +59,7 @@ stronger evidence than the layer totals.
 ### F1 — Same scalar-property operation implemented twice: confirmed
 
 [Density](../../src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Density.cpp)
-and [spacing](../../src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Spacing.cpp)
+and spacing (`Runtime.GeometryProcessingOperations.Spacing.cpp`, later merged into the density unit)
 are each 449 lines. After trimming whitespace, 363 of their 448 nonblank lines
 match exactly in sequence. That includes braces and imports: it is textual
 overlap, not a promise that 81% of either file can be deleted.
