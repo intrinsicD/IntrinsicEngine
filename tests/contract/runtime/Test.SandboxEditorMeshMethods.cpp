@@ -5864,28 +5864,26 @@ TEST(SandboxEditorUi, UvRegenerationPanelModelTracksDerivedJobStateThroughCache)
     Runtime::EditorSelectedModelCache cache{};
     Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     context.SelectedModelCache = &cache;
-    // Parks every worker so the post-submit snapshot observes Queued; a fast
+    // Holds the UV job's work until the post-submit snapshot is taken; a fast
     // worker could otherwise reach AwaitingGate first, and the next snapshot
-    // would then be a legitimate cache hit. Declared before the harness so it
-    // outlives the scheduler shutdown.
-    struct
-    {
-        std::mutex Mutex{};
-        std::condition_variable Condition{};
-        unsigned Parked{0u};
-        bool Released{false};
-    } fence;
-    const auto releaseWorkers = [&fence]
-    {
-        {
-            std::lock_guard lock(fence.Mutex);
-            fence.Released = true;
-        }
-        fence.Condition.notify_all();
-    };
-    constexpr unsigned kWorkers = 2u;
-    Extrinsic::Tests::EditorJobHarness jobs{kWorkers};
+    // would then be a legitimate cache hit. The mutex outlives the harness;
+    // the lock is released before harness teardown on every exit path.
+    std::mutex workGate;
+    Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
+    std::unique_lock gateLock(workGate);
+    context.JobCommands.Submit =
+        [&workGate, submit = context.JobCommands.Submit](
+            Runtime::JobDesc desc, Runtime::EditorJobIdentity identity)
+    {
+        desc.Work = [&workGate, work = std::move(desc.Work)](
+                        const Runtime::JobCancellation& cancellation) mutable
+        {
+            { std::lock_guard wait(workGate); }
+            return work(cancellation);
+        };
+        return submit(std::move(desc), std::move(identity));
+    };
 
     const ECS::EntityHandle mesh =
         MakeSelectable(registry, "CachedUvJobMesh");
@@ -5899,27 +5897,6 @@ TEST(SandboxEditorUi, UvRegenerationPanelModelTracksDerivedJobStateThroughCache)
     ASSERT_TRUE(frame.Inspector.HasEntity);
     EXPECT_FALSE(frame.Inspector.TextureBake.Uv.UvRegenerationJob.has_value());
 
-    for (unsigned worker = 0u; worker < kWorkers; ++worker)
-    {
-        Core::Tasks::Scheduler::Dispatch([&fence]
-        {
-            std::unique_lock lock(fence.Mutex);
-            ++fence.Parked;
-            fence.Condition.notify_all();
-            fence.Condition.wait(lock, [&fence] { return fence.Released; });
-        });
-    }
-    bool parked = false;
-    {
-        std::unique_lock lock(fence.Mutex);
-        parked = fence.Condition.wait_for(lock, std::chrono::seconds(5),
-            [&fence] { return fence.Parked == kWorkers; });
-    }
-    if (!parked)
-        releaseWorkers();
-    ASSERT_TRUE(parked);
-
-    // No assertion may return between parking and releasing the workers.
     const Runtime::EditorUvRegenerationCommandResult result =
         Runtime::ApplyEditorUvRegenerationCommand(
             context,
@@ -5927,14 +5904,15 @@ TEST(SandboxEditorUi, UvRegenerationPanelModelTracksDerivedJobStateThroughCache)
                 .StableEntityId = stableId,
                 .Atlas = {.Resolution = 64u, .Padding = 2u},
             });
-    frame = Runtime::BuildEditorWorkspaceSnapshot(context);
-    releaseWorkers();
     ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
+
+    frame = Runtime::BuildEditorWorkspaceSnapshot(context);
+    gateLock.unlock();
     ASSERT_TRUE(frame.Inspector.TextureBake.Uv.UvRegenerationJob.has_value());
     EXPECT_TRUE(Runtime::IsActiveEditorJobState(
         frame.Inspector.TextureBake.Uv.UvRegenerationJob->State));
-    EXPECT_EQ(frame.Inspector.TextureBake.Uv.UvRegenerationJob->State,
-              Runtime::JobState::Queued);
+    EXPECT_NE(frame.Inspector.TextureBake.Uv.UvRegenerationJob->State,
+              Runtime::JobState::AwaitingGate);
     EXPECT_EQ(frame.Inspector.TextureBake.Uv.UvRegenerationJob->Identity.OutputName,
               "uv_regeneration");
 

@@ -15,7 +15,8 @@ contract_review: Catalog reviewed; this fixes one contract test's worker synchro
 
 ## Goal
 Make `SandboxEditorUi.UvRegenerationPanelModelTracksDerivedJobStateThroughCache`
-observe `Queued` at its post-submit snapshot every time, so its four snapshots
+observe a pre-completion job state (`Queued` or `Running`, never
+`AwaitingGate`) at its post-submit snapshot every time, so its four snapshots
 remain four distinct selected-analysis cache misses.
 
 ## Context
@@ -29,21 +30,34 @@ remain four distinct selected-analysis cache misses.
   - If a worker finishes the tiny UV job before the post-submit snapshot, that snapshot already sees `AwaitingGate`.
   - The post-`WaitForAll` snapshot then has an identical key and is a correct cache hit.
   - The production cache is correct; the test does not pin the job state.
-- Reuse:
-  - The file's existing `DirectMeshPostProcessWorkerBarrier` is a JobService job, and its completion would be drained by the test's single `DrainCompletions`.
-  - `JobServiceTestHooks` only offers post-completion hooks.
-  - So the test parks both workers with plain scheduler tasks, using the same mutex/condition-variable idiom. There is no sleep, production change or shared helper.
-- Fix details:
-  - The fence outlives the harness.
-  - Workers are released right after the post-submit snapshot, before any assertion.
-  - A park timeout also releases before failing.
-  - The test now also asserts `Queued` at that snapshot.
-  - All four snapshots, existing assertions, `EXPECT_GE(misses, 4u)`, the fixture and job parameters are unchanged.
+- Reproduction (root, same binary): with a breakpoint at the first post-submit
+  snapshot, root called the actual `Scheduler::WaitForAll()` from gdb and
+  continued. This reproduced exactly 3 vs 4 misses while every state/content
+  assertion passed. 300 normal CTest repeats passed, so only a forced schedule
+  exposes the race.
+- Fix, using the existing `context.JobCommands.Submit` test seam:
+  - `std::mutex workGate` is declared before the harness.
+  - A `std::unique_lock` is taken after it, so the gate is released before
+    harness teardown on any return or exception.
+  - The wrapper moves `desc.Work` into a `mutable` lambda. That lambda briefly
+    acquires and releases the gate, then calls the original `Work`; the gate
+    is never held during `Work`.
+  - JobService stores `Running` before calling `Work`, and calls it with no
+    JobService lock held. The gated snapshot therefore sees `Queued` or
+    `Running` and cannot deadlock.
+  - The lock is released right after that snapshot. The test keeps the
+    `IsActive` assertion and adds `EXPECT_NE(state, AwaitingGate)`.
+  - The four snapshots, `EXPECT_GE(misses, 4u)`, the fixture and job
+    parameters are unchanged. There are no dummy jobs, worker parking, sleeps,
+    timeouts or production changes.
+- The first candidate, `183d50c72`, parked both workers with blocking scheduler
+  tasks. Review found it larger than needed and not exception-safe; it remains
+  in history and is replaced by the gate.
 - Separate from BUG-218; that run stopped before the curvature chunk.
 
 ## Acceptance criteria
-- [ ] Before the fix, the gdb non-stop pause of the main thread at the post-submit snapshot (recipe in `/tmp/intrinsic-simplify-ui-cache-diagnosis.md`) reproduces 3 misses.
-- [ ] After the fix, the same pause, now at line 5930, still passes, and 200 repetitions of the single case pass.
+- [x] Before the fix, a forced schedule on the unchanged binary reproduces the failure: gdb at the post-submit snapshot calls `Scheduler::WaitForAll()`, and the test fails with 3 vs 4 misses.
+- [ ] After the fix, forcing `WaitForAll()` right after the gate is released (line 5911) passes with all assertions and 4 misses, and normal repeats of the single case pass.
 - [ ] The changed runtime contract test target builds; the full CPU, ASan and UBSan gates pass.
 - [ ] Normal hosted pr-fast passes for PR #1045.
 

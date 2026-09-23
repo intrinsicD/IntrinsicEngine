@@ -12,3 +12,9 @@ Mechanism (source reading): JobService::DispatchJob stores Queued and dispatches
   UV job before the post-submit snapshot, that snapshot sees AwaitingGate and the post-WaitForAll snapshot is an
   identical-key cache hit (3 misses). Reproduction recipe: /tmp/intrinsic-simplify-ui-cache-diagnosis.md (gdb non-stop
   pause of the main thread at the post-submit snapshot).
+Root reproduction (same binary at 4cdf626f0; 2026-09-23): gdb breakpoint at the first post-submit snapshot
+  (Test.SandboxEditorMeshMethods.cpp:5891), `call Extrinsic::Core::Tasks::Scheduler::WaitForAll()`, disable, continue
+  -> test fails at :5912 with SelectedAnalysisCacheMisses 3 vs 4; all state/content assertions pass; exit code 1.
+  300 normal CTest repeats of the unchanged case passed in 5.46 s, so the race needs a forced schedule to show.
+Candidate history: 183d50c72 parked both workers (superseded after review); the follow-up gates the UV job's Work
+  through the existing JobCommands.Submit seam.

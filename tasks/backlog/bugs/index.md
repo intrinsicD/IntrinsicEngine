@@ -5,7 +5,7 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [BUG-219 — Fix the UV panel cache test's post-submit snapshot race](../../active/BUG-219-uv-panel-cache-snapshot-race.md): a fast worker can reach `AwaitingGate` before the post-submit snapshot, which removes one expected cache miss (hosted run 35851119431). The test-only fence awaits reproduction and verification.
+- [BUG-219 — Fix the UV panel cache test's post-submit snapshot race](../../active/BUG-219-uv-panel-cache-snapshot-race.md): a fast worker can reach `AwaitingGate` before the post-submit snapshot, which removes one expected cache miss (hosted run 35851119431). Root reproduced it deterministically, and a test-only `JobCommands.Submit` work gate awaits verification.
 - [BUG-218 — Split the curvature scenarios and budget the refinement case](../../active/BUG-218-curvature-refinement-scenario-split.md): the scenarios are split and refinement stays serial, but refinement still timed out alone at 30 s on a hosted runner (run 35849534652). It now has a case-only 60 s `TIMEOUT`, and the local budget metadata and full CPU run pass. Hosted pr-fast is pending.
 
 - [BUG-178 — Clang 23 crashes during an incremental module rebuild](BUG-178-clang23-incremental-module-ice.md).
