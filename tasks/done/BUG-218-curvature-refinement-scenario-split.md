@@ -6,12 +6,24 @@ template: micro
 workflow_schema: 1
 workflow_profile: micro
 evidence: not_applicable
-evidence_skip_reason: Interactive test-structure and budget fix; retained CI counterexamples, gdb scenario timings and the pending verification are the evidence.
+evidence_skip_reason: Interactive test-structure and budget fix; retained CI counterexamples, gdb scenario timings and local/hosted verification are the evidence.
 contract_schema: 1
 contracts: []
 contract_review: Catalog reviewed; this splits one geometry unit test into two independently registered scenarios and sets case-scoped CTest scheduling/timeout properties, with no engine, numeric, tolerance or reusable contract change.
 ---
 # BUG-218 — Split the curvature scenarios and budget the refinement case
+
+## Completion — 2026-09-23
+Resolved.
+- The former combined case is now two independently registered scenarios. Every grid, parameter and assertion is kept.
+- `RefinementRetainsCenterCurve` alone is `RUN_SERIAL` and has a case-only 60 s `TIMEOUT`.
+- Unchanged: the 30 s default for every other case, labels, selection, the grouped wrapper, workflows and numeric code.
+- The split and serialization alone were insufficient: hosted run 35849534652 timed out refinement alone at 30.01 s.
+- Hosted run 35853323917 then passed with refinement at 27.95 s on that runner. That is a single-runner measurement, not a bound for all hosted runners.
+- BUG-216 and BUG-217 stay as written; BUG-217 was a partial mitigation.
+
+PR/commit: [PR #1045](https://github.com/intrinsicD/IntrinsicEngine/pull/1045); split `895980f87`,
+budget `4cdf626f0`, verified at `621566843`; the enclosing retirement commit is docs only.
 
 ## Goal
 Register the two independent scenarios of the former
@@ -20,7 +32,7 @@ cases. Keep every grid, parameter and assertion. Serialize only the dominant
 refinement case and give it a case-only 60 s `TIMEOUT`.
 
 ## Context
-- [BUG-217](../done/BUG-217-curvature-refinement-run-serial.md) removed
+- [BUG-217](BUG-217-curvature-refinement-run-serial.md) removed
   CPU-bound sibling overlap. On hosted
   [run 35845852620](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/35845852620),
   the combined case nevertheless ran alone and timed out at 30.04 s, after
@@ -67,7 +79,7 @@ refinement case and give it a case-only 60 s `TIMEOUT`.
   - ASan: 3,333, 0 failures, 0 skips, 721.31 s; curvature group 99.72 s
   - UBSan: 3,333, 0 failures, 1 expected skip, 318.69 s; curvature group 84.13 s
 - [x] The normal local CPU run passes again with the 60 s budget: 5,013 tests, 0 failures, 1 expected skip, 60.09 s (refinement 15.72 s).
-- [ ] Normal hosted pr-fast passes for PR #1045.
+- [x] Normal hosted pr-fast passes for PR #1045: [run 35853323917](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/35853323917) at `621566843` succeeded in 9m38s. The geometry chunk passed 116/116, with retriangulation at 7.64 s and serialized refinement at 27.95 s.
 
 ## Verification
 ```bash
@@ -86,3 +98,9 @@ ctest --test-dir build/ci-ubsan --output-on-failure -LE 'gpu|vulkan|slow|flaky-q
 - 2026-09-23: Full CPU, ASan and UBSan passed on `895980f87`.
 - 2026-09-23: Hosted run 35849534652 at `d6d3bccfe` timed out the serialized refinement case alone at 30.01 s. The unchanged 30 s budget proved insufficient. The final proposal is the case-only 60 s budget; its metadata, local rerun and hosted result are pending.
 - 2026-09-23: Budget metadata and the local full CPU run passed at `4cdf626f0`. Hosted run 35851119431 then failed an unrelated UI cache test ([BUG-219](BUG-219-uv-panel-cache-snapshot-race.md)) before reaching the curvature chunk, so the hosted budget criterion stays open.
+- 2026-09-23: Final verification at `621566843`, where the curvature test and CMake are unchanged since `4cdf626f0`:
+  - full CPU: 5,013 tests, 0 failures, 1 skip, 74.66 s; refinement 14.90 s
+  - full ASan: 3,333, 0 failures, 0 skips, 727.84 s; curvature group 97.16 s
+  - full UBSan: 3,333, 0 failures, 1 skip, 349.02 s; curvature group 82.44 s
+  - hosted pr-fast 35853323917 passed
+- 2026-09-23: The 36–44 s figure in the context was an unmeasured estimate. The measured hosted results are the 30.01 s timeout (run 35849534652) and the 27.95 s pass (run 35853323917). Retired.

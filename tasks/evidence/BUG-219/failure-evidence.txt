@@ -18,3 +18,16 @@ Root reproduction (same binary at 4cdf626f0; 2026-09-23): gdb breakpoint at the 
   300 normal CTest repeats of the unchanged case passed in 5.46 s, so the race needs a forced schedule to show.
 Candidate history: 183d50c72 parked both workers (superseded after review); the follow-up gates the UV job's Work
   through the existing JobCommands.Submit seam.
+
+Final verification of 621566843 (Codex):
+  IntrinsicRuntimeContractTests built in ci, ci-asan, ci-ubsan and ci-vulkan; the changed executable has no GPU/Vulkan
+    registrations.
+  post-fix forced schedule: gdb non-stop paused the main thread 1 s at the post-submit snapshot (line 5909) while the
+    workers ran (debugger probe, not test code); all original assertions plus the non-AwaitingGate check passed, and
+    the inferior exited normally (1,023 ms).
+  300 normal CTest repeats after the fix passed, 7.22 s. Before the fix, 300 normal repeats also passed (5.46 s); only
+    the forced schedule reproduced the failure.
+  full CPU 5,013 / 0 / 1 expected LSan skip, 74.66 s (case 0.026 s); full ASan 3,333 / 0 / 0, 727.84 s;
+    full UBSan 3,333 / 0 / 1 expected skip, 349.02 s
+  hosted pr-fast https://github.com/intrinsicD/IntrinsicEngine/actions/runs/35853323917  success, 9m38s; case 0.03 s;
+    docs-validation https://github.com/intrinsicD/IntrinsicEngine/actions/runs/35853324007  success, 3m29s

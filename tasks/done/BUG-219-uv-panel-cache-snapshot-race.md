@@ -6,12 +6,22 @@ template: micro
 workflow_schema: 1
 workflow_profile: micro
 evidence: not_applicable
-evidence_skip_reason: Interactive test-synchronization fix; retained CI failure, source diagnosis and the pending reproduction/verification are the evidence.
+evidence_skip_reason: Interactive test-synchronization fix; retained CI failure, source diagnosis, forced-schedule reproduction and local/hosted verification are the evidence.
 contract_schema: 1
 contracts: []
 contract_review: Catalog reviewed; this fixes one contract test's worker synchronization, with no production cache, job, engine or reusable contract change.
 ---
 # BUG-219 — Fix the UV panel cache test's post-submit snapshot race
+
+## Completion — 2026-09-23
+Resolved.
+- The UV job's `Work` is gated through the existing `JobCommands.Submit` test seam until the post-submit snapshot has been taken. That snapshot therefore always sees a pre-completion state, and all four snapshots remain distinct cache misses.
+- Production code is unchanged. The fix adds no sleeps and no dummy jobs.
+- Before the fix, a forced schedule reproduced the hosted 3 vs 4 failure while 300 normal repeats passed.
+- After the fix, a forced debugger pause, 300 repeats, the full CPU/ASan/UBSan gates and hosted pr-fast all pass.
+
+PR/commit: [PR #1045](https://github.com/intrinsicD/IntrinsicEngine/pull/1045); fix `621566843`
+(the first candidate `183d50c72` is superseded); the enclosing retirement commit is docs only.
 
 ## Goal
 Make `SandboxEditorUi.UvRegenerationPanelModelTracksDerivedJobStateThroughCache`
@@ -57,9 +67,16 @@ remain four distinct selected-analysis cache misses.
 
 ## Acceptance criteria
 - [x] Before the fix, a forced schedule on the unchanged binary reproduces the failure: gdb at the post-submit snapshot calls `Scheduler::WaitForAll()`, and the test fails with 3 vs 4 misses.
-- [ ] After the fix, forcing `WaitForAll()` right after the gate is released (line 5911) passes with all assertions and 4 misses, and normal repeats of the single case pass.
-- [ ] The changed runtime contract test target builds; the full CPU, ASan and UBSan gates pass.
-- [ ] Normal hosted pr-fast passes for PR #1045.
+- [x] After the fix, a forced schedule passes and normal repeats of the single case pass.
+  - gdb non-stop paused the main thread for 1 s at the post-submit snapshot (line 5909) while the workers ran. This was a deliberate debugger probe, not a sleep in the test.
+  - All original assertions plus the non-`AwaitingGate` check passed, and the process exited normally.
+  - 300 normal CTest repeats passed in 7.22 s.
+- [x] The changed runtime contract test target builds in all four presets:
+  - full CPU: 5,013 tests, 0 failures, 1 expected LSan skip, 74.66 s
+  - full ASan: 3,333, 0 failures, 0 skips, 727.84 s
+  - full UBSan: 3,333, 0 failures, 1 expected skip, 349.02 s
+  - The changed executable has no GPU/Vulkan registrations.
+- [x] Normal hosted pr-fast passes for PR #1045: [run 35853323917](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/35853323917) succeeded in 9m38s, with the case at 0.03 s. Docs-validation run 35853324007 also passed.
 
 ## Verification
 ```bash

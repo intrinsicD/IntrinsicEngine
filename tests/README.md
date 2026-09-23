@@ -227,7 +227,7 @@ retriangulation and refinement scenarios are separate discovered cases. Only the
 single-threaded, dominant `CurvatureExtrema.RefinementRetainsCenterCurve` is
 `RUN_SERIAL` and has a case-only 60-second `TIMEOUT`, because it exceeded 30 s
 alone on a slow hosted Debug runner
-([BUG-218](../tasks/active/BUG-218-curvature-refinement-scenario-split.md)).
+([BUG-218](../tasks/done/BUG-218-curvature-refinement-scenario-split.md)).
 
 The case-scoped reservation list in
 [`tests/CMakeLists.txt`](CMakeLists.txt) intentionally covers only tests that

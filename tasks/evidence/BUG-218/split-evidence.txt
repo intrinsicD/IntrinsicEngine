@@ -49,3 +49,12 @@ Local verification of the budget change 4cdf626f0 (Codex): all four presets conf
   ci-vulkan; grouped ci-asan/ci-ubsan unchanged; four curvature binaries SHA-256 identical to before.
   full CPU 12:49:24: 5,013 tests / 0 failures / 1 expected skip, 60.09 s; Refinement 15.72 s.
   Hosted run 35851119431 stopped on an unrelated UI cache failure (BUG-219) before the curvature chunk.
+
+Final verification at 621566843 (Codex; curvature test/CMake unchanged since 4cdf626f0):
+  full CPU 13:12:11: 5,013 / 0 failures / 1 expected LSan skip, 74.66 s; Refinement 14.90 s
+  full ASan 3,333 / 0 / 0 skips, 727.84 s (curvature group 97.16 s); full UBSan 3,333 / 0 / 1 expected skip, 349.02 s
+    (curvature group 82.44 s)
+  hosted pr-fast https://github.com/intrinsicD/IntrinsicEngine/actions/runs/35853323917  success, 9m38s
+    geometry chunk 116/116; Retriangulation 7.64 s; serialized Refinement 27.95 s under its case-only TIMEOUT 60
+  27.95 s is one runner's measurement. Run 35849534652 (same test, 30 s budget) timed out at 30.01 s. Neither run, nor
+    the earlier 36-44 s estimate, bounds every hosted runner.

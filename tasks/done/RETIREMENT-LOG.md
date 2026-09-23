@@ -8,6 +8,34 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-09-23 — BUG-219 UV panel cache snapshot race
+
+Retired [BUG-219](BUG-219-uv-panel-cache-snapshot-race.md). A fast worker could
+finish the UV job before the post-submit snapshot, which turned the next
+snapshot into a correct cache hit (3 of 4 misses). The test now gates the job's
+work through the existing `JobCommands.Submit` seam until that snapshot.
+Production code is unchanged.
+- Before the fix, a forced schedule reproduced the failure, while 300 normal
+  repeats passed.
+- After the fix, a forced debugger pause and 300 repeats pass.
+- Full CPU/ASan/UBSan and hosted pr-fast run 35853323917 pass.
+
+[PR #1045](https://github.com/intrinsicD/IntrinsicEngine/pull/1045).
+
+## 2026-09-23 — BUG-218 curvature scenario split and refinement budget
+
+Retired [BUG-218](BUG-218-curvature-refinement-scenario-split.md). The combined
+curvature case is now separate retriangulation and refinement cases. Only
+refinement is `RUN_SERIAL`, with a case-only 60 s `TIMEOUT`, after it timed out
+alone at 30.01 s on hosted run 35849534652.
+- Hosted run 35853323917 passed with refinement at 27.95 s. That is a
+  single-runner measurement, not a general bound.
+- Full CPU/ASan/UBSan pass.
+- BUG-217, which serialized the case, was a partial mitigation; its record and
+  BUG-216's stay as written.
+
+[PR #1045](https://github.com/intrinsicD/IntrinsicEngine/pull/1045).
+
 ## 2026-09-23 — BUG-217 curvature refinement serial scheduling
 
 Retired [BUG-217](BUG-217-curvature-refinement-run-serial.md) after

@@ -5,8 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [BUG-219 — Fix the UV panel cache test's post-submit snapshot race](../../active/BUG-219-uv-panel-cache-snapshot-race.md): a fast worker can reach `AwaitingGate` before the post-submit snapshot, which removes one expected cache miss (hosted run 35851119431). Root reproduced it deterministically, and a test-only `JobCommands.Submit` work gate awaits verification.
-- [BUG-218 — Split the curvature scenarios and budget the refinement case](../../active/BUG-218-curvature-refinement-scenario-split.md): the scenarios are split and refinement stays serial, but refinement still timed out alone at 30 s on a hosted runner (run 35849534652). It now has a case-only 60 s `TIMEOUT`, and the local budget metadata and full CPU run pass. Hosted pr-fast is pending.
 
 - [BUG-178 — Clang 23 crashes during an incremental module rebuild](BUG-178-clang23-incremental-module-ice.md).
 
@@ -42,6 +40,14 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-09-23: [BUG-219 — Fix the UV panel cache test's post-submit snapshot race](../../done/BUG-219-uv-panel-cache-snapshot-race.md).
+  The test gates the UV job's work through the `JobCommands.Submit` seam until its post-submit snapshot. A forced
+  schedule reproduced 3 vs 4 before the fix and passes after it; full CPU/ASan/UBSan and hosted pr-fast pass.
+
+- Closed 2026-09-23: [BUG-218 — Split the curvature scenarios and budget the refinement case](../../done/BUG-218-curvature-refinement-scenario-split.md).
+  Retriangulation and refinement are separate cases. Only refinement is `RUN_SERIAL`, with a case-only 60 s `TIMEOUT`,
+  after timing out alone at 30.01 s on a hosted runner. Hosted pr-fast later passed with refinement at 27.95 s.
 
 - Closed 2026-09-23: [BUG-217 — Run the curvature refinement case without CPU-bound siblings](../../done/BUG-217-curvature-refinement-run-serial.md).
   Single-case `RUN_SERIAL` via the generated property fixup. One-CPU parallel probes went from three timeouts
