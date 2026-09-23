@@ -8,6 +8,16 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-09-23 — BUG-214 CMake discovery probe portability
+
+Retired [BUG-214](BUG-214-cmake-discovery-probe-portability.md) after reproducing
+the hosted CMake 3.31.6 mismatch and adapting the private race probe to both
+known write forms and generated include paths. All three concurrency cases pass
+on 3.28.3 and 3.31.6; 15 aggregate/prerequisite regressions and the final Opus
+review pass. The production lock and installed modules are unchanged.
+[PR #1044](https://github.com/intrinsicD/IntrinsicEngine/pull/1044) and the enclosing
+commit retain the repair and its evidence.
+
 ## 2026-09-23 — BUG-213 historical CI fixtures
 
 Retired [BUG-213](BUG-213-ci-historical-fixture-bindings.md) after restoring the

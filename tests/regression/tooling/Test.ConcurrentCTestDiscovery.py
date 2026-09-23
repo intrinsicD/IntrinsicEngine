@@ -65,18 +65,28 @@ if os.environ.get("DISCOVERY_RACE") == "1":
         def call(stage: str) -> str:
             return (f'execute_process(COMMAND "{sys.executable}" "{sync}" {stage}'
                     ' COMMAND_ERROR_IS_FATAL ANY)\n')
-        write = '  file(${flush_tests_MODE} "${_CTEST_FILE}" "${script}")'
-        self.assertEqual(original.count(write), 1, "CMake flush implementation changed")
-        instrumented = original.replace(write,
-            '  if(flush_tests_MODE STREQUAL "WRITE")\n' + call("before-write") + '  endif()\n'
-            + write + '\n  if(flush_tests_MODE STREQUAL "WRITE")\n'
-            + call("after-write") + '  endif()')
+        # CMake 3.28 flushes through a macro; 3.31 inlines its two write sites.
+        # Instrument only the initial WRITE in either implementation, preserving
+        # APPEND chunks and the production discovery lock unchanged.
+        write = 'file(${flush_tests_MODE} "${_CTEST_FILE}" "${script}")'
+        mode = "flush_tests_MODE"
+        final_flush = "  # Write CTest script\n  flush_script()"
+        write_count = 1
+        if write not in original:
+            write = 'file(${file_write_mode} "${arg_CTEST_FILE}" "${script}")'
+            mode = "file_write_mode"
+            final_flush = "  # Write remaining content to the CTest script\n  " + write
+            write_count = 2
+        self.assertEqual(original.count(write), write_count, "CMake flush implementation changed")
+        self.assertEqual(original.count(final_flush), 1, "CMake final flush implementation changed")
+        instrumented = original.replace(final_flush, final_flush + "\n" + call("done"))
+        instrumented = instrumented.replace(write,
+            f'if({mode} STREQUAL "WRITE")\n' + call("before-write") + 'endif()\n'
+            + write + f'\nif({mode} STREQUAL "WRITE")\n'
+            + call("after-write") + 'endif()')
         entry = "function(gtest_discover_tests_impl)\n"
         self.assertEqual(instrumented.count(entry), 1)
         instrumented = instrumented.replace(entry, entry + call("enter"))
-        final_flush = "  # Write CTest script\n  flush_script()"
-        self.assertEqual(instrumented.count(final_flush), 1)
-        instrumented = instrumented.replace(final_flush, final_flush + "\n" + call("done"))
         private_module = source / "GoogleTestAddTests.cmake"
         private_module.write_text(instrumented)
         fake = source / "fake-gtest.py"
@@ -99,6 +109,15 @@ set_tests_properties(NestedRegistry PROPERTIES TIMEOUT 10)
             body += f'include("{HELPER}")\nintrinsic_serialize_test_discovery()\n'
         (source / "CMakeLists.txt").write_text(body)
         run("cmake", "-S", str(source), "-B", str(build))
+        # Newer CMake ignores the private-script variable above. Redirect only
+        # this fixture's generated include and verify the instrumented path.
+        discovery = build / "Fake[1]_include.cmake"
+        generated = discovery.read_text()
+        installed_include = f'include("{module}")'
+        private_include = f'include("{private_module}")'
+        self.assertEqual(generated.count(installed_include) + generated.count(private_include), 1,
+                         "CMake discovery include changed")
+        discovery.write_text(generated.replace(installed_include, private_include))
         # Startup marker runs before the production lock, demonstrating the
         # second CTest reached registry parsing while the first owns discovery.
         registry = build / "CTestTestfile.cmake"

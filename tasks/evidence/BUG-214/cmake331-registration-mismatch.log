@@ -1,0 +1,44 @@
+FFF
+======================================================================
+FAIL: test_guard_preserves_real_duplicate_registrations (__main__.ConcurrentDiscoveryTests.test_guard_preserves_real_duplicate_registrations)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/alex/Documents/IntrinsicEngine/tests/regression/tooling/Test.ConcurrentCTestDiscovery.py", line 201, in test_guard_preserves_real_duplicate_registrations
+    for document in self.concurrent(root, build, race=False):
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/alex/Documents/IntrinsicEngine/tests/regression/tooling/Test.ConcurrentCTestDiscovery.py", line 134, in concurrent
+    wait_for(barriers / f"{role}-enter", tuple(processes))
+  File "/home/alex/Documents/IntrinsicEngine/tests/regression/tooling/Test.ConcurrentCTestDiscovery.py", line 26, in wait_for
+    raise AssertionError(f"CTest exited before barrier {path}: {process.returncode}")
+AssertionError: CTest exited before barrier /tmp/intrinsic-discovery-duplicate-0xb6fn6w/barriers/a-enter: 0
+
+======================================================================
+FAIL: test_guard_serializes_and_releases_before_nested_ctest (__main__.ConcurrentDiscoveryTests.test_guard_serializes_and_releases_before_nested_ctest)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/alex/Documents/IntrinsicEngine/tests/regression/tooling/Test.ConcurrentCTestDiscovery.py", line 190, in test_guard_serializes_and_releases_before_nested_ctest
+    for document in self.concurrent(root, build, race=False):
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/alex/Documents/IntrinsicEngine/tests/regression/tooling/Test.ConcurrentCTestDiscovery.py", line 134, in concurrent
+    wait_for(barriers / f"{role}-enter", tuple(processes))
+  File "/home/alex/Documents/IntrinsicEngine/tests/regression/tooling/Test.ConcurrentCTestDiscovery.py", line 26, in wait_for
+    raise AssertionError(f"CTest exited before barrier {path}: {process.returncode}")
+AssertionError: CTest exited before barrier /tmp/intrinsic-discovery-guard-un1q0e1l/barriers/a-enter: 0
+
+======================================================================
+FAIL: test_unlocked_control_reproduces_duplicate_appends (__main__.ConcurrentDiscoveryTests.test_unlocked_control_reproduces_duplicate_appends)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/alex/Documents/IntrinsicEngine/tests/regression/tooling/Test.ConcurrentCTestDiscovery.py", line 180, in test_unlocked_control_reproduces_duplicate_appends
+    documents = self.concurrent(root, build, race=True)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/alex/Documents/IntrinsicEngine/tests/regression/tooling/Test.ConcurrentCTestDiscovery.py", line 134, in concurrent
+    wait_for(barriers / f"{role}-enter", tuple(processes))
+  File "/home/alex/Documents/IntrinsicEngine/tests/regression/tooling/Test.ConcurrentCTestDiscovery.py", line 26, in wait_for
+    raise AssertionError(f"CTest exited before barrier {path}: {process.returncode}")
+AssertionError: CTest exited before barrier /tmp/intrinsic-discovery-control-4kecsm92/barriers/a-enter: 0
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.421s
+
+FAILED (failures=3)

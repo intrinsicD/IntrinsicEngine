@@ -1,0 +1,38 @@
+FFF
+======================================================================
+FAIL: test_guard_preserves_real_duplicate_registrations (__main__.ConcurrentDiscoveryTests.test_guard_preserves_real_duplicate_registrations)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/alex/Documents/IntrinsicEngine/tests/regression/tooling/Test.ConcurrentCTestDiscovery.py", line 190, in test_guard_preserves_real_duplicate_registrations
+    build = self.project(root, guarded=True, duplicate=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/alex/Documents/IntrinsicEngine/tests/regression/tooling/Test.ConcurrentCTestDiscovery.py", line 69, in project
+    self.assertEqual(original.count(write), 1, "CMake flush implementation changed")
+AssertionError: 0 != 1 : CMake flush implementation changed
+
+======================================================================
+FAIL: test_guard_serializes_and_releases_before_nested_ctest (__main__.ConcurrentDiscoveryTests.test_guard_serializes_and_releases_before_nested_ctest)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/alex/Documents/IntrinsicEngine/tests/regression/tooling/Test.ConcurrentCTestDiscovery.py", line 179, in test_guard_serializes_and_releases_before_nested_ctest
+    build = self.project(root, guarded=True)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/alex/Documents/IntrinsicEngine/tests/regression/tooling/Test.ConcurrentCTestDiscovery.py", line 69, in project
+    self.assertEqual(original.count(write), 1, "CMake flush implementation changed")
+AssertionError: 0 != 1 : CMake flush implementation changed
+
+======================================================================
+FAIL: test_unlocked_control_reproduces_duplicate_appends (__main__.ConcurrentDiscoveryTests.test_unlocked_control_reproduces_duplicate_appends)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/alex/Documents/IntrinsicEngine/tests/regression/tooling/Test.ConcurrentCTestDiscovery.py", line 169, in test_unlocked_control_reproduces_duplicate_appends
+    build = self.project(root, guarded=False)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/alex/Documents/IntrinsicEngine/tests/regression/tooling/Test.ConcurrentCTestDiscovery.py", line 69, in project
+    self.assertEqual(original.count(write), 1, "CMake flush implementation changed")
+AssertionError: 0 != 1 : CMake flush implementation changed
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.006s
+
+FAILED (failures=3)
