@@ -14,3 +14,20 @@ modify the program; `SCENARIO_TIMING` monotonic stamps; debugger overhead includ
   Grid(40, alternate) build  0.014 s   Extract 3.545317 s   assertions ~0.0015 s
   Grid(60)            build  0.030 s   Extract 15.489573 s  assertions ~0.0009 s
   refinement Extract share of the two Extract calls: 15.49 / 19.03 = 81%
+
+Local verification of 895980f87 (Codex, 2026-09-23; production source 909b422 unchanged):
+  build: all four presets configured; changed IntrinsicGeometryCurvatureExtremaTests built in ci, ci-asan, ci-ubsan, ci-vulkan
+  metadata: ci 5,120 -> 5,121 and ci-vulkan 5,122 -> 5,123 registrations; exactly the old combined case removed and
+    RetriangulationRetainsCenterCurve + RefinementRetainsCenterCurve added; TIMEOUT 30 and labels unchanged;
+    RUN_SERIAL on RefinementRetainsCenterCurve only; grouped ci-asan/ci-ubsan (3,352 each) and all GPU registrations unchanged
+  first one-CPU probe, NOT green (12:19:47):
+    taskset -c0 ctest -R '^CurvatureExtrema\.' --parallel 4 --repeat until-fail:3
+    -> 10/11 passed; unchanged OrientationReversalExchangesRidgeValley Timeout 30.02 s; both new cases passed
+       (Retriangulation 4.79/3.62/3.66 s, Refinement 15.93/16.17/15.65 s over the repeats); 105.38 s real
+    --repeat repeats individual tests inside one invocation, so its sibling overlap differs from the earlier
+    before/after probes, which were separate whole-cohort invocations. Orientation alone on the same binary: 7.67 s.
+  corrected probe: three separate whole-cohort invocations, same command without --repeat:
+    12:24:41  11/11 pass, 40 s  Refinement 15.47 s  Retriangulation 15.79 s  Orientation 8.68 s
+    12:25:22  11/11 pass, 41 s  Refinement 16.15 s  Retriangulation 16.01 s  Orientation 8.75 s
+    12:26:03  11/11 pass, 38 s  Refinement 15.90 s  Retriangulation 14.44 s  Orientation 8.63 s
+  Under one-CPU four-way sharing the unserialized heavy cases (Retriangulation, Gaussian, Noisy) take 14-16 s.

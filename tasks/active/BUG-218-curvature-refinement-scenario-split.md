@@ -47,17 +47,24 @@ refinement case serialized.
   escalate with that evidence; do not retry or split further.
 
 ## Acceptance criteria
-- [ ] The changed geometry-test target builds in `ci`, `ci-asan`, `ci-ubsan` and `ci-vulkan`.
-- [ ] Test metadata delta: the old combined case is replaced by exactly the two new cases. `RUN_SERIAL` is on refinement only, both have `TIMEOUT 30`, labels are unchanged, and grouped and GPU registrations are unchanged.
-- [ ] A one-CPU `--parallel 4` run of the 11 CurvatureExtrema cases passes three times in a row.
+- [x] The changed geometry-test target builds in `ci`, `ci-asan`, `ci-ubsan` and `ci-vulkan`.
+- [x] Test metadata delta: the old combined case is replaced by exactly the two new cases. `RUN_SERIAL` is on refinement only, both have `TIMEOUT 30`, labels are unchanged, and grouped and GPU registrations are unchanged.
+- [x] Three separate one-CPU `--parallel 4` whole-cohort invocations of the 11 CurvatureExtrema cases each pass, 11/11. Refinement took 15.47, 16.15 and 15.90 s. An earlier `--repeat until-fail:3` variant was not green; see the log.
 - [ ] The full CPU, full ASan and full UBSan gates pass.
 - [ ] Normal hosted pr-fast passes for PR #1045.
 
 ## Verification
 ```bash
 ctest --test-dir build/ci --show-only=json-v1 -R '^CurvatureExtrema\.'
-taskset -c0 ctest --test-dir build/ci --output-on-failure -R '^CurvatureExtrema\.' --parallel 4 --repeat until-fail:3
+for i in 1 2 3; do taskset -c0 ctest --test-dir build/ci --output-on-failure -R '^CurvatureExtrema\.' --parallel 4 || exit 1; done
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
 ctest --test-dir build/ci-asan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1
 ctest --test-dir build/ci-ubsan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1
 ```
+
+## Log
+- 2026-09-23: The four presets built. The metadata delta is exactly as intended.
+- 2026-09-23: The first one-CPU probe used `--repeat until-fail:3` and was **not green**. Both new cases passed, but the unchanged `OrientationReversalExchangesRidgeValley` timed out at 30.02 s. Orientation alone on the same binary takes 7.67 s.
+- 2026-09-23: `--repeat` reruns individual tests inside one invocation, so its sibling overlap differs from the earlier before/after probes, which were separate whole-cohort invocations. The probe was therefore corrected to three separate whole-cohort invocations, and all three passed 11/11.
+- 2026-09-23: The repeated-test variant shows that unserialized heavy siblings can still approach 30 s under extreme one-CPU sharing. No test or gate was changed for it.
+- 2026-09-23: Full CPU, ASan, UBSan and hosted pr-fast are still pending.
