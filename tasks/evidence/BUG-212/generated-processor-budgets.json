@@ -1,0 +1,10 @@
+[
+  {
+    "name": "ClusteringModule.EveryPointDomainPreservesDeletedSlotsAndExactScalarUndo",
+    "processors": 3
+  },
+  {
+    "name": "ClusteringModule.UnrepresentableScalarLabelRejectsAllOutputPublication",
+    "processors": 3
+  }
+]

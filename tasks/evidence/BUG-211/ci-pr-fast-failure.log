@@ -1,0 +1,63 @@
+pr-fast	Build selected test closure	﻿2026-09-23T02:31:31.6681897Z ##[group]Run python3 tools/ci/time_command.py \
+pr-fast	Build selected test closure	2026-09-23T02:31:31.6682400Z [36;1mpython3 tools/ci/time_command.py \[0m
+pr-fast	Build selected test closure	2026-09-23T02:31:31.6682745Z [36;1m  --label "Build selected test closure" \[0m
+pr-fast	Build selected test closure	2026-09-23T02:31:31.6683131Z [36;1m  --json-out build/ci-fast/ci-timing/phases/build.json \[0m
+pr-fast	Build selected test closure	2026-09-23T02:31:31.6683507Z [36;1m  -- python3 tools/ci/touched_scope.py \[0m
+pr-fast	Build selected test closure	2026-09-23T02:31:31.6683808Z [36;1m    --root . \[0m
+pr-fast	Build selected test closure	2026-09-23T02:31:31.6684051Z [36;1m    --action build \[0m
+pr-fast	Build selected test closure	2026-09-23T02:31:31.6684373Z [36;1m    --plan build/ci-fast/ci-routing/route.json \[0m
+pr-fast	Build selected test closure	2026-09-23T02:31:31.6684704Z [36;1m    --build-dir build/ci-fast \[0m
+pr-fast	Build selected test closure	2026-09-23T02:31:31.6685003Z [36;1m    --github-output "$GITHUB_OUTPUT" \[0m
+pr-fast	Build selected test closure	2026-09-23T02:31:31.6685325Z [36;1m    --step-summary "$GITHUB_STEP_SUMMARY"[0m
+pr-fast	Build selected test closure	2026-09-23T02:31:31.6711188Z shell: /usr/bin/bash -e {0}
+pr-fast	Build selected test closure	2026-09-23T02:31:31.6711492Z env:
+pr-fast	Build selected test closure	2026-09-23T02:31:31.6711748Z   CCACHE_DIR: /tmp/intrinsic-pr-fast-ccache
+pr-fast	Build selected test closure	2026-09-23T02:31:31.6712114Z   CCACHE_CONFIGPATH: /tmp/intrinsic-pr-fast-ccache.conf
+pr-fast	Build selected test closure	2026-09-23T02:31:31.6712498Z   CCACHE_MAXSIZE: 2G
+pr-fast	Build selected test closure	2026-09-23T02:31:31.6712756Z   INTRINSIC_CCACHE_MAXSIZE_DISPLAY: 2.0 GB
+pr-fast	Build selected test closure	2026-09-23T02:31:31.6713287Z   VCPKG_BINARY_SOURCES: clear;files,/home/runner/work/IntrinsicEngine/IntrinsicEngine/external/vcpkg-bincache,readwrite
+pr-fast	Build selected test closure	2026-09-23T02:31:31.6713808Z ##[endgroup]
+pr-fast	Build selected test closure	2026-09-23T02:31:31.7981062Z touched_scope: error: could not enumerate Ninja commands for IntrinsicShaderOutputs, IntrinsicPrFastTests: ninja: error: unknown target 'IntrinsicShaderOutputs'
+pr-fast	Build selected test closure	2026-09-23T02:31:31.8082114Z Build selected test closure elapsed: 0.098 s
+pr-fast	Build selected test closure	2026-09-23T02:31:31.8157464Z ##[error]Process completed with exit code 2.
+pr-fast	Aggregate gate timing result	﻿2026-09-23T02:31:31.8993958Z ##[group]Run context_args=()
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.8994297Z [36;1mcontext_args=()[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.8994563Z [36;1mcache_state=cold[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.8994818Z [36;1mif [ -n '' ]; then[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.8995073Z [36;1m  cache_state=warm[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.8995313Z [36;1mfi[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.8995537Z [36;1mif [ -n '' ]; then[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.8995823Z [36;1m  context_args+=(--selected-test-count '')[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.8996171Z [36;1mfi[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.8996390Z [36;1mif [ -n '' ]; then[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.8996663Z [36;1m  context_args+=(--ninja-edge-count '')[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.8996963Z [36;1mfi[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.8997220Z [36;1mpython3 tools/ci/aggregate_gate_timing.py \[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.8997647Z [36;1m  --configure-json build/ci-fast/ci-timing/phases/configure.json \[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.8998107Z [36;1m  --build-json build/ci-fast/ci-timing/phases/build.json \[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.8998553Z [36;1m  --test-json build/ci-fast/ci-timing/phases/test.json \[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.8998939Z [36;1m  --gate pr-fast \[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.8999201Z [36;1m  --preset ci-fast \[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.8999472Z [36;1m  --build-dir build/ci-fast \[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.8999762Z [36;1m  --compiler 'clang-20' \[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.9000047Z [36;1m  --sanitizer 'none' \[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.9000486Z [36;1m  --runner-image ubuntu-24.04 \[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.9000853Z [36;1m  --commit '05d0aa8f418f8376be325d62ff28ab87ae134145' \[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.9001215Z [36;1m  --cache-state "$cache_state" \[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.9001612Z [36;1m  --ccache-stats-json build/ci-fast/ci-timing/ccache/stats.json \[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.9002011Z [36;1m  --require-ccache-stats \[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.9002293Z [36;1m  --vcpkg-cache-hit 'true' \[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.9002725Z [36;1m  --job-url 'https://github.com/intrinsicD/IntrinsicEngine/actions/runs/35810595146' \[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.9003172Z [36;1m  "${context_args[@]}" \[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.9003495Z [36;1m  --output build/ci-fast/ci-timing/result/result.json[0m
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.9028729Z shell: /usr/bin/bash -e {0}
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.9029018Z env:
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.9029281Z   CCACHE_DIR: /tmp/intrinsic-pr-fast-ccache
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.9029647Z   CCACHE_CONFIGPATH: /tmp/intrinsic-pr-fast-ccache.conf
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.9030031Z   CCACHE_MAXSIZE: 2G
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.9030573Z   INTRINSIC_CCACHE_MAXSIZE_DISPLAY: 2.0 GB
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.9031170Z   VCPKG_BINARY_SOURCES: clear;files,/home/runner/work/IntrinsicEngine/IntrinsicEngine/external/vcpkg-bincache,readwrite
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:31.9031700Z ##[endgroup]
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:32.1469959Z ERROR: missing phase report: build/ci-fast/ci-timing/phases/test.json
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:32.1472925Z Wrote build/ci-fast/ci-timing/result/result.json (error)
+pr-fast	Aggregate gate timing result	2026-09-23T02:31:32.1554038Z ##[error]Process completed with exit code 1.

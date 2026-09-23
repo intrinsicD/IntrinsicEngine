@@ -8,6 +8,18 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-09-23 — BUG-211 shader prerequisite and BUG-212 worker budgets
+
+Retired [BUG-211](BUG-211-pr-fast-shader-compiler-prerequisite.md) after adding
+the existing shader compiler prerequisite to pr-fast and verifying the real
+producer's 114 outputs. Retired
+[BUG-212](BUG-212-clustering-ctest-worker-budgets.md) after declaring the two
+missing three-slot CTest budgets and passing both cases with generated metadata.
+All 75 relevant Python regression cases pass. Actual Opus 5.5 reviewed the
+repairs. [PR #1044](https://github.com/intrinsicD/IntrinsicEngine/pull/1044) carries
+the fixes; the enclosing commit records retirement. Remote CI is rerun after
+push. No engine source, test behavior or gate is weakened.
+
 ## 2026-09-23 — BUG-210 portable Framework24 source references
 
 Retired [BUG-210](BUG-210-framework24-reference-link-portability.md) after

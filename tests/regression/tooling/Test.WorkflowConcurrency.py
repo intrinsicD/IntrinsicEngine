@@ -290,7 +290,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             body.count("config.Simulation.WorkerThreadCount = workers;"),
             1,
         )
-        self.assertEqual(source.count("NullWindowHeadlessConfig(),"), 6)
+        self.assertEqual(source.count("NullWindowHeadlessConfig(),"), 8)
         self.assertEqual(source.count("NullWindowHeadlessConfig(1u),"), 3)
 
     def test_exact_multiworker_ctest_budgets_match_cpu_sources(self) -> None:
@@ -312,7 +312,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         source_budgets = _source_multiworker_budgets()
 
         self.assertEqual(declared, source_budgets)
-        self.assertEqual(len(declared), 78)
+        self.assertEqual(len(declared), 80)
         self.assertEqual(
             {
                 budget: sum(
@@ -320,7 +320,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
                 )
                 for budget in (2, 3, 4, 8)
             },
-            {2: 3, 3: 51, 4: 22, 8: 2},
+            {2: 3, 3: 53, 4: 22, 8: 2},
         )
         self.assertIn(
             "Declared multi-worker test "

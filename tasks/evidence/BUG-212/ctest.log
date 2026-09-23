@@ -1,0 +1,14 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+    Start 1025: ClusteringModule.EveryPointDomainPreservesDeletedSlotsAndExactScalarUndo
+1/2 Test #1025: ClusteringModule.EveryPointDomainPreservesDeletedSlotsAndExactScalarUndo ...   Passed    0.24 sec
+    Start 1026: ClusteringModule.UnrepresentableScalarLabelRejectsAllOutputPublication
+2/2 Test #1026: ClusteringModule.UnrepresentableScalarLabelRejectsAllOutputPublication .....   Passed    0.04 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Label Time Summary:
+contract    =   0.84 sec*proc (2 tests)
+runtime     =   0.84 sec*proc (2 tests)
+
+Total Test time (real) =   0.46 sec

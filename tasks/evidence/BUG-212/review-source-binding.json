@@ -1,0 +1,12 @@
+{
+  "reviewer_model": "claude-opus-5-5",
+  "effort": "high",
+  "reviewed_diff": {
+    "pr-fast.yml": "one glslc prerequisite",
+    "tests/CMakeLists.txt": "two PROCESSORS=3 records",
+    "Test.WorkflowConcurrency.py": "exact source counts and inventories updated"
+  },
+  "unchanged_clustering_cpp_blob_on_head_and_parent": "7daa5bc2a69adf76ee23db9658d47ac4c75c0e91",
+  "local_checks_completed_after_review": true,
+  "remote_ci": "pending push"
+}
