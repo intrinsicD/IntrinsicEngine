@@ -36,6 +36,7 @@ import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.TextureBakeModule;
@@ -888,6 +889,8 @@ namespace Extrinsic::Runtime
                                     RuntimeMeshMaterializationOptions{
                                         .AllowDisconnectedRenderableFallback =
                                             true,
+                                        .UvResolution = {
+                                            .FailurePolicy = RuntimeMeshUvFailurePolicy::Optional},
                                     });
                             if (materialized.has_value())
                             {
@@ -1006,6 +1009,16 @@ namespace Extrinsic::Runtime
                                 raw,
                                 state->Entity,
                                 mesh);
+                            // Only a generated atlas has an extent; authored
+                            // UVs clear any record and use the bake default.
+                            const bool generatedAtlas =
+                                meshDiagnostics.TexcoordProvenance ==
+                                RuntimeMeshResolvedUvProvenance::GeneratedAtlas;
+                            (void)PublishMeshUvAtlasExtent(
+                                raw,
+                                state->Entity,
+                                generatedAtlas ? meshDiagnostics.AtlasWidth : 0u,
+                                generatedAtlas ? meshDiagnostics.AtlasHeight : 0u);
                             MarkMeshGeometryDirty(raw, state->Entity);
                             UpdateDirectMeshEnrichmentState(
                                 raw,

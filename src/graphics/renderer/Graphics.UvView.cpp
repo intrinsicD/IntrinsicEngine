@@ -28,9 +28,8 @@ namespace Extrinsic::Graphics
             const RHI::BindlessIndex index,
             const std::uint32_t capacity) noexcept
         {
-            // Slot zero is the RHI invalid/default texture. Every other index
-            // must remain inside the descriptor array before the shader uses
-            // it for non-uniform dynamic indexing.
+            // Reject the RHI sentinel and out-of-array descriptors before
+            // non-uniform dynamic indexing in the shader.
             return index != RHI::kInvalidBindlessIndex && index < capacity;
         }
 
@@ -508,10 +507,22 @@ namespace Extrinsic::Graphics
             std::max(static_cast<double>(m_Impl->Request.Bounds.MaxV), 1.0);
         double halfU = 0.5 * (maxU - minU) * kUvPadding;
         double halfV = 0.5 * (maxV - minV) * kUvPadding;
+        double viewCenterU = 0.5 * (minU + maxU);
+        double viewCenterV = 0.5 * (minV + maxV);
         const double paneAspect =
             static_cast<double>(m_Impl->Request.Width) /
             static_cast<double>(m_Impl->Request.Height);
-        if ((halfU / halfV) < paneAspect)
+        const UvViewNavigation& navigation = m_Impl->Request.Navigation;
+        if (navigation.HalfExtentV > 0.0f && std::isfinite(navigation.HalfExtentV) &&
+            std::isfinite(navigation.CenterU) && std::isfinite(navigation.CenterV))
+        {
+            // The caller's pan/zoom window, identical to its CPU projection.
+            viewCenterU = navigation.CenterU;
+            viewCenterV = navigation.CenterV;
+            halfV = navigation.HalfExtentV;
+            halfU = halfV * paneAspect;
+        }
+        else if ((halfU / halfV) < paneAspect)
             halfU = halfV * paneAspect;
         else
             halfV = halfU / paneAspect;
@@ -520,8 +531,8 @@ namespace Extrinsic::Graphics
         float centerV = 0.0f;
         float fittedHalfU = 0.0f;
         float fittedHalfV = 0.0f;
-        if (!ToRepresentableFloat(0.5 * (minU + maxU), centerU) ||
-            !ToRepresentableFloat(0.5 * (minV + maxV), centerV) ||
+        if (!ToRepresentableFloat(viewCenterU, centerU) ||
+            !ToRepresentableFloat(viewCenterV, centerV) ||
             !ToRepresentableFloat(halfU, fittedHalfU) ||
             !ToRepresentableFloat(halfV, fittedHalfV) ||
             fittedHalfU <= 0.0f || fittedHalfV <= 0.0f)
@@ -591,6 +602,32 @@ namespace Extrinsic::Graphics
         }
 
         UvViewBackgroundMode activeBackground = m_Impl->Request.Background;
+        const UvViewTextureDisplay& baked = m_Impl->Request.BakedTexture;
+        if (activeBackground == UvViewBackgroundMode::BakedTexture)
+        {
+            const std::uint32_t capacity = m_Impl->Device->GetBindlessHeap().GetCapacity();
+            const char* reason = nullptr;
+            if (!IsAvailableBackgroundTexture(baked.Texture, capacity))
+                reason = "the baked texture is not resident";
+            else if (!IsAvailableBackgroundTexture(baked.CoverageTexture, capacity))
+                reason = "the baked coverage texture is not resident";
+            else if (baked.Mode != UvViewTextureDisplayMode::Color &&
+                     (!std::isfinite(baked.RangeMin) || !std::isfinite(baked.RangeMax) ||
+                      baked.RangeMax < baked.RangeMin))
+                reason = "its display range is not finite and ordered";
+            else if (baked.Mode == UvViewTextureDisplayMode::ScalarColormap &&
+                     !IsAvailableBackgroundTexture(baked.ColormapLut, capacity))
+                reason = "the display colormap is not resident";
+            if (reason != nullptr)
+            {
+                activeBackground = UvViewBackgroundMode::Checker;
+                if (!diagnostic.empty())
+                    diagnostic += ' ';
+                diagnostic += "Baked texture display fell back to checker because ";
+                diagnostic += reason;
+                diagnostic += '.';
+            }
+        }
         if (activeBackground == UvViewBackgroundMode::Texture &&
             !IsAvailableBackgroundTexture(
                 m_Impl->Request.BackgroundTexture,
@@ -615,8 +652,16 @@ namespace Extrinsic::Graphics
             .UvHalfExtentX = fittedHalfU,
             .UvHalfExtentY = fittedHalfV,
             .BackgroundMode = static_cast<std::uint32_t>(activeBackground),
-            .BackgroundTextureBindlessIndex = m_Impl->Request.BackgroundTexture,
+            .BackgroundTextureBindlessIndex =
+                activeBackground == UvViewBackgroundMode::BakedTexture
+                    ? baked.Texture
+                    : m_Impl->Request.BackgroundTexture,
             .ShowHeatmap = heatmapActive ? 1u : 0u,
+            .TextureDisplayMode = static_cast<std::uint32_t>(baked.Mode),
+            .TextureRangeMin = baked.RangeMin,
+            .TextureRangeMax = baked.RangeMax,
+            .ColormapBindlessIndex = baked.ColormapLut,
+            .CoverageTextureBindlessIndex = baked.CoverageTexture,
         };
 
         m_Impl->Output = UvViewOutput{
@@ -677,17 +722,22 @@ namespace Extrinsic::Graphics
                                      sizeof(m_Impl->PushConstants));
         commandContext.Draw(3u, 1u, 0u, 0u);
 
-        commandContext.BindPipeline(fill);
-        commandContext.BindIndexBuffer(m_Impl->ManagedIndexBuffer,
-                                       0u,
-                                       RHI::IndexType::Uint32);
-        commandContext.PushConstants(&m_Impl->PushConstants,
-                                     sizeof(m_Impl->PushConstants));
-        commandContext.DrawIndexed(m_Impl->GeometryRecord.SurfaceIndexCount,
-                                   1u,
-                                   m_Impl->GeometryRecord.SurfaceFirstIndex,
-                                   0,
-                                   0u);
+        // Baked values are already drawn by the background pass. Filling the
+        // charts here would replace those values with the layout tint.
+        if (m_Impl->Output.ActiveBackground != UvViewBackgroundMode::BakedTexture)
+        {
+            commandContext.BindPipeline(fill);
+            commandContext.BindIndexBuffer(m_Impl->ManagedIndexBuffer,
+                                           0u,
+                                           RHI::IndexType::Uint32);
+            commandContext.PushConstants(&m_Impl->PushConstants,
+                                         sizeof(m_Impl->PushConstants));
+            commandContext.DrawIndexed(m_Impl->GeometryRecord.SurfaceIndexCount,
+                                       1u,
+                                       m_Impl->GeometryRecord.SurfaceFirstIndex,
+                                       0,
+                                       0u);
+        }
 
         commandContext.BindPipeline(line);
         commandContext.BindIndexBuffer(m_Impl->LineIndexBuffer.GetHandle(),

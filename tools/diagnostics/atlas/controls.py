@@ -4,9 +4,6 @@ import argparse
 import json
 from pathlib import Path
 import numpy as np
-import trimesh
-import patch_merge as pm
-from compare_atlases import audit
 
 
 def cylinder(n, cut=False, planar=False):
@@ -38,6 +35,8 @@ def fold(n):
 
 
 def fixtures():
+    import trimesh
+
     for n in (16,32,64):
         yield f'cylinder_annulus_{n}',*cylinder(n)
         yield f'cylinder_cut_{n}',*cylinder(n,cut=True)
@@ -50,6 +49,9 @@ def fixtures():
 
 
 def main():
+    import patch_merge as pm
+    from compare_atlases import audit
+
     parser=argparse.ArgumentParser(description=__doc__); parser.add_argument('output',type=Path)
     args=parser.parse_args(); records=[]
     for name,v,f in fixtures():

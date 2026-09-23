@@ -59,9 +59,14 @@ made curvature unsupported).
 
 ### 3. Resolved `v:texcoord` policy — authored UVs preserved, else generated atlas UVs before first extraction
 
-Authored `v:texcoord` survives materialization; missing/invalid source UVs are
-replaced by generated xatlas-backed atlas UVs before ECS population and any
-generated-texture bake, not left absent (which reads as invisible).
+Authored UVs survive materialization with corner-over-vertex authority. Missing
+or invalid UVs go through the canonical validated atlas generator. Automatic
+import retains renderable, selectable geometry and normals when atlas generation
+fails quality admission, reports the missing UVs, and leaves texture baking
+unavailable until an accepted atlas exists. It must neither invent UVs nor drop
+source faces to conceal failure. Verify extraction without UVs as well as the
+successful atlas path. Explicit callers may require UV success via the existing
+materialization failure policy.
 
 Evidence: `BUG-043` (dropped OBJ without UVs loaded but was invisible), `BUG-045`
 (progressive raw-mesh surface UV fallback), `ASSETIO-008` (default UV-atlas

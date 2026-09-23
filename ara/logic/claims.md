@@ -2353,3 +2353,26 @@
 - **Dependencies**: []
 - **Tags**: compilation, JSON codecs, local matched observations, edit regression
 - **From staging**: O241
+
+
+## C109: Bounded property-guided atlas correctness campaign
+- **Statement**: METHOD-047's retained 35-run CPU campaign accepts three procedural controls and four frozen METHOD-045 surfaces with native None/Angle/Area/Both and xatlas Angle at 1024², padding 2 and distortion limits 10/10. Independent NumPy auditing finds no region crossings; runner-reported method/objective matches every request without fallback. Across native Both cases the largest conformal and area ratios are 1.637081 and 1.353008. A separate 100,000-triangle child case at 4096² yields 260 charts with independent maxima 1.578208 and 1.373161.
+- **Status**: supported — descriptive finite-cohort CPU correctness only. Dirty local Debug records remain claim_eligible:false; no speed, universal mesh, semantic-part, optimizer-convergence or hardware-independent raster claim. None can meet quality limits by extensive chart refinement. Native validation supplies overlap and interior-texel checks; Python independently recomputes other metrics.
+- **Provenance**: ai-executed
+- **Crystallized via**: empirical-resolution
+- **Falsification criteria**: Retained outputs fail coverage, positive area, bounds, region preservation or independent metric thresholds; actual runner identity differs from requests; hashes/source binding differ; or recomputed reported maxima disagree. Python accepts maxima at most the configured limit times (1+1e-6), not native/Python agreement within that tolerance.
+- **Proof**: [ara/evidence/diagnostics/method047_property_atlas/report.md, ara/evidence/diagnostics/method047_property_atlas/final-corpus-summary.json, ara/evidence/diagnostics/method047_property_atlas/final-child-audit.json, ara/evidence/diagnostics/method047_property_atlas/backend-audit.json, ara/evidence/diagnostics/method047_property_atlas/final-numerical-runs.tar.gz, ara/evidence/diagnostics/method047_property_atlas/source-provenance.json, ara/evidence/diagnostics/method047_property_atlas/post-corpus-source-binding.json, ara/evidence/diagnostics/method047_property_atlas/claude-results-audit.md, ara/evidence/diagnostics/method047_property_atlas/review-resolution.md]
+- **Dependencies**: []
+- **Tags**: UV atlas, property guidance, independent Jacobians, finite corpus, CPU reference
+- **From staging**: O244
+
+## C110: Bounded operational atlas workspace and property-bake path
+- **Statement**: METHOD-047's final Clang23 ci-vulkan run on the recorded NVIDIA RTX 3050 executes the promoted Vulkan bake/UV/editor path, including raw values and independent coverage, chart gutters, thin-chart sampling, UV-view pixel readbacks, bake lifecycle, and the actual split workspace with its scene rectangle. The complete selected Vulkan gate has 97 passed entries, 0 skips and zero failures. CPU, separate ASan and UBSan gates also pass with the documented LSan-only skips.
+- **Status**: supported — Operational for the named executed path and device; bounded readback checks against the CPU oracle are not unrestricted backend parity. CPU parameterization has no GPU solver. No cross-device, timing, universal input, UDIM or unrestricted mip-chain claim. The debugger screenshot is separate from sanitizer evidence.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Named Vulkan cases skip/fall back, fail operational checks or readbacks, the real workspace does not claim the split scene rectangle, raw data is confused with coverage/alpha, or final source differs from the tested artifacts. Float bake comparisons use 1e-4 and encoded 8-bit comparisons at most one quantization step.
+- **Proof**: [ara/evidence/diagnostics/method047_property_atlas/verification.json, ara/evidence/diagnostics/method047_property_atlas/verification-runs.tar.gz, ara/evidence/diagnostics/method047_property_atlas/environment.json, ara/evidence/diagnostics/method047_property_atlas/atlas-workspace.png, ara/evidence/diagnostics/method047_property_atlas/post-corpus-source-binding.json, tests/integration/graphics/Test.PropertyTextureBakeGpuSmoke.cpp, tests/integration/graphics/Test.UvViewGpuSmoke.cpp, tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp]
+- **Dependencies**: [C109]
+- **Tags**: Vulkan, Operational, property baking, raw values, UV workspace, bounded pixel readback
+- **From staging**: O245

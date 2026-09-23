@@ -115,6 +115,32 @@ namespace
             .Vector();
     }
 } // namespace
+TEST(PointConstructionOperations, UnderResolvedAtlasDoesNotDiscardReconstructedSurface)
+{
+    R::WorldRegistry worlds;
+    const auto world = worlds.CreateWorld("Under-resolved atlas");
+    auto& scene = *worlds.Get(world);
+    R::SpatialIndexCache cache(worlds);
+    const auto entity = Make(scene, D::PointCloudPoint);
+    // Preserve the reconstruction's local sampling, then stretch its world
+    // surface beyond the texel budget. Geometry remains non-degenerate.
+    scene.Raw().get<EC::Transform::Component>(entity).Scale = {1.0e8f, 1, 1};
+    auto config = Config(entity, D::PointCloudPoint, R::PointConstructionMethod::Hoppe);
+    const auto context = R::BindEditorProcessingCommands(R::EditorProcessingContext{
+        .Scene = &scene, .World = world, .SpatialIndices = &cache});
+    const auto result = R::ApplyEditorPointConstructionCommand(context, config);
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    const auto generated = Output(scene, result.OutputEntityId);
+    ASSERT_NE(generated, entt::entity{entt::null});
+    EXPECT_GT(result.OutputFaceCount, 0u);
+    EXPECT_TRUE((scene.Raw().all_of<EC::Selection::SelectableTag, EC::Culling::Local::Bounds,
+        Extrinsic::Graphics::Components::RenderSurface, GS::Faces>(generated)));
+    const auto view = GS::BuildConstView(scene.Raw(), generated);
+    EXPECT_TRUE(view.VertexSource->Properties.Exists("v:normal"));
+    EXPECT_FALSE(view.VertexSource->Properties.Exists("v:texcoord"));
+    EXPECT_FALSE(view.HalfedgeSource->Properties.Exists("h:texcoord"));
+    EXPECT_NE(result.Message.find("UV atlas unavailable"), std::string::npos) << result.Message;
+}
 TEST(PointConstructionConfig, RoundTripPreviewApplyAndRejectMalformedControls)
 {
     namespace C = Extrinsic::Core::Config;

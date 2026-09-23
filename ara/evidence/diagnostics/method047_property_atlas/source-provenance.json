@@ -1,0 +1,23 @@
+{
+  "base_revision": "c972355684f52e6c69907f65c1ade001f26084e1",
+  "source_paths": [
+    "src",
+    "tests",
+    "assets/shaders",
+    "methods",
+    "benchmarks",
+    "cmake",
+    "tools",
+    "CMakeLists.txt",
+    "CMakePresets.json",
+    "vcpkg.json",
+    "vcpkg-configuration.json"
+  ],
+  "patch_sha256": "8474c5f3ab3e10e27587108a0cb1c613efb4ec724971d1887b45f3d173b0cabb",
+  "runner_sha256": "fedc4d1a547af4047bd31af6a3fabbf5e8499130ae4fbe9c3316e8d08a5d07ab",
+  "command": [
+    "tools/diagnostics/atlas/check_property_atlas.py",
+    "/tmp/intrinsic-method047-collaboration/atlas-corpus-3",
+    "--corpus"
+  ]
+}

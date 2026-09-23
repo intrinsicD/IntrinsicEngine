@@ -1025,21 +1025,31 @@ TEST(AssetWorkflowModule,
     ASSERT_NE(pipeline, nullptr);
     ASSERT_NE(scene, nullptr);
 
-    const auto loadTexture =
-        [assets](const std::string_view path) -> Core::Expected<Assets::AssetId>
-    {
-        return assets->Load<Assets::AssetTexture2DPayload>(
-            path,
-            [](std::string_view,
-               Assets::AssetId) -> Core::Expected<Assets::AssetTexture2DPayload>
-            { return Assets::AssetTexture2DPayload{}; });
-    };
-    auto albedoTexture = loadTexture("generated://runtime191/albedo");
-    auto normalTexture = loadTexture("generated://runtime191/normal");
-    ASSERT_TRUE(albedoTexture.has_value());
-    ASSERT_TRUE(normalTexture.has_value());
-
-    const ECS::EntityHandle entity = scene->Create();
+    auto* baker = harness.Services.Find<Runtime::TextureBakeService>();
+    ASSERT_NE(baker, nullptr);
+    const ECS::EntityHandle entity = MakeTextureBakeMesh(*scene);
+    auto& properties = scene->Raw().get<ECS::Components::GeometrySources::Vertices>(entity).Properties;
+    (void)properties.GetOrAdd<float>("v:heat", 1.0f);
+    auto albedoRequest = MakeBakeRequest(1u, harness.InitialWorld, entity);
+    albedoRequest.Source = {Runtime::GeometryElementDomain::MeshVertex, "v:heat", Geometry::PropertyValueKind::Float};
+    albedoRequest.Storage = Runtime::PropertyTextureBakeStorage::RawFloat;
+    albedoRequest.Encoding = Runtime::PropertyTextureBakeEncoding::LinearScalar;
+    albedoRequest.RangePolicy = Runtime::PropertyTextureBakeRangePolicy::Manual;
+    albedoRequest.RangeMin = -2.0f;
+    albedoRequest.RangeMax = 3.0f;
+    albedoRequest.OutputName = "generated-albedo";
+    ASSERT_TRUE(baker->Bake(albedoRequest).Succeeded());
+    auto normalRequest = MakeBakeRequest(2u, harness.InitialWorld, entity);
+    normalRequest.OutputName = "generated-normal";
+    ASSERT_TRUE(baker->Bake(normalRequest).Succeeded());
+    auto& outputs = scene->Raw().get<Runtime::PropertyTextureBakeOutputs>(entity);
+    ASSERT_EQ(outputs.Records.size(), 2u);
+    const auto albedoTexture = outputs.Records[0].Texture;
+    const auto normalTexture = outputs.Records[1].Texture;
+    // This tests material reconciliation; real GPU completion is covered by
+    // runtime acceptance readbacks. Identities come from the actual bake path.
+    outputs.Records[0].State = Runtime::PropertyTextureBakeOutputState::Ready;
+    outputs.Records[1].State = Runtime::PropertyTextureBakeOutputState::Ready;
     const std::uint32_t stableId =
         Runtime::StableEntityLookup::ToRenderId(entity);
     scene->Raw().emplace<Runtime::GeometryPresentationRecipe>(
@@ -1105,52 +1115,6 @@ TEST(AssetWorkflowModule,
                     },
                 },
         });
-    auto& outputs = scene->Raw().emplace<Runtime::PropertyTextureBakeOutputs>(
-        entity,
-        Runtime::PropertyTextureBakeOutputs{
-            .Records =
-                {
-                    Runtime::PropertyTextureBakeRecord{
-                        .OutputName = "generated-albedo",
-                        .Source =
-                            Runtime::GeometryPropertyRef{
-                                .Domain =
-                                    Runtime::GeometryElementDomain::MeshVertex,
-                                .Name = "v:heat",
-                                .ValueKind = Geometry::PropertyValueKind::Float,
-                            },
-                        .Storage =
-                            Runtime::PropertyTextureBakeStorage::RawFloat,
-                        .Encoding =
-                            Runtime::PropertyTextureBakeEncoding::LinearScalar,
-                        .Texture = *albedoTexture,
-                        .RangeMin = -2.0f,
-                        .RangeMax = 3.0f,
-                        .Generation = 4u,
-                        .State = Runtime::PropertyTextureBakeOutputState::Ready,
-                        .Diagnostic = "albedo ready",
-                    },
-                    Runtime::PropertyTextureBakeRecord{
-                        .OutputName = "generated-normal",
-                        .Source =
-                            Runtime::GeometryPropertyRef{
-                                .Domain =
-                                    Runtime::GeometryElementDomain::MeshVertex,
-                                .Name = "v:normal",
-                                .ValueKind = Geometry::PropertyValueKind::Vec3,
-                            },
-                        .Storage =
-                            Runtime::PropertyTextureBakeStorage::EncodedRgba,
-                        .Encoding =
-                            Runtime::PropertyTextureBakeEncoding::Normal,
-                        .Texture = *normalTexture,
-                        .Generation = 7u,
-                        .State = Runtime::PropertyTextureBakeOutputState::Ready,
-                        .Diagnostic = "normal ready",
-                    },
-                },
-        });
-
     const Assets::AssetId unrelatedMetallicRoughness{700u, 3u};
     const Assets::AssetId unrelatedEmissive{701u, 5u};
     harness.Extraction.SetMaterialTextureAssetBindings(
@@ -1171,20 +1135,32 @@ TEST(AssetWorkflowModule,
         SCOPED_TRACE(static_cast<int>(kind));
         auto& recipe = scene->Raw().get<Runtime::GeometryPresentationRecipe>(entity);
         recipe.Presentations[0].Slots[0].Property.ValueKind = kind;
-        outputs.Records[0].Source.ValueKind = kind;
-        ++outputs.Records[0].Generation;
+        (void)properties.Registry().Remove(*properties.Registry().Find("v:heat"));
+        switch (kind)
+        {
+        case Geometry::PropertyValueKind::Bool: (void)properties.GetOrAdd<bool>("v:heat", true); break;
+        case Geometry::PropertyValueKind::Int32: (void)properties.GetOrAdd<std::int32_t>("v:heat", 1); break;
+        case Geometry::PropertyValueKind::UInt32: (void)properties.GetOrAdd<std::uint32_t>("v:heat", 1u); break;
+        case Geometry::PropertyValueKind::UInt64: (void)properties.GetOrAdd<std::uint64_t>("v:heat", 1u); break;
+        case Geometry::PropertyValueKind::Float: (void)properties.GetOrAdd<float>("v:heat", 1.0f); break;
+        case Geometry::PropertyValueKind::Double: (void)properties.GetOrAdd<double>("v:heat", 1.0); break;
+        default: FAIL() << "unexpected scalar kind";
+        }
+        albedoRequest.Source.ValueKind = kind;
+        ASSERT_TRUE(baker->Bake(albedoRequest).Succeeded());
+        outputs.Records[0].State = Runtime::PropertyTextureBakeOutputState::Ready;
         pipeline->RunFrameMaintenance();
 
         const auto ready =
             harness.Extraction.GetMaterialTextureAssetBindings(stableId);
         ASSERT_TRUE(ready.has_value());
-        EXPECT_EQ(ready->Albedo, *albedoTexture);
+        EXPECT_EQ(ready->Albedo, albedoTexture);
         EXPECT_EQ(ready->AlbedoInterpretation,
                   Graphics::MaterialAlbedoTextureInterpretation::Scalar);
         EXPECT_EQ(ready->AlbedoScalarColormap, Graphics::Colormap::Type::Inferno);
         EXPECT_FLOAT_EQ(ready->AlbedoScalarRangeMin, -2.0f);
         EXPECT_FLOAT_EQ(ready->AlbedoScalarRangeMax, 3.0f);
-        EXPECT_EQ(ready->Normal, *normalTexture);
+        EXPECT_EQ(ready->Normal, normalTexture);
         EXPECT_EQ(ready->NormalSpace,
                   Graphics::MaterialNormalTextureSpace::WorldSpaceNormal);
         EXPECT_EQ(ready->MetallicRoughness, unrelatedMetallicRoughness);
@@ -1193,14 +1169,26 @@ TEST(AssetWorkflowModule,
 
     }
 
+    auto values = properties.Get<double>("v:heat");
+    values[0] = 2.0;
+    pipeline->RunFrameMaintenance();
+    const auto stale = harness.Extraction.GetMaterialTextureAssetBindings(stableId);
+    ASSERT_TRUE(stale.has_value());
+    EXPECT_FALSE(stale->Albedo.IsValid());
+    EXPECT_EQ(stale->Normal, normalTexture);
+    EXPECT_EQ(stale->MetallicRoughness, unrelatedMetallicRoughness);
+    values[0] = 1.0;
+    pipeline->RunFrameMaintenance();
+
     outputs.Records[0].State = Runtime::PropertyTextureBakeOutputState::Pending;
     outputs.Records[0].Diagnostic = "rebake pending";
     pipeline->RunFrameMaintenance();
     const auto pending =
         harness.Extraction.GetMaterialTextureAssetBindings(stableId);
     ASSERT_TRUE(pending.has_value());
-    EXPECT_EQ(pending->Albedo, *albedoTexture)
-        << "the last ready output remains visible while its rebake is pending";
+    EXPECT_FALSE(pending->Albedo.IsValid())
+        << "pending output cannot bind an incomplete replacement texture";
+    EXPECT_EQ(pending->Normal, normalTexture);
 
     outputs.Records[0].State = Runtime::PropertyTextureBakeOutputState::Failed;
     outputs.Records[0].Diagnostic = "rebake failed";
@@ -1209,7 +1197,7 @@ TEST(AssetWorkflowModule,
         harness.Extraction.GetMaterialTextureAssetBindings(stableId);
     ASSERT_TRUE(failed.has_value());
     EXPECT_FALSE(failed->Albedo.IsValid());
-    EXPECT_EQ(failed->Normal, *normalTexture);
+    EXPECT_EQ(failed->Normal, normalTexture);
     EXPECT_EQ(failed->MetallicRoughness, unrelatedMetallicRoughness);
     EXPECT_EQ(failed->Emissive, unrelatedEmissive);
 
@@ -1229,7 +1217,7 @@ TEST(AssetWorkflowModule,
               Runtime::GeometryPresentationReadiness::Failed);
     EXPECT_EQ(normalStatus->Readiness,
               Runtime::GeometryPresentationReadiness::Ready);
-    EXPECT_EQ(normalStatus->GeneratedTexture, *normalTexture);
+    EXPECT_EQ(normalStatus->GeneratedTexture, normalTexture);
 }
 
 TEST(

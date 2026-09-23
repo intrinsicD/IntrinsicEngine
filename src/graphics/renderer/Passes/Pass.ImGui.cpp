@@ -72,23 +72,11 @@ namespace Extrinsic::Graphics
                     continue;
                 }
 
-                // Renderer passes use the RHI viewport convention whose
-                // Vulkan implementation has negative height. ImGui clip
-                // rectangles are top-left oriented, so mirror their Y extent
-                // into the attachment coordinate space used by SetScissor.
-                const std::uint64_t mirroredY =
-                    static_cast<std::uint64_t>(upload.DisplayHeight) -
-                    (static_cast<std::uint64_t>(command.Scissor.Y) +
-                     command.Scissor.Height);
-                if (mirroredY >
-                    static_cast<std::uint64_t>(
-                        std::numeric_limits<std::int32_t>::max()))
-                {
-                    continue;
-                }
+                // The overlay composites directly onto the backbuffer, whose
+                // rows are top-left oriented like ImGui clip rectangles.
                 cmd.SetScissor(
                     command.Scissor.X,
-                    static_cast<std::int32_t>(mirroredY),
+                    command.Scissor.Y,
                     command.Scissor.Width,
                     command.Scissor.Height);
                 const std::uint32_t flags =

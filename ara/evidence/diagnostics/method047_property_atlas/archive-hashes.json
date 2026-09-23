@@ -1,0 +1,7 @@
+{
+  "claude-review-source.tar.gz": "5fa9e1b9f939146e91e7abad9abc9e2456fe1d52a3a9a6ca0b4b377709dda27e",
+  "final-numerical-runs.tar.gz": "2a7d3e85bfe30dc8785147f35457c4f8e38a5f56d52f34f596adc1795b8474ee",
+  "intermediate-numerical-runs.tar.gz": "a9e1a12128ce8a9267fc66b3e4aca616d0825909cd9315b6f6d05c7daaaeb46f",
+  "structural-checks.tar.gz": "a0f6441237bbf8c2332f2d52aa457e4cc9fae97b25177d6dc38429646ad59639",
+  "verification-runs.tar.gz": "628be841b3974ef1c1726b4cd00f91db0ac294cbc5b3bb9d4c8882968933555a"
+}

@@ -14,6 +14,7 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -29,7 +30,6 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.GpuAssetCache;
-import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.Material;
@@ -54,10 +54,9 @@ import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
-import Extrinsic.Runtime.VertexAttributeBinding;
-import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.WorldRegistry;
 import Geometry.Properties;
+import Geometry.UvAtlas.Validation;
 
 namespace Extrinsic::Runtime
 {
@@ -66,7 +65,6 @@ namespace Extrinsic::Runtime
         namespace GS = ECS::Components::GeometrySources;
 
         constexpr float kAtlasEpsilon = 1.0e-4f;
-        constexpr float kUvAreaEpsilon = 1.0e-10f;
         constexpr std::size_t kMaxActivePropertyTextureBakes = 256u;
         constexpr std::size_t kMaxRetainedPropertyBakeSourceBytes =
             64u * 1024u * 1024u;
@@ -105,12 +103,7 @@ namespace Extrinsic::Runtime
                    std::isfinite(value.w);
         }
 
-        [[nodiscard]] float Cross2(
-            const glm::vec2 a,
-            const glm::vec2 b) noexcept
-        {
-            return a.x * b.y - a.y * b.x;
-        }
+
 
         [[nodiscard]] std::uint64_t EdgeKey(
             std::uint32_t a,
@@ -201,10 +194,19 @@ namespace Extrinsic::Runtime
             Graphics::PropertyTextureBakeEncoding GpuEncoding{
                 Graphics::PropertyTextureBakeEncoding::Raw};
             RHI::Format Format{RHI::Format::Undefined};
+            // Bake-owned indexed raster input: one texcoord slot per distinct
+            // (mesh vertex, resolved UV), values per slot/triangle/corner.
             std::vector<glm::vec2> Texcoords{};
             std::vector<glm::vec4> Values{};
             std::vector<std::uint32_t> SurfaceIndices{};
-            std::uint64_t SurfaceIndexFingerprint{0u};
+            Graphics::PropertyTextureBakeCharts Charts{};
+            std::vector<Graphics::PropertyTextureBakeGutterEdge> GutterEdges{};
+            Graphics::PropertyTextureBakeCoverageReport Coverage{};
+            PropertyTextureBakeSourceIdentity Identity{};
+            // Adopted output extent: the requested one, or the adaptive
+            // extent at which every chart resolves.
+            std::uint32_t Width{0u};
+            std::uint32_t Height{0u};
             std::size_t ExpectedElementCount{0u};
             std::uint64_t SourceGeneration{0u};
             float RangeMin{0.0f};
@@ -313,6 +315,496 @@ namespace Extrinsic::Runtime
             }
             return false;
         }
+
+        constexpr std::string_view kCornerTexcoordProperty = "h:texcoord";
+        constexpr std::string_view kVertexTexcoordProperty = "v:texcoord";
+
+        // Word-wise FNV-1a with a down-mix, over the exact bytes consumed.
+        // Identical content on the supported little-endian targets yields the
+        // same value across runs, so persisted fingerprints stay comparable.
+        class ContentFingerprint
+        {
+        public:
+            void Word(const std::uint64_t value) noexcept
+            {
+                m_State ^= value;
+                m_State *= 1099511628211ull;
+                m_State ^= m_State >> 32u;
+            }
+
+            void Bytes(const void* const data, const std::size_t size) noexcept
+            {
+                Word(static_cast<std::uint64_t>(size));
+                const auto* bytes = static_cast<const unsigned char*>(data);
+                std::size_t offset = 0u;
+                for (; offset + sizeof(std::uint64_t) <= size;
+                     offset += sizeof(std::uint64_t))
+                {
+                    std::uint64_t chunk{};
+                    std::memcpy(&chunk, bytes + offset, sizeof(chunk));
+                    Word(chunk);
+                }
+                if (offset < size)
+                {
+                    std::uint64_t tail{0u};
+                    std::memcpy(&tail, bytes + offset, size - offset);
+                    Word(tail);
+                }
+            }
+
+            void Text(const std::string_view text) noexcept
+            {
+                Bytes(text.data(), text.size());
+            }
+
+            template <class T>
+            void Values(const std::span<const T> values) noexcept
+            {
+                Bytes(values.data(), values.size_bytes());
+            }
+
+            [[nodiscard]] std::uint64_t Value() const noexcept
+            {
+                return m_State == 0u ? 1u : m_State;
+            }
+
+        private:
+            std::uint64_t m_State{14695981039346656037ull};
+        };
+
+        [[nodiscard]] std::optional<std::uint64_t> FingerprintProperty(
+            const Geometry::ConstPropertySet& properties,
+            const GeometryElementDomain domain,
+            const std::string_view name,
+            const Geometry::PropertyValueKind kind)
+        {
+            ContentFingerprint fingerprint{};
+            fingerprint.Word(static_cast<std::uint64_t>(domain));
+            fingerprint.Word(static_cast<std::uint64_t>(kind));
+            fingerprint.Text(name);
+            const auto typed = [&]<class T>() -> bool
+            {
+                const auto property = properties.Get<T>(name);
+                if (!property)
+                    return false;
+                if constexpr (std::is_same_v<T, bool>)
+                {
+                    fingerprint.Word(property.Vector().size());
+                    for (const bool value : property.Vector())
+                        fingerprint.Word(value ? 1u : 0u);
+                }
+                else
+                {
+                    fingerprint.Values(std::span<const T>{property.Vector()});
+                }
+                return true;
+            };
+            bool found = false;
+            switch (kind)
+            {
+            case Geometry::PropertyValueKind::Bool: found = typed.template operator()<bool>(); break;
+            case Geometry::PropertyValueKind::Int32: found = typed.template operator()<std::int32_t>(); break;
+            case Geometry::PropertyValueKind::UInt32: found = typed.template operator()<std::uint32_t>(); break;
+            case Geometry::PropertyValueKind::UInt64: found = typed.template operator()<std::uint64_t>(); break;
+            case Geometry::PropertyValueKind::Float: found = typed.template operator()<float>(); break;
+            case Geometry::PropertyValueKind::Double: found = typed.template operator()<double>(); break;
+            case Geometry::PropertyValueKind::Vec2: found = typed.template operator()<glm::vec2>(); break;
+            case Geometry::PropertyValueKind::Vec3: found = typed.template operator()<glm::vec3>(); break;
+            case Geometry::PropertyValueKind::Vec4: found = typed.template operator()<glm::vec4>(); break;
+            case Geometry::PropertyValueKind::Unknown: break;
+            }
+            return found ? std::optional<std::uint64_t>{fingerprint.Value()}
+                         : std::nullopt;
+        }
+
+        struct TexcoordBinding
+        {
+            PropertyTextureBakeStatus Status{
+                PropertyTextureBakeStatus::Success};
+            std::string Diagnostic{};
+            GeometryPropertyRef Resolved{};
+            std::span<const glm::vec2> Values{};
+            bool Corner{false};
+        };
+
+        // The canonical atlas is the renderer's corner-over-vertex authority.
+        // A named reference is exact: it never falls back to `h:texcoord`.
+        [[nodiscard]] TexcoordBinding ResolveTexcoordBinding(
+            const GS::ConstSourceView& view,
+            const GeometryPropertyRef& requested)
+        {
+            const auto bind = [&view](
+                const GeometryElementDomain domain,
+                const std::string_view name) -> std::optional<TexcoordBinding>
+            {
+                const bool corner = domain == GeometryElementDomain::MeshHalfedge;
+                const Geometry::PropertySet& set = corner
+                    ? view.HalfedgeSource->Properties
+                    : view.VertexSource->Properties;
+                const auto property =
+                    Geometry::ConstPropertySet{set}.Get<glm::vec2>(name);
+                if (!property || property.Vector().size() != set.Size())
+                    return std::nullopt;
+                return TexcoordBinding{
+                    .Resolved = GeometryPropertyRef{
+                        .Domain = domain,
+                        .Name = std::string{name},
+                        .ValueKind = Geometry::PropertyValueKind::Vec2,
+                    },
+                    .Values = std::span<const glm::vec2>{property.Vector()},
+                    .Corner = corner,
+                };
+            };
+
+            if (!requested.HasName())
+            {
+                if (auto corner = bind(
+                        GeometryElementDomain::MeshHalfedge,
+                        kCornerTexcoordProperty))
+                {
+                    return std::move(*corner);
+                }
+                if (auto vertex = bind(
+                        GeometryElementDomain::MeshVertex,
+                        kVertexTexcoordProperty))
+                {
+                    return std::move(*vertex);
+                }
+                return TexcoordBinding{
+                    .Status = PropertyTextureBakeStatus::MissingTexcoords,
+                    .Diagnostic =
+                        "texture bake requires a complete corner h:texcoord "
+                        "or vertex v:texcoord atlas",
+                };
+            }
+            if ((requested.Domain != GeometryElementDomain::MeshHalfedge &&
+                 requested.Domain != GeometryElementDomain::MeshVertex) ||
+                (requested.ValueKind != Geometry::PropertyValueKind::Unknown &&
+                 requested.ValueKind != Geometry::PropertyValueKind::Vec2))
+            {
+                return TexcoordBinding{
+                    .Status = PropertyTextureBakeStatus::MissingTexcoords,
+                    .Diagnostic =
+                        "texture bake texcoords must reference a mesh-corner "
+                        "or mesh-vertex vec2 property",
+                };
+            }
+            if (auto exact = bind(requested.Domain, requested.Name))
+                return std::move(*exact);
+            return TexcoordBinding{
+                .Status = PropertyTextureBakeStatus::MissingTexcoords,
+                .Diagnostic = "texture bake atlas property '" +
+                              requested.Name +
+                              "' is missing, not vec2, or not one value per " +
+                              (requested.Domain ==
+                                       GeometryElementDomain::MeshHalfedge
+                                   ? "corner"
+                                   : "vertex"),
+            };
+        }
+
+        // Triangulated surface plus the UV each triangle corner carries under
+        // the resolved binding. Shared by preparation and freshness capture so
+        // both hash exactly what the raster consumes.
+        struct BakeGeometry
+        {
+            PropertyTextureBakeStatus Status{
+                PropertyTextureBakeStatus::Success};
+            std::string Diagnostic{};
+            std::vector<std::uint32_t> SurfaceIndices{};
+            std::vector<std::uint32_t> TriangleToFace{};
+            std::vector<std::uint32_t> CornerHalfedges{};
+            TexcoordBinding Texcoords{};
+            std::vector<glm::vec2> CornerUv{};
+
+            [[nodiscard]] bool Succeeded() const noexcept
+            {
+                return Status == PropertyTextureBakeStatus::Success;
+            }
+        };
+
+        [[nodiscard]] BakeGeometry ResolveBakeGeometry(
+            const GS::ConstSourceView& view,
+            const GeometryPropertyRef& requestedTexcoords)
+        {
+            BakeGeometry geometry{};
+            const auto fail = [&geometry](
+                const PropertyTextureBakeStatus status,
+                std::string diagnostic)
+            {
+                geometry.Status = status;
+                geometry.Diagnostic = std::move(diagnostic);
+                return std::move(geometry);
+            };
+            if (view.ActiveDomain != GS::Domain::Mesh ||
+                view.VertexSource == nullptr ||
+                view.EdgeSource == nullptr ||
+                view.HalfedgeSource == nullptr ||
+                view.FaceSource == nullptr)
+            {
+                return fail(
+                    PropertyTextureBakeStatus::NonMeshSource,
+                    "texture bake requires complete mesh topology");
+            }
+            const MeshSurfaceTopologyStatus topology =
+                BuildMeshSurfaceTriangleCornerTopology(
+                    view,
+                    geometry.SurfaceIndices,
+                    geometry.TriangleToFace,
+                    geometry.CornerHalfedges);
+            if (topology != MeshSurfaceTopologyStatus::Success ||
+                geometry.SurfaceIndices.empty() ||
+                (geometry.SurfaceIndices.size() % 3u) != 0u)
+            {
+                return fail(
+                    PropertyTextureBakeStatus::BakeFailed,
+                    DebugNameForMeshSurfaceTopologyStatus(topology));
+            }
+            geometry.Texcoords =
+                ResolveTexcoordBinding(view, requestedTexcoords);
+            if (geometry.Texcoords.Status !=
+                PropertyTextureBakeStatus::Success)
+            {
+                return fail(
+                    geometry.Texcoords.Status,
+                    geometry.Texcoords.Diagnostic);
+            }
+            geometry.CornerUv.resize(geometry.SurfaceIndices.size());
+            for (std::size_t index = 0u;
+                 index < geometry.SurfaceIndices.size();
+                 ++index)
+            {
+                const std::uint32_t element = geometry.Texcoords.Corner
+                    ? geometry.CornerHalfedges[index]
+                    : geometry.SurfaceIndices[index];
+                if (element >= geometry.Texcoords.Values.size())
+                {
+                    return fail(
+                        PropertyTextureBakeStatus::BakeFailed,
+                        "texture bake topology references an invalid atlas element");
+                }
+                geometry.CornerUv[index] = geometry.Texcoords.Values[element];
+            }
+            return geometry;
+        }
+
+        [[nodiscard]] std::uint64_t FingerprintUv(
+            const BakeGeometry& geometry) noexcept
+        {
+            ContentFingerprint fingerprint{};
+            fingerprint.Word(static_cast<std::uint64_t>(
+                geometry.Texcoords.Resolved.Domain));
+            fingerprint.Text(geometry.Texcoords.Resolved.Name);
+            fingerprint.Values(std::span<const glm::vec2>{geometry.CornerUv});
+            return fingerprint.Value();
+        }
+
+        [[nodiscard]] std::uint64_t FingerprintTopology(
+            const BakeGeometry& geometry) noexcept
+        {
+            ContentFingerprint fingerprint{};
+            fingerprint.Values(
+                std::span<const std::uint32_t>{geometry.SurfaceIndices});
+            fingerprint.Values(
+                std::span<const std::uint32_t>{geometry.TriangleToFace});
+            return fingerprint.Value();
+        }
+
+        [[nodiscard]] std::uint64_t FingerprintPositions(
+            const GS::ConstSourceView& view) noexcept
+        {
+            ContentFingerprint fingerprint{};
+            const auto positions =
+                Geometry::ConstPropertySet{view.VertexSource->Properties}
+                    .Get<glm::vec3>(GS::PropertyNames::kPosition);
+            if (positions)
+                fingerprint.Values(std::span<const glm::vec3>{positions.Vector()});
+            else
+                fingerprint.Text("absent");
+            return fingerprint.Value();
+        }
+
+        struct CapturedSourceIdentity
+        {
+            PropertyTextureBakeStatus Status{
+                PropertyTextureBakeStatus::Success};
+            std::string Diagnostic{};
+            PropertyTextureBakeSourceIdentity Identity{};
+        };
+
+        [[nodiscard]] std::optional<std::uint64_t> FingerprintSourceProperty(
+            const GS::ConstSourceView& view,
+            const GeometryPropertyRef& source)
+        {
+            const GeometryEntityAvailability availability =
+                BuildGeometryAvailability(view);
+            const Geometry::PropertySet* properties =
+                ResolveGeometryPropertySet(availability, source.Domain);
+            if (properties == nullptr)
+                return std::nullopt;
+            return FingerprintProperty(
+                Geometry::ConstPropertySet{*properties},
+                source.Domain,
+                source.Name,
+                DetectGeometryPropertyValueKind(*properties, source.Name));
+        }
+
+        [[nodiscard]] CapturedSourceIdentity CaptureSourceIdentity(
+            const GS::ConstSourceView& view,
+            const GeometryPropertyRef& source,
+            const GeometryPropertyRef& requestedTexcoords)
+        {
+            const BakeGeometry geometry =
+                ResolveBakeGeometry(view, requestedTexcoords);
+            if (!geometry.Succeeded())
+            {
+                return CapturedSourceIdentity{
+                    .Status = geometry.Status,
+                    .Diagnostic = geometry.Diagnostic,
+                };
+            }
+            const std::optional<std::uint64_t> property =
+                FingerprintSourceProperty(view, source);
+            if (!property.has_value())
+            {
+                return CapturedSourceIdentity{
+                    .Status = PropertyTextureBakeStatus::MissingProperty,
+                    .Diagnostic = "texture bake source property is missing",
+                };
+            }
+            return CapturedSourceIdentity{
+                .Identity = PropertyTextureBakeSourceIdentity{
+                    .ResolvedTexcoords = geometry.Texcoords.Resolved,
+                    .UvFingerprint = FingerprintUv(geometry),
+                    .PositionFingerprint = FingerprintPositions(view),
+                    .TopologyFingerprint = FingerprintTopology(geometry),
+                    .PropertyFingerprint = *property,
+                },
+            };
+        }
+
+        [[nodiscard]] PropertyTextureBakeRevisionLookup MakeRevisionLookup(
+            const GS::ConstSourceView& view)
+        {
+            return [availability = BuildGeometryAvailability(view)](
+                       const GeometryElementDomain domain,
+                       const std::string_view name)
+                -> std::optional<std::uint64_t>
+            {
+                const Geometry::PropertySet* properties =
+                    ResolveGeometryPropertySet(availability, domain);
+                if (properties == nullptr)
+                    return std::nullopt;
+                const std::optional<Geometry::PropertyRevision> revision =
+                    properties->FindPropertyRevision(name);
+                return revision.has_value()
+                    ? std::optional<std::uint64_t>{*revision}
+                    : std::nullopt;
+            };
+        }
+    }
+
+    PropertyTextureBakeFreshness ComparePropertyTextureBakeSourceIdentity(
+        const PropertyTextureBakeSourceIdentity& baked,
+        const PropertyTextureBakeSourceIdentity& current) noexcept
+    {
+        if (baked.UvFingerprint == 0u ||
+            baked.PositionFingerprint == 0u ||
+            baked.TopologyFingerprint == 0u ||
+            baked.PropertyFingerprint == 0u)
+        {
+            return PropertyTextureBakeFreshness::Unknown;
+        }
+        if (baked.TopologyFingerprint != current.TopologyFingerprint)
+            return PropertyTextureBakeFreshness::TopologyChanged;
+        if (baked.ResolvedTexcoords != current.ResolvedTexcoords ||
+            baked.UvFingerprint != current.UvFingerprint)
+        {
+            return PropertyTextureBakeFreshness::UvChanged;
+        }
+        if (baked.PositionFingerprint != current.PositionFingerprint)
+            return PropertyTextureBakeFreshness::PositionsChanged;
+        if (baked.PropertyFingerprint != current.PropertyFingerprint)
+            return PropertyTextureBakeFreshness::PropertyChanged;
+        return PropertyTextureBakeFreshness::Fresh;
+    }
+
+    const char* DebugNameForPropertyTextureBakeFreshness(
+        const PropertyTextureBakeFreshness freshness) noexcept
+    {
+        switch (freshness)
+        {
+        case PropertyTextureBakeFreshness::Unknown:
+            return "PropertyTextureBakeFreshness.Unknown";
+        case PropertyTextureBakeFreshness::Fresh:
+            return "PropertyTextureBakeFreshness.Fresh";
+        case PropertyTextureBakeFreshness::TopologyChanged:
+            return "PropertyTextureBakeFreshness.TopologyChanged";
+        case PropertyTextureBakeFreshness::UvChanged:
+            return "PropertyTextureBakeFreshness.UvChanged";
+        case PropertyTextureBakeFreshness::PositionsChanged:
+            return "PropertyTextureBakeFreshness.PositionsChanged";
+        case PropertyTextureBakeFreshness::PropertyChanged:
+            return "PropertyTextureBakeFreshness.PropertyChanged";
+        case PropertyTextureBakeFreshness::SourceUnavailable:
+            return "PropertyTextureBakeFreshness.SourceUnavailable";
+        }
+        return "PropertyTextureBakeFreshness.Unknown";
+    }
+
+    std::uint64_t ComputePropertyTextureBakeRevisionToken(
+        const PropertyTextureBakeRecord& record,
+        const PropertyTextureBakeRevisionLookup& lookup)
+    {
+        if (!lookup)
+            return 0u;
+        ContentFingerprint token{};
+        const auto watch = [&token, &lookup](
+            const GeometryElementDomain domain,
+            const std::string_view name)
+        {
+            const std::optional<std::uint64_t> revision = lookup(domain, name);
+            token.Word(static_cast<std::uint64_t>(domain));
+            token.Text(name);
+            token.Word(revision.has_value() ? 1u : 0u);
+            token.Word(revision.value_or(0u));
+        };
+        if (record.Texcoords.HasName())
+        {
+            watch(record.Texcoords.Domain, record.Texcoords.Name);
+        }
+        else
+        {
+            watch(GeometryElementDomain::MeshHalfedge, kCornerTexcoordProperty);
+            watch(GeometryElementDomain::MeshVertex, kVertexTexcoordProperty);
+        }
+        watch(GeometryElementDomain::MeshVertex, GS::PropertyNames::kPosition);
+        watch(GeometryElementDomain::MeshHalfedge,
+              GS::PropertyNames::kHalfedgeToVertex);
+        watch(GeometryElementDomain::MeshHalfedge,
+              GS::PropertyNames::kHalfedgeNext);
+        watch(GeometryElementDomain::MeshHalfedge,
+              GS::PropertyNames::kHalfedgeFace);
+        watch(GeometryElementDomain::MeshFace,
+              GS::PropertyNames::kFaceHalfedge);
+        if (record.Source.Domain == GeometryElementDomain::MeshEdge)
+        {
+            watch(GeometryElementDomain::MeshEdge, GS::PropertyNames::kEdgeV0);
+            watch(GeometryElementDomain::MeshEdge, GS::PropertyNames::kEdgeV1);
+        }
+        watch(record.Source.Domain, record.Source.Name);
+        return token.Value();
+    }
+
+    bool IsPropertyTextureBakeRecordBindable(
+        const PropertyTextureBakeRecord& record,
+        const std::uint64_t currentRevisionToken) noexcept
+    {
+        return record.State == PropertyTextureBakeOutputState::Ready &&
+               record.Freshness == PropertyTextureBakeFreshness::Fresh &&
+               record.Texture.IsValid() &&
+               record.ObservedRevisionToken != 0u &&
+               record.ObservedRevisionToken == currentRevisionToken;
     }
 
     PropertyTextureBakeEncoding ResolveSurfaceAppearanceEncoding(
@@ -454,6 +946,10 @@ namespace Extrinsic::Runtime
             return "PropertyTextureBake.DegenerateAllTriangles";
         case PropertyTextureBakeStatus::DegenerateUvTriangles:
             return "PropertyTextureBake.DegenerateUvTriangles";
+        case PropertyTextureBakeStatus::OverlappingUvCharts:
+            return "PropertyTextureBake.OverlappingUvCharts";
+        case PropertyTextureBakeStatus::UnderresolvedAtlas:
+            return "PropertyTextureBake.UnderresolvedAtlas";
         case PropertyTextureBakeStatus::ZeroCoverageBake:
             return "PropertyTextureBake.ZeroCoverageBake";
         case PropertyTextureBakeStatus::BakeFailed:
@@ -489,6 +985,28 @@ namespace Extrinsic::Runtime
             Failed,
         };
 
+        // Per-bake GPU inputs and transient targets, retired only after the
+        // frame that consumed them can no longer be in flight.
+        struct BakeGpuResources
+        {
+            std::optional<RHI::BufferManager::BufferLease> PropertyBuffer{};
+            std::optional<RHI::BufferManager::BufferLease> TexcoordBuffer{};
+            std::optional<RHI::BufferManager::BufferLease> IndexBuffer{};
+            std::optional<RHI::BufferManager::BufferLease> ChartBuffer{};
+            std::optional<RHI::BufferManager::BufferLease> GutterBuffer{};
+            std::optional<RHI::TextureManager::TextureLease> Depth{};
+
+            [[nodiscard]] bool Empty() const noexcept
+            {
+                return !PropertyBuffer.has_value() &&
+                       !TexcoordBuffer.has_value() &&
+                       !IndexBuffer.has_value() &&
+                       !ChartBuffer.has_value() &&
+                       !GutterBuffer.has_value() &&
+                       !Depth.has_value();
+            }
+        };
+
         struct Work
         {
             WorkPhase Phase{WorkPhase::Queued};
@@ -498,17 +1016,15 @@ namespace Extrinsic::Runtime
             std::uint32_t StableEntityId{0u};
             std::string OutputName{};
             Assets::AssetId Asset{};
+            Assets::AssetId CoverageAsset{};
             std::uint64_t RecordGeneration{0u};
             PropertyTextureBakeRequest Request{};
             PreparedPropertyBake Prepared{};
             std::uint32_t Width{0u};
             std::uint32_t Height{0u};
-            std::optional<RHI::BufferManager::BufferLease> PropertyBuffer{};
-            std::optional<RHI::BufferManager::BufferLease> TexcoordBuffer{};
-            std::optional<RHI::TextureManager::TextureLease>
-                DilationScratch{};
+            BakeGpuResources Resources{};
             std::uint64_t CacheGeneration{0u};
-            std::uint64_t GeometryRevision{0u};
+            std::uint64_t CoverageCacheGeneration{0u};
             std::uint64_t ReadyFrame{0u};
         };
 
@@ -516,15 +1032,11 @@ namespace Extrinsic::Runtime
         {
             RHI::Format Format{RHI::Format::Undefined};
             std::optional<RHI::PipelineManager::PipelineLease> Raster{};
-            std::optional<RHI::PipelineManager::PipelineLease> Dilation{};
         };
 
         struct RetiredWorkResources
         {
-            std::optional<RHI::BufferManager::BufferLease> PropertyBuffer{};
-            std::optional<RHI::BufferManager::BufferLease> TexcoordBuffer{};
-            std::optional<RHI::TextureManager::TextureLease>
-                DilationScratch{};
+            BakeGpuResources Resources{};
             std::uint64_t SafeFrame{0u};
         };
 
@@ -539,6 +1051,9 @@ namespace Extrinsic::Runtime
         std::vector<PipelineEntry> Pipelines{};
         std::uint64_t NextAssetSerial{1u};
         GpuQueueParticipantHandle Participant{};
+        // Total retained source-snapshot bytes; one request above it can
+        // never be admitted, however empty the queue is.
+        std::size_t SourceSnapshotBudget{kMaxRetainedPropertyBakeSourceBytes};
 
         // The owning module composes the service through its always-constructed Impl.
         void Bind(
@@ -644,9 +1159,30 @@ namespace Extrinsic::Runtime
             return prepared.Texcoords.size() * sizeof(glm::vec2) +
                    prepared.Values.size() * sizeof(glm::vec4) +
                    prepared.SurfaceIndices.size() *
-                       sizeof(std::uint32_t);
+                       sizeof(std::uint32_t) +
+                   prepared.Charts.TriangleChart.size() *
+                       sizeof(std::uint32_t) +
+                   prepared.GutterEdges.size() *
+                       sizeof(Graphics::PropertyTextureBakeGutterEdge);
         }
 
+        [[nodiscard]] PropertyTextureBakeResult OversizedSnapshotResult(
+            std::string outputName,
+            const std::size_t bytes,
+            const std::string_view measure) const
+        {
+            return PropertyTextureBakeResult{
+                .Status = PropertyTextureBakeStatus::BakeFailed,
+                .OutputName = std::move(outputName),
+                .Diagnostic = "texture bake source snapshot " + std::string{measure} + " " +
+                              std::to_string(bytes) + " bytes, more than the " +
+                              std::to_string(SourceSnapshotBudget) +
+                              "-byte bake budget; this mesh cannot be baked until it is simplified",
+            };
+        }
+
+        // Queue pressure only: the caller has already rejected a candidate
+        // that exceeds the whole budget on its own.
         [[nodiscard]] bool HasScheduleCapacity(
             const ECS::EntityHandle entity,
             const std::string_view outputName,
@@ -654,12 +1190,6 @@ namespace Extrinsic::Runtime
         {
             const std::size_t candidateBytes =
                 SourceByteCount(prepared);
-            if (candidateBytes >
-                kMaxRetainedPropertyBakeSourceBytes)
-            {
-                return false;
-            }
-
             std::size_t retainedBytes = 0u;
             std::size_t retainedCount = 0u;
             for (const Work& work : WorkItems)
@@ -675,27 +1205,29 @@ namespace Extrinsic::Runtime
             return retainedCount <
                        kMaxActivePropertyTextureBakes &&
                    retainedBytes <=
-                       kMaxRetainedPropertyBakeSourceBytes -
-                           candidateBytes;
+                       SourceSnapshotBudget - candidateBytes;
         }
 
         void RetireWorkResources(
             Work& work,
             const std::uint64_t safeFrame)
         {
-            if (!work.PropertyBuffer.has_value() &&
-                !work.TexcoordBuffer.has_value() &&
-                !work.DilationScratch.has_value())
-            {
+            if (work.Resources.Empty())
                 return;
-            }
             RetiredResources.push_back(RetiredWorkResources{
-                .PropertyBuffer =
-                    std::exchange(work.PropertyBuffer, std::nullopt),
-                .TexcoordBuffer =
-                    std::exchange(work.TexcoordBuffer, std::nullopt),
-                .DilationScratch =
-                    std::exchange(work.DilationScratch, std::nullopt),
+                .Resources = std::exchange(work.Resources, BakeGpuResources{}),
+                .SafeFrame = safeFrame,
+            });
+        }
+
+        void RetireWorkResources(
+            BakeGpuResources& resources,
+            const std::uint64_t safeFrame)
+        {
+            if (resources.Empty())
+                return;
+            RetiredResources.push_back(RetiredWorkResources{
+                .Resources = std::exchange(resources, BakeGpuResources{}),
                 .SafeFrame = safeFrame,
             });
         }
@@ -756,52 +1288,46 @@ namespace Extrinsic::Runtime
                 {
                     if (owner == entity && record.OutputName == outputName)
                         continue;
-                    if (record.Texture == asset)
+                    if (record.Texture == asset ||
+                        record.CoverageTexture == asset)
+                    {
                         return true;
+                    }
                 }
             }
             return false;
-        }
-
-        template <typename T>
-        [[nodiscard]] static bool ExactVectorEqual(
-            const std::vector<T>& lhs,
-            const std::vector<T>& rhs) noexcept
-        {
-            return lhs.size() == rhs.size() &&
-                   (lhs.empty() ||
-                    std::memcmp(
-                        lhs.data(),
-                        rhs.data(),
-                        lhs.size() * sizeof(T)) == 0);
         }
 
         [[nodiscard]] bool SourceStillCurrent(
             const Work& work,
             std::string& diagnostic) const
         {
-            const PreparedPropertyBake current = Prepare(work.Request);
-            if (!current.Succeeded())
+            if (Context.Scene == nullptr ||
+                !Context.Scene->IsValid(work.Entity))
+            {
+                diagnostic = "property texture bake entity is stale";
+                return false;
+            }
+            const CapturedSourceIdentity current = CaptureSourceIdentity(
+                GS::BuildConstView(Context.Scene->Raw(), work.Entity),
+                work.Request.Source,
+                work.Request.Texcoords);
+            if (current.Status != PropertyTextureBakeStatus::Success)
             {
                 diagnostic = current.Diagnostic.empty()
                     ? "property texture bake source is no longer valid"
                     : current.Diagnostic;
                 return false;
             }
-            if (current.ValueKind != work.Prepared.ValueKind ||
-                current.Domain != work.Prepared.Domain ||
-                !ExactVectorEqual(
-                    current.Texcoords,
-                    work.Prepared.Texcoords) ||
-                !ExactVectorEqual(
-                    current.Values,
-                    work.Prepared.Values) ||
-                !ExactVectorEqual(
-                    current.SurfaceIndices,
-                    work.Prepared.SurfaceIndices))
+            if (current.Identity != work.Prepared.Identity)
             {
-                diagnostic =
-                    "property texture bake source changed; submit a rebake";
+                diagnostic = std::string{
+                    "property texture bake source changed ("} +
+                    DebugNameForPropertyTextureBakeFreshness(
+                        ComparePropertyTextureBakeSourceIdentity(
+                            work.Prepared.Identity,
+                            current.Identity)) +
+                    "); submit a rebake";
                 return false;
             }
             return true;
@@ -825,13 +1351,26 @@ namespace Extrinsic::Runtime
             }
 
             if (request.Width == 0u || request.Height == 0u ||
-                request.Width > 8192u || request.Height > 8192u)
+                request.Width > kPropertyTextureBakeMaxExtent ||
+                request.Height > kPropertyTextureBakeMaxExtent)
             {
                 return PrepareFailure(
                     PropertyTextureBakeStatus::InvalidResolution,
-                    "texture bake extent must be within [1, 8192]");
+                    "texture bake extent " + std::to_string(request.Width) + "x" +
+                        std::to_string(request.Height) + " must be within [1, " +
+                        std::to_string(kPropertyTextureBakeMaxExtent) + "]");
             }
-            if (request.PaddingTexels > 32u)
+            if (request.MaxAdaptiveExtent != 0u &&
+                (request.MaxAdaptiveExtent < std::max(request.Width, request.Height) ||
+                 request.MaxAdaptiveExtent > kPropertyTextureBakeMaxExtent))
+            {
+                return PrepareFailure(
+                    PropertyTextureBakeStatus::InvalidResolution,
+                    "texture bake adaptive extent bound must cover the requested extent and be at most " +
+                        std::to_string(kPropertyTextureBakeMaxExtent));
+            }
+            if (request.PaddingTexels >
+                Graphics::kPropertyTextureBakeMaxPaddingTexels)
             {
                 return PrepareFailure(
                     PropertyTextureBakeStatus::InvalidPadding,
@@ -842,18 +1381,6 @@ namespace Extrinsic::Runtime
                 return PrepareFailure(
                     PropertyTextureBakeStatus::MissingProperty,
                     "texture bake source property name must not be empty");
-            }
-            if (request.Texcoords.Domain !=
-                    GeometryElementDomain::MeshVertex ||
-                !request.Texcoords.HasName() ||
-                (request.Texcoords.ValueKind !=
-                     Geometry::PropertyValueKind::Unknown &&
-                 request.Texcoords.ValueKind !=
-                     Geometry::PropertyValueKind::Vec2))
-            {
-                return PrepareFailure(
-                    PropertyTextureBakeStatus::MissingTexcoords,
-                    "texture bake texcoords must reference a mesh-vertex vec2 property");
             }
             if (request.EncodingColormap >= Graphics::Colormap::Type::Count)
             {
@@ -874,58 +1401,25 @@ namespace Extrinsic::Runtime
 
             const GS::ConstSourceView view =
                 GS::BuildConstView(Context.Scene->Raw(), entity);
-            if (view.ActiveDomain != GS::Domain::Mesh ||
-                view.VertexSource == nullptr ||
-                view.EdgeSource == nullptr ||
-                view.HalfedgeSource == nullptr ||
-                view.FaceSource == nullptr)
+            BakeGeometry geometry =
+                ResolveBakeGeometry(view, request.Texcoords);
+            if (!geometry.Succeeded())
+                return PrepareFailure(geometry.Status, geometry.Diagnostic);
+            // Every snapshot retains at least three corner indices and one
+            // chart id per triangle, so a mesh whose floor already exceeds
+            // the budget is rejected before coverage is measured.
+            const std::size_t snapshotFloor =
+                (geometry.SurfaceIndices.size() / 3u) * 4u * sizeof(std::uint32_t);
+            if (snapshotFloor > SourceSnapshotBudget)
             {
-                return PrepareFailure(
-                    PropertyTextureBakeStatus::NonMeshSource,
-                    "texture bake requires complete mesh topology");
+                PropertyTextureBakeResult oversized = OversizedSnapshotResult(
+                    {}, snapshotFloor, "needs at least");
+                return PrepareFailure(oversized.Status, std::move(oversized.Diagnostic));
             }
 
-            // UVs follow canonical corner-over-vertex resolution. A
-            // seam-carrying mesh can omit the per-vertex channel, so texture
-            // bake resolves the corner property first.
-            const Geometry::ConstPropertySet vertexProperties{
-                view.VertexSource->Properties};
-            const Geometry::ConstPropertySet halfedgeProperties{
-                view.HalfedgeSource->Properties};
-            const auto cornerTexcoords =
-                halfedgeProperties.Get<glm::vec2>("h:texcoord");
-            const bool useCornerTexcoords = cornerTexcoords.IsValid() &&
-                cornerTexcoords.Vector().size() ==
-                    view.HalfedgeSource->Properties.Size();
-            const auto cornerNormals =
-                halfedgeProperties.Get<glm::vec3>("h:normal");
-            const auto* channelBindings =
-                Context.Scene->Raw().try_get<VertexChannelBindingSet>(entity);
-            const VertexChannelSourceBinding* normalOverride =
-                channelBindings != nullptr &&
-                        IsVertexChannelBindingEnabled(channelBindings->Normal)
-                    ? &channelBindings->Normal
-                    : nullptr;
-            const bool useCornerNormals = normalOverride == nullptr &&
-                cornerNormals.IsValid() &&
-                cornerNormals.Vector().size() ==
-                    view.HalfedgeSource->Properties.Size();
-
-            const auto texcoords = vertexProperties.Get<glm::vec2>(
-                request.Texcoords.Name);
-            if (!useCornerTexcoords &&
-                (!texcoords.IsValid() ||
-                 texcoords.Vector().size() !=
-                     view.VertexSource->Properties.Size()))
-            {
-                return PrepareFailure(
-                    PropertyTextureBakeStatus::MissingTexcoords,
-                    "texture bake requires one vec2 atlas coordinate per vertex "
-                    "or per corner");
-            }
-            const std::vector<glm::vec2>& resolvedTexcoords =
-                useCornerTexcoords ? cornerTexcoords.Vector() : texcoords.Vector();
-            for (const glm::vec2 uv : resolvedTexcoords)
+            // Only UVs that triangles actually carry are validated; unused
+            // boundary-corner slots may hold anything.
+            for (const glm::vec2 uv : geometry.CornerUv)
             {
                 if (!Finite(uv))
                 {
@@ -940,6 +1434,19 @@ namespace Extrinsic::Runtime
                     return PrepareFailure(
                         PropertyTextureBakeStatus::MissingTexcoords,
                         "texture bake coordinates are not a normalized atlas");
+                }
+            }
+            for (std::size_t index = 0u;
+                 index < geometry.CornerUv.size();
+                 index += 3u)
+            {
+                if (Geometry::UvAtlas::ExactUvOrientation(
+                        geometry.CornerUv[index], geometry.CornerUv[index + 1u],
+                        geometry.CornerUv[index + 2u]) == 0)
+                {
+                    return PrepareFailure(
+                        PropertyTextureBakeStatus::DegenerateUvTriangles,
+                        "texture bake atlas contains a degenerate UV triangle");
                 }
             }
 
@@ -983,6 +1490,13 @@ namespace Extrinsic::Runtime
                     "texture bake property generation is stale");
             }
 
+            const PropertyTextureBakeRepresentation representation =
+                ResolvePropertyTextureBakeRepresentation(
+                    prepared.ValueKind,
+                    request.Storage,
+                    request.Encoding);
+            const bool labels = representation.Encoding ==
+                                PropertyTextureBakeEncoding::LabelPalette;
             const Geometry::PropertySet* propertySet =
                 ResolveGeometryPropertySet(
                     availability, request.Source.Domain);
@@ -991,7 +1505,7 @@ namespace Extrinsic::Runtime
                     Geometry::ConstPropertySet{*propertySet},
                     request.Source.Name,
                     prepared.ValueKind,
-                    ResolvePropertyTextureBakeRepresentation(prepared.ValueKind, request.Storage, request.Encoding).Encoding == PropertyTextureBakeEncoding::LabelPalette,
+                    labels,
                     prepared.Values))
             {
                 return PrepareFailure(
@@ -1004,7 +1518,7 @@ namespace Extrinsic::Runtime
                     PropertyTextureBakeStatus::MismatchedPropertyCount,
                     "texture bake source property count changed during preparation");
             }
-            if (ResolvePropertyTextureBakeRepresentation(prepared.ValueKind, request.Storage, request.Encoding).Encoding != PropertyTextureBakeEncoding::LabelPalette &&
+            if (!labels &&
                 !std::ranges::all_of(
                     prepared.Values,
                     [](const glm::vec4 value) noexcept
@@ -1016,73 +1530,30 @@ namespace Extrinsic::Runtime
                     PropertyTextureBakeStatus::NonFinitePropertyValue,
                     "texture bake source property contains a non-finite value");
             }
-
-            std::vector<std::uint32_t> triangleToFace{};
-            std::vector<std::uint32_t> cornerHalfedges{};
-            const MeshSurfaceTopologyStatus topology =
-                BuildMeshSurfaceTriangleCornerTopology(
-                    view,
-                    prepared.SurfaceIndices,
-                    triangleToFace,
-                    cornerHalfedges);
-            if (topology != MeshSurfaceTopologyStatus::Success ||
-                prepared.SurfaceIndices.empty() ||
-                (prepared.SurfaceIndices.size() % 3u) != 0u)
+            const std::optional<std::uint64_t> propertyFingerprint =
+                FingerprintProperty(
+                    Geometry::ConstPropertySet{*propertySet},
+                    request.Source.Domain,
+                    request.Source.Name,
+                    prepared.ValueKind);
+            if (!propertyFingerprint.has_value())
             {
                 return PrepareFailure(
-                    PropertyTextureBakeStatus::BakeFailed,
-                    DebugNameForMeshSurfaceTopologyStatus(topology));
+                    PropertyTextureBakeStatus::MissingProperty,
+                    "texture bake source property is missing");
             }
+            prepared.Identity = PropertyTextureBakeSourceIdentity{
+                .ResolvedTexcoords = geometry.Texcoords.Resolved,
+                .UvFingerprint = FingerprintUv(geometry),
+                .PositionFingerprint = FingerprintPositions(view),
+                .TopologyFingerprint = FingerprintTopology(geometry),
+                .PropertyFingerprint = *propertyFingerprint,
+            };
 
-            // Resolve the UV each triangle corner actually carries. For a
-            // corner-domain mesh that is a halfedge lookup; for a vertex-domain
-            // mesh it is the corner's target vertex, which reproduces the
-            // previous behaviour exactly.
-            std::vector<glm::vec2> cornerUvForIndex(
-                prepared.SurfaceIndices.size(), glm::vec2{0.0f});
-            for (std::size_t index = 0u;
-                 index < prepared.SurfaceIndices.size();
-                 ++index)
-            {
-                const std::uint32_t vertex = prepared.SurfaceIndices[index];
-                if (useCornerTexcoords)
-                {
-                    const std::uint32_t halfedge = cornerHalfedges[index];
-                    if (halfedge >= resolvedTexcoords.size())
-                    {
-                        return PrepareFailure(
-                            PropertyTextureBakeStatus::BakeFailed,
-                            "texture bake topology references an invalid corner");
-                    }
-                    cornerUvForIndex[index] = resolvedTexcoords[halfedge];
-                }
-                else
-                {
-                    if (vertex >= resolvedTexcoords.size())
-                    {
-                        return PrepareFailure(
-                            PropertyTextureBakeStatus::BakeFailed,
-                            "texture bake topology references an invalid vertex");
-                    }
-                    cornerUvForIndex[index] = resolvedTexcoords[vertex];
-                }
-            }
-
-            for (std::size_t index = 0u;
-                 index < prepared.SurfaceIndices.size();
-                 index += 3u)
-            {
-                const float area = std::abs(Cross2(
-                    cornerUvForIndex[index + 1u] - cornerUvForIndex[index + 0u],
-                    cornerUvForIndex[index + 2u] - cornerUvForIndex[index + 0u]));
-                if (area <= kUvAreaEpsilon)
-                {
-                    return PrepareFailure(
-                        PropertyTextureBakeStatus::DegenerateUvTriangles,
-                        "texture bake atlas contains a degenerate UV triangle");
-                }
-            }
-
+            // Domain expansion reads mesh-vertex corner ids, so it runs before
+            // corner UVs rewrite the index buffer into texcoord slots.
+            const std::vector<std::uint32_t>& meshCorners =
+                geometry.SurfaceIndices;
             switch (request.Source.Domain)
             {
             case GeometryElementDomain::MeshVertex:
@@ -1092,8 +1563,8 @@ namespace Extrinsic::Runtime
             {
                 prepared.Domain = Graphics::PropertyTextureBakeDomain::Face;
                 std::vector<glm::vec4> expanded{};
-                expanded.reserve(triangleToFace.size());
-                for (const std::uint32_t face : triangleToFace)
+                expanded.reserve(geometry.TriangleToFace.size());
+                for (const std::uint32_t face : geometry.TriangleToFace)
                 {
                     if (face >= prepared.Values.size())
                     {
@@ -1137,17 +1608,14 @@ namespace Extrinsic::Runtime
                         edge);
                 }
                 std::vector<glm::vec4> expanded{};
-                expanded.reserve(prepared.SurfaceIndices.size());
+                expanded.reserve(meshCorners.size());
                 for (std::size_t index = 0u;
-                     index < prepared.SurfaceIndices.size();
+                     index < meshCorners.size();
                      index += 3u)
                 {
-                    const std::uint32_t a =
-                        prepared.SurfaceIndices[index + 0u];
-                    const std::uint32_t b =
-                        prepared.SurfaceIndices[index + 1u];
-                    const std::uint32_t c =
-                        prepared.SurfaceIndices[index + 2u];
+                    const std::uint32_t a = meshCorners[index + 0u];
+                    const std::uint32_t b = meshCorners[index + 1u];
+                    const std::uint32_t c = meshCorners[index + 2u];
                     const std::uint64_t keys[3]{
                         EdgeKey(b, c),
                         EdgeKey(c, a),
@@ -1179,62 +1647,27 @@ namespace Extrinsic::Runtime
                     "texture bake supports mesh vertex, edge, and face properties");
             }
 
-            // Reproduce the renderer's complete corner shading split in the
-            // bake's own vertex table.
-            // This runs *after* the domain expansions above, which read
-            // `SurfaceIndices` as mesh-vertex ids to resolve edge endpoints and
-            // face rows. It uses the same shared split as renderer upload, so
-            // the bake's vertex count, index count, and index fingerprint match
-            // the GPU residency it is cross-checked against.
-            if (useCornerTexcoords || useCornerNormals)
+            // The bake owns its index buffer, so any vertex or corner binding
+            // rasterizes without depending on the renderer's shading split.
+            // Corner UVs split each mesh vertex into one slot per distinct UV;
+            // triangles across a UV seam then share no slot edge, which is
+            // exactly the chart boundary used for gutters.
+            prepared.SurfaceIndices = geometry.SurfaceIndices;
+            if (geometry.Texcoords.Corner)
             {
-                std::vector<glm::vec3> resolvedNormals(
-                    view.VertexSource->Properties.Size());
-                const bool validNormalOverride =
-                    normalOverride != nullptr &&
-                    normalOverride->Property.Domain ==
-                        GeometryElementDomain::MeshVertex &&
-                    normalOverride->Property.ValueKind ==
-                        Geometry::PropertyValueKind::Vec3;
-                const VertexAttributeBinding normalBinding{
-                    .Channel = VertexChannel::Normal,
-                    .SourceType = AttributeSourceType::Vec3,
-                    .SourceProperty = validNormalOverride
-                        ? std::string_view{normalOverride->Property.Name}
-                        : normalOverride == nullptr
-                            ? std::string_view{GS::PropertyNames::kNormal}
-                            : std::string_view{},
-                    .AllowFallback = true,
-                    .Normalize = true,
-                    .Fallback = glm::vec4{0.0f, 0.0f, 1.0f, 0.0f},
-                };
-                static_cast<void>(ResolveVec3Channel(
-                    view.VertexSource->Properties,
-                    normalBinding,
-                    static_cast<std::uint32_t>(resolvedNormals.size()),
-                    resolvedNormals));
-
-                MeshCornerAttributeSplit split{};
-                if (!BuildMeshCornerAttributeSplit(
-                        useCornerTexcoords
-                            ? std::span<const glm::vec2>{cornerTexcoords.Vector()}
-                            : std::span<const glm::vec2>{},
-                        useCornerNormals
-                            ? std::span<const glm::vec3>{cornerNormals.Vector()}
-                            : std::span<const glm::vec3>{},
-                        cornerHalfedges,
-                        texcoords.IsValid() ? std::span<const glm::vec2>{texcoords.Vector()}
-                                            : std::span<const glm::vec2>{},
-                        resolvedNormals,
+                MeshCornerTexcoordSplit split{};
+                if (!BuildMeshCornerTexcoordSplit(
+                        geometry.Texcoords.Values,
+                        geometry.CornerHalfedges,
+                        {},
                         view.VertexSource->Properties.Size(),
                         prepared.SurfaceIndices,
                         split))
                 {
                     return PrepareFailure(
                         PropertyTextureBakeStatus::BakeFailed,
-                        "texture bake could not de-index corner shading attributes");
+                        "texture bake could not split corner atlas coordinates");
                 }
-
                 if (prepared.Domain == Graphics::PropertyTextureBakeDomain::Vertex)
                 {
                     std::vector<glm::vec4> splitValues{};
@@ -1255,10 +1688,83 @@ namespace Extrinsic::Runtime
             }
             else
             {
-                prepared.Texcoords = resolvedTexcoords;
+                prepared.Texcoords.assign(
+                    geometry.Texcoords.Values.begin(),
+                    geometry.Texcoords.Values.end());
             }
-            prepared.SurfaceIndexFingerprint =
-                Graphics::FingerprintSurfaceIndices(prepared.SurfaceIndices);
+
+            prepared.Charts =
+                Graphics::BuildPropertyTextureBakeCharts(prepared.SurfaceIndices);
+            if (prepared.Charts.ChartCount >
+                Graphics::kPropertyTextureBakeMaxCharts)
+            {
+                return PrepareFailure(
+                    PropertyTextureBakeStatus::UnderresolvedAtlas,
+                    "texture bake atlas has more UV charts than coverage ids can encode");
+            }
+            if (request.PaddingTexels != 0u)
+            {
+                prepared.GutterEdges =
+                    Graphics::BuildPropertyTextureBakeGutterEdges(
+                        prepared.SurfaceIndices);
+            }
+            // Adaptive requests grow the extent only while a chart is missing
+            // texel centres; overlap is an atlas defect at every extent.
+            prepared.Width = request.Width;
+            prepared.Height = request.Height;
+            for (;;)
+            {
+                prepared.Coverage = Graphics::MeasurePropertyTextureBakeCoverage(
+                    prepared.Texcoords,
+                    prepared.SurfaceIndices,
+                    prepared.Charts,
+                    prepared.Width,
+                    prepared.Height);
+                if (prepared.Coverage.OverlapTexels != 0u)
+                {
+                    return PrepareFailure(
+                        PropertyTextureBakeStatus::OverlappingUvCharts,
+                        std::to_string(prepared.Coverage.OverlapTexels) +
+                            " texel centres are covered by more than one UV "
+                            "triangle; a property bake needs a non-overlapping atlas");
+                }
+                const bool resolved =
+                    prepared.Coverage.CoveredTexels != 0u &&
+                    prepared.Coverage.UnderresolvedChartCount == 0u;
+                if (resolved ||
+                    request.MaxAdaptiveExtent == 0u ||
+                    prepared.Width > request.MaxAdaptiveExtent / 2u ||
+                    prepared.Height > request.MaxAdaptiveExtent / 2u)
+                {
+                    break;
+                }
+                prepared.Width *= 2u;
+                prepared.Height *= 2u;
+            }
+            const std::string extent =
+                std::to_string(prepared.Width) + "x" +
+                std::to_string(prepared.Height) +
+                (request.MaxAdaptiveExtent != 0u
+                     ? " (largest adaptive extent within " +
+                           std::to_string(request.MaxAdaptiveExtent) + ")"
+                     : std::string{});
+            if (prepared.Coverage.CoveredTexels == 0u)
+            {
+                return PrepareFailure(
+                    PropertyTextureBakeStatus::ZeroCoverageBake,
+                    "texture bake atlas covers no texel centre at " + extent);
+            }
+            if (prepared.Coverage.UnderresolvedChartCount != 0u)
+            {
+                return PrepareFailure(
+                    PropertyTextureBakeStatus::UnderresolvedAtlas,
+                    std::to_string(prepared.Coverage.UnderresolvedChartCount) +
+                        " of " + std::to_string(prepared.Charts.ChartCount) +
+                        " UV charts cover no texel centre at " + extent +
+                        " (first chart " +
+                        std::to_string(prepared.Coverage.FirstUnderresolvedChart) +
+                        "); increase the bake extent or repack the atlas");
+            }
 
             switch (prepared.ValueKind)
             {
@@ -1289,11 +1795,6 @@ namespace Extrinsic::Runtime
                     "texture bake property type is not GPU-rasterizable");
             }
 
-            const PropertyTextureBakeRepresentation representation =
-                ResolvePropertyTextureBakeRepresentation(
-                    prepared.ValueKind,
-                    request.Storage,
-                    request.Encoding);
             prepared.Storage = representation.Storage;
             prepared.Encoder = representation.Encoding;
             if (prepared.Encoder == PropertyTextureBakeEncoding::LabelPalette)
@@ -1307,14 +1808,6 @@ namespace Extrinsic::Runtime
                 return PrepareFailure(
                     PropertyTextureBakeStatus::UnsupportedPropertyType,
                     "texture bake encoder is incompatible with the selected property type and storage");
-            }
-            if (request.PaddingTexels != 0u &&
-                prepared.Storage !=
-                    PropertyTextureBakeStorage::EncodedRgba)
-            {
-                return PrepareFailure(
-                    PropertyTextureBakeStatus::InvalidPadding,
-                    "texture bake padding requires encoded RGBA storage with alpha coverage");
             }
             if (prepared.Storage == PropertyTextureBakeStorage::RawFloat)
             {
@@ -1375,20 +1868,23 @@ namespace Extrinsic::Runtime
 
             prepared.RangeMin = request.RangeMin;
             prepared.RangeMax = request.RangeMax;
-            if (IsScalar(prepared.ValueKind) && prepared.Encoder != PropertyTextureBakeEncoding::LabelPalette)
+            if ((IsScalar(prepared.ValueKind) && prepared.Encoder != PropertyTextureBakeEncoding::LabelPalette) ||
+                prepared.Storage == PropertyTextureBakeStorage::RawFloat)
             {
                 if (request.RangePolicy ==
                     PropertyTextureBakeRangePolicy::AutoFinite)
                 {
                     prepared.RangeMin = std::numeric_limits<float>::infinity();
                     prepared.RangeMax = -std::numeric_limits<float>::infinity();
+                    const int components = prepared.ValueKind == Geometry::PropertyValueKind::Vec4 ? 4 :
+                        prepared.ValueKind == Geometry::PropertyValueKind::Vec3 ? 3 :
+                        prepared.ValueKind == Geometry::PropertyValueKind::Vec2 ? 2 : 1;
                     for (const glm::vec4 value : prepared.Values)
-                    {
-                        prepared.RangeMin =
-                            std::min(prepared.RangeMin, value.x);
-                        prepared.RangeMax =
-                            std::max(prepared.RangeMax, value.x);
-                    }
+                        for (int component = 0; component < components; ++component)
+                        {
+                            prepared.RangeMin = std::min(prepared.RangeMin, value[component]);
+                            prepared.RangeMax = std::max(prepared.RangeMax, value[component]);
+                        }
                     if (prepared.RangeMin == prepared.RangeMax)
                     {
                         const float delta = std::max(
@@ -1404,7 +1900,7 @@ namespace Extrinsic::Runtime
                 {
                     return PrepareFailure(
                         PropertyTextureBakeStatus::InvalidRange,
-                        "texture bake scalar range is invalid");
+                        "texture bake display range is invalid");
                 }
             }
             else
@@ -1414,6 +1910,15 @@ namespace Extrinsic::Runtime
             }
 
             return prepared;
+        }
+
+        void FailGpuTextures(const Work& work)
+        {
+            if (GpuAssets == nullptr) return;
+            if (work.CacheGeneration != 0u)
+                (void)GpuAssets->FailGpuProducedTexture(work.Asset, work.CacheGeneration);
+            if (work.CoverageCacheGeneration != 0u)
+                (void)GpuAssets->FailGpuProducedTexture(work.CoverageAsset, work.CoverageCacheGeneration);
         }
 
         void CancelWork(
@@ -1428,12 +1933,7 @@ namespace Extrinsic::Runtime
                     ++index;
                     continue;
                 }
-                if (work.CacheGeneration != 0u && GpuAssets != nullptr)
-                {
-                    (void)GpuAssets->FailGpuProducedTexture(
-                        work.Asset,
-                        work.CacheGeneration);
-                }
+                FailGpuTextures(work);
                 RetireWorkResources(
                     work,
                     work.ReadyFrame != 0u
@@ -1444,8 +1944,152 @@ namespace Extrinsic::Runtime
             }
         }
 
-        [[nodiscard]] Core::Expected<Assets::AssetId> CreateOrReloadAsset(
-            const std::optional<Assets::AssetId> existing,
+        [[nodiscard]] bool AssetAlive(const Assets::AssetId asset) const noexcept
+        {
+            return asset.IsValid() &&
+                   Context.AssetService != nullptr &&
+                   Context.AssetService->IsAlive(asset);
+        }
+
+        enum class GeneratedAssetUse : std::uint8_t
+        {
+            Create,
+            Reload,
+            // A previous reload or load has not completed yet.
+            Busy,
+            // The asset service gave up on it; it never becomes Ready again.
+            Failed,
+            Foreign,
+        };
+
+        // In-place reload keeps the generated AssetId stable. AssetService
+        // accepts it only for a Ready asset of the same payload type, so this
+        // predicts the reload outcome before any asset of a pair is touched.
+        [[nodiscard]] GeneratedAssetUse ClassifyGeneratedAsset(
+            const Assets::AssetId asset) const
+        {
+            if (!AssetAlive(asset))
+                return GeneratedAssetUse::Create;
+            const Core::Expected<Assets::AssetMeta> meta =
+                Context.AssetService->GetMeta(asset);
+            if (!meta.has_value() ||
+                meta->typeId !=
+                    Assets::AssetService::TypeIdOf<
+                        GeneratedPropertyTextureMetadata>())
+            {
+                return GeneratedAssetUse::Foreign;
+            }
+            switch (meta->state)
+            {
+            case Assets::AssetState::Ready:
+                return GeneratedAssetUse::Reload;
+            case Assets::AssetState::Failed:
+                return GeneratedAssetUse::Failed;
+            default:
+                return GeneratedAssetUse::Busy;
+            }
+        }
+
+        [[nodiscard]] static PropertyTextureBakeResult BusyAssetsResult(
+            std::string outputName)
+        {
+            return PropertyTextureBakeResult{
+                .Status = PropertyTextureBakeStatus::JobSubmitFailed,
+                .OutputName = std::move(outputName),
+                .Diagnostic =
+                    "generated property texture assets are still loading from the previous bake; "
+                    "retry once they are ready (the previous bake is unchanged)",
+            };
+        }
+
+        // A failed generated asset is not replaced in place: its id may
+        // still be bound elsewhere, so the owner removes the output first.
+        [[nodiscard]] static PropertyTextureBakeResult FailedAssetsResult(
+            std::string outputName)
+        {
+            std::string diagnostic =
+                "a generated property texture asset of '" + outputName +
+                "' failed to load and is not reused; remove this bake output, then bake again";
+            return PropertyTextureBakeResult{
+                .Status = PropertyTextureBakeStatus::AssetLoadFailed,
+                .OutputName = std::move(outputName),
+                .Diagnostic = std::move(diagnostic),
+            };
+        }
+
+        // Rejections that need no preparation are decided first, so a
+        // producer retrying them every frame never re-measures coverage.
+        [[nodiscard]] std::optional<PropertyTextureBakeResult>
+            RejectBeforePreparation(
+                const PropertyTextureBakeRequest& request) const
+        {
+            if (Context.Scene == nullptr ||
+                request.World != Context.World)
+            {
+                return std::nullopt;
+            }
+            const ECS::EntityHandle entity = ResolveEntity(
+                *Context.Scene,
+                request.StableEntityId);
+            if (entity == ECS::InvalidEntityHandle)
+                return std::nullopt;
+            const std::string_view outputName = request.OutputName.empty()
+                ? std::string_view{request.Source.Name}
+                : std::string_view{request.OutputName};
+            const auto queued = std::ranges::count_if(
+                WorkItems,
+                [entity, outputName](const Work& work)
+                {
+                    return work.Entity != entity ||
+                           work.OutputName != outputName;
+                });
+            if (static_cast<std::size_t>(queued) >=
+                kMaxActivePropertyTextureBakes)
+            {
+                return PropertyTextureBakeResult{
+                    .Status = PropertyTextureBakeStatus::JobSubmitFailed,
+                    .OutputName = std::string{outputName},
+                    .Diagnostic =
+                        "property texture bake queue reached its bounded bake count",
+                };
+            }
+            const PropertyTextureBakeRecord* record =
+                FindRecord(entity, outputName);
+            if (record == nullptr)
+                return std::nullopt;
+            const GeneratedAssetUse value = ClassifyGeneratedAsset(record->Texture);
+            const GeneratedAssetUse coverage =
+                ClassifyGeneratedAsset(record->CoverageTexture);
+            if (value == GeneratedAssetUse::Failed ||
+                coverage == GeneratedAssetUse::Failed)
+            {
+                return FailedAssetsResult(std::string{outputName});
+            }
+            if (value == GeneratedAssetUse::Busy ||
+                coverage == GeneratedAssetUse::Busy)
+            {
+                return BusyAssetsResult(std::string{outputName});
+            }
+            return std::nullopt;
+        }
+
+        [[nodiscard]] bool ReloadGeneratedAsset(
+            const Assets::AssetId asset,
+            const GeneratedPropertyTextureMetadata& metadata)
+        {
+            return Context.AssetService != nullptr &&
+                   Context.AssetService->Reload<
+                       GeneratedPropertyTextureMetadata>(
+                       asset,
+                       [metadata](std::string_view, Assets::AssetId)
+                           -> Core::Expected<GeneratedPropertyTextureMetadata>
+                       {
+                           return metadata;
+                       })
+                       .has_value();
+        }
+
+        [[nodiscard]] Core::Expected<Assets::AssetId> CreateGeneratedAsset(
             const GeneratedPropertyTextureMetadata& metadata)
         {
             if (Context.AssetService == nullptr)
@@ -1453,23 +2097,6 @@ namespace Extrinsic::Runtime
                 return Core::Err<Assets::AssetId>(
                     Core::ErrorCode::InvalidState);
             }
-            if (existing.has_value() &&
-                existing->IsValid() &&
-                Context.AssetService->IsAlive(*existing))
-            {
-                const Core::Result reloaded = Context.AssetService->Reload<
-                    GeneratedPropertyTextureMetadata>(
-                        *existing,
-                        [metadata](std::string_view, Assets::AssetId)
-                            -> Core::Expected<GeneratedPropertyTextureMetadata>
-                        {
-                            return metadata;
-                        });
-                if (!reloaded.has_value())
-                    return Core::Err<Assets::AssetId>(reloaded.error());
-                return *existing;
-            }
-
             const std::string path =
                 "intrinsic-runtime-generated/property-texture/v1/entity-" +
                 std::to_string(metadata.StableEntityId) + "-" +
@@ -1486,6 +2113,11 @@ namespace Extrinsic::Runtime
         [[nodiscard]] PropertyTextureBakeResult Schedule(
             const PropertyTextureBakeRequest& request)
         {
+            if (std::optional<PropertyTextureBakeResult> rejected =
+                    RejectBeforePreparation(request))
+            {
+                return std::move(*rejected);
+            }
             PreparedPropertyBake prepared = Prepare(request);
             if (!prepared.Succeeded())
             {
@@ -1505,6 +2137,12 @@ namespace Extrinsic::Runtime
                     .Status = PropertyTextureBakeStatus::StaleEntity,
                     .Diagnostic = "texture bake entity is stale",
                 };
+            }
+            if (const std::size_t bytes = SourceByteCount(prepared);
+                bytes > SourceSnapshotBudget)
+            {
+                return OversizedSnapshotResult(
+                    std::move(prepared.OutputName), bytes, "needs");
             }
             if (!HasScheduleCapacity(
                     entity,
@@ -1562,32 +2200,120 @@ namespace Extrinsic::Runtime
                 .OutputName = prepared.OutputName,
                 .SourceDomain = request.Source.Domain,
                 .SourcePropertyName = request.Source.Name,
-                .TexcoordPropertyName = request.Texcoords.Name,
+                .TexcoordPropertyName =
+                    prepared.Identity.ResolvedTexcoords.Name,
                 .ValueKind = prepared.ValueKind,
                 .Storage = prepared.Storage,
                 .Encoder = prepared.Encoder,
                 .EncodingColormap = prepared.EncodingColormap,
                 .RangeMin = prepared.RangeMin,
                 .RangeMax = prepared.RangeMax,
-                .Width = request.Width,
-                .Height = request.Height,
+                .Width = prepared.Width,
+                .Height = prepared.Height,
                 .SourceGeneration = prepared.SourceGeneration,
                 .Serial = serial,
             };
-            const std::optional<Assets::AssetId> existing = replacing
-                ? std::optional<Assets::AssetId>{found->Texture}
-                : (request.ExistingGeneratedTexture.IsValid()
-                       ? std::optional<Assets::AssetId>{
-                             request.ExistingGeneratedTexture}
-                       : std::nullopt);
-            auto asset = CreateOrReloadAsset(existing, metadata);
-            if (!asset.has_value())
+            auto coverageMetadata = metadata;
+            coverageMetadata.OutputName += ".coverage";
+            coverageMetadata.Serial = NextAssetSerial++;
+            if (coverageMetadata.Serial == 0u) coverageMetadata.Serial = NextAssetSerial++;
+            coverageMetadata.ValueKind = Geometry::PropertyValueKind::Float;
+            coverageMetadata.Storage = PropertyTextureBakeStorage::RawFloat;
+            coverageMetadata.Encoder = PropertyTextureBakeEncoding::LinearScalar;
+
+            // The value/coverage pair is admitted as a unit: live assets are
+            // reloaded in place (stable ids) and missing ones are created.
+            // Every precondition is checked and every creation completes
+            // before either existing asset's metadata is replaced; created
+            // assets are destroyed again if the pair cannot be completed.
+            const auto assetFailure = [&prepared](std::string diagnostic)
             {
                 return PropertyTextureBakeResult{
                     .Status = PropertyTextureBakeStatus::AssetLoadFailed,
                     .OutputName = prepared.OutputName,
-                    .Diagnostic = "failed to create generated property texture asset",
+                    .Diagnostic = std::move(diagnostic),
                 };
+            };
+            const Assets::AssetId existingValue = replacing
+                ? found->Texture
+                : request.ExistingGeneratedTexture;
+            const Assets::AssetId existingCoverage = replacing
+                ? found->CoverageTexture
+                : Assets::AssetId{};
+            const GeneratedAssetUse valueUse =
+                ClassifyGeneratedAsset(existingValue);
+            const GeneratedAssetUse coverageUse =
+                ClassifyGeneratedAsset(existingCoverage);
+            if (valueUse == GeneratedAssetUse::Foreign ||
+                coverageUse == GeneratedAssetUse::Foreign)
+            {
+                return assetFailure(
+                    "existing generated texture is not a property texture asset");
+            }
+            if (valueUse == GeneratedAssetUse::Failed ||
+                coverageUse == GeneratedAssetUse::Failed)
+            {
+                return FailedAssetsResult(prepared.OutputName);
+            }
+            if (valueUse == GeneratedAssetUse::Busy ||
+                coverageUse == GeneratedAssetUse::Busy)
+            {
+                return BusyAssetsResult(prepared.OutputName);
+            }
+            const bool reuseValue = valueUse == GeneratedAssetUse::Reload;
+            const bool reuseCoverage = coverageUse == GeneratedAssetUse::Reload;
+            Assets::AssetId valueAsset = existingValue;
+            Assets::AssetId coverageAsset = existingCoverage;
+            Assets::AssetId createdValue{};
+            if (!reuseValue)
+            {
+                auto created = CreateGeneratedAsset(metadata);
+                if (!created.has_value())
+                    return assetFailure("failed to create generated property texture asset");
+                valueAsset = createdValue = *created;
+            }
+            if (!reuseCoverage)
+            {
+                auto created = CreateGeneratedAsset(coverageMetadata);
+                if (!created.has_value())
+                {
+                    (void)DestroyAsset(createdValue);
+                    return assetFailure("failed to create property texture coverage asset");
+                }
+                coverageAsset = *created;
+            }
+            const Assets::AssetId createdCoverage =
+                reuseCoverage ? Assets::AssetId{} : coverageAsset;
+            if (reuseValue && !ReloadGeneratedAsset(valueAsset, metadata))
+            {
+                (void)DestroyAsset(createdCoverage);
+                return assetFailure(
+                    "failed to reload generated property texture asset; the previous bake is unchanged");
+            }
+            if (reuseCoverage &&
+                !ReloadGeneratedAsset(coverageAsset, coverageMetadata))
+            {
+                (void)DestroyAsset(createdValue);
+                if (!reuseValue)
+                {
+                    return assetFailure(
+                        "failed to reload property texture coverage asset; the previous bake is unchanged");
+                }
+                // Only an internal asset-service failure after a successful
+                // precheck reaches this point. The value asset now carries
+                // the new metadata, so the previous pair is not left bindable.
+                CancelWork(entity, prepared.OutputName);
+                found->State = PropertyTextureBakeOutputState::Failed;
+                found->Diagnostic =
+                    "coverage asset reload failed after the value asset was reloaded; rebake required";
+                found->UvFingerprint = 0u;
+                found->PositionFingerprint = 0u;
+                found->TopologyFingerprint = 0u;
+                found->PropertyFingerprint = 0u;
+                found->Freshness = PropertyTextureBakeFreshness::Unknown;
+                AdvanceGeneration(found->Generation);
+                AdvanceGeneration(catalog.Generation);
+                return assetFailure(found->Diagnostic);
             }
             CancelWork(entity, prepared.OutputName);
 
@@ -1602,21 +2328,35 @@ namespace Extrinsic::Runtime
                 .Storage = prepared.Storage,
                 .Encoding = prepared.Encoder,
                 .EncodingColormap = prepared.EncodingColormap,
-                .Texture = *asset,
+                .Texture = valueAsset,
+                .CoverageTexture = coverageAsset,
                 .ExpectedElementCount = prepared.ExpectedElementCount,
                 .SourceGeneration = prepared.SourceGeneration,
                 .PropertyGeneration =
                     request.ExpectedPropertyGeneration,
                 .RangeMin = prepared.RangeMin,
                 .RangeMax = prepared.RangeMax,
-                .Width = request.Width,
-                .Height = request.Height,
+                .Width = prepared.Width,
+                .Height = prepared.Height,
                 .PaddingTexels = request.PaddingTexels,
                 .Generation = replacing ? found->Generation : 1u,
                 .State = PropertyTextureBakeOutputState::Pending,
                 .Diagnostic = "GPU property texture bake pending",
                 .RangePolicy = request.RangePolicy,
+                .ResolvedTexcoords = prepared.Identity.ResolvedTexcoords,
+                .UvFingerprint = prepared.Identity.UvFingerprint,
+                .PositionFingerprint = prepared.Identity.PositionFingerprint,
+                .TopologyFingerprint = prepared.Identity.TopologyFingerprint,
+                .PropertyFingerprint = prepared.Identity.PropertyFingerprint,
+                .Freshness = PropertyTextureBakeFreshness::Fresh,
+                .CoveredTexels = prepared.Coverage.CoveredTexels,
+                .ChartCount = prepared.Charts.ChartCount,
             };
+            record.ObservedRevisionToken =
+                ComputePropertyTextureBakeRevisionToken(
+                    record,
+                    MakeRevisionLookup(
+                        GS::BuildConstView(Context.Scene->Raw(), entity)));
             if (replacing)
             {
                 AdvanceGeneration(record.Generation);
@@ -1635,11 +2375,12 @@ namespace Extrinsic::Runtime
                 .StableEntityId = request.StableEntityId,
                 .OutputName = record.OutputName,
                 .Asset = record.Texture,
+                .CoverageAsset = record.CoverageTexture,
                 .RecordGeneration = record.Generation,
                 .Request = request,
                 .Prepared = std::move(prepared),
-                .Width = request.Width,
-                .Height = request.Height,
+                .Width = record.Width,
+                .Height = record.Height,
             });
 
             return PropertyTextureBakeResult{
@@ -1655,47 +2396,31 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] RHI::PipelineHandle PipelineFor(
-            const RHI::Format format,
-            const bool dilation)
+        [[nodiscard]] RHI::PipelineHandle PipelineFor(const RHI::Format format)
         {
             if (Renderer == nullptr || Device == nullptr)
-                return {};
-            for (PipelineEntry& entry : Pipelines)
-            {
-                if (entry.Format != format)
-                    continue;
-                auto& lease = dilation
-                    ? entry.Dilation
-                    : entry.Raster;
-                if (lease.has_value() && lease->IsValid())
-                {
-                    return Renderer->GetPipelineManager().GetDeviceHandle(
-                        lease->GetHandle());
-                }
-            }
-
-            RHI::PipelineDesc desc = dilation
-                ? Graphics::MakePropertyTextureBakeDilationPipelineDesc(
-                    Core::Filesystem::GetShaderPath(
-                        "shaders/post_fullscreen.vert.spv"),
-                    Core::Filesystem::GetShaderPath(
-                        "shaders/property_texture_bake_dilate.frag.spv"),
-                    format)
-                : Graphics::MakePropertyTextureBakePipelineDesc(
-                    Core::Filesystem::GetShaderPath(
-                        "shaders/property_texture_bake.vert.spv"),
-                    Core::Filesystem::GetShaderPath(
-                        "shaders/property_texture_bake.frag.spv"),
-                    format);
-            auto lease =
-                Renderer->GetPipelineManager().Create(desc);
-            if (!lease.has_value())
                 return {};
             auto found = std::ranges::find(
                 Pipelines,
                 format,
                 &PipelineEntry::Format);
+            if (found != Pipelines.end() &&
+                found->Raster.has_value() &&
+                found->Raster->IsValid())
+            {
+                return Renderer->GetPipelineManager().GetDeviceHandle(
+                    found->Raster->GetHandle());
+            }
+
+            auto lease = Renderer->GetPipelineManager().Create(
+                Graphics::MakePropertyTextureBakePipelineDesc(
+                    Core::Filesystem::GetShaderPath(
+                        "shaders/property_texture_bake.vert.spv"),
+                    Core::Filesystem::GetShaderPath(
+                        "shaders/property_texture_bake.frag.spv"),
+                    format));
+            if (!lease.has_value())
+                return {};
             if (found == Pipelines.end())
             {
                 Pipelines.push_back(PipelineEntry{
@@ -1703,22 +2428,14 @@ namespace Extrinsic::Runtime
                 });
                 found = std::prev(Pipelines.end());
             }
-            auto& stored = dilation
-                ? found->Dilation
-                : found->Raster;
-            stored.emplace(std::move(*lease));
+            found->Raster.emplace(std::move(*lease));
             return Renderer->GetPipelineManager().GetDeviceHandle(
-                stored->GetHandle());
+                found->Raster->GetHandle());
         }
 
         void MarkFailed(Work& work, std::string diagnostic)
         {
-            if (work.CacheGeneration != 0u && GpuAssets != nullptr)
-            {
-                (void)GpuAssets->FailGpuProducedTexture(
-                    work.Asset,
-                    work.CacheGeneration);
-            }
+            FailGpuTextures(work);
             if (PropertyTextureBakeRecord* record =
                     FindRecord(work.Entity, work.OutputName);
                 record != nullptr &&
@@ -1735,6 +2452,36 @@ namespace Extrinsic::Runtime
             work.Phase = WorkPhase::Failed;
         }
 
+        template <class T>
+        [[nodiscard]] std::optional<RHI::BufferManager::BufferLease>
+            UploadStorage(
+                const std::span<const T> values,
+                const RHI::BufferUsage extraUsage,
+                const char* const debugName,
+                std::uint64_t& outAddress)
+        {
+            outAddress = 0u;
+            RHI::BufferDesc desc{};
+            desc.SizeBytes = static_cast<std::uint64_t>(values.size_bytes());
+            desc.Usage = RHI::BufferUsage::Storage |
+                         RHI::BufferUsage::TransferDst |
+                         extraUsage;
+            desc.HostVisible = true;
+            desc.DebugName = debugName;
+            auto lease = Renderer->GetBufferManager().Create(desc);
+            if (!lease.has_value())
+                return std::nullopt;
+            Device->WriteBuffer(
+                lease->GetHandle(),
+                values.data(),
+                desc.SizeBytes,
+                0u);
+            outAddress = Device->GetBufferDeviceAddress(lease->GetHandle());
+            if (outAddress == 0u)
+                return std::nullopt;
+            return std::move(*lease);
+        }
+
         void RecordFrameCommands(RHI::ICommandContext& commandContext)
         {
             if (!Available())
@@ -1742,16 +2489,10 @@ namespace Extrinsic::Runtime
 
             DrainRetiredResources();
             std::size_t recorded = 0u;
-            bool paddedRecorded = false;
             for (Work& work : WorkItems)
             {
                 if (work.Phase != WorkPhase::Queued || recorded >= 4u)
                     continue;
-                if (work.Request.PaddingTexels != 0u &&
-                    paddedRecorded)
-                {
-                    continue;
-                }
                 if (work.World != Context.World ||
                     work.BindingEpoch != Context.BindingEpoch ||
                     !Context.Scene->IsValid(work.Entity))
@@ -1766,46 +2507,6 @@ namespace Extrinsic::Runtime
                     record->Texture != work.Asset)
                 {
                     MarkFailed(work, "property texture bake was superseded");
-                    continue;
-                }
-                const auto renderable =
-                    Extraction->FindGpuRenderableAvailability(
-                        work.StableEntityId);
-                if (!renderable.has_value() ||
-                    !renderable->HasRenderable ||
-                    !renderable->Surface.HasGeometry)
-                {
-                    continue;
-                }
-                Graphics::GpuGeometryResidencyView residency{};
-                if (!Renderer->GetGpuWorld().TryGetGeometryResidencyView(
-                        renderable->Surface.Geometry,
-                        residency))
-                {
-                    continue;
-                }
-                if (!residency.IndexBuffer.IsValid() ||
-                    residency.Record.IndexBufferBDA == 0u ||
-                    residency.Record.SurfaceIndexCount !=
-                        work.Prepared.SurfaceIndices.size() ||
-                    residency.SurfaceIndexCount !=
-                        work.Prepared.SurfaceIndices.size() ||
-                    residency.SurfaceIndexByteCount !=
-                        work.Prepared.SurfaceIndices.size() *
-                            sizeof(std::uint32_t) ||
-                    residency.SurfaceIndexFingerprint !=
-                        work.Prepared.SurfaceIndexFingerprint ||
-                    residency.VertexCount !=
-                        work.Prepared.Texcoords.size() ||
-                    residency.SurfaceIndexFormat != RHI::Format::R32_UINT ||
-                    residency.SurfaceIndexElementBytes !=
-                        sizeof(std::uint32_t) ||
-                    residency.SurfaceIndexStrideBytes !=
-                        sizeof(std::uint32_t))
-                {
-                    MarkFailed(
-                        work,
-                        "property texture bake geometry lacks matching GPU atlas residency");
                     continue;
                 }
                 std::string sourceDiagnostic{};
@@ -1830,125 +2531,98 @@ namespace Extrinsic::Runtime
                     }
                 }
 
-                const std::uint64_t texcoordBytes =
-                    static_cast<std::uint64_t>(
-                        work.Prepared.Texcoords.size()) *
-                    sizeof(glm::vec2);
-                RHI::BufferDesc texcoordDesc{};
-                texcoordDesc.SizeBytes = texcoordBytes;
-                texcoordDesc.Usage = RHI::BufferUsage::Storage |
-                                     RHI::BufferUsage::TransferDst;
-                texcoordDesc.HostVisible = true;
-                texcoordDesc.DebugName =
-                    "Runtime.PropertyTextureBake.Texcoords";
-                auto texcoordBuffer =
-                    Renderer->GetBufferManager().Create(texcoordDesc);
-                if (!texcoordBuffer.has_value())
+                const PreparedPropertyBake& prepared = work.Prepared;
+                BakeGpuResources resources{};
+                std::uint64_t texcoordBda = 0u;
+                std::uint64_t propertyBda = 0u;
+                std::uint64_t indexBda = 0u;
+                std::uint64_t chartBda = 0u;
+                std::uint64_t gutterBda = 0u;
+                resources.TexcoordBuffer = UploadStorage(
+                    std::span<const glm::vec2>{prepared.Texcoords},
+                    RHI::BufferUsage::None,
+                    "Runtime.PropertyTextureBake.Texcoords",
+                    texcoordBda);
+                resources.PropertyBuffer = UploadStorage(
+                    std::span<const glm::vec4>{prepared.Values},
+                    RHI::BufferUsage::None,
+                    "Runtime.PropertyTextureBake.Values",
+                    propertyBda);
+                resources.IndexBuffer = UploadStorage(
+                    std::span<const std::uint32_t>{prepared.SurfaceIndices},
+                    RHI::BufferUsage::Index,
+                    "Runtime.PropertyTextureBake.Indices",
+                    indexBda);
+                resources.ChartBuffer = UploadStorage(
+                    std::span<const std::uint32_t>{
+                        prepared.Charts.TriangleChart},
+                    RHI::BufferUsage::None,
+                    "Runtime.PropertyTextureBake.Charts",
+                    chartBda);
+                const bool drawGutter = work.Request.PaddingTexels != 0u &&
+                                        !prepared.GutterEdges.empty();
+                if (drawGutter)
                 {
-                    MarkFailed(
-                        work,
-                        "property texture bake GPU atlas-buffer allocation failed");
-                    continue;
+                    resources.GutterBuffer = UploadStorage(
+                        std::span<const Graphics::PropertyTextureBakeGutterEdge>{
+                            prepared.GutterEdges},
+                        RHI::BufferUsage::None,
+                        "Runtime.PropertyTextureBake.GutterEdges",
+                        gutterBda);
                 }
-                Device->WriteBuffer(
-                    texcoordBuffer->GetHandle(),
-                    work.Prepared.Texcoords.data(),
-                    texcoordBytes,
-                    0u);
-                const std::uint64_t texcoordBda =
-                    Device->GetBufferDeviceAddress(
-                        texcoordBuffer->GetHandle());
-                if (texcoordBda == 0u)
+                if (!resources.TexcoordBuffer.has_value() ||
+                    !resources.PropertyBuffer.has_value() ||
+                    !resources.IndexBuffer.has_value() ||
+                    !resources.ChartBuffer.has_value() ||
+                    (drawGutter && !resources.GutterBuffer.has_value()))
                 {
+                    work.Resources = std::move(resources);
                     MarkFailed(
                         work,
-                        "property texture bake atlas buffer has no device address");
-                    continue;
-                }
-
-                const std::uint64_t propertyBytes =
-                    static_cast<std::uint64_t>(work.Prepared.Values.size()) *
-                    sizeof(glm::vec4);
-                RHI::BufferDesc propertyDesc{};
-                propertyDesc.SizeBytes = propertyBytes;
-                propertyDesc.Usage = RHI::BufferUsage::Storage |
-                                     RHI::BufferUsage::TransferDst;
-                propertyDesc.HostVisible = true;
-                propertyDesc.DebugName = "Runtime.PropertyTextureBake.Values";
-                auto propertyBuffer =
-                    Renderer->GetBufferManager().Create(propertyDesc);
-                if (!propertyBuffer.has_value())
-                {
-                    MarkFailed(
-                        work,
-                        "property texture bake GPU value-buffer allocation failed");
-                    continue;
-                }
-                Device->WriteBuffer(
-                    propertyBuffer->GetHandle(),
-                    work.Prepared.Values.data(),
-                    propertyBytes,
-                    0u);
-                const std::uint64_t propertyBda =
-                    Device->GetBufferDeviceAddress(
-                        propertyBuffer->GetHandle());
-                if (propertyBda == 0u)
-                {
-                    MarkFailed(
-                        work,
-                        "property texture bake value buffer has no device address");
+                        "property texture bake GPU input-buffer allocation failed");
                     continue;
                 }
 
                 const RHI::PipelineHandle pipeline =
-                    PipelineFor(work.Prepared.Format, false);
+                    PipelineFor(prepared.Format);
                 if (!pipeline.IsValid())
                 {
+                    work.Resources = std::move(resources);
                     MarkFailed(
                         work,
                         "property texture bake raster pipeline is unavailable");
                     continue;
                 }
-
-                RHI::PipelineHandle dilationPipeline{};
-                std::optional<RHI::TextureManager::TextureLease>
-                    dilationScratch{};
-                if (work.Request.PaddingTexels != 0u)
+                auto depth = Renderer->GetTextureManager().Create(
+                    Graphics::MakePropertyTextureBakeDepthTextureDesc(
+                        work.Width,
+                        work.Height,
+                        "Runtime.PropertyTextureBake.Depth"));
+                if (depth.has_value())
+                    resources.Depth.emplace(std::move(*depth));
+                if (!resources.Depth.has_value())
                 {
-                    dilationPipeline =
-                        PipelineFor(work.Prepared.Format, true);
-                    if (!dilationPipeline.IsValid())
-                    {
-                        MarkFailed(
-                            work,
-                            "property texture bake dilation pipeline is unavailable");
-                        continue;
-                    }
-                    auto scratch =
-                        Renderer->GetTextureManager().Create(
-                            Graphics::
-                                MakePropertyTextureBakeDilationScratchTextureDesc(
-                                    work.Width,
-                                    work.Height,
-                                    work.Prepared.Format,
-                                    "Runtime.PropertyTextureBake.DilationScratch"));
-                    if (!scratch.has_value())
-                    {
-                        MarkFailed(
-                            work,
-                            "property texture bake dilation scratch allocation failed");
-                        continue;
-                    }
-                    dilationScratch.emplace(std::move(*scratch));
+                    work.Resources = std::move(resources);
+                    MarkFailed(
+                        work,
+                        "property texture bake coverage/depth allocation failed");
+                    continue;
                 }
 
+                // Labels are discrete: nearest sampling never blends two
+                // label colours. Other encodings filter linearly within the
+                // requested gutter; there is one mip level and no mip filter.
+                const RHI::FilterMode filter =
+                    prepared.Encoder == PropertyTextureBakeEncoding::LabelPalette
+                        ? RHI::FilterMode::Nearest
+                        : RHI::FilterMode::Linear;
                 Graphics::GpuProducedTextureRequest textureRequest{};
                 textureRequest.Id = work.Asset;
                 textureRequest.Desc = RHI::TextureDesc{
                     .Width = work.Width,
                     .Height = work.Height,
                     .MipLevels = 1u,
-                    .Fmt = work.Prepared.Format,
+                    .Fmt = prepared.Format,
                     .Usage = RHI::TextureUsage::Sampled |
                              RHI::TextureUsage::ColorTarget |
                              RHI::TextureUsage::TransferSrc,
@@ -1956,8 +2630,8 @@ namespace Extrinsic::Runtime
                     .DebugName = "Runtime.PropertyTextureBake.Output",
                 };
                 textureRequest.SamplerDesc = RHI::SamplerDesc{
-                    .MagFilter = RHI::FilterMode::Linear,
-                    .MinFilter = RHI::FilterMode::Linear,
+                    .MagFilter = filter,
+                    .MinFilter = filter,
                     .MipFilter = RHI::MipmapMode::Nearest,
                     .AddressU = RHI::AddressMode::ClampToEdge,
                     .AddressV = RHI::AddressMode::ClampToEdge,
@@ -1969,76 +2643,74 @@ namespace Extrinsic::Runtime
                 if (!pending.has_value())
                 {
                     if (pending.error() == Core::ErrorCode::ResourceBusy)
+                    {
+                        RetireWorkResources(resources, SafeReleaseFrame());
                         continue;
+                    }
+                    work.Resources = std::move(resources);
                     MarkFailed(
                         work,
                         "property texture bake output allocation failed");
                     continue;
                 }
 
-                Graphics::PropertyTextureBakeDilationResources
-                    dilationResources{};
-                if (dilationScratch.has_value())
+                work.CacheGeneration = pending->Generation;
+                Graphics::GpuProducedTextureRequest coverageRequest{};
+                coverageRequest.Id = work.CoverageAsset;
+                coverageRequest.Desc = Graphics::MakePropertyTextureBakeCoverageTextureDesc(work.Width, work.Height);
+                coverageRequest.SamplerDesc = textureRequest.SamplerDesc;
+                coverageRequest.SamplerDesc.MagFilter = RHI::FilterMode::Nearest;
+                coverageRequest.SamplerDesc.MinFilter = RHI::FilterMode::Nearest;
+                auto coveragePending = GpuAssets->BeginGpuProducedTexture(coverageRequest);
+                if (!coveragePending.has_value())
                 {
-                    dilationResources =
-                        Graphics::PropertyTextureBakeDilationResources{
-                            .Pipeline = dilationPipeline,
-                            .ScratchTexture =
-                                dilationScratch->GetHandle(),
-                        };
+                    work.Resources = std::move(resources);
+                    MarkFailed(work, "property texture coverage allocation failed");
+                    continue;
                 }
+                work.CoverageCacheGeneration = coveragePending->Generation;
+
                 const Core::Result recordedResult =
                     Graphics::RecordPropertyTextureBake(
                         commandContext,
                         Graphics::PropertyTextureBakeRecordDesc{
                             .Pipeline = pipeline,
                             .OutputTexture = pending->Texture,
-                            .Dilation = dilationResources,
-                            .IndexBuffer = residency.IndexBuffer,
+                            .CoverageTexture = coveragePending->Texture,
+                            .DepthTexture = resources.Depth->GetHandle(),
+                            .IndexBuffer = resources.IndexBuffer->GetHandle(),
                             .TexcoordBDA = texcoordBda,
                             .PropertyBDA = propertyBda,
-                            .IndexBDA =
-                                residency.Record.IndexBufferBDA +
-                                static_cast<std::uint64_t>(
-                                    residency.Record.SurfaceFirstIndex) *
-                                    sizeof(std::uint32_t),
-                            .FirstIndex =
-                                residency.Record.SurfaceFirstIndex,
-                            .IndexCount =
-                                residency.Record.SurfaceIndexCount,
+                            .IndexBDA = indexBda,
+                            .ChartBDA = chartBda,
+                            .GutterEdgeBDA = gutterBda,
+                            .IndexCount = static_cast<std::uint32_t>(
+                                prepared.SurfaceIndices.size()),
+                            .GutterEdgeCount = drawGutter
+                                ? static_cast<std::uint32_t>(
+                                      prepared.GutterEdges.size())
+                                : 0u,
                             .Width = work.Width,
                             .Height = work.Height,
-                            .PaddingTexels =
-                                work.Request.PaddingTexels,
-                            .Domain = work.Prepared.Domain,
-                            .ValueKind = work.Prepared.GpuValueKind,
-                            .Encoding = work.Prepared.GpuEncoding,
+                            .PaddingTexels = work.Request.PaddingTexels,
+                            .Domain = prepared.Domain,
+                            .ValueKind = prepared.GpuValueKind,
+                            .Encoding = prepared.GpuEncoding,
                             .ColormapID = encodingColormapId,
-                            .RangeMin = work.Prepared.RangeMin,
-                            .RangeMax = work.Prepared.RangeMax,
+                            .RangeMin = prepared.RangeMin,
+                            .RangeMax = prepared.RangeMax,
                         });
+                work.Resources = std::move(resources);
+                work.CacheGeneration = pending->Generation;
                 if (!recordedResult.has_value())
                 {
-                    work.CacheGeneration = pending->Generation;
                     MarkFailed(
                         work,
                         "property texture bake command recording failed");
                     continue;
                 }
 
-                const std::uint64_t readyFrame =
-                    CurrentFrame() +
-                    std::max<std::uint32_t>(
-                        Device->GetFramesInFlight(),
-                        1u);
-                work.PropertyBuffer.emplace(std::move(*propertyBuffer));
-                work.TexcoordBuffer.emplace(std::move(*texcoordBuffer));
-                if (dilationScratch.has_value())
-                {
-                    work.DilationScratch.emplace(
-                        std::move(*dilationScratch));
-                }
-                work.CacheGeneration = pending->Generation;
+                const std::uint64_t readyFrame = SafeReleaseFrame();
                 work.ReadyFrame = readyFrame;
                 if (Core::Result ready =
                         GpuAssets->SetGpuProducedTextureReadyFrame(
@@ -2053,11 +2725,13 @@ namespace Extrinsic::Runtime
                     continue;
                 }
 
-                work.GeometryRevision = residency.ContentRevision;
+                if (!GpuAssets->SetGpuProducedTextureReadyFrame(
+                        work.CoverageAsset, work.CoverageCacheGeneration, readyFrame).has_value())
+                {
+                    MarkFailed(work, "property texture coverage ready-frame publication failed");
+                    continue;
+                }
                 work.Phase = WorkPhase::WaitingForReadyFrame;
-                paddedRecorded =
-                    paddedRecorded ||
-                    work.Request.PaddingTexels != 0u;
                 ++recorded;
             }
 
@@ -2085,8 +2759,11 @@ namespace Extrinsic::Runtime
                 }
                 const Graphics::GpuAssetState state =
                     GpuAssets->GetState(work.Asset);
+                const auto coverageState = GpuAssets->GetState(work.CoverageAsset);
                 if (state == Graphics::GpuAssetState::GpuUploading ||
-                    state == Graphics::GpuAssetState::CpuPending)
+                    state == Graphics::GpuAssetState::CpuPending ||
+                    coverageState == Graphics::GpuAssetState::GpuUploading ||
+                    coverageState == Graphics::GpuAssetState::CpuPending)
                 {
                     ++index;
                     continue;
@@ -2095,21 +2772,7 @@ namespace Extrinsic::Runtime
                 PropertyTextureBakeRecord* record =
                     FindRecord(work.Entity, work.OutputName);
                 const auto view = GpuAssets->GetView(work.Asset);
-                bool geometryCurrent = false;
-                if (const auto renderable =
-                        Extraction->FindGpuRenderableAvailability(
-                            work.StableEntityId);
-                    renderable.has_value() &&
-                    renderable->HasRenderable &&
-                    renderable->Surface.HasGeometry)
-                {
-                    Graphics::GpuGeometryResidencyView residency{};
-                    geometryCurrent = Renderer->GetGpuWorld()
-                        .TryGetGeometryResidencyView(
-                            renderable->Surface.Geometry,
-                            residency) &&
-                        residency.ContentRevision == work.GeometryRevision;
-                }
+                const auto coverageView = GpuAssets->GetView(work.CoverageAsset);
                 const bool current =
                     Context.Scene != nullptr &&
                     work.World == Context.World &&
@@ -2117,28 +2780,128 @@ namespace Extrinsic::Runtime
                     Context.Scene->IsValid(work.Entity) &&
                     record != nullptr &&
                     record->Generation == work.RecordGeneration &&
-                    record->Texture == work.Asset &&
-                    geometryCurrent;
+                    record->Texture == work.Asset && record->CoverageTexture == work.CoverageAsset;
                 std::string sourceDiagnostic{};
                 const bool sourceCurrent =
                     current && SourceStillCurrent(work, sourceDiagnostic);
-                if (state == Graphics::GpuAssetState::Ready &&
-                    view.has_value() &&
-                    view->Generation == work.CacheGeneration &&
-                    sourceCurrent)
+                // Names why one output of the pair is not this bake's result.
+                const auto outputProblem = [](
+                    const Graphics::GpuAssetState outputState,
+                    const auto& outputView,
+                    const std::uint64_t generation) -> const char*
+                {
+                    if (outputState == Graphics::GpuAssetState::Failed)
+                        return "failed on the GPU";
+                    if (outputState != Graphics::GpuAssetState::Ready ||
+                        !outputView.has_value())
+                    {
+                        return "is no longer resident";
+                    }
+                    if (outputView->Generation != generation)
+                        return "was replaced by a newer GPU generation";
+                    return nullptr;
+                };
+                const char* const valueProblem =
+                    outputProblem(state, view, work.CacheGeneration);
+                const char* const coverageProblem = outputProblem(
+                    coverageState, coverageView, work.CoverageCacheGeneration);
+                if (sourceCurrent &&
+                    valueProblem == nullptr &&
+                    coverageProblem == nullptr)
                 {
                     record->State = PropertyTextureBakeOutputState::Ready;
                     record->Diagnostic = "GPU property texture bake ready";
+                    RefreshFreshness(work.Entity, *record);
                 }
                 else if (current)
                 {
                     record->State = PropertyTextureBakeOutputState::Failed;
-                    record->Diagnostic = sourceCurrent
-                        ? "GPU property texture bake completion became stale"
-                        : std::move(sourceDiagnostic);
+                    if (!sourceCurrent)
+                    {
+                        record->Diagnostic = std::move(sourceDiagnostic);
+                    }
+                    else if (valueProblem != nullptr)
+                    {
+                        record->Diagnostic =
+                            std::string{"GPU property texture bake value output "} +
+                            valueProblem;
+                    }
+                    else
+                    {
+                        record->Diagnostic =
+                            std::string{"GPU property texture bake coverage output "} +
+                            coverageProblem +
+                            "; the value texture is not published without it";
+                    }
                 }
+                RetireWorkResources(work, work.ReadyFrame);
                 WorkItems.erase(
                     WorkItems.begin() + static_cast<std::ptrdiff_t>(index));
+            }
+        }
+
+        // Re-evaluates one record against the live source. The revision token
+        // makes the per-frame check O(watched properties); content is hashed
+        // again only after one of those properties was mutably borrowed.
+        [[nodiscard]] static PropertyTextureBakeFreshness EvaluateFreshness(
+            const GS::ConstSourceView& view,
+            const PropertyTextureBakeRecord& record,
+            const std::uint64_t token)
+        {
+            if (token != 0u && token == record.ObservedRevisionToken &&
+                record.Freshness != PropertyTextureBakeFreshness::Unknown)
+            {
+                return record.Freshness;
+            }
+            const PropertyTextureBakeSourceIdentity baked =
+                record.SourceIdentity();
+            if (baked.UvFingerprint == 0u)
+                return PropertyTextureBakeFreshness::Unknown;
+            const CapturedSourceIdentity current = CaptureSourceIdentity(
+                view,
+                record.Source,
+                record.Texcoords);
+            if (current.Status != PropertyTextureBakeStatus::Success)
+                return PropertyTextureBakeFreshness::SourceUnavailable;
+            return ComparePropertyTextureBakeSourceIdentity(
+                baked,
+                current.Identity);
+        }
+
+        void RefreshFreshness(
+            const ECS::EntityHandle entity,
+            PropertyTextureBakeRecord& record) const
+        {
+            if (Context.Scene == nullptr || !Context.Scene->IsValid(entity))
+                return;
+            const GS::ConstSourceView view =
+                GS::BuildConstView(Context.Scene->Raw(), entity);
+            const std::uint64_t token =
+                ComputePropertyTextureBakeRevisionToken(
+                    record,
+                    MakeRevisionLookup(view));
+            record.Freshness = EvaluateFreshness(view, record, token);
+            record.ObservedRevisionToken = token;
+        }
+
+        // Maintenance pass: keeps every catalog's stored freshness current so
+        // extraction and UI read an honest state. Stale records stay for
+        // inspection; binding consumers reject them.
+        void RefreshAllFreshness()
+        {
+            if (Context.Scene == nullptr)
+                return;
+            auto view = Context.Scene->Raw().view<PropertyTextureBakeOutputs>();
+            for (auto&& [entity, catalog] : view.each())
+            {
+                for (PropertyTextureBakeRecord& record : catalog.Records)
+                {
+                    const PropertyTextureBakeFreshness before =
+                        record.Freshness;
+                    RefreshFreshness(entity, record);
+                    if (record.Freshness != before)
+                        AdvanceGeneration(catalog.Generation);
+                }
             }
         }
 
@@ -2181,12 +2944,7 @@ namespace Extrinsic::Runtime
                     ++index;
                     continue;
                 }
-                if (work.CacheGeneration != 0u && GpuAssets != nullptr)
-                {
-                    (void)GpuAssets->FailGpuProducedTexture(
-                        work.Asset,
-                        work.CacheGeneration);
-                }
+                FailGpuTextures(work);
                 if (PropertyTextureBakeRecord* record =
                         FindRecord(work.Entity, work.OutputName);
                     record != nullptr &&
@@ -2217,7 +2975,10 @@ namespace Extrinsic::Runtime
                          catalog.Records)
                     {
                         if (destroyGeneratedAssets)
+                        {
                             (void)DestroyAsset(record.Texture);
+                            (void)DestroyAsset(record.CoverageTexture);
+                        }
                     }
                 }
             }
@@ -2230,7 +2991,10 @@ namespace Extrinsic::Runtime
             {
                 (void)entity;
                 for (const PropertyTextureBakeRecord& record : catalog.Records)
+                {
                     (void)DestroyAsset(record.Texture);
+                    (void)DestroyAsset(record.CoverageTexture);
+                }
             }
         }
 
@@ -2238,12 +3002,7 @@ namespace Extrinsic::Runtime
         {
             for (Work& work : WorkItems)
             {
-                if (work.CacheGeneration != 0u && GpuAssets != nullptr)
-                {
-                    (void)GpuAssets->FailGpuProducedTexture(
-                        work.Asset,
-                        work.CacheGeneration);
-                }
+                FailGpuTextures(work);
             }
             WorkItems.clear();
             RetiredResources.clear();
@@ -2348,15 +3107,31 @@ namespace Extrinsic::Runtime
             if (found == catalog->Records.end())
                 return {TextureBakeMutationStatus::MissingTexture, "baked texture was not found"};
 
-            const PropertyTextureBakeRecord removed = *found;
-            if (!DestroyAsset(removed.Texture))
+            // Removal tears down the in-flight bake and attempts both
+            // destroys. A partial failure keeps an unbindable record naming
+            // only the surviving asset, so removing again retries just that.
+            CancelWork(entity, found->OutputName);
+            const bool coverageDestroyed = DestroyAsset(found->CoverageTexture);
+            const bool valueDestroyed = DestroyAsset(found->Texture);
+            if (!coverageDestroyed || !valueDestroyed)
             {
+                if (coverageDestroyed)
+                    found->CoverageTexture = {};
+                if (valueDestroyed)
+                    found->Texture = {};
+                found->State = PropertyTextureBakeOutputState::Failed;
+                found->Diagnostic = std::string{"generated "} +
+                    (!valueDestroyed && !coverageDestroyed
+                         ? "value and coverage assets"
+                         : !valueDestroyed ? "value asset" : "coverage asset") +
+                    " could not be destroyed; remove again to retry";
+                AdvanceGeneration(found->Generation);
+                AdvanceGeneration(catalog->Generation);
                 return {
                     TextureBakeMutationStatus::AssetDestroyFailed,
-                    "generated texture asset could not be destroyed",
+                    found->Diagnostic,
                 };
             }
-            CancelWork(entity, removed.OutputName);
             catalog->Records.erase(found);
             AdvanceGeneration(catalog->Generation);
             return {TextureBakeMutationStatus::Success, "baked texture removed"};
@@ -2399,6 +3174,12 @@ namespace Extrinsic::Runtime
         return result;
     }
 
+    void TextureBakeService::SetSourceSnapshotBudgetForTest(const std::size_t bytes) noexcept
+    {
+        if (m_Impl)
+            m_Impl->SourceSnapshotBudget = bytes;
+    }
+
     TextureBakeModuleStats TextureBakeService::Stats() const noexcept
     {
         return m_Impl && m_Impl->Stats != nullptr
@@ -2427,7 +3208,11 @@ namespace Extrinsic::Runtime
         if (const auto* catalog = m_Impl->Context.Scene->Raw()
                 .try_get<PropertyTextureBakeOutputs>(entity))
         {
+            // Evaluate on read so a copied tab never pairs a just-changed
+            // atlas with a texture that maintenance has not re-checked yet.
             snapshot.Textures = catalog->Records;
+            for (PropertyTextureBakeRecord& record : snapshot.Textures)
+                m_Impl->RefreshFreshness(entity, record);
         }
         return snapshot;
     }
@@ -2485,7 +3270,8 @@ namespace Extrinsic::Runtime
                     .Domain = face ? GeometryElementDomain::MeshFace : GeometryElementDomain::MeshVertex,
                     .Name = scalar ? config->ScalarFieldName : config->ColorBufferName,
                 };
-                const auto availability = BuildGeometryAvailability(GS::BuildConstView(raw, entity));
+                const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+                const auto availability = BuildGeometryAvailability(view);
                 const auto resolved = ResolveGeometryProperty(availability, property,
                     ResolveGeometryElementCount(availability, property.Domain));
                 if (!resolved.Resolved())
@@ -2494,17 +3280,46 @@ namespace Extrinsic::Runtime
                 const auto rangePolicy = config->Scalar.AutoRange
                     ? PropertyTextureBakeRangePolicy::AutoFinite : PropertyTextureBakeRangePolicy::Manual;
                 const auto encoding = ResolveSurfaceAppearanceEncoding(*config, property.ValueKind);
+                // Bake at the extent of the generated atlas that produced the
+                // current UVs; authored or unrecorded UVs use the default
+                // extent. Appearance never escalates on its own, and a
+                // recorded extent above the bake cap fails without allocating.
+                const std::optional<MeshUvAtlasExtent> atlas =
+                    RefreshMeshUvAtlasExtent(raw, entity);
+                const std::uint32_t width = atlas ? atlas->Width : PropertyTextureBakeRequest{}.Width;
+                const std::uint32_t height = atlas ? atlas->Height : PropertyTextureBakeRequest{}.Height;
+                const auto matchesConfig = [&](const PropertyTextureBakeRecord& record)
+                {
+                    return record.Width == width && record.Height == height &&
+                           record.Source.Name == property.Name &&
+                           record.Source.Domain == property.Domain &&
+                           record.Source.ValueKind == property.ValueKind &&
+                           record.Encoding == encoding && record.RangePolicy == rangePolicy &&
+                           record.EncodingColormap == config->Scalar.Map &&
+                           (config->Scalar.AutoRange || (record.RangeMin == config->Scalar.RangeMin &&
+                                                        record.RangeMax == config->Scalar.RangeMax));
+                };
                 if (const auto* outputs = raw.try_get<PropertyTextureBakeOutputs>(entity))
                 {
                     const auto record = std::ranges::find(outputs->Records,
                         kSurfaceAppearanceTextureOutput, &PropertyTextureBakeRecord::OutputName);
-                    if (record != outputs->Records.end() && record->Source.Name == property.Name &&
-                        record->Source.Domain == property.Domain && record->Source.ValueKind == property.ValueKind &&
-                        record->Encoding == encoding && record->RangePolicy == rangePolicy &&
-                        record->EncodingColormap == config->Scalar.Map &&
-                        (config->Scalar.AutoRange || (record->RangeMin == config->Scalar.RangeMin &&
-                                                     record->RangeMax == config->Scalar.RangeMax)))
-                        continue;
+                    if (record != outputs->Records.end() && matchesConfig(*record))
+                    {
+                        // A Fresh record is this request's current bake; a
+                        // stale or unverified one is rebaked against the
+                        // current atlas instead of being left unbound.
+                        if (record->Freshness == PropertyTextureBakeFreshness::Fresh)
+                            continue;
+                        // A rejected request is resubmitted only after one of
+                        // its dependency revisions changed, never per frame.
+                        if (record->State == PropertyTextureBakeOutputState::Failed &&
+                            record->RejectedRevisionToken != 0u &&
+                            record->RejectedRevisionToken ==
+                                ComputePropertyTextureBakeRevisionToken(*record, MakeRevisionLookup(view)))
+                        {
+                            continue;
+                        }
+                    }
                 }
                 const auto baked = service.Bake(PropertyTextureBakeRequest{
                     .World = world,
@@ -2516,9 +3331,17 @@ namespace Extrinsic::Runtime
                     .RangeMin = config->Scalar.RangeMin,
                     .RangeMax = config->Scalar.RangeMax,
                     .EncodingColormap = config->Scalar.Map,
+                    .Width = width,
+                    .Height = height,
                     .PaddingTexels = 2u,
                     .OutputName = std::string{kSurfaceAppearanceTextureOutput},
                 });
+                // Only queue pressure and still-loading outputs are
+                // transient; retry them next frame without recording a
+                // failure. Everything else, including a snapshot larger than
+                // the whole budget, is recorded once and gated below.
+                if (baked.Status == PropertyTextureBakeStatus::JobSubmitFailed)
+                    continue;
                 if (!baked.Succeeded())
                 {
                     auto& outputs = raw.get_or_emplace<PropertyTextureBakeOutputs>(entity);
@@ -2531,14 +3354,30 @@ namespace Extrinsic::Runtime
                         failed = std::prev(outputs.Records.end());
                     }
                     failed->Source = property;
+                    failed->Texcoords = {};
+                    failed->Storage = PropertyTextureBakeStorage::EncodedRgba;
                     failed->Encoding = encoding;
                     failed->RangePolicy = rangePolicy;
                     failed->EncodingColormap = config->Scalar.Map;
                     failed->RangeMin = config->Scalar.RangeMin;
                     failed->RangeMax = config->Scalar.RangeMax;
+                    failed->Width = width;
+                    failed->Height = height;
                     failed->State = PropertyTextureBakeOutputState::Failed;
                     failed->Diagnostic = baked.Diagnostic;
-                    ++outputs.Generation;
+                    // A rejected request owns no source identity, so the
+                    // record stays unverified and never binds. Its revision
+                    // token gates the retry above; the generation bump
+                    // supersedes any bake still in flight for this slot.
+                    failed->UvFingerprint = 0u;
+                    failed->PositionFingerprint = 0u;
+                    failed->TopologyFingerprint = 0u;
+                    failed->PropertyFingerprint = 0u;
+                    failed->Freshness = PropertyTextureBakeFreshness::Unknown;
+                    failed->RejectedRevisionToken =
+                        ComputePropertyTextureBakeRevisionToken(*failed, MakeRevisionLookup(view));
+                    AdvanceGeneration(failed->Generation);
+                    AdvanceGeneration(outputs.Generation);
                     continue;
                 }
             }
@@ -2909,7 +3748,10 @@ namespace Extrinsic::Runtime
                     if (const auto state = weakState.lock())
                     {
                         if (state->ValidateBinding())
+                        {
+                            state->Service.m_Impl->RefreshAllFreshness();
                             ReconcileSurfaceAppearance(state->Service, state->BoundRegistry, state->BoundWorld);
+                        }
                     }
                 });
             !hook.has_value())

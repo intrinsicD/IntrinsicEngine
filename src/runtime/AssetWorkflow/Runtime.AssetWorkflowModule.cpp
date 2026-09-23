@@ -341,13 +341,19 @@ namespace Extrinsic::Runtime
                 {
                     GeometryPresentationRecipe& recipe =
                         view.get<GeometryPresentationRecipe>(entity);
-                    const auto* outputs =
+                    const PropertyTextureBakeOutputs* outputs =
                         raw.try_get<PropertyTextureBakeOutputs>(entity);
                     auto& runtimeState =
                         raw.get_or_emplace<GeometryPresentationRuntimeState>(
                             entity);
                     const std::uint32_t stableId =
                         SelectionController::ToStableEntityId(entity);
+                    PropertyTextureBakeOutputs evaluatedOutputs{};
+                    if (TextureBake != nullptr)
+                    {
+                        evaluatedOutputs.Records = TextureBake->Snapshot(stableId).Textures;
+                        outputs = &evaluatedOutputs;
+                    }
                     Graphics::MaterialTextureAssetBindings bindings =
                         Extraction->GetMaterialTextureAssetBindings(stableId)
                             .value_or(Graphics::MaterialTextureAssetBindings{});
@@ -454,6 +460,9 @@ namespace Extrinsic::Runtime
                             switch (output->State)
                             {
                             case PropertyTextureBakeOutputState::Pending:
+                                ClearGeneratedMaterialTarget(bindings, slot.Semantic, status->GeneratedTexture);
+                                materialChanged = status->GeneratedTexture.IsValid() || materialChanged;
+                                status->GeneratedTexture = {};
                                 status->Readiness =
                                     GeometryPresentationReadiness::Pending;
                                 status->Provenance =
@@ -461,6 +470,17 @@ namespace Extrinsic::Runtime
                                         PropertyBinding;
                                 break;
                             case PropertyTextureBakeOutputState::Ready:
+                                if (output->Freshness != PropertyTextureBakeFreshness::Fresh)
+                                {
+                                    ClearGeneratedMaterialTarget(bindings, slot.Semantic, status->GeneratedTexture);
+                                    materialChanged = status->GeneratedTexture.IsValid() || materialChanged;
+                                    status->GeneratedTexture = {};
+                                    status->Readiness = GeometryPresentationReadiness::Stale;
+                                    status->Provenance = GeometryPresentationProvenance::PropertyBinding;
+                                    status->Diagnostic = std::string{"generated texture requires rebaking: "} +
+                                        DebugNameForPropertyTextureBakeFreshness(output->Freshness);
+                                    break;
+                                }
                                 if (Assets == nullptr ||
                                     !output->Texture.IsValid() ||
                                     !Assets->IsAlive(output->Texture))

@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "region_crossings": 0,
+  "max_conformal": 1.5782082037497356,
+  "mean_conformal": 1.0136166721808246,
+  "p95_conformal": 1.0476448483401706,
+  "max_area": 1.3731611762117055,
+  "mean_area": 1.009961382808071,
+  "texels_per_unit": 1591.4992588495547,
+  "overlap_check": "independent native BVH validator; no Python all-pairs pass",
+  "input_sha256": "8054ac89818c91df21148e2f148a1a8c896656c6b5e637d037c53d990fd3ddc0",
+  "result_sha256": "00f92ed9750f88a3478a45a911fce910aa5f17ebafd1802ee51a50d9fb932e84",
+  "source_faces": 100000,
+  "scope": "Independent NumPy metric recomputation; native validator supplies overlap and texel-center checks. Same runner as atlas-corpus-3; see its retained source-provenance.json and source.patch. No speed claim."
+}

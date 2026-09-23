@@ -4,6 +4,11 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_nonuniform_qualifier : require
 
+// Writes the encoded property value, the chart coverage id and a depth that
+// orders interior data before gutters and nearer boundaries before farther
+// ones. Graphics.PropertyTextureBake documents the shared raster contract and
+// mirrors it in its CPU reference.
+
 layout(set = 0, binding = 0) uniform sampler2D globalTextures[];
 
 layout(buffer_reference, scalar) readonly buffer TexcoordBuffer {
@@ -15,22 +20,36 @@ layout(buffer_reference, scalar) readonly buffer PropertyBuffer {
 layout(buffer_reference, scalar) readonly buffer IndexBuffer {
     uint value[];
 };
+layout(buffer_reference, scalar) readonly buffer ChartBuffer {
+    uint value[];
+};
+layout(buffer_reference, scalar) readonly buffer GutterEdgeBuffer {
+    uvec4 value[];
+};
 
 layout(push_constant, scalar) uniform PushConstants {
     uint64_t TexcoordBDA;
     uint64_t PropertyBDA;
     uint64_t IndexBDA;
+    uint64_t ChartBDA;
+    uint64_t GutterEdgeBDA;
     uint Domain;
     uint ValueKind;
     uint Encoding;
     uint ColormapID;
     float RangeMin;
     float RangeMax;
+    uint Mode;
+    uint PaddingTexels;
+    uint Width;
+    uint Height;
 } push;
 
 layout(location = 0) in vec2 fragUv;
 layout(location = 1) in vec4 fragVertexValue;
+layout(location = 2) flat in uint fragGutterEdge;
 layout(location = 0) out vec4 outValue;
+layout(location = 1) out float outCoverage;
 
 const uint DomainVertex = 0u;
 const uint DomainFace = 1u;
@@ -42,6 +61,7 @@ const uint EncodingRgba = 2u;
 const uint EncodingColormap = 3u;
 const uint EncodingLabelPalette = 4u;
 const uint EncodingLinearScalar = 5u;
+const uint ModeGutter = 1u;
 
 uvec3 TriangleIndices(uint primitive)
 {
@@ -94,10 +114,9 @@ uint NearestTriangleVertex(uint primitive, vec2 uv)
     return distanceB <= distanceC ? 1u : 2u;
 }
 
-vec4 ResolvePropertyValue()
+vec4 ResolveInteriorValue(uint primitive)
 {
     PropertyBuffer properties = PropertyBuffer(push.PropertyBDA);
-    const uint primitive = uint(gl_PrimitiveID);
     if (push.Domain == DomainFace)
         return properties.value[primitive];
     if (push.Domain == DomainNearestEdge)
@@ -114,6 +133,34 @@ vec4 ResolvePropertyValue()
     return fragVertexValue;
 }
 
+// Chebyshev distance from p to segment [a, b], evaluated at the same
+// breakpoint candidates as the CPU reference.
+float ChebyshevAt(vec2 o, vec2 d, float t)
+{
+    return max(abs(o.x + t * d.x), abs(o.y + t * d.y));
+}
+
+float ChebyshevCandidate(vec2 o, vec2 d, float numerator, float denominator,
+                         float best)
+{
+    if (denominator == 0.0)
+        return best;
+    const float t = numerator / denominator;
+    return t > 0.0 && t < 1.0 ? min(best, ChebyshevAt(o, d, t)) : best;
+}
+
+float ChebyshevSegmentDistance(vec2 p, vec2 a, vec2 b)
+{
+    const vec2 d = b - a;
+    const vec2 o = a - p;
+    float best = min(ChebyshevAt(o, d, 0.0), ChebyshevAt(o, d, 1.0));
+    best = ChebyshevCandidate(o, d, -o.x, d.x, best);
+    best = ChebyshevCandidate(o, d, -o.y, d.y, best);
+    best = ChebyshevCandidate(o, d, o.y - o.x, d.x - d.y, best);
+    best = ChebyshevCandidate(o, d, -(o.x + o.y), d.x + d.y, best);
+    return best;
+}
+
 vec3 LabelColor(uint label)
 {
     uint hash = label * 747796405u + 2891336453u;
@@ -125,14 +172,10 @@ vec3 LabelColor(uint label)
         float((hash >> 16u) & 255u)) / 255.0;
 }
 
-void main()
+vec4 EncodeValue(vec4 value)
 {
-    const vec4 value = ResolvePropertyValue();
     if (push.Encoding == EncodingRaw)
-    {
-        outValue = value;
-        return;
-    }
+        return value;
     if (push.Encoding == EncodingNormal)
     {
         // Normalize finite directions without overflowing the squared length.
@@ -144,29 +187,86 @@ void main()
         const vec3 normal = scaledLength > 0.0 && scale > cutoff / scaledLength
             ? scaled / scaledLength
             : vec3(0.0, 0.0, 1.0);
-        outValue = vec4(normal * 0.5 + 0.5, 1.0);
-        return;
+        return vec4(normal * 0.5 + 0.5, 1.0);
     }
     if (push.Encoding == EncodingColormap)
     {
         const float t = (value.x - push.RangeMin) /
             (push.RangeMax - push.RangeMin);
-        outValue = texture(
+        return texture(
             globalTextures[nonuniformEXT(push.ColormapID)],
             vec2(clamp(t, 0.0, 1.0), 0.5));
-        return;
     }
     if (push.Encoding == EncodingLabelPalette)
-    {
-        outValue = vec4(LabelColor(floatBitsToUint(value.x)), 1.0);
-        return;
-    }
+        return vec4(LabelColor(floatBitsToUint(value.x)), 1.0);
     if (push.Encoding == EncodingLinearScalar)
     {
         const float t = (value.x - push.RangeMin) /
             (push.RangeMax - push.RangeMin);
-        outValue = vec4(clamp(t, 0.0, 1.0), 0.0, 0.0, 1.0);
+        return vec4(clamp(t, 0.0, 1.0), 0.0, 0.0, 1.0);
+    }
+    return clamp(value, 0.0, 1.0);
+}
+
+void main()
+{
+    ChartBuffer charts = ChartBuffer(push.ChartBDA);
+    if (push.Mode == ModeGutter)
+    {
+        GutterEdgeBuffer edges = GutterEdgeBuffer(push.GutterEdgeBDA);
+        TexcoordBuffer texcoords = TexcoordBuffer(push.TexcoordBDA);
+        PropertyBuffer properties = PropertyBuffer(push.PropertyBDA);
+        const uvec4 edge = edges.value[fragGutterEdge];
+        const vec2 extent = vec2(float(push.Width), float(push.Height));
+        const vec2 p = gl_FragCoord.xy;
+        const vec2 a = texcoords.value[edge.x] * extent;
+        const vec2 b = texcoords.value[edge.y] * extent;
+        const float padding = float(push.PaddingTexels);
+        const float distance = ChebyshevSegmentDistance(p, a, b);
+        if (distance > padding)
+            discard;
+
+        const vec2 ab = b - a;
+        const float lengthSquared = dot(ab, ab);
+        const float t = lengthSquared > 0.0
+            ? clamp(dot(p - a, ab) / lengthSquared, 0.0, 1.0)
+            : 0.0;
+        const float euclidean = length(p - (a + t * ab));
+        vec4 value;
+        if (push.Domain == DomainFace)
+        {
+            value = properties.value[edge.z];
+        }
+        else if (push.Domain == DomainNearestEdge)
+        {
+            value = properties.value[edge.z * 3u + edge.w];
+        }
+        else if (push.ValueKind == ValueLabel)
+        {
+            value = properties.value[t < 0.5 ? edge.x : edge.y];
+        }
+        else
+        {
+            vec4 va = properties.value[edge.x];
+            vec4 vb = properties.value[edge.y];
+            if (push.Encoding == EncodingNormal)
+            {
+                va.xyz *= 0.125;
+                vb.xyz *= 0.125;
+            }
+            value = mix(va, vb, t);
+        }
+        outValue = EncodeValue(value);
+        outCoverage = -(float(charts.value[edge.z]) + 1.0);
+        // Chebyshev distance orders gutters; the Euclidean term only breaks
+        // equal-distance ties toward the geometrically nearer edge.
+        gl_FragDepth = (distance + euclidean / 64.0 + 1.0) /
+            (padding + padding / 32.0 + 2.0);
         return;
     }
-    outValue = clamp(value, 0.0, 1.0);
+
+    const uint primitive = uint(gl_PrimitiveID);
+    outValue = EncodeValue(ResolveInteriorValue(primitive));
+    outCoverage = float(charts.value[primitive]) + 1.0;
+    gl_FragDepth = 0.0;
 }

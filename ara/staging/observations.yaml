@@ -4122,3 +4122,27 @@ observations:
     promoted_to: null
     crystallized_via: null
     stale: false
+
+  - id: O244
+    timestamp: 2026-09-23T04:22+02:00
+    provenance: ai-executed
+    content: All 35 finite-corpus atlas cases and the 100000-triangle child case pass their recorded quality gates; independent metrics and reporting audit retained, without performance or universal claims.
+    context: Actual Opus 5.5 numerical audit corrected rounding and unsupported draft wording. Earlier design observations remain historical proposals, not wholesale adoption of every idea.
+    potential_type: claim
+    bound_to: [N637]
+    promoted: true
+    promoted_to: logic/claims.md:C109
+    crystallized_via: empirical-resolution
+    stale: false
+
+  - id: O245
+    timestamp: 2026-09-23T04:22+02:00
+    provenance: ai-executed
+    content: The final Vulkan bake, UV-view and split-workspace paths execute on the recorded GPU after unchanged-source stale-module recovery, with full CPU and separate sanitizer verification.
+    context: Named readback assertions and current logs prove a bounded operational path; the debugger-only screenshot is not sanitizer evidence.
+    potential_type: claim
+    bound_to: [N637]
+    promoted: true
+    promoted_to: logic/claims.md:C110
+    crystallized_via: artifact-commitment
+    stale: false

@@ -518,6 +518,21 @@ namespace Extrinsic::Runtime
             {
                 EditorFeatureDetail::MixSignature(token, std::bit_cast<std::uint32_t>(bound));
             }
+            for (const float value : {model.ViewCenter.x, model.ViewCenter.y, model.ViewHalfExtent})
+                EditorFeatureDetail::MixSignature(token, std::bit_cast<std::uint32_t>(value));
+            if (model.Texture)
+            {
+                const auto& texture = *model.Texture;
+                EditorFeatureDetail::MixSignature(token, texture.TextureAssetId);
+                EditorFeatureDetail::MixSignature(token, texture.Revision);
+                EditorFeatureDetail::MixSignature(token, static_cast<std::uint64_t>(texture.State));
+                EditorFeatureDetail::MixSignature(token, texture.CoverageTextureAssetId);
+                EditorFeatureDetail::MixSignature(token, texture.RawFloat);
+                EditorFeatureDetail::MixSignature(token, texture.Encoding);
+                EditorFeatureDetail::MixSignature(token, texture.Colormap);
+                EditorFeatureDetail::MixSignature(token, std::bit_cast<std::uint32_t>(texture.RangeMin));
+                EditorFeatureDetail::MixSignature(token, std::bit_cast<std::uint32_t>(texture.RangeMax));
+            }
             for (const std::uint32_t index : model.LineIndices)
                 EditorFeatureDetail::MixSignature(token, index);
             for (const glm::vec2 uv : model.UVs)
@@ -1379,13 +1394,13 @@ namespace Extrinsic::Runtime
             return model;
         }
         model.SelectedEntityIsMesh = true;
+        model.GpuUvCompatible = config.Texcoords.Name == "v:texcoord";
 
         std::vector<std::uint32_t> surfaceIndices{};
         std::vector<std::uint32_t> triangleFaces{};
-        const MeshSurfaceTopologyStatus topologyStatus = BuildMeshSurfaceTriangleTopology(
-            view,
-            surfaceIndices,
-            triangleFaces);
+        std::vector<std::uint32_t> cornerHalfedges{};
+        const MeshSurfaceTopologyStatus topologyStatus = BuildMeshSurfaceTriangleCornerTopology(
+            view, surfaceIndices, triangleFaces, cornerHalfedges);
         if (topologyStatus != MeshSurfaceTopologyStatus::Success)
         {
             model.Message = "UV view topology is unavailable (";
@@ -1393,41 +1408,61 @@ namespace Extrinsic::Runtime
             model.Message += ").";
             return model;
         }
-        model.Triangles.reserve(surfaceIndices.size() / 3u);
         const bool gpuRequested =
-            model.View.RenderMode ==
-            ParameterizationUvRenderMode::GpuShaded;
-        if (gpuRequested)
-            model.LineIndices.reserve(surfaceIndices.size() * 2u);
-        for (std::size_t index = 0u;
-             index + 2u < surfaceIndices.size();
-             index += 3u)
-        {
-            const std::array triangle{
-                surfaceIndices[index],
-                surfaceIndices[index + 1u],
-                surfaceIndices[index + 2u],
-            };
-            model.Triangles.push_back(triangle);
-            if (gpuRequested)
-            {
-                model.LineIndices.insert(
-                    model.LineIndices.end(),
-                    {triangle[0u], triangle[1u],
-                     triangle[1u], triangle[2u],
-                     triangle[2u], triangle[0u]});
-            }
-        }
-
-        const auto uvs = view.VertexSource->Properties.Get<glm::vec2>(
+            model.View.RenderMode == ParameterizationUvRenderMode::GpuShaded;
+        const auto vertexUvs = view.VertexSource->Properties.Get<glm::vec2>(
             config.Texcoords.Name);
-        if (uvs &&
-            uvs.Vector().size() == view.VertexSource->Properties.Size() &&
-            AllFiniteUvs(uvs.Vector()))
+        std::span<const glm::vec2> selectedUvs{};
+        if (vertexUvs && vertexUvs.Vector().size() == view.VertexSource->Properties.Size())
+            selectedUvs = vertexUvs.Vector();
+
+        // Atlas seams are corner-owned. Resolve the canonical authority before
+        // constructing indices, and use the same complete shading split as upload.
+        // Validate before the upload helper, whose repair policy is inappropriate
+        // for a diagnostic view of invalid authored data.
+        std::span<const glm::vec2> cornerUvs{};
+        std::span<const glm::vec3> cornerNormals{};
+        if (view.HalfedgeSource != nullptr)
         {
-            model.UVs = uvs.Vector();
-            model.HasUvCoordinates = true;
-            if (!model.UVs.empty())
+            if (config.Texcoords.Name == "v:texcoord")
+            {
+                const auto property = view.HalfedgeSource->Properties.Get<glm::vec2>(
+                    kCornerTexcoordProperty);
+                if (property && property.Vector().size() == view.HalfedgeSource->Properties.Size())
+                    cornerUvs = property.Vector();
+            }
+            const auto normals = view.HalfedgeSource->Properties.Get<glm::vec3>("h:normal");
+            if (normals && normals.Vector().size() == view.HalfedgeSource->Properties.Size())
+                cornerNormals = normals.Vector();
+        }
+        const auto diagnosticIndices = cornerUvs.empty() ? surfaceIndices : std::vector<std::uint32_t>{};
+        const bool uvFinite = !cornerUvs.empty()
+            ? std::ranges::all_of(cornerHalfedges, [&](const std::uint32_t index)
+              { return index < cornerUvs.size() && IsFiniteUv(cornerUvs[index]); })
+            : !selectedUvs.empty() && AllFiniteUvs(selectedUvs);
+        if (uvFinite)
+        {
+            model.ResolvedTexcoords = !cornerUvs.empty()
+                ? GeometryPropertyRef{GeometryElementDomain::MeshHalfedge, "h:texcoord", Geometry::PropertyValueKind::Vec2}
+                : config.Texcoords;
+            model.UVs.assign(selectedUvs.begin(), selectedUvs.end());
+            if (!cornerUvs.empty() || !cornerNormals.empty())
+            {
+                const auto vertexNormals = view.VertexSource->Properties.Get<glm::vec3>("v:normal");
+                MeshCornerAttributeSplit split{};
+                if (!BuildMeshCornerAttributeSplit(
+                        cornerUvs, cornerNormals, cornerHalfedges, selectedUvs,
+                        vertexNormals ? std::span<const glm::vec3>{vertexNormals.Vector()}
+                                      : std::span<const glm::vec3>{},
+                        view.VertexSource->Properties.Size(), surfaceIndices, split))
+                {
+                    model.Message = "UV view cannot resolve the surface corner attributes.";
+                    return model;
+                }
+                model.UVs = std::move(split.TexcoordForSlot);
+            }
+            model.HasUvCoordinates = !model.UVs.empty();
+            if (model.HasUvCoordinates)
             {
                 model.UvBoundsMin = model.UVs.front();
                 model.UvBoundsMax = model.UVs.front();
@@ -1436,39 +1471,27 @@ namespace Extrinsic::Runtime
                     model.UvBoundsMin = glm::min(model.UvBoundsMin, uv);
                     model.UvBoundsMax = glm::max(model.UvBoundsMax, uv);
                 }
-                model.HasFiniteUvBounds =
-                    IsFiniteUv(model.UvBoundsMin) &&
-                    IsFiniteUv(model.UvBoundsMax);
+                model.HasFiniteUvBounds = IsFiniteUv(model.UvBoundsMin) && IsFiniteUv(model.UvBoundsMax);
             }
-            const auto positions =
-                view.VertexSource->Properties.Get<glm::vec3>(
-                    config.Positions.Name);
-            if (positions &&
-                positions.Vector().size() ==
-                    view.VertexSource->Properties.Size() &&
+            const auto positions = view.VertexSource->Properties.Get<glm::vec3>(config.Positions.Name);
+            if (cornerUvs.empty() && positions && positions.Vector().size() == view.VertexSource->Properties.Size() &&
                 AllFinitePositions(positions.Vector()))
-            {
-                model.DiagnosticInputFingerprint =
-                    ComputeDiagnosticInputFingerprint(
-                        surfaceIndices,
-                        triangleFaces,
-                        positions.Vector(),
-                        model.UVs);
-            }
+                model.DiagnosticInputFingerprint = ComputeDiagnosticInputFingerprint(
+                    diagnosticIndices, triangleFaces, positions.Vector(), selectedUvs);
         }
-        else if (view.VertexSource->Properties.Exists(config.Texcoords.Name))
+        else if (!cornerUvs.empty() || view.VertexSource->Properties.Exists(config.Texcoords.Name))
+            model.Message = "The bound mesh UV output has the wrong type, count, or non-finite values.";
+
+        model.Triangles.reserve(surfaceIndices.size() / 3u);
+        if (gpuRequested)
+            model.LineIndices.reserve(surfaceIndices.size() * 2u);
+        for (std::size_t index = 0u; index + 2u < surfaceIndices.size(); index += 3u)
         {
-            model.Message =
-                "The bound mesh UV output has the wrong type, count, or non-finite values.";
-        }
-        else if (view.HalfedgeSource != nullptr &&
-                 view.HalfedgeSource->Properties.Exists(
-                     kCornerTexcoordProperty))
-        {
-            model.Message =
-                "Selected mesh carries corner-domain UVs (h:texcoord), which "
-                "the vertex-indexed UV layout view cannot draw. Corner storage "
-                "is preserved unless explicitly selected for retirement.";
+            const std::array triangle{surfaceIndices[index], surfaceIndices[index + 1u], surfaceIndices[index + 2u]};
+            model.Triangles.push_back(triangle);
+            if (gpuRequested)
+                model.LineIndices.insert(model.LineIndices.end(),
+                    {triangle[0u], triangle[1u], triangle[1u], triangle[2u], triangle[2u], triangle[0u]});
         }
 
         if (results.LastParameterizationResult &&
@@ -1542,6 +1565,13 @@ namespace Extrinsic::Runtime
                 : "CPU UV layout is active.",
         };
 
+        if (gpuRequested && !model.GpuUvCompatible)
+        {
+            fallback.Status = EditorParameterizationUvViewStatus::CpuLayout;
+            fallback.Message = "The bound custom UV property uses CPU layout; resident GPU geometry carries canonical UVs.";
+            if (uvViewCommands.Available()) (void)uvViewCommands.Submit(EditorParameterizationUvViewRequest{});
+            return fallback;
+        }
         if (!gpuRequested)
         {
             if (uvViewCommands.Available())
@@ -1571,6 +1601,9 @@ namespace Extrinsic::Runtime
             .UvBoundsMin = model.UvBoundsMin,
             .UvBoundsMax = model.UvBoundsMax,
             .View = model.View,
+            .Texture = model.Texture,
+            .ViewCenter = model.ViewCenter,
+            .ViewHalfExtent = model.ViewHalfExtent,
             .LineIndices = model.LineIndices,
             .TriangleConformalDistortion =
                 model.TriangleConformalDistortion,

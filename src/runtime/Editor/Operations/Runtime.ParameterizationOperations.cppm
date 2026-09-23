@@ -36,6 +36,29 @@ export namespace Extrinsic::Runtime
         Ready,
     };
 
+    enum class EditorParameterizationTextureState : std::uint8_t
+    {
+        Unavailable, Pending, Ready, Failed, Stale,
+    };
+
+    struct EditorParameterizationTextureTab
+    {
+        std::string Name{};
+        std::string Diagnostic{};
+        std::uint64_t TextureAssetId{0u};
+        std::uint64_t CoverageTextureAssetId{0u};
+        GeometryPropertyRef ResolvedTexcoords{};
+        std::uint32_t Width{0u};
+        std::uint32_t Height{0u};
+        float RangeMin{0.0f};
+        float RangeMax{1.0f};
+        EditorParameterizationTextureState State{EditorParameterizationTextureState::Unavailable};
+        bool RawFloat{true};
+        std::uint32_t Encoding{0u};
+        std::uint32_t Colormap{0u};
+        std::uint64_t Revision{0u};
+    };
+
     struct EditorParameterizationUvViewRequest
     {
         bool Enabled{false};
@@ -46,6 +69,9 @@ export namespace Extrinsic::Runtime
         glm::vec2 UvBoundsMin{0.0f};
         glm::vec2 UvBoundsMax{1.0f};
         ParameterizationViewConfig View{};
+        std::optional<EditorParameterizationTextureTab> Texture{};
+        glm::vec2 ViewCenter{0.5f};
+        float ViewHalfExtent{0.55f};
         std::vector<std::uint32_t> LineIndices{};
         std::vector<float> TriangleConformalDistortion{};
     };
@@ -74,10 +100,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t StableEntityId{0u};
         bool PreserveValidAuthoredUvs{false};
         bool ForceRegenerate{true};
-        std::uint32_t Resolution{1024u};
-        std::uint32_t Padding{2u};
-        float TexelsPerUnit{0.0f};
-        std::string BackendName{"xatlas"};
+        ParameterizationAtlasConfig Atlas{};
     };
 
     struct EditorUvRegenerationCommandResult
@@ -93,6 +116,21 @@ export namespace Extrinsic::Runtime
         // count of vertices added to the mesh, whose topology is preserved
         // while the seam is carried on the corner domain.
         std::size_t SeamSplitVertexCount{0u};
+        Geometry::UvAtlas::UvAtlasMethod RequestedMethod{Geometry::UvAtlas::UvAtlasMethod::FastStaged};
+        Geometry::UvAtlas::UvAtlasMethod ActualMethod{Geometry::UvAtlas::UvAtlasMethod::None};
+        Geometry::UvAtlas::UvAtlasDistortion RequestedDistortion{Geometry::UvAtlas::UvAtlasDistortion::Both};
+        Geometry::UvAtlas::UvAtlasDistortion ActualDistortion{Geometry::UvAtlas::UvAtlasDistortion::None};
+        bool UsedFallback{false};
+        std::string FallbackReason{};
+        std::uint32_t RegionCount{0u};
+        std::uint32_t StableEntityId{0u};
+        double MaxConformalDistortion{0.0};
+        double MaxAreaDistortion{0.0};
+        double MeanConformalDistortion{0.0};
+        double MeanAreaDistortion{0.0};
+        std::uint32_t RefinementSplitCount{0u};
+        std::uint32_t SingleTriangleChartCount{0u};
+        std::uint32_t UnconvergedChartCount{0u};
         std::string Diagnostic{};
 
         [[nodiscard]] bool Succeeded() const noexcept
@@ -151,12 +189,18 @@ export namespace Extrinsic::Runtime
         bool HasUvCoordinates{false};
         bool HasFiniteUvBounds{false};
         bool HasLastResult{false};
+        bool GpuUvCompatible{true};
+        GeometryPropertyRef ResolvedTexcoords{};
         std::uint32_t SelectedStableEntityId{0u};
         // Matches LastParameterizationResult only while every input consumed
         // by the position- and UV-dependent face diagnostics is unchanged.
         std::optional<std::uint64_t> DiagnosticInputFingerprint{};
         EditorParameterizationStrategy Strategy{EditorParameterizationStrategy::Lscm};
         ParameterizationViewConfig View{};
+        std::optional<EditorParameterizationTextureTab> Texture{};
+        glm::vec2 ViewCenter{0.5f};
+        float ViewHalfExtent{0.55f};
+        std::vector<EditorParameterizationTextureTab> TextureTabs{};
         std::vector<glm::vec2> UVs{};
         std::vector<std::array<std::uint32_t, 3u>> Triangles{};
         std::vector<std::uint32_t> LineIndices{};
@@ -177,6 +221,7 @@ export namespace Extrinsic::Runtime
         // session owns one guarded instance and the prepared frame copies it.
         struct EditorParameterizationUvViewCommandSurface
         {
+            std::function<std::vector<EditorParameterizationTextureTab>(std::uint32_t)> TextureTabs{};
             std::function<EditorParameterizationUvViewState(EditorParameterizationUvViewRequest)>
                 Submit{};
 

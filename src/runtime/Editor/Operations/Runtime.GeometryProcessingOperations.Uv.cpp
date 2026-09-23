@@ -1,5 +1,6 @@
 module;
 #include <functional>
+#include "GeometryIntegration/Runtime.GeometryValueComparison.hpp"
 #include <entt/entity/fwd.hpp>
 
 #include <algorithm>
@@ -18,6 +19,7 @@ module;
 #include <string>
 #include <string_view>
 #include <utility>
+#include <type_traits>
 #include <unordered_map>
 #include <variant>
 #include <vector>
@@ -53,6 +55,7 @@ import Geometry.Properties;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.Mesh.Conversion;
 import Geometry.UvAtlas;
+import Geometry.HalfedgeMesh.CurvatureSegmentation;
 
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
@@ -169,9 +172,9 @@ namespace GeometryProcessingDetail::MeshSupport
                 return true;
             }
 
-            // No seam, or the corner publication could not map: the per-vertex
-            // representatives are the exact answer in the first case and the
-            // best available one in the second.
+            if (corners.HasSeam)
+                return false;
+            // A vertex property is exact only when no corner seam exists.
             if (corners.VertexUvs.size() != mesh.VerticesSize())
                 return false;
             removeProperty(
@@ -247,9 +250,15 @@ namespace GeometryProcessingDetail::MeshSupport
                     return false;
                 if (!beforeUvs)
                     return true;
-                return beforeUvs.Vector() == afterUvs.Vector();
+                return GeometryValueComparison::BitEqual(beforeUvs.Vector(), afterUvs.Vector());
             };
 
+            for (const auto* name : {"f:atlas_region", "f:atlas_chart"})
+            {
+                const auto a = before.FaceProperties().Get<std::uint32_t>(name);
+                const auto b = after.FaceProperties().Get<std::uint32_t>(name);
+                if (static_cast<bool>(a) != static_cast<bool>(b) || (a && a.Vector() != b.Vector())) return false;
+            }
             return sameProperty(
                        Geometry::ConstPropertySet(before.VertexProperties()),
                        Geometry::ConstPropertySet(after.VertexProperties()),
@@ -351,10 +360,193 @@ using namespace GeometryProcessingDetail::MeshSupport;
                lhs.FaceHalfedge == rhs.FaceHalfedge;
     }
 
+    struct UvPublishedProperties
+    {
+        std::optional<std::vector<glm::vec2>> VertexUvs{};
+        std::optional<std::vector<glm::vec2>> CornerUvs{};
+        std::optional<std::vector<std::uint32_t>> FaceRegions{};
+        std::optional<std::vector<std::uint32_t>> FaceCharts{};
+        // Generated-atlas extent of these UVs; its revision stamps are
+        // ignored and re-taken when the state is applied.
+        std::optional<MeshUvAtlasExtent> AtlasExtent{};
+        // Retain a stale before-state binding so undoing this regeneration
+        // does not prevent an older UV edit's undo from recovering its grid.
+        std::optional<MeshUvAtlasExtent> RetainedExtent{};
+    };
+
+    [[nodiscard]] bool SameAtlasExtent(
+        const std::optional<MeshUvAtlasExtent>& lhs,
+        const std::optional<MeshUvAtlasExtent>& rhs) noexcept
+    {
+        return lhs.has_value() == rhs.has_value() &&
+               (!lhs || (lhs->Width == rhs->Width && lhs->Height == rhs->Height));
+    }
+    using UvPropertySnapshot = std::shared_ptr<const UvPublishedProperties>;
+
+    [[nodiscard]] UvPublishedProperties CaptureUvPublishedProperties(const GS::ConstSourceView& view)
+    {
+        UvPublishedProperties result{};
+        if (view.VertexSource)
+            if (const auto uv = view.VertexSource->Properties.Get<glm::vec2>("v:texcoord")) result.VertexUvs = uv.Vector();
+        if (view.HalfedgeSource)
+            if (const auto uv = view.HalfedgeSource->Properties.Get<glm::vec2>("h:texcoord")) result.CornerUvs = uv.Vector();
+        if (view.FaceSource)
+        {
+            if (const auto property = view.FaceSource->Properties.Get<std::uint32_t>("f:atlas_region")) result.FaceRegions = property.Vector();
+            if (const auto property = view.FaceSource->Properties.Get<std::uint32_t>("f:atlas_chart")) result.FaceCharts = property.Vector();
+        }
+        return result;
+    }
+
+    // Stored `h:texcoord` as three UVs per soup face. The corner walk and the
+    // soup builder fan faces identically (see
+    // CopyStoredCornerTexcoordsToScratchMesh); anything that does not line
+    // up yields an empty result rather than misassigned corners.
+    [[nodiscard]] std::vector<glm::vec2> GatherSoupCornerTexcoords(
+        const GS::ConstSourceView& view, const Geometry::MeshSoup::IndexedMesh& soup)
+    {
+        if (!view.HalfedgeSource) return {};
+        const auto stored = view.HalfedgeSource->Properties.Get<glm::vec2>("h:texcoord");
+        std::vector<std::uint32_t> indices{}, faces{}, halfedges{};
+        if (!stored ||
+            BuildMeshSurfaceTriangleCornerTopology(view, indices, faces, halfedges) != MeshSurfaceTopologyStatus::Success ||
+            indices.size() != 3u * soup.FaceCount())
+            return {};
+        std::vector<glm::vec2> corners{};
+        corners.reserve(indices.size());
+        for (std::size_t face = 0u; face < soup.FaceCount(); ++face)
+        {
+            const auto& ring = soup.Faces()[face].Indices;
+            for (std::size_t k = 0u; k < 3u; ++k)
+            {
+                const std::size_t corner = face * 3u + k;
+                if (ring.size() != 3u || ring[k] != indices[corner] || halfedges[corner] >= stored.Vector().size())
+                    return {};
+                corners.push_back(stored.Vector()[halfedges[corner]]);
+            }
+        }
+        return corners;
+    }
+
+    // Admits corner UVs with exactly the rules ValidateAuthoredUvs applies to
+    // vertex UVs, by validating a de-indexed copy in which every face owns
+    // its three corners (so seams are representable).
+    [[nodiscard]] Geometry::UvAtlas::UvAtlasDiagnostics ValidateAuthoredCornerTexcoords(
+        const Geometry::MeshSoup::IndexedMesh& soup, const std::span<const glm::vec2> corners)
+    {
+        std::vector<glm::vec3> positions{};
+        std::vector<Geometry::MeshSoup::PolygonFace> faces{};
+        positions.reserve(corners.size());
+        faces.reserve(soup.FaceCount());
+        for (const auto& face : soup.Faces())
+        {
+            Geometry::MeshSoup::PolygonFace owned{};
+            for (const auto vertex : face.Indices)
+            {
+                owned.Indices.push_back(static_cast<Geometry::MeshSoup::Index>(positions.size()));
+                positions.push_back(soup.Positions()[vertex]);
+            }
+            faces.push_back(std::move(owned));
+        }
+        return Geometry::UvAtlas::ValidateAuthoredUvs(Geometry::UvAtlas::UvAtlasInput{
+            .Positions = positions,
+            .Faces = faces,
+            .AuthoredTexcoords = corners,
+        });
+    }
+
+    [[nodiscard]] std::optional<UvPublishedProperties> MapUvPublishedProperties(
+        const GS::ConstSourceView& view, const Geometry::HalfedgeMesh::Mesh& mesh)
+    {
+        UvPublishedProperties result{};
+        std::vector<std::uint32_t> indices{}, faces{}, halfedges{};
+        if (!view.FaceSource || BuildMeshSurfaceTriangleCornerTopology(view, indices, faces, halfedges) != MeshSurfaceTopologyStatus::Success || faces.size() != mesh.FaceCount())
+            return std::nullopt;
+        const auto source = CaptureUvPublishedProperties(view);
+        const auto mapLabels = [&](const char* name, const auto& oldValues, auto& output)
+        {
+            const auto labels = mesh.FaceProperties().Get<std::uint32_t>(name);
+            if (!labels) return true;
+            if (labels.Vector().size() != faces.size()) return false;
+            output = oldValues.value_or(std::vector<std::uint32_t>(view.FaceSource->Properties.Size(), std::numeric_limits<std::uint32_t>::max()));
+            for (std::size_t face = 0; face < faces.size(); ++face)
+            {
+                if (faces[face] >= output->size()) return false;
+                (*output)[faces[face]] = labels[face];
+            }
+            return true;
+        };
+        if (!mapLabels("f:atlas_region", source.FaceRegions, result.FaceRegions) ||
+            !mapLabels("f:atlas_chart", source.FaceCharts, result.FaceCharts)) return std::nullopt;
+        if (const auto uv = mesh.VertexProperties().Get<glm::vec2>("v:texcoord")) result.VertexUvs = uv.Vector();
+        if (const auto uv = mesh.HalfedgeProperties().Get<glm::vec2>("h:texcoord"))
+        {
+            if (!view.HalfedgeSource) return std::nullopt;
+            result.CornerUvs = CaptureUvPublishedProperties(view).CornerUvs.value_or(
+                std::vector<glm::vec2>(view.HalfedgeSource->Properties.Size(), glm::vec2{0.0f}));
+            for (std::size_t triangle = 0; triangle < faces.size(); ++triangle)
+            {
+                for (std::size_t corner = 0; corner < 3u; ++corner)
+                {
+                    const auto sourceCorner = triangle * 3u + corner;
+                    bool matched = false;
+                    for (const auto h : mesh.HalfedgesAroundFace(Geometry::FaceHandle{static_cast<std::uint32_t>(triangle)}))
+                        if (mesh.ToVertex(h).Index == indices[sourceCorner])
+                        {
+                            if (halfedges[sourceCorner] >= result.CornerUvs->size() || h.Index >= uv.Vector().size()) return std::nullopt;
+                            (*result.CornerUvs)[halfedges[sourceCorner]] = uv[h.Index];
+                            matched = true;
+                            break;
+                        }
+                    if (!matched) return std::nullopt;
+                }
+            }
+        }
+        return result;
+    }
+
+    [[nodiscard]] EditorCommandHistoryStatus ApplyUvPublishedProperties(
+        ECS::Scene::Registry* scene, const std::uint32_t stableEntityId, const UvPublishedProperties& state)
+    {
+        if (!scene) return EditorCommandHistoryStatus::MissingScene;
+        auto& raw = scene->Raw();
+        const auto entity = ResolveStableEntity(raw, stableEntityId);
+        if (!entity) return EditorCommandHistoryStatus::StaleEntity;
+        auto view = GS::BuildMutableView(raw, *entity);
+        if (!view.VertexSource || !view.HalfedgeSource || !view.FaceSource) return EditorCommandHistoryStatus::UnsupportedOperation;
+        const auto compatible = []<typename T>(const Geometry::PropertySet& set, const char* name, const std::optional<std::vector<T>>& values)
+        { return (!values || values->size() == set.Size()) && (!set.Exists(name) || static_cast<bool>(set.Get<T>(name))); };
+        if (!compatible(view.VertexSource->Properties, "v:texcoord", state.VertexUvs) ||
+            !compatible(view.HalfedgeSource->Properties, "h:texcoord", state.CornerUvs) ||
+            !compatible(view.FaceSource->Properties, "f:atlas_region", state.FaceRegions) ||
+            !compatible(view.FaceSource->Properties, "f:atlas_chart", state.FaceCharts))
+            return EditorCommandHistoryStatus::CommandFailed;
+        const auto apply = []<typename T>(Geometry::PropertySet& set, const char* name, const std::optional<std::vector<T>>& values)
+        {
+            if (values) set.GetOrAdd<T>(name, T{}).Vector() = *values;
+            else if (const auto id = set.Registry().Find(name)) (void)set.Registry().Remove(*id);
+        };
+        apply(view.VertexSource->Properties, "v:texcoord", state.VertexUvs);
+        apply(view.HalfedgeSource->Properties, "h:texcoord", state.CornerUvs);
+        apply(view.FaceSource->Properties, "f:atlas_region", state.FaceRegions);
+        apply(view.FaceSource->Properties, "f:atlas_chart", state.FaceCharts);
+        // Stamped after the writes above, so undo and redo restore the extent
+        // together with exactly the UVs it describes.
+        (void)PublishMeshUvAtlasExtent(raw, *entity,
+            state.AtlasExtent ? state.AtlasExtent->Width : 0u,
+            state.AtlasExtent ? state.AtlasExtent->Height : 0u);
+        if (!state.AtlasExtent && state.RetainedExtent)
+            RestoreMeshUvAtlasExtent(raw, *entity, *state.RetainedExtent);
+        Dirty::MarkVertexTexcoordsDirty(raw, *entity);
+        Dirty::MarkGpuDirty(raw, *entity);
+        return EditorCommandHistoryStatus::Applied;
+    }
+
     struct UvMeshKnownPropertyState
     {
         Geometry::PropertySet VertexProperties{};
         Geometry::PropertySet FaceProperties{};
+        std::optional<std::vector<glm::vec2>> CornerUvs{};
     };
 
     using UvMeshKnownPropertySnapshot =
@@ -369,7 +561,16 @@ using namespace GeometryProcessingDetail::MeshSupport;
             UvMeshKnownPropertyState{
                 .VertexProperties = view.VertexSource->Properties,
                 .FaceProperties = view.FaceSource->Properties,
+                .CornerUvs = CaptureUvPublishedProperties(view).CornerUvs,
             });
+    }
+
+    [[nodiscard]] bool SameCornerUvSnapshot(
+        const std::optional<std::vector<glm::vec2>>& lhs,
+        const std::optional<std::vector<glm::vec2>>& rhs) noexcept
+    {
+        return lhs.has_value() == rhs.has_value() &&
+               (!lhs || GeometryValueComparison::BitEqual(*lhs, *rhs));
     }
 
     [[nodiscard]] bool SameUvMeshKnownPropertyState(
@@ -378,6 +579,7 @@ using namespace GeometryProcessingDetail::MeshSupport;
     {
         return view.VertexSource != nullptr &&
                view.FaceSource != nullptr &&
+               SameCornerUvSnapshot(CaptureUvPublishedProperties(view).CornerUvs, expected.CornerUvs) &&
                SameKnownPropertyValues(
                    Geometry::ConstPropertySet(
                        view.VertexSource->Properties),
@@ -397,19 +599,30 @@ using namespace GeometryProcessingDetail::MeshSupport;
         UvMeshKnownPropertySnapshot Properties{};
     };
 
-    [[nodiscard]] EditorCommandStatus CommitUvMeshTopologyReplacement(
+    [[nodiscard]] EditorCommandStatus CommitUvPropertyReplacement(
         const EditorProcessingContext& context,
         const std::uint32_t stableEntityId,
         const char* label,
         const std::uint64_t expectedGeometryMetadataSignature,
         EditorUvRegenerationSourceSnapshot expectedSnapshot,
-        Geometry::HalfedgeMesh::Mesh before,
-        Geometry::HalfedgeMesh::Mesh after)
+        const Geometry::HalfedgeMesh::Mesh& after,
+        const std::optional<MeshUvAtlasExtent>& afterExtent)
     {
-        if (before.HasGarbage())
-            before.GarbageCollection();
-        if (after.HasGarbage())
-            after.GarbageCollection();
+        if (!context.Scene) return EditorCommandStatus::MissingScene;
+        auto& sourceRaw = context.Scene->Raw();
+        const auto sourceEntity = ResolveStableEntity(sourceRaw, stableEntityId);
+        if (!sourceEntity) return EditorCommandStatus::StaleEntity;
+        const auto sourceView = GS::BuildConstView(sourceRaw, *sourceEntity);
+        auto mapped = MapUvPublishedProperties(sourceView, after);
+        if (!mapped) return EditorCommandStatus::GeometryProcessingFailed;
+        mapped->AtlasExtent = afterExtent;
+        UvPublishedProperties before = CaptureUvPublishedProperties(sourceView);
+        before.AtlasExtent = FindCurrentMeshUvAtlasExtent(sourceRaw, *sourceEntity);
+        if (!before.AtlasExtent)
+            if (const auto* retained = sourceRaw.try_get<MeshUvAtlasExtent>(*sourceEntity))
+                before.RetainedExtent = *retained;
+        const UvPropertySnapshot beforeState = std::make_shared<UvPublishedProperties>(std::move(before));
+        const UvPropertySnapshot afterState = std::make_shared<UvPublishedProperties>(std::move(*mapped));
 
         if (context.CommandHistory != nullptr)
         {
@@ -431,12 +644,6 @@ using namespace GeometryProcessingDetail::MeshSupport;
                     UnsupportedGeometryDomain;
             }
 
-            const MeshTopologySnapshot beforeState =
-                std::make_shared<Geometry::HalfedgeMesh::Mesh>(
-                    std::move(before));
-            const MeshTopologySnapshot afterState =
-                std::make_shared<Geometry::HalfedgeMesh::Mesh>(
-                    std::move(after));
             const EditorCommandHistoryResult history =
                 Internal::ExecuteUndoableEntityMutation(
                     *context.CommandHistory,
@@ -457,7 +664,7 @@ using namespace GeometryProcessingDetail::MeshSupport;
                     [](
                         const MeshPropertyMutationIdentity& identity,
                         const UvMeshTopologyMutationGeneration& expected,
-                        const MeshTopologySnapshot& target)
+                        const UvPropertySnapshot& target)
                     {
                         if (identity.Scene == nullptr ||
                             !identity.World.IsValid())
@@ -511,11 +718,11 @@ using namespace GeometryProcessingDetail::MeshSupport;
                     },
                     [](
                         const MeshPropertyMutationIdentity& identity,
-                        const MeshTopologySnapshot& target)
+                        const UvPropertySnapshot& target)
                     {
                         if (target == nullptr)
                             return EditorCommandHistoryStatus::CommandFailed;
-                        return ApplyMeshTopologyState(
+                        return ApplyUvPublishedProperties(
                             identity.Scene,
                             identity.StableEntityId,
                             *target);
@@ -523,7 +730,7 @@ using namespace GeometryProcessingDetail::MeshSupport;
                     [](
                         const MeshPropertyMutationIdentity& identity,
                         const UvMeshTopologyMutationGeneration&,
-                        const MeshTopologySnapshot&)
+                        const UvPropertySnapshot&)
                     {
                         entt::registry& raw = identity.Scene->Raw();
                         const std::optional<ECS::EntityHandle> entity =
@@ -533,7 +740,7 @@ using namespace GeometryProcessingDetail::MeshSupport;
                         EditorUvRegenerationSourceSnapshot current{};
                         if (entity.has_value())
                         {
-                            MarkMeshTopologyReplacementDirty(raw, *entity);
+                            Dirty::MarkVertexTexcoordsDirty(raw, *entity);
                             Dirty::MarkGpuDirty(raw, *entity);
                             (void)CaptureUvRegenerationSourceSnapshot(
                                 GS::BuildConstView(raw, *entity),
@@ -559,10 +766,7 @@ using namespace GeometryProcessingDetail::MeshSupport;
         }
 
         const EditorCommandHistoryStatus applied =
-            ApplyMeshTopologyState(
-                context.Scene,
-                stableEntityId,
-                after);
+            ApplyUvPublishedProperties(context.Scene, stableEntityId, *afterState);
         if (applied != EditorCommandHistoryStatus::Applied)
             return ToEditorCommandStatus(applied);
         entt::registry& raw = context.Scene->Raw();
@@ -570,7 +774,7 @@ using namespace GeometryProcessingDetail::MeshSupport;
             ResolveStableEntity(raw, stableEntityId);
         if (entity.has_value())
         {
-            MarkMeshTopologyReplacementDirty(raw, *entity);
+            Dirty::MarkVertexTexcoordsDirty(raw, *entity);
             Dirty::MarkGpuDirty(raw, *entity);
         }
         return EditorCommandStatus::Applied;
@@ -598,6 +802,20 @@ using namespace GeometryProcessingDetail::MeshSupport;
         result.AtlasWidth = atlas.Diagnostics.AtlasWidth;
         result.AtlasHeight = atlas.Diagnostics.AtlasHeight;
         result.ChartCount = atlas.Diagnostics.ChartCount;
+        result.RegionCount = atlas.Diagnostics.RegionComponentCount;
+        result.RequestedMethod = atlas.Diagnostics.RequestedMethod;
+        result.ActualMethod = atlas.Diagnostics.ActualMethod;
+        result.RequestedDistortion = atlas.Diagnostics.RequestedDistortion;
+        result.ActualDistortion = atlas.Diagnostics.ActualDistortion;
+        result.UsedFallback = atlas.Diagnostics.UsedFallback;
+        result.FallbackReason = atlas.Diagnostics.FallbackReason;
+        result.MaxConformalDistortion = atlas.Diagnostics.Validation.MaxConformalDistortion;
+        result.MaxAreaDistortion = atlas.Diagnostics.Validation.MaxAreaDistortion;
+        result.MeanConformalDistortion = atlas.Diagnostics.Validation.MeanConformalDistortion;
+        result.MeanAreaDistortion = atlas.Diagnostics.Validation.MeanAreaDistortion;
+        result.RefinementSplitCount = atlas.Diagnostics.RefinementSplitCount;
+        result.SingleTriangleChartCount = atlas.Diagnostics.SingleTriangleChartCount;
+        result.UnconvergedChartCount = atlas.Diagnostics.UnconvergedChartCount;
         result.SeamSplitVertexCount =
             atlas.Diagnostics.OutputVertexCount >
                     atlas.Diagnostics.InputVertexCount
@@ -632,6 +850,11 @@ using namespace GeometryProcessingDetail::MeshSupport;
         Geometry::PropertySet SourceFaceProperties{};
         bool HasSourceFaceProperties{false};
         std::vector<glm::vec2> AuthoredTexcoords{};
+        // Preserve requested without Force while `h:texcoord` exists: its
+        // UVs, three per soup face (empty when they do not map onto the soup).
+        bool PreserveAuthoredCornerUvs{false};
+        std::vector<glm::vec2> AuthoredCornerUvs{};
+        std::optional<std::vector<glm::vec2>> SourceCornerUvs{};
         Geometry::HalfedgeMesh::Mesh BeforeMesh{};
         Geometry::HalfedgeMesh::Mesh AfterMesh{};
         EditorUvRegenerationCommand Command{};
@@ -680,14 +903,15 @@ using namespace GeometryProcessingDetail::MeshSupport;
             !SameUvRegenerationSourceSnapshot(current, job.Snapshot) ||
             view.VertexSource == nullptr ||
             view.FaceSource == nullptr ||
+            !SameCornerUvSnapshot(CaptureUvPublishedProperties(view).CornerUvs, job.SourceCornerUvs) ||
             !SameKnownPropertyValues(
                 Geometry::ConstPropertySet(
                     view.VertexSource->Properties),
-                job.BeforeMesh.VertexProperties()) ||
+                Geometry::ConstPropertySet(job.SourceVertexProperties)) ||
             !SameKnownPropertyValues(
                 Geometry::ConstPropertySet(
                     view.FaceSource->Properties),
-                job.BeforeMesh.FaceProperties()))
+                Geometry::ConstPropertySet(job.SourceFaceProperties)))
         {
             return JobApplyValidation::StaleGeneration;
         }
@@ -724,16 +948,136 @@ using namespace GeometryProcessingDetail::MeshSupport;
     }
 
     [[nodiscard]] JobResultEnvelope RunUvRegenerationCpuWorker(
-        const std::shared_ptr<EditorUvRegenerationCpuJobState>& state)
+        const std::shared_ptr<EditorUvRegenerationCpuJobState>& state,
+        const JobCancellation* cancellation = nullptr)
     {
         Geometry::UvAtlas::UvAtlasOptions options{};
+        options.CancelFlag = cancellation ? cancellation->Flag() : nullptr;
         options.PreserveValidAuthoredUvs =
             state->Command.PreserveValidAuthoredUvs;
         options.ForceRegenerate = state->Command.ForceRegenerate;
-        options.Resolution = state->Command.Resolution;
-        options.Padding = state->Command.Padding;
-        options.TexelsPerUnit = state->Command.TexelsPerUnit;
-        options.BackendName = "xatlas";
+        const auto& config = state->Command.Atlas;
+        options.Resolution = config.Resolution;
+        options.Padding = config.Padding;
+        options.TexelsPerUnit = config.TexelsPerUnit;
+        options.Method = config.Method;
+        options.BackendName = config.Method == Geometry::UvAtlas::UvAtlasMethod::XAtlas ? "xatlas" : "fast-staged";
+        options.Distortion = config.Distortion;
+        options.MaxConformalDistortion = config.MaxConformalDistortion;
+        options.MaxAreaDistortion = config.MaxAreaDistortion;
+        options.MaxCharts = config.MaxCharts;
+        options.MaxIterations = config.MaxIterations;
+        options.AllowXAtlasFallback = config.AllowXAtlasFallback;
+        state->Result.StableEntityId = state->StableEntityId;
+        state->Result.RequestedMethod = config.Method;
+        state->Result.RequestedDistortion = config.Distortion;
+
+        // Corner UVs are validated like authored vertex UVs and, when valid,
+        // kept exactly: seams, labels and atlas extent stay as they are.
+        // Preservation cannot honor a region guide, so a guided request
+        // regenerates instead of claiming a region-constrained atlas.
+        std::string authoredDetail{};
+        if (state->PreserveAuthoredCornerUvs)
+        {
+            if (config.Guide)
+            {
+                authoredDetail = "authored corner UVs were not preserved because they cannot honor the requested region guide; ";
+            }
+            else if (state->AuthoredCornerUvs.empty())
+            {
+                authoredDetail = "authored corner UVs were not preserved because they do not map onto the triangulated surface; ";
+            }
+            else
+            {
+                const Geometry::UvAtlas::UvAtlasDiagnostics authored =
+                    ValidateAuthoredCornerTexcoords(state->Soup.Mesh, state->AuthoredCornerUvs);
+                if (authored.Status == Geometry::UvAtlas::UvAtlasStatus::Success)
+                {
+                    state->Result.Status = EditorCommandStatus::NoChange;
+                    state->Result.UvStatus = Geometry::UvAtlas::UvAtlasStatus::Success;
+                    state->Result.Provenance = Geometry::UvAtlas::UvAtlasProvenance::AuthoredPreserved;
+                    state->Result.ActualMethod = Geometry::UvAtlas::UvAtlasMethod::Authored;
+                    state->Result.Diagnostic =
+                        "Valid authored corner UVs (h:texcoord) were preserved. Nothing was published and "
+                        "no undo entry was created; force regeneration to replace them.";
+                    return JobResultEnvelope::Make<EditorJobResult>(
+                        EditorJobResult{.Diagnostic = state->Result.Diagnostic});
+                }
+                authoredDetail = std::string{"authored corner UVs were not preserved ("} +
+                                 Geometry::UvAtlas::ToString(authored.Status) + "); ";
+            }
+        }
+
+        // The source snapshot and canonical typed capture own storage. Only
+        // participating source slots are converted, rejecting inexact uint64
+        // values rather than merging distinct features through rounding.
+        std::vector<std::uint32_t> faceRegions{};
+        if (config.Guide)
+        {
+            const auto& guide = *config.Guide;
+            const bool vertexInput = guide.Domain == GeometryElementDomain::MeshVertex;
+            const auto captured = CaptureGeometryScalarProperty(
+                vertexInput ? state->SourceVertexProperties : state->SourceFaceProperties, guide);
+            std::vector<glm::dvec3> features(state->Soup.Mesh.FaceCount(), glm::dvec3{0.0});
+            const bool valid = captured.Exists && std::visit([&](const auto& values)
+            {
+                const auto read = [&](const std::size_t row, double& output)
+                {
+                    if (row >= values.size()) return false;
+                    using T = typename std::decay_t<decltype(values)>::value_type;
+                    const T value = values[row];
+                    if constexpr (std::is_same_v<T, std::uint64_t>)
+                    {
+                        const auto bits = std::bit_width(value);
+                        if (bits > std::numeric_limits<double>::digits &&
+                            (value & ((std::uint64_t{1} << (bits - std::numeric_limits<double>::digits)) - 1u))) return false;
+                    }
+                    output = static_cast<double>(value);
+                    return std::isfinite(output);
+                };
+                for (std::size_t face = 0; face < features.size(); ++face)
+                {
+                    if (vertexInput)
+                    {
+                        const auto& polygon = state->Soup.Mesh.Faces()[face];
+                        for (const auto vertex : polygon.Indices)
+                        {
+                            double value{};
+                            if (!read(vertex, value)) return false;
+                            features[face].x += value / static_cast<double>(polygon.Indices.size());
+                        }
+                    }
+                    else if (!read(state->Soup.SourceFaceForSoupFace[face], features[face].x)) return false;
+                    if (!std::isfinite(features[face].x)) return false;
+                }
+                return true;
+            }, captured.Values);
+            if (!valid)
+            {
+                state->Result.Status = EditorCommandStatus::InvalidProcessingParameters;
+                state->Result.UvStatus = Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput;
+                state->Result.Diagnostic = "Atlas guide requires finite scalar values with exact numeric conversion.";
+                return JobResultEnvelope::Make<EditorJobResult>(EditorJobResult{.Diagnostic = state->Result.Diagnostic});
+            }
+            namespace Seg = Geometry::CurvatureSegmentation;
+            Seg::CurvatureSegmentationParams params{};
+            params.SelectionMode = config.RegionCount == 0u ? Seg::ComponentSelectionMode::Automatic : Seg::ComponentSelectionMode::FixedCount;
+            params.FixedComponentCount = std::max(1u, config.RegionCount);
+            params.AutomaticMaxComponents = static_cast<std::uint32_t>(std::min<std::size_t>(12u, features.size()));
+            params.MinimumRegionFaces = 1u;
+            params.MaxEmIterations = config.MaxIterations;
+            const auto segmentation = Seg::SegmentFaceFeatures(state->BeforeMesh, features, 1u, params);
+            if (!segmentation.Succeeded())
+            {
+                state->Result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                state->Result.UvStatus = Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput;
+                state->Result.Diagnostic = std::string{"Atlas guide segmentation failed: "} + Seg::ToString(segmentation.Diagnostics.Status);
+                return JobResultEnvelope::Make<EditorJobResult>(EditorJobResult{.Diagnostic = state->Result.Diagnostic});
+            }
+            faceRegions = segmentation.FaceRegions;
+            for (const auto region : faceRegions)
+                if (region != Seg::kInvalidLabel) state->Result.RegionCount = std::max(state->Result.RegionCount, region + 1u);
+        }
 
         Geometry::UvAtlas::UvAtlasInput input{};
         input.Positions = state->Soup.Mesh.Positions();
@@ -743,6 +1087,7 @@ using namespace GeometryProcessingDetail::MeshSupport;
             ? Geometry::ConstPropertySet(state->SourceVertexProperties)
             : Geometry::ConstPropertySet{};
         input.HasVertexProperties = state->HasSourceVertexProperties;
+        input.FaceRegions = faceRegions;
 
         Geometry::UvAtlas::UvAtlasResult atlas =
             Geometry::UvAtlas::ResolveUvAtlas(input, options, nullptr);
@@ -760,10 +1105,10 @@ using namespace GeometryProcessingDetail::MeshSupport;
             state->Result.Status = backendFailure
                 ? EditorCommandStatus::GeometryProcessingFailed
                 : EditorCommandStatus::InvalidProcessingParameters;
-            state->Result.Diagnostic =
-                atlas.Diagnostics.BackendDetail.empty()
+            state->Result.Diagnostic = authoredDetail +
+                (atlas.Diagnostics.BackendDetail.empty()
                     ? std::string{Geometry::UvAtlas::ToString(atlas.Status)}
-                    : atlas.Diagnostics.BackendDetail;
+                    : atlas.Diagnostics.BackendDetail);
             return JobResultEnvelope::Make<EditorJobResult>(
                 EditorJobResult{
                     .Diagnostic = state->Result.Diagnostic,
@@ -809,9 +1154,18 @@ using namespace GeometryProcessingDetail::MeshSupport;
                     .Diagnostic = state->Result.Diagnostic,
                 });
         }
+        if (atlas.SourceFaceChart.size() != converted.Mesh.FacesSize() ||
+            atlas.SourceFaceRegionComponent.size() != converted.Mesh.FacesSize())
+        {
+            state->Result.Status = EditorCommandStatus::GeometryProcessingFailed;
+            state->Result.Diagnostic = "Atlas region/chart correspondence does not cover every source face.";
+            return JobResultEnvelope::Make<EditorJobResult>(EditorJobResult{.Diagnostic = state->Result.Diagnostic});
+        }
+        converted.Mesh.FaceProperties().GetOrAdd<std::uint32_t>("f:atlas_region", 0u).Vector() = atlas.SourceFaceRegionComponent;
+        converted.Mesh.FaceProperties().GetOrAdd<std::uint32_t>("f:atlas_chart", 0u).Vector() = atlas.SourceFaceChart;
         state->AfterMesh = std::move(converted.Mesh);
         state->Result.Status = EditorCommandStatus::Applied;
-        state->Result.Diagnostic = atlas.Diagnostics.BackendDetail;
+        state->Result.Diagnostic = authoredDetail + atlas.Diagnostics.BackendDetail;
         return JobResultEnvelope::Make<EditorJobResult>(
             EditorJobResult{
                 .Diagnostic = "UV regeneration CPU result ready",
@@ -827,7 +1181,25 @@ using namespace GeometryProcessingDetail::MeshSupport;
         if (!result.Succeeded())
             return result;
 
-        if (SameUvRegenerationOutput(job.BeforeMesh, job.AfterMesh))
+        // A generated atlas records its extent; preserved authored UVs are
+        // unchanged content, so they keep whatever extent is still current.
+        std::optional<MeshUvAtlasExtent> currentExtent{};
+        if (context.Scene != nullptr)
+            if (const auto entity = ResolveStableEntity(context.Scene->Raw(), job.StableEntityId))
+                currentExtent = FindCurrentMeshUvAtlasExtent(context.Scene->Raw(), *entity);
+        std::optional<MeshUvAtlasExtent> afterExtent = currentExtent;
+        if (result.Provenance == Geometry::UvAtlas::UvAtlasProvenance::Generated)
+        {
+            afterExtent = IsValidMeshUvAtlasExtent(result.AtlasWidth, result.AtlasHeight)
+                ? std::optional<MeshUvAtlasExtent>{MeshUvAtlasExtent{
+                      .Width = result.AtlasWidth, .Height = result.AtlasHeight}}
+                : std::nullopt;
+        }
+
+        // Identical UVs with a different extent still commit, so the extent
+        // change is undoable together with the UVs.
+        if (SameUvRegenerationOutput(job.BeforeMesh, job.AfterMesh) &&
+            SameAtlasExtent(currentExtent, afterExtent))
         {
             // The atlas resolved to exactly the UVs and topology already
             // stored, so there is nothing to commit; replacing the mesh with
@@ -844,14 +1216,14 @@ using namespace GeometryProcessingDetail::MeshSupport;
         }
 
         const EditorCommandStatus commitStatus =
-            CommitUvMeshTopologyReplacement(
+            CommitUvPropertyReplacement(
                 context,
                 job.StableEntityId,
                 "Regenerate UVs",
                 job.GeometryMetadataSignature,
                 std::move(job.Snapshot),
-                std::move(job.BeforeMesh),
-                std::move(job.AfterMesh));
+                job.AfterMesh,
+                afterExtent);
         if (commitStatus != EditorCommandStatus::Applied)
         {
             result.Status = commitStatus;
@@ -907,9 +1279,9 @@ using namespace GeometryProcessingDetail::MeshSupport;
                      1023u) /
                     1024u)),
             .Work =
-                [state](const JobCancellation&) -> JobResultEnvelope
+                [state](const JobCancellation& cancellation) -> JobResultEnvelope
                 {
-                    return RunUvRegenerationCpuWorker(state);
+                    return RunUvRegenerationCpuWorker(state, &cancellation);
                 },
             .ValidateBeforeApply =
                 [context, state]()
@@ -975,28 +1347,9 @@ using namespace GeometryProcessingDetail::MeshSupport;
                 Geometry::UvAtlas::UvAtlasStatus::EmptyInput,
                 "Scene registry is unavailable.");
         }
-        if (command.Resolution == 0u || command.Padding >= command.Resolution)
-        {
-            return MakeUvRegenerationResult(
-                EditorCommandStatus::InvalidProcessingParameters,
-                Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput,
-                "UV regeneration requires a positive resolution and padding smaller "
-                "than the atlas.");
-        }
-        if (!std::isfinite(command.TexelsPerUnit) || command.TexelsPerUnit < 0.0f)
-        {
-            return MakeUvRegenerationResult(
-                EditorCommandStatus::InvalidProcessingParameters,
-                Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput,
-                "UV regeneration requires a finite non-negative texel density.");
-        }
-        if (!command.BackendName.empty() && command.BackendName != "xatlas")
-        {
-            return MakeUvRegenerationResult(
-                EditorCommandStatus::InvalidProcessingParameters,
-                Geometry::UvAtlas::UvAtlasStatus::BackendUnavailable,
-                "Only the promoted xatlas UV backend is available.");
-        }
+        if (const auto error = ValidateParameterizationAtlasConfig(command.Atlas))
+            return MakeUvRegenerationResult(EditorCommandStatus::InvalidProcessingParameters,
+                Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput, *error);
 
         entt::registry& raw = context.Scene->Raw();
         const std::optional<ECS::EntityHandle> entity =
@@ -1016,6 +1369,23 @@ using namespace GeometryProcessingDetail::MeshSupport;
             return MakeUvRegenerationResult(
                 sourceStatus, Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput,
                 "UV regeneration cannot use the selected entity: " + diagnostic);
+
+        for (const auto* name : {"f:atlas_region", "f:atlas_chart"})
+            if (view.FaceSource->Properties.Exists(name) && !view.FaceSource->Properties.Get<std::uint32_t>(name))
+                return MakeUvRegenerationResult(EditorCommandStatus::InvalidProcessingParameters,
+                    Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput,
+                    std::string{"Atlas output requires a uint32 face property: "} + name);
+
+        if (command.Atlas.Guide)
+        {
+            const auto& guide = *command.Atlas.Guide;
+            const auto count = guide.Domain == GeometryElementDomain::MeshVertex
+                ? view.VertexSource->Properties.Size() : view.FaceSource->Properties.Size();
+            if (!ResolveGeometryProperty(BuildGeometryAvailability(view), guide, count).Resolved())
+                return MakeUvRegenerationResult(EditorCommandStatus::InvalidProcessingParameters,
+                    Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput,
+                    "Atlas guide must exist with its declared scalar type and complete source-domain count.");
+        }
 
         if (const auto active = context.JobCommands.Available()
                 ? FindActiveEditorJob(context, MakeUvRegenerationCpuJobIdentity(command.StableEntityId))
@@ -1038,6 +1408,11 @@ using namespace GeometryProcessingDetail::MeshSupport;
         auto admission = ValidateUvRegenerationRequest(context, command, view);
         if (!admission.Succeeded())
             return admission;
+        std::string diagnostic;
+        const auto rings = ValidateMeshSoupFaceRings(view, diagnostic, GS::PropertyNames::kPosition, true);
+        if (rings != EditorCommandStatus::Applied)
+            return MakeUvRegenerationResult(rings, Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput,
+                "UV regeneration cannot use the selected entity: " + diagnostic);
         entt::registry& raw = context.Scene->Raw();
         const auto entity = ResolveStableEntity(raw, command.StableEntityId);
         MeshSoupFromGeometrySourcesResult soup =
@@ -1074,7 +1449,10 @@ using namespace GeometryProcessingDetail::MeshSupport;
         }
 
         std::vector<glm::vec2> authoredTexcoords;
-        if (view.VertexSource != nullptr)
+        // Corner UVs are authoritative; a shadow vertex property must never
+        // be preserved in their place and silently replace the visible atlas.
+        if (view.VertexSource != nullptr &&
+            !CaptureUvPublishedProperties(view).CornerUvs.has_value())
         {
             const auto texcoords =
                 view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
@@ -1093,6 +1471,13 @@ using namespace GeometryProcessingDetail::MeshSupport;
         state->BeforeMesh = std::move(topology.Mesh);
         state->Command = command;
         state->AuthoredTexcoords = std::move(authoredTexcoords);
+        state->PreserveAuthoredCornerUvs =
+            command.PreserveValidAuthoredUvs && !command.ForceRegenerate &&
+            view.HalfedgeSource != nullptr &&
+            view.HalfedgeSource->Properties.Exists("h:texcoord");
+        if (state->PreserveAuthoredCornerUvs)
+            state->AuthoredCornerUvs = GatherSoupCornerTexcoords(view, state->Soup.Mesh);
+        state->SourceCornerUvs = CaptureUvPublishedProperties(view).CornerUvs;
         if (view.VertexSource != nullptr)
         {
             state->SourceVertexProperties = view.VertexSource->Properties;
@@ -1143,7 +1528,8 @@ using namespace GeometryProcessingDetail::MeshSupport;
         {
             std::string diagnostic;
             const auto entity = ResolveStableEntity(context.Scene->Raw(), command.StableEntityId);
-            if (!PrepareMeshSoupFaceRings(context, *entity, BuildGeometryAvailability(view), diagnostic))
+            if (!PrepareMeshSoupFaceRings(context, *entity, BuildGeometryAvailability(view), diagnostic,
+                                          {GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3}, true))
                 return {false, "UV regeneration cannot use the selected entity: " + diagnostic};
             if (ValidateMeshVertexDeletionMaskMetadata(view, diagnostic) != EditorCommandStatus::Applied)
                 return {false, "UV regeneration: " + diagnostic};

@@ -87,6 +87,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         bool ValidLbvh{true};
         bool HasSubnormalCoordinates{};
         bool HasZeroVectors{};
+        bool HasNonTriangleFaces{};
         bool HasNonfiniteVectors{};
         float MinimumSquaredNorm{std::numeric_limits<float>::infinity()}, MaximumSquaredNorm{};
     };

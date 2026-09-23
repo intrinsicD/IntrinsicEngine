@@ -61,6 +61,42 @@ vec3 TexelDensityBackground(vec2 uv)
     return color;
 }
 
+float RangeParameter(float value)
+{
+    const float span = pc.TextureRangeMax - pc.TextureRangeMin;
+    // A zero-width range still separates below/at/above instead of dividing
+    // by zero; negative and zero values keep their place in the range.
+    if (span <= 0.0)
+        return value < pc.TextureRangeMin ? 0.0 : (value > pc.TextureRangeMax ? 1.0 : 0.5);
+    return clamp((value - pc.TextureRangeMin) / span, 0.0, 1.0);
+}
+
+vec3 BakedTexel(vec2 uv, vec3 fallback)
+{
+    // Texel-exact display: fetch the stored texel under this UV instead of
+    // filtering, so the pane shows actual baked values, never interpolation.
+    if (any(lessThan(uv, vec2(0.0))) || any(greaterThanEqual(uv, vec2(1.0))))
+        return fallback * 0.55;
+    const ivec2 size = textureSize(globalTextures[nonuniformEXT(pc.BackgroundTextureBindlessIndex)], 0);
+    // Texture row 0 is v = 0; UV-view V grows upward like the CPU pane.
+    const ivec2 texel = clamp(ivec2(floor(uv * vec2(size))), ivec2(0), size - ivec2(1));
+    const float coverage = texelFetch(globalTextures[nonuniformEXT(pc.CoverageTextureBindlessIndex)], texel, 0).r;
+    if (coverage == 0.0) return fallback;
+    if (isnan(coverage) || isinf(coverage)) return vec3(1.0, 0.0, 1.0);
+    const vec4 stored = texelFetch(globalTextures[nonuniformEXT(pc.BackgroundTextureBindlessIndex)], texel, 0);
+    if (any(isnan(stored)) || any(isinf(stored)))
+        return vec3(1.0, 0.0, 1.0);
+    if (pc.TextureDisplayMode == UV_VIEW_TEXTURE_SCALAR_COLORMAP)
+    {
+        const float t = RangeParameter(stored.r);
+        return texture(globalTextures[nonuniformEXT(pc.ColormapBindlessIndex)], vec2(t, 0.5)).rgb;
+    }
+    if (pc.TextureDisplayMode == UV_VIEW_TEXTURE_VECTOR_RANGE)
+        return vec3(RangeParameter(stored.r), RangeParameter(stored.g), RangeParameter(stored.b));
+    // Data alpha is independent of coverage, including a legitimate zero.
+    return stored.rgb;
+}
+
 void main()
 {
     const vec2 uv = ViewUv();
@@ -73,6 +109,11 @@ void main()
     else if (pc.BackgroundMode == UV_VIEW_BACKGROUND_TEXEL_DENSITY)
     {
         color = TexelDensityBackground(uv);
+    }
+    else if (pc.BackgroundMode == UV_VIEW_BACKGROUND_BAKED_TEXTURE)
+    {
+        // The host validated both indices before selecting this mode.
+        color = BakedTexel(uv, CheckerBackground(uv));
     }
     else if (pc.BackgroundMode == UV_VIEW_BACKGROUND_TEXTURE)
     {

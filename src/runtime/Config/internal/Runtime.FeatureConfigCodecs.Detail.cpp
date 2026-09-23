@@ -12,6 +12,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <type_traits>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -808,6 +809,36 @@ namespace Extrinsic::Runtime
             if (value == "Hierarchical")
                 return KMeansInitialization::Hierarchical;
             return std::nullopt;
+        }
+
+        [[nodiscard]] std::optional<Geometry::UvAtlas::UvAtlasMethod>
+        ParseAtlasMethod(const std::string_view value) noexcept
+        {
+            using M = Geometry::UvAtlas::UvAtlasMethod;
+            if (value == "fast_staged") return M::FastStaged;
+            if (value == "xatlas") return M::XAtlas;
+            return std::nullopt;
+        }
+        [[nodiscard]] std::optional<Geometry::UvAtlas::UvAtlasDistortion>
+        ParseAtlasDistortion(const std::string_view value) noexcept
+        {
+            using D = Geometry::UvAtlas::UvAtlasDistortion;
+            if (value == "none") return D::None;
+            if (value == "angle") return D::Angle;
+            if (value == "area") return D::Area;
+            if (value == "both") return D::Both;
+            return std::nullopt;
+        }
+        [[nodiscard]] std::string_view ToConfigString(const Geometry::UvAtlas::UvAtlasMethod value) noexcept
+        {
+            using M = Geometry::UvAtlas::UvAtlasMethod;
+            switch (value) { case M::FastStaged: return "fast_staged"; case M::XAtlas: return "xatlas"; default: return "invalid"; }
+        }
+        [[nodiscard]] std::string_view ToConfigString(const Geometry::UvAtlas::UvAtlasDistortion value) noexcept
+        {
+            using D = Geometry::UvAtlas::UvAtlasDistortion;
+            switch (value) { case D::None: return "none"; case D::Angle: return "angle"; case D::Area: return "area"; case D::Both: return "both"; }
+            return "invalid";
         }
 
         [[nodiscard]] std::optional<ParameterizationStrategyKind>
@@ -1851,7 +1882,7 @@ namespace Extrinsic::Runtime
             AddUnknownFieldDiagnostics(
                 context,
                 *object,
-                {"positions", "texcoords", "corner_texcoords_to_retire", "strategy", "lscm", "harmonic", "bff", "view"});
+                {"positions", "texcoords", "corner_texcoords_to_retire", "strategy", "lscm", "harmonic", "bff", "view", "atlas"});
             const ParameterizationLscmConfig referenceLscm = config.Lscm;
             const ParameterizationBffConfig referenceBff = config.Bff;
 
@@ -1883,7 +1914,7 @@ namespace Extrinsic::Runtime
                         *view,
                         {"render_mode",
                          "background_mode",
-                         "show_distortion_heatmap"});
+                         "show_distortion_heatmap", "split_enabled", "atlas_on_left", "split_ratio"});
                     if (ReadEnum(
                             viewContext,
                             *view,
@@ -1908,6 +1939,82 @@ namespace Extrinsic::Runtime
                         config.View.ShowDistortionHeatmap = *value;
                         CountParsed(viewContext);
                     }
+                    if (const auto value = ReadBool(viewContext, *view, "split_enabled")) config.View.SplitEnabled = *value;
+                    if (const auto value = ReadBool(viewContext, *view, "atlas_on_left")) config.View.AtlasOnLeft = *value;
+                    if (const auto value = ReadNumber(viewContext, *view, "split_ratio", 0.2, static_cast<double>(0.8f)))
+                        config.View.SplitRatio = static_cast<float>(*value);
+                    else if (FindMember(*view, "split_ratio") && context.Result)
+                    {
+                        context.Result->State = Core::Config::EngineConfigState::Invalid;
+                        context.Result->Diagnostics.push_back({.Code = Core::Config::EngineConfigDiagnosticCode::InvalidValue,
+                            .Subject = viewContext.Path, .Message = "Scene split ratio must be finite and in [0.2, 0.8]."});
+                    }
+                }
+            }
+
+            if (const json* atlas = FindMember(*object, "atlas"); atlas != nullptr)
+            {
+                auto atlasContext = ChildContext(context, "atlas");
+                const auto invalid = [&](const std::string& message)
+                {
+                    if (context.Result)
+                    {
+                        context.Result->State = Core::Config::EngineConfigState::Invalid;
+                        context.Result->Diagnostics.push_back({
+                            .Code = Core::Config::EngineConfigDiagnosticCode::InvalidValue,
+                            .Subject = atlasContext.Path, .Message = message});
+                    }
+                };
+                if (!atlas->is_object()) invalid("Atlas configuration must be an object.");
+                else
+                {
+                    AddUnknownFieldDiagnostics(atlasContext, *atlas,
+                        {"method", "distortion", "guide", "region_count", "resolution", "padding",
+                         "texels_per_unit", "max_conformal_distortion", "max_area_distortion",
+                         "max_charts", "max_iterations", "allow_xatlas_fallback"});
+                    if (FindMember(*atlas, "method") && !ReadEnum(atlasContext, *atlas, "method", ParseAtlasMethod, config.Atlas.Method))
+                        invalid("Atlas method must be fast_staged or xatlas.");
+                    if (FindMember(*atlas, "distortion") && !ReadEnum(atlasContext, *atlas, "distortion", ParseAtlasDistortion, config.Atlas.Distortion))
+                        invalid("Atlas distortion must be none, angle, area or both.");
+                    const auto integer = [&](const char* key, std::uint32_t& target, const std::int64_t minimum, const std::int64_t maximum)
+                    {
+                        if (!FindMember(*atlas, key)) return;
+                        if (const auto value = ReadInteger(atlasContext, *atlas, key, minimum, maximum))
+                        { target = static_cast<std::uint32_t>(*value); CountParsed(atlasContext); }
+                        else invalid(std::string{"Invalid atlas "} + key + ".");
+                    };
+                    integer("region_count", config.Atlas.RegionCount, 0, 64);
+                    integer("resolution", config.Atlas.Resolution, 16, 16384);
+                    integer("padding", config.Atlas.Padding, 0, 32);
+                    integer("max_charts", config.Atlas.MaxCharts, 1, 1000000);
+                    integer("max_iterations", config.Atlas.MaxIterations, 1, 1000);
+                    const auto number = [&](const char* key, auto& target, const double minimum, const double maximum)
+                    {
+                        if (!FindMember(*atlas, key)) return;
+                        if (const auto value = ReadNumber(atlasContext, *atlas, key, minimum, maximum))
+                        { target = static_cast<std::remove_reference_t<decltype(target)>>(*value); CountParsed(atlasContext); }
+                        else invalid(std::string{"Invalid atlas "} + key + ".");
+                    };
+                    number("texels_per_unit", config.Atlas.TexelsPerUnit, 0.0, 1.0e12);
+                    number("max_conformal_distortion", config.Atlas.MaxConformalDistortion, 1.0, 1.0e6);
+                    number("max_area_distortion", config.Atlas.MaxAreaDistortion, 1.0, 1.0e6);
+                    if (FindMember(*atlas, "allow_xatlas_fallback"))
+                    {
+                        if (const auto value = ReadBool(atlasContext, *atlas, "allow_xatlas_fallback"))
+                            config.Atlas.AllowXAtlasFallback = *value;
+                        else invalid("Atlas fallback setting must be boolean.");
+                    }
+                    if (const auto* guide = FindMember(*atlas, "guide"))
+                    {
+                        config.Atlas.Guide.reset();
+                        if (!guide->is_null())
+                        {
+                            GeometryPropertyRef ref{};
+                            ReadPropertyRef(atlasContext, *atlas, "guide", ref, true, true);
+                            config.Atlas.Guide = std::move(ref);
+                        }
+                    }
+                    if (const auto error = ValidateParameterizationAtlasConfig(config.Atlas)) invalid(*error);
                 }
             }
 
@@ -2449,6 +2556,38 @@ namespace Extrinsic::Runtime
         }));
     }
 
+    std::optional<std::string> ValidateParameterizationAtlasConfig(const ParameterizationAtlasConfig& config)
+    {
+        using M = Geometry::UvAtlas::UvAtlasMethod;
+        using D = Geometry::UvAtlas::UvAtlasDistortion;
+        if (config.Method != M::FastStaged && config.Method != M::XAtlas)
+            return "Select fast_staged or xatlas atlas generation.";
+        if (config.Distortion != D::None && config.Distortion != D::Angle &&
+            config.Distortion != D::Area && config.Distortion != D::Both)
+            return "Select none, angle, area or both distortion objectives.";
+        if (config.Method == M::XAtlas && config.Distortion != D::Angle)
+            return "XAtlas supports the angle objective; select fast_staged for none, area or both.";
+        if (config.Resolution < 16u || config.Resolution > 16384u || config.Padding > 32u ||
+            config.Padding * 2u + 1u >= config.Resolution)
+            return "Atlas resolution must be 16..16384 with at most 32 padding texels and usable interior space.";
+        if (!std::isfinite(config.TexelsPerUnit) || config.TexelsPerUnit < 0.0f || config.TexelsPerUnit > 1.0e12f)
+            return "Atlas texel density must be finite and non-negative.";
+        if (!std::isfinite(config.MaxConformalDistortion) || config.MaxConformalDistortion < 1.0 || config.MaxConformalDistortion > 1.0e6 ||
+            !std::isfinite(config.MaxAreaDistortion) || config.MaxAreaDistortion < 1.0 || config.MaxAreaDistortion > 1.0e6)
+            return "Atlas distortion limits must be finite and at least one (at most 1e6).";
+        if (config.MaxCharts == 0u || config.MaxCharts > 1000000u || config.MaxIterations == 0u || config.MaxIterations > 1000u || config.RegionCount > 64u)
+            return "Atlas budgets require 1..1000000 charts, 1..1000 iterations and 0..64 guide components (zero selects automatically).";
+        if (config.Guide)
+        {
+            const auto& ref = *config.Guide;
+            if ((ref.Domain != GeometryElementDomain::MeshVertex && ref.Domain != GeometryElementDomain::MeshFace) ||
+                GeometryPropertyComponentCount(ref.ValueKind) != 1u || ref.ValueKind == Geometry::PropertyValueKind::Unknown ||
+                ref.Name.empty() || ref.Name.find('\0') != std::string::npos)
+                return "Atlas guide must name a scalar mesh vertex or mesh face property.";
+        }
+        return std::nullopt;
+    }
+
     std::string SerializeParameterizationConfig(
         const ParameterizationConfig& config)
     {
@@ -2458,6 +2597,17 @@ namespace Extrinsic::Runtime
             {"corner_texcoords_to_retire", config.CornerTexcoordsToRetire
                 ? EncodePropertyRef(*config.CornerTexcoordsToRetire) : json(nullptr)},
             {"strategy", std::string{ToConfigString(config.Strategy)}},
+            {"atlas", json::object({
+                {"method", std::string{ToConfigString(config.Atlas.Method)}},
+                {"distortion", std::string{ToConfigString(config.Atlas.Distortion)}},
+                {"guide", config.Atlas.Guide ? EncodePropertyRef(*config.Atlas.Guide) : json(nullptr)},
+                {"region_count", config.Atlas.RegionCount}, {"resolution", config.Atlas.Resolution},
+                {"padding", config.Atlas.Padding}, {"texels_per_unit", config.Atlas.TexelsPerUnit},
+                {"max_conformal_distortion", config.Atlas.MaxConformalDistortion},
+                {"max_area_distortion", config.Atlas.MaxAreaDistortion},
+                {"max_charts", config.Atlas.MaxCharts}, {"max_iterations", config.Atlas.MaxIterations},
+                {"allow_xatlas_fallback", config.Atlas.AllowXAtlasFallback},
+            })},
             {"view",
              json::object({
                  {"render_mode",
@@ -2466,6 +2616,9 @@ namespace Extrinsic::Runtime
                   std::string{ToConfigString(config.View.BackgroundMode)}},
                  {"show_distortion_heatmap",
                   config.View.ShowDistortionHeatmap},
+                 {"split_enabled", config.View.SplitEnabled},
+                 {"atlas_on_left", config.View.AtlasOnLeft},
+                 {"split_ratio", config.View.SplitRatio},
              })},
             {"lscm",
              json::object({

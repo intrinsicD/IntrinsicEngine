@@ -128,6 +128,9 @@ namespace Extrinsic::Runtime
         JobCancellation() = default;
 
         [[nodiscard]] bool IsCancelled() const noexcept;
+        // Borrow for a synchronous CPU kernel that polls cancellation. The
+        // token must outlive the kernel; consumers cannot change the flag.
+        [[nodiscard]] const std::atomic<bool>* Flag() const noexcept { return m_Flag.get(); }
 
     private:
         friend class JobService;

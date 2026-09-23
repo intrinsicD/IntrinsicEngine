@@ -1,0 +1,55 @@
+{
+  "ci": {
+    "CMAKE_BUILD_TYPE": "Debug",
+    "CMAKE_CXX_COMPILER": "/usr/bin/clang++-23",
+    "CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS": "/usr/bin/clang-scan-deps-23",
+    "INTRINSIC_ENABLE_SANITIZERS": "OFF",
+    "INTRINSIC_GROUP_PURE_CTEST": "OFF",
+    "INTRINSIC_HEADLESS_NO_GLFW": "OFF",
+    "INTRINSIC_SANITIZER_MODE": "none"
+  },
+  "ci-asan": {
+    "CMAKE_BUILD_TYPE": "Debug",
+    "CMAKE_CXX_COMPILER": "/usr/bin/clang++-23",
+    "CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS": "/usr/bin/clang-scan-deps-23",
+    "INTRINSIC_ENABLE_SANITIZERS": "ON",
+    "INTRINSIC_GROUP_PURE_CTEST": "ON",
+    "INTRINSIC_HEADLESS_NO_GLFW": "OFF",
+    "INTRINSIC_SANITIZER_MODE": "address"
+  },
+  "ci-ubsan": {
+    "CMAKE_BUILD_TYPE": "Debug",
+    "CMAKE_CXX_COMPILER": "/usr/bin/clang++-23",
+    "CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS": "/usr/bin/clang-scan-deps-23",
+    "INTRINSIC_ENABLE_SANITIZERS": "ON",
+    "INTRINSIC_GROUP_PURE_CTEST": "ON",
+    "INTRINSIC_HEADLESS_NO_GLFW": "OFF",
+    "INTRINSIC_SANITIZER_MODE": "undefined"
+  },
+  "ci-vulkan": {
+    "CMAKE_BUILD_TYPE": "Debug",
+    "CMAKE_CXX_COMPILER": "/bin/clang++-23",
+    "CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS": "/bin/clang-scan-deps-23",
+    "INTRINSIC_ENABLE_SANITIZERS": "ON",
+    "INTRINSIC_GROUP_PURE_CTEST": "OFF",
+    "INTRINSIC_HEADLESS_NO_GLFW": "OFF",
+    "INTRINSIC_SANITIZER_MODE": "address,undefined",
+    "INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN": "ON",
+    "final_rebuild_cache": "CCACHE_DISABLE=1 after changed-input timestamp refresh; source bytes unchanged (BUG-209)"
+  },
+  "compiler": "Ubuntu clang version 23.0.0 (++20260614081921+80b1dddb5a24-1~exp1~20260614202044.1664)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/lib/llvm-23/bin",
+  "claude_cli": "2.1.280 (Claude Code)",
+  "gpu": "NVIDIA GeForce RTX 3050, 590.48.01, 8192 MiB",
+  "parallelism": {
+    "compiler_jobs": 2,
+    "sanitizer_ctest_jobs": 1,
+    "memory_high_gib": 16,
+    "memory_max_gib": 24,
+    "swap_max_gib": 1
+  },
+  "python": {
+    "executable": "/home/alex/miniconda3/bin/python3",
+    "version": "3.12.9",
+    "numpy": "2.1.3"
+  }
+}

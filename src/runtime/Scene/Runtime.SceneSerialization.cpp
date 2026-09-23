@@ -4,6 +4,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <optional>
 #include <span>
 #include <string>
@@ -44,6 +45,7 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Geometry.Graph.Fwd;
 import Geometry.Properties;
 import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.MeshSurfaceTopology;
 
 namespace Extrinsic::Runtime
 {
@@ -1713,6 +1715,14 @@ namespace Extrinsic::Runtime
             {
                 return false;
             }
+            for (const auto& [key, propertyName] : {std::pair{"atlasRegion", "f:atlas_region"},
+                                                   std::pair{"atlasChart", "f:atlas_chart"}})
+            {
+                if (!faces.Properties.Exists(propertyName)) continue;
+                const auto property = faces.Properties.Get<std::uint32_t>(propertyName);
+                if (!property || property.Vector().size() != faces.Properties.Size()) return false;
+                out[key] = UIntArrayToJson(property.Vector());
+            }
             geometry["faces"] = std::move(out);
             return true;
         }
@@ -1745,6 +1755,15 @@ namespace Extrinsic::Runtime
                     !AddFaces(geometry, *view.FaceSource))
                 {
                     return false;
+                }
+                // Only the extent is persisted; its binding to the UVs is
+                // runtime state rebuilt on load.
+                if (const auto extent = FindCurrentMeshUvAtlasExtent(raw, entity))
+                {
+                    geometry["uvAtlasExtent"] = json{
+                        {"width", extent->Width},
+                        {"height", extent->Height},
+                    };
                 }
                 ++stats.MeshEntities;
                 break;
@@ -2014,6 +2033,14 @@ namespace Extrinsic::Runtime
 
             GS::Faces faces{};
             WriteUIntProperty(faces.Properties, PN::kFaceHalfedge, std::move(halfedge));
+            for (const auto& [key, propertyName] : {std::pair{"atlasRegion", "f:atlas_region"},
+                                                   std::pair{"atlasChart", "f:atlas_chart"}})
+            {
+                if (!value.contains(key)) continue;
+                std::vector<std::uint32_t> labels{};
+                if (!TryReadUIntArray(value[key], labels) || labels.size() != faces.Properties.Size()) return false;
+                WriteUIntProperty(faces.Properties, propertyName, std::move(labels));
+            }
             faces.NumDeleted = deleted;
             raw.emplace_or_replace<GS::Faces>(entity, std::move(faces));
             return true;
@@ -2055,6 +2082,22 @@ namespace Extrinsic::Runtime
                     return false;
                 }
                 raw.emplace_or_replace<GS::HasMeshTopology>(entity);
+                if (geometry.contains("uvAtlasExtent"))
+                {
+                    const json& extent = geometry["uvAtlasExtent"];
+                    const auto side = [&extent](const char* key) -> std::uint32_t
+                    {
+                        return extent.is_object() && extent.contains(key) &&
+                                       extent[key].is_number_unsigned() &&
+                                       extent[key].get<std::uint64_t>() <=
+                                           std::numeric_limits<std::uint32_t>::max()
+                            ? static_cast<std::uint32_t>(extent[key].get<std::uint64_t>())
+                            : 0u;
+                    };
+                    // Rejects out-of-bounds extents and extents without UVs.
+                    if (!PublishMeshUvAtlasExtent(raw, entity, side("width"), side("height")))
+                        return false;
+                }
                 ++stats.MeshEntities;
                 break;
             }

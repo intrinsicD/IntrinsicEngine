@@ -856,6 +856,104 @@ namespace Extrinsic::Runtime
         return &it->second;
     }
 
+    namespace
+    {
+        void ResolveMaterialTextureBindingRecord(
+            const Graphics::MaterialTextureAssetBindings& bindings,
+            Graphics::Components::MaterialInstance& material,
+            Graphics::IRenderer& renderer,
+            Graphics::GpuAssetCache* gpuAssets,
+            RuntimeRenderExtractionStats& stats)
+        {
+            ++stats.MaterialTextureBindingRecordCount;
+            if (gpuAssets == nullptr || !material.Lease.IsValid())
+            {
+                ++stats.MaterialTextureBindingResolveFailureCount;
+                return;
+            }
+
+            auto resolved = renderer.GetMaterialSystem().ResolveTextureAssetBindings(
+                material.Lease.GetHandle(),
+                bindings,
+                *gpuAssets,
+                &renderer.GetColormapSystem());
+            if (resolved.has_value())
+            {
+                material.EffectiveSlot =
+                    renderer.GetMaterialSystem().GetMaterialSlot(
+                        material.Lease.GetHandle());
+                ++stats.MaterialTextureBindingResolveCount;
+            }
+            else
+            {
+                ++stats.MaterialTextureBindingResolveFailureCount;
+            }
+        }
+
+        // A baked texture reaches a material only while its record is Ready,
+        // evaluated Fresh, and none of its UV/topology/position/source
+        // properties changed since that evaluation. Stale records stay in the
+        // catalog for inspection but are never drawn over a changed atlas.
+        [[nodiscard]] bool IsBakeRecordBindable(
+            const GeometryEntityAvailability& availability,
+            const PropertyTextureBakeRecord& record)
+        {
+            const std::uint64_t token = ComputePropertyTextureBakeRevisionToken(
+                record,
+                [&availability](const GeometryElementDomain domain,
+                                const std::string_view name)
+                    -> std::optional<std::uint64_t>
+                {
+                    const Geometry::PropertySet* properties =
+                        ResolveGeometryPropertySet(availability, domain);
+                    if (properties == nullptr)
+                        return std::nullopt;
+                    const auto revision = properties->FindPropertyRevision(name);
+                    return revision.has_value()
+                        ? std::optional<std::uint64_t>{*revision}
+                        : std::nullopt;
+                });
+            return IsPropertyTextureBakeRecordBindable(record, token);
+        }
+
+        // Clears every binding that names an entity-owned bake texture which is
+        // not bindable this frame; returns whether anything was cleared.
+        bool StripUnbindableBakeTextures(
+            const entt::registry& registry,
+            const entt::entity entity,
+            const GeometryEntityAvailability& availability,
+            Graphics::MaterialTextureAssetBindings& bindings)
+        {
+            const auto* outputs = registry.try_get<PropertyTextureBakeOutputs>(entity);
+            if (outputs == nullptr)
+                return false;
+            bool stripped = false;
+            for (const PropertyTextureBakeRecord& record : outputs->Records)
+            {
+                const Assets::AssetId texture = record.Texture;
+                if (!texture.IsValid() ||
+                    (bindings.Albedo != texture &&
+                     bindings.Normal != texture &&
+                     bindings.MetallicRoughness != texture &&
+                     bindings.Emissive != texture) ||
+                    IsBakeRecordBindable(availability, record))
+                {
+                    continue;
+                }
+                for (Assets::AssetId* slot : {&bindings.Albedo,
+                                              &bindings.Normal,
+                                              &bindings.MetallicRoughness,
+                                              &bindings.Emissive})
+                {
+                    if (*slot == texture)
+                        *slot = {};
+                }
+                stripped = true;
+            }
+            return stripped;
+        }
+    }
+
     void RenderExtractionCache::State::ApplyMaterialTextureBindings(
         const std::uint32_t stableId,
         RenderableSidecar& sidecar,
@@ -868,30 +966,8 @@ namespace Extrinsic::Runtime
         {
             return;
         }
-
-        ++stats.MaterialTextureBindingRecordCount;
-        if (gpuAssets == nullptr || !sidecar.Material.Lease.IsValid())
-        {
-            ++stats.MaterialTextureBindingResolveFailureCount;
-            return;
-        }
-
-        auto resolved = renderer.GetMaterialSystem().ResolveTextureAssetBindings(
-            sidecar.Material.Lease.GetHandle(),
-            it->second,
-            *gpuAssets,
-            &renderer.GetColormapSystem());
-        if (resolved.has_value())
-        {
-            sidecar.Material.EffectiveSlot =
-                renderer.GetMaterialSystem().GetMaterialSlot(
-                    sidecar.Material.Lease.GetHandle());
-            ++stats.MaterialTextureBindingResolveCount;
-        }
-        else
-        {
-            ++stats.MaterialTextureBindingResolveFailureCount;
-        }
+        ResolveMaterialTextureBindingRecord(
+            it->second, sidecar.Material, renderer, gpuAssets, stats);
     }
 
     namespace
@@ -1136,13 +1212,18 @@ namespace Extrinsic::Runtime
             // generated-texture slot refers to the same full binding record.
             textureBindings = direct->second;
         }
+        for (const GeometryPresentationSlotSnapshot& slot : snapshot.Slots)
+            (void)AssignGeometryPresentationTextureBinding(textureBindings, slot);
+        // A cleared stale output still needs this frame's resolve so the
+        // material drops the texture chosen by the direct-binding pass.
+        const bool strippedStaleBake =
+            StripUnbindableBakeTextures(registry, entity, availability, textureBindings);
         bool hasTextureBinding =
+            strippedStaleBake ||
             textureBindings.Albedo.IsValid() ||
             textureBindings.Normal.IsValid() ||
             textureBindings.MetallicRoughness.IsValid() ||
             textureBindings.Emissive.IsValid();
-        for (const GeometryPresentationSlotSnapshot& slot : snapshot.Slots)
-            hasTextureBinding = AssignGeometryPresentationTextureBinding(textureBindings, slot) || hasTextureBinding;
 
         bool appearanceTextureAssigned = false;
         if (useAppearanceTexture)
@@ -1154,7 +1235,7 @@ namespace Extrinsic::Runtime
                 const bool scalar = surfaceConfig->Source == Graphics::Components::VisualizationConfig::ColorSource::ScalarField;
                 const bool face = scalar ? surfaceConfig->ScalarDomain == Graphics::Components::VisualizationConfig::Domain::Face
                     : surfaceConfig->Source == Graphics::Components::VisualizationConfig::ColorSource::PerFaceBuffer;
-                if (record != outputs->Records.end() && record->State == PropertyTextureBakeOutputState::Ready &&
+                if (record != outputs->Records.end() && IsBakeRecordBindable(availability, *record) &&
                     record->Source.Name == (scalar ? surfaceConfig->ScalarFieldName : surfaceConfig->ColorBufferName) &&
                     record->Source.Domain == (face ? GeometryElementDomain::MeshFace : GeometryElementDomain::MeshVertex) &&
                     record->Encoding == ResolveSurfaceAppearanceEncoding(*surfaceConfig, record->Source.ValueKind))
@@ -1304,12 +1385,34 @@ namespace Extrinsic::Runtime
         {
             return;
         }
-        ApplyMaterialTextureBindings(
-            stableId,
-            *sidecar,
-            renderer,
-            gpuAssets,
-            stats);
+        // Authored bindings keep naming bake outputs; this frame resolves a
+        // copy without any output whose atlas or source is no longer current.
+        const auto direct = m_MaterialTextureBindings.find(stableId);
+        const bool hasDirectBakeOutputs =
+            direct != m_MaterialTextureBindings.end() &&
+            registry.all_of<PropertyTextureBakeOutputs>(entity);
+        Graphics::MaterialTextureAssetBindings freshBindings =
+            hasDirectBakeOutputs ? direct->second
+                                 : Graphics::MaterialTextureAssetBindings{};
+        if (hasDirectBakeOutputs &&
+            StripUnbindableBakeTextures(
+                registry,
+                entity,
+                BuildGeometryAvailability(registry, entity),
+                freshBindings))
+        {
+            ResolveMaterialTextureBindingRecord(
+                freshBindings, sidecar->Material, renderer, gpuAssets, stats);
+        }
+        else
+        {
+            ApplyMaterialTextureBindings(
+                stableId,
+                *sidecar,
+                renderer,
+                gpuAssets,
+                stats);
+        }
 
         const bool dirtyTransform = registry.any_of<ECS::Components::DirtyTags::DirtyTransform>(entity);
         if (dirtyTransform)

@@ -1,0 +1,13 @@
+{
+  "corpus_source_tree": "b78ecc751dc503a62a6b0d2bafa0ee1be4c0a301",
+  "final_source_tree": "e1e9866d48b991714b73131858e802b4d6dad4da",
+  "changed_after_corpus": [
+    "tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp"
+  ],
+  "delta_sha256": "81dbbe45e31391bd9133d6a7b897fb3e9c61535a65be7aed4749ad274ff1120e",
+  "interpretation": "The only post-corpus build-input change adds real atlas split-workspace GPU coverage by reusing the existing runtime-path fixture. Production source, shaders, solver, runner, corpus driver, build configuration and dependencies are byte-identical. CPU/ASan/UBSan populations exclude this GPU-only fixture. The final Vulkan run includes it.",
+  "final_source_revision": "ae8c1d416c9dabb6c98b26e7bb1e0a5e605abaaa",
+  "delta_artifact": "post-corpus-ui-test.patch.gz",
+  "delta_sha256_scope": "Uncompressed patch bytes",
+  "delta_compressed_sha256": "a3a9b1b3c7ba7ca9df231ca88587fe302838667111421dc45f9b872370b51ba5"
+}

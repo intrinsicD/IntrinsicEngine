@@ -899,7 +899,7 @@ TEST(SandboxEditorUi, MeshAdmissionRejectsStorageOutsideItsElementDomain)
               Runtime::PreviewEditorCurvatureSegmentationCommand,
               [](const auto& c, const auto& r) { return Runtime::ApplyEditorCurvatureSegmentationCommand(c, r); });
         const Runtime::EditorUvRegenerationCommand uv{
-            .StableEntityId = id, .Resolution = 64u, .Padding = 2u};
+            .StableEntityId = id, .Atlas = {.Resolution = 64u, .Padding = 2u}};
         check(uv, Runtime::PreviewEditorUvRegenerationCommand,
               [](const auto& c, const auto& r) { return Runtime::ApplyEditorUvRegenerationCommand(c, r); });
     }
@@ -1047,10 +1047,13 @@ TEST(SandboxEditorUi, MeshAdmissionKeepsPolygonAndUnusedSlotSemantics)
     EXPECT_NE(segmentation.DisabledReason.find("triangle source faces"), std::string::npos);
     EXPECT_EQ(Runtime::ApplyEditorCurvatureSegmentationCommand(context, {.StableEntityId = id}).Message,
               segmentation.DisabledReason);
-    const Runtime::EditorUvRegenerationCommand uv{.StableEntityId = id, .Resolution = 64u, .Padding = 2u};
-    EXPECT_TRUE(Runtime::PreviewEditorUvRegenerationCommand(context, uv).Enabled);
+    const Runtime::EditorUvRegenerationCommand uv{.StableEntityId = id, .Atlas = {.Resolution = 64u, .Padding = 2u}};
+    const auto uvReadiness = Runtime::PreviewEditorUvRegenerationCommand(context, uv);
+    EXPECT_FALSE(uvReadiness.Enabled);
+    EXPECT_NE(uvReadiness.DisabledReason.find("triangular source faces"), std::string::npos);
     const auto result = Runtime::ApplyEditorUvRegenerationCommand(context, uv);
-    EXPECT_TRUE(result.Succeeded()) << result.Diagnostic;
+    EXPECT_FALSE(result.Succeeded());
+    EXPECT_EQ(result.Diagnostic, uvReadiness.DisabledReason);
 }
 
 TEST(SandboxEditorUi, MeshTopologyAdmissionSharesCommandValidation)
@@ -4850,7 +4853,7 @@ TEST(SandboxEditorUi, UvRegenerationAdmissionMatchesCommandRejections)
     AddTriangleMeshSource(registry, mesh);
     Runtime::EditorUvRegenerationCommand command{
         .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
-        .Resolution = 64u, .Padding = 2u};
+        .Atlas = {.Resolution = 64u, .Padding = 2u}};
     const auto reject = [&](const auto& commands, const auto& request, const auto status) {
         const auto preview = Runtime::PreviewEditorUvRegenerationCommand(commands, request);
         const auto applied = Runtime::ApplyEditorUvRegenerationCommand(commands, request);
@@ -4863,16 +4866,16 @@ TEST(SandboxEditorUi, UvRegenerationAdmissionMatchesCommandRejections)
     auto invalid = command;
     invalid.StableEntityId = 0u;
     reject(context, invalid, Runtime::EditorCommandStatus::StaleEntity);
-    invalid = command; invalid.Resolution = 0u;
+    invalid = command; invalid.Atlas.Resolution = 0u;
     reject(context, invalid, Runtime::EditorCommandStatus::InvalidProcessingParameters);
-    invalid = command; invalid.Padding = invalid.Resolution;
+    invalid = command; invalid.Atlas.Padding = invalid.Atlas.Resolution;
     reject(context, invalid, Runtime::EditorCommandStatus::InvalidProcessingParameters);
-    invalid = command; invalid.BackendName = "unavailable";
+    invalid = command; invalid.Atlas.Method = Geometry::UvAtlas::UvAtlasMethod::None;
     reject(context, invalid, Runtime::EditorCommandStatus::InvalidProcessingParameters);
     for (float density : {-1.f, std::numeric_limits<float>::quiet_NaN(),
                           std::numeric_limits<float>::infinity()})
     {
-        invalid = command; invalid.TexelsPerUnit = density;
+        invalid = command; invalid.Atlas.TexelsPerUnit = density;
         reject(context, invalid, Runtime::EditorCommandStatus::InvalidProcessingParameters);
     }
     invalid = command;
@@ -4921,7 +4924,7 @@ TEST(SandboxEditorUi, UvMaskReadinessPreservesPriorityAndRejectsChangedSource)
     AddTriangleMeshSource(registry, mesh);
     const Runtime::EditorUvRegenerationCommand command{
         .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
-        .Resolution = 64u, .Padding = 2u};
+        .Atlas = {.Resolution = 64u, .Padding = 2u}};
     auto& vertices = registry.Raw().get<GS::Vertices>(mesh).Properties;
     auto positions = vertices.Get<glm::vec3>(PN::kPosition);
     auto texcoords = vertices.Get<glm::vec2>("v:texcoord");
@@ -4948,10 +4951,10 @@ TEST(SandboxEditorUi, UvMaskReadinessPreservesPriorityAndRejectsChangedSource)
     reject(command, readiness.DisabledReason);
 
     auto invalid = command;
-    invalid.Resolution = 0u;
+    invalid.Atlas.Resolution = 0u;
     const auto invalidReadiness = Runtime::PreviewEditorUvRegenerationCommand(context, invalid);
     EXPECT_FALSE(invalidReadiness.Enabled);
-    EXPECT_NE(invalidReadiness.DisabledReason.find("positive resolution"), std::string::npos);
+    EXPECT_NE(invalidReadiness.DisabledReason.find("resolution must be"), std::string::npos);
     reject(invalid, invalidReadiness.DisabledReason);
 
     auto next = registry.Raw().get<GS::Halfedges>(mesh).Properties.Get<std::uint32_t>(
@@ -4993,6 +4996,36 @@ TEST(SandboxEditorUi, UvMaskReadinessPreservesPriorityAndRejectsChangedSource)
     EXPECT_TRUE(history.IsDirty());
 }
 
+TEST(SandboxEditorUi, UvRegenerationNeverPreservesShadowVertexUvsOverCornerAuthority)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    const auto mesh = MakeSelectable(registry, "CornerAuthority");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    auto context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    auto& vertices = registry.Raw().get<GS::Vertices>(mesh).Properties;
+    auto vertexUvs = vertices.GetOrAdd<glm::vec2>("v:texcoord", {});
+    vertexUvs.Vector() = {{0.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 1.0f}};
+    auto& halfedges = registry.Raw().get<GS::Halfedges>(mesh).Properties;
+    auto corners = halfedges.GetOrAdd<glm::vec2>("h:texcoord", {0.25f, 0.25f});
+    const auto before = corners.Vector();
+    const auto result = Runtime::ApplyEditorUvRegenerationCommand(context,
+        Runtime::EditorUvRegenerationCommand{
+            .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
+            .PreserveValidAuthoredUvs = true,
+            .Atlas = {.Resolution = 64u, .Padding = 2u}});
+    ASSERT_TRUE(result.Succeeded()) << result.Diagnostic;
+    EXPECT_NE(result.Provenance, decltype(result.Provenance)::AuthoredPreserved);
+    EXPECT_EQ(history.UndoCount(), 1u);
+    // The source corner authority remains recoverable after regeneration.
+    ASSERT_TRUE(history.Undo().Succeeded());
+    EXPECT_EQ(registry.Raw().get<GS::Halfedges>(mesh).Properties
+                  .Get<glm::vec2>("h:texcoord").Vector(), before);
+}
+
 TEST(SandboxEditorUi, UvRegenerationThatReproducesStoredUvsReportsNoChange)
 {
     ECS::Scene::Registry registry;
@@ -5014,8 +5047,7 @@ TEST(SandboxEditorUi, UvRegenerationThatReproducesStoredUvsReportsNoChange)
             Runtime::EditorUvRegenerationCommand{
                 .StableEntityId = stableId,
                 .PreserveValidAuthoredUvs = true,
-                .Resolution = 64u,
-                .Padding = 2u,
+                .Atlas = {.Resolution = 64u, .Padding = 2u},
             });
     };
 
@@ -5059,8 +5091,7 @@ TEST(SandboxEditorUi, QueuedUvRegenerationDeliversItsOutcomeThroughTheTerminalCa
                 .StableEntityId =
                     Runtime::SelectionController::ToStableEntityId(mesh),
                 .PreserveValidAuthoredUvs = true,
-                .Resolution = 64u,
-                .Padding = 2u,
+                .Atlas = {.Resolution = 64u, .Padding = 2u},
             },
             [&delivered](Runtime::EditorUvRegenerationCommandResult result)
             {
@@ -5106,8 +5137,7 @@ TEST(SandboxEditorUi, StaleQueuedUvRegenerationStillReportsOneTerminalResult)
             Runtime::EditorUvRegenerationCommand{
                 .StableEntityId =
                     Runtime::SelectionController::ToStableEntityId(mesh),
-                .Resolution = 64u,
-                .Padding = 2u,
+                .Atlas = {.Resolution = 64u, .Padding = 2u},
             },
             [&](Runtime::EditorUvRegenerationCommandResult result)
             {
@@ -5179,8 +5209,7 @@ TEST(SandboxEditorUi, UvRegenerationPreservesClosedManifoldTopology)
             Runtime::EditorUvRegenerationCommand{
                 .StableEntityId =
                     Runtime::SelectionController::ToStableEntityId(mesh),
-                .Resolution = 64u,
-                .Padding = 2u,
+                .Atlas = {.Resolution = 64u, .Padding = 2u},
             });
     ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Applied)
         << result.Diagnostic;
@@ -5240,8 +5269,7 @@ TEST(SandboxEditorUi, UvRegenerationWithoutASeamStaysOnTheVertexDomain)
             Runtime::EditorUvRegenerationCommand{
                 .StableEntityId =
                     Runtime::SelectionController::ToStableEntityId(mesh),
-                .Resolution = 64u,
-                .Padding = 2u,
+                .Atlas = {.Resolution = 64u, .Padding = 2u},
             });
     ASSERT_TRUE(result.Status == Runtime::EditorCommandStatus::Applied ||
                 result.Status == Runtime::EditorCommandStatus::NoChange)
@@ -5307,8 +5335,7 @@ TEST(SandboxEditorUi, UvRegenerationCommandRepairsSelectedMeshTexcoords)
             context,
             Runtime::EditorUvRegenerationCommand{
                 .StableEntityId = stableId,
-                .Resolution = 64u,
-                .Padding = 2u,
+                .Atlas = {.Resolution = 64u, .Padding = 2u},
             });
 
     ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Applied);
@@ -5317,10 +5344,10 @@ TEST(SandboxEditorUi, UvRegenerationCommandRepairsSelectedMeshTexcoords)
     EXPECT_GT(result.AtlasWidth, 0u);
     EXPECT_GT(result.AtlasHeight, 0u);
     EXPECT_TRUE(history.IsDirty());
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexTexcoords>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
     EXPECT_TRUE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
 
     const GS::ConstSourceView repaired = GS::BuildConstView(registry.Raw(), mesh);
@@ -5479,8 +5506,7 @@ TEST(SandboxEditorUi, UvRegenerationRequestQueuesDerivedJobAndPublishesOnApply)
             context,
             Runtime::EditorUvRegenerationCommand{
                 .StableEntityId = stableId,
-                .Resolution = 64u,
-                .Padding = 2u,
+                .Atlas = {.Resolution = 64u, .Padding = 2u},
             }, onComplete);
 
     EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
@@ -5516,10 +5542,10 @@ TEST(SandboxEditorUi, UvRegenerationRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_EQ(completedResult->Provenance,
               Geometry::UvAtlas::UvAtlasProvenance::Generated);
     EXPECT_TRUE(texcoordsFinite());
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexTexcoords>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
     EXPECT_TRUE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
     EXPECT_TRUE(history.IsDirty());
 
@@ -5554,8 +5580,8 @@ TEST(SandboxEditorUi, UvRegenerationDuplicateSubmitUsesExistingActiveJob)
     const Runtime::EditorUvRegenerationCommand command{
         .StableEntityId =
             Runtime::SelectionController::ToStableEntityId(mesh),
-        .Resolution = 64u,
-        .Padding = 2u,
+        .Atlas = {.Resolution = 64u, .Padding = 2u},
+
     };
 
     EXPECT_TRUE(Runtime::PreviewEditorUvRegenerationCommand(context, command).Enabled);
@@ -5593,7 +5619,7 @@ TEST(SandboxEditorUi, UvRegenerationDuplicateSubmitUsesExistingActiveJob)
     }
     next[0] = savedNext;
     deleted.Vector().resize(vertices.Properties.Size(), false);
-    auto invalid = command; invalid.Resolution = 0u;
+    auto invalid = command; invalid.Atlas.Resolution = 0u;
     EXPECT_EQ(Runtime::ApplyEditorUvRegenerationCommand(context, invalid).Status,
               Runtime::EditorCommandStatus::InvalidProcessingParameters);
     EXPECT_EQ(duplicate.Status, Runtime::EditorCommandStatus::Pending);
@@ -5672,8 +5698,7 @@ TEST(SandboxEditorUi, UvRegenerationDerivedJobDiscardsStaleSource)
             context,
             Runtime::EditorUvRegenerationCommand{
                 .StableEntityId = stableId,
-                .Resolution = 64u,
-                .Padding = 2u,
+                .Atlas = {.Resolution = 64u, .Padding = 2u},
             }, onComplete);
     ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
 
@@ -5746,8 +5771,7 @@ TEST(SandboxEditorUi, UvRegenerationDerivedJobDiscardsStaleAuthoredProperty)
             Runtime::EditorUvRegenerationCommand{
                 .StableEntityId =
                     Runtime::SelectionController::ToStableEntityId(mesh),
-                .Resolution = 64u,
-                .Padding = 2u,
+                .Atlas = {.Resolution = 64u, .Padding = 2u},
             }, onComplete);
     ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
 
@@ -5781,6 +5805,58 @@ TEST(SandboxEditorUi, UvRegenerationDerivedJobDiscardsStaleAuthoredProperty)
     EXPECT_FLOAT_EQ(stalePaint[0].z, 0.75f);
     EXPECT_FLOAT_EQ(stalePaint[0].w, 1.0f);
 }
+TEST(SandboxEditorUi, AtlasJobRejectsCornerEditsAndAcceptsUnchangedBoundaryNanSlots)
+{
+    for (const bool edit : {false, true})
+    {
+        SCOPED_TRACE(edit);
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        auto context = MakeContext(registry, selection);
+        Extrinsic::Tests::EditorJobHarness jobs{};
+        jobs.Attach(context);
+        Runtime::EditorCommandHistory history{};
+        context.CommandHistory = &history;
+        const auto mesh = MakeSelectable(registry, "CornerAtlasGuard");
+        AddTriangleMeshSource(registry, mesh);
+        auto& halfedges = registry.Raw().get<GS::Halfedges>(mesh).Properties;
+        const auto face = halfedges.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeFace);
+        const auto toVertex = halfedges.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeToVertex);
+        const auto vertexUv = registry.Raw().get<GS::Vertices>(mesh).Properties.Get<glm::vec2>("v:texcoord");
+        auto corners = halfedges.GetOrAdd<glm::vec2>("h:texcoord", glm::vec2{std::numeric_limits<float>::quiet_NaN()});
+        std::size_t liveCorner = 0;
+        for (std::size_t h = 0; h < corners.Vector().size(); ++h)
+            if (face[h] != std::numeric_limits<std::uint32_t>::max())
+            { corners[h] = vertexUv[toVertex[h]]; liveCorner = h; }
+        const auto initial = corners.Vector();
+        const auto result = Runtime::ApplyEditorUvRegenerationCommand(context,
+            Runtime::EditorUvRegenerationCommand{
+                .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
+                .ForceRegenerate = true, .Atlas = {.Resolution = 64u, .Padding = 2u}});
+        ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
+        if (edit) corners[liveCorner].x += 0.125f;
+        ASSERT_TRUE(jobs.DrainUntilTerminal());
+        const auto done = jobs.Snapshot();
+        ASSERT_EQ(done.Entries.size(), 1u);
+        if (edit)
+        {
+            EXPECT_EQ(done.Entries[0].State, Runtime::JobState::StaleDiscarded);
+            EXPECT_FALSE(history.CanUndo());
+            EXPECT_FLOAT_EQ(corners[liveCorner].x, initial[liveCorner].x + 0.125f);
+        }
+        else
+        {
+            EXPECT_TRUE(history.CanUndo());
+            EXPECT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+            const auto restored = halfedges.Get<glm::vec2>("h:texcoord");
+            ASSERT_TRUE(restored);
+            for (std::size_t h = 0; h < initial.size(); ++h)
+                if (std::isnan(initial[h].x)) EXPECT_TRUE(std::isnan(restored[h].x));
+                else EXPECT_EQ(restored[h], initial[h]);
+        }
+    }
+}
+
 TEST(SandboxEditorUi, UvRegenerationPanelModelTracksDerivedJobStateThroughCache)
 {
     ECS::Scene::Registry registry;
@@ -5808,8 +5884,7 @@ TEST(SandboxEditorUi, UvRegenerationPanelModelTracksDerivedJobStateThroughCache)
             context,
             Runtime::EditorUvRegenerationCommand{
                 .StableEntityId = stableId,
-                .Resolution = 64u,
-                .Padding = 2u,
+                .Atlas = {.Resolution = 64u, .Padding = 2u},
             });
     ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
 
@@ -6263,7 +6338,7 @@ TEST(SandboxEditorUi, DetachedQueuedMeshFamiliesDoNotReadFreedScenes)
         else
         {
             const auto queued = Runtime::ApplyEditorUvRegenerationCommand(context,
-                Runtime::EditorUvRegenerationCommand{.StableEntityId = stableId, .Resolution = 64u},
+                Runtime::EditorUvRegenerationCommand{.StableEntityId = stableId, .Atlas = {.Resolution = 64u},},
                 [&](auto) { ++deliveries; });
             ASSERT_EQ(queued.Status, Runtime::EditorCommandStatus::Pending) << queued.Diagnostic;
         }

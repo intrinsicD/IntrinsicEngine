@@ -365,6 +365,17 @@ configured strategy writes `v:texcoord` through the runtime command-history
 path, with undo and redo controls in the same window. No panel-only solver or
 configuration path exists.
 
+The same window's atlas controls accept a scalar vertex/face guide and choose
+native None, Angle, Area or Both objectives, or the xatlas Angle backend.
+Resolution, chart padding, distortion limits and budgets use the shared config
+and command path. Successful generation opens `Mesh > UV Atlas Workspace`: a
+resizable scene/atlas split with a left/right toggle, UV wireframe, and one tab
+per baked texture. Tabs retain pending, failed and stale diagnostics; ready tabs
+show the stored values with independent coverage, range legends and shared
+pan/zoom. The atlas tab remains available while bakes complete. See the
+[method contract](../../../docs/methods/property_guided_atlas.md) for input limits
+and validation.
+
 The parameterization window stores its controls-to-UV split ratio in panel
 state and exposes a draggable divider. Its config-backed view controls choose
 `CPU layout` or `GPU shaded`, a grid/checker/texel-density/selected-albedo

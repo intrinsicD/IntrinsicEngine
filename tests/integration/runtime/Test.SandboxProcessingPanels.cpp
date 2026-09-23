@@ -41,6 +41,7 @@ import Extrinsic.ECS.Components.Selection;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.EditorUiModule;
+import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.EditorCommon;
@@ -1647,14 +1648,12 @@ TEST(SandboxProcessingPanels, UvAtlasAdoptionTracksNewExtentsAndPreservesManualS
             .Status = R::EditorCommandStatus::Applied,
             .AtlasWidth = 256u, .AtlasHeight = 128u}};
     std::optional<R::EditorUvRegenerationCommandResult> adopted;
-    std::int32_t width = 1, height = 1, padding = 0, resolution = 1024, uvPadding = 2;
-    float texelsPerUnit = 0.0f;
+    // Without a context the block submits default atlas config (padding 2).
+    std::int32_t width = 1, height = 1, padding = 0;
     bool force = true, preserve = false;
     const Editor::SandboxUvRegenerationControls controls{
         .LastResult = &result, .LastExtentAdoption = &adopted,
         .BakeWidth = &width, .BakeHeight = &height, .BakePadding = &padding,
-        .UvResolution = &resolution, .UvPadding = &uvPadding,
-        .UvTexelsPerUnit = &texelsPerUnit,
         .UvForceRegenerate = &force, .UvPreserveAuthored = &preserve};
     int checks = 0;
     const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
@@ -1685,12 +1684,12 @@ TEST(SandboxProcessingPanels, UvRegenerationControlBlocksUnavailableAndPublishes
     PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
     R::EditorTextureBakeControlsModel model;
     std::optional<R::EditorUvRegenerationCommandResult> result, adoption;
-    std::int32_t bakeWidth = 1024, bakeHeight = 1024, bakePadding = 0, resolution = 64, padding = 2;
-    float density = 0.f;
+    // The control submits the applied atlas config, whose default padding is 2.
+    const std::int32_t padding = 2;
+    std::int32_t bakeWidth = 1024, bakeHeight = 1024, bakePadding = 0;
     bool force = true, preserve = false;
     const Editor::SandboxUvRegenerationControls controls{
-        &result, &adoption, &bakeWidth, &bakeHeight, &bakePadding,
-        &resolution, &padding, &density, &force, &preserve};
+        &result, &adoption, &bakeWidth, &bakeHeight, &bakePadding, &force, &preserve};
     const auto windowHandle = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
         .Id = "test.uv_regeneration", .MenuPath = {"View"}, .Title = "UV controls test",
         .OpenByDefault = true,
@@ -2709,4 +2708,138 @@ TEST(SandboxProcessingPanels, ConsolidationNormalsRequireExplicitSelectionAndSur
         h.Engine->Run();
         EXPECT_TRUE(completed);
     }
+}
+
+// METHOD-047: a successful atlas for the still-selected mesh opens the mesh |
+// UV workspace, which claims the scene rectangle beside the atlas pane; with
+// auto-open disabled in the persisted config, a new atlas leaves it closed.
+TEST(SandboxProcessingPanels, AtlasWorkspaceAutoOpensAndClaimsSceneRectangle)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    const std::uint32_t stableId = R::SelectionController::ToStableEntityId(entity);
+    constexpr std::string_view kWorkspace = "mesh.uv_atlas_workspace";
+    const auto workspaceOpen = [&h, kWorkspace] {
+        for (const auto& entry : h.Shell.BuildEditorWindowMenuModel())
+            if (entry.Id == kWorkspace)
+                return entry.Open;
+        ADD_FAILURE() << "workspace window is not registered";
+        return false;
+    };
+    ASSERT_FALSE(workspaceOpen());
+
+    std::optional<R::EditorUvRegenerationCommandResult> immediate{};
+    std::optional<R::EditorUvRegenerationCommandResult> terminal{};
+    bool submit = false;
+    const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id = "test.atlas_workspace", .MenuPath = {"View"}, .Title = "Atlas workspace observer",
+        .OpenByDefault = true,
+        .Draw = [&](bool&, const Editor::SandboxEditorContext& context) {
+            terminal = context.Parameterization.Results.LastUvRegenerationResult;
+            if (!submit)
+                return;
+            submit = false;
+            const auto active = R::GetEditorParameterizationConfig(context.Parameterization.Commands);
+            ASSERT_TRUE(active.has_value());
+            if (context.Parameterization.ResultSinks.DismissUvRegenerationResult)
+                context.Parameterization.ResultSinks.DismissUvRegenerationResult();
+            terminal.reset();
+            immediate = R::ApplyEditorUvRegenerationCommand(
+                context.Parameterization.Commands,
+                R::EditorUvRegenerationCommand{.StableEntityId = stableId, .Atlas = active->Atlas},
+                context.Parameterization.ResultSinks.UvRegeneration);
+        }});
+
+    const auto* host = h.Engine->Services().Find<R::EditorUiHost>();
+    ASSERT_NE(host, nullptr);
+    enum class Step { FirstAtlas, Claim, LeftClaim, SecondAtlas, Done };
+    Step step = Step::FirstAtlas;
+    bool claimChecked = false;
+    int frames = 0, waited = 0;
+    submit = true;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frames > 800) { ADD_FAILURE() << "atlas workspace scenario stalled"; engine.RequestExit(); return; }
+        const bool finished = !submit && terminal.has_value() &&
+                              terminal->Status != R::EditorCommandStatus::Pending;
+        if (!finished)
+            waited = 0;
+        switch (step)
+        {
+        case Step::FirstAtlas:
+            // Let the observer and workspace see the terminal result first.
+            if (!finished || ++waited < 3)
+                return;
+            EXPECT_TRUE(terminal->Succeeded()) << terminal->Diagnostic;
+            EXPECT_EQ(terminal->StableEntityId, stableId);
+            EXPECT_TRUE(workspaceOpen());
+            step = Step::Claim;
+            return;
+        case Step::Claim:
+        {
+            const auto claim = host->SceneViewport().has_value() ? host->SceneViewport()
+                                                                   : host->PresentedSceneViewport();
+            ASSERT_TRUE(claim.has_value());
+            const ImGuiViewport* viewport = ImGui::GetMainViewport();
+            // Default layout: mesh on the left taking half of the work area.
+            EXPECT_FLOAT_EQ(claim->X, viewport->WorkPos.x);
+            EXPECT_FLOAT_EQ(claim->Y, viewport->WorkPos.y);
+            EXPECT_NEAR(claim->Width, viewport->WorkSize.x * 0.5f, 1.0f);
+            EXPECT_FLOAT_EQ(claim->Height, viewport->WorkSize.y);
+            claimChecked = true;
+            auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+            auto parameterization = *R::GetParameterizationConfig(config);
+            parameterization.View.AtlasOnLeft = true;
+            parameterization.View.SplitRatio = 0.6f;
+            R::SetParameterizationConfig(config, parameterization);
+            EXPECT_TRUE(h.Apply(config));
+            waited = 0;
+            step = Step::LeftClaim;
+            return;
+        }
+        case Step::LeftClaim:
+        {
+            if (++waited < 3) return;
+            const auto claim = host->SceneViewport().has_value() ? host->SceneViewport()
+                                                                   : host->PresentedSceneViewport();
+            ASSERT_TRUE(claim.has_value());
+            const ImGuiViewport* viewport = ImGui::GetMainViewport();
+            EXPECT_NEAR(claim->X, viewport->WorkPos.x + viewport->WorkSize.x * 0.4f, 1.0f);
+            EXPECT_NEAR(claim->Width, viewport->WorkSize.x * 0.6f, 1.0f);
+            // Close it and disable auto-open through the persisted config.
+            EXPECT_TRUE(h.Shell.SetEditorWindowOpen(kWorkspace, false));
+            auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+            auto parameterization = *R::GetParameterizationConfig(config);
+            parameterization.View.SplitEnabled = false;
+            // A different layout so the second run publishes new UVs.
+            parameterization.Atlas.Resolution = 512u;
+            parameterization.Atlas.Padding = 6u;
+            R::SetParameterizationConfig(config, parameterization);
+            EXPECT_TRUE(h.Apply(config));
+            terminal.reset();
+            immediate.reset();
+            waited = 0;
+            submit = true;
+            step = Step::SecondAtlas;
+            return;
+        }
+        case Step::SecondAtlas:
+            if (!finished || ++waited < 3)
+                return;
+            EXPECT_TRUE(terminal->Succeeded()) << terminal->Diagnostic;
+            EXPECT_FALSE(workspaceOpen());
+            step = Step::Done;
+            engine.RequestExit();
+            return;
+        case Step::Done:
+            return;
+        }
+    };
+    h.Engine->Run();
+    EXPECT_EQ(step, Step::Done);
+    EXPECT_TRUE(claimChecked);
+
+    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
 }

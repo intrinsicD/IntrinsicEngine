@@ -358,7 +358,8 @@ TEST(ImGuiPassContract, UploadHelperPreservesPerCommandTextureBindlessIndices)
 
     ASSERT_EQ(device.CommandContext.ScissorRecords.size(), 2u);
     EXPECT_EQ(device.CommandContext.ScissorRecords[0].X, 5);
-    EXPECT_EQ(device.CommandContext.ScissorRecords[0].Y, 93);
+    // Backbuffer rows are top-left oriented like ImGui clip rectangles.
+    EXPECT_EQ(device.CommandContext.ScissorRecords[0].Y, 7);
     EXPECT_EQ(device.CommandContext.ScissorRecords[0].Width, 100u);
     EXPECT_EQ(device.CommandContext.ScissorRecords[0].Height, 80u);
     EXPECT_EQ(device.CommandContext.ScissorRecords[1].X, 120);
@@ -685,7 +686,7 @@ TEST(ImGuiPassContract, PipelineMatchesLegacyDearImGuiStraightAlphaBlend)
     renderer->Shutdown();
 }
 
-TEST(ImGuiPassContract, DebugViewRgba8PresentSourceBindsRgba8PipelineVariant)
+TEST(ImGuiPassContract, OverlayOverDebugViewBindsBackbufferPipelineVariant)
 {
     Tests::MockDevice device;
     device.BackbufferFormat = RHI::Format::BGRA8_UNORM;
@@ -745,10 +746,12 @@ TEST(ImGuiPassContract, DebugViewRgba8PresentSourceBindsRgba8PipelineVariant)
     ASSERT_NE(imguiPass, nullptr);
     EXPECT_EQ(imguiPass->Status, Graphics::RenderCommandPassStatus::Recorded);
 
+    // The debug view is placed by Present; the overlay then composites onto
+    // the swapchain-format backbuffer, never onto the RGBA8 debug target.
     const auto& bound = device.CommandContext.BoundPipelines;
-    EXPECT_NE(std::find(bound.begin(), bound.end(), rgba8ImGuiPipeline), bound.end());
-    EXPECT_EQ(std::find(bound.begin(), bound.end(), backbufferImGuiPipeline), bound.end())
-        << "ImGui over DebugViewRGBA must not bind the swapchain-format pipeline.";
+    EXPECT_NE(std::find(bound.begin(), bound.end(), backbufferImGuiPipeline), bound.end());
+    EXPECT_EQ(std::find(bound.begin(), bound.end(), rgba8ImGuiPipeline), bound.end())
+        << "ImGui must bind the pipeline matching the backbuffer attachment.";
 
     renderer->Shutdown();
 }

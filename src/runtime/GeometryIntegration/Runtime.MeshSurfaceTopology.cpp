@@ -1,10 +1,12 @@
-// Implements canonical runtime mesh face/corner traversal and shading seams.
+// Implements canonical runtime mesh face/corner traversal, shading seams and
+// the generated-atlas extent record.
 module;
 
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -12,6 +14,7 @@ module;
 #include <utility>
 #include <vector>
 
+#include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
@@ -22,6 +25,8 @@ import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.MeshSoup;
 import Geometry.Properties;
+import Geometry.UvAtlas;
+import Extrinsic.Core.Hash;
 
 namespace Extrinsic::Runtime
 {
@@ -676,5 +681,180 @@ namespace Extrinsic::Runtime
 
         return FinalizeMeshCornerTexcoords(
             out, cornerAssigned, sourceFaces, sourceVertexCount);
+    }
+
+    namespace
+    {
+        struct CanonicalTexcoordBinding
+        {
+            std::optional<std::uint64_t> Corner{};
+            std::optional<std::uint64_t> Vertex{};
+            const Geometry::PropertySet* Corners{nullptr};
+            const Geometry::PropertySet* Vertices{nullptr};
+
+            [[nodiscard]] bool MatchesStamps(const MeshUvAtlasExtent& extent) const noexcept
+            {
+                return Corner == extent.CornerTexcoordRevision &&
+                       Vertex == extent.VertexTexcoordRevision;
+            }
+
+            // Presence and exact bytes of the canonical corner-over-vertex UVs.
+            [[nodiscard]] std::uint64_t Fingerprint() const
+            {
+                const auto hash = [](const Geometry::PropertySet& set, const char* name)
+                {
+                    const auto uv = Geometry::ConstPropertySet{set}.Get<glm::vec2>(name);
+                    if (!uv)
+                        return std::uint64_t{0u};
+                    const std::span<const glm::vec2> values{uv.Vector()};
+                    return Core::Hash::HashString64(std::string_view{
+                               reinterpret_cast<const char*>(values.data()), values.size_bytes()}) |
+                           1u;
+                };
+                const std::uint64_t corner = Corner.has_value()
+                    ? hash(*Corners, Geometry::MeshUtils::kHalfedgeTexcoordPropertyName) : 0u;
+                const std::uint64_t vertex = Vertex.has_value()
+                    ? hash(*Vertices, Geometry::MeshUtils::kVertexTexcoordPropertyName) : 0u;
+                const std::uint64_t combined = (corner * 1099511628211ull) ^ vertex;
+                return combined == 0u ? 1u : combined;
+            }
+        };
+
+        // Revision of the selected canonical UV property, or nullopt when the
+        // entity is not a mesh carrying a complete `h:texcoord` or
+        // `v:texcoord` (the bake's canonical corner-over-vertex atlas).
+        [[nodiscard]] std::optional<CanonicalTexcoordBinding> BindCanonicalTexcoords(
+            const entt::registry& registry,
+            const entt::entity entity)
+        {
+            if (!registry.valid(entity))
+                return std::nullopt;
+            const ECS::Components::GeometrySources::ConstSourceView view =
+                ECS::Components::GeometrySources::BuildConstView(registry, entity);
+            if (view.ActiveDomain != ECS::Components::GeometrySources::Domain::Mesh ||
+                view.VertexSource == nullptr ||
+                view.HalfedgeSource == nullptr)
+            {
+                return std::nullopt;
+            }
+            const auto complete = [](const Geometry::PropertySet& set, const char* name)
+            {
+                const auto uv = Geometry::ConstPropertySet{set}.Get<glm::vec2>(name);
+                return uv && uv.Vector().size() == set.Size();
+            };
+            const Geometry::PropertySet& corners = view.HalfedgeSource->Properties;
+            const Geometry::PropertySet& vertices = view.VertexSource->Properties;
+            const bool useCorners = complete(corners, Geometry::MeshUtils::kHalfedgeTexcoordPropertyName);
+            if (!useCorners &&
+                !complete(vertices, Geometry::MeshUtils::kVertexTexcoordPropertyName))
+            {
+                return std::nullopt;
+            }
+            return CanonicalTexcoordBinding{
+                .Corner = useCorners ? corners.FindPropertyRevision(
+                    Geometry::MeshUtils::kHalfedgeTexcoordPropertyName) : std::nullopt,
+                .Vertex = useCorners ? std::nullopt : vertices.FindPropertyRevision(
+                    Geometry::MeshUtils::kVertexTexcoordPropertyName),
+                .Corners = &corners,
+                .Vertices = &vertices,
+            };
+        }
+    }
+
+    bool IsValidMeshUvAtlasExtent(const std::uint32_t width, const std::uint32_t height)
+    {
+        // Resolution 0 means "default" to the generator, so it is excluded
+        // here; the upper bound is the generator's own option preflight.
+        const auto valid = [](const std::uint32_t side)
+        {
+            return side != 0u &&
+                   Geometry::UvAtlas::ValidateUvAtlasOptions(
+                       Geometry::UvAtlas::UvAtlasOptions{.Resolution = side, .Padding = 0u})
+                       .Valid;
+        };
+        return valid(width) && valid(height);
+    }
+
+    bool PublishMeshUvAtlasExtent(
+        entt::registry& registry,
+        const entt::entity entity,
+        const std::uint32_t width,
+        const std::uint32_t height)
+    {
+        if (!registry.valid(entity))
+            return false;
+        const std::optional<CanonicalTexcoordBinding> binding =
+            IsValidMeshUvAtlasExtent(width, height)
+                ? BindCanonicalTexcoords(registry, entity)
+                : std::nullopt;
+        if (!binding.has_value())
+        {
+            registry.remove<MeshUvAtlasExtent>(entity);
+            return false;
+        }
+        registry.emplace_or_replace<MeshUvAtlasExtent>(
+            entity,
+            MeshUvAtlasExtent{
+                .Width = width,
+                .Height = height,
+                .CornerTexcoordRevision = binding->Corner,
+                .VertexTexcoordRevision = binding->Vertex,
+                .TexcoordFingerprint = binding->Fingerprint(),
+            });
+        return true;
+    }
+
+    void RestoreMeshUvAtlasExtent(
+        entt::registry& registry,
+        const entt::entity entity,
+        MeshUvAtlasExtent extent)
+    {
+        if (!registry.valid(entity))
+            return;
+        extent.CornerTexcoordRevision.reset();
+        extent.VertexTexcoordRevision.reset();
+        extent.StampsMatchContent = false;
+        registry.emplace_or_replace<MeshUvAtlasExtent>(entity, extent);
+    }
+
+    std::optional<MeshUvAtlasExtent> FindCurrentMeshUvAtlasExtent(
+        const entt::registry& registry,
+        const entt::entity entity)
+    {
+        const auto* extent = registry.valid(entity)
+            ? registry.try_get<MeshUvAtlasExtent>(entity)
+            : nullptr;
+        if (extent == nullptr)
+            return std::nullopt;
+        const std::optional<CanonicalTexcoordBinding> binding =
+            BindCanonicalTexcoords(registry, entity);
+        if (!binding.has_value() ||
+            (binding->MatchesStamps(*extent) ? !extent->StampsMatchContent :
+             binding->Fingerprint() != extent->TexcoordFingerprint))
+        {
+            return std::nullopt;
+        }
+        return *extent;
+    }
+
+    std::optional<MeshUvAtlasExtent> RefreshMeshUvAtlasExtent(
+        entt::registry& registry,
+        const entt::entity entity)
+    {
+        auto* extent = registry.valid(entity)
+            ? registry.try_get<MeshUvAtlasExtent>(entity)
+            : nullptr;
+        if (extent == nullptr)
+            return std::nullopt;
+        const std::optional<CanonicalTexcoordBinding> binding =
+            BindCanonicalTexcoords(registry, entity);
+        if (!binding.has_value())
+            return std::nullopt;
+        if (binding->MatchesStamps(*extent))
+            return extent->StampsMatchContent ? std::optional{*extent} : std::nullopt;
+        extent->StampsMatchContent = binding->Fingerprint() == extent->TexcoordFingerprint;
+        extent->CornerTexcoordRevision = binding->Corner;
+        extent->VertexTexcoordRevision = binding->Vertex;
+        return extent->StampsMatchContent ? std::optional{*extent} : std::nullopt;
     }
 }

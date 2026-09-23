@@ -1677,6 +1677,7 @@ void SetEntityPosition(Registry& scene, const EntityHandle entity, const glm::ve
 
 struct ParameterizationUvViewRuntimePathState
 {
+    bool OpenAtlasWorkspace{false};
     bool ConfigPreviewUsable{false};
     bool ConfigApplied{false};
     bool ConfigAppliedFromAgentCli{false};
@@ -1771,7 +1772,7 @@ public:
         m_State->WindowOpened =
             editorUi != nullptr &&
             editorUi->Windows().SetOpen(
-                "mesh.processing.parameterize_uv",
+                m_State->OpenAtlasWorkspace ? "mesh.uv_atlas_workspace" : "mesh.processing.parameterize_uv",
                 true);
     }
 
@@ -2126,10 +2127,10 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigProducesVisi
     engine.Shutdown();
 }
 
-TEST(RuntimeSandboxAcceptanceGpuSmoke,
-     ParameterizationUvViewWindowUsesOperationalGpuTargetThroughRuntimePath)
+static void RunParameterizationUvViewRuntimePath(const bool workspace)
 {
     auto state = std::make_shared<ParameterizationUvViewRuntimePathState>();
+    state->OpenAtlasWorkspace = workspace;
     auto bootstrap = BootstrapDefaultSandboxAppEngineWithApp(
         std::make_unique<ParameterizationUvViewRuntimePathApp>(state));
     if (bootstrap.Skipped)
@@ -2174,7 +2175,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
         << "The real ReferenceTriangle was not selected through "
            "SelectionController.";
     EXPECT_TRUE(state->WindowOpened)
-        << "The contributed mesh.processing.parameterize_uv window did not open.";
+        << "The requested parameterization or atlas workspace window did not open.";
     const RT::EngineConfigControl* const configControl =
         engine.Services().Find<RT::EngineConfigControl>();
     ASSERT_NE(configControl, nullptr);
@@ -2229,6 +2230,23 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
         << BuildPassStatusSummary(run.Stats);
 
     EXPECT_TRUE(editorUiDiagnostics.LastFrameUsedUserTexture);
+    if (workspace)
+    {
+        auto rectangle = editorUi->PresentedSceneViewport();
+        if (!rectangle)
+            rectangle = editorUi->SceneViewport();
+        EXPECT_TRUE(rectangle.has_value()) << "the real split workspace must claim the scene rectangle";
+        if (rectangle)
+        {
+            EXPECT_GT(rectangle->Width, 0.0f);
+            EXPECT_GT(rectangle->Height, 0.0f);
+            const auto& window = engine.GetEngineConfig().Window;
+            // The menu bar reduces the work height slightly. A full-window
+            // scene would have twice this aspect and fails this check.
+            EXPECT_NEAR(rectangle->Width / rectangle->Height,
+                        0.5f * static_cast<float>(window.Width) / static_cast<float>(window.Height), 0.12f);
+        }
+    }
     EXPECT_GT(editorUiDiagnostics.LastVertexCount, 0u);
     EXPECT_GT(editorUiDiagnostics.LastIndexCount, 0u);
     EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
@@ -2241,6 +2259,18 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
         << run.After.OperationalGateFailure;
 
     engine.Shutdown();
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke,
+     ParameterizationUvViewWindowUsesOperationalGpuTargetThroughRuntimePath)
+{
+    RunParameterizationUvViewRuntimePath(false);
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke,
+     AtlasWorkspaceUsesOperationalGpuTargetAndSceneRectangle)
+{
+    RunParameterizationUvViewRuntimePath(true);
 }
 
 TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigPresentsReferenceTriangleAtFrameCenter)
@@ -7044,6 +7074,21 @@ private:
         std::uint64_t& generation)
     {
         const auto view = m_Cache->GetView(record.Texture);
+        const auto coverage = m_Cache->GetView(record.CoverageTexture);
+        if (m_Cache->GetState(record.CoverageTexture) !=
+                Extrinsic::Graphics::GpuAssetState::Ready ||
+            !coverage.has_value() || !coverage->Texture.IsValid())
+        {
+            Fail("Ready property texture has no resident companion coverage texture.");
+            return false;
+        }
+        const auto* coverageDesc = m_Renderer->GetTextureManager().GetDesc(coverage->Texture);
+        if (coverageDesc == nullptr || coverageDesc->Fmt != Extrinsic::RHI::Format::R32_FLOAT ||
+            coverageDesc->Width != record.Width || coverageDesc->Height != record.Height)
+        {
+            Fail("Coverage texture does not match its bake dimensions and R32F format.");
+            return false;
+        }
         if (!view.has_value() ||
             view->Kind != Extrinsic::Graphics::GpuAssetKind::Texture ||
             !view->Texture.IsValid())

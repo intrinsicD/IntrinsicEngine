@@ -13685,3 +13685,15 @@ tree:
     - ara/evidence/diagnostics/property_guided_atlas_design_20260922/claude-response-1.md
     - ara/evidence/diagnostics/property_guided_atlas_design_20260922/record.json
     status: open
+
+  - id: N637
+    type: experiment
+    title: Implement and verify property-guided atlas generation and inspection
+    provenance: ai-executed
+    timestamp: 2026-09-23T04:22+02:00
+    result: Operator-authorized continuation of N636 implements the bounded triangular-mesh workflow. Five actual Opus 5.5 fixed-source reviews plus numerical audit drove fixes. C109 records the finite CPU campaign; C110 records the named GPU path and verification. Arbitrary-mesh and speed guarantees remain unclaimed.
+    evidence:
+    - ara/evidence/diagnostics/method047_property_atlas/report.md
+    - ara/evidence/diagnostics/method047_property_atlas/review-resolution.md
+    - ara/evidence/diagnostics/method047_property_atlas/verification.json
+    status: resolved

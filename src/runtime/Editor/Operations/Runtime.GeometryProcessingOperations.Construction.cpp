@@ -418,6 +418,7 @@ namespace Extrinsic::Runtime
                 return;
             const auto start = Clock::now();
             auto& r = w.Result;
+            bool atlasUnavailable = false;
             if (w.Prepared)
             {
                 auto extracted = SR::Extract(*w.Prepared, w.Field);
@@ -449,12 +450,16 @@ namespace Extrinsic::Runtime
                     if (reflected)
                         std::reverse(faces[f.Index].begin(), faces[f.Index].end());
                 }
-                auto materialized = BuildRuntimeHalfedgeMeshMaterialization(payload);
+                // A valid extracted surface can exceed the atlas's texel or
+                // quality budget. UV rejection must not discard that geometry.
+                auto materialized = BuildRuntimeHalfedgeMeshMaterialization(payload,
+                    {.UvResolution = {.FailurePolicy = RuntimeMeshUvFailurePolicy::Optional}});
                 if (!materialized)
                 {
-                    r.Message = "Generated mesh normal/UV materialization failed.";
+                    r.Message = "Generated mesh materialization failed.";
                     return;
                 }
+                atlasUnavailable = !materialized->Diagnostics.ResolvedTexcoordsValid;
                 w.Mesh = std::move(materialized->Mesh);
                 r.OutputVertexCount = w.Mesh->VertexCount();
                 r.OutputEdgeCount = w.Mesh->EdgeCount();
@@ -496,6 +501,8 @@ namespace Extrinsic::Runtime
             r.Status = EditorCommandStatus::Applied;
             r.Message = std::string(ToString(w.Config.Method)) + " constructed with " +
                         r.ActualBackend + " queries and CPU geometry extraction.";
+            if (atlasUnavailable)
+                r.Message += " UV atlas unavailable; the surface remains usable without texture coordinates.";
         }
         struct GeneratedEntity
         {

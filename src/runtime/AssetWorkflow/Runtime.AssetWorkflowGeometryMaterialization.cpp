@@ -400,6 +400,9 @@ MakeUvAtlasOptions(const RuntimeMeshUvResolutionOptions &options) {
   atlasOptions.Padding = options.Padding;
   atlasOptions.TexelsPerUnit = options.TexelsPerUnit;
   atlasOptions.Method = options.Method;
+  atlasOptions.Distortion = options.Method == Geometry::UvAtlas::UvAtlasMethod::XAtlas
+      ? Geometry::UvAtlas::UvAtlasDistortion::Angle
+      : Geometry::UvAtlas::UvAtlasDistortion::Both;
   atlasOptions.AllowXAtlasFallback = options.AllowXAtlasFallback;
   atlasOptions.BackendName =
       options.Method == Geometry::UvAtlas::UvAtlasMethod::XAtlas

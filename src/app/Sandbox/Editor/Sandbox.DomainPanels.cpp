@@ -805,9 +805,6 @@ struct DomainPanels::Impl {
   std::int32_t TextureBakeWidth{1024};
   std::int32_t TextureBakeHeight{1024};
   std::int32_t TextureBakePadding{2};
-  std::int32_t UvAtlasResolution{1024};
-  std::int32_t UvAtlasPadding{2};
-  float UvAtlasTexelsPerUnit{0.0f};
   bool UvAtlasForceRegenerate{true};
   bool UvAtlasPreserveAuthored{false};
 
@@ -947,9 +944,6 @@ void DomainPanels::Impl::DrawWindow(
       .Width = &TextureBakeWidth,
       .Height = &TextureBakeHeight,
       .Padding = &TextureBakePadding,
-      .UvResolution = &UvAtlasResolution,
-      .UvPadding = &UvAtlasPadding,
-      .UvTexelsPerUnit = &UvAtlasTexelsPerUnit,
       .UvForceRegenerate = &UvAtlasForceRegenerate,
       .UvPreserveAuthored = &UvAtlasPreserveAuthored,
   };

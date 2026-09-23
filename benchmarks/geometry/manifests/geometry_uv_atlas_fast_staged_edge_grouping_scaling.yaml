@@ -8,6 +8,7 @@ benchmark_id: geometry.uv_atlas.fast_staged_edge_grouping.scaling
 method: geometry.uv_atlas.fast_staged_edge_grouping
 dataset: builtin.uv_atlas_edge_grouping_grid_pair_v1
 params:
+  distortion: angle
   fixture_generator: indexed_planar_grid
   small_grid_side: 16
   large_grid_side: 32

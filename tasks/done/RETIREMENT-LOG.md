@@ -7,6 +7,24 @@ relative to `tasks/done/`, which sits at the same depth as `tasks/active/`,
 so blocks moved from the old active-README history work verbatim.
 
 
+
+## 2026-09-23 — METHOD-047 atlas workflow and BUG-209 build recovery
+
+Retired [METHOD-047](METHOD-047-property-guided-atlas-editor.md) at Operational
+for scalar-guided triangular-mesh charting, truthful None/Angle/Area/Both
+objectives, validated source-corner UVs, raw property bakes and the actual
+left/right atlas workspace. Five fixed-source Opus 5.5 reviews and a numerical
+audit drove fixes, including exact bake extents and nested undo/redo. Focused and
+full CPU, separate ASan/UBSan, the final Vulkan selection and visual inspection
+pass; [C109/C110 evidence](../../ara/evidence/diagnostics/method047_property_atlas/report.md)
+bounds numerical and device claims without universal or speed guarantees.
+
+[BUG-209](BUG-209-atlas-vulkan-stale-module-recovery.md) retires after regenerating
+outdated Vulkan module artifacts with ccache disabled and unchanged source. Both
+attempts are retained; no compiler/cache root cause beyond the observed outdated
+module view is asserted. The enclosing implementation/evidence commit records
+both retirements. No in-scope work is deferred.
+
 ## 2026-09-22 — PROC-034 agent token efficiency retired
 
 Retired [PROC-034](PROC-034-agent-token-efficiency.md) at its workflow-maintenance

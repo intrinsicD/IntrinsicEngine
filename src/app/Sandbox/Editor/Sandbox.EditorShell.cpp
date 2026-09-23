@@ -36,6 +36,7 @@ import Extrinsic.Runtime.MeshTopologyOperations;
 import Extrinsic.Runtime.ParameterizationOperations;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorUiHost;
+import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.JobService;
@@ -1981,6 +1982,9 @@ namespace Extrinsic::Sandbox::Editor
             Runtime::EditorUiFrameContributionHandle FrameContribution{};
             BuiltinWindowHandles BuiltinHandles{};
             std::vector<Runtime::EditorWindowHandle> RegisteredWindows{};
+            std::vector<std::pair<std::uint64_t, std::function<void(const SandboxEditorContext&)>>>
+                FrameObservers{};
+            std::uint64_t NextFrameObserverId{1u};
             std::array<char, 1024> ImportPathBuffer{};
             std::array<char, 1024> ScenePathBuffer{};
             Runtime::EditorAssetPayloadKind ImportPayloadKind{
@@ -2004,9 +2008,6 @@ namespace Extrinsic::Sandbox::Editor
             std::int32_t TextureBakeWidth{1024};
             std::int32_t TextureBakeHeight{1024};
             std::int32_t TextureBakePadding{2};
-            std::int32_t UvAtlasResolution{1024};
-            std::int32_t UvAtlasPadding{2};
-            float UvAtlasTexelsPerUnit{0.0f};
             bool UvAtlasForceRegenerate{true};
             bool UvAtlasPreserveAuthored{false};
             SandboxEditorFrame LastFrame{};
@@ -2084,9 +2085,6 @@ namespace Extrinsic::Sandbox::Editor
                     .Width = &TextureBakeWidth,
                     .Height = &TextureBakeHeight,
                     .Padding = &TextureBakePadding,
-                    .UvResolution = &UvAtlasResolution,
-                    .UvPadding = &UvAtlasPadding,
-                    .UvTexelsPerUnit = &UvAtlasTexelsPerUnit,
                     .UvForceRegenerate = &UvAtlasForceRegenerate,
                     .UvPreserveAuthored = &UvAtlasPreserveAuthored,
                 };
@@ -2149,7 +2147,20 @@ namespace Extrinsic::Sandbox::Editor
                     prepared.Visualization,
                     prepared.RenderRecipe,
                     LastFrame);
+                ActiveContext->ClaimSceneViewport =
+                    [host = Host](const float x, const float y, const float width, const float height)
+                    {
+                        host->SetSceneViewport(Runtime::EditorSceneViewportRect{
+                            .X = x, .Y = y, .Width = width, .Height = height});
+                    };
                 DrawMainMenuBar(&Host->Windows());
+                // Copy: an observer may add or remove observers.
+                const auto observers = FrameObservers;
+                for (const auto& [id, observer] : observers)
+                {
+                    if (observer)
+                        observer(*ActiveContext);
+                }
                 (void)Host->Windows().DrawOpenWindows();
                 // Drop the context before the frame storage it borrows.
                 ActiveContext.reset();
@@ -2252,6 +2263,20 @@ namespace Extrinsic::Sandbox::Editor
             EditorWindowDescriptor descriptor)
         {
             return m_Impl->RegisterEditorWindow(std::move(descriptor));
+        }
+
+        std::uint64_t EditorShell::AddFrameObserver(
+            std::function<void(const SandboxEditorContext&)> observer)
+        {
+            const std::uint64_t id = m_Impl->NextFrameObserverId++;
+            m_Impl->FrameObservers.emplace_back(id, std::move(observer));
+            return id;
+        }
+
+        void EditorShell::RemoveFrameObserver(const std::uint64_t id) noexcept
+        {
+            std::erase_if(m_Impl->FrameObservers,
+                          [id](const auto& entry) { return entry.first == id; });
         }
 
         bool EditorShell::UnregisterEditorWindow(

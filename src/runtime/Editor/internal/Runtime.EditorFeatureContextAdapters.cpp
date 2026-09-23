@@ -29,6 +29,7 @@ import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.GeometryPayload;
 import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
+import Extrinsic.Graphics.Colormap;
 import Extrinsic.Core.Error;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Component.Transform;
@@ -44,6 +45,7 @@ import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetWorkflowRecipePolicies;
 import Extrinsic.Runtime.EditorUiHost;
+import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Geometry.Properties;
@@ -1572,6 +1574,7 @@ namespace
             case Graphics::UvViewBackgroundMode::TexelDensity:
                 return ConfigMode::TexelDensity;
             case Graphics::UvViewBackgroundMode::Texture:
+            case Graphics::UvViewBackgroundMode::BakedTexture:
                 return ConfigMode::Texture;
             }
             return ConfigMode::Grid;
@@ -1606,6 +1609,42 @@ namespace
         {
             token ^= value + 0x9E3779B97F4A7C15ull +
                      (token << 6u) + (token >> 2u);
+        }
+
+        // Texture tabs carry an asset id packed as (generation << 32) | index.
+        [[nodiscard]] Assets::AssetId UnpackTextureTabAssetId(const std::uint64_t packed) noexcept
+        {
+            return Assets::AssetId{static_cast<std::uint32_t>(packed & 0xFFFFFFFFull),
+                                   static_cast<std::uint32_t>(packed >> 32u)};
+        }
+
+        // Bake encodings (PropertyTextureBakeEncoding values) that store a raw
+        // scalar or vector are mapped through the tab's display range; colour,
+        // palette and pre-colormapped encodings are shown as stored.
+        [[nodiscard]] Graphics::UvViewTextureDisplayMode UvViewDisplayModeForTextureTab(
+            const EditorParameterizationTextureTab& tab) noexcept
+        {
+            constexpr std::uint32_t kAuto = 0u;
+            constexpr std::uint32_t kScalarColormap = 1u;
+            constexpr std::uint32_t kLinearScalar = 2u;
+            constexpr std::uint32_t kVector2 = 4u;
+            constexpr std::uint32_t kVector3 = 5u;
+            constexpr std::uint32_t kNormal = 6u;
+            if (!tab.RawFloat)
+                return Graphics::UvViewTextureDisplayMode::Color;
+            switch (tab.Encoding)
+            {
+            case kAuto:
+            case kScalarColormap:
+            case kLinearScalar:
+                return Graphics::UvViewTextureDisplayMode::ScalarColormap;
+            case kVector2:
+            case kVector3:
+            case kNormal:
+                return Graphics::UvViewTextureDisplayMode::VectorRange;
+            default:
+                return Graphics::UvViewTextureDisplayMode::Color;
+            }
         }
 
         [[nodiscard]] EditorParameterizationUvViewState
@@ -1699,6 +1738,54 @@ namespace
                 state.RequestToken,
                 backgroundTextureGeneration);
 
+            // An explicit baked texture replaces the configured background,
+            // but only a fresh (ready, not stale) bake of the current atlas
+            // is ever bound; otherwise the pane keeps the plain layout.
+            Graphics::UvViewTextureDisplay bakedTexture{};
+            bool showBakedTexture = false;
+            if (request.Texture.has_value() && request.Texture->State == EditorParameterizationTextureState::Ready)
+            {
+                const EditorParameterizationTextureTab& tab = *request.Texture;
+                if (gpuAssetCache != nullptr)
+                {
+                    const auto view = gpuAssetCache->GetView(UnpackTextureTabAssetId(tab.TextureAssetId));
+                    const auto coverage = gpuAssetCache->GetView(UnpackTextureTabAssetId(tab.CoverageTextureAssetId));
+                    if (coverage.has_value() && coverage->Kind == Graphics::GpuAssetKind::Texture &&
+                        coverage->BindlessIdx != RHI::kInvalidBindlessIndex)
+                    {
+                        bakedTexture.CoverageTexture = coverage->BindlessIdx;
+                        MixSandboxUvViewToken(state.RequestToken, coverage->Generation);
+                    }
+                    if (view.has_value() && view->Kind == Graphics::GpuAssetKind::Texture &&
+                        view->BindlessIdx != RHI::kInvalidBindlessIndex)
+                    {
+                        bakedTexture.Texture = view->BindlessIdx;
+                        MixSandboxUvViewToken(state.RequestToken, view->Generation);
+                    }
+                }
+                bakedTexture.Mode = UvViewDisplayModeForTextureTab(tab);
+                bakedTexture.RangeMin = tab.RangeMin;
+                bakedTexture.RangeMax = tab.RangeMax;
+                bakedTexture.Colormap = tab.Colormap < Graphics::Colormap::kColormapCount
+                    ? static_cast<Graphics::Colormap::Type>(tab.Colormap)
+                    : Graphics::Colormap::Type::Viridis;
+                showBakedTexture = true;
+                MixSandboxUvViewToken(state.RequestToken, bakedTexture.Texture);
+                MixSandboxUvViewToken(state.RequestToken, tab.Revision);
+                MixSandboxUvViewToken(state.RequestToken, static_cast<std::uint64_t>(bakedTexture.Mode));
+                MixSandboxUvViewToken(state.RequestToken, std::bit_cast<std::uint32_t>(tab.RangeMin));
+                MixSandboxUvViewToken(state.RequestToken, std::bit_cast<std::uint32_t>(tab.RangeMax));
+                MixSandboxUvViewToken(state.RequestToken, tab.Colormap);
+            }
+            const Graphics::UvViewNavigation navigation{
+                .CenterU = request.ViewCenter.x,
+                .CenterV = request.ViewCenter.y,
+                .HalfExtentV = request.ViewHalfExtent,
+            };
+            MixSandboxUvViewToken(state.RequestToken, std::bit_cast<std::uint32_t>(navigation.CenterU));
+            MixSandboxUvViewToken(state.RequestToken, std::bit_cast<std::uint32_t>(navigation.CenterV));
+            MixSandboxUvViewToken(state.RequestToken, std::bit_cast<std::uint32_t>(navigation.HalfExtentV));
+
             Graphics::UvViewRequest graphicsRequest{
                 .Enabled = true,
                 .RequestToken = state.RequestToken,
@@ -1711,9 +1798,12 @@ namespace
                     .MaxU = request.UvBoundsMax.x,
                     .MaxV = request.UvBoundsMax.y,
                 },
-                .Background =
-                    ToGraphicsUvViewBackground(request.View.BackgroundMode),
+                .Background = showBakedTexture
+                    ? Graphics::UvViewBackgroundMode::BakedTexture
+                    : ToGraphicsUvViewBackground(request.View.BackgroundMode),
                 .BackgroundTexture = backgroundTexture,
+                .BakedTexture = bakedTexture,
+                .Navigation = navigation,
                 .ShowDistortionHeatmap =
                     request.View.ShowDistortionHeatmap,
                 .LineIndices = std::move(request.LineIndices),
@@ -1788,6 +1878,27 @@ namespace
             return state;
         }
 
+        // Camera commands issued from the UI frame match the scene rectangle
+        // the engine is currently presenting, not the whole framebuffer.
+        [[nodiscard]] Core::Extent2D PresentedSceneViewportExtent(
+            const Platform::IWindow* const window,
+            const EditorUiHost* const host) noexcept
+        {
+            if (window == nullptr)
+                return {};
+            EditorInputCaptureSnapshot capture{};
+            if (host != nullptr && host->IsVisible())
+            {
+                if (const auto presented = host->PresentedSceneViewport())
+                {
+                    capture.HasSceneViewport = true;
+                    capture.SceneViewport = *presented;
+                }
+            }
+            return ResolveSceneViewportPixels(
+                window->GetWindowExtent(), window->GetFramebufferExtent(), capture).Extent;
+        }
+
         [[nodiscard]] EditorFeatureBindings BuildContextFromRuntime(WorldRegistry& worlds,
                                                                    ServiceRegistry& services)
         {
@@ -1814,10 +1925,7 @@ namespace
                 .LastRefinedPrimitiveGeneration =
                     interaction != nullptr ? interaction->LastRefinedPrimitiveGeneration() : 0u,
                 .CameraControllers = services.Find<CameraControllerRegistry>(),
-                .CameraViewport    = window != nullptr
-                                         ? Core::Extent2D{window->GetFramebufferExtent().Width,
-                                                       window->GetFramebufferExtent().Height}
-                                         : Core::Extent2D{},
+                .CameraViewport    = PresentedSceneViewportExtent(window, services.Find<EditorUiHost>()),
                 .Device            = device,
                 .TextureBake       = textureBake,
                 .AssetImportCommands =
@@ -2182,6 +2290,40 @@ MakeEditorParameterizationUvViewCommandSurface(ServiceRegistry& services)
     RHI::IDevice* const device = services.Find<RHI::IDevice>();
     Graphics::IRenderer* const renderer = services.Find<Graphics::IRenderer>();
     return EditorParameterizationUvViewCommandSurface{
+        .TextureTabs = [&services](const std::uint32_t entity)
+        {
+            std::vector<EditorParameterizationTextureTab> tabs{};
+            const auto* bake = services.Find<TextureBakeService>();
+            if (bake == nullptr) return tabs;
+            const auto snapshot = bake->Snapshot(entity);
+            const auto pack = [](const Assets::AssetId id)
+            { return (static_cast<std::uint64_t>(id.Generation) << 32u) | id.Index; };
+            for (const auto& record : snapshot.Textures)
+            {
+                auto state = record.State == PropertyTextureBakeOutputState::Pending
+                    ? EditorParameterizationTextureState::Pending
+                    : record.State == PropertyTextureBakeOutputState::Failed
+                    ? EditorParameterizationTextureState::Failed
+                    : record.Freshness == PropertyTextureBakeFreshness::Fresh
+                    ? EditorParameterizationTextureState::Ready
+                    : EditorParameterizationTextureState::Stale;
+                std::string diagnostic = record.Diagnostic;
+                if (state == EditorParameterizationTextureState::Stale)
+                    diagnostic = DebugNameForPropertyTextureBakeFreshness(record.Freshness);
+                tabs.push_back(EditorParameterizationTextureTab{
+                    .Name = record.OutputName, .Diagnostic = std::move(diagnostic),
+                    .TextureAssetId = pack(record.Texture), .CoverageTextureAssetId = pack(record.CoverageTexture),
+                    .ResolvedTexcoords = record.ResolvedTexcoords,
+                    .Width = record.Width, .Height = record.Height,
+                    .RangeMin = record.RangeMin, .RangeMax = record.RangeMax, .State = state,
+                    .RawFloat = record.Storage == PropertyTextureBakeStorage::RawFloat,
+                    .Encoding = static_cast<std::uint32_t>(record.Encoding),
+                    .Colormap = static_cast<std::uint32_t>(record.EncodingColormap),
+                    .Revision = record.Generation,
+                });
+            }
+            return tabs;
+        },
         .Submit =
             [renderer, device, &services, renderExtraction](
                 EditorParameterizationUvViewRequest request)

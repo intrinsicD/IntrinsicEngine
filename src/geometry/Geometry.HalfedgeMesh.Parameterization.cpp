@@ -25,6 +25,7 @@ import Geometry.HalfedgeMesh.Repair;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.Parameterization.Diagnostics;
 import Geometry.Parameterization.Harmonic;
+import Geometry.Sparse;
 
 namespace Geometry::Parameterization
 {
@@ -407,15 +408,30 @@ namespace Geometry::Parameterization
         auto Atb = ComputeAtb(A, rhs);
 
         // ------------------------------------------------------------------
-        // Step 6: Solve via CG
+        // Step 6: Solve the SPD normal equations (CG, or direct LDLT on
+        // request with CG as the fallback).
         // ------------------------------------------------------------------
         std::vector<double> solution(nCols, 0.0);
 
-        DEC::CGParams cgParams;
-        cgParams.MaxIterations = params.MaxSolverIterations;
-        cgParams.Tolerance = params.SolverTolerance;
-
-        auto cgResult = DEC::SolveCG(AtA, Atb, solution, cgParams);
+        DEC::CGResult cgResult{};
+        Sparse::SparseLDLT ldlt;
+        const bool directSolved = params.UseDirectSolver
+            && ldlt.factor(AtA).Succeeded()
+            && ldlt.solve(Atb, solution).Succeeded()
+            && std::all_of(solution.begin(), solution.end(),
+                   [](const double value) { return std::isfinite(value); });
+        if (directSolved)
+        {
+            cgResult.Converged = true;
+        }
+        else
+        {
+            std::fill(solution.begin(), solution.end(), 0.0);
+            DEC::CGParams cgParams;
+            cgParams.MaxIterations = params.MaxSolverIterations;
+            cgParams.Tolerance = params.SolverTolerance;
+            cgResult = DEC::SolveCG(AtA, Atb, solution, cgParams);
+        }
 
         // ------------------------------------------------------------------
         // Step 7: Extract UVs

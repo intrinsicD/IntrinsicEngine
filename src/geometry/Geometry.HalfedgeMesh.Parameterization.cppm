@@ -32,7 +32,8 @@ export namespace Geometry::Parameterization
     // computes UV coordinates that minimize conformal (angle) distortion.
     // Two boundary vertices are pinned to break translational, rotational,
     // and scale degrees of freedom. The resulting normal-equations system is
-    // SPD and solved via the DEC module's Jacobi-preconditioned CG.
+    // SPD and solved via the DEC module's Jacobi-preconditioned CG, or by
+    // sparse LDLT factorization when UseDirectSolver is set.
     //
     // Requirements:
     //   - Triangle mesh (all faces must be triangles)
@@ -58,6 +59,12 @@ export namespace Geometry::Parameterization
         // CG solver parameters
         double SolverTolerance{1e-8};
         std::size_t MaxSolverIterations{5000};
+
+        // Factor the normal equations with sparse LDLT instead of CG. CG
+        // stops at a relative residual of the squared-condition system and
+        // can land far from the minimizer; the direct solve is exact up to
+        // round-off. CG remains the fallback if factorization fails.
+        bool UseDirectSolver{false};
     };
 
     struct ParameterizationResult

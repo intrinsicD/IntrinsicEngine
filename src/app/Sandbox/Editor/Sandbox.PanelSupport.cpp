@@ -666,9 +666,6 @@ namespace Extrinsic::Sandbox::Editor
         std::int32_t fallbackHeight{
             static_cast<std::int32_t>(model.DefaultHeight)};
         std::int32_t fallbackPadding{2};
-        std::int32_t fallbackUvResolution{1024};
-        std::int32_t fallbackUvPadding{2};
-        float fallbackUvTexelsPerUnit{0.0f};
         bool fallbackUvForceRegenerate{true};
         bool fallbackUvPreserveAuthored{false};
 
@@ -722,18 +719,6 @@ namespace Extrinsic::Sandbox::Editor
             state != nullptr && state->Padding != nullptr
                 ? *state->Padding
                 : fallbackPadding;
-        std::int32_t& uvResolution =
-            state != nullptr && state->UvResolution != nullptr
-                ? *state->UvResolution
-                : fallbackUvResolution;
-        std::int32_t& uvPadding =
-            state != nullptr && state->UvPadding != nullptr
-                ? *state->UvPadding
-                : fallbackUvPadding;
-        float& uvTexelsPerUnit =
-            state != nullptr && state->UvTexelsPerUnit != nullptr
-                ? *state->UvTexelsPerUnit
-                : fallbackUvTexelsPerUnit;
         bool& uvForceRegenerate =
             state != nullptr && state->UvForceRegenerate != nullptr
                 ? *state->UvForceRegenerate
@@ -764,8 +749,8 @@ namespace Extrinsic::Sandbox::Editor
             normalSpaceIndex,
             0,
             static_cast<std::int32_t>(kNormalSpaceNames.size() - 1u));
-        bakeWidth = std::clamp<std::int32_t>(bakeWidth, 1, 8192);
-        bakeHeight = std::clamp<std::int32_t>(bakeHeight, 1, 8192);
+        bakeWidth = std::clamp<std::int32_t>(bakeWidth, 1, static_cast<std::int32_t>(kPropertyTextureBakeMaxExtent));
+        bakeHeight = std::clamp<std::int32_t>(bakeHeight, 1, static_cast<std::int32_t>(kPropertyTextureBakeMaxExtent));
 
         DrawSandboxUvRegenerationControls(
             model,
@@ -776,9 +761,6 @@ namespace Extrinsic::Sandbox::Editor
                 .BakeWidth = &bakeWidth,
                 .BakeHeight = &bakeHeight,
                 .BakePadding = &bakePadding,
-                .UvResolution = &uvResolution,
-                .UvPadding = &uvPadding,
-                .UvTexelsPerUnit = &uvTexelsPerUnit,
                 .UvForceRegenerate = &uvForceRegenerate,
                 .UvPreserveAuthored = &uvPreserveAuthored,
             });
@@ -1042,8 +1024,8 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::InputInt("Bake padding", &bakePadding);
         if (!paddingSupported)
             ImGui::EndDisabled();
-        bakeWidth = std::clamp<std::int32_t>(bakeWidth, 1, 8192);
-        bakeHeight = std::clamp<std::int32_t>(bakeHeight, 1, 8192);
+        bakeWidth = std::clamp<std::int32_t>(bakeWidth, 1, static_cast<std::int32_t>(kPropertyTextureBakeMaxExtent));
+        bakeHeight = std::clamp<std::int32_t>(bakeHeight, 1, static_cast<std::int32_t>(kPropertyTextureBakeMaxExtent));
         bakePadding = std::clamp<std::int32_t>(bakePadding, 0, 32);
 
         const bool canBake =
@@ -1443,19 +1425,46 @@ namespace Extrinsic::Sandbox::Editor
                 return;
             }
 
-            const EditorUvRegenerationCommandResult& result = *lastResult;
-            ImGui::Text("Last UV regeneration: %s",
-                        DebugNameForEditorCommandStatus(result.Status));
-            ImGui::Text("Atlas: %s / %s  %ux%u  charts=%u  splits=%zu",
-                        DebugNameForEditorUvAtlasStatus(result.UvStatus),
-                        DebugNameForEditorUvAtlasProvenance(result.Provenance),
-                        result.AtlasWidth,
-                        result.AtlasHeight,
-                        result.ChartCount,
-                        result.SeamSplitVertexCount);
-            if (!result.Diagnostic.empty())
-                ImGui::TextWrapped("%s", result.Diagnostic.c_str());
+            DrawSandboxUvAtlasResult(*lastResult);
         }
+    }
+
+    void DrawSandboxUvAtlasResult(const EditorUvRegenerationCommandResult& result)
+    {
+        ImGui::Text("Last UV regeneration: %s",
+                    DebugNameForEditorCommandStatus(result.Status));
+        ImGui::Text("Atlas: %s / %s  %ux%u  charts=%u  regions=%u  splits=%zu",
+                    DebugNameForEditorUvAtlasStatus(result.UvStatus),
+                    DebugNameForEditorUvAtlasProvenance(result.Provenance),
+                    result.AtlasWidth,
+                    result.AtlasHeight,
+                    result.ChartCount,
+                    result.RegionCount,
+                    result.SeamSplitVertexCount);
+        // Requested versus actual keeps a fallback from reading as success
+        // of the requested method or objective.
+        ImGui::Text("Method: requested %s, actual %s",
+                    SandboxUvAtlasMethodLabel(result.RequestedMethod),
+                    SandboxUvAtlasMethodLabel(result.ActualMethod));
+        ImGui::Text("Objective: requested %s, actual %s",
+                    SandboxUvAtlasDistortionLabel(result.RequestedDistortion),
+                    SandboxUvAtlasDistortionLabel(result.ActualDistortion));
+        if (result.Provenance == decltype(result.Provenance)::AuthoredPreserved)
+            ImGui::TextUnformatted("Distortion: not evaluated (authored UVs preserved)");
+        else
+            ImGui::Text("Distortion max/mean: angle %.4g / %.4g, area %.4g / %.4g",
+                        result.MaxConformalDistortion, result.MeanConformalDistortion,
+                        result.MaxAreaDistortion, result.MeanAreaDistortion);
+        ImGui::Text("Refinement splits: %u  exact triangle charts: %u  unconverged optimizers: %u",
+                    result.RefinementSplitCount, result.SingleTriangleChartCount, result.UnconvergedChartCount);
+        if (result.UsedFallback)
+        {
+            ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f), "Fallback used: %s",
+                               result.FallbackReason.empty() ? "(no reason reported)"
+                                                             : result.FallbackReason.c_str());
+        }
+        if (!result.Diagnostic.empty())
+            ImGui::TextWrapped("%s", result.Diagnostic.c_str());
     }
 
     void DrawSandboxUvRegenerationControls(
@@ -1470,20 +1479,16 @@ namespace Extrinsic::Sandbox::Editor
         std::int32_t& bakeWidth = *controls.BakeWidth;
         std::int32_t& bakeHeight = *controls.BakeHeight;
         std::int32_t& bakePadding = *controls.BakePadding;
-        std::int32_t& uvResolution = *controls.UvResolution;
-        std::int32_t& uvPadding = *controls.UvPadding;
-        float& uvTexelsPerUnit = *controls.UvTexelsPerUnit;
         bool& uvForceRegenerate = *controls.UvForceRegenerate;
         bool& uvPreserveAuthored = *controls.UvPreserveAuthored;
-
-        const auto clampAtlasParameters = [&]()
-        {
-            uvResolution = std::clamp<std::int32_t>(uvResolution, 1, 16384);
-            uvPadding = std::clamp<std::int32_t>(uvPadding, 0, uvResolution - 1);
-            if (!std::isfinite(uvTexelsPerUnit) || uvTexelsPerUnit < 0.0f)
-                uvTexelsPerUnit = 0.0f;
-        };
-        clampAtlasParameters();
+        // Atlas tuning is persisted parameterization config; this block only
+        // submits the active, already validated settings.
+        const std::optional<ParameterizationConfig> activeConfig =
+            context != nullptr
+                ? GetEditorParameterizationConfig(context->Parameterization.Commands)
+                : std::nullopt;
+        const ParameterizationAtlasConfig atlas =
+            activeConfig.has_value() ? activeConfig->Atlas : ParameterizationAtlasConfig{};
 
         ImGui::SeparatorText("UV / texture bake");
         ImGui::Text("UV: %s texcoords=%s count=%zu/%zu",
@@ -1497,18 +1502,19 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::Checkbox("Force regenerate", &uvForceRegenerate);
         ImGui::SameLine();
         ImGui::Checkbox("Preserve valid authored", &uvPreserveAuthored);
-        ImGui::InputInt("UV resolution", &uvResolution);
-        ImGui::InputInt("UV padding", &uvPadding);
-        ImGui::InputFloat("Texels per unit", &uvTexelsPerUnit, 0.0f, 0.0f, "%.3f");
-        clampAtlasParameters();
+        ImGui::TextDisabled("Atlas: %s / %s, %ux%u px, padding %u%s",
+                            SandboxUvAtlasMethodLabel(atlas.Method),
+                            SandboxUvAtlasDistortionLabel(atlas.Distortion),
+                            atlas.Resolution, atlas.Resolution, atlas.Padding,
+                            atlas.Guide.has_value() ? ", property-guided" : "");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Edit and apply atlas settings in Mesh / Processing / Parameterize (UV).");
 
         const EditorUvRegenerationCommand command{
             .StableEntityId = model.SelectedStableId,
             .PreserveValidAuthoredUvs = uvPreserveAuthored,
             .ForceRegenerate = uvForceRegenerate,
-            .Resolution = static_cast<std::uint32_t>(uvResolution),
-            .Padding = static_cast<std::uint32_t>(uvPadding),
-            .TexelsPerUnit = uvTexelsPerUnit,
+            .Atlas = atlas,
         };
         const auto readiness = PreviewEditorUvRegenerationCommand(
             context != nullptr ? context->Parameterization.Commands : EditorProcessingCommands{}, command);
@@ -1536,13 +1542,18 @@ namespace Extrinsic::Sandbox::Editor
                      lastExtentAdoption->AtlasHeight != lastResult->AtlasHeight)
             {
                 bakeWidth = std::clamp<std::int32_t>(
-                    static_cast<std::int32_t>(lastResult->AtlasWidth), 1, 8192);
+                    static_cast<std::int32_t>(lastResult->AtlasWidth), 1, static_cast<std::int32_t>(kPropertyTextureBakeMaxExtent));
                 bakeHeight = std::clamp<std::int32_t>(
-                    static_cast<std::int32_t>(lastResult->AtlasHeight), 1, 8192);
-                bakePadding = std::clamp<std::int32_t>(uvPadding, 0, 32);
+                    static_cast<std::int32_t>(lastResult->AtlasHeight), 1, static_cast<std::int32_t>(kPropertyTextureBakeMaxExtent));
+                bakePadding = std::clamp<std::int32_t>(static_cast<std::int32_t>(atlas.Padding), 0, 32);
                 lastExtentAdoption = *lastResult;
             }
         }
+        if (lastResult.has_value() && lastResult->Succeeded() &&
+            (lastResult->AtlasWidth > kPropertyTextureBakeMaxExtent ||
+             lastResult->AtlasHeight > kPropertyTextureBakeMaxExtent))
+            ImGui::TextWrapped("Atlas exceeds the maximum bake extent (%u). Bake controls use that cap; small charts may require a smaller atlas or fewer regions.",
+                               kPropertyTextureBakeMaxExtent);
         DrawUvRegenerationStatus(model.Uv, lastResult);
         // Drawn after every reader above: dismissal clears the panel copy, the
         // once-per-result extent latch, and the session slot that would
@@ -1844,6 +1855,34 @@ namespace Extrinsic::Sandbox::Editor
         }
         projection.Valid = true;
         return projection;
+    }
+
+    const char* SandboxUvAtlasMethodLabel(
+        const Geometry::UvAtlas::UvAtlasMethod method) noexcept
+    {
+        using Method = Geometry::UvAtlas::UvAtlasMethod;
+        switch (method)
+        {
+        case Method::None: return "None";
+        case Method::Authored: return "Authored UVs";
+        case Method::XAtlas: return "xatlas";
+        case Method::FastStaged: return "Fast staged";
+        }
+        return "Unknown";
+    }
+
+    const char* SandboxUvAtlasDistortionLabel(
+        const Geometry::UvAtlas::UvAtlasDistortion distortion) noexcept
+    {
+        using Distortion = Geometry::UvAtlas::UvAtlasDistortion;
+        switch (distortion)
+        {
+        case Distortion::None: return "None (valid map only)";
+        case Distortion::Angle: return "Angle";
+        case Distortion::Area: return "Area";
+        case Distortion::Both: return "Angle + area";
+        }
+        return "Unknown";
     }
 
     SandboxParameterizationResultSummary

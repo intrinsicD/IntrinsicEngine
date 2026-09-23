@@ -9,10 +9,11 @@ benchmark_id: geometry.uv_atlas.fast_staged_vs_xatlas.smoke
 method: geometry.uv_atlas.fast_staged_vs_xatlas
 dataset: builtin.cube_surface
 params:
+  distortion: angle
   fixture: cube_surface
   baseline_method: xatlas
   probe_method: fast_staged
-  resolution: 128
+  resolution: 256
   padding: 2
   warmup_iterations: 1
   measured_iterations: 4

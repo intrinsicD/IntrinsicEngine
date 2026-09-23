@@ -2070,6 +2070,93 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportKeepsVertexUvsWhenTheAtlas
     engine.Shutdown();
 }
 
+TEST(RuntimeAssetImportFormatCoverage, RejectedAtlasKeepsDirectMeshRenderableAndSelectable)
+{
+    TempAssetFile meshFile("atlas_underresolved.obj",
+        "v 0 0 0\nv 1000 0 0\nv 0 1000 0\nv 2000 0 0\nv 2000.1 0 0\nv 2000 0.1 0\nf 1 2 3\nf 4 5 6\n");
+    std::optional<ECS::EntityHandle> entity;
+    bool publicationObserved = false;
+    const auto published = [&entity, &publicationObserved](Runtime::Engine& engine)
+    {
+        if (!entity) return false;
+        for (const auto& job : RequiredEngineService<Runtime::JobService>(engine).SnapshotAll())
+            if (job.DebugName.starts_with("Runtime.DirectMeshPostProcess."))
+                return publicationObserved = job.State == Runtime::JobState::Published;
+        return false;
+    };
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+        std::make_unique<WaitForConditionApplication>(published, 4096u));
+    InitializeAssetImportEngine(engine);
+    InstallSandboxDefaultRuntimePolicies(engine);
+    const auto imported = RequiredEngineService<Runtime::AssetWorkflowModule>(engine)
+        .ImportAssetFromPath({.Path = meshFile.Path.string(),
+                             .PayloadKind = Assets::AssetPayloadKind::Mesh});
+    ASSERT_TRUE(imported.has_value());
+    entity = FindFirstEntityWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
+    ASSERT_TRUE(entity.has_value());
+    engine.Run();
+    ASSERT_TRUE(publicationObserved)
+        << "the import job must publish before the engine stops its job service";
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const auto counts = ReadMeshTopologyCounts(scene, *entity);
+    EXPECT_EQ(counts.Vertices, 6u);
+    EXPECT_EQ(counts.Faces, 2u);
+    EXPECT_TRUE((scene.Raw().all_of<G::RenderSurface, Sel::SelectableTag>(*entity)));
+    EXPECT_TRUE(MeshHasVertexProperty(engine, *entity, "v:normal"));
+    EXPECT_FALSE(MeshHasVertexProperty(engine, *entity, "v:texcoord"));
+    EXPECT_FALSE(MeshHasHalfedgeProperty(engine, *entity, "h:texcoord"));
+    {
+        // Borrowed material leases must retire while their renderer is alive.
+        Runtime::RenderExtractionCache extraction;
+        const auto stats = extraction.ExtractAndSubmit(scene, engine.GetRenderer(),
+            &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
+        EXPECT_EQ(stats.MeshGeometryUploads, 1u);
+    }
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, RejectedAtlasDoesNotDiscardModelScene)
+{
+    std::vector<std::byte> bytes;
+    for (float value : {0.f,0.f,0.f, 1000.f,0.f,0.f, 0.f,1000.f,0.f,
+                        2000.f,0.f,0.f, 2000.1f,0.f,0.f, 2000.f,0.1f,0.f})
+        AppendScalar(bytes, value);
+    for (std::uint16_t index : {0u,1u,2u, 3u,4u,5u}) AppendScalar(bytes, index);
+    const std::string binName = "atlas_underresolved.bin";
+    auto json = TriangleGltfJson(binName, false);
+    const auto replace = [&json](const std::string& from, const std::string& to)
+    {
+        const auto offset = json.find(from);
+        ASSERT_NE(offset, std::string::npos);
+        json.replace(offset, from.size(), to);
+    };
+    replace("\"byteLength\": 44", "\"byteLength\": 84");
+    replace("\"byteLength\": 36", "\"byteLength\": 72");
+    replace("\"byteOffset\": 36", "\"byteOffset\": 72");
+    replace("\"byteLength\": 6,", "\"byteLength\": 12,");
+    replace("\"count\": 3, \"type\": \"VEC3\"", "\"count\": 6, \"type\": \"VEC3\"");
+    replace("\"count\": 3, \"type\": \"SCALAR\"", "\"count\": 6, \"type\": \"SCALAR\"");
+    replace("\"max\": [1, 1, 0]", "\"max\": [2000.1, 1000, 0]");
+    TempAssetFile binFile(binName, std::span<const std::byte>{bytes});
+    TempAssetFile modelFile("atlas_underresolved.gltf", json);
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
+        std::make_unique<OneFrameApplication>());
+    InitializeAssetImportEngine(engine);
+    InstallSandboxDefaultRuntimePolicies(engine);
+    const auto imported = RequiredEngineService<Runtime::AssetWorkflowModule>(engine)
+        .ImportAssetFromPath({.Path = modelFile.Path.string()});
+    ASSERT_TRUE(imported.has_value());
+    EXPECT_TRUE(imported->MaterializedModelScene);
+    EXPECT_EQ(imported->PrimitiveEntitiesCreated, 1u);
+    const auto entity = FindFirstEntityWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
+    ASSERT_TRUE(entity.has_value());
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    EXPECT_EQ(ReadMeshTopologyCounts(scene, *entity).Faces, 2u);
+    EXPECT_TRUE((scene.Raw().all_of<G::RenderSurface, Sel::SelectableTag>(*entity)));
+    EXPECT_FALSE(MeshHasVertexProperty(engine, *entity, "v:texcoord"));
+    engine.Shutdown();
+}
+
 TEST(RuntimeAssetImportFormatCoverage, DirectMeshEnrichmentCloseDrainsSmallGeneratedGrid)
 {
     constexpr std::uint32_t side = 2u;

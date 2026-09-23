@@ -27,6 +27,7 @@ module Extrinsic.Graphics.Renderer;
 
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Telemetry;
+import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Profiler;
 import Extrinsic.RHI.QueueAffinity;
@@ -2065,6 +2066,10 @@ namespace Extrinsic::Graphics
         {
             if (m_Subsystems.UvViewSystem)
             {
+                request.BakedTexture.ColormapLut =
+                    m_Subsystems.ColormapSystemRegistry.has_value()
+                        ? m_Subsystems.ColormapSystemRegistry->GetBindlessIndex(request.BakedTexture.Colormap)
+                        : RHI::kInvalidBindlessIndex;
                 m_Subsystems.UvViewSystem->Submit(std::move(request));
             }
         }
@@ -2556,6 +2561,7 @@ namespace Extrinsic::Graphics
             const CameraViewSnapshot camera = BuildCameraViewSnapshot(input.Camera, input.Viewport, pick);
             return RenderWorld{
                 .Viewport       = input.Viewport,
+                .ViewportOffset = input.ViewportOffset,
                 .Alpha          = input.Alpha,
                 .HasPendingPick = input.HasPendingPick,
                 .DebugOverlayEnabled = input.DebugOverlayEnabled,
@@ -3234,9 +3240,10 @@ namespace Extrinsic::Graphics
                     }
                 };
 
+            const RHI::TextureHandle backbufferHandle = imports.Backbuffer;
             const auto recordPassBody =
                 [this, &passNameByIndex, &camera, &frame, &compiled,
-                 defaultRecipeUsesDeferred, &renderWorld](RHI::ICommandContext& graphicsContext,
+                 defaultRecipeUsesDeferred, &renderWorld, backbufferHandle](RHI::ICommandContext& graphicsContext,
                                                            const std::uint32_t passIndex)
                 {
                     if (passIndex >= passNameByIndex.size())
@@ -3256,7 +3263,17 @@ namespace Extrinsic::Graphics
                     const FramePassId passId = passIndex < compiled->PassIds.size()
                         ? compiled->PassIds[passIndex]
                         : FramePassId{};
-                    const ActiveRenderPassDesc activeRenderPass = BuildActiveRenderPassDesc(*compiled, passIndex);
+                    ActiveRenderPassDesc activeRenderPass = BuildActiveRenderPassDesc(*compiled, passIndex);
+                    const bool targetsBackbuffer = std::any_of(
+                        activeRenderPass.ColorAttachments.begin(),
+                        activeRenderPass.ColorAttachments.end(),
+                        [backbufferHandle](const RHI::ColorAttachment& attachment) {
+                            return backbufferHandle.IsValid() && attachment.Target == backbufferHandle;
+                        });
+                    // The imported backbuffer's graph desc has no real format;
+                    // pipeline variants must match the swapchain format.
+                    if (targetsBackbuffer)
+                        activeRenderPass.FirstColorFormat = m_BackbufferFormat;
                     const auto bindFrameSampledTextureByResource =
                         [&](const FrameResourceId resourceId,
                             const std::uint32_t descriptorSlot) -> bool
@@ -3337,13 +3354,25 @@ namespace Extrinsic::Graphics
                             .ColorTargets = {activeRenderPass.ColorAttachments.data(), activeRenderPass.ColorAttachments.size()},
                             .Depth = activeRenderPass.DepthAttachment,
                         });
-                        const Core::Extent2D extent = m_Device != nullptr
-                            ? m_Device->GetBackbufferExtent()
-                            : Core::Extent2D{.Width = 1, .Height = 1};
-                        const std::uint32_t width = extent.Width > 0 ? static_cast<std::uint32_t>(extent.Width) : 1u;
-                        const std::uint32_t height = extent.Height > 0 ? static_cast<std::uint32_t>(extent.Height) : 1u;
-                        graphicsContext.SetViewport(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f);
-                        graphicsContext.SetScissor(0, 0, width, height);
+                        // Scene passes render at the scene-rectangle extent;
+                        // Present places that image into the backbuffer and
+                        // later backbuffer writers (ImGui) cover the window.
+                        const FramePassViewportPlacement placement = !targetsBackbuffer
+                            ? FramePassViewportPlacement::SceneTarget
+                            : passId == ToFramePassId(FrameRecipePassKind::Present)
+                                ? FramePassViewportPlacement::BackbufferSceneRect
+                                : FramePassViewportPlacement::BackbufferFull;
+                        const Core::Rect2D rect = ResolveFramePassViewport(
+                            placement,
+                            m_Device != nullptr ? m_Device->GetBackbufferExtent() : Core::Extent2D{.Width = 1, .Height = 1},
+                            renderWorld.Viewport,
+                            renderWorld.ViewportOffset);
+                        graphicsContext.SetViewport(static_cast<float>(rect.Offset.X), static_cast<float>(rect.Offset.Y),
+                                                    static_cast<float>(rect.Extent.Width), static_cast<float>(rect.Extent.Height),
+                                                    0.0f, 1.0f);
+                        graphicsContext.SetScissor(rect.Offset.X, rect.Offset.Y,
+                                                   static_cast<std::uint32_t>(rect.Extent.Width),
+                                                   static_cast<std::uint32_t>(rect.Extent.Height));
                     }
 
                     // GRAPHICS-074 Slice D.2 — the picking executor branch
@@ -10657,9 +10686,8 @@ namespace Extrinsic::Graphics
                         break;
                     }
                 }
-                const Core::Extent2D bloomExtent = m_Device != nullptr
-                    ? m_Device->GetBackbufferExtent()
-                    : Core::Extent2D{.Width = 1, .Height = 1};
+                // Bloom scratch is a scene target sized to the scene rectangle.
+                const Core::Extent2D bloomExtent = context.World->Viewport;
                 const std::uint32_t bloomWidth = bloomExtent.Width > 0
                     ? static_cast<std::uint32_t>(bloomExtent.Width)
                     : 1u;
@@ -10703,9 +10731,8 @@ namespace Extrinsic::Graphics
             std::lock_guard<std::mutex> postProcessLock(m_PostProcessPassMutex);
             if (m_PostProcessHistogramPass.has_value())
             {
-                const Core::Extent2D histogramExtent = m_Device != nullptr
-                    ? m_Device->GetBackbufferExtent()
-                    : Core::Extent2D{.Width = 1, .Height = 1};
+                // The histogram samples the scene-sized HDR target.
+                const Core::Extent2D histogramExtent = context.World->Viewport;
                 const std::uint32_t histogramWidth = histogramExtent.Width > 0
                     ? static_cast<std::uint32_t>(histogramExtent.Width)
                     : 1u;

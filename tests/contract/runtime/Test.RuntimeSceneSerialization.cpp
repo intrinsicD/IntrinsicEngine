@@ -35,6 +35,7 @@ import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.SceneSerialization;
 import Geometry.Properties;
 import Geometry.Graph;
@@ -959,6 +960,9 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesCornerDomainTexcoords)
     halfedges.Properties.GetOrAdd<glm::vec2>("h:texcoord", glm::vec2{0.0f})
         .Vector() = cornerUvs;
 
+    auto& faces = raw.get<GS::Faces>(mesh).Properties;
+    faces.GetOrAdd<std::uint32_t>("f:atlas_region", 7u).Vector()[0] = 7u;
+    faces.GetOrAdd<std::uint32_t>("f:atlas_chart", 3u).Vector()[0] = 3u;
     MemoryIOBackend backend;
     auto saved = Runtime::SaveSceneDocument(source, "scene.json", backend);
     ASSERT_TRUE(saved.has_value()) << static_cast<int>(saved.error());
@@ -979,6 +983,11 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesCornerDomainTexcoords)
 
     const ECS::EntityHandle loadedMesh = FindEntityByName(loaded, "Mesh Entity");
     ASSERT_NE(loadedMesh, ECS::InvalidEntityHandle);
+    const auto& loadedFaces = loaded.Raw().get<GS::Faces>(loadedMesh).Properties;
+    ASSERT_TRUE(loadedFaces.Get<std::uint32_t>("f:atlas_region"));
+    ASSERT_TRUE(loadedFaces.Get<std::uint32_t>("f:atlas_chart"));
+    EXPECT_EQ(loadedFaces.Get<std::uint32_t>("f:atlas_region").Vector(), (std::vector<std::uint32_t>{7u}));
+    EXPECT_EQ(loadedFaces.Get<std::uint32_t>("f:atlas_chart").Vector(), (std::vector<std::uint32_t>{3u}));
     const auto& loadedHalfedges = loaded.Raw().get<GS::Halfedges>(loadedMesh);
     const auto reloaded =
         loadedHalfedges.Properties.Get<glm::vec2>("h:texcoord");
@@ -1032,4 +1041,55 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesCornerDomainNormals)
     ASSERT_EQ(reloaded.Vector().size(), cornerNormals.size());
     for (std::size_t i = 0; i < cornerNormals.size(); ++i)
         EXPECT_EQ(reloaded.Vector()[i], cornerNormals[i]) << "corner " << i;
+}
+
+// The generated-atlas extent is persisted without its runtime UV binding,
+// which load rebuilds; extents outside the shared atlas bounds, or with no
+// UVs to describe, fail closed.
+TEST(RuntimeSceneSerialization, GeneratedAtlasExtentRoundTripsAndRebindsToLoadedUvs)
+{
+    ECS::Scene::Registry source;
+    const ECS::EntityHandle mesh = AddMeshEntity(source);
+    ASSERT_TRUE(Runtime::PublishMeshUvAtlasExtent(source.Raw(), mesh, 1536u, 512u));
+
+    MemoryIOBackend backend;
+    ASSERT_TRUE(Runtime::SaveSceneDocument(source, "scene.json", backend).has_value());
+    const nlohmann::json parsed = nlohmann::json::parse(backend.Text("scene.json"));
+    EXPECT_EQ(parsed["entities"][0]["geometrySources"]["uvAtlasExtent"],
+              (nlohmann::json{{"width", 1536u}, {"height", 512u}}))
+        << "only the extent is persisted, never revision stamps or fingerprints";
+
+    ECS::Scene::Registry loaded;
+    ASSERT_TRUE(Runtime::LoadSceneDocument(loaded, "scene.json", backend).has_value());
+    const ECS::EntityHandle loadedMesh = FindEntityByName(loaded, "Mesh Entity");
+    ASSERT_NE(loadedMesh, ECS::InvalidEntityHandle);
+    const auto rebound = Runtime::FindCurrentMeshUvAtlasExtent(loaded.Raw(), loadedMesh);
+    ASSERT_TRUE(rebound.has_value()) << "load binds the extent to the loaded UVs";
+    EXPECT_EQ(rebound->Width, 1536u);
+    EXPECT_EQ(rebound->Height, 512u);
+
+    // An edited atlas no longer has a generated extent, so none is saved.
+    auto uvs = loaded.Raw().get<GS::Vertices>(loadedMesh).Properties.Get<glm::vec2>("v:texcoord");
+    uvs[2] = glm::vec2{0.0f, 0.5f};
+    EXPECT_FALSE(Runtime::FindCurrentMeshUvAtlasExtent(loaded.Raw(), loadedMesh).has_value());
+    ASSERT_TRUE(Runtime::SaveSceneDocument(loaded, "edited.json", backend).has_value());
+    EXPECT_FALSE(nlohmann::json::parse(backend.Text("edited.json"))["entities"][0]["geometrySources"]
+                     .contains("uvAtlasExtent"));
+
+    for (const nlohmann::json& bad : {nlohmann::json{{"width", 0u}, {"height", 512u}},
+                                      nlohmann::json{{"width", 20000u}, {"height", 512u}},
+                                      nlohmann::json{{"width", -1}, {"height", 512}},
+                                      nlohmann::json{{"width", 1536u}},
+                                      nlohmann::json("1024x1024")})
+    {
+        nlohmann::json document = parsed;
+        document["entities"][0]["geometrySources"]["uvAtlasExtent"] = bad;
+        ECS::Scene::Registry rejected;
+        EXPECT_FALSE(Runtime::DeserializeSceneDocument(rejected, document.dump()).has_value()) << bad.dump();
+    }
+    nlohmann::json withoutUvs = parsed;
+    withoutUvs["entities"][0]["geometrySources"]["vertices"].erase("texcoords");
+    ECS::Scene::Registry rejected;
+    EXPECT_FALSE(Runtime::DeserializeSceneDocument(rejected, withoutUvs.dump()).has_value())
+        << "an extent needs canonical UVs to describe";
 }

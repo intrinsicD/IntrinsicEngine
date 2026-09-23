@@ -454,11 +454,14 @@ namespace Extrinsic::Graphics
             .FontAtlasBindlessIndex = m_Impl->Diagnostics.FontAtlasBindlessIndex,
             .TextureBindlessIndex = selectedTexture,
             .Flags = flags | atlasFlags,
+            // The overlay draws directly into the backbuffer, whose RHI
+            // viewport maps clip-space +Y to row 0; ImGui's top-left origin
+            // therefore maps display y = 0 to clip y = +1.
             .Scale = {
                 m_Impl->Frame.DisplayWidth > 0u ? 2.0f / static_cast<float>(m_Impl->Frame.DisplayWidth) : 1.0f,
-                m_Impl->Frame.DisplayHeight > 0u ? 2.0f / static_cast<float>(m_Impl->Frame.DisplayHeight) : 1.0f,
+                m_Impl->Frame.DisplayHeight > 0u ? -2.0f / static_cast<float>(m_Impl->Frame.DisplayHeight) : -1.0f,
             },
-            .Translate = {-1.0f, -1.0f},
+            .Translate = {-1.0f, 1.0f},
         };
     }
 

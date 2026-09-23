@@ -282,8 +282,8 @@ TEST(GraphicsRenderer, NullRendererForwardDebugDumpContainsCanonicalPassesAndDat
     EXPECT_LT(surfacePos, linePos);
     EXPECT_LT(linePos, pointPos);
     EXPECT_LT(pointPos, postPos);
-    EXPECT_LT(postPos, imguiPos);
-    EXPECT_LT(imguiPos, presentPos);
+    EXPECT_LT(postPos, presentPos);
+    EXPECT_LT(presentPos, imguiPos);
 
     EXPECT_EQ(renderer->EndFrame(frame), 1u);
     renderer->Shutdown();
@@ -359,8 +359,8 @@ TEST(GraphicsRenderer, NullRendererEnablesDebugChainWhenRequested)
     ASSERT_NE(debugPos, std::string::npos);
     ASSERT_NE(imguiPos, std::string::npos);
     ASSERT_NE(presentPos, std::string::npos);
-    EXPECT_LT(debugPos, imguiPos);
-    EXPECT_LT(imguiPos, presentPos);
+    EXPECT_LT(debugPos, presentPos);
+    EXPECT_LT(presentPos, imguiPos);
 
     EXPECT_EQ(renderer->EndFrame(frame), 1u);
     renderer->Shutdown();

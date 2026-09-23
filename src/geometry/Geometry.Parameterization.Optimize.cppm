@@ -256,4 +256,46 @@ export namespace Geometry::Parameterization
         std::span<const glm::dvec2> uvs,
         std::span<const glm::dvec2> direction,
         const InjectiveLineSearchParams& params = {});
+
+    struct AreaPriorityEnergyResult
+    {
+        OptimizationStatus Status{OptimizationStatus::EmptyInput};
+        std::size_t ActiveFaceCount{0u};
+        std::size_t BarrierFace{std::numeric_limits<std::size_t>::max()};
+        double TotalEnergy{0.0};
+        double AreaTerm{0.0};
+        double ConformalTerm{0.0};
+        double MaxAbsLogDeterminant{0.0};
+        double MaxConformalRatio{0.0};
+        std::vector<double> FaceEnergy{};
+        std::vector<glm::dvec2> Gradient{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == OptimizationStatus::Success;
+        }
+    };
+
+    /// Evaluate the engine's area-priority objective
+    ///   sum_f A_f ((ln det J_f)^2 + mu (||J_f||_F^2 / (2 det J_f) - 1))
+    /// and its analytic vertex gradient. The first term vanishes exactly on
+    /// area-preserving (authalic) triangles; the second is the MIPS conformal
+    /// energy of Hormann and Greiner (2000) shifted to zero at similarity,
+    /// used here only as a small anisotropy regularizer (mu > 0). Both terms
+    /// diverge as det J -> 0+, so det J <= determinantEpsilon is an
+    /// orientation barrier failure exactly as in EvaluateSymmetricDirichlet.
+    [[nodiscard]] AreaPriorityEnergyResult EvaluateAreaPriorityEnergy(
+        const OptimizationReference& reference,
+        std::span<const glm::dvec2> uvs,
+        double conformalWeight,
+        double determinantEpsilon = 1.0e-12);
+
+    /// The same bounded, orientation-preserving Armijo search as
+    /// FindInjectiveDirichletStep, applied to EvaluateAreaPriorityEnergy.
+    [[nodiscard]] InjectiveLineSearchResult FindInjectiveAreaPriorityStep(
+        const OptimizationReference& reference,
+        std::span<const glm::dvec2> uvs,
+        std::span<const glm::dvec2> direction,
+        double conformalWeight,
+        const InjectiveLineSearchParams& params = {});
 } // namespace Geometry::Parameterization

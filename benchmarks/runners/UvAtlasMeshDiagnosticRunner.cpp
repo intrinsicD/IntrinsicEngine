@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <vector>
 #include <glm/glm.hpp>
 #include <nlohmann/json.hpp>
 
@@ -34,10 +35,21 @@ int main(int argc, char** argv) {
   options.Method = method == "xatlas" ? Geometry::UvAtlas::UvAtlasMethod::XAtlas
                                       : Geometry::UvAtlas::UvAtlasMethod::FastStaged;
   options.BackendName = method;
-  options.Resolution = 1024;
-  options.Padding = 2;
+  options.Resolution = source.value("resolution", 1024u);
+  options.Padding = source.value("padding", 2u);
+  const std::string objective = source.value("distortion", method == "xatlas" ? "angle" : "both");
+  const auto distortion = Geometry::UvAtlas::ParseUvAtlasDistortion(objective);
+  if (!distortion) return 2;
+  options.Distortion = *distortion;
+  options.MaxConformalDistortion = source.value("max_conformal_distortion", 10.0);
+  options.MaxAreaDistortion = source.value("max_area_distortion", 10.0);
+  options.MaxCharts = source.value("max_charts", 16384u);
+  options.MaxIterations = source.value("max_iterations", 40u);
+  const auto regions = source.value("face_regions", std::vector<std::uint32_t>{});
+  auto atlasInput = Geometry::UvAtlas::BorrowInput(mesh);
+  atlasInput.FaceRegions = regions;
   const auto start = std::chrono::steady_clock::now();
-  const auto atlas = Geometry::UvAtlas::ResolveUvAtlas(Geometry::UvAtlas::BorrowInput(mesh), options);
+  const auto atlas = Geometry::UvAtlas::ResolveUvAtlas(atlasInput, options);
   const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();
   nlohmann::json result{
       {"schema", "intrinsic.native-atlas.diagnostic.v1"}, {"claim_eligible", false},
@@ -47,7 +59,30 @@ int main(int argc, char** argv) {
       {"atlas_width", atlas.Diagnostics.AtlasWidth}, {"atlas_height", atlas.Diagnostics.AtlasHeight},
       {"source_vertices", atlas.SourceVertexForOutputVertex},
       {"source_faces", atlas.SourceFaceForOutputFace}, {"face_charts", atlas.OutputFaceChart},
-      {"resolution", 1024}, {"padding", 2}};
+      {"resolution", options.Resolution}, {"padding", options.Padding},
+      {"requested_distortion", objective},
+      {"actual_distortion", Geometry::UvAtlas::ToString(atlas.Diagnostics.ActualDistortion)},
+      {"diagnostic", atlas.Diagnostics.BackendDetail},
+      {"fallback_reason", atlas.Diagnostics.FallbackReason},
+      {"source_corner_uvs", nlohmann::json::array()},
+      {"source_face_charts", atlas.SourceFaceChart},
+      {"source_face_regions", atlas.SourceFaceRegionComponent},
+      {"validation", {
+          {"evaluated", atlas.Diagnostics.Validation.Evaluated},
+          {"passed", atlas.Diagnostics.Validation.Passed()},
+          {"overlap_pairs", atlas.Diagnostics.Validation.Overlaps.OverlapPairCount},
+          {"non_positive_faces", atlas.Diagnostics.Validation.NonPositiveOrientationCount},
+          {"region_crossings", atlas.Diagnostics.Validation.RegionCrossingChartCount},
+          {"max_conformal_distortion", atlas.Diagnostics.Validation.MaxConformalDistortion},
+          {"mean_conformal_distortion", atlas.Diagnostics.Validation.MeanConformalDistortion},
+          {"max_area_distortion", atlas.Diagnostics.Validation.MaxAreaDistortion},
+          {"mean_area_distortion", atlas.Diagnostics.Validation.MeanAreaDistortion},
+          {"underresolved_charts", atlas.Diagnostics.Validation.UnderResolvedChartCount},
+          {"charts_without_texel_centers", atlas.Diagnostics.Validation.ChartsWithoutTexelCenterCount},
+          {"subtexel_faces", atlas.Diagnostics.Validation.SubTexelFaceCount},
+          {"texels_per_unit", atlas.Diagnostics.Validation.TexelsPerUnit},
+      }}};
+  for (const auto uv : atlas.SourceCornerUvs) result["source_corner_uvs"].push_back({uv.x, uv.y});
   const auto output = Geometry::UvAtlas::BorrowInput(atlas.OutputMesh);
   const auto uvs = atlas.OutputMesh.GetVertexProperty<glm::vec2>("v:texcoord");
   for (const auto& f : output.Faces) result["faces"].push_back(f.Indices);

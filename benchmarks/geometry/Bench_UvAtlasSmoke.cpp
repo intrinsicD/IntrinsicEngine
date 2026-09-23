@@ -248,6 +248,7 @@ MakeHighValenceFanFixture(const std::uint32_t slices) {
   options.PreserveValidAuthoredUvs = false;
   options.ForceRegenerate = true;
   options.Method = method;
+  options.Distortion = ::Geometry::UvAtlas::UvAtlasDistortion::Angle;
   options.AllowXAtlasFallback = false;
   options.Resolution = 256u;
   options.Padding = 2u;

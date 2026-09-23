@@ -1037,8 +1037,11 @@ namespace Extrinsic::Graphics
         const bool selectionOutlineActive =
             features.EnableDepthPrepass && features.EnableSelectionOutline;
         const FramePassId presentPassId = ToFramePassId(FrameRecipePassKind::Present);
+        // ImGui composites onto the backbuffer after Present has placed the
+        // scene image at the scene rectangle, so editor panes outside that
+        // rectangle are drawn at full backbuffer size.
         std::vector<FrameResourceId> imguiReads{
-            FrameRecipePresentSourceResourceId(),
+            ToFrameResourceId(FrameRecipeResourceKind::Backbuffer),
         };
         if (features.EnableUvView)
         {
@@ -1115,13 +1118,14 @@ namespace Extrinsic::Graphics
                 .Name = "ImGuiPass",
                 .Enabled = features.EnableImGui,
                 .PreserveDisabledDeclaration = true,
+                .FinalizesBackbuffer = true,
                 .Anchor = FrameRecipeContributionAnchor{
                     .PassId = presentPassId,
-                    .Placement = FrameRecipeContributionAnchorPlacement::Before,
+                    .Placement = FrameRecipeContributionAnchorPlacement::After,
                 },
                 .Reads = std::move(imguiReads),
                 .Writes = {
-                    FrameRecipePresentSourceResourceId(),
+                    ToFrameResourceId(FrameRecipeResourceKind::Backbuffer),
                 },
             });
     }
@@ -2313,7 +2317,11 @@ namespace Extrinsic::Graphics
                     builder.SetRenderPass(RHI::RenderPassDesc{
                         .ColorTargets = kDefaultClearColorAttachments,
                     });
-                });
+                    // A selected AA mode stays live and reports its recorded
+                    // or skipped status even while presentation remains on
+                    // SceneColorLDR (AA disabled or its pipeline unavailable).
+                    builder.SideEffect();
+                }, true);
             }
             presentSource =
                 (features.EnableAntiAliasing && spatialAAActive) ? postProcessAATempResolved : ldr;
@@ -2445,22 +2453,6 @@ namespace Extrinsic::Graphics
                 });
                 presentSource = debugView;
             }
-            else if (contribution.Kind == FrameRecipePassKind::ImGui && imguiActive)
-            {
-                const TextureRef input = presentSource;
-                addRecipePassWithId(contribution.Id, std::string{contribution.Name}, [=](RenderGraphBuilder& builder) {
-                    builder.Read(input, TextureUsage::ColorAttachmentRead);
-                    if (uvViewColor.IsValid())
-                    {
-                        builder.Read(uvViewColor, TextureUsage::ShaderRead);
-                    }
-                    builder.Write(input, TextureUsage::ColorAttachmentWrite);
-                    builder.SetRenderPass(RHI::RenderPassDesc{
-                        .ColorTargets = kDefaultLoadColorAttachments,
-                    });
-                    builder.SideEffect();
-                });
-            }
         }
 
         // GRAPHICS-076 Slice A follow-up — the canonical default-recipe
@@ -2484,6 +2476,28 @@ namespace Extrinsic::Graphics
             });
             builder.SideEffect();
         }, true);
+
+        for (const FrameRecipePassContribution& contribution : contributions)
+        {
+            if (!contribution.Enabled ||
+                contribution.Kind != FrameRecipePassKind::ImGui ||
+                !imguiActive)
+            {
+                continue;
+            }
+            addRecipePassWithId(contribution.Id, std::string{contribution.Name}, [=](RenderGraphBuilder& builder) {
+                builder.Read(backbuffer, TextureUsage::ColorAttachmentRead);
+                if (uvViewColor.IsValid())
+                {
+                    builder.Read(uvViewColor, TextureUsage::ShaderRead);
+                }
+                builder.Write(backbuffer, TextureUsage::ColorAttachmentWrite);
+                builder.SetRenderPass(RHI::RenderPassDesc{
+                    .ColorTargets = kDefaultLoadColorAttachments,
+                });
+                builder.SideEffect();
+            }, true);
+        }
 
         std::uint32_t enabledPassCount = 0u;
         std::uint32_t enabledResourceCount = 0u;

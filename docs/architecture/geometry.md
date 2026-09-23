@@ -896,50 +896,25 @@ registration backends (TEASER/FGR/CPD-class) remain deferred to
 
 ### UV atlas backend contract
 
-`Geometry.UvAtlas` owns the backend-neutral UV atlas contract for generated
-texture coordinates. Callers pass positions, triangle faces, optional authored
-UVs, and optional read-only vertex properties through `UvAtlasInput`; the result
-returns a `MeshSoup::IndexedMesh` with finite `v:texcoord`, source-vertex and
-source-face xrefs, output chart IDs, optional chart/seam-cut records,
-provenance (`AuthoredPreserved` or `Generated`), requested and actual atlas
-method, backend identity, atlas resolution, fallback diagnostics, and GEOM-018
-quality diagnostics. The default concrete backend is now the geometry-owned
-`UvAtlasMethod::FastStaged` path. The repository-pinned `jpcy/xatlas` overlay
-port remains available through explicit `UvAtlasMethod::XAtlas` requests and as
-the compatibility fallback when the fast path fails and
-`AllowXAtlasFallback = true`. Callers can disable xatlas fallback with
-`AllowXAtlasFallback = false`, or supply an `UvAtlasBackend` function to
-satisfy the selected method without importing runtime, assets, ECS, graphics,
-platform, or app layers.
+`Geometry.UvAtlas` accepts indexed triangles, finite positions, optional authored
+UVs and face region constraints. `FastStaged` is the default CPU implementation;
+`XAtlas` is the explicit alternative and may serve as a compatible-objective
+fallback. Requested and actual method/objective, fallback reason, region and
+chart counts, refinement and optimizer convergence are reported explicitly.
 
-Valid authored UVs are preserved by default when they are finite, count-matched,
-and triangle-usable. Missing or invalid authored UVs fall through to the
-selected backend unless the input mesh itself is invalid. The built-in
-`FastStaged` backend is conservative: it grows deterministic connected planar
-multi-face charts, parameterizes each accepted disk-topology chart through the
-existing LSCM solver or harmonic/Tutte solver where those solvers accept the
-chart topology, falls back to deterministic local projection for unsupported
-chart topology, and records the chosen per-chart parameterization backend plus
-GEOM-018 quality diagnostics on each chart record. Atlas placement uses a
-deterministic shelf packer with texel padding and optional right-angle chart
-rotation instead of the earlier uniform grid lower bound. The path emits
-finite, non-overlapping generated UVs, chart/seam-cut metadata, whole-atlas
-quality diagnostics, a cube smoke benchmark comparison against xatlas, and a
-multi-fixture promotion benchmark that gates default adoption.
+`Geometry.UvAtlas.ChartSolve` composes existing Tutte/LSCM and optimization
+kernels into None, Angle, Area and Both objectives. `Geometry.UvAtlas.Validation`
+independently audits source-corner correspondence, bounds, orientation,
+positive-area overlap, region preservation, global density and distortion.
+Packing uses common density and texel gutters. Chart, iteration and resolution
+limits fail with typed diagnostics. Source vertex/face xrefs and flat
+source-corner UVs allow consumers to preserve original topology and properties;
+seam duplication belongs at render upload rather than in the source mesh.
 
-Within `FastStaged`, source-edge incidence groups use normalized vertex pairs
-packed into 64-bit lookup keys while a first-seen vector remains the output
-ordering authority; the same groups feed adjacency and seam recording, with
-scaling evidence declared by the
-[`geometry.uv_atlas.fast_staged_edge_grouping.scaling`](../../benchmarks/geometry/manifests/geometry_uv_atlas_fast_staged_edge_grouping_scaling.yaml)
-benchmark. If a
-caller-supplied fast backend fails and
-`AllowXAtlasFallback` is enabled, diagnostics report
-`RequestedMethod = FastStaged`, `ActualMethod = XAtlas`, and
-`UsedFallback = true`. Seam-split output may duplicate vertices, and the
-`SourceVertexForOutputVertex` table is the canonical way for runtime or future
-geometry consumers to remap normals, colors, scalar/vector attributes,
-selection data, and bake sources.
+See the [method contract](../methods/property_guided_atlas.md) for the exact
+objectives, supported xatlas combinations, numerical acceptance, input limits
+and evidence entry point. The geometry API imports no runtime, ECS, assets,
+graphics, platform or app ownership.
 
 ## Topology connectivity ownership
 

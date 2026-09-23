@@ -50,7 +50,7 @@ inline constexpr std::uint32_t kTargetWidth = 128u;
 inline constexpr std::uint32_t kTargetHeight = 128u;
 inline constexpr std::uint32_t kPixelBytes = 4u;
 inline constexpr std::uint32_t kMinimumFrames = 8u;
-inline constexpr std::uint32_t kMaximumFrames = 12u;
+inline constexpr std::uint32_t kMaximumFrames = 16u;
 inline constexpr std::uint64_t kReadbackBytes =
     static_cast<std::uint64_t>(kTargetWidth) * kTargetHeight * kPixelBytes;
 inline constexpr std::uint32_t kTextureBackgroundWidth = 4u;
@@ -92,6 +92,7 @@ enum class UvViewSmokeMode : std::uint8_t
     CheckerHeatmap = 0u,
     TexelDensity,
     Texture,
+    Baked,
     Count,
 };
 
@@ -102,6 +103,7 @@ inline constexpr std::array<std::uint64_t, kUvViewSmokeModeCount>
         0x4752415048494353ull,
         0x4752415048494354ull,
         0x4752415048494355ull,
+        0x4752415048494356ull,
     };
 inline constexpr std::array<Extrinsic::Graphics::UvViewBackgroundMode,
                             kUvViewSmokeModeCount>
@@ -109,6 +111,7 @@ inline constexpr std::array<Extrinsic::Graphics::UvViewBackgroundMode,
         Extrinsic::Graphics::UvViewBackgroundMode::Checker,
         Extrinsic::Graphics::UvViewBackgroundMode::TexelDensity,
         Extrinsic::Graphics::UvViewBackgroundMode::Texture,
+        Extrinsic::Graphics::UvViewBackgroundMode::BakedTexture,
     };
 using TextureRgba = std::array<std::uint8_t, 4u>;
 inline constexpr TextureRgba kTextureLowULowV{230u, 35u, 45u, 255u};
@@ -258,6 +261,17 @@ public:
             m_TextureBackgroundBindlessIndex =
                 Extrinsic::RHI::kInvalidBindlessIndex;
         }
+        if (m_CoverageIndex != Extrinsic::RHI::kInvalidBindlessIndex)
+        {
+            engine.GetDevice().GetBindlessHeap().FreeSlot(m_CoverageIndex);
+            engine.GetDevice().GetBindlessHeap().FlushPending();
+            m_CoverageIndex = Extrinsic::RHI::kInvalidBindlessIndex;
+        }
+        if (m_Coverage.IsValid())
+        {
+            engine.GetDevice().DestroyTexture(m_Coverage);
+            m_Coverage = {};
+        }
         if (m_TextureBackgroundSampler.IsValid())
         {
             engine.GetDevice().DestroySampler(m_TextureBackgroundSampler);
@@ -336,6 +350,7 @@ private:
                 "UvViewGpuSmoke.CheckerHeatmapReadback",
                 "UvViewGpuSmoke.TexelDensityReadback",
                 "UvViewGpuSmoke.TextureReadback",
+                "UvViewGpuSmoke.BakedReadback",
             };
         for (std::size_t index = 0u; index < kUvViewSmokeModeCount; ++index)
         {
@@ -417,7 +432,7 @@ private:
                 for (std::size_t channel = 0u; channel < color.size();
                      ++channel)
                 {
-                    texturePixels[offset + channel] = color[channel];
+                    texturePixels[offset + channel] = channel == 3u ? 0u : color[channel];
                 }
             }
         }
@@ -455,6 +470,34 @@ private:
                       "texture background.";
             return;
         }
+        m_Coverage = engine.GetDevice().CreateTexture({
+            .Width = kTextureBackgroundWidth,
+            .Height = kTextureBackgroundHeight,
+            .MipLevels = 1u,
+            .Fmt = Extrinsic::RHI::Format::R32_FLOAT,
+            .Usage = Extrinsic::RHI::TextureUsage::Sampled |
+                     Extrinsic::RHI::TextureUsage::TransferDst,
+            .InitialLayout = Extrinsic::RHI::TextureLayout::Undefined,
+            .DebugName = "UvViewGpuSmoke.Coverage",
+        });
+        if (!m_Coverage.IsValid())
+        {
+            m_Error = "Could not allocate baked coverage texture.";
+            return;
+        }
+        // Low-U/high-V is empty. Negative coverage is a valid gutter, and
+        // positive coverage is an interior texel, both independent of alpha.
+        const std::array<float, 16> coverage{
+            1, 1, -1, -1, 1, 1, -1, -1,
+            0, 0, 2, 2, 0, 0, 2, 2};
+        engine.GetDevice().WriteTexture(m_Coverage, coverage.data(), sizeof(coverage), 0u, 0u);
+        m_CoverageIndex = engine.GetDevice().GetBindlessHeap().AllocateTextureSlot(
+            m_Coverage, m_TextureBackgroundSampler);
+        if (m_CoverageIndex == Extrinsic::RHI::kInvalidBindlessIndex)
+        {
+            m_Error = "Could not bind baked coverage texture.";
+            return;
+        }
         engine.GetDevice().GetBindlessHeap().FlushPending();
         m_ResourcesReady = true;
     }
@@ -486,6 +529,11 @@ private:
                 .ShowDistortionHeatmap = checkerHeatmap,
                 .LineIndices = m_LineIndices,
                 .TriangleConformalDistortion = m_ConformalDistortion,
+                .BakedTexture = {
+                    .Texture = m_TextureBackgroundBindlessIndex,
+                    .CoverageTexture = m_CoverageIndex,
+                    .Mode = Extrinsic::Graphics::UvViewTextureDisplayMode::Color,
+                },
             });
     }
 
@@ -543,6 +591,8 @@ private:
     std::array<Extrinsic::Graphics::UvViewOutput, kUvViewSmokeModeCount>
         m_CapturedOutputs{};
     std::array<bool, kUvViewSmokeModeCount> m_ModeCaptured{};
+    Extrinsic::RHI::TextureHandle m_Coverage{};
+    Extrinsic::RHI::BindlessIndex m_CoverageIndex{Extrinsic::RHI::kInvalidBindlessIndex};
     Extrinsic::RHI::TextureHandle m_TextureBackground{};
     Extrinsic::RHI::SamplerHandle m_TextureBackgroundSampler{};
     Extrinsic::RHI::BindlessIndex m_TextureBackgroundBindlessIndex{
@@ -756,9 +806,9 @@ TEST(UvViewGpuSmoke, RetainedBackgroundModesReadBackOnOperationalVulkan)
         engine.GetRenderer().GetUvViewOutput();
     ASSERT_TRUE(finalOutput.IsGpuReady()) << finalOutput.Diagnostic;
     EXPECT_EQ(finalOutput.RequestToken,
-              kRequestTokens[ModeIndex(UvViewSmokeMode::Texture)]);
+              kRequestTokens[ModeIndex(UvViewSmokeMode::Baked)]);
     EXPECT_EQ(finalOutput.ActiveBackground,
-              Extrinsic::Graphics::UvViewBackgroundMode::Texture);
+              Extrinsic::Graphics::UvViewBackgroundMode::BakedTexture);
 
     EXPECT_EQ(app.ReadbackCopyCount(),
               static_cast<std::uint32_t>(kUvViewSmokeModeCount));
@@ -790,6 +840,7 @@ TEST(UvViewGpuSmoke, RetainedBackgroundModesReadBackOnOperationalVulkan)
     assertCapturedMode(UvViewSmokeMode::CheckerHeatmap, true);
     assertCapturedMode(UvViewSmokeMode::TexelDensity, false);
     assertCapturedMode(UvViewSmokeMode::Texture, false);
+    assertCapturedMode(UvViewSmokeMode::Baked, false);
 
     EXPECT_NE(app.TextureBackgroundBindlessIndex(),
               Extrinsic::RHI::kInvalidBindlessIndex);
@@ -835,6 +886,8 @@ TEST(UvViewGpuSmoke, RetainedBackgroundModesReadBackOnOperationalVulkan)
         readCapturedPixels(UvViewSmokeMode::TexelDensity);
     const std::vector<std::uint8_t> texturePixels =
         readCapturedPixels(UvViewSmokeMode::Texture);
+
+    const auto bakedPixels = readCapturedPixels(UvViewSmokeMode::Baked);
 
     constexpr std::array<Rgba8Pixel, kHeatmapTriangleCount>
         kExpectedHeatmapColors{{
@@ -1021,6 +1074,23 @@ TEST(UvViewGpuSmoke, RetainedBackgroundModesReadBackOnOperationalVulkan)
     EXPECT_GT(realTexturePixelCount, kPixelCount / 3u)
         << "Real four-quadrant bindless texture did not cover a substantial "
            "retained-target region.";
+
+    // Probe inside every chart: this catches a fill pass painting over the
+    // bake, treating data alpha zero as empty, and treating gutters as empty.
+    for (std::size_t i = 0; i < kHeatmapUvTriangles.size(); ++i)
+    {
+        const auto& t = kHeatmapUvTriangles[i];
+        const auto probe = TargetPixelForUv((t[0] + t[1] + t[2]) / 3.0f);
+        const auto pixel = PixelAt(bakedPixels, probe.X, probe.Y);
+        if (i == 2u)
+            EXPECT_TRUE(PixelNear(pixel, kCheckerDark) || PixelNear(pixel, kCheckerLight));
+        else
+        {
+            const auto color = i == 0u ? kTextureLowULowV :
+                (i == 1u ? kTextureHighULowV : kTextureHighUHighV);
+            EXPECT_TRUE(PixelNear(pixel, PixelFromTextureRgba(color))) << "Baked chart " << i;
+        }
+    }
 
     EXPECT_TRUE(Counters::IsStable(before, after))
         << "Vulkan operational counters changed across UV-view rendering: "

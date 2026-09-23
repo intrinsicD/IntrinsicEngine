@@ -464,10 +464,11 @@ beside a freshly derived mean one. Remesh, subdivide, and simplify publication
 validate geometry metadata plus the complete canonical position/connectivity
 state, including before queued output may publish. UV regeneration uses the
 same transaction mechanics with its owner-specific semantic source snapshot:
-exact live positions, edge/halfedge/face connectivity, and known vertex/face
-property values are revalidated before queued publication and every history
-transition. Its apply stamp requests the required full GPU rebuild only after
-the regenerated topology is published; the other mesh owners stamp their
+exact live positions, edge/halfedge/face connectivity, canonical corner UVs,
+and known vertex/face property values are revalidated before queued publication
+and every history transition. It writes UVs and atlas region/chart labels into
+the original source slots, preserving topology and unrelated properties. Its
+apply stamp requests the required full GPU rebuild after publication; the other mesh owners stamp their
 normal deferred geometry dirty tags after publication. Point-cloud outlier
 replacement also uses the transaction with an exact full point-property/deleted
 slot snapshot; queued output and undo/redo reject any intervening point
@@ -818,63 +819,81 @@ handoff, selected texture baking, object-space normal completion, and Sandbox
 models and commands all mutate or observe this same recipe/state pair; no
 second feature-specific presentation pipeline remains.
 
+### Property atlas and baked-texture inspection
+
+The parameterization config's atlas section supplies the method, scalar guide,
+objective, resolution, padding and solver budgets through the same validated
+command used by the editor. Guide slots bind arbitrary compatible vertex/face
+scalar properties. Atlas results publish canonical UVs and face-owned
+`f:atlas_region` / `f:atlas_chart`; scene documents retain these labels and
+corner UVs. The complete CPU method contract is documented in
+[property-guided atlas](../methods/property_guided_atlas.md).
+
+`TextureBakeService` resolves default UV authority as corner-over-vertex; explicit
+bindings remain exact. Records retain resolved binding and content fingerprints
+for UVs, topology, positions and source values. Snapshot queries evaluate current
+freshness, while render extraction refuses stale or incomplete bindings. This
+allows tabs to retain a diagnostic record after an atlas edit without sampling
+old pixels against the new layout. Generated GPU pixels and the live bake catalog
+remain runtime resources, not serialized texture payloads in scene documents.
+
+The editor's scene/atlas split shares one authoritative scene rectangle with
+camera projection, scene presentation and input mapping. The derived UV view
+uses the complete corner-attribute split and has an atlas tab plus generated
+texture tabs. See [ADR 0025](../adr/0025-parameterization-uv-view-and-split-view.md).
+
 ### GPU object-space normal bake lifecycle
 
-`AssetWorkflowModule` owns the object-space normal bake as private runtime
-composition, not as an Engine or graphics-domain service. Eligible
-non-progressive model, progressive model, direct-mesh, and selected-mesh
-producers resolve UVs and normals first, then build one versioned canonical
-content identity from the exact packed position bytes, fan-triangulated surface
-index order, resolved UV and normal bytes, element counts, and resolved
-extent/padding/normal-space/epsilon options. Float `-0` is canonicalized to
-`+0`. World and binding epoch, the raw generation-qualified entity handle,
-stable render id, presentation/semantic, and expected geometry-presentation
-recipe generation form a separate target record so reusable content never hides a
-destroyed/recycled entity or scene replacement.
+`AssetWorkflowModule` prepares the source normals and presentation recipe for
+eligible model and direct-mesh imports, then calls the shared
+`TextureBakeService`. The caller reconciles a completed generated output into
+the requested material slot while preserving unrelated channels. Pending,
+failed, unknown-identity and stale records cannot bind as current output.
+The producer owns source fingerprints, GPU work and generated assets; callers
+do not duplicate its raster path or texture lifetime.
 
 Automatic property bakes resolve their output width and height from the
 materialized UV-atlas diagnostics. If an authored-UV or progressive path has no
 atlas extent to report, it uses the atlas-scale 1024x1024 fallback rather than
-the former 64x64 downsample. Generated normals use two dilation texels at this
+the former 64x64 downsample. Generated normals use two gutter texels at this
 matching resolution, equal to the default atlas chart margin. The Sandbox
 manual bake controls expose width, height, and padding through the same editor
 command; completion of a UV-regeneration job adopts its reported atlas extent
-and requested padding once, while raw-float outputs force padding to zero
-because dilation is an encoded-texture operation.
+and requested padding once. Selected property bakes use explicit chart coverage
+and chart-aware gutters for both raw-float and encoded output.
+Automatic surface-appearance bakes use the exact generated-atlas extent stored
+on the entity, or 1024 when authored UVs have no known extent. They never enlarge
+the texture implicitly. The extent follows UV undo/redo and scene serialization;
+UV edits invalidate it. An extent above the shared 8192 bake cap fails before
+allocation. Records report the requested extent. Rejected requests wait for a source/atlas revision or matching
+appearance-config change before retrying; unknown source identity never binds.
+A source snapshot larger than the 64 MiB budget is a permanent rejection for
+that revision. Failed metadata assets require removal before a fresh bake;
+queue pressure remains a transient condition.
+The atlas generator allows up to 16384, so the editor reports any native atlas
+extent above the bake cap instead of implying a matching-resolution bake.
 
-Queue scheduling does not fabricate or expose an output `AssetId`. During the
-asset tick, the private service allocates a runtime metadata asset through the
-live `AssetService`: reusable identities use a deterministic digest path with
-bounded collision probes, while identity-less requests receive distinct
-non-reusable paths. Service provenance distinguishes queued, exact pending
-`{AssetId, GpuAssetCache generation}`, and exact proven-ready states.
-Same-identity pending requests attach as waiters without opening another cache
-generation; only a proven generation that is still the cache's current
-`Ready` texture may fast-bind.
+After canonical preflight, the producer creates value and coverage metadata
+assets and publishes a pending catalog record keyed by entity and output name.
+Successful rebakes preserve asset identity and advance the output generation.
+CPU metadata does not stand in for GPU readiness: both exact cache generations
+and the current source identity must match before output publication.
 
-The production plan provider resolves the target's current extraction surface
-and `Graphics::GpuGeometryResidencyView`. It requires the identity's exact
-fingerprints, byte/count metadata, nonzero content revision, managed index
-buffer, tightly packed bake-readable position/UV/normal/index layouts, and
-channel device addresses. It revalidates that residency immediately before
-recording, submits pending managed-buffer upload barriers, preserves the live
-`SurfaceFirstIndex` for a shared index-buffer slice, and keeps indexed-draw
-base vertex zero. Raster and optional dilation commands are recorded by the
-existing `JobService` `GpuQueue` participant in the renderer's already-open
-frame command context. This path never acquires, submits, or presents a second
-frame. Readiness remains conservatively frame-based at
-`issueFrame + framesInFlight`; exact-generation publication prevents an older
-ticket from stamping or failing a replacement.
+The texture-bake producer snapshots the resolved source properties, triangle
+indices and authoritative corner-or-vertex UVs into its own GPU buffers. It
+revalidates their source identities before recording, independently of the
+renderer’s geometry residency. The existing `JobService` GPU-queue participant
+records into the renderer’s open frame; it never acquires, submits or presents a
+second frame. Value and coverage textures have separate cache generations and
+become ready together after `issueFrame + framesInFlight`. A superseded ticket
+cannot publish into either replacement generation.
 
-Pipeline and extent-keyed dilation resources are retained rather than created
-per frame. Fixed entry/byte caps bound queued identities, in-flight/proven
-outputs, and dilation scratch; at most one bake records per frame so shared
-dilation state is serialized. The output finishes in
-`ShaderReadOnly` and includes transfer-source usage for acceptance readback;
-dilation scratch records its actual post-use layout for safe reuse. Generated
-normal textures intentionally retain one mip: ordinary component-wise color
-downsampling is not a valid normal-vector reduction and no vector-aware mip
-generator is currently composed.
+Up to four bakes record per frame. Explicit source-byte and active-work limits
+bound pending work. Each bake owns its raster buffers and depth attachment;
+chart coverage and nearest-edge gutters do not share dilation scratch. Value
+and coverage outputs finish in `ShaderReadOnly`, with transfer-source usage for
+acceptance readback and one mip level. Ordinary component-wise averaging is not
+a valid normal-vector reduction, and no vector-aware mip generator is composed.
 
 Completion is a transactional runtime merge. Before mutation it rechecks the
 current world/epoch, raw entity lifetime and render id, latest request, exact
@@ -891,7 +910,7 @@ for callers that compose no workflow queue.
 
 Scene replacement detaches outgoing queued work and target waiters but retains
 already-recorded tickets until their safe completion/retirement frame. The
-participant reports retained pipeline, dilation, cache, and provenance state
+participant reports retained bake pipeline, cache, and provenance state
 through `HasInFlightWork()`, so the generic GPU-queue shutdown bridge performs
 the existing device-idle boundary before exact pending generations and
 generated assets are retired and resource leases are released.

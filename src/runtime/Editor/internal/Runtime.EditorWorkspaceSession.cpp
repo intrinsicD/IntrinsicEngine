@@ -274,6 +274,10 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             EditorParameterizationUvViewCommandSurface& surface,
             const std::shared_ptr<std::atomic_bool>& epoch)
         {
+            if (surface.TextureTabs)
+                surface.TextureTabs = GuardAttachmentCommand(
+                    std::move(surface.TextureTabs), epoch,
+                    [](std::uint32_t) { return std::vector<EditorParameterizationTextureTab>{}; });
             surface.Submit = GuardAttachmentCommand(
             std::move(surface.Submit), epoch,
             [](EditorParameterizationUvViewRequest request)

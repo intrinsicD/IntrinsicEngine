@@ -8,6 +8,7 @@ benchmark_id: geometry.uv_atlas.fast_staged_promotion.smoke
 method: geometry.uv_atlas.fast_staged_promotion
 dataset: builtin.uv_atlas_promotion_suite
 params:
+  distortion: angle
   fixtures:
     - planar_grid_4x4
     - thin_strip_12x1

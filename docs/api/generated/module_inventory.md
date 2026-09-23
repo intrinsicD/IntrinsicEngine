@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 11 |
 | `core` | 41 |
 | `ecs` | 27 |
-| `geometry` | 125 |
+| `geometry` | 127 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 75 |
@@ -233,7 +233,9 @@ Root scanned: `src`
 | `Geometry.SupportRadius` | `src/geometry/Geometry.SupportRadius.cppm` | `geometry` |
 | `Geometry.SurfaceReconstruction` | `src/geometry/Geometry.SurfaceReconstruction.cppm` | `geometry` |
 | `Geometry.Triangle` | `src/geometry/Geometry.Triangle.cppm` | `geometry` |
+| `Geometry.UvAtlas.ChartSolve` | `src/geometry/Geometry.UvAtlas.ChartSolve.cppm` | `geometry` |
 | `Geometry.UvAtlas.Types` | `src/geometry/Geometry.UvAtlas.Types.cppm` | `geometry` |
+| `Geometry.UvAtlas.Validation` | `src/geometry/Geometry.UvAtlas.Validation.cppm` | `geometry` |
 | `Geometry.UvAtlas` | `src/geometry/Geometry.UvAtlas.cppm` | `geometry` |
 | `Geometry.Validation` | `src/geometry/Geometry.Validation.cppm` | `geometry` |
 | `Geometry` | `src/geometry/Geometry.cppm` | `geometry` |
@@ -456,4 +458,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **429**
+Total modules: **431**

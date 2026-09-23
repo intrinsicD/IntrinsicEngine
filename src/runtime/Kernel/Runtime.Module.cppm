@@ -58,11 +58,24 @@ namespace Extrinsic::Runtime
 
     export extern "C++"
     {
+    // Scene rectangle published by an editor layout, in window coordinates
+    // (the logical space of cursor positions and editor UI).
+    struct EditorSceneViewportRect
+    {
+        float X{0.0f};
+        float Y{0.0f};
+        float Width{0.0f};
+        float Height{0.0f};
+    };
+
     struct EditorInputCaptureSnapshot
     {
         bool CapturedKeyboard{false};
         bool CapturedMouse{false};
         bool WidgetsActive{false};
+        // False means the scene covers the whole framebuffer.
+        bool HasSceneViewport{false};
+        EditorSceneViewportRect SceneViewport{};
 
         [[nodiscard]] bool CapturesViewportInput() const noexcept
         {
@@ -70,6 +83,31 @@ namespace Extrinsic::Runtime
         }
     };
     }
+
+    // The one authoritative scene rectangle in framebuffer pixels: the
+    // published editor rectangle scaled window->framebuffer (HiDPI) and
+    // clipped to the framebuffer, or the whole framebuffer when none is
+    // published or the published rectangle is empty/non-finite.
+    export [[nodiscard]] Core::Rect2D ResolveSceneViewportPixels(
+        Core::Extent2D windowExtent,
+        Core::Extent2D framebufferExtent,
+        const EditorInputCaptureSnapshot& capture) noexcept;
+
+    export struct SceneViewportCursor
+    {
+        float X{0.0f};
+        float Y{0.0f};
+        bool Inside{false};
+    };
+
+    // Maps a window-space cursor to scene-rectangle-local framebuffer pixels.
+    // An empty framebuffer extent means window and framebuffer coincide.
+    export [[nodiscard]] SceneViewportCursor MapWindowCursorToSceneViewport(
+        float cursorX,
+        float cursorY,
+        Core::Extent2D windowExtent,
+        Core::Extent2D framebufferExtent,
+        Core::Rect2D sceneViewport) noexcept;
 
     export struct RuntimeFrameHookContext
     {
@@ -95,10 +133,16 @@ namespace Extrinsic::Runtime
         const Core::Config::EngineConfig& Config;
         WorldHandle ActiveWorldHandle{};
         const Platform::Input::Context& Input;
+        // Scene rectangle extent in framebuffer pixels (camera aspect,
+        // picking and gizmo projection).
         Core::Extent2D Viewport{};
         const EditorInputCaptureSnapshot& EditorCapture;
         Graphics::RenderFrameInput& RenderInput;
         double FrameDeltaSeconds{0.0};
+        // Scene rectangle origin inside the framebuffer and the full
+        // framebuffer extent; an empty extent means the scene fills it.
+        Core::Offset2D ViewportOrigin{};
+        Core::Extent2D FramebufferExtent{};
     };
 
     export using RuntimeViewportInputHook =

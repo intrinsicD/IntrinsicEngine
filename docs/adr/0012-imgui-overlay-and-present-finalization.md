@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-05-17
+- **Scene-rectangle update:** 2026-09-22, [METHOD-047](../../tasks/done/METHOD-047-property-guided-atlas-editor.md).
 - **Owners:** Graphics (`Extrinsic.Graphics.ImGuiOverlaySystem`, `Extrinsic.Graphics.Pass.Present`), Runtime composition (event pump, frame bracketing), Platform (`src/platform/`), Backend (`src/graphics/vulkan/`)
 - **Related tasks:** [`tasks/done/GRAPHICS-013C`](../../tasks/archive/GRAPHICS-013C-imgui-overlay-and-present.md), [`GRAPHICS-013CQ`](../../tasks/archive/GRAPHICS-013CQ-imgui-present-backend-clarifications.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`docs/architecture/rendering-three-pass.md`](../architecture/rendering-three-pass.md), [`src/graphics/renderer/README.md`](../../src/graphics/renderer/README.md)
@@ -39,7 +40,7 @@ Submission timing per frame:
 
 1. Runtime calls `ImGui::Render()`.
 2. Runtime calls `ImGuiOverlaySystem::SubmitFrame(...)` **once per frame**, after `ImGui::Render()` and **before** `IRenderer::PrepareFrame()`, alongside the `IRenderer::SubmitRuntimeSnapshots()` handoff so pass execution always sees a stable overlay state.
-3. The renderer invokes the matching `ImGuiOverlaySystem::ClearFrame()` at end-of-frame **after** `Pass.Present` has finalized the imported backbuffer, mirroring the runtime-snapshot drain pattern.
+3. The renderer invokes the matching `ImGuiOverlaySystem::ClearFrame()` at end-of-frame **after** the declared `Present` and optional `ImGuiPass` writers have completed, mirroring the runtime-snapshot drain pattern.
 
 Graphics never imports `imgui.h`, never calls Dear ImGui platform / renderer backend functions, and never sees `ImDrawData` directly. The runtime adapter is the sole translator.
 
@@ -72,7 +73,7 @@ The `ImGuiOverlayFrame` published to graphics carries copied POD vertex/index pa
 
 **Pipeline state.** `ImGuiPass` owns exactly **one** pipeline created by the backend at startup and bound through the existing `SetPipeline` / `RHI::PipelineHandle` seam. Backend Vulkan pipeline state stays backend-local under `src/graphics/vulkan` and never leaks through RHI or renderer module surfaces:
 
-- Dynamic rendering against the present-source attachment.
+- Dynamic rendering against the imported backbuffer, after the scene presentation draw.
 - Premultiplied-alpha blend.
 - No depth test.
 - Scissor enabled.
@@ -83,7 +84,19 @@ The CPU/null backend exercises the same `SetPipeline` / `HasOverlayWork` / `Buil
 
 ### 3. `Pass.Present` finalization strategy
 
-`Pass.Present` keeps the existing **CPU-testable fullscreen-triangle** finalization contract: `Draw(3, 1, 0, 0)` after binding the present pipeline. The backend samples `FrameRecipe.PresentSource` (the post-overlay LDR color attachment) and writes the imported backbuffer through `TextureUsage::Present`.
+`Pass.Present` keeps the **CPU-testable triangle draw** contract:
+`Draw(3, 1, 0, 0)` after binding the present pipeline. It samples
+`FrameRecipe.PresentSource` and places the scene image in the resolved scene
+rectangle of the imported backbuffer. Scene passes use that rectangle's extent
+with a local origin; `Present` uses its framebuffer origin and extent.
+
+The optional `ImGuiPass` follows `Present`, reads and writes the backbuffer with
+`LOAD`, and uses the full framebuffer extent. Both writers are explicitly marked
+`FinalizesBackbuffer` in recipe data. The render graph transitions to the final
+present layout after the last declared writer. Undeclared imported-resource
+writes remain rejected. This order lets UV/editor panes occupy the rest of the
+window without scaling editor text and mouse coordinates with the scene image.
+Runtime still calls `IDevice::Present` only after renderer frame completion.
 
 Backend-native swapchain `vkCmdCopyImage` / `vkCmdBlitImage` paths are **rejected** as the contract finalization form because they would require graphics to assume:
 
@@ -92,9 +105,12 @@ Backend-native swapchain `vkCmdCopyImage` / `vkCmdBlitImage` paths are **rejecte
 
 Neither of which graphics can guarantee without owning swapchain state.
 
-The fullscreen-draw form is **format-agnostic**, lets the backend apply any LDR color-space handling required by the swapchain image format (sRGB write conversion, HDR10 PQ encode) inside the backend-owned present pipeline, and matches the current `Pass.Present::Execute()` shim.
+The triangle draw keeps format and swapchain ownership in the backend. The
+current overlay path targets the supported LDR backbuffer formats. An HDR/PQ
+swapchain would need an explicit matching UI encoding contract; the scene-rect
+change does not establish HDR overlay support.
 
-A backend **may internally** opt into a copy / blit fast-path only when it can prove identical formats and a compatible source layout after the overlay barrier. That decision remains backend-local under `src/graphics/vulkan` and never alters:
+A backend **may internally** opt into a copy / blit fast-path only when it can prove identical formats and a compatible source layout before the final UI overlay. That decision remains backend-local under `src/graphics/vulkan` and never alters:
 
 - The `Pass.Present` command contract.
 - The frame-recipe `Present` declaration.
@@ -109,7 +125,7 @@ No retained graphics-owned present resources exist beyond the backend pipeline h
 | **Platform** (`src/platform/`) | Window creation / destroy, window-event pump (resize / focus / close), DPI / display reporting back to runtime / editor. Must not import `graphics`, `ecs`, or `runtime` per `AGENTS.md` §2 layering. |
 | **Backend** (`src/graphics/vulkan/`) | Surface (`VkSurfaceKHR`) creation against the platform window handle; swapchain (`VkSwapchainKHR`) creation / recreation and per-image `VkImage` / `VkImageView` / `RHI::TextureHandle` registration; acquire (`vkAcquireNextImageKHR`) timing through `IDevice::BeginFrame`; present (`vkQueuePresentKHR`) timing through `IDevice::Present`. Resize handling: records the requested extent through `IDevice::Resize`, defers zero-extent requests, recreates the swapchain on the next `BeginFrame` for nonzero extents; pending-resize and out-of-date results route through fail-closed skips per `GRAPHICS-018` ([ADR-0004](0004-vulkan-backend-bringup-and-fallback.md)). Observable via `GetVulkanFrameLifecycleDiagnosticsSnapshot()`. |
 | **Runtime** (`src/runtime/`) | Composition: pumps platform events, calls `IRenderer::BeginFrame` / … / `EndFrame` bracketed around graphics frame work, calls `IDevice::Present(frame)` after `IRenderer::EndFrame()`, and forwards window-resize events to `IDevice::Resize(...)` without graphics involvement. |
-| **Graphics** (`src/graphics/`) | Backbuffer-import declaration in the frame recipe, the `Pass.Present` finalization command contract, and render-graph rejection of non-present writes to the imported backbuffer. Never imports platform window / surface types, never calls swapchain acquire / present directly, and never owns swapchain image lifecycle. |
+| **Graphics** (`src/graphics/`) | Backbuffer-import declaration in the frame recipe, the `Pass.Present` finalization command contract, and render-graph rejection of undeclared writes to the imported backbuffer. Never imports platform window / surface types, never calls swapchain acquire / present directly, and never owns swapchain image lifecycle. |
 
 This boundary is consistent with the existing `IRenderer::EndFrame()` → `IDevice::Present()` runtime composition pattern and with the `GRAPHICS-018` Vulkan integration scope captured in [ADR-0004](0004-vulkan-backend-bringup-and-fallback.md).
 
@@ -120,7 +136,7 @@ Positive:
 - Graphics never imports `imgui.h` and never owns ImGui translation, so the editor adapter can iterate freely without graphics churn.
 - The overlay upload reuses the same transient-buffer ring pattern as `GRAPHICS-007Q` / `GRAPHICS-008Q` and the visualization overlay upload from [ADR-0009](0009-visualization-packets-and-overlay-upload.md), so backend reviewers have one shape to validate.
 - The retained font-atlas texture lives behind the same `RHI::TextureHandle` seam as SMAA lookup textures from [ADR-0010](0010-postprocess-chain-backend-policy.md), reducing the count of retained-state owners reviewers must remember.
-- `Pass.Present` finalization stays fullscreen-draw and therefore format-agnostic; backends can apply swapchain-specific color-space encoding inside the backend pipeline without leaking swapchain state through RHI / renderer.
+- Scene presentation and full-window UI composition share one imported backbuffer, with explicit recipe order and independent viewport extents. Swapchain lifecycle remains backend-owned.
 - The platform / backend / runtime / graphics boundary is explicit and tabular; reviewers can reject any new code that violates it by checking which row owns the touched API.
 
 Trade-offs and risks:

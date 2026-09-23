@@ -27,6 +27,7 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.ParameterizationOperations;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.EditorJobProjection;
@@ -886,6 +887,13 @@ TEST(ParameterizationOperations, WrongTypedUvAndNonTriangleFacesFailClosed)
     EXPECT_EQ(result.Status,
               Runtime::EditorCommandStatus::InvalidProcessingParameters);
     EXPECT_FALSE(quad.Vertices().Properties.Exists("v:texcoord"));
+    const Runtime::EditorUvRegenerationCommand atlasCommand{.StableEntityId = quad.StableEntityId};
+    EXPECT_FALSE(Runtime::PreviewEditorUvRegenerationCommand(quad.Context, atlasCommand).Enabled);
+    const auto atlas = Runtime::ApplyEditorUvRegenerationCommand(quad.Context, atlasCommand);
+    EXPECT_EQ(atlas.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_NE(atlas.Diagnostic.find("triangular source faces"), std::string::npos);
+    EXPECT_FALSE(quad.Vertices().Properties.Exists("v:texcoord"));
+    EXPECT_EQ(quad.History.UndoCount(), 0u);
 }
 
 // BUG-141: "Mesh parameterization solver rejected the selected mesh or config."
@@ -978,7 +986,7 @@ TEST(ParameterizationOperations, RetiresSupersededCornerUvsAndUndoRestoresThem)
 // BUG-137: the vertex-indexed UV layout view cannot draw corner UVs, and
 // reporting nothing at all read as "this mesh has no UVs" for exactly the
 // meshes an atlas produces.
-TEST(ParameterizationOperations, ViewModelNamesCornerDomainUvsItCannotDraw)
+TEST(ParameterizationOperations, ViewModelDrawsAuthoritativeCornerUvs)
 {
     ParameterizationHarness harness{};
     ASSERT_FALSE(harness.Vertices().Properties.Exists("v:texcoord"));
@@ -987,9 +995,18 @@ TEST(ParameterizationOperations, ViewModelNamesCornerDomainUvsItCannotDraw)
 
     const Runtime::EditorParameterizationViewModel model =
         Runtime::BuildEditorParameterizationViewModel(harness.Context, harness.Results);
-    EXPECT_FALSE(model.HasUvCoordinates);
-    EXPECT_NE(model.Message.find("h:texcoord"), std::string::npos)
-        << "message was: " << model.Message;
+    ASSERT_TRUE(model.HasUvCoordinates);
+    ASSERT_TRUE(model.HasFiniteUvBounds);
+    EXPECT_EQ(model.UvBoundsMin, (glm::vec2{0.25f, 0.5f}));
+    EXPECT_EQ(model.UvBoundsMax, (glm::vec2{0.25f, 0.5f}));
+    EXPECT_FALSE(model.Triangles.empty());
+    for (const auto triangle : model.Triangles)
+        for (const auto index : triangle)
+        {
+            ASSERT_LT(index, model.UVs.size());
+            EXPECT_EQ(model.UVs[index], (glm::vec2{0.25f, 0.5f}));
+        }
+    EXPECT_FALSE(harness.Vertices().Properties.Exists("v:texcoord"));
 }
 
 // BUG-141: the panel renders its header from the view model's `Message` and
@@ -1471,7 +1488,7 @@ TEST(ParameterizationOperations, ExplicitCornerBindingRetiresOnlyItsPropertyAndR
 
 TEST(ParameterizationOperations, CornerRetirementRejectsWrongDomainKindAndStructuralStorage)
 {
-    for (const auto ref : {
+    for (const auto& ref : {
              Runtime::GeometryPropertyRef{Runtime::GeometryElementDomain::MeshVertex, "v:texcoord", Geometry::PropertyValueKind::Vec2},
              Runtime::GeometryPropertyRef{Runtime::GeometryElementDomain::MeshHalfedge, "corners", Geometry::PropertyValueKind::Vec3},
              Runtime::GeometryPropertyRef{Runtime::GeometryElementDomain::MeshHalfedge, "h:face", Geometry::PropertyValueKind::Vec2},
@@ -1507,14 +1524,263 @@ TEST(ParameterizationOperations, UndoRejectsChangesToTheRetiredCornerBinding)
 {
     ParameterizationHarness h;
     auto& corners = h.Halfedges().Properties;
-    corners.GetOrAdd<glm::vec2>("retired_uv", {0.2f, 0.7f});
+    (void)corners.GetOrAdd<glm::vec2>("retired_uv", {0.2f, 0.7f});
     auto config = MakeConfig(Runtime::ParameterizationStrategyKind::TutteUniform);
     config.CornerTexcoordsToRetire = Runtime::GeometryPropertyRef{
         Runtime::GeometryElementDomain::MeshHalfedge, "retired_uv", Geometry::PropertyValueKind::Vec2};
     ASSERT_TRUE(Runtime::ApplyEditorParameterizationCommand(h.Context,
         {.StableEntityId = h.StableEntityId, .Config = config}).Succeeded());
-    corners.GetOrAdd<glm::vec2>("retired_uv", {0.8f, 0.1f});
+    (void)corners.GetOrAdd<glm::vec2>("retired_uv", {0.8f, 0.1f});
     EXPECT_FALSE(h.History.Undo().Succeeded());
     EXPECT_TRUE(h.Uvs());
     EXPECT_EQ(corners.Get<glm::vec2>("retired_uv")[0], glm::vec2(0.8f, 0.1f));
+}
+
+
+TEST(ParameterizationOperations, AtlasConfigRoundTripsAndRejectsUnusableBudgets)
+{
+    Runtime::ParameterizationConfig config{};
+    config.Atlas.Guide = Runtime::GeometryPropertyRef{
+        Runtime::GeometryElementDomain::MeshFace, "measured_saliency", Geometry::PropertyValueKind::Double};
+    config.Atlas.Distortion = Geometry::UvAtlas::UvAtlasDistortion::Area;
+    config.Atlas.RegionCount = 3u;
+    config.Atlas.Resolution = 2048u;
+    config.Atlas.MaxCharts = 512u;
+    config.View.AtlasOnLeft = true;
+    config.View.SplitRatio = 0.4f;
+    Config::EngineConfig document{};
+    Runtime::SetParameterizationConfig(document, config);
+    const auto restored = Runtime::GetParameterizationConfig(document);
+    ASSERT_TRUE(restored);
+    EXPECT_EQ(Runtime::SerializeParameterizationConfig(*restored), Runtime::SerializeParameterizationConfig(config));
+    for (const float split : {0.2f, 0.8f})
+    {
+        config.View.SplitRatio = split;
+        Runtime::SetParameterizationConfig(document, config);
+        const auto edge = Runtime::GetParameterizationConfig(document);
+        ASSERT_TRUE(edge);
+        EXPECT_FLOAT_EQ(edge->View.SplitRatio, split);
+    }
+    for (const auto payload : {
+        R"({"atlas":{"resolution":0}})", R"({"atlas":{"resolution":16,"padding":8}})",
+        R"({"atlas":{"max_iterations":0}})", R"({"atlas":{"max_conformal_distortion":0.9}})",
+        R"({"atlas":{"method":"imaginary"}})", R"({"atlas":{"distortion":"imaginary"}})",
+        R"({"atlas":{"method":"xatlas","distortion":"both"}})",
+        R"({"view":{"split_ratio":0.0}})"})
+        EXPECT_EQ(Runtime::ValidateParameterizationConfigSection(payload,
+            Runtime::SerializeParameterizationConfig(config), "parameterization").State,
+            Config::EngineConfigState::Invalid) << payload;
+}
+
+TEST(ParameterizationOperations, GuidedAtlasPreservesSourceSlotsAndUnrelatedCornerAttributes)
+{
+    ParameterizationHarness harness{};
+    auto& faces = harness.Scene.Raw().get<GS::Faces>(harness.Entity).Properties;
+    auto guide = faces.GetOrAdd<double>("arbitrary_scalar", 0.0);
+    for (std::size_t i = 0; i < guide.Vector().size(); ++i)
+        guide[i] = i < guide.Vector().size() / 2u ? -5.0 : 5.0;
+    auto untouched = harness.Halfedges().Properties.GetOrAdd<glm::vec3>("custom_corner", glm::vec3{0.0f});
+    for (std::size_t i = 0; i < untouched.Vector().size(); ++i)
+        untouched[i] = {static_cast<float>(i), -3.0f, 0.125f};
+    const auto expectedCorner = untouched.Vector();
+    const auto expectedGuide = guide.Vector();
+    const auto expectedFaceHalfedge = faces.Get<std::uint32_t>(GS::PropertyNames::kFaceHalfedge).Vector();
+    const auto expectedToVertex = harness.Halfedges().Properties.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeToVertex).Vector();
+    const auto expectedNext = harness.Halfedges().Properties.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeNext).Vector();
+    const auto expectedVertexCount = harness.Vertices().Properties.Size();
+    const auto expectedFaceCount = faces.Size();
+    const auto expectedHalfedgeCount = harness.Halfedges().Properties.Size();
+    Runtime::EditorUvRegenerationCommand command{};
+    command.StableEntityId = harness.StableEntityId;
+    command.Atlas.Resolution = 256u;
+    command.Atlas.Guide = Runtime::GeometryPropertyRef{
+        Runtime::GeometryElementDomain::MeshFace, "arbitrary_scalar", Geometry::PropertyValueKind::Double};
+    command.Atlas.RegionCount = 2u;
+    const auto result = Runtime::ApplyEditorUvRegenerationCommand(harness.Context, command);
+    ASSERT_TRUE(result.Succeeded()) << result.Diagnostic;
+    EXPECT_EQ(result.StableEntityId, harness.StableEntityId);
+    EXPECT_GE(result.RegionCount, 2u);
+    EXPECT_GE(result.ChartCount, result.RegionCount);
+    EXPECT_EQ(harness.Vertices().Properties.Size(), expectedVertexCount);
+    EXPECT_EQ(faces.Size(), expectedFaceCount);
+    EXPECT_EQ(harness.Halfedges().Properties.Size(), expectedHalfedgeCount);
+    EXPECT_EQ(harness.Halfedges().Properties.Get<glm::vec3>("custom_corner").Vector(), expectedCorner);
+    EXPECT_EQ(faces.Get<double>("arbitrary_scalar").Vector(), expectedGuide);
+    EXPECT_EQ(faces.Get<std::uint32_t>(GS::PropertyNames::kFaceHalfedge).Vector(), expectedFaceHalfedge);
+    EXPECT_EQ(harness.Halfedges().Properties.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeToVertex).Vector(), expectedToVertex);
+    EXPECT_EQ(harness.Halfedges().Properties.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeNext).Vector(), expectedNext);
+    const auto regions = faces.Get<std::uint32_t>("f:atlas_region");
+    const auto charts = faces.Get<std::uint32_t>("f:atlas_chart");
+    ASSERT_TRUE(regions);
+    ASSERT_TRUE(charts);
+    for (std::size_t i = 0; i < expectedFaceCount; ++i)
+    {
+        EXPECT_LT(regions[i], result.RegionCount);
+        EXPECT_LT(charts[i], result.ChartCount);
+        for (std::size_t j = 0; j < i; ++j)
+            if (charts[i] == charts[j]) EXPECT_EQ(regions[i], regions[j]);
+    }
+    const auto view = Runtime::BuildEditorParameterizationViewModel(harness.Context, harness.Results);
+    EXPECT_TRUE(view.HasUvCoordinates);
+    EXPECT_EQ(view.Triangles.size(), expectedFaceCount);
+    EXPECT_EQ(harness.History.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(harness.Halfedges().Properties.Get<glm::vec3>("custom_corner").Vector(), expectedCorner);
+    EXPECT_FALSE(harness.Vertices().Properties.Exists("v:texcoord"));
+    EXPECT_FALSE(harness.Halfedges().Properties.Exists("h:texcoord"));
+    EXPECT_FALSE(faces.Exists("f:atlas_region"));
+    EXPECT_FALSE(faces.Exists("f:atlas_chart"));
+}
+
+TEST(ParameterizationOperations, AtlasGuideRejectsPrecisionLossAndWrongDomainBeforePublication)
+{
+    ParameterizationHarness harness{};
+    (void)harness.Vertices().Properties.GetOrAdd<std::uint64_t>("precise_ids", 9007199254740993ull);
+    Runtime::EditorUvRegenerationCommand command{};
+    command.StableEntityId = harness.StableEntityId;
+    command.Atlas.Resolution = 256u;
+    command.Atlas.Guide = Runtime::GeometryPropertyRef{
+        Runtime::GeometryElementDomain::MeshVertex, "precise_ids", Geometry::PropertyValueKind::UInt64};
+    const auto result = Runtime::ApplyEditorUvRegenerationCommand(harness.Context, command);
+    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_NE(result.Diagnostic.find("exact numeric"), std::string::npos);
+    EXPECT_EQ(harness.History.UndoCount(), 0u);
+    command.Atlas.Guide->Domain = Runtime::GeometryElementDomain::MeshHalfedge;
+    const auto readiness = Runtime::PreviewEditorUvRegenerationCommand(harness.Context, command);
+    EXPECT_FALSE(readiness.Enabled);
+}
+
+TEST(ParameterizationOperations, GeneratedAtlasExtentFollowsItsUvsThroughHistory)
+{
+    ParameterizationHarness harness{};
+    auto& raw = harness.Scene.Raw();
+    const auto regenerate = [&harness](const std::uint32_t resolution)
+    {
+        Runtime::EditorUvRegenerationCommand command{};
+        command.StableEntityId = harness.StableEntityId;
+        command.Atlas.Resolution = resolution;
+        return Runtime::ApplyEditorUvRegenerationCommand(harness.Context, command);
+    };
+    const auto extent = [&raw, &harness]
+    {
+        const auto recorded = Runtime::FindCurrentMeshUvAtlasExtent(raw, harness.Entity);
+        return recorded ? glm::uvec2{recorded->Width, recorded->Height} : glm::uvec2{0u};
+    };
+
+    // Arbitrary, non-power-of-two resolutions are recorded exactly.
+    const auto large = regenerate(1536u);
+    ASSERT_TRUE(large.Succeeded()) << large.Diagnostic;
+    EXPECT_EQ(large.AtlasWidth, 1536u);
+    EXPECT_EQ(extent(), glm::uvec2(1536u));
+    const auto small = regenerate(512u);
+    ASSERT_TRUE(small.Succeeded()) << small.Diagnostic;
+    EXPECT_EQ(extent(), glm::uvec2(512u));
+
+    ASSERT_TRUE(harness.History.Undo().Succeeded());
+    EXPECT_EQ(extent(), glm::uvec2(1536u)) << "undo restores the extent together with its UVs";
+    ASSERT_TRUE(harness.History.Redo().Succeeded());
+    EXPECT_EQ(extent(), glm::uvec2(512u));
+
+    // Identical UVs under a different recorded extent are still an undoable change.
+    ASSERT_TRUE(Runtime::PublishMeshUvAtlasExtent(raw, harness.Entity, 700u, 700u));
+    const std::size_t undoCount = harness.History.UndoCount();
+    const auto metadataOnly = regenerate(512u);
+    ASSERT_TRUE(metadataOnly.Succeeded()) << metadataOnly.Diagnostic;
+    EXPECT_EQ(harness.History.UndoCount(), undoCount + 1u);
+    EXPECT_EQ(extent(), glm::uvec2(512u));
+    ASSERT_TRUE(harness.History.Undo().Succeeded());
+    EXPECT_EQ(extent(), glm::uvec2(700u));
+    ASSERT_TRUE(harness.History.Redo().Succeeded());
+    EXPECT_EQ(regenerate(512u).Status, Runtime::EditorCommandStatus::NoChange)
+        << "the same UVs and extent publish nothing";
+
+    // Another UV writer leaves no stale extent to describe its UVs.
+    ASSERT_TRUE(Apply(harness, Runtime::ParameterizationStrategyKind::Lscm).Succeeded());
+    EXPECT_EQ(extent(), glm::uvec2(0u));
+    EXPECT_FALSE(Runtime::RefreshMeshUvAtlasExtent(raw, harness.Entity));
+    EXPECT_FALSE(Runtime::RefreshMeshUvAtlasExtent(raw, harness.Entity));
+    ASSERT_TRUE(harness.History.Undo().Succeeded());
+    EXPECT_EQ(extent(), glm::uvec2(512u)) << "an appearance refresh must not destroy undo metadata";
+    ASSERT_TRUE(Runtime::RefreshMeshUvAtlasExtent(raw, harness.Entity));
+    ASSERT_TRUE(harness.History.Redo().Succeeded());
+    EXPECT_FALSE(Runtime::RefreshMeshUvAtlasExtent(raw, harness.Entity));
+
+    ASSERT_TRUE(regenerate(1536u).Succeeded());
+    ASSERT_TRUE(harness.History.Undo().Succeeded());
+    EXPECT_EQ(extent(), glm::uvec2(0u));
+    EXPECT_FALSE(Runtime::RefreshMeshUvAtlasExtent(raw, harness.Entity));
+    ASSERT_TRUE(harness.History.Undo().Succeeded());
+    EXPECT_EQ(extent(), glm::uvec2(512u)) << "undo past another regeneration retains the original grid";
+    ASSERT_TRUE(harness.History.Redo().Succeeded());
+    ASSERT_TRUE(harness.History.Redo().Succeeded());
+    EXPECT_EQ(extent(), glm::uvec2(1536u));
+}
+
+TEST(ParameterizationOperations, PreservationKeepsValidCornerUvsAndRegeneratesOnlyWhenItMust)
+{
+    ParameterizationHarness harness{};
+    auto& raw = harness.Scene.Raw();
+    auto& faces = raw.get<GS::Faces>(harness.Entity).Properties;
+    auto guide = faces.GetOrAdd<double>("arbitrary_scalar", 0.0);
+    for (std::size_t i = 0; i < guide.Vector().size(); ++i)
+        guide[i] = i < guide.Vector().size() / 2u ? -5.0 : 5.0;
+
+    // Artist corner UVs with a seam around face 0; no shadow vertex UVs.
+    const auto toVertex = harness.Halfedges().Properties.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeToVertex).Vector();
+    const auto halfedgeFace = harness.Halfedges().Properties.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeFace).Vector();
+    const auto positions = harness.Vertices().Properties.Get<glm::vec3>(GS::PropertyNames::kPosition).Vector();
+    std::vector<glm::vec2> authored(toVertex.size());
+    for (std::size_t h = 0; h < authored.size(); ++h)
+        authored[h] = glm::vec2{positions[toVertex[h]]} * 0.4f + (halfedgeFace[h] == 0u ? glm::vec2{0.1f} : glm::vec2{0.0f});
+    harness.Halfedges().Properties.GetOrAdd<glm::vec2>("h:texcoord", glm::vec2{0.0f}).Vector() = authored;
+    ASSERT_FALSE(harness.Vertices().Properties.Exists("v:texcoord"));
+    ASSERT_TRUE(Runtime::PublishMeshUvAtlasExtent(raw, harness.Entity, 777u, 777u));
+
+    Runtime::EditorUvRegenerationCommand preserve{};
+    preserve.StableEntityId = harness.StableEntityId;
+    preserve.PreserveValidAuthoredUvs = true;
+    preserve.ForceRegenerate = false;
+    preserve.Atlas.Resolution = 256u;
+    const auto kept = Runtime::ApplyEditorUvRegenerationCommand(harness.Context, preserve);
+    EXPECT_EQ(kept.Status, Runtime::EditorCommandStatus::NoChange) << kept.Diagnostic;
+    EXPECT_EQ(kept.Provenance, Geometry::UvAtlas::UvAtlasProvenance::AuthoredPreserved);
+    EXPECT_EQ(harness.History.UndoCount(), 0u);
+    EXPECT_EQ(harness.CornerUvs().value_or(std::vector<glm::vec2>{}), authored) << "artist seams are kept bit for bit";
+    EXPECT_FALSE(harness.Vertices().Properties.Exists("v:texcoord")) << "no shadow vertex UVs are resurrected";
+    ASSERT_TRUE(Runtime::FindCurrentMeshUvAtlasExtent(raw, harness.Entity).has_value());
+    EXPECT_EQ(Runtime::FindCurrentMeshUvAtlasExtent(raw, harness.Entity)->Width, 777u);
+
+    // Preservation cannot honor a region guide, so a guided request regenerates and says why.
+    Runtime::EditorUvRegenerationCommand guided = preserve;
+    guided.Atlas.Guide = Runtime::GeometryPropertyRef{
+        Runtime::GeometryElementDomain::MeshFace, "arbitrary_scalar", Geometry::PropertyValueKind::Double};
+    guided.Atlas.RegionCount = 2u;
+    const auto regioned = Runtime::ApplyEditorUvRegenerationCommand(harness.Context, guided);
+    ASSERT_TRUE(regioned.Succeeded()) << regioned.Diagnostic;
+    EXPECT_EQ(regioned.Provenance, Geometry::UvAtlas::UvAtlasProvenance::Generated);
+    EXPECT_NE(regioned.Diagnostic.find("region guide"), std::string::npos) << regioned.Diagnostic;
+    ASSERT_TRUE(harness.History.Undo().Succeeded());
+    EXPECT_EQ(harness.CornerUvs().value_or(std::vector<glm::vec2>{}), authored);
+    ASSERT_TRUE(Runtime::FindCurrentMeshUvAtlasExtent(raw, harness.Entity).has_value());
+
+    // The atlas action forces regeneration over valid corners.
+    Runtime::EditorUvRegenerationCommand force = preserve;
+    force.PreserveValidAuthoredUvs = false;
+    force.ForceRegenerate = true;
+    const auto forced = Runtime::ApplyEditorUvRegenerationCommand(harness.Context, force);
+    ASSERT_TRUE(forced.Succeeded()) << forced.Diagnostic;
+    EXPECT_EQ(forced.Provenance, Geometry::UvAtlas::UvAtlasProvenance::Generated);
+    ASSERT_TRUE(harness.History.Undo().Succeeded());
+    EXPECT_EQ(harness.CornerUvs().value_or(std::vector<glm::vec2>{}), authored);
+
+    // Invalid corners regenerate with a truthful diagnostic.
+    auto corners = harness.Halfedges().Properties.Get<glm::vec2>("h:texcoord");
+    for (std::size_t h = 0; h < authored.size(); ++h)
+        if (halfedgeFace[h] == 0u)
+            corners[h] = glm::vec2{0.5f};
+    const auto repaired = Runtime::ApplyEditorUvRegenerationCommand(harness.Context, preserve);
+    ASSERT_TRUE(repaired.Succeeded()) << repaired.Diagnostic;
+    EXPECT_EQ(repaired.Provenance, Geometry::UvAtlas::UvAtlasProvenance::Generated);
+    EXPECT_NE(repaired.Diagnostic.find("authored corner UVs were not preserved ("), std::string::npos)
+        << repaired.Diagnostic;
+    EXPECT_EQ(harness.History.UndoCount(), 1u);
 }

@@ -23,11 +23,12 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
 
     [[nodiscard]] EditorCommandStatus ValidateMeshSoupFaceRings(
         const GS::ConstSourceView&, std::string& diagnostic,
-        std::string_view positionProperty);
+        std::string_view positionProperty, bool requireTriangles = false, bool* trianglesOnly = nullptr);
 
     [[nodiscard]] bool PrepareMeshSoupFaceRings(
         const EditorProcessingContext&, entt::entity,
         const GeometryEntityAvailability&, std::string& diagnostic,
-        GeometryPropertyRef positions = {GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3});
+        GeometryPropertyRef positions = {GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3},
+        bool requireTriangles = false);
 }
 }

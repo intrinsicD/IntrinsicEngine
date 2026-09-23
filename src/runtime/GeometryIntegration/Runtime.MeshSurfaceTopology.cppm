@@ -1,12 +1,14 @@
-// Canonical runtime mesh face/corner traversal and GPU-only corner-attribute
-// splitting.
+// Canonical runtime mesh face/corner traversal, GPU-only corner-attribute
+// splitting, and the generated-atlas extent bound to the canonical UVs.
 module;
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <vector>
 
+#include <entt/entity/fwd.hpp>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 
@@ -203,4 +205,57 @@ export namespace Extrinsic::Runtime
         std::span<const std::uint8_t> cornerAssigned,
         std::span<const Geometry::MeshSoup::PolygonFace> sourceFaces,
         std::size_t sourceVertexCount);
+
+    // Entity component: texel extent of the generated atlas that produced the
+    // entity's canonical UVs. Width/Height are the persistent fact; the rest
+    // is a runtime-only binding (never serialized) to the exact `h:texcoord`
+    // / `v:texcoord` content it was published with, so a later UV write,
+    // replacement or removal makes the record stale instead of describing
+    // different UVs. Revision stamps (nullopt = absent) are the fast path;
+    // the content fingerprint re-validates after a component move rebases
+    // property revisions without changing any UV.
+    struct MeshUvAtlasExtent
+    {
+        std::uint32_t Width{0u};
+        std::uint32_t Height{0u};
+        std::optional<std::uint64_t> CornerTexcoordRevision{};
+        std::optional<std::uint64_t> VertexTexcoordRevision{};
+        std::uint64_t TexcoordFingerprint{0u};
+        // Cached verdict for the observed stamps above. Keep the published
+        // fingerprint while stale so undo can restore the original binding.
+        bool StampsMatchContent{true};
+    };
+
+    // Both sides within the atlas generator's resolution bounds.
+    [[nodiscard]] bool IsValidMeshUvAtlasExtent(
+        std::uint32_t width,
+        std::uint32_t height);
+
+    // Call after the UVs are written. Binds `width` x `height` to the
+    // entity's current canonical UVs and returns true. An invalid extent (0
+    // for authored UVs) or a mesh without canonical UVs removes any record
+    // and returns false.
+    bool PublishMeshUvAtlasExtent(
+        entt::registry& registry,
+        entt::entity entity,
+        std::uint32_t width,
+        std::uint32_t height);
+
+    // Restore an earlier content binding, including a stale one kept for
+    // undo. Revision stamps are discarded and re-derived on the next query.
+    void RestoreMeshUvAtlasExtent(
+        entt::registry& registry,
+        entt::entity entity,
+        MeshUvAtlasExtent extent);
+
+    // The record, only while it still describes the current canonical UVs.
+    [[nodiscard]] std::optional<MeshUvAtlasExtent> FindCurrentMeshUvAtlasExtent(
+        const entt::registry& registry,
+        entt::entity entity);
+
+    // Same answer for per-frame producers. Cache both current and stale
+    // verdicts; retaining the original fingerprint allows UV undo to recover.
+    std::optional<MeshUvAtlasExtent> RefreshMeshUvAtlasExtent(
+        entt::registry& registry,
+        entt::entity entity);
 }

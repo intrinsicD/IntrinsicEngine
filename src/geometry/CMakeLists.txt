@@ -123,6 +123,8 @@ target_sources(${target_name}
         Geometry.SurfaceReconstruction.cppm
         Geometry.Triangle.cppm
         Geometry.UvAtlas.Types.cppm
+        Geometry.UvAtlas.Validation.cppm
+        Geometry.UvAtlas.ChartSolve.cppm
         Geometry.UvAtlas.cppm
         Geometry.Validation.cppm
         Geometry.cppm
@@ -231,6 +233,8 @@ target_sources(${target_name}
         Geometry.Sparse.cpp
         Geometry.SurfaceReconstruction.cpp
         Geometry.Triangle.cpp
+        Geometry.UvAtlas.Validation.cpp
+        Geometry.UvAtlas.ChartSolve.cpp
         Geometry.UvAtlas.cpp
         Geometry.Validation.cpp
         PUBLIC

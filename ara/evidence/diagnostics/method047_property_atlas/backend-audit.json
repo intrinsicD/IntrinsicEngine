@@ -1,0 +1,317 @@
+[
+  {
+    "case": "disconnected_triangles-fast-staged-angle",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "angle",
+    "requested_distortion": "angle",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "disconnected_triangles-fast-staged-area",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "area",
+    "requested_distortion": "area",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "disconnected_triangles-fast-staged-both",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "both",
+    "requested_distortion": "both",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "disconnected_triangles-fast-staged-none",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "none",
+    "requested_distortion": "none",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "disconnected_triangles-xatlas-angle",
+    "actual_method": "xatlas",
+    "requested_method": "xatlas",
+    "actual_distortion": "angle",
+    "requested_distortion": "angle",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "dolphin-fast-staged-angle",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "angle",
+    "requested_distortion": "angle",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "dolphin-fast-staged-area",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "area",
+    "requested_distortion": "area",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "dolphin-fast-staged-both",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "both",
+    "requested_distortion": "both",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "dolphin-fast-staged-none",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "none",
+    "requested_distortion": "none",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "dolphin-xatlas-angle",
+    "actual_method": "xatlas",
+    "requested_method": "xatlas",
+    "actual_distortion": "angle",
+    "requested_distortion": "angle",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "fandisk-fast-staged-angle",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "angle",
+    "requested_distortion": "angle",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "fandisk-fast-staged-area",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "area",
+    "requested_distortion": "area",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "fandisk-fast-staged-both",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "both",
+    "requested_distortion": "both",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "fandisk-fast-staged-none",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "none",
+    "requested_distortion": "none",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "fandisk-xatlas-angle",
+    "actual_method": "xatlas",
+    "requested_method": "xatlas",
+    "actual_distortion": "angle",
+    "requested_distortion": "angle",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "folded_grid-fast-staged-angle",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "angle",
+    "requested_distortion": "angle",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "folded_grid-fast-staged-area",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "area",
+    "requested_distortion": "area",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "folded_grid-fast-staged-both",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "both",
+    "requested_distortion": "both",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "folded_grid-fast-staged-none",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "none",
+    "requested_distortion": "none",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "folded_grid-xatlas-angle",
+    "actual_method": "xatlas",
+    "requested_method": "xatlas",
+    "actual_distortion": "angle",
+    "requested_distortion": "angle",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "frog-fast-staged-angle",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "angle",
+    "requested_distortion": "angle",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "frog-fast-staged-area",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "area",
+    "requested_distortion": "area",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "frog-fast-staged-both",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "both",
+    "requested_distortion": "both",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "frog-fast-staged-none",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "none",
+    "requested_distortion": "none",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "frog-xatlas-angle",
+    "actual_method": "xatlas",
+    "requested_method": "xatlas",
+    "actual_distortion": "angle",
+    "requested_distortion": "angle",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "planar_grid-fast-staged-angle",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "angle",
+    "requested_distortion": "angle",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "planar_grid-fast-staged-area",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "area",
+    "requested_distortion": "area",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "planar_grid-fast-staged-both",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "both",
+    "requested_distortion": "both",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "planar_grid-fast-staged-none",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "none",
+    "requested_distortion": "none",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "planar_grid-xatlas-angle",
+    "actual_method": "xatlas",
+    "requested_method": "xatlas",
+    "actual_distortion": "angle",
+    "requested_distortion": "angle",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "sculpt-fast-staged-angle",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "angle",
+    "requested_distortion": "angle",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "sculpt-fast-staged-area",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "area",
+    "requested_distortion": "area",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "sculpt-fast-staged-both",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "both",
+    "requested_distortion": "both",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "sculpt-fast-staged-none",
+    "actual_method": "fast_staged",
+    "requested_method": "fast-staged",
+    "actual_distortion": "none",
+    "requested_distortion": "none",
+    "used_fallback": false,
+    "passed": true
+  },
+  {
+    "case": "sculpt-xatlas-angle",
+    "actual_method": "xatlas",
+    "requested_method": "xatlas",
+    "actual_distortion": "angle",
+    "requested_distortion": "angle",
+    "used_fallback": false,
+    "passed": true
+  }
+]

@@ -1,6 +1,7 @@
 // Declares editor window registration and lifecycle without processing views.
 module;
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
@@ -64,6 +65,11 @@ export namespace Extrinsic::Sandbox::Editor
             [[nodiscard]] bool SetEditorWindowOpen(
                 std::string_view id,
                 bool open);
+            // Called every attached UI frame before open windows draw, so a
+            // panel can react to results (e.g. open its window) while closed.
+            [[nodiscard]] std::uint64_t AddFrameObserver(
+                std::function<void(const SandboxEditorContext&)> observer);
+            void RemoveFrameObserver(std::uint64_t id) noexcept;
             [[nodiscard]] bool IsAttached() const noexcept;
             [[nodiscard]] const SandboxEditorFrame&
             GetLastFrame() const noexcept;

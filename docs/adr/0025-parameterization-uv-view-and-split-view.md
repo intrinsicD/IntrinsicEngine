@@ -4,7 +4,7 @@
 - **Date:** 2026-07-13
 - **Owners:** Graphics/Runtime/UI
 - **Related tasks:** GEOM-063 (retired), RUNTIME-176 (retired), UI-036
-  (retired), GRAPHICS-122 (retired optional GPU upgrade)
+  (retired), GRAPHICS-122 (retired optional GPU upgrade), METHOD-047
 
 ## Context
 
@@ -71,10 +71,29 @@ overlays — never a separate scene object.
 
 **The parameterization UV layout is a derived view/projection of the existing mesh
 entity, not a separate ECS entity.** It shares the mesh's topology, `StableId`
-identity, selection, and `v:texcoord` attribute. It is rendered in a dedicated,
+identity, selection, and authoritative corner or vertex UV attribute. It is rendered in a dedicated,
 resizable UV view that is a *different space* (UV) of the same entity.
 
-**Delivery (staged, cheapest first):**
+### METHOD-047 scene/atlas split
+
+The selected mesh and atlas now occupy adjacent regions of the main window.
+The existing scene still uses one camera. Runtime publishes the scene rectangle
+for rendering, camera aspect, cursor-to-scene mapping, picking and gizmos; the
+UV side uses the existing derived offscreen target or CPU wireframe. This adds
+no second scene entity or general multi-camera renderer. Present places the
+scene image into its rectangle, then ImGui draws the full-window editor overlay
+([ADR 0012](0012-imgui-overlay-and-present-finalization.md)).
+
+The validated parameterization config persists split enablement, side and ratio,
+plus atlas method, scalar guide, objective and budgets. Canonical corner UVs
+(`h:texcoord`) take precedence over canonical vertex UVs; explicit custom vertex
+bindings remain exact. The view reuses the geometry upload's complete UV/normal
+corner split, so seam edges refer to the correct UV copies. Each generated
+property texture has a tab beside the atlas wireframe. Ready textures use their
+recorded encoding and value range; pending, failed and stale records carry a
+status instead of displaying mismatched data. Navigation is shared across tabs.
+
+**Earlier delivery stages:**
 
 - **Delivered baseline — CPU `ImDrawList` layout in a resizable split window (retired UI-036).**
   A single registered editor window is split by a **manual draggable two-pane
@@ -134,12 +153,9 @@ exists.
   view. It also fragments the mesh's identity (two entities, two `StableId`s, two
   selection targets for one mesh) and contradicts the universal DCC model of a UV
   *view* of one object. Rejected as the primary model.
-- **True second viewport + second camera — deferred.** The architecturally "correct"
-  long-term split view, but it contradicts today's single-view assumptions in
-  `RenderFrameInput`, `RenderWorld`, and `FrameRecipe` (one camera/viewport/backbuffer)
-  and would require a multi-view concept across runtime extraction, the renderer
-  contract, and the recipe. Deferred; not required for the family to be integrated and
-  choosable.
+- **Second scene camera — deferred.** The scene/atlas split needs a scene
+  rectangle and the existing derived UV projection. A general multi-camera
+  renderer is outside this workflow.
 - **Enable ImGui docking for a docked splitter — deferred.** One flag in
   `Runtime.ImGuiAdapter::ConfigureIo()`, but it also requires solving layout
   persistence (`IniFilename` is intentionally null). The manual two-pane splitter

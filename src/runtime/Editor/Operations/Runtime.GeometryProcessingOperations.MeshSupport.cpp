@@ -144,8 +144,9 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
         // A null output validates rings without materializing positions or triangles.
         [[nodiscard]] EditorCommandStatus WalkMeshSoupFaces(
             const GS::ConstSourceView& view, std::string_view positionProperty,
-            std::string& diagnostic, MeshSoupFromGeometrySourcesResult* output)
+            std::string& diagnostic, MeshSoupFromGeometrySourcesResult* output, bool requireTriangles = false, bool* trianglesOnly = nullptr)
         {
+            if (trianglesOnly) *trianglesOnly = true;
             const auto status = ValidateMeshSoupSourceMetadata(view, diagnostic, positionProperty);
             if (status != EditorCommandStatus::Applied) return status;
             const auto positions = view.VertexSource->Properties.Get<glm::vec3>(positionProperty);
@@ -181,6 +182,12 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
                 if (status == MeshFaceRingStatus::Skip)
                     continue;
 
+                if (trianglesOnly && ring.size() != 3u) *trianglesOnly = false;
+                if (requireTriangles && ring.size() != 3u)
+                {
+                    diagnostic = "UV atlas generation requires triangular source faces; triangulate the mesh before generating an atlas.";
+                    return EditorCommandStatus::InvalidProcessingParameters;
+                }
                 hasFaces = true;
                 if (!output) continue;
                 for (std::size_t i = 1u; i + 1u < ring.size(); ++i)
@@ -203,9 +210,9 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
 
         EditorCommandStatus ValidateMeshSoupFaceRings(
             const GS::ConstSourceView& view, std::string& diagnostic,
-            std::string_view positionProperty)
+            std::string_view positionProperty, bool requireTriangles, bool* trianglesOnly)
         {
-            return WalkMeshSoupFaces(view, positionProperty, diagnostic, nullptr);
+            return WalkMeshSoupFaces(view, positionProperty, diagnostic, nullptr, requireTriangles, trianglesOnly);
         }
 
         MeshSoupFromGeometrySourcesResult BuildMeshSoupFromGeometrySources(

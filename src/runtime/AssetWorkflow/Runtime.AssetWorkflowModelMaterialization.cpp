@@ -43,6 +43,7 @@ import Extrinsic.Runtime.AssetWorkflowTextureResidency;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.MeshSurfaceTopology;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.TextureBakeModule;
 import Geometry.HalfedgeMesh.IO;
@@ -545,7 +546,10 @@ namespace Extrinsic::Runtime
                     continue;
                 }
 
-                auto materialized = BuildRuntimeHalfedgeMeshMaterialization(**meshPayload);
+                // An unusable atlas must not discard otherwise renderable geometry.
+                auto materialized = BuildRuntimeHalfedgeMeshMaterialization(
+                    **meshPayload, RuntimeMeshMaterializationOptions{
+                        .UvResolution = {.FailurePolicy = RuntimeMeshUvFailurePolicy::Optional}});
                 if (!materialized.has_value())
                 {
                     return Core::Err<std::vector<PreparedPrimitive>>(materialized.error());
@@ -1508,6 +1512,16 @@ namespace Extrinsic::Runtime
                     raw,
                     entity,
                     primitive.Mesh);
+                // Only a generated atlas has an extent; authored UVs use the
+                // bake default.
+                const bool generatedAtlas =
+                    primitive.TexcoordProvenance ==
+                    RuntimeMeshResolvedUvProvenance::GeneratedAtlas;
+                (void)PublishMeshUvAtlasExtent(
+                    raw,
+                    entity,
+                    generatedAtlas ? primitive.UvAtlasWidth : 0u,
+                    generatedAtlas ? primitive.UvAtlasHeight : 0u);
                 const Assets::AssetModelMaterialPayload* material =
                     primitive.MaterialIndex < model.Materials.size()
                         ? &model.Materials[primitive.MaterialIndex]

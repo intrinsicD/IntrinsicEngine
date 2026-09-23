@@ -1,0 +1,56 @@
+{
+  "focused_cpu": {
+    "selected_ctest_entries": 198,
+    "passed_entries": 198,
+    "failed_entries": 0,
+    "skipped_entries": [],
+    "wall_seconds": 8.94,
+    "summary_log": "final-cpu-focused.log",
+    "raw_output": null
+  },
+  "full_cpu": {
+    "selected_ctest_entries": 5012,
+    "passed_entries": 5011,
+    "failed_entries": 0,
+    "skipped_entries": [
+      "GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl"
+    ],
+    "wall_seconds": 165.68,
+    "summary_log": "full-cpu-9.log",
+    "raw_output": "full-cpu-9-output.log"
+  },
+  "asan": {
+    "selected_ctest_entries": 3333,
+    "passed_entries": 3333,
+    "failed_entries": 0,
+    "skipped_entries": [],
+    "wall_seconds": 658.09,
+    "summary_log": "asan-full-4.log",
+    "raw_output": "asan-full-4-output.log"
+  },
+  "ubsan": {
+    "selected_ctest_entries": 3333,
+    "passed_entries": 3332,
+    "failed_entries": 0,
+    "skipped_entries": [
+      "GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl"
+    ],
+    "wall_seconds": 295.96,
+    "summary_log": "ubsan-full-2.log",
+    "raw_output": "ubsan-full-2-output.log"
+  },
+  "vulkan": {
+    "selected_ctest_entries": 97,
+    "passed_entries": 97,
+    "failed_entries": 0,
+    "skipped_entries": [],
+    "wall_seconds": 2935.04,
+    "summary_log": "vulkan-final-tests-2.log",
+    "raw_output": "vulkan-final-tests-2-recovered-output.log"
+  },
+  "vulkan_raw_log_capture": "Retained directly from the running CTest process original log inode with a read-only descriptor after a show-only metadata query replaced the conventional LastTest path. Test execution and the separately redirected CTest summary were unaffected.",
+  "counting": "ASan/UBSan use INTRINSIC_GROUP_PURE_CTEST=ON, so their CTest entry counts include grouped executables and are not directly comparable to the ungrouped CPU/GPU count.",
+  "source_binding": "See source-provenance.json, retained corpus source.patch, post-corpus-source-binding.json and post-corpus-ui-test.patch.gz. Only the additional GPU workspace test differs after the numerical/CPU/ASan runs.",
+  "resource_policy": "One build/corpus at a time under flock, compiler parallelism at most two, cgroup MemoryHigh16G/MemoryMax24G/MemorySwapMax1G; sanitizer CTest serial.",
+  "visual_capture": "Separate GDB diagnostic after the normal Vulkan gate; ASAN_OPTIONS=detect_leaks=0 only in this debugger run because LSan cannot run under ptrace. It is visual evidence, not sanitizer verification."
+}

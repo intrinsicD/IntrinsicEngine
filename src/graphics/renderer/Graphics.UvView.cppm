@@ -8,6 +8,7 @@ module;
 
 export module Extrinsic.Graphics.UvView;
 
+import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.SceneHandles;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.RHI.Bindless;
@@ -27,6 +28,42 @@ export namespace Extrinsic::Graphics
         Checker,
         TexelDensity,
         Texture,
+        // An explicit baked texture shown texel-exact in atlas layout.
+        BakedTexture,
+    };
+
+    // How displayed baked texels are interpreted. Stored data is never
+    // modified: display transforms run in the shader only.
+    enum class UvViewTextureDisplayMode : std::uint8_t
+    {
+        Color,          // RGB as stored (colormapped/label/colour encodings)
+        ScalarColormap, // raw scalar in R, mapped through Range and Colormap
+        VectorRange,    // raw vector in RGB, each component mapped through Range
+    };
+
+    struct UvViewTextureDisplay
+    {
+        RHI::BindlessIndex Texture = RHI::kInvalidBindlessIndex;
+        RHI::BindlessIndex CoverageTexture = RHI::kInvalidBindlessIndex;
+        UvViewTextureDisplayMode Mode = UvViewTextureDisplayMode::Color;
+        // Display range for raw values; values outside it saturate, NaN is
+        // shown in a distinct colour, and negative/zero values keep their
+        // position in the range.
+        float RangeMin = 0.0f;
+        float RangeMax = 1.0f;
+        Colormap::Type Colormap = Colormap::Type::Viridis;
+        // Resolved by the renderer from Colormap; callers leave it invalid.
+        RHI::BindlessIndex ColormapLut = RHI::kInvalidBindlessIndex;
+    };
+
+    // Explicit view window shared with the CPU pane so pan/zoom agree across
+    // both paths. A non-positive half extent selects the automatic fit.
+    struct UvViewNavigation
+    {
+        float CenterU = 0.5f;
+        float CenterV = 0.5f;
+        // UV half extent along the target height; width follows the aspect.
+        float HalfExtentV = 0.0f;
     };
 
     enum class UvViewActiveMode : std::uint8_t
@@ -66,6 +103,9 @@ export namespace Extrinsic::Graphics
         UvViewBounds Bounds{};
         UvViewBackgroundMode Background = UvViewBackgroundMode::Grid;
         RHI::BindlessIndex BackgroundTexture = RHI::kInvalidBindlessIndex;
+        // Consumed when Background is BakedTexture.
+        UvViewTextureDisplay BakedTexture{};
+        UvViewNavigation Navigation{};
         bool ShowDistortionHeatmap = false;
 
         // Triangle edges expanded as (a,b,b,c,c,a). These are copied on
@@ -116,10 +156,14 @@ export namespace Extrinsic::Graphics
         std::uint32_t BackgroundMode = 0u;
         std::uint32_t BackgroundTextureBindlessIndex = RHI::kInvalidBindlessIndex;
         std::uint32_t ShowHeatmap = 0u;
-        std::uint32_t Reserved = 0u;
+        std::uint32_t TextureDisplayMode = 0u;
+        float TextureRangeMin = 0.0f;
+        float TextureRangeMax = 1.0f;
+        std::uint32_t ColormapBindlessIndex = RHI::kInvalidBindlessIndex;
+        std::uint32_t CoverageTextureBindlessIndex = RHI::kInvalidBindlessIndex;
     };
 
-    static_assert(sizeof(UvViewPushConstants) == 48u);
+    static_assert(sizeof(UvViewPushConstants) == 64u);
 
     class UvView
     {

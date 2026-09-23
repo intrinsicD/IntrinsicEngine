@@ -61,7 +61,7 @@ namespace Extrinsic::Runtime
             bool Queued{};
             std::optional<bool> Accepted{};
             std::size_t LiveCount{};
-            bool ValidLbvh{true}, HasSubnormalCoordinates{}, HasZeroVectors{}, HasNonfiniteVectors{};
+            bool ValidLbvh{true}, HasSubnormalCoordinates{}, HasZeroVectors{}, HasNonfiniteVectors{}, HasNonTriangleFaces{};
             float MinimumSquaredNorm{std::numeric_limits<float>::infinity()}, MaximumSquaredNorm{};
             std::string Diagnostic{};
         };
@@ -302,8 +302,11 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     {
         if (kind == InputKind::PointRows)
             return ScanPointInputRows(a, positions, false, capture, diagnostic);
-        return MeshSupport::ValidateMeshSoupFaceRings(a.SourceView, diagnostic, positions.Name) ==
-               EditorCommandStatus::Applied;
+        bool trianglesOnly = true;
+        const bool valid = MeshSupport::ValidateMeshSoupFaceRings(
+            a.SourceView, diagnostic, positions.Name, false, &trianglesOnly) == EditorCommandStatus::Applied;
+        capture.HasNonTriangleFaces = !trianglesOnly;
+        return valid;
     }
 
     namespace
@@ -353,6 +356,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             entry->HasSubnormalCoordinates = capture.HasSubnormalCoordinates;
             entry->HasZeroVectors = capture.HasZeroVectors;
             entry->HasNonfiniteVectors = capture.HasNonfiniteVectors;
+            entry->HasNonTriangleFaces = capture.HasNonTriangleFaces;
             entry->MinimumSquaredNorm = capture.MinimumSquaredNorm;
             entry->MaximumSquaredNorm = capture.MaximumSquaredNorm;
             entry->Diagnostic = std::move(diagnostic);
@@ -417,6 +421,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             capture.HasSubnormalCoordinates = entry->HasSubnormalCoordinates;
             capture.HasZeroVectors = entry->HasZeroVectors;
             capture.HasNonfiniteVectors = entry->HasNonfiniteVectors;
+            capture.HasNonTriangleFaces = entry->HasNonTriangleFaces;
             capture.MinimumSquaredNorm = entry->MinimumSquaredNorm;
             capture.MaximumSquaredNorm = entry->MaximumSquaredNorm;
             diagnostic = entry->Diagnostic;
@@ -455,10 +460,17 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     bool MeshSupport::PrepareMeshSoupFaceRings(
         const EditorProcessingContext& context, entt::entity entity,
         const GeometryEntityAvailability& availability, std::string& diagnostic,
-        GeometryPropertyRef positions)
+        GeometryPropertyRef positions, const bool requireTriangles)
     {
         PointInputCapture capture;
-        return PrepareInput(InputKind::MeshFaceRings, context, entity, availability, positions, capture, diagnostic);
+        if (!PrepareInput(InputKind::MeshFaceRings, context, entity, availability, positions, capture, diagnostic))
+            return false;
+        if (requireTriangles && capture.HasNonTriangleFaces)
+        {
+            diagnostic = "UV atlas generation requires triangular source faces; triangulate the mesh before generating an atlas.";
+            return false;
+        }
+        return true;
     }
 
     bool PrepareMeshFieldInput(

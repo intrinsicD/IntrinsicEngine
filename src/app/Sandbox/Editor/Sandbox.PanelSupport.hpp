@@ -33,9 +33,6 @@ namespace Extrinsic::Sandbox::Editor
         std::int32_t* Width{nullptr};
         std::int32_t* Height{nullptr};
         std::int32_t* Padding{nullptr};
-        std::int32_t* UvResolution{nullptr};
-        std::int32_t* UvPadding{nullptr};
-        float* UvTexelsPerUnit{nullptr};
         bool* UvForceRegenerate{nullptr};
         bool* UvPreserveAuthored{nullptr};
     };
@@ -137,6 +134,9 @@ namespace Extrinsic::Sandbox::Editor
             const Runtime::EditorSelectionModel* Selection{nullptr};
             const Runtime::EditorDocumentModel* Document{nullptr};
             Runtime::EditorWorkspaceSnapshotStats* ModelBuildStats{nullptr};
+            // Claims the scene rectangle (window coordinates: x, y, width,
+            // height) for this UI frame; unclaimed frames render full-window.
+            std::function<void(float, float, float, float)> ClaimSceneViewport{};
         };
 
     }
@@ -190,15 +190,14 @@ namespace Extrinsic::Sandbox::Editor
         std::int32_t* BakeWidth{nullptr};
         std::int32_t* BakeHeight{nullptr};
         std::int32_t* BakePadding{nullptr};
-        std::int32_t* UvResolution{nullptr};
-        std::int32_t* UvPadding{nullptr};
-        float* UvTexelsPerUnit{nullptr};
         bool* UvForceRegenerate{nullptr};
         bool* UvPreserveAuthored{nullptr};
     };
 
-    // The one "Regenerate UVs" control: atlas parameters, submission with its
-    // terminal callback, atlas-extent adoption, status and dismissal. Every
+    // The one "Regenerate UVs" control: submission of the persisted atlas
+    // configuration (edited and validated in the Parameterize (UV) window)
+    // with its terminal callback, atlas-extent adoption, status and
+    // dismissal. Every
     // texture-bake panel drives this helper, so the command, the session sink
     // that carries a queued job's terminal result, and the dismissal that
     // clears it cannot drift apart between panels.
@@ -338,6 +337,17 @@ namespace Extrinsic::Sandbox::Editor
     [[nodiscard]] glm::vec2 ProjectSandboxParameterizationUvPoint(
         const SandboxParameterizationUvProjection& projection,
         glm::vec2 uv) noexcept;
+
+    // Status, requested/actual method and objective, fallback and diagnostic
+    // of one atlas generation result.
+    void DrawSandboxUvAtlasResult(
+        const Runtime::EditorUvRegenerationCommandResult& result);
+
+    // Display names for the atlas method/objective selectors and reports.
+    [[nodiscard]] const char* SandboxUvAtlasMethodLabel(
+        Geometry::UvAtlas::UvAtlasMethod method) noexcept;
+    [[nodiscard]] const char* SandboxUvAtlasDistortionLabel(
+        Geometry::UvAtlas::UvAtlasDistortion distortion) noexcept;
 
     struct SandboxParameterizationResultSummary
     {

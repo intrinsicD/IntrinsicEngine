@@ -9,6 +9,7 @@ module;
 
 export module Extrinsic.Runtime.ParameterizationConfig;
 export import Extrinsic.Runtime.GeometryProperty.Types;
+export import Geometry.UvAtlas.Types;
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
@@ -20,7 +21,7 @@ export namespace Extrinsic::Runtime
     inline constexpr std::string_view kParameterizationConfigSectionSchemaId =
         "intrinsic.runtime.sandbox.parameterization";
     inline constexpr std::uint32_t kParameterizationConfigSectionSchemaVersion =
-        2u;
+        3u;
 
     enum class ParameterizationStrategyKind : std::uint32_t
     {
@@ -65,6 +66,9 @@ export namespace Extrinsic::Runtime
         ParameterizationUvBackgroundMode BackgroundMode{
             ParameterizationUvBackgroundMode::Grid};
         bool ShowDistortionHeatmap{false};
+        bool SplitEnabled{true};
+        bool AtlasOnLeft{false};
+        float SplitRatio{0.5f};
     };
 
     struct ParameterizationUvConfig
@@ -103,6 +107,24 @@ export namespace Extrinsic::Runtime
         double DegeneracyTolerance{1.0e-12};
     };
 
+    struct ParameterizationAtlasConfig
+    {
+        Geometry::UvAtlas::UvAtlasMethod Method{Geometry::UvAtlas::UvAtlasMethod::FastStaged};
+        Geometry::UvAtlas::UvAtlasDistortion Distortion{Geometry::UvAtlas::UvAtlasDistortion::Both};
+        // Null selects geometry-only charting; any scalar mesh vertex/face
+        // property may guide segmentation regardless of its name or provenance.
+        std::optional<GeometryPropertyRef> Guide{};
+        std::uint32_t RegionCount{0u};
+        std::uint32_t Resolution{1024u};
+        std::uint32_t Padding{2u};
+        float TexelsPerUnit{0.0f};
+        double MaxConformalDistortion{10.0};
+        double MaxAreaDistortion{10.0};
+        std::uint32_t MaxCharts{16384u};
+        std::uint32_t MaxIterations{40u};
+        bool AllowXAtlasFallback{true};
+    };
+
     struct ParameterizationConfig
     {
         ParameterizationStrategyKind Strategy{ParameterizationStrategyKind::Lscm};
@@ -110,6 +132,7 @@ export namespace Extrinsic::Runtime
         ParameterizationHarmonicConfig Harmonic{};
         ParameterizationBffConfig Bff{};
         ParameterizationViewConfig View{};
+        ParameterizationAtlasConfig Atlas{};
         GeometryPropertyRef Positions{GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};
         GeometryPropertyRef Texcoords{GeometryElementDomain::MeshVertex, "v:texcoord", Geometry::PropertyValueKind::Vec2};
         // Null preserves corner storage; a bound property is retired with undo.
@@ -120,6 +143,9 @@ export namespace Extrinsic::Runtime
     // JSON dependency once for every feature family.
     extern "C++"
     {
+        [[nodiscard]] std::optional<std::string> ValidateParameterizationAtlasConfig(
+            const ParameterizationAtlasConfig& config);
+
         [[nodiscard]] std::string SerializeParameterizationConfig(
             const ParameterizationConfig& config);
 

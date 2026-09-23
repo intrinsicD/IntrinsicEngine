@@ -1997,29 +1997,25 @@ Concretely:
   If `InitializeFallbackTexture()` fails, `FallbackTextureReady = false`
   and `GetViewOrFallback()` returns `GpuAssetFallbackReason::Unavailable`,
   letting material code fall back to factor-only shading deterministically.
-- `Extrinsic.Graphics.PropertyTextureBake` is the sole graphics-owned
-  UV-raster surface used by `Runtime.TextureBakeModule`. Its backend-neutral
-  descriptor carries an already-open command context, caller-owned pipeline,
-  output and managed index handles, texcoord/property/index BDAs, surface index
-  slice, extent, property domain/value kind, encoding, scalar range, and
-  colormap index. It maps UVs to clip space and rasterizes the resident triangle
-  topology directly: vertex values interpolate, face values remain primitive
-  constant, discrete vertex labels choose the nearest corner, and edge values
-  choose the nearest triangle segment by exact UV-space point-to-segment
-  distance. Encodings are
-  raw values, encoded normals, RGBA colors, scalar colormaps, label palettes,
-  and linear scalar red-channel output. Runtime selects `R32_FLOAT`,
-  `RG32_FLOAT`, or `RGBA32_FLOAT` for raw scalar/vector data and `RGBA8_UNORM`
-  for explicit encoded output. Uncovered texels clear to alpha zero; normal
-  output clears to encoded `+Z`, while other output clears to zero. The recorder
-  validates handles, BDA alignment, triangulation, extent, range, and required
-  colormap. Encoded-RGBA output may provide one same-extent sampled/color-target
-  scratch texture and a generic dilation pipeline; the recorder ping-pongs one
-  fullscreen eight-neighbor dilation pass per padding texel while preserving
-  covered alpha-one texels. Missing dilation resources fail closed and no CPU
-  dilation fallback exists. It records barriers, render passes, draws, and the
-  final layout only—it does not acquire, submit, present, inspect ECS, or access
-  live assets, and no `Vk*` type crosses the graphics/RHI/runtime surfaces.
+- `Extrinsic.Graphics.PropertyTextureBake` is the graphics-owned UV raster
+  surface used by `Runtime.TextureBakeModule`. Runtime supplies copied indices,
+  resolved corner UVs, chart IDs and property buffers; the recorder consumes an
+  already-open command context and managed targets. Explicit custom UV bindings
+  therefore do not depend on the resident scene geometry's canonical UV layout.
+  Vertex values interpolate, face values remain constant, discrete vertex labels
+  choose a corner, and edge values use UV-space segment distance. Raw scalar and
+  vector data use float formats; explicit encodings use RGBA8.
+  The raster writes a separate R32F coverage attachment: positive chart IDs for
+  interior samples, negative IDs for gutter samples, zero for uncovered texels.
+  Coverage never comes from data alpha. Boundary-edge gutter draws use closest
+  chart selection within the requested padding distance and a depth attachment;
+  they support raw zero/negative values as well as encoded data. CPU reference
+  rasterization and coverage diagnostics test interpolation, overlap,
+  under-resolution and chart separation. Outputs retain one mip; filtering
+  footprints beyond the available gutter have no safety guarantee.
+  Graphics records barriers, passes and draws without acquiring, submitting,
+  presenting, inspecting ECS or accessing live asset services. No `Vk*` type
+  crosses the graphics/RHI/runtime interfaces.
   Normal, color, scalar, label, and vector sources differ only through property
   data and encoding values; there is no specialized normal recorder or shader.
 - `Extrinsic.Graphics.ComputeParallelPrimitives` owns the generic

@@ -316,6 +316,8 @@ TEST(SandboxEditorSession, StaleCopiedCommandSurfacesFailAfterDetachAndReattach)
     EXPECT_NE(staleUvState.RequestToken, 0u);
     EXPECT_FALSE(staleUvState.GpuReady);
     EXPECT_NE(staleUvState.Message.find("attachment expired"), std::string::npos);
+    ASSERT_TRUE(static_cast<bool>(staleParameterization.UvViewCommands.TextureTabs));
+    EXPECT_TRUE(staleParameterization.UvViewCommands.TextureTabs(1u).empty());
 
     attachment.Detach();
     engine.Shutdown();
@@ -2041,7 +2043,7 @@ TEST_F(EditorPointReadiness, UvFaceRingsCacheVerdictsAndPreserveErrorPriority)
     ASSERT_TRUE(mesh.AddTriangle(a,b,c));
     GS::PopulateFromMesh(Scene->Raw(), Entity, mesh);
     const Runtime::EditorUvRegenerationCommand command{
-        .StableEntityId = Keypoints.StableEntityId, .Resolution = 64u, .Padding = 2u};
+        .StableEntityId = Keypoints.StableEntityId, .Atlas = {.Resolution = 64u, .Padding = 2u}};
     const auto preview = [&] { return Runtime::PreviewEditorUvRegenerationCommand(Commands, command); };
     const std::string pending = "UV regeneration cannot use the selected entity: Checking mesh face rings. Wait for input validation.";
     const std::string invalidRing = "UV regeneration cannot use the selected entity: selected mesh has a face ring that is not a valid polygon";

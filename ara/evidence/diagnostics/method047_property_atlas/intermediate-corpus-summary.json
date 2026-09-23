@@ -1,0 +1,562 @@
+[
+  {
+    "case": "folded_grid-fast-staged-none",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 9.929435064146986,
+      "mean_conformal": 2.611997737328994,
+      "p95_conformal": 8.086732536871802,
+      "max_area": 5.454435969228705,
+      "mean_area": 1.544288022114656,
+      "texels_per_unit": 400.07919063199483,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "folded_grid-fast-staged-angle",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.0000021535164103,
+      "mean_conformal": 1.0000005342834979,
+      "p95_conformal": 1.0000013021646947,
+      "max_area": 1.000001949924437,
+      "mean_area": 1.0000004328082852,
+      "texels_per_unit": 506.99941414222474,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "folded_grid-fast-staged-area",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.00000215351641,
+      "mean_conformal": 1.0000005060041528,
+      "p95_conformal": 1.0000012817563146,
+      "max_area": 1.0000016003796246,
+      "mean_area": 1.0000004144668524,
+      "texels_per_unit": 506.9994291327911,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "folded_grid-fast-staged-both",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.0000019261643425,
+      "mean_conformal": 1.0000003614755606,
+      "p95_conformal": 1.0000009630817075,
+      "max_area": 1.0000016429680108,
+      "mean_area": 1.0000003262164774,
+      "texels_per_unit": 506.9994399286823,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "folded_grid-xatlas-angle",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.0011235837943842,
+      "mean_conformal": 1.001122383275698,
+      "p95_conformal": 1.0011225958304797,
+      "max_area": 1.0000011470195656,
+      "mean_area": 1.0000002764044131,
+      "texels_per_unit": 445.74993980798706,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "planar_grid-fast-staged-none",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 9.929435064146986,
+      "mean_conformal": 2.611997737328994,
+      "p95_conformal": 8.086732536871802,
+      "max_area": 5.454435969228705,
+      "mean_area": 1.544288022114656,
+      "texels_per_unit": 400.07919063199483,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "planar_grid-fast-staged-angle",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.0000021535164103,
+      "mean_conformal": 1.0000005342834979,
+      "p95_conformal": 1.0000013021646947,
+      "max_area": 1.000001949924437,
+      "mean_area": 1.0000004328082852,
+      "texels_per_unit": 506.99941414222474,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "planar_grid-fast-staged-area",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.00000215351641,
+      "mean_conformal": 1.0000005060041528,
+      "p95_conformal": 1.0000012817563146,
+      "max_area": 1.0000016003796246,
+      "mean_area": 1.0000004144668524,
+      "texels_per_unit": 506.9994291327911,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "planar_grid-fast-staged-both",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.0000019261643425,
+      "mean_conformal": 1.0000003614755606,
+      "p95_conformal": 1.0000009630817075,
+      "max_area": 1.0000016429680108,
+      "mean_area": 1.0000003262164774,
+      "texels_per_unit": 506.9994399286823,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "planar_grid-xatlas-angle",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.0011235837943842,
+      "mean_conformal": 1.001122383275698,
+      "p95_conformal": 1.0011225958304797,
+      "max_area": 1.0000011470195656,
+      "mean_area": 1.0000002764044131,
+      "texels_per_unit": 445.74993980798706,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "disconnected_triangles-fast-staged-none",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.0000000998584369,
+      "mean_conformal": 1.0000000766929362,
+      "p95_conformal": 1.0000000998584369,
+      "max_area": 1.0000000244532141,
+      "mean_area": 1.0000000244532137,
+      "texels_per_unit": 717.0055428522884,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "disconnected_triangles-fast-staged-angle",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.0000000998584369,
+      "mean_conformal": 1.0000000766929362,
+      "p95_conformal": 1.0000000998584369,
+      "max_area": 1.0000000244532141,
+      "mean_area": 1.0000000244532137,
+      "texels_per_unit": 717.0055428522884,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "disconnected_triangles-fast-staged-area",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.0000000998584369,
+      "mean_conformal": 1.0000000766929362,
+      "p95_conformal": 1.0000000998584369,
+      "max_area": 1.0000000244532141,
+      "mean_area": 1.0000000244532137,
+      "texels_per_unit": 717.0055428522884,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "disconnected_triangles-fast-staged-both",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.0000000998584369,
+      "mean_conformal": 1.0000000766929362,
+      "p95_conformal": 1.0000000998584369,
+      "max_area": 1.0000000244532141,
+      "mean_area": 1.0000000244532137,
+      "texels_per_unit": 717.0055428522884,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "disconnected_triangles-xatlas-angle",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.0000000594792176,
+      "mean_conformal": 1.0000000542084273,
+      "p95_conformal": 1.0000000594792176,
+      "max_area": 1.000050990998264,
+      "mean_area": 1.0000509896982894,
+      "texels_per_unit": 890.9772579446555,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "sculpt-fast-staged-none",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 9.982663048886835,
+      "mean_conformal": 3.0639851354344696,
+      "p95_conformal": 8.025058307383455,
+      "max_area": 8.95114468373964,
+      "mean_area": 1.91339307531933,
+      "texels_per_unit": 411.07457477708374,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "sculpt-fast-staged-angle",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.0505678345280631,
+      "mean_conformal": 1.0077380855498301,
+      "p95_conformal": 1.024556641541746,
+      "max_area": 1.3345478265051056,
+      "mean_area": 1.0557185478431057,
+      "texels_per_unit": 308.27502580491114,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "sculpt-fast-staged-area",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.3841388186617472,
+      "mean_conformal": 1.0500775818551171,
+      "p95_conformal": 1.1634307627364142,
+      "max_area": 1.0318585489596248,
+      "mean_area": 1.0027129890341018,
+      "texels_per_unit": 311.7925690240901,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "sculpt-fast-staged-both",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.216962026893136,
+      "mean_conformal": 1.026615960692386,
+      "p95_conformal": 1.0903319203515265,
+      "max_area": 1.1736171556531394,
+      "mean_area": 1.0239798905944806,
+      "texels_per_unit": 312.2332527411285,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "sculpt-xatlas-angle",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.288401092873081,
+      "mean_conformal": 1.029459821687807,
+      "p95_conformal": 1.1531532973277527,
+      "max_area": 1.2651223820999449,
+      "mean_area": 1.0399530517665436,
+      "texels_per_unit": 472.54542801610967,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "frog-fast-staged-none",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 9.983309087292936,
+      "mean_conformal": 3.232436824703715,
+      "p95_conformal": 7.4027258072495385,
+      "max_area": 9.65085693450835,
+      "mean_area": 1.8258100752805684,
+      "texels_per_unit": 4.537789216809713,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "frog-fast-staged-angle",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.741858792650158,
+      "mean_conformal": 1.012219129350289,
+      "p95_conformal": 1.0413608044382912,
+      "max_area": 4.559267173889642,
+      "mean_area": 1.1168089689009504,
+      "texels_per_unit": 4.38960017917002,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "frog-fast-staged-area",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 7.6229304512071305,
+      "mean_conformal": 1.0610793607730282,
+      "p95_conformal": 1.2028374927362784,
+      "max_area": 1.0601685950419844,
+      "mean_area": 1.0037872273071695,
+      "texels_per_unit": 4.229955221151661,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "frog-fast-staged-both",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.6370809736464682,
+      "mean_conformal": 1.03399878324283,
+      "p95_conformal": 1.1096526225047925,
+      "max_area": 1.3530084352880614,
+      "mean_area": 1.0259824424174786,
+      "texels_per_unit": 4.223194979131785,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "frog-xatlas-angle",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.2018732612851784,
+      "mean_conformal": 1.0104210976096455,
+      "p95_conformal": 1.0315989516866646,
+      "max_area": 3.146610345766511,
+      "mean_area": 1.0827796676770618,
+      "texels_per_unit": 6.203492930150308,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "fandisk-fast-staged-none",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 9.987581440258518,
+      "mean_conformal": 3.252042466875248,
+      "p95_conformal": 8.08302655622291,
+      "max_area": 8.442977403780231,
+      "mean_area": 1.890460723721952,
+      "texels_per_unit": 93.65089967758917,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "fandisk-fast-staged-angle",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.0037408180414915,
+      "mean_conformal": 1.0002010550135432,
+      "p95_conformal": 1.0012286126029268,
+      "max_area": 1.0255378754303563,
+      "mean_area": 1.001313153150694,
+      "texels_per_unit": 74.98456451858783,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "fandisk-fast-staged-area",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.0304913622019656,
+      "mean_conformal": 1.0011141299564321,
+      "p95_conformal": 1.0079369364069488,
+      "max_area": 1.0029451959645945,
+      "mean_area": 1.0001273953595846,
+      "texels_per_unit": 74.98265172454785,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "fandisk-fast-staged-both",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.015325803845367,
+      "mean_conformal": 1.000657317916814,
+      "p95_conformal": 1.004581119041218,
+      "max_area": 1.014459261944738,
+      "mean_area": 1.0005558265878502,
+      "texels_per_unit": 74.97945552605597,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "fandisk-xatlas-angle",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.2215330880645854,
+      "mean_conformal": 1.013866901538376,
+      "p95_conformal": 1.08870661574587,
+      "max_area": 1.1693456780266038,
+      "mean_area": 1.0138546921870197,
+      "texels_per_unit": 114.5825929975012,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "dolphin-fast-staged-none",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 9.985653585965755,
+      "mean_conformal": 3.5785521022348554,
+      "p95_conformal": 8.05656578804199,
+      "max_area": 7.748799911810798,
+      "mean_area": 1.7256290874328806,
+      "texels_per_unit": 1020.6606921726052,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "dolphin-fast-staged-angle",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.2618528951195562,
+      "mean_conformal": 1.0097805960352755,
+      "p95_conformal": 1.030724468721317,
+      "max_area": 2.3481356787130108,
+      "mean_area": 1.109413422809273,
+      "texels_per_unit": 799.0672789871344,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "dolphin-fast-staged-area",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.382624707508168,
+      "mean_conformal": 1.0208728708154124,
+      "p95_conformal": 1.0589980942667323,
+      "max_area": 1.0682544082330843,
+      "mean_area": 1.0039864105622094,
+      "texels_per_unit": 789.184833325202,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "dolphin-fast-staged-both",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 1.2417083173992416,
+      "mean_conformal": 1.013637078338722,
+      "p95_conformal": 1.0376170986956381,
+      "max_area": 1.1818368281769072,
+      "mean_area": 1.0096540148044388,
+      "texels_per_unit": 788.8568292720724,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  },
+  {
+    "case": "dolphin-xatlas-angle",
+    "passed": true,
+    "status": "success",
+    "audit": {
+      "passed": true,
+      "region_crossings": 0,
+      "max_conformal": 4.257537630291191,
+      "mean_conformal": 1.019327988508602,
+      "p95_conformal": 1.055389086550779,
+      "max_area": 2.929721444358677,
+      "mean_area": 1.0467796909479938,
+      "texels_per_unit": 1031.0562940546974,
+      "overlap_check": "independent native BVH validator; no Python all-pairs pass"
+    }
+  }
+]

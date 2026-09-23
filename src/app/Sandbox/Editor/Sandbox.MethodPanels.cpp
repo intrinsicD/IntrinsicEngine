@@ -15,6 +15,7 @@ module;
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -539,12 +540,33 @@ namespace Extrinsic::Sandbox::Editor
                 LastResult{};
             std::string VisualizationDiagnostic{};
             float SplitRatio{0.42f};
-            float Zoom{1.0f};
-            glm::vec2 Pan{0.0f};
+            // Pan/zoom per mesh, shared by every tab and by both UV panes.
+            struct UvNavigation
+            {
+                float Zoom{1.0f};
+                glm::vec2 Pan{0.0f};
+            };
+            std::unordered_map<std::uint32_t, UvNavigation> Navigation{};
             std::optional<
                 Runtime::EditorParameterizationUvViewState>
                 LastUvViewState{};
+            std::optional<Runtime::EditorUvRegenerationCommandResult>
+                LastAtlasResult{};
+            // Result signatures already considered for auto-opening, so a
+            // closed workspace is not reopened by the same result.
+            std::optional<std::string> SeenAtlasResult{};
+            std::optional<std::string> SeenParameterizationResult{};
+            // Live divider position while dragging; persisted on release.
+            std::optional<float> DraggingSplitRatio{};
+            std::optional<Runtime::RuntimeEngineConfigApplyResult>
+                LastWorkspaceConfigResult{};
+            int UvViewSubmitFrame{-1};
+            int WorkspaceDrawFrame{-100};
+            std::uint64_t FrameObserver{0u};
         };
+
+        static constexpr std::string_view kAtlasWorkspaceWindowId =
+            "mesh.uv_atlas_workspace";
 
         EditorShell* Shell{nullptr};
         std::vector<Runtime::EditorWindowHandle> Handles{};
@@ -615,6 +637,8 @@ namespace Extrinsic::Sandbox::Editor
             {
                 for (const Runtime::EditorWindowHandle handle : Handles)
                     (void)Shell->UnregisterEditorWindow(handle);
+                if (Parameterization.FrameObserver != 0u)
+                    Shell->RemoveFrameObserver(Parameterization.FrameObserver);
             }
             Handles.clear();
             Shell = nullptr;
@@ -750,6 +774,25 @@ namespace Extrinsic::Sandbox::Editor
                             DrawParameterizationWindow(open, context);
                         },
                 }));
+            Handles.push_back(Shell->RegisterEditorWindow(
+                EditorWindowDescriptor{
+                    .Id = std::string{kAtlasWorkspaceWindowId},
+                    .MenuPath = {"Mesh"},
+                    .Title = "UV Atlas Workspace",
+                    .OpenByDefault = false,
+                    .Draw =
+                        [this](
+                            bool& open,
+                            const SandboxEditorContext& context)
+                        {
+                            DrawAtlasWorkspaceWindow(open, context);
+                        },
+                }));
+            Parameterization.FrameObserver = Shell->AddFrameObserver(
+                [this](const SandboxEditorContext& context)
+                {
+                    ObserveAtlasResults(context);
+                });
         }
 
         void RegisterPointSetConsolidationWindow(
@@ -2820,14 +2863,7 @@ namespace Extrinsic::Sandbox::Editor
             const auto configReadiness = Runtime::ResolveEditorProcessingActionReadiness(
                 context.Parameterization.Commands, {true, {}});
             if (DrawProcessingActionButton("Apply configuration##Parameterization", configReadiness))
-            {
-                Parameterization.LastConfigResult =
-                    Runtime::ApplyEditorParameterizationConfig(
-                        context.Parameterization.Commands, Parameterization.Draft,
-                        "sandbox.parameterization.panel");
-                if (Parameterization.LastConfigResult->Succeeded())
-                    Parameterization.Dirty = false;
-            }
+                Parameterization.LastConfigResult = ApplyParameterizationDraft(context);
             ImGui::SameLine();
             if (ImGui::Button("Reload active##Parameterization"))
             {
@@ -2846,6 +2882,9 @@ namespace Extrinsic::Sandbox::Editor
                 {model.HasSelectedEntity && model.SelectedEntityIsMesh, model.Message});
             if (DrawProcessingActionButton("Parameterize selected mesh##Parameterization", readiness))
             {
+                PreserveWorkspaceLayout(
+                    Parameterization.Draft,
+                    Runtime::GetEditorParameterizationConfig(context.Parameterization.Commands));
                 SandboxParameterizationPanelActionResult action =
                     ApplySandboxParameterizationPanelAction(
                         context,
@@ -2921,6 +2960,7 @@ namespace Extrinsic::Sandbox::Editor
                         context.Parameterization.ResultSinks.DismissResult();
                 }
             }
+            DrawAtlasGenerationSection(context, model, domainModel.PropertyCatalog);
         }
 
         static ImVec2 ToImVec2(const glm::vec2 value) noexcept
@@ -2928,19 +2968,116 @@ namespace Extrinsic::Sandbox::Editor
             return ImVec2{value.x, value.y};
         }
 
+        [[nodiscard]] static bool TextureTabDisplayable(
+            const Runtime::EditorParameterizationTextureTab& tab) noexcept
+        {
+            return tab.State == Runtime::EditorParameterizationTextureState::Ready;
+        }
+
+        [[nodiscard]] static const char* TextureTabStateLabel(
+            const Runtime::EditorParameterizationTextureTab& tab) noexcept
+        {
+            using State = Runtime::EditorParameterizationTextureState;
+            switch (tab.State)
+            {
+            case State::Ready: return "ready";
+            case State::Pending: return "pending";
+            case State::Failed: return "failed";
+            case State::Stale: return "stale";
+            case State::Unavailable: return "unavailable";
+            }
+            return "unavailable";
+        }
+
+        [[nodiscard]] static const char* TextureTabColormapLabel(
+            const std::uint32_t colormap) noexcept
+        {
+            return colormap < kColormapNames.size() ? kColormapNames[colormap] : "unknown";
+        }
+
+        static void DrawCpuUvLayout(
+            ImDrawList& drawList,
+            const SandboxParameterizationUvProjection& projection,
+            const Runtime::ParameterizationUvBackgroundMode background)
+        {
+            const bool showGrid =
+                background == Runtime::ParameterizationUvBackgroundMode::Grid;
+            if (!showGrid)
+            {
+                constexpr std::uint32_t kCheckerCount = 10u;
+                for (std::uint32_t y = 0u; y < kCheckerCount; ++y)
+                {
+                    for (std::uint32_t x = 0u; x < kCheckerCount; ++x)
+                    {
+                        const glm::vec2 p0 = ProjectSandboxParameterizationUvPoint(
+                            projection,
+                            {static_cast<float>(x) / static_cast<float>(kCheckerCount),
+                             static_cast<float>(y) / static_cast<float>(kCheckerCount)});
+                        const glm::vec2 p1 = ProjectSandboxParameterizationUvPoint(
+                            projection,
+                            {static_cast<float>(x + 1u) / static_cast<float>(kCheckerCount),
+                             static_cast<float>(y + 1u) / static_cast<float>(kCheckerCount)});
+                        if (!IsFiniteVec2(p0) || !IsFiniteVec2(p1))
+                            continue;
+                        drawList.AddRectFilled(
+                            ImVec2{std::min(p0.x, p1.x), std::min(p0.y, p1.y)},
+                            ImVec2{std::max(p0.x, p1.x), std::max(p0.y, p1.y)},
+                            ((x + y) & 1u) == 0u
+                                ? IM_COL32(53, 57, 66, 255)
+                                : IM_COL32(36, 40, 47, 255));
+                    }
+                }
+            }
+            else
+            {
+                for (std::uint32_t index = 0u; index <= 10u; ++index)
+                {
+                    const float t = static_cast<float>(index) / 10.0f;
+                    const glm::vec2 vertical0 = ProjectSandboxParameterizationUvPoint(projection, {t, 0.0f});
+                    const glm::vec2 vertical1 = ProjectSandboxParameterizationUvPoint(projection, {t, 1.0f});
+                    const glm::vec2 horizontal0 = ProjectSandboxParameterizationUvPoint(projection, {0.0f, t});
+                    const glm::vec2 horizontal1 = ProjectSandboxParameterizationUvPoint(projection, {1.0f, t});
+                    if (!IsFiniteVec2(vertical0) || !IsFiniteVec2(vertical1) ||
+                        !IsFiniteVec2(horizontal0) || !IsFiniteVec2(horizontal1))
+                    {
+                        continue;
+                    }
+                    const ImU32 color = index == 0u || index == 10u
+                        ? IM_COL32(121, 129, 146, 190)
+                        : IM_COL32(91, 98, 112, 100);
+                    drawList.AddLine(ToImVec2(vertical0), ToImVec2(vertical1), color);
+                    drawList.AddLine(ToImVec2(horizontal0), ToImVec2(horizontal1), color);
+                }
+            }
+
+            for (const auto& triangle : projection.Triangles)
+            {
+                const ImVec2 a = ToImVec2(projection.Vertices[triangle[0]]);
+                const ImVec2 b = ToImVec2(projection.Vertices[triangle[1]]);
+                const ImVec2 c = ToImVec2(projection.Vertices[triangle[2]]);
+                drawList.AddTriangleFilled(a, b, c, IM_COL32(66, 145, 214, 52));
+                drawList.AddTriangle(a, b, c, IM_COL32(113, 190, 255, 220), 1.25f);
+            }
+            for (const glm::vec2 vertex : projection.Vertices)
+                drawList.AddCircleFilled(ToImVec2(vertex), 2.0f, IM_COL32(225, 240, 255, 235));
+        }
+
+        // The one UV canvas used by the Parameterize (UV) window and the atlas
+        // workspace. Pan/zoom are per mesh and drive both the CPU projection
+        // and the GPU view window, so the two paths always agree.
         void DrawParameterizationUvPane(
             const SandboxEditorContext& context,
-            const Runtime::EditorParameterizationViewModel& model)
+            Runtime::EditorParameterizationViewModel model,
+            const std::optional<Runtime::EditorParameterizationTextureTab>& textureTab)
         {
-            ImGui::TextUnformatted("UV layout");
+            ParameterizationState::UvNavigation& navigation =
+                Parameterization.Navigation[model.SelectedStableEntityId];
+            ImGui::TextUnformatted(textureTab.has_value() ? textureTab->Name.c_str() : "UV layout");
             ImGui::SameLine();
             if (ImGui::SmallButton("Fit##ParameterizationUv"))
-            {
-                Parameterization.Zoom = 1.0f;
-                Parameterization.Pan = glm::vec2{0.0f};
-            }
+                navigation = {};
             ImGui::SameLine();
-            ImGui::TextDisabled("%.0f%%", Parameterization.Zoom * 100.0f);
+            ImGui::TextDisabled("%.0f%%", navigation.Zoom * 100.0f);
             if (Parameterization.LastUvViewState.has_value())
             {
                 ImGui::SameLine();
@@ -2950,228 +3087,555 @@ namespace Extrinsic::Sandbox::Editor
                         Parameterization.LastUvViewState->Status),
                     ParameterizationUvBackgroundModeLabel(
                         Parameterization.LastUvViewState->ActiveBackground),
-                    Parameterization.LastUvViewState->HeatmapActive
-                        ? " / heatmap"
-                        : "");
-                if (ImGui::IsItemHovered() &&
-                    !Parameterization.LastUvViewState->Message.empty())
-                {
-                    ImGui::SetTooltip(
-                        "%s",
-                        Parameterization.LastUvViewState->Message.c_str());
-                }
+                    Parameterization.LastUvViewState->HeatmapActive ? " / heatmap" : "");
+                if (ImGui::IsItemHovered() && !Parameterization.LastUvViewState->Message.empty())
+                    ImGui::SetTooltip("%s", Parameterization.LastUvViewState->Message.c_str());
             }
 
             const ImVec2 canvasMin = ImGui::GetCursorScreenPos();
             ImVec2 canvasSize = ImGui::GetContentRegionAvail();
             canvasSize.x = std::max(canvasSize.x, 80.0f);
             canvasSize.y = std::max(canvasSize.y, 80.0f);
-            Runtime::EditorParameterizationUvViewState uvView =
+            ImGui::InvisibleButton("##ParameterizationUvCanvas", canvasSize);
+            const bool hovered = ImGui::IsItemHovered();
+            const ImGuiIO& io = ImGui::GetIO();
+            if (hovered && (ImGui::IsMouseDragging(ImGuiMouseButton_Middle) ||
+                            ImGui::IsMouseDragging(ImGuiMouseButton_Right)))
+            {
+                navigation.Pan += glm::vec2{io.MouseDelta.x, io.MouseDelta.y};
+            }
+            if (hovered && io.MouseWheel != 0.0f)
+            {
+                const float oldZoom = navigation.Zoom;
+                navigation.Zoom = std::clamp(oldZoom * std::pow(1.15f, io.MouseWheel), 0.1f, 40.0f);
+                const glm::vec2 paneCenter{canvasMin.x + canvasSize.x * 0.5f,
+                                           canvasMin.y + canvasSize.y * 0.5f};
+                const glm::vec2 cursorOffset =
+                    glm::vec2{io.MousePos.x, io.MousePos.y} - paneCenter - navigation.Pan;
+                navigation.Pan += cursorOffset * (1.0f - navigation.Zoom / oldZoom);
+            }
+
+            const ImVec2 canvasMax{canvasMin.x + canvasSize.x, canvasMin.y + canvasSize.y};
+            const SandboxParameterizationUvProjection projection =
+                BuildSandboxParameterizationUvProjection(
+                    model,
+                    SandboxParameterizationUvPane{
+                        .Min = {canvasMin.x, canvasMin.y},
+                        .Max = {canvasMax.x, canvasMax.y},
+                        .Padding = 24.0f,
+                        .Zoom = navigation.Zoom,
+                        .Pan = navigation.Pan,
+                        .IncludeUnitSquare = true,
+                    });
+            if (projection.Valid)
+            {
+                // UV at the canvas centre and the vertical half extent of the
+                // same projection the CPU path draws below.
+                const float pixelsPerUv = projection.Scale * projection.Zoom;
+                model.ViewCenter = projection.UvCenter +
+                                   glm::vec2{-projection.Pan.x, projection.Pan.y} / pixelsPerUv;
+                model.ViewHalfExtent = 0.5f * canvasSize.y / pixelsPerUv;
+            }
+            model.Texture.reset();
+            if (textureTab.has_value() && TextureTabDisplayable(*textureTab))
+            {
+                model.Texture = textureTab;
+                model.View.RenderMode = Runtime::ParameterizationUvRenderMode::GpuShaded;
+                if (model.LineIndices.empty())
+                    for (const auto& t : model.Triangles)
+                        model.LineIndices.insert(model.LineIndices.end(), {t[0], t[1], t[1], t[2], t[2], t[0]});
+            }
+
+            const Runtime::EditorParameterizationUvViewState uvView =
                 Runtime::SubmitEditorParameterizationUvView(
                     context.Parameterization.UvViewCommands,
                     model,
                     static_cast<std::uint32_t>(canvasSize.x),
                     static_cast<std::uint32_t>(canvasSize.y));
             Parameterization.LastUvViewState = uvView;
-            ImGui::InvisibleButton(
-                "##ParameterizationUvCanvas",
-                canvasSize);
-            const bool hovered = ImGui::IsItemHovered();
-            if (!uvView.GpuReady && hovered &&
-                ImGui::IsMouseDragging(ImGuiMouseButton_Middle))
-            {
-                const ImVec2 delta = ImGui::GetIO().MouseDelta;
-                Parameterization.Pan += glm::vec2{delta.x, delta.y};
-            }
-            if (!uvView.GpuReady && hovered &&
-                ImGui::GetIO().MouseWheel != 0.0f)
-            {
-                const float oldZoom = Parameterization.Zoom;
-                const float factor = std::pow(
-                    1.15f,
-                    ImGui::GetIO().MouseWheel);
-                Parameterization.Zoom = std::clamp(
-                    oldZoom * factor,
-                    0.1f,
-                    20.0f);
-                const ImVec2 mouse = ImGui::GetIO().MousePos;
-                const glm::vec2 paneCenter{
-                    canvasMin.x + canvasSize.x * 0.5f,
-                    canvasMin.y + canvasSize.y * 0.5f,
-                };
-                const glm::vec2 cursorOffset =
-                    glm::vec2{mouse.x, mouse.y} - paneCenter -
-                    Parameterization.Pan;
-                Parameterization.Pan +=
-                    cursorOffset *
-                    (1.0f - Parameterization.Zoom / oldZoom);
-            }
+            Parameterization.UvViewSubmitFrame = ImGui::GetFrameCount();
 
             ImDrawList* drawList = ImGui::GetWindowDrawList();
-            const ImVec2 canvasMax{
-                canvasMin.x + canvasSize.x,
-                canvasMin.y + canvasSize.y,
-            };
-            drawList->AddRectFilled(
-                canvasMin,
-                canvasMax,
-                IM_COL32(24, 27, 32, 255));
+            drawList->AddRectFilled(canvasMin, canvasMax, IM_COL32(24, 27, 32, 255));
             drawList->PushClipRect(canvasMin, canvasMax, true);
+            std::string overlay{};
             if (uvView.GpuReady)
             {
-                drawList->AddImage(
-                    static_cast<ImTextureID>(uvView.BindlessIndex),
-                    canvasMin,
-                    canvasMax);
+                drawList->AddImage(static_cast<ImTextureID>(uvView.BindlessIndex), canvasMin, canvasMax);
+            }
+            else if (projection.Valid)
+            {
+                DrawCpuUvLayout(*drawList, projection, uvView.ActiveBackground);
             }
             else
             {
-                const bool showGrid =
-                    uvView.ActiveBackground ==
-                    ParameterizationUvBackgroundMode::Grid;
-                const bool showChecker = !showGrid;
-                const SandboxParameterizationUvProjection projection =
-                    BuildSandboxParameterizationUvProjection(
-                        model,
-                        SandboxParameterizationUvPane{
-                            .Min = {canvasMin.x, canvasMin.y},
-                            .Max = {canvasMax.x, canvasMax.y},
-                            .Padding = 24.0f,
-                            .Zoom = Parameterization.Zoom,
-                            .Pan = Parameterization.Pan,
-                            .IncludeUnitSquare = true,
-                        });
-                if (projection.Valid)
-                {
-                    if (showChecker)
-                    {
-                        constexpr std::uint32_t kCheckerCount = 10u;
-                        for (std::uint32_t y = 0u; y < kCheckerCount; ++y)
-                        {
-                            for (std::uint32_t x = 0u; x < kCheckerCount; ++x)
-                            {
-                                const glm::vec2 uv0{
-                                    static_cast<float>(x) /
-                                        static_cast<float>(kCheckerCount),
-                                    static_cast<float>(y) /
-                                        static_cast<float>(kCheckerCount),
-                                };
-                                const glm::vec2 uv1{
-                                    static_cast<float>(x + 1u) /
-                                        static_cast<float>(kCheckerCount),
-                                    static_cast<float>(y + 1u) /
-                                        static_cast<float>(kCheckerCount),
-                                };
-                                const glm::vec2 p0 =
-                                    ProjectSandboxParameterizationUvPoint(
-                                        projection,
-                                        uv0);
-                                const glm::vec2 p1 =
-                                    ProjectSandboxParameterizationUvPoint(
-                                        projection,
-                                        uv1);
-                                if (!IsFiniteVec2(p0) || !IsFiniteVec2(p1))
-                                    continue;
-                                drawList->AddRectFilled(
-                                    ImVec2{
-                                        std::min(p0.x, p1.x),
-                                        std::min(p0.y, p1.y),
-                                    },
-                                    ImVec2{
-                                        std::max(p0.x, p1.x),
-                                        std::max(p0.y, p1.y),
-                                    },
-                                    ((x + y) & 1u) == 0u
-                                        ? IM_COL32(53, 57, 66, 255)
-                                        : IM_COL32(36, 40, 47, 255));
-                            }
-                        }
-                    }
-                    if (showGrid)
-                    {
-                        for (std::uint32_t index = 0u; index <= 10u; ++index)
-                        {
-                            const float t = static_cast<float>(index) / 10.0f;
-                            const glm::vec2 vertical0 =
-                                ProjectSandboxParameterizationUvPoint(
-                                    projection,
-                                    {t, 0.0f});
-                            const glm::vec2 vertical1 =
-                                ProjectSandboxParameterizationUvPoint(
-                                    projection,
-                                    {t, 1.0f});
-                            const glm::vec2 horizontal0 =
-                                ProjectSandboxParameterizationUvPoint(
-                                    projection,
-                                    {0.0f, t});
-                            const glm::vec2 horizontal1 =
-                                ProjectSandboxParameterizationUvPoint(
-                                    projection,
-                                    {1.0f, t});
-                            if (!IsFiniteVec2(vertical0) ||
-                                !IsFiniteVec2(vertical1) ||
-                                !IsFiniteVec2(horizontal0) ||
-                                !IsFiniteVec2(horizontal1))
-                            {
-                                continue;
-                            }
-                            const ImU32 color = index == 0u || index == 10u
-                                ? IM_COL32(121, 129, 146, 190)
-                                : IM_COL32(91, 98, 112, 100);
-                            drawList->AddLine(
-                                ToImVec2(vertical0),
-                                ToImVec2(vertical1),
-                                color);
-                            drawList->AddLine(
-                                ToImVec2(horizontal0),
-                                ToImVec2(horizontal1),
-                                color);
-                        }
-                    }
-
-                    for (const auto& triangle : projection.Triangles)
-                    {
-                        const ImVec2 a =
-                            ToImVec2(projection.Vertices[triangle[0]]);
-                        const ImVec2 b =
-                            ToImVec2(projection.Vertices[triangle[1]]);
-                        const ImVec2 c =
-                            ToImVec2(projection.Vertices[triangle[2]]);
-                        drawList->AddTriangleFilled(
-                            a, b, c, IM_COL32(66, 145, 214, 52));
-                        drawList->AddTriangle(
-                            a,
-                            b,
-                            c,
-                            IM_COL32(113, 190, 255, 220),
-                            1.25f);
-                    }
-                    for (const glm::vec2 vertex : projection.Vertices)
-                    {
-                        drawList->AddCircleFilled(
-                            ToImVec2(vertex),
-                            2.0f,
-                            IM_COL32(225, 240, 255, 235));
-                    }
-                }
-                else
-                {
-                    const std::string& message = projection.Message.empty()
-                        ? model.Message
-                        : projection.Message;
-                    drawList->AddText(
-                        ImVec2{canvasMin.x + 12.0f, canvasMin.y + 12.0f},
-                        IM_COL32(170, 176, 188, 255),
-                        message.empty()
-                            ? "Parameterize the selected mesh to populate UVs."
-                            : message.c_str());
-                }
+                overlay = projection.Message.empty() ? model.Message : projection.Message;
+                if (overlay.empty())
+                    overlay = "Parameterize the selected mesh to populate UVs.";
+            }
+            // Never present source or interpolated values as baked texels:
+            // a texture tab shows texels only through a fresh GPU binding.
+            if (textureTab.has_value() && overlay.empty())
+            {
+                if (textureTab->State == Runtime::EditorParameterizationTextureState::Stale)
+                    overlay = "Stale bake of an earlier atlas; not overlaid on this layout. Re-bake to refresh.";
+                else if (textureTab->State != Runtime::EditorParameterizationTextureState::Ready)
+                    overlay = textureTab->Diagnostic.empty()
+                        ? std::string{"Bake pending."}
+                        : textureTab->Diagnostic;
+                else if (!uvView.GpuReady)
+                    overlay = "Baked texels need the GPU UV view (Render mode: GPU shaded); "
+                              "the CPU layout shows the atlas wireframe only.";
+            }
+            if (!overlay.empty())
+            {
+                drawList->AddText(ImVec2{canvasMin.x + 12.0f, canvasMin.y + 12.0f},
+                                  IM_COL32(230, 200, 120, 255), overlay.c_str());
             }
             drawList->PopClipRect();
-            drawList->AddRect(
-                canvasMin,
-                canvasMax,
-                IM_COL32(90, 96, 108, 255));
+            drawList->AddRect(canvasMin, canvasMax, IM_COL32(90, 96, 108, 255));
+        }
+
+        [[nodiscard]] static bool AcceptsAtlasGuide(const Runtime::GeometryPropertyRef& ref)
+        {
+            return ref.Domain == Runtime::GeometryElementDomain::MeshVertex ||
+                   ref.Domain == Runtime::GeometryElementDomain::MeshFace;
+        }
+
+        // Persisted atlas settings; the draft is applied through the shared
+        // validated config path before any generation uses it.
+        bool DrawParameterizationAtlasControls(
+            Runtime::ParameterizationAtlasConfig& atlas,
+            const Runtime::EditorPropertyCatalogModel& catalog)
+        {
+            using Method = Geometry::UvAtlas::UvAtlasMethod;
+            using Distortion = Geometry::UvAtlas::UvAtlasDistortion;
+            bool changed = false;
+            // Only requestable generators; None/Authored are outcomes.
+            constexpr std::array methods{Method::FastStaged, Method::XAtlas};
+            constexpr std::array objectives{
+                Distortion::None, Distortion::Angle, Distortion::Area, Distortion::Both};
+            const bool methodChanged = DrawParameterizationChoice("Method##Atlas", atlas.Method, methods,
+                                                                  SandboxUvAtlasMethodLabel);
+            changed |= methodChanged;
+            if (methodChanged && atlas.Method == Method::XAtlas) atlas.Distortion = Distortion::Angle;
+            if (atlas.Method == Method::XAtlas)
+                ImGui::TextDisabled("Distortion objective: angle (xatlas)");
+            else
+                changed |= DrawParameterizationChoice("Distortion objective##Atlas", atlas.Distortion,
+                                                       objectives, SandboxUvAtlasDistortionLabel);
+            changed |= ImGui::Checkbox("Allow xatlas fallback##Atlas", &atlas.AllowXAtlasFallback);
+
+            bool guided = atlas.Guide.has_value();
+            if (ImGui::Checkbox("Guide regions by a scalar property##Atlas", &guided))
+            {
+                if (guided)
+                    atlas.Guide = Runtime::GeometryPropertyRef{
+                        Runtime::GeometryElementDomain::MeshVertex, "", Geometry::PropertyValueKind::Float};
+                else
+                    atlas.Guide.reset();
+                changed = true;
+            }
+            if (atlas.Guide.has_value())
+            {
+                changed |= DrawProcessingPropertyInput("Guide property##Atlas", catalog, *atlas.Guide,
+                                                       &AcceptsAtlasGuide, 1u);
+                if (atlas.Guide->Name.empty())
+                    ImGui::TextDisabled("Select any scalar vertex or face property (e.g. curvature).");
+            }
+            changed |= DrawParameterizationU32("Regions (0 = automatic)##Atlas", atlas.RegionCount);
+            changed |= DrawParameterizationU32("Resolution##Atlas", atlas.Resolution);
+            changed |= DrawParameterizationU32("Padding##Atlas", atlas.Padding);
+            changed |= ImGui::InputFloat("Texels per unit (0 = fit)##Atlas", &atlas.TexelsPerUnit, 0.0f, 0.0f, "%.3f");
+            changed |= ImGui::InputDouble("Max conformal distortion##Atlas", &atlas.MaxConformalDistortion, 0.0, 0.0, "%.3f");
+            changed |= ImGui::InputDouble("Max area distortion##Atlas", &atlas.MaxAreaDistortion, 0.0, 0.0, "%.3f");
+            changed |= DrawParameterizationU32("Max charts##Atlas", atlas.MaxCharts);
+            changed |= DrawParameterizationU32("Max iterations##Atlas", atlas.MaxIterations);
+            if (const std::optional<std::string> invalid =
+                    Runtime::ValidateParameterizationAtlasConfig(atlas))
+            {
+                ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.45f, 1.0f), "Invalid: %s", invalid->c_str());
+            }
+            return changed;
+        }
+
+        // Split fields belong to the workspace; a controls draft never
+        // reverts a layout the user changed there meanwhile.
+        static void PreserveWorkspaceLayout(
+            Runtime::ParameterizationConfig& draft,
+            const std::optional<Runtime::ParameterizationConfig>& active) noexcept
+        {
+            if (!active.has_value())
+                return;
+            draft.View.SplitEnabled = active->View.SplitEnabled;
+            draft.View.AtlasOnLeft = active->View.AtlasOnLeft;
+            draft.View.SplitRatio = active->View.SplitRatio;
+        }
+
+        [[nodiscard]] Runtime::RuntimeEngineConfigApplyResult ApplyParameterizationDraft(
+            const SandboxEditorContext& context)
+        {
+            PreserveWorkspaceLayout(
+                Parameterization.Draft,
+                Runtime::GetEditorParameterizationConfig(context.Parameterization.Commands));
+            Runtime::RuntimeEngineConfigApplyResult result =
+                Runtime::ApplyEditorParameterizationConfig(
+                    context.Parameterization.Commands, Parameterization.Draft,
+                    "sandbox.parameterization.panel");
+            if (result.Succeeded())
+                Parameterization.Dirty = false;
+            return result;
+        }
+
+        void SubmitAtlasGeneration(
+            const SandboxEditorContext& context,
+            const std::uint32_t entity,
+            const Runtime::ParameterizationAtlasConfig& atlas)
+        {
+            if (context.Parameterization.ResultSinks.DismissUvRegenerationResult)
+                context.Parameterization.ResultSinks.DismissUvRegenerationResult();
+            // A queued job returns Pending and reports its outcome through the
+            // session sink; the observer auto-opens the workspace on success.
+            Parameterization.LastAtlasResult = Runtime::ApplyEditorUvRegenerationCommand(
+                context.Parameterization.Commands,
+                Runtime::EditorUvRegenerationCommand{
+                    .StableEntityId = entity,
+                    .PreserveValidAuthoredUvs = false,
+                    .ForceRegenerate = true,
+                    .Atlas = atlas,
+                },
+                context.Parameterization.ResultSinks.UvRegeneration);
+        }
+
+        void DrawAtlasGenerationSection(
+            const SandboxEditorContext& context,
+            const Runtime::EditorParameterizationViewModel& model,
+            const Runtime::EditorPropertyCatalogModel& catalog)
+        {
+            ImGui::SeparatorText("Atlas generation");
+            Parameterization.Dirty |= DrawParameterizationAtlasControls(Parameterization.Draft.Atlas, catalog);
+            const bool atlasValid =
+                !Runtime::ValidateParameterizationAtlasConfig(Parameterization.Draft.Atlas).has_value();
+            const Runtime::EditorUvRegenerationCommand preview{
+                .StableEntityId = model.SelectedStableEntityId,
+                .ForceRegenerate = true,
+                .Atlas = Parameterization.Draft.Atlas,
+            };
+            Runtime::ActionReadiness readiness = Runtime::PreviewEditorUvRegenerationCommand(
+                context.Parameterization.Commands, preview);
+            ImGui::BeginDisabled(!atlasValid);
+            if (DrawProcessingActionButton("Generate atlas for selected mesh##Atlas", readiness))
+            {
+                // Generation always consumes applied, validated config.
+                Parameterization.LastConfigResult = ApplyParameterizationDraft(context);
+                if (Parameterization.LastConfigResult->Succeeded())
+                {
+                    if (const auto active =
+                            Runtime::GetEditorParameterizationConfig(context.Parameterization.Commands))
+                    {
+                        SubmitAtlasGeneration(context, model.SelectedStableEntityId, active->Atlas);
+                    }
+                }
+            }
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            if (ImGui::Button("Open mesh | UV workspace##Atlas") && Shell != nullptr)
+                (void)Shell->SetEditorWindowOpen(kAtlasWorkspaceWindowId, true);
+            if (context.Parameterization.Results.LastUvRegenerationResult.has_value())
+                Parameterization.LastAtlasResult = *context.Parameterization.Results.LastUvRegenerationResult;
+            if (Parameterization.LastAtlasResult.has_value())
+                DrawSandboxUvAtlasResult(*Parameterization.LastAtlasResult);
+        }
+
+        [[nodiscard]] static std::string AtlasResultSignature(
+            const Runtime::EditorUvRegenerationCommandResult& result)
+        {
+            return std::to_string(static_cast<int>(result.Status)) + ':' +
+                   std::to_string(static_cast<int>(result.UvStatus)) + ':' +
+                   std::to_string(result.StableEntityId) + ':' + std::to_string(result.AtlasWidth) + 'x' +
+                   std::to_string(result.AtlasHeight) + ':' + std::to_string(result.ChartCount) + ':' +
+                   std::to_string(result.SeamSplitVertexCount) + ':' + result.Diagnostic;
+        }
+
+        [[nodiscard]] static std::string ParameterizationResultSignature(
+            const Runtime::EditorParameterizationResult& result)
+        {
+            return std::to_string(static_cast<int>(result.Status)) + ':' +
+                   std::to_string(result.StableEntityId) + ':' +
+                   std::to_string(result.DiagnosticInputFingerprint.value_or(0u)) + ':' + result.Message;
+        }
+
+        // Runs every UI frame: a newly successful UV result for an entity that
+        // is still selected opens the workspace when the config allows it.
+        void ObserveAtlasResults(const SandboxEditorContext& context)
+        {
+            const auto& results = context.Parameterization.Results;
+            // Evaluated only for a new result: the model follows the scene
+            // selection whether or not the Selection window is open.
+            const auto stillSelected = [&context, &results](const std::uint32_t entity) {
+                if (entity == 0u)
+                    return false;
+                const Runtime::EditorParameterizationViewModel model =
+                    Runtime::BuildEditorParameterizationViewModel(
+                        context.Parameterization.Commands, results);
+                return model.HasSelectedEntity && model.SelectedEntityIsMesh &&
+                       model.SelectedStableEntityId == entity;
+            };
+            bool open = false;
+            if (results.LastUvRegenerationResult.has_value())
+            {
+                const auto& result = *results.LastUvRegenerationResult;
+                std::string signature = AtlasResultSignature(result);
+                if (Parameterization.SeenAtlasResult != signature)
+                {
+                    Parameterization.SeenAtlasResult = std::move(signature);
+                    open |= (result.Succeeded() || result.Status == Runtime::EditorCommandStatus::NoChange) && stillSelected(result.StableEntityId);
+                }
+            }
+            else
+            {
+                Parameterization.SeenAtlasResult.reset();
+            }
+            if (results.LastParameterizationResult.has_value())
+            {
+                const auto& result = *results.LastParameterizationResult;
+                std::string signature = ParameterizationResultSignature(result);
+                if (Parameterization.SeenParameterizationResult != signature)
+                {
+                    Parameterization.SeenParameterizationResult = std::move(signature);
+                    open |= result.Succeeded() && stillSelected(result.StableEntityId);
+                }
+            }
+            else
+            {
+                Parameterization.SeenParameterizationResult.reset();
+            }
+            if (!open || Shell == nullptr)
+                return;
+            auto active = Runtime::GetEditorParameterizationConfig(context.Parameterization.Commands);
+            const auto& atlas = results.LastUvRegenerationResult;
+            if (active.has_value() && atlas.has_value() &&
+                (atlas->Succeeded() || atlas->Status == Runtime::EditorCommandStatus::NoChange) &&
+                stillSelected(atlas->StableEntityId))
+            {
+                const Runtime::GeometryPropertyRef canonical{
+                    Runtime::GeometryElementDomain::MeshVertex, "v:texcoord", Geometry::PropertyValueKind::Vec2};
+                if (active->Texcoords != canonical)
+                {
+                    active->Texcoords = canonical;
+                    Parameterization.LastWorkspaceConfigResult = Runtime::ApplyEditorParameterizationConfig(
+                        context.Parameterization.Commands, *active, "sandbox.parameterization.atlas_output");
+                }
+            }
+            if (active.has_value() && active->View.SplitEnabled)
+                (void)Shell->SetEditorWindowOpen(kAtlasWorkspaceWindowId, true);
+        }
+
+        void ApplyWorkspaceLayout(
+            const SandboxEditorContext& context,
+            const std::function<void(Runtime::ParameterizationViewConfig&)>& edit)
+        {
+            auto active = Runtime::GetEditorParameterizationConfig(context.Parameterization.Commands);
+            if (!active.has_value())
+                return;
+            edit(active->View);
+            Parameterization.LastWorkspaceConfigResult = Runtime::ApplyEditorParameterizationConfig(
+                context.Parameterization.Commands, *active, "sandbox.parameterization.workspace");
+        }
+
+        // Mesh | UV split: the atlas pane occupies one side of the main work
+        // area and the scene rectangle the other. The scene rectangle is the
+        // only one the engine renders, picks and drives gizmos in.
+        void DrawAtlasWorkspaceWindow(bool& open, const SandboxEditorContext& context)
+        {
+            Parameterization.WorkspaceDrawFrame = ImGui::GetFrameCount();
+            const auto active = Runtime::GetEditorParameterizationConfig(context.Parameterization.Commands);
+            const Runtime::ParameterizationViewConfig view =
+                active.has_value() ? active->View : Runtime::ParameterizationViewConfig{};
+            const ImGuiViewport* mainViewport = ImGui::GetMainViewport();
+            const ImVec2 workPos = mainViewport->WorkPos;
+            const ImVec2 workSize = mainViewport->WorkSize;
+            if (workSize.x < 160.0f || workSize.y < 120.0f)
+                return;
+
+            constexpr float kMinRatio = 0.2f;
+            constexpr float kMaxRatio = 0.8f;
+            constexpr float kSplitterWidth = 6.0f;
+            const float ratio = std::clamp(
+                Parameterization.DraggingSplitRatio.value_or(view.SplitRatio), kMinRatio, kMaxRatio);
+            // SplitRatio is the mesh (scene) share of the work area width.
+            const float meshWidth = std::floor(workSize.x * ratio);
+            const float atlasWidth = workSize.x - meshWidth;
+            const bool atlasLeft = view.AtlasOnLeft;
+            const float atlasX = atlasLeft ? workPos.x : workPos.x + meshWidth;
+            const float meshX = atlasLeft ? workPos.x + atlasWidth : workPos.x;
+
+            ImGui::SetNextWindowPos(ImVec2{atlasX, workPos.y});
+            ImGui::SetNextWindowSize(ImVec2{atlasWidth, workSize.y});
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0.0f, 0.0f});
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+            constexpr ImGuiWindowFlags kPaneFlags =
+                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+                ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar |
+                ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBringToFrontOnFocus;
+            const bool visible = ImGui::Begin("UV Atlas Workspace##Pane", &open, kPaneFlags);
+            ImGui::PopStyleVar(2);
+            if (open && context.ClaimSceneViewport)
+                context.ClaimSceneViewport(meshX, workPos.y, meshWidth, workSize.y);
+
+            if (visible)
+            {
+                const auto drawSplitter = [&]()
+                {
+                    ImGui::InvisibleButton("##AtlasWorkspaceSplitter", ImVec2{kSplitterWidth, workSize.y});
+                    if (ImGui::IsItemActive())
+                    {
+                        const float delta = ImGui::GetIO().MouseDelta.x / workSize.x;
+                        Parameterization.DraggingSplitRatio = std::clamp(
+                            ratio + (atlasLeft ? -delta : delta), kMinRatio, kMaxRatio);
+                    }
+                    else if (Parameterization.DraggingSplitRatio.has_value())
+                    {
+                        const float released = *Parameterization.DraggingSplitRatio;
+                        Parameterization.DraggingSplitRatio.reset();
+                        ApplyWorkspaceLayout(context, [released](auto& layout) { layout.SplitRatio = released; });
+                    }
+                    if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+                        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+                    ImGui::GetWindowDrawList()->AddRectFilled(
+                        ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
+                        ImGui::IsItemHovered() || ImGui::IsItemActive()
+                            ? IM_COL32(94, 155, 214, 230)
+                            : IM_COL32(69, 75, 86, 220));
+                };
+
+                if (!atlasLeft)
+                {
+                    drawSplitter();
+                    ImGui::SameLine(0.0f, 0.0f);
+                }
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{8.0f, 6.0f});
+                ImGui::BeginChild("##AtlasWorkspaceContent",
+                                  ImVec2{atlasWidth - kSplitterWidth, workSize.y},
+                                  ImGuiChildFlags_AlwaysUseWindowPadding);
+                ImGui::PopStyleVar();
+                DrawAtlasWorkspaceContent(open, context, view);
+                ImGui::EndChild();
+                if (atlasLeft)
+                {
+                    ImGui::SameLine(0.0f, 0.0f);
+                    drawSplitter();
+                }
+            }
+            ImGui::End();
+        }
+
+        void DrawAtlasWorkspaceContent(
+            bool& open,
+            const SandboxEditorContext& context,
+            const Runtime::ParameterizationViewConfig& view)
+        {
+            Runtime::EditorParameterizationViewModel model =
+                Runtime::BuildEditorParameterizationViewModel(
+                    context.Parameterization.Commands, context.Parameterization.Results);
+            if (model.HasSelectedEntity && context.Parameterization.UvViewCommands.TextureTabs)
+                model.TextureTabs = context.Parameterization.UvViewCommands.TextureTabs(model.SelectedStableEntityId);
+            for (auto& tab : model.TextureTabs)
+                if (tab.State == Runtime::EditorParameterizationTextureState::Ready &&
+                    (tab.ResolvedTexcoords != model.ResolvedTexcoords || !model.GpuUvCompatible))
+                {
+                    tab.State = Runtime::EditorParameterizationTextureState::Unavailable;
+                    tab.Diagnostic = "This texture uses a different UV binding from the displayed atlas.";
+                }
+            if (model.HasSelectedEntity)
+                ImGui::Text("Mesh %u", model.SelectedStableEntityId);
+            else
+                ImGui::TextDisabled("No mesh selected");
+            ImGui::SameLine();
+            if (ImGui::SmallButton(view.AtlasOnLeft ? "Mesh left##Workspace" : "Atlas left##Workspace"))
+                ApplyWorkspaceLayout(context, [](auto& layout) { layout.AtlasOnLeft = !layout.AtlasOnLeft; });
+            ImGui::SameLine();
+            bool autoOpen = view.SplitEnabled;
+            if (ImGui::Checkbox("Open on new UVs##Workspace", &autoOpen))
+                ApplyWorkspaceLayout(context, [autoOpen](auto& layout) { layout.SplitEnabled = autoOpen; });
+            ImGui::SameLine();
+            if (const auto active = Runtime::GetEditorParameterizationConfig(context.Parameterization.Commands))
+            {
+                const Runtime::ActionReadiness readiness = Runtime::PreviewEditorUvRegenerationCommand(
+                    context.Parameterization.Commands,
+                    Runtime::EditorUvRegenerationCommand{
+                        .StableEntityId = model.SelectedStableEntityId,
+                        .ForceRegenerate = true,
+                        .Atlas = active->Atlas,
+                    });
+                if (DrawProcessingActionButton("Regenerate##Workspace", readiness))
+                    SubmitAtlasGeneration(context, model.SelectedStableEntityId, active->Atlas);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Regenerate with the applied atlas settings (edit them in Parameterize (UV)).");
+            }
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Close##Workspace"))
+                open = false;
+            if (Parameterization.LastWorkspaceConfigResult.has_value() &&
+                !Parameterization.LastWorkspaceConfigResult->Succeeded())
+            {
+                ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.45f, 1.0f), "Layout change rejected.");
+                for (const auto& diagnostic : Parameterization.LastWorkspaceConfigResult->LoadResult.Diagnostics)
+                    ImGui::TextWrapped("%s", diagnostic.Message.c_str());
+            }
+
+            // A failed regeneration publishes nothing, so the pane keeps the
+            // last valid UVs and states why the new atlas is missing.
+            const auto& atlasResult = context.Parameterization.Results.LastUvRegenerationResult;
+            if (atlasResult.has_value() && atlasResult->StableEntityId == model.SelectedStableEntityId &&
+                atlasResult->Status != Runtime::EditorCommandStatus::Applied &&
+                atlasResult->Status != Runtime::EditorCommandStatus::Pending &&
+                atlasResult->Status != Runtime::EditorCommandStatus::NoChange)
+            {
+                ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f),
+                                   "Atlas generation failed (%s); showing the last valid UVs.",
+                                   Runtime::DebugNameForEditorUvAtlasStatus(atlasResult->UvStatus));
+                if (!atlasResult->Diagnostic.empty() && ImGui::IsItemHovered())
+                    ImGui::SetTooltip("%s", atlasResult->Diagnostic.c_str());
+            }
+
+            // Tab state is per mesh: the tab bar id carries the entity.
+            std::optional<Runtime::EditorParameterizationTextureTab> selectedTab{};
+            ImGui::PushID(static_cast<int>(model.SelectedStableEntityId));
+            if (ImGui::BeginTabBar("##AtlasTabs", ImGuiTabBarFlags_FittingPolicyScroll))
+            {
+                if (ImGui::BeginTabItem("Atlas"))
+                    ImGui::EndTabItem();
+                for (std::size_t index = 0u; index < model.TextureTabs.size(); ++index)
+                {
+                    const auto& tab = model.TextureTabs[index];
+                    const std::string label = tab.Name + (TextureTabDisplayable(tab)
+                        ? std::string{}
+                        : std::string{" ("} + TextureTabStateLabel(tab) + ")") +
+                        "###bake" + tab.Name;
+                    if (ImGui::BeginTabItem(label.c_str()))
+                    {
+                        selectedTab = tab;
+                        ImGui::EndTabItem();
+                    }
+                }
+                ImGui::EndTabBar();
+            }
+            ImGui::PopID();
+            if (selectedTab.has_value())
+            {
+                // Display transform only: stored texels keep raw values.
+                ImGui::TextDisabled("%ux%u  %s  range [%g, %g]  colormap %s  revision %llu  %s",
+                                    selectedTab->Width, selectedTab->Height,
+                                    selectedTab->RawFloat ? "raw float" : "encoded 8-bit",
+                                    static_cast<double>(selectedTab->RangeMin),
+                                    static_cast<double>(selectedTab->RangeMax),
+                                    TextureTabColormapLabel(selectedTab->Colormap),
+                                    static_cast<unsigned long long>(selectedTab->Revision),
+                                    TextureTabStateLabel(*selectedTab));
+            }
+            DrawParameterizationUvPane(context, std::move(model), selectedTab);
         }
 
         void DrawParameterizationWindow(
@@ -3207,6 +3671,9 @@ namespace Extrinsic::Sandbox::Editor
                 if (!model.Message.empty())
                     ImGui::TextWrapped("%s", model.Message.c_str());
 
+                // One GPU UV view exists; the open workspace owns it.
+                const bool workspaceOwnsUv =
+                    ImGui::GetFrameCount() - Parameterization.WorkspaceDrawFrame <= 1;
                 constexpr float splitterWidth = 6.0f;
                 const ImVec2 available = ImGui::GetContentRegionAvail();
                 const float usableWidth =
@@ -3215,8 +3682,9 @@ namespace Extrinsic::Sandbox::Editor
                     Parameterization.SplitRatio,
                     0.28f,
                     0.72f);
-                const float controlWidth =
-                    usableWidth * Parameterization.SplitRatio;
+                const float controlWidth = workspaceOwnsUv
+                    ? available.x
+                    : usableWidth * Parameterization.SplitRatio;
 
                 ImGui::BeginChild(
                     "##ParameterizationControls",
@@ -3224,44 +3692,50 @@ namespace Extrinsic::Sandbox::Editor
                     true);
                 DrawParameterizationControlPane(context, model);
                 ImGui::EndChild();
-                if (const auto active =
-                        Runtime::GetEditorParameterizationConfig(context.Parameterization.Commands);
-                    active.has_value())
+                if (!workspaceOwnsUv)
                 {
-                    model.View = active->View;
-                }
-                ImGui::SameLine(0.0f, 0.0f);
+                    if (const auto active =
+                            Runtime::GetEditorParameterizationConfig(context.Parameterization.Commands);
+                        active.has_value())
+                    {
+                        model.View = active->View;
+                    }
+                    ImGui::SameLine(0.0f, 0.0f);
 
-                ImGui::InvisibleButton(
-                    "##ParameterizationSplitter",
-                    ImVec2(splitterWidth, available.y));
-                if (ImGui::IsItemActive())
-                {
-                    Parameterization.SplitRatio = std::clamp(
-                        Parameterization.SplitRatio +
-                            ImGui::GetIO().MouseDelta.x / usableWidth,
-                        0.28f,
-                        0.72f);
-                }
-                const ImVec2 splitterMin = ImGui::GetItemRectMin();
-                const ImVec2 splitterMax = ImGui::GetItemRectMax();
-                ImGui::GetWindowDrawList()->AddRectFilled(
-                    splitterMin,
-                    splitterMax,
-                    ImGui::IsItemHovered() || ImGui::IsItemActive()
-                        ? IM_COL32(94, 155, 214, 210)
-                        : IM_COL32(69, 75, 86, 180));
-                ImGui::SameLine(0.0f, 0.0f);
+                    ImGui::InvisibleButton(
+                        "##ParameterizationSplitter",
+                        ImVec2(splitterWidth, available.y));
+                    if (ImGui::IsItemActive())
+                    {
+                        Parameterization.SplitRatio = std::clamp(
+                            Parameterization.SplitRatio +
+                                ImGui::GetIO().MouseDelta.x / usableWidth,
+                            0.28f,
+                            0.72f);
+                    }
+                    const ImVec2 splitterMin = ImGui::GetItemRectMin();
+                    const ImVec2 splitterMax = ImGui::GetItemRectMax();
+                    ImGui::GetWindowDrawList()->AddRectFilled(
+                        splitterMin,
+                        splitterMax,
+                        ImGui::IsItemHovered() || ImGui::IsItemActive()
+                            ? IM_COL32(94, 155, 214, 210)
+                            : IM_COL32(69, 75, 86, 180));
+                    ImGui::SameLine(0.0f, 0.0f);
 
-                ImGui::BeginChild(
-                    "##ParameterizationUv",
-                    ImVec2(0.0f, available.y),
-                    true);
-                DrawParameterizationUvPane(context, model);
-                ImGui::EndChild();
+                    ImGui::BeginChild(
+                        "##ParameterizationUv",
+                        ImVec2(0.0f, available.y),
+                        true);
+                    DrawParameterizationUvPane(context, std::move(model), std::nullopt);
+                    ImGui::EndChild();
+                }
             }
             ImGui::End();
-            if (!open || !contentsVisible)
+            // Nothing else submitted the single UV view this frame: release it.
+            if ((!open || !contentsVisible) &&
+                Parameterization.UvViewSubmitFrame != ImGui::GetFrameCount() &&
+                ImGui::GetFrameCount() - Parameterization.WorkspaceDrawFrame > 1)
             {
                 Runtime::DisableEditorParameterizationUvView(context.Parameterization.UvViewCommands);
                 Parameterization.LastUvViewState.reset();

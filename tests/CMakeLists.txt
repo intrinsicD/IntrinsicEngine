@@ -1507,6 +1507,7 @@ set(_geometry_test_files
     Test.ParameterizationDispatch.cpp
     Test.BoundaryFirstFlattening.cpp
     Test.UvAtlas.cpp
+    Test.UvAtlasQuality.cpp
     Test_AdaptiveRemeshing.cpp
     Test_ConvexHull.cpp
     Test_PointCloud.cpp
@@ -1799,6 +1800,7 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
         Test.DefaultRecipeSurfaceGpuSmoke.cpp
         Test.HzbOcclusionConservatismGpuSmoke.cpp
         Test.ImGuiSurfaceGpuSmoke.cpp
+        Test.PropertyTextureBakeGpuSmoke.cpp
         Test.TransientDebugSurfaceGpuSmoke.cpp
         Test.UvViewGpuSmoke.cpp
         Test.VisualizationOverlaySurfaceGpuSmoke.cpp

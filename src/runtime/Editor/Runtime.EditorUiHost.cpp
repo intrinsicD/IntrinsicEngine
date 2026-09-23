@@ -4,6 +4,7 @@ module;
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -29,6 +30,8 @@ struct EditorUiHost::Impl
     std::uint64_t NextContributionHandle{1u};
     bool Operational{false};
     bool OwnerControlClaimed{false};
+    std::optional<EditorSceneViewportRect> SceneViewport{};
+    std::optional<EditorSceneViewportRect> PresentedSceneViewport{};
 };
 
 EditorUiHostOwnerControl::EditorUiHostOwnerControl(
@@ -193,8 +196,24 @@ EditorUiHost::ClaimOwnerControl() noexcept
     return EditorUiHostOwnerControl{*this};
 }
 
+void EditorUiHost::SetSceneViewport(const EditorSceneViewportRect rect) noexcept
+{
+    m_Impl->SceneViewport = rect;
+}
+
+std::optional<EditorSceneViewportRect> EditorUiHost::SceneViewport() const noexcept
+{
+    return m_Impl->SceneViewport;
+}
+
+std::optional<EditorSceneViewportRect> EditorUiHost::PresentedSceneViewport() const noexcept
+{
+    return m_Impl->PresentedSceneViewport;
+}
+
 std::size_t EditorUiHost::DrawFrameContributions()
 {
+    m_Impl->PresentedSceneViewport = std::exchange(m_Impl->SceneViewport, std::nullopt);
     if (!m_Impl->Operational || !m_Impl->WindowRegistry.IsVisible())
         return 0u;
 

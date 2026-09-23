@@ -877,10 +877,16 @@ namespace Extrinsic::Runtime
 
         // ── Phase 4: Build render snapshot ────────────────────────────────
         const auto preRenderSetupBegin = std::chrono::steady_clock::now();
-        const Platform::Extent2D viewport = m_Impl->m_Window->GetFramebufferExtent();
+        // One authoritative scene rectangle drives scene target sizing,
+        // camera aspect, picking, gizmos and presentation placement.
+        const Platform::Extent2D framebufferExtent = m_Impl->m_Window->GetFramebufferExtent();
+        const Core::Rect2D sceneViewport = ResolveSceneViewportPixels(
+            m_Impl->m_Window->GetWindowExtent(), framebufferExtent, editorCapture);
+        const Platform::Extent2D viewport = sceneViewport.Extent;
         frameContext.RenderInput = Graphics::RenderFrameInput{
             .Alpha    = alpha,
             .Viewport = viewport,
+            .ViewportOffset = sceneViewport.Offset,
             .EnableGpuProfiling =
                 m_Impl->m_Config.Render.EnableGpuProfiling,
         };
@@ -895,6 +901,8 @@ namespace Extrinsic::Runtime
             .EditorCapture = editorCapture,
             .RenderInput = renderInput,
             .FrameDeltaSeconds = frameDt,
+            .ViewportOrigin = sceneViewport.Offset,
+            .FramebufferExtent = framebufferExtent,
         };
         for (const Impl::ViewportInputHookRecord& record :
              m_Impl->m_ViewportInputHooks)
