@@ -8,6 +8,15 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-09-23 — BUG-210 portable Framework24 source references
+
+Retired [BUG-210](BUG-210-framework24-reference-link-portability.md) after
+replacing ten links into an optional local checkout with nine verified upstream
+source blobs pinned to a commit. The strict checker passes in a tracked-only
+export. [PR #1044](https://github.com/intrinsicD/IntrinsicEngine/pull/1044) records
+the pre-existing CI blocker and its documentation-only repair; the enclosing
+commit records retirement. No dependency, checker policy or engine source changed.
+
 ## 2026-09-23 — METHOD-047 atlas workflow and BUG-209 build recovery
 
 Retired [METHOD-047](METHOD-047-property-guided-atlas-editor.md) at Operational

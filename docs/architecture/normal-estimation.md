@@ -141,8 +141,8 @@ The integration retains the existing kernels after reviewing
 [Hoppe et al., 1992](https://www.hhoppe.com/proj/recon/)
 (DOI `10.1145/133994.134011`) and the neighborhood-error analysis of
 [Mitra, Nguyen and Guibas, 2003/2004](https://graphics.stanford.edu/~niloy/research/normal_est/normal_estimation_socg_03_ijcga_04.html).
-Framework24's [point-cloud PCA system](../../experimental/framework24/lib_bcg_viewer/src/bcg_system_point_cloud_vertex_pca.cpp)
-and [mesh vertex-normal system](../../experimental/framework24/lib_bcg_viewer/src/bcg_system_mesh_vertices_normals.cpp)
+Framework24's [point-cloud PCA system](https://github.com/intrinsicD/framework24/blob/81c54ad4294280fc034d39e46eafc1a29d598b81/lib_bcg_viewer/src/bcg_system_point_cloud_vertex_pca.cpp)
+and [mesh vertex-normal system](https://github.com/intrinsicD/framework24/blob/81c54ad4294280fc034d39e46eafc1a29d598b81/lib_bcg_viewer/src/bcg_system_mesh_vertices_normals.cpp)
 supply the behavioral baseline for kNN/radius and face-weighting choices.
 PCA eigenvalue/features/saliency publication remains separate.
 Adaptive, robust and learned estimators are excluded variants; this wiring does

@@ -1,0 +1,28 @@
+docs-validation	Validate markdown links (strict mode)	﻿2026-09-23T02:30:19.0333054Z ##[group]Run python3 tools/docs/check_doc_links.py --root . --strict
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:19.0333603Z [36;1mpython3 tools/docs/check_doc_links.py --root . --strict[0m
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:19.0371341Z shell: /usr/bin/bash -e {0}
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:19.0371601Z env:
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:19.0371877Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.14/x64
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:19.0372317Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.14/x64/lib/pkgconfig
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:19.0372758Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.14/x64
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:19.0373159Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.14/x64
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:19.0373558Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.14/x64
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:19.0373999Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.14/x64/lib
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:19.0374330Z ##[endgroup]
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:21.0155566Z [check_doc_links] Root: /home/runner/work/IntrinsicEngine/IntrinsicEngine
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:21.0156476Z [check_doc_links] Checked relative links: 4067
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:21.0157014Z [check_doc_links] Mode: strict
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:21.0157409Z [check_doc_links] Broken relative links:
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:21.0158367Z   - docs/architecture/normal-estimation.md -> ../../experimental/framework24/lib_bcg_viewer/src/bcg_system_point_cloud_vertex_pca.cpp
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:21.0159794Z   - docs/architecture/normal-estimation.md -> ../../experimental/framework24/lib_bcg_viewer/src/bcg_system_mesh_vertices_normals.cpp
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:21.0161226Z   - docs/architecture/spatial-index-consumers.md -> ../../experimental/framework24/lib_bcg_viewer/src/bcg_system_nearest_neighbors.cpp
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:21.0162653Z   - docs/architecture/spatial-index-consumers.md -> ../../experimental/framework24/lib_bcg_viewer/src/bcg_system_correspondence.cpp
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:21.0164092Z   - docs/architecture/spatial-index-consumers.md -> ../../experimental/framework24/lib_bcg_viewer/src/bcg_system_point_cloud_vertex_pca.cpp
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:21.0166096Z   - docs/architecture/spatial-index-consumers.md -> ../../experimental/framework24/lib_bcg_viewer/src/bcg_system_selection.cpp
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:21.0167463Z   - docs/architecture/spatial-index-consumers.md -> ../../experimental/framework24/lib_bcg_viewer/src/bcg_system_point_cloud_saliency.cpp
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:21.0168821Z   - docs/architecture/spatial-index-consumers.md -> ../../experimental/framework24/lib_bcg_viewer/src/bcg_system_point_cloud.cpp
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:21.0170122Z   - docs/architecture/spatial-index-consumers.md -> ../../experimental/framework24/lib_bcg_viewer/src/bcg_system_subsampling.cpp
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:21.0171519Z   - docs/architecture/spatial-index-consumers.md -> ../../experimental/framework24/lib_bcg_viewer/src/bcg_system_point_cloud_gaussian_mixture.cpp
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:21.0172648Z [check_doc_links] Action: update moved paths or convert to canonical links.
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:21.0173235Z [check_doc_links] STRICT MODE: failing.
+docs-validation	Validate markdown links (strict mode)	2026-09-23T02:30:21.0221102Z ##[error]Process completed with exit code 1.

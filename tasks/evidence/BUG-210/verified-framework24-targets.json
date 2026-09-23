@@ -1,0 +1,52 @@
+{
+  "repository": "https://github.com/intrinsicD/framework24",
+  "revision": "81c54ad4294280fc034d39e46eafc1a29d598b81",
+  "targets": [
+    {
+      "path": "lib_bcg_viewer/src/bcg_system_correspondence.cpp",
+      "sha": "cdf2a9855d7f90236e83d17aac60f9011fcd90df",
+      "type": "blob"
+    },
+    {
+      "path": "lib_bcg_viewer/src/bcg_system_mesh_vertices_normals.cpp",
+      "sha": "10bed0a86b6de2ad7465a07d0f5b8fce4d1cfd93",
+      "type": "blob"
+    },
+    {
+      "path": "lib_bcg_viewer/src/bcg_system_nearest_neighbors.cpp",
+      "sha": "7bc9c48d2a801549baeecec7b99caf4f0c0dabdb",
+      "type": "blob"
+    },
+    {
+      "path": "lib_bcg_viewer/src/bcg_system_point_cloud.cpp",
+      "sha": "d9eb6746bae5eb65ffaa661d50c664a988c221e2",
+      "type": "blob"
+    },
+    {
+      "path": "lib_bcg_viewer/src/bcg_system_point_cloud_gaussian_mixture.cpp",
+      "sha": "4f81fe892637585d619903045ef2084466517483",
+      "type": "blob"
+    },
+    {
+      "path": "lib_bcg_viewer/src/bcg_system_point_cloud_saliency.cpp",
+      "sha": "abef02537f223d779902741d679e87363faebe81",
+      "type": "blob"
+    },
+    {
+      "path": "lib_bcg_viewer/src/bcg_system_point_cloud_vertex_pca.cpp",
+      "sha": "b4d825e4a610e7c8a69b2258d782640b35fa1931",
+      "type": "blob"
+    },
+    {
+      "path": "lib_bcg_viewer/src/bcg_system_selection.cpp",
+      "sha": "3ce3be638dc1792eb9fc987156775271c32dc412",
+      "type": "blob"
+    },
+    {
+      "path": "lib_bcg_viewer/src/bcg_system_subsampling.cpp",
+      "sha": "31bb1bd8ffb6f6f1ffdbcb675882d44fe428328b",
+      "type": "blob"
+    }
+  ],
+  "scope": "GitHub tree API confirms every pinned source target exists. No reference repository source was imported."
+}

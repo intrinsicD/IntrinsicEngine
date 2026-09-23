@@ -74,15 +74,15 @@ path; selecting Vulkan must not imply every stage uses an LBVH.
 | [Htex patch point-to-centroid classification](../../src/geometry/Geometry.HtexPatch.cpp) | Exhaustive nearest centroid. | Nearest fits for large batches/patch sets; use a small local CPU tree or private GPU workspace only when build/query cost justifies it. A three/few-centroid scan should stay simple. |
 | [Selection and primitive refinement](../../src/runtime/GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cpp) | Raster primitive IDs, local face/edge refinement, and a full scan for the nearest point to a pick ray. | Future brush/radius selection and snapping to a known 3D point can use the shared cache. The existing half-ray-distance fallback needs conservative ray/capsule traversal, not nearest to the ray origin. Keep visible-ID, depth, input-capture and stale-source checks. |
 
-Framework24's [nearest-neighbor system](../../experimental/framework24/lib_bcg_viewer/src/bcg_system_nearest_neighbors.cpp)
+Framework24's [nearest-neighbor system](https://github.com/intrinsicD/framework24/blob/81c54ad4294280fc034d39e46eafc1a29d598b81/lib_bcg_viewer/src/bcg_system_nearest_neighbors.cpp)
 shares a CPU property KD-tree across
-[correspondence](../../experimental/framework24/lib_bcg_viewer/src/bcg_system_correspondence.cpp),
-[PCA](../../experimental/framework24/lib_bcg_viewer/src/bcg_system_point_cloud_vertex_pca.cpp),
-[selection](../../experimental/framework24/lib_bcg_viewer/src/bcg_system_selection.cpp),
-[saliency](../../experimental/framework24/lib_bcg_viewer/src/bcg_system_point_cloud_saliency.cpp),
-[point analysis](../../experimental/framework24/lib_bcg_viewer/src/bcg_system_point_cloud.cpp),
-[subsampling](../../experimental/framework24/lib_bcg_viewer/src/bcg_system_subsampling.cpp)
-and [Gaussian-mixture workflows](../../experimental/framework24/lib_bcg_viewer/src/bcg_system_point_cloud_gaussian_mixture.cpp).
+[correspondence](https://github.com/intrinsicD/framework24/blob/81c54ad4294280fc034d39e46eafc1a29d598b81/lib_bcg_viewer/src/bcg_system_correspondence.cpp),
+[PCA](https://github.com/intrinsicD/framework24/blob/81c54ad4294280fc034d39e46eafc1a29d598b81/lib_bcg_viewer/src/bcg_system_point_cloud_vertex_pca.cpp),
+[selection](https://github.com/intrinsicD/framework24/blob/81c54ad4294280fc034d39e46eafc1a29d598b81/lib_bcg_viewer/src/bcg_system_selection.cpp),
+[saliency](https://github.com/intrinsicD/framework24/blob/81c54ad4294280fc034d39e46eafc1a29d598b81/lib_bcg_viewer/src/bcg_system_point_cloud_saliency.cpp),
+[point analysis](https://github.com/intrinsicD/framework24/blob/81c54ad4294280fc034d39e46eafc1a29d598b81/lib_bcg_viewer/src/bcg_system_point_cloud.cpp),
+[subsampling](https://github.com/intrinsicD/framework24/blob/81c54ad4294280fc034d39e46eafc1a29d598b81/lib_bcg_viewer/src/bcg_system_subsampling.cpp)
+and [Gaussian-mixture workflows](https://github.com/intrinsicD/framework24/blob/81c54ad4294280fc034d39e46eafc1a29d598b81/lib_bcg_viewer/src/bcg_system_point_cloud_gaussian_mixture.cpp).
 These are discovery references for shared query inputs, not evidence that every
 Framework24 method uses a GPU LBVH. Port local PCA/saliency/neighborhood outcomes
 through canonical properties; keep dense Gaussian responsibilities exact unless
