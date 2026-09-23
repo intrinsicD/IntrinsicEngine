@@ -2809,9 +2809,10 @@ if(_intrinsic_registered_test_targets)
         )
     endforeach()
     # BUG-217/218: the single-threaded 60-grid refinement case dominates the
-    # former combined retriangulation/refinement case; CPU-bound siblings pushed
-    # that case past 30 s, so only refinement is isolated. Grouped (NO_DISCOVER)
-    # registration is unchanged.
+    # former combined retriangulation/refinement case. It runs isolated and,
+    # after timing out alone at 30 s on a slow hosted Debug runner, has a
+    # case-only 60 s budget (the CPU gate's outer --timeout). Grouped
+    # (NO_DISCOVER) registration is unchanged.
     get_target_property(_intrinsic_curvature_extrema_discovered
         IntrinsicGeometryCurvatureExtremaTests INTRINSIC_GTEST_DISCOVERED)
     if(_intrinsic_curvature_extrema_discovered)
@@ -2821,7 +2822,7 @@ if(_intrinsic_registered_test_targets)
             "  if(_intrinsic_serial_index EQUAL -1)\n"
             "    message(FATAL_ERROR \"Serial test CurvatureExtrema.RefinementRetainsCenterCurve was not discovered\")\n"
             "  endif()\n"
-            "  set_tests_properties(CurvatureExtrema.RefinementRetainsCenterCurve PROPERTIES RUN_SERIAL TRUE)\n"
+            "  set_tests_properties(CurvatureExtrema.RefinementRetainsCenterCurve PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)\n"
             "endif()\n"
         )
     endif()

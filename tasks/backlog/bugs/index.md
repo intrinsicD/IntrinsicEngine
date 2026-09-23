@@ -5,7 +5,7 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [BUG-218 — Split the curvature retriangulation and refinement scenarios](../../active/BUG-218-curvature-refinement-scenario-split.md): after BUG-217's serialization, the combined case still timed out alone on a hosted runner. The two scenarios are now separate cases (3.5 s / 15.5 s locally), and only refinement stays serial. Awaiting verification.
+- [BUG-218 — Split the curvature scenarios and budget the refinement case](../../active/BUG-218-curvature-refinement-scenario-split.md): the scenarios are split and refinement stays serial, but refinement still timed out alone at 30 s on a hosted runner (run 35849534652). It now has a case-only 60 s `TIMEOUT`; budget verification and hosted pr-fast are pending.
 
 - [BUG-178 — Clang 23 crashes during an incremental module rebuild](BUG-178-clang23-incremental-module-ice.md).
 

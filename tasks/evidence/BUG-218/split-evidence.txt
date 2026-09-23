@@ -31,3 +31,15 @@ Local verification of 895980f87 (Codex, 2026-09-23; production source 909b422 un
     12:25:22  11/11 pass, 41 s  Refinement 16.15 s  Retriangulation 16.01 s  Orientation 8.75 s
     12:26:03  11/11 pass, 38 s  Refinement 15.90 s  Retriangulation 14.44 s  Orientation 8.63 s
   Under one-CPU four-way sharing the unserialized heavy cases (Retriangulation, Gaussian, Noisy) take 14-16 s.
+
+Local full gates on split source 895980f87 (Codex): CPU 5,013 tests / 0 failures / 1 expected skip, 60.27 s
+  (Refinement 14.38 s, Retriangulation 3.39 s, Orientation 6.93 s, Gaussian 3.39 s);
+  ASan grouped 3,333 / 0 / 0 skips, 721.31 s (curvature group 99.72 s of its 120 s wrapper);
+  UBSan grouped 3,333 / 0 / 1 expected skip, 318.69 s (curvature group 84.13 s).
+
+Hosted counterexample to the split with a 30 s budget:
+  FAIL https://github.com/intrinsicD/IntrinsicEngine/actions/runs/35849534652  head d6d3bccfe
+       Refinement started 10:44:56.284 after Orientation finished, ran alone, Timeout 30.01 s; 115/116 other cases passed
+       siblings hosted vs local full CPU: Gaussian 10.41/3.39 (3.07), Plane 5.37/1.37 (3.93), Orientation 17.07/6.93 (2.46),
+       Retriangulation 8.53/3.39 (2.52), Scale 3.92/1.41 (2.78); the siblings overlapped each other under -j4
+  Case-only TIMEOUT 60 estimate (not measured): 14.38 s x 2.5-3.1 = 36-44 s; Plane's 3.9x (short, four-way) would be ~56 s.

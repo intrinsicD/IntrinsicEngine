@@ -225,7 +225,8 @@ four, and the two Release architecture-SLO cases reserve eight. Do not replace
 these budgets with independently inferred host-core counts. The curvature
 retriangulation and refinement scenarios are separate discovered cases. Only the
 single-threaded, dominant `CurvatureExtrema.RefinementRetainsCenterCurve` is
-`RUN_SERIAL`, with the default 30-second timeout
+`RUN_SERIAL` and has a case-only 60-second `TIMEOUT`, because it exceeded 30 s
+alone on a slow hosted Debug runner
 ([BUG-218](../tasks/active/BUG-218-curvature-refinement-scenario-split.md)).
 
 The case-scoped reservation list in
