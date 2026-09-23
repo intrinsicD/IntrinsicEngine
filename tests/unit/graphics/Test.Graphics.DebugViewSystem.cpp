@@ -5,6 +5,7 @@
 
 import Extrinsic.Graphics.DebugViewSystem;
 import Extrinsic.Graphics.FrameRecipe;
+import Extrinsic.Graphics.RenderGraph;
 
 using namespace Extrinsic;
 

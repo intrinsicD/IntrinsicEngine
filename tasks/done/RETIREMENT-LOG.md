@@ -8,6 +8,15 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-09-23 — BUG-215 debug-view test module import
+
+Retired [BUG-215](BUG-215-debug-view-test-resource-id-import.md) after importing
+the existing RenderGraph owner for the test's resource-ID comparisons. The
+Clang 20 preset target builds and all five debug-view cases pass; Opus 5.5
+approved the one-line import. No assertion or production export changed.
+[PR #1044](https://github.com/intrinsicD/IntrinsicEngine/pull/1044) and the enclosing
+commit retain the clean-runner failure and focused compiler/execution evidence.
+
 ## 2026-09-23 — BUG-214 CMake discovery probe portability
 
 Retired [BUG-214](BUG-214-cmake-discovery-probe-portability.md) after reproducing

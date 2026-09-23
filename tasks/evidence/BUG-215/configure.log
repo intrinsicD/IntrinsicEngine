@@ -1,0 +1,29 @@
+Preset CMake variables:
+
+  CMAKE_BUILD_TYPE="Debug"
+  CMAKE_EXPORT_COMPILE_COMMANDS="ON"
+  CMAKE_TOOLCHAIN_FILE:FILEPATH="/home/alex/Documents/IntrinsicEngine/external/vcpkg/scripts/buildsystems/vcpkg.cmake"
+  EXTRINSIC_BACKEND="Vulkan"
+  EXTRINSIC_PLATFORM="Linux"
+  INTRINSIC_BUILD_SANDBOX="OFF"
+  INTRINSIC_BUILD_TESTS="ON"
+  INTRINSIC_ENABLE_CUDA="OFF"
+  INTRINSIC_ENABLE_SANITIZERS="OFF"
+  INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN="OFF"
+  INTRINSIC_SANITIZER_MODE="none"
+  VCPKG_CHAINLOAD_TOOLCHAIN_FILE="/home/alex/Documents/IntrinsicEngine/cmake/IntrinsicClangToolchain.cmake"
+  VCPKG_INSTALLED_DIR="/home/alex/Documents/IntrinsicEngine/external/vcpkg-installed/ci"
+  VCPKG_MANIFEST_MODE="ON"
+
+-- IntrinsicEngine using caller-provided compilers: /usr/bin/clang-20, /usr/bin/clang++-20
+-- IntrinsicEngine Clang requirement: using C=20.1.2 and CXX=20.1.2; minimum is 20.0
+-- Sanitizers DISABLED
+-- Clang source coverage instrumentation DISABLED
+-- CCache disabled by INTRINSIC_ENABLE_CCACHE=OFF
+-- Intrinsic dependencies: using vcpkg manifest packages
+-- CUDA compute backend DISABLED
+-- INTRINSIC_HEADLESS_NO_GLFW=ON: skipping Extrinsic Vulkan backend
+-- IntrinsicEngine configure identity: platform=Linux; graphics_backend=Vulkan; platform_backend_request=Null; platform_backend_selected=Null; headless_no_glfw=ON
+-- Configuring done (0.3s)
+-- Generating done (0.1s)
+-- Build files have been written to: /home/alex/Documents/IntrinsicEngine/build/ci-clang20

@@ -1,0 +1,247 @@
+[0/2] Re-checking globbed directories...
+[1/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Dag.Scheduler.Hazards.cpp.o
+[2/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Dag.Scheduler.cpp.o
+[3/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.FrameGraph.cpp.o
+[4/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.BoundedHeap.cppm.o
+[5/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.IndexedHeap.cppm.o
+[6/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.IOBackend.cppm.o
+[7/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Process.cppm.o
+[8/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.IOBackend.cpp.o
+[9/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.RingBuffer.cppm.o
+[10/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.ResourcePool.cppm.o
+[11/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Config.EngineLoad.cpp.o
+[12/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Telemetry.cppm.o
+[13/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.CallbackRegistry.cppm.o
+[14/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.FrameClock.cppm.o
+[15/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Telemetry.cpp.o
+[16/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Filesystem.PathResolver.cppm.o
+[17/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Filesystem.cppm.o
+[18/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.LockFreeQueue.cppm.o
+[19/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Logging.cppm.o
+[20/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.LocalTask.cppm.o
+[21/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Logging.cpp.o
+[22/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Filesystem.PathResolver.cpp.o
+[23/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Process.cpp.o
+[24/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.cppm.o
+[25/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.Internal.cppm.o
+[26/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Filesystem.cpp.o
+[27/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.Dispatch.cpp.o
+[28/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.Job.cpp.o
+[29/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.Stats.cpp.o
+[30/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.Lifecycle.cpp.o
+[31/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.WaitToken.cpp.o
+[32/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.Worker.cpp.o
+[33/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.CounterEvent.cppm.o
+[34/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.Internal.cpp.o
+[35/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.CounterEvent.cpp.o
+[36/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Dag.TaskGraph.cpp.o
+[37/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Tasks.LocalTask.cpp.o
+[38/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Memory.ScopeStack.cpp.o
+[39/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Memory.Polymorphic.cpp.o
+[40/239] Scanning /home/alex/Documents/IntrinsicEngine/src/assets/Asset.LoadPipeline.cpp for CXX dependencies
+[41/239] Scanning /home/alex/Documents/IntrinsicEngine/src/assets/Asset.Service.cpp for CXX dependencies
+[42/239] Scanning /home/alex/Documents/IntrinsicEngine/src/assets/Asset.LoadPipeline.cppm for CXX dependencies
+[43/239] Scanning /home/alex/Documents/IntrinsicEngine/src/assets/Asset.Service.cppm for CXX dependencies
+[44/239] Generating CXX dyndep file src/assets/CMakeFiles/ExtrinsicAssets.dir/CXX.dd
+[45/239] Building CXX object src/core/CMakeFiles/ExtrinsicCore.dir/Core.Memory.LinearArena.cpp.o
+[46/239] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.Registry.cpp.o
+[47/239] Linking CXX static library lib/libExtrinsicCore.a
+[48/239] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.ImportRouter.cppm.o
+[49/239] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.EventBus.cppm.o
+[50/239] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.ImportRouter.cpp.o
+[51/239] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.EventBus.cpp.o
+[52/239] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.OperationStatus.cppm.o
+[53/239] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.PathIndex.cppm.o
+[54/239] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.LoadPipeline.cppm.o
+[55/239] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.PathIndex.cpp.o
+[56/239] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.TypePool.cppm.o
+[57/239] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.LoadPipeline.cpp.o
+[58/239] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.GeometryPayload.cppm.o
+[59/239] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.PayloadStore.cppm.o
+[60/239] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.ModelTexturePayload.cppm.o
+[61/239] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.PayloadStore.cpp.o
+[62/239] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.ModelTexturePayload.cpp.o
+[63/239] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.CommandContext.cpp.o
+[64/239] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.Device.cpp.o
+[65/239] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.BufferManager.cpp.o
+[66/239] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.Service.cppm.o
+[67/239] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.TextureManager.cpp.o
+[68/239] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.SamplerManager.cpp.o
+[69/239] Building CXX object src/assets/CMakeFiles/ExtrinsicAssets.dir/Asset.Service.cpp.o
+[70/239] Linking CXX static library lib/libExtrinsicAssets.a
+[71/239] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.Profiler.cpp.o
+[72/239] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.BufferTransfer.cppm.o
+[73/239] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.PipelineManager.cpp.o
+[74/239] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.BufferTransfer.cpp.o
+[75/239] Generating CXX dyndep file src/graphics/assets/CMakeFiles/ExtrinsicGraphicsAssets.dir/CXX.dd
+[76/239] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.TextureUpload.cppm.o
+[77/239] Building CXX object src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/RHI.TextureUpload.cpp.o
+[78/239] Linking CXX static library lib/libExtrinsicRHI.a
+[79/239] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.Renderer.cpp for CXX dependencies
+[80/239] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.FrameRecipe.cpp for CXX dependencies
+[81/239] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.PropertyTextureBake.cpp for CXX dependencies
+[82/239] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.ImGuiOverlaySystem.cpp for CXX dependencies
+[83/239] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.UvView.cpp for CXX dependencies
+[84/239] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.ImGui.cpp for CXX dependencies
+[85/239] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.RenderFrameInput.cppm for CXX dependencies
+[86/239] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.RenderWorld.cppm for CXX dependencies
+[87/239] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.PropertyTextureBake.cppm for CXX dependencies
+[88/239] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.UvView.cppm for CXX dependencies
+[89/239] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Components/Graphics.Component.VisualizationConfig.cppm for CXX dependencies
+[90/239] Generating CXX dyndep file src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/CXX.dd
+[91/246] Building CXX object src/graphics/assets/CMakeFiles/ExtrinsicGraphicsAssets.dir/Graphics.GpuAssetCache.cpp.o
+[92/246] Linking CXX static library lib/libExtrinsicGraphicsAssets.a
+[93/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.CameraSnapshots.cpp.o
+[94/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderCommandRouter.cpp.o
+[95/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderingContract.cpp.o
+[96/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderRecipeConfig.cpp.o
+[97/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.MaterialSystem.cpp.o
+[98/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.VisualizationPackets.cpp.o
+[99/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.ColormapSystem.cpp.o
+[100/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.VisualizationPropertyBufferResidency.cpp.o
+[101/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.ImGuiOverlaySystem.cpp.o
+[102/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.CullingSystem.cpp.o
+[103/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.ImGuiUploadHelper.cpp.o
+[104/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.LightSystem.cpp.o
+[105/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.SelectionSystem.cpp.o
+[106/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.ForwardSystem.cpp.o
+[107/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.DeferredSystem.cpp.o
+[108/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.ShadowSystem.cpp.o
+[109/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.PostProcessSystem.cpp.o
+[110/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.HZB.cpp.o
+[111/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Components/Graphics.Component.GpuSceneSlot.cpp.o
+[112/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.TransformSyncSystem.cpp.o
+[113/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.VisualizationOverlay.cpp.o
+[114/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.ComputeParallelPrimitives.cppm.o
+[115/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.PointLBVH.cppm.o
+[116/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.ComputeParallelPrimitives.cpp.o
+[117/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.PointLBVH.cpp.o
+[118/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderFrameInput.cppm.o
+[119/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.PointKeypoints.cppm.o
+[120/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.PointKeypoints.cpp.o
+[121/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderWorld.cppm.o
+[122/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.GpuTransfer.cppm.o
+[123/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.CurrentRendererContractAdapter.cppm.o
+[124/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.GpuTransfer.cpp.o
+[125/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.CurrentRendererContractAdapter.cpp.o
+[126/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.GpuWorld.cpp.o
+[127/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.FrameRecipe.cppm.o
+[128/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.SharedRenderRecipeExecution.cppm.o
+[129/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.GeometryResidency.cppm.o
+[130/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.SharedRenderRecipeExecution.cpp.o
+[131/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.GeometryResidency.cpp.o
+[132/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.PropertyTextureBake.cppm.o
+[133/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.PropertyTextureBake.cpp.o
+[134/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.DebugViewSystem.cppm.o
+[135/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.DebugViewSystem.cpp.o
+[136/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.SpatialDebugVisualizers.cppm.o
+[137/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.SpatialDebugVisualizers.cpp.o
+[138/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.GpuScene.cppm.o
+[139/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.GpuScene.cpp.o
+[140/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.LightClusters.cppm.o
+[141/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.Reconstruction.cppm.o
+[142/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.LightClusters.cpp.o
+[143/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.Reconstruction.cpp.o
+[144/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.TransientDebugUploadHelper.cppm.o
+[145/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.UvView.cppm.o
+[146/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.TransientDebugUploadHelper.cpp.o
+[147/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.VisualizationOverlayUploadHelper.cpp.o
+[148/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Components/Graphics.Component.VisualizationConfig.cppm.o
+[149/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.UvView.cpp.o
+[150/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Backends/Null/Backends.Null.cppm.o
+[151/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Backends/Null/Backends.Null.cpp.o
+[152/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.VisualizationSyncSystem.cppm.o
+[153/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Backends/Null/Backends.Null.Bindless.cpp.o
+[154/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Backends/Null/Backends.Null.Profiler.cpp.o
+[155/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.VisualizationSyncSystem.cpp.o
+[156/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Backends/Null/Backends.Null.Transfer.cpp.o
+[157/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderSubsystemRegistry.cppm.o
+[158/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderSubsystemRegistry.cpp.o
+[159/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderPrepPipeline.cppm.o
+[160/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.Renderer.cppm.o
+[161/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Culling.cppm.o
+[162/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Culling.cpp.o
+[163/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.RenderPrepPipeline.cpp.o
+[164/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.DepthPrepass.cppm.o
+[165/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.DepthPrepass.cpp.o
+[166/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Deferred.GBuffers.cppm.o
+[167/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Deferred.GBuffers.cpp.o
+[168/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Deferred.Lighting.cppm.o
+[169/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.DebugView.cppm.o
+[170/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Deferred.Lighting.cpp.o
+[171/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.DebugView.cpp.o
+[172/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Forward.Line.cppm.o
+[173/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Forward.Line.cpp.o
+[174/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Forward.Point.cppm.o
+[175/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Forward.Point.cpp.o
+[176/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Forward.Surface.cppm.o
+[177/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Forward.Surface.cpp.o
+[178/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.ImGui.cppm.o
+[179/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.PostProcess.Bloom.cppm.o
+[180/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.ImGui.cpp.o
+[181/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.PostProcess.Bloom.cpp.o
+[182/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.PostProcess.FXAA.cppm.o
+[183/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.PostProcess.FXAA.cpp.o
+[184/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.PostProcess.Histogram.cppm.o
+[185/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.PostProcess.Histogram.cpp.o
+[186/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.PostProcess.SMAA.cppm.o
+[187/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.PostProcess.SMAA.cpp.o
+[188/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.PostProcess.ToneMap.cppm.o
+[189/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.PostProcess.ToneMap.cpp.o
+[190/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Present.cppm.o
+[191/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Present.cpp.o
+[192/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Selection.EdgeId.cppm.o
+[193/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Selection.EdgeId.cpp.o
+[194/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Selection.EntityId.cppm.o
+[195/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Selection.EntityId.cpp.o
+[196/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Selection.FaceId.cppm.o
+[197/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Selection.FaceId.cpp.o
+[198/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Selection.Outline.cppm.o
+[199/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Selection.Outline.cpp.o
+[200/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.FrameRecipe.cpp.o
+[201/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Selection.PointId.cppm.o
+[202/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Shadows.cppm.o
+[203/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Selection.PointId.cpp.o
+[204/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.Shadows.cpp.o
+[205/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.TransientDebug.Surface.cppm.o
+[206/246] Building CXX object src/graphics/framegraph/CMakeFiles/ExtrinsicGraphicsRenderGraph.dir/Graphics.RenderGraph.cpp.o
+[207/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Passes/Pass.TransientDebug.Surface.cpp.o
+[208/246] Building CXX object src/graphics/framegraph/CMakeFiles/ExtrinsicGraphicsRenderGraph.dir/Graphics.RenderGraph.Barriers.cpp.o
+[209/246] Building CXX object src/graphics/framegraph/CMakeFiles/ExtrinsicGraphicsRenderGraph.dir/Graphics.RenderGraph.Compiler.cpp.o
+[210/246] Building CXX object src/graphics/framegraph/CMakeFiles/ExtrinsicGraphicsRenderGraph.dir/Graphics.RenderGraph.TransientAllocator.cpp.o
+[211/246] Building CXX object src/graphics/framegraph/CMakeFiles/ExtrinsicGraphicsRenderGraph.dir/Graphics.RenderGraph.Executor.cpp.o
+[212/246] Linking CXX static library lib/libExtrinsicGraphicsRenderGraph.a
+[213/246] Building CXX object src/platform/CMakeFiles/ExtrinsicPlatform.dir/Platform.Input.cpp.o
+[214/246] Building CXX object src/platform/CMakeFiles/ExtrinsicPlatform.dir/Platform.IWindow.cppm.o
+[215/246] Building CXX object src/platform/CMakeFiles/ExtrinsicPlatform.dir/backends/null/Platform.Backend.Null.cppm.o
+[216/246] Building CXX object src/platform/CMakeFiles/ExtrinsicPlatform.dir/Platform.CreateWindow.cpp.o
+[217/246] Building CXX object src/platform/CMakeFiles/ExtrinsicPlatform.dir/backends/null/Platform.Backend.Null.cpp.o
+[218/246] Linking CXX static library lib/libExtrinsicPlatform.a
+[219/246] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.Graphics.ColormapSystem.cpp for CXX dependencies
+[220/246] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.Graphics.DebugViewSystem.cpp for CXX dependencies
+[221/246] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.Renderer.cpp.o
+[222/246] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.Graphics.GpuSceneSlot.cpp for CXX dependencies
+[223/246] Linking CXX static library lib/libExtrinsicGraphics.a
+[224/246] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.Graphics.ImGuiOverlaySystem.cpp for CXX dependencies
+[225/246] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.Graphics.MaterialSystem.cpp for CXX dependencies
+[226/246] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.Graphics.PostProcessSystem.cpp for CXX dependencies
+[227/246] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.RenderGraphDebugDump.cpp for CXX dependencies
+[228/246] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.Graphics.SpatialDebugVisualizers.cpp for CXX dependencies
+[229/246] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.Graphics.VisualizationPackets.cpp for CXX dependencies
+[230/246] Scanning /home/alex/Documents/IntrinsicEngine/tests/support/MockRHI.cpp for CXX dependencies
+[231/246] Generating CXX dyndep file tests/CMakeFiles/MockRhiTestSupportObjs.dir/CXX.dd
+[232/246] Generating CXX dyndep file tests/CMakeFiles/GraphicsRendererCpuUnitTestObjs.dir/CXX.dd
+[233/246] Building CXX object tests/CMakeFiles/MockRhiTestSupportObjs.dir/support/MockRHI.cpp.o
+[234/246] Building CXX object tests/CMakeFiles/GraphicsRendererCpuUnitTestObjs.dir/unit/graphics/Test.Graphics.ColormapSystem.cpp.o
+[235/246] Building CXX object tests/CMakeFiles/GraphicsRendererCpuUnitTestObjs.dir/unit/graphics/Test.Graphics.DebugViewSystem.cpp.o
+[236/246] Building CXX object tests/CMakeFiles/GraphicsRendererCpuUnitTestObjs.dir/unit/graphics/Test.Graphics.GpuSceneSlot.cpp.o
+[237/246] Building CXX object tests/CMakeFiles/GraphicsRendererCpuUnitTestObjs.dir/unit/graphics/Test.Graphics.ImGuiOverlaySystem.cpp.o
+[238/246] Building CXX object tests/CMakeFiles/GraphicsRendererCpuUnitTestObjs.dir/unit/graphics/Test.Graphics.MaterialSystem.cpp.o
+[239/246] Building CXX object tests/CMakeFiles/GraphicsRendererCpuUnitTestObjs.dir/unit/graphics/Test.Graphics.PostProcessSystem.cpp.o
+[240/246] Building CXX object tests/CMakeFiles/GraphicsRendererCpuUnitTestObjs.dir/unit/graphics/Test.RenderGraphDebugDump.cpp.o
+[241/246] Building CXX object tests/CMakeFiles/GraphicsRendererCpuUnitTestObjs.dir/unit/graphics/Test.Graphics.SpatialDebugVisualizers.cpp.o
+[242/246] Scanning /home/alex/Documents/IntrinsicEngine/tests/support/Test_SanitizerConfig.cpp for CXX dependencies
+[243/246] Generating CXX dyndep file tests/CMakeFiles/TestSupportObjs.dir/CXX.dd
+[244/246] Building CXX object tests/CMakeFiles/TestSupportObjs.dir/support/Test_SanitizerConfig.cpp.o
+[245/246] Building CXX object tests/CMakeFiles/GraphicsRendererCpuUnitTestObjs.dir/unit/graphics/Test.Graphics.VisualizationPackets.cpp.o
+[246/246] Linking CXX executable bin/IntrinsicGraphicsRendererCpuUnitTests
