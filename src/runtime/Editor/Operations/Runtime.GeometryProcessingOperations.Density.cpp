@@ -206,8 +206,8 @@ namespace Extrinsic::Runtime
                 w.Points, w.Slots, NeighborWidth(w), w.Config.GpuQueryBatchSize, w.Neighbors, w.Result.Message);
             w.Result.GpuQueryBatches = w.Neighbors.QueryBatches;
             w.Result.GpuNeighborhoodMilliseconds = w.Neighbors.Milliseconds;
-            if (state == KnnRowsState::Failed) w.Result.Status = EditorCommandStatus::GeometryProcessingFailed;
-            return state != KnnRowsState::Pending;
+            if (state == RowsState::Failed) w.Result.Status = EditorCommandStatus::GeometryProcessingFailed;
+            return state != RowsState::Pending;
         }
         template <class M>
         typename M::Result Publish(const EditorProcessingContext& context, const std::shared_ptr<PointFieldWork<M>>& w)

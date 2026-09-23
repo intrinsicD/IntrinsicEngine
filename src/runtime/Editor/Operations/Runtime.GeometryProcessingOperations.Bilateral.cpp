@@ -58,10 +58,8 @@ namespace Extrinsic::Runtime
             std::optional<EditorBilateralFilterResult> MainFailure{};
             std::shared_ptr<const SpatialIndexSnapshot> Index{};
             SpatialIndexHandle GpuIndex{};
-            std::shared_ptr<SpatialNearestBatch> Batch{};
-            std::size_t NextQuery{};
-            bool GpuFinished{}, Abandoned{};
-            std::chrono::steady_clock::time_point GpuStarted{};
+            GeometryProcessingDetail::GpuRowPages Pages{};
+            bool Abandoned{};
             EditorBilateralFilterResult Result{};
         };
         bool CurrentInput(const EditorProcessingContext& context, const BilateralWork& w)
@@ -194,13 +192,15 @@ namespace Extrinsic::Runtime
             {ComputeStep(w);if(w.Result.Status!=EditorCommandStatus::Applied)return;}
             CompleteOutput(w);
         }
+        // Iteration 0 decodes source rows; later iterations query a private workspace
+        // whose IDs are already compact. Neighborhood time accumulates across iterations.
         bool AdvanceGpu(const EditorProcessingContext& context, BilateralWork& w)
         {
             auto fail=[&](std::string why, EditorCommandStatus status=EditorCommandStatus::GeometryProcessingFailed)
-            {w.Result.Status=status; w.Result.Message=std::move(why); w.MainFailure=w.Result; w.Batch.reset(); return true;};
+            {w.Result.Status=status; w.Result.Message=std::move(why); w.MainFailure=w.Result; w.Pages.Batch.reset(); return true;};
             if (w.Abandoned || !CurrentInput(context,w))
                 return fail("Bilateral inputs changed or the job was cancelled.",EditorCommandStatus::StaleEntity);
-            if (w.GpuFinished) return true;
+            if (w.Pages.Finished) return true;
             if (!w.GpuIndex.Value)
             {
                 auto workspace=context.SpatialIndices->CreateWorkspace(w.Points);
@@ -208,47 +208,42 @@ namespace Extrinsic::Runtime
                 w.GpuIndex=workspace.Handle;w.Index=std::move(workspace.Snapshot);
                 ++w.Result.WorkspaceBuilds;
             }
-            if (w.GpuStarted==std::chrono::steady_clock::time_point{}) w.GpuStarted=std::chrono::steady_clock::now();
-            if (w.Batch)
-            {
-                if (w.Batch->State==SpatialQueryState::Failed) return fail(w.Batch->Diagnostic);
-                if (w.Batch->State!=SpatialQueryState::Ready) return false;
-                for (std::size_t row=0;row<w.Batch->Counts.size();++row)
+            const auto width=std::min<std::size_t>(w.Points.size()-1,w.Config.KNeighbors)+1;
+            std::string diagnostic;
+            const auto state=GeometryProcessingDetail::AdvanceGpuRowPages(w.Pages,w.Points.size(),w.Config.GpuQueryBatchSize,diagnostic,
+                [&](const SpatialNearestBatch& batch, std::string& why)
                 {
-                    const auto width=std::min<std::size_t>(w.Points.size()-1,w.Config.KNeighbors)+1;
-                    if(w.Batch->Counts[row]!=width) return fail("Incomplete Vulkan kNN neighborhood.");
-                    for(std::size_t j=0;j<width;++j)
+                    for (std::size_t row=0;row<batch.Counts.size();++row)
                     {
-                        const auto id=w.Batch->Neighbors[row*w.Batch->Capacity+j].Index;
-                        if(w.Result.CompletedIterations)
+                        if(batch.Counts[row]!=width){why="Incomplete Vulkan kNN neighborhood.";return false;}
+                        for(std::size_t j=0;j<width;++j)
                         {
-                            if(id>=w.Points.size())return fail("Invalid private Vulkan neighbor row.");
-                            w.NeighborIds.push_back(id);
-                        }
-                        else
-                        {
-                            const auto found=std::lower_bound(w.Slots.begin(),w.Slots.end(),id);
-                            if(found==w.Slots.end() || *found!=id)return fail("Invalid Vulkan source row.");
-                            w.NeighborIds.push_back(std::uint32_t(found-w.Slots.begin()));
+                            const auto id=batch.Neighbors[row*batch.Capacity+j].Index;
+                            if(w.Result.CompletedIterations)
+                            {
+                                if(id>=w.Points.size()){why="Invalid private Vulkan neighbor row.";return false;}
+                                w.NeighborIds.push_back(id);
+                            }
+                            else
+                            {
+                                const auto found=std::lower_bound(w.Slots.begin(),w.Slots.end(),id);
+                                if(found==w.Slots.end() || *found!=id){why="Invalid Vulkan source row.";return false;}
+                                w.NeighborIds.push_back(std::uint32_t(found-w.Slots.begin()));
+                            }
                         }
                     }
-                }
-                w.NextQuery+=w.Batch->Counts.size();
-                if (w.NextQuery==w.Points.size())
-                {
-                    w.Batch.reset(); w.GpuFinished=true;
-                    w.Result.GpuNeighborhoodMilliseconds+=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-w.GpuStarted).count();
                     return true;
-                }
-            }
-            const auto count=std::min<std::size_t>(w.Config.GpuQueryBatchSize,w.Points.size()-w.NextQuery);
-            if (w.Batch && w.Batch->Counts.size()!=count) w.Batch.reset();
-            const auto queries=std::span(w.Points).subspan(w.NextQuery,count);
-            w.Batch=context.SpatialIndices->QueueGpuKNearest(w.GpuIndex,queries,
-                std::uint32_t(std::min<std::size_t>(w.Points.size()-1,w.Config.KNeighbors)+1),{},std::move(w.Batch));
-            ++w.Result.GpuQueryBatches;
-            if (w.Batch->State==SpatialQueryState::Failed) return fail(w.Batch->Diagnostic);
-            return false;
+                },
+                [&](std::size_t first, std::size_t count, std::shared_ptr<SpatialNearestBatch> reuse)
+                {
+                    return context.SpatialIndices->QueueGpuKNearest(w.GpuIndex,std::span(w.Points).subspan(first,count),
+                        std::uint32_t(width),{},std::move(reuse));
+                });
+            w.Result.GpuQueryBatches=w.Pages.QueryBatches;
+            if (state==GeometryProcessingDetail::RowsState::Failed) return fail(std::move(diagnostic));
+            if (state==GeometryProcessingDetail::RowsState::Pending) return false;
+            w.Result.GpuNeighborhoodMilliseconds+=w.Pages.Milliseconds;
+            return true;
         }
         EditorBilateralFilterResult Publish(const EditorProcessingContext& context,
                                             const std::shared_ptr<BilateralWork>& w)
@@ -387,7 +382,7 @@ namespace Extrinsic::Runtime
                 submitted=submit({.DebugName="Bilateral neighborhoods (Vulkan)",.Scope=context.World,.Kind=RuntimeTaskKinds::GeometryProcess,
                     .Work=[](const JobCancellation&){return JobResultEnvelope::Make(true);},
                     .IsReadyToApply=[context,w]{return AdvanceGpu(context,*w);},.ValidateBeforeApply=validate,
-                    .PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope&){return w->GpuFinished;},
+                    .PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope&){return w->Pages.Finished;},
                     .FinalizeUnpublishedOnMainThread=[w]{w->Abandoned=true;}});
                 if(!submitted)break;
                 const bool last=i+1==w->Config.Iterations;
@@ -399,8 +394,9 @@ namespace Extrinsic::Runtime
                 {
                     step.PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope&){
                         if(w->Result.Status!=EditorCommandStatus::Applied){w->MainFailure=w->Result;return false;}
-                        w->GpuIndex={};w->Index.reset();w->Batch.reset();w->NextQuery=0;w->NeighborIds.clear();
-                        w->GpuFinished=false;w->GpuStarted={};return true;};
+                        // Restart pagination for the moved points; the batch count stays cumulative.
+                        w->GpuIndex={};w->Index.reset();w->NeighborIds.clear();
+                        w->Pages={.QueryBatches=w->Pages.QueryBatches};return true;};
                     step.FinalizeUnpublishedOnMainThread=[w]{w->Abandoned=true;};
                 }
                 submitted=submit(std::move(step));

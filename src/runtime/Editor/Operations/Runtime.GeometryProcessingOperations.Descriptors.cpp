@@ -206,9 +206,9 @@ namespace Extrinsic::Runtime
             w.Result.MaximumNeighbors=w.Rows.MaximumNeighbors;w.Result.GpuQueryBatches=w.Rows.QueryBatches;
             w.Result.GpuNeighborhoodMilliseconds=w.Rows.Milliseconds;
             if(w.Rows.Queried)w.Result.ActualBackend="vulkan_lbvh";
-            if(state==GeometryProcessingDetail::RadiusRowsState::Failed)
+            if(state==GeometryProcessingDetail::RowsState::Failed)
             {w.Result.Status=EditorCommandStatus::GeometryProcessingFailed;w.Result.Message=std::move(diagnostic);w.MainFailure=w.Result;}
-            return state!=GeometryProcessingDetail::RadiusRowsState::Pending;
+            return state!=GeometryProcessingDetail::RowsState::Pending;
         }
         EditorDescriptorAnalysisResult Publish(const EditorProcessingContext& context,
                                             const std::shared_ptr<DescriptorWork>& w)

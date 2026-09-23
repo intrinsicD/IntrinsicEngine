@@ -130,9 +130,9 @@ namespace Extrinsic::Runtime
             w.Result.MaximumNeighbors=w.Rows.MaximumNeighbors;w.Result.GpuQueryBatches=w.Rows.QueryBatches;
             w.Result.GpuNeighborhoodMilliseconds=w.Rows.Milliseconds;
             if(w.Rows.Queried)w.Result.ActualBackend="vulkan_lbvh";
-            if(state==Detail::RadiusRowsState::Failed)
+            if(state==Detail::RowsState::Failed)
             {w.Result.Status=EditorCommandStatus::GeometryProcessingFailed;w.Result.Message=std::move(diagnostic);w.MainFailure=w.Result;}
-            return state!=Detail::RadiusRowsState::Pending;
+            return state!=Detail::RowsState::Pending;
         }
         EditorDensityWeightResult Publish(const EditorProcessingContext& context,const std::shared_ptr<DensityWeightWork>& w)
         {

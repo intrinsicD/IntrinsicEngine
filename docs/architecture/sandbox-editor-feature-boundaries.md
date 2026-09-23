@@ -462,7 +462,12 @@ statuses and method-specific diagnostics stay with the callers. Registration's
 transformed target-space acquisition stays separate.
 
 `RadiusRows.cpp` compiles the CPU capture and both pagers once outside either family and preserves
-complete radius support and its explicit lowest-ID limit. Property capture imports
+complete radius support and its explicit lowest-ID limit. Both pagers and the framed
+outlier, bilateral and normal neighborhood stages share `AdvanceGpuRowPages` in
+`RadiusRows.hpp`: one batch cursor for pending/failed/ready states, batch recycling,
+query counts and first-to-last timing. Each caller passes its own per-batch decoder and
+query submission, so radius versus kNN queries, exclusions, capacity caps, source-ID
+decoding and result timing stay method-specific; the shared cursor adds no row checks. Property capture imports
 only the leaf point-LBVH algorithm for coordinate validation, without the spatial
 cache service or paging records; `ProcessingCompilationLocality.PropertyCapture`
 guards that compiler boundary. Normal processing uses its dedicated

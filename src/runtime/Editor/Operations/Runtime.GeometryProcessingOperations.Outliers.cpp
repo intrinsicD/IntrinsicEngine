@@ -71,10 +71,8 @@ namespace Extrinsic::Runtime
             std::vector<float> AfterScore{};
             std::shared_ptr<const SpatialIndexSnapshot> Index{};
             SpatialIndexHandle GpuIndex{};
-            std::shared_ptr<SpatialNearestBatch> Batch{};
-            std::size_t NextQuery{};
-            bool GpuFinished{}, Abandoned{};
-            std::chrono::steady_clock::time_point GpuStarted{};
+            GeometryProcessingDetail::GpuRowPages Pages{};
+            bool Abandoned{};
             EditorOutlierAnalysisResult Result{};
         };
         bool CurrentInput(const EditorProcessingContext& context, const OutlierWork& w)
@@ -252,49 +250,38 @@ namespace Extrinsic::Runtime
             r.CpuComputeMilliseconds=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
             r.Message="Outlier mask and score computed using "+r.ActualBackend+" neighborhoods and CPU classification.";
         }
+        // Radius rows keep only counts; kNN rows keep raw source IDs, decoded by Compute.
         bool AdvanceGpu(const EditorProcessingContext& context, OutlierWork& w)
         {
-            auto fail=[&](std::string why, EditorCommandStatus status=EditorCommandStatus::GeometryProcessingFailed)
-            {w.Result.Status=status; w.Result.Message=std::move(why); w.Batch.reset(); return true;};
             if (w.Abandoned || !CurrentInput(context,w))
-                return fail("Outlier inputs changed or the job was cancelled.",EditorCommandStatus::StaleEntity);
-            if (w.GpuFinished) return true;
-            if (w.GpuStarted==std::chrono::steady_clock::time_point{}) w.GpuStarted=std::chrono::steady_clock::now();
-            if (w.Batch)
-            {
-                if (w.Batch->State==SpatialQueryState::Failed) return fail(w.Batch->Diagnostic);
-                if (w.Batch->State!=SpatialQueryState::Ready) return false;
-                for (std::size_t row=0;row<w.Batch->Counts.size();++row)
+            {w.Result.Status=EditorCommandStatus::StaleEntity; w.Result.Message="Outlier inputs changed or the job was cancelled."; w.Pages.Batch.reset(); return true;}
+            const auto& c=w.Config;
+            const auto width=QueryWidth(c,w.Points.size());
+            const auto state=GeometryProcessingDetail::AdvanceGpuRowPages(w.Pages,w.Points.size(),c.GpuQueryBatchSize,w.Result.Message,
+                [&](const SpatialNearestBatch& batch, std::string& why)
                 {
-                    if (w.Config.Method==OutlierAnalysisMethod::Radius) w.Counts.push_back(w.Batch->Counts[row]);
-                    else
+                    for (std::size_t row=0;row<batch.Counts.size();++row)
                     {
-                        if (w.Batch->Counts[row]!=QueryWidth(w.Config,w.Points.size()))
-                            return fail("Incomplete Vulkan kNN neighborhood.");
-                        for (std::uint32_t j=0;j<w.Batch->Counts[row];++j)
-                            w.NeighborIds.push_back(w.Batch->Neighbors[row*w.Batch->Capacity+j].Index);
+                        if (c.Method==OutlierAnalysisMethod::Radius) { w.Counts.push_back(batch.Counts[row]); continue; }
+                        if (batch.Counts[row]!=width) { why="Incomplete Vulkan kNN neighborhood."; return false; }
+                        for (std::uint32_t j=0;j<batch.Counts[row];++j)
+                            w.NeighborIds.push_back(batch.Neighbors[row*batch.Capacity+j].Index);
                     }
-                }
-                w.NextQuery+=w.Batch->Counts.size();
-                if (w.NextQuery==w.Points.size())
-                {
-                    w.Batch.reset(); w.GpuFinished=true;
-                    w.Result.GpuNeighborhoodMilliseconds=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-w.GpuStarted).count();
                     return true;
-                }
-            }
-            const auto count=std::min<std::size_t>(w.Config.GpuQueryBatchSize,w.Points.size()-w.NextQuery);
-            if (w.Batch && w.Batch->Counts.size()!=count) w.Batch.reset();
-            const auto queries=std::span(w.Points).subspan(w.NextQuery,count);
-            const auto exclusions=w.Config.Method==OutlierAnalysisMethod::LocalDistanceRatio ?
-                std::span<const std::uint32_t>{} : std::span<const std::uint32_t>(w.Slots).subspan(w.NextQuery,count);
-            if (w.Config.Method==OutlierAnalysisMethod::Radius)
-                w.Batch=context.SpatialIndices->QueueGpuRadius(w.GpuIndex,queries,w.Config.Radius,1,exclusions,std::move(w.Batch));
-            else w.Batch=context.SpatialIndices->QueueGpuKNearest(w.GpuIndex,queries,
-                QueryWidth(w.Config,w.Points.size()),exclusions,std::move(w.Batch));
-            ++w.Result.GpuQueryBatches;
-            if (w.Batch->State==SpatialQueryState::Failed) return fail(w.Batch->Diagnostic);
-            return false;
+                },
+                [&](std::size_t first, std::size_t count, std::shared_ptr<SpatialNearestBatch> reuse)
+                {
+                    const auto queries=std::span(w.Points).subspan(first,count);
+                    const auto exclusions=c.Method==OutlierAnalysisMethod::LocalDistanceRatio ?
+                        std::span<const std::uint32_t>{} : std::span<const std::uint32_t>(w.Slots).subspan(first,count);
+                    return c.Method==OutlierAnalysisMethod::Radius
+                        ? context.SpatialIndices->QueueGpuRadius(w.GpuIndex,queries,c.Radius,1,exclusions,std::move(reuse))
+                        : context.SpatialIndices->QueueGpuKNearest(w.GpuIndex,queries,width,exclusions,std::move(reuse));
+                });
+            w.Result.GpuQueryBatches=w.Pages.QueryBatches;
+            if (state==GeometryProcessingDetail::RowsState::Ready) w.Result.GpuNeighborhoodMilliseconds=w.Pages.Milliseconds;
+            if (state==GeometryProcessingDetail::RowsState::Failed) w.Result.Status=EditorCommandStatus::GeometryProcessingFailed;
+            return state!=GeometryProcessingDetail::RowsState::Pending;
         }
         void RestoreStamp(const EditorProcessingContext& context, entt::entity entity,
                           std::optional<AnalysisStamp> stamp, bool rebaseInputs = false,
@@ -504,7 +491,7 @@ namespace Extrinsic::Runtime
                 .Kind = RuntimeTaskKinds::GeometryProcess,
                 .Work = [](const JobCancellation&) { return JobResultEnvelope::Make(true); },
                 .IsReadyToApply = [context, w] { return AdvanceGpu(context, *w); },
-                .PublishCompletion = [w](KernelEventBus&, const JobResultEnvelope&) { return w->GpuFinished; },
+                .PublishCompletion = [w](KernelEventBus&, const JobResultEnvelope&) { return w->Pages.Finished; },
                 .FinalizeUnpublishedOnMainThread = [w] { w->Abandoned = true; }};
             const auto prerequisite = context.JobCommands.Submit(std::move(gpu), identity);
             if (!prerequisite.IsValid())

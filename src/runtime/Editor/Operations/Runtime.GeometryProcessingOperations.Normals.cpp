@@ -71,11 +71,9 @@ namespace Extrinsic::Runtime
             Geometry::PropertySet GraphVertices{}, GraphHalfedges{}, GraphEdges{};
             std::shared_ptr<const SpatialIndexSnapshot> Index{};
             SpatialIndexHandle GpuIndex{};
-            std::shared_ptr<SpatialNearestBatch> Batch{};
+            GeometryProcessingDetail::GpuRowPages Pages{};
             std::vector<std::uint32_t> NeighborOffsets{0}, NeighborIndices{};
-            std::size_t NextQuery{};
-            bool GpuFinished{}, Abandoned{};
-            std::chrono::steady_clock::time_point GpuStarted{};
+            bool Abandoned{};
             EditorNormalEstimationResult Result{};
         };
         bool CaptureDeletionMetadata(const GeometryEntityAvailability &a, D domain, std::string name,
@@ -410,58 +408,54 @@ namespace Extrinsic::Runtime
                 ? "Normals computed using Vulkan LBVH neighborhoods and CPU PCA/orientation."
                 : "Normals computed using " + r.ActualBackend + ".";
         }
+        // Rows become CSR neighborhoods of raw source IDs; Compute decodes them.
         bool AdvanceNormalGpu(const EditorProcessingContext& context, NormalWork& w)
         {
-            auto fail = [&](std::string message, EditorCommandStatus status = EditorCommandStatus::GeometryProcessingFailed) {
-                w.Result.Status = status;
-                w.Result.Message = std::move(message);
-                w.Batch.reset();
-                return true;
-            };
             if (w.Abandoned || !CurrentNormalInput(context, w, true))
-                return fail("Normal inputs changed or the job was cancelled before GPU completion.", EditorCommandStatus::StaleEntity);
-            if (w.GpuFinished) return true;
-            if (w.GpuStarted == std::chrono::steady_clock::time_point{})
-                w.GpuStarted = std::chrono::steady_clock::now();
-            if (w.Batch)
             {
-                if (w.Batch->State == SpatialQueryState::Failed) return fail(w.Batch->Diagnostic);
-                if (w.Batch->State != SpatialQueryState::Ready) return false;
-                const auto& batch = *w.Batch;
-                for (auto count : batch.Counts)
-                    if (count > batch.Capacity)
-                        return fail("Vulkan radius neighborhood exceeds 1024 candidates; use a CPU backend or a smaller radius. Previous normals retained.");
-                for (std::size_t row = 0; row < batch.Counts.size(); ++row)
-                {
-                    for (std::uint32_t j = 0; j < batch.Counts[row]; ++j)
-                        w.NeighborIndices.push_back(batch.Neighbors[row * batch.Capacity + j].Index);
-                    w.NeighborOffsets.push_back(std::uint32_t(w.NeighborIndices.size()));
-                }
-                w.NextQuery += batch.Counts.size();
-                if (w.NextQuery == w.Points.size())
-                {
-                    w.Batch.reset();
-                    w.GpuFinished = true;
-                    w.Result.ActualBackend = "vulkan_lbvh";
-                    w.Result.GpuNeighborhoodMilliseconds = std::chrono::duration<double, std::milli>(
-                        std::chrono::steady_clock::now() - w.GpuStarted).count();
-                    return true;
-                }
+                w.Result.Status = EditorCommandStatus::StaleEntity;
+                w.Result.Message = "Normal inputs changed or the job was cancelled before GPU completion.";
+                w.Pages.Batch.reset();
+                return true;
             }
-            const auto count = std::min<std::size_t>(w.Config.GpuQueryBatchSize, w.Points.size() - w.NextQuery);
-            if (w.Batch && w.Batch->Counts.size() != count) w.Batch.reset();
-            const auto queries = std::span(w.Points).subspan(w.NextQuery, count);
-            if (w.Config.UseRadiusSearch)
-                w.Batch = context.SpatialIndices->QueueGpuRadius(w.GpuIndex, queries, w.Config.Radius,
-                    std::uint32_t(std::min<std::size_t>(1024, w.Points.size())), {}, std::move(w.Batch));
-            else
-                w.Batch = context.SpatialIndices->QueueGpuKNearest(w.GpuIndex, queries,
-                    std::uint32_t(std::min<std::uint64_t>(w.Points.size(),
-                        std::uint64_t(std::max(w.Config.KNeighbors, w.Config.MinimumNeighbors)) + 1)),
-                    {}, std::move(w.Batch));
-            ++w.Result.GpuQueryBatches;
-            if (w.Batch->State == SpatialQueryState::Failed) return fail(w.Batch->Diagnostic);
-            return false;
+            const auto state = GeometryProcessingDetail::AdvanceGpuRowPages(
+                w.Pages, w.Points.size(), w.Config.GpuQueryBatchSize, w.Result.Message,
+                [&](const SpatialNearestBatch& batch, std::string& why)
+                {
+                    for (auto count : batch.Counts)
+                        if (count > batch.Capacity)
+                        {
+                            why = "Vulkan radius neighborhood exceeds 1024 candidates; use a CPU backend or a smaller radius. Previous normals retained.";
+                            return false;
+                        }
+                    for (std::size_t row = 0; row < batch.Counts.size(); ++row)
+                    {
+                        for (std::uint32_t j = 0; j < batch.Counts[row]; ++j)
+                            w.NeighborIndices.push_back(batch.Neighbors[row * batch.Capacity + j].Index);
+                        w.NeighborOffsets.push_back(std::uint32_t(w.NeighborIndices.size()));
+                    }
+                    return true;
+                },
+                [&](std::size_t first, std::size_t count, std::shared_ptr<SpatialNearestBatch> reuse)
+                {
+                    const auto queries = std::span(w.Points).subspan(first, count);
+                    if (w.Config.UseRadiusSearch)
+                        return context.SpatialIndices->QueueGpuRadius(w.GpuIndex, queries, w.Config.Radius,
+                            std::uint32_t(std::min<std::size_t>(1024, w.Points.size())), {}, std::move(reuse));
+                    return context.SpatialIndices->QueueGpuKNearest(w.GpuIndex, queries,
+                        std::uint32_t(std::min<std::uint64_t>(w.Points.size(),
+                            std::uint64_t(std::max(w.Config.KNeighbors, w.Config.MinimumNeighbors)) + 1)),
+                        {}, std::move(reuse));
+                });
+            w.Result.GpuQueryBatches = w.Pages.QueryBatches;
+            if (state == GeometryProcessingDetail::RowsState::Ready)
+            {
+                w.Result.ActualBackend = "vulkan_lbvh";
+                w.Result.GpuNeighborhoodMilliseconds = w.Pages.Milliseconds;
+            }
+            if (state == GeometryProcessingDetail::RowsState::Failed)
+                w.Result.Status = EditorCommandStatus::GeometryProcessingFailed;
+            return state != GeometryProcessingDetail::RowsState::Pending;
         }
         EditorNormalEstimationResult PublishNormals(const EditorProcessingContext &context,
                                                     const std::shared_ptr<NormalWork> &w)
@@ -627,7 +621,7 @@ namespace Extrinsic::Runtime
                 .Kind = RuntimeTaskKinds::GeometryProcess,
                 .Work = [](const JobCancellation&) { return JobResultEnvelope::Make(true); },
                 .IsReadyToApply = [context, w] { return AdvanceNormalGpu(context, *w); },
-                .PublishCompletion = [w](KernelEventBus&, const JobResultEnvelope&) { return w->GpuFinished; },
+                .PublishCompletion = [w](KernelEventBus&, const JobResultEnvelope&) { return w->Pages.Finished; },
                 .FinalizeUnpublishedOnMainThread = [w] { w->Abandoned = true; }};
             const auto prerequisite = context.JobCommands.Submit(std::move(gpu), identity);
             if (!prerequisite.IsValid())
