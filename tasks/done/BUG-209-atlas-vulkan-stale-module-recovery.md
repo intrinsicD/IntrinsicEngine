@@ -44,7 +44,7 @@ METHOD-047 verification archive retains `vulkan-final-build-2.log` (failed),
 
 ## Status
 
-PR/commit: enclosing implementation commit on `codex/method-047-property-guided-atlas`.
+PR/commit: [PR #1044](https://github.com/intrinsicD/IntrinsicEngine/pull/1044), implementation `9221c02c8`.
 
 Retired 2026-09-23 at the build-state recovery endpoint. The enclosing METHOD-047
 implementation/evidence commit records retirement. The complete cache-disabled

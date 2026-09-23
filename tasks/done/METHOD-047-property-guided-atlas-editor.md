@@ -129,7 +129,7 @@ git diff --check
 
 ## Completion
 
-PR/commit: enclosing implementation commit on `codex/method-047-property-guided-atlas`.
+PR/commit: [PR #1044](https://github.com/intrinsicD/IntrinsicEngine/pull/1044), implementation `9221c02c8`.
 
 Retired 2026-09-23 at Operational for the bounded triangle-mesh CPU atlas and
 recorded Vulkan bake/editor path. The enclosing METHOD-047 implementation commit

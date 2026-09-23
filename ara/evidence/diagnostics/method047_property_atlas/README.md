@@ -5,6 +5,7 @@ Current METHOD-047 verification artifacts and their scope:
 - [Report](report.md): corpus, metrics, execution counts and limitations.
 - [Verification](verification.json): exact CPU, sanitizer and Vulkan verdicts.
 - [Review resolution](review-resolution.md): five Opus 5.5 source reviews and the numerical audit.
+- [Integration commit and PR](integration.json).
 - [Source binding](post-corpus-source-binding.json) and [archive hashes](archive-hashes.json).
 - [Rendered workspace](atlas-workspace.png): task-owned Sandbox integration fixture.
 
