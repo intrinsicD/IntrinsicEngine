@@ -222,11 +222,11 @@ runtime-bearing fixtures request one engine worker unless worker-count behavior
 is the contract. The 73 cases that intentionally create larger pools carry
 exact case-scoped `PROCESSORS` reservations: 49 reserve three slots, 22 reserve
 four, and the two Release architecture-SLO cases reserve eight. Do not replace
-these budgets with independently inferred host-core counts. The single-threaded
-discovered case `CurvatureExtrema.RetriangulationAndRefinementRetainCenterCurve`
-alone is `RUN_SERIAL`, because CPU-bound siblings pushed it past its unchanged
-30-second timeout
-([BUG-217](../tasks/done/BUG-217-curvature-refinement-run-serial.md)).
+these budgets with independently inferred host-core counts. The curvature
+retriangulation and refinement scenarios are separate discovered cases. Only the
+single-threaded, dominant `CurvatureExtrema.RefinementRetainsCenterCurve` is
+`RUN_SERIAL`, with the default 30-second timeout
+([BUG-218](../tasks/active/BUG-218-curvature-refinement-scenario-split.md)).
 
 The case-scoped reservation list in
 [`tests/CMakeLists.txt`](CMakeLists.txt) intentionally covers only tests that

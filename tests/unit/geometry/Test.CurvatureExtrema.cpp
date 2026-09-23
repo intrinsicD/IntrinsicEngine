@@ -131,16 +131,21 @@ TEST(CurvatureExtrema, OrientationReversalExchangesRidgeValley)
     }
     CheckCenter(Midpoints(rb, C::Kind::MeanRidge));
 }
-TEST(CurvatureExtrema, RetriangulationAndRefinementRetainCenterCurve)
+TEST(CurvatureExtrema, RetriangulationRetainsCenterCurve)
 {
-    for (auto settings : std::vector<std::pair<int, bool>>{{40, true}, {60, false}})
-    {
-        auto mesh = Grid(settings.first, false, settings.second);
-        auto r = C::Extract(mesh, Parameters());
-        ASSERT_TRUE(r.Succeeded());
-        CheckCenter(Midpoints(r, C::Kind::PrincipalValley));
-        CheckCenter(Midpoints(r, C::Kind::MeanValley));
-    }
+    auto mesh = Grid(40, false, true);
+    auto r = C::Extract(mesh, Parameters());
+    ASSERT_TRUE(r.Succeeded());
+    CheckCenter(Midpoints(r, C::Kind::PrincipalValley));
+    CheckCenter(Midpoints(r, C::Kind::MeanValley));
+}
+TEST(CurvatureExtrema, RefinementRetainsCenterCurve)
+{
+    auto mesh = Grid(60, false, false);
+    auto r = C::Extract(mesh, Parameters());
+    ASSERT_TRUE(r.Succeeded());
+    CheckCenter(Midpoints(r, C::Kind::PrincipalValley));
+    CheckCenter(Midpoints(r, C::Kind::MeanValley));
 }
 TEST(CurvatureExtrema, ScaleTranslationAndSourcePreservation)
 {

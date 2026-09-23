@@ -1,0 +1,16 @@
+# BUG-218 retained evidence (extracted; raw logs stay in the operator's /tmp)
+# Former case CurvatureExtrema.RetriangulationAndRefinementRetainCenterCurve (RUN_SERIAL from BUG-217, TIMEOUT 30),
+# binary IntrinsicGeometryCurvatureExtremaTests, ci-fast/ci Debug; production source 909b422 unchanged.
+
+Hosted counterexample after BUG-217 (RUN_SERIAL active):
+  FAIL https://github.com/intrinsicD/IntrinsicEngine/actions/runs/35845852620  head 20a84ae4c (comment/docs only after 4f3ff1683)
+       last sibling (Orientation 13.21 s) finished 10:05:12.2607; case started 10:05:12.2608 and ran alone;
+       Timeout 30.04 s at 10:05:42.296
+       siblings vs prior passing serial run 35844618599: Gaussian 6.17->8.69 s (1.41), Plane 2.52->3.20 s (1.27),
+       Orientation 9.20->13.21 s (1.44), Scale 2.27->3.17 s (1.40); case 19.03 s -> >=30.04 s (>=1.58)
+
+Per-scenario timing of the former combined case (Codex; existing Debug ci binary, gdb line breakpoints that do not
+modify the program; `SCENARIO_TIMING` monotonic stamps; debugger overhead included; combined case 19,181 ms):
+  Grid(40, alternate) build  0.014 s   Extract 3.545317 s   assertions ~0.0015 s
+  Grid(60)            build  0.030 s   Extract 15.489573 s  assertions ~0.0009 s
+  refinement Extract share of the two Extract calls: 15.49 / 19.03 = 81%

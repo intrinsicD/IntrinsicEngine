@@ -9,6 +9,7 @@ picking backlog work; theme priorities and rationale live in
 ## Active tasks
 
 - `BUG-194` — Large-mesh property display and geodesic controls (tasks/active/BUG-194-large-mesh-property-display.md)
+- `BUG-218` — Split the curvature retriangulation and refinement scenarios (tasks/active/BUG-218-curvature-refinement-scenario-split.md)
 - `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/active/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)

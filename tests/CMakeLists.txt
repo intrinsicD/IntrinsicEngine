@@ -2808,19 +2808,20 @@ if(_intrinsic_registered_test_targets)
             "endif()\n"
         )
     endforeach()
-    # BUG-217: CPU-bound CurvatureExtrema siblings pushed this single-threaded
-    # two-grid case past its unchanged 30 s timeout under parallel CTest, so it
-    # is isolated explicitly. Grouped (NO_DISCOVER) registration is unchanged.
+    # BUG-217/218: the single-threaded 60-grid refinement case dominates the
+    # former combined retriangulation/refinement case; CPU-bound siblings pushed
+    # that case past 30 s, so only refinement is isolated. Grouped (NO_DISCOVER)
+    # registration is unchanged.
     get_target_property(_intrinsic_curvature_extrema_discovered
         IntrinsicGeometryCurvatureExtremaTests INTRINSIC_GTEST_DISCOVERED)
     if(_intrinsic_curvature_extrema_discovered)
         string(APPEND _intrinsic_property_fixup_script
             "if(EXISTS \"$<TARGET_FILE:IntrinsicGeometryCurvatureExtremaTests>\")\n"
-            "  list(FIND IntrinsicGeometryCurvatureExtremaTests_TESTS \"CurvatureExtrema.RetriangulationAndRefinementRetainCenterCurve\" _intrinsic_serial_index)\n"
+            "  list(FIND IntrinsicGeometryCurvatureExtremaTests_TESTS \"CurvatureExtrema.RefinementRetainsCenterCurve\" _intrinsic_serial_index)\n"
             "  if(_intrinsic_serial_index EQUAL -1)\n"
-            "    message(FATAL_ERROR \"Serial test CurvatureExtrema.RetriangulationAndRefinementRetainCenterCurve was not discovered\")\n"
+            "    message(FATAL_ERROR \"Serial test CurvatureExtrema.RefinementRetainsCenterCurve was not discovered\")\n"
             "  endif()\n"
-            "  set_tests_properties(CurvatureExtrema.RetriangulationAndRefinementRetainCenterCurve PROPERTIES RUN_SERIAL TRUE)\n"
+            "  set_tests_properties(CurvatureExtrema.RefinementRetainsCenterCurve PROPERTIES RUN_SERIAL TRUE)\n"
             "endif()\n"
         )
     endif()
