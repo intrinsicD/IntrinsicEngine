@@ -5,6 +5,7 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [BUG-217 — Run the curvature refinement case without CPU-bound siblings](../../active/BUG-217-curvature-refinement-run-serial.md): hosted pr-fast and one-CPU probes time out the unchanged case under parallel sibling load; it passes alone in 17.10 s. The fix sets single-case `RUN_SERIAL` and awaits verification.
 
 - [BUG-178 — Clang 23 crashes during an incremental module rebuild](BUG-178-clang23-incremental-module-ice.md).
 

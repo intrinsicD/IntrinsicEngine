@@ -1,0 +1,19 @@
+# BUG-217 retained evidence (extracted; raw logs stay in the operator's /tmp)
+# Case: CurvatureExtrema.RetriangulationAndRefinementRetainCenterCurve, registered TIMEOUT 30,
+# labels unit;geometry, binary IntrinsicGeometryCurvatureExtremaTests. Source 909b422660f3c96c82b75581f46676a8f9195d34
+# (RORG-135); geometry sources, test body and link closure unchanged since 362b794ac.
+
+Hosted pr-fast, ubuntu-24.04, fresh ci-fast tree, touched_scope exact-regex chunk run with -j4 (os.cpu_count()),
+no concurrent build:
+  pass  https://github.com/intrinsicD/IntrinsicEngine/actions/runs/35838290607  head 40a22bcd5
+        case 23.51 s; overlapped Gaussian 2.80 s and Orientation 8.18 s, then ran alone 15.33 s
+        siblings: Gaussian 6.65 s, Plane 2.98 s, Orientation 10.85 s, Scale 2.64 s
+  FAIL  https://github.com/intrinsicD/IntrinsicEngine/actions/runs/35841932080  head edae4c0c7 (docs-only diff)
+        case Timeout 30.02 s (only failure; 114/115 in chunk passed); overlapped Orientation 15.64 s, then ran alone 14.38 s
+        siblings: Gaussian 9.68 s, Plane 4.12 s, Orientation 18.09 s, Scale 3.91 s
+
+Local probes, same ci binary, 10 CurvatureExtrema cases (Codex, 2026-09-23):
+  taskset -c0,1  ctest -R '^CurvatureExtrema\.' --parallel 4  11:29:26  all pass; case 23.36 s; Orientation 12.30 s
+  taskset -c0    ctest -R '^CurvatureExtrema\.' --parallel 4  11:30:20  case Timeout 30.01 s, 9 others pass; Orientation 24.19 s, Gaussian 13.08 s, Noisy 13.12 s
+  taskset -c0    case alone (--parallel 1)                   11:31:11  case pass 17.10 s
+Earlier isolated reference: 18.29 s (BUG-216). Retained full-CPU logs 2026-09-07..09-22: 16.51-18.14 s.

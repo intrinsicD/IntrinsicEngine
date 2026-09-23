@@ -2808,6 +2808,21 @@ if(_intrinsic_registered_test_targets)
             "endif()\n"
         )
     endforeach()
+    # BUG-217: this single-threaded two-grid case keeps its 30 s budget only
+    # without CPU-bound siblings; grouped (NO_DISCOVER) registration is unchanged.
+    get_target_property(_intrinsic_curvature_extrema_discovered
+        IntrinsicGeometryCurvatureExtremaTests INTRINSIC_GTEST_DISCOVERED)
+    if(_intrinsic_curvature_extrema_discovered)
+        string(APPEND _intrinsic_property_fixup_script
+            "if(EXISTS \"$<TARGET_FILE:IntrinsicGeometryCurvatureExtremaTests>\")\n"
+            "  list(FIND IntrinsicGeometryCurvatureExtremaTests_TESTS \"CurvatureExtrema.RetriangulationAndRefinementRetainCenterCurve\" _intrinsic_serial_index)\n"
+            "  if(_intrinsic_serial_index EQUAL -1)\n"
+            "    message(FATAL_ERROR \"Serial test CurvatureExtrema.RetriangulationAndRefinementRetainCenterCurve was not discovered\")\n"
+            "  endif()\n"
+            "  set_tests_properties(CurvatureExtrema.RetriangulationAndRefinementRetainCenterCurve PROPERTIES RUN_SERIAL TRUE)\n"
+            "endif()\n"
+        )
+    endif()
     # BUG-179: three sequential framed ICP GPU runs take ~47 s under DPMS-off
     # present pacing. The fixture stops itself at 70 s with round/frame diagnostics.
     string(APPEND _intrinsic_property_fixup_script
