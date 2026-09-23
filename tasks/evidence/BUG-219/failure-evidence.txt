@@ -1,0 +1,14 @@
+# BUG-219 retained evidence (extracted; raw logs stay in the operator's /tmp)
+Hosted pr-fast https://github.com/intrinsicD/IntrinsicEngine/actions/runs/35851119431  head 4cdf626f0
+  SandboxEditorUi.UvRegenerationPanelModelTracksDerivedJobStateThroughCache  Failed 0.05 s (33 ms in gtest)
+  tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp:5912: Failure
+  Expected: (stats.SelectedAnalysisCacheMisses) >= (4u), actual: 3 vs 4
+  106/107 other cases in that chunk passed; the pipeline stopped before the curvature chunk.
+Provenance: the test body predates this branch (last changed by 9221c02c8, included in base 9831bc4fc); production
+  cache/job code is unchanged by RORG-135/BUG-217/BUG-218. The same case passed locally in the 5,013-test full CPU
+  run at 4cdf626f0 (0.019 s).
+Mechanism (source reading): JobService::DispatchJob stores Queued and dispatches immediately to the 2-worker harness
+  scheduler; the selected-analysis cache key mixes each entity job's State and progress. If a worker finishes the tiny
+  UV job before the post-submit snapshot, that snapshot sees AwaitingGate and the post-WaitForAll snapshot is an
+  identical-key cache hit (3 misses). Reproduction recipe: /tmp/intrinsic-simplify-ui-cache-diagnosis.md (gdb non-stop
+  pause of the main thread at the post-submit snapshot).

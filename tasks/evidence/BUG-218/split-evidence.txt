@@ -43,3 +43,9 @@ Hosted counterexample to the split with a 30 s budget:
        siblings hosted vs local full CPU: Gaussian 10.41/3.39 (3.07), Plane 5.37/1.37 (3.93), Orientation 17.07/6.93 (2.46),
        Retriangulation 8.53/3.39 (2.52), Scale 3.92/1.41 (2.78); the siblings overlapped each other under -j4
   Case-only TIMEOUT 60 estimate (not measured): 14.38 s x 2.5-3.1 = 36-44 s; Plane's 3.9x (short, four-way) would be ~56 s.
+
+Local verification of the budget change 4cdf626f0 (Codex): all four presets configured, curvature target built;
+  normalized metadata: only CurvatureExtrema.RefinementRetainsCenterCurve TIMEOUT 30 -> 60 (RUN_SERIAL kept) in ci and
+  ci-vulkan; grouped ci-asan/ci-ubsan unchanged; four curvature binaries SHA-256 identical to before.
+  full CPU 12:49:24: 5,013 tests / 0 failures / 1 expected skip, 60.09 s; Refinement 15.72 s.
+  Hosted run 35851119431 stopped on an unrelated UI cache failure (BUG-219) before the curvature chunk.

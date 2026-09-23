@@ -60,13 +60,13 @@ refinement case and give it a case-only 60 s `TIMEOUT`.
 ## Acceptance criteria
 - [x] The changed geometry-test target builds in `ci`, `ci-asan`, `ci-ubsan` and `ci-vulkan`.
 - [x] Split metadata delta (`895980f87`): the old combined case is replaced by exactly the two new cases. `RUN_SERIAL` is on refinement only, both have `TIMEOUT 30`, labels are unchanged, and grouped and GPU registrations are unchanged.
-- [ ] Budget metadata delta: only `RefinementRetainsCenterCurve` changes, from `TIMEOUT 30` to `TIMEOUT 60`, keeping `RUN_SERIAL`. Every other registration and property is unchanged.
+- [x] Budget metadata delta (`4cdf626f0`): the curvature target builds in all four presets. The only change is `RefinementRetainsCenterCurve` going from `TIMEOUT 30` to `TIMEOUT 60`, keeping `RUN_SERIAL`, in `ci`/`ci-vulkan`. Grouped `ci-asan`/`ci-ubsan` are unchanged, and all four curvature binaries' SHA-256 hashes are identical.
 - [x] Three separate one-CPU `--parallel 4` whole-cohort invocations of the 11 CurvatureExtrema cases each pass, 11/11. Refinement took 15.47, 16.15 and 15.90 s. An earlier `--repeat until-fail:3` variant was not green; see the log.
 - [x] The full CPU, full ASan and full UBSan gates pass on the split source `895980f87`:
   - CPU: 5,013 tests, 0 failures, 1 expected skip, 60.27 s; refinement 14.38 s
   - ASan: 3,333, 0 failures, 0 skips, 721.31 s; curvature group 99.72 s
   - UBSan: 3,333, 0 failures, 1 expected skip, 318.69 s; curvature group 84.13 s
-- [ ] The normal local CPU run passes again with the 60 s budget.
+- [x] The normal local CPU run passes again with the 60 s budget: 5,013 tests, 0 failures, 1 expected skip, 60.09 s (refinement 15.72 s).
 - [ ] Normal hosted pr-fast passes for PR #1045.
 
 ## Verification
@@ -85,3 +85,4 @@ ctest --test-dir build/ci-ubsan --output-on-failure -LE 'gpu|vulkan|slow|flaky-q
 - 2026-09-23: The repeated-test variant shows that unserialized heavy siblings can still approach 30 s under extreme one-CPU sharing. No test or gate was changed for it.
 - 2026-09-23: Full CPU, ASan and UBSan passed on `895980f87`.
 - 2026-09-23: Hosted run 35849534652 at `d6d3bccfe` timed out the serialized refinement case alone at 30.01 s. The unchanged 30 s budget proved insufficient. The final proposal is the case-only 60 s budget; its metadata, local rerun and hosted result are pending.
+- 2026-09-23: Budget metadata and the local full CPU run passed at `4cdf626f0`. Hosted run 35851119431 then failed an unrelated UI cache test ([BUG-219](BUG-219-uv-panel-cache-snapshot-race.md)) before reaching the curvature chunk, so the hosted budget criterion stays open.
