@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import tempfile
@@ -11,6 +12,11 @@ from shutil import copyfile
 REPO_ROOT = Path(__file__).resolve().parents[3]
 VALIDATOR = REPO_ROOT / "tools" / "agents" / "validate_tasks.py"
 CONTRACT_BASE_REVISION = "577b45837d47e731f4495c8ab4ea1570bdc63911"
+# Enrollment consumes a legacy entry, so use an eligible fixture from the
+# authoritative inventory rather than a task that may already be enrolled.
+UNCONSUMED_LEGACY_TASK = next(iter(sorted(json.loads(
+    (REPO_ROOT / "tools/agents/contract_legacy_tasks.json").read_text(encoding="utf-8")
+)["tasks"])))
 
 
 def run_validator(root: Path) -> subprocess.CompletedProcess[str]:
@@ -550,15 +556,13 @@ contracts: [method.engine-integration]
         self.assertIn("missing field(s): Publication", result.stdout)
 
     def test_byte_identical_legacy_task_is_grandfathered(self) -> None:
-        source = (
-            REPO_ROOT
-            / "tasks/backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md"
-        )
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "tasks"
-            target = root / "backlog/bugs" / source.name
+            target = root / UNCONSUMED_LEGACY_TASK
             target.parent.mkdir(parents=True, exist_ok=True)
-            copyfile(source, target)
+            target.write_bytes(task_bytes_at_contract_baseline(
+                UNCONSUMED_LEGACY_TASK
+            ))
 
             result = run_validator(root)
 
@@ -601,15 +605,13 @@ contracts: [method.engine-integration]
         self.assertIn("outside the prospective contract baseline", result.stdout)
 
     def test_changed_legacy_task_must_enroll(self) -> None:
-        source = (
-            REPO_ROOT
-            / "tasks/backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md"
-        )
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "tasks"
-            target = root / "backlog/bugs" / source.name
+            target = root / UNCONSUMED_LEGACY_TASK
             target.parent.mkdir(parents=True, exist_ok=True)
-            copyfile(source, target)
+            target.write_bytes(task_bytes_at_contract_baseline(
+                UNCONSUMED_LEGACY_TASK
+            ))
             target.write_text(
                 target.read_text(encoding="utf-8")
                 + "\n<!-- prospective semantic edit -->\n",
@@ -622,15 +624,13 @@ contracts: [method.engine-integration]
         self.assertIn("must declare `contract_schema: 1`", result.stdout)
 
     def test_promoted_legacy_task_must_enroll(self) -> None:
-        source = (
-            REPO_ROOT
-            / "tasks/backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md"
-        )
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "tasks"
-            target = root / "active" / source.name
+            target = root / "active" / Path(UNCONSUMED_LEGACY_TASK).name
             target.parent.mkdir(parents=True, exist_ok=True)
-            copyfile(source, target)
+            target.write_bytes(task_bytes_at_contract_baseline(
+                UNCONSUMED_LEGACY_TASK
+            ))
 
             result = run_validator(root)
 

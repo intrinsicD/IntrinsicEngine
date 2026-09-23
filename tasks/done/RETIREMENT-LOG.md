@@ -8,6 +8,16 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-09-23 — BUG-213 historical CI fixtures
+
+Retired [BUG-213](BUG-213-ci-historical-fixture-bindings.md) after restoring the
+exact scaling manifest bound by the immutable baseline and selecting eligible
+legacy task fixtures from their authoritative inventory and frozen revision.
+Strict baseline/manifest checks, selected structural checks and docs regression
+suites pass; Opus 5.5 approved the final repair. No validator or historical
+result changed. [PR #1044](https://github.com/intrinsicD/IntrinsicEngine/pull/1044)
+and the enclosing commit carry the fix and retained evidence.
+
 ## 2026-09-23 — BUG-211 shader prerequisite and BUG-212 worker budgets
 
 Retired [BUG-211](BUG-211-pr-fast-shader-compiler-prerequisite.md) after adding

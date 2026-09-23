@@ -1,0 +1,60 @@
+[touched_scope] workflow policy regressions: python3 tests/regression/tooling/Test.WorkflowConcurrency.py
+....................
+----------------------------------------------------------------------
+Ran 20 tests in 0.270s
+
+OK
+[touched_scope] workflow policy regressions: python3 tests/regression/tooling/Test.WorkflowRouting.py
+...........
+----------------------------------------------------------------------
+Ran 11 tests in 0.455s
+
+OK
+[touched_scope] workflow policy regressions: python3 tests/regression/tooling/Test.CcacheWorkflow.py
+....................ERROR: ccache --print-stats failed: statistics unavailable
+.ERROR: invalid ccache stats value for 'cache_miss': 'not-a-number'
+..
+----------------------------------------------------------------------
+Ran 23 tests in 0.032s
+
+OK
+Wrote /tmp/tmp9mixcj57/stats.json
+[touched_scope] workflow policy regressions: python3 tests/regression/tooling/Test.CiTiming.py
+..................success elapsed: 0.014 s
+failure elapsed: 0.016 s
+..
+----------------------------------------------------------------------
+Ran 20 tests in 2.688s
+
+OK
+[touched_scope] workflow naming contract: python3 tools/ci/check_workflow_names.py --root .github/workflows --strict
+Workflow naming check passed: file names, top-level names, trigger sections, and readability gates are valid.
+[touched_scope] layering contract: python3 tools/repo/check_layering.py --root src --strict
+[check_layering] Scan root: /home/alex/Documents/IntrinsicEngine/src
+[check_layering] Files scanned: 882
+[check_layering] References scanned: 8614 import/include, 84 CMake link
+[check_layering] Allowlist entries: 0
+[check_layering] Allowlisted violations: 0
+[check_layering] No layering violations found.
+[touched_scope] test layout contract: python3 tools/repo/check_test_layout.py --root . --strict
+test layout check complete. findings=0 mode=strict
+[touched_scope] documentation links: python3 tools/docs/check_doc_links.py --root .
+[check_doc_links] Root: /home/alex/Documents/IntrinsicEngine
+[check_doc_links] Checked relative links: 4071
+[check_doc_links] Mode: warning
+[check_doc_links] No broken relative links found.
+[touched_scope] task policy: python3 tools/agents/check_task_policy.py --root . --strict
+Validated 444 task file(s); findings: 0; mode: strict.
+[check_task_maturity_followups] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_maturity_followups] Open task files scanned: 129
+[check_task_maturity_followups] No maturity follow-up findings.
+Task policy check complete. findings=0 mode=strict.
+[touched_scope] task-state links: python3 tools/agents/check_task_state_links.py --root . --strict
+[check_task_state_links] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_state_links] Indexed task IDs: 1080
+[check_task_state_links] Mode: strict
+[check_task_state_links] No task-state link findings.
+[touched_scope] agent skill mirror sync: python3 tools/agents/sync_skills.py --check
+Skill mirror sync complete. mode=check files=13 surfaces=3.
+[touched_scope] session brief freshness: python3 tools/agents/generate_session_brief.py --check
+tasks/SESSION-BRIEF.md is up to date.

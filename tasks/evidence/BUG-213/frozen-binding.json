@@ -1,0 +1,8 @@
+{
+  "manifest": "benchmarks/geometry/manifests/geometry_uv_atlas_fast_staged_edge_grouping_scaling.yaml",
+  "sha256": "962fb130b3ba9cf86feb9668d83ee82150729c28ffb3a50d6992077837b1eac8",
+  "baseline": "benchmarks/baselines/geometry_uv_atlas_fast_staged_edge_grouping_scaling_8ca52438.json",
+  "baseline_bytes_unchanged": true,
+  "current_fixed_objective": "Angle",
+  "runtime_cpp_changes_in_this_repair": false
+}

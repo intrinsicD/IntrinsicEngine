@@ -162,6 +162,10 @@ deterministic public atlas output. Its checked-in `8ca52438` baseline and
 [`BUG-101 result report`](../reports/BUG-101-uv-atlas-edge-grouping-scaling.md)
 support only the documented same-host, same-toolchain before/after comparison;
 the smoke test has no flaky timing-ratio gate or broader speedup claim.
+The scaling manifest remains byte-identical to the manifest bound by that
+historical baseline. This fixed workload uses the Angle objective explicitly
+in `MakeOptions`; it does not expose objective selection as a benchmark parameter.
+The separate property-guided-atlas manifest records selectable objectives.
 
 ## Fixture policy
 
