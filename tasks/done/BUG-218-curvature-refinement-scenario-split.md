@@ -62,7 +62,8 @@ refinement case and give it a case-only 60 s `TIMEOUT`.
   - Estimate, not a measurement: local refinement 14.38 s × the 2.5–3.1×
     hosted/local ratio of the longer siblings ≈ 36–44 s. Those siblings shared
     CPUs; refinement ran alone.
-  - The only hosted refinement measurement is the > 30.01 s lower bound.
+  - At budget selection, the only hosted refinement measurement was the
+    > 30.01 s lower bound; the later passing run is recorded under Completion.
   - A hang still fails at 60 s.
   - This is a diagnosed, case-scoped budget change. It is not a broad timeout
     change, slow label or quarantine.
