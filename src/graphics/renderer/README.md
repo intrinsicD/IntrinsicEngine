@@ -443,10 +443,7 @@ into graphics public contracts.
 - `Extrinsic.Graphics.Pass.PostProcess.Histogram`
 - `Extrinsic.Graphics.Pass.PostProcess.SMAA`
 - `Extrinsic.Graphics.Pass.PostProcess.ToneMap`
-- `Extrinsic.Graphics.Pass.Selection.EntityId`
-- `Extrinsic.Graphics.Pass.Selection.PointId`
-- `Extrinsic.Graphics.Pass.Selection.EdgeId`
-- `Extrinsic.Graphics.Pass.Selection.FaceId`
+- `Extrinsic.Graphics.Pass.Selection.Id`
 - `Extrinsic.Graphics.Pass.Selection.Outline`
 - `Extrinsic.Graphics.Pass.Shadows`
 - `Extrinsic.Graphics.Pass.ImGui`
@@ -1083,9 +1080,8 @@ Concretely:
   push block and are deliberately *not* referenced — see the "Shader
   push-constant compatibility policy" subsection above. The typed `PickingPass` command route now invokes
   `RecordSelectionEntityIdPass(...)` then
-  `RecordSelectionFaceIdPass(...)` then
-  `RecordSelectionEdgeIdPass(...)` then
-  `RecordSelectionPointIdPass(...)` with the standard
+  `RecordSelectionPrimitiveIdPass(...)` for the Face, Edge and Point
+  passes in that order, with the standard
   `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy
   accumulated per sub-pass. With depth-equal / depth-write-off, only the
   nearest-surface fragment that survives the prepass depth test can

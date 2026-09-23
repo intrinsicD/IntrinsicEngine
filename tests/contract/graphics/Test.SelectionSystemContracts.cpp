@@ -3,11 +3,8 @@
 #include <optional>
 
 import Extrinsic.Graphics.SelectionSystem;
-import Extrinsic.Graphics.Pass.Selection.EdgeId;
-import Extrinsic.Graphics.Pass.Selection.EntityId;
-import Extrinsic.Graphics.Pass.Selection.FaceId;
+import Extrinsic.Graphics.Pass.Selection.Id;
 import Extrinsic.Graphics.Pass.Selection.Outline;
-import Extrinsic.Graphics.Pass.Selection.PointId;
 
 using namespace Extrinsic;
 
@@ -160,13 +157,11 @@ TEST(GraphicsSelectionSystemContracts, PromotedSelectionPassClassNamesRemainAvai
     Graphics::EdgeIdPass edgePass{selection};
     Graphics::PointIdPass pointPass{selection};
     Graphics::SelectionOutlinePass outlinePass{selection};
-    Graphics::SelectionEntityIdPass legacyAlias{selection};
 
     (void)entityPass;
     (void)facePass;
     (void)edgePass;
     (void)pointPass;
     (void)outlinePass;
-    (void)legacyAlias;
 }
 

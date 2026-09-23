@@ -7,11 +7,8 @@
 
 import Extrinsic.Graphics.CullingSystem;
 import Extrinsic.Graphics.GpuWorld;
-import Extrinsic.Graphics.Pass.Selection.EdgeId;
-import Extrinsic.Graphics.Pass.Selection.EntityId;
-import Extrinsic.Graphics.Pass.Selection.FaceId;
+import Extrinsic.Graphics.Pass.Selection.Id;
 import Extrinsic.Graphics.Pass.Selection.Outline;
-import Extrinsic.Graphics.Pass.Selection.PointId;
 import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.CommandContext;

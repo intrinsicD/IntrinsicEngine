@@ -963,7 +963,7 @@ Both upload helpers contain the same lease/capacity growth, cap checking, host-v
 
 ### R22 — GPU surface bucket draw recording
 
-**Locations:** [src/graphics/renderer/Passes/Pass.Selection.EntityId.cpp:21](../../src/graphics/renderer/Passes/Pass.Selection.EntityId.cpp#L21); [src/graphics/renderer/Passes/Pass.Selection.FaceId.cpp:21](../../src/graphics/renderer/Passes/Pass.Selection.FaceId.cpp#L21); [src/graphics/renderer/Passes/Pass.Deferred.GBuffers.cpp:23](../../src/graphics/renderer/Passes/Pass.Deferred.GBuffers.cpp#L23); [src/graphics/renderer/Passes/Pass.Forward.Surface.cpp:23](../../src/graphics/renderer/Passes/Pass.Forward.Surface.cpp#L23); [src/graphics/renderer/Passes/Pass.DepthPrepass.cpp:24](../../src/graphics/renderer/Passes/Pass.DepthPrepass.cpp#L24).
+**Locations:** [src/graphics/renderer/Passes/Pass.Selection.Id.cpp](../../src/graphics/renderer/Passes/Pass.Selection.Id.cpp) (`EntityIdPass`/`FaceIdPass::Execute`; formerly separate EntityId/FaceId units); [src/graphics/renderer/Passes/Pass.Deferred.GBuffers.cpp:23](../../src/graphics/renderer/Passes/Pass.Deferred.GBuffers.cpp#L23); [src/graphics/renderer/Passes/Pass.Forward.Surface.cpp:23](../../src/graphics/renderer/Passes/Pass.Forward.Surface.cpp#L23); [src/graphics/renderer/Passes/Pass.DepthPrepass.cpp:24](../../src/graphics/renderer/Passes/Pass.DepthPrepass.cpp#L24).
 
 The passes repeat bucket validity checks, managed index-buffer binding, GpuScenePushConstants construction and DrawIndexedIndirectCount.
 

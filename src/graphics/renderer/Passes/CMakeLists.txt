@@ -16,11 +16,8 @@ target_sources(${target_name}
 		Pass.PostProcess.SMAA.cppm
 		Pass.PostProcess.ToneMap.cppm
 		Pass.Present.cppm
-		Pass.Selection.EdgeId.cppm
-		Pass.Selection.EntityId.cppm
-		Pass.Selection.FaceId.cppm
+		Pass.Selection.Id.cppm
 		Pass.Selection.Outline.cppm
-		Pass.Selection.PointId.cppm
 		Pass.Shadows.cppm
 		Pass.TransientDebug.Surface.cppm
 		Pass.VisualizationOverlay.cppm
@@ -40,11 +37,8 @@ target_sources(${target_name}
 		Pass.PostProcess.SMAA.cpp
 		Pass.PostProcess.ToneMap.cpp
 		Pass.Present.cpp
-		Pass.Selection.EdgeId.cpp
-		Pass.Selection.EntityId.cpp
-		Pass.Selection.FaceId.cpp
+		Pass.Selection.Id.cpp
 		Pass.Selection.Outline.cpp
-		Pass.Selection.PointId.cpp
 		Pass.Shadows.cpp
 		Pass.TransientDebug.Surface.cpp
 		Pass.VisualizationOverlay.cpp

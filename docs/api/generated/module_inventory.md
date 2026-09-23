@@ -15,7 +15,7 @@ Root scanned: `src`
 | `geometry` | 127 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 75 |
+| `graphics/renderer` | 72 |
 | `graphics/rhi` | 18 |
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
@@ -314,11 +314,8 @@ Root scanned: `src`
 | `Extrinsic.Graphics.Pass.PostProcess.SMAA` | `src/graphics/renderer/Passes/Pass.PostProcess.SMAA.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Pass.PostProcess.ToneMap` | `src/graphics/renderer/Passes/Pass.PostProcess.ToneMap.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Pass.Present` | `src/graphics/renderer/Passes/Pass.Present.cppm` | `graphics/renderer` |
-| `Extrinsic.Graphics.Pass.Selection.EdgeId` | `src/graphics/renderer/Passes/Pass.Selection.EdgeId.cppm` | `graphics/renderer` |
-| `Extrinsic.Graphics.Pass.Selection.EntityId` | `src/graphics/renderer/Passes/Pass.Selection.EntityId.cppm` | `graphics/renderer` |
-| `Extrinsic.Graphics.Pass.Selection.FaceId` | `src/graphics/renderer/Passes/Pass.Selection.FaceId.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.Pass.Selection.Id` | `src/graphics/renderer/Passes/Pass.Selection.Id.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Pass.Selection.Outline` | `src/graphics/renderer/Passes/Pass.Selection.Outline.cppm` | `graphics/renderer` |
-| `Extrinsic.Graphics.Pass.Selection.PointId` | `src/graphics/renderer/Passes/Pass.Selection.PointId.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Pass.Shadows` | `src/graphics/renderer/Passes/Pass.Shadows.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Pass.TransientDebug.Surface` | `src/graphics/renderer/Passes/Pass.TransientDebug.Surface.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Pass.VisualizationOverlay` | `src/graphics/renderer/Passes/Pass.VisualizationOverlay.cppm` | `graphics/renderer` |
@@ -458,4 +455,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **431**
+Total modules: **428**

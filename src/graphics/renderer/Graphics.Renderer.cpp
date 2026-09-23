@@ -65,10 +65,7 @@ import Extrinsic.Graphics.Pass.Forward.Surface;
 import Extrinsic.Graphics.Pass.Forward.Line;
 import Extrinsic.Graphics.Pass.Forward.Point;
 import Extrinsic.Graphics.Pass.Shadows;
-import Extrinsic.Graphics.Pass.Selection.EntityId;
-import Extrinsic.Graphics.Pass.Selection.FaceId;
-import Extrinsic.Graphics.Pass.Selection.EdgeId;
-import Extrinsic.Graphics.Pass.Selection.PointId;
+import Extrinsic.Graphics.Pass.Selection.Id;
 import Extrinsic.Graphics.Pass.Selection.Outline;
 import Extrinsic.Graphics.Pass.PostProcess.Bloom;
 import Extrinsic.Graphics.Pass.PostProcess.FXAA;
@@ -8933,83 +8930,39 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
-        // GRAPHICS-074 Slice B — default-recipe Face / Edge / Point
-        // sub-pass routes inside the `"PickingPass"` executor branch.
-        // Each helper mirrors `RecordSelectionEntityIdPass` exactly: a
-        // non-operational device → `SkippedNonOperational`; missing
-        // culling output, pass, lease, GpuWorld, or CullingSystem →
-        // `SkippedUnavailable`; otherwise the bucket-bound
-        // `FaceIdPass` / `EdgeIdPass` / `PointIdPass` `Execute(...)`
-        // records the matching `Bind/Bind/Push/DrawIndexedIndirectCount`
-        // (or non-indexed `DrawIndirectCount` for points) shape and
-        // returns `Recorded`. The four sub-passes share the recipe's
-        // `PickingPass` render pass, so all bound pipelines are
-        // render-pass-compatible (two R32_UINT color targets + D32_FLOAT
-        // depth, depth-equal / depth-write-off). The Face/Edge/Point
-        // pipelines write the matching `EncodeSelectionId(domain,
-        // gl_PrimitiveID)` value into `PrimitiveId` while still emitting
-        // the per-instance stable entity ID into `EntityId`, so the
-        // last-pass-wins-per-pixel behavior after depth-equal yields the
-        // most refined domain code that survives the prepass depth test.
-        // The `Picking.Readback` drain + `PublishPickResult` /
-        // `PublishNoHit` wiring remain Slice D scope.
-        [[nodiscard]] RenderCommandPassStatus RecordSelectionFaceIdPass(RHI::ICommandContext& cmd,
-                                                                         const RHI::CameraUBO& camera,
-                                                                         const std::uint32_t frameIndex)
+        // Face / Edge / Point primitive-ID sub-passes inside the `"PickingPass"`
+        // executor branch. Same status mapping as `RecordSelectionEntityIdPass`:
+        // a non-operational device → `SkippedNonOperational`; a missing culling
+        // output, pass, lease, GpuWorld or CullingSystem → `SkippedUnavailable`;
+        // otherwise the pass records its bucket draw and we return `Recorded`.
+        // Their pipelines were bound at lease creation. All four sub-passes share
+        // the recipe's `PickingPass` render pass, so every bound pipeline is
+        // render-pass-compatible (two R32_UINT color targets + D32_FLOAT depth,
+        // depth-equal / depth-write-off). Face/Edge/Point pipelines write
+        // `EncodeSelectionId(domain, gl_PrimitiveID)` into `PrimitiveId` while
+        // still emitting the stable entity ID into `EntityId`, so last-pass-wins
+        // after depth-equal yields the most refined domain code per pixel.
+        template <class Pass>
+        [[nodiscard]] RenderCommandPassStatus RecordSelectionPrimitiveIdPass(
+            std::optional<Pass>& pass,
+            const std::optional<RHI::PipelineManager::PipelineLease>& pipelineLease,
+            RHI::ICommandContext& cmd,
+            const RHI::CameraUBO& camera,
+            const std::uint32_t frameIndex)
         {
             if (m_Device == nullptr || !m_Device->IsOperational())
             {
                 return RenderCommandPassStatus::SkippedNonOperational;
             }
-            if (!m_CullingOutputAvailable || !m_SelectionFaceIdPass.has_value() ||
-                !m_SelectionFaceIdPipelineLease.has_value() ||
-                !m_SelectionFaceIdPipelineLease->IsValid() ||
+            if (!m_CullingOutputAvailable || !pass.has_value() ||
+                !pipelineLease.has_value() ||
+                !pipelineLease->IsValid() ||
                 !m_Subsystems.GpuWorldSystem.has_value() || !m_Subsystems.CullingSystemRegistry.has_value())
             {
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
-            m_SelectionFaceIdPass->Execute(cmd, camera, *m_Subsystems.GpuWorldSystem, *m_Subsystems.CullingSystemRegistry, frameIndex);
-            return RenderCommandPassStatus::Recorded;
-        }
-
-        [[nodiscard]] RenderCommandPassStatus RecordSelectionEdgeIdPass(RHI::ICommandContext& cmd,
-                                                                         const RHI::CameraUBO& camera,
-                                                                         const std::uint32_t frameIndex)
-        {
-            if (m_Device == nullptr || !m_Device->IsOperational())
-            {
-                return RenderCommandPassStatus::SkippedNonOperational;
-            }
-            if (!m_CullingOutputAvailable || !m_SelectionEdgeIdPass.has_value() ||
-                !m_SelectionEdgeIdPipelineLease.has_value() ||
-                !m_SelectionEdgeIdPipelineLease->IsValid() ||
-                !m_Subsystems.GpuWorldSystem.has_value() || !m_Subsystems.CullingSystemRegistry.has_value())
-            {
-                return RenderCommandPassStatus::SkippedUnavailable;
-            }
-
-            m_SelectionEdgeIdPass->Execute(cmd, camera, *m_Subsystems.GpuWorldSystem, *m_Subsystems.CullingSystemRegistry, frameIndex);
-            return RenderCommandPassStatus::Recorded;
-        }
-
-        [[nodiscard]] RenderCommandPassStatus RecordSelectionPointIdPass(RHI::ICommandContext& cmd,
-                                                                          const RHI::CameraUBO& camera,
-                                                                          const std::uint32_t frameIndex)
-        {
-            if (m_Device == nullptr || !m_Device->IsOperational())
-            {
-                return RenderCommandPassStatus::SkippedNonOperational;
-            }
-            if (!m_CullingOutputAvailable || !m_SelectionPointIdPass.has_value() ||
-                !m_SelectionPointIdPipelineLease.has_value() ||
-                !m_SelectionPointIdPipelineLease->IsValid() ||
-                !m_Subsystems.GpuWorldSystem.has_value() || !m_Subsystems.CullingSystemRegistry.has_value())
-            {
-                return RenderCommandPassStatus::SkippedUnavailable;
-            }
-
-            m_SelectionPointIdPass->Execute(cmd, camera, *m_Subsystems.GpuWorldSystem, *m_Subsystems.CullingSystemRegistry, frameIndex);
+            pass->Execute(cmd, camera, *m_Subsystems.GpuWorldSystem, *m_Subsystems.CullingSystemRegistry, frameIndex);
             return RenderCommandPassStatus::Recorded;
         }
 
@@ -10544,14 +10497,14 @@ namespace Extrinsic::Graphics
         }
         if (primitivePickingActive)
         {
-            const RenderCommandPassStatus faceStatus =
-                RecordSelectionFaceIdPass(cmd, camera, frame.FrameIndex);
+            const RenderCommandPassStatus faceStatus = RecordSelectionPrimitiveIdPass(
+                m_SelectionFaceIdPass, m_SelectionFaceIdPipelineLease, cmd, camera, frame.FrameIndex);
             AccumulateCommandRecordStatus(route.DebugName, route.PassId, faceStatus);
-            const RenderCommandPassStatus edgeStatus =
-                RecordSelectionEdgeIdPass(cmd, camera, frame.FrameIndex);
+            const RenderCommandPassStatus edgeStatus = RecordSelectionPrimitiveIdPass(
+                m_SelectionEdgeIdPass, m_SelectionEdgeIdPipelineLease, cmd, camera, frame.FrameIndex);
             AccumulateCommandRecordStatus(route.DebugName, route.PassId, edgeStatus);
-            const RenderCommandPassStatus pointStatus =
-                RecordSelectionPointIdPass(cmd, camera, frame.FrameIndex);
+            const RenderCommandPassStatus pointStatus = RecordSelectionPrimitiveIdPass(
+                m_SelectionPointIdPass, m_SelectionPointIdPipelineLease, cmd, camera, frame.FrameIndex);
             AccumulateCommandRecordStatus(route.DebugName, route.PassId, pointStatus);
             if (faceStatus == RenderCommandPassStatus::Recorded &&
                 edgeStatus == RenderCommandPassStatus::Recorded &&

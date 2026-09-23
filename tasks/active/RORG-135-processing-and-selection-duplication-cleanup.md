@@ -23,13 +23,13 @@ contracts: [runtime.processing-compilation-locality, repo.source-documentation, 
 - Out of scope: review finding four (GPU readback lifecycle), ProgressivePoisson GPU scaffolding, `*.Frame.cpp` and Config/Types compile-locality boundaries, SelectionOutline, public result/config types, numerical kernels.
 - Right-sizing: no public lifecycle template, scheduler, method-name switch, virtual interface or policy-flag set. Justified shared mechanism only where the contract is identical; distinct neighbor/decoding contracts stay local.
 - Reuse (slice 1): capture/publication reuse `CapturePointScalarField`/`PointScalarFieldCurrent`/`PublishPointScalarField` (`PointProperties.cpp`) and `AcquirePointIndex`/`AppendPointKnnRows`/`AdvancePointKnnRows` (`RadiusRows.cpp`). The duplicated capture/index/job/publication body becomes one anonymous-namespace template in `Runtime.GeometryProcessingOperations.Density.cpp`, instantiated for `KernelDensityMethod` and `PointSpacingMethod`. Each record keeps its config/result types, validator, statistics, history label, failure text and self-neighbor floor (density `min(N,max(k,2)+1)`, spacing `min(N,max(k,1)+1)`). Shared diagnostics compose the method noun and keep the previous exact strings. The k=1 width difference is already covered by the all-domain CPU LBVH/octree parity loops (k in {1,2,63}), whose neighbor-row cardinality validation rejects a wrong width.
-- Reuse (slice 2): see the slice-2 log entry.
+- Reuse (slice 2): `RecordOpaqueSurfaceBucket` (`Graphics.CullingSystem`) stays the surface draw owner for entity/face IDs. One module `Extrinsic.Graphics.Pass.Selection.Id` keeps four named pass types over a non-virtual `SelectionIdPassState` (selection reference, pipeline, ready guard); edge (indexed `Lines`) and point (non-indexed `SelectionPoints`) records keep their bucket checks and draw calls and share one TU-local push-constant writer. `NullRenderer::RecordSelectionPrimitiveIdPass` replaces three identical face/edge/point guards; the entity route keeps its lease selection and per-record pipeline binding. Removed surface: the old four module names, the unused no-op `Execute(cmd, camera)` overloads and the `Selection*IdPass` type aliases (no production users; the alias assertion in `Test.SelectionSystemContracts.cpp` is dropped).
 - Reuse (slice 3): see the slice-3 log entry.
 
 | Slice | Production files before → after | Physical lines before → after |
 | --- | --- | --- |
 | 1 Density/Spacing TUs | 2 → 1 | 564 → 400 (plus 2 CMake list lines removed) |
-| 2 Selection-ID passes | 8 → 2 | 325 → pending |
+| 2 Selection-ID passes | 8 → 2 | 325 → 155; `Graphics.Renderer.cpp` −47 net, pass CMake −6 |
 | 3 Outliers/Bilateral/Normals + RadiusRows owner | 5 → pending | 1,858 → pending |
 
 ## Acceptance criteria
