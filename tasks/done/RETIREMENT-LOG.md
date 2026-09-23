@@ -8,6 +8,25 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-09-23 — RORG-135 processing and selection duplication cleanup
+
+Retired [RORG-135](RORG-135-processing-and-selection-duplication-cleanup.md)
+after three reviewed behavior-preserving slices. Density and spacing share one
+private lifecycle template. The four selection-ID passes form one module,
+`Extrinsic.Graphics.Pass.Selection.Id`. Five GPU row-pagination loops share the
+private RadiusRows cursor. Net production C++: −390 physical lines and −7 files.
+Source `909b422` passed full CPU, ASan, UBSan and 97-case ci-vulkan gates.
+[PR #1045](https://github.com/intrinsicD/IntrinsicEngine/pull/1045). No maturity or
+performance claim; GPU readback lifecycle consolidation remains out of scope.
+
+## 2026-09-23 — BUG-216 loaded curvature refinement timeout
+
+Retired [BUG-216](BUG-216-curvature-refinement-timeout-during-concurrent-builds.md)
+as host contention. The unchanged case timed out at 30.012 s while builds ran,
+then passed in 18.29 s in isolation after all builds and suites finished. The
+full CPU selector passed: 5,012 tests, 0 failures. No timeout, label, assertion
+or geometry source changed. [PR #1045](https://github.com/intrinsicD/IntrinsicEngine/pull/1045).
+
 ## 2026-09-23 — BUG-215 debug-view test module import
 
 Retired [BUG-215](BUG-215-debug-view-test-resource-id-import.md) after importing

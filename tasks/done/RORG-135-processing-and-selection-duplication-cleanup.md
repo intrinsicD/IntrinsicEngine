@@ -16,6 +16,9 @@ contracts: [runtime.processing-compilation-locality, repo.source-documentation, 
 ---
 # RORG-135 — Consolidate density/spacing, selection-ID passes and GPU row pagination
 
+## Completion — 2026-09-23
+Completed and retired. PR/commit: source `909b422660f3c96c82b75581f46676a8f9195d34` (slices `5fde1bbb8`, `76bc5d6b3`, `fa4022715`, and fix `909b42266`); docs-only follow-ups `40a22bcd5` and this retirement. [PR #1045](https://github.com/intrinsicD/IntrinsicEngine/pull/1045), branch `codex/processing-selection-simplify`. Net production C++: −390 physical lines and −7 files. Behavior-preserving refactor; no feature, maturity or performance claim.
+
 ## Goal
 - Implement the first three findings of the 2026-09-23 simplification review, explicitly batched by the operator, as three separate behavior-preserving commits: (1) density/spacing share one private lifecycle, (2) the four selection-ID passes become one module, (3) Outliers/Bilateral/Normals reuse the existing GPU row-pagination owner.
 
@@ -34,17 +37,33 @@ contracts: [runtime.processing-compilation-locality, repo.source-documentation, 
 | 3 Outliers/Bilateral/Normals + RadiusRows owner | 5 → 5 | 1,858 → 1,846; four existing clients rename the state enum only |
 - Contract review: `runtime.spatial-query-locality` (source `docs/architecture/spatial-indices.md`) was read and is not declared. `Runtime.SpatialIndexCache.cppm` module dependencies, the cache's GPU query integration (`QueueGpuKNearest`/`QueueGpuRadius`, frame participant, readback ordering) and its borrowed `WorldRegistry` declaration are unchanged. Only consumer-side batch pagination moved into the private RadiusRows owner. Consumer query kinds, metrics, exclusions, capacities, overflow handling and invalidation are unchanged, so `docs/architecture/spatial-index-consumers.md` needs no update.
 
-## Review and verification received
-- Independent Codex review of `5fde1bbb8`, `76bc5d6b3` and `fa4022715` (2026-09-23) found the slices bounded and behavior-preserving. The slice-2 surface removals (no-op two-argument `Execute` overloads, legacy alias test) are accepted under the no-compatibility policy. The slice-3 private template (compile-time per-batch lambdas, no type erasure, no per-neighbor callbacks) is accepted, with its modest line saving as recorded above. One requested fix: slice 1 `Join` reserves the summed part length once; committed separately.
-- Completed by Codex before the reserve fix and slice 3 were integrated: baseline `9831bc4fc` passed 241 focused CPU/locality tests, the full CPU gate (5,012 tests, 0 failures, 1 expected unsanitized LSan skip) and 11 impacted ci-vulkan ASan+UBSan tests on a real RTX 3050 (0 skips). With slices 1+2 (`76bc5d6b3`), `IntrinsicRuntimeContractTests` and `IntrinsicGraphicsContractCpuTests` built with the Clang 23 `ci` preset. 176 focused CPU/locality tests passed. Fresh grouped `ci-asan`/`ci-ubsan` `IntrinsicCpuTests` builds succeeded, and 169 focused ASan tests passed. Strict layering, task policy, docs sync, doc links, skill mirrors and whitespace checks passed.
-- Combined tree `909b42266` (Codex): `ci`, `ci-asan` and `ci-ubsan` builds succeed. The first full CPU run had one failure: `CurvatureExtrema.RetriangulationAndRefinementRetainCenterCurve` timed out at 30.012 s (baseline 17.91 s) while the `ci-vulkan` and sanitizer builds ran concurrently. It is tracked as environmental in [BUG-216](../backlog/bugs/BUG-216-curvature-refinement-timeout-during-concurrent-builds.md), pending an isolated rerun. This change touches no geometry or core sources or tests.
-- Pending: isolated rerun of that case and the full CPU selector; full CPU, separate full ASan/UBSan and full Vulkan/readback gates; final review and clean-workshop scorecard.
+## Review and verification
+- Codex independently reviewed each slice and the combined source `909b422660f3c96c82b75581f46676a8f9195d34`; no code findings remain open. The one requested fix, a single reserve in `Join`, is `909b42266`. The slice-2 surface removals and the slice-3 private template (compile-time per-batch lambdas, no type erasure, no per-neighbor callbacks) were accepted.
+- Final gates on `909b422`, Clang 23, host `alex-home`:
+  - full `ci` CPU: 5,012 tests, 0 failures, 1 expected unsanitized LSan skip
+  - `ci-asan`: 3,333 grouped registrations, 0 failures, 0 skips
+  - `ci-ubsan`: 3,333, 0 failures, 1 expected LSan skip
+  - full `ci-vulkan` ASan+UBSan on an RTX 3050: 97 tests, 0 failures, 0 skips, 2,868.46 s
+- Structural checks passed: strict layering, test layout, task policy, doc links, docs sync, skill mirrors, module-inventory freshness, session brief and whitespace. The source-documentation audit found 0 errors. On draft PR #1045, docs-validation and pr-fast passed at `40a22bcd5`. Optional full/GPU workflows are skipped by routing; the full gates ran locally.
+- The first loaded full CPU run timed out one unchanged geometry case. [BUG-216](BUG-216-curvature-refinement-timeout-during-concurrent-builds.md) resolved it as host contention: the isolated rerun passed in 18.29 s, and no gate was weakened.
+- Clean-workshop scorecard (strict `tools/ci/run_clean_workshop_review.sh` bundle passed):
+
+| # | Row | Score | Note |
+| --- | --- | --- | --- |
+| 1 | Layer imports | pass | Strict layering clean; no new import edges. |
+| 2 | CMake links | pass | No new `target_link_libraries` edges. |
+| 3 | Public API types | pass | `Pass.Selection.Id` exports only Graphics/RHI types. |
+| 4 | Renderer growth | pass | No new renderer state or subsystem; one private record helper replaces three. |
+| 5 | Typed pass IDs | n/a | Pass identities and routing unchanged. |
+| 6 | Recipe dependencies | n/a | No recipe or resource edges changed. |
+| 7 | Scaffold/parity closure | n/a | Refactor; no maturity claim. |
+| 8 | Temporary exceptions | n/a | No allowlist rows or shims. |
 
 ## Acceptance criteria
-- [ ] Density/spacing public behavior, job identity/guard, GPU prerequisite ordering, terminal delivery/cancellation, expired-attachment suppression, staleness, deleted slots and checked conversion are unchanged (focused density/spacing contracts and GPU smokes pass).
-- [ ] Selection-ID passes keep pass identities, shaders/pipelines, attachments, recipe order, failure statuses, draw kinds and push-constant layout (selection contracts, frame lifecycle and Vulkan picking pass).
-- [ ] Outliers/Bilateral/Normals keep radius vs kNN semantics, decoding, caps and timing; any fail-closed guard added by sharing has focused coverage (contracts and Vulkan smokes pass).
-- [ ] `ProcessingCompilationLocality.*`, layering, module inventory, doc links, task policy and full CPU/ASan/UBSan/Vulkan gates pass on the combined tree.
+- [x] Density/spacing public behavior, job identity/guard, GPU prerequisite ordering, terminal delivery/cancellation, expired-attachment suppression, staleness, deleted slots and checked conversion are unchanged (focused density/spacing contracts and GPU smokes pass).
+- [x] Selection-ID passes keep pass identities, shaders/pipelines, attachments, recipe order, failure statuses, draw kinds and push-constant layout (selection contracts, frame lifecycle and Vulkan picking pass).
+- [x] Outliers/Bilateral/Normals keep radius vs kNN semantics, decoding, caps and timing; sharing added no fail-closed guard (contracts and Vulkan smokes pass).
+- [x] `ProcessingCompilationLocality.*`, layering, module inventory, doc links, task policy and full CPU/ASan/UBSan/Vulkan gates pass on the combined tree.
 
 ## Verification
 ```bash
@@ -64,3 +83,4 @@ git diff --check
 ## Log
 - 2026-09-23: Opened with slice 1. C++ builds and tests are run by Codex in the main checkout; the writer worktree runs structural checks only.
 - 2026-09-23: Slices committed as `5fde1bbb8`, `76bc5d6b3` and `fa4022715`; review received; `Join` reserve fix committed separately.
+- 2026-09-23: Final gates passed on `909b422`; BUG-216 resolved as environmental; retired.

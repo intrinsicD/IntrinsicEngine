@@ -5,7 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [BUG-216 — Curvature refinement test timed out while builds ran concurrently](BUG-216-curvature-refinement-timeout-during-concurrent-builds.md): observed during the RORG-135 full CPU gate; pending an isolated rerun of the unchanged case and CPU selector. No timeout or test change.
 
 - [BUG-178 — Clang 23 crashes during an incremental module rebuild](BUG-178-clang23-incremental-module-ice.md).
 
@@ -41,6 +40,10 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-09-23: [BUG-216 — Curvature refinement test timed out while builds ran concurrently](../../done/BUG-216-curvature-refinement-timeout-during-concurrent-builds.md).
+  The unchanged case timed out at 30.012 s under concurrent compilation, then passed isolated in 18.29 s
+  after all builds and suites finished; the full CPU selector passed. Host contention; no gate changed.
 
 - Closed 2026-09-17: [BUG-203 — Manual geometry import frame budget](../../done/BUG-203-manual-import-frame-budget.md).
   Controlled 513-frame decode passes 25 repetitions with bounded completion waiting;

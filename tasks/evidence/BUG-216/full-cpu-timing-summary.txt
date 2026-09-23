@@ -17,3 +17,9 @@ other tests with baseline >=1s: 12; slowdown ratio min 1.14 median 2.59 max 3.55
   3.10  CurvatureExtrema.PlaneHasNoArtificialCurves                                 1.37 -> 4.24 s
   3.55  CurvatureExtrema.GaussianExtrusionFindsGeometricTransverseExtremum          3.30 -> 11.71 s
 sum of per-test times: baseline 191.5 s, combined 471.0 s
+
+# Final reruns (Codex, same host, main-checkout build/ci at source 909b422660f3c96c82b75581f46676a8f9195d34)
+build-free focused recheck: CurvatureExtrema.RetriangulationAndRefinementRetainCenterCurve passed 18.12 s
+full CPU recheck: timestamp=2026-09-23T10:23:15 tests=5012 failures=0 skipped=1 (GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl, expected unsanitized LSan skip) wall_s=47.98; ASan/UBSan suites (started 10:19:54) were still executing
+isolated case after all builds and suites finished: timestamp=2026-09-23T11:12:14 passed 18.29 s (CTest real 18.57 s), registered TIMEOUT 30 unchanged
+# Source logs (not retained in repo): /tmp/intrinsic-simplify-final-cpu-recheck.xml, /tmp/intrinsic-simplify-final-cpu-isolated.log/.xml
