@@ -1,0 +1,19 @@
+# CTest JUnit summaries extracted from Codex main-checkout runs (host alex-home).
+# Source XML (not retained in repo): baseline /tmp/intrinsic-simplify-baseline-full-cpu.xml ; combined tree /tmp/intrinsic-simplify-final-cpu.xml
+baseline 9831bc4fc: timestamp=2026-09-23T09:59:04 tests=5012 failures=0 skipped=1 wall_s=50
+combined RORG-135 tree: timestamp=2026-09-23T10:18:20 tests=5012 failures=1 skipped=1 wall_s=124
+CurvatureExtrema.RetriangulationAndRefinementRetainCenterCurve: baseline 17.9138s run; combined 30.012s fail (CTest failure message: Timeout; registered TIMEOUT 30)
+other tests with baseline >=1s: 12; slowdown ratio min 1.14 median 2.59 max 3.55
+  1.14  RuntimeModule.MissingRequiredServiceTerminatesEngineBoot                    1.12 -> 1.28 s
+  1.16  SandboxConfigSections.ConfigSerializersPreserveEncodingPolicy               1.08 -> 1.25 s
+  2.12  CurvatureExtrema.ScaleTranslationAndSourcePreservation                      1.38 -> 2.94 s
+  2.32  RuntimeAssetImportFormatCoverage.DirectObjImportOfSculptFixturePreservesItsManifold 1.37 -> 3.18 s
+  2.56  SandboxEditorUi.ProgressivePoissonAdmissionSharesTypedValidation            1.47 -> 3.75 s
+  2.56  CurvatureExtrema.NoisyExtrusionRetainsDominantCenter                        3.33 -> 8.55 s
+  2.62  CurvatureExtrema.SharpFoldDoesNotCreateParallelSmoothCurves                 1.10 -> 2.89 s
+  2.72  CurvatureTensor.SculptAssetProducesStableFeatureAlignedParts                4.77 -> 12.94 s
+  2.94  CurvatureExtrema.OrientationReversalExchangesRidgeValley                    6.65 -> 19.52 s
+  3.01  CurvaturePatchContract.PatchCompletionReplaysWithDetectedFeatureEvidence    1.94 -> 5.83 s
+  3.10  CurvatureExtrema.PlaneHasNoArtificialCurves                                 1.37 -> 4.24 s
+  3.55  CurvatureExtrema.GaussianExtrusionFindsGeometricTransverseExtremum          3.30 -> 11.71 s
+sum of per-test times: baseline 191.5 s, combined 471.0 s

@@ -5,6 +5,7 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [BUG-216 — Curvature refinement test timed out while builds ran concurrently](BUG-216-curvature-refinement-timeout-during-concurrent-builds.md): observed during the RORG-135 full CPU gate; pending an isolated rerun of the unchanged case and CPU selector. No timeout or test change.
 
 - [BUG-178 — Clang 23 crashes during an incremental module rebuild](BUG-178-clang23-incremental-module-ice.md).
 
