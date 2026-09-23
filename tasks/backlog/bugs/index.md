@@ -5,7 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [BUG-217 — Run the curvature refinement case without CPU-bound siblings](../../active/BUG-217-curvature-refinement-run-serial.md): hosted pr-fast and one-CPU probes time out the unchanged case under parallel sibling load; it passes alone in 17.10 s. The fix sets single-case `RUN_SERIAL` and awaits verification.
 
 - [BUG-178 — Clang 23 crashes during an incremental module rebuild](BUG-178-clang23-incremental-module-ice.md).
 
@@ -41,6 +40,10 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-09-23: [BUG-217 — Run the curvature refinement case without CPU-bound siblings](../../done/BUG-217-curvature-refinement-run-serial.md).
+  Single-case `RUN_SERIAL` via the generated property fixup. One-CPU parallel probes went from three timeouts
+  to three passes (18.00–18.69 s); full CPU and hosted pr-fast (19.03 s) passed. `TIMEOUT 30` unchanged.
 
 - Closed 2026-09-23: [BUG-216 — Curvature refinement test timed out while builds ran concurrently](../../done/BUG-216-curvature-refinement-timeout-during-concurrent-builds.md).
   The unchanged case timed out at 30.012 s under concurrent compilation, then passed isolated in 18.29 s

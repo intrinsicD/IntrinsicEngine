@@ -8,6 +8,17 @@ so blocks moved from the old active-README history work verbatim.
 
 
 
+## 2026-09-23 — BUG-217 curvature refinement serial scheduling
+
+Retired [BUG-217](BUG-217-curvature-refinement-run-serial.md) after
+isolating `CurvatureExtrema.RetriangulationAndRefinementRetainCenterCurve` with
+`RUN_SERIAL` in the existing generated CTest property fixup. CPU-bound sibling
+tests alone reproduced its 30 s timeout: three of three one-CPU `--parallel 4`
+probes timed out. With the fix, the same probes, the full CPU gate and hosted
+pr-fast (19.03 s) pass. This extends the compile-load framing of the retired
+BUG-216/190/207 records. The test body, labels, `TIMEOUT 30` and grouped
+registration are unchanged. [PR #1045](https://github.com/intrinsicD/IntrinsicEngine/pull/1045).
+
 ## 2026-09-23 — RORG-135 processing and selection duplication cleanup
 
 Retired [RORG-135](RORG-135-processing-and-selection-duplication-cleanup.md)

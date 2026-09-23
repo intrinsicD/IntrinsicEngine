@@ -2808,8 +2808,9 @@ if(_intrinsic_registered_test_targets)
             "endif()\n"
         )
     endforeach()
-    # BUG-217: this single-threaded two-grid case keeps its 30 s budget only
-    # without CPU-bound siblings; grouped (NO_DISCOVER) registration is unchanged.
+    # BUG-217: CPU-bound CurvatureExtrema siblings pushed this single-threaded
+    # two-grid case past its unchanged 30 s timeout under parallel CTest, so it
+    # is isolated explicitly. Grouped (NO_DISCOVER) registration is unchanged.
     get_target_property(_intrinsic_curvature_extrema_discovered
         IntrinsicGeometryCurvatureExtremaTests INTRINSIC_GTEST_DISCOVERED)
     if(_intrinsic_curvature_extrema_discovered)

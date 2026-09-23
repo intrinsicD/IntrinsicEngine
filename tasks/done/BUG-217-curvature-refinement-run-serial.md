@@ -6,12 +6,21 @@ template: micro
 workflow_schema: 1
 workflow_profile: micro
 evidence: not_applicable
-evidence_skip_reason: Interactive CI/test-scheduling fix; retained CI links, probe timings and the pending pre/post probes are the evidence.
+evidence_skip_reason: Interactive CI/test-scheduling fix; retained CI links and local/hosted probe timings are the evidence.
 contract_schema: 1
 contracts: []
 contract_review: Catalog reviewed; this changes only the CTest scheduling property of one discovered test case, with no engine, algorithm or reusable contract change.
 ---
 # BUG-217 — Run the curvature refinement case without CPU-bound siblings
+
+## Completion — 2026-09-23
+Resolved. With `RUN_SERIAL` on the one discovered case, the one-CPU parallel
+probe that previously timed out passes, the full CPU gate passes, and hosted
+pr-fast passes. The test body, identity, labels, `TIMEOUT 30`, grouped
+registration and production source `909b422` are unchanged.
+PR/commit: [PR #1045](https://github.com/intrinsicD/IntrinsicEngine/pull/1045);
+fix `4f3ff16831b2721da6b01631748e5784f9c181aa`; the enclosing retirement commit
+updates only a comment and task records.
 
 ## Goal
 Keep `CurvatureExtrema.RetriangulationAndRefinementRetainCenterCurve` within its
@@ -32,9 +41,9 @@ Set `RUN_SERIAL` on that single case.
   - one CPU, case alone: 17.10 s
   - two CPUs, all 10 at `--parallel 4`: passes in 23.36 s
 - See the [retained evidence](../evidence/BUG-217/timeout-evidence.txt).
-- The retired [BUG-216](../done/BUG-216-curvature-refinement-timeout-during-concurrent-builds.md),
-  [BUG-190](../done/BUG-190-curvature-refinement-timeout-during-compilation.md) and
-  [BUG-207](../done/BUG-207-loaded-ubsan-curvature-timeout.md) attributed earlier
+- The retired [BUG-216](BUG-216-curvature-refinement-timeout-during-concurrent-builds.md),
+  [BUG-190](BUG-190-curvature-refinement-timeout-during-compilation.md) and
+  [BUG-207](BUG-207-loaded-ubsan-curvature-timeout.md) attributed earlier
   misses to concurrent compilation. These probes show that CPU competition from
   sibling tests alone is enough. Those retired records stay unchanged.
 - Fix: the existing generated property fixup in `tests/CMakeLists.txt` sets
@@ -46,10 +55,10 @@ Set `RUN_SERIAL` on that single case.
 - Cost: other tests in the same CTest invocation wait while this case runs.
 
 ## Acceptance criteria
-- [ ] Test metadata shows the case with `RUN_SERIAL` true and still `TIMEOUT 30`; no other property or test changes.
-- [ ] One-CPU `--parallel 4` probe of the 10-case CurvatureExtrema set, repeated 3 times before and after the change, shows the timeout removed after it.
-- [ ] Full CPU gate passes on the combined tree.
-- [ ] Normal hosted pr-fast passes for PR #1045; if it still fails, diagnose further before closing.
+- [x] Test metadata shows the case with `RUN_SERIAL` true and still `TIMEOUT 30`; no other property or test changes. Across `ci`, `ci-asan`, `ci-ubsan` and `ci-vulkan`, `RUN_SERIAL` was added only to this case in the individually discovered `ci`/`ci-vulkan` registrations. Grouped sanitizer registrations are unchanged, and all four compared test binaries are identical.
+- [x] One-CPU `--parallel 4` probe of the 10-case CurvatureExtrema set, repeated 3 times before and after the change, shows the timeout removed after it. Before: timeouts at 30.01, 29.99 and 30.01 s. After: all 10 cases passed in each run, with the case at 18.00, 18.69 and 18.03 s.
+- [x] Full CPU gate passes on the combined tree: 5,012 tests, 0 failures, 1 expected unsanitized LSan skip, 68.47 s (case 17.96 s).
+- [x] Normal hosted pr-fast passes for PR #1045: [run 35844618599](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/35844618599) succeeded in 8m28s. The case started after its last sibling finished and passed in 19.03 s; docs-validation also passed.
 
 ## Verification
 ```bash

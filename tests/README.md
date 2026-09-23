@@ -226,7 +226,7 @@ these budgets with independently inferred host-core counts. The single-threaded
 discovered case `CurvatureExtrema.RetriangulationAndRefinementRetainCenterCurve`
 alone is `RUN_SERIAL`, because CPU-bound siblings pushed it past its unchanged
 30-second timeout
-([BUG-217](../tasks/active/BUG-217-curvature-refinement-run-serial.md)).
+([BUG-217](../tasks/done/BUG-217-curvature-refinement-run-serial.md)).
 
 The case-scoped reservation list in
 [`tests/CMakeLists.txt`](CMakeLists.txt) intentionally covers only tests that
