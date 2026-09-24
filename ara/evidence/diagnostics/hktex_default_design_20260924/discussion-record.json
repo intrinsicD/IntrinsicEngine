@@ -1,0 +1,20 @@
+{
+  "model": "claude-opus-5-5",
+  "effort": "high",
+  "completed_rounds": 3,
+  "executed": [
+    "literature searches",
+    "pinned upstream source inspection",
+    "Claude CLI discussion"
+  ],
+  "not_executed": [
+    "HKTex fitting",
+    "compiler or parity experiment",
+    "performance benchmark",
+    "GPU implementation"
+  ],
+  "status": "proposal; no default changed",
+  "primary_recommendation": "Exact frozen-kernel compiler, conservative candidates, certified output specialization and final-color footprint filtering",
+  "authoritative_summary": "proposal.md",
+  "corrections": "review-resolution.md"
+}

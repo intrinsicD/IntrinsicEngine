@@ -2808,3 +2808,32 @@ entries:
       adoption or empirical closure.
     - Preserved both completed responses, the timeout and the final Codex qualifications. Existing atlas/part observations
       remain unresolved; unrelated historical staging was not swept or promoted.
+
+  - turn: 2026-09-24_001#1
+    notes:
+    - Retained both actual Claude responses; second round corrects first-round overclaims.
+      No claim promotion or user adoption inferred.
+    - No closure signal established for unrelated staging; historical records preserved.
+      No implementation or performance experiment.
+
+  - turn: 2026-09-24_001#2
+    notes:
+    - Source clarification narrows the intended method and invalidates applying the earlier generic rejection
+      to HKTex. Preserved history and explicit scope correction.
+    - Published findings remain attributed literature; no local performance or capability claim. O247 stays
+      staged; unrelated observations have no established closure signal.
+
+  - turn: 2026-09-24_001#3
+    notes:
+    - Staged O248/O249 rather than asserting measured speed, compression or engine capability. Algebraic
+      arguments still require implementation validation.
+    - Preserved raw Claude proposals and explicit corrections, especially normalization, power ordering,
+      candidate supersets, ranking ambiguity and nonlinear filtering.
+    - No unrelated staging closure inferred. Literature supplies donor mechanisms, not local engine evidence.
+      No method task/default/source/build change.
+
+  - turn: 2026-09-24_001#4
+    notes:
+    - Recorded implementation-evaluation direction and new ranking-proof constraint, not task formatting or structural checks.
+    - Candidate architectures remain experimental; user authorized a testable plan, not a measured improvement. No empirical claim promoted or historical observation silently overwritten.
+    - Compact runtime without spectral inputs remains conditional; exact refinement can require optional original operands. O250 records this qualification to O248 rather than declaring the algebraic compiler invalid.

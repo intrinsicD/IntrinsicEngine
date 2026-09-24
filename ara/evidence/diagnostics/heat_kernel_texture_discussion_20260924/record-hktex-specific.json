@@ -1,0 +1,8 @@
+{
+  "model": "claude-opus-5-5",
+  "effort": "medium",
+  "rounds": 1,
+  "status": "literature-informed discussion; no local experiment",
+  "response": "claude-hktex-specific.md",
+  "codex_qualifications": "hktex-reassessment.md"
+}

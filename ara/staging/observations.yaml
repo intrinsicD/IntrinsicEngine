@@ -4146,3 +4146,84 @@ observations:
     promoted_to: logic/claims.md:C110
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O246
+    timestamp: 2026-09-24T14:33+02:00
+    provenance: ai-suggested
+    content: 'Tentative recommendation: preserve UV atlases for authored image content; compare direct vertex
+      attributes before adding heat-field reconstruction for mesh properties. Heat-derived procedural fields
+      may cover restricted signals; Htex is a distinct candidate for atlas-free image addressing.'
+    context: Two-round conceptual consultation, not empirical evidence. Corrected linear versus nonlinear
+      reconstruction, signed kernel fits, multitime HKS, reference-geometry attachment and current object-space
+      normals. No universal quality, compression or speed claim.
+    potential_type: architecture
+    bound_to:
+    - N638
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+    scope_correction: "O247 addresses the specific HKTex paper subsequently supplied by the user; O246 records only the earlier generic discussion."
+
+  - id: O247
+    timestamp: 2026-09-24T14:39+02:00
+    provenance: ai-suggested
+    content: HKTex merits a bounded albedo prototype as a genuine UV-free learned texture representation.
+      Global atlas replacement in IntrinsicEngine remains unestablished; evaluate full preprocessing, fitting,
+      reconstructed caches, runtime sampling and minification.
+    context: Corrects application of generic O246 reasoning to the specific HKTex paper. External albedo
+      results are not local engine evidence. Claude recommends deferral; Codex recommends bounded evaluation.
+      No adoption, benchmark result or claim promotion.
+    potential_type: architecture
+    bound_to:
+    - N639
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+
+  - id: O248
+    timestamp: 2026-09-24T22:09+02:00
+    provenance: ai-suggested
+    content: A frozen HKTex fit may be deployed as affine heat and quadratic distance coefficients, conservative
+      nearest-k candidate supersets and certified output-specialized cells. These derivations offer a concrete
+      path to avoiding runtime spectral data and global KNN; compactness and speed remain untested.
+    context: Three Opus 5.5 high-effort discussions and pinned upstream inspection. Source normalization/power
+      order, ties and exact-versus-approximate modes are explicit. No numerical experiment, code implementation
+      or user adoption of this particular design.
+    potential_type: architecture
+    bound_to:
+    - N640
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+
+  - id: O249
+    timestamp: 2026-09-24T22:09+02:00
+    provenance: ai-suggested
+    content: Default adoption still depends on compiled storage/list tails and final-color footprint integration.
+      Coarse integral caches, variable-projection fitting, deployment-cost-aware allocation and alternative
+      heat generators are publication-informed candidates, not established HKTex improvements.
+    context: Exact scientific values, categorical properties and authored UV semantics remain explicit.
+      No claim that LEAN, tufted scalar Laplacians, reduced bases or polynomial diffusion transfer without
+      adaptation and validation.
+    potential_type: constraint
+    bound_to:
+    - N640
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+
+  - id: O250
+    timestamp: 2026-09-24T22:40+02:00
+    provenance: ai-suggested
+    content: Strict HKTex ranking parity requires bounds against canonical reference operands, exact polynomial tie predicates, and bounded inner-contribution refinement. Rounded compiled coefficients alone cannot recover the original ordering. Optional refinement operands may reintroduce significant spectral storage and cost.
+    context: Three task-plan reviews, no implementation or experiment. METHOD-048 makes unresolved samples explicit and measures refinement footprint; compact compiled-only default feasibility remains unproved.
+    potential_type: constraint
+    bound_to: [N641]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false

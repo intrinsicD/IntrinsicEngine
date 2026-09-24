@@ -1,0 +1,1192 @@
+Review this concrete IntrinsicEngine implementation TASK, not an implementation. Act as an adversarial research-method and engine architecture reviewer. User requests full HKTex for meshes, pinned publication reference reuse, individually measurable slices for shortcomings and proposed solutions, with findings resolved before handoff. Identify blocking/high/medium findings with precise location and actionable replacement. Check full original method coverage, mathematical correctness, dependency order, ownership, isolated ablations, honest maturity/default gates, verification feasibility, external multiview limitations. Do not invent repository facts. End with APPROVE or REVISE. This is read-only; no tools. Task SHA256: 330706368aed9dcd983b2944a95e724a5012bec1ea0658cfe5774c283e7926ab
+
+SOURCE AGENTS.md
+# IntrinsicEngine Agent Contract
+
+This is the authoritative repository contract. It supersedes conflicting policy
+in `CLAUDE.md`, `.github/copilot-instructions.md`, and `.codex/config.yaml`.
+Linked detailed requirements are mandatory when their scope applies; this file
+wins in a conflict. Scoped reading changes neither those requirements nor gates.
+
+## Agent skills
+
+At session start, read this file and
+`tools/agents/skills/intrinsicengine-core/SKILL.md`, then the task being continued.
+Current, complete instructions already supplied in context count as read. Fetch
+only missing, truncated, or changed sections; do not reload an unchanged source
+or read both a canonical document and its generated skill reference.
+
+The core skill routes to procedures for the touched scope. Read only the named
+sections of expanded documents; the full session workflow is not a startup
+prerequisite. Re-evaluate routes when scope changes. Skills live in
+`tools/agents/skills/`, also surfaced through `.claude/skills/` and `.codex/skills/`;
+agents without auto-discovery use that same entry point.
+
+Edit canonical `docs/agent/*` sources, then run
+`python3 tools/agents/sync_skills.py --write`; never hand-edit generated
+`references/` mirrors. Read `tasks/SESSION-BRIEF.md` and `tasks/backlog/README.md`
+only when selecting backlog work.
+
+For tool execution, follow the workflow's
+[output and wait procedure](docs/agent/prompt/prompt.md#tool-output-and-waits):
+bound routine results, preserve full evidence, batch independent reads, and wait
+on completion or meaningful changes without redundant polling.
+
+## Shared optional session setup
+
+Before provisioning a toolchain, dependencies, or the optional knowledge graph,
+read [setup requirements](docs/agent/contract.md#shared-optional-session-setup).
+Reuse `tools/setup/` entrypoints; setup never substitutes for preset verification.
+
+## 1. Mission
+
+Build a modular, high-performance, scientifically rigorous graphics and geometry
+engine. Preserve buildability, testability, ownership, synchronized docs, and
+reviewability. Framework24 user-facing feature/workflow convergence is the
+standing P0 until `REVIEW-004` retires with an accepted verdict. Framework24 is a
+behavioral baseline, not an implementation template. Follow its
+[inventory and golden workflows](docs/product/framework24-convergence.md).
+The operator may direct other work; record that direction and proceed.
+When selecting work, read the [selection rules](docs/agent/contract.md#mission).
+Selectable backends require real implementations and truthful requested/actual/
+fallback reporting backed by evidence appropriate to their claims.
+
+## 2. Non-negotiable architecture invariants
+
+The following dependency boundaries are mandatory:
+
+- `core` -> nothing.
+- `geometry` -> `core`.
+- `assets` -> `core`.
+- `ecs` -> `core`; may use geometry handles/types only when explicitly required.
+- `physics` -> `core`, `geometry`; owns simulation world/state, never live ECS/runtime/graphics/platform/app.
+- `graphics/rhi` -> `core`.
+- `graphics/assets` -> `core`, asset IDs (`Asset.Registry` types only), `graphics/rhi`; no live `AssetService` traffic.
+- `graphics/vulkan` -> `core`, `graphics/rhi`, backend-local Vulkan dependencies (`Vulkan::Vulkan`, `volk`,
+  `VulkanMemoryAllocator`, `glfw`); no ECS, runtime, or live asset-service knowledge, and no `Vk*` types through
+  RHI/renderer APIs.
+- `graphics/*` -> `core`, asset IDs, `graphics/rhi`, geometry GPU views; **no live ECS knowledge**.
+- `platform` -> `core`.
+- `runtime` -> all lower layers; owns composition/wiring, including ECS-to-physics synchronization and physics-to-ECS writeback.
+- `app` -> `runtime` only.
+- `methods` -> public method API + declared backend integration only.
+- `benchmarks` -> public method APIs only.
+- `tests` -> explicit test seams only.
+
+Cross-layer convenience imports that violate this table are prohibited.
+
+## 3. Source tree map
+
+Engine layers live under `src/`: `core`, `assets`, `ecs`, `geometry`, `physics`,
+`graphics/{rhi,assets,vulkan,framegraph,renderer}`, `runtime`, `platform`, `app`.
+`methods/`, `benchmarks/`, `tests/`, `docs/`, `tasks/`, `tools/`, `cmake/`, and
+`.github/workflows/` are supporting architecture roots. Before changing layout
+or dependency ownership, read the [full tree map](docs/agent/contract.md#source-tree-map)
+and [layering rules](docs/agent/contract.md#layering-rules).
+
+## 4. Layering rules
+
+Lower layers never import higher layers. Runtime owns wiring; graphics consumes
+snapshots/views, not live ECS ownership. Assets is CPU-only and GPU-agnostic;
+GPU asset state belongs to `graphics/assets`, wired from asset events by runtime.
+Physics owns simulation state; ECS physics components hold CPU descriptors,
+while runtime owns live sidecars, fixed-step scheduling, and writeback. Platform
+exposes window/input ports and explicit backends without graphics/ECS/runtime imports.
+
+Before changing layer ownership, backend selection, runtime/physics/graphics
+wiring, or a dependency edge, read the [detailed layering rules](docs/agent/contract.md#layering-rules)
+and [architecture index](docs/architecture/index.md), and use the core skill's
+architecture-review route. Default headless work uses `Null`/
+`INTRINSIC_HEADLESS_NO_GLFW=ON` unless surface coverage is required. Promoted
+Vulkan requires both build and runtime opt-ins; renderer/runtime gate on
+`RHI::IDevice::IsOperational()`, not Vulkan diagnostics. There are no active
+legacy-tree exceptions; future exceptions must satisfy §13 and the allowlist.
+Justify every new dependency and document architectural changes.
+
+## 5. Coding rules
+
+- Use C++23 and out-of-source CMake presets with a complete Clang 20+ toolchain
+  (compiler and matching `clang-scan-deps`). GCC and stale non-preset trees are
+  not module-verification evidence.
+- Before adding/copying a non-trivial implementation, helper, or source file,
+  use `intrinsicengine-reuse`; record the existing owner reused or its concrete
+  contract mismatch. Prefer plain structs/free functions. Introduce abstraction
+  only for a present second caller, layer boundary, test seam, or config/UI/agent
+  variant axis; one implementation alone is not a seam.
+- Public C++ APIs and engine-owned scene/config formats currently have no
+  backward-compatibility commitment. Update in-tree callers, codecs, fixtures,
+  and tests together; remove superseded paths directly. Do not add wrappers,
+  aliases, dual readers, or migrations solely to retain old representations.
+  Preserve user-facing capabilities and current-format save/load/config round trips.
+- Preserve module names during mechanical moves; do not mix moves with semantic
+  refactors or add features during reorganization. Keep patches scoped.
+- Use `intrinsic_add_module_library(...)` and `FILE_SET CXX_MODULES`. Keep
+  `.cppm` surfaces to exported declarations/types, small accessors, and necessary
+  templates; non-trivial bodies belong in matching private `.cpp` units.
+- Every project-owned `.cppm`/header starts with a short purpose synopsis.
+  Comment non-obvious contracts, not history or boilerplate; implementation
+  rationale belongs near implementation. Use `intrinsicengine-source-documentation`.
+- New tuning state must be serializable config with side-effect-free preview/
+  validate-then-apply. Files, agents/CLI, and UI use the same validated path;
+  no UI-only subsystem writes. `RenderRecipeConfig` is the reference shape.
+- Compose frames through `FrameRecipe*` data; derive/load defaults at init and
+  keep the main loop an ordered list of named phases. No hidden imperative pass
+  order or composition that recipe data cannot express/introspect.
+
+Before editing code or build/dependency inputs, read
+[coding and change-scope details](docs/agent/contract.md#coding-and-change-scope-rules).
+Dependencies use vcpkg manifests and repository-local preset toolchains; CUDA is
+off unless the task explicitly requires it. Determinism, explicit ownership,
+and failure states are required.
+
+## 6. Method implementation protocol
+
+Method/paper work follows: original paper and relevant extensions → exact
+contract → CPU reference → correctness tests → benchmark harness → optimized
+CPU → optional GPU after reference parity → limitations/diagnostics.
+
+Before method or geometry-method integration work, read the
+[full method contract](docs/agent/contract.md#method-implementation-protocol)
+and use `intrinsicengine-method`. Property slots bind canonical typed properties
+on any compatible element domain, independent of names or provenance; use
+checked numeric conversion. Same-cardinality results preserve unrelated
+properties/topology and publish on the originating domain. Runtime/config/UI
+reuse canonical preflight. Public vector properties use float `glm::vec*` unless
+a scoped API decision approves otherwise. Applicable tasks declare element-domain
+and engine-integration contracts and name deferred integration owners. Spatial
+work also reads the [consumer inventory](docs/architecture/spatial-index-consumers.md).
+
+## 7. Testing protocol
+
+Run the strongest relevant verification, focused targets first. Add/update tests
+for behavior changes; do not weaken gates to reach green. Before code, build, or
+test changes, read [verification requirements](docs/agent/contract.md#testing-and-verification-protocol)
+for labels, touched-scope feedback, full CPU, sanitizer, and Vulkan gates.
+Task-specific stricter checks still apply. C++ tests use `Test.<Name>.cpp`;
+do not rename legacy test files outside an explicit mechanical task.
+
+Default code/test gate:
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+```
+
+Docs/task-only changes run structural checks, not C++ builds: task policy and
+doc links, plus skill-mirror/session-brief checks when their sources change.
+The workflow's [verification section](docs/agent/prompt/prompt.md#verification)
+lists exact commands. Full CPU, separate ASan/UBSan, and opt-in Vulkan are distinct
+evidence classes; focused feedback does not replace required PR/merge gates.
+Use current CTest output, not historical `LastTestsFailed.log`, as the verdict.
+
+## 8. Benchmarking protocol
+
+Before benchmark work use `intrinsicengine-benchmark` and read the
+[benchmark contract](docs/agent/contract.md#benchmarking-protocol): stable IDs,
+schema-v2 manifest/source binding, resolved parameters, diagnostics, explicit
+claim eligibility, baseline comparisons, and validators. Dirty, historical,
+unverified, or `local-dev` runs are not claim-eligible. Do not infer performance
+wins from smoke runs; repeatable claims also follow §8b.
+
+## 8b. Research claim and evidence protocol
+
+Research method, performance, parity, and capability results need an
+`ara/logic/claims.md` row before entering docs, reports, README, or task status.
+Supported/refuted rows cite existing repository evidence addressing the claim;
+refuted hypotheses stay recorded. Benchmark wins need matched baselines, parity
+needs reference comparisons/tolerances, operational claims need the named path
+actually run. CPU, GPU/Vulkan, and sanitizer evidence remain distinct.
+
+Ordinary implementation/refactoring owes no research claim rows. Before making
+or auditing a research result, read [the full evidence contract](docs/agent/contract.md#research-claim-and-evidence-protocol)
+and [ARA policy](docs/agent/ara-evidence-policy.md); use
+`intrinsicengine-results-audit` when its review trigger applies. Run
+`python3 tools/agents/check_ara_claims.py --root . --strict` when touching this scope.
+
+Apply [research-bookkeeping relevance](docs/agent/ara-evidence-policy.md#research-bookkeeping-relevance)
+from the conversation before loading research-manager references or ARA ledgers.
+Ordinary engineering exits without a research epilogue; research events and
+explicit ARA work still follow the required evidence/recording path.
+
+## 9. Documentation sync protocol
+
+When code, structure, or policy changes:
+
+- Update relevant architecture/migration/task docs in the same PR.
+- Update references and links for moved files.
+- Regenerate inventories when required by tooling.
+- After module surface changes, refresh `docs/api/generated/module_inventory.md` with
+  `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`.
+- After opening, retiring, or re-gating any task, regenerate `tasks/SESSION-BRIEF.md` with
+  `python3 tools/agents/generate_session_brief.py`; after editing `docs/agent/*` or `tasks/templates/task.md`,
+  re-run `python3 tools/agents/sync_skills.py --write`. CI (`ci-docs.yml`) enforces skill-mirror
+  freshness; the session brief is a convenience view regenerated opportunistically.
+- Keep docs factual (current state), not aspirational unless clearly labeled.
+- Keep every `README.md` as a concise current-state entry point. Link to ADRs, migration docs, tasks, retirement records,
+  reports, or Git for history and future work instead of copying those narratives into a README.
+
+## 10. CI expectations
+
+Touched PR checks must stay green. Structural checks run strict; a warning-mode
+exception requires a named task owning its tightening. Never weaken, skip, or
+quarantine a gate without diagnosis. A pre-existing/environmental failing check
+requires a `BUG-` task with evidence in the same session and a PR reference.
+For a failure or CI/workflow change, read the [CI requirements](docs/agent/contract.md#ci-expectations)
+and [failure procedure](docs/agent/prompt/prompt.md#when-ci-fails).
+Code verification configures `ci`, builds a meaningful target, and runs CTest;
+`help` is not verification. Docs-only work follows §7's structural route.
+
+## 11. Task execution workflow
+
+Default posture is pair: inspect real state, give concrete scoped hints, and ask
+only questions the repository cannot answer. Respect rejected hints; defer
+polish until requested or review. At startup inspect `git status --short --branch`,
+recent commits, and active task names; skim `tasks/HINTS.md` only for open entries.
+
+Authorization persists for agreed work. Proceed with necessary implementation
+choices; a new decision is required for scope, layer policy/exceptions,
+compatibility commitments, or unapproved destructive/irreversible consequences.
+Prepare the concrete diff before that decision. Verification/review still apply.
+Use one writer per checkout/build directory; concurrent writers need separate
+worktrees and build trees. Review a fixed diff and re-verify combined changes.
+
+Interactive single-session work needs no task file. Persistent work uses the
+micro template and `intrinsicengine-task-workflow`; consult the contract catalog
+for applicable IDs (or justify none). Task wording cannot narrow canonical
+contracts. Keep notes under `tasks/`, not root-level planning files.
+Only unattended/opt-in custody work uses claims, work graphs, and completion
+reports; research evidence still applies in every posture.
+
+Before delegated work, task lifecycle changes, unattended execution, or workflow
+policy changes, read the [detailed execution requirements](docs/agent/contract.md#task-execution-workflow)
+and the matching [workflow section](docs/agent/prompt/prompt.md). The core skill
+maps posture and trigger to section. Delegated work follows inspect → scoped
+implementation/tests/docs → verification → review → commit/push → report.
+Unattended work accepts only fully specified night-ready tasks and observes its
+stop conditions. Audits are on demand, not an ambient duty; offer deferred hints
+before filing them. Preserve frozen task/evidence history.
+
+### Standing Claude Code authorization
+
+The operator authorizes Codex to delegate IntrinsicEngine planning, implementation,
+refactoring, review, debugging and testing to Claude Code CLI through the operator's
+configured Anthropic account. This includes transmitting private repository source
+files, complete diffs, documentation and relevant build/test output needed for that
+work. Authorization covers this repository, its worktrees and future tasks until
+the operator revokes it. Do not request per-packet confirmation merely because the
+files, diff size or amount of source context change.
+
+Exclude credentials, secrets, authentication/session material and unrelated personal
+data from shared payloads. Delegated work follows the same scope, layer, verification
+and one-writer rules above; reconcile and verify any changes before integration.
+This authorization does not grant permission to publish repository contents to other
+destinations or override platform or managed restrictions. When an approval review
+is required, cite this standing authorization with the actual destination, payload
+scope and purpose.
+
+## 12. Review checklist
+
+Before committing or reporting non-trivial work complete, use
+`intrinsicengine-review`: one intent, intact layering, tested changed behavior,
+current docs/tasks, scoped mechanical/semantic changes, and tracked exceptions.
+Risk signals require the corresponding deeper review. Unattended work also needs
+profile-specific completion evidence and independent revision-bound review when
+required. See the [full checklist](docs/agent/contract.md#review-checklist).
+
+## 13. Temporary migration exceptions
+
+Temporary exceptions are allowed only when all of the following are true:
+
+- Exception is documented in a current task under `tasks/active/`.
+- Exception has a specific removal task ID.
+- Exception is time-bounded and reviewed.
+- Exception does not create new violations in promoted final layers.
+
+Undocumented exceptions are policy violations.
+
+## Related expanded docs
+
+The core skill owns specialist routing. Read linked contract sections above only
+for the matching scope. For additional detail:
+
+- Workflow posture, hints, commits, and unattended stop rules: the matching
+  section of [session workflow](docs/agent/prompt/prompt.md).
+- Architecture decisions: [architecture index](docs/architecture/index.md).
+- Repository/workflow orientation when requested: [overview](docs/agent/how-this-repo-is-built.md).
+- Role questions: [roles](docs/agent/roles.md).
+- Ambiguous task stop-state: [maturity](docs/agent/task-maturity.md).
+
+
+SOURCE tasks/backlog/methods/METHOD-048-hktex-mesh-textures.md
+---
+id: METHOD-048
+theme: I
+depends_on: [METHOD-047]
+maturity_target: ParityProven
+template: micro
+workflow_schema: 1
+workflow_profile: micro
+evidence: not_applicable
+evidence_skip_reason: interactive implementation plan; micro waives unattended custody only, not method, benchmark, research-claim or backend evidence
+contract_schema: 1
+contracts: [method.engine-integration, geometry.element-domain-sources, geometry.property-coherence, repo.source-documentation, runtime.texture-bake-interface-locality, runtime.processing-compilation-locality]
+---
+# METHOD-048 — Full HKTex mesh authoring, compiled rendering and measured default adoption
+
+## Goal
+
+Implement Heat Kernel Textures for IntrinsicEngine triangle surfaces: native
+reference preparation/evaluation/fitting, surface-constrained kernel optimization
+and density control, saved assets, native compiled CPU/Vulkan rendering, filtered
+material sampling, runtime/editor authoring, and a calibrated multi-view acquisition
+path. Evaluate the proposed optimizations individually before enabling HKTex as
+the default generated continuous mesh-appearance producer.
+
+Operator direction on 2026-09-24 explicitly selects this work despite the standing
+Theme-I pause behind REVIEW-004. This note is **planned backlog work**, not an
+implementation claim. Creating/reviewing the task does not start engine changes.
+The micro profile does not relax CPU-reference-first, research evidence, full CPU,
+sanitizer, Vulkan or fixed-revision review gates.
+
+## Scope, formulation and closure
+
+- The paper's complete core means anisotropic surface operators; spectral grid
+  preparation/alignment/interpolation; continuous source/query evaluation;
+  normalized heat and distance weighting; nonlinear kernel modulation; both
+  neighbor-selection stages; color formation; Riemannian optimization with
+  transported momentum; pruning, cloning/splitting; fitting existing texture or
+  property targets; and calibrated multi-view albedo fitting. Merely loading
+  externally fitted kernels or rendering fixed colors does not close the task.
+- Native C++ implements the mesh/property/UV authoring and runtime path. Python,
+  PyTorch, FAISS, digeo and Mitsuba are reference/optional acquisition tooling,
+  never unconditional runtime dependencies. Native CUDA is not part of this task.
+- Original HKTex's appearance evidence is albedo. Continuous scalar channels,
+  object-space normals, robust input extensions and alternate heat generators
+  are separately named adaptations with their own tests and diagnostics.
+- Preserve authoritative scientific properties, categorical IDs, source topology,
+  authored material interpretation and existing UV export/inspection capabilities.
+  A requested HKTex fit may be rejected or explicitly fall back; neither outcome
+  counts as an HKTex success. Exact properties need not become lossy kernels.
+- S00–S18 below are required scope. An experimental candidate may finish with a
+  reproducible rejection; its rejected selector must not become an advertised
+  backend. The core method, native runtime integration and acquisition path may
+  not be replaced by a negative experiment. S18 must record accepted promotion
+  or a named blocking result; the umbrella remains open if default adoption is
+  still the desired outcome and its gate has not passed.
+
+## Sources and fixed reference
+
+- [HKTex paper and supplement](https://arxiv.org/html/2609.07557v1).
+- [Upstream source](https://github.com/circle-group/hktex/tree/9e942972c5411a364f12563eb6864520f9effe70),
+  pinned commit `9e942972c5411a364f12563eb6864520f9effe70`; MIT notice must accompany
+  copied/adapted substantial source. Audit separate dependency licenses as used.
+- [Design proposal](../../../ara/evidence/diagnostics/hktex_default_design_20260924/proposal.md),
+  [candidate screen](../../../ara/evidence/diagnostics/hktex_default_design_20260924/candidate-screen.md),
+  [discussion corrections](../../../ara/evidence/diagnostics/hktex_default_design_20260924/review-resolution.md).
+  These are hypotheses and derivations, not passed experiments.
+- Trace upstream `eigen_albo*.py`, `heat_kernel_texture*.py`, `geodesic_opt.py`,
+  `heat_kernel_density_knn.py`, `knn_heat/`, fitting configs and trainers to each
+  native operation. Record code/paper differences in `methods/rendering/hktex/paper.md`.
+- In the inspected KNN configuration Gaussian weighting precedes
+  `power_diffused_diracs`; blend division uses `max(sum(alpha), 1)`, then base
+  color and RGB clamp. The displayed paper equation differs. Preserve all
+  normalizer epsilons, postprocessing, index settings and configured counts.
+  The paper, deterministic CPU oracle and upstream floating implementation are
+  separate comparators; no silent averaging of their semantics.
+
+## Ownership and reuse decisions
+
+Read the definitions, callers and listed tests again before implementation;
+this table captures inspected contract fits, not permission to copy mechanisms.
+
+| Behavior | Existing owner/evidence | Decision and missing contract |
+|---|---|---|
+| Sparse assembly/mass/solves | `Geometry.Sparse` (`SparseBuilder`, `SparseLDLT`, `SparseLLT`, CG); `Geometry.DEC` (`BuildLaplacian`, `BuildHodgeStar0`, `BuildConsistentMass`); `Test.Sparse.cpp`, `Test.SparseFactorization.cpp`, `Test_DEC.cpp` | Reuse assembly/factorization. Add justified generic operator support only for anisotropic tensor/mass semantics; the existing Gaussian edge-weight mode is not HKTex's ALBO. Verify stiffness sign from implementation and analytic tests. |
+| Dense numerical primitives | `Geometry.Linalg`, existing Eigen dependency, symmetric eigen/SVD/QR and `Test_LinalgEigenMap.cpp` | Reuse tiny reference eigensolves and alignment primitives. No production sparse partial generalized eigensolver was found by the eigen/Lanczos/Spectra search; evaluate a bounded sparse implementation/dependency rather than densifying large meshes. |
+| Surface geometry and motion | Halfedge topology/curvature, `Geometry.Geodesic`, `Geometry.VectorHeatMethod::TransportVectors`/`ComputeLogMap`; `Test_Geodesic.cpp`, `Test_VectorHeatMethod.cpp` | Reuse topology and transport pieces. Vertex-source distance/log maps do not supply arbitrary barycentric exp-map stepping, face crossing and momentum transport; implement the missing surface-point mechanism at the numerical owner with explicit boundaries/cut loci. |
+| Nearest-source queries | `Geometry.PointLBVH`, runtime `SpatialIndexCache`, `Graphics.PointLbvhWorkspace`; corresponding CPU/GPU tests | Existing 3D Euclidean LBVH cannot implement 64-D biharmonic kNN by substitution. Use deterministic exhaustive embedding-distance scan for the reference and private reusable compiled-cell workspaces for optimization. No second entity spatial-index cache. |
+| Typed property capture and readiness | `Runtime.GeometryProperty.Types`, `Runtime.GeometryProcessingOperations.MeshSources`, shared processing operations and source/property contract tests | Reuse property refs, checked conversion, topology correspondence, snapshots and readiness. Extend current family preparation privately; no UI-only eligibility or name-based channel interpretation. |
+| Texture production lifecycle | `Runtime.TextureBakeModule` request/result/revision token/freshness paths; `Test.TextureBakeModule.cpp` | Reuse scheduling, cancellation, history and source freshness. A compiled surface asset is not a raster image: extend the existing producer records with a concrete representation alternative; do not fabricate UV/atlas identities. Keep heavy dependencies out of its public interface. |
+| Raw property/image baseline | `Graphics.PropertyTextureBake`; `Test.PropertyTextureBake.cpp`, `Test.PropertyTextureBakeGpuSmoke.cpp` | Keep as matched atlas comparator and export rasterization mechanism. Raw values, coverage and padding semantics remain independent of color alpha. |
+| Asset ownership and GPU lifetime | assets registry/codecs; `Graphics.GpuAssetCache`, RHI buffers/descriptors; cache/lifetime/readback tests | Extend CPU payload and GPU residency at their existing owners. No HKTex texture manager/service/registry, no `Vk*` in the API, no live asset-service calls from graphics. |
+| Materials and editor | `Graphics.Material`, existing forward/deferred material sampling; runtime prepared frames, bake workspace and scene codec | Add one explicit compiled-surface source where actual consumers require it. Keep app → runtime; renderer consumes immutable views, not ECS. Coordinate normal-source work with active GRAPHICS-105; do not overwrite/retire its scope implicitly. |
+
+Paper-specific algorithms and public method records belong in
+`methods/rendering/hktex/` (proposed target `MethodHktex`). Shared numerical
+primitives belong in geometry only when their contract is general. Runtime
+materializes method results into a core-only CPU asset payload; graphics/assets
+owns its packed GPU representation. Renderer does not import the paper package.
+Benchmarks call public method APIs; renderer measurements use declared integration
+entry points, not private editor state. No general shader VM, fitting framework
+or family-wide backend registry is justified by this task.
+
+## Engine integration
+
+| Field | Required disposition / owning slice |
+|---|---|
+| Least-structured input | Finite indexed triangle surface and corresponding float3 position property; source signal is a typed property or a surface/image sampling contract. Surface topology is necessary; arbitrary point sets alone are insufficient. S00/S01. |
+| Compatible entity sources | Every constructed/imported mesh meeting the topology/property contract, independent of importer or property names. Mesh face/corner/vertex attributes are eligible only with declared interpolation/correspondence; edge/halfedge fields need explicit surface reconstruction, never guessed interpolation. Bare graphs/point clouds receive an actionable topology-required result. S04/S11. |
+| RuntimeModule | Existing texture-production module owns mesh capture, jobs, stale checks and publication; private HKTex implementation calls the public method. Multi-view acquisition is an explicitly named optional authoring backend of the same job lifecycle. S11/S17. |
+| Config/agent | Persist source refs, fit/generator/evaluator identity, seeds, budget/tolerance units, filter policy and fallback preference; shared side-effect-free preview and validate/apply for UI, files and commands. Only implemented choices are selectable. S00/S11. |
+| UI | Mesh texture action, per-channel source selection, progress/cancel, error/budget/backend diagnostics, kernel/support/error inspection and atlas export preview. Enable from the same prepared readiness snapshot used by execution. S11/S12/S17. |
+| Publication | New material asset/result attachment on the originating mesh; preserve mesh cardinality, unrelated properties and authored UVs. Undo/redo updates per-renderable bindings without mutating shared authored material. Geometry/topology/property/config revisions bind the result; stale completion cannot apply. S10/S11/S14. |
+| End-to-end tests | Constructed/imported meshes and renamed compatible properties; fit → compile → save/load → residency → draw/readback → edit/cancel/stale/undo → export; normal/scalar and calibrated multi-view acquisition paths separately. S10–S18. |
+
+### Spatial acceleration consideration
+
+Index method-owned moving sources in the pinned biharmonic embedding, using
+squared L2, configured nearest-k, source-ID stable ties and the same active set
+as the fit. No radius surrogate or silent k truncation. Rebuild reference query
+state when positions, anisotropy-dependent fields or active kernels change;
+rebuild compiled lists when their frozen inputs change. Component-local behavior
+is explicit. Candidate overflow increases work/subdivision within budget or
+returns a budget failure. Update the spatial-index consumer inventory in S06.
+
+## Impact protocol shared by every slice
+
+- Each slice emits a result row with slice/config/source/fixture identity, actual
+  backend/generator/representation, dependencies, correctness disposition and
+  incremental plus cumulative deltas. Use schema-v2 manifests and retained
+  failed attempts. A proposed test name or runner below is not already available.
+- Freeze S00 controls and cohort before tuning: tiny analytic triangles/quads,
+  sphere/torus, open boundaries, disconnected parts, skinny/degenerate faces,
+  symmetric/eigenvalue-clustered meshes, ties/duplicate kernels, thin close sheets,
+  sharp subtriangle decals and high-frequency images. Add representative licensed
+  engine assets and separate fit/tuning from held-out views/assets.
+- Runtime optimizations compare the **same frozen fit** to S03/S05; do not refit
+  away compiler error. Fitter/generator variants use paired initial states,
+  seeds, observations and stopping/budget policies; report changed fitted output.
+- Record cold preprocessing, fitting, compilation, load/upload, warm evaluation,
+  filtering and edit latency separately; source/cache/serialized/compiled/tree/
+  filter/peak CPU/VRAM bytes; candidate mean/p95/p99/max; source/distance/tie/rank
+  errors, final channel errors, seam/edge-band error and temporal flicker.
+- Compare current atlas with its actual compression/mips/UV/gutter costs, direct
+  attributes where semantically equivalent, and a named sampled surface baseline
+  when available. No performance inference from operation counts or smoke runs.
+- Before S04 campaign work, freeze numeric bounds in method.yaml and manifests:
+  reference/compiled scalar residuals, per-channel output error, fit quality,
+  angular normal error, footprint integration error and resource caps. Initial
+  planning targets: normalized albedo compiler L∞ ≤ 1e-6 on CPU and ≤ 1e-4 on
+  Vulkan; certified approximation budget ≤ 1/1024 per linear-albedo channel;
+  angular normal error ≤ 0.5 degrees. These are proposed gates, not evidence.
+  Raw scientific/categorical values require exact preservation. S00 must turn
+  every remaining budget into finite values tied to the target device/scene;
+  it cannot leave adoption limits as "acceptable" or retune them to pass.
+- CPU float64 defines the semantic oracle; compare upstream with its own measured
+  precision. Near-tie disagreement is logged, never an excuse for color error.
+  Nonfinite, unstable denominator, invalid power domain and resource exhaustion
+  are explicit outcomes. Stable IDs break exact ties in the native contract;
+  the difference from upstream unspecified tie behavior is retained.
+
+## Slice plan
+
+All slice IDs are stable within METHOD-048. Each finishes with a fixed-revision
+review, named tests, diagnostics and a small report; no deployment optimization
+is enabled merely because its preceding slice passed.
+
+### S00 — Paper intake, fixture bridge and executable contract
+- [ ] Create the method package/manifest, pinned-source/license inventory and
+  code-to-native formulation map. Export tiny upstream fixtures (operators,
+  aligned eigenproperties, kernels, barycentric queries, intermediate and final
+  outputs) with hashes. A pinned external environment is opt-in tooling only.
+- [ ] Define sign/mass conventions, coordinate/color spaces, component/nullspace
+  handling, anisotropy frames, eigenvalue multiplicity/alignment, zero modes,
+  all epsilons/powers/clamps, outer/inner selection and error/status contracts.
+- [ ] Freeze dataset splits, budgets and baseline configuration. Reserve public
+  benchmark target `HktexBench`, stable IDs below and CTest prefix `Hktex.`.
+  Gate: license/provenance and intermediate semantics reproducible; otherwise
+  no parity claim. No future selector appears as an implemented backend.
+
+### S01 — Surface/ALBO and deterministic spectral preparation (after S00)
+- [ ] Assemble mass and isotropic/anisotropic operators from typed positions;
+  tiny dense generalized-eigen reference first, explicitly bounded by mesh size.
+  Implement grid alignment/interpolation and source normalization. Diagnose
+  negative modes, clustered spectra, zero mass, missing frames and component modes.
+- [ ] Tests: analytic planar/isotropic limits, residual `W Phi - M Phi Lambda`,
+  mass orthogonality, eigenvector sign/subspace changes and upstream fixture deltas.
+  Record preparation bytes/time and solver residuals under `rendering.hktex.prepare`.
+- [ ] Gate: faithful operator/interpolation contract; no production fallback to
+  unbounded dense solves. Optimized sparse preparation is owned by S15.
+
+### S02 — Arbitrary surface points and geodesic optimizer primitives (after S01)
+- [ ] Add/reuse barycentric source evaluation, surface gradients, triangle-edge
+  crossing, constrained step/exp-map approximation and parallel momentum transport.
+  Define vertex hits, boundary steps, step rejection and disconnected-sheet behavior.
+- [ ] Compare directional derivatives to finite differences on smooth regions;
+  transport norm/round-trip and flat-plane exactness tests; gradient/tie/nondifferentiable
+  points have explicit rules. `rendering.hktex.surface_motion` records drift,
+  rejected steps and cost. Gate: sources and momentum remain on the chosen surface.
+
+### S03 — Full deterministic CPU evaluator (after S01/S02)
+- [ ] Implement direct spectral heat, normalization, biharmonic distance/window,
+  nonlinear modulation, exhaustive outer kNN, inner top contributions, compositing
+  and final postprocessing. Freeze semantic tie order and trace intermediates.
+- [ ] Test both intermediate fixture parity and final color; include zeros,
+  negative spectral lobes, even/noninteger powers, duplicate sources, empty sets,
+  K greater than source count, extreme sharpness and denominator floor crossing.
+- [ ] `rendering.hktex.reference`: deterministic fixture results, upstream deltas,
+  arithmetic/rank diagnostics. Gate: no optimized/compiled evaluator before this
+  oracle and its correctness tests exist.
+
+### S04 — Native fitting, constraints and density control (after S03)
+- [ ] Implement the baseline objective/sampling, Adam-like shape updates, geodesic
+  position/momentum updates, parameter constraints, initialization, error-driven
+  clone/split, pruning and stopping; source IDs survive deterministic updates.
+  Reuse exact property or authored-texture sampling; masks/coverage are not RGB.
+- [ ] Tests: recover synthetic constant/gradient/decal targets; loss/gradient checks;
+  source movement/splitting, no inactive-source leakage, deterministic seeds,
+  cancellation and budget exhaustion. Compare trajectories only where algorithms
+  and precision match; compare final error otherwise.
+- [ ] `rendering.hktex.fit`: fit quality, time, active counts, samples and peaks
+  versus fixed kernels/no density control. Gate: fitting produces reusable
+  native kernels, not just an upstream subprocess result.
+
+### S05 — Exact frozen-fit compiler and optimized CPU evaluation (after S04)
+- [ ] Compile normalized heat to `H_s(b)=sum b_i A_si`; distance to
+  `q_s(b)=sum b_i D_si-sum(i<j)b_i b_j E_ij`, sharing edge coefficients.
+  Retain Gaussian-before-power order and all reference semantics. Baseline compiler
+  may retain every source; no candidate or approximation shortcut yet.
+- [ ] Compare face-major and shared-vertex storage at identical outputs; bounded
+  streaming compile with explicit overflow. Independent tests expand original
+  spectral expressions and query edges/interiors/subtriangle detail.
+- [ ] `rendering.hktex.compile`: output/intermediate deltas, compile cost and total
+  bytes vs S03 on the identical fit. Gate: CPU optimized parity before Vulkan.
+
+### S06 — Certified candidates and fixed-rank cells (after S05)
+- [ ] Bound squared distance on each cell; with kth-smallest upper bound U_k,
+  discard only sources with lower bound > U_k. Keep ties and round conservatively.
+  Recompute original outer/inner rankings at query; optional fixed-order cell
+  specialization requires bounds over every possible competitor.
+- [ ] Adaptive subdivision stops at configured memory/depth/work limits with an
+  explicit failure or exact slower evaluation. No center-in-face shortcut.
+  Update shared-index consumer documentation with the metric/reuse decision.
+- [ ] Tests: exhaustive ranking against candidate sets, long thin cells, many
+  overlapping/broad kernels, clones and cross-face ties; inspect proof obligations
+  as well as samples. `rendering.hktex.candidates`: zero missed sources, list tails,
+  bytes and warm cost versus S05; gate: output error unchanged.
+
+### S07 — Certified final-color specialization (after S06)
+- [ ] Bound complete color across possible rankings and clamps, including signed
+  alpha and power domains. Use constant/base-color shortcuts only when the
+  per-channel interval/error certificate fits the budget. Add low-order cell
+  polynomials only if constant/exact cells leave a demonstrated cost problem.
+- [ ] Tests: derivative/interval bounds, rounding, cancellation, selection jumps,
+  negative lobes, unsafe-domain rejection and shared-edge continuity. Dense
+  sampling supplements but does not establish a certificate. No arbitrary alpha cutoff.
+- [ ] `rendering.hktex.specialize`: maximum measured and certified errors, certified
+  area fraction, bytes and cost versus S06. Gate: explicit exact/approximate mode,
+  validated conservative bounds; uncertified cells keep exact evaluation.
+
+### S08 — CPU footprint oracle and filter contract (after S05)
+- [ ] Define footprint/visibility/color-space semantics. Integrate final composed
+  color, including rankings/clamps, across cells/faces with adaptive quadrature;
+  independently converge supersampled renders. Distinguish empirical error
+  estimates from certified interval enclosures.
+- [ ] Tests: shrinking footprint → point limit; constant/integrable controls;
+  tiny decals, high-frequency patterns, grazing ellipses, triangle/selection/occlusion
+  boundaries. `rendering.hktex.filter_reference`: integration error vs convergence
+  and cost. Gate: widening alpha or dividing filtered sums is not the oracle.
+
+### S09 — Coarse moments, cross-face filtering and transitions (after S07/S08)
+- [ ] Build coarse integral/moment caches of final color and a bounded cross-face
+  hierarchy. Fully covered nodes use moments; partial coverage refines or bounds
+  residuals. Near views retain analytic kernels. Count all cache/hierarchy bytes.
+- [ ] Test anisotropic footprints, many tiny faces, minification/magnification,
+  silhouettes with visibility controls, rank jumps and animated scale switches.
+  Preserve `integral(P-C) ≤ epsilon` only under its normalized nonnegative filter
+  assumptions; bound footprint approximation and integration separately.
+- [ ] `rendering.hktex.filter`: flicker/error/storage/time against S08 and the atlas.
+  Gate: no unbounded traversal; failed filter budgets retain explicit opt-in status.
+
+### S10 — Native asset codec, packed layout and residency (after S05; filter extension after S09)
+- [ ] Add versioned CPU asset payload for fit parameters, mesh/reference-domain
+  identity, compiled coefficients/cells and optional filter cache. Store provenance,
+  source/config hashes and regenerability requirements. Runtime rendering must load
+  compiled payload without needing the fitting eigensolver/cache.
+- [ ] Extend current assets/GpuAssetCache and RHI buffer/descriptors; define
+  source-triangle/render-primitive mapping including seam splits, submeshes and
+  instance bindings. Preserve deferred retirement and renderer operational checks.
+- [ ] Tests: round trips, malformed sizes/indices/nonfinite input, hash mismatch,
+  memory caps, stale handles and shared-material isolation. `rendering.hktex.asset`:
+  serialized/loaded/peak residency bytes and cold load cost. Gate: no second owner.
+
+### S11 — Runtime jobs, controls and mesh authoring UI (after S04/S10)
+- [ ] Extend existing texture-production jobs, source capture, prepared readiness,
+  serializable config, preview/apply, history, progress/cancel, and asset publication.
+  Presets expose only implemented generator/evaluator/filter choices. Public
+  bake/workspace interfaces stay compilation-local.
+- [ ] Mesh panel supports fitting, inspection of kernels/support/error/budgets,
+  pending/failed/stale states, representation provenance and explicit fallback.
+  All compatible property names/provenances use identical binding rules.
+- [ ] Tests: UI/agent/config parity; cancellation at each phase; source revision,
+  topology edit, deletion, entity detach, scene close, out-of-order completion,
+  undo/redo and restart/save/load. `rendering.hktex.lifecycle` records stage latency
+  and cancellation responsiveness. Gate: no stale result may publish.
+
+### S12 — Vulkan evaluation and visible material integration (after S05–S11)
+- [ ] Port the already verified compiled evaluator/filter to Vulkan using existing
+  material and residency boundaries. Prove face/barycentric addressing and derivative
+  conventions; avoid extra vertex duplication solely for HKTex where possible.
+  CPU remains the oracle; raster and compute paths report which actually ran.
+- [ ] Offscreen readback tests of reference/exact/approximate/filtered outputs,
+  forward/deferred lighting, instances, multi-material submeshes, nontrivial model
+  transforms and resource retirement. Null or skipped Vulkan is not completion.
+- [ ] `rendering.hktex.vulkan`: CPU deltas, full-frame and texture-stage GPU timestamps,
+  p95 frame time, warm/cold VRAM and integration overhead at pinned scenes/devices.
+  Gate: actual operational Vulkan, no portable speed claim from one device.
+
+### S13 — Material channels and directional filtering (after S09/S12)
+- [ ] Add explicit scalar/RGB/normal interpretation with range/units/encoding;
+  share kernel support only where held-out error permits, otherwise channel-specific
+  coefficients/supports. Preserve categorical and scientific exact-source routes.
+- [ ] Native object-space normal reconstruction handles zero vectors, hemisphere
+  errors and transforms. Implement/evaluate normal moment filtering against the
+  actual engine BRDF; LEAN is a donor, not an assumed GGX conversion. Coordinate
+  normal source authority with GRAPHICS-105 without creating a parallel pipeline.
+- [ ] `rendering.hktex.channels`: scalar/RGB/normal/angular and rendered specular
+  errors, per-channel incremental bytes/cost, grazing highlights and malformed
+  encodings. Gate: no RGB clamp reused for unbounded/raw data; normals have their
+  own oracle/readback tests rather than inheriting albedo parity.
+
+### S14 — Edits, deformation, topology transfer and export (after S11–S13)
+- [ ] Color edits reuse geometry coefficients; source/shape edits invalidate old
+  and new ranking footprints. Rest-domain deformation is explicit; metric updates
+  and remeshing trigger their own recapture/transfer/refit requirements.
+- [ ] Implement local paint/update plus cancel/undo and bounded global fallback;
+  preserve source correspondence and fit/compiled generation identities. Atlas
+  export uses existing UV/bake machinery when required by the destination;
+  authored UV inputs and existing atlas inspection remain available.
+- [ ] `rendering.hktex.edit_export`: no stale generations, bounded transfer error,
+  edit latency/affected records, deformation quality and exported appearance
+  versus native. Gate: no "local update" claim if distant ranking regions change.
+
+### S15 — Sparse preparation and fitting acceleration (after S04/S07)
+- [ ] Implement a bounded production sparse partial generalized eigensolver
+  route, reusing existing assembly/factorization; choose dependency versus minimal
+  implementation after residual/orthogonality/scaling evidence. Stream/cache aligned
+  grid data without hiding temporary memory or recomputation.
+- [ ] Separately evaluate variable-projection/constrained color solves with
+  fixed support, handling base-color rank ambiguity, clipping and nonlinear losses.
+  Then evaluate deployment-cost-aware fitting (compiled bytes/work plus error),
+  not kernel-count-only optimization. Separate toggles and paired baselines.
+- [ ] `rendering.hktex.prepare_optimized`, `rendering.hktex.fit_variable_projection`,
+  `rendering.hktex.fit_deployment_cost`: each reports matched error, total cost,
+  memory, iterations and gradient/residual diagnostics. Gate: no bundled speedup
+  attribution; failed candidate is disabled with retained evidence.
+
+### S16 — Robustness and alternate generator experiments (after S15)
+- [ ] Implement declared component/boundary policies and test weak/degenerate
+  geometry, poor triangles and ambiguous anisotropy frames. Nonmanifold sheet
+  splitting is an explicit auxiliary analysis operation preserving render mapping,
+  not silent source topology mutation. Scalar tufted-Laplacian robustness does
+  not license arbitrary anisotropic/transport behavior.
+- [ ] Isolate two candidate generators: sparse polynomial heat-operator actions
+  on a consistent mass-scaled operator, and a residual-checked reduced basis.
+  Each has a CPU reference/gradient check, separate identity and paired refit;
+  neither is a parity optimization of the interpolated original by assertion.
+- [ ] `rendering.hktex.robustness`, `rendering.hktex.generator_polynomial`,
+  `rendering.hktex.generator_reduced`: record failures, accepted-domain coverage,
+  residuals/positivity violations, fit quality and full preparation/runtime cost.
+  Gate: evaluated/rejected variants are valid slice outcomes; unsupported source
+  topology is reported before any mutation or expensive job starts.
+
+### S17 — Calibrated multi-view acquisition (after S04/S10/S11)
+- [ ] Implement a versioned observation contract: fixed mesh, cameras/intrinsics,
+  poses, masks, linear-image/exposure convention, known lighting/material settings,
+  train/held-out views and correspondence. Albedo-only inverse fitting does not
+  infer geometry or claim disentanglement under unknown illumination.
+- [ ] Provide an opt-in pinned upstream Mitsuba/Dr.Jit acquisition adapter through
+  the same cancellable runtime job and public method boundary, with a native
+  import/validation/compiler path. Declare it `external_reference_multiview`,
+  not native CPU/Vulkan fitting. No new general differentiable renderer is hidden
+  in scope. CPU reference tests validate observation/transport fixtures, objective
+  and gradient checks; upstream rendering supplies the full published inverse
+  rendering comparator. A future native differentiable renderer needs its own task.
+- [ ] Transfer source/aligned spectral state or compiled coefficients plus exact
+  metadata so imported fits cannot silently depend on different eigensolver gauges.
+  Test actual image-fit → native load/compile → engine render on synthetic known
+  albedo and a licensed calibrated example, with held-out image errors.
+- [ ] `rendering.hktex.multiview`: actual authoring backend, held-out error, fit
+  cost and native evaluation deltas. Gate: missing environment is an unavailable
+  capability, not a completed acquisition slice; installation stays opt-in and
+  offline tool dependencies never enter headless/runtime requirements.
+
+### S18 — Independent ablations and default promotion (after all required slices)
+- [ ] Freeze held-out corpus, current atlas configuration, devices/scenes and
+  numeric quality/frame/memory/edit/coverage thresholds before adoption runs.
+  Retain each independent slice toggle and cumulative configurations; include
+  negative controls and atlas/direct-attribute/sampled-surface comparisons.
+- [ ] Run CPU correctness/full CPU/sanitizers and actual Vulkan integration,
+  repeat alternating matched benchmarks, independently audit results and ARA
+  claims, and review the fixed implementation revision with Claude or an
+  independent reviewer. Report every failure and actual fallback.
+- [ ] Only after those gates pass, change the generated continuous mesh-appearance
+  default through the common validated recipe/config path; preserve authored UV
+  and exact-property routes and explicitly report eligible input coverage.
+  Inspector, save/load, restart, history, export and multi-view acquisition must
+  remain usable. No task retirement by relabeling failed HKTex as an atlas success.
+
+## Acceptance criteria
+
+- [ ] S00–S18 each has a reviewed disposition and reproducible impact evidence;
+  no TODO placeholder backend is selectable and no required core slice is waived.
+- [ ] Original fitting/evaluation and optimized compiled evaluation have distinct
+  identities, reproducible CPU correctness and declared parity evidence.
+- [ ] Native Vulkan actually renders the supported compiled/filter/channel path;
+  CPU/null/skip evidence cannot satisfy it.
+- [ ] Native mesh-property/UV authoring and explicit external multi-view acquisition
+  both produce usable saved engine assets; provenance and source mapping survive.
+- [ ] Integration preserves canonical properties, source topology, source readiness,
+  job freshness, material instance ownership, history, export and editor usability.
+- [ ] Proposed optimizations have isolated ablations and complete cost accounting;
+  accepted default promotion is backed by held-out quality/resource evidence.
+- [ ] Required documentation/inventories and ARA claims are current, fixed-revision
+  reviews are resolved, and retirement includes the actual reached maturity.
+
+## Documentation and evidence deliverables
+
+- [ ] `methods/rendering/hktex/{method.yaml,paper.md,README.md}` and method reports
+  distinguish published method, code oracle, engine adaptations and limitations.
+- [ ] Update relevant sections of architecture geometry/assets/graphics/runtime,
+  material/source and scene-format contracts, method/benchmark indexes, and spatial
+  consumers. Update AGENTS only if ownership/boundaries actually change.
+- [ ] New module surfaces refresh the module inventory; source purpose synopses
+  and non-obvious mathematical/lifetime contracts follow source-documentation policy.
+- [ ] Benchmarks use stable `rendering.hktex.*` IDs above with schema-v2 sealing;
+  records under `ara/evidence/` bind exact source/config/manifest/dataset identity.
+  Claims enter the ledger before result summaries promote them. Dirty/local runs
+  remain diagnostic. Numerical, performance and operational claims remain distinct.
+- [ ] Preserve planned versus executed state. Rejected methods remain documented;
+  no task, source README or report describes proposals as implemented.
+
+## Verification
+
+Planning-only checks (run now; no C++ build is evidence for writing this task):
+
+```bash
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/generate_session_brief.py
+python3 tools/agents/generate_session_brief.py --check
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/agents/check_ara_claims.py --root . --strict
+git diff --check
+```
+
+Implementation commands below become available as the named slices create their
+tests/runner. S00–S04 must register CPU tests as `Hktex.*`; S12 registers GPU
+cases with the same prefix and both `gpu` and `vulkan` labels. No empty selection
+counts as a pass. Use focused tests first, then all required gates at integration.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci -R '^Hktex\.' --output-on-failure --no-tests=error -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+ctest --test-dir build/ci --output-on-failure --no-tests=error -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+cmake --preset ci-asan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON
+cmake --build --preset ci-asan --target IntrinsicCpuTests
+ctest --test-dir build/ci-asan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1
+cmake --preset ci-ubsan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON
+cmake --build --preset ci-ubsan --target IntrinsicCpuTests
+ctest --test-dir build/ci-ubsan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target IntrinsicTests
+ctest --test-dir build/ci-vulkan -R '^Hktex\.' -L gpu -L vulkan --output-on-failure --no-tests=error --timeout 120
+ctest --test-dir build/ci-vulkan -L gpu -L vulkan --output-on-failure --no-tests=error --timeout 120
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
+python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
+python3 tools/agents/check_ara_claims.py --root . --strict
+```
+
+S04 owns the proposed `HktexBench` executable, accepting the positional output
+directory passed by `run_and_seal.py`. Register an optional benchmark target with
+`RUNTIME_OUTPUT_DIRECTORY` set to the build tree’s `bin` directory. Its default
+campaign is bounded smoke. A proposed `INTRINSIC_HKTEX_BENCH_CONFIG` environment
+variable selects a versioned campaign file, including slice, baseline, variants,
+fixtures and seeds; copy all resolved settings into results. Register focused tests
+as `Hktex.S00.*` through `Hktex.S18.*` so each slice can run independently once its
+prerequisites exist. Campaign manifests live under `benchmarks/rendering/manifests/`
+and bind the stable IDs specified in each slice. These are implementation
+requirements, not currently available commands.
+Example sealing command once the runner exists (choose a fresh run ID for every
+campaign; never reuse an attempt to overwrite failure):
+
+```bash
+cmake --build --preset ci --target HktexBench
+python3 tools/benchmark/run_and_seal.py --executable build/ci/bin/HktexBench --output /tmp/hktex-method048-results --manifests-root benchmarks --run-id method048-smoke-001 --attempt-id attempt-001
+python3 tools/benchmark/validate_benchmark_results.py --root /tmp/hktex-method048-results --manifests-root benchmarks --strict
+```
+
+## Planning review
+
+Claude Opus 5.5 high-effort review and its findings/resolutions are retained with
+the task-planning evidence. Approval applies to the task text at its recorded
+digest, not to future code or to an unexecuted performance claim.
+
+
+SOURCE ara/evidence/diagnostics/hktex_default_design_20260924/proposal.md
+# Making HKTex a credible IntrinsicEngine default
+
+Status: research proposal, 2026-09-24. No engine implementation, benchmark,
+default change, or new capability result. The operator requested solutions and
+publication-based adaptations, not merely an assessment of the original paper.
+Claude Opus 5.5 at high effort is the discussion partner. Retained responses are
+advisory; the qualifications below take precedence over their unchecked claims.
+
+## Recommendation and meaning of default
+
+Develop a **compiled HKTex evaluator** first. Keep spectral fitting as an offline
+producer, specialize its fixed computations into triangle-local coefficients,
+and render those coefficients. This is a concrete route to removing global KNN
+and eigenbasis evaluation from the draw path while preserving subtriangle detail.
+It is not yet evidence that the resulting representation is fast or small.
+
+Pin the initial oracle to upstream commit
+`9e942972c5411a364f12563eb6864520f9effe70`, especially
+[the KNN texture evaluator](https://github.com/circle-group/hktex/blob/9e942972c5411a364f12563eb6864520f9effe70/hktex/modules/heat_kernel_texture_knn.py)
+and its configuration. It clamps the blend denominator to at least 1 and the
+final RGB to [0,1]; this differs from the displayed paper equation. Gaussian
+weighting precedes `power_diffused_diracs`. Configured outer/inner counts and
+index type are part of the oracle, not hard-coded universal constants.
+
+The intended default is the producer for newly generated continuous mesh
+appearance that passes the quality and cost contract. Exact scientific values
+and categorical IDs remain authoritative properties; authored UV materials keep
+their interpretation. A real adoption decision must publish the eligible asset
+population, success rate and exceptions. Calling an automatic atlas fallback
+HKTex would not meet the objective. A universal replacement of every image,
+normal, label, export and UV-editing workflow is not presently justified.
+
+## Frontier and functional problem
+
+| Existing approach | Useful primitive | Limitation relevant here |
+|---|---|---|
+| HKTex reference | Fitted surface kernels; spectral geometry; point evaluation | Expensive evaluation, preprocessing, dynamic candidate selection and unestablished footprint filtering |
+| Engine UV atlas and property bake | Charted image storage with raw-value and coverage contracts | Chart construction, duplicates, gutters, distortion and image resolution |
+| Direct mesh attributes | Exact source-domain interpolation or face lookup | No independent fine surface signal storage |
+| Htex / Mesh Colors | Local surface samples without global unwrapping | Sample-resolution/storage tradeoff; a different runtime representation |
+| Vector graphics cell specialization | Local lists of analytic primitives | HKTex has global tails, ranking and nonlinear normalization |
+
+The domain-neutral problem is to compress a bounded signal on a piecewise smooth
+domain, answer point and finite-footprint queries under tight latency and memory
+budgets, and update the signal without altering authoritative observations.
+Geometry is mostly fixed during drawing; optimization and topology edits run on
+different timescales. Discrete labels, continuous scalars and directional
+statistics have different semantics.
+
+The obvious suggestions—port PyTorch to shaders, reduce eigenmodes, quantize
+everything, add mips, or replace the fitter with a neural network—do not by
+themselves solve this problem. None is the recommended first move.
+
+## 1. Compile the fixed kernel, rather than port the research evaluator
+
+This is our algebraic adaptation, not a measured result. Fix a mesh, spectral
+configuration, kernel source, anisotropy and diffusion time. Let b be a triangle's
+barycentric coordinates. Barycentric spectral interpolation makes the normalized
+heat term a three-value interpolation:
+
+    H_s(b) = sum_i b_i A_s(v_i).
+
+Let z be the fixed biharmonic embedding and z_s the source embedding. Define
+D_s(v_i)=||z(v_i)-z_s||² and E_ij=||z(v_i)-z(v_j)||². Then
+
+    q_s(b) = ||sum_i b_i z(v_i)-z_s||²
+           = sum_i b_i D_s(v_i) - sum_(i<j) b_i b_j E_ij.
+
+The identity follows by expanding the squared norm and using sum b_i=1. E is
+shared across kernels. Store A and D per retained kernel/vertex, or duplicate six
+scalars into face-major records when coherence is worth the storage. Evaluate
+H_s(b) exp(-q_s(b)/(2 sigma²)), followed by the selected reference's power,
+soft-step, rankings, normalization and channel postprocessing. Constants and
+epsilon terms must be carried through; do not silently substitute paper formulas.
+
+This removes spectral dimension from the per-candidate runtime computation.
+It does not remove exponential/sigmoid evaluation, candidate traversal, ranking,
+or memory traffic. A complete compiled asset can avoid loading the spectral
+cache in the renderer; the authoring process still needs its own working data.
+
+Donor: [partial evaluation](https://studwww.itu.dk/people/sestoft/pebook/).
+The transferred mechanism is specializing computations with fixed inputs, not
+changing the fitted signal. [Random-access vector graphics](https://hhoppe.com/ravg.pdf)
+supplies the closer rendering precedent: localized primitive streams with
+adaptive evaluation. Our required adaptation is curved-domain cell addressing
+plus HKTex's distance/ranking semantics. This is known-component engineering,
+with no global novelty claim.
+
+## 2. Replace global KNN with certified local candidate supersets
+
+Preserve the reference's outer distance ranking and inner contribution ranking
+first. A list of kernels whose centers lie in a face is insufficient.
+
+For each barycentric cell T and source s, compute conservative bounds
+l_s <= q_s(b) <= u_s for all b in T. The quadratic is convex; its maximum is at
+a vertex, and its minimum can be obtained by testing the constrained interior
+minimum and all edges. Conservative interval bounds also work. Let U_k be the
+k-th smallest u_s. Exclude s only when l_s > U_k: at least k other sources are
+always no farther than U_k. All possible nearest-k sources therefore remain.
+
+At a query, evaluate distances in that superset, retain the original nearest k,
+then perform the original top-contribution selection. Subdivide cells when their
+lists are large. Bound rounding outward; preserve ties conservatively and specify
+deterministic tie semantics. Shared quadratic terms cancel in pairwise distance
+differences, so distance-order boundaries are affine inside a face. Explicit
+order-k arrangements are a possible alternative, not the first implementation.
+
+Donor: [simplicial Bernstein range bounds](https://www.reliable-computing.org/reliable-computing-25-pp-024-037.pdf).
+Use interval arithmetic for exp and sigmoid around polynomial enclosures;
+Bernstein bounds alone do not certify a transcendental function. Initially prune
+only impossible nearest-k candidates, not small alpha values. Arbitrary alpha
+cutoffs and changed top-k semantics are approximations requiring separate error
+contracts and potentially refitting.
+
+**Worst case:** every cell retains almost every source, or subdivision produces
+too many records. Storage can approach the face-source product. Count compiled
+records, duplicates, offsets, hierarchy nodes and shared arrays—not just kernels.
+A subdivision limit returns a truthful budget failure; it never silently drops
+contributors. Global heat tails also prevent assuming that kernel movement has
+strictly local effects.
+
+**Flat-region shortcut:** after the exact compiler, add a separately measured
+error-bounded specialization. Bound final color over the cell, including all
+possible rankings and clamps. If it is uniformly within epsilon of a constant,
+store that constant and skip kernel evaluation. The reference-code denominator
+floor is useful: for a candidate superset, let B_s bound
+sup_T |alpha_s| ||c_s||. The sum of the largest inner-k B_s bounds the residual
+numerator magnitude and hence its contribution after division by a denominator
+at least 1. Clipping is nonexpansive. A small sum certifies the base-color shortcut,
+even when distant kernels remain in the nearest-k set. Negative weights require
+absolute-value bounds; undefined power inputs must fail validation.
+
+This is a proposed conservative sufficient test, not a necessary condition for
+uniform appearance. It can fail on cancellation or large but equal-color
+contributions. Tighter bounds/subdivision or a general final-color polynomial
+approximation are alternatives. Count all cached cells. Approximate mode reports
+its tolerance and error evidence; exact mode does not take this shortcut. Near
+ranking ties, a small distance discrepancy can cause a large color jump, so a
+ranking ambiguity band never waives the output-error gate.
+
+A particularly close donor is Keeter's
+[region-specialized implicit rendering](https://www.mattkeeter.com/research/mpr/):
+interval evaluation simplifies a large expression separately over spatial regions.
+Transfer the specialization mechanism to HKTex color expressions and ranking
+branches. Do not assume its implicit-surface rendering guarantees transfer to
+HKTex. Initial implementation needs only fixed HKTex data records and evaluator
+variants, not a new general-purpose bytecode VM or shader framework.
+
+## 3. Make filtering a query of an area, not a blurred point sample
+
+This is the hardest unresolved rendering part. The desired reference is an
+integral of the **final composited and postprocessed color** over the pixel's
+visible surface footprint. Averaging separately filtered weights and dividing
+afterward is not generally equivalent. Likewise, widening a sigmoid or averaging
+vertex samples does not reliably capture many tiny kernels inside one triangle.
+
+Build a CPU adaptive footprint-integration oracle, split across triangle and
+ranking boundaries, and compare it with converged supersampled renders. A
+sample-difference stopping rule is an estimator, not a rigorous bound; certified
+tests need interval enclosures, or an explicit empirical tolerance and independent
+convergence control. Occlusion boundaries require visibility-aware sampling.
+
+First fast candidate: reuse compiled cell lists for adaptive, footprint-aware
+sampling of the final evaluator. Smooth low-variation cells use few samples;
+unresolved detail uses more or a preintegrated coarse representation. Investigate
+an adaptive hierarchy of final-color moments/polynomials for large footprints,
+integrating the reconstruction over clipped footprint regions. Error must cover
+the spatial reconstruction, quadrature, footprint approximation and transitions.
+The hierarchy is derived storage and must be counted. If it becomes dense per-face
+texels, call it a hybrid bake and compare it honestly with Htex.
+
+There is a useful sufficient condition: if a reconstruction P approximates final
+color C uniformly within epsilon, integrating P against a normalized nonnegative
+footprint differs from integrating C by at most epsilon. This follows directly
+from the triangle inequality. It requires **integrating** P, not point-sampling it.
+Sum clipped integrals across cells/faces and bound geometric footprint error
+separately. Top-k discontinuities may prevent a single smooth cell polynomial
+meeting the bound; split those regions or use explicitly bounded area error.
+
+For fully covered coarse nodes, stored integrals or low-order weighted moments
+can summarize discontinuous detail without a uniform smooth approximation. For
+partially covered nodes, refine or use a certified residual bound. A pixel
+footprint spanning many tiny triangles needs a cross-face cluster hierarchy,
+not just independent per-face trees. Coarse-cache storage, certified integration
+cost and stable transitions remain open. Fine mode can retain analytic kernels;
+the coarse cache need not resolve maximum-zoom detail as texels.
+
+Donors: [EWA Surface Splatting](https://www.merl.com/publications/TR2001-20)
+for anisotropic footprints; [mip-NeRF](https://jonbarron.info/mipnerf/) for
+scale-aware queries; [Mip-Splatting](https://arxiv.org/abs/2311.16493) for
+separating representation bandwidth from image sampling; and vector-graphics
+local supersampling. Their formulas do not directly solve HKTex's nonlinear
+ratio, clamping and selection boundaries. The adaptation remains research.
+
+## 4. Fit faster and charge the actual deployment cost
+
+For fixed supports and weights, unclipped predicted colors are linear in kernel
+colors and base color. Use a constrained/regularized linear color solve inside
+the nonlinear source-position/shape loop. Fix the base or handle its rank
+ambiguity. This transfers [variable projection](https://www.nist.gov/publications/variable-projection-nonlinear-least-squares-problems).
+Clipping, perceptual losses and inverse-rendering objectives are not automatically
+linear; an inner constrained or nonlinear solve must reflect the actual objective.
+
+Fit directly to queryable source mesh properties when photographs and lighting
+inference are unnecessary. Warm-start edits; a color-only edit can reuse
+geometric coefficients and candidate lists. Source/shape edits must update their
+fields and certify changed support; topology edits require transfer/recompilation.
+No assumption that every edit is local or cheap.
+
+Transfer [rate-distortion optimization](https://www.microsoft.com/en-us/research/publication/rate-distortion-optimization-for-video-compression/)
+from codecs: optimize measured distortion plus compiled bytes and an evaluation
+cost surrogate, not kernel count alone. Keep hard quality limits and independently
+measured runtime gates. Candidate count is not GPU time. A shared layout can
+support many material channels, but one layout may fit different channels poorly.
+
+## 5. Reduce preprocessing only after runtime compilation is viable
+
+Keep the published spectral generator initially so representation changes are
+not confused with compiler bugs. Cache its input/version/configuration identity.
+Grouping kernels by anisotropy-grid cell may reduce active basis memory, but
+alignment dependencies and I/O must be measured; four-node streaming is not an
+established bound on total preprocessing memory.
+
+If cold preparation remains unacceptable, investigate
+[polynomial heat-operator actions](https://arxiv.org/abs/1911.02721), transferred
+from cortical-surface analysis: approximate exp(-t L) applied to a source using
+sparse matrix recurrences rather than eigenvectors. With a mass matrix, use a
+consistent symmetric mass-scaled operator and spectral interval. Moving sources,
+anisotropy, polynomial degree and batched-source storage remain costs. The result
+is not automatically the paper's truncated, interpolated spectral field; refit
+and validate it as a distinct generator.
+
+A second option is a snapshot-based
+[reduced basis](https://epubs.siam.org/doi/10.1137/100795772), with independent
+error checks over anisotropy/source queries. Neither a compact global basis nor
+positivity follows for free. DEIM-style hyper-reduction is an exploratory option
+only if nonlinear operator evaluation still dominates.
+
+## 6. Preserve channels, topology and editing semantics
+
+- Continuous albedo and bounded scalar material channels can use typed fits,
+  with per-channel units, ranges, losses and error thresholds. One RGB clamp is
+  not an acceptable general property encoding.
+- Store exact vertex/face signals directly, optionally with an explicitly named
+  HKTex residual for genuinely finer content. Never approximate authoritative
+  labels/IDs merely to make a default appear universal.
+- For object-space normal detail, reconstruct a vector with an explicit
+  degeneracy rule and deformation transform. Renormalization alone does not
+  preserve minified specular appearance. Investigate directional moments using
+  [LEAN Mapping](https://userpages.cs.umbc.edu/olano/papers/lean/), adapting the
+  distribution to the engine BRDF. LEAN's original tangent-space/shading model
+  is not a drop-in proof for object-space GGX.
+- Split disconnected components explicitly and define sheet adjacency at
+  nonmanifold junctions. A [tufted Laplacian](https://www.cs.cmu.edu/~kmcrane/Projects/NonmanifoldLaplace/index.html)
+  helps the scalar operator, but does not establish robust anisotropic operators,
+  kernel transport, or physically intended cross-sheet diffusion. Robustness
+  cannot be inferred from the availability of a scalar solver.
+- Existing `Geometry.HalfedgeMesh.VectorHeatMethod` offers a reuse lead for
+  directional transport. [Vector heat](https://www.cs.cmu.edu/~kmcrane/Projects/VectorHeatMethod/index.html)
+  does not remove cut loci or directional singularities.
+- Rest-domain coefficients can follow deformation through face/barycentric
+  attachment. Recomputing diffusion on the stretched surface is a different
+  behavior. Remeshing needs correspondence/transfer and validation; a full refit
+  may be required but is not universally necessary.
+- Keep authored UV interpretation and generate an atlas at export when the
+  destination requires one. Replace current atlas inspection with an actual
+  kernel/coverage/error inspection path before removing a user workflow.
+
+## Engine ownership and adoption gates
+
+Geometry owns surface operators, coordinates and numerical records, depending
+only on core. A paper-specific method owns the fit/compiler contract. Assets own
+serialized CPU payloads; graphics/assets owns residency; graphics consumes
+immutable compiled data without live ECS access; runtime composes source binding,
+jobs, publication and invalidation. App uses runtime. Reuse the existing material
+and validated configuration paths; do not add a second asset/texture manager.
+
+The first experiment is a deterministic CPU compiler identity and candidate-list
+study on one fitted asset plus adversarial tiny fixtures. Include sharp
+subtriangle detail, broad overlapping kernels, sparse coverage, near distance
+ties, triangle boundaries, degenerate triangles and signed residual colors.
+Compare to a pinned reference, preserving outer/inner ranks and every clamp.
+Proposed normalized-color CPU tolerance is 1e-6; validate its suitability before
+adoption, never loosen it merely to get a passing result. Record ranking changes
+separately. This is a proposed test, not a passed test.
+
+If that passes, measure compiled storage/list tails, then filtering, then a Vulkan
+evaluator against the CPU oracle. Only afterward optimize preprocessing. Compare
+to the current atlas with its real compression/mips and all UV/gutter costs,
+direct attributes where appropriate, and an atlas-free sampled baseline.
+
+Promotion requires predeclared scene/device/frame and memory budgets, a held-out
+asset cohort with reported eligibility and failure rates, no silent fallback,
+bounded visual/numerical error, stable minification, supported material channels,
+save/load, editing, cancellation, invalidation, inspection and export. Establish
+budgets from the actual product target before measuring; the present discussion
+does not invent a frame-rate requirement. No default changes before CPU reference,
+optimized CPU and separately demonstrated Vulkan parity/runtime coverage.
+
+## What would make us change direction?
+
+If exact compiled lists are too expensive, test a **named HKTex-derived variant**
+with compact support, changed ranking, or a mixed exact-field/residual model.
+Each changes the fitted function and needs refitting and separate evidence.
+If filtering storage approaches ordinary local textures, prefer the simpler
+sampled representation where it wins. HKTex as authoring plus Htex at runtime is
+a legitimate atlas-free fallback, but it is not pure HKTex runtime adoption.
+
+The most credible path is therefore compiler first, certified candidates second,
+final-color filtering third. The first two have concrete algebraic mechanisms;
+bounded memory and effective antialiasing are still the decisive uncertainties.
+
+
+SOURCE ara/evidence/diagnostics/hktex_default_design_20260924/review-resolution.md
+# Discussion corrections and evidence boundary
+
+The retained Claude responses are raw deliberation, not independently verified
+implementation results. `proposal.md` is the corrected recommendation.
+
+| Issue raised in discussion | Disposition |
+|---|---|
+| Frozen-kernel affine heat and quadratic distance | Retained as algebraic derivations under fixed source/basis/configuration. Numerical and full-pipeline parity still need testing. |
+| Shared distance coefficients | Retained: squared embedding lengths on triangle edges are kernel-independent, while vertex-to-source distances are kernel-specific. |
+| Static lists cannot preserve the paper | Corrected: static candidate **supersets**, followed by the original query-time rankings, can preserve the selected exact-KNN semantics. Static active sets need not equal membership everywhere. |
+| Safe candidate bound | Retained: exclude only when the source's lower distance bound exceeds the k-th smallest upper bound. Conservative rounding and ties are required. |
+| Tiny denominator in Eq. 7 | Reference-code inspection found a floor of 1. Pin that code rather than silently reproducing the displayed equation. |
+| Gaussian and nonlinear power order | Corrected: the inspected path weights heat with the Gaussian and then applies `power_diffused_diracs`. Moving the exponent before the Gaussian changes the function. |
+| Mandatory per-pixel evaluation of all 50 candidates | Qualified: that is a straightforward parity path, not a universal lower bound. Fixed-order cells and certified final-color specialization can avoid work. |
+| Ranking ambiguity means acceptable parity | Rejected. Small distance changes can produce large color jumps. A deterministic semantic oracle and an output tolerance are separate requirements; ambiguity cannot waive the latter. |
+| Wendland window as a parity-preserving fix | Rejected for the first route: it changes the model and needs refitting. A radial Wendland expression in sqrt(q) is not generally a polynomial in barycentrics. |
+| Separate min-distance and max-heat tests exactly characterize overlap | Corrected to conservative necessary tests; their extrema need not occur at the same location. |
+| Sigmoid-threshold example suggesting all negative inputs qualify | Retracted during discussion. The rescaled soft step is zero at zero; signed values and power domains still need explicit handling. |
+| Per-kernel widening or filtered-weight ratios solve antialiasing | Rejected as a proof. The final composition must be integrated or approximated with a stated error contract. |
+| Uniform signal approximation alone solves aliasing | Corrected: a uniform bound transfers to a normalized footprint integral only if the approximant is actually integrated, not point-sampled. |
+| A simple vertex color pyramid captures arbitrary fine detail | Rejected. The coarse cache must summarize the complete surface signal, including subtriangle content and crossing cells/faces. |
+| Streaming four basis nodes solves preparation memory | Qualified: alignment, persisted bases, preparation working sets and I/O remain; measure all of them. |
+| Polynomial heat actions or a tufted Laplacian preserve paper fits | Rejected as automatic parity. Both may define a different generator and require refitting; scalar robustness does not establish anisotropic/transport robustness. |
+| Every geometry edit needs a full refit | Qualified: retained rest-domain appearance can survive deformation. Recomputing the metric or changing topology has different invalidation/transfer obligations. |
+| Kernel edits are local | Qualified by the old/new ranking footprint and possible global influence. Color-only edits need not change geometric records. |
+| LEAN directly solves object-space normal filtering in the engine | Rejected as established capability. Directional moment fitting, frame transport and BRDF mapping require their own reference and tests. |
+
+## Evidence audit
+
+- Executed: literature retrieval, source inspection at a pinned upstream revision,
+  and actual Claude CLI consultation with explicit model/effort.
+- Not executed: HKTex fitting, compiler implementation, numerical parity probe,
+  timing/memory benchmark, mesh-corpus trial or GPU rendering.
+- No engine default or source/build files changed. No operational, performance,
+  compression or general compatibility result is asserted.
+- Future artifacts must count spectral preparation separately from compiled
+  runtime bytes and distinguish exact reference evaluation, bounded approximation,
+  a refitted HKTex-derived model, and sampled hybrids.
+- Research-manager recording keeps recommendations staged. Structural repository
+  checks validate the notes' structure, not the mathematical or runtime claims.
+
+## Publication audit boundary
+
+Verified donor publications support mechanisms, not the proposed integration's
+performance. The candidate screen records what transfers and where it breaks.
+Unverified extra citations suggested by Claude are not needed for the preferred
+route and are not treated as established evidence. No novelty claim is made.
+
+Verified repository runner detail: run_and_seal.py invokes [args.executable, str(args.output)]. Sparse partial generalized eigensolver and native differentiable image renderer were not found in reuse searches. The task is unstarted and should not claim experiments have run.

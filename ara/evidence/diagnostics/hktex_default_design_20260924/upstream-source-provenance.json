@@ -1,0 +1,31 @@
+{
+  "repository": "https://github.com/circle-group/hktex",
+  "revision": "9e942972c5411a364f12563eb6864520f9effe70",
+  "inspected_files": [
+    {
+      "path": "hktex/modules/heat_kernel_texture_knn.py",
+      "url": "https://raw.githubusercontent.com/circle-group/hktex/9e942972c5411a364f12563eb6864520f9effe70/hktex/modules/heat_kernel_texture_knn.py",
+      "sha256": "209e9ca95547622f33ef527a302eea85c8aa512645e86c164b8bcf04e7b34783"
+    },
+    {
+      "path": "hktex/modules/eigen_albo_knn.py",
+      "url": "https://raw.githubusercontent.com/circle-group/hktex/9e942972c5411a364f12563eb6864520f9effe70/hktex/modules/eigen_albo_knn.py",
+      "sha256": "7ef44c2b01ffee7c30f22dfeb1bd114071235ca36849c9cf36fad223e47058a5"
+    },
+    {
+      "path": "hktex/knn_heat/knn_heat/knn_heat.py",
+      "url": "https://raw.githubusercontent.com/circle-group/hktex/9e942972c5411a364f12563eb6864520f9effe70/hktex/knn_heat/knn_heat/knn_heat.py",
+      "sha256": "260ede151ef387ab8a891f68a7de17994265ba841581c880ad8e6bb7eb0eb430"
+    },
+    {
+      "path": "hktex/knn_heat/knn_heat/config.py",
+      "url": "https://raw.githubusercontent.com/circle-group/hktex/9e942972c5411a364f12563eb6864520f9effe70/hktex/knn_heat/knn_heat/config.py",
+      "sha256": "e6695c5a18bac096e40996fdbd909866b78999a52d9b946a2ebea35eb31cc128"
+    },
+    {
+      "path": "configs/texture_hktex_knn.yaml",
+      "url": "https://raw.githubusercontent.com/circle-group/hktex/9e942972c5411a364f12563eb6864520f9effe70/configs/texture_hktex_knn.yaml",
+      "sha256": "828ee3bfba21024481356630c32e72464a55e2a9063234bc557676da79f54ff0"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "model": "claude-opus-5-5",
+  "effort": "medium",
+  "rounds": 2,
+  "status": "conceptual discussion; no implementation or experimental evidence",
+  "corrections": "Second round supersedes first-round overclaims. A single proposed experiment would establish only a bounded comparison, not general refutation.",
+  "sources": [
+    "https://arxiv.org/abs/2207.05618",
+    "https://doi.org/10.1111/j.1467-8659.2009.01515.x"
+  ]
+}

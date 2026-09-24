@@ -33,6 +33,8 @@ its dependencies, conditional gates, scope and verification.
 - [METHOD-035 — Parametric Gauss (winding-number) orientation baseline (reference backend)](METHOD-035-pgr-winding-number-orientation-baseline.md)
 - [METHOD-036 — Normal-orientation method comparison evidence (publication protocol)](METHOD-036-orientation-comparison-evidence.md)
 
+- [METHOD-048 — Full HKTex mesh textures and measured default adoption](METHOD-048-hktex-mesh-textures.md)
+
 Theme I remains paused behind REVIEW-004 except explicit operator direction
 and named product dependencies. A retired prerequisite does not prove a
 method, backend, or adoption gate passed.

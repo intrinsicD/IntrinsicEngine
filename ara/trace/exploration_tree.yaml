@@ -13697,3 +13697,64 @@ tree:
     - ara/evidence/diagnostics/method047_property_atlas/review-resolution.md
     - ara/evidence/diagnostics/method047_property_atlas/verification.json
     status: resolved
+
+  - id: N638
+    type: question
+    title: Can heat-kernel surface fields replace UV atlases?
+    provenance: user
+    timestamp: 2026-09-24T14:33+02:00
+    description: User requested discussion with Claude Opus 5.5 at medium effort. Two rounds distinguish
+      heat-derived fields, image addressing, direct vertex attributes and Htex. No adoption or implementation
+      authorized.
+    evidence:
+    - ara/evidence/diagnostics/heat_kernel_texture_discussion_20260924/claude-first.md
+    - ara/evidence/diagnostics/heat_kernel_texture_discussion_20260924/claude-second.md
+    - ara/evidence/diagnostics/heat_kernel_texture_discussion_20260924/record.json
+    status: open
+
+  - id: N639
+    type: question
+    title: Reassess the specific HKTex paper as a UV atlas alternative
+    provenance: user
+    timestamp: 2026-09-24T14:39+02:00
+    description: User identified the intended paper, correcting the generic scope of N638. Literature-informed
+      discussion revises the representation objection; suitability for IntrinsicEngine remains open.
+    also_depends_on:
+    - N638
+    evidence:
+    - ara/evidence/diagnostics/heat_kernel_texture_discussion_20260924/hktex-reassessment.md
+    - ara/evidence/diagnostics/heat_kernel_texture_discussion_20260924/claude-hktex-specific.md
+    status: open
+
+  - id: N640
+    type: question
+    title: Find publication-backed adaptations that could make HKTex the generated-texture default
+    provenance: user
+    timestamp: 2026-09-24T22:09+02:00
+    description: Operator requested Claude discussion with agent-selected model/effort and practical solutions,
+      including adapting published approaches. Three actual Opus 5.5 high-effort rounds produced a compiler/candidate/certified-color/filtering
+      proposal; no implementation or adoption result.
+    also_depends_on:
+    - N639
+    evidence:
+    - ara/evidence/diagnostics/hktex_default_design_20260924/proposal.md
+    - ara/evidence/diagnostics/hktex_default_design_20260924/candidate-screen.md
+    - ara/evidence/diagnostics/hktex_default_design_20260924/review-resolution.md
+    - ara/evidence/diagnostics/hktex_default_design_20260924/discussion-record.json
+    status: open
+
+  - id: N641
+    type: decision
+    title: Prepare full HKTex implementation and isolated default-adoption experiments
+    provenance: user
+    timestamp: 2026-09-24T22:40+02:00
+    choice: Author METHOD-048 from the pinned reference with native fitting/render integration, independently measured adaptations and adversarial Claude review.
+    alternatives:
+    - Keep HKTex as an unstructured discussion without an executable evaluation plan.
+    description: User selected concrete implementation planning, not unconditional promotion of experimental optimizations. Three actual high-effort reviews resolved preparation, differentiation and ranking-certification gaps.
+    also_depends_on: [N640]
+    evidence:
+    - tasks/backlog/methods/METHOD-048-hktex-mesh-textures.md
+    - ara/evidence/diagnostics/hktex_task_plan_20260924/record.json
+    - ara/evidence/diagnostics/hktex_task_plan_20260924/resolutions.md
+    status: open

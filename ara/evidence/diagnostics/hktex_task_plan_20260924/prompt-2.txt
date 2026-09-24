@@ -1,0 +1,678 @@
+Re-review the revised task against your round-1 findings. Read-only. Please focus on unresolved blocking/high issues, not optional expansion. Independently assess whether resolutions are coherent and the task is actionable. Do not insist on interval-admissible O(1) color differences as strict parity: we retained strict output gate with uncertainty/failure explicitly separate. Repository task-maturity.md explicitly states levels cumulative, and ParityProven signals include promoted path is default, so retaining that target is correct. Contract catalog has no dedicated benchmark/claim/codec/backend IDs. Changes not yet implemented. Return APPROVE or REVISE and any concrete remaining findings. Revised SHA256: 43a3723053d417536bdedca0ead43af3d7730ed975184c9e3cae9f08e021c711
+
+TASK
+---
+id: METHOD-048
+theme: I
+depends_on: [METHOD-047]
+maturity_target: ParityProven
+template: micro
+workflow_schema: 1
+workflow_profile: micro
+evidence: not_applicable
+evidence_skip_reason: interactive implementation plan; micro waives unattended custody only, not method, benchmark, research-claim or backend evidence
+contract_schema: 1
+contracts: [method.engine-integration, geometry.element-domain-sources, geometry.property-coherence, repo.source-documentation, runtime.texture-bake-interface-locality, runtime.processing-compilation-locality]
+---
+# METHOD-048 — Full HKTex mesh authoring, compiled rendering and measured default adoption
+
+## Goal
+
+Implement Heat Kernel Textures for IntrinsicEngine triangle surfaces: native
+reference preparation/evaluation/fitting, surface-constrained kernel optimization
+and density control, saved assets, compiled CPU evaluation and Vulkan rendering, filtered
+material sampling, runtime/editor authoring, and a calibrated multi-view acquisition
+path. Evaluate the proposed optimizations individually before enabling HKTex as
+the default generated continuous mesh-appearance producer.
+
+Operator direction on 2026-09-24 explicitly selects this work despite the standing
+Theme-I pause behind REVIEW-004. This note is **planned backlog work**, not an
+implementation claim. Creating/reviewing the task does not start engine changes.
+METHOD-047 supplies the existing atlas/property bake and inspection baseline reused
+by S04/S11/S14; it is a retired prerequisite, not HKTex evidence.
+`ParityProven` is cumulative in the repository taxonomy and includes Operational;
+its listed signals include promotion to the default. S18 adds the product gate.
+The micro profile does not relax CPU-reference-first, research evidence, full CPU,
+sanitizer, Vulkan or fixed-revision review gates.
+
+## Scope, formulation and closure
+
+- The paper's complete core means anisotropic surface operators; spectral grid
+  preparation/alignment/interpolation; continuous source/query evaluation;
+  normalized heat and distance weighting; nonlinear kernel modulation; both
+  neighbor-selection stages; color formation; Riemannian optimization with
+  transported momentum; pruning, cloning/splitting; fitting existing texture or
+  property targets; and calibrated multi-view albedo fitting. Merely loading
+  externally fitted kernels or rendering fixed colors does not close the task.
+- Native C++ implements the mesh/property/UV authoring and runtime path. Python,
+  PyTorch, FAISS, digeo and Mitsuba are reference/optional acquisition tooling,
+  never unconditional runtime dependencies. Native CUDA is not part of this task.
+- Original HKTex's appearance evidence is albedo. Continuous scalar channels,
+  object-space normals, robust input extensions and alternate heat generators
+  are separately named adaptations with their own tests and diagnostics.
+- Preserve authoritative scientific properties, categorical IDs, source topology,
+  authored material interpretation and existing UV export/inspection capabilities.
+  A requested HKTex fit may be rejected or explicitly fall back; neither outcome
+  counts as an HKTex success. Exact properties need not become lossy kernels.
+- S00–S18 below are required scope. An experimental candidate may finish with a
+  reproducible rejection; its rejected selector must not become an advertised
+  backend. The core method, native runtime integration and acquisition path may
+  not be replaced by a negative experiment. S18 must record accepted promotion
+  or a named blocking result; the umbrella remains open if default adoption is
+  still the desired outcome and its gate has not passed. An operator-recorded
+  rejection of default adoption may instead close at the actually achieved
+  maturity with the failed goal explicit; the implementer cannot silently drop it.
+
+## Sources and fixed reference
+
+- [HKTex paper and supplement](https://arxiv.org/html/2609.07557v1).
+- [Upstream source](https://github.com/circle-group/hktex/tree/9e942972c5411a364f12563eb6864520f9effe70),
+  pinned commit `9e942972c5411a364f12563eb6864520f9effe70`; MIT notice must accompany
+  copied/adapted substantial source. Audit separate dependency licenses as used.
+- [Design proposal](../../../ara/evidence/diagnostics/hktex_default_design_20260924/proposal.md),
+  [candidate screen](../../../ara/evidence/diagnostics/hktex_default_design_20260924/candidate-screen.md),
+  [discussion corrections](../../../ara/evidence/diagnostics/hktex_default_design_20260924/review-resolution.md).
+  These are hypotheses and derivations, not passed experiments.
+- Trace upstream `eigen_albo*.py`, `heat_kernel_texture*.py`, `geodesic_opt.py`,
+  `heat_kernel_density_knn.py`, `knn_heat/`, fitting configs and trainers to each
+  native operation. Record code/paper differences in `methods/rendering/hktex/paper.md`.
+- In the inspected KNN configuration Gaussian weighting precedes
+  `power_diffused_diracs`; blend division uses `max(sum(alpha), 1)`, then base
+  color and RGB clamp. The displayed paper equation differs. Preserve all
+  normalizer epsilons, postprocessing, index settings and configured counts.
+  The paper, deterministic CPU oracle and upstream floating implementation are
+  separate comparators; no silent averaging of their semantics.
+
+## Ownership and reuse decisions
+
+Read the definitions, callers and listed tests again before implementation;
+this table captures inspected contract fits, not permission to copy mechanisms.
+
+| Behavior | Existing owner/evidence | Decision and missing contract |
+|---|---|---|
+| Sparse assembly/mass/solves | `Geometry.Sparse` (`SparseBuilder`, `SparseLDLT`, `SparseLLT`, CG); `Geometry.DEC` (`BuildLaplacian`, `BuildHodgeStar0`, `BuildConsistentMass`); `Test.Sparse.cpp`, `Test.SparseFactorization.cpp`, `Test_DEC.cpp` | Reuse assembly/factorization. Add justified generic operator support only for anisotropic tensor/mass semantics; the existing Gaussian edge-weight mode is not HKTex's ALBO. Verify stiffness sign from implementation and analytic tests. |
+| Dense numerical primitives | `Geometry.Linalg`, existing Eigen dependency, symmetric eigen/SVD/QR and `Test_LinalgEigenMap.cpp` | Reuse tiny reference eigensolves and alignment primitives. No production sparse partial generalized eigensolver was found by the eigen/Lanczos/Spectra search; evaluate a bounded sparse implementation/dependency rather than densifying large meshes. |
+| Surface geometry and motion | Halfedge topology/curvature, `Geometry.Geodesic`, `Geometry.VectorHeatMethod::TransportVectors`/`ComputeLogMap`; `Test_Geodesic.cpp`, `Test_VectorHeatMethod.cpp` | Reuse topology and transport pieces. Vertex-source distance/log maps do not supply arbitrary barycentric exp-map stepping, face crossing and momentum transport; implement the missing surface-point mechanism at the numerical owner with explicit boundaries/cut loci. |
+| Nearest-source queries | `Geometry.PointLBVH`, runtime `SpatialIndexCache`, `Graphics.PointLbvhWorkspace`; corresponding CPU/GPU tests | Existing 3D Euclidean LBVH cannot implement configured-dimensional biharmonic kNN by substitution. Use deterministic exhaustive embedding-distance scan for the reference and private reusable compiled-cell workspaces for optimization. No second entity spatial-index cache. |
+| Typed property capture and readiness | `Runtime.GeometryProperty.Types`, `Runtime.GeometryProcessingOperations.MeshSources`, shared processing operations and source/property contract tests | Reuse property refs, checked conversion, topology correspondence, snapshots and readiness. Extend current family preparation privately; no UI-only eligibility or name-based channel interpretation. |
+| Texture production lifecycle | `Runtime.TextureBakeModule` request/result/revision token/freshness paths; `Test.TextureBakeModule.cpp` | Reuse scheduling, cancellation, history and source freshness. A compiled surface asset is not a raster image: extend the existing producer records with a concrete representation alternative; do not fabricate UV/atlas identities. Keep heavy dependencies out of its public interface. |
+| Raw property/image baseline | `Graphics.PropertyTextureBake`; `Test.PropertyTextureBake.cpp`, `Test.PropertyTextureBakeGpuSmoke.cpp` | Keep as matched atlas comparator and export rasterization mechanism. Raw values, coverage and padding semantics remain independent of color alpha. |
+| Asset ownership and GPU lifetime | assets registry/codecs; `Graphics.GpuAssetCache`, RHI buffers/descriptors; cache/lifetime/readback tests | Extend CPU payload and GPU residency at their existing owners. No HKTex texture manager/service/registry, no `Vk*` in the API, no live asset-service calls from graphics. |
+| Materials and editor | `Graphics.Material`, existing forward/deferred material sampling; runtime prepared frames, bake workspace and scene codec | Add one explicit compiled-surface source where actual consumers require it. Keep app → runtime; renderer consumes immutable views, not ECS. Coordinate normal-source work with active GRAPHICS-105; do not overwrite/retire its scope implicitly. |
+
+Paper-specific algorithms and public method records belong in
+`methods/rendering/hktex/` (proposed target `MethodHktex`). The core-only CPU asset payload is the single compiled-record schema owner.
+S05 numerical results convert into it losslessly at the runtime boundary; test
+the conversion and serialization. Shared numerical
+primitives belong in geometry only when their contract is general. Runtime
+materializes method results into a core-only CPU asset payload; graphics/assets
+owns its packed GPU representation. Renderer does not import the paper package.
+Benchmarks call public method APIs; renderer measurements use declared integration
+entry points, not private editor state. No general shader VM, fitting framework
+or family-wide backend registry is justified by this task.
+
+The contract catalog has no dedicated IDs for benchmark manifests, research
+claims, asset/scene codec or backend truthfulness; AGENTS §§1/7/8/8b and the
+asset/runtime format contracts still bind S00/S10/S12/S18. The spatial-consumer
+inventory is mandatory for S06; `runtime.spatial-query-locality` is inapplicable
+unless the existing cache interface actually changes (none is planned). Re-evaluate
+the catalog when implementation changes scope; do not invent contract IDs.
+
+## Engine integration
+
+| Field | Required disposition / owning slice |
+|---|---|
+| Least-structured input | Finite indexed triangle surface and corresponding float3 position property; source signal is a typed property or a surface/image sampling contract. Surface topology is necessary; arbitrary point sets alone are insufficient. S00/S01. |
+| Compatible entity sources | Every constructed/imported mesh meeting the topology/property contract, independent of importer or property names. Mesh face/corner/vertex attributes are eligible only with declared interpolation/correspondence; edge/halfedge fields need explicit surface reconstruction, never guessed interpolation. Bare graphs/point clouds receive an actionable topology-required result. S04/S11. |
+| RuntimeModule | Existing texture-production module owns mesh capture, jobs, stale checks and publication; private HKTex implementation calls the public method. External multi-view fitting runs through an opt-in tools command; its result import/validation/compilation uses this job lifecycle. S11/S17. |
+| Config/agent | Persist source refs, fit/generator/evaluator identity, seeds, budget/tolerance units, filter policy and fallback preference; shared side-effect-free preview and validate/apply for UI, files and commands. Only implemented choices are selectable. S00/S11. |
+| UI | Mesh texture action, per-channel source selection, progress/cancel, error/budget/backend diagnostics, kernel/support/error inspection and atlas export preview. Enable from the same prepared readiness snapshot used by execution. S11/S12/S17. |
+| Publication | New material asset/result attachment on the originating mesh; preserve mesh cardinality, unrelated properties and authored UVs. Undo/redo updates per-renderable bindings without mutating shared authored material. Geometry/topology/property/config revisions bind the result; stale completion cannot apply. S10/S11/S14. |
+| End-to-end tests | Constructed/imported meshes and renamed compatible properties; fit → compile → save/load → residency → draw/readback → edit/cancel/stale/undo → export; normal/scalar and calibrated multi-view acquisition paths separately. S10–S18. |
+
+### Spatial acceleration consideration
+
+Index method-owned moving sources in the pinned biharmonic embedding, using
+squared L2, configured nearest-k, source-ID stable ties and the same active set
+as the fit. No radius surrogate or silent k truncation. Rebuild reference query
+state when positions, anisotropy-dependent fields or active kernels change;
+rebuild compiled lists when their frozen inputs change. Component-local behavior
+is explicit. Candidate overflow increases work/subdivision within budget or
+returns a budget failure. Update the spatial-index consumer inventory in S06.
+
+## Impact protocol shared by every slice
+
+- Each slice emits a result row with slice/config/source/fixture identity, actual
+  backend/generator/representation, dependencies, correctness disposition and
+  incremental plus cumulative deltas. Use schema-v2 manifests and retained
+  failed attempts. A proposed test name or runner below is not already available.
+- Freeze S00 controls and cohort before tuning: tiny analytic triangles/quads,
+  sphere/torus, open boundaries, disconnected parts, skinny/degenerate faces,
+  symmetric/eigenvalue-clustered meshes, ties/duplicate kernels, thin close sheets,
+  sharp subtriangle decals and high-frequency images. Add representative licensed
+  engine assets and separate fit/tuning from held-out views/assets.
+- Runtime optimizations compare the **same frozen fit** to S03/S05; do not refit
+  away compiler error. Fitter/generator variants use paired initial states,
+  seeds, observations and stopping/budget policies; report changed fitted output.
+- Record cold preprocessing, fitting, compilation, load/upload, warm evaluation,
+  filtering and edit latency separately; source/cache/serialized/compiled/tree/
+  filter/peak CPU/VRAM bytes; candidate mean/p95/p99/max; source/distance/tie/rank
+  errors, final channel errors, seam/edge-band error and temporal flicker.
+- Compare current atlas with its actual compression/mips/UV/gutter costs, direct
+  attributes where semantically equivalent, and a named sampled surface baseline
+  when available. No performance inference from operation counts or smoke runs.
+- Before S04 campaign work, freeze numeric bounds in method.yaml and manifests:
+  reference/compiled scalar residuals, per-channel output error, fit quality,
+  angular normal error, footprint integration error and resource caps. Initial
+  planning targets: normalized albedo compiler L∞ ≤ 1e-6 on CPU and ≤ 1e-4 on
+  Vulkan; certified approximation budget ≤ 1/1024 per linear-albedo channel;
+  angular normal error ≤ 0.5 degrees. These are proposed gates, not evidence.
+  Raw scientific/categorical values require exact preservation. S00 must turn
+  every remaining budget into finite values tied to the target device/scene;
+  it cannot leave adoption limits as "acceptable" or retune them to pass.
+- Freeze the adoption corpus/device/scene contract once in S00, not after results.
+  Initial relative product gates: p95 frame time ≤ 1.05× the matched atlas baseline,
+  total resident texture VRAM ≤ 1.0×, cold authoring and edit latency ≤ 2.0×,
+  and linear-albedo MAE ≤ atlas MAE + 1/1024. These are proposed product limits,
+  not predictions. S00 measures only baseline/training data to translate them into
+  finite device-specific units and sets coverage/CPU memory/filter limits before
+  held-out HKTex runs. Amendments require a retained rationale and a fresh held-out
+  cohort if results have been seen; do not tune a gate against its test results.
+- CPU float64 defines the semantic oracle; compare upstream with its own measured
+  precision. Near-tie disagreement is logged, never an excuse for color error.
+  Nonfinite, unstable denominator, invalid power domain and resource exhaustion
+  are explicit outcomes. Stable IDs break exact ties in the native contract;
+  the difference from upstream unspecified tie behavior is retained.
+- Rank stability is a separate correctness axis: compute conservative arithmetic
+  intervals for outer distances and inner contributions, certify ordering gaps,
+  and refine ambiguous rankings with higher precision until resolved or explicitly
+  unavailable. Exact ties use stable IDs. The deterministic strict mode keeps the
+  oracle ranking and final-color gate; it cannot excuse O(1) color errors as ties.
+  An interval-admissible comparison may diagnose upstream float32 results, but
+  cannot satisfy strict parity. Record ambiguous/rank-mismatch pixel counts and
+  final-color impact separately; S00's strict success cap is zero unresolved
+  samples. No finite precision format alone proves ordering of arbitrarily close
+  values. Query failure/capability rejection is truthful, not a successful fallback.
+  S12 either implements bounded precision refinement or reports inability; adoption
+  requires the preregistered eligible-domain coverage and visible-error gates.
+
+## Slice plan
+
+All slice IDs are stable within METHOD-048. Each finishes with a fixed-revision
+review, named tests, diagnostics and a small report; no deployment optimization
+is enabled merely because its preceding slice passed.
+
+### Classification and dependency rules
+
+| Slices | Required outcome |
+|---|---|
+| S00, S01, S01b, S02, S03, S03b, S04, S05, S08, S10, S11, S12a, S14, S17 | Core: implementation and correctness must pass. |
+| S06, S07, S09, S12b, S15 | Optimization candidates: isolated rejection is valid; S12a never depends on their success. Rejection of S09/S12b prevents promotion unless a separately tested filter meets the same S08/S18 contract. |
+| S13 | Scalar/RGB channel handling and exact-source preservation must pass; directional filtering is an adaptation that may be rejected, with affected materials ineligible for promotion. |
+| S16 | Input-policy diagnostics must pass; robustness extensions and alternate generators may be rejected individually. |
+| S18 | Adoption gate: actual default promotion or explicit blocking/operator-rejection outcome. |
+
+Suffixes preserve the original slice numbering. Register tests for every suffix
+and report its impact separately. Dependencies on a candidate mean its disposition
+is available, not that its proposed optimization must have succeeded.
+
+### S00 — Paper intake, fixture bridge and executable contract
+- [ ] Create the method package/manifest, pinned-source/license inventory and
+  code-to-native formulation map. Export tiny upstream fixtures (operators,
+  aligned eigenproperties, kernels, barycentric queries, intermediate and final
+  outputs) with hashes. A pinned external environment is opt-in tooling only.
+- [ ] Define sign/mass conventions, coordinate/color spaces, component/nullspace
+  handling, anisotropy frames, eigenvalue multiplicity/alignment, zero modes,
+  all epsilons/powers/clamps, outer/inner selection and error/status contracts.
+- [ ] Pin exact FAISS mode, index refresh cadence, embedding dimension, optimizer
+  settings and hardware/tool dependencies per trainer. Export exact-index fixtures;
+  approximate-index comparisons have a separate identity. Lock the optional
+  reference environment and regeneration command; cap committed tiny fixtures at
+  20 MiB, keep licensed large data external, and let CI consume committed fixtures.
+  Optional CUDA for upstream tooling is declared explicitly, never native scope.
+- [ ] Hash original configs and map every key to native presets without silent
+  transcription. Add an equation/algorithm/experiment/ablation coverage matrix in
+  paper.md. Identify licensed texture-fitting and calibrated multi-view datasets;
+  unavailable publication data remains an explicit reproduction limitation.
+- [ ] Trace and fixture-test source-only versus query-dependent heat normalization
+  and isotropic/shared versus per-kernel distance embedding. The inspected code
+  uses `_iso_embeddings` for distance and anisotropic grid interpolation for heat;
+  preserve that distinction. Record the exact selected-set formula:
+  `C=clamp(base + sum(alpha_s*c_s)/max(sum(alpha_s),1),0,1)` per channel.
+- [ ] Freeze dataset splits, budgets and baseline configuration. Implement public
+  benchmark target `HktexBench`, stable IDs below and CTest prefix `Hktex.`.
+  Gate: license/provenance and intermediate semantics reproducible; otherwise
+  no parity claim. No future selector appears as an implemented backend.
+
+### S01 — Surface/ALBO and deterministic spectral preparation (after S00)
+- [ ] Assemble mass and isotropic/anisotropic operators from typed positions;
+  tiny dense generalized-eigen reference first, explicitly bounded by mesh size.
+  Implement grid alignment/interpolation and source normalization. Diagnose
+  negative modes, clustered spectra, zero mass, missing frames and component modes.
+- [ ] Tests: analytic planar/isotropic limits, residual `W Phi - M Phi Lambda`,
+  mass orthogonality, eigenvector sign/subspace changes and upstream fixture deltas.
+  Record preparation bytes/time and solver residuals under `rendering.hktex.prepare`.
+- [ ] Gate: faithful operator/interpolation contract; no production fallback to
+  unbounded dense solves. Production sparse preparation is owned by S01b. Implement the declared
+  upstream-equivalent component/nullspace/boundary policies here; S16 only extends them.
+
+### S01b — Production sparse spectral preparation (after S01; before S04)
+- [ ] Implement a bounded sparse partial generalized eigensolver, reusing sparse
+  assembly/factorization. Resolve dependency versus minimal implementation using
+  residual, orthogonality and scaling evidence; never densify production meshes.
+- [ ] Compare eigenvalue clusters/subspace angles, residuals, mass orthogonality
+  and upstream fixtures against S01. Test real engine meshes with explicit memory,
+  convergence and cancellation limits. `rendering.hktex.prepare_sparse` records
+  preparation cost, peaks and failures. This is required core capability.
+
+### S02 — Arbitrary surface points and geodesic optimizer primitives (after S01)
+- [ ] Add/reuse barycentric source evaluation, surface gradients, triangle-edge
+  crossing, constrained step/exp-map approximation and parallel momentum transport.
+  Define vertex hits, boundary steps, step rejection and disconnected-sheet behavior.
+- [ ] Compare directional derivatives to finite differences on smooth regions;
+  transport norm/reversed-same-path and flat-plane exactness tests (curved
+  closed loops have holonomy, so do not demand identity); gradient/tie/nondifferentiable
+  points have explicit rules. `rendering.hktex.surface_motion` records drift,
+  rejected steps and cost. Gate: sources and momentum remain on the chosen surface.
+
+### S03 — Full deterministic CPU evaluator (after S01/S02)
+- [ ] Implement direct spectral heat, normalization, biharmonic distance/window,
+  nonlinear modulation, exhaustive outer kNN, inner top contributions, compositing
+  and final postprocessing. Freeze semantic tie order and trace intermediates.
+- [ ] Test both intermediate fixture parity and final color; include zeros,
+  negative spectral lobes, even/noninteger powers, duplicate sources, empty sets,
+  K greater than source count, extreme sharpness and denominator floor crossing.
+- [ ] `rendering.hktex.reference`: deterministic fixture results, upstream deltas,
+  arithmetic/rank diagnostics. Gate: no optimized/compiled evaluator before this
+  oracle and its correctness tests exist.
+
+### S03b — Native differentiable reference (after S03; before S04)
+- [ ] Implement float64 per-stage analytic adjoints for every optimized upstream
+  parameter: color/base, sharpness, threshold/scale, power and diffusion time if
+  learnable, anisotropy/angle grid interpolation, and barycentric surface position.
+  Map fixed versus learnable fields from pinned configs; justify any AD dependency.
+- [ ] Differentiate selected values with the discrete selection set held fixed,
+  matching the traced upstream gather/top-k backward convention; this is not a
+  derivative of a discontinuous ranking. Document subgradients at grid/clamp/floor
+  boundaries. On the floor branch only the denominator derivative vanishes;
+  numerator gradients remain. Reject undefined nonpositive power domains.
+- [ ] Stage-wise central finite differences away from nonsmooth points and upstream
+  exported gradients validate adjoints; boundary fixtures validate explicit rules.
+  `rendering.hktex.gradients` records absolute/relative error and time/memory.
+
+### S04 — Native fitting, constraints and density control (after S01b/S03b)
+- [ ] Implement the baseline objective/sampling, pinned upstream optimizer/hyperparameter shape updates, geodesic
+  position/momentum updates, parameter constraints, initialization, error-driven
+  clone/split, pruning and stopping; source IDs survive deterministic updates.
+  Reuse exact property or authored-texture sampling; masks/coverage are not RGB.
+- [ ] Tests: recover synthetic constant/gradient/decal targets; loss/gradient checks;
+  source movement/splitting, no inactive-source leakage, deterministic seeds,
+  cancellation and budget exhaustion. Compare trajectories only where algorithms
+  and precision match; compare final error otherwise.
+- [ ] `rendering.hktex.fit`: fit quality, time, active counts, samples and peaks
+  versus fixed kernels/no density control. Gate: fitting produces reusable
+  native kernels, not just an upstream subprocess result. Native fitting is CPU-only;
+  record upstream hardware and reproduce its neighbor refresh schedule or label
+  the deviation. Add a pinned published texture-fitting experiment with native and
+  upstream metrics/tolerances from S00; unavailable data is a limitation, never parity.
+
+### S05 — Exact frozen-fit compiler and optimized CPU evaluation (after S04)
+- [ ] Compile normalized heat to `H_s(b)=sum b_i A_si`; distance to
+  `q_s(b)=sum b_i D_si-sum(i<j)b_i b_j E_ij`, sharing edge coefficients.
+  Prove source-constant heat normalization and shared distance embedding from S00
+  before using those storage identities; if a supported variant differs, compile
+  numerator/normalizer separately or retain per-source edge coefficients and
+  separate metric queries. Do not silently apply shared-grid kNN to another metric.
+  Retain Gaussian-before-power order and all reference semantics. Baseline compiler
+  may retain every source; no candidate or approximation shortcut yet.
+- [ ] Bound cancellation in the distance expansion, especially at the source.
+  Clamp a negative q to zero only when the certified rounding interval includes
+  zero, label this arithmetic guard, and fail materially negative values. Feed
+  float32/float64 error bounds into rank certification/refinement and shader tests.
+- [ ] Compare face-major and shared-vertex storage at identical outputs; bounded
+  streaming compile with explicit overflow. Independent tests expand original
+  spectral expressions and query edges/interiors/subtriangle detail.
+- [ ] `rendering.hktex.compile`: output/intermediate deltas, compile cost and total
+  bytes vs S03 on the identical fit. Gate: CPU optimized parity before Vulkan.
+
+### S06 — Certified candidates and fixed-rank cells (after S05)
+- [ ] Bound squared distance on each cell; with kth-smallest upper bound U_k,
+  discard only sources with lower bound > U_k. Keep ties and round conservatively.
+  Recompute original outer/inner rankings at query; optional fixed-order cell
+  specialization requires bounds over every possible competitor.
+- [ ] Adaptive subdivision stops at configured memory/depth/work limits with an
+  explicit failure or exact slower evaluation. No center-in-face shortcut.
+  Update shared-index consumer documentation with the metric/reuse decision.
+- [ ] Tests: exhaustive ranking against candidate sets, long thin cells, many
+  overlapping/broad kernels, clones and cross-face ties; inspect proof obligations
+  as well as samples. `rendering.hktex.candidates`: zero missed sources, list tails,
+  bytes and warm cost versus S05; gate: output error unchanged.
+
+### S07 — Certified final-color specialization (after S06)
+- [ ] Bound complete color across possible rankings and clamps, including signed
+  alpha and power domains. Use constant/base-color shortcuts only when the
+  per-channel interval/error certificate fits the budget. Derive contribution
+  bounds from S00’s exact formula, including base and clamp placement. Add low-order cell
+  polynomials only if constant/exact cells leave a demonstrated cost problem.
+- [ ] Tests: derivative/interval bounds, rounding, cancellation, selection jumps,
+  negative lobes, unsafe-domain rejection and shared-edge continuity. Dense
+  sampling supplements but does not establish a certificate. No arbitrary alpha cutoff.
+- [ ] `rendering.hktex.specialize`: maximum measured and certified errors, certified
+  area fraction, bytes and cost versus S06. Gate: explicit exact/approximate mode,
+  validated conservative bounds; uncertified cells keep exact evaluation.
+
+### S08 — CPU footprint oracle and filter contract (after S05)
+- [ ] Define footprint/visibility/color-space semantics. Integrate final composed
+  color, including rankings/clamps, across cells/faces with adaptive quadrature;
+  independently converge supersampled renders. Distinguish empirical error
+  estimates from certified interval enclosures.
+- [ ] Tests: shrinking footprint → point limit; constant/integrable controls;
+  tiny decals, high-frequency patterns, grazing ellipses, triangle/selection/occlusion
+  boundaries. `rendering.hktex.filter_reference`: integration error vs convergence
+  and cost. Gate: widening alpha or dividing filtered sums is not the oracle.
+
+### S09 — Coarse moments, cross-face filtering and transitions (after S07/S08)
+- [ ] Build coarse integral/moment caches of final color and a bounded cross-face
+  hierarchy. Fully covered nodes use moments; partial coverage refines or bounds
+  residuals. Near views retain analytic kernels. Count all cache/hierarchy bytes.
+- [ ] Test anisotropic footprints, many tiny faces, minification/magnification,
+  silhouettes with visibility controls, rank jumps and animated scale switches.
+  Require `|integral(w*(P-C))| ≤ ||P-C||_infinity ≤ epsilon` for `w≥0`,
+  `integral(w)=1`. Zeroth moments are exact only for constant node weights; for
+  variable weights include `osc_node(w)*integral_node(|C|)` or higher-moment error.
+  Bound footprint approximation, numerical integration and source approximation
+  separately and compose their budgets.
+- [ ] `rendering.hktex.filter`: flicker/error/storage/time against S08 and the atlas.
+  Gate: no unbounded traversal; failed filter budgets retain explicit opt-in status.
+
+### S10 — Native asset codec, packed layout and residency (after S05; filter extension after S09)
+- [ ] Add versioned CPU asset payload for fit parameters, mesh/reference-domain
+  identity, compiled coefficients/cells and optional filter cache. Store provenance,
+  source/config hashes and regenerability requirements. Runtime rendering must load
+  compiled payload without needing the fitting eigensolver/cache.
+- [ ] Extend current assets/GpuAssetCache and RHI buffer/descriptors; define
+  source-triangle/render-primitive mapping including seam splits, submeshes and
+  instance bindings. Preserve deferred retirement and renderer operational checks.
+- [ ] Tests: round trips, malformed sizes/indices/nonfinite input, hash mismatch,
+  memory caps, stale handles and shared-material isolation. `rendering.hktex.asset`:
+  serialized/loaded/peak residency bytes and cold load cost. Gate: no second owner.
+
+### S11 — Runtime jobs, controls and mesh authoring UI (after S04/S10)
+- [ ] Extend existing texture-production jobs, source capture, prepared readiness,
+  serializable config, preview/apply, history, progress/cancel, and asset publication.
+  Presets expose only implemented generator/evaluator/filter choices. Public
+  bake/workspace interfaces stay compilation-local.
+- [ ] Mesh panel supports fitting, inspection of kernels/support/error/budgets,
+  pending/failed/stale states, representation provenance and explicit fallback.
+  All compatible property names/provenances use identical binding rules.
+- [ ] Tests: UI/agent/config parity; cancellation at each phase; source revision,
+  topology edit, deletion, entity detach, scene close, out-of-order completion,
+  undo/redo and restart/save/load. `rendering.hktex.lifecycle` records stage latency
+  and cancellation responsiveness. Gate: no stale result may publish.
+
+### S12a — Vulkan point evaluation and visible material integration (after S05/S10/S11)
+- [ ] Port the already verified compiled point evaluator to Vulkan using existing
+  material and residency boundaries. Prove face/barycentric addressing and derivative
+  conventions; avoid extra vertex duplication solely for HKTex where possible.
+  Detect fragment-barycentric support; use interpolated vertex attributes or an
+  explicitly tested alternative when absent, count vertex duplication, and report
+  actual addressing. Evaluate the deserialized S10 payload in the CPU comparator.
+  Rank refinement is bounded and capability-gated per the shared impact contract;
+  shaderFloat64 or double-float alone is not an ordering proof. Raster/compute and
+  requested/actual backend paths report which actually ran.
+- [ ] Offscreen readback tests of reference/exact outputs and accepted approximate variants,
+  forward/deferred lighting, instances, multi-material submeshes, nontrivial model
+  transforms and resource retirement. Null or skipped Vulkan is not completion.
+- [ ] `rendering.hktex.vulkan`: CPU deltas, full-frame and texture-stage GPU timestamps,
+  p95 frame time, warm/cold VRAM and integration overhead at pinned scenes/devices.
+  Gate: actual operational Vulkan, no portable speed claim from one device.
+
+### S12b — Vulkan filtered evaluation (after S09/S12a)
+- [ ] Port accepted filter variants with S08 as oracle. Separately test cross-face
+  footprints, transitions, visibility, derivative and resource-limit behavior.
+  `rendering.hktex.vulkan_filter` measures quality/flicker, timestamps and full VRAM
+  versus point evaluation and atlas mips. Rejection leaves S12a usable as opt-in;
+  it does not satisfy default filtered-material acceptance.
+
+### S13 — Material channels and directional filtering (after S09/S12a; filtered tests after S12b)
+- [ ] Add explicit scalar/RGB/normal interpretation with range/units/encoding;
+  share kernel support only where held-out error permits, otherwise channel-specific
+  coefficients/supports. Preserve categorical and scientific exact-source routes.
+- [ ] Native object-space normal reconstruction handles zero vectors, hemisphere
+  errors and transforms. Implement/evaluate normal moment filtering against the
+  actual engine BRDF; LEAN is a donor, not an assumed GGX conversion. Coordinate
+  normal source authority with GRAPHICS-105 without creating a parallel pipeline.
+- [ ] `rendering.hktex.channels`: scalar/RGB/normal/angular and rendered specular
+  errors, per-channel incremental bytes/cost, grazing highlights and malformed
+  encodings. Gate: no RGB clamp reused for unbounded/raw data; normals have their
+  own oracle/readback tests rather than inheriting albedo parity.
+
+### S14 — Edits, deformation, topology transfer and export (after S11–S13)
+- [ ] Color edits reuse geometry coefficients; source/shape edits invalidate old
+  and new ranking footprints. Rest-domain deformation is explicit; metric updates
+  and remeshing trigger their own recapture/transfer/refit requirements.
+- [ ] Implement local paint/update plus cancel/undo and bounded global fallback;
+  preserve source correspondence and fit/compiled generation identities. Atlas
+  export uses existing UV/bake machinery when required by the destination;
+  authored UV inputs and existing atlas inspection remain available.
+- [ ] `rendering.hktex.edit`, `rendering.hktex.deform`, `rendering.hktex.transfer`,
+  `rendering.hktex.export` separately report: no stale generations, bounded transfer error,
+  edit latency/affected records, deformation quality and exported appearance
+  versus native. Gate: no "local update" claim if distant ranking regions change.
+
+### S15 — Preparation and fitting acceleration (after S01b/S04; deployment cost after S07)
+- [ ] Optimize S01b with isolated grid grouping, streaming/cache experiments;
+  retain its solver as the baseline and count temporary memory/recomputation.
+- [ ] Evaluate fit-time moving-source kNN acceleration against exhaustive search,
+  preserving refresh cadence and configured metric; index rebuild cost is charged.
+  `rendering.hktex.fit_candidates` proves candidate/rank exactness and measures
+  total fit cost. Frozen rendering cell lists are not automatically valid here.
+- [ ] Separately evaluate variable-projection/constrained color solves with
+  fixed support, handling base-color rank ambiguity, clipping and nonlinear losses.
+  Then evaluate deployment-cost-aware fitting (compiled bytes/work plus error),
+  not kernel-count-only optimization. Separate toggles and paired baselines.
+- [ ] `rendering.hktex.prepare_optimized`, `rendering.hktex.fit_variable_projection`,
+  `rendering.hktex.fit_deployment_cost`: each reports matched error, total cost,
+  memory, iterations and gradient/residual diagnostics. Gate: no bundled speedup
+  attribution; failed candidate is disabled with retained evidence.
+
+### S16 — Robustness and alternate generator experiments (after S15)
+- [ ] Extend S01’s implemented component/boundary policies and test weak/degenerate
+  geometry, poor triangles and ambiguous anisotropy frames. Nonmanifold sheet
+  splitting is an explicit auxiliary analysis operation preserving render mapping,
+  not silent source topology mutation. Scalar tufted-Laplacian robustness does
+  not license arbitrary anisotropic/transport behavior.
+- [ ] Isolate two candidate generators: sparse polynomial heat-operator actions
+  on a consistent mass-scaled operator, and a residual-checked reduced basis.
+  Each has a CPU reference/gradient check, separate identity and paired refit;
+  neither is a parity optimization of the interpolated original by assertion.
+- [ ] `rendering.hktex.robustness`, `rendering.hktex.generator_polynomial`,
+  `rendering.hktex.generator_reduced`: record failures, accepted-domain coverage,
+  residuals/positivity violations, fit quality and full preparation/runtime cost.
+  Gate: evaluated/rejected variants are valid slice outcomes; unsupported source
+  topology is reported before any mutation or expensive job starts.
+
+### S17 — Calibrated multi-view acquisition (after S04/S10/S11)
+- [ ] Implement a versioned observation contract: fixed mesh, cameras/intrinsics,
+  poses, masks, linear-image/exposure convention, known lighting/material settings,
+  train/held-out views and correspondence. Albedo-only inverse fitting does not
+  infer geometry or claim disentanglement under unknown illumination.
+- [ ] Provide an opt-in pinned upstream Mitsuba/Dr.Jit acquisition command under
+  `tools/`, declared `external_reference_multiview`. Native runtime jobs own
+  result import, validation and compilation; no editor process launcher or general
+  differentiable renderer is hidden in scope. The tools command exposes its own
+  progress/cancel. Native tests validate observation/schema/correspondence; full
+  objective/gradient checks run in the pinned external environment, not a fictional
+  native image model. An editor launcher or native renderer requires separately
+  scoped architecture work if later requested.
+- [ ] Transfer source/aligned spectral state or compiled coefficients plus exact
+  metadata so imported fits cannot silently depend on different eigensolver gauges.
+  Test actual image-fit → native load/compile → engine render on synthetic known
+  albedo and a licensed calibrated example, with held-out image errors. Require matching position/index hashes after upstream
+  preprocessing, or an explicit verified reversible mapping; reject unknown
+  reordering/normalization. Reproduce a pinned published multi-view experiment;
+  measure held-out error in the upstream forward model. Native render comparison
+  is a separately labeled diagnostic listing BRDF/lighting/tonemapping differences.
+  Synthetic-only coverage does not close the licensed-example acquisition gate.
+- [ ] `rendering.hktex.multiview`: actual authoring backend, held-out error, fit
+  cost and native evaluation deltas. Gate: missing environment is an unavailable
+  capability, not a completed acquisition slice; installation stays opt-in and
+  offline tool dependencies never enter headless/runtime requirements.
+
+### S18 — Independent ablations and default promotion (after all required slices)
+- [ ] Consume the S00-frozen held-out corpus, atlas configuration, devices/scenes
+  and numeric quality/frame/memory/edit/coverage thresholds without retuning them.
+  Retain each independent slice toggle and cumulative configurations; include
+  negative controls and atlas/direct-attribute/sampled-surface comparisons.
+- [ ] Run CPU correctness/full CPU/sanitizers and actual Vulkan integration,
+  repeat alternating matched benchmarks, independently audit results and ARA
+  claims, and review the fixed implementation revision with Claude or an
+  independent reviewer. Report every failure and actual fallback.
+- [ ] Only after those gates pass, change the generated continuous mesh-appearance
+  default through the common validated recipe/config path. S11 introduces the
+  concrete serialized field `generated_mesh_appearance.producer` with `atlas` and
+  `hktex` values; the current atlas/property texture workflow has no HKTex selector.
+  Keep `atlas` as its initial value; S18 alone changes it to `hktex`. Save explicit
+  request and fallback policy. Headless/Null can fit/evaluate CPU data but cannot
+  claim a draw; incapable Vulkan reports unavailable, or requested HKTex / actual
+  atlas plus reason only when the saved fallback policy permits atlas production.
+  Never overwrite the saved request silently. `rendering.hktex.adoption` records
+  eligible coverage and all rejected/unsupported cases. Preserve preserve authored UV
+  and exact-property routes and explicitly report eligible input coverage.
+  Inspector, save/load, restart, history, export and multi-view acquisition must
+  remain usable. No task retirement by relabeling failed HKTex as an atlas success.
+
+## Acceptance criteria
+
+- [ ] S00–S18 each has a reviewed disposition and reproducible impact evidence;
+  no TODO placeholder backend is selectable and no required core slice is waived.
+- [ ] Original fitting/evaluation and optimized compiled evaluation have distinct
+  identities, reproducible CPU correctness and declared parity evidence.
+- [ ] Native Vulkan actually renders the supported compiled/filter/channel path;
+  CPU/null/skip evidence cannot satisfy it.
+- [ ] Native mesh-property/UV authoring and explicit external multi-view acquisition
+  both produce usable saved engine assets; provenance and source mapping survive.
+- [ ] Integration preserves canonical properties, source topology, source readiness,
+  job freshness, material instance ownership, history, export and editor usability.
+- [ ] Proposed optimizations have isolated ablations and complete cost accounting;
+  accepted default promotion is backed by held-out quality/resource evidence.
+- [ ] Required documentation/inventories and ARA claims are current, fixed-revision
+  reviews are resolved, and retirement includes the actual reached maturity.
+
+## Documentation and evidence deliverables
+
+- [ ] `methods/rendering/hktex/{method.yaml,paper.md,README.md}` and method reports
+  distinguish published method, code oracle, engine adaptations and limitations.
+- [ ] Update relevant sections of architecture geometry/assets/graphics/runtime,
+  material/source and scene-format contracts, method/benchmark indexes, and spatial
+  consumers. Update AGENTS only if ownership/boundaries actually change.
+- [ ] New module surfaces refresh the module inventory; source purpose synopses
+  and non-obvious mathematical/lifetime contracts follow source-documentation policy.
+- [ ] Benchmarks use stable `rendering.hktex.*` IDs above with schema-v2 sealing;
+  records under `ara/evidence/` bind exact source/config/manifest/dataset identity.
+  Claims enter the ledger before result summaries promote them. Dirty/local runs
+  remain diagnostic. Numerical, performance and operational claims remain distinct.
+- [ ] Preserve planned versus executed state. Rejected methods remain documented;
+  no task, source README or report describes proposals as implemented.
+
+## Verification
+
+Planning-only checks (run now; no C++ build is evidence for writing this task):
+
+```bash
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/generate_session_brief.py
+python3 tools/agents/generate_session_brief.py --check
+python3 tools/docs/check_doc_links.py --root . --strict
+python3 tools/agents/check_ara_claims.py --root . --strict
+git diff --check
+```
+
+Implementation commands below become available as the named slices create their
+tests/runner. S00–S04 must register CPU tests as `Hktex.*`; S12 registers GPU
+cases with the same prefix and both `gpu` and `vulkan` labels. No empty selection
+counts as a pass. Use focused tests first, then all required gates at integration.
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci -R '^Hktex\.' --output-on-failure --no-tests=error -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+ctest --test-dir build/ci --output-on-failure --no-tests=error -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+cmake --preset ci-asan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON
+cmake --build --preset ci-asan --target IntrinsicCpuTests
+ctest --test-dir build/ci-asan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1
+cmake --preset ci-ubsan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON
+cmake --build --preset ci-ubsan --target IntrinsicCpuTests
+ctest --test-dir build/ci-ubsan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target IntrinsicTests
+ctest --test-dir build/ci-vulkan -R '^Hktex\.' -L gpu -L vulkan --output-on-failure --no-tests=error --timeout 120
+ctest --test-dir build/ci-vulkan -L gpu -L vulkan --output-on-failure --no-tests=error --timeout 120
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
+python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
+python3 tools/agents/check_ara_claims.py --root . --strict
+```
+
+S00 owns the proposed `HktexBench` executable, accepting the positional output
+directory passed by `run_and_seal.py`. Register an optional benchmark target with
+`RUNTIME_OUTPUT_DIRECTORY` set to the build tree’s `bin` directory. Its default
+campaign is bounded smoke. A proposed `INTRINSIC_HKTEX_BENCH_CONFIG` environment
+variable selects a versioned campaign file, including slice, baseline, variants,
+fixtures and seeds; copy all resolved settings into results. Register focused tests
+as `Hktex.S00.*` through `Hktex.S18.*` so each slice can run independently once its
+prerequisites exist. Campaign manifests live under `benchmarks/rendering/manifests/`
+and bind the stable IDs specified in each slice. These are implementation
+requirements, not currently available commands.
+Example sealing command once the runner exists (choose a fresh run ID for every
+campaign; never reuse an attempt to overwrite failure). `/tmp` is smoke-only;
+claim-eligible campaigns seal into retained `ara/evidence/` run directories:
+
+```bash
+cmake --build --preset ci --target HktexBench
+python3 tools/benchmark/run_and_seal.py --executable build/ci/bin/HktexBench --output /tmp/hktex-method048-results --manifests-root benchmarks --run-id method048-smoke-001 --attempt-id attempt-001
+python3 tools/benchmark/validate_benchmark_results.py --root /tmp/hktex-method048-results --manifests-root benchmarks --strict
+```
+
+## Planning review
+
+The fixed-text Claude Opus 5.5 high-effort reviews and finding dispositions are
+stored in `ara/evidence/diagnostics/hktex_task_plan_20260924/`. The review record
+binds the reviewed task digest and actual verdict. Approval concerns this plan,
+not future code, experiment outcomes or unexecuted performance claims.
+
+
+RESOLUTIONS
+# METHOD-048 planning review dispositions
+
+Claude Opus 5.5, high effort, reviewed supplied text read-only. This is task review,
+not implementation verification. Round 1 requested revision. No experiments ran.
+
+| Finding | Disposition |
+|---|---|
+| B1 sparse preparation too late | Added required S01b before native fitting; S15 now optimizes an existing production solver. |
+| B2 rank discontinuity/parity | Added arithmetic interval/gap certification, bounded precision refinement and explicit unresolved failure. Kept strict deterministic color parity; interval-admissible outputs are diagnostics, not permission to conceal large color changes. Higher precision alone is not an ordering proof. |
+| B3 missing differentiation | Added S03b stage adjoints, upstream gradients, fixed-selection derivative conventions, power/floor/clamp behavior. Corrected suggested floor wording: numerator derivatives do not vanish. |
+| H1 core versus candidate | Added classification table; separated S12a point rendering and S12b filtering. Candidate rejection does not block point rendering, but missing viable filtering blocks default adoption. |
+| H2 default/maturity | One S00 preregistration with concrete relative product targets; S18 consumes it. Named proposed serialized selector and incapable-backend behavior. Retained ParityProven: repository taxonomy explicitly makes it cumulative over Operational and lists default promotion. Operator rejection is an explicit terminal option; no fabricated approval requirement. |
+| H3 paper reproduction | Added paper equation/experiment coverage matrix, hashed configuration mapping and publication reproduction rows for texture and multiview fitting. Missing data remains a limitation. |
+| H4 compiler assumptions | Traced shared isotropic embedding in pinned code; require S00 normalization fixtures and conditional coefficient/query forms for variants. |
+| H5 reference environment | Exact/approximate index identity, trainer refresh cadence, hardware, optional upstream CUDA, locked environment and bounded fixture generation are explicit. |
+| H6 multiview | External tools command owns inverse renderer/gradients; native jobs import/validate/compile. Source correspondence mandatory; held-out forward-model error separated from native-render diagnostic. Licensed real example remains required. |
+| M1 runner timing | HktexBench created in S00; smoke /tmp versus retained claim evidence distinguished. |
+| M2 compositing | Recorded actual additive-base composition from pinned heat_kernel_texture_knn.py; bounds must derive from it. |
+| M3 filtering bound | Corrected absolute normalized-weight integral inequality and variable-filter moment error. |
+| M4 distance precision | Added cancellation bound and conditional zero clamp; negative outside arithmetic enclosure fails. |
+| M5 input domain | S01 implements base domain policies; S16 only extends; readiness rejects unsupported input. |
+| M6 fit search | Added S15 fit_candidates ablation and rebuild/refresh cost; native fitting CPU-only explicit. |
+| M7 metadata | Explained METHOD-047 reuse dependency. Catalog has no specific IDs for several requested scopes; canonical contracts still bind. Spatial locality ID applies only if cache interface changes, which is not planned. |
+| M8 rendering | CPU evaluation wording, barycentric capabilities and counted addressing fallback. |
+| M9 benchmark attribution | Split edit/deform/transfer/export IDs and separate Vulkan filtering ID. |
+| M10 schema | CPU assets owns compiled schema; lossless method conversion tested; GPU comparator uses deserialized payload. |
+| M11 configured fidelity | Configured embedding dimension, pinned optimizer, reversed-path transport versus holonomy. |
+| M12 review provenance | Review directory and digest/verdict record explicitly identify actual planning evidence. |
+
+The review is limited to supplied task/design/contract excerpts; it does not certify
+uninspected upstream code or engine behavior. Codex verified the source composition,
+isotropic distance use, benchmark runner convention and maturity/catalog corrections.

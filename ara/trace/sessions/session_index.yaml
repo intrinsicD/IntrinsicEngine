@@ -670,3 +670,12 @@ sessions:
   events_count: 3
   claims_touched: [C109, C110]
   open_threads: 1
+
+- id: 2026-09-24_001
+  date: '2026-09-24'
+  summary: HKTex proposal developed through actual Claude discussions, source inspection and publication
+    transfers; no default changed.
+  turn_count: 4
+  events_count: 9
+  claims_touched: []
+  open_threads: 2
