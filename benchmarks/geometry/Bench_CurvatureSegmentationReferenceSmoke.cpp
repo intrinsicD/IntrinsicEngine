@@ -117,7 +117,7 @@ namespace Intrinsic::Bench::Geometry
             params.Seed = 17u;
 
             const Segment::SegmentationResult result =
-                Segment::Segment(
+                Segment::SegmentCurvature(
                     fixture.Mesh, fixture.K1, fixture.K2, params);
             CurvatureSegmentationReferenceSmokeMetrics metrics{};
             if (!result.Succeeded())

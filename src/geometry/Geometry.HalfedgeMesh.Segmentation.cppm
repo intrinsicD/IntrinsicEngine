@@ -1,11 +1,13 @@
-// Exposes bounded face-feature GMM segmentation and curvature adapters so
-// geometry and runtime share deterministic labels and diagnostics.
+// Exposes bounded face-feature GMM segmentation guided by any floating-point
+// vertex/face fields, plus the curvature preset, so geometry and runtime share
+// deterministic labels and diagnostics.
 module;
 
 #include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <span>
+#include <string_view>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -108,10 +110,44 @@ export namespace Geometry::Segmentation
         std::uint32_t dimension,
         const SegmentationParams& params = {});
 
-    // Segment a triangle mesh from slot-aligned signed principal curvatures.
-    // maxPrincipal[i] is k1 and minPrincipal[i] is k2, with k1 >= k2 under the
-    // caller's orientation convention. The kernel does not mutate the mesh.
+    enum class GuideDomain : std::uint8_t
+    {
+        Vertex = 0,
+        Face,
+    };
+
+    // One scalar guide channel aligned to vertex or face storage slots.
+    // Vertex channels are averaged over each triangle's corners.
+    struct Guide
+    {
+        GuideDomain Domain{GuideDomain::Vertex};
+        std::span<const double> Values{};
+    };
+
+    // A named mesh property used as guide channels: float and double give one
+    // channel, glm::vec2/glm::vec3 give one channel per component.
+    struct GuideProperty
+    {
+        GuideDomain Domain{GuideDomain::Vertex};
+        std::string_view Name{};
+    };
+
+    // Segment a triangle mesh from 1..3 guide channels, in order. Wrong-sized
+    // channels fail with FeatureCountMismatch; missing or non-floating-point
+    // properties fail with MissingGuideProperty. The mesh is not mutated.
     [[nodiscard]] SegmentationResult Segment(
+        const HalfedgeMesh::Mesh& mesh,
+        std::span<const Guide> guides,
+        const SegmentationParams& params = {});
+    [[nodiscard]] SegmentationResult Segment(
+        const HalfedgeMesh::Mesh& mesh,
+        std::span<const GuideProperty> guides,
+        const SegmentationParams& params = {});
+
+    // Curvature preset over slot-aligned signed principal curvatures:
+    // maxPrincipal[i] is k1 and minPrincipal[i] is k2, with k1 >= k2 under the
+    // caller's orientation convention, as two vertex guides.
+    [[nodiscard]] SegmentationResult SegmentCurvature(
         const HalfedgeMesh::Mesh& mesh,
         std::span<const double> maxPrincipal,
         std::span<const double> minPrincipal,

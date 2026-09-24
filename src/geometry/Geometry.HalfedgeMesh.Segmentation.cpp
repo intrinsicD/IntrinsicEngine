@@ -9,6 +9,8 @@ module;
 #include <limits>
 #include <optional>
 #include <span>
+#include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -849,6 +851,8 @@ namespace Geometry::Segmentation
             return "gaussian_mixture_fit_failed";
         case SegmentationStatus::PosteriorEvaluationFailed:
             return "posterior_evaluation_failed";
+        case SegmentationStatus::MissingGuideProperty:
+            return "missing_guide_property";
         }
         return "unknown";
     }
@@ -1108,18 +1112,25 @@ namespace Geometry::Segmentation
 
     SegmentationResult Segment(
         const HalfedgeMesh::Mesh& mesh,
-        const std::span<const double> maxPrincipal,
-        const std::span<const double> minPrincipal,
+        const std::span<const Guide> guides,
         const SegmentationParams& params)
     {
         const ProfileClock::time_point totalStart = ProfileClock::now();
+        const auto dimension = static_cast<std::uint32_t>(guides.size());
+        const bool sized = std::ranges::all_of(guides, [&](const Guide& guide)
+        {
+            return guide.Values.size() == (guide.Domain == GuideDomain::Vertex
+                                               ? mesh.VerticesSize()
+                                               : mesh.FacesSize());
+        });
         if (mesh.IsEmpty() || mesh.FaceCount() == 0u ||
             mesh.IsSubmeshView() || !IsValidSegmentationParams(params) ||
-            maxPrincipal.size() != mesh.VerticesSize() ||
-            minPrincipal.size() != mesh.VerticesSize())
+            dimension < 1u || dimension > 3u || !sized)
         {
+            // Dimension 1..3 with an empty feature span reports the size
+            // mismatch; other rejections keep their own status.
             SegmentationResult result = SegmentFaceFeatures(
-                mesh, {}, 2u, params);
+                mesh, {}, dimension, params);
             result.Diagnostics.Timings.TotalMilliseconds =
                 ElapsedMilliseconds(totalStart);
             return result;
@@ -1130,7 +1141,7 @@ namespace Geometry::Segmentation
         {
             SegmentationResult result{};
             InitializeResult(mesh, result);
-            result.Diagnostics.FeatureDimension = 2u;
+            result.Diagnostics.FeatureDimension = dimension;
             result.Diagnostics.Status = status;
             result.Diagnostics.Timings
                 .FaceAggregationAndNormalizationMilliseconds =
@@ -1152,12 +1163,16 @@ namespace Geometry::Segmentation
             {
                 if (!IsFinite(mesh.Position(vertex)))
                     return reject(SegmentationStatus::NonFinitePosition);
-                const double k1 = maxPrincipal[vertex.Index];
-                const double k2 = minPrincipal[vertex.Index];
-                if (!std::isfinite(k1) || !std::isfinite(k2))
-                    return reject(SegmentationStatus::NonFiniteFeature);
-                sum.x += k1;
-                sum.y += k2;
+                // Corner order decides between position and guide failures.
+                for (std::uint32_t channel = 0u; channel < dimension; ++channel)
+                {
+                    if (guides[channel].Domain != GuideDomain::Vertex)
+                        continue;
+                    const double value = guides[channel].Values[vertex.Index];
+                    if (!std::isfinite(value))
+                        return reject(SegmentationStatus::NonFiniteFeature);
+                    sum[channel] += value;
+                }
                 ++vertexCount;
             }
             if (vertexCount != 3u)
@@ -1169,24 +1184,90 @@ namespace Geometry::Segmentation
             if (!std::isfinite(normalLength) || normalLength <= kTiny)
                 return reject(SegmentationStatus::DegenerateFace);
 
-            faceFeatures[face.Index] =
-                sum / static_cast<double>(vertexCount);
-            if (!IsFinite(faceFeatures[face.Index], 2u))
-            {
+            for (std::uint32_t channel = 0u; channel < dimension; ++channel)
+                faceFeatures[face.Index][channel] =
+                    guides[channel].Domain == GuideDomain::Vertex
+                        ? sum[channel] / static_cast<double>(vertexCount)
+                        : guides[channel].Values[face.Index];
+            if (!IsFinite(faceFeatures[face.Index], dimension))
                 return reject(SegmentationStatus::NonFiniteFeature);
-            }
         }
         const double aggregationMilliseconds =
             ElapsedMilliseconds(aggregationStart);
 
         SegmentationResult result = SegmentFaceFeatures(
-            mesh, faceFeatures, 2u, params);
+            mesh, faceFeatures, dimension, params);
         result.Diagnostics.Timings
             .FaceAggregationAndNormalizationMilliseconds +=
             aggregationMilliseconds;
         result.Diagnostics.Timings.TotalMilliseconds =
             ElapsedMilliseconds(totalStart);
         return result;
+    }
+
+    SegmentationResult Segment(
+        const HalfedgeMesh::Mesh& mesh,
+        const std::span<const GuideProperty> guides,
+        const SegmentationParams& params)
+    {
+        std::vector<std::vector<double>> channels;
+        std::vector<GuideDomain> domains;
+        const auto add = [&]<typename T>(const auto& properties,
+                                         const GuideProperty& guide) -> bool
+        {
+            const auto property = properties.template Get<T>(guide.Name);
+            if (!property)
+                return false;
+            std::size_t width = 1u;
+            if constexpr (!std::is_floating_point_v<T>)
+                width = static_cast<std::size_t>(T::length());
+            for (std::size_t c = 0u; c < width; ++c)
+            {
+                auto& channel = channels.emplace_back();
+                channel.reserve(property.Vector().size());
+                for (const T& value : property.Vector())
+                {
+                    if constexpr (std::is_floating_point_v<T>)
+                        channel.push_back(static_cast<double>(value));
+                    else
+                        channel.push_back(static_cast<double>(value[static_cast<int>(c)]));
+                }
+                domains.push_back(guide.Domain);
+            }
+            return true;
+        };
+        for (const GuideProperty& guide : guides)
+        {
+            const auto properties = guide.Domain == GuideDomain::Vertex
+                                        ? mesh.VertexProperties()
+                                        : mesh.FaceProperties();
+            if (!add.template operator()<double>(properties, guide) &&
+                !add.template operator()<float>(properties, guide) &&
+                !add.template operator()<glm::vec2>(properties, guide) &&
+                !add.template operator()<glm::vec3>(properties, guide))
+            {
+                SegmentationResult result{};
+                InitializeResult(mesh, result);
+                result.Diagnostics.Status = SegmentationStatus::MissingGuideProperty;
+                return result;
+            }
+        }
+        std::vector<Guide> spans;
+        for (std::size_t i = 0u; i < channels.size(); ++i)
+            spans.push_back({domains[i], channels[i]});
+        return Segment(mesh, std::span<const Guide>{spans}, params);
+    }
+
+    SegmentationResult SegmentCurvature(
+        const HalfedgeMesh::Mesh& mesh,
+        const std::span<const double> maxPrincipal,
+        const std::span<const double> minPrincipal,
+        const SegmentationParams& params)
+    {
+        const std::array<Guide, 2u> guides{
+            Guide{GuideDomain::Vertex, maxPrincipal},
+            Guide{GuideDomain::Vertex, minPrincipal}};
+        return Segment(mesh, std::span<const Guide>{guides}, params);
     }
 
     SegmentationResult ComputeAndSegment(
@@ -1230,7 +1311,7 @@ namespace Geometry::Segmentation
             curvature.MaxPrincipalCurvatureProperty.Vector();
         const std::vector<double>& minimum =
             curvature.MinPrincipalCurvatureProperty.Vector();
-        SegmentationResult result = Segment(
+        SegmentationResult result = SegmentCurvature(
             mesh,
             std::span<const double>{maximum.data(), maximum.size()},
             std::span<const double>{minimum.data(), minimum.size()},

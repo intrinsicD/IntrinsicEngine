@@ -900,11 +900,26 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             return true;
         }
 
-        [[nodiscard]] bool CaptureSegmentationFaceFeatures(
+        // Bound features as geometry guide channels in processing-mesh slot
+        // order; face values follow SourceFaceForMeshFace. Vertex channels keep
+        // source vertex slots, which the processing mesh preserves.
+        struct SegmentationGuideChannels
+        {
+            std::vector<std::vector<double>> Values{};
+            std::vector<CurvSeg::GuideDomain> Domains{};
+            [[nodiscard]] std::vector<CurvSeg::Guide> Guides() const
+            {
+                std::vector<CurvSeg::Guide> guides;
+                for (std::size_t i = 0; i < Values.size(); ++i)
+                    guides.push_back({Domains[i], Values[i]});
+                return guides;
+            }
+        };
+
+        [[nodiscard]] bool CaptureSegmentationGuides(
             const GS::ConstSourceView& view, const CurvatureSegmentationConfig& config,
             const MeshCurvatureSegmentationSourceResult& source,
-            std::vector<glm::dvec3>& features, std::uint32_t& dimension,
-            std::string& diagnostic)
+            SegmentationGuideChannels& channels, std::string& diagnostic)
         {
             for (const auto face : source.Mesh.LiveFaces())
                 for (const auto vertex : source.Mesh.VerticesAroundFace(face))
@@ -913,17 +928,24 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                         diagnostic = "Segmentation requires finite positions on participating face vertices.";
                         return false;
                     }
-            features.assign(source.Mesh.FacesSize(), glm::dvec3{0.0});
-            dimension = 0u;
+            channels = {};
             for (const auto& ref : config.Features)
             {
                 const bool vertexInput = ref.Domain == GeometryElementDomain::MeshVertex;
                 const auto& properties = vertexInput ? view.VertexSource->Properties : view.FaceSource->Properties;
                 const auto width = GeometryPropertyComponentCount(ref.ValueKind);
+                const auto first = channels.Values.size();
+                for (std::uint32_t c = 0; c < width; ++c)
+                {
+                    channels.Values.emplace_back(
+                        vertexInput ? source.Mesh.VerticesSize() : source.Mesh.FacesSize(), 0.0);
+                    channels.Domains.push_back(vertexInput ? CurvSeg::GuideDomain::Vertex
+                                                           : CurvSeg::GuideDomain::Face);
+                }
                 const auto capture = [&]<typename T>()
                 {
                     const auto property = properties.Get<T>(ref.Name);
-                    const auto add = [&](std::size_t row, glm::dvec3& sum)
+                    const auto read = [&](std::size_t row, std::size_t slot)
                     {
                         const T value = property.Vector()[row];
                         glm::dvec3 numeric{0.0};
@@ -944,29 +966,19 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                         for (std::uint32_t c = 0; c < width; ++c)
                         {
                             if (!std::isfinite(numeric[c])) return false;
-                            sum[c] += numeric[c];
+                            channels.Values[first + c][slot] = numeric[c];
                         }
                         return true;
                     };
                     for (const auto face : source.Mesh.LiveFaces())
                     {
-                        glm::dvec3 sample{0.0};
                         if (vertexInput)
                         {
-                            std::size_t count = 0;
                             for (const auto vertex : source.Mesh.VerticesAroundFace(face))
-                            {
-                                if (!add(vertex.Index, sample)) return false;
-                                ++count;
-                            }
-                            sample /= static_cast<double>(count);
+                                if (!read(vertex.Index, vertex.Index)) return false;
                         }
-                        else if (!add(source.SourceFaceForMeshFace[face.Index], sample)) return false;
-                        for (std::uint32_t c = 0; c < width; ++c)
-                        {
-                            if (!std::isfinite(sample[c])) return false;
-                            features[face.Index][dimension + c] = sample[c];
-                        }
+                        else if (!read(source.SourceFaceForMeshFace[face.Index], face.Index))
+                            return false;
                     }
                     return true;
                 };
@@ -990,7 +1002,6 @@ namespace Extrinsic::Runtime::MeshFieldDetail
                         "' must contain finite values representable without integer precision loss.";
                     return false;
                 }
-                dimension += width;
             }
             return true;
         }
@@ -2010,9 +2021,8 @@ namespace Extrinsic::Runtime::MeshFieldDetail
             auto source = BuildHalfedgeMeshForCurvatureSegmentation(current.SourceView, positions.Name);
             if (!source.Succeeded()) { why = std::move(source.Diagnostic); return false; }
             if (config->Features.empty()) return true;
-            std::vector<glm::dvec3> features;
-            std::uint32_t dimension{};
-            return CaptureSegmentationFaceFeatures(current.SourceView, *config, source, features, dimension, why);
+            SegmentationGuideChannels channels;
+            return CaptureSegmentationGuides(current.SourceView, *config, source, channels, why);
         };
         return PrepareMeshFieldInput(context, entity, availability, positions, segmentation != nullptr, std::move(bindings),
                                      std::move(inputs), validate, diagnostic);
@@ -2313,15 +2323,15 @@ ApplyEditorMeshCurvatureCommand(
                 segmented = CurvSeg::ComputeAndSegment(source.Mesh, MakeCurvatureSegmentationParams(command.Config));
             else
             {
-                std::vector<glm::dvec3> features;
-                std::uint32_t dimension{};
-                if (!CaptureSegmentationFaceFeatures(constView, command.Config, source, features, dimension, result.Message))
+                SegmentationGuideChannels channels;
+                if (!CaptureSegmentationGuides(constView, command.Config, source, channels, result.Message))
                 {
                     result.Status = EditorCommandStatus::InvalidProcessingParameters;
                     result.Error = Core::ErrorCode::InvalidArgument;
                     return result;
                 }
-                segmented = CurvSeg::SegmentFaceFeatures(source.Mesh, features, dimension,
+                const auto guides = channels.Guides();
+                segmented = CurvSeg::Segment(source.Mesh, std::span<const CurvSeg::Guide>{guides},
                     MakeCurvatureSegmentationParams(command.Config));
             }
             result.Diagnostics = segmented.Diagnostics;
@@ -2341,6 +2351,7 @@ ApplyEditorMeshCurvatureCommand(
                 case CurvSeg::SegmentationStatus::NonFinitePosition:
                 case CurvSeg::SegmentationStatus::DegenerateFace:
                 case CurvSeg::SegmentationStatus::NonFiniteFeature:
+                case CurvSeg::SegmentationStatus::MissingGuideProperty:
                     result.Status =
                         EditorCommandStatus::InvalidProcessingParameters;
                     result.Error = Core::ErrorCode::InvalidArgument;

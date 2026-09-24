@@ -46,7 +46,8 @@ mesh results, rejected inputs, verification, and reproduction commands.
 ## Implemented path
 
 `Geometry.HalfedgeMesh.Segmentation` computes or accepts signed
-per-vertex `(k1,k2)`, robustly normalizes face averages, fits the existing
+per-vertex `(k1,k2)` (its curvature preset; `Segment` accepts any 1-3
+floating-point vertex/face guide channels), robustly normalizes face averages, fits the existing
 deterministic Gaussian mixture, and minimizes a feature-weighted Potts energy
 on the face-dual graph. It supports:
 

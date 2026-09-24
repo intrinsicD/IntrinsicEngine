@@ -233,7 +233,7 @@ namespace
 TEST(Segmentation, FixedCountFitsSignedPrincipalCurvatureGmm)
 {
     CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
-    const auto result = Segment::Segment(
+    const auto result = Segment::SegmentCurvature(
         fixture.Mesh, fixture.K1, fixture.K2, FixedParams(2u));
     ASSERT_TRUE(result.Succeeded()) << Segment::ToString(result.Diagnostics.Status);
     EXPECT_EQ(result.Diagnostics.RequestedComponentCount, 2u);
@@ -256,7 +256,7 @@ TEST(Segmentation, CurvatureAdapterMatchesGenericD2Kernel)
 {
     const CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
     const auto params = FixedParams(2u);
-    const auto adapter = Segment::Segment(
+    const auto adapter = Segment::SegmentCurvature(
         fixture.Mesh, fixture.K1, fixture.K2, params);
     const std::vector<glm::dvec3> features =
         MakeFaceCurvatureFeatures(fixture);
@@ -367,7 +367,7 @@ TEST(Segmentation, AutomaticModeSelectsSeparatedPopulations)
     params.MinimumRegionFaces = 1u;
     params.Seed = 17u;
 
-    const auto result = Segment::Segment(
+    const auto result = Segment::SegmentCurvature(
         fixture.Mesh, fixture.K1, fixture.K2, params);
     ASSERT_TRUE(result.Succeeded()) << Segment::ToString(result.Diagnostics.Status);
     EXPECT_EQ(result.Diagnostics.SelectedComponentCount, 2u);
@@ -384,7 +384,7 @@ TEST(Segmentation,
      SignedFeaturesSeparatePlaneSphereCylinderAndSaddleRegimes)
 {
     CurvatureFixture fixture = MakeAnalyticRegimeFixture();
-    const auto result = Segment::Segment(
+    const auto result = Segment::SegmentCurvature(
         fixture.Mesh, fixture.K1, fixture.K2, FixedParams(4u));
     ASSERT_TRUE(result.Succeeded())
         << Segment::ToString(result.Diagnostics.Status);
@@ -420,7 +420,7 @@ TEST(Segmentation,
     params.MinimumRegionFaces = 1u;
     params.Seed = 17u;
 
-    const auto result = Segment::Segment(
+    const auto result = Segment::SegmentCurvature(
         fixture.Mesh, fixture.K1, fixture.K2, params);
     ASSERT_TRUE(result.Succeeded())
         << Segment::ToString(result.Diagnostics.Status);
@@ -466,7 +466,7 @@ TEST(Segmentation,
     params.MinimumRegionFaces = 1u;
     params.Seed = 17u;
 
-    const auto result = Segment::Segment(
+    const auto result = Segment::SegmentCurvature(
         fixture.Mesh, fixture.K1, fixture.K2, params);
     ASSERT_TRUE(result.Succeeded())
         << Segment::ToString(result.Diagnostics.Status);
@@ -486,7 +486,7 @@ TEST(Segmentation,
     auto unregularizedParams = FixedParams(2u);
     unregularizedParams.SpatialWeight = 0.0;
     unregularizedParams.FeatureSensitivity = 0.0;
-    const auto unregularized = Segment::Segment(
+    const auto unregularized = Segment::SegmentCurvature(
         fixture.Mesh,
         fixture.K1,
         fixture.K2,
@@ -496,7 +496,7 @@ TEST(Segmentation,
 
     auto regularizedParams = unregularizedParams;
     regularizedParams.SpatialWeight = 1.0e6;
-    const auto regularized = Segment::Segment(
+    const auto regularized = Segment::SegmentCurvature(
         fixture.Mesh,
         fixture.K1,
         fixture.K2,
@@ -518,14 +518,14 @@ TEST(Segmentation,
     params.FeatureSensitivity = 0.0;
     params.MinimumRegionFaces = 1u;
 
-    const auto unmerged = Segment::Segment(
+    const auto unmerged = Segment::SegmentCurvature(
         fixture.Mesh, fixture.K1, fixture.K2, params);
     ASSERT_TRUE(unmerged.Succeeded());
     ASSERT_EQ(unmerged.Diagnostics.SmallRegionsMerged, 0u);
     ASSERT_GT(unmerged.Diagnostics.ConnectedRegionCount, 1u);
 
     params.MinimumRegionFaces = 2u;
-    const auto merged = Segment::Segment(
+    const auto merged = Segment::SegmentCurvature(
         fixture.Mesh, fixture.K1, fixture.K2, params);
     ASSERT_TRUE(merged.Succeeded());
     EXPECT_GT(merged.Diagnostics.SmallRegionsMerged, 0u);
@@ -542,7 +542,7 @@ TEST(Segmentation, FeatureWeightPreservesFoldBoundary)
     params.SpatialWeight = 40.0;
     params.FeatureSensitivity = 20.0;
 
-    const auto result = Segment::Segment(
+    const auto result = Segment::SegmentCurvature(
         fixture.Curvature.Mesh,
         fixture.Curvature.K1,
         fixture.Curvature.K2,
@@ -559,9 +559,9 @@ TEST(Segmentation, ConnectedRegionsAreContiguousAndDeterministic)
 {
     CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
     const auto params = FixedParams(2u);
-    const auto first = Segment::Segment(
+    const auto first = Segment::SegmentCurvature(
         fixture.Mesh, fixture.K1, fixture.K2, params);
-    const auto second = Segment::Segment(
+    const auto second = Segment::SegmentCurvature(
         fixture.Mesh, fixture.K1, fixture.K2, params);
     ASSERT_TRUE(first.Succeeded());
     ASSERT_TRUE(second.Succeeded());
@@ -582,7 +582,7 @@ TEST(Segmentation,
      DisconnectedEqualCurvaturePatchesShareComponentButNotRegion)
 {
     CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
-    const auto result = Segment::Segment(
+    const auto result = Segment::SegmentCurvature(
         fixture.Mesh, fixture.K1, fixture.K2, FixedParams(2u));
     ASSERT_TRUE(result.Succeeded());
     ASSERT_GE(result.FaceComponents.size(), 2u);
@@ -617,7 +617,7 @@ TEST(Segmentation,
 TEST(Segmentation, GlobalOrientationReversalPreservesPartition)
 {
     CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
-    const auto original = Segment::Segment(
+    const auto original = Segment::SegmentCurvature(
         fixture.Mesh, fixture.K1, fixture.K2, FixedParams(2u));
     ASSERT_TRUE(original.Succeeded());
 
@@ -628,7 +628,7 @@ TEST(Segmentation, GlobalOrientationReversalPreservesPartition)
         reversedK1[i] = -fixture.K2[i];
         reversedK2[i] = -fixture.K1[i];
     }
-    const auto reversed = Segment::Segment(
+    const auto reversed = Segment::SegmentCurvature(
         fixture.Mesh, reversedK1, reversedK2, FixedParams(2u));
     ASSERT_TRUE(reversed.Succeeded());
     EXPECT_TRUE(SamePartition(
@@ -640,24 +640,24 @@ TEST(Segmentation, FailsClosedOnInvalidInputs)
 {
     Geometry::HalfedgeMesh::Mesh empty{};
     EXPECT_EQ(
-        Segment::Segment(empty, {}, {}).Diagnostics.Status,
+        Segment::SegmentCurvature(empty, {}, {}).Diagnostics.Status,
         Segment::SegmentationStatus::EmptyMesh);
 
     CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
     EXPECT_EQ(
-        Segment::Segment(fixture.Mesh, {}, fixture.K2).Diagnostics.Status,
+        Segment::SegmentCurvature(fixture.Mesh, {}, fixture.K2).Diagnostics.Status,
         Segment::SegmentationStatus::FeatureCountMismatch);
 
     auto badParams = FixedParams(2u);
     badParams.SpatialWeight = -1.0;
     EXPECT_EQ(
-        Segment::Segment(
+        Segment::SegmentCurvature(
             fixture.Mesh, fixture.K1, fixture.K2, badParams).Diagnostics.Status,
         Segment::SegmentationStatus::InvalidParameters);
 
     fixture.K1.front() = std::numeric_limits<double>::quiet_NaN();
     EXPECT_EQ(
-        Segment::Segment(
+        Segment::SegmentCurvature(
             fixture.Mesh,
             fixture.K1,
             fixture.K2,
@@ -702,7 +702,7 @@ TEST(Segmentation, CurvatureAdapterPreservesValidationPriority)
     fixture.Mesh.Position(Geometry::VertexHandle{1u}) = glm::vec3{
         std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f};
     EXPECT_EQ(
-        Segment::Segment(
+        Segment::SegmentCurvature(
             fixture.Mesh,
             fixture.K1,
             fixture.K2,
@@ -714,7 +714,7 @@ TEST(Segmentation, CurvatureAdapterPreservesValidationPriority)
     fixture.Mesh.Position(Geometry::VertexHandle{0u}) = glm::vec3{
         std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f};
     EXPECT_EQ(
-        Segment::Segment(
+        Segment::SegmentCurvature(
             fixture.Mesh,
             fixture.K1,
             fixture.K2,
@@ -743,7 +743,7 @@ TEST(Segmentation,
 
     const std::vector<double> k1(mesh.VerticesSize(), 2.0);
     const std::vector<double> k2(mesh.VerticesSize(), -1.0);
-    const auto result = Segment::Segment(
+    const auto result = Segment::SegmentCurvature(
         mesh, k1, k2, FixedParams(1u));
     ASSERT_TRUE(result.Succeeded())
         << Segment::ToString(result.Diagnostics.Status);
@@ -788,7 +788,7 @@ TEST(Segmentation, RejectsPolygonAndDegenerateFaces)
     EXPECT_TRUE(polygon.AddQuad(p0, p1, p2, p3));
     const std::vector<double> zeros(4u, 0.0);
     EXPECT_EQ(
-        Segment::Segment(
+        Segment::SegmentCurvature(
             polygon, zeros, zeros, FixedParams(1u)).Diagnostics.Status,
         Segment::SegmentationStatus::NonTriangleFace);
 
@@ -799,7 +799,89 @@ TEST(Segmentation, RejectsPolygonAndDegenerateFaces)
     EXPECT_TRUE(degenerate.AddTriangle(d0, d1, d2));
     const std::vector<double> flat(3u, 0.0);
     EXPECT_EQ(
-        Segment::Segment(
+        Segment::SegmentCurvature(
             degenerate, flat, flat, FixedParams(1u)).Diagnostics.Status,
         Segment::SegmentationStatus::DegenerateFace);
+}
+
+TEST(Segmentation, NamedGuidePropertiesMatchCurvaturePreset)
+{
+    CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
+    const auto params = FixedParams(2u);
+    const auto preset = Segment::SegmentCurvature(
+        fixture.Mesh, fixture.K1, fixture.K2, params);
+    ASSERT_TRUE(preset.Succeeded());
+
+    auto& mesh = fixture.Mesh;
+    mesh.VertexProperties().GetOrAdd<double>("v:k1", 0.0).Vector() = fixture.K1;
+    mesh.VertexProperties().GetOrAdd<double>("v:k2", 0.0).Vector() = fixture.K2;
+    const std::array named{
+        Segment::GuideProperty{Segment::GuideDomain::Vertex, "v:k1"},
+        Segment::GuideProperty{Segment::GuideDomain::Vertex, "v:k2"}};
+    const auto byName = Segment::Segment(
+        mesh, std::span<const Segment::GuideProperty>{named}, params);
+    ASSERT_TRUE(byName.Succeeded()) << Segment::ToString(byName.Diagnostics.Status);
+    EXPECT_EQ(byName.FaceComponents, preset.FaceComponents);
+    EXPECT_EQ(byName.FaceRegions, preset.FaceRegions);
+
+    // Face-domain guides holding the corner means reproduce the vertex guides,
+    // and a mixed vertex/face binding keeps channel order.
+    const std::vector<glm::dvec3> faceMeans = MakeFaceCurvatureFeatures(fixture);
+    auto faceK2 = mesh.FaceProperties().GetOrAdd<double>("f:k2", 0.0);
+    for (std::size_t face = 0u; face < faceMeans.size(); ++face)
+        faceK2.Vector()[face] = faceMeans[face].y;
+    const std::array mixed{
+        Segment::GuideProperty{Segment::GuideDomain::Vertex, "v:k1"},
+        Segment::GuideProperty{Segment::GuideDomain::Face, "f:k2"}};
+    const auto byMixed = Segment::Segment(
+        mesh, std::span<const Segment::GuideProperty>{mixed}, params);
+    ASSERT_TRUE(byMixed.Succeeded());
+    EXPECT_EQ(byMixed.FaceComponents, preset.FaceComponents);
+    EXPECT_EQ(byMixed.Diagnostics.FeatureDimension, 2u);
+
+    // A float vector property contributes one channel per component.
+    auto packed = mesh.VertexProperties().GetOrAdd<glm::vec2>("v:k12", glm::vec2{0.0f});
+    for (std::size_t v = 0u; v < fixture.K1.size(); ++v)
+        packed.Vector()[v] = glm::vec2{fixture.K1[v], fixture.K2[v]};
+    const std::array vector{Segment::GuideProperty{Segment::GuideDomain::Vertex, "v:k12"}};
+    const auto byVector = Segment::Segment(
+        mesh, std::span<const Segment::GuideProperty>{vector}, params);
+    ASSERT_TRUE(byVector.Succeeded());
+    EXPECT_EQ(byVector.Diagnostics.FeatureDimension, 2u);
+    EXPECT_EQ(byVector.FaceComponents, preset.FaceComponents);
+}
+
+TEST(Segmentation, GuideBindingsRejectMissingMisSizedAndTooWideInputs)
+{
+    CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
+    auto& mesh = fixture.Mesh;
+    const auto params = FixedParams(2u);
+    mesh.VertexProperties().GetOrAdd<std::uint32_t>("v:ids", 0u);
+    mesh.VertexProperties().GetOrAdd<glm::vec3>("v:triple", glm::vec3{0.0f});
+    mesh.VertexProperties().GetOrAdd<double>("v:k1", 0.0).Vector() = fixture.K1;
+    for (const char* name : {"v:absent", "v:ids"})
+    {
+        const std::array guide{Segment::GuideProperty{Segment::GuideDomain::Vertex, name}};
+        EXPECT_EQ(Segment::Segment(mesh, std::span<const Segment::GuideProperty>{guide}, params)
+                      .Diagnostics.Status,
+                  Segment::SegmentationStatus::MissingGuideProperty)
+            << name;
+    }
+    const std::array tooWide{
+        Segment::GuideProperty{Segment::GuideDomain::Vertex, "v:triple"},
+        Segment::GuideProperty{Segment::GuideDomain::Vertex, "v:k1"}};
+    EXPECT_EQ(Segment::Segment(mesh, std::span<const Segment::GuideProperty>{tooWide}, params)
+                  .Diagnostics.Status,
+              Segment::SegmentationStatus::InvalidParameters);
+
+    // A vertex-sized channel bound to the face domain is a size mismatch.
+    const std::array misSized{
+        Segment::Guide{Segment::GuideDomain::Face, std::span<const double>{fixture.K1}}};
+    ASSERT_NE(fixture.K1.size(), mesh.FacesSize());
+    EXPECT_EQ(Segment::Segment(mesh, std::span<const Segment::Guide>{misSized}, params)
+                  .Diagnostics.Status,
+              Segment::SegmentationStatus::FeatureCountMismatch);
+    EXPECT_EQ(Segment::Segment(mesh, std::span<const Segment::Guide>{}, params)
+                  .Diagnostics.Status,
+              Segment::SegmentationStatus::InvalidParameters);
 }

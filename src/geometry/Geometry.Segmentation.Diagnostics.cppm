@@ -24,6 +24,7 @@ export namespace Geometry::Segmentation
         NonFiniteFeature,
         GaussianMixtureFitFailed,
         PosteriorEvaluationFailed,
+        MissingGuideProperty,
     };
 
     struct ModelCandidateDiagnostics
@@ -45,7 +46,7 @@ export namespace Geometry::Segmentation
 
     struct SegmentationStageTimings
     {
-        // Zero for Segment(), which consumes supplied curvatures. The
+        // Zero for Segment()/SegmentCurvature(), which consume supplied guides. The
         // ComputeAndSegment() convenience path fills this field and includes
         // it in TotalMilliseconds.
         double CurvatureEstimationMilliseconds{0.0};

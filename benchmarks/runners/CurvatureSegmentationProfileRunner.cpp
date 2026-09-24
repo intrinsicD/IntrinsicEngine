@@ -839,7 +839,7 @@ namespace
                     classification.EdgeFeatureMask,
                     fixture.ExpectedFeatureMask));
 
-            Segment::SegmentationResult result = Segment::Segment(
+            Segment::SegmentationResult result = Segment::SegmentCurvature(
                 fixture.Mesh,
                 fixture.K1,
                 fixture.K2,
@@ -909,12 +909,12 @@ namespace
         const Segment::SegmentationParams params =
             MakeParams(SelectionMode::Fixed, 1u);
         std::array<Segment::SegmentationResult, 2u> flatResults{
-            Segment::Segment(
+            Segment::SegmentCurvature(
                 flatFixtures[0u].Mesh,
                 flatFixtures[0u].K1,
                 flatFixtures[0u].K2,
                 params),
-            Segment::Segment(
+            Segment::SegmentCurvature(
                 flatFixtures[1u].Mesh,
                 flatFixtures[1u].K1,
                 flatFixtures[1u].K2,
@@ -1063,7 +1063,7 @@ namespace
                 classification.EdgeFeatureMask,
                 fixture.ExpectedFeatureMask);
 
-            results[index] = Segment::Segment(
+            results[index] = Segment::SegmentCurvature(
                 fixture.Mesh, fixture.K1, fixture.K2, segmentParams);
             valid &= results[index].Succeeded();
             if (results[index].Succeeded())
@@ -1144,7 +1144,7 @@ namespace
         Segment::SegmentationParams segmentParams =
             MakeParams(SelectionMode::Fixed, 2u);
         segmentParams.Seed = 1741u;
-        const Segment::SegmentationResult result = Segment::Segment(
+        const Segment::SegmentationResult result = Segment::SegmentCurvature(
             fixture.Mesh, fixture.K1, fixture.K2, segmentParams);
         if (result.Succeeded())
         {
@@ -1257,7 +1257,7 @@ namespace
              iteration < spec.WarmupIterations;
              ++iteration)
         {
-            const auto warmup = Segment::Segment(
+            const auto warmup = Segment::SegmentCurvature(
                 fixture.Mesh, fixture.K1, fixture.K2, params);
             if (!warmup.Succeeded())
                 return profile;
@@ -1271,7 +1271,7 @@ namespace
              iteration < spec.MeasuredIterations;
              ++iteration)
         {
-            Segment::SegmentationResult result = Segment::Segment(
+            Segment::SegmentationResult result = Segment::SegmentCurvature(
                 fixture.Mesh, fixture.K1, fixture.K2, params);
             if (!result.Succeeded())
                 return profile;
@@ -1327,7 +1327,7 @@ namespace
                 reusable.MaxPrincipalCurvatureProperty.Vector();
             const std::vector<double>& minimum =
                 reusable.MinPrincipalCurvatureProperty.Vector();
-            return Segment::Segment(
+            return Segment::SegmentCurvature(
                 fixture.Mesh,
                 std::span<const double>{maximum.data(), maximum.size()},
                 std::span<const double>{minimum.data(), minimum.size()},
