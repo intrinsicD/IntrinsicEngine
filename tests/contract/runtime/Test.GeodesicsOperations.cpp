@@ -415,3 +415,71 @@ TEST(GeodesicsOperations, FloatingOutputsPreserveUnreachableInfinityAndDeletedSt
     EXPECT_TRUE(std::isnan(distance.Vector()[4]));
     ASSERT_TRUE(h.History.Redo().Succeeded());
 }
+
+TEST(GeodesicsOperations, SourceVertexPropertyAddsMarkedVerticesAsSources)
+{
+    Harness h;
+    h.Command.Config.SourceVertices.clear();
+    auto marks = h.Properties().GetOrAdd<bool>("v:feature", false);
+    marks.Vector()[2] = true;
+    h.Command.Config.SourceVertexProperty = {Runtime::GeometryElementDomain::MeshVertex,
+                                             "v:feature", Geometry::PropertyValueKind::Bool};
+    auto result = Runtime::ApplyEditorGeodesicsCommand(h.Commands(), h.Command);
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    auto distance = h.Properties().Get<double>("v:geodesic_distance");
+    ASSERT_TRUE(distance);
+    EXPECT_EQ(distance.Vector()[2], 0.0);
+    EXPECT_NEAR(distance.Vector()[0], std::sqrt(2.), 1e-6);
+    EXPECT_TRUE(h.Properties().Get<bool>("v:is_geodesic_source").Vector()[2]);
+
+    // Explicit sources and marked vertices combine; float marks use nonzero.
+    auto weights = h.Properties().GetOrAdd<float>("v:weights", 0.f);
+    weights.Vector()[1] = 0.5f;
+    h.Command.Config.SourceVertices = {3};
+    h.Command.Config.SourceVertexProperty = {Runtime::GeometryElementDomain::MeshVertex,
+                                             "v:weights", Geometry::PropertyValueKind::Float};
+    result = Runtime::ApplyEditorGeodesicsCommand(h.Commands(), h.Command);
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_EQ(result.Diagnostics.SourceCount, 2u);
+    EXPECT_EQ(distance.Vector()[1], 0.0);
+    EXPECT_EQ(distance.Vector()[3], 0.0);
+
+    // A missing property or an all-zero one with no explicit source is rejected.
+    h.Command.Config.SourceVertexProperty.Name = "v:absent";
+    EXPECT_EQ(Runtime::ApplyEditorGeodesicsCommand(h.Commands(), h.Command).Status,
+              Runtime::EditorCommandStatus::InvalidProcessingParameters);
+    h.Command.Config.SourceVertices.clear();
+    h.Properties().GetOrAdd<std::uint32_t>("v:none", 0u);
+    h.Command.Config.SourceVertexProperty = {Runtime::GeometryElementDomain::MeshVertex,
+                                             "v:none", Geometry::PropertyValueKind::UInt32};
+    EXPECT_EQ(Runtime::ApplyEditorGeodesicsCommand(h.Commands(), h.Command).Status,
+              Runtime::EditorCommandStatus::InvalidProcessingParameters);
+}
+
+TEST(GeodesicsOperations, SourceVertexPropertyRoundTripsThroughConfig)
+{
+    Config::EngineConfig engine;
+    Runtime::GeodesicsConfig config;
+    Runtime::SetGeodesicsConfig(engine, config);
+    auto decoded = Runtime::GetGeodesicsConfig(engine);
+    ASSERT_TRUE(decoded);
+    EXPECT_TRUE(decoded->SourceVertexProperty.Name.empty());
+
+    config.SourceVertexProperty = {Runtime::GeometryElementDomain::MeshVertex, "v:feature",
+                                   Geometry::PropertyValueKind::UInt32};
+    Runtime::SetGeodesicsConfig(engine, config);
+    decoded = Runtime::GetGeodesicsConfig(engine);
+    ASSERT_TRUE(decoded);
+    EXPECT_EQ(decoded->SourceVertexProperty, config.SourceVertexProperty);
+
+    for (const auto payload :
+         {R"({"source_vertex_property":{"domain":"mesh_face","name":"f:x","kind":"bool"}})",
+          R"({"source_vertex_property":"v:feature"})"})
+        EXPECT_FALSE(Runtime::ValidateGeodesicsConfigSection(payload, {}, "geodesics").Usable())
+            << payload;
+    auto collide = config;
+    collide.SourceVertexProperty.Name = collide.DistanceProperty.Name;
+    EXPECT_FALSE(Runtime::ValidateGeodesicsConfigSection(
+                     Runtime::SerializeGeodesicsConfig(collide), {}, "geodesics")
+                     .Usable());
+}

@@ -37,18 +37,43 @@ transverse second derivative; negative mean crests require a positive one.
 This is a signed-crest comparator, not every possible scalar-field ridge.
 Its Hessian directions are distinct from principal surface directions.
 
-`ExtractScalarExtrema` applies the same quadratic fit to any float or double
-vertex property, for example `v:mean_curvature` or a geodesic distance. Heights
-are normalized by the field's finite range, so an affine rescale of the field
-does not change the curves. A scalar ridge (valley) needs a negative (positive)
-transverse Hessian eigenvalue that also dominates the along-ridge eigenvalue;
-this rejects flat tails whose fit noise would otherwise read as a ridge. There
-is no sign requirement on the value. Strength is the crossing's height above
-the field minimum (ridges) or below the maximum (valleys), in `[0, 1]`, and the
-scalar default sharpness floor is `0.01` of the range per squared radius.
-Non-finite values drop their vertex; sharp edges are not emitted. The Sandbox
-`Mesh / Processing / Scalar Ridges` window publishes one selected scale as a new
-graph entity with `e:scalar_extremum` (+1 ridge, -1 valley) and `e:strength`.
+`Geometry.HalfedgeMesh.ScalarfieldExtrema::Extract` applies the same quadratic
+fit to any float or double vertex property (by name or as a slot-aligned span),
+for example `v:mean_curvature` or a geodesic distance; the curvature curves
+above are its `ExtractCurvatureExtrema` preset. Heights are normalized by the
+field's finite range, so an affine rescale of the field does not change the
+curves. A scalar ridge (valley) needs a negative (positive) transverse Hessian
+eigenvalue that also dominates the along-ridge eigenvalue; this rejects flat
+tails whose fit noise would otherwise read as a ridge. There is no sign
+requirement on the value. Strength is the crossing's height above the field
+minimum (ridges) or below the maximum (valleys), in `[0, 1]`, and the scalar
+default sharpness floor is `0.01` of the range per squared radius. Non-finite
+values drop their vertex; sharp edges are not emitted.
+
+`Params::Algorithm = Method::Watershed` selects a topological alternative: each
+vertex flows along its steepest descending (ascending) mesh edge, with a strict
+(height, index) order for plateaus. Basins of the descending flow are merged by
+0-dimensional persistence: sweeping upward, a younger minimum whose height
+below the vertex where its component meets an older one is under
+`MinimumPersistence` (fraction of the range, default `0.05`) is absorbed.
+Ridges are the separatrices between the remaining basins: each face edge joining
+two basins contributes its higher endpoint, and one face's contributions are
+joined by its edges, so watershed curves lie on mesh vertices and edges. Valleys
+use the ascending flow. The result keeps both vertex basin labels. Unlike
+Hessian ridges, watershed ridges are closed basin boundaries: a ridge that
+fades out without separating basins is not found, and every separatrix that
+survives persistence is reported regardless of its sharpness. The flow uses
+hard labels only; soft absorbing-chain membership is not implemented.
+
+`SnapToMesh` turns selected segments into boolean vertex and edge masks: each
+point snaps to its source vertex, or the nearer endpoint of its source edge.
+Both points of a segment lie on one triangle, so a segment marks one mesh edge
+or collapses to a vertex. The Sandbox `Mesh / Processing / Scalar Ridges`
+window selects the method, publishes one Hessian scale (or the scale-free
+watershed curves) as a new graph entity with `e:scalar_extremum` (+1 ridge,
+-1 valley) and `e:strength`, and optionally writes undoable `v:feature` /
+`e:feature` masks and, for the watershed, `v:watershed_basin` labels on the
+source mesh. Geodesics accept the vertex mask as a source property.
 
 ## Selected numerical choices
 

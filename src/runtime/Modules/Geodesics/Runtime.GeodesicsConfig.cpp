@@ -23,6 +23,8 @@ namespace Extrinsic::Runtime
     std::string SerializeGeodesicsConfig(const GeodesicsConfig& config)
     {
         return Json{{"source_vertices", config.SourceVertices},
+                    {"source_vertex_property", config.SourceVertexProperty.Name.empty()
+                        ? Json(nullptr) : ConfigDetail::EncodePointPropertyRef(config.SourceVertexProperty)},
                     {"max_halfedge_expansions", config.MaxHalfedgeExpansions},
                     {"position_property", ConfigDetail::EncodePointPropertyRef(config.PositionProperty)},
                     {"distance_property", ConfigDetail::EncodePointPropertyRef(config.DistanceProperty)},
@@ -44,7 +46,8 @@ namespace Extrinsic::Runtime
         if (!doc.is_object())
             return reject("Geodesics config must be an object.");
         for (auto it = doc.begin(); it != doc.end(); ++it)
-            if (it.key() != "source_vertices" && it.key() != "max_halfedge_expansions" &&
+            if (it.key() != "source_vertices" && it.key() != "source_vertex_property" &&
+                it.key() != "max_halfedge_expansions" &&
                 it.key() != "position_property" && it.key() != "distance_property" &&
                 it.key() != "source_mask_property")
                 return reject("Unknown geodesics field: " + it.key());
@@ -61,6 +64,19 @@ namespace Extrinsic::Runtime
                     return reject("source_vertices requires unsigned 32-bit indices.");
                 config.SourceVertices.push_back(source.get<std::uint32_t>());
             }
+        }
+        if (doc.contains("source_vertex_property") && !doc["source_vertex_property"].is_null())
+        {
+            const auto& ref = doc["source_vertex_property"];
+            if (ConfigDetail::ValidatePointPropertyRef(ref, Geometry::PropertyValueKind::Bool, true) !=
+                    ConfigDetail::PointPropertyValidation::Valid ||
+                ref["domain"] != ToString(GeometryElementDomain::MeshVertex))
+                return reject("source_vertex_property requires a scalar mesh vertex property reference.");
+            ConfigDetail::DecodePointPropertyRef(ref, config.SourceVertexProperty);
+            if (GeometryPropertyComponentCount(config.SourceVertexProperty.ValueKind) != 1u ||
+                config.SourceVertexProperty.Name.find('\0') != std::string::npos ||
+                IsStructuralVertexProperty(config.SourceVertexProperty.Name))
+                return reject("source_vertex_property must name a scalar, non-structural vertex property.");
         }
         if (doc.contains("max_halfedge_expansions"))
         {
@@ -91,7 +107,9 @@ namespace Extrinsic::Runtime
         }
         if (config.DistanceProperty.Name == config.SourceMaskProperty.Name ||
             config.DistanceProperty.Name == config.PositionProperty.Name ||
-            config.SourceMaskProperty.Name == config.PositionProperty.Name)
+            config.SourceMaskProperty.Name == config.PositionProperty.Name ||
+            (!config.SourceVertexProperty.Name.empty() &&
+             config.SourceVertexProperty.Name == config.DistanceProperty.Name))
             return reject("Geodesics input and output properties must be distinct.");
         result.State = EngineConfigState::Valid;
         result.CanonicalPayloadJson = SerializeGeodesicsConfig(config);
@@ -112,6 +130,8 @@ namespace Extrinsic::Runtime
         const auto doc = Json::parse(validated.CanonicalPayloadJson);
         GeodesicsConfig result;
         result.SourceVertices = doc["source_vertices"].get<std::vector<std::uint32_t>>();
+        if (!doc["source_vertex_property"].is_null())
+            ConfigDetail::DecodePointPropertyRef(doc["source_vertex_property"], result.SourceVertexProperty);
         result.MaxHalfedgeExpansions = doc["max_halfedge_expansions"].get<std::uint32_t>();
         ConfigDetail::DecodePointPropertyRef(doc["position_property"], result.PositionProperty);
         ConfigDetail::DecodePointPropertyRef(doc["distance_property"], result.DistanceProperty);

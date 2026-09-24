@@ -179,7 +179,7 @@ int main(int argc, char** argv)
             return write(4);
         }
     }
-    auto result = C::Extract(mesh, params);
+    auto result = C::ExtractCurvatureExtrema(mesh, params);
     const auto& d = result.Diagnostic;
     report["diagnostics"] = {{"state", C::ToString(d.State)},
                              {"runtime_ms", d.TotalMilliseconds},

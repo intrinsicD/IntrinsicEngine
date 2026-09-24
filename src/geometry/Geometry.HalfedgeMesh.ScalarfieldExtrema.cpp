@@ -852,7 +852,10 @@ namespace Geometry::ScalarfieldExtrema
                 !finiteNonnegative(params.MinimumAnisotropy) || params.MinimumAnisotropy > 1 ||
                 !finiteNonnegative(params.HardDihedralDegrees) ||
                 params.HardDihedralDegrees > 180 || params.MaximumNeighbors < 9 ||
-                !params.MaximumWorkItems)
+                !params.MaximumWorkItems ||
+                (params.Algorithm != Method::HessianRidge &&
+                 params.Algorithm != Method::Watershed) ||
+                !finiteNonnegative(params.MinimumPersistence) || params.MinimumPersistence > 1)
                 return false;
             double previous = 0;
             for (double factor : params.ScaleFactors)
@@ -883,17 +886,17 @@ namespace Geometry::ScalarfieldExtrema
             return state;
         }
         // Range-normalized field heights; NaN marks vertices without a finite
-        // value or fitting support. Returns false for a constant field.
-        template <class T>
-        bool NormalizedHeights(const Surface& s, const ConstProperty<T>& property,
+        // value, incident face or (when `barriers`) fitting support. Returns
+        // false for a constant field.
+        bool NormalizedHeights(const Surface& s, std::span<const double> values, bool barriers,
                                std::vector<double>& heights)
         {
             heights.assign(s.Positions.size(), std::numeric_limits<double>::quiet_NaN());
             double low = std::numeric_limits<double>::infinity(), high = -low;
-            for (std::size_t v = 0; v < heights.size() && v < property.Vector().size(); ++v)
+            for (std::size_t v = 0; v < heights.size(); ++v)
             {
-                const double value = static_cast<double>(property[v]);
-                if (s.Areas[v] == 0 || s.Barrier[v] || !std::isfinite(value))
+                const double value = values[v];
+                if (s.Areas[v] == 0 || (barriers && s.Barrier[v]) || !std::isfinite(value))
                     continue;
                 heights[v] = value;
                 low = std::min(low, value);
@@ -906,12 +909,138 @@ namespace Geometry::ScalarfieldExtrema
                 h = (h - low) / range;
             return true;
         }
+        // Strict (height, index) order: simulation of simplicity for plateaus.
+        bool Below(const std::vector<double>& h, std::uint32_t a, std::uint32_t b)
+        {
+            return h[a] < h[b] || (h[a] == h[b] && a < b);
+        }
+        // Steepest-descent basins of `h` with 0-dimensional persistence
+        // simplification: sweeping vertices upward, components meeting at a
+        // vertex keep the older (lower) minimum; a younger minimum whose
+        // height below the meeting vertex is under `persistence` is absorbed.
+        std::vector<std::uint32_t> Basins(const Surface& s, const std::vector<double>& h,
+                                          double persistence, std::size_t& minima,
+                                          std::size_t& basins)
+        {
+            const auto n = static_cast<std::uint32_t>(h.size());
+            std::vector<std::uint32_t> order;
+            for (std::uint32_t v = 0; v < n; ++v)
+                if (!std::isnan(h[v]))
+                    order.push_back(v);
+            std::sort(order.begin(), order.end(),
+                      [&](auto a, auto b) { return Below(h, a, b); });
+            std::vector<std::uint32_t> label(n, kInvalidBasin), component(n, None), absorbed;
+            std::vector<std::uint32_t> componentMinimum, basinMinimum;
+            auto find = [](std::vector<std::uint32_t>& parent, std::uint32_t x)
+            {
+                while (parent[x] != x)
+                    x = parent[x] = parent[parent[x]];
+                return x;
+            };
+            std::vector<std::uint32_t> merged; // component union-find
+            for (auto v : order)
+            {
+                std::uint32_t steepest = None;
+                double slope = 0;
+                std::vector<std::uint32_t> roots;
+                for (auto edge : s.Adjacent[v])
+                {
+                    auto j = edge.Vertex;
+                    if (std::isnan(h[j]) || !Below(h, j, v))
+                        continue;
+                    double drop = (h[v] - h[j]) / edge.Distance;
+                    if (steepest == None || drop > slope ||
+                        (drop == slope && Below(h, j, steepest)))
+                    {
+                        steepest = j;
+                        slope = drop;
+                    }
+                    roots.push_back(find(merged, component[j]));
+                }
+                if (steepest == None)
+                {
+                    label[v] = static_cast<std::uint32_t>(basinMinimum.size());
+                    basinMinimum.push_back(v);
+                    absorbed.push_back(label[v]);
+                    component[v] = static_cast<std::uint32_t>(merged.size());
+                    merged.push_back(component[v]);
+                    componentMinimum.push_back(v);
+                    continue;
+                }
+                label[v] = label[steepest];
+                std::sort(roots.begin(), roots.end());
+                roots.erase(std::unique(roots.begin(), roots.end()), roots.end());
+                std::sort(roots.begin(), roots.end(), [&](auto a, auto b)
+                          { return Below(h, componentMinimum[a], componentMinimum[b]); });
+                for (std::size_t i = 1; i < roots.size(); ++i)
+                {
+                    const auto young = componentMinimum[roots[i]];
+                    if (h[v] - h[young] < persistence)
+                        absorbed[label[young]] = label[componentMinimum[roots[0]]];
+                    merged[roots[i]] = roots[0];
+                }
+                component[v] = roots[0];
+            }
+            minima = basinMinimum.size();
+            std::vector<std::uint32_t> compact(basinMinimum.size(), kInvalidBasin);
+            basins = 0;
+            for (auto& l : label)
+            {
+                if (l == kInvalidBasin)
+                    continue;
+                l = find(absorbed, l);
+                if (compact[l] == kInvalidBasin)
+                    compact[l] = static_cast<std::uint32_t>(basins++);
+                l = compact[l];
+            }
+            return label;
+        }
+        // Separatrices of `basin` on the mesh: every face edge joining two
+        // basins contributes its higher endpoint (by `h`), and the distinct
+        // contributions of one face are joined by that face's edges. Strength
+        // is the segment's mean `h`: height for ridges, depth for valleys.
+        void Separatrices(const Surface& s, const std::vector<double>& h,
+                          const std::vector<std::uint32_t>& basin, Kind kind,
+                          const Params& params, Result& result)
+        {
+            PointMap points;
+            std::set<std::pair<std::uint32_t, std::uint32_t>> segments;
+            for (std::uint32_t fi = 0; fi < s.Faces.size(); ++fi)
+            {
+                const auto& f = s.Faces[fi];
+                if (!std::all_of(f.Verts.begin(), f.Verts.end(),
+                                 [&](auto v) { return basin[v] != kInvalidBasin; }))
+                    continue;
+                std::vector<std::uint32_t> crest;
+                for (int j = 0; j < 3; ++j)
+                {
+                    auto a = f.Verts[j], b = f.Verts[(j + 1) % 3];
+                    if (basin[a] != basin[b])
+                        crest.push_back(Below(h, a, b) ? b : a);
+                }
+                std::sort(crest.begin(), crest.end(), [&](auto a, auto b) { return Below(h, b, a); });
+                crest.erase(std::unique(crest.begin(), crest.end()), crest.end());
+                for (std::size_t i = 1; i < crest.size(); ++i)
+                {
+                    auto a = crest[0], b = crest[i];
+                    const double strength = (h[a] + h[b]) / 2;
+                    if (strength < params.MinimumStrength)
+                        continue;
+                    auto pa = Intern(result, s, points, a, a, 0),
+                         pb = Intern(result, s, points, b, b, 0);
+                    if (!segments.emplace(std::min(pa, pb), std::max(pa, pb)).second)
+                        continue;
+                    result.Segments.push_back({pa, pb, s.SourceFaces[fi], 0, kind, kScaleFree, 7,
+                                               strength, 0, 1, 0});
+                }
+            }
+        }
     } // namespace
-    Result Extract(const HalfedgeMesh::Mesh& mesh, const Params& params)
+    Result ExtractCurvatureExtrema(const HalfedgeMesh::Mesh& mesh, const Params& params)
     {
         const auto start = Clock::now();
         Result result;
-        if (!ValidParams(params))
+        if (!ValidParams(params) || params.Algorithm != Method::HessianRidge)
             return Finish(std::move(result), Status::InvalidParameters, start);
         Surface surface;
         auto state = Prepare(mesh, params, surface, result.Diagnostic);
@@ -941,28 +1070,53 @@ namespace Geometry::ScalarfieldExtrema
         state = Connect(surface, params, result);
         return Finish(std::move(result), state, start);
     }
-    Result ExtractScalarExtrema(const HalfedgeMesh::Mesh& mesh, std::string_view vertexProperty,
-                                const Params& params)
+    Result Extract(const HalfedgeMesh::Mesh& mesh, std::span<const double> vertexValues,
+                   const Params& params)
     {
         const auto start = Clock::now();
         Result result;
         if (!ValidParams(params))
             return Finish(std::move(result), Status::InvalidParameters, start);
-        const auto asDouble = mesh.VertexProperties().Get<double>(vertexProperty);
-        const auto asFloat = mesh.VertexProperties().Get<float>(vertexProperty);
-        if (!asDouble.IsValid() && !asFloat.IsValid())
+        if (vertexValues.size() != mesh.VerticesSize())
             return Finish(std::move(result), Status::MissingProperty, start);
         Surface surface;
-        auto state = Prepare(mesh, params, surface, result.Diagnostic);
+        const bool watershed = params.Algorithm == Method::Watershed;
+        // Watershed flow needs only one-ring adjacency, not fit neighborhoods.
+        auto state = watershed ? Assemble(mesh, surface, result.Diagnostic, params)
+                               : Prepare(mesh, params, surface, result.Diagnostic);
         if (state != Status::Success)
             return Finish(std::move(result), state, start);
         auto phaseStart = Clock::now();
         std::vector<double> heights;
-        const bool varying = asDouble.IsValid() ? NormalizedHeights(surface, asDouble, heights)
-                                                : NormalizedHeights(surface, asFloat, heights);
+        const bool varying = NormalizedHeights(surface, vertexValues, !watershed, heights);
         result.Diagnostic.FieldMilliseconds += Elapsed(phaseStart);
         const auto supported = static_cast<std::size_t>(std::count_if(
             heights.begin(), heights.end(), [](double h) { return !std::isnan(h); }));
+        if (watershed)
+        {
+            auto& d = result.Diagnostic;
+            for (auto& scale : d.Scales)
+                scale.SupportedVertices = varying ? supported : 0;
+            if (!varying)
+                return Finish(std::move(result), Status::Success, start);
+            phaseStart = Clock::now();
+            result.DescendingBasin =
+                Basins(surface, heights, params.MinimumPersistence, d.Minima, d.DescendingBasins);
+            std::vector<double> depths(heights.size());
+            std::transform(heights.begin(), heights.end(), depths.begin(),
+                           [](double h) { return 1 - h; });
+            result.AscendingBasin =
+                Basins(surface, depths, params.MinimumPersistence, d.Maxima, d.AscendingBasins);
+            d.FieldMilliseconds += Elapsed(phaseStart);
+            phaseStart = Clock::now();
+            Separatrices(surface, heights, result.DescendingBasin, Kind::ScalarRidge, params,
+                         result);
+            Separatrices(surface, depths, result.AscendingBasin, Kind::ScalarValley, params,
+                         result);
+            d.TraceMilliseconds += Elapsed(phaseStart);
+            ConnectCurves(result);
+            return Finish(std::move(result), Status::Success, start);
+        }
         for (std::uint8_t scale = 0; scale < 3; ++scale)
         {
             const double radius = params.RadiusRatio * params.ScaleFactors[scale];
@@ -984,5 +1138,59 @@ namespace Geometry::ScalarfieldExtrema
         }
         state = Connect(surface, params, result);
         return Finish(std::move(result), state, start);
+    }
+    Result Extract(const HalfedgeMesh::Mesh& mesh, std::string_view vertexProperty,
+                   const Params& params)
+    {
+        std::vector<double> values;
+        if (const auto asDouble = mesh.VertexProperties().Get<double>(vertexProperty))
+            values = asDouble.Vector();
+        else if (const auto asFloat = mesh.VertexProperties().Get<float>(vertexProperty))
+            values.assign(asFloat.Vector().begin(), asFloat.Vector().end());
+        else
+        {
+            Result result;
+            result.Diagnostic.State = ValidParams(params) ? Status::MissingProperty
+                                                          : Status::InvalidParameters;
+            return result;
+        }
+        values.resize(mesh.VerticesSize(), std::numeric_limits<double>::quiet_NaN());
+        return Extract(mesh, std::span<const double>{values}, params);
+    }
+    MeshFeatures SnapToMesh(const HalfedgeMesh::Mesh& mesh, const Result& result,
+                            std::span<const std::uint32_t> segments)
+    {
+        MeshFeatures features;
+        features.Vertices.assign(mesh.VerticesSize(), 0);
+        features.Edges.assign(mesh.EdgesSize(), 0);
+        auto snap = [&](std::uint32_t point) -> std::uint32_t
+        {
+            if (point >= result.Points.size())
+                return None;
+            const auto& p = result.Points[point];
+            const auto v = p.Fraction <= 0.5 ? p.VertexA : p.VertexB;
+            return v < mesh.VerticesSize() && !mesh.IsDeleted(VertexHandle{v}) ? v : None;
+        };
+        auto mark = [](std::vector<std::uint8_t>& mask, std::size_t index, std::size_t& count)
+        {
+            count += mask[index] == 0;
+            mask[index] = 1;
+        };
+        for (auto index : segments)
+        {
+            if (index >= result.Segments.size())
+                continue;
+            const auto& segment = result.Segments[index];
+            const auto a = snap(segment.PointA), b = snap(segment.PointB);
+            if (a == None || b == None)
+                continue;
+            mark(features.Vertices, a, features.VertexCount);
+            mark(features.Vertices, b, features.VertexCount);
+            if (a == b)
+                continue;
+            if (const auto edge = mesh.FindEdge(VertexHandle{a}, VertexHandle{b}))
+                mark(features.Edges, edge->Index, features.EdgeCount);
+        }
+        return features;
     }
 } // namespace Geometry::ScalarfieldExtrema

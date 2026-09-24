@@ -17,6 +17,10 @@ export namespace Extrinsic::Runtime
     struct GeodesicsConfig
     {
         std::vector<std::uint32_t> SourceVertices{};
+        // Optional scalar vertex property (bool, integer or floating point,
+        // e.g. v:feature); vertices with a finite nonzero value are added to
+        // SourceVertices. An empty name binds nothing.
+        GeometryPropertyRef SourceVertexProperty{GeometryElementDomain::MeshVertex, "", Geometry::PropertyValueKind::Bool};
         std::uint32_t MaxHalfedgeExpansions{10000000};
         // Vertex-domain float3 binding; topology still comes from the mesh.
         GeometryPropertyRef PositionProperty{GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};

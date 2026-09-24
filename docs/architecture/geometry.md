@@ -560,14 +560,28 @@ fails before mutation on invalid parameters, property/mask count mismatches, or
 non-finite live input. It changes neither mesh positions nor topology and leaves
 unrelated properties untouched.
 
-### Signed-curvature mesh segmentation
+### Scalar-field extrema
+
+`Geometry.HalfedgeMesh.ScalarfieldExtrema` extracts detached ridge/valley curve
+graphs of any float or double vertex field: Hessian height ridges from a
+multi-scale local quadratic fit, or gradient-flow watershed separatrices between
+persistence-simplified basins (with vertex basin labels). Its
+`ExtractCurvatureExtrema` preset adds principal/mean-curvature curves and sharp
+edges. `SnapToMesh` converts selected segments into boolean vertex/edge feature
+masks that later methods consume as ordinary mesh properties, for example as
+geodesic sources. See the [method note](../../methods/geometry/curvature_segmentation/curvature_extrema.md).
+
+### Guided mesh segmentation
 
 `Geometry.HalfedgeMesh.Segmentation` is the deterministic CPU
 reference for non-destructive, spatially coherent segmentation of an oriented
-triangle mesh. It averages signed per-vertex `(κ₁, κ₂)` onto faces, robustly
-normalizes both channels, and reuses `Geometry.GaussianMixture::FitEM`; the
-existing 3D GMM carrier receives `(κ₁, κ₂, 0)`, never world-space position.
-Segmentation and patch fitting share the curvature median/MAD normalization
+triangle mesh. `Segment` takes 1-3 guide channels: slot-aligned vertex or face
+spans, or named float/double/`glm::vec2`/`glm::vec3` mesh properties (one
+channel per component). Vertex channels are averaged onto faces; every channel
+is robustly normalized and fed to `Geometry.GaussianMixture::FitEM`, never
+world-space position. `SegmentCurvature` and `ComputeAndSegment` are the
+signed-curvature preset with guides `(κ₁, κ₂)`.
+Segmentation and patch fitting share the median/MAD normalization
 with RMS and unit-scale fallbacks. Geometry owns mixture and full segmentation
 parameter validation; runtime config validation and execution reuse one
 config-to-parameter conversion. Patch fitting checks mixture parameters without

@@ -818,7 +818,7 @@ closure are separate: completing the pilot cannot retire the product gate.
 | Denoise, remesh, subdivide, simplify commands, UV outcome and copied results | `Extrinsic.Runtime.MeshTopologyOperations` |
 | Bilateral filtering and progressive Poisson commands, configs and copied results | `Extrinsic.Runtime.PointSetOperations` |
 | Point construction commands, config and copied results | `Extrinsic.Runtime.PointConstructionOperations` |
-| Scalar-property ridge/valley extraction published as a generated graph entity | `Extrinsic.Runtime.ScalarRidgeOperations` |
+| Scalar-property ridge/valley extraction (Hessian or watershed) published as a generated graph entity and/or undoable mesh feature masks | `Extrinsic.Runtime.ScalarRidgeOperations` |
 | K-Means and point-set consolidation dispatch, availability and copied results | `Extrinsic.Runtime.PointCloudServiceOperations` |
 | Processing discovery, menus, capabilities, algorithm entries, panel availability model and primitive selection | `Extrinsic.Runtime.GeometryProcessingOperations` |
 | Property, presentation, binding, spatial-debug, visualization operations | `Extrinsic.Runtime.VisualizationEditingOperations` |

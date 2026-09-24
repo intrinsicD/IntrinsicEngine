@@ -4,6 +4,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <bit>
+#include <cmath>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -12,6 +13,7 @@ module;
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <entt/entity/registry.hpp>
@@ -90,6 +92,28 @@ namespace Extrinsic::Runtime
             if (v >= source.DeletedVertices.size() || source.DeletedVertices[v])
                 return fail(EditorCommandStatus::InvalidProcessingParameters,
                             "Geodesics source vertex is deleted or out of range.");
+        if (const auto& ref = command.Config.SourceVertexProperty; !ref.Name.empty())
+        {
+            const auto marked = CaptureGeometryScalarProperty(
+                GS::BuildConstView(raw, *entity).VertexSource->Properties, ref);
+            if (!marked.Exists || GeometryScalarPropertySize(marked) != source.DeletedVertices.size())
+                return fail(EditorCommandStatus::InvalidProcessingParameters,
+                            "Geodesics source property '" + ref.Name +
+                                "' is not a scalar vertex property of this mesh.");
+            std::visit([&](const auto& values) {
+                for (std::size_t v = 0; v < values.size(); ++v)
+                {
+                    const auto value = static_cast<double>(values[v]);
+                    if (!source.DeletedVertices[v] && std::isfinite(value) && value != 0.0)
+                        sources.push_back(v);
+                }
+            }, marked.Values);
+            std::sort(sources.begin(), sources.end());
+            sources.erase(std::unique(sources.begin(), sources.end()), sources.end());
+        }
+        if (sources.empty())
+            return fail(EditorCommandStatus::InvalidProcessingParameters,
+                        "Geodesics need at least one source vertex.");
         auto view = GS::BuildMutableView(raw, *entity);
         auto& properties = view.VertexSource->Properties;
         const auto distanceRef = command.Config.DistanceProperty;

@@ -332,6 +332,7 @@ namespace Extrinsic::Sandbox::Editor
         Runtime::EditorScalarRidgeCommand ScalarRidges{};
         std::optional<std::vector<std::uint32_t>> ScalarRidgesSelection{};
         std::optional<Runtime::EditorScalarRidgeResult> ScalarRidgesResult{};
+        std::string ScalarRidgesVisualizationDiagnostic{};
         RemeshState Remesh{};
         SubdivideState Subdivide{};
         SimplifyState Simplify{};
@@ -521,6 +522,7 @@ namespace Extrinsic::Sandbox::Editor
         ScalarRidges = {};
         ScalarRidgesSelection.reset();
         ScalarRidgesResult.reset();
+        ScalarRidgesVisualizationDiagnostic.clear();
         Curvature = {};
         Segmentation = {};
         Remesh.LastResult.reset();
@@ -2773,6 +2775,25 @@ namespace Extrinsic::Sandbox::Editor
         for (auto vertex : config.SourceVertices)
             sourceText += " " + std::to_string(vertex);
         ImGui::TextWrapped("%s", sourceText.c_str());
+        const auto acceptsSourceProperty = [](const Runtime::GeometryPropertyRef& ref) {
+            return ref.Domain == Runtime::GeometryElementDomain::MeshVertex;
+        };
+        auto sourceProperty = config.SourceVertexProperty;
+        if (DrawProcessingPropertyInput("Source property##Geodesics", model.PropertyCatalog,
+                                        sourceProperty, +acceptsSourceProperty, 1u))
+        {
+            config.SourceVertexProperty = sourceProperty;
+            changed = true;
+        }
+        ImGui::SameLine();
+        ImGui::BeginDisabled(config.SourceVertexProperty.Name.empty());
+        if (ImGui::Button("Clear##GeodesicsSourceProperty"))
+        {
+            config.SourceVertexProperty.Name.clear();
+            changed = true;
+        }
+        ImGui::EndDisabled();
+        ImGui::TextDisabled("Nonzero values (e.g. v:feature from Scalar Ridges) add sources.");
         if (ImGui::BeginCombo("Position property", config.PositionProperty.Name.c_str()))
         {
             for (const auto& row : model.PropertyCatalog.Rows)
@@ -2802,7 +2823,9 @@ namespace Extrinsic::Sandbox::Editor
             Geodesics.ConfigDiagnostic = apply(config).Succeeded()
                 ? "" : "Geodesics config was rejected; check property names and expansion budget.";
         const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
-            context.MeshFields.Commands, {!config.SourceVertices.empty(), "Add at least one source vertex."});
+            context.MeshFields.Commands,
+            {!config.SourceVertices.empty() || !config.SourceVertexProperty.Name.empty(),
+             "Add a source vertex or choose a source property."});
         if (DrawProcessingActionButton("Compute geodesics", readiness))
             ApplyProcessingExecution(Geodesics, config, apply,
                 [&] { return Runtime::ApplyEditorConfiguredGeodesicsCommand(
@@ -2862,33 +2885,64 @@ namespace Extrinsic::Sandbox::Editor
             return;
         }
         ImGui::TextWrapped(
-            "Curves where a vertex scalar field is maximal (ridges) or minimal (valleys) "
-            "across its dominant direction. Run Curvature first to use v:mean_curvature.");
+            "Curves where a vertex scalar field is maximal (ridges) or minimal (valleys). "
+            "Run Curvature first to use v:mean_curvature.");
         DrawProcessingPropertyInput("Scalar property##ScalarRidges", model.PropertyCatalog,
                                     command.Property, &AcceptsScalarRidgeInput, 1u);
-        float radiusPercent = static_cast<float>(command.RadiusRatio * 100.0);
-        if (ImGui::SliderFloat("Fit radius (% of diagonal)", &radiusPercent, 0.5f, 25.0f, "%.2f"))
-            command.RadiusRatio = radiusPercent / 100.0;
-        int scale = command.Scale;
-        if (ImGui::Combo("Scale", &scale, "0.5x radius\0" "1x radius\0" "2x radius\0"))
-            command.Scale = static_cast<std::uint8_t>(scale);
-        ImGui::InputDouble("Min sharpness", &command.MinimumSharpness, 0.001, 0.01, "%.4f");
+        int method = static_cast<int>(command.Method);
+        if (ImGui::Combo("Method##ScalarRidges", &method,
+                         "Hessian ridges (height across dominant direction)\0"
+                         "Watershed (gradient-flow basin boundaries)\0"))
+            command.Method = static_cast<Runtime::EditorScalarExtremaMethod>(method);
+        const bool watershed = command.Method == Runtime::EditorScalarExtremaMethod::Watershed;
+        if (watershed)
+        {
+            float persistence = static_cast<float>(command.MinimumPersistence * 100.0);
+            if (ImGui::SliderFloat("Min persistence (% of range)", &persistence, 0.0f, 50.0f, "%.2f"))
+                command.MinimumPersistence = persistence / 100.0;
+            ImGui::TextDisabled("Shallower basins merge into their older neighbor.");
+        }
+        else
+        {
+            float radiusPercent = static_cast<float>(command.RadiusRatio * 100.0);
+            if (ImGui::SliderFloat("Fit radius (% of diagonal)", &radiusPercent, 0.5f, 25.0f, "%.2f"))
+                command.RadiusRatio = radiusPercent / 100.0;
+            int scale = command.Scale;
+            if (ImGui::Combo("Scale", &scale, "0.5x radius\0" "1x radius\0" "2x radius\0"))
+                command.Scale = static_cast<std::uint8_t>(scale);
+            ImGui::InputDouble("Min sharpness", &command.MinimumSharpness, 0.001, 0.01, "%.4f");
+        }
         ImGui::InputDouble("Min strength", &command.MinimumStrength, 0.01, 0.1, "%.3f");
         ImGui::Checkbox("Ridges", &command.Ridges);
         ImGui::SameLine();
         ImGui::Checkbox("Valleys", &command.Valleys);
-        ImGui::Checkbox("Only curves found at another scale too", &command.RequirePersistence);
+        if (!watershed)
+            ImGui::Checkbox("Only curves found at another scale too", &command.RequirePersistence);
+        ImGui::SeparatorText("Outputs");
+        ImGui::Checkbox("Curve graph entity", &command.PublishGraph);
+        ImGui::Checkbox("Mesh feature properties", &command.PublishMeshFeatures);
+        if (command.PublishMeshFeatures)
+        {
+            DrawProcessingScalarOutput("Vertex features##ScalarRidges", command.VertexFeatures);
+            DrawProcessingScalarOutput("Edge features##ScalarRidges", command.EdgeFeatures);
+            if (watershed)
+                DrawProcessingScalarOutput("Basin labels##ScalarRidges", command.BasinLabels);
+            ImGui::TextDisabled("Curves snap to the nearest mesh vertices and edges; "
+                                "vertex features can seed Geodesics.");
+        }
         const Runtime::ActionReadiness readiness{
-            command.Property.HasName() && (command.Ridges || command.Valleys),
-            "Choose a scalar vertex property and ridges and/or valleys."};
+            command.Property.HasName() && (command.Ridges || command.Valleys) &&
+                (command.PublishGraph || command.PublishMeshFeatures),
+            "Choose a scalar vertex property, ridges and/or valleys, and an output."};
         if (DrawProcessingActionButton("Extract ridges", readiness))
         {
             auto request = command;
             request.StableEntityId = model.SelectedStableId;
             ScalarRidgesResult = Runtime::ApplyEditorScalarRidgeCommand(context.Processing, request);
         }
-        ImGui::TextDisabled("Output is a new graph entity; color its edges by "
-                            "e:scalar_extremum (+1 ridge, -1 valley).");
+        if (command.PublishGraph)
+            ImGui::TextDisabled("The graph is a new entity; color its edges by "
+                                "e:scalar_extremum (+1 ridge, -1 valley).");
         if (ScalarRidgesResult)
         {
             ImGui::TextWrapped("%s", ScalarRidgesResult->Message.c_str());
@@ -2897,6 +2951,21 @@ namespace Extrinsic::Sandbox::Editor
                             ScalarRidgesResult->RidgeSegmentCount,
                             ScalarRidgesResult->ValleySegmentCount,
                             ScalarRidgesResult->ComputeMilliseconds);
+            if (ScalarRidgesResult->FeatureVertexCount || ScalarRidgesResult->BasinCount)
+                ImGui::Text("Feature vertices: %zu | Feature edges: %zu | Basins: %zu",
+                            ScalarRidgesResult->FeatureVertexCount,
+                            ScalarRidgesResult->FeatureEdgeCount,
+                            ScalarRidgesResult->BasinCount);
+            if (ScalarRidgesResult->Succeeded() && command.PublishMeshFeatures)
+            {
+                DrawProcessingPropertyShowButton(context, model.SelectedStableId,
+                    command.VertexFeatures, ScalarRidgesVisualizationDiagnostic);
+                if (watershed)
+                    DrawProcessingPropertyShowButton(context, model.SelectedStableId,
+                        command.BasinLabels, ScalarRidgesVisualizationDiagnostic);
+                if (!ScalarRidgesVisualizationDiagnostic.empty())
+                    ImGui::TextWrapped("%s", ScalarRidgesVisualizationDiagnostic.c_str());
+            }
         }
         ImGui::End();
     }

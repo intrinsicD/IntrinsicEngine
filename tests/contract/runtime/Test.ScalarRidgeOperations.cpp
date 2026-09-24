@@ -1,6 +1,7 @@
 // Graph publication, source preservation, undo and input rejection for
 // scalar-property ridge extraction.
 #include <cmath>
+#include <cstdint>
 #include <string>
 #include <utility>
 #include <vector>
@@ -156,4 +157,95 @@ TEST(ScalarRidgeOperations, RejectsMissingNonScalarOrNonVertexPropertiesWithoutH
               Runtime::EditorCommandStatus::StaleEntity);
     EXPECT_EQ(h.History.UndoCount(), 0);
     EXPECT_EQ(h.EntityCount(), 1u);
+}
+
+TEST(ScalarRidgeOperations, WatershedPublishesUndoableMeshFeaturesAndBasins)
+{
+    Harness h;
+    h.Command.Method = Runtime::EditorScalarExtremaMethod::Watershed;
+    h.Command.Valleys = false;
+    h.Command.PublishGraph = false;
+    h.Command.PublishMeshFeatures = true;
+    const auto result = Runtime::ApplyEditorScalarRidgeCommand(h.Commands(), h.Command);
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_GT(result.RidgeSegmentCount, 10u);
+    EXPECT_EQ(result.BasinCount, 2u);
+    EXPECT_EQ(result.OutputEntityId, 0u);
+    EXPECT_EQ(h.EntityCount(), 1u);
+    EXPECT_EQ(result.FeatureEdgeCount, result.RidgeSegmentCount);
+
+    const auto positions = h.Properties().Get<glm::vec3>("v:position").Vector();
+    const auto features = h.Properties().Get<bool>("v:feature");
+    ASSERT_TRUE(features);
+    std::size_t marked = 0;
+    for (std::size_t v = 0; v < positions.size(); ++v)
+        if (features.Vector()[v])
+        {
+            ++marked;
+            EXPECT_LE(std::abs(positions[v].x), 1.f / 16.f + 1e-5f);
+        }
+    EXPECT_EQ(marked, result.FeatureVertexCount);
+    const auto& edges = h.Scene.Raw().get<GS::Edges>(h.Entity).Properties;
+    const auto edgeFeatures = edges.Get<bool>("e:feature");
+    ASSERT_TRUE(edgeFeatures);
+    std::size_t markedEdges = 0;
+    for (bool e : edgeFeatures.Vector())
+        markedEdges += e;
+    EXPECT_EQ(markedEdges, result.FeatureEdgeCount);
+    const auto basins = h.Properties().Get<std::uint32_t>("v:watershed_basin");
+    ASSERT_TRUE(basins);
+    EXPECT_NE(basins.Vector().front(), basins.Vector().back());
+
+    ASSERT_TRUE(h.History.Undo().Succeeded());
+    EXPECT_FALSE(h.Properties().Exists("v:feature"));
+    EXPECT_FALSE(h.Properties().Exists("v:watershed_basin"));
+    EXPECT_FALSE(h.Scene.Raw().get<GS::Edges>(h.Entity).Properties.Exists("e:feature"));
+    ASSERT_TRUE(h.History.Redo().Succeeded());
+    EXPECT_TRUE(h.Properties().Exists("v:feature"));
+    // Re-running the same request changes nothing and records no history.
+    EXPECT_EQ(Runtime::ApplyEditorScalarRidgeCommand(h.Commands(), h.Command).Status,
+              Runtime::EditorCommandStatus::NoChange);
+    EXPECT_EQ(h.History.UndoCount(), 1);
+}
+
+TEST(ScalarRidgeOperations, HessianFeaturesAndGraphAreSeparateUndoSteps)
+{
+    Harness h;
+    h.Command.PublishMeshFeatures = true;
+    const auto result = Runtime::ApplyEditorScalarRidgeCommand(h.Commands(), h.Command);
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_NE(result.OutputEntityId, 0u);
+    EXPECT_GT(result.FeatureVertexCount, 10u);
+    EXPECT_GT(result.FeatureEdgeCount, 10u);
+    EXPECT_EQ(result.BasinCount, 0u);
+    EXPECT_FALSE(h.Properties().Exists("v:watershed_basin"));
+    EXPECT_EQ(h.History.UndoCount(), 2);
+    ASSERT_TRUE(h.History.Undo().Succeeded());
+    EXPECT_EQ(h.EntityCount(), 1u);
+    EXPECT_TRUE(h.Properties().Exists("v:feature"));
+    ASSERT_TRUE(h.History.Undo().Succeeded());
+    EXPECT_FALSE(h.Properties().Exists("v:feature"));
+}
+
+TEST(ScalarRidgeOperations, RejectsInvalidFeatureOutputsWithoutHistory)
+{
+    Harness h;
+    h.Command.PublishMeshFeatures = true;
+    const auto expectRejected = [&](const char* why) {
+        const auto result = Runtime::ApplyEditorScalarRidgeCommand(h.Commands(), h.Command);
+        EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::InvalidProcessingParameters) << why;
+    };
+    h.Command.VertexFeatures.Name = "v:bump";
+    expectRejected("vertex features overwrite the input field");
+    h.Command.VertexFeatures.Name = "v:position";
+    expectRejected("topology/structural output");
+    h.Command.VertexFeatures.Name = "v:feature";
+    h.Command.EdgeFeatures.Domain = Runtime::GeometryElementDomain::MeshVertex;
+    expectRejected("edge features on the vertex domain");
+    h.Command.EdgeFeatures.Domain = Runtime::GeometryElementDomain::MeshEdge;
+    h.Command.PublishMeshFeatures = false;
+    h.Command.PublishGraph = false;
+    expectRejected("no output");
+    EXPECT_EQ(h.History.UndoCount(), 0);
+    EXPECT_FALSE(h.Properties().Exists("v:feature"));
 }
