@@ -29,6 +29,7 @@ import Extrinsic.Runtime.PointFieldOperations;
 import Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.Runtime.PointSetOperations;
 import Extrinsic.Runtime.PointConstructionOperations;
+import Extrinsic.Runtime.ScalarRidgeOperations;
 import Extrinsic.Sandbox.Editor.Shell;
 
 import Extrinsic.Runtime.EditorCommon;
@@ -328,6 +329,9 @@ namespace Extrinsic::Sandbox::Editor
         GeodesicsState Geodesics{};
         std::uint32_t GeodesicsEntity{0u};
         int GeodesicsSourceVertex{0};
+        Runtime::EditorScalarRidgeCommand ScalarRidges{};
+        std::optional<std::vector<std::uint32_t>> ScalarRidgesSelection{};
+        std::optional<Runtime::EditorScalarRidgeResult> ScalarRidgesResult{};
         RemeshState Remesh{};
         SubdivideState Subdivide{};
         SimplifyState Simplify{};
@@ -372,6 +376,7 @@ namespace Extrinsic::Sandbox::Editor
         void DrawGeodesicsWindow(bool&, const SandboxEditorContext&);
         void DrawGeodesicsControls(const Runtime::EditorDomainWindowModel&,
                                    const SandboxEditorContext&);
+        void DrawScalarRidgesWindow(bool&, const SandboxEditorContext&);
         void DrawRemeshWindow(bool&, const SandboxEditorContext&);
         void DrawSubdivideWindow(bool&, const SandboxEditorContext&);
         void DrawSimplifyWindow(bool&, const SandboxEditorContext&);
@@ -417,6 +422,8 @@ namespace Extrinsic::Sandbox::Editor
                        "Curvature", &Impl::DrawCurvatureWindow);
         RegisterWindow("mesh.processing.segmentation", {"Mesh", "Processing"},
                        "Curvature Segmentation", &Impl::DrawSegmentationWindow);
+        RegisterWindow("mesh.processing.scalar_ridges", {"Mesh", "Processing"},
+                       "Scalar Ridges", &Impl::DrawScalarRidgesWindow);
         RegisterWindow("mesh.processing.remesh", {"Mesh", "Processing"},
                        "Remesh", &Impl::DrawRemeshWindow);
         RegisterWindow("mesh.processing.subdivide", {"Mesh", "Processing"},
@@ -511,6 +518,9 @@ namespace Extrinsic::Sandbox::Editor
         Geodesics = {};
         GeodesicsEntity = 0u;
         GeodesicsSourceVertex = 0;
+        ScalarRidges = {};
+        ScalarRidgesSelection.reset();
+        ScalarRidgesResult.reset();
         Curvature = {};
         Segmentation = {};
         Remesh.LastResult.reset();
@@ -2815,5 +2825,79 @@ namespace Extrinsic::Sandbox::Editor
                         diagnostics.TriangleUpdates);
             ImGui::Text("Unreachable vertices: %zu", diagnostics.UnreachableVertexCount);
         }
+    }
+}
+
+namespace Extrinsic::Sandbox::Editor
+{
+    namespace
+    {
+        [[nodiscard]] bool AcceptsScalarRidgeInput(const Runtime::GeometryPropertyRef& ref)
+        {
+            return ref.Domain == Runtime::GeometryElementDomain::MeshVertex;
+        }
+    }
+    void MeshProcessingPanels::Impl::DrawScalarRidgesWindow(bool& open,
+                                                            const SandboxEditorContext& context)
+    {
+        ImGui::SetNextWindowSize(ImVec2(440, 420), ImGuiCond_FirstUseEver);
+        if (!ImGui::Begin("Mesh / Processing / Scalar Ridges", &open))
+        {
+            ImGui::End();
+            return;
+        }
+        auto& command = ScalarRidges;
+        const auto previousEntity = command.StableEntityId;
+        DrawProcessingEntity("Entity##ScalarRidges", context, command.StableEntityId,
+                             ScalarRidgesSelection, Runtime::EditorDomainWindowKind::Mesh);
+        DrawProcessingCpuBackend();
+        if (previousEntity != command.StableEntityId)
+            ScalarRidgesResult.reset();
+        const auto& model = GetDomainWindowModel(context, Runtime::EditorDomainWindowKind::Mesh,
+                                                command.StableEntityId);
+        if (!model.DomainMatches || !model.Processing.HasSelectedEntity)
+        {
+            ImGui::TextDisabled("Choose a mesh entity to extract ridges of a vertex property.");
+            ImGui::End();
+            return;
+        }
+        ImGui::TextWrapped(
+            "Curves where a vertex scalar field is maximal (ridges) or minimal (valleys) "
+            "across its dominant direction. Run Curvature first to use v:mean_curvature.");
+        DrawProcessingPropertyInput("Scalar property##ScalarRidges", model.PropertyCatalog,
+                                    command.Property, &AcceptsScalarRidgeInput, 1u);
+        float radiusPercent = static_cast<float>(command.RadiusRatio * 100.0);
+        if (ImGui::SliderFloat("Fit radius (% of diagonal)", &radiusPercent, 0.5f, 25.0f, "%.2f"))
+            command.RadiusRatio = radiusPercent / 100.0;
+        int scale = command.Scale;
+        if (ImGui::Combo("Scale", &scale, "0.5x radius\0" "1x radius\0" "2x radius\0"))
+            command.Scale = static_cast<std::uint8_t>(scale);
+        ImGui::InputDouble("Min sharpness", &command.MinimumSharpness, 0.001, 0.01, "%.4f");
+        ImGui::InputDouble("Min strength", &command.MinimumStrength, 0.01, 0.1, "%.3f");
+        ImGui::Checkbox("Ridges", &command.Ridges);
+        ImGui::SameLine();
+        ImGui::Checkbox("Valleys", &command.Valleys);
+        ImGui::Checkbox("Only curves found at another scale too", &command.RequirePersistence);
+        const Runtime::ActionReadiness readiness{
+            command.Property.HasName() && (command.Ridges || command.Valleys),
+            "Choose a scalar vertex property and ridges and/or valleys."};
+        if (DrawProcessingActionButton("Extract ridges", readiness))
+        {
+            auto request = command;
+            request.StableEntityId = model.SelectedStableId;
+            ScalarRidgesResult = Runtime::ApplyEditorScalarRidgeCommand(context.Processing, request);
+        }
+        ImGui::TextDisabled("Output is a new graph entity; color its edges by "
+                            "e:scalar_extremum (+1 ridge, -1 valley).");
+        if (ScalarRidgesResult)
+        {
+            ImGui::TextWrapped("%s", ScalarRidgesResult->Message.c_str());
+            if (ScalarRidgesResult->Succeeded() || ScalarRidgesResult->ComputeMilliseconds > 0.0)
+                ImGui::Text("Ridge segments: %zu | Valley segments: %zu | %.1f ms",
+                            ScalarRidgesResult->RidgeSegmentCount,
+                            ScalarRidgesResult->ValleySegmentCount,
+                            ScalarRidgesResult->ComputeMilliseconds);
+        }
+        ImGui::End();
     }
 }

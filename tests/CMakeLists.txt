@@ -425,6 +425,22 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshField
         --forbid-module Extrinsic.Runtime.PointConstructionOperations
         --forbid-module Extrinsic.Runtime.PointCloudServiceOperations
         --forbid-module Extrinsic.Runtime.Private.EditorWorkspaceAttachment)
+intrinsic_add_module_boundary_test(ProcessingCompilationLocality.ScalarRidges
+        --check-source src/runtime/Editor/Operations/Runtime.ScalarRidgeOperations.cppm
+        --check-source src/runtime/Editor/Operations/Runtime.ScalarRidgeOperations.cpp
+        --forbid-module Extrinsic.Runtime.NormalOperations
+        --forbid-module Extrinsic.Runtime.PointAnalysisOperations
+        --forbid-module Extrinsic.Runtime.PointFieldOperations
+        --forbid-module Extrinsic.Runtime.RegistrationOperations
+        --forbid-module Extrinsic.Runtime.ParameterizationOperations
+        --forbid-module Extrinsic.Runtime.MeshFieldOperations
+        --forbid-module Extrinsic.Runtime.MeshTopologyOperations
+        --forbid-module Extrinsic.Runtime.GeometryProcessingOperations
+        --forbid-module Extrinsic.Runtime.EditorWorkspaceSnapshots
+        --forbid-module Extrinsic.Runtime.PointSetOperations
+        --forbid-module Extrinsic.Runtime.PointConstructionOperations
+        --forbid-module Extrinsic.Runtime.PointCloudServiceOperations
+        --forbid-module Extrinsic.Runtime.Private.EditorWorkspaceAttachment)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.GeodesicResults
         --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cpp
@@ -1276,6 +1292,7 @@ if(TARGET ExtrinsicRuntime)
         Test.GeometryPresentation.cpp
         Test.PointCloudGeometryExtraction.cpp
         Test.GeodesicsOperations.cpp
+        Test.ScalarRidgeOperations.cpp
         Test.ParameterizationOperations.cpp
         Test.CurvatureSegmentationOperations.cpp
         Test.PrimitiveSelection.cpp

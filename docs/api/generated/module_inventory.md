@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 98 |
+| `runtime` | 99 |
 
 ## Modules
 
@@ -380,6 +380,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.PointSetOperations` | `src/runtime/Editor/Operations/Runtime.PointSetOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.RegistrationOperations` | `src/runtime/Editor/Operations/Runtime.RegistrationOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderRecipeEditingOperations` | `src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.cppm` | `runtime` |
+| `Extrinsic.Runtime.ScalarRidgeOperations` | `src/runtime/Editor/Operations/Runtime.ScalarRidgeOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.SceneEditingOperations` | `src/runtime/Editor/Operations/Runtime.SceneEditingOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationEditingOperations` | `src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorCommandHistory` | `src/runtime/Editor/Runtime.EditorCommandHistory.cppm` | `runtime` |

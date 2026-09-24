@@ -46,6 +46,7 @@ target_sources(${target_name}
         Editor/Operations/Runtime.PointAnalysisOperations.cppm
         Editor/Operations/Runtime.PointSetOperations.cppm
         Editor/Operations/Runtime.PointConstructionOperations.cppm
+        Editor/Operations/Runtime.ScalarRidgeOperations.cppm
         Editor/Operations/Runtime.PointCloudServiceOperations.cppm
         Editor/Operations/Runtime.NormalOperations.cppm
         Editor/Operations/Runtime.RegistrationOperations.cppm
@@ -194,6 +195,7 @@ target_sources(${target_name}
     Editor/Operations/Runtime.PointAnalysisOperations.Frame.cpp
         Editor/Operations/Runtime.PointSetOperations.Frame.cpp
         Editor/Operations/Runtime.PointConstructionOperations.Frame.cpp
+        Editor/Operations/Runtime.ScalarRidgeOperations.cpp
         Editor/Operations/Runtime.PointCloudServiceOperations.Frame.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Frame.cpp
         Editor/Operations/Runtime.NormalOperations.Frame.cpp

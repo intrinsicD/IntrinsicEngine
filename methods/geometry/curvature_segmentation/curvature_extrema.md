@@ -46,7 +46,9 @@ this rejects flat tails whose fit noise would otherwise read as a ridge. There
 is no sign requirement on the value. Strength is the crossing's height above
 the field minimum (ridges) or below the maximum (valleys), in `[0, 1]`, and the
 scalar default sharpness floor is `0.01` of the range per squared radius.
-Non-finite values drop their vertex; sharp edges are not emitted.
+Non-finite values drop their vertex; sharp edges are not emitted. The Sandbox
+`Mesh / Processing / Scalar Ridges` window publishes one selected scale as a new
+graph entity with `e:scalar_extremum` (+1 ridge, -1 valley) and `e:strength`.
 
 ## Selected numerical choices
 
