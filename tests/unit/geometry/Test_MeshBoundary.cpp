@@ -1,7 +1,12 @@
 #include <gtest/gtest.h>
 #include <cstddef>
 
-import Geometry;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.Graph;
+import Geometry.MeshSoup;
+import Geometry.HalfedgeMesh.Boundary;
+import Geometry.Properties;
 
 #include "Test_MeshBuilders.h"
 

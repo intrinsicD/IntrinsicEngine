@@ -13,7 +13,15 @@
 
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.Sphere;
+import Geometry.HalfedgeMesh.Utils;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.HalfedgeMesh.IO;
+import Geometry.Graph;
+import Geometry.Curvature;
+import Geometry.MeshSoup;
 import Geometry.HalfedgeMesh.CurvatureSegmentation.Features;
 import Geometry.HalfedgeMesh.CurvatureSegmentation.Patches;
 

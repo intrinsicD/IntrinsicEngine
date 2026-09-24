@@ -6,7 +6,11 @@
 
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.AABB;
+import Geometry.Sphere;
+import Geometry.BVH;
+import Geometry.Properties;
+import Geometry.Ray;
 
 TEST(BVH, RejectsDegenerateBuildInputs)
 {

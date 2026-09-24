@@ -5,7 +5,14 @@
 
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.Statistics;
+import Geometry.HalfedgeMesh.Utils;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.Graph;
+import Geometry.Curvature;
+import Geometry.MeshSoup;
 
 #include "Test_MeshBuilders.h"
 

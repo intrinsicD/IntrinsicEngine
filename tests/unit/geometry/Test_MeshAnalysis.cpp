@@ -3,7 +3,11 @@
 #include <cstddef>
 #include <cstdint>
 
-import Geometry;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.MeshSoup;
+import Geometry.HalfedgeMesh.Analysis;
 
 #include "Test_MeshBuilders.h"
 

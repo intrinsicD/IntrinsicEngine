@@ -8,7 +8,19 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtc/quaternion.hpp>
 
-import Geometry;
+import Geometry.AABB;
+import Geometry.Sphere;
+import Geometry.Capsule;
+import Geometry.Cylinder;
+import Geometry.Ellipsoid;
+import Geometry.Segment;
+import Geometry.Triangle;
+import Geometry.Plane;
+import Geometry.ConvexHull;
+import Geometry.Properties;
+import Geometry.SDF;
+import Geometry.SDFContact;
+import Geometry.OBB;
 
 using namespace Geometry;
 

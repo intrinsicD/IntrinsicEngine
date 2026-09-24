@@ -8,7 +8,9 @@
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.Sphere;
+import Geometry.PointCloud;
+import Geometry.Properties;
 
 namespace
 {

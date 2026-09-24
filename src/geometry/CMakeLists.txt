@@ -127,7 +127,6 @@ target_sources(${target_name}
         Geometry.UvAtlas.ChartSolve.cppm
         Geometry.UvAtlas.cppm
         Geometry.Validation.cppm
-        Geometry.cppm
         PRIVATE
         Geometry.AABB.cpp
         Geometry.BVH.cpp
@@ -190,8 +189,8 @@ target_sources(${target_name}
         Geometry.KMeans.cpp
         Geometry.Linalg.cpp
         Geometry.MarchingCubes.cpp
-        Geometry.Mesh.SurfaceSampling.cpp
         Geometry.Mesh.Conversion.cpp
+        Geometry.Mesh.SurfaceSampling.cpp
         Geometry.MeshClosestFace.cpp
         Geometry.MeshSoup.cpp
         Geometry.OBB.cpp

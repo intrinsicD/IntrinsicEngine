@@ -25,11 +25,10 @@ follow-up task that records compatibility expectations and inventory updates.
   an exported module name that matches the file stem.
 - Place public symbols under `Geometry::<Concept>` or another explicitly
   documented namespace that matches the module concept.
-- Use the broad `Geometry` umbrella only for stable, commonly composed APIs.
-  Advanced or experimental numerical modules may remain narrow imports until
-  their public role is intentionally expanded.
-- Do not add broad umbrella exports merely for convenience; callers should import
-  the least-specific module set they need.
+- There is no broad `Geometry` umbrella module. Callers import the specific
+  modules they use, so a module interface change rebuilds only its real
+  consumers and each translation unit states its dependencies.
+- Do not reintroduce an umbrella or aggregate re-export module for convenience.
 - Keep implementation helpers non-exported where possible. Exported `Internal`
   namespaces are compatibility debt unless the helper types have stable semantics
   and tests.
@@ -371,14 +370,13 @@ The geometry numerical policy is hybrid GLM + Eigen3: GLM remains the public
 geometry storage vocabulary, while Eigen is available behind geometry-owned
 adapters for CPU linear-algebra kernels. `Geometry.Linalg` is the explicit narrow
 import for Eigen-backed fixed-size adapters, row-major map helpers, and dense
-decomposition wrappers. Do not expose Eigen types through the broad `Geometry`
-umbrella or existing geometry containers without a separate API-review task.
+decomposition wrappers. Do not expose Eigen types through existing geometry
+containers or other public modules without a separate API-review task.
 
 ## `Geometry.LinearSolver` policy
 
 `Geometry.LinearSolver` is currently a narrow public module interface listed in
-`src/geometry/CMakeLists.txt` and the generated module inventory, but it is not
-re-exported by the broad `Geometry` umbrella. Treat it as an advanced narrow
+`src/geometry/CMakeLists.txt` and the generated module inventory. Treat it as an advanced narrow
 import for the current small fixed-size solver helper, not as the canonical public
 solver infrastructure.
 

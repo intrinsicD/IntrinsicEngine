@@ -5,7 +5,17 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-import Geometry;
+import Geometry.AABB;
+import Geometry.Sphere;
+import Geometry.Capsule;
+import Geometry.Segment;
+import Geometry.Triangle;
+import Geometry.Plane;
+import Geometry.Validation;
+import Geometry.PointCloud;
+import Geometry.Properties;
+import Geometry.OBB;
+import Geometry.Ray;
 
 using namespace Geometry::Validation;
 

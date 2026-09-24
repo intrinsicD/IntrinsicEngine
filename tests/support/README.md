@@ -42,8 +42,8 @@ snapshot, command callbacks, drain loop and scheduler lifecycle compile once in
 `geometry/Test_MeshBuilders.h` declares shared mesh fixtures; their bodies compile
 in `geometry/MeshBuilders.cpp`. `GeometryMeshBuilderTestSupportObjs` links into
 `IntrinsicGeometryTests`, `IntrinsicGeometryProcessStateTests` and
-`IntrinsicGeometrySlowTests`. Consumers import `Geometry.HalfedgeMesh` or the
-`Geometry` umbrella before the header. Default arguments stay in the header;
+`IntrinsicGeometrySlowTests`. Consumers import `Geometry.HalfedgeMesh` before
+the header. Default arguments stay in the header;
 the support object adds no test cases or registration labels.
 
 ## Visible-Triangle Readback Harness

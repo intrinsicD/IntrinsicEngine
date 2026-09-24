@@ -6,7 +6,28 @@
 #include <random>
 
 import Extrinsic.Core.Memory;
-import Geometry;
+import Geometry.AABB;
+import Geometry.OBB;
+import Geometry.Sphere;
+import Geometry.Capsule;
+import Geometry.Robust;
+import Geometry.Segment;
+import Geometry.Triangle;
+import Geometry.Plane;
+import Geometry.ConvexHull;
+import Geometry.Ray;
+import Geometry.ContactManifold;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.Graph;
+import Geometry.SDF;
+import Geometry.SDFContact;
+import Geometry.Support;
+import Geometry.Validation;
+import Geometry.ImplicitPlaneField;
+import Geometry.MeshSoup;
+import Geometry.PointCloud;
 
 using namespace Geometry;
 using namespace Geometry::Validation;

@@ -9,7 +9,20 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/norm.hpp>
 
-import Geometry;
+import Geometry.AABB;
+import Geometry.Sphere;
+import Geometry.Capsule;
+import Geometry.Cylinder;
+import Geometry.Ellipsoid;
+import Geometry.Segment;
+import Geometry.Triangle;
+import Geometry.ConvexHull;
+import Geometry.Frustum;
+import Geometry.GJK;
+import Geometry.Properties;
+import Geometry.Support;
+import Geometry.OBB;
+import Geometry.Ray;
 
 using namespace Geometry;
 

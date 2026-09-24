@@ -8,7 +8,13 @@
 
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.AABB;
+import Geometry.Sphere;
+import Geometry.Octree;
+import Geometry.KDTree;
+import Geometry.MeshClosestFace;
+import Geometry.PointCloud;
+import Geometry.Properties;
 
 TEST(KDTree, RejectsDegenerateBuildInputs)
 {

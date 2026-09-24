@@ -14,7 +14,16 @@
 #include <glm/gtx/norm.hpp>
 
 import Extrinsic.Core.Memory;
-import Geometry;
+import Geometry.AABB;
+import Geometry.Sphere;
+import Geometry.Capsule;
+import Geometry.ConvexHull;
+import Geometry.ContactManifold;
+import Geometry.Properties;
+import Geometry.ImplicitPlaneField;
+import Geometry.PointCloud;
+import Geometry.OBB;
+import Geometry.Ray;
 
 using namespace Geometry;
 

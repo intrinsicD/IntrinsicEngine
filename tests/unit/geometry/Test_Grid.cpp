@@ -9,7 +9,10 @@
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-import Geometry;
+import Geometry.Properties;
+import Geometry.Grid;
+import Geometry.MarchingCubes;
+import Geometry.SurfaceReconstruction;
 
 using namespace Geometry::Grid;
 

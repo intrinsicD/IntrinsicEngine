@@ -11,7 +11,18 @@
 
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.HalfedgeMesh.Utils;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.Graph;
+import Geometry.Simplification;
+import Geometry.Subdivision;
+import Geometry.CatmullClark;
+import Geometry.MeshSoup;
+import Geometry.MeshClosestFace;
+import Geometry.Quadric;
+import Geometry.PointCloud.Features;
 import Geometry.HalfedgeMesh.Features;
 
 #include "Test_MeshBuilders.h"

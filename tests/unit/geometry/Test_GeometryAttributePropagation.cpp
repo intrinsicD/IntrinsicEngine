@@ -6,7 +6,19 @@
 #include <vector>
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.Triangle;
+import Geometry.HalfedgeMesh.Utils;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.Graph;
+import Geometry.Simplification;
+import Geometry.Subdivision;
+import Geometry.Remeshing;
+import Geometry.CatmullClark;
+import Geometry.MeshSoup;
+import Geometry.Quadric;
+import Geometry.HalfedgeMesh.AdaptiveRemeshing;
 
 #include "Test_MeshBuilders.h"
 

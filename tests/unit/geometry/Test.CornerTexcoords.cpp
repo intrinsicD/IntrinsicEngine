@@ -8,7 +8,12 @@
 
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.HalfedgeMesh.Utils;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.Graph;
+import Geometry.MeshSoup;
 
 namespace
 {

@@ -7,7 +7,13 @@
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-import Geometry;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.Graph;
+import Geometry.ImplicitPlaneField;
+import Geometry.MeshSoup;
+import Geometry.HalfedgeMesh.AdaptiveRemeshing;
 
 #include "Test_MeshBuilders.h"
 

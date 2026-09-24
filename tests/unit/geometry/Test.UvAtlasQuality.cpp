@@ -13,7 +13,13 @@
 
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.UvAtlas;
+import Geometry.HalfedgeMesh.Utils;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.MeshSoup;
+import Geometry.HalfedgeMesh.Boundary;
+import Geometry.KMeans;
 import Geometry.UvAtlas.ChartSolve;
 
 namespace {

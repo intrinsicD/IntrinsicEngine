@@ -10,7 +10,15 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
 
-import Geometry;
+import Geometry.OBB;
+import Geometry.Ellipsoid;
+import Geometry.PCA;
+import Geometry.Statistics;
+import Geometry.Segment;
+import Geometry.Plane;
+import Geometry.ImplicitPlaneField;
+import Geometry.PointCloud;
+import Geometry.Properties;
 
 namespace
 {

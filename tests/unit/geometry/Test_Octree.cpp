@@ -9,7 +9,15 @@
 
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.AABB;
+import Geometry.Sphere;
+import Geometry.Statistics;
+import Geometry.Octree;
+import Geometry.KDTree;
+import Geometry.BVH;
+import Geometry.Overlap;
+import Geometry.Properties;
+import Geometry.Ray;
 
 using namespace Geometry;
 

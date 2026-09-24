@@ -16,7 +16,15 @@
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-import Geometry;
+import Geometry.EPA;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.Graph;
+import Geometry.Graph.Utils;
+import Geometry.DomainViews;
+import Geometry.Graph.ShortestPath;
+import Geometry.MeshSoup;
 
 #include "Test_MeshBuilders.h"
 

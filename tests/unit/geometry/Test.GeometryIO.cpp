@@ -20,7 +20,19 @@
 #include <glm/glm.hpp>
 
 import Extrinsic.Core.Error;
-import Geometry;
+import Geometry.EPA;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.IO;
+import Geometry.HalfedgeMesh.IO;
+import Geometry.Graph;
+import Geometry.DomainViews;
+import Geometry.Graph.IO;
+import Geometry.ImplicitPlaneField;
+import Geometry.MeshSoup;
+import Geometry.PointCloud;
+import Geometry.PointCloud.Utils;
+import Geometry.PointCloud.IO;
 
 #ifndef INTRINSIC_TEST_SUPPORT_DIR
 #define INTRINSIC_TEST_SUPPORT_DIR "tests/support"

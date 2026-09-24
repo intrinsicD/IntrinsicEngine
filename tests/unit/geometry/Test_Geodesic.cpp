@@ -10,7 +10,12 @@
 
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.Subdivision;
+import Geometry.Geodesic;
+import Geometry.CatmullClark;
 
 #include "Test_MeshBuilders.h"
 

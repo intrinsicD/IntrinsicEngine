@@ -6,7 +6,12 @@
 #include <limits>
 #include <vector>
 #include <glm/glm.hpp>
-import Geometry;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.Graph;
+import Geometry.Geodesic;
+import Geometry.MeshSoup;
 
 namespace
 {

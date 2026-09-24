@@ -16,7 +16,15 @@
 #include <system_error>
 #include <vector>
 import Extrinsic.Core.Error;
-import Geometry;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.HalfedgeMesh.IO;
+import Geometry.Graph;
+import Geometry.MarchingCubes;
+import Geometry.MeshSoup;
+import Geometry.SurfaceReconstruction;
+import Geometry.PointCloud;
 import Geometry.HalfedgeMesh.CurvatureExtrema;
 namespace C = Geometry::CurvatureExtrema;
 using Json = nlohmann::json;

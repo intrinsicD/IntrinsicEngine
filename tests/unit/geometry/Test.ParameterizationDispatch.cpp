@@ -8,7 +8,14 @@
 
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.MeshSoup;
+import Geometry.HalfedgeMesh.Boundary;
+import Geometry.Parameterization.Diagnostics;
+import Geometry.Parameterization.Harmonic;
+import Geometry.Parameterization;
+import Geometry.Properties;
 
 #include "Test_MeshBuilders.h"
 

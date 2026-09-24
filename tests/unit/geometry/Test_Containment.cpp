@@ -8,7 +8,13 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtc/quaternion.hpp>
 
-import Geometry;
+import Geometry.AABB;
+import Geometry.Sphere;
+import Geometry.Frustum;
+import Geometry.ImplicitPlaneField;
+import Geometry.PointCloud;
+import Geometry.Properties;
+import Geometry.Containment;
 
 using namespace Geometry;
 

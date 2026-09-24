@@ -5,7 +5,9 @@
 #include <optional>
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.Raycast;
+import Geometry.Properties;
+import Geometry.Ray;
 
 using namespace Geometry;
 

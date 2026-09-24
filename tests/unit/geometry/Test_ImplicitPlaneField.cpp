@@ -4,7 +4,13 @@
 
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.Grid;
+import Geometry.ImplicitPlaneField;
+import Geometry.Quadric;
+import Geometry.HalfedgeMesh.AdaptiveRemeshing;
+import Geometry.Properties;
 
 namespace
 {

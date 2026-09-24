@@ -17,7 +17,9 @@
 #include <glm/geometric.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-import Geometry;
+import Geometry.Robust;
+import Geometry.Registration;
+import Geometry.Properties;
 
 namespace
 {

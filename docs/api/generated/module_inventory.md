@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 11 |
 | `core` | 41 |
 | `ecs` | 27 |
-| `geometry` | 127 |
+| `geometry` | 126 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 72 |
@@ -238,7 +238,6 @@ Root scanned: `src`
 | `Geometry.UvAtlas.Validation` | `src/geometry/Geometry.UvAtlas.Validation.cppm` | `geometry` |
 | `Geometry.UvAtlas` | `src/geometry/Geometry.UvAtlas.cppm` | `geometry` |
 | `Geometry.Validation` | `src/geometry/Geometry.Validation.cppm` | `geometry` |
-| `Geometry` | `src/geometry/Geometry.cppm` | `geometry` |
 | `Extrinsic.Graphics.GpuAssetCache` | `src/graphics/assets/Graphics.GpuAssetCache.cppm` | `graphics/assets` |
 | `Extrinsic.Graphics.RenderGraph:Barriers` | `src/graphics/framegraph/Graphics.RenderGraph.Barriers.cppm` | `graphics/framegraph` |
 | `Extrinsic.Graphics.RenderGraph:Compiler` | `src/graphics/framegraph/Graphics.RenderGraph.Compiler.cppm` | `graphics/framegraph` |

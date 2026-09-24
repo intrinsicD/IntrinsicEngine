@@ -6,7 +6,20 @@
 #include <span>
 #include <vector>
 #include <glm/glm.hpp>
-import Geometry;
+import Geometry.AABB;
+import Geometry.OBB;
+import Geometry.Sphere;
+import Geometry.SpatialQueries;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.Graph;
+import Geometry.Graph.Utils;
+import Geometry.DomainViews;
+import Geometry.Grid;
+import Geometry.MarchingCubes;
+import Geometry.MeshSoup;
+import Geometry.SurfaceReconstruction;
+import Geometry.PointCloud;
 import Geometry.PointLBVH;
 
 namespace

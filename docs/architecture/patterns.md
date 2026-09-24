@@ -82,7 +82,7 @@ if (x && y && z) tempPos.emplace_back(*x, *y, *z);
 - **In-place vs. new mesh:** Topology-modifying operations (simplification, remeshing) work in-place. Topology-restructuring operations (subdivision) take `const Mesh& input, Mesh& output`.
 - **Use acceleration structures:** Select the appropriate acceleration structure — `Geometry::KDTree`, `Geometry::Octree`, or `Geometry::BVH` — whenever it improves the operator's asymptotic cost or practical performance.
 - **Add a CUDA variant:** Provide a CUDA-friendly implementation path whenever the operator is a good candidate for GPU execution.
-- **Reuse existing code:** Reuse engine implementations first. If a required algorithm or data structure is missing, add it to the `Geometry` module and expose it through a new operator entry point instead of duplicating logic inside a feature.
+- **Reuse existing code:** Reuse engine implementations first. If a required algorithm or data structure is missing, add it to the geometry layer (`src/geometry`) and expose it through a new operator entry point instead of duplicating logic inside a feature.
 - **Safety limits:** All `CWRotatedHalfedge` loops have `if (++safety > N) break;` guards.
 
 **Canonical examples:**

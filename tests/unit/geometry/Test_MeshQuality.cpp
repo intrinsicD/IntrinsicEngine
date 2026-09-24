@@ -4,7 +4,11 @@
 
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.HalfedgeMesh.Utils;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.HalfedgeMesh.Quality;
+import Geometry.Properties;
 
 #include "Test_MeshBuilders.h"
 

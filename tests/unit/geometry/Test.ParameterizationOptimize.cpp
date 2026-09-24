@@ -10,7 +10,15 @@
 
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.Sparse;
+import Geometry.DEC;
+import Geometry.MeshSoup;
+import Geometry.Parameterization.Diagnostics;
+import Geometry.Parameterization.Harmonic;
+import Geometry.Parameterization;
 import Geometry.Parameterization.Optimize;
 
 #include "Test_MeshBuilders.h"

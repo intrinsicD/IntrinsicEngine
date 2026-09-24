@@ -5,7 +5,9 @@
 #include <limits>
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.Queries;
+import Geometry.Properties;
+import Geometry.Ray;
 
 using namespace Geometry;
 

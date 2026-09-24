@@ -8,7 +8,11 @@
 
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.AABB;
+import Geometry.OBB;
+import Geometry.Graph;
+import Geometry.Graph.Utils;
+import Geometry.Properties;
 
 TEST(RuntimeGraphKNN, ReturnsNulloptForDegenerateInputs)
 {

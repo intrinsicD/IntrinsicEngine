@@ -54,10 +54,11 @@
 
 - GLM remains the public storage vocabulary for geometry containers, primitive
   records, and renderer-facing data.
-- Eigen3 is available only behind geometry-owned numerical modules. The broad
-  `Geometry` umbrella exports `Geometry.Sparse` because sparse CSR builders and
-  diagnostics are engine-facing geometry utilities, but it does not re-export the
-  Eigen-backed `Geometry.Linalg` module; callers that need fixed-size
+- Eigen3 is available only behind geometry-owned numerical modules. There is no
+  `Geometry` umbrella module; every caller imports the modules it uses.
+  `Geometry.Sparse` holds the engine-facing sparse CSR builders and
+  diagnostics without Eigen types, while the Eigen-backed `Geometry.Linalg`
+  module stays an explicit narrow import; callers that need fixed-size
   GLM/Eigen adapters or dense decompositions must import `Geometry.Linalg`
   explicitly.
 - `Geometry.Linalg` is the narrow advanced numerical surface for CPU kernels. It
@@ -117,8 +118,8 @@
   convergence, likelihood-history, regularization, and acceleration
   diagnostics. Optional Anderson proposals reuse the domain-neutral
   `Geometry.FixedPoint.Anderson` mixer and are accepted only after Gaussian
-  invariants and non-decreasing likelihood are verified; both modules remain
-  narrow imports rather than broad `Geometry` umbrella exports.
+  invariants and non-decreasing likelihood are verified; both modules are
+  imported explicitly by their callers.
 - `Geometry.Registration` keeps percentile trimming (`InlierRatio`) as the
   default ICP outlier policy. Optional robust weighting is explicit through
   `RegistrationParams::RobustKernelKind` plus `RobustScale`; when selected, ICP
@@ -301,7 +302,7 @@ incidence to a line, and three-or-more to a pinned corner, while its collapse
 legality path calls the shared fail-closed edge predicate against recomputed
 one-ring normals. Its historical leading-triangle normal policy for polygon
 faces and its separate boundary-turning promotion remain local compatibility
-behavior. The broad `Geometry` umbrella does not re-export this focused module.
+behavior.
 
 `Geometry.HalfedgeMesh::Mesh` publishes core topology helpers for polygon
 `Triangulate`, conservative `IsRemovalOk`, intrinsic `IsDelaunay`, conditional
@@ -406,8 +407,7 @@ point-index order using an internally built or exactly matching supplied
 non-finite positions, index/query defects, resource overflow, and any point
 without another positive-weight neighbor fail closed with a structured status
 and no published weight vector. The module does not own projection iterations,
-point-cloud mutation, normal estimation, or backend selection, and is not
-re-exported through the broad `Geometry` umbrella.
+point-cloud mutation, normal estimation, or backend selection.
 
 `Geometry.PointCloud.Consolidation` is the deterministic serial CPU-reference
 owner for the LOP method family. Its typed `Strategy` exposes plain LOP,
@@ -1172,8 +1172,7 @@ already covers every direction:
 
 `Geometry.RobustPredicates` is the narrow predicate foundation introduced by
 [`GEOM-007`](../../tasks/archive/GEOM-007-robust-predicates-intersection-classification.md)
-Slice 1. It is **not** re-exported by the broad `Geometry` umbrella; callers
-must `import Geometry.RobustPredicates;` explicitly. Surface:
+Slice 1. Callers `import Geometry.RobustPredicates;` explicitly. Surface:
 
 - `Sign` (`Negative`/`Zero`/`Positive`) and `Certainty`
   (`Certain`/`Uncertain`) diagnostic enums.
@@ -1268,9 +1267,7 @@ Slice 3 pins the contract for that constant:
 
 `Geometry.IntersectionClassification` is the records-only sibling module
 introduced by [`GEOM-007`](../../tasks/archive/GEOM-007-robust-predicates-intersection-classification.md)
-Slice 2. Like `Geometry.RobustPredicates`, it is **not** re-exported by the
-broad `Geometry` umbrella; callers must `import
-Geometry.IntersectionClassification;` explicitly. The module ships data
+Slice 2. Callers `import Geometry.IntersectionClassification;` explicitly. The module ships data
 records only — no intersection algorithm implementations — so it can land
 without rewriting existing callers. Surface:
 

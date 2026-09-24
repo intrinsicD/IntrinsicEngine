@@ -10,7 +10,16 @@
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-import Geometry;
+import Geometry.AABB;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.Graph;
+import Geometry.Subdivision;
+import Geometry.HalfedgeMesh.SubdivisionSqrt3;
+import Geometry.CatmullClark;
+import Geometry.MeshSoup;
+import Geometry.PointCloud;
 
 #include "Test_MeshBuilders.h"
 

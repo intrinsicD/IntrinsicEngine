@@ -4,7 +4,11 @@
 #include <optional>
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.Properties;
+import Geometry.Grid;
+import Geometry.MarchingCubes;
+import Geometry.SurfaceReconstruction;
+import Geometry.PointCloud;
 
 using namespace Geometry::MarchingCubes;
 using namespace Geometry::Grid;

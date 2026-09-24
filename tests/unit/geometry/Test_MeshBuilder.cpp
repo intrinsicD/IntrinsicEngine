@@ -8,7 +8,17 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-import Geometry;
+import Geometry.AABB;
+import Geometry.Sphere;
+import Geometry.Capsule;
+import Geometry.Cylinder;
+import Geometry.Ellipsoid;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.Graph;
+import Geometry.PointCloud;
+import Geometry.OBB;
 
 namespace
 {

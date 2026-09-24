@@ -27,7 +27,16 @@
 
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.EPA;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.Graph;
+import Geometry.Graph.Utils;
+import Geometry.DomainViews;
+import Geometry.MeshSoup;
+import Geometry.PointCloud;
+import Geometry.PointCloud.Utils;
 
 #include "Test_MeshBuilders.h"
 

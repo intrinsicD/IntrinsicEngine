@@ -12,7 +12,15 @@
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-import Geometry;
+import Geometry.Plane;
+import Geometry.ConvexHull;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.ImplicitPlaneField;
+import Geometry.MeshSoup;
+import Geometry.ConvexHullBuilder;
+import Geometry.PointCloud;
 
 // =============================================================================
 // Helpers

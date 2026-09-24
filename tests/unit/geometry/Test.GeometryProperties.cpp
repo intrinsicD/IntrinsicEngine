@@ -10,7 +10,12 @@
 
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.DomainViews;
+import Geometry.MeshSoup;
+import Geometry.PointCloud;
 import Geometry.Linalg;
 
 namespace

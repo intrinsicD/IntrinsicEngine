@@ -6,7 +6,17 @@
 
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.Triangle;
+import Geometry.Plane;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.Graph;
+import Geometry.Simplification;
+import Geometry.Subdivision;
+import Geometry.CatmullClark;
+import Geometry.MeshSoup;
+import Geometry.Quadric;
 
 #include "Test_MeshBuilders.h"
 

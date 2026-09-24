@@ -11,7 +11,17 @@
 #include <glm/gtc/quaternion.hpp>
 
 import Extrinsic.Core.Memory;
-import Geometry;
+import Geometry.AABB;
+import Geometry.Sphere;
+import Geometry.Capsule;
+import Geometry.Ellipsoid;
+import Geometry.ConvexHull;
+import Geometry.ContactManifold;
+import Geometry.GJK;
+import Geometry.EPA;
+import Geometry.Overlap;
+import Geometry.Properties;
+import Geometry.OBB;
 
 using namespace Geometry;
 

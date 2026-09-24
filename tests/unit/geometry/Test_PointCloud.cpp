@@ -10,7 +10,13 @@
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-import Geometry;
+import Geometry.Properties;
+import Geometry.Graph.Utils;
+import Geometry.DomainViews;
+import Geometry.ImplicitPlaneField;
+import Geometry.KMeans;
+import Geometry.PointCloud;
+import Geometry.PointCloud.Utils;
 
 // =============================================================================
 // Helper: generate unit sphere point cloud (Fibonacci sampling)

@@ -11,7 +11,9 @@
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-import Geometry;
+import Geometry.Properties;
+import Geometry.Grid;
+import Geometry.SurfaceReconstruction;
 
 // =============================================================================
 // Helper: generate unit sphere point cloud (Fibonacci sampling)

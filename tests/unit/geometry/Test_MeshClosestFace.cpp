@@ -9,7 +9,16 @@
 #include <vector>
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.Triangle;
+import Geometry.HalfedgeMesh.Utils;
+import Geometry.KDTree;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Builder;
+import Geometry.ImplicitPlaneField;
+import Geometry.MeshSoup;
+import Geometry.MeshClosestFace;
+import Geometry.PointCloud;
 
 namespace
 {

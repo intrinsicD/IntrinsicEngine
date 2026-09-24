@@ -10,7 +10,15 @@
 
 #include <glm/glm.hpp>
 
-import Geometry;
+import Geometry.UvAtlas;
+import Geometry.HalfedgeMesh.Utils;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.MeshSoup;
+import Geometry.HalfedgeMesh.Boundary;
+import Geometry.Parameterization.Diagnostics;
+import Geometry.Parameterization.Harmonic;
+import Geometry.Parameterization;
 
 namespace {
 struct FakeBackendState {
