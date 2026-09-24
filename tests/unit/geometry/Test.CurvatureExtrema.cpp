@@ -6,11 +6,13 @@
 #include <map>
 #include <numbers>
 #include <set>
+#include <string>
 #include <tuple>
 #include <vector>
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh.CurvatureExtrema;
+import Geometry.Curvature;
 namespace
 {
     namespace C = Geometry::CurvatureExtrema;
@@ -294,4 +296,109 @@ TEST(CurvatureExtrema, SharpFoldDoesNotCreateParallelSmoothCurves)
         EXPECT_EQ(s.Signal, C::Kind::SharpEdge);
     EXPECT_EQ(r.Curves.size(), 1u);
     EXPECT_EQ(r.Curves[0].Endpoints, 2u);
+}
+
+namespace
+{
+    C::Params ScalarParameters()
+    {
+        C::Params p = C::kScalarDefaults;
+        p.RadiusRatio = 0.08;
+        return p;
+    }
+    // Publishes f(x) = amplitude * exp(-x^2 / (2 * 0.2^2)) on a flat grid: a
+    // straight scalar ridge (valley for negative amplitude) along x = 0.
+    template <class T>
+    void PublishBump(Mesh& mesh, const std::string& name, double amplitude, double offset = 0)
+    {
+        auto property = mesh.VertexProperties().GetOrAdd<T>(name, T{});
+        for (auto v : mesh.LiveVertices())
+        {
+            const double x = mesh.Position(v).x;
+            property[v.Index] = static_cast<T>(offset + amplitude * std::exp(-x * x / 0.08));
+        }
+    }
+    // True when midpoints of `kind` near x = 0 span most of the grid in y.
+    bool CoversCenter(const C::Result& r, C::Kind kind)
+    {
+        float low = 1, high = -1;
+        for (auto p : Midpoints(r, kind))
+            if (std::abs(p.x) < 0.04f)
+            {
+                low = std::min(low, p.y);
+                high = std::max(high, p.y);
+            }
+        return low < -0.6f && high > 0.6f;
+    }
+}
+
+TEST(CurvatureExtrema, ScalarBumpHasCenterRidgeAndNoValley)
+{
+    auto mesh = Grid(40, true);
+    PublishBump<double>(mesh, "v:field", 3.0, -7.0);
+    auto r = C::ExtractScalarExtrema(mesh, "v:field", ScalarParameters());
+    ASSERT_TRUE(r.Succeeded()) << C::ToString(r.Diagnostic.State);
+    CheckCenter(Midpoints(r, C::Kind::ScalarRidge));
+    EXPECT_TRUE(Midpoints(r, C::Kind::ScalarValley).empty());
+    for (const auto& s : r.Segments)
+    {
+        EXPECT_TRUE(s.Signal == C::Kind::ScalarRidge || s.Signal == C::Kind::ScalarValley);
+        EXPECT_GE(s.Strength, 0);
+        EXPECT_LE(s.Strength, 1);
+    }
+    EXPECT_GT(r.Diagnostic.Scales[1].SegmentCounts[static_cast<unsigned>(C::Kind::ScalarRidge)],
+              0u);
+}
+
+TEST(CurvatureExtrema, ScalarNegatedFloatFieldIsValleyAndScaleInvariant)
+{
+    auto mesh = Grid(40, true);
+    PublishBump<float>(mesh, "v:field", -1.0);
+    PublishBump<double>(mesh, "v:scaled", -250.0, 12.0);
+    auto r = C::ExtractScalarExtrema(mesh, "v:field", ScalarParameters());
+    ASSERT_TRUE(r.Succeeded());
+    CheckCenter(Midpoints(r, C::Kind::ScalarValley));
+    EXPECT_TRUE(Midpoints(r, C::Kind::ScalarRidge).empty());
+    // Heights are range-normalized: an affine rescale of the field is invisible.
+    auto scaled = C::ExtractScalarExtrema(mesh, "v:scaled", ScalarParameters());
+    ASSERT_TRUE(scaled.Succeeded());
+    EXPECT_EQ(scaled.Segments.size(), r.Segments.size());
+}
+
+TEST(CurvatureExtrema, ScalarMeanCurvaturePropertyHasCenterExtremum)
+{
+    auto mesh = Grid();
+    ASSERT_TRUE(Geometry::Curvature::ComputeMeanCurvature(mesh).has_value());
+    auto r = C::ExtractScalarExtrema(mesh, "v:mean_curvature", ScalarParameters());
+    ASSERT_TRUE(r.Succeeded()) << C::ToString(r.Diagnostic.State);
+    // The bump crest is the mean-curvature extremum; the sign convention of H
+    // decides whether it is a ridge or a valley of the field.
+    EXPECT_TRUE(CoversCenter(r, C::Kind::ScalarRidge) || CoversCenter(r, C::Kind::ScalarValley));
+}
+
+TEST(CurvatureExtrema, ScalarRejectsMissingOrNonScalarPropertyAndIgnoresConstantField)
+{
+    auto mesh = Grid(16, true);
+    EXPECT_EQ(C::ExtractScalarExtrema(mesh, "v:absent", ScalarParameters()).Diagnostic.State,
+              C::Status::MissingProperty);
+    EXPECT_EQ(C::ExtractScalarExtrema(mesh, "v:point", ScalarParameters()).Diagnostic.State,
+              C::Status::MissingProperty);
+    PublishBump<double>(mesh, "v:field", 1.0);
+    auto invalid = ScalarParameters();
+    invalid.RadiusRatio = 0;
+    EXPECT_EQ(C::ExtractScalarExtrema(mesh, "v:field", invalid).Diagnostic.State,
+              C::Status::InvalidParameters);
+
+    PublishBump<double>(mesh, "v:constant", 0.0, 4.0);
+    auto flat = C::ExtractScalarExtrema(mesh, "v:constant", ScalarParameters());
+    ASSERT_TRUE(flat.Succeeded());
+    EXPECT_TRUE(flat.Segments.empty());
+    EXPECT_EQ(flat.Diagnostic.Scales[1].SupportedVertices, 0u);
+
+    // Non-finite samples drop their vertex instead of poisoning the range.
+    auto field = mesh.VertexProperties().Get<double>("v:field");
+    field[0] = std::numeric_limits<double>::quiet_NaN();
+    auto r = C::ExtractScalarExtrema(mesh, "v:field", ScalarParameters());
+    ASSERT_TRUE(r.Succeeded());
+    EXPECT_LT(r.Diagnostic.Scales[1].SupportedVertices, mesh.VertexCount());
 }

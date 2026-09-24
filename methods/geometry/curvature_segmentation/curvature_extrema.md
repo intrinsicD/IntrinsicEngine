@@ -37,6 +37,17 @@ transverse second derivative; negative mean crests require a positive one.
 This is a signed-crest comparator, not every possible scalar-field ridge.
 Its Hessian directions are distinct from principal surface directions.
 
+`ExtractScalarExtrema` applies the same quadratic fit to any float or double
+vertex property, for example `v:mean_curvature` or a geodesic distance. Heights
+are normalized by the field's finite range, so an affine rescale of the field
+does not change the curves. A scalar ridge (valley) needs a negative (positive)
+transverse Hessian eigenvalue that also dominates the along-ridge eigenvalue;
+this rejects flat tails whose fit noise would otherwise read as a ridge. There
+is no sign requirement on the value. Strength is the crossing's height above
+the field minimum (ridges) or below the maximum (valleys), in `[0, 1]`, and the
+scalar default sharpness floor is `0.01` of the range per squared radius.
+Non-finite values drop their vertex; sharp edges are not emitted.
+
 ## Selected numerical choices
 
 - Internally center and normalize by the bounding-box diagonal `D`. Source
@@ -106,7 +117,8 @@ inspection records rather than being mislabeled as the frozen benchmark.
 ## Validation scope and limitations
 
 The analytic suite covers a Gaussian extrusion's central crease, mean-curvature
-comparison, plane/sphere/cylinder negatives, winding reversal, retriangulation,
+comparison, scalar-field ridges and valleys (float and double, affine
+invariance, a mean-curvature property, missing/constant/non-finite input), plane/sphere/cylinder negatives, winding reversal, retriangulation,
 refinement, small positional noise, scale/translation, an exact sharp fold,
 source preservation, malformed input and bounded work. These fixtures are the
 CPU contract; they are not semantic-part ground truth or a corpus-wide stability

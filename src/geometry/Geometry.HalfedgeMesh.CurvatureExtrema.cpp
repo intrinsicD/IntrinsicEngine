@@ -13,11 +13,13 @@ module;
 #include <numeric>
 #include <queue>
 #include <set>
+#include <string_view>
 #include <utility>
 #include <vector>
 module Geometry.HalfedgeMesh.CurvatureExtrema;
 import Geometry.HalfedgeMesh;
 import Geometry.Curvature;
+import Geometry.Properties;
 namespace Geometry::CurvatureExtrema
 {
     namespace
@@ -370,23 +372,30 @@ namespace Geometry::CurvatureExtrema
             }
             return smoothed;
         }
-        std::vector<Signal> MeanSignal(const Surface& s, const std::vector<Field>& field,
-                                       double radius, bool ridge, const Params& p)
+        // Fits f(u, t) in each tangent frame with radius-normalized coordinates;
+        // NaN marks unsupported vertices and fit heights are valueScale * df.
+        // `dominant` also requires the transverse Hessian eigenvalue to have the
+        // larger magnitude, rejecting nearly flat tails whose fit noise would
+        // otherwise read as a ridge along the flat direction.
+        std::vector<Signal> QuadraticSignal(const Surface& s, const std::vector<double>& values,
+                                            const std::vector<double>& residuals,
+                                            double valueScale, double radius, bool ridge,
+                                            bool dominant, const Params& p)
         {
-            std::vector<Signal> signal(field.size());
-            for (std::size_t v = 0; v < field.size(); ++v)
+            std::vector<Signal> signal(values.size());
+            for (std::size_t v = 0; v < values.size(); ++v)
             {
-                if (!field[v].Valid)
+                if (std::isnan(values[v]))
                     continue;
                 auto [x, y] = Basis(s.Normals[v]);
                 Eigen::Matrix<double, 5, 5> matrix = Eigen::Matrix<double, 5, 5>::Zero();
                 Eigen::Matrix<double, 5, 1> rhs = Eigen::Matrix<double, 5, 1>::Zero();
-                double total = 0, mean = (field[v].Max + field[v].Min) / 2;
+                double total = 0, center = values[v];
                 std::size_t samples = 0;
                 for (auto neighbor : s.Support[v])
                 {
                     auto j = neighbor.Vertex;
-                    if (j == v || !field[j].Valid)
+                    if (j == v || std::isnan(values[j]))
                         continue;
                     double w = Weight(neighbor.Distance, radius, s.Areas[j]);
                     if (w == 0)
@@ -395,7 +404,7 @@ namespace Geometry::CurvatureExtrema
                     double u = glm::dot(delta, x), t = glm::dot(delta, y);
                     Eigen::Matrix<double, 5, 1> row;
                     row << u, t, u * u / 2, u * t, t * t / 2;
-                    double value = radius * ((field[j].Max + field[j].Min) / 2 - mean);
+                    double value = valueScale * (values[j] - center);
                     matrix.noalias() += w * row * row.transpose();
                     rhs.noalias() += w * row * value;
                     total += w;
@@ -425,15 +434,31 @@ namespace Geometry::CurvatureExtrema
                 int index = ridge ? 0 : 1;
                 if (ridge ? low >= -p.MinimumSharpness : high <= p.MinimumSharpness)
                     continue;
+                if (dominant && (ridge ? -low <= std::abs(high) : high <= std::abs(low)))
+                    continue;
                 auto& a = signal[v];
                 a.Valid = true;
-                a.Value = mean;
-                a.Residual = field[v].Residual;
+                a.Value = center;
+                a.Residual = residuals.empty() ? 0.0 : residuals[v];
                 a.Direction = x * eig.eigenvectors()(0, index) + y * eig.eigenvectors()(1, index);
                 a.Extremality = solution[0] * eig.eigenvectors()(0, index) +
                                 solution[1] * eig.eigenvectors()(1, index);
             }
             return signal;
+        }
+        std::vector<Signal> MeanSignal(const Surface& s, const std::vector<Field>& field,
+                                       double radius, bool ridge, const Params& p)
+        {
+            std::vector<double> mean(field.size(), std::numeric_limits<double>::quiet_NaN()),
+                residuals(field.size());
+            for (std::size_t v = 0; v < field.size(); ++v)
+            {
+                if (!field[v].Valid)
+                    continue;
+                mean[v] = (field[v].Max + field[v].Min) / 2;
+                residuals[v] = field[v].Residual;
+            }
+            return QuadraticSignal(s, mean, residuals, radius, radius, ridge, false, p);
         }
 
         using PointMap = std::map<std::pair<std::uint32_t, std::uint32_t>, std::uint32_t>;
@@ -466,8 +491,10 @@ namespace Geometry::CurvatureExtrema
         {
             PointMap points;
             std::set<std::pair<std::uint32_t, std::uint32_t>> segments;
-            const bool ridge = kind == Kind::PrincipalRidge || kind == Kind::MeanRidge;
+            const bool ridge = kind == Kind::PrincipalRidge || kind == Kind::MeanRidge ||
+                               kind == Kind::ScalarRidge;
             const bool principal = kind == Kind::PrincipalRidge || kind == Kind::PrincipalValley;
+            const bool scalar = kind == Kind::ScalarRidge || kind == Kind::ScalarValley;
             auto& diagnostics = result.Diagnostic.Scales[scale];
             for (std::uint32_t fi = 0; fi < s.Faces.size(); ++fi)
             {
@@ -563,10 +590,15 @@ namespace Geometry::CurvatureExtrema
                     continue;
                 direction /= norm;
                 double sharpness = glm::dot(Gradient(s, f, e), direction) * radius;
-                if (ridge ? value <= 0 || sharpness >= -params.MinimumSharpness
-                          : value >= 0 || sharpness <= params.MinimumSharpness)
+                // Curvature curves need a convex (concave) crease; scalar heights are
+                // range-normalized, so their strength is height above the minimum
+                // (ridge) or below the maximum (valley).
+                if (ridge ? sharpness >= -params.MinimumSharpness
+                          : sharpness <= params.MinimumSharpness)
                     continue;
-                double strength = std::abs(value) * radius;
+                if (!scalar && (ridge ? value <= 0 : value >= 0))
+                    continue;
+                double strength = scalar ? (ridge ? value : 1 - value) : std::abs(value) * radius;
                 if (strength < params.MinimumStrength ||
                     (principal && std::abs(value) <= std::abs(other)))
                     continue;
@@ -674,7 +706,7 @@ namespace Geometry::CurvatureExtrema
             std::uint32_t faceSlots = 0;
             for (auto f : s.SourceFaces)
                 faceSlots = std::max(faceSlots, f + 1);
-            std::array<std::vector<std::uint32_t>, 12> byFace;
+            std::array<std::vector<std::uint32_t>, kKindCount * 3> byFace;
             for (auto& array : byFace)
                 array.resize(faceSlots, None);
             for (std::uint32_t i = 0; i < result.Segments.size(); ++i)
@@ -766,6 +798,8 @@ namespace Geometry::CurvatureExtrema
             return "invalid_geometry";
         case Status::WorkLimit:
             return "work_limit";
+        case Status::MissingProperty:
+            return "missing_property";
         }
         return "unknown";
     }
@@ -783,81 +817,172 @@ namespace Geometry::CurvatureExtrema
             return "mean_valley";
         case Kind::SharpEdge:
             return "sharp_edge";
+        case Kind::ScalarRidge:
+            return "scalar_ridge";
+        case Kind::ScalarValley:
+            return "scalar_valley";
         }
         return "unknown";
     }
-    Result Extract(const HalfedgeMesh::Mesh& mesh, const Params& params)
+    namespace
     {
-        const auto start = std::chrono::steady_clock::now();
-        Result result;
-        auto finish = [&](Status state)
+        using Clock = std::chrono::steady_clock;
+        double Elapsed(Clock::time_point t)
+        {
+            return std::chrono::duration<double, std::milli>(Clock::now() - t).count();
+        }
+        Result Finish(Result result, Status state, Clock::time_point start)
         {
             result.Diagnostic.State = state;
-            result.Diagnostic.TotalMilliseconds =
-                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
-                    .count();
+            result.Diagnostic.TotalMilliseconds = Elapsed(start);
             if (state != Status::Success)
             {
                 result.Points.clear();
                 result.Segments.clear();
                 result.Curves.clear();
             }
-            return std::move(result);
-        };
-        auto finiteNonnegative = [](double v) { return std::isfinite(v) && v >= 0; };
-        if (!std::isfinite(params.RadiusRatio) || params.RadiusRatio <= 0 ||
-            !finiteNonnegative(params.MinimumStrength) ||
-            !finiteNonnegative(params.MinimumSharpness) ||
-            !finiteNonnegative(params.MinimumAnisotropy) || params.MinimumAnisotropy > 1 ||
-            !finiteNonnegative(params.HardDihedralDegrees) || params.HardDihedralDegrees > 180 ||
-            params.MaximumNeighbors < 9 || !params.MaximumWorkItems)
-            return finish(Status::InvalidParameters);
-        double previous = 0;
-        for (double factor : params.ScaleFactors)
-        {
-            if (!std::isfinite(factor) || factor <= previous || params.RadiusRatio * factor > 1)
-                return finish(Status::InvalidParameters);
-            previous = factor;
+            return result;
         }
-        auto elapsed = [](auto t)
+        bool ValidParams(const Params& params)
         {
-            return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t)
-                .count();
-        };
+            auto finiteNonnegative = [](double v) { return std::isfinite(v) && v >= 0; };
+            if (!std::isfinite(params.RadiusRatio) || params.RadiusRatio <= 0 ||
+                !finiteNonnegative(params.MinimumStrength) ||
+                !finiteNonnegative(params.MinimumSharpness) ||
+                !finiteNonnegative(params.MinimumAnisotropy) || params.MinimumAnisotropy > 1 ||
+                !finiteNonnegative(params.HardDihedralDegrees) ||
+                params.HardDihedralDegrees > 180 || params.MaximumNeighbors < 9 ||
+                !params.MaximumWorkItems)
+                return false;
+            double previous = 0;
+            for (double factor : params.ScaleFactors)
+            {
+                if (!std::isfinite(factor) || factor <= previous || params.RadiusRatio * factor > 1)
+                    return false;
+                previous = factor;
+            }
+            return true;
+        }
+        Status Prepare(const HalfedgeMesh::Mesh& mesh, const Params& params, Surface& surface,
+                       Diagnostics& diagnostics)
+        {
+            auto state = Assemble(mesh, surface, diagnostics, params);
+            if (state != Status::Success)
+                return state;
+            const auto phaseStart = Clock::now();
+            state = Neighborhoods(surface, params, diagnostics);
+            diagnostics.NeighborhoodMilliseconds = Elapsed(phaseStart);
+            return state;
+        }
+        Status Connect(const Surface& surface, const Params& params, Result& result)
+        {
+            ConnectCurves(result);
+            const auto phaseStart = Clock::now();
+            const auto state = MatchScales(surface, params, result);
+            result.Diagnostic.MatchMilliseconds = Elapsed(phaseStart);
+            return state;
+        }
+        // Range-normalized field heights; NaN marks vertices without a finite
+        // value or fitting support. Returns false for a constant field.
+        template <class T>
+        bool NormalizedHeights(const Surface& s, const ConstProperty<T>& property,
+                               std::vector<double>& heights)
+        {
+            heights.assign(s.Positions.size(), std::numeric_limits<double>::quiet_NaN());
+            double low = std::numeric_limits<double>::infinity(), high = -low;
+            for (std::size_t v = 0; v < heights.size() && v < property.Vector().size(); ++v)
+            {
+                const double value = static_cast<double>(property[v]);
+                if (s.Areas[v] == 0 || s.Barrier[v] || !std::isfinite(value))
+                    continue;
+                heights[v] = value;
+                low = std::min(low, value);
+                high = std::max(high, value);
+            }
+            const double range = high - low;
+            if (!(range > 0) || !std::isfinite(range))
+                return false;
+            for (auto& h : heights)
+                h = (h - low) / range;
+            return true;
+        }
+    } // namespace
+    Result Extract(const HalfedgeMesh::Mesh& mesh, const Params& params)
+    {
+        const auto start = Clock::now();
+        Result result;
+        if (!ValidParams(params))
+            return Finish(std::move(result), Status::InvalidParameters, start);
         Surface surface;
-        auto state = Assemble(mesh, surface, result.Diagnostic, params);
+        auto state = Prepare(mesh, params, surface, result.Diagnostic);
         if (state != Status::Success)
-            return finish(state);
-        auto phaseStart = std::chrono::steady_clock::now();
-        state = Neighborhoods(surface, params, result.Diagnostic);
-        result.Diagnostic.NeighborhoodMilliseconds = elapsed(phaseStart);
-        if (state != Status::Success)
-            return finish(state);
+            return Finish(std::move(result), state, start);
         for (std::uint8_t scale = 0; scale < 3; ++scale)
         {
             const double radius = params.RadiusRatio * params.ScaleFactors[scale];
             result.Diagnostic.Scales[scale].Radius = radius * surface.Diagonal;
-            phaseStart = std::chrono::steady_clock::now();
+            auto phaseStart = Clock::now();
             auto field = FitShape(surface, radius);
-            result.Diagnostic.FieldMilliseconds += elapsed(phaseStart);
+            result.Diagnostic.FieldMilliseconds += Elapsed(phaseStart);
             result.Diagnostic.Scales[scale].SupportedVertices =
                 std::count_if(field.begin(), field.end(), [](const auto& f) { return f.Valid; });
             for (unsigned kind = 0; kind < 4; ++kind)
             {
-                phaseStart = std::chrono::steady_clock::now();
+                phaseStart = Clock::now();
                 auto signal = kind < 2 ? PrincipalSignal(surface, field, radius, kind == 0, params)
                                        : MeanSignal(surface, field, radius, kind == 2, params);
-                result.Diagnostic.FieldMilliseconds += elapsed(phaseStart);
-                phaseStart = std::chrono::steady_clock::now();
+                result.Diagnostic.FieldMilliseconds += Elapsed(phaseStart);
+                phaseStart = Clock::now();
                 Trace(surface, signal, radius, static_cast<Kind>(kind), scale, params, result);
-                result.Diagnostic.TraceMilliseconds += elapsed(phaseStart);
+                result.Diagnostic.TraceMilliseconds += Elapsed(phaseStart);
             }
         }
         SharpEdges(mesh, surface, params, result);
-        ConnectCurves(result);
-        phaseStart = std::chrono::steady_clock::now();
-        state = MatchScales(surface, params, result);
-        result.Diagnostic.MatchMilliseconds = elapsed(phaseStart);
-        return finish(state);
+        state = Connect(surface, params, result);
+        return Finish(std::move(result), state, start);
+    }
+    Result ExtractScalarExtrema(const HalfedgeMesh::Mesh& mesh, std::string_view vertexProperty,
+                                const Params& params)
+    {
+        const auto start = Clock::now();
+        Result result;
+        if (!ValidParams(params))
+            return Finish(std::move(result), Status::InvalidParameters, start);
+        const auto asDouble = mesh.VertexProperties().Get<double>(vertexProperty);
+        const auto asFloat = mesh.VertexProperties().Get<float>(vertexProperty);
+        if (!asDouble.IsValid() && !asFloat.IsValid())
+            return Finish(std::move(result), Status::MissingProperty, start);
+        Surface surface;
+        auto state = Prepare(mesh, params, surface, result.Diagnostic);
+        if (state != Status::Success)
+            return Finish(std::move(result), state, start);
+        auto phaseStart = Clock::now();
+        std::vector<double> heights;
+        const bool varying = asDouble.IsValid() ? NormalizedHeights(surface, asDouble, heights)
+                                                : NormalizedHeights(surface, asFloat, heights);
+        result.Diagnostic.FieldMilliseconds += Elapsed(phaseStart);
+        const auto supported = static_cast<std::size_t>(std::count_if(
+            heights.begin(), heights.end(), [](double h) { return !std::isnan(h); }));
+        for (std::uint8_t scale = 0; scale < 3; ++scale)
+        {
+            const double radius = params.RadiusRatio * params.ScaleFactors[scale];
+            result.Diagnostic.Scales[scale].Radius = radius * surface.Diagonal;
+            result.Diagnostic.Scales[scale].SupportedVertices = varying ? supported : 0;
+            if (!varying)
+                continue;
+            for (const Kind kind : {Kind::ScalarRidge, Kind::ScalarValley})
+            {
+                phaseStart = Clock::now();
+                auto signal =
+                    QuadraticSignal(surface, heights, {}, 1.0, radius, kind == Kind::ScalarRidge,
+                                    true, params);
+                result.Diagnostic.FieldMilliseconds += Elapsed(phaseStart);
+                phaseStart = Clock::now();
+                Trace(surface, signal, radius, kind, scale, params, result);
+                result.Diagnostic.TraceMilliseconds += Elapsed(phaseStart);
+            }
+        }
+        state = Connect(surface, params, result);
+        return Finish(std::move(result), state, start);
     }
 } // namespace Geometry::CurvatureExtrema

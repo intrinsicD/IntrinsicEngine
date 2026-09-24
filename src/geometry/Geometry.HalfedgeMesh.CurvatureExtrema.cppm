@@ -1,10 +1,12 @@
-// Extracts detached curvature-extremum curve graphs for surface inspection;
-// preserves source geometry and exposes the evidence needed for later cuts.
+// Extracts detached curvature-extremum curve graphs, or ridge/valley graphs of
+// any vertex scalar property, for surface inspection; preserves source geometry
+// and exposes the evidence needed for later cuts.
 module;
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <glm/glm.hpp>
+#include <string_view>
 #include <vector>
 export module Geometry.HalfedgeMesh.CurvatureExtrema;
 import Geometry.HalfedgeMesh;
@@ -17,7 +19,8 @@ export namespace Geometry::CurvatureExtrema
         InvalidParameters,
         UnsupportedMesh,
         InvalidGeometry,
-        WorkLimit
+        WorkLimit,
+        MissingProperty
     };
     enum class Kind : std::uint8_t
     {
@@ -25,8 +28,11 @@ export namespace Geometry::CurvatureExtrema
         PrincipalValley,
         MeanRidge,
         MeanValley,
-        SharpEdge
+        SharpEdge,
+        ScalarRidge,
+        ScalarValley
     };
+    inline constexpr std::size_t kKindCount = 7;
     struct Params
     {
         // Radii are fractions of the input bounding-box diagonal.
@@ -65,7 +71,7 @@ export namespace Geometry::CurvatureExtrema
     {
         double Radius{};
         std::size_t SupportedVertices{}, SingularTriangles{}, PlateauTriangles{};
-        std::array<std::size_t, 4> SegmentCounts{};
+        std::array<std::size_t, kKindCount> SegmentCounts{};
     };
     struct Diagnostics
     {
@@ -93,4 +99,18 @@ export namespace Geometry::CurvatureExtrema
     // S = -dN fixes the sign convention. Normal reversal exchanges ridge/valley
     // roles. Failed calls return diagnostics only. Owning triangle meshes only.
     [[nodiscard]] Result Extract(const HalfedgeMesh::Mesh& mesh, const Params& params = {});
+    // Scalar sharpness is a fraction of the field range per squared radius, so
+    // the curvature default (1e-4) would admit numerical noise in flat tails.
+    inline constexpr Params kScalarDefaults{.MinimumSharpness = 0.01};
+    // Ridges (valleys) of the float or double vertex property `vertexProperty`:
+    // curves where the field is maximal (minimal) across its dominant Hessian
+    // direction, from the same multi-scale quadratic fit as mean-curvature
+    // curves. Heights are normalized by the finite field range, so Strength is
+    // the crossing's relative height above the minimum (ridge) or below the
+    // maximum (valley) in [0, 1] and Sharpness is dimensionless. Non-finite
+    // values drop their vertex; no sharp edges are emitted. A missing or
+    // non-scalar property fails with MissingProperty.
+    [[nodiscard]] Result ExtractScalarExtrema(const HalfedgeMesh::Mesh& mesh,
+                                              std::string_view vertexProperty,
+                                              const Params& params = kScalarDefaults);
 } // namespace Geometry::CurvatureExtrema
