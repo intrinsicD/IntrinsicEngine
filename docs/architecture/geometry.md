@@ -457,7 +457,7 @@ computations. Only terminal `TakeResult` transfers output; premature or repeated
 extraction returns `InvalidProjectionState`. Runtime supplies framed LBVH rows
 without introducing graphics/runtime dependencies into geometry.
 
-`Geometry.PointCloud.SurfaceSampling` converts a triangle `HalfedgeMesh::Mesh`
+`Geometry.Mesh.SurfaceSampling` converts a triangle `HalfedgeMesh::Mesh`
 into a deterministic dense `PointCloud::Cloud` by area-weighted face selection
 and sqrt-corrected barycentric sampling. The API returns a result record rather
 than throwing: invalid sample counts, empty meshes, and meshes with no valid

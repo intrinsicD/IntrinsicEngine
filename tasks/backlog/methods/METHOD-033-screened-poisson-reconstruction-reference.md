@@ -33,7 +33,7 @@ contracts: [geometry.element-domain-sources, method.engine-integration]
 - Method package: `methods/geometry/screened_poisson/`.
 - Public module in `src/geometry` (engine-grade capability with two present consumers: engine reconstruction users and `METHOD-034`): `Geometry.SurfaceReconstruction.Poisson`.
 - Reference simplification: uniform-grid finite-difference discretization instead of the papers' adaptive octree FEM — clarity over scale; fidelity implications documented in the package README.
-- Reuse: `Geometry.Grid` (`DenseGrid`) for the discretization, `Geometry.MarchingCubes` for iso-extraction, `Geometry.KDTree` for splatting neighborhoods, `Geometry.PointCloud.SurfaceSampling` for fixtures. The exported `Geometry.LinearSolver`/`Geometry.Sparse` surface targets assembled sparse systems; if it does not fit the grid solve, a method-internal fixed-iteration CG over the grid stencil is in-contract (documented choice, not exported).
+- Reuse: `Geometry.Grid` (`DenseGrid`) for the discretization, `Geometry.MarchingCubes` for iso-extraction, `Geometry.KDTree` for splatting neighborhoods, `Geometry.Mesh.SurfaceSampling` for fixtures. The exported `Geometry.LinearSolver`/`Geometry.Sparse` surface targets assembled sparse systems; if it does not fit the grid solve, a method-internal fixed-iteration CG over the grid stencil is in-contract (documented choice, not exported).
 - Operator decision (2026-09-05): reconcile METHOD-033/METHOD-034 through
   primary-source intake before either implementation. Prefer one shared
   reconstruction primitive whose accepted iterative input and output/failure

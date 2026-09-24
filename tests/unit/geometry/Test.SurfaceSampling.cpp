@@ -9,12 +9,12 @@
 #include <glm/glm.hpp>
 
 import Geometry.HalfedgeMesh;
-import Geometry.PointCloud.SurfaceSampling;
+import Geometry.Mesh.SurfaceSampling;
 import Geometry.Properties;
 
 namespace
 {
-    namespace SurfaceSampling = Geometry::PointCloud::SurfaceSampling;
+    namespace SurfaceSampling = Geometry::Mesh::SurfaceSampling;
 
     [[nodiscard]] Geometry::HalfedgeMesh::Mesh MakeSeparatedAreaRatioMesh()
     {

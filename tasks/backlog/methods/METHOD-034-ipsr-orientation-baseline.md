@@ -29,7 +29,7 @@ contracts: [geometry.element-domain-sources, method.engine-integration]
 ## Context
 - Paper/method: Hou, Wang, Bao, et al. — "Iterative Poisson Surface Reconstruction (iPSR) for Unoriented Points", SIGGRAPH 2022.
 - Method package: `methods/geometry/ipsr/`; implementation is package-local (`include/` + `src/`, the `progressive_poisson` pattern) — a research baseline does not warrant a `src/geometry` module surface.
-- Reuse: `Geometry.SurfaceReconstruction.Poisson` (`METHOD-033`) for the inner solve; `Geometry.MeshClosestFace` for the declared exact nearest-face normal transfer; `Geometry.PointCloud.SurfaceSampling` for fixtures. A sampled/centroid transfer is a distinct approximation requiring an explicit intake decision.
+- Reuse: `Geometry.SurfaceReconstruction.Poisson` (`METHOD-033`) for the inner solve; `Geometry.MeshClosestFace` for the declared exact nearest-face normal transfer; `Geometry.Mesh.SurfaceSampling` for fixtures. A sampled/centroid transfer is a distinct approximation requiring an explicit intake decision.
 - Seeding: iPSR legitimately requires an RNG for the initial normals; the seed is an explicit param, and the `METHOD-036` comparison protocol pins it.
 - Diagnostics use the same orientation-correctness definition as METHOD-032,
   plus iterations and final flip fraction. Shared names alone do not make

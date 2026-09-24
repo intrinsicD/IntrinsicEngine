@@ -26,7 +26,7 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, method.e
 ## Context
 - Paper/method: Lin, Wang, et al. — "Surface Reconstruction from Point Clouds without Normals by Parametrizing the Gauss Formula", TOG 2022 (PGR).
 - Method package: `methods/geometry/parametric_gauss_orientation/`; implementation is package-local (`include/` + `src/`, the `progressive_poisson` pattern).
-- Reuse: `Geometry.KDTree` for the near-field regularization width (kNN spacing); `Geometry.PointCloud.SurfaceSampling` for fixtures. The exported `Geometry.LinearSolver` targets assembled sparse systems; the dense matrix-free CG here is method-local by design (documented, not exported).
+- Reuse: `Geometry.KDTree` for the near-field regularization width (kNN spacing); `Geometry.Mesh.SurfaceSampling` for fixtures. The exported `Geometry.LinearSolver` targets assembled sparse systems; the dense matrix-free CG here is method-local by design (documented, not exported).
 - Fully deterministic: no RNG anywhere; fixed CG iteration count and summation order.
 - Share diagnostic names with METHOD-032, including `oriented_correct_fraction`,
   and record `confidence_mean` and `cg_residual`. METHOD-036 separates comparison

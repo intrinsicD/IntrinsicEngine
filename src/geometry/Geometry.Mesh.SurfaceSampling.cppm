@@ -4,13 +4,13 @@ module;
 #include <cstdint>
 #include <string_view>
 
-export module Geometry.PointCloud.SurfaceSampling;
+export module Geometry.Mesh.SurfaceSampling;
 
 export import Geometry.PointCloud;
 
 import Geometry.HalfedgeMesh;
 
-export namespace Geometry::PointCloud::SurfaceSampling
+export namespace Geometry::Mesh::SurfaceSampling
 {
     inline constexpr std::string_view kDefaultSourceNormalProperty = "v:normal";
 

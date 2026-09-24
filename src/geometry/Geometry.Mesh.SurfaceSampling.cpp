@@ -12,12 +12,12 @@ module;
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
 
-module Geometry.PointCloud.SurfaceSampling;
+module Geometry.Mesh.SurfaceSampling;
 
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.Properties;
 
-namespace Geometry::PointCloud::SurfaceSampling
+namespace Geometry::Mesh::SurfaceSampling
 {
     namespace
     {

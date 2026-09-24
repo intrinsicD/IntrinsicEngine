@@ -50,7 +50,7 @@ sample-to-face ownership and direct face-to-sample iteration.
   clouds merely to add this representation. Prefer a small geometry-owned data
   record and compiled operations over another service or registry.
 - Extend the existing producer in
-  `src/geometry/Geometry.PointCloud.SurfaceSampling.cpp` where useful. It
+  `src/geometry/Geometry.Mesh.SurfaceSampling.cpp` where useful. It
   already computes triangle selection and barycentric weights, but currently
   publishes only a 3D cloud with normals. Preserve that sampling policy and
   reuse its implementation while retaining source associations in the new

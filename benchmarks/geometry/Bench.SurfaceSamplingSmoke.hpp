@@ -6,7 +6,7 @@
 namespace Intrinsic::Bench::Geometry
 {
     inline constexpr const char* kSurfaceSamplingSmokeBenchmarkId = "geometry.surface_sampling.smoke";
-    inline constexpr const char* kSurfaceSamplingSmokeMethod      = "geometry.pointcloud.surface_sampling";
+    inline constexpr const char* kSurfaceSamplingSmokeMethod      = "geometry.mesh.surface_sampling";
     inline constexpr const char* kSurfaceSamplingSmokeDataset     = "builtin.two_triangle_area_ratio";
 
     struct SurfaceSamplingSmokeMetrics

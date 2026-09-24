@@ -9,7 +9,7 @@
 #include <glm/glm.hpp>
 
 import Geometry.HalfedgeMesh;
-import Geometry.PointCloud.SurfaceSampling;
+import Geometry.Mesh.SurfaceSampling;
 
 namespace Intrinsic::Bench::Geometry
 {
@@ -50,11 +50,11 @@ namespace Intrinsic::Bench::Geometry
         {
             const auto mesh = MakeAreaRatioFixture();
 
-            ::Geometry::PointCloud::SurfaceSampling::Params params;
+            ::Geometry::Mesh::SurfaceSampling::Params params;
             params.SampleCount = kSampleCount;
             params.Seed = 0x35035u;
 
-            const auto result = ::Geometry::PointCloud::SurfaceSampling::SampleTriangleMeshSurface(mesh, params);
+            const auto result = ::Geometry::Mesh::SurfaceSampling::SampleTriangleMeshSurface(mesh, params);
 
             std::size_t smallTriangleSamples = 0;
             for (const auto point : result.Cloud.LivePoints())

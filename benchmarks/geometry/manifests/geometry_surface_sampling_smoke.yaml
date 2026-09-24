@@ -9,7 +9,7 @@
 # error for a deterministic two-triangle fixture with a 1:4 area ratio.
 
 benchmark_id: geometry.surface_sampling.smoke
-method: geometry.pointcloud.surface_sampling
+method: geometry.mesh.surface_sampling
 dataset: builtin.two_triangle_area_ratio
 params:
   intent: smoke

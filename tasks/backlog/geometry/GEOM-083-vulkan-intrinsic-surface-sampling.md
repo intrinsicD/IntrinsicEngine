@@ -31,7 +31,7 @@ reviewed decision explicitly adopts a change.
 
 Existing owners and evidence:
 
-- [`src/geometry/Geometry.PointCloud.SurfaceSampling.cpp`](../../../src/geometry/Geometry.PointCloud.SurfaceSampling.cpp)
+- [`src/geometry/Geometry.Mesh.SurfaceSampling.cpp`](../../../src/geometry/Geometry.Mesh.SurfaceSampling.cpp)
 - [`tests/unit/geometry/Test.SurfaceSampling.cpp`](../../../tests/unit/geometry/Test.SurfaceSampling.cpp)
 - [`tasks/backlog/geometry/GEOM-078-intrinsic-surface-sample-point-cloud.md`](../../../tasks/backlog/geometry/GEOM-078-intrinsic-surface-sample-point-cloud.md)
 

@@ -71,6 +71,7 @@ target_sources(${target_name}
         Geometry.LinearSolver.cppm
         Geometry.MarchingCubes.cppm
         Geometry.Mesh.Conversion.cppm
+        Geometry.Mesh.SurfaceSampling.cppm
         Geometry.MeshClosestFace.cppm
         Geometry.MeshSoup.cppm
         Geometry.MeshOperator.cppm
@@ -94,7 +95,6 @@ target_sources(${target_name}
         Geometry.NormalEstimation.Types.cppm
         Geometry.PointCloud.Normals.cppm
         Geometry.PointCloud.QualityMetrics.cppm
-        Geometry.PointCloud.SurfaceSampling.cppm
         Geometry.PointCloud.Utils.cppm
         Geometry.PointCloud.cppm
         Geometry.Primitives.cppm
@@ -190,6 +190,7 @@ target_sources(${target_name}
         Geometry.KMeans.cpp
         Geometry.Linalg.cpp
         Geometry.MarchingCubes.cpp
+        Geometry.Mesh.SurfaceSampling.cpp
         Geometry.Mesh.Conversion.cpp
         Geometry.MeshClosestFace.cpp
         Geometry.MeshSoup.cpp
@@ -210,7 +211,6 @@ target_sources(${target_name}
         Geometry.PointCloud.Kernels.Types.cpp
         Geometry.PointCloud.Normals.cpp
         Geometry.PointCloud.QualityMetrics.cpp
-        Geometry.PointCloud.SurfaceSampling.cpp
         Geometry.PointCloud.Utils.cpp
         Geometry.PointCloud.cpp
         Geometry.Properties.cpp
