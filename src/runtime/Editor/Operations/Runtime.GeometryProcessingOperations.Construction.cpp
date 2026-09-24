@@ -57,6 +57,7 @@ import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.IO;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
+#include "Editor/internal/Runtime.EditorGeneratedEntity.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 namespace Extrinsic::Runtime
@@ -94,32 +95,11 @@ namespace Extrinsic::Runtime
         {
             return c.Scene && (!c.AttachmentActive || c.AttachmentActive());
         }
-        std::optional<glm::mat4> WorldMatrix(const entt::registry& raw, entt::entity entity)
-        {
-            glm::mat4 matrix{1};
-            std::vector<entt::entity> visited;
-            while (entity != entt::null)
-            {
-                if (!raw.valid(entity) || visited.size() >= 4096 ||
-                    std::ranges::find(visited, entity) != visited.end())
-                    return {};
-                visited.push_back(entity);
-                if (const auto* t = raw.try_get<Transform::Component>(entity))
-                    matrix = Transform::GetMatrix(*t) * matrix;
-                const auto* hierarchy = raw.try_get<ECS::Components::Hierarchy::Component>(entity);
-                entity = hierarchy ? hierarchy->Parent : entt::null;
-            }
-            for (unsigned i = 0; i < 4; ++i)
-                for (unsigned j = 0; j < 4; ++j)
-                    if (!std::isfinite(matrix[i][j]))
-                        return {};
-            return matrix;
-        }
         bool Current(const EditorProcessingContext& c, const ConstructionWork& w)
         {
             if (!Attached(c) || !Detail::GeometryPropertiesCurrent(c, w.Entity, w.Inputs))
                 return false;
-            const auto matrix = WorldMatrix(c.Scene->Raw(), w.Entity);
+            const auto matrix = GeometryProcessingDetail::ComposeEditorWorldMatrix(c.Scene->Raw(), w.Entity);
             return matrix && *matrix == w.SourceMatrix;
         }
         bool GpuPoint(glm::vec3 p)
@@ -169,7 +149,7 @@ namespace Extrinsic::Runtime
                  !ResolveGeometryProperty(a, c.Normals, props->Size(), false).Resolved()))
                 return fail("Hoppe reconstruction requires count-matched normals on the position "
                             "domain, or CPU normal estimation.");
-            const auto matrix = WorldMatrix(context.Scene->Raw(), *entity);
+            const auto matrix = GeometryProcessingDetail::ComposeEditorWorldMatrix(context.Scene->Raw(), *entity);
             if (!matrix || !std::isfinite(glm::determinant(glm::mat3(*matrix))) ||
                 glm::determinant(glm::mat3(*matrix)) == 0)
                 return fail(
@@ -504,26 +484,6 @@ namespace Extrinsic::Runtime
             if (atlasUnavailable)
                 r.Message += " UV atlas unavailable; the surface remains usable without texture coordinates.";
         }
-        struct GeneratedEntity
-        {
-            entt::entity Entity{entt::null};
-            ECS::Components::StableId Identity{};
-            entt::entity Source{entt::null};
-            std::string Name{};
-            std::optional<Geometry::HalfedgeMesh::Mesh> Mesh{};
-            std::optional<Geometry::Graph::Graph> Graph{};
-            std::uint64_t Metadata{};
-            std::array<Geometry::PropertyRevision, 4> Revisions{};
-        };
-        std::array<Geometry::PropertyRevision, 4> GeometryRevisions(const entt::registry& raw,
-                                                                    entt::entity entity)
-        {
-            const auto v = GS::BuildConstView(raw, entity);
-            return {v.VertexSource ? v.VertexSource->Properties.Revision() : 0,
-                    v.EdgeSource ? v.EdgeSource->Properties.Revision() : 0,
-                    v.HalfedgeSource ? v.HalfedgeSource->Properties.Revision() : 0,
-                    v.FaceSource ? v.FaceSource->Properties.Revision() : 0};
-        }
         EditorPointConstructionResult Publish(const EditorProcessingContext& context,
                                               const std::shared_ptr<ConstructionWork>& w)
         {
@@ -536,136 +496,17 @@ namespace Extrinsic::Runtime
             }
             if (!r.Succeeded())
                 return r;
-            auto generated = std::make_shared<GeneratedEntity>();
-            generated->Source = w->Entity;
-            generated->Name = w->Config.OutputName;
-            generated->Mesh = std::move(w->Mesh);
-            generated->Graph = std::move(w->Graph);
-            auto& raw = context.Scene->Raw();
-            generated->Identity = {0x504f494e54434f4eull, 1};
-            for (auto e : raw.view<ECS::Components::StableId>())
-            {
-                const auto id = raw.get<ECS::Components::StableId>(e);
-                if (id.High == generated->Identity.High && id.Low >= generated->Identity.Low)
-                {
-                    if (id.Low == std::numeric_limits<std::uint64_t>::max())
-                    {
-                        r.Status = EditorCommandStatus::GeometryProcessingFailed;
-                        r.Message = "Generated identity range exhausted.";
-                        return r;
-                    }
-                    generated->Identity.Low = id.Low + 1;
-                }
-            }
-            const auto create = [context, generated]
-            {
-                if (!Attached(context))
-                    return EditorCommandHistoryStatus::StaleEntity;
-                auto& scene = *context.Scene;
-                auto& registry = scene.Raw();
-                if (registry.valid(generated->Entity))
-                    return EditorCommandHistoryStatus::StaleEntity;
-                for (auto e : registry.view<ECS::Components::StableId>())
-                    if (registry.get<ECS::Components::StableId>(e) == generated->Identity)
-                        return EditorCommandHistoryStatus::StaleEntity;
-                const auto entity = ECS::Scene::CreateDefault(scene, generated->Name);
-                registry.emplace<ECS::Components::StableId>(entity, generated->Identity);
-                if (generated->Mesh)
-                    GS::PopulateFromMesh(registry, entity, *generated->Mesh);
-                else
-                    GS::PopulateFromGraph(registry, entity, *generated->Graph);
-                const auto authored = ApplyAssetImportAuthoringRecipe(
-                    generated->Mesh ? Assets::AssetPayloadKind::Mesh
-                                    : Assets::AssetPayloadKind::Graph,
-                    true, true, entity, scene);
-                if (!authored)
-                {
-                    scene.Destroy(entity);
-                    return EditorCommandHistoryStatus::CommandFailed;
-                }
-                const auto points =
-                    std::as_const(registry).get<GS::Vertices>(entity).Properties.Get<glm::vec3>(
-                        "v:position");
-                glm::vec3 minimum = points[0], maximum = points[0];
-                for (auto p : points.Vector())
-                {
-                    minimum = glm::min(minimum, p);
-                    maximum = glm::max(maximum, p);
-                }
-                ECS::Components::Culling::Local::Bounds local{};
-                local.LocalBoundingAABB.Min = minimum;
-                local.LocalBoundingAABB.Max = maximum;
-                local.LocalBoundingSphere.Center = (minimum + maximum) * 0.5f;
-                local.LocalBoundingSphere.Radius = glm::length(maximum - minimum) * 0.5f;
-                registry.emplace<ECS::Components::Culling::Local::Bounds>(entity, local);
-                ECS::Components::Culling::World::Bounds world{};
-                world.WorldBoundingOBB.Center = local.LocalBoundingSphere.Center;
-                world.WorldBoundingOBB.Extents = (maximum - minimum) * 0.5f;
-                world.WorldBoundingSphere = local.LocalBoundingSphere;
-                registry.emplace<ECS::Components::Culling::World::Bounds>(entity, world);
-                generated->Entity = entity;
-                generated->Metadata =
-                    EditorFeatureDetail::GeometryMetadataSignatureForEntity(registry, entity);
-                generated->Revisions = GeometryRevisions(registry, entity);
-                if (context.Selection)
-                    (void)context.Selection->SetSelectedEntity(scene, entity);
-                if (context.InvalidateWorkspaceSnapshotCache)
-                    context.InvalidateWorkspaceSnapshotCache();
-                return EditorCommandHistoryStatus::Applied;
-            };
-            const auto remove = [context, generated]
-            {
-                if (!Attached(context))
-                    return EditorCommandHistoryStatus::StaleEntity;
-                const auto& registry = std::as_const(context.Scene->Raw());
-                const auto entity = generated->Entity;
-                if (!registry.valid(entity))
-                    return EditorCommandHistoryStatus::StaleEntity;
-                const auto* id = registry.try_get<ECS::Components::StableId>(entity);
-                const auto* name = registry.try_get<ECS::Components::MetaData>(entity);
-                const auto* hierarchy =
-                    registry.try_get<ECS::Components::Hierarchy::Component>(entity);
-                const auto* transform = registry.try_get<Transform::Component>(entity);
-                if (!id || *id != generated->Identity || !name ||
-                    name->EntityName != generated->Name || !hierarchy ||
-                    hierarchy->Parent != entt::null || hierarchy->FirstChild != entt::null ||
-                    hierarchy->ChildCount || !transform ||
-                    Transform::GetMatrix(*transform) != glm::mat4(1) ||
-                    generated->Metadata !=
-                        EditorFeatureDetail::GeometryMetadataSignatureForEntity(registry, entity) ||
-                    generated->Revisions != GeometryRevisions(registry, entity))
-                    return EditorCommandHistoryStatus::StaleEntity;
-                if (context.Selection)
-                {
-                    const auto selected = context.Selection->SelectedStableIds();
-                    if (selected.size() == 1 &&
-                        selected.front() == SelectionController::ToStableEntityId(entity))
-                    {
-                        if (registry.valid(generated->Source))
-                            (void)context.Selection->SetSelectedEntity(*context.Scene,
-                                                                       generated->Source);
-                        else
-                            context.Selection->ClearSelection(*context.Scene);
-                    }
-                }
-                context.Scene->Destroy(entity);
-                generated->Entity = entt::null;
-                if (context.InvalidateWorkspaceSnapshotCache)
-                    context.InvalidateWorkspaceSnapshotCache();
-                return EditorCommandHistoryStatus::Applied;
-            };
-            const auto status = context.CommandHistory
-                                    ? context.CommandHistory
-                                          ->Execute({.Label = "Construct geometry from points",
-                                                     .Redo = create,
-                                                     .Undo = remove})
-                                          .Status
-                                    : create();
-            r.Status = EditorFeatureDetail::ToEditorCommandStatus(status);
-            if (r.Succeeded())
-                r.OutputEntityId = SelectionController::ToStableEntityId(generated->Entity);
-            else
-                r.Message = "Generated entity publication was rejected.";
+            const auto published = GeometryProcessingDetail::PublishEditorGeneratedEntity(
+                context, {.Source = w->Entity,
+                          .Name = w->Config.OutputName,
+                          .Mesh = std::move(w->Mesh),
+                          .Graph = std::move(w->Graph),
+                          .IdentityHigh = 0x504f494e54434f4eull,
+                          .Label = "Construct geometry from points"});
+            r.Status = published.Status;
+            r.OutputEntityId = published.OutputEntityId;
+            if (!published.Message.empty())
+                r.Message = published.Message;
             return r;
         }
     } // namespace
@@ -871,3 +712,196 @@ namespace Extrinsic::Runtime
         return GetPointConstructionConfig(context.EngineConfigControlState->ActiveConfig);
     }
 } // namespace Extrinsic::Runtime
+
+extern "C++"
+{
+namespace Extrinsic::Runtime::GeometryProcessingDetail
+{
+    namespace
+    {
+        namespace GS = ECS::Components::GeometrySources;
+        namespace Transform = ECS::Components::Transform;
+        bool Attached(const EditorProcessingContext& c)
+        {
+            return c.Scene && (!c.AttachmentActive || c.AttachmentActive());
+        }
+        struct GeneratedEntity
+        {
+            entt::entity Entity{entt::null};
+            ECS::Components::StableId Identity{};
+            entt::entity Source{entt::null};
+            std::string Name{};
+            std::optional<Geometry::HalfedgeMesh::Mesh> Mesh{};
+            std::optional<Geometry::Graph::Graph> Graph{};
+            std::uint64_t Metadata{};
+            std::array<Geometry::PropertyRevision, 4> Revisions{};
+        };
+        std::array<Geometry::PropertyRevision, 4> GeometryRevisions(const entt::registry& raw,
+                                                                    entt::entity entity)
+        {
+            const auto v = GS::BuildConstView(raw, entity);
+            return {v.VertexSource ? v.VertexSource->Properties.Revision() : 0,
+                    v.EdgeSource ? v.EdgeSource->Properties.Revision() : 0,
+                    v.HalfedgeSource ? v.HalfedgeSource->Properties.Revision() : 0,
+                    v.FaceSource ? v.FaceSource->Properties.Revision() : 0};
+        }
+    } // namespace
+    std::optional<glm::mat4> ComposeEditorWorldMatrix(const entt::registry& raw, entt::entity entity)
+    {
+        glm::mat4 matrix{1};
+        std::vector<entt::entity> visited;
+        while (entity != entt::null)
+        {
+            if (!raw.valid(entity) || visited.size() >= 4096 ||
+                std::ranges::find(visited, entity) != visited.end())
+                return {};
+            visited.push_back(entity);
+            if (const auto* t = raw.try_get<Transform::Component>(entity))
+                matrix = Transform::GetMatrix(*t) * matrix;
+            const auto* hierarchy = raw.try_get<ECS::Components::Hierarchy::Component>(entity);
+            entity = hierarchy ? hierarchy->Parent : entt::null;
+        }
+        for (unsigned i = 0; i < 4; ++i)
+            for (unsigned j = 0; j < 4; ++j)
+                if (!std::isfinite(matrix[i][j]))
+                    return {};
+        return matrix;
+    }
+    EditorGeneratedEntityPublication PublishEditorGeneratedEntity(
+        const EditorProcessingContext& context, EditorGeneratedEntityRequest request)
+    {
+        EditorGeneratedEntityPublication r;
+        auto generated = std::make_shared<GeneratedEntity>();
+        generated->Source = request.Source;
+        generated->Name = std::move(request.Name);
+        generated->Mesh = std::move(request.Mesh);
+        generated->Graph = std::move(request.Graph);
+        auto& raw = context.Scene->Raw();
+        generated->Identity = {request.IdentityHigh, 1};
+        for (auto e : raw.view<ECS::Components::StableId>())
+        {
+            const auto id = raw.get<ECS::Components::StableId>(e);
+            if (id.High == generated->Identity.High && id.Low >= generated->Identity.Low)
+            {
+                if (id.Low == std::numeric_limits<std::uint64_t>::max())
+                {
+                    r.Status = EditorCommandStatus::GeometryProcessingFailed;
+                    r.Message = "Generated identity range exhausted.";
+                    return r;
+                }
+                generated->Identity.Low = id.Low + 1;
+            }
+        }
+        const auto create = [context, generated]
+        {
+            if (!Attached(context))
+                return EditorCommandHistoryStatus::StaleEntity;
+            auto& scene = *context.Scene;
+            auto& registry = scene.Raw();
+            if (registry.valid(generated->Entity))
+                return EditorCommandHistoryStatus::StaleEntity;
+            for (auto e : registry.view<ECS::Components::StableId>())
+                if (registry.get<ECS::Components::StableId>(e) == generated->Identity)
+                    return EditorCommandHistoryStatus::StaleEntity;
+            const auto entity = ECS::Scene::CreateDefault(scene, generated->Name);
+            registry.emplace<ECS::Components::StableId>(entity, generated->Identity);
+            if (generated->Mesh)
+                GS::PopulateFromMesh(registry, entity, *generated->Mesh);
+            else
+                GS::PopulateFromGraph(registry, entity, *generated->Graph);
+            const auto authored = ApplyAssetImportAuthoringRecipe(
+                generated->Mesh ? Assets::AssetPayloadKind::Mesh
+                                : Assets::AssetPayloadKind::Graph,
+                true, true, entity, scene);
+            if (!authored)
+            {
+                scene.Destroy(entity);
+                return EditorCommandHistoryStatus::CommandFailed;
+            }
+            const auto points =
+                std::as_const(registry).get<GS::Vertices>(entity).Properties.Get<glm::vec3>(
+                    "v:position");
+            glm::vec3 minimum = points[0], maximum = points[0];
+            for (auto p : points.Vector())
+            {
+                minimum = glm::min(minimum, p);
+                maximum = glm::max(maximum, p);
+            }
+            ECS::Components::Culling::Local::Bounds local{};
+            local.LocalBoundingAABB.Min = minimum;
+            local.LocalBoundingAABB.Max = maximum;
+            local.LocalBoundingSphere.Center = (minimum + maximum) * 0.5f;
+            local.LocalBoundingSphere.Radius = glm::length(maximum - minimum) * 0.5f;
+            registry.emplace<ECS::Components::Culling::Local::Bounds>(entity, local);
+            ECS::Components::Culling::World::Bounds world{};
+            world.WorldBoundingOBB.Center = local.LocalBoundingSphere.Center;
+            world.WorldBoundingOBB.Extents = (maximum - minimum) * 0.5f;
+            world.WorldBoundingSphere = local.LocalBoundingSphere;
+            registry.emplace<ECS::Components::Culling::World::Bounds>(entity, world);
+            generated->Entity = entity;
+            generated->Metadata =
+                EditorFeatureDetail::GeometryMetadataSignatureForEntity(registry, entity);
+            generated->Revisions = GeometryRevisions(registry, entity);
+            if (context.Selection)
+                (void)context.Selection->SetSelectedEntity(scene, entity);
+            if (context.InvalidateWorkspaceSnapshotCache)
+                context.InvalidateWorkspaceSnapshotCache();
+            return EditorCommandHistoryStatus::Applied;
+        };
+        const auto remove = [context, generated]
+        {
+            if (!Attached(context))
+                return EditorCommandHistoryStatus::StaleEntity;
+            const auto& registry = std::as_const(context.Scene->Raw());
+            const auto entity = generated->Entity;
+            if (!registry.valid(entity))
+                return EditorCommandHistoryStatus::StaleEntity;
+            const auto* id = registry.try_get<ECS::Components::StableId>(entity);
+            const auto* name = registry.try_get<ECS::Components::MetaData>(entity);
+            const auto* hierarchy =
+                registry.try_get<ECS::Components::Hierarchy::Component>(entity);
+            const auto* transform = registry.try_get<Transform::Component>(entity);
+            if (!id || *id != generated->Identity || !name ||
+                name->EntityName != generated->Name || !hierarchy ||
+                hierarchy->Parent != entt::null || hierarchy->FirstChild != entt::null ||
+                hierarchy->ChildCount || !transform ||
+                Transform::GetMatrix(*transform) != glm::mat4(1) ||
+                generated->Metadata !=
+                    EditorFeatureDetail::GeometryMetadataSignatureForEntity(registry, entity) ||
+                generated->Revisions != GeometryRevisions(registry, entity))
+                return EditorCommandHistoryStatus::StaleEntity;
+            if (context.Selection)
+            {
+                const auto selected = context.Selection->SelectedStableIds();
+                if (selected.size() == 1 &&
+                    selected.front() == SelectionController::ToStableEntityId(entity))
+                {
+                    if (registry.valid(generated->Source))
+                        (void)context.Selection->SetSelectedEntity(*context.Scene,
+                                                                   generated->Source);
+                    else
+                        context.Selection->ClearSelection(*context.Scene);
+                }
+            }
+            context.Scene->Destroy(entity);
+            generated->Entity = entt::null;
+            if (context.InvalidateWorkspaceSnapshotCache)
+                context.InvalidateWorkspaceSnapshotCache();
+            return EditorCommandHistoryStatus::Applied;
+        };
+        const auto status = context.CommandHistory
+                                ? context.CommandHistory
+                                      ->Execute({.Label = request.Label,
+                                                 .Redo = create,
+                                                 .Undo = remove})
+                                      .Status
+                                : create();
+        r.Status = EditorFeatureDetail::ToEditorCommandStatus(status);
+        if (r.Succeeded())
+            r.OutputEntityId = SelectionController::ToStableEntityId(generated->Entity);
+        else
+            r.Message = "Generated entity publication was rejected.";
+        return r;
+    }
+}
+}
