@@ -4,7 +4,7 @@
 #include <array>
 #include <span>
 #include <vector>
-namespace Geometry::CurvatureSegmentation::BoundaryDetail
+namespace Geometry::Segmentation::BoundaryDetail
 {
 struct Edge
 {
@@ -49,4 +49,4 @@ struct Result
 Result Solve(std::uint32_t nodes, std::span<const Edge> edges,
              const Options &options = {}, std::span<const Sample> samples = {},
              std::span<const double> nodeAreas = {});
-} // namespace Geometry::CurvatureSegmentation::BoundaryDetail
+} // namespace Geometry::Segmentation::BoundaryDetail

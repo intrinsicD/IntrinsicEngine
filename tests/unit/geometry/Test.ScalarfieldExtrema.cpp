@@ -11,11 +11,11 @@
 #include <vector>
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;
-import Geometry.HalfedgeMesh.CurvatureExtrema;
+import Geometry.HalfedgeMesh.ScalarfieldExtrema;
 import Geometry.Curvature;
 namespace
 {
-    namespace C = Geometry::CurvatureExtrema;
+    namespace C = Geometry::ScalarfieldExtrema;
     using Mesh = Geometry::HalfedgeMesh::Mesh;
     Mesh Grid(int n = 40, bool flat = false, bool alternate = false, bool reverse = false,
               double scale = 1, glm::vec3 offset = {})
@@ -81,7 +81,7 @@ namespace
         EXPECT_GT(high, 0.6f);
     }
 } // namespace
-TEST(CurvatureExtrema, GaussianExtrusionFindsGeometricTransverseExtremum)
+TEST(ScalarfieldExtrema, GaussianExtrusionFindsGeometricTransverseExtremum)
 {
     auto mesh = Grid();
     auto result = C::Extract(mesh, Parameters());
@@ -107,7 +107,7 @@ TEST(CurvatureExtrema, GaussianExtrusionFindsGeometricTransverseExtremum)
         EXPECT_NE(segment.PersistentScaleMask & (1u << segment.Scale), 0);
     }
 }
-TEST(CurvatureExtrema, PlaneHasNoArtificialCurves)
+TEST(ScalarfieldExtrema, PlaneHasNoArtificialCurves)
 {
     auto mesh = Grid(32, true);
     auto result = C::Extract(mesh, Parameters());
@@ -115,7 +115,7 @@ TEST(CurvatureExtrema, PlaneHasNoArtificialCurves)
     EXPECT_TRUE(result.Segments.empty());
     EXPECT_TRUE(result.Curves.empty());
 }
-TEST(CurvatureExtrema, OrientationReversalExchangesRidgeValley)
+TEST(ScalarfieldExtrema, OrientationReversalExchangesRidgeValley)
 {
     auto a = Grid(), b = Grid(40, false, false, true);
     auto p = Parameters();
@@ -133,7 +133,7 @@ TEST(CurvatureExtrema, OrientationReversalExchangesRidgeValley)
     }
     CheckCenter(Midpoints(rb, C::Kind::MeanRidge));
 }
-TEST(CurvatureExtrema, RetriangulationRetainsCenterCurve)
+TEST(ScalarfieldExtrema, RetriangulationRetainsCenterCurve)
 {
     auto mesh = Grid(40, false, true);
     auto r = C::Extract(mesh, Parameters());
@@ -141,7 +141,7 @@ TEST(CurvatureExtrema, RetriangulationRetainsCenterCurve)
     CheckCenter(Midpoints(r, C::Kind::PrincipalValley));
     CheckCenter(Midpoints(r, C::Kind::MeanValley));
 }
-TEST(CurvatureExtrema, RefinementRetainsCenterCurve)
+TEST(ScalarfieldExtrema, RefinementRetainsCenterCurve)
 {
     auto mesh = Grid(60, false, false);
     auto r = C::Extract(mesh, Parameters());
@@ -149,7 +149,7 @@ TEST(CurvatureExtrema, RefinementRetainsCenterCurve)
     CheckCenter(Midpoints(r, C::Kind::PrincipalValley));
     CheckCenter(Midpoints(r, C::Kind::MeanValley));
 }
-TEST(CurvatureExtrema, ScaleTranslationAndSourcePreservation)
+TEST(ScalarfieldExtrema, ScaleTranslationAndSourcePreservation)
 {
     auto mesh = Grid(32, false, false, false, 5, {10, -4, 3});
     auto positions = mesh.VertexProperties().Get<glm::vec3>("v:point").Vector();
@@ -168,7 +168,7 @@ TEST(CurvatureExtrema, ScaleTranslationAndSourcePreservation)
     EXPECT_TRUE(
         std::all_of(custom.Vector().begin(), custom.Vector().end(), [](int x) { return x == 17; }));
 }
-TEST(CurvatureExtrema, InvalidInputsAndWorkLimitHaveNoPartialCurves)
+TEST(ScalarfieldExtrema, InvalidInputsAndWorkLimitHaveNoPartialCurves)
 {
     Mesh empty;
     EXPECT_EQ(C::Extract(empty).Diagnostic.State, C::Status::EmptyMesh);
@@ -245,7 +245,7 @@ namespace
         return mesh;
     }
 } // namespace
-TEST(CurvatureExtrema, ConstantCurvatureCylinderHasNoInteriorCreases)
+TEST(ScalarfieldExtrema, ConstantCurvatureCylinderHasNoInteriorCreases)
 {
     auto mesh = Cylinder();
     auto r = C::Extract(mesh, Parameters());
@@ -256,14 +256,14 @@ TEST(CurvatureExtrema, ConstantCurvatureCylinderHasNoInteriorCreases)
         EXPECT_GT(std::abs(p.y), 0.6f) << C::ToString(segment.Signal);
     }
 }
-TEST(CurvatureExtrema, SphereRejectsUmbilicPrincipalDirections)
+TEST(ScalarfieldExtrema, SphereRejectsUmbilicPrincipalDirections)
 {
     auto mesh = Sphere();
     auto r = C::Extract(mesh, Parameters());
     ASSERT_TRUE(r.Succeeded());
     EXPECT_TRUE(r.Segments.empty()) << r.Segments.size() << " false constant-curvature segments";
 }
-TEST(CurvatureExtrema, NoisyExtrusionRetainsDominantCenter)
+TEST(ScalarfieldExtrema, NoisyExtrusionRetainsDominantCenter)
 {
     auto mesh = Grid();
     unsigned seed = 941;
@@ -279,7 +279,7 @@ TEST(CurvatureExtrema, NoisyExtrusionRetainsDominantCenter)
     CheckCenter(points);
 }
 
-TEST(CurvatureExtrema, SharpFoldDoesNotCreateParallelSmoothCurves)
+TEST(ScalarfieldExtrema, SharpFoldDoesNotCreateParallelSmoothCurves)
 {
     auto mesh = Grid(32, true);
     for (auto v : mesh.LiveVertices())
@@ -332,7 +332,7 @@ namespace
     }
 }
 
-TEST(CurvatureExtrema, ScalarBumpHasCenterRidgeAndNoValley)
+TEST(ScalarfieldExtrema, ScalarBumpHasCenterRidgeAndNoValley)
 {
     auto mesh = Grid(40, true);
     PublishBump<double>(mesh, "v:field", 3.0, -7.0);
@@ -350,7 +350,7 @@ TEST(CurvatureExtrema, ScalarBumpHasCenterRidgeAndNoValley)
               0u);
 }
 
-TEST(CurvatureExtrema, ScalarNegatedFloatFieldIsValleyAndScaleInvariant)
+TEST(ScalarfieldExtrema, ScalarNegatedFloatFieldIsValleyAndScaleInvariant)
 {
     auto mesh = Grid(40, true);
     PublishBump<float>(mesh, "v:field", -1.0);
@@ -365,7 +365,7 @@ TEST(CurvatureExtrema, ScalarNegatedFloatFieldIsValleyAndScaleInvariant)
     EXPECT_EQ(scaled.Segments.size(), r.Segments.size());
 }
 
-TEST(CurvatureExtrema, ScalarMeanCurvaturePropertyHasCenterExtremum)
+TEST(ScalarfieldExtrema, ScalarMeanCurvaturePropertyHasCenterExtremum)
 {
     auto mesh = Grid();
     ASSERT_TRUE(Geometry::Curvature::ComputeMeanCurvature(mesh).has_value());
@@ -376,7 +376,7 @@ TEST(CurvatureExtrema, ScalarMeanCurvaturePropertyHasCenterExtremum)
     EXPECT_TRUE(CoversCenter(r, C::Kind::ScalarRidge) || CoversCenter(r, C::Kind::ScalarValley));
 }
 
-TEST(CurvatureExtrema, ScalarRejectsMissingOrNonScalarPropertyAndIgnoresConstantField)
+TEST(ScalarfieldExtrema, ScalarRejectsMissingOrNonScalarPropertyAndIgnoresConstantField)
 {
     auto mesh = Grid(16, true);
     EXPECT_EQ(C::ExtractScalarExtrema(mesh, "v:absent", ScalarParameters()).Diagnostic.State,

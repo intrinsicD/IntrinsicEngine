@@ -454,7 +454,7 @@ before adoption, and any optimization remains a later parity-bound task.
 ### Slice C local-reference verdict
 
 The companion module
-`Geometry.HalfedgeMesh.CurvatureSegmentation.Patches` implements the equations
+`Geometry.HalfedgeMesh.Segmentation.Patches` implements the equations
 above as an unadopted serial CPU candidate. It borrows the Slice B feature-evidence
 view, reuses the existing deterministic Gaussian mixture, keeps the sealed v1
 interface byte-stable, and returns slot-aligned provisional/final regions,
@@ -671,7 +671,7 @@ the fixture/oracle lane itself passes.
 
 ## Profiling contract
 
-`CurvatureSegmentationDiagnostics::Timings` reports wall-clock milliseconds for
+`SegmentationDiagnostics::Timings` reports wall-clock milliseconds for
 curvature estimation, face aggregation/normalization, all GMM candidate fits,
 unary construction, dual-graph construction, spatial optimization,
 connectivity/cleanup/publication, and total time. Each candidate also reports

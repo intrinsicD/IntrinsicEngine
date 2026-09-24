@@ -13,12 +13,12 @@
 
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
-import Geometry.HalfedgeMesh.CurvatureSegmentation;
+import Geometry.HalfedgeMesh.Segmentation;
 import Geometry.Properties;
 
 namespace
 {
-    namespace Segment = Geometry::CurvatureSegmentation;
+    namespace Segment = Geometry::Segmentation;
 
     struct CurvatureFixture
     {
@@ -181,10 +181,10 @@ namespace
         return fixture;
     }
 
-    [[nodiscard]] Segment::CurvatureSegmentationParams FixedParams(
+    [[nodiscard]] Segment::SegmentationParams FixedParams(
         const std::uint32_t count)
     {
-        Segment::CurvatureSegmentationParams params{};
+        Segment::SegmentationParams params{};
         params.SelectionMode = Segment::ComponentSelectionMode::FixedCount;
         params.FixedComponentCount = count;
         params.MinimumRegionFaces = 1u;
@@ -230,7 +230,7 @@ namespace
     }
 }
 
-TEST(CurvatureSegmentation, FixedCountFitsSignedPrincipalCurvatureGmm)
+TEST(Segmentation, FixedCountFitsSignedPrincipalCurvatureGmm)
 {
     CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
     const auto result = Segment::Segment(
@@ -252,7 +252,7 @@ TEST(CurvatureSegmentation, FixedCountFitsSignedPrincipalCurvatureGmm)
         { return label != Segment::kInvalidLabel; }));
 }
 
-TEST(CurvatureSegmentation, CurvatureAdapterMatchesGenericD2Kernel)
+TEST(Segmentation, CurvatureAdapterMatchesGenericD2Kernel)
 {
     const CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
     const auto params = FixedParams(2u);
@@ -286,7 +286,7 @@ TEST(CurvatureSegmentation, CurvatureAdapterMatchesGenericD2Kernel)
                      generic.Diagnostics.FinalEnergy);
 }
 
-TEST(CurvatureSegmentation, GenericD1UsesOnlyTheDeclaredFeatureChannel)
+TEST(Segmentation, GenericD1UsesOnlyTheDeclaredFeatureChannel)
 {
     const CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
     std::vector<glm::dvec3> features(
@@ -322,7 +322,7 @@ TEST(CurvatureSegmentation, GenericD1UsesOnlyTheDeclaredFeatureChannel)
         EXPECT_EQ(result.FaceComponents[face], second);
 }
 
-TEST(CurvatureSegmentation, GenericD3UsesTheThirdFeatureChannel)
+TEST(Segmentation, GenericD3UsesTheThirdFeatureChannel)
 {
     const CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
     std::vector<glm::dvec3> features(
@@ -355,10 +355,10 @@ TEST(CurvatureSegmentation, GenericD3UsesTheThirdFeatureChannel)
         EXPECT_EQ(result.FaceComponents[face], second);
 }
 
-TEST(CurvatureSegmentation, AutomaticModeSelectsSeparatedPopulations)
+TEST(Segmentation, AutomaticModeSelectsSeparatedPopulations)
 {
     CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
-    Segment::CurvatureSegmentationParams params{};
+    Segment::SegmentationParams params{};
     params.SelectionMode = Segment::ComponentSelectionMode::Automatic;
     params.AutomaticMinComponents = 1u;
     params.AutomaticMaxComponents = 4u;
@@ -380,7 +380,7 @@ TEST(CurvatureSegmentation, AutomaticModeSelectsSeparatedPopulations)
               1);
 }
 
-TEST(CurvatureSegmentation,
+TEST(Segmentation,
      SignedFeaturesSeparatePlaneSphereCylinderAndSaddleRegimes)
 {
     CurvatureFixture fixture = MakeAnalyticRegimeFixture();
@@ -408,11 +408,11 @@ TEST(CurvatureSegmentation,
               regimeLabels.end());
 }
 
-TEST(CurvatureSegmentation,
+TEST(Segmentation,
      ReportsStageAndPerCandidateProfileTimingsWithoutChangingTheSolve)
 {
     CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
-    Segment::CurvatureSegmentationParams params{};
+    Segment::SegmentationParams params{};
     params.SelectionMode = Segment::ComponentSelectionMode::Automatic;
     params.AutomaticMinComponents = 1u;
     params.AutomaticMaxComponents = 4u;
@@ -454,11 +454,11 @@ TEST(CurvatureSegmentation,
     }
 }
 
-TEST(CurvatureSegmentation,
+TEST(Segmentation,
      AutomaticModeReportsToleranceFallbackWhenNoCandidateQualifies)
 {
     CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
-    Segment::CurvatureSegmentationParams params{};
+    Segment::SegmentationParams params{};
     params.SelectionMode = Segment::ComponentSelectionMode::Automatic;
     params.AutomaticMinComponents = 1u;
     params.AutomaticMaxComponents = 1u;
@@ -479,7 +479,7 @@ TEST(CurvatureSegmentation,
               params.AutomaticFitTolerance);
 }
 
-TEST(CurvatureSegmentation,
+TEST(Segmentation,
      IncreasingSpatialWeightReducesSmoothEdgeDisagreement)
 {
     CurvatureFixture fixture = MakeSingleOutlierStrip();
@@ -509,7 +509,7 @@ TEST(CurvatureSegmentation,
               regularized.Diagnostics.InitialEnergy + 1.0e-10);
 }
 
-TEST(CurvatureSegmentation,
+TEST(Segmentation,
      MinimumRegionCleanupDeterministicallyMergesTheSingleFaceOutlier)
 {
     CurvatureFixture fixture = MakeSingleOutlierStrip();
@@ -535,7 +535,7 @@ TEST(CurvatureSegmentation,
               unmerged.Diagnostics.BoundaryEdgeCount);
 }
 
-TEST(CurvatureSegmentation, FeatureWeightPreservesFoldBoundary)
+TEST(Segmentation, FeatureWeightPreservesFoldBoundary)
 {
     FoldFixture fixture = MakeFoldFixture();
     auto params = FixedParams(2u);
@@ -555,7 +555,7 @@ TEST(CurvatureSegmentation, FeatureWeightPreservesFoldBoundary)
     EXPECT_LE(result.Diagnostics.FinalEnergy, result.Diagnostics.InitialEnergy + 1.0e-10);
 }
 
-TEST(CurvatureSegmentation, ConnectedRegionsAreContiguousAndDeterministic)
+TEST(Segmentation, ConnectedRegionsAreContiguousAndDeterministic)
 {
     CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
     const auto params = FixedParams(2u);
@@ -578,7 +578,7 @@ TEST(CurvatureSegmentation, ConnectedRegionsAreContiguousAndDeterministic)
         EXPECT_EQ(regions[i], i);
 }
 
-TEST(CurvatureSegmentation,
+TEST(Segmentation,
      DisconnectedEqualCurvaturePatchesShareComponentButNotRegion)
 {
     CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
@@ -590,7 +590,7 @@ TEST(CurvatureSegmentation,
     EXPECT_NE(result.FaceRegions[0], result.FaceRegions[1]);
 }
 
-TEST(CurvatureSegmentation,
+TEST(Segmentation,
      ComputeAndSegmentUsesExistingSignedCurvatureEstimator)
 {
     Geometry::HalfedgeMesh::Mesh sphere =
@@ -614,7 +614,7 @@ TEST(CurvatureSegmentation,
                   .CurvatureEstimationMilliseconds);
 }
 
-TEST(CurvatureSegmentation, GlobalOrientationReversalPreservesPartition)
+TEST(Segmentation, GlobalOrientationReversalPreservesPartition)
 {
     CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
     const auto original = Segment::Segment(
@@ -636,7 +636,7 @@ TEST(CurvatureSegmentation, GlobalOrientationReversalPreservesPartition)
     EXPECT_EQ(original.EdgeBoundaries, reversed.EdgeBoundaries);
 }
 
-TEST(CurvatureSegmentation, FailsClosedOnInvalidInputs)
+TEST(Segmentation, FailsClosedOnInvalidInputs)
 {
     Geometry::HalfedgeMesh::Mesh empty{};
     EXPECT_EQ(
@@ -665,7 +665,7 @@ TEST(CurvatureSegmentation, FailsClosedOnInvalidInputs)
         Segment::SegmentationStatus::NonFiniteFeature);
 }
 
-TEST(CurvatureSegmentation, GenericFeaturesRejectInvalidShapeAndValues)
+TEST(Segmentation, GenericFeaturesRejectInvalidShapeAndValues)
 {
     const CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
     std::vector<glm::dvec3> features =
@@ -695,7 +695,7 @@ TEST(CurvatureSegmentation, GenericFeaturesRejectInvalidShapeAndValues)
         Segment::SegmentationStatus::NonFiniteFeature);
 }
 
-TEST(CurvatureSegmentation, CurvatureAdapterPreservesValidationPriority)
+TEST(Segmentation, CurvatureAdapterPreservesValidationPriority)
 {
     CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
     fixture.K1[0u] = std::numeric_limits<double>::quiet_NaN();
@@ -722,7 +722,7 @@ TEST(CurvatureSegmentation, CurvatureAdapterPreservesValidationPriority)
         Segment::SegmentationStatus::NonFinitePosition);
 }
 
-TEST(CurvatureSegmentation,
+TEST(Segmentation,
      DeletedSlotsAndOpenMeshBoundaryEdgesRemainUnpublished)
 {
     Geometry::HalfedgeMesh::Mesh mesh{};
@@ -778,7 +778,7 @@ TEST(CurvatureSegmentation,
     EXPECT_NE(generic.FaceComponents[1u], Segment::kInvalidLabel);
 }
 
-TEST(CurvatureSegmentation, RejectsPolygonAndDegenerateFaces)
+TEST(Segmentation, RejectsPolygonAndDegenerateFaces)
 {
     Geometry::HalfedgeMesh::Mesh polygon{};
     const auto p0 = polygon.AddVertex({0.0f, 0.0f, 0.0f});

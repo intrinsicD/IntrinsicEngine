@@ -47,10 +47,10 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.Curvature;
 import Geometry.HalfedgeMesh;
-import Geometry.HalfedgeMesh.CurvatureSegmentation;
-import Geometry.HalfedgeMesh.CurvatureSegmentation.Features;
-import Geometry.HalfedgeMesh.CurvatureSegmentation.Patches;
-import Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut;
+import Geometry.HalfedgeMesh.Segmentation;
+import Geometry.HalfedgeMesh.Segmentation.Features;
+import Geometry.HalfedgeMesh.Segmentation.Patches;
+import Geometry.HalfedgeMesh.Segmentation.Multicut;
 import Geometry.Properties;
 
 #include "Config/internal/Runtime.CurvatureSegmentationParams.hpp"
@@ -161,7 +161,7 @@ namespace Extrinsic::Runtime::MeshFieldDetail
 
         using namespace GeometryProcessingDetail::MeshSupport;
         namespace Curv = Geometry::Curvature;
-        namespace CurvSeg = Geometry::CurvatureSegmentation;
+        namespace CurvSeg = Geometry::Segmentation;
         inline constexpr std::array<EditorMeshCurvatureOutput, 4>
             kMeshCurvatureOutputs{{
                 EditorMeshCurvatureOutput::All,
@@ -2308,7 +2308,7 @@ ApplyEditorMeshCurvatureCommand(
         if (command.Config.Method ==
             CurvatureSegmentationMethod::CurvatureGmm)
         {
-            CurvSeg::CurvatureSegmentationResult segmented;
+            CurvSeg::SegmentationResult segmented;
             if (command.Config.Features.empty())
                 segmented = CurvSeg::ComputeAndSegment(source.Mesh, MakeCurvatureSegmentationParams(command.Config));
             else

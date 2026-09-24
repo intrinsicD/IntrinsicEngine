@@ -453,12 +453,12 @@ intrinsic_add_module_boundary_test(ProcessingCompilationLocality.SegmentationDia
         --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cppm
         --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cpp
         --check-source src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Frame.cpp
-        --check-source src/geometry/Geometry.CurvatureSegmentation.Diagnostics.cppm
+        --check-source src/geometry/Geometry.Segmentation.Diagnostics.cppm
         --forbid-module Geometry.HalfedgeMesh
-        --forbid-module Geometry.HalfedgeMesh.CurvatureSegmentation
-        --forbid-module Geometry.HalfedgeMesh.CurvatureSegmentation.Features
-        --forbid-module Geometry.HalfedgeMesh.CurvatureSegmentation.Patches
-        --forbid-module Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut)
+        --forbid-module Geometry.HalfedgeMesh.Segmentation
+        --forbid-module Geometry.HalfedgeMesh.Segmentation.Features
+        --forbid-module Geometry.HalfedgeMesh.Segmentation.Patches
+        --forbid-module Geometry.HalfedgeMesh.Segmentation.Multicut)
 set_tests_properties(ProcessingCompilationLocality.SegmentationDiagnostics
     PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
 intrinsic_add_module_boundary_test(ProcessingCompilationLocality.MeshTopology
@@ -897,7 +897,7 @@ intrinsic_add_module_boundary_test(ConfigCompilationLocality.CurvatureInterface
         --check-source src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
         --check-source src/app/Sandbox/Sandbox.ConfigSections.cppm
         --check-source src/app/Sandbox/Sandbox.ConfigSections.cpp
-        --forbid-module Geometry.HalfedgeMesh.CurvatureSegmentation)
+        --forbid-module Geometry.HalfedgeMesh.Segmentation)
 set_tests_properties(ConfigCompilationLocality.CurvatureInterface
     PROPERTIES LABELS "contract;build;runtime" TIMEOUT 30)
 
@@ -1511,7 +1511,7 @@ set(_geometry_test_files
     Test_MeshBuilder.cpp
     Test_GeometryProcessing.cpp
     Test.GaussianMixture.cpp
-    Test.CurvatureSegmentation.cpp
+    Test.Segmentation.cpp
     Test_SurfaceReconstruction.cpp
     Test.PointConstruction.cpp
     Test_MeshQuality.cpp
@@ -1630,9 +1630,9 @@ target_compile_definitions(GeometryFeaturePartitionTestObjs PRIVATE
 # Multi-scale extremum fixtures need their own bounded sanitizer process.
 intrinsic_resolve_test_sources(_geometry_curvature_extrema_test_sources
     SEARCH_DIRS unit/geometry
-    FILES Test.CurvatureExtrema.cpp
+    FILES Test.ScalarfieldExtrema.cpp
 )
-intrinsic_test_object_lib(GeometryCurvatureExtremaTestObjs
+intrinsic_test_object_lib(GeometryScalarfieldExtremaTestObjs
     SOURCES ${_geometry_curvature_extrema_test_sources}
     DEPS ExtrinsicCore IntrinsicGeometry
 )
@@ -2377,16 +2377,16 @@ if(INTRINSIC_GROUP_PURE_CTEST)
     )
 endif()
 
-intrinsic_test_executable(IntrinsicGeometryCurvatureExtremaTests
-    OBJECTS GeometryCurvatureExtremaTestObjs
+intrinsic_test_executable(IntrinsicGeometryScalarfieldExtremaTests
+    OBJECTS GeometryScalarfieldExtremaTestObjs
     LINK_LIBS ExtrinsicCore IntrinsicGeometry
     LABELS unit geometry
     ${_intrinsic_pure_ctest_registration}
 )
 if(INTRINSIC_GROUP_PURE_CTEST)
     intrinsic_grouped_test(
-        IntrinsicGeometryCurvatureExtremaTests.Grouped
-        IntrinsicGeometryCurvatureExtremaTests
+        IntrinsicGeometryScalarfieldExtremaTests.Grouped
+        IntrinsicGeometryScalarfieldExtremaTests
         FILTER "*"
         LABELS unit geometry
     )
@@ -2831,15 +2831,15 @@ if(_intrinsic_registered_test_targets)
     # case-only 60 s budget (the CPU gate's outer --timeout). Grouped
     # (NO_DISCOVER) registration is unchanged.
     get_target_property(_intrinsic_curvature_extrema_discovered
-        IntrinsicGeometryCurvatureExtremaTests INTRINSIC_GTEST_DISCOVERED)
+        IntrinsicGeometryScalarfieldExtremaTests INTRINSIC_GTEST_DISCOVERED)
     if(_intrinsic_curvature_extrema_discovered)
         string(APPEND _intrinsic_property_fixup_script
-            "if(EXISTS \"$<TARGET_FILE:IntrinsicGeometryCurvatureExtremaTests>\")\n"
-            "  list(FIND IntrinsicGeometryCurvatureExtremaTests_TESTS \"CurvatureExtrema.RefinementRetainsCenterCurve\" _intrinsic_serial_index)\n"
+            "if(EXISTS \"$<TARGET_FILE:IntrinsicGeometryScalarfieldExtremaTests>\")\n"
+            "  list(FIND IntrinsicGeometryScalarfieldExtremaTests_TESTS \"ScalarfieldExtrema.RefinementRetainsCenterCurve\" _intrinsic_serial_index)\n"
             "  if(_intrinsic_serial_index EQUAL -1)\n"
-            "    message(FATAL_ERROR \"Serial test CurvatureExtrema.RefinementRetainsCenterCurve was not discovered\")\n"
+            "    message(FATAL_ERROR \"Serial test ScalarfieldExtrema.RefinementRetainsCenterCurve was not discovered\")\n"
             "  endif()\n"
-            "  set_tests_properties(CurvatureExtrema.RefinementRetainsCenterCurve PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)\n"
+            "  set_tests_properties(ScalarfieldExtrema.RefinementRetainsCenterCurve PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)\n"
             "endif()\n"
         )
     endif()

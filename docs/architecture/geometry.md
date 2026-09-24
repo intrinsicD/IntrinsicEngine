@@ -562,7 +562,7 @@ unrelated properties untouched.
 
 ### Signed-curvature mesh segmentation
 
-`Geometry.HalfedgeMesh.CurvatureSegmentation` is the deterministic CPU
+`Geometry.HalfedgeMesh.Segmentation` is the deterministic CPU
 reference for non-destructive, spatially coherent segmentation of an oriented
 triangle mesh. It averages signed per-vertex `(κ₁, κ₂)` onto faces, robustly
 normalizes both channels, and reuses `Geometry.GaussianMixture::FitEM`; the
@@ -588,7 +588,7 @@ component/region labels, edge boundary flags, deterministic colors, candidate
 and solver diagnostics, and explicit failure status.
 
 The narrow companion module
-`Geometry.HalfedgeMesh.CurvatureSegmentation.Features` exposes METHOD-039's
+`Geometry.HalfedgeMesh.Segmentation.Features` exposes METHOD-039's
 standalone CPU feature-evidence stage. `DetectFeatureEvidence` consumes
 slot-aligned ordered signed principal
 curvatures, while `ComputeFeatureEvidence` invokes the existing curvature
@@ -602,7 +602,7 @@ confidence for inspection; it does not turn the rejected patch formulation
 into an accepted v2 backend. The bounded CPU contract evidence is recorded by
 ARA claim C44.
 
-The companion `Geometry.HalfedgeMesh.CurvatureSegmentation.Patches` module is
+The companion `Geometry.HalfedgeMesh.Segmentation.Patches` module is
 an unadopted diagnostic reference. Its deterministic grow/merge/refine path
 passes the bounded oracle and computed-feature controls, but a one-dual-step
 seed perturbation violates the preregistered partition-stability gate. ARA

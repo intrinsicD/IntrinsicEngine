@@ -15,7 +15,7 @@ export import Extrinsic.Runtime.CurvatureSegmentationConfig;
 export import Extrinsic.Runtime.GeodesicsConfig;
 export import Extrinsic.Core.Error;
 export import Geometry.Geodesic.Types;
-export import Geometry.CurvatureSegmentation.Diagnostics;
+export import Geometry.Segmentation.Diagnostics;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
@@ -81,16 +81,16 @@ export namespace Extrinsic::Runtime
             CurvatureSegmentationMethod::CurvatureGmm};
         CurvatureSegmentationMethod ActualMethod{
             CurvatureSegmentationMethod::CurvatureGmm};
-        Geometry::CurvatureSegmentation::CurvatureSegmentationDiagnostics
+        Geometry::Segmentation::SegmentationDiagnostics
             Diagnostics{};
         std::optional<
-            Geometry::CurvatureSegmentation::FeatureEvidenceDiagnostics>
+            Geometry::Segmentation::FeatureEvidenceDiagnostics>
             FeatureDiagnostics{};
         std::optional<
-            Geometry::CurvatureSegmentation::CurvaturePatchDiagnostics>
+            Geometry::Segmentation::CurvaturePatchDiagnostics>
             PatchDiagnostics{};
         std::optional<
-            Geometry::CurvatureSegmentation::BoundaryPartitionDiagnostics>
+            Geometry::Segmentation::BoundaryPartitionDiagnostics>
             BoundaryDiagnostics{};
         std::size_t ChangedValueCount{0u};
         Core::ErrorCode Error{Core::ErrorCode::Success};

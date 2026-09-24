@@ -29,8 +29,8 @@ metrics:
   - "fold_boundary_recall"
   - "runtime_ms"
 correctness_tests:
-  - "../../../tests/unit/geometry/Test.CurvatureExtrema.cpp"
-  - "../../../tests/unit/geometry/Test.CurvatureSegmentation.cpp"
+  - "../../../tests/unit/geometry/Test.ScalarfieldExtrema.cpp"
+  - "../../../tests/unit/geometry/Test.Segmentation.cpp"
   - "../../../tests/unit/geometry/Test.CurvaturePatchContract.cpp"
   - "../../../tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp"
   - "../../../tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp"

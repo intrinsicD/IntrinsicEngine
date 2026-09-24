@@ -15,7 +15,7 @@ module;
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
 
-module Geometry.HalfedgeMesh.CurvatureSegmentation;
+module Geometry.HalfedgeMesh.Segmentation;
 
 import Geometry.Curvature;
 import Geometry.GaussianMixture;
@@ -23,7 +23,7 @@ import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.Properties;
 
-namespace Geometry::CurvatureSegmentation
+namespace Geometry::Segmentation
 {
     namespace Gmm = Geometry::GaussianMixture;
 
@@ -42,9 +42,9 @@ namespace Geometry::CurvatureSegmentation
 
         void InitializeResult(
             const HalfedgeMesh::Mesh& mesh,
-            CurvatureSegmentationResult& result)
+            SegmentationResult& result)
         {
-            CurvatureSegmentationDiagnostics& diagnostics = result.Diagnostics;
+            SegmentationDiagnostics& diagnostics = result.Diagnostics;
             diagnostics.FaceSlotCount = mesh.FacesSize();
             diagnostics.LiveFaceCount = mesh.FaceCount();
             diagnostics.EdgeSlotCount = mesh.EdgesSize();
@@ -149,7 +149,7 @@ namespace Geometry::CurvatureSegmentation
             const std::uint32_t dimension,
             std::vector<FaceSample>& samples,
             std::vector<std::uint32_t>& faceSlotToSample,
-            CurvatureSegmentationDiagnostics& diagnostics)
+            SegmentationDiagnostics& diagnostics)
         {
             if (faceFeatures.size() != mesh.FacesSize())
                 return SegmentationStatus::FeatureCountMismatch;
@@ -205,8 +205,8 @@ namespace Geometry::CurvatureSegmentation
 
             for (std::uint32_t channel = 0u; channel < dimension; ++channel)
             {
-                const CurvatureNormalization normalization =
-                    ComputeCurvatureNormalization(channelValues[channel]);
+                const FeatureNormalization normalization =
+                    ComputeFeatureNormalization(channelValues[channel]);
                 diagnostics.FeatureCenter[channel] = normalization.Center;
                 diagnostics.FeatureScale[channel] = normalization.Scale;
             }
@@ -326,7 +326,7 @@ namespace Geometry::CurvatureSegmentation
             const std::span<const glm::vec3> points,
             const std::uint32_t componentCount,
             const std::uint32_t dimension,
-            const CurvatureSegmentationParams& params)
+            const SegmentationParams& params)
         {
             FittedCandidate candidate{};
             candidate.Diagnostics.ComponentCount = componentCount;
@@ -527,8 +527,8 @@ namespace Geometry::CurvatureSegmentation
             const std::size_t componentCount,
             const std::vector<DualEdge>& dualEdges,
             const std::vector<std::vector<std::uint32_t>>& incidentDualEdges,
-            const CurvatureSegmentationParams& params,
-            CurvatureSegmentationDiagnostics& diagnostics)
+            const SegmentationParams& params,
+            SegmentationDiagnostics& diagnostics)
         {
             diagnostics.InitialEnergy = LabelEnergy(
                 labels,
@@ -657,8 +657,8 @@ namespace Geometry::CurvatureSegmentation
             const std::size_t componentCount,
             const std::vector<DualEdge>& dualEdges,
             const std::vector<std::vector<std::uint32_t>>& incidentDualEdges,
-            const CurvatureSegmentationParams& params,
-            CurvatureSegmentationDiagnostics& diagnostics)
+            const SegmentationParams& params,
+            SegmentationDiagnostics& diagnostics)
         {
             if (params.MinimumRegionFaces <= 1u)
                 return;
@@ -777,7 +777,7 @@ namespace Geometry::CurvatureSegmentation
     }
 
     [[nodiscard]] bool
-    IsValidMixtureParams(const CurvatureSegmentationParams& params) noexcept
+    IsValidMixtureParams(const SegmentationParams& params) noexcept
     {
         const bool validMode =
             params.SelectionMode == ComponentSelectionMode::FixedCount ||
@@ -798,7 +798,7 @@ namespace Geometry::CurvatureSegmentation
     }
 
     [[nodiscard]] bool IsValidSegmentationParams(
-        const CurvatureSegmentationParams& params) noexcept
+        const SegmentationParams& params) noexcept
     {
         return IsValidMixtureParams(params) &&
                std::isfinite(params.SpatialWeight) &&
@@ -809,11 +809,11 @@ namespace Geometry::CurvatureSegmentation
                params.MinimumRegionFaces > 0u;
     }
 
-    CurvatureNormalization ComputeCurvatureNormalization(
+    FeatureNormalization ComputeFeatureNormalization(
         const std::span<const double> values)
     {
         const double center = Median(std::vector<double>(values.begin(), values.end()));
-        return CurvatureNormalization{center, RobustScale(values, center)};
+        return FeatureNormalization{center, RobustScale(values, center)};
     }
 
     const char* ToString(const ComponentSelectionMode mode) noexcept
@@ -853,16 +853,16 @@ namespace Geometry::CurvatureSegmentation
         return "unknown";
     }
 
-    CurvatureSegmentationResult SegmentFaceFeatures(
+    SegmentationResult SegmentFaceFeatures(
         const HalfedgeMesh::Mesh& mesh,
         const std::span<const glm::dvec3> faceFeatures,
         const std::uint32_t dimension,
-        const CurvatureSegmentationParams& params)
+        const SegmentationParams& params)
     {
-        CurvatureSegmentationResult result{};
-        CurvatureSegmentationDiagnostics& diagnostics = result.Diagnostics;
+        SegmentationResult result{};
+        SegmentationDiagnostics& diagnostics = result.Diagnostics;
         const ProfileClock::time_point totalStart = ProfileClock::now();
-        const auto finish = [&]() -> CurvatureSegmentationResult
+        const auto finish = [&]() -> SegmentationResult
         {
             diagnostics.Timings.TotalMilliseconds =
                 ElapsedMilliseconds(totalStart);
@@ -1106,11 +1106,11 @@ namespace Geometry::CurvatureSegmentation
         return finish();
     }
 
-    CurvatureSegmentationResult Segment(
+    SegmentationResult Segment(
         const HalfedgeMesh::Mesh& mesh,
         const std::span<const double> maxPrincipal,
         const std::span<const double> minPrincipal,
-        const CurvatureSegmentationParams& params)
+        const SegmentationParams& params)
     {
         const ProfileClock::time_point totalStart = ProfileClock::now();
         if (mesh.IsEmpty() || mesh.FaceCount() == 0u ||
@@ -1118,7 +1118,7 @@ namespace Geometry::CurvatureSegmentation
             maxPrincipal.size() != mesh.VerticesSize() ||
             minPrincipal.size() != mesh.VerticesSize())
         {
-            CurvatureSegmentationResult result = SegmentFaceFeatures(
+            SegmentationResult result = SegmentFaceFeatures(
                 mesh, {}, 2u, params);
             result.Diagnostics.Timings.TotalMilliseconds =
                 ElapsedMilliseconds(totalStart);
@@ -1128,7 +1128,7 @@ namespace Geometry::CurvatureSegmentation
         const ProfileClock::time_point aggregationStart = ProfileClock::now();
         const auto reject = [&](const SegmentationStatus status)
         {
-            CurvatureSegmentationResult result{};
+            SegmentationResult result{};
             InitializeResult(mesh, result);
             result.Diagnostics.FeatureDimension = 2u;
             result.Diagnostics.Status = status;
@@ -1179,7 +1179,7 @@ namespace Geometry::CurvatureSegmentation
         const double aggregationMilliseconds =
             ElapsedMilliseconds(aggregationStart);
 
-        CurvatureSegmentationResult result = SegmentFaceFeatures(
+        SegmentationResult result = SegmentFaceFeatures(
             mesh, faceFeatures, 2u, params);
         result.Diagnostics.Timings
             .FaceAggregationAndNormalizationMilliseconds +=
@@ -1189,14 +1189,14 @@ namespace Geometry::CurvatureSegmentation
         return result;
     }
 
-    CurvatureSegmentationResult ComputeAndSegment(
+    SegmentationResult ComputeAndSegment(
         HalfedgeMesh::Mesh& mesh,
-        const CurvatureSegmentationParams& params)
+        const SegmentationParams& params)
     {
         const ProfileClock::time_point totalStart = ProfileClock::now();
         if (mesh.IsEmpty() || mesh.FaceCount() == 0u)
         {
-            CurvatureSegmentationResult result{};
+            SegmentationResult result{};
             result.Diagnostics.Status = SegmentationStatus::EmptyMesh;
             result.Diagnostics.FeatureDimension = 2u;
             result.Diagnostics.FaceSlotCount = mesh.FacesSize();
@@ -1216,7 +1216,7 @@ namespace Geometry::CurvatureSegmentation
         if (!curvature.MaxPrincipalCurvatureProperty ||
             !curvature.MinPrincipalCurvatureProperty)
         {
-            CurvatureSegmentationResult result{};
+            SegmentationResult result{};
             result.Diagnostics.Status =
                 SegmentationStatus::FeatureCountMismatch;
             result.Diagnostics.FeatureDimension = 2u;
@@ -1230,7 +1230,7 @@ namespace Geometry::CurvatureSegmentation
             curvature.MaxPrincipalCurvatureProperty.Vector();
         const std::vector<double>& minimum =
             curvature.MinPrincipalCurvatureProperty.Vector();
-        CurvatureSegmentationResult result = Segment(
+        SegmentationResult result = Segment(
             mesh,
             std::span<const double>{maximum.data(), maximum.size()},
             std::span<const double>{minimum.data(), minimum.size()},

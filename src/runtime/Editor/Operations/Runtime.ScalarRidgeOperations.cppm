@@ -19,7 +19,7 @@ export namespace Extrinsic::Runtime
                                      Geometry::PropertyValueKind::Double};
         // Fit radius as a fraction of the bounding-box diagonal.
         double RadiusRatio{0.02};
-        // Fractions of the field range; see Geometry::CurvatureExtrema.
+        // Fractions of the field range; see Geometry::ScalarfieldExtrema.
         double MinimumSharpness{0.01};
         double MinimumStrength{0.01};
         // 0, 1, 2 select 0.5x, 1x, 2x the fit radius.

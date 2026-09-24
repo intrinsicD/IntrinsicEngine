@@ -28,7 +28,7 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GeometryAvailability;
 import Geometry.Graph;
 import Geometry.HalfedgeMesh;
-import Geometry.HalfedgeMesh.CurvatureExtrema;
+import Geometry.HalfedgeMesh.ScalarfieldExtrema;
 import Geometry.Properties;
 
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
@@ -41,7 +41,7 @@ namespace Extrinsic::Runtime
     namespace
     {
         namespace GS = ECS::Components::GeometrySources;
-        namespace C = Geometry::CurvatureExtrema;
+        namespace C = Geometry::ScalarfieldExtrema;
         constexpr std::string_view kFieldProperty = "v:scalar_ridge_field";
     }
 

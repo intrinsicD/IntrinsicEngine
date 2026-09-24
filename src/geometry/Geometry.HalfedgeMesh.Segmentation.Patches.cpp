@@ -22,13 +22,13 @@ module;
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
 
-module Geometry.HalfedgeMesh.CurvatureSegmentation.Patches;
+module Geometry.HalfedgeMesh.Segmentation.Patches;
 
 import Geometry.GaussianMixture;
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;
 
-namespace Geometry::CurvatureSegmentation
+namespace Geometry::Segmentation
 {
     namespace Gmm = Geometry::GaussianMixture;
 
@@ -303,8 +303,8 @@ namespace Geometry::CurvatureSegmentation
                 k2Values.push_back(curvature.y);
             }
 
-            const auto k1Normalization = ComputeCurvatureNormalization(k1Values);
-            const auto k2Normalization = ComputeCurvatureNormalization(k2Values);
+            const auto k1Normalization = ComputeFeatureNormalization(k1Values);
+            const auto k2Normalization = ComputeFeatureNormalization(k2Values);
             result.Diagnostics.SignedK1Center = k1Normalization.Center;
             result.Diagnostics.SignedK2Center = k2Normalization.Center;
             result.Diagnostics.SignedK1Scale = k1Normalization.Scale;
@@ -454,7 +454,7 @@ namespace Geometry::CurvatureSegmentation
         [[nodiscard]] FittedPatchCandidate
         FitCandidate(const std::span<const glm::vec3> points,
                      const std::uint32_t componentCount,
-                     const CurvatureSegmentationParams& params)
+                     const SegmentationParams& params)
         {
             FittedPatchCandidate candidate{};
             candidate.Diagnostics.ComponentCount = componentCount;
@@ -2818,4 +2818,4 @@ namespace Geometry::CurvatureSegmentation
             ElapsedMilliseconds(publicationStart);
         return finish(publicationStatus);
     }
-} // namespace Geometry::CurvatureSegmentation
+} // namespace Geometry::Segmentation

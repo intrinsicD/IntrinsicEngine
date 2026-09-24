@@ -16,11 +16,11 @@ module;
 #include <string_view>
 #include <utility>
 #include <vector>
-module Geometry.HalfedgeMesh.CurvatureExtrema;
+module Geometry.HalfedgeMesh.ScalarfieldExtrema;
 import Geometry.HalfedgeMesh;
 import Geometry.Curvature;
 import Geometry.Properties;
-namespace Geometry::CurvatureExtrema
+namespace Geometry::ScalarfieldExtrema
 {
     namespace
     {
@@ -985,4 +985,4 @@ namespace Geometry::CurvatureExtrema
         state = Connect(surface, params, result);
         return Finish(std::move(result), state, start);
     }
-} // namespace Geometry::CurvatureExtrema
+} // namespace Geometry::ScalarfieldExtrema

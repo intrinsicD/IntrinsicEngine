@@ -9,7 +9,7 @@
 #include <tuple>
 #include <utility>
 
-namespace Geometry::CurvatureSegmentation::BoundaryDetail
+namespace Geometry::Segmentation::BoundaryDetail
 {
 namespace
 {
@@ -868,4 +868,4 @@ Result Solve(Index nodes, std::span<const Edge> input, const Options &options,
     result.State = Status::Success;
     return result;
 }
-} // namespace Geometry::CurvatureSegmentation::BoundaryDetail
+} // namespace Geometry::Segmentation::BoundaryDetail

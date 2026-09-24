@@ -7,9 +7,9 @@ module;
 #include <cstdint>
 #include <vector>
 
-export module Geometry.CurvatureSegmentation.Diagnostics;
+export module Geometry.Segmentation.Diagnostics;
 
-export namespace Geometry::CurvatureSegmentation
+export namespace Geometry::Segmentation
 {
     enum class SegmentationStatus : std::uint8_t
     {
@@ -43,7 +43,7 @@ export namespace Geometry::CurvatureSegmentation
         bool Selected{false};
     };
 
-    struct CurvatureSegmentationStageTimings
+    struct SegmentationStageTimings
     {
         // Zero for Segment(), which consumes supplied curvatures. The
         // ComputeAndSegment() convenience path fills this field and includes
@@ -66,7 +66,7 @@ export namespace Geometry::CurvatureSegmentation
         std::array<double, 3u> FeatureMean{};
     };
 
-    struct CurvatureSegmentationDiagnostics
+    struct SegmentationDiagnostics
     {
         SegmentationStatus Status{SegmentationStatus::EmptyMesh};
         std::size_t FaceSlotCount{0u};
@@ -102,7 +102,7 @@ export namespace Geometry::CurvatureSegmentation
 
         std::vector<ModelCandidateDiagnostics> Candidates{};
         std::vector<CurvatureComponentSummary> Components{};
-        CurvatureSegmentationStageTimings Timings{};
+        SegmentationStageTimings Timings{};
 
         [[nodiscard]] bool Succeeded() const noexcept
         {

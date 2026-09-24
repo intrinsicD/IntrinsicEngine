@@ -9,13 +9,13 @@ module;
 #include <span>
 #include <vector>
 
-export module Geometry.HalfedgeMesh.CurvatureSegmentation.Features;
+export module Geometry.HalfedgeMesh.Segmentation.Features;
 
-export import Geometry.CurvatureSegmentation.Diagnostics;
+export import Geometry.Segmentation.Diagnostics;
 
 import Geometry.HalfedgeMesh;
 
-export namespace Geometry::CurvatureSegmentation
+export namespace Geometry::Segmentation
 {
     inline constexpr std::size_t kFeatureEvidenceScaleCount = 3u;
     inline constexpr std::uint32_t kInvalidFeatureIndex =
@@ -125,4 +125,4 @@ export namespace Geometry::CurvatureSegmentation
     // evidence itself remains an owning result and is not auto-published.
     [[nodiscard]] FeatureEvidenceResult ComputeFeatureEvidence(
         HalfedgeMesh::Mesh &mesh, const FeatureEvidenceParams &params = {});
-} // namespace Geometry::CurvatureSegmentation
+} // namespace Geometry::Segmentation

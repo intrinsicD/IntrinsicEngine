@@ -55,7 +55,7 @@ The source exposes three distinct mechanisms:
    solver.
 
 These observations follow from
-[`RegionCost`, `VertexTurnContribution`, and the merge/refinement implementation](../../../src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp).
+[`RegionCost`, `VertexTurnContribution`, and the merge/refinement implementation](../../../src/geometry/Geometry.HalfedgeMesh.Segmentation.Patches.cpp).
 They do not establish that the detector is sufficient: frog has many retained
 soft fragments, but whether they mark useful contours still needs overlays.
 Changing detector thresholds and partitioning simultaneously would obscure that

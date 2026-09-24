@@ -6,7 +6,7 @@ extern "C++"
 {
     namespace Extrinsic::Runtime
     {
-        [[nodiscard]] Geometry::CurvatureSegmentation::CurvatureSegmentationParams
+        [[nodiscard]] Geometry::Segmentation::SegmentationParams
         MakeCurvatureSegmentationParams(const CurvatureSegmentationConfig& config);
     }
 }

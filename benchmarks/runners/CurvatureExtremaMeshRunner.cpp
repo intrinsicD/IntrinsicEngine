@@ -25,8 +25,8 @@ import Geometry.MarchingCubes;
 import Geometry.MeshSoup;
 import Geometry.SurfaceReconstruction;
 import Geometry.PointCloud;
-import Geometry.HalfedgeMesh.CurvatureExtrema;
-namespace C = Geometry::CurvatureExtrema;
+import Geometry.HalfedgeMesh.ScalarfieldExtrema;
+namespace C = Geometry::ScalarfieldExtrema;
 using Json = nlohmann::json;
 int main(int argc, char** argv)
 {

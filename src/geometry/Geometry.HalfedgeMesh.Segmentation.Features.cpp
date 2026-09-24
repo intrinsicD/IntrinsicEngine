@@ -16,14 +16,14 @@ module;
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
 
-module Geometry.HalfedgeMesh.CurvatureSegmentation.Features;
+module Geometry.HalfedgeMesh.Segmentation.Features;
 
 import Geometry.Curvature;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Features;
 import Geometry.Properties;
 
-namespace Geometry::CurvatureSegmentation
+namespace Geometry::Segmentation
 {
     namespace SharedFeatures = Geometry::HalfedgeMesh::Features;
 
@@ -1344,4 +1344,4 @@ namespace Geometry::CurvatureSegmentation
             ElapsedMilliseconds(totalStart);
         return result;
     }
-} // namespace Geometry::CurvatureSegmentation
+} // namespace Geometry::Segmentation

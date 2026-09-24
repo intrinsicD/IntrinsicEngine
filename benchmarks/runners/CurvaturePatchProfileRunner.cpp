@@ -27,13 +27,13 @@
 #include <glm/glm.hpp>
 
 import Geometry.HalfedgeMesh;
-import Geometry.HalfedgeMesh.CurvatureSegmentation.Patches;
+import Geometry.HalfedgeMesh.Segmentation.Patches;
 import Geometry.Properties;
 
 namespace
 {
     using namespace Intrinsic::Bench::CurvatureProfile;
-    namespace Segment = Geometry::CurvatureSegmentation;
+    namespace Segment = Geometry::Segmentation;
 
     struct FeaturePatchFeatureVariantProfile
     {

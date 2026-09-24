@@ -735,7 +735,7 @@ Geodesic status and complete owned distance results live in
 interfaces, config adapters and prepared frames import that data-only module;
 only the geodesic execution unit imports `Geometry.Geodesic`. Parameter choices
 and status-string conversion remain with the algorithm. Segmentation
-status and diagnostic records live in `Geometry.CurvatureSegmentation.Diagnostics`,
+status and diagnostic records live in `Geometry.Segmentation.Diagnostics`,
 shared by the GMM, feature, patch and boundary algorithms and runtime reports.
 Mesh-field interfaces, config adapters and prepared frames therefore stay
 independent of those algorithms and the owning halfedge mesh. Algorithm parameters,

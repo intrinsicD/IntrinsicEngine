@@ -22,7 +22,7 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.HalfedgeMesh;
-import Geometry.HalfedgeMesh.CurvatureSegmentation.Patches;
+import Geometry.HalfedgeMesh.Segmentation.Patches;
 import Geometry.HalfedgeMesh.Builder;
 import Geometry.Properties;
 import Geometry.Subdivision;
@@ -205,11 +205,11 @@ TEST(CurvatureSegmentationOperations,
             EXPECT_EQ(
                 roles[edge],
                 static_cast<std::uint32_t>(
-                    Geometry::CurvatureSegmentation::
+                    Geometry::Segmentation::
                         PatchBoundaryRole::HardFeature));
         }
         if (roles[edge] == static_cast<std::uint32_t>(
-                Geometry::CurvatureSegmentation::
+                Geometry::Segmentation::
                     PatchBoundaryRole::SoftFeatureSupported))
         {
             EXPECT_GT(soft[edge], 0.0);

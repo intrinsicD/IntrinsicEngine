@@ -10,16 +10,16 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Geometry.HalfedgeMesh.CurvatureSegmentation.Patches;
+export module Geometry.HalfedgeMesh.Segmentation.Patches;
 
-export import Geometry.HalfedgeMesh.CurvatureSegmentation;
-export import Geometry.HalfedgeMesh.CurvatureSegmentation.Features;
+export import Geometry.HalfedgeMesh.Segmentation;
+export import Geometry.HalfedgeMesh.Segmentation.Features;
 
-export import Geometry.CurvatureSegmentation.Diagnostics;
+export import Geometry.Segmentation.Diagnostics;
 
 import Geometry.HalfedgeMesh;
 
-export namespace Geometry::CurvatureSegmentation
+export namespace Geometry::Segmentation
 {
     inline constexpr std::uint32_t kInvalidPatchIndex =
         std::numeric_limits<std::uint32_t>::max();
@@ -47,7 +47,7 @@ export namespace Geometry::CurvatureSegmentation
         // Fixed/Automatic selection and deterministic EM controls are reused
         // from the established curvature-segmentation reference. Its Potts
         // and cleanup fields are intentionally ignored by this formulation.
-        CurvatureSegmentationParams Mixture{};
+        SegmentationParams Mixture{};
 
         double BaseRadiusRatio{0.02};
         double SeedSpacingMultiplier{2.0};
@@ -166,4 +166,4 @@ export namespace Geometry::CurvatureSegmentation
                                  FeatureEvidenceView evidence,
                                  const CurvaturePatchParams& params = {},
                                  PatchSeedOverrides seedOverrides = {});
-} // namespace Geometry::CurvatureSegmentation
+} // namespace Geometry::Segmentation

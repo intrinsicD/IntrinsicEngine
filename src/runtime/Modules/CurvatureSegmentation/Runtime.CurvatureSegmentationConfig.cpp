@@ -8,20 +8,20 @@ module;
 
 module Extrinsic.Runtime.CurvatureSegmentationConfig;
 
-import Geometry.HalfedgeMesh.CurvatureSegmentation;
+import Geometry.HalfedgeMesh.Segmentation;
 
 #include "Config/internal/Runtime.CurvatureSegmentationParams.hpp"
 
 namespace Extrinsic::Runtime
 {
-    namespace CurvSeg = Geometry::CurvatureSegmentation;
+    namespace CurvSeg = Geometry::Segmentation;
 
     extern "C++"
-    [[nodiscard]] CurvSeg::CurvatureSegmentationParams
+    [[nodiscard]] CurvSeg::SegmentationParams
     MakeCurvatureSegmentationParams(
         const CurvatureSegmentationConfig& config)
     {
-        return CurvSeg::CurvatureSegmentationParams{
+        return CurvSeg::SegmentationParams{
             .SelectionMode =
                 config.SelectionMode ==
                         CurvatureSegmentationSelectionMode::FixedCount

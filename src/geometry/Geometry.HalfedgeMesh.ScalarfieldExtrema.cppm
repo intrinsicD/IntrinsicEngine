@@ -8,9 +8,9 @@ module;
 #include <glm/glm.hpp>
 #include <string_view>
 #include <vector>
-export module Geometry.HalfedgeMesh.CurvatureExtrema;
+export module Geometry.HalfedgeMesh.ScalarfieldExtrema;
 import Geometry.HalfedgeMesh;
-export namespace Geometry::CurvatureExtrema
+export namespace Geometry::ScalarfieldExtrema
 {
     enum class Status : std::uint8_t
     {
@@ -113,4 +113,4 @@ export namespace Geometry::CurvatureExtrema
     [[nodiscard]] Result ExtractScalarExtrema(const HalfedgeMesh::Mesh& mesh,
                                               std::string_view vertexProperty,
                                               const Params& params = kScalarDefaults);
-} // namespace Geometry::CurvatureExtrema
+} // namespace Geometry::ScalarfieldExtrema
