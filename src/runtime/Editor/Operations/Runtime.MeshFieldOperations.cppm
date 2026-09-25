@@ -1,5 +1,5 @@
 // Same-domain scalar and direction fields published on an existing mesh:
-// curvature, curvature segmentation and geodesic distance. These methods never
+// curvature, segmentation, geodesic distance and face scalar gradients. These methods never
 // replace topology, which is what separates them from mesh topology editing.
 module;
 #include <cstddef>
@@ -7,6 +7,7 @@ module;
 #include <functional>
 #include <optional>
 #include <string>
+#include <string_view>
 export module Extrinsic.Runtime.MeshFieldOperations;
 export import Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.EditorCommon;
@@ -118,6 +119,33 @@ export namespace Extrinsic::Runtime
                    Diagnostics.Succeeded();
         }
     };
+
+    inline constexpr std::string_view kScalarGradientConfigSectionName = "sandbox.scalar_gradient";
+    struct ScalarGradientConfig
+    {
+        GeometryPropertyRef Positions{GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};
+        GeometryPropertyRef Scalar{GeometryElementDomain::MeshVertex, "v:mean_curvature", Geometry::PropertyValueKind::Double};
+        GeometryPropertyRef Output{GeometryElementDomain::MeshFace, "f:scalar_gradient", Geometry::PropertyValueKind::Vec3};
+    };
+    struct EditorScalarGradientResult
+    {
+        EditorCommandStatus Status{EditorCommandStatus::NoChange};
+        std::size_t FaceCount{};
+        std::string Message{};
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == EditorCommandStatus::Applied || Status == EditorCommandStatus::NoChange;
+        }
+    };
+    [[nodiscard]] std::string SerializeScalarGradientConfig(const ScalarGradientConfig&);
+    [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeScalarGradientConfigSectionRegistration();
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorScalarGradientConfig(
+        const EditorProcessingCommands&, const ScalarGradientConfig&);
+    [[nodiscard]] std::optional<ScalarGradientConfig> GetEditorScalarGradientConfig(const EditorProcessingCommands&);
+    [[nodiscard]] ActionReadiness PreviewEditorScalarGradientCommand(
+        const EditorProcessingCommands&, std::uint32_t stableEntityId, const ScalarGradientConfig&);
+    [[nodiscard]] EditorScalarGradientResult ApplyEditorScalarGradientCommand(
+        const EditorProcessingCommands&, std::uint32_t stableEntityId, const ScalarGradientConfig&);
 
     // Incomplete borrowed containers keep sibling workspace features independent
     // of mesh-field records; prepared frames copy their values. Curvature is the

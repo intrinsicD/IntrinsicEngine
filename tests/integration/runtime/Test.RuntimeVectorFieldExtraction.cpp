@@ -27,6 +27,9 @@ import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.MeshFieldOperations;
+import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.HalfedgeMesh;
@@ -433,4 +436,41 @@ TEST(RuntimeVectorFieldExtraction, SteadyFramesDoNotRevisitLiveRowsOfSharedDelet
         EXPECT_EQ(steady.Stats.VectorFieldRowIndexCheckCount, 0u);
         EXPECT_EQ(steady.World.Visualization.PropertyBufferDiagnostics.UploadedBufferCount, 0u);
     }
+}
+
+TEST(RuntimeVectorFieldExtraction, ScalarGradientCommandReachesFaceArrowBuffers)
+{
+    Fixture fixture;
+    const auto entity = fixture.Scene.Create();
+    fixture.Scene.Raw().emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1};
+    fixture.Scene.Raw().emplace<Graphics::Components::RenderSurface>(entity);
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0,0,0}), b = mesh.AddVertex({1,0,0}), c = mesh.AddVertex({0,1,0});
+    ASSERT_TRUE(mesh.AddTriangle(a,b,c));
+    GS::PopulateFromMesh(fixture.Scene.Raw(), entity, mesh);
+    auto& props = fixture.Scene.Raw().get<GS::Vertices>(entity).Properties;
+    props.GetOrAdd<double>("field", 0.).Vector() = {0,2,3};
+    Runtime::EditorProcessingContext processing;
+    processing.Scene = &fixture.Scene;
+    Runtime::ScalarGradientConfig config;
+    config.Scalar.Name = "field";
+    const auto id = Runtime::SelectionController::ToStableEntityId(entity);
+    ASSERT_TRUE(Runtime::ApplyEditorScalarGradientCommand(
+        Runtime::BindEditorProcessingCommands(processing), id, config).Succeeded());
+    Runtime::EditorVisualizationEditingContext visualization;
+    visualization.Scene = &fixture.Scene;
+    EXPECT_EQ(Runtime::ApplyEditorGeometryVectorFieldCommand(visualization,
+        {.StableEntityId = id, .Layer = {.Vector = config.Output}}), Runtime::EditorCommandStatus::Applied);
+    const auto frame = fixture.Extract();
+    const auto* packet = FindPacket(frame.World, ":f:scalar_gradient");
+    ASSERT_NE(packet, nullptr);
+    ASSERT_TRUE(Graphics::IsRenderableVectorFieldPacket(*packet));
+    EXPECT_EQ(packet->Domain, Graphics::VisualizationAttributeDomain::Face);
+    EXPECT_EQ(packet->RowCount, 1u);
+    const auto anchors = fixture.Read<glm::vec3>(packet->PositionBufferBDA);
+    const auto vectors = fixture.Read<glm::vec3>(packet->VectorBufferBDA);
+    ASSERT_EQ(anchors.size(), 1u);
+    ASSERT_EQ(vectors.size(), 1u);
+    EXPECT_EQ(anchors[0], glm::vec3(1.f/3, 1.f/3, 0));
+    EXPECT_EQ(vectors[0], glm::vec3(2,3,0));
 }

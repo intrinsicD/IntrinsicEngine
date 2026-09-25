@@ -188,6 +188,15 @@ fitting/orientation through the same persisted config. **Show normals** selects
 the output property for Appearance color display on the corresponding surface,
 edge, or point layer. Processing Show actions resolve already-published output
 properties independently of whether the current method parameters can run.
+Mesh / Processing / Faces / Scalar Field Gradient binds a vertex scalar and
+vertex positions, then publishes a face `vec3` property (`f:scalar_gradient` by
+default) with undo/redo. **Show Gradient Vectorfield** adds the output to the
+mesh's Appearance vector fields, with arrows anchored at face centers. Bindings
+persist in `sandbox.scalar_gradient`; files, runtime callers and the panel use
+the same validation path. This operation requires triangle faces and finite
+scalar values; degenerate triangles produce zero vectors. Polygon meshes must
+be triangulated first. Arrow scale, color and visibility use Appearance controls.
+
 Mesh / Processing / Faces / Normals presets full-polygon face-normal computation
 and a face output (`f:normal`), with a button to display its object-space colors. It
 uses the persisted `sandbox.normal_estimation` config and canonical property bindings. The panels own their ImGui

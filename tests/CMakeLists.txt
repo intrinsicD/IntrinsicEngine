@@ -1291,6 +1291,7 @@ if(TARGET ExtrinsicRuntime)
         Test.GeometryValueComparison.cpp
         Test.GeometryPresentation.cpp
         Test.PointCloudGeometryExtraction.cpp
+        Test.ScalarGradientOperations.cpp
         Test.GeodesicsOperations.cpp
         Test.ScalarRidgeOperations.cpp
         Test.ParameterizationOperations.cpp

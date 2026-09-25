@@ -668,7 +668,7 @@ service import and a frame copied past detach reports unavailable.
 `Extrinsic.Runtime.RegistrationOperations` owns ICP alignment, its source/target
 selection and its narrower input catalog. `Extrinsic.Runtime.ParameterizationOperations`
 owns UV regeneration, surface parameterization and the UV view request/state.
-`Extrinsic.Runtime.MeshFieldOperations` owns curvature, curvature segmentation and
+`Extrinsic.Runtime.MeshFieldOperations` owns face scalar gradients, curvature, curvature segmentation and
 geodesic distance: fields published onto the mesh that produced them, never a
 topology replacement. Segmentation result success evaluation is defined in the
 existing `Runtime.MeshFieldOperations.cpp` implementation unit; its method-specific
@@ -814,7 +814,7 @@ closure are separate: completing the pilot cannot retire the product gate.
 | Normal commands, config and copied results | `Extrinsic.Runtime.NormalOperations` |
 | ICP registration commands, config, input catalog and copied results | `Extrinsic.Runtime.RegistrationOperations` |
 | UV regeneration, parameterization, UV view surface, view model and copied results | `Extrinsic.Runtime.ParameterizationOperations` |
-| Curvature, curvature segmentation, geodesics commands, configs and copied results | `Extrinsic.Runtime.MeshFieldOperations` |
+| Face scalar gradients, curvature, curvature segmentation, geodesics commands, configs and copied results | `Extrinsic.Runtime.MeshFieldOperations` |
 | Denoise, remesh, subdivide, simplify commands, UV outcome and copied results | `Extrinsic.Runtime.MeshTopologyOperations` |
 | Bilateral filtering and progressive Poisson commands, configs and copied results | `Extrinsic.Runtime.PointSetOperations` |
 | Point construction commands, config and copied results | `Extrinsic.Runtime.PointConstructionOperations` |

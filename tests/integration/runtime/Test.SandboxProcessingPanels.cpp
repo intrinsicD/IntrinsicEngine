@@ -2843,3 +2843,62 @@ TEST(SandboxProcessingPanels, AtlasWorkspaceAutoOpensAndClaimsSceneRectangle)
 
     EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
 }
+
+TEST(SandboxProcessingPanels, FaceScalarGradientComputesAndShowsVectorfield)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0,0,0}), b = mesh.AddVertex({1,0,0}), c = mesh.AddVertex({0,1,0});
+    ASSERT_TRUE(mesh.AddTriangle(a,b,c));
+    GS::PopulateFromMesh(scene.Raw(), entity, mesh);
+    auto& vertices = scene.Raw().get<GS::Vertices>(entity).Properties;
+    vertices.GetOrAdd<double>("v:mean_curvature", 0.).Vector() = {0,2,3};
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("mesh.processing.faces.scalar_gradient", true));
+    auto& initialRecipe = scene.Raw().get_or_emplace<R::GeometryPresentationRecipe>(entity);
+    initialRecipe.VectorFields.push_back({
+        .Vector = {R::GeometryElementDomain::MeshFace, "f:scalar_gradient", Geometry::PropertyValueKind::Vec3},
+        .Length = 0.37f, .Enabled = false});
+    int frames = 0;
+    bool requested = false, shown = false;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        ++frames;
+        auto* window = ImGui::FindWindowByName("Mesh / Processing / Faces / Scalar Field Gradient");
+        if (window)
+        {
+            ImGui::SetWindowSize(window, {700, 900});
+            ImGui::SetWindowPos(window, {0,0});
+            ImGui::FocusWindow(window);
+        }
+        const auto& faces = std::as_const(scene.Raw().get<GS::Faces>(entity).Properties);
+        if (window && frames == 10)
+        {
+            ImGui::ActivateItemByID(window->GetID("Compute Gradient"));
+            requested = true;
+        }
+        if (window && requested && faces.Exists("f:scalar_gradient") && !shown)
+        {
+            EXPECT_EQ(faces.Get<glm::vec3>("f:scalar_gradient")[0], glm::vec3(2,3,0));
+            ImGui::ActivateItemByID(window->GetID("Show Gradient Vectorfield"));
+            shown = true;
+        }
+        const auto* recipe = scene.Raw().try_get<R::GeometryPresentationRecipe>(entity);
+        if (recipe && !recipe->VectorFields.empty() && recipe->VectorFields[0].Enabled)
+        {
+            ASSERT_EQ(recipe->VectorFields.size(), 1u);
+            EXPECT_EQ(recipe->VectorFields[0].Vector.Domain, R::GeometryElementDomain::MeshFace);
+            EXPECT_EQ(recipe->VectorFields[0].Vector.Name, "f:scalar_gradient");
+            EXPECT_TRUE(recipe->VectorFields[0].Enabled);
+            EXPECT_FLOAT_EQ(recipe->VectorFields[0].Length, 0.37f);
+            engine.RequestExit();
+        }
+        if (frames > 60)
+        {
+            ADD_FAILURE() << "Gradient compute/show did not complete: " << requested << "/" << shown;
+            engine.RequestExit();
+        }
+    };
+    h.Engine->Run();
+}

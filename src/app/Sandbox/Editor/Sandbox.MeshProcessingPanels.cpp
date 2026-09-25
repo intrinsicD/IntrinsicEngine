@@ -326,6 +326,8 @@ namespace Extrinsic::Sandbox::Editor
         DenoiseState Denoise{};
         CurvatureState Curvature{};
         SegmentationState Segmentation{};
+        ProcessingDraftState<Runtime::ScalarGradientConfig, Runtime::EditorScalarGradientResult> Gradient{};
+        std::uint32_t GradientEntity{};
         GeodesicsState Geodesics{};
         std::uint32_t GeodesicsEntity{0u};
         int GeodesicsSourceVertex{0};
@@ -374,6 +376,7 @@ namespace Extrinsic::Sandbox::Editor
         void DrawDenoiseWindow(bool&, const SandboxEditorContext&);
         void DrawCurvatureWindow(bool&, const SandboxEditorContext&);
         void DrawSegmentationWindow(bool&, const SandboxEditorContext&);
+        void DrawGradientWindow(bool&, const SandboxEditorContext&);
         void DrawGeodesicsWindow(bool&, const SandboxEditorContext&);
         void DrawGeodesicsControls(const Runtime::EditorDomainWindowModel&,
                                    const SandboxEditorContext&);
@@ -417,6 +420,8 @@ namespace Extrinsic::Sandbox::Editor
         Shell = &editorShell;
         RegisterWindow("mesh.processing.denoise", {"Mesh", "Processing"},
                        "Denoise", &Impl::DrawDenoiseWindow);
+        RegisterWindow("mesh.processing.faces.scalar_gradient", {"Mesh", "Processing", "Faces"},
+                       "Scalar Field Gradient", &Impl::DrawGradientWindow);
         RegisterWindow("mesh.processing.geodesics", {"Mesh", "Geodesics"},
                        "Virtual Source Propagation", &Impl::DrawGeodesicsWindow);
         RegisterWindow("mesh.processing.curvature", {"Mesh", "Processing"},
@@ -516,6 +521,8 @@ namespace Extrinsic::Sandbox::Editor
         ResetModelCache();
         Denoise.LastResult.reset();
         Denoise.Input = {};
+        Gradient = {};
+        GradientEntity = 0u;
         Geodesics = {};
         GeodesicsEntity = 0u;
         GeodesicsSourceVertex = 0;
@@ -2687,6 +2694,85 @@ namespace Extrinsic::Sandbox::Editor
 
 namespace Extrinsic::Sandbox::Editor
 {
+    void MeshProcessingPanels::Impl::DrawGradientWindow(bool& open, const SandboxEditorContext& context)
+    {
+        if (!ImGui::Begin("Mesh / Processing / Faces / Scalar Field Gradient", &open))
+        {
+            ImGui::End();
+            return;
+        }
+        const auto previous = GradientEntity;
+        DrawProcessingEntity("Entity##ScalarGradient", context, GradientEntity,
+                             Gradient.LastSelectedEntity, Runtime::EditorDomainWindowKind::Mesh);
+        if (previous != GradientEntity)
+        {
+            Gradient.LastResult.reset();
+            Gradient.VisualizationDiagnostic.clear();
+        }
+        if (const auto active = Runtime::GetEditorScalarGradientConfig(context.MeshFields.Commands))
+            Gradient.Synchronize(*active, Runtime::SerializeScalarGradientConfig(*active));
+        const auto& model = GetDomainWindowModel(context, Runtime::EditorDomainWindowKind::Mesh, GradientEntity);
+        if (!model.DomainMatches || !model.Processing.HasSelectedEntity || Gradient.LastApplied.empty())
+        {
+            ImGui::TextDisabled("Choose a mesh entity with a scalar vertex property.");
+            ImGui::End();
+            return;
+        }
+        DrawProcessingCpuBackend();
+        ImGui::TextWrapped("Compute a tangent gradient on each triangle from a vertex scalar field. "
+                           "Degenerate triangles produce zero vectors. Polygon meshes require triangulation.");
+        auto& config = Gradient.Draft;
+        const auto vertex = +[](const Runtime::GeometryPropertyRef& ref) {
+            return ref.Domain == Runtime::GeometryElementDomain::MeshVertex;
+        };
+        bool changed = DrawProcessingPropertyInput("Scalar property##ScalarGradient", model.PropertyCatalog,
+                                                   config.Scalar, vertex, 1u);
+        changed |= DrawProcessingPropertyInput("Positions##ScalarGradient", model.PropertyCatalog,
+                                               config.Positions, vertex, 3u);
+        changed |= DrawProcessingPropertyName("Output face property##ScalarGradient", config.Output.Name);
+        const auto apply = [&](const auto& request) {
+            return Runtime::ApplyEditorScalarGradientConfig(context.MeshFields.Commands, request);
+        };
+        if (changed)
+        {
+            Gradient.LastResult.reset();
+            Gradient.ConfigDiagnostic = apply(config).Succeeded() ? "" : "Scalar gradient configuration was rejected.";
+        }
+        const auto readiness = Runtime::PreviewEditorScalarGradientCommand(context.MeshFields.Commands,
+                                                                           model.SelectedStableId, config);
+        if (DrawProcessingActionButton("Compute Gradient", readiness))
+            ApplyProcessingExecution(Gradient, config, apply,
+                [&] { return Runtime::ApplyEditorScalarGradientCommand(context.MeshFields.Commands,
+                                                                      model.SelectedStableId, config); },
+                std::function<void(Runtime::EditorScalarGradientResult)>{}, "Scalar gradient configuration was rejected.");
+        const bool hasOutput = std::ranges::any_of(model.PropertyCatalog.Rows, [&](const auto& row) {
+            return row.Domain == Runtime::EditorPropertyCatalogDomain::MeshFaces &&
+                   row.Name == config.Output.Name && row.ValueKind == decltype(row.ValueKind)::Vec3 && row.Bindable;
+        });
+        ImGui::BeginDisabled(!hasOutput);
+        if (ImGui::Button("Show Gradient Vectorfield"))
+        {
+            Runtime::EditorGeometryVectorFieldCommand command{
+                .StableEntityId = model.SelectedStableId, .Layer = {.Vector = config.Output}};
+            for (const auto& row : model.VectorFields.Layers)
+                if (row.Layer.Vector == config.Output)
+                {
+                    command.Operation = Runtime::EditorVectorFieldOperation::Update;
+                    command.Layer = row.Layer;
+                    command.Layer.Enabled = true;
+                    break;
+                }
+            const auto status = Runtime::ApplyEditorGeometryVectorFieldCommand(context.VisualizationCommands, command);
+            Gradient.VisualizationDiagnostic = Runtime::DebugNameForEditorCommandStatus(status);
+        }
+        ImGui::EndDisabled();
+        ImGui::TextDisabled("Arrow scale, color and visibility: Appearance > Vector fields.");
+        if (Gradient.LastResult) ImGui::TextWrapped("%s", Gradient.LastResult->Message.c_str());
+        if (!Gradient.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Gradient.ConfigDiagnostic.c_str());
+        if (!Gradient.VisualizationDiagnostic.empty()) ImGui::TextWrapped("%s", Gradient.VisualizationDiagnostic.c_str());
+        ImGui::End();
+    }
+
     void MeshProcessingPanels::Impl::DrawGeodesicsWindow(bool& open,
                                                          const SandboxEditorContext& context)
     {
