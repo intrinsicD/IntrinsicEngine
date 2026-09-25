@@ -36,12 +36,21 @@ fixed rows. Runtime can pin mesh boundary vertices for any filter.
 - **Implicit backward Euler:** solve `(M + dt (D-W)) x_new = M x_old` for
   each channel and iteration. `M` is the identity for combinatorial, weighted
   degree for random walk, or the DEC lumped vertex area for the mesh-area option.
-  Geometry callers can supply arbitrary positive row masses. The existing
-  `Geometry::Sparse::SolveCGShifted` / `SolveCGShiftedFixed` solvers provide
-  Jacobi-preconditioned CG and true reduced-system Dirichlet elimination.
-  Nonconvergence, nonfinite results, or output conversion failure publish
-  nothing. Time step is positive and independent of explicit lambda; solver
-  tolerance and maximum iterations are serialized settings.
+  Geometry callers can supply arbitrary positive row masses. The system
+  matrix is assembled once per run: fixed rows become identity rows and their
+  coupling moves into the free right-hand side (reduced-system Dirichlet
+  elimination), so the matrix stays symmetric positive definite. The default
+  **direct** solver factors it once with `Geometry::Sparse::SparseLLT`
+  (sparse Cholesky) and reuses the factor for every channel and iteration;
+  it has no convergence tolerance. The **conjugate gradient** solver runs
+  Jacobi-preconditioned `Geometry::Sparse::SolveCG` on the same matrix and is
+  the parity reference. If the factorization fails, the direct setting falls
+  back to CG and reports it in the diagnostic. Factorization cost dominates
+  on large meshes with small time steps, where CG converges in few
+  iterations; large steps or many iterations favor the direct solver.
+  CG nonconvergence, nonfinite results, or output conversion failure publish
+  nothing. Time step is positive and independent of explicit lambda; solver,
+  CG tolerance and CG maximum iterations are serialized settings.
 - **Taubin:** alternate positive lambda and negative mu updates on the fixed
   graph. Both combinatorial steps use the same maximum-degree scaling.
   These parameters define the filter polynomial; arbitrary parameters are
@@ -57,12 +66,13 @@ Gaussian `exp(-distance^2/(2 spatial_sigma^2))`, or inverse distance. Inverse
 distance uses `spatial_sigma*1e-12` as a positive distance floor for coincident
 samples. The shared CPU `PointLBVH::Index` supplies deterministic neighbors,
 excluding only the query ID; coincident distinct samples remain eligible.
+Mutual neighbor pairs are merged once and edges are ordered by index pair.
 The index owns the compact live-position snapshot for one operation. This
 geometry API accepts spans independently of ECS/runtime, so it uses a private
 index rather than retaining an entity-cache lease. No GPU backend is selected.
 
 Mesh vertex cotangent weights reuse `DEC::BuildLaplacian`, clamping negative
-edge weights to zero. This is a nonnegative graph operator, not signed FEM.
+edge weights to zero; it is assembled only when cotangent weights are selected. This is a nonnegative graph operator, not signed FEM.
 Implicit smoothing optionally pairs it with `DEC::BuildHodgeStar0` lumped areas.
 Uniform mesh-edge weights retain one-ring topology independently of geometry;
 the three kNN weights remain available on every domain. Topological weights,
@@ -86,7 +96,7 @@ face-center construction and guarded editor history.
 | Config/agent | `sandbox.property_smoothing`, registered in the sandbox config tree; serialization and preview/apply use the same validator as execution admission. |
 | UI | View → Smooth Property, also reachable from Mesh/Graph/PointCloud → Processing. Input property, output name/storage, positions, filter, Laplacian, weights and parameters are configurable. |
 | Publication | Same domain and cardinality; only the named output changes. Existing deleted output slots remain bitwise untouched; new deleted output slots are zero. In-place writes, including positions, use guarded undo/redo. |
-| Verification | `Test.PropertySmoothing.cpp`, `Test.PropertySmoothingOperations.cpp`, and the real ImGui action in `Test.SandboxProcessingPanels.cpp`. |
+| Verification | `Test.PropertySmoothing.cpp` (including direct-vs-CG implicit parity), `Test.PropertySmoothingOperations.cpp`, and the real ImGui action in `Test.SandboxProcessingPanels.cpp`. |
 
 The default output type follows the chosen input in the UI. Scalar output
 storage can also be float or double. Conversion rejects nonfinite results or

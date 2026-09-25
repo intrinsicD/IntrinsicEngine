@@ -5,7 +5,6 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <limits>
-#include <map>
 #include <optional>
 #include <span>
 #include <string>
@@ -21,6 +20,7 @@ namespace Geometry::Smoothing
     bool ValidatePropertyFilterParams(const PropertyFilterParams& p) noexcept
     {
         return p.Method <= PropertyFilter::Implicit && p.Laplacian <= PropertyLaplacian::LumpedMass &&
+            p.Solver <= PropertySolver::ConjugateGradient &&
             (p.Laplacian != PropertyLaplacian::LumpedMass || p.Method == PropertyFilter::Implicit) &&
             std::isfinite(p.TimeStep) && p.TimeStep > 0 &&
             std::isfinite(p.SolverTolerance) && p.SolverTolerance > 0 && p.SolverTolerance < 1 &&
@@ -39,23 +39,25 @@ namespace Geometry::Smoothing
         if (!k || k > 1024 || positions.empty() || positions.size() > std::numeric_limits<std::uint32_t>::max() || weight > PropertyWeight::InverseDistance ||
             !std::isfinite(sigma) || sigma <= 0 ||
             !std::ranges::all_of(positions, PointLBVH::ValidPoint)) return {};
-        std::map<std::pair<std::size_t, std::size_t>, double> unique;
+        std::vector<PropertyEdge> edges;
+        edges.reserve(positions.size() * k);
         PointLBVH::Index index;
         if (!index.Build(positions)) return {};
         for (std::uint32_t i = 0; i < positions.size(); ++i)
             for (const auto neighbor : index.KNearest(positions[i], k, i))
             {
-                const std::pair<std::size_t, std::size_t> pair{std::min(i, neighbor.Index), std::max(i, neighbor.Index)};
                 const auto delta = glm::dvec3(positions[i]) - glm::dvec3(positions[neighbor.Index]);
                 const double distance = glm::length(delta);
                 const double w = weight == PropertyWeight::Gaussian ? std::exp(-0.5 * (distance / sigma) * (distance / sigma))
                     : weight == PropertyWeight::InverseDistance ? 1.0 / std::max(distance, sigma * 1e-12) : 1.0;
                 if (!std::isfinite(w)) return {};
-                unique[{pair.first, pair.second}] = w;
+                edges.push_back({std::min<std::size_t>(i, neighbor.Index), std::max<std::size_t>(i, neighbor.Index), w});
             }
-        std::vector<PropertyEdge> edges;
-        edges.reserve(unique.size());
-        for (const auto& [pair, w] : unique) edges.push_back({pair.first, pair.second, w});
+        // Mutual neighbors produce the same pair twice with bitwise-equal weights; keep one, ordered by pair.
+        const auto key = [](const PropertyEdge& e) { return std::pair{e.A, e.B}; };
+        std::ranges::sort(edges, {}, key);
+        const auto duplicates = std::ranges::unique(edges, {}, key);
+        edges.erase(duplicates.begin(), duplicates.end());
         return edges;
     }
 
@@ -123,42 +125,67 @@ namespace Geometry::Smoothing
         };
         if (p.Method == PropertyFilter::Implicit)
         {
-            // Random walk is solved as (D + dt L)x = D b, preserving symmetry.
-            // Combinatorial uses unit mass; custom mass supports area-aware fairing.
-            Sparse::DiagonalMatrix mass{count, std::vector<double>(count, 1.0)};
+            // Solve (M + dt L) x = M b. Random walk uses M = D, preserving symmetry;
+            // combinatorial uses unit mass; custom mass supports area-aware fairing.
+            // The operator is fixed for the run, so it is assembled once with fixed
+            // rows eliminated: they become identity rows and their coupling moves
+            // into the free right-hand side, keeping the system SPD.
+            std::vector<double> mass(count, 1.0), diagonal(count);
             for (std::size_t i = 0; i < count; ++i)
-                if (!isolated[i]) mass.Diagonal[i] = p.Laplacian == PropertyLaplacian::RandomWalk
+            {
+                if (!isolated[i]) mass[i] = p.Laplacian == PropertyLaplacian::RandomWalk
                     ? degree[i] : p.Laplacian == PropertyLaplacian::LumpedMass ? lumpedMass[i] : 1.0;
+                diagonal[i] = fixed[i] ? 1.0 : mass[i];
+            }
+            struct Coupling { std::size_t Free, Fixed; double Weight; };
+            std::vector<Coupling> couplings;
             Sparse::SparseBuilder builder(count, count);
+            builder.Reserve(2 * edges.size() + count);
             for (const auto& edge : edges)
             {
-                builder.Add(edge.A, edge.A, edge.Weight);
-                builder.Add(edge.B, edge.B, edge.Weight);
-                builder.Add(edge.A, edge.B, -edge.Weight);
-                builder.Add(edge.B, edge.A, -edge.Weight);
+                const double w = p.TimeStep * edge.Weight;
+                for (const auto [row, col] : {std::pair{edge.A, edge.B}, std::pair{edge.B, edge.A}})
+                {
+                    if (fixed[row]) continue;
+                    diagonal[row] += w;
+                    if (fixed[col]) couplings.push_back({row, col, w});
+                    else builder.Add(row, col, -w);
+                }
             }
-            const auto laplacian = builder.Build();
-            if (!laplacian.Valid) return fail("Unable to assemble implicit Laplacian.");
+            for (std::size_t i = 0; i < count; ++i) builder.Add(i, i, diagonal[i]);
+            const auto system = builder.Build();
+            if (!system.Valid || !std::ranges::all_of(diagonal, [](double x) { return std::isfinite(x); }))
+                return fail("Unable to assemble implicit system.");
+            Sparse::SparseLLT cholesky;
+            const bool direct = p.Solver == PropertySolver::Direct && cholesky.factor(system.Matrix).Succeeded();
             const Sparse::CGParams solver{p.MaxSolverIterations, p.SolverTolerance};
-            std::vector<double> rhs(count), solved(count), pins(fixedRows.size());
+            std::vector<double> rhs(count), solved(count);
             for (std::size_t iteration = 0; iteration < p.Iterations; ++iteration)
                 for (std::size_t c = 0; c < channels; ++c)
                 {
                     for (std::size_t i = 0; i < count; ++i)
                     {
-                        solved[i] = values[i * channels + c];
-                        rhs[i] = mass.Diagonal[i] * solved[i];
+                        solved[i] = fixed[i] ? input[i * channels + c] : values[i * channels + c];
+                        rhs[i] = fixed[i] ? solved[i] : mass[i] * solved[i];
                     }
-                    for (std::size_t i = 0; i < fixedRows.size(); ++i)
-                        pins[i] = input[fixedRows[i] * channels + c];
-                    const auto status = fixedRows.empty()
-                        ? Sparse::SolveCGShifted(mass, 1.0, laplacian.Matrix, p.TimeStep, rhs, solved, solver)
-                        : Sparse::SolveCGShiftedFixed(mass, 1.0, laplacian.Matrix, p.TimeStep,
-                            rhs, fixedRows, pins, solved, solver);
-                    result.OperatorApplications += status.Iterations + 1;
-                    if (!status.Converged) return fail("Implicit solver failed to converge; no property was changed.");
+                    for (const auto& coupling : couplings)
+                        rhs[coupling.Free] += coupling.Weight * input[coupling.Fixed * channels + c];
+                    if (direct)
+                    {
+                        if (!cholesky.solve(rhs, solved).Succeeded())
+                            return fail("Implicit Cholesky solve failed; no property was changed.");
+                        ++result.OperatorApplications;
+                    }
+                    else
+                    {
+                        const auto status = Sparse::SolveCG(system.Matrix, rhs, solved, solver);
+                        result.OperatorApplications += status.Iterations + 1;
+                        if (!status.Converged) return fail("Implicit solver failed to converge; no property was changed.");
+                    }
                     for (std::size_t i = 0; i < count; ++i) values[i * channels + c] = solved[i];
                 }
+            result.Diagnostic = direct ? "cpu_sparse_cholesky"
+                : p.Solver == PropertySolver::Direct ? "cpu_reference (Cholesky factorization failed; used CG)" : "cpu_reference";
         }
         else if (p.Method == PropertyFilter::SpectralHeat && rate > 0)
         {
@@ -222,7 +249,7 @@ namespace Geometry::Smoothing
             return fail("Filter produced non-finite values; no property was changed.");
         result.Success = true;
         result.Values = std::move(values);
-        result.Diagnostic = "cpu_reference";
+        if (result.Diagnostic.empty()) result.Diagnostic = "cpu_reference";
         return result;
     }
 }

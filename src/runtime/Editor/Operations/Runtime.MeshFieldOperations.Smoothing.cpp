@@ -113,6 +113,7 @@ namespace Extrinsic::Runtime
             c.Filter.TimeStep = doc.at("time_step").get<double>();
             c.Filter.SolverTolerance = doc.at("solver_tolerance").get<double>();
             c.Filter.MaxSolverIterations = doc.at("max_solver_iterations").get<std::uint32_t>();
+            c.Filter.Solver = S::PropertySolver(doc.at("solver").get<unsigned>());
             c.PreserveBoundary = doc.at("preserve_boundary").get<bool>();
             return c;
         }
@@ -123,7 +124,7 @@ namespace Extrinsic::Runtime
             auto merged = Json::parse(SerializePropertySmoothingConfig({}));
             if (auto error = ConfigDetail::ValidatePointConfigFields(doc, merged,
                 "Smoothing config must be an object.", "Unknown smoothing field: ",
-                {"method", "weight", "laplacian", "iterations", "neighbors", "max_solver_iterations"}))
+                {"method", "weight", "laplacian", "solver", "iterations", "neighbors", "max_solver_iterations"}))
                 return ConfigDetail::RejectConfigSection(subject, *error);
             for (const auto key : {"input", "output", "positions"})
             {
@@ -137,8 +138,9 @@ namespace Extrinsic::Runtime
                     return ConfigDetail::RejectConfigSection(subject, "Filter parameters must be finite numbers.");
             if (merged["method"].get<unsigned>() > unsigned(S::PropertyFilter::Implicit) ||
                 merged["weight"].get<unsigned>() > unsigned(S::PropertyWeight::MeshUniform) ||
-                merged["laplacian"].get<unsigned>() > unsigned(S::PropertyLaplacian::LumpedMass))
-                return ConfigDetail::RejectConfigSection(subject, "Unknown smoothing method, weight or Laplacian.");
+                merged["laplacian"].get<unsigned>() > unsigned(S::PropertyLaplacian::LumpedMass) ||
+                merged["solver"].get<unsigned>() > unsigned(S::PropertySolver::ConjugateGradient))
+                return ConfigDetail::RejectConfigSection(subject, "Unknown smoothing method, weight, Laplacian or solver.");
             if (!merged["preserve_boundary"].is_boolean())
                 return ConfigDetail::RejectConfigSection(subject, "preserve_boundary must be boolean.");
             const auto c = Decode(merged);
@@ -257,7 +259,7 @@ namespace Extrinsic::Runtime
             {"iterations", c.Filter.Iterations}, {"neighbors", c.Neighbors}, {"spatial_sigma", c.SpatialSigma},
             {"lambda", c.Filter.Lambda}, {"mu", c.Filter.Mu}, {"heat_time", c.Filter.HeatTime}, {"range_sigma", c.Filter.RangeSigma},
             {"time_step", c.Filter.TimeStep}, {"solver_tolerance", c.Filter.SolverTolerance},
-            {"max_solver_iterations", c.Filter.MaxSolverIterations}, {"preserve_boundary", c.PreserveBoundary}}.dump();
+            {"max_solver_iterations", c.Filter.MaxSolverIterations}, {"solver", unsigned(c.Filter.Solver)}, {"preserve_boundary", c.PreserveBoundary}}.dump();
     }
     Core::Config::EngineConfigSectionRegistration MakePropertySmoothingConfigSectionRegistration()
     { return {.DefaultSection = Section({}), .Validate = Validate}; }
@@ -304,13 +306,12 @@ namespace Extrinsic::Runtime
         std::optional<std::vector<S::PropertyEdge>> edges;
         std::vector<std::size_t> fixedRows;
         std::vector<double> mass;
-        if (c.Weight == S::PropertyWeight::Cotangent || c.Weight == S::PropertyWeight::MeshUniform ||
-            c.PreserveBoundary || c.Filter.Laplacian == S::PropertyLaplacian::LumpedMass)
+        const bool meshWeights = c.Weight == S::PropertyWeight::Cotangent || c.Weight == S::PropertyWeight::MeshUniform;
+        if (meshWeights || c.PreserveBoundary || c.Filter.Laplacian == S::PropertyLaplacian::LumpedMass)
         {
             auto mesh = GP::MeshSupport::BuildHalfedgeMeshForProcessing(a.SourceView, "Property smoothing", c.Positions.Name);
             if (!mesh.Succeeded()) return fail(mesh.Diagnostic);
-            const auto laplacian = Geometry::DEC::BuildLaplacian(mesh.Mesh);
-            if (laplacian.Rows != samples.SlotCount) return fail("Mesh vertex correspondence mismatch.");
+            if (mesh.Mesh.VerticesSize() != samples.SlotCount) return fail("Mesh vertex correspondence mismatch.");
             if (c.Filter.Laplacian == S::PropertyLaplacian::LumpedMass)
             {
                 const auto areas = Geometry::DEC::BuildHodgeStar0(mesh.Mesh);
@@ -326,9 +327,9 @@ namespace Extrinsic::Runtime
                         fixedRows.push_back(i);
             std::vector<std::size_t> inverse(samples.SlotCount, samples.SlotCount);
             for (std::size_t i = 0; i < samples.Slots.size(); ++i) inverse[samples.Slots[i]] = i;
-            edges.emplace();
             if (c.Weight == S::PropertyWeight::MeshUniform)
             {
+                edges.emplace();
                 for (std::size_t e = 0; e < mesh.Mesh.EdgesSize(); ++e)
                 {
                     if (mesh.Mesh.IsDeleted(Geometry::EdgeHandle{static_cast<Geometry::PropertyIndex>(e)})) continue;
@@ -338,7 +339,11 @@ namespace Extrinsic::Runtime
                         edges->push_back({inverse[i], inverse[j], 1.0});
                 }
             }
-            else
+            else if (c.Weight == S::PropertyWeight::Cotangent)
+            {
+                // Cotangent weights are only assembled when selected; kNN weights ignore them.
+                const auto laplacian = Geometry::DEC::BuildLaplacian(mesh.Mesh);
+                edges.emplace();
                 for (std::size_t i = 0; i < laplacian.Rows; ++i)
                     for (auto entry = laplacian.RowOffsets[i]; entry < laplacian.RowOffsets[i+1]; ++entry)
                     {
@@ -346,12 +351,13 @@ namespace Extrinsic::Runtime
                         if (j > i && inverse[i] != samples.SlotCount && inverse[j] != samples.SlotCount)
                             edges->push_back({inverse[i], inverse[j], std::max(0.0, -laplacian.Values[entry])});
                     }
+            }
             for (unsigned d = unsigned(D::MeshVertex); d <= unsigned(D::MeshFace); ++d)
                 if (const auto* set = ResolveGeometryPropertySet(a, D(d)))
                     for (const auto& name : set->Properties())
                         if (IsTopologyProperty(D(d), name)) samples.Inputs.push_back(GP::ObserveGeometryProperty(a, D(d), name));
         }
-        if (c.Weight != S::PropertyWeight::Cotangent && c.Weight != S::PropertyWeight::MeshUniform)
+        if (!meshWeights)
             edges = S::BuildPropertyNeighborhood(samples.Points, c.Neighbors, c.Weight, c.SpatialSigma);
         if (!edges) return fail("Invalid spatial neighborhood; check finite positions, coordinate bounds and sigma.");
         const auto filtered = S::FilterProperty(values, channels, *edges, c.Filter, fixedRows, mass);
@@ -375,6 +381,8 @@ namespace Extrinsic::Runtime
         result.LiveCount = samples.LiveCount;
         result.EdgeCount = edges->size();
         result.OperatorApplications = filtered.OperatorApplications;
+        // The diagnostic starts with the backend identity; a CG fallback note may follow.
+        result.BackendId = filtered.Diagnostic.substr(0, filtered.Diagnostic.find(' '));
         if (Same(before, after)) { result.Message = "Smoothed property is unchanged."; return result; }
         // An aliased output is guarded by its expected values; unrelated input revisions stay fixed.
         samples.Inputs.push_back(GP::ObserveGeometryProperty(a, c.Input.Domain, c.Input.Name));
@@ -399,7 +407,7 @@ namespace Extrinsic::Runtime
             .Redo = [mutate, before, after] { return mutate(before, after); },
             .Undo = [mutate, before, after] { return mutate(after, before); }}).Status : mutate(before, after);
         result.Status = EditorFeatureDetail::ToEditorCommandStatus(status);
-        result.Message = result.Succeeded() ? "Property smoothed (cpu_reference)." : "Property publication rejected by history guards.";
+        result.Message = result.Succeeded() ? "Property smoothed (" + filtered.Diagnostic + ")." : "Property publication rejected by history guards.";
         return result;
     }
 }

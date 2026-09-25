@@ -21,6 +21,8 @@ export namespace Geometry::Smoothing
     enum class PropertyFilter : std::uint8_t { Averaging, SpectralHeat, Taubin, Bilateral, Implicit };
     enum class PropertyLaplacian : std::uint8_t { RandomWalk, Combinatorial, LumpedMass };
     enum class PropertyWeight : std::uint8_t { Uniform, Gaussian, InverseDistance, Cotangent, MeshUniform };
+    // Implicit solver: one sparse Cholesky factorization per run, or the preconditioned-CG reference.
+    enum class PropertySolver : std::uint8_t { Direct, ConjugateGradient };
 
     struct PropertyFilterParams
     {
@@ -34,5 +36,6 @@ export namespace Geometry::Smoothing
         double TimeStep{1.0};
         double SolverTolerance{1e-8};
         std::uint32_t MaxSolverIterations{2000};
+        PropertySolver Solver{PropertySolver::Direct};
     };
 }

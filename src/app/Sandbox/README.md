@@ -575,6 +575,6 @@ Open **View → Kernel Density**, choose the input/backend/bandwidth and run
 Property filtering is available through **View → Smooth Property** and each
 geometry domain's Processing menu. Select a floating scalar/vector input and
 a same-domain output; filter settings round-trip in `sandbox.property_smoothing`.
-Implicit backward Euler supports cotangent weights, lumped mesh areas and boundary
-pinning. Select positions as both input and output to smooth geometry.
+Implicit backward Euler supports cotangent weights, lumped mesh areas, boundary
+pinning, and a sparse Cholesky (default) or conjugate-gradient solver. Select positions as both input and output to smooth geometry.
 See [property smoothing](../../../docs/methods/property-smoothing.md).

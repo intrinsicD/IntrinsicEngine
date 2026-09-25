@@ -2758,6 +2758,10 @@ namespace Extrinsic::Sandbox::Editor
         else if (config.Filter.Method == Geometry::Smoothing::PropertyFilter::Implicit)
         {
             changed |= ImGui::InputDouble("Time step", &config.Filter.TimeStep);
+            int solver = int(config.Filter.Solver);
+            if (ImGui::Combo("Solver", &solver, "Sparse Cholesky (direct)\0Conjugate gradient\0"))
+            { config.Filter.Solver = Geometry::Smoothing::PropertySolver(solver); changed = true; }
+            // CG settings also govern the fallback when the Cholesky factorization fails.
             changed |= ImGui::InputDouble("Solver tolerance", &config.Filter.SolverTolerance);
             changed |= ImGui::InputScalar("Maximum solver iterations", ImGuiDataType_U32, &config.Filter.MaxSolverIterations);
         }

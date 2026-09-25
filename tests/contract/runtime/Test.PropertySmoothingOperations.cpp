@@ -158,11 +158,12 @@ TEST(PropertySmoothingOperations, ConfigRoundtripAndFailClosedValidation)
     c.Input={D::GraphEdge,"custom",K::Vec4}; c.Output={D::GraphEdge,"filtered",K::Vec4};
     c.Positions={D::GraphEdge,"samples",K::Vec3}; c.Filter.Method=S::PropertyFilter::Implicit;
     c.Filter.TimeStep=12; c.Filter.SolverTolerance=1e-7; c.Filter.MaxSolverIterations=432;
+    c.Filter.Solver=S::PropertySolver::ConjugateGradient;
     const auto payload=R::SerializePropertySmoothingConfig(c);
     EXPECT_EQ(payload.find("invalid"),std::string::npos);
     const auto valid=registration.Validate(payload,{},R::kPropertySmoothingConfigSectionName);
     ASSERT_TRUE(valid.Usable()); EXPECT_EQ(valid.CanonicalPayloadJson,payload);
-    for (const char* invalid : {"{\"method\":256}","{\"iterations\":0}","{\"lambda\":2}","{\"mu\":0}","{\"heat_time\":null}","{\"unknown\":1}","{\"time_step\":0}","{\"solver_tolerance\":-1}","{\"max_solver_iterations\":0}","{\"preserve_boundary\":1}","{\"laplacian\":2}"})
+    for (const char* invalid : {"{\"method\":256}","{\"iterations\":0}","{\"lambda\":2}","{\"mu\":0}","{\"heat_time\":null}","{\"unknown\":1}","{\"time_step\":0}","{\"solver_tolerance\":-1}","{\"max_solver_iterations\":0}","{\"preserve_boundary\":1}","{\"laplacian\":2}","{\"solver\":2}","{\"solver\":-1}"})
         EXPECT_FALSE(registration.Validate(invalid,{},R::kPropertySmoothingConfigSectionName).Usable()) << invalid;
 }
 TEST(PropertySmoothingOperations, DerivedFaceEdgeAndHalfedgeSamples)
@@ -244,6 +245,7 @@ TEST(PropertySmoothingOperations, ImplicitMeshPositionsPinBoundaryAndUndo)
         h.Config.Weight=weight;
         const auto before=std::as_const(h.Props()).Get<glm::vec3>("v:position").Vector();
         const auto result=h.Run(); ASSERT_TRUE(result.Succeeded()) << result.Message;
+        EXPECT_EQ(result.BackendId,"cpu_sparse_cholesky");
         const auto after=std::as_const(h.Props()).Get<glm::vec3>("v:position").Vector();
         for (std::size_t i=0;i<4;++i) EXPECT_EQ(after[i],before[i]);
         EXPECT_LT(after[4].z,0.001f);
@@ -259,6 +261,7 @@ TEST(PropertySmoothingOperations, ImplicitNonconvergenceLeavesOutputAndHistoryUn
 {
     SmoothingHarness h;
     h.Config.Filter.Method=S::PropertyFilter::Implicit;
+    h.Config.Filter.Solver=S::PropertySolver::ConjugateGradient;
     h.Config.Filter.MaxSolverIterations=1;
     h.Config.Filter.SolverTolerance=1e-14;
     h.Config.Weight=S::PropertyWeight::MeshUniform;
