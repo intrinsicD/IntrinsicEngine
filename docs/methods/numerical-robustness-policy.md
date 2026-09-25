@@ -63,11 +63,11 @@ Fail-closed policy, never emitting NaN/Inf and never firing an assert:
 - Zero-length edges and invalid/non-finite face normals are skipped.
 - Empty meshes and meshes with no faces → `nullopt`.
 
-The public `Geometry::Smoothing::CotanSmoothVertexProperty` operation is a
-separate reusable contract and is not used by this curvature path. It accepts
-vertex properties of `float`, `double`, and canonical persisted
-`glm::vec2/vec3/vec4`, computes every damped iteration from a separate read
-buffer, clamps cotan weights nonnegative, and validates parameters,
-property/mask cardinality, geometry, and live values before mutation. Its
-optional active-vertex mask excludes unreliable values from both their own rows
-and every neighbour average.
+The public `Geometry::Smoothing::FilterProperty` operation is independent of
+the curvature path. It accepts compact floating scalar/vector signals and
+nonnegative weighted edges, validates finite input before filtering, and
+returns no partial values on failure. Runtime validates geometry, cardinality,
+solver convergence and numeric output conversion before publication. Inactive
+rows must be compacted out with their incident edges; fixed rows instead retain
+their values while contributing to neighboring rows. See
+[property smoothing](property-smoothing.md).

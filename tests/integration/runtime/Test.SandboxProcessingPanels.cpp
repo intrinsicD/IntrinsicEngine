@@ -2902,3 +2902,47 @@ TEST(SandboxProcessingPanels, FaceScalarGradientComputesAndShowsVectorfield)
     };
     h.Engine->Run();
 }
+
+TEST(SandboxProcessingPanels, PropertySmoothingExecutesConfiguredPropertyAndPublishes)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a=mesh.AddVertex({0,0,0}), b=mesh.AddVertex({1,0,0}), c=mesh.AddVertex({0,1,0});
+    ASSERT_TRUE(mesh.AddTriangle(a,b,c));
+    GS::PopulateFromMesh(scene.Raw(),entity,mesh);
+    auto& vertices=scene.Raw().get<GS::Vertices>(entity).Properties;
+    vertices.GetOrAdd<glm::vec2>("custom_uv",{}).Vector()={{0,0},{2,4},{4,8}};
+    R::PropertySmoothingConfig smoothing;
+    smoothing.Input={R::GeometryElementDomain::MeshVertex,"custom_uv",Geometry::PropertyValueKind::Vec2};
+    smoothing.Output={R::GeometryElementDomain::MeshVertex,"filtered_uv",Geometry::PropertyValueKind::Vec2};
+    smoothing.Filter.Method=Geometry::Smoothing::PropertyFilter::Implicit;
+    smoothing.Filter.TimeStep=2;
+    auto config=h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto section=R::MakePropertySmoothingConfigSectionRegistration().DefaultSection;
+    section.PayloadJson=R::SerializePropertySmoothingConfig(smoothing);
+    Config::UpsertEngineConfigSection(config.AppSections,section);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene,entity));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("mesh.processing.property_smoothing",true));
+    int frames=0;
+    bool requested=false;
+    h.Driver->OnFrame=[&](R::Engine& engine) {
+        ++frames;
+        auto* window=ImGui::FindWindowByName("Smooth Property");
+        if(window) { ImGui::SetWindowSize(window,{750,1000}); ImGui::SetWindowPos(window,{0,0}); ImGui::FocusWindow(window); }
+        if(window && frames==10) { ImGui::ActivateItemByID(window->GetID("Smooth property")); requested=true; }
+        const auto output=std::as_const(vertices).Get<glm::vec2>("filtered_uv");
+        if(output)
+        {
+            EXPECT_TRUE(requested);
+            EXPECT_NEAR(output[0].x,1.5f,1e-6f);
+            EXPECT_NEAR(output[0].y,3.0f,1e-6f);
+            EXPECT_EQ(std::as_const(vertices).Get<glm::vec2>("custom_uv")[0],glm::vec2(0));
+            engine.RequestExit();
+        }
+        if(frames>60) { ADD_FAILURE()<<"Property smoothing panel did not publish"; engine.RequestExit(); }
+    };
+    h.Engine->Run();
+}

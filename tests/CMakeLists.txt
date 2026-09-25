@@ -1292,6 +1292,7 @@ if(TARGET ExtrinsicRuntime)
         Test.GeometryPresentation.cpp
         Test.PointCloudGeometryExtraction.cpp
         Test.ScalarGradientOperations.cpp
+        Test.PropertySmoothingOperations.cpp
         Test.GeodesicsOperations.cpp
         Test.ScalarRidgeOperations.cpp
         Test.ParameterizationOperations.cpp
@@ -1559,6 +1560,7 @@ set(_geometry_test_files
     Test_ShortestPath.cpp
     Test_Subdivision.cpp
     Test_Smoothing.cpp
+    Test.PropertySmoothing.cpp
     Test.QualityMetrics.cpp
     Test.Sampling.cpp
     Test.SurfaceSampling.cpp

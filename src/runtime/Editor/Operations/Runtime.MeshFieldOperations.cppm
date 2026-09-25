@@ -1,6 +1,6 @@
-// Same-domain scalar and direction fields published on an existing mesh:
-// curvature, segmentation, geodesic distance and face scalar gradients. These methods never
-// replace topology, which is what separates them from mesh topology editing.
+// Same-cardinality fields published on existing geometry: mesh curvature,
+// segmentation, geodesics, gradients, and smoothing on any property domain.
+// These methods preserve topology and own guarded property publication.
 module;
 #include <cstddef>
 #include <cstdint>
@@ -16,6 +16,7 @@ export import Extrinsic.Runtime.CurvatureSegmentationConfig;
 export import Extrinsic.Runtime.GeodesicsConfig;
 export import Extrinsic.Core.Error;
 export import Geometry.Geodesic.Types;
+export import Geometry.Smoothing.Types;
 export import Geometry.Segmentation.Diagnostics;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.EngineConfigControl;
@@ -119,6 +120,37 @@ export namespace Extrinsic::Runtime
                    Diagnostics.Succeeded();
         }
     };
+
+    inline constexpr std::string_view kPropertySmoothingConfigSectionName = "sandbox.property_smoothing";
+    struct PropertySmoothingConfig
+    {
+        GeometryPropertyRef Input{GeometryElementDomain::MeshVertex, "v:mean_curvature", Geometry::PropertyValueKind::Double};
+        GeometryPropertyRef Output{GeometryElementDomain::MeshVertex, "smoothed", Geometry::PropertyValueKind::Double};
+        GeometryPropertyRef Positions{GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};
+        Geometry::Smoothing::PropertyWeight Weight{Geometry::Smoothing::PropertyWeight::Uniform};
+        Geometry::Smoothing::PropertyFilterParams Filter{};
+        std::uint32_t Neighbors{12};
+        double SpatialSigma{1.0};
+        bool PreserveBoundary{false};
+    };
+    struct EditorPropertySmoothingResult
+    {
+        EditorCommandStatus Status{EditorCommandStatus::NoChange};
+        std::size_t LiveCount{}, EdgeCount{}, OperatorApplications{};
+        std::string BackendId{"cpu_reference"};
+        std::string Message{};
+        [[nodiscard]] bool Succeeded() const noexcept
+        { return Status == EditorCommandStatus::Applied || Status == EditorCommandStatus::NoChange; }
+    };
+    [[nodiscard]] std::string SerializePropertySmoothingConfig(const PropertySmoothingConfig&);
+    [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakePropertySmoothingConfigSectionRegistration();
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorPropertySmoothingConfig(
+        const EditorProcessingCommands&, const PropertySmoothingConfig&);
+    [[nodiscard]] std::optional<PropertySmoothingConfig> GetEditorPropertySmoothingConfig(const EditorProcessingCommands&);
+    [[nodiscard]] ActionReadiness PreviewEditorPropertySmoothingCommand(
+        const EditorProcessingCommands&, std::uint32_t stableEntityId, const PropertySmoothingConfig&);
+    [[nodiscard]] EditorPropertySmoothingResult ApplyEditorPropertySmoothingCommand(
+        const EditorProcessingCommands&, std::uint32_t stableEntityId, const PropertySmoothingConfig&);
 
     inline constexpr std::string_view kScalarGradientConfigSectionName = "sandbox.scalar_gradient";
     struct ScalarGradientConfig

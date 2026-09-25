@@ -355,9 +355,10 @@ Every family already shares the reference skeleton (`Params → std::optional<Re
 - **Smoothing / denoising** = the non-rigid skeleton with correspondence fixed to
   identity: a deformation model (which Laplacian/operator) + a regularizer/strength
   + an iteration/annealing schedule. `Geometry.Smoothing` already exposes
-  `Uniform/Cotan/Taubin/ImplicitLaplacian/DenoiseBilateral` with `Iterations`/
-  `Lambda`/`PreserveBoundary` and convergence tracking — an enum + schedule waiting
-  to be named.
+  `FilterProperty` for averaging, spectral heat, Taubin, bilateral and implicit
+  diffusion with selectable weighted operators and fixed rows. Mesh positions
+  are ordinary vector properties; `DenoiseBilateral` separately owns face-normal
+  filtering and reconstruction.
 - **Parameterization** = a solver choice (LSCM/Harmonic-Tutte, future ARAP/SLIM)
   + a boundary policy + the already-canonical shared `ParameterizationDiagnostics`
   (conformal/authalic/stretch/flipped/seam metrics). See

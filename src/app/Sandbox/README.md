@@ -571,3 +571,10 @@ Open **View → Kernel Density**, choose the input/backend/bandwidth and run
 `sandbox.kernel_density` config drives UI and agent commands.
 
 [Point Spacing and Radii](../../../docs/architecture/point-spacing.md) exposes canonical positions, radius output, k, scale and CPU/Vulkan neighborhoods through View and geometry Processing menus. Show radii uses scalar colors; model-space radius rendering is tracked by RUNTIME-222.
+
+Property filtering is available through **View → Smooth Property** and each
+geometry domain's Processing menu. Select a floating scalar/vector input and
+a same-domain output; filter settings round-trip in `sandbox.property_smoothing`.
+Implicit backward Euler supports cotangent weights, lumped mesh areas and boundary
+pinning. Select positions as both input and output to smooth geometry.
+See [property smoothing](../../../docs/methods/property-smoothing.md).

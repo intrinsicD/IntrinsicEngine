@@ -205,6 +205,7 @@ target_sources(${target_name}
         Editor/Operations/Runtime.ParameterizationOperations.Frame.cpp
         Editor/Operations/Runtime.MeshFieldOperations.Curvature.cpp
         Editor/Operations/Runtime.MeshFieldOperations.Gradient.cpp
+        Editor/Operations/Runtime.MeshFieldOperations.Smoothing.cpp
         Editor/Operations/Runtime.MeshFieldOperations.Geodesics.cpp
         Editor/Operations/Runtime.MeshTopologyOperations.Topology.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp

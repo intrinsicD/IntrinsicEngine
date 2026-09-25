@@ -27,6 +27,7 @@
 #include "../geometry/Bench.ProgressivePoissonReferenceSmoke.hpp"
 #include "../geometry/Bench.QualityMetricsSmoke.hpp"
 #include "../geometry/Bench.SignedHeatReferenceSmoke.hpp"
+#include "../geometry/Bench.PropertySmoothingSmoke.hpp"
 #include "../geometry/Bench.GeodesicsReferenceSmoke.hpp"
 #include "../geometry/Bench.PointLBVHSmoke.hpp"
 #include "../geometry/Bench.RegistrationSpatialSmoke.hpp"
@@ -495,6 +496,18 @@ auto EmitProgressivePoissonReferenceSmoke(const std::string &commit)
             << "    \"accepted_count\": " << metrics.AcceptedCount << ",\n"
             << "    \"level_count\": " << metrics.LevelCount << "\n";
       });
+}
+
+auto EmitPropertySmoothingSmoke(const std::string& commit) -> EmittedBenchmark {
+  const auto metrics = Intrinsic::Bench::Geometry::RunPropertySmoothingSmoke();
+  std::ostringstream out;
+  out.precision(17);
+  return EmitBenchmarkResult(out, "geometry.property_smoothing.smoke", "geometry.property_smoothing",
+      "cpu_reference", "builtin.cycle_signal.128.mode8", commit, metrics.Succeeded,
+      [&] { out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+                 << "    \"quality_error_linf\": " << metrics.MaxError << "\n"; },
+      [&] { out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+                 << "    \"warmup_iterations\": 1,\n    \"measured_iterations\": 8\n"; });
 }
 
 auto EmitSignedHeatReferenceSmoke(const std::string &commit)
@@ -1653,6 +1666,7 @@ auto main(int argc, char **argv) -> int {
   emitted.push_back(EmitUvAtlasEdgeGroupingScaling(commit));
   emitted.push_back(EmitProgressivePoissonReferenceSmoke(commit));
   emitted.push_back(EmitSignedHeatReferenceSmoke(commit));
+  emitted.push_back(EmitPropertySmoothingSmoke(commit));
   emitted.push_back(EmitGeodesicsReferenceSmoke(commit));
   emitted.push_back(EmitPointLBVHSmoke(commit));
   emitted.push_back(EmitLopLBVHSmoke(commit));

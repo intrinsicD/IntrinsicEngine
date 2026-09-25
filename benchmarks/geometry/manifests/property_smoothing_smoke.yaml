@@ -1,0 +1,23 @@
+benchmark_id: geometry.property_smoothing.smoke
+method: geometry.property_smoothing
+dataset: builtin.cycle_signal.128.mode8
+params:
+  intent: correctness
+  rows: 128
+  mode: 8
+  filters: [averaging, spectral_heat, taubin, implicit]
+  laplacians: [random_walk, combinatorial]
+  iterations: 1
+  lambda: 0.5
+  mu: -0.53
+  heat_time: 1.0
+  time_step: 1.0
+  solver_tolerance: 1.0e-8
+  max_solver_iterations: 2000
+  warmup_iterations: 1
+  measured_iterations: 8
+metrics:
+  - runtime_ms
+  - quality_error_linf
+thresholds:
+  quality_error_linf_max: 1.0e-11

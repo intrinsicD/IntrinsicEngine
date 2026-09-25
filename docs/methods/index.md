@@ -43,6 +43,9 @@ This index is the canonical entry point for method/paper implementation document
 
 ## Geometry Methods
 
+- [Property smoothing](property-smoothing.md): scalar/vector graph filters,
+  spectral heat, Taubin and bilateral filtering through canonical property bindings.
+
 - [Normal estimation](../architecture/normal-estimation.md): canonical-domain PCA and distinct mesh/graph topology normal workflows.
 
 - [`geometry.boundary_first_flattening`](../../methods/geometry/boundary_first_flattening/)

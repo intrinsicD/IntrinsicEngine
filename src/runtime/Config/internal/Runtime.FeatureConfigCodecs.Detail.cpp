@@ -115,7 +115,9 @@ namespace Extrinsic::Runtime::ConfigDetail
     {
         switch (kind)
         {
+        case Geometry::PropertyValueKind::Vec2: return "vec2";
         case Geometry::PropertyValueKind::Vec3: return "vec3";
+        case Geometry::PropertyValueKind::Vec4: return "vec4";
         case Geometry::PropertyValueKind::UInt32: return "uint32";
         case Geometry::PropertyValueKind::Float: return "float";
         case Geometry::PropertyValueKind::Double: return "double";

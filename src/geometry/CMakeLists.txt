@@ -176,6 +176,7 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.Simplification.cpp
         Geometry.HalfedgeMesh.SignedHeatMethod.cpp
         Geometry.HalfedgeMesh.Smoothing.cpp
+        Geometry.PropertySmoothing.cpp
         Geometry.HalfedgeMesh.Subdivision.cpp
         Geometry.HalfedgeMesh.SubdivisionSqrt3.cpp
         Geometry.HalfedgeMesh.Utils.cpp

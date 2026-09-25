@@ -35,6 +35,7 @@ namespace Extrinsic::Sandbox
         if (!registry.Register(Runtime::MakeSelectionConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeGeodesicsConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeScalarGradientConfigSectionRegistration()) ||
+            !registry.Register(Runtime::MakePropertySmoothingConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeMeshCurvatureConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeRegistrationConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeNormalEstimationConfigSectionRegistration()) ||

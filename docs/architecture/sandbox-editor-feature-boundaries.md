@@ -1044,3 +1044,12 @@ contexts supply their respective fields. Any expired attachment makes the combin
 record inert. Job commands fall back from processing to visualization, engine
 config from processing to recipe, and invalidation from scene through processing
 to visualization. Forward feature-context construction remains shared.
+
+### Property smoothing
+
+The shared Smooth Property window is registered under View and redirected from
+Mesh, Graph and PointCloud processing menus. `Runtime.MeshFieldOperations` owns
+validated `sandbox.property_smoothing` configuration, typed domain capture and
+guarded publication; `Geometry.Smoothing` owns the filters. See the
+[property smoothing contract](../methods/property-smoothing.md) for input/output
+bindings, Laplacian semantics, derived sample positions and limits.
