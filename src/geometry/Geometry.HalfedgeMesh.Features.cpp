@@ -7,6 +7,7 @@ module;
 #include <optional>
 #include <span>
 #include <string>
+#include <vector>
 
 #include <glm/glm.hpp>
 

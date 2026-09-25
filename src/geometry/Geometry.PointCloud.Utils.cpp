@@ -601,6 +601,30 @@ namespace Geometry::PointCloud
 
     namespace
     {
+        // Octree over the finite samples only; Source maps compact tree indices to input indices.
+        struct FiniteOutlierIndex
+        {
+            Octree Tree;
+            std::vector<std::size_t> Source;
+
+            [[nodiscard]] bool Build(std::span<const glm::vec3> positions, std::size_t maxPerNode, std::size_t maxDepth)
+            {
+                std::vector<glm::vec3> finite;
+                for (std::size_t i = 0; i < positions.size(); ++i)
+                    if (IsFinite(positions[i]))
+                    {
+                        Source.push_back(i);
+                        finite.push_back(positions[i]);
+                    }
+                // All-non-finite input needs no tree: every point is rejected without queries.
+                if (finite.empty()) return true;
+                Octree::SplitPolicy policy{};
+                policy.SplitPoint = Octree::SplitPoint::Center;
+                policy.TightChildren = true;
+                return Tree.BuildFromPoints(finite, policy, maxPerNode, maxDepth);
+            }
+        };
+
         std::size_t OutlierCandidateWidth(std::size_t n, std::size_t k)
         {
             return n < 2 ? n : std::min(n - 1, std::max(k, std::size_t{2})) + 1;
@@ -704,11 +728,10 @@ namespace Geometry::PointCloud
         }
 
 
-        Octree octree;
-        Octree::SplitPolicy policy{};
-        policy.SplitPoint = Octree::SplitPoint::Center;
-        policy.TightChildren = true;
-        if (!octree.BuildFromPoints(positions, policy, params.OctreeMaxPerNode, params.OctreeMaxDepth))
+        // The octree rejects non-finite coordinates, so it indexes only finite samples;
+        // non-finite points are classified below without entering any neighborhood.
+        FiniteOutlierIndex index;
+        if (!index.Build(positions, params.OctreeMaxPerNode, params.OctreeMaxDepth))
         {
             result.Status = OutlierRemovalStatus::BuildFailed;
             return result;
@@ -732,13 +755,14 @@ namespace Geometry::PointCloud
             }
 
             knn.clear();
-            octree.QueryKNN(positions[i], kQuery, knn);
+            index.Tree.QueryKNN(positions[i], kQuery, knn);
 
             float distSum = 0.0f;
             std::size_t count = 0;
-            for (std::size_t ni : knn)
+            for (std::size_t compact : knn)
             {
-                if (ni == i || !IsFinite(positions[ni]))
+                const std::size_t ni = index.Source[compact];
+                if (ni == i)
                     continue;
                 distSum += glm::length(positions[ni] - positions[i]);
                 ++count;
@@ -797,9 +821,8 @@ namespace Geometry::PointCloud
         if (positions.empty()) { result.Status=OutlierRemovalStatus::EmptyInput;return result; }
         if (!(params.SearchRadius>0) || !std::isfinite(params.SearchRadius))
         { result.Status=OutlierRemovalStatus::InvalidParameters;return result; }
-        Octree tree;
-        Octree::SplitPolicy policy{};policy.SplitPoint=Octree::SplitPoint::Center;policy.TightChildren=true;
-        if (!tree.BuildFromPoints(positions,policy,params.OctreeMaxPerNode,params.OctreeMaxDepth))
+        FiniteOutlierIndex index;
+        if (!index.Build(positions,params.OctreeMaxPerNode,params.OctreeMaxDepth))
         { result.Status=OutlierRemovalStatus::BuildFailed;return result; }
         std::vector<std::size_t> hits;
         for (std::size_t i=0;i<positions.size();++i)
@@ -809,11 +832,13 @@ namespace Geometry::PointCloud
                 result.Mask.push_back(1);result.Scores.push_back(std::numeric_limits<float>::quiet_NaN());
                 ++result.NonFiniteCount;++result.RejectedCount;continue;
             }
-            hits.clear();tree.QuerySphere(Sphere{positions[i],params.SearchRadius},hits);
+            hits.clear();index.Tree.QuerySphere(Sphere{positions[i],params.SearchRadius},hits);
             std::size_t count=0;
-            for (auto neighbor : hits)
-                if (neighbor!=i && IsFinite(positions[neighbor]) &&
-                    glm::length(positions[neighbor]-positions[i])<=params.SearchRadius) ++count;
+            for (auto compact : hits)
+            {
+                const std::size_t neighbor=index.Source[compact];
+                if (neighbor!=i && glm::length(positions[neighbor]-positions[i])<=params.SearchRadius) ++count;
+            }
             result.Scores.push_back(float(count));result.Mask.push_back(count<params.MinNeighbors);
             result.RejectedCount += count<params.MinNeighbors;
         }

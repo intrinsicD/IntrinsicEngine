@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <vector>
 
@@ -174,4 +175,24 @@ TEST(KDTree, HandlesCoincidentElementsAndInvalidQueries)
     EXPECT_FALSE(tree.QueryKNN(glm::vec3{0.0f}, 0, indices).has_value());
     EXPECT_FALSE(tree.QueryRadius(glm::vec3{0.0f}, -1.0f, indices).has_value());
     EXPECT_FALSE(tree.QueryRadius(glm::vec3{0.0f}, std::numeric_limits<float>::quiet_NaN(), indices).has_value());
+}
+
+TEST(KDTree, RejectsNonFiniteElementsAndClearsPreviousTree)
+{
+    Geometry::KDTree tree;
+    std::vector<glm::vec3> points{{0, 0, 0}, {1, 0, 0}, {2, 0, 0}, {3, 0, 0}};
+    ASSERT_TRUE(tree.BuildFromPoints(points).has_value());
+    std::vector<std::uint32_t> indices;
+    for (const float bad : {std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity(),
+                            -std::numeric_limits<float>::infinity()})
+    {
+        points[2].z = bad;
+        EXPECT_FALSE(tree.BuildFromPoints(points).has_value());
+        EXPECT_TRUE(tree.Nodes().empty());
+        EXPECT_FALSE(tree.QueryKNN(glm::vec3{0.0f}, 2, indices).has_value());
+        EXPECT_TRUE(indices.empty());
+    }
+    // Inverted element boxes are rejected as well.
+    const std::array<Geometry::AABB, 1> inverted{Geometry::AABB{}};
+    EXPECT_FALSE(tree.Build(inverted).has_value());
 }

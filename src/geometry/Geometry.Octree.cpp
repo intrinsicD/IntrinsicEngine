@@ -11,6 +11,7 @@ module;
 #include <functional>
 #include <span>
 #include <utility>
+#include <vector>
 #include <glm/glm.hpp>
 
 module Geometry.Octree;
@@ -18,6 +19,7 @@ import Extrinsic.Core.BoundedHeap;
 import Geometry.Containment;
 import Geometry.Overlap;
 import Geometry.Support;
+import Geometry.Validation;
 
 namespace Geometry
 {
@@ -35,13 +37,16 @@ namespace Geometry
             }
 
             const Octree::Node* nodePtr = nodes.data();
-            alignas(64) std::array<Octree::NodeIndex, 128> stack{};
-            int stackTop = 0;
-            stack[stackTop++] = 0;
+            // Each level can leave up to seven siblings pending, and depth is caller-chosen,
+            // so the stack must grow instead of using a fixed-size array.
+            std::vector<Octree::NodeIndex> stack;
+            stack.reserve(128);
+            stack.push_back(0);
 
-            while (stackTop > 0)
+            while (!stack.empty())
             {
-                const Octree::NodeIndex nodeIdx = stack[--stackTop];
+                const Octree::NodeIndex nodeIdx = stack.back();
+                stack.pop_back();
                 const Octree::Node& node = nodePtr[nodeIdx];
 
                 if (!TestOverlap(node.Aabb, queryShape))
@@ -88,7 +93,7 @@ namespace Geometry
                         const Octree::NodeIndex childIndex = node.BaseChildIndex + childOffset;
                         if (childIndex != Octree::kInvalidIndex && TestOverlap(nodePtr[childIndex].Aabb, queryShape))
                         {
-                            stack[stackTop++] = childIndex;
+                            stack.push_back(childIndex);
                         }
                         ++childOffset;
                     }
@@ -347,8 +352,14 @@ namespace Geometry
     bool Octree::BuildFromOwned(const SplitPolicy& policy, const std::size_t maxPerNode,
                                 const std::size_t maxDepth)
     {
-        if (ElementAabbs.empty())
+        // A failed build must not leave the previous hierarchy indexing the new element array.
+        m_Nodes.clear();
+        m_ElementIndices.clear();
+        NodeProperties.Clear();
+        if (ElementAabbs.empty() ||
+            !std::ranges::all_of(ElementAabbs, [](const AABB& box) { return Validation::IsValid(box); }))
         {
+            ElementAabbs.clear();
             return false;
         }
 
@@ -356,9 +367,7 @@ namespace Geometry
         m_MaxElementsPerNode = maxPerNode;
         m_MaxBvhDepth = maxDepth;
 
-        m_Nodes.clear();
         m_Nodes.reserve(ElementAabbs.size() / 4);
-        NodeProperties.Clear(); // Clear previous state
 
         const std::size_t numElements = ElementAabbs.size();
         m_ElementIndices.resize(numElements);

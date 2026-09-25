@@ -117,6 +117,11 @@ used for face/edge bounds, or `Geometry.KDTree` consumers. It supplies nearest
 k-nearest and radius queries. Triangle distance, ray traversal and renderer
 scene acceleration require other primitives and traversal.
 
+`Geometry.KDTree` and `Geometry.Octree` reject element boxes with non-finite
+coordinates or `Min > Max`; a failed build leaves an empty tree, never the
+previous hierarchy. Octree overlap queries use a growable traversal stack, so
+caller-chosen depth limits are not bounded by a fixed stack size.
+
 ## Consumer leases and framed batches
 
 ICP and point PCA use immutable `Snapshot` leases and framed GPU batches:

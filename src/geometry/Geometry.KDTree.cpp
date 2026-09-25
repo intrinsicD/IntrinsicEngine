@@ -9,11 +9,12 @@ module;
 #include <queue>
 #include <span>
 #include <utility>
-#include <span>
 #include <vector>
 #include <glm/glm.hpp>
 
 module Geometry.KDTree;
+
+import Geometry.Validation;
 
 namespace Geometry
 {
@@ -81,8 +82,10 @@ namespace Geometry
         m_Nodes.clear();
         m_ElementIndices.clear();
 
+        // Non-finite coordinates would break nth_element's strict weak ordering.
         if (m_ElementAabbs.empty() || params.LeafSize == 0 || params.MaxDepth == 0 ||
-            !std::isfinite(params.MinSplitExtent) || params.MinSplitExtent < 0.0f)
+            !std::isfinite(params.MinSplitExtent) || params.MinSplitExtent < 0.0f ||
+            !std::ranges::all_of(m_ElementAabbs, [](const AABB& box) { return Validation::IsValid(box); }))
         {
             return std::nullopt;
         }
