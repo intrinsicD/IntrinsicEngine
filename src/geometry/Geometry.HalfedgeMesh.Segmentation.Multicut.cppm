@@ -5,12 +5,12 @@ module;
 #include <cstdint>
 #include <vector>
 #include <span>
-export module Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut;
-export import Geometry.HalfedgeMesh.CurvatureSegmentation.Features;
-export import Geometry.CurvatureSegmentation.Diagnostics;
+export module Geometry.HalfedgeMesh.Segmentation.Multicut;
+export import Geometry.HalfedgeMesh.Segmentation.Features;
+export import Geometry.Segmentation.Diagnostics;
 
 import Geometry.HalfedgeMesh;
-export namespace Geometry::CurvatureSegmentation
+export namespace Geometry::Segmentation
 {
 struct BoundaryPartitionParams
 {
@@ -56,4 +56,4 @@ PartitionFeatureBoundaries(const HalfedgeMesh::Mesh &mesh, FeatureEvidenceView e
                            const BoundaryPartitionParams &params = {},
                            std::span<const double> maxPrincipal = {},
                            std::span<const double> minPrincipal = {});
-} // namespace Geometry::CurvatureSegmentation
+} // namespace Geometry::Segmentation

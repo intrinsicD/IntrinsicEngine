@@ -31,7 +31,7 @@ reviewed decision explicitly adopts a change.
 
 Existing owners and evidence:
 
-- [`src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cpp`](../../../src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cpp)
+- [`src/geometry/Geometry.HalfedgeMesh.Segmentation.cpp`](../../../src/geometry/Geometry.HalfedgeMesh.Segmentation.cpp)
 - [`methods/geometry/curvature_segmentation/method.yaml`](../../../methods/geometry/curvature_segmentation/method.yaml)
 - [`src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Curvature.cpp`](../../../src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Curvature.cpp)
 

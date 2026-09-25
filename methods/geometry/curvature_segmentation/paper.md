@@ -29,7 +29,7 @@ Hildebrandt--Polthier--Wardetzky extremality equations remain a bounded
 comparator, not a second production path.
 
 Slice B implements the hard/soft feature-evidence portion in the narrow
-`Geometry.HalfedgeMesh.CurvatureSegmentation.Features` companion module as
+`Geometry.HalfedgeMesh.Segmentation.Features` companion module as
 `DetectFeatureEvidence`/`ComputeFeatureEvidence`, including explicit failure,
 per-scale response, suppression, hysteresis, fragment, endpoint, junction, and
 bounded-search diagnostics. Executable controls cover the shared hard facts,

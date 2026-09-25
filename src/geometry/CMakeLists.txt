@@ -34,13 +34,13 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.Boundary.cppm
         Geometry.HalfedgeMesh.Builder.cppm
         Geometry.HalfedgeMesh.CatmullClark.cppm
-        Geometry.HalfedgeMesh.CurvatureExtrema.cppm
+        Geometry.HalfedgeMesh.ScalarfieldExtrema.cppm
         Geometry.HalfedgeMesh.Curvature.cppm
-        Geometry.CurvatureSegmentation.Diagnostics.cppm
-        Geometry.HalfedgeMesh.CurvatureSegmentation.cppm
-        Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cppm
-        Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cppm
-        Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut.cppm
+        Geometry.Segmentation.Diagnostics.cppm
+        Geometry.HalfedgeMesh.Segmentation.cppm
+        Geometry.HalfedgeMesh.Segmentation.Features.cppm
+        Geometry.HalfedgeMesh.Segmentation.Patches.cppm
+        Geometry.HalfedgeMesh.Segmentation.Multicut.cppm
         Geometry.HalfedgeMesh.DEC.cppm
         Geometry.HalfedgeMesh.Features.cppm
         Geometry.Geodesic.Types.cppm
@@ -157,12 +157,12 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.Boundary.cpp
         Geometry.HalfedgeMesh.Builder.cpp
         Geometry.HalfedgeMesh.CatmullClark.cpp
-        Geometry.HalfedgeMesh.CurvatureExtrema.cpp
+        Geometry.HalfedgeMesh.ScalarfieldExtrema.cpp
         Geometry.HalfedgeMesh.Curvature.cpp
-        Geometry.HalfedgeMesh.CurvatureSegmentation.cpp
-        Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cpp
-        Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp
-        Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut.cpp
+        Geometry.HalfedgeMesh.Segmentation.cpp
+        Geometry.HalfedgeMesh.Segmentation.Features.cpp
+        Geometry.HalfedgeMesh.Segmentation.Patches.cpp
+        Geometry.HalfedgeMesh.Segmentation.Multicut.cpp
         CurvatureBoundaryGraph.cpp
         Geometry.HalfedgeMesh.DEC.cpp
         Geometry.HalfedgeMesh.Features.cpp

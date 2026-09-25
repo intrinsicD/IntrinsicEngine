@@ -33,7 +33,7 @@ def main() -> int:
     source_root = Path(__file__).resolve().parents[2]
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=source_root, text=True).strip()
     changed = subprocess.check_output(["git", "status", "--porcelain"], cwd=source_root, text=True)
-    source_paths = ["src/geometry/CurvatureBoundaryGraph.cpp", "src/geometry/CurvatureBoundaryGraph.hpp", "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut.cpp", "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut.cppm", "benchmarks/runners/CurvatureBoundaryMeshRunner.cpp"]
+    source_paths = ["src/geometry/CurvatureBoundaryGraph.cpp", "src/geometry/CurvatureBoundaryGraph.hpp", "src/geometry/Geometry.HalfedgeMesh.Segmentation.Multicut.cpp", "src/geometry/Geometry.HalfedgeMesh.Segmentation.Multicut.cppm", "benchmarks/runners/CurvatureBoundaryMeshRunner.cpp"]
     record = {"schema": 1, "candidates": {"multicut": "boundary_multicut_isotropic_v2", "regional": "curvature_region_scale_v2", "contrast": "boundary_feature_contrast_v1", "clean": "boundary_feature_area_cleanup_v1", "clean_medium": "boundary_feature_area_cleanup_v1", "clean_coarse": "boundary_feature_area_cleanup_v1", "curves": "boundary_feature_curve_coverage_v1", "local": "method_039_local_patch_unadopted"}, "source_revision": revision, "source_dirty": bool(changed), "source_hashes": {p: digest(source_root / p) for p in source_paths}, "runner_sha256": digest(runner), "claim_eligible": False, "timeout_seconds": args.timeout, "inputs": {}, "runs": []}
     # Bind every input before the first candidate output, including missing files.
     for name in args.meshes:

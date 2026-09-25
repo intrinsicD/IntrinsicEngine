@@ -41,7 +41,7 @@ contract_review: "Publishes detached geometric feature curves through shared val
 ```bash
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicSandboxEditorIntegrationTests
-ctest --test-dir build/ci --output-on-failure -R 'CurvatureExtrema|SandboxCurvatureSegmentationPanel' --timeout 120
+ctest --test-dir build/ci --output-on-failure -R 'ScalarfieldExtrema|SandboxCurvatureSegmentationPanel' --timeout 120
 cmake --build --preset dev --target ExtrinsicSandbox
 python3 tools/agents/check_task_policy.py --root . --strict
 ```

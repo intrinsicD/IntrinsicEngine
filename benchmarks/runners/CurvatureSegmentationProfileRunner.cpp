@@ -28,13 +28,13 @@
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Features;
 import Geometry.Curvature;
-import Geometry.HalfedgeMesh.CurvatureSegmentation;
+import Geometry.HalfedgeMesh.Segmentation;
 import Geometry.Properties;
 
 namespace
 {
     using namespace Intrinsic::Bench::CurvatureProfile;
-    namespace Segment = Geometry::CurvatureSegmentation;
+    namespace Segment = Geometry::Segmentation;
     namespace Features = Geometry::HalfedgeMesh::Features;
     using ProfileClock = std::chrono::steady_clock;
 
@@ -68,7 +68,7 @@ namespace
         std::uint32_t SpatialIterations{0u};
         double MisclassifiedFaceFraction{1.0};
         double DescriptorSetupMilliseconds{0.0};
-        Segment::CurvatureSegmentationStageTimings MedianTimings{};
+        Segment::SegmentationStageTimings MedianTimings{};
         std::vector<CandidateProfile> Candidates{};
         BoundaryProfile Boundary{};
     };
@@ -183,7 +183,7 @@ namespace
         bool Succeeded{false};
     };
 
-    [[nodiscard]] Segment::CurvatureSegmentationParams MakeParams(
+    [[nodiscard]] Segment::SegmentationParams MakeParams(
         SelectionMode mode,
         std::uint32_t fixedComponentCount);
 
@@ -210,7 +210,7 @@ namespace
             Total.reserve(count);
         }
 
-        void Add(const Segment::CurvatureSegmentationStageTimings& timings)
+        void Add(const Segment::SegmentationStageTimings& timings)
         {
             Curvature.push_back(timings.CurvatureEstimationMilliseconds);
             Aggregation.push_back(
@@ -247,10 +247,10 @@ namespace
             ProfileClock::now() - start).count();
     }
 
-    [[nodiscard]] Segment::CurvatureSegmentationStageTimings MedianTimings(
+    [[nodiscard]] Segment::SegmentationStageTimings MedianTimings(
         TimingSamples samples)
     {
-        Segment::CurvatureSegmentationStageTimings timings{};
+        Segment::SegmentationStageTimings timings{};
         timings.CurvatureEstimationMilliseconds =
             Median(std::move(samples.Curvature));
         timings.FaceAggregationAndNormalizationMilliseconds =
@@ -271,7 +271,7 @@ namespace
 
     void CopyResultDiagnostics(
         VariantProfile& profile,
-        const Segment::CurvatureSegmentationResult& result)
+        const Segment::SegmentationResult& result)
     {
         profile.DualEdgeCount = result.Diagnostics.DualEdgeCount;
         profile.SelectedComponentCount =
@@ -786,8 +786,8 @@ namespace
     }
 
     [[nodiscard]] bool SameV1Payload(
-        const Segment::CurvatureSegmentationResult& a,
-        const Segment::CurvatureSegmentationResult& b) noexcept
+        const Segment::SegmentationResult& a,
+        const Segment::SegmentationResult& b) noexcept
     {
         return a.Succeeded() && b.Succeeded()
             && a.FaceComponents == b.FaceComponents
@@ -798,7 +798,7 @@ namespace
     [[nodiscard]] FoldVariantProfile RunFoldVariant(
         const double dihedralDegrees,
         const std::array<FoldFixture, 2u>& flatFixtures,
-        const std::array<Segment::CurvatureSegmentationResult, 2u>& flatResults,
+        const std::array<Segment::SegmentationResult, 2u>& flatResults,
         double& maxIsometricDelta)
     {
         constexpr std::uint32_t kRows = 24u;
@@ -809,7 +809,7 @@ namespace
         Features::Params featureParams{};
         featureParams.BoundaryIsFeature = false;
         featureParams.DihedralThresholdDegrees = 45.0;
-        const Segment::CurvatureSegmentationParams segmentParams =
+        const Segment::SegmentationParams segmentParams =
             MakeParams(SelectionMode::Fixed, 1u);
 
         bool allValid = true;
@@ -839,7 +839,7 @@ namespace
                     classification.EdgeFeatureMask,
                     fixture.ExpectedFeatureMask));
 
-            Segment::CurvatureSegmentationResult result = Segment::Segment(
+            Segment::SegmentationResult result = Segment::SegmentCurvature(
                 fixture.Mesh,
                 fixture.K1,
                 fixture.K2,
@@ -906,15 +906,15 @@ namespace
             MakeFoldFixture(kRows, kColumns, 0.0, false),
             MakeFoldFixture(kRows, kColumns, 0.0, true),
         };
-        const Segment::CurvatureSegmentationParams params =
+        const Segment::SegmentationParams params =
             MakeParams(SelectionMode::Fixed, 1u);
-        std::array<Segment::CurvatureSegmentationResult, 2u> flatResults{
-            Segment::Segment(
+        std::array<Segment::SegmentationResult, 2u> flatResults{
+            Segment::SegmentCurvature(
                 flatFixtures[0u].Mesh,
                 flatFixtures[0u].K1,
                 flatFixtures[0u].K2,
                 params),
-            Segment::Segment(
+            Segment::SegmentCurvature(
                 flatFixtures[1u].Mesh,
                 flatFixtures[1u].K1,
                 flatFixtures[1u].K2,
@@ -995,11 +995,11 @@ namespace
             static_cast<double>(labels.size());
     }
 
-    [[nodiscard]] Segment::CurvatureSegmentationParams MakeParams(
+    [[nodiscard]] Segment::SegmentationParams MakeParams(
         const SelectionMode mode,
         const std::uint32_t fixedComponentCount)
     {
-        Segment::CurvatureSegmentationParams params{};
+        Segment::SegmentationParams params{};
         params.SelectionMode = mode == SelectionMode::Fixed
             ? Segment::ComponentSelectionMode::FixedCount
             : Segment::ComponentSelectionMode::Automatic;
@@ -1020,14 +1020,14 @@ namespace
             MakeCylinderControlFixture(0.0),
             MakeCylinderControlFixture(1.0 / 128.0),
         };
-        std::array<Segment::CurvatureSegmentationResult, 2u> results{};
+        std::array<Segment::SegmentationResult, 2u> results{};
         constexpr std::array<std::string_view, 2u> kNames{
             "phase_0", "phase_1_over_128_turn"};
 
         Features::Params featureParams{};
         featureParams.BoundaryIsFeature = false;
         featureParams.DihedralThresholdDegrees = 45.0;
-        Segment::CurvatureSegmentationParams segmentParams =
+        Segment::SegmentationParams segmentParams =
             MakeParams(SelectionMode::Fixed, 1u);
         segmentParams.Seed = 1709u;
 
@@ -1063,7 +1063,7 @@ namespace
                 classification.EdgeFeatureMask,
                 fixture.ExpectedFeatureMask);
 
-            results[index] = Segment::Segment(
+            results[index] = Segment::SegmentCurvature(
                 fixture.Mesh, fixture.K1, fixture.K2, segmentParams);
             valid &= results[index].Succeeded();
             if (results[index].Succeeded())
@@ -1141,10 +1141,10 @@ namespace
             classification.EdgeFeatureMask,
             fixture.ExpectedFeatureMask);
 
-        Segment::CurvatureSegmentationParams segmentParams =
+        Segment::SegmentationParams segmentParams =
             MakeParams(SelectionMode::Fixed, 2u);
         segmentParams.Seed = 1741u;
-        const Segment::CurvatureSegmentationResult result = Segment::Segment(
+        const Segment::SegmentationResult result = Segment::SegmentCurvature(
             fixture.Mesh, fixture.K1, fixture.K2, segmentParams);
         if (result.Succeeded())
         {
@@ -1251,13 +1251,13 @@ namespace
         if (!fixture.Valid)
             return profile;
 
-        const Segment::CurvatureSegmentationParams params =
+        const Segment::SegmentationParams params =
             MakeParams(mode, 2u);
         for (std::uint32_t iteration = 0u;
              iteration < spec.WarmupIterations;
              ++iteration)
         {
-            const auto warmup = Segment::Segment(
+            const auto warmup = Segment::SegmentCurvature(
                 fixture.Mesh, fixture.K1, fixture.K2, params);
             if (!warmup.Succeeded())
                 return profile;
@@ -1266,12 +1266,12 @@ namespace
         TimingSamples timings;
         timings.Reserve(spec.MeasuredIterations);
 
-        Segment::CurvatureSegmentationResult last{};
+        Segment::SegmentationResult last{};
         for (std::uint32_t iteration = 0u;
              iteration < spec.MeasuredIterations;
              ++iteration)
         {
-            Segment::CurvatureSegmentationResult result = Segment::Segment(
+            Segment::SegmentationResult result = Segment::SegmentCurvature(
                 fixture.Mesh, fixture.K1, fixture.K2, params);
             if (!result.Succeeded())
                 return profile;
@@ -1303,7 +1303,7 @@ namespace
         if (!fixture.Valid)
             return profile;
 
-        const Segment::CurvatureSegmentationParams params =
+        const Segment::SegmentationParams params =
             MakeParams(mode, 1u);
         Geometry::Curvature::CurvatureField reusable{};
         if (lane == DescriptorLane::Reusable)
@@ -1327,7 +1327,7 @@ namespace
                 reusable.MaxPrincipalCurvatureProperty.Vector();
             const std::vector<double>& minimum =
                 reusable.MinPrincipalCurvatureProperty.Vector();
-            return Segment::Segment(
+            return Segment::SegmentCurvature(
                 fixture.Mesh,
                 std::span<const double>{maximum.data(), maximum.size()},
                 std::span<const double>{minimum.data(), minimum.size()},
@@ -1345,12 +1345,12 @@ namespace
 
         TimingSamples timings;
         timings.Reserve(spec.MeasuredIterations);
-        Segment::CurvatureSegmentationResult last{};
+        Segment::SegmentationResult last{};
         for (std::uint32_t iteration = 0u;
              iteration < spec.MeasuredIterations;
              ++iteration)
         {
-            Segment::CurvatureSegmentationResult result = execute();
+            Segment::SegmentationResult result = execute();
             if (!result.Succeeded())
                 return profile;
             timings.Add(result.Diagnostics.Timings);

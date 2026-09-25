@@ -47,7 +47,7 @@ filters. These choices are not anatomical ground truth or tuned decision limits.
 
 Native baseline complexity cost is the existing local diagnostic value 0.5.
 Native fields originate in
-[CurvatureSegmentation.Patches](../../src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp),
+[CurvatureSegmentation.Patches](../../src/geometry/Geometry.HalfedgeMesh.Segmentation.Patches.cpp),
 not in the Python atlas. Native curvature-mixture components also differ from
 spatial regions: identical curvature descriptors can occur on distant parts.
 

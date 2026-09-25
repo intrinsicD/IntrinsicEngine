@@ -11,14 +11,14 @@
 #include <glm/glm.hpp>
 
 import Geometry.HalfedgeMesh;
-import Geometry.HalfedgeMesh.CurvatureSegmentation;
+import Geometry.HalfedgeMesh.Segmentation;
 import Geometry.Properties;
 
 namespace Intrinsic::Bench::Geometry
 {
     namespace
     {
-        namespace Segment = ::Geometry::CurvatureSegmentation;
+        namespace Segment = ::Geometry::Segmentation;
 
         constexpr int kWarmupIterations = 1;
         constexpr int kMeasuredIterations = 8;
@@ -106,7 +106,7 @@ namespace Intrinsic::Bench::Geometry
         [[nodiscard]] CurvatureSegmentationReferenceSmokeMetrics Tick()
         {
             FoldFixture fixture = MakeFoldFixture();
-            Segment::CurvatureSegmentationParams params{};
+            Segment::SegmentationParams params{};
             params.SelectionMode =
                 Segment::ComponentSelectionMode::FixedCount;
             params.FixedComponentCount = 2u;
@@ -116,8 +116,8 @@ namespace Intrinsic::Bench::Geometry
             params.MinimumRegionFaces = 1u;
             params.Seed = 17u;
 
-            const Segment::CurvatureSegmentationResult result =
-                Segment::Segment(
+            const Segment::SegmentationResult result =
+                Segment::SegmentCurvature(
                     fixture.Mesh, fixture.K1, fixture.K2, params);
             CurvatureSegmentationReferenceSmokeMetrics metrics{};
             if (!result.Succeeded())

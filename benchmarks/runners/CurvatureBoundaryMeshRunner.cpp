@@ -21,10 +21,10 @@ import Geometry.HalfedgeMesh.IO;
 import Geometry.Graph;
 import Geometry.Curvature;
 import Geometry.MeshSoup;
-import Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut;
-import Geometry.HalfedgeMesh.CurvatureSegmentation.Patches;
+import Geometry.HalfedgeMesh.Segmentation.Multicut;
+import Geometry.HalfedgeMesh.Segmentation.Patches;
 
-namespace C = Geometry::CurvatureSegmentation;
+namespace C = Geometry::Segmentation;
 int main(int argc, char **argv)
 {
     if (argc < 4 || argc > 5)

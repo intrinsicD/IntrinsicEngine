@@ -31,7 +31,7 @@ namespace Extrinsic::Runtime
             return FeatureDiagnostics.has_value() &&
                    FeatureDiagnostics->Succeeded() &&
                    BoundaryDiagnostics.has_value() &&
-                   BoundaryDiagnostics->Status == Geometry::CurvatureSegmentation::
+                   BoundaryDiagnostics->Status == Geometry::Segmentation::
                        BoundaryPartitionStatus::Success;
         }
         return ActualMethod == CurvatureSegmentationMethod::CurvatureGmm &&

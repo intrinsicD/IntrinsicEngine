@@ -10,11 +10,11 @@ module;
 #include <queue>
 #include <utility>
 #include <glm/glm.hpp>
-module Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut;
+module Geometry.HalfedgeMesh.Segmentation.Multicut;
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;
 
-namespace Geometry::CurvatureSegmentation
+namespace Geometry::Segmentation
 {
 BoundaryPartitionParams BoundaryCurveCoverageProfileV1() noexcept
 {
@@ -372,4 +372,4 @@ BoundaryPartitionResult PartitionFeatureBoundaries(
     d.ModelEnergy = d.FinalEnergy - d.BoundaryEnergy - d.RegionCostEnergy;
     return finish(BoundaryPartitionStatus::Success);
 }
-} // namespace Geometry::CurvatureSegmentation
+} // namespace Geometry::Segmentation

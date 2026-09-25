@@ -1,22 +1,24 @@
-// Exposes bounded face-feature GMM segmentation and curvature adapters so
-// geometry and runtime share deterministic labels and diagnostics.
+// Exposes bounded face-feature GMM segmentation guided by any floating-point
+// vertex/face fields, plus the curvature preset, so geometry and runtime share
+// deterministic labels and diagnostics.
 module;
 
 #include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <span>
+#include <string_view>
 #include <vector>
 
 #include <glm/glm.hpp>
 
-export module Geometry.HalfedgeMesh.CurvatureSegmentation;
+export module Geometry.HalfedgeMesh.Segmentation;
 
-export import Geometry.CurvatureSegmentation.Diagnostics;
+export import Geometry.Segmentation.Diagnostics;
 
 import Geometry.HalfedgeMesh;
 
-export namespace Geometry::CurvatureSegmentation
+export namespace Geometry::Segmentation
 {
     inline constexpr std::uint32_t kInvalidLabel =
         std::numeric_limits<std::uint32_t>::max();
@@ -27,7 +29,7 @@ export namespace Geometry::CurvatureSegmentation
         Automatic,
     };
 
-    struct CurvatureSegmentationParams
+    struct SegmentationParams
     {
         ComponentSelectionMode SelectionMode{
             ComponentSelectionMode::Automatic};
@@ -63,10 +65,10 @@ export namespace Geometry::CurvatureSegmentation
         std::uint32_t MinimumRegionFaces{2u};
     };
 
-    [[nodiscard]] bool IsValidMixtureParams(const CurvatureSegmentationParams& params) noexcept;
-    [[nodiscard]] bool IsValidSegmentationParams(const CurvatureSegmentationParams& params) noexcept;
+    [[nodiscard]] bool IsValidMixtureParams(const SegmentationParams& params) noexcept;
+    [[nodiscard]] bool IsValidSegmentationParams(const SegmentationParams& params) noexcept;
 
-    struct CurvatureNormalization
+    struct FeatureNormalization
     {
         double Center{0.0};
         double Scale{1.0};
@@ -74,10 +76,10 @@ export namespace Geometry::CurvatureSegmentation
 
     // Called after finite face-sample preflight. Keeps the curvature median and
     // MAD-to-RMS-to-unit fallback policy, including the empty-input defaults.
-    [[nodiscard]] CurvatureNormalization ComputeCurvatureNormalization(
+    [[nodiscard]] FeatureNormalization ComputeFeatureNormalization(
         std::span<const double> values);
 
-    struct CurvatureSegmentationResult
+    struct SegmentationResult
     {
         // Slot-aligned outputs. Deleted face slots retain kInvalidLabel;
         // deleted/non-boundary edge slots retain zero/transparent values.
@@ -86,7 +88,7 @@ export namespace Geometry::CurvatureSegmentation
         std::vector<std::uint8_t> EdgeBoundaries{};
         std::vector<glm::vec4> FaceRegionColors{};
         std::vector<glm::vec4> EdgeBoundaryColors{};
-        CurvatureSegmentationDiagnostics Diagnostics{};
+        SegmentationDiagnostics Diagnostics{};
 
         [[nodiscard]] bool Succeeded() const noexcept
         {
@@ -102,26 +104,60 @@ export namespace Geometry::CurvatureSegmentation
     // Features are face-slot aligned and dimension selects the active leading
     // channels (1..3). Inactive packed channels and deleted-face slots are
     // ignored. The kernel does not mutate the mesh.
-    [[nodiscard]] CurvatureSegmentationResult SegmentFaceFeatures(
+    [[nodiscard]] SegmentationResult SegmentFaceFeatures(
         const HalfedgeMesh::Mesh& mesh,
         std::span<const glm::dvec3> faceFeatures,
         std::uint32_t dimension,
-        const CurvatureSegmentationParams& params = {});
+        const SegmentationParams& params = {});
 
-    // Segment a triangle mesh from slot-aligned signed principal curvatures.
+    enum class GuideDomain : std::uint8_t
+    {
+        Vertex = 0,
+        Face,
+    };
+
+    // One scalar guide channel aligned to vertex or face storage slots.
+    // Vertex channels are averaged over each triangle's corners.
+    struct Guide
+    {
+        GuideDomain Domain{GuideDomain::Vertex};
+        std::span<const double> Values{};
+    };
+
+    // A named mesh property used as guide channels: float and double give one
+    // channel, glm::vec2/glm::vec3 give one channel per component.
+    struct GuideProperty
+    {
+        GuideDomain Domain{GuideDomain::Vertex};
+        std::string_view Name{};
+    };
+
+    // Segment a triangle mesh from 1..3 guide channels, in order. Wrong-sized
+    // channels fail with FeatureCountMismatch; missing or non-floating-point
+    // properties fail with MissingGuideProperty. The mesh is not mutated.
+    [[nodiscard]] SegmentationResult Segment(
+        const HalfedgeMesh::Mesh& mesh,
+        std::span<const Guide> guides,
+        const SegmentationParams& params = {});
+    [[nodiscard]] SegmentationResult Segment(
+        const HalfedgeMesh::Mesh& mesh,
+        std::span<const GuideProperty> guides,
+        const SegmentationParams& params = {});
+
+    // Curvature preset over slot-aligned signed principal curvatures:
     // maxPrincipal[i] is k1 and minPrincipal[i] is k2, with k1 >= k2 under the
-    // caller's orientation convention. The kernel does not mutate the mesh.
-    [[nodiscard]] CurvatureSegmentationResult Segment(
+    // caller's orientation convention, as two vertex guides.
+    [[nodiscard]] SegmentationResult SegmentCurvature(
         const HalfedgeMesh::Mesh& mesh,
         std::span<const double> maxPrincipal,
         std::span<const double> minPrincipal,
-        const CurvatureSegmentationParams& params = {});
+        const SegmentationParams& params = {});
 
     // Convenience path using Geometry.Curvature's signed per-vertex estimate.
     // Curvature properties are materialized only on the supplied mesh object;
     // runtime calls this on its detached snapshot and publishes selected output
     // properties explicitly after the solve.
-    [[nodiscard]] CurvatureSegmentationResult ComputeAndSegment(
+    [[nodiscard]] SegmentationResult ComputeAndSegment(
         HalfedgeMesh::Mesh& mesh,
-        const CurvatureSegmentationParams& params = {});
+        const SegmentationParams& params = {});
 }

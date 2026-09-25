@@ -79,7 +79,7 @@ LAYER_SCOPES: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
         (
             "IntrinsicGeometryCurvatureTests",
             "IntrinsicGeometryFeaturePartitionTests",
-            "IntrinsicGeometryCurvatureExtremaTests",
+            "IntrinsicGeometryScalarfieldExtremaTests",
             "IntrinsicGeometryTests",
             "IntrinsicGeometryIoTests",
         ),
@@ -152,9 +152,9 @@ TEST_SCOPES: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
         ("IntrinsicGeometryFeaturePartitionTests",),
     ),
     (
-        "tests/unit/geometry/Test.CurvatureExtrema.cpp",
+        "tests/unit/geometry/Test.ScalarfieldExtrema.cpp",
         ("geometry",),
-        ("IntrinsicGeometryCurvatureExtremaTests",),
+        ("IntrinsicGeometryScalarfieldExtremaTests",),
     ),
     ("tests/unit/geometry/", ("geometry",), ("IntrinsicGeometryTests",)),
     (

@@ -923,7 +923,7 @@ The two modules carry the same RayAabbSlabInterval implementation, including par
 
 ### R18 — Curvature median and robust scale
 
-**Locations:** [src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cpp:114](../../src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cpp#L114); [src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp:193](../../src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp#L193); [src/geometry/Geometry.Statistics.cppm:75](../../src/geometry/Geometry.Statistics.cppm#L75).
+**Locations:** [src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cpp:114](../../src/geometry/Geometry.HalfedgeMesh.Segmentation.cpp#L114); [src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp:193](../../src/geometry/Geometry.HalfedgeMesh.Segmentation.Patches.cpp#L193); [src/geometry/Geometry.Statistics.cppm:75](../../src/geometry/Geometry.Statistics.cppm#L75).
 
 Segmentation and patches each implement Median and the same MAD-to-RMS-to-one RobustScale fallback. Geometry::Statistics already exposes an exact median.
 
@@ -1123,7 +1123,7 @@ Several editor suites copy low-level property/topology fixture construction such
 
 ### R38 — Curvature parameter validity rules
 
-**Locations:** [src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cpp:89](../../src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cpp#L89); [src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp:142](../../src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp#L142); [src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp:49](../../src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp#L49).
+**Locations:** [src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cpp:89](../../src/geometry/Geometry.HalfedgeMesh.Segmentation.cpp#L89); [src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp:142](../../src/geometry/Geometry.HalfedgeMesh.Segmentation.Patches.cpp#L142); [src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp:49](../../src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp#L49).
 
 Geometry and runtime config validation repeat the mixture-count, tolerance, covariance-floor and related numerical bounds. Runtime adds method/UI-specific bounds.
 

@@ -34,7 +34,7 @@ same-cardinality visualization properties for direct sculpt inspection; it did
 not change the refutation, register a v2 backend, or replace METHOD-037 as the
 production default.
 
-The experimental `Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut` module
+The experimental `Geometry.HalfedgeMesh.Segmentation.Multicut` module
 now exposes signed-boundary partitioning, optional regional fitting, and explicit
 area cleanup through `PartitionFeatureBoundaries`. It is not an accepted
 replacement backend. The [experiment contract](boundary_partition_experiment.md)
@@ -45,8 +45,9 @@ mesh results, rejected inputs, verification, and reproduction commands.
 
 ## Implemented path
 
-`Geometry.HalfedgeMesh.CurvatureSegmentation` computes or accepts signed
-per-vertex `(k1,k2)`, robustly normalizes face averages, fits the existing
+`Geometry.HalfedgeMesh.Segmentation` computes or accepts signed
+per-vertex `(k1,k2)` (its curvature preset; `Segment` accepts any 1-3
+floating-point vertex/face guide channels), robustly normalizes face averages, fits the existing
 deterministic Gaussian mixture, and minimizes a feature-weighted Potts energy
 on the face-dual graph. It supports:
 
@@ -64,7 +65,7 @@ region IDs.
 ### METHOD-039 feature-evidence stage
 
 The narrow companion module
-`Geometry.HalfedgeMesh.CurvatureSegmentation.Features` keeps the retired v1
+`Geometry.HalfedgeMesh.Segmentation.Features` keeps the retired v1
 interface and its sealed evidence byte-stable. `DetectFeatureEvidence` consumes
 a full owning triangle mesh and slot-aligned ordered signed principal
 curvatures; `ComputeFeatureEvidence` obtains those curvatures through the
@@ -88,7 +89,7 @@ contract evidence.
 ### METHOD-039 local patch reference and negative verdict
 
 The companion module
-`Geometry.HalfedgeMesh.CurvatureSegmentation.Patches` consumes borrowed
+`Geometry.HalfedgeMesh.Segmentation.Patches` consumes borrowed
 hard/soft feature evidence and reuses the existing deterministic Gaussian
 mixture. It selects deterministic farthest-point seeds behind hard barriers,
 grows provisional regions with stable multi-source Dijkstra, greedily merges a
@@ -172,7 +173,7 @@ runner through `BoundaryCurveCoverageProfileV1`.
 
 ## Verification and scope
 
-- Correctness: `tests/unit/geometry/Test.CurvatureSegmentation.cpp`
+- Correctness: `tests/unit/geometry/Test.Segmentation.cpp`
 - METHOD-039 frozen oracle/preflight contract:
   `tests/unit/geometry/Test.CurvaturePatchContract.cpp`
 - Runtime publication/history: `tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp`

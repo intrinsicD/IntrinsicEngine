@@ -25,8 +25,8 @@ import Geometry.MarchingCubes;
 import Geometry.MeshSoup;
 import Geometry.SurfaceReconstruction;
 import Geometry.PointCloud;
-import Geometry.HalfedgeMesh.CurvatureExtrema;
-namespace C = Geometry::CurvatureExtrema;
+import Geometry.HalfedgeMesh.ScalarfieldExtrema;
+namespace C = Geometry::ScalarfieldExtrema;
 using Json = nlohmann::json;
 int main(int argc, char** argv)
 {
@@ -179,7 +179,7 @@ int main(int argc, char** argv)
             return write(4);
         }
     }
-    auto result = C::Extract(mesh, params);
+    auto result = C::ExtractCurvatureExtrema(mesh, params);
     const auto& d = result.Diagnostic;
     report["diagnostics"] = {{"state", C::ToString(d.State)},
                              {"runtime_ms", d.TotalMilliseconds},

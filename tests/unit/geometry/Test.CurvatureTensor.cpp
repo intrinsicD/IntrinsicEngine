@@ -22,8 +22,8 @@ import Geometry.HalfedgeMesh.IO;
 import Geometry.Graph;
 import Geometry.Curvature;
 import Geometry.MeshSoup;
-import Geometry.HalfedgeMesh.CurvatureSegmentation.Features;
-import Geometry.HalfedgeMesh.CurvatureSegmentation.Patches;
+import Geometry.HalfedgeMesh.Segmentation.Features;
+import Geometry.HalfedgeMesh.Segmentation.Patches;
 
 namespace
 {
@@ -31,7 +31,7 @@ namespace
     using Geometry::PropertyIndex;
     using Geometry::VertexHandle;
     namespace Curv = Geometry::Curvature;
-    namespace Patches = Geometry::CurvatureSegmentation;
+    namespace Patches = Geometry::Segmentation;
     namespace MU = Geometry::MeshUtils;
 
     constexpr double kPi = std::numbers::pi;

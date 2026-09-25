@@ -13,6 +13,7 @@ The vertex float3 position binding is selected from the property catalog.
 ```json
 {
   "source_vertices": [0, 12],
+  "source_vertex_property": null,
   "max_halfedge_expansions": 10000000,
   "position_property": {"domain": "MeshVertex", "name": "v:position", "kind": "vec3"},
   "distance_property": {"domain": "MeshVertex", "name": "v:geodesic_distance", "kind": "double"},
@@ -21,8 +22,12 @@ The vertex float3 position binding is selected from the property catalog.
 ```
 
 This is the payload of app section `sandbox.geodesics`, schema
-`intrinsic.runtime.sandbox.geodesics`, version 2. Empty source lists can be
-stored while preparing an operation, but computation requires a nonempty set.
+`intrinsic.runtime.sandbox.geodesics`, version 2. `source_vertex_property`
+optionally binds a scalar vertex property (bool, integer or floating point);
+live vertices with a finite nonzero value join `source_vertices`, so a
+`v:feature` mask from **Mesh / Processing / Scalar Ridges** can seed distances.
+Empty sources can be stored while preparing an operation, but computation
+requires a nonempty combined set.
 `ApplyEditorGeodesicsCommand` also accepts an explicit config, and
 `ApplyEditorConfiguredGeodesicsCommand` uses the active config.
 

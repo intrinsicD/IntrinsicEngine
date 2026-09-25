@@ -6,16 +6,17 @@
 #include <map>
 #include <numbers>
 #include <set>
+#include <span>
 #include <string>
 #include <tuple>
 #include <vector>
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;
-import Geometry.HalfedgeMesh.CurvatureExtrema;
+import Geometry.HalfedgeMesh.ScalarfieldExtrema;
 import Geometry.Curvature;
 namespace
 {
-    namespace C = Geometry::CurvatureExtrema;
+    namespace C = Geometry::ScalarfieldExtrema;
     using Mesh = Geometry::HalfedgeMesh::Mesh;
     Mesh Grid(int n = 40, bool flat = false, bool alternate = false, bool reverse = false,
               double scale = 1, glm::vec3 offset = {})
@@ -81,10 +82,10 @@ namespace
         EXPECT_GT(high, 0.6f);
     }
 } // namespace
-TEST(CurvatureExtrema, GaussianExtrusionFindsGeometricTransverseExtremum)
+TEST(ScalarfieldExtrema, GaussianExtrusionFindsGeometricTransverseExtremum)
 {
     auto mesh = Grid();
-    auto result = C::Extract(mesh, Parameters());
+    auto result = C::ExtractCurvatureExtrema(mesh, Parameters());
     ASSERT_TRUE(result.Succeeded());
     CheckCenter(Midpoints(result, C::Kind::PrincipalValley));
     CheckCenter(Midpoints(result, C::Kind::MeanValley));
@@ -107,19 +108,19 @@ TEST(CurvatureExtrema, GaussianExtrusionFindsGeometricTransverseExtremum)
         EXPECT_NE(segment.PersistentScaleMask & (1u << segment.Scale), 0);
     }
 }
-TEST(CurvatureExtrema, PlaneHasNoArtificialCurves)
+TEST(ScalarfieldExtrema, PlaneHasNoArtificialCurves)
 {
     auto mesh = Grid(32, true);
-    auto result = C::Extract(mesh, Parameters());
+    auto result = C::ExtractCurvatureExtrema(mesh, Parameters());
     ASSERT_TRUE(result.Succeeded());
     EXPECT_TRUE(result.Segments.empty());
     EXPECT_TRUE(result.Curves.empty());
 }
-TEST(CurvatureExtrema, OrientationReversalExchangesRidgeValley)
+TEST(ScalarfieldExtrema, OrientationReversalExchangesRidgeValley)
 {
     auto a = Grid(), b = Grid(40, false, false, true);
     auto p = Parameters();
-    auto ra = C::Extract(a, p), rb = C::Extract(b, p);
+    auto ra = C::ExtractCurvatureExtrema(a, p), rb = C::ExtractCurvatureExtrema(b, p);
     ASSERT_TRUE(ra.Succeeded());
     ASSERT_TRUE(rb.Succeeded());
     auto pa = Midpoints(ra, C::Kind::PrincipalValley), pb = Midpoints(rb, C::Kind::PrincipalRidge);
@@ -133,30 +134,30 @@ TEST(CurvatureExtrema, OrientationReversalExchangesRidgeValley)
     }
     CheckCenter(Midpoints(rb, C::Kind::MeanRidge));
 }
-TEST(CurvatureExtrema, RetriangulationRetainsCenterCurve)
+TEST(ScalarfieldExtrema, RetriangulationRetainsCenterCurve)
 {
     auto mesh = Grid(40, false, true);
-    auto r = C::Extract(mesh, Parameters());
+    auto r = C::ExtractCurvatureExtrema(mesh, Parameters());
     ASSERT_TRUE(r.Succeeded());
     CheckCenter(Midpoints(r, C::Kind::PrincipalValley));
     CheckCenter(Midpoints(r, C::Kind::MeanValley));
 }
-TEST(CurvatureExtrema, RefinementRetainsCenterCurve)
+TEST(ScalarfieldExtrema, RefinementRetainsCenterCurve)
 {
     auto mesh = Grid(60, false, false);
-    auto r = C::Extract(mesh, Parameters());
+    auto r = C::ExtractCurvatureExtrema(mesh, Parameters());
     ASSERT_TRUE(r.Succeeded());
     CheckCenter(Midpoints(r, C::Kind::PrincipalValley));
     CheckCenter(Midpoints(r, C::Kind::MeanValley));
 }
-TEST(CurvatureExtrema, ScaleTranslationAndSourcePreservation)
+TEST(ScalarfieldExtrema, ScaleTranslationAndSourcePreservation)
 {
     auto mesh = Grid(32, false, false, false, 5, {10, -4, 3});
     auto positions = mesh.VertexProperties().Get<glm::vec3>("v:point").Vector();
     auto custom = mesh.FaceProperties().GetOrAdd<int>("f:user", 17);
     auto faces = mesh.FaceCount();
     auto edges = mesh.EdgeCount();
-    auto r = C::Extract(mesh, Parameters());
+    auto r = C::ExtractCurvatureExtrema(mesh, Parameters());
     ASSERT_TRUE(r.Succeeded());
     auto centers = Midpoints(r, C::Kind::PrincipalValley);
     for (auto& center : centers)
@@ -168,23 +169,23 @@ TEST(CurvatureExtrema, ScaleTranslationAndSourcePreservation)
     EXPECT_TRUE(
         std::all_of(custom.Vector().begin(), custom.Vector().end(), [](int x) { return x == 17; }));
 }
-TEST(CurvatureExtrema, InvalidInputsAndWorkLimitHaveNoPartialCurves)
+TEST(ScalarfieldExtrema, InvalidInputsAndWorkLimitHaveNoPartialCurves)
 {
     Mesh empty;
-    EXPECT_EQ(C::Extract(empty).Diagnostic.State, C::Status::EmptyMesh);
+    EXPECT_EQ(C::ExtractCurvatureExtrema(empty).Diagnostic.State, C::Status::EmptyMesh);
     auto mesh = Grid(20);
     auto params = Parameters();
     params.MaximumWorkItems = 5;
-    auto r = C::Extract(mesh, params);
+    auto r = C::ExtractCurvatureExtrema(mesh, params);
     EXPECT_EQ(r.Diagnostic.State, C::Status::WorkLimit);
     EXPECT_TRUE(r.Points.empty());
     EXPECT_TRUE(r.Segments.empty());
     EXPECT_TRUE(r.Curves.empty());
     params = Parameters();
     params.ScaleFactors = {1, 1, 2};
-    EXPECT_EQ(C::Extract(mesh, params).Diagnostic.State, C::Status::InvalidParameters);
+    EXPECT_EQ(C::ExtractCurvatureExtrema(mesh, params).Diagnostic.State, C::Status::InvalidParameters);
     mesh.Position(Geometry::VertexHandle{0}) = {std::numeric_limits<float>::quiet_NaN(), 0, 0};
-    EXPECT_EQ(C::Extract(mesh).Diagnostic.State, C::Status::InvalidGeometry);
+    EXPECT_EQ(C::ExtractCurvatureExtrema(mesh).Diagnostic.State, C::Status::InvalidGeometry);
 }
 
 namespace
@@ -245,10 +246,10 @@ namespace
         return mesh;
     }
 } // namespace
-TEST(CurvatureExtrema, ConstantCurvatureCylinderHasNoInteriorCreases)
+TEST(ScalarfieldExtrema, ConstantCurvatureCylinderHasNoInteriorCreases)
 {
     auto mesh = Cylinder();
-    auto r = C::Extract(mesh, Parameters());
+    auto r = C::ExtractCurvatureExtrema(mesh, Parameters());
     ASSERT_TRUE(r.Succeeded());
     for (const auto& segment : r.Segments)
     {
@@ -256,14 +257,14 @@ TEST(CurvatureExtrema, ConstantCurvatureCylinderHasNoInteriorCreases)
         EXPECT_GT(std::abs(p.y), 0.6f) << C::ToString(segment.Signal);
     }
 }
-TEST(CurvatureExtrema, SphereRejectsUmbilicPrincipalDirections)
+TEST(ScalarfieldExtrema, SphereRejectsUmbilicPrincipalDirections)
 {
     auto mesh = Sphere();
-    auto r = C::Extract(mesh, Parameters());
+    auto r = C::ExtractCurvatureExtrema(mesh, Parameters());
     ASSERT_TRUE(r.Succeeded());
     EXPECT_TRUE(r.Segments.empty()) << r.Segments.size() << " false constant-curvature segments";
 }
-TEST(CurvatureExtrema, NoisyExtrusionRetainsDominantCenter)
+TEST(ScalarfieldExtrema, NoisyExtrusionRetainsDominantCenter)
 {
     auto mesh = Grid();
     unsigned seed = 941;
@@ -272,14 +273,14 @@ TEST(CurvatureExtrema, NoisyExtrusionRetainsDominantCenter)
         seed = 1664525 * seed + 1013904223;
         mesh.Position(v).z += 0.0005f * (2.0f * float(seed & 65535) / 65535 - 1);
     }
-    auto r = C::Extract(mesh, Parameters());
+    auto r = C::ExtractCurvatureExtrema(mesh, Parameters());
     ASSERT_TRUE(r.Succeeded());
     auto points = Midpoints(r, C::Kind::PrincipalValley);
     std::erase_if(points, [](auto p) { return std::abs(p.y) > 0.7f; });
     CheckCenter(points);
 }
 
-TEST(CurvatureExtrema, SharpFoldDoesNotCreateParallelSmoothCurves)
+TEST(ScalarfieldExtrema, SharpFoldDoesNotCreateParallelSmoothCurves)
 {
     auto mesh = Grid(32, true);
     for (auto v : mesh.LiveVertices())
@@ -289,7 +290,7 @@ TEST(CurvatureExtrema, SharpFoldDoesNotCreateParallelSmoothCurves)
             mesh.Position(v).x = 0.5f * x;
             mesh.Position(v).z = std::sqrt(0.75f) * x;
         }
-    auto r = C::Extract(mesh, Parameters());
+    auto r = C::ExtractCurvatureExtrema(mesh, Parameters());
     ASSERT_TRUE(r.Succeeded());
     ASSERT_EQ(r.Segments.size(), 32u);
     for (const auto& s : r.Segments)
@@ -332,11 +333,11 @@ namespace
     }
 }
 
-TEST(CurvatureExtrema, ScalarBumpHasCenterRidgeAndNoValley)
+TEST(ScalarfieldExtrema, ScalarBumpHasCenterRidgeAndNoValley)
 {
     auto mesh = Grid(40, true);
     PublishBump<double>(mesh, "v:field", 3.0, -7.0);
-    auto r = C::ExtractScalarExtrema(mesh, "v:field", ScalarParameters());
+    auto r = C::Extract(mesh, "v:field", ScalarParameters());
     ASSERT_TRUE(r.Succeeded()) << C::ToString(r.Diagnostic.State);
     CheckCenter(Midpoints(r, C::Kind::ScalarRidge));
     EXPECT_TRUE(Midpoints(r, C::Kind::ScalarValley).empty());
@@ -350,47 +351,47 @@ TEST(CurvatureExtrema, ScalarBumpHasCenterRidgeAndNoValley)
               0u);
 }
 
-TEST(CurvatureExtrema, ScalarNegatedFloatFieldIsValleyAndScaleInvariant)
+TEST(ScalarfieldExtrema, ScalarNegatedFloatFieldIsValleyAndScaleInvariant)
 {
     auto mesh = Grid(40, true);
     PublishBump<float>(mesh, "v:field", -1.0);
     PublishBump<double>(mesh, "v:scaled", -250.0, 12.0);
-    auto r = C::ExtractScalarExtrema(mesh, "v:field", ScalarParameters());
+    auto r = C::Extract(mesh, "v:field", ScalarParameters());
     ASSERT_TRUE(r.Succeeded());
     CheckCenter(Midpoints(r, C::Kind::ScalarValley));
     EXPECT_TRUE(Midpoints(r, C::Kind::ScalarRidge).empty());
     // Heights are range-normalized: an affine rescale of the field is invisible.
-    auto scaled = C::ExtractScalarExtrema(mesh, "v:scaled", ScalarParameters());
+    auto scaled = C::Extract(mesh, "v:scaled", ScalarParameters());
     ASSERT_TRUE(scaled.Succeeded());
     EXPECT_EQ(scaled.Segments.size(), r.Segments.size());
 }
 
-TEST(CurvatureExtrema, ScalarMeanCurvaturePropertyHasCenterExtremum)
+TEST(ScalarfieldExtrema, ScalarMeanCurvaturePropertyHasCenterExtremum)
 {
     auto mesh = Grid();
     ASSERT_TRUE(Geometry::Curvature::ComputeMeanCurvature(mesh).has_value());
-    auto r = C::ExtractScalarExtrema(mesh, "v:mean_curvature", ScalarParameters());
+    auto r = C::Extract(mesh, "v:mean_curvature", ScalarParameters());
     ASSERT_TRUE(r.Succeeded()) << C::ToString(r.Diagnostic.State);
     // The bump crest is the mean-curvature extremum; the sign convention of H
     // decides whether it is a ridge or a valley of the field.
     EXPECT_TRUE(CoversCenter(r, C::Kind::ScalarRidge) || CoversCenter(r, C::Kind::ScalarValley));
 }
 
-TEST(CurvatureExtrema, ScalarRejectsMissingOrNonScalarPropertyAndIgnoresConstantField)
+TEST(ScalarfieldExtrema, ScalarRejectsMissingOrNonScalarPropertyAndIgnoresConstantField)
 {
     auto mesh = Grid(16, true);
-    EXPECT_EQ(C::ExtractScalarExtrema(mesh, "v:absent", ScalarParameters()).Diagnostic.State,
+    EXPECT_EQ(C::Extract(mesh, "v:absent", ScalarParameters()).Diagnostic.State,
               C::Status::MissingProperty);
-    EXPECT_EQ(C::ExtractScalarExtrema(mesh, "v:point", ScalarParameters()).Diagnostic.State,
+    EXPECT_EQ(C::Extract(mesh, "v:point", ScalarParameters()).Diagnostic.State,
               C::Status::MissingProperty);
     PublishBump<double>(mesh, "v:field", 1.0);
     auto invalid = ScalarParameters();
     invalid.RadiusRatio = 0;
-    EXPECT_EQ(C::ExtractScalarExtrema(mesh, "v:field", invalid).Diagnostic.State,
+    EXPECT_EQ(C::Extract(mesh, "v:field", invalid).Diagnostic.State,
               C::Status::InvalidParameters);
 
     PublishBump<double>(mesh, "v:constant", 0.0, 4.0);
-    auto flat = C::ExtractScalarExtrema(mesh, "v:constant", ScalarParameters());
+    auto flat = C::Extract(mesh, "v:constant", ScalarParameters());
     ASSERT_TRUE(flat.Succeeded());
     EXPECT_TRUE(flat.Segments.empty());
     EXPECT_EQ(flat.Diagnostic.Scales[1].SupportedVertices, 0u);
@@ -398,7 +399,153 @@ TEST(CurvatureExtrema, ScalarRejectsMissingOrNonScalarPropertyAndIgnoresConstant
     // Non-finite samples drop their vertex instead of poisoning the range.
     auto field = mesh.VertexProperties().Get<double>("v:field");
     field[0] = std::numeric_limits<double>::quiet_NaN();
-    auto r = C::ExtractScalarExtrema(mesh, "v:field", ScalarParameters());
+    auto r = C::Extract(mesh, "v:field", ScalarParameters());
     ASSERT_TRUE(r.Succeeded());
     EXPECT_LT(r.Diagnostic.Scales[1].SupportedVertices, mesh.VertexCount());
+}
+
+namespace
+{
+    // Two radial pits at (+-0.5, 0) with an optional shallow third pit far from
+    // both; the gradient-flow separatrix between the main pits is x = 0.
+    void PublishPits(Mesh& mesh, double shallow)
+    {
+        auto property = mesh.VertexProperties().GetOrAdd<double>("v:pits", 0.0);
+        auto pit = [](glm::dvec2 p, glm::dvec2 c, double sigma2)
+        { return std::exp(-glm::dot(p - c, p - c) / (2 * sigma2)); };
+        for (auto v : mesh.LiveVertices())
+        {
+            const glm::dvec2 p{mesh.Position(v).x, mesh.Position(v).y};
+            property[v.Index] = -pit(p, {0.5, 0}, 0.025) - pit(p, {-0.5, 0}, 0.025) -
+                                shallow * pit(p, {0.5, -0.75}, 0.005);
+        }
+    }
+    C::Params WatershedParameters(double persistence = 0.05)
+    {
+        C::Params p = C::kScalarDefaults;
+        p.Algorithm = C::Method::Watershed;
+        p.MinimumPersistence = persistence;
+        return p;
+    }
+}
+
+TEST(ScalarfieldExtrema, WatershedRidgeSeparatesTwoPitsOnMeshEdges)
+{
+    auto mesh = Grid(40, true);
+    PublishPits(mesh, 0.0);
+    auto r = C::Extract(mesh, "v:pits", WatershedParameters());
+    ASSERT_TRUE(r.Succeeded()) << C::ToString(r.Diagnostic.State);
+    EXPECT_EQ(r.Diagnostic.DescendingBasins, 2u);
+    ASSERT_EQ(r.DescendingBasin.size(), mesh.VerticesSize());
+    ASSERT_EQ(r.AscendingBasin.size(), mesh.VerticesSize());
+    // The two pit centers drain into different basins.
+    auto nearest = [&](glm::vec3 target)
+    {
+        std::uint32_t best = 0;
+        for (auto v : mesh.LiveVertices())
+            if (glm::length(mesh.Position(v) - target) <
+                glm::length(mesh.Position(Geometry::VertexHandle{best}) - target))
+                best = v.Index;
+        return best;
+    };
+    EXPECT_NE(r.DescendingBasin[nearest({0.5f, 0, 0})], r.DescendingBasin[nearest({-0.5f, 0, 0})]);
+
+    std::vector<std::uint32_t> ridges;
+    float low = 1, high = -1;
+    for (std::uint32_t i = 0; i < r.Segments.size(); ++i)
+    {
+        const auto& s = r.Segments[i];
+        EXPECT_EQ(s.Scale, C::kScaleFree);
+        EXPECT_GE(s.Strength, 0);
+        EXPECT_LE(s.Strength, 1);
+        // Watershed curves run through source vertices only.
+        EXPECT_EQ(r.Points[s.PointA].VertexA, r.Points[s.PointA].VertexB);
+        EXPECT_EQ(r.Points[s.PointB].VertexA, r.Points[s.PointB].VertexB);
+        if (s.Signal != C::Kind::ScalarRidge)
+            continue;
+        ridges.push_back(i);
+        for (auto point : {s.PointA, s.PointB})
+        {
+            const auto p = r.Points[point].Position;
+            EXPECT_LE(std::abs(p.x), 0.051f);
+            low = std::min(low, p.y);
+            high = std::max(high, p.y);
+        }
+    }
+    EXPECT_LT(low, -0.9f);
+    EXPECT_GT(high, 0.9f);
+
+    const auto features = C::SnapToMesh(mesh, r, ridges);
+    ASSERT_EQ(features.Vertices.size(), mesh.VerticesSize());
+    ASSERT_EQ(features.Edges.size(), mesh.EdgesSize());
+    EXPECT_EQ(features.EdgeCount, ridges.size());
+    for (auto e : mesh.LiveEdges())
+        if (features.Edges[e.Index])
+        {
+            auto h = mesh.Halfedge(e, 0);
+            EXPECT_TRUE(features.Vertices[mesh.FromVertex(h).Index]);
+            EXPECT_TRUE(features.Vertices[mesh.ToVertex(h).Index]);
+        }
+}
+
+TEST(ScalarfieldExtrema, WatershedPersistenceMergesShallowBasins)
+{
+    auto mesh = Grid(40, true);
+    PublishPits(mesh, 0.03);
+    auto merged = C::Extract(mesh, "v:pits", WatershedParameters(0.05));
+    ASSERT_TRUE(merged.Succeeded());
+    EXPECT_EQ(merged.Diagnostic.DescendingBasins, 2u);
+    EXPECT_GE(merged.Diagnostic.Minima, 3u);
+    auto kept = C::Extract(mesh, "v:pits", WatershedParameters(0.01));
+    ASSERT_TRUE(kept.Succeeded());
+    EXPECT_EQ(kept.Diagnostic.DescendingBasins, 3u);
+    EXPECT_GT(kept.Segments.size(), merged.Segments.size());
+    // Deterministic: an identical call reproduces labels and curves exactly.
+    auto again = C::Extract(mesh, "v:pits", WatershedParameters(0.01));
+    EXPECT_EQ(again.DescendingBasin, kept.DescendingBasin);
+    EXPECT_EQ(again.Segments.size(), kept.Segments.size());
+}
+
+TEST(ScalarfieldExtrema, HessianCurvesSnapToConnectedMeshFeatures)
+{
+    auto mesh = Grid(40, true);
+    PublishBump<double>(mesh, "v:field", 1.0);
+    const std::vector<double> values = mesh.VertexProperties().Get<double>("v:field").Vector();
+    auto r = C::Extract(mesh, std::span<const double>{values}, ScalarParameters());
+    ASSERT_TRUE(r.Succeeded());
+    std::vector<std::uint32_t> selected;
+    for (std::uint32_t i = 0; i < r.Segments.size(); ++i)
+        if (r.Segments[i].Signal == C::Kind::ScalarRidge && r.Segments[i].Scale == 1)
+            selected.push_back(i);
+    ASSERT_FALSE(selected.empty());
+    const auto features = C::SnapToMesh(mesh, r, selected);
+    EXPECT_GT(features.VertexCount, 20u);
+    EXPECT_GT(features.EdgeCount, 20u);
+    for (auto v : mesh.LiveVertices())
+        if (features.Vertices[v.Index])
+            EXPECT_LE(std::abs(mesh.Position(v).x), 0.051f);
+    // Out-of-range segment indices are ignored rather than trusted.
+    const std::uint32_t bogus[] = {static_cast<std::uint32_t>(r.Segments.size())};
+    EXPECT_EQ(C::SnapToMesh(mesh, r, bogus).VertexCount, 0u);
+}
+
+TEST(ScalarfieldExtrema, FieldEntryPointsRejectMismatchedInputsAndParameters)
+{
+    auto mesh = Grid(16, true);
+    const std::vector<double> shortField(mesh.VerticesSize() - 1, 0.0);
+    EXPECT_EQ(C::Extract(mesh, std::span<const double>{shortField}).Diagnostic.State,
+              C::Status::MissingProperty);
+    PublishBump<float>(mesh, "v:field", 1.0);
+    EXPECT_EQ(C::Extract(mesh, "v:field", WatershedParameters(1.5)).Diagnostic.State,
+              C::Status::InvalidParameters);
+    auto curvature = Parameters();
+    curvature.Algorithm = C::Method::Watershed;
+    EXPECT_EQ(C::ExtractCurvatureExtrema(mesh, curvature).Diagnostic.State,
+              C::Status::InvalidParameters);
+    // A constant field succeeds with no curves or basins.
+    PublishBump<double>(mesh, "v:constant", 0.0, 2.0);
+    auto flat = C::Extract(mesh, "v:constant", WatershedParameters());
+    ASSERT_TRUE(flat.Succeeded());
+    EXPECT_TRUE(flat.Segments.empty());
+    EXPECT_TRUE(flat.DescendingBasin.empty());
 }

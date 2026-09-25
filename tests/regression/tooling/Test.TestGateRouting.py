@@ -125,7 +125,7 @@ GROUPED_PURE_CTEST_TARGETS = frozenset(
     {
         "IntrinsicGeometryCurvatureTests",
         "IntrinsicGeometryFeaturePartitionTests",
-        "IntrinsicGeometryCurvatureExtremaTests",
+        "IntrinsicGeometryScalarfieldExtremaTests",
         "IntrinsicGeometryTests",
         "IntrinsicGeometryMethodTests",
         "IntrinsicGraphicsBufferTransferTests",

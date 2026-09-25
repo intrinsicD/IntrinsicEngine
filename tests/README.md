@@ -182,7 +182,7 @@ entries with one CTest wrapper each:
 
 - `IntrinsicGeometryCurvatureTests`
 - `IntrinsicGeometryFeaturePartitionTests`
-- `IntrinsicGeometryCurvatureExtremaTests`
+- `IntrinsicGeometryScalarfieldExtremaTests`
 - `IntrinsicGeometryTests`
 - `IntrinsicGeometryMethodTests`
 - `IntrinsicGraphicsBufferTransferTests`
@@ -198,7 +198,7 @@ Curvature tensor and feature/partition fixtures use separate pure producers so
 each fixture-heavy cohort and the remaining geometry tests retain the same
 120-second sanitizer hang-detection budget. The feature producer owns
 `Test.CurvaturePatchContract.cpp` and `Test.CurvatureBoundaryPartition.cpp`;
-the extremum producer owns `Test.CurvatureExtrema.cpp`. Keeping multi-scale
+the extremum producer owns `Test.ScalarfieldExtrema.cpp`. Keeping multi-scale
 extremum fixtures separate prevents their added runtime from exceeding the
 feature producer's sanitizer timeout. All cases remain in the required CPU
 selector with unchanged assertions.
@@ -224,7 +224,7 @@ exact case-scoped `PROCESSORS` reservations: 49 reserve three slots, 22 reserve
 four, and the two Release architecture-SLO cases reserve eight. Do not replace
 these budgets with independently inferred host-core counts. The curvature
 retriangulation and refinement scenarios are separate discovered cases. Only the
-single-threaded, dominant `CurvatureExtrema.RefinementRetainsCenterCurve` is
+single-threaded, dominant `ScalarfieldExtrema.RefinementRetainsCenterCurve` is
 `RUN_SERIAL` and has a case-only 60-second `TIMEOUT`, because it exceeded 30 s
 alone on a slow hosted Debug runner
 ([BUG-218](../tasks/done/BUG-218-curvature-refinement-scenario-split.md)).

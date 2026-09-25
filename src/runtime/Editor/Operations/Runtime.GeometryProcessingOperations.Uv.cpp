@@ -55,7 +55,7 @@ import Geometry.Properties;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.Mesh.Conversion;
 import Geometry.UvAtlas;
-import Geometry.HalfedgeMesh.CurvatureSegmentation;
+import Geometry.HalfedgeMesh.Segmentation;
 
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.JobFailure.hpp"
@@ -1059,8 +1059,8 @@ using namespace GeometryProcessingDetail::MeshSupport;
                 state->Result.Diagnostic = "Atlas guide requires finite scalar values with exact numeric conversion.";
                 return JobResultEnvelope::Make<EditorJobResult>(EditorJobResult{.Diagnostic = state->Result.Diagnostic});
             }
-            namespace Seg = Geometry::CurvatureSegmentation;
-            Seg::CurvatureSegmentationParams params{};
+            namespace Seg = Geometry::Segmentation;
+            Seg::SegmentationParams params{};
             params.SelectionMode = config.RegionCount == 0u ? Seg::ComponentSelectionMode::Automatic : Seg::ComponentSelectionMode::FixedCount;
             params.FixedComponentCount = std::max(1u, config.RegionCount);
             params.AutomaticMaxComponents = static_cast<std::uint32_t>(std::min<std::size_t>(12u, features.size()));

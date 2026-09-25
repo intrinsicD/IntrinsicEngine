@@ -20,16 +20,16 @@
 
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
-import Geometry.HalfedgeMesh.CurvatureSegmentation.Features;
-import Geometry.HalfedgeMesh.CurvatureSegmentation.Patches;
-import Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut;
+import Geometry.HalfedgeMesh.Segmentation.Features;
+import Geometry.HalfedgeMesh.Segmentation.Patches;
+import Geometry.HalfedgeMesh.Segmentation.Multicut;
 import Geometry.HalfedgeMesh.Features;
 import Geometry.Properties;
 
 namespace
 {
     namespace Features = Geometry::HalfedgeMesh::Features;
-    namespace FeatureDetector = Geometry::CurvatureSegmentation;
+    namespace FeatureDetector = Geometry::Segmentation;
     using Geometry::EdgeHandle;
     using Geometry::FaceHandle;
     using Geometry::HalfedgeHandle;

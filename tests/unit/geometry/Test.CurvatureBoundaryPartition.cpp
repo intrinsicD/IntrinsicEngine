@@ -9,12 +9,12 @@
 #include "CurvatureBoundaryGraph.hpp"
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;
-import Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut;
+import Geometry.HalfedgeMesh.Segmentation.Multicut;
 
 namespace
 {
-namespace B = Geometry::CurvatureSegmentation::BoundaryDetail;
-namespace C = Geometry::CurvatureSegmentation;
+namespace B = Geometry::Segmentation::BoundaryDetail;
+namespace C = Geometry::Segmentation;
 using Labels = std::vector<std::uint32_t>;
 double Cost(const std::vector<B::Edge> &edges, const Labels &labels)
 {
@@ -563,7 +563,7 @@ TEST(CurvatureBoundaryPartition, OnlyQualifyingConnectedHardCurvesSeedAttenuatio
 
 TEST(CurvatureBoundaryPartition, CurveCoverageV1ProfileRemainsFrozen)
 {
-    const auto profile = Geometry::CurvatureSegmentation::BoundaryCurveCoverageProfileV1();
+    const auto profile = Geometry::Segmentation::BoundaryCurveCoverageProfileV1();
     EXPECT_DOUBLE_EQ(profile.FeatureWeight, 4.0);
     EXPECT_DOUBLE_EQ(profile.FeatureExponent, 3.0);
     EXPECT_DOUBLE_EQ(profile.BoundaryScale, 0.04);
