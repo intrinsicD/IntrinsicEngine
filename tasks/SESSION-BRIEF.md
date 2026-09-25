@@ -158,6 +158,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-182` — Framed kNN smoke times out when promoted Vulkan is not compiled (tasks/backlog/bugs/BUG-182-framed-knn-unavailable-device-timeout.md)
 - unblocked: `BUG-188` — Sandbox blocks LeakSanitizer during CTest discovery (tasks/backlog/bugs/BUG-188-sandbox-sanitizer-test-discovery.md)
 - unblocked: `BUG-195` — Verification can exhaust host disk space (tasks/backlog/bugs/BUG-195-verification-disk-headroom.md)
+- unblocked: `BUG-220` — Parked-worker wake count flakes under parallel CTest load (tasks/backlog/bugs/BUG-220-parked-worker-wake-count-flake.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 
 ## Audits
