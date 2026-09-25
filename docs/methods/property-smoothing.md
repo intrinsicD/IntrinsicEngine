@@ -67,6 +67,8 @@ distance uses `spatial_sigma*1e-12` as a positive distance floor for coincident
 samples. The shared CPU `PointLBVH::Index` supplies deterministic neighbors,
 excluding only the query ID; coincident distinct samples remain eligible.
 Mutual neighbor pairs are merged once and edges are ordered by index pair.
+Queries use the index's cubic Morton cells and near-first traversal described
+in [spatial indices](../architecture/spatial-indices.md#construction-and-limits).
 The index owns the compact live-position snapshot for one operation. This
 geometry API accepts spans independently of ECS/runtime, so it uses a private
 index rather than retaining an entity-cache lease. No GPU backend is selected.

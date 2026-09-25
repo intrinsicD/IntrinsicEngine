@@ -7,6 +7,7 @@ module;
 #include <glm/glm.hpp>
 #include <numeric>
 #include <span>
+#include <utility>
 #include <vector>
 module Geometry.PointLBVH;
 
@@ -31,26 +32,40 @@ namespace Geometry::PointLBVH
             return a.SquaredDistance < b.SquaredDistance ||
                    (a.SquaredDistance == b.SquaredDistance && a.Index < b.Index);
         }
+        float BoxDistance(const Node& node, glm::vec3 query)
+        {
+            return Distance(query, glm::clamp(query, node.Min, node.Max));
+        }
+        // Visits every leaf whose box is within `limit`, nearer child first so shrinking
+        // kNN/nearest limits prune early. Pruning is strict, so boxes at exactly the limit
+        // are still visited and index tie-breaks do not depend on visit order.
         template <typename Visit>
         void Traverse(std::span<const Node> nodes, glm::vec3 query, float& limit, Visit visit)
         {
             if (nodes.empty() || !ValidPoint(query))
                 return;
-            // A radix tree over (30-bit Morton,32-bit index) has depth at most 62.
-            std::array<std::uint32_t, 64> stack{};
+            // A radix tree over (30-bit Morton,32-bit index) has depth at most 62; each
+            // expansion replaces one entry by at most two, so 64 entries suffice.
+            struct Entry { std::uint32_t Node; float Distance; };
+            std::array<Entry, 64> stack{};
+            stack[0] = {0u, BoxDistance(nodes[0], query)};
             std::uint32_t size = 1;
             while (size)
             {
-                const auto& node = nodes[stack[--size]];
-                if (Distance(query, glm::clamp(query, node.Min, node.Max)) > limit)
+                const auto entry = stack[--size];
+                if (entry.Distance > limit)
                     continue;
+                const auto& node = nodes[entry.Node];
                 if (node.Object != InvalidIndex)
-                    visit(node.Object);
-                else
                 {
-                    stack[size++] = node.Right;
-                    stack[size++] = node.Left;
+                    visit(node.Object);
+                    continue;
                 }
+                Entry near{node.Left, BoxDistance(nodes[node.Left], query)};
+                Entry far{node.Right, BoxDistance(nodes[node.Right], query)};
+                if (far.Distance < near.Distance) std::swap(near, far);
+                if (far.Distance <= limit) stack[size++] = far;
+                if (near.Distance <= limit) stack[size++] = near;
             }
         }
     } // namespace
@@ -132,15 +147,18 @@ namespace Geometry::PointLBVH
             lo = glm::min(lo, p);
             hi = glm::max(hi, p);
         }
+        // Cubic cells (largest extent on every axis) keep boxes compact for flat inputs;
+        // lbvh_morton.comp uses the same quantization.
+        const float extent = std::max({hi.x - lo.x, hi.y - lo.y, hi.z - lo.z});
         std::vector<std::uint64_t> keys;
         keys.reserve(points.size());
         for (std::uint32_t i = 0; i < points.size(); ++i)
         {
             glm::uvec3 q{};
             for (int a = 0; a < 3; ++a)
-                q[a] = hi[a] > lo[a]
+                q[a] = extent > 0
                            ? static_cast<std::uint32_t>(std::clamp(
-                                 (points[i][a] - lo[a]) / (hi[a] - lo[a]) * 1024.0f, 0.0f, 1023.0f))
+                                 (points[i][a] - lo[a]) / extent * 1024.0f, 0.0f, 1023.0f))
                            : 0u;
             const auto code = (Spread(q.x) << 2u) | (Spread(q.y) << 1u) | Spread(q.z);
             keys.push_back((std::uint64_t(code) << 32u) | i);

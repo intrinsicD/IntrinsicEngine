@@ -89,9 +89,14 @@ when Vulkan is unavailable or its supported input bounds are exceeded.
 The [method package](../../methods/geometry/point_lbvh/README.md) fixes the
 Karras 2012 radix-tree formulation. The CPU oracle is an independent exhaustive
 scan. The GPU builds bounds, Morton keys, sort order, topology, and node bounds
-without CPU sorting or hierarchy construction. Duplicate Morton codes append
-the original compact index, limiting binary radix depth to 62 and permitting
-a 64-entry traversal stack.
+without CPU sorting or hierarchy construction. CPU and GPU quantize Morton
+keys to 10 bits per axis over cubic cells sized by the largest bounds extent,
+so flat inputs do not get cells stretched along their thin axis. Duplicate
+Morton codes append the original compact index, limiting binary radix depth
+to 62 and permitting a 64-entry traversal stack. CPU traversal visits the
+nearer child first and prunes children against the current limit before
+pushing; pruning is strict, so results do not depend on visit order. GPU
+traversal still visits children in fixed order.
 
 The current GPU implementation uses a bitonic sorting network and independent
 sorted-range bound unions. These prioritize deterministic, portable execution;
