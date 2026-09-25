@@ -70,7 +70,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 ```
 
 ## Maturity
-- Target: `Operational` on Vulkan-capable hosts via the readback smokes in
+- Reached: `Operational` on the verified Vulkan host via the readback smokes in
   `Test.RuntimeSandboxAcceptanceGpuSmoke.cpp` and
   `Test.VisualizationOverlaySurfaceGpuSmoke.cpp`; `CPUContracted` elsewhere.
 
@@ -87,3 +87,15 @@ python3 tools/agents/check_task_policy.py --root . --strict
 | 6 | Resource-driven recipe deps | n/a | no recipe edge changed |
 | 7 | Maturity follow-up | pass | target `Operational`, proven by the listed Vulkan smokes |
 | 8 | Temporary exceptions | n/a | none added |
+
+## Completion
+- Completed 2026-09-25; implementation commit: `91ab9092c`.
+- Planned and implemented with Claude Opus 5.5 at medium effort; independent
+  Codex review findings were corrected and reverified.
+- Final default CPU gate: 5,049 tests, zero failures. ASan and UBSan: 3,359
+  registered tests each, zero failures; the LSan-only case skips under UBSan.
+- Appearance widget automation and all nine focused Vulkan vector-field/overlay
+  smokes pass. Full Vulkan: 103/104; the sole shutdown LSan failure reproduces
+  on unchanged `3a352d3ed` and remains owned by `BUG-221`, without suppression
+  or gate changes.
+- Strict structural checks and the clean-workshop review passed.
