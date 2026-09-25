@@ -12,6 +12,8 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 - [BUG-188 — Sandbox blocks LeakSanitizer during CTest discovery](BUG-188-sandbox-sanitizer-test-discovery.md).
 
+- [BUG-221 — Vulkan shutdown LSan contract fails on NVIDIA 580.159.04 instance creation](BUG-221-vulkan-shutdown-lsan-nvidia-580-instance-leak.md): reproduced on unchanged `main` and the UI-050 tree; suppressions must not be widened without review.
+
 - [BUG-193 — GPU pacing and watchdog margin](BUG-193-gpu-pacing-and-watchdog-margin.md): controlled follow-up to the corrected Vulkan fixture budgets; preserve finite-work and backend assertions.
 
 - [`BUG-160` — FastStaged fixed seed planes fragment smooth meshes into tiny

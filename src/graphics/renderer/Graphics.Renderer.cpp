@@ -1252,7 +1252,6 @@ namespace Extrinsic::Graphics
             std::vector<VisualizationSyncRecord>           VisualizationSyncRecords;
             std::vector<VisualizationPropertyBufferUploadDescriptor> VisualizationPropertyBuffers;
             std::vector<VisualizationPropertyBufferAddress> VisualizationPropertyBufferAddresses;
-            std::vector<std::vector<std::byte>>             VisualizationPropertyBufferPayloads;
             std::vector<VisualizationAttributeBufferPacket> VisualizationAttributeBuffers;
             std::vector<ScalarAttributePacket>              VisualizationScalars;
             std::vector<ColorAttributePacket>               VisualizationColors;
@@ -1280,7 +1279,6 @@ namespace Extrinsic::Graphics
                 VisualizationSyncRecords.clear();
                 VisualizationPropertyBuffers.clear();
                 VisualizationPropertyBufferAddresses.clear();
-                VisualizationPropertyBufferPayloads.clear();
                 VisualizationAttributeBuffers.clear();
                 VisualizationScalars.clear();
                 VisualizationColors.clear();
@@ -2089,7 +2087,6 @@ namespace Extrinsic::Graphics
             auto& m_VisualizationSyncRecords = storage.VisualizationSyncRecords;
             auto& m_VisualizationPropertyBuffers = storage.VisualizationPropertyBuffers;
             auto& m_VisualizationPropertyBufferAddresses = storage.VisualizationPropertyBufferAddresses;
-            auto& m_VisualizationPropertyBufferPayloads = storage.VisualizationPropertyBufferPayloads;
             auto& m_VisualizationAttributeBuffers = storage.VisualizationAttributeBuffers;
             auto& m_VisualizationScalars = storage.VisualizationScalars;
             auto& m_VisualizationColors = storage.VisualizationColors;
@@ -2113,20 +2110,13 @@ namespace Extrinsic::Graphics
             m_TransformSyncRecords.assign(snapshots.Transforms.begin(), snapshots.Transforms.end());
             m_LightSnapshots.assign(snapshots.Lights.begin(), snapshots.Lights.end());
             m_VisualizationSyncRecords.assign(snapshots.Visualizations.begin(), snapshots.Visualizations.end());
-            m_VisualizationPropertyBuffers.clear();
-            m_VisualizationPropertyBufferPayloads.clear();
-            m_VisualizationPropertyBuffers.reserve(snapshots.VisualizationPropertyBuffers.size());
-            m_VisualizationPropertyBufferPayloads.reserve(snapshots.VisualizationPropertyBuffers.size());
-            for (const VisualizationPropertyBufferUploadDescriptor& descriptor :
-                 snapshots.VisualizationPropertyBuffers)
-            {
-                std::vector<std::byte>& payload =
-                    m_VisualizationPropertyBufferPayloads.emplace_back(
-                        descriptor.Bytes.begin(), descriptor.Bytes.end());
-                VisualizationPropertyBufferUploadDescriptor copied = descriptor;
-                copied.Bytes = std::span<const std::byte>{payload.data(), payload.size()};
-                m_VisualizationPropertyBuffers.push_back(std::move(copied));
-            }
+            // Descriptors borrow the producer's payload bytes for the duration
+            // of this call only: residency reads them below (and skips them
+            // entirely when the buffer is unchanged), then the spans are
+            // cleared so retained metadata can never dangle.
+            m_VisualizationPropertyBuffers.assign(
+                snapshots.VisualizationPropertyBuffers.begin(),
+                snapshots.VisualizationPropertyBuffers.end());
             m_VisualizationAttributeBuffers.assign(snapshots.VisualizationAttributeBuffers.begin(), snapshots.VisualizationAttributeBuffers.end());
             m_VisualizationScalars.assign(snapshots.VisualizationScalars.begin(), snapshots.VisualizationScalars.end());
             m_VisualizationColors.assign(snapshots.VisualizationColors.begin(), snapshots.VisualizationColors.end());
@@ -2238,16 +2228,15 @@ namespace Extrinsic::Graphics
 
                 for (VectorFieldOverlayPacket& packet : m_VisualizationVectorFields)
                 {
+                    const auto isVector = [](const VisualizationValueType candidate)
+                    {
+                        return candidate == VisualizationValueType::VectorFloat3;
+                    };
                     if (packet.PositionBufferBDA == 0u)
                     {
                         const VisualizationPropertyBufferAddress* address =
-                            findAddress(packet.PositionBufferSourceKey, {},
-                                        packet.Domain,
-                                        [](const VisualizationValueType candidate)
-                                        {
-                                            return candidate == VisualizationValueType::VectorFloat3;
-                                        });
-                        if (address != nullptr)
+                            findAddress(packet.PositionBufferSourceKey, {}, packet.Domain, isVector);
+                        if (address != nullptr && address->ElementCount == packet.ElementCount)
                         {
                             packet.PositionBufferBDA = address->BufferBDA;
                         }
@@ -2255,15 +2244,23 @@ namespace Extrinsic::Graphics
                     if (packet.VectorBufferBDA == 0u)
                     {
                         const VisualizationPropertyBufferAddress* address =
-                            findAddress(packet.VectorBufferSourceKey, packet.Name,
-                                        packet.Domain,
-                                        [](const VisualizationValueType candidate)
-                                        {
-                                            return candidate == VisualizationValueType::VectorFloat3;
-                                        });
-                        if (address != nullptr)
+                            findAddress(packet.VectorBufferSourceKey, packet.Name, packet.Domain, isVector);
+                        if (address != nullptr && address->ElementCount == packet.ElementCount)
                         {
                             packet.VectorBufferBDA = address->BufferBDA;
+                        }
+                    }
+                    if (packet.RowBufferBDA == 0u && !packet.RowBufferSourceKey.empty())
+                    {
+                        const VisualizationPropertyBufferAddress* address =
+                            findAddress(packet.RowBufferSourceKey, {}, packet.Domain,
+                                        [](const VisualizationValueType candidate)
+                                        {
+                                            return candidate == VisualizationValueType::LabelUint32;
+                                        });
+                        if (address != nullptr && address->ElementCount == packet.RowCount)
+                        {
+                            packet.RowBufferBDA = address->BufferBDA;
                         }
                     }
                 }
@@ -2302,6 +2299,10 @@ namespace Extrinsic::Graphics
                             m_VisualizationPropertyBuffers.size());
                     m_VisualizationPropertyBufferDiagnostics.HasErrors = true;
                 }
+            }
+            for (VisualizationPropertyBufferUploadDescriptor& descriptor : m_VisualizationPropertyBuffers)
+            {
+                descriptor.Bytes = {};
             }
 
             // These borrowed views use pointer/count constructors to avoid repeated
@@ -5572,7 +5573,15 @@ namespace Extrinsic::Graphics
                 "shaders/visualization_vector_field.vert.spv");
             desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
                 "shaders/visualization_vector_field.frag.spv");
-            desc.PrimitiveTopology = RHI::Topology::LineList;
+            // Instanced arrow triangles; alpha blends over the lit scene and
+            // LessEqual keeps glyphs biased onto their own surface visible.
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
+            desc.DepthStencil.DepthFunc = RHI::DepthOp::LessEqual;
+            desc.ColorBlend[0].Enable = true;
+            desc.ColorBlend[0].SrcColorFactor = RHI::BlendFactor::SrcAlpha;
+            desc.ColorBlend[0].DstColorFactor = RHI::BlendFactor::OneMinusSrcAlpha;
+            desc.ColorBlend[0].SrcAlphaFactor = RHI::BlendFactor::One;
+            desc.ColorBlend[0].DstAlphaFactor = RHI::BlendFactor::OneMinusSrcAlpha;
             desc.PushConstantSize =
                 static_cast<std::uint32_t>(sizeof(VisualizationVectorFieldPushConstants));
             desc.DebugName = depthTested
@@ -9942,6 +9951,9 @@ namespace Extrinsic::Graphics
                         cmd,
                         world.Visualization.VectorFields,
                         uploadResult,
+                        m_Subsystems.GpuWorldSystem
+                            ? m_Subsystems.GpuWorldSystem->GetSceneTableBDA()
+                            : 0u,
                         m_LastRenderGraphStats.VisualizationOverlayUpload);
                     if (uploadResult.Uploaded)
                     {

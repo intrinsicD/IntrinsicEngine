@@ -9,6 +9,7 @@ module;
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <span>
@@ -511,12 +512,174 @@ void DrawDomainVisualizationControls(const EditorDomainWindowModel &model,
                                      const SandboxEditorContext &context,
                                      EditorCommandStatus &lastStatus);
 
+struct VectorFieldUiState {
+  std::size_t DomainIndex{0u};
+  EditorCommandStatus LastStatus{EditorCommandStatus::NoChange};
+};
+
+[[nodiscard]] EditorCommandStatus
+ApplyVectorFieldLayer(const SandboxEditorContext &context,
+                      const std::uint32_t stableId,
+                      const EditorVectorFieldOperation operation,
+                      const GeometryVectorFieldLayerRecipe &layer) {
+  return ApplyEditorGeometryVectorFieldCommand(
+      context.VisualizationCommands,
+      EditorGeometryVectorFieldCommand{.StableEntityId = stableId,
+                                       .Operation = operation,
+                                       .Layer = layer,
+                                       .UseLayerStyle = true});
+}
+
+// Edits one active field; every change goes through the validated command.
+void DrawVectorFieldLayer(const EditorVectorFieldLayerRow &row,
+                          const SandboxEditorContext &context,
+                          const std::uint32_t stableId,
+                          VectorFieldUiState &state) {
+  bool keep = true;
+  const std::string header =
+      row.DomainLabel + ": " + row.Layer.Vector.Name + "###" +
+      row.DomainLabel + row.Layer.Vector.Name;
+  const bool open =
+      ImGui::CollapsingHeader(header.c_str(), &keep,
+                              ImGuiTreeNodeFlags_DefaultOpen);
+  if (!keep) {
+    state.LastStatus = ApplyVectorFieldLayer(
+        context, stableId, EditorVectorFieldOperation::Remove, row.Layer);
+    return;
+  }
+  if (!open)
+    return;
+  if (!row.SourceAvailable)
+    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s",
+                       row.Status.c_str());
+
+  GeometryVectorFieldLayerRecipe layer = row.Layer;
+  bool changed = ImGui::Checkbox("Visible", &layer.Enabled);
+  ImGui::SameLine();
+  changed |= ImGui::Checkbox("Depth test", &layer.DepthTested);
+
+  int lengthMode = static_cast<int>(layer.LengthMode);
+  if (ImGui::Combo("Length mode", &lengthMode,
+                   "Normalized\0Raw vectors (scaled)\0")) {
+    layer.LengthMode = static_cast<GeometryVectorFieldLengthMode>(lengthMode);
+    changed = true;
+  }
+  const char *lengthLabel =
+      layer.LengthMode == GeometryVectorFieldLengthMode::Normalized
+          ? "Length"
+          : "Scale";
+  changed |= ImGui::DragFloat(lengthLabel, &layer.Length,
+                              std::max(layer.Length * 0.01f, 1.0e-6f), 1.0e-6f,
+                              1.0e9f, "%.4g", ImGuiSliderFlags_AlwaysClamp);
+  changed |= ImGui::SliderFloat("Width (px)", &layer.LineWidthPx,
+                                kMinGeometryVectorFieldLineWidthPx,
+                                kMaxGeometryVectorFieldLineWidthPx, "%.1f",
+                                ImGuiSliderFlags_AlwaysClamp);
+  changed |= ImGui::ColorEdit4("Color", &layer.Color.x);
+
+  int stride = static_cast<int>(std::min<std::uint32_t>(
+      layer.Stride, static_cast<std::uint32_t>(
+                        std::numeric_limits<int>::max())));
+  if (ImGui::InputInt("Every Nth element", &stride)) {
+    layer.Stride = static_cast<std::uint32_t>(std::clamp(
+        stride, 1, static_cast<int>(kMaxGeometryVectorFieldStride)));
+    changed = true;
+  }
+  int maxGlyphs = static_cast<int>(std::min<std::uint32_t>(
+      layer.MaxGlyphs,
+      static_cast<std::uint32_t>(std::numeric_limits<int>::max())));
+  if (ImGui::InputInt("Max arrows (0 = all)", &maxGlyphs)) {
+    layer.MaxGlyphs = static_cast<std::uint32_t>(std::max(maxGlyphs, 0));
+    changed = true;
+  }
+  if (changed)
+    state.LastStatus = ApplyVectorFieldLayer(
+        context, stableId, EditorVectorFieldOperation::Update, layer);
+}
+
+// Framework24-style vector fields: choose an element domain, then one of its
+// vec3 properties to add. Fields are drawn regardless of lane visibility.
+void DrawVectorFieldSection(const EditorDomainWindowModel &model,
+                            const SandboxEditorContext &context,
+                            VectorFieldUiState &state) {
+  if (!ImGui::CollapsingHeader("Vector fields"))
+    return;
+  const EditorVectorFieldModel &fields = model.VectorFields;
+  if (!fields.Available) {
+    ImGui::TextDisabled(
+        "No vertex, edge, face or point elements to attach arrows to.");
+    return;
+  }
+  ImGui::PushID("vector-fields");
+  ImGui::BeginDisabled(!model.VisualizationControlsAvailable);
+
+  state.DomainIndex = std::min(state.DomainIndex, fields.Domains.size() - 1u);
+  const EditorVectorFieldDomainOption &domain =
+      fields.Domains[state.DomainIndex];
+  if (ImGui::BeginCombo("Domain", domain.Label.c_str())) {
+    for (std::size_t i = 0u; i < fields.Domains.size(); ++i) {
+      const std::string label = fields.Domains[i].Label + " (" +
+                                std::to_string(fields.Domains[i].ElementCount) +
+                                ")";
+      if (ImGui::Selectable(label.c_str(), i == state.DomainIndex))
+        state.DomainIndex = i;
+    }
+    ImGui::EndCombo();
+  }
+
+  if (domain.Properties.empty()) {
+    ImGui::TextDisabled("%s have no vec3 properties.", domain.Label.c_str());
+  } else if (ImGui::BeginCombo("Property", "Add vec3 property...")) {
+    for (const EditorVectorFieldPropertyOption &property : domain.Properties) {
+      if (!property.Compatible) {
+        ImGui::TextDisabled("%s (%s)", property.Name.c_str(),
+                            property.DisabledReason.c_str());
+        continue;
+      }
+      const ImGuiSelectableFlags flags =
+          property.Active ? ImGuiSelectableFlags_Disabled : 0;
+      const std::string label =
+          property.Active ? property.Name + " (shown)" : property.Name;
+      if (ImGui::Selectable(label.c_str(), false, flags)) {
+        state.LastStatus = ApplyEditorGeometryVectorFieldCommand(
+            context.VisualizationCommands,
+            EditorGeometryVectorFieldCommand{
+                .StableEntityId = model.SelectedStableId,
+                .Operation = EditorVectorFieldOperation::Add,
+                .Layer = GeometryVectorFieldLayerRecipe{
+                    .Vector = GeometryPropertyRef{
+                        .Domain = domain.Domain,
+                        .Name = property.Name,
+                        .ValueKind = Geometry::PropertyValueKind::Vec3,
+                    },
+                },
+            });
+      }
+    }
+    ImGui::EndCombo();
+  }
+
+  for (const EditorVectorFieldLayerRow &row : fields.Layers) {
+    ImGui::PushID((row.DomainLabel + row.Layer.Vector.Name).c_str());
+    DrawVectorFieldLayer(row, context, model.SelectedStableId, state);
+    ImGui::PopID();
+  }
+  if (state.LastStatus != EditorCommandStatus::Applied &&
+      state.LastStatus != EditorCommandStatus::NoChange)
+    ImGui::TextWrapped("Vector field change failed: %s",
+                       DebugNameForEditorCommandStatus(state.LastStatus));
+
+  ImGui::EndDisabled();
+  ImGui::PopID();
+}
+
 // Appearance owns render hints and state, visualization controls, property and
-// attribute bindings, and texture baking.
+// attribute bindings, vector fields, and texture baking.
 void DrawDomainRenderWindow(
     const std::span<const EditorDomainWindowModel *const> models,
     const SandboxEditorContext &context, TextureBakeUiState *textureBakeState,
-    std::array<EditorCommandStatus, 3> &statuses) {
+    std::array<EditorCommandStatus, 3> &statuses,
+    VectorFieldUiState &vectorFieldState) {
   const auto &selected = *models.front();
   if (!selected.HasSelectedEntity) {
     ImGui::TextDisabled("Select a mesh, graph, or point cloud.");
@@ -585,6 +748,7 @@ void DrawDomainRenderWindow(
     ImGui::TreePop();
     ImGui::PopID();
   }
+  DrawVectorFieldSection(selected, context, vectorFieldState);
 }
 
 void DrawDomainVisualizationControls(const EditorDomainWindowModel &model,
@@ -770,6 +934,7 @@ void DrawDomainSelectionWindow(const EditorDomainWindowModel& model,
 } // namespace
 
 struct DomainPanels::Impl {
+  VectorFieldUiState VectorFieldState{};
   std::array<EditorCommandStatus, 3> AppearanceStatuses{
       EditorCommandStatus::NoChange, EditorCommandStatus::NoChange,
       EditorCommandStatus::NoChange};
@@ -956,6 +1121,7 @@ void DomainPanels::Impl::DrawWindow(
     case Section::Appearance: {
       if (AppearanceEntity != model.SelectedStableId) {
         AppearanceStatuses.fill(EditorCommandStatus::NoChange);
+        VectorFieldState.LastStatus = EditorCommandStatus::NoChange;
         AppearanceEntity = model.SelectedStableId;
       }
       std::array<const EditorDomainWindowModel *, 3> appearanceModels{&model};
@@ -967,7 +1133,8 @@ void DomainPanels::Impl::DrawWindow(
         appearanceModels[count++] =
             &GetDomainWindowModel(context, EditorDomainWindowKind::PointCloud);
       DrawDomainRenderWindow({appearanceModels.data(), count}, context,
-                             &textureBakeState, AppearanceStatuses);
+                             &textureBakeState, AppearanceStatuses,
+                             VectorFieldState);
     }
       if (kind == Runtime::EditorDomainWindowKind::Mesh &&
           model.DomainMatches && ImGui::CollapsingHeader("Property distribution")) {

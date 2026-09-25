@@ -2363,6 +2363,8 @@ TEST(SandboxEditorUi, VisualizationModelEnumeratesPromotedGeometryProperties)
         FindVisualizationProperty(properties, Domain::MeshVertices, "v:normal");
     ASSERT_NE(normal, nullptr);
     EXPECT_TRUE(normal->VectorFieldCandidate);
+    // The Vector field action addresses the canonical element domain.
+    EXPECT_EQ(normal->ElementDomain, Runtime::GeometryElementDomain::MeshVertex);
     EXPECT_TRUE(normal->ColorBufferPresetAvailable);
 
     const auto* edgeWeight =

@@ -161,7 +161,7 @@ Task links retain detailed acceptance criteria, source references and evidence.
 | [UI-047](../../tasks/backlog/ui/UI-047-file-chooser-for-import-and-scene-paths.md) | Revised | Path chooser remains missing; source references updated to current controls. |
 | [UI-048](../../tasks/backlog/ui/UI-048-first-run-workspace-and-layout-persistence.md) | Revised | First-run layout/persistence remains; references updated to current owners. |
 | [UI-049](../../tasks/backlog/ui/UI-049-editor-panel-sizing-and-readability.md) | Revised | Reproduce historical layout symptoms on shared panels before fixing remaining defects. |
-| [UI-050](../../tasks/backlog/ui/UI-050-vector-field-property-visualization.md) | Revised | Generic vector-property action remains; reuse the delivered vector recipe/rendering path. |
+| [UI-050](../../tasks/active/UI-050-vector-field-property-visualization.md) | Revised | Generic vector-property action remains; reuse the delivered vector recipe/rendering path. |
 | [UI-051](../../tasks/backlog/ui/UI-051-domain-agnostic-appearance-properties-selection-windows.md) | Revised | Property-based domain windows remain; update the actual shared-panel gate locations. |
 
 ## Review and verification

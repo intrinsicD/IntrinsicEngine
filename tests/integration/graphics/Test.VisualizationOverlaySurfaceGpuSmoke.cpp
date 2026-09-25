@@ -80,8 +80,16 @@ struct VisualizationOverlaySamplePoint
 	Readback::ExpectedPixel Expected;
 };
 
-inline constexpr std::array<VisualizationOverlaySamplePoint, 3> kVisualizationReadbackSamples{{
+// The vector field is drawn from its resident anchor/vector buffers under an
+// identity camera, so clip space equals object space. The RHI viewport is
+// Y-up, so the first arrow, from clip (-0.5, 0.5) to (0, 0.5), covers pixels
+// x 64..128 on row 64 of the 256x256 target. (72, 64) lies on its shaft; the
+// mirrored (40, 64) must stay clear, which a source-independent placeholder
+// could not satisfy.
+inline constexpr std::array<VisualizationOverlaySamplePoint, 4> kVisualizationReadbackSamples{{
     VisualizationOverlaySamplePoint{"vector_field_red", 72u, 64u, ExpectedColor(1.0f, 0.0f, 0.0f)},
+    VisualizationOverlaySamplePoint{"vector_field_mirror_clear", 40u, 64u,
+                                    ExpectedColor(0.10f, 0.20f, 0.45f)},
     VisualizationOverlaySamplePoint{"isoline_green", 184u, 176u, ExpectedColor(0.0f, 1.0f, 0.0f)},
     // BUG-015/BUG-016: the default-recipe SceneColorHDR background clears
     // to a visible blue (0.10, 0.20, 0.45), not black.
@@ -217,12 +225,12 @@ struct VisualizationOverlayRunCapture
 [[nodiscard]] VisualizationOverlayRunCapture DriveVisualizationOverlayFrameAndCapture(Engine& engine)
 {
 	const std::array<glm::vec3, 2> vectorPositions{{
-		glm::vec3{-0.25f, 0.0f, 0.0f},
-		glm::vec3{0.25f, 0.0f, 0.0f},
+		glm::vec3{-0.5f, 0.5f, 0.0f},
+		glm::vec3{0.5f, -0.5f, 0.0f},
 	}};
 	const std::array<glm::vec3, 2> vectorDirections{{
-		glm::vec3{0.1f, 0.0f, 0.0f},
-		glm::vec3{0.0f, 0.1f, 0.0f},
+		glm::vec3{0.5f, 0.0f, 0.0f},
+		glm::vec3{0.0f, 0.25f, 0.0f},
 	}};
 	const std::array<Extrinsic::Graphics::VisualizationPropertyBufferUploadDescriptor, 2> propertyBuffers{{
 		Extrinsic::Graphics::VisualizationPropertyBufferUploadDescriptor{
@@ -251,7 +259,10 @@ struct VisualizationOverlayRunCapture
 			.VectorBufferSourceKey = "GpuSmoke.VectorDirections",
 			.Domain = Extrinsic::Graphics::VisualizationAttributeDomain::Vertex,
 			.ElementCount = static_cast<std::uint32_t>(vectorPositions.size()),
+			.RowCount = static_cast<std::uint32_t>(vectorPositions.size()),
 			.Scale = 1.0f,
+			.NormalizeLength = false,
+			.LineWidthPx = 6.0f,
 			.Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
 			.DepthTested = false,
 		},
@@ -297,6 +308,7 @@ struct VisualizationOverlayRunCapture
 
 	const Extrinsic::Graphics::RenderFrameInput input{
 		.Viewport = {.Width = kReadbackWidth, .Height = kReadbackHeight},
+		.Camera = {.Valid = true},
 		.DebugOverlayEnabled = true,
 	};
 	Extrinsic::Graphics::RenderWorld world = renderer.ExtractRenderWorld(input);
@@ -357,6 +369,8 @@ TEST(VisualizationOverlaySurfaceGpuSmoke, PropertyBuffersPublishBdasBeforeOperat
 
         EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsSubmitted, 1u);
 	EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsRecorded, 1u);
+	EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldGlyphsRecorded, 2u);
+	EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldPacketsSkipped, 0u);
 	EXPECT_EQ(stats.VisualizationOverlayUpload.IsolineRecordsSubmitted, 1u);
 	EXPECT_EQ(stats.VisualizationOverlayUpload.IsolineRecordsRecorded, 1u);
 	EXPECT_EQ(stats.VisualizationOverlayUpload.UploadOverflowCount, 0u);

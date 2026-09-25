@@ -14,30 +14,24 @@ import Extrinsic.RHI.Handles;
 
 namespace Extrinsic::Graphics
 {
-    // GRAPHICS-078 Slices B + C — operational shell class for the
-    // canonical default-recipe `VisualizationOverlayPass`. Mirrors the
-    // `TransientDebugSurfacePass` shape: default-constructible (no
-    // system dependency), per-kind pipeline accessors for fail-closed
-    // prerequisite checks, and per-lane `Execute*(...)` bodies that
-    // iterate each lane's packet span and record `BindPipeline +
-    // PushConstants(BDA) + Draw(N, 1, 0, 0)` per packet (N =
-    // 2 * ElementCount for vector-field glyphs, 2 * IsoValueCount for
-    // isoline polylines on the CPU/null path). Each packet
-    // independently switches between the depth-tested and always-on-
-    // top variants based on its `DepthTested` flag.
+    // Records the canonical default-recipe `VisualizationOverlayPass` from
+    // copied packets. Each packet independently selects the depth-tested or
+    // always-on-top pipeline variant through its `DepthTested` flag.
     //
-    // Push constant layout: 16 bytes packing the helper's vertex buffer
-    // BDA + a per-draw `FirstVertex` index so the BDA-fetch vertex
-    // shader can address the right packet in the shared upload buffer.
-    // Both kinds share the same 16-byte payload shape; separate types
-    // per kind keep room for per-kind evolution (e.g. per-glyph width
-    // or per-iso polyline expansion push fields in a follow-up task).
+    // Vector fields draw one instanced arrow glyph per sampled source row:
+    // `Draw(kVisualizationVectorFieldGlyphVertexCount, glyphCount, 0, 0)`.
+    // The push block names the GpuScene table (camera and viewport) and the
+    // packet's draw record; the vertex shader reads anchors, vectors and live
+    // rows through the record's buffer addresses. Isolines keep the packed
+    // fixture-vertex shape: `Draw(2 * IsoValueCount, 1, 0, 0)` per packet.
     export struct VisualizationVectorFieldPushConstants
     {
-        std::uint64_t VertexBufferBDA;
-        std::uint32_t FirstVertex;
+        std::uint64_t SceneTableBDA;
+        std::uint64_t RecordBufferBDA;
+        std::uint32_t RecordIndex;
         std::uint32_t Reserved;
     };
+    static_assert(sizeof(VisualizationVectorFieldPushConstants) == 24u);
 
     export struct VisualizationIsolinePushConstants
     {
@@ -76,21 +70,14 @@ namespace Extrinsic::Graphics
             return m_IsolineAlwaysOnTopPipeline;
         }
 
-        // GRAPHICS-078 Slice B — records the per-packet `BindPipeline +
-        // PushConstants + Draw(2 * ElementCount, 1, 0, 0)` shape
-        // against `cmd`. `uploadResult` carries the helper's vertex
-        // buffer handle/BDA and total endpoint count for the frame.
-        // The caller has already validated that both pipeline handles
-        // are valid (see `Graphics.Renderer.cpp`'s
-        // `RecordVisualizationOverlayPass` gate). Increments
-        // `diagnostics.VectorFieldRecordsSubmitted` per submitted
-        // packet and `diagnostics.VectorFieldRecordsRecorded` per
-        // packet whose draw record actually lands; sets
-        // `diagnostics.UploadOverflowCount` when the upload helper
-        // reported an overflow.
+        // Records every packet that received a draw record. `sceneTableBDA`
+        // supplies camera matrices and viewport; the caller has already
+        // validated both pipeline handles. Packets without a record count as
+        // skipped; an upload overflow ticks `UploadOverflowCount`.
         void ExecuteVectorFields(RHI::ICommandContext& cmd,
                                  std::span<const VectorFieldOverlayPacket> vectorFields,
                                  const VisualizationVectorFieldUploadResult& uploadResult,
+                                 std::uint64_t sceneTableBDA,
                                  VisualizationOverlayUploadDiagnostics& diagnostics);
 
         // GRAPHICS-078 Slice C — records the per-packet `BindPipeline +

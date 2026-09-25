@@ -234,7 +234,13 @@ use the shared Appearance color encoder. METHOD-040 hides unused GMM controls an
 boundary/cleanup diagnostics. It remains experimental and exposes no cut or
 UV-atlas action. Appearance groups surface, edge, and vertex property dropdowns
 for a selected mesh. Surface properties can use the shared UV texture-bake
-command; advanced binding and bake controls are collapsed. `Sandbox.Editor.DomainPanels` registers the existing Appearance,
+command; advanced binding and bake controls are collapsed. Its entity-level
+**Vector fields** section (independent of which lanes are visible) chooses an
+element domain, then a vec3 property, and draws it as arrows; each field has
+visibility, normalized/raw length, width, color, depth test and sampling
+controls and a close button, all through the undoable
+`ApplyEditorGeometryVectorFieldCommand` that Geometry Visualization's
+`Vector field` action also uses. Fields are saved with the scene. `Sandbox.Editor.DomainPanels` registers the existing Appearance,
 Properties, and Selection windows for Mesh, Graph, and PointCloud. It owns their menu paths, lazy per-frame model
 cache, texture-bake and property-widget draft state, and
 result presentation. K-Means and Progressive Poisson command/config/result

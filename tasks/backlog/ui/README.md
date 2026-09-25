@@ -14,7 +14,6 @@ its dependencies, conditional gates, scope and verification.
 - [UI-047 — File paths must be hand-typed into a raw text field](UI-047-file-chooser-for-import-and-scene-paths.md)
 - [UI-048 — Editor opens empty, hides file operations under View, and never remembers layout](UI-048-first-run-workspace-and-layout-persistence.md)
 - [UI-049 — Editor panels are sized so that labels clip and results are hidden](UI-049-editor-panel-sizing-and-readability.md)
-- [UI-050 — Generic vector-property actions in Geometry Visualization](UI-050-vector-field-property-visualization.md)
 - [UI-051 — A mesh does not pass as a graph or a point cloud in the domain windows](UI-051-domain-agnostic-appearance-properties-selection-windows.md)
 
 Completed and superseded work is recorded in the

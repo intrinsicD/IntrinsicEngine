@@ -79,6 +79,9 @@ namespace Extrinsic::Graphics
         Core::Std::span<const TransformSyncRecord>     Transforms{};
         Core::Std::span<const LightSnapshot>           Lights{};
         Core::Std::span<const VisualizationSyncRecord> Visualizations{};
+        // Payload bytes are read only during `SubmitRuntimeSnapshots`; the
+        // renderer keeps descriptor metadata and resident GPU addresses, not
+        // the bytes, so producers may borrow payload storage for the call.
         Core::Std::span<const VisualizationPropertyBufferUploadDescriptor> VisualizationPropertyBuffers{};
         Core::Std::span<const VisualizationAttributeBufferPacket> VisualizationAttributeBuffers{};
         Core::Std::span<const ScalarAttributePacket>              VisualizationScalars{};

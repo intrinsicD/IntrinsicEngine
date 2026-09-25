@@ -40,6 +40,7 @@ import Extrinsic.Sandbox.Editor.DomainPanels;
 import Extrinsic.Sandbox.Editor.Shell;
 
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.Graphics.Component.RenderGeometry;
@@ -564,4 +565,111 @@ TEST(SandboxDomainPanels, AppearanceCheckboxesCanEnableAndReenableEverySupported
         shell.Detach();
         engine.Shutdown();
     }
+}
+
+// UI automation for the Appearance-level Vector fields section: domain first,
+// then a vec3 property, then edit and close the field. The mesh has no visible
+// lane, which the section must not depend on.
+TEST(SandboxDomainPanels, VectorFieldSectionAddsEditsAndRemovesFieldsWithoutVisibleLanes)
+{
+    namespace GS = Extrinsic::ECS::Components::GeometrySources;
+    auto application = std::make_unique<OneFrameApplication>();
+    auto* driver = application.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
+    engine.EmplaceModule<Runtime::EditorUiModule>();
+    engine.Initialize();
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    auto& raw = scene.Raw();
+    const auto entity = scene.Create();
+    raw.emplace<Extrinsic::ECS::Components::Selection::SelectableTag>(entity);
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    const auto b = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+    const auto c = mesh.AddVertex({0.0f, 1.0f, 0.0f});
+    (void)mesh.AddTriangle(a, b, c);
+    GS::PopulateFromMesh(raw, entity, mesh);
+    raw.get<GS::Faces>(entity).Properties.GetOrAdd<glm::vec3>("f:flow", glm::vec3{1.0f, 0.0f, 0.0f});
+    auto* selection = engine.Services().Find<Runtime::SelectionController>();
+    ASSERT_NE(selection, nullptr);
+    ASSERT_TRUE(selection->SetSelectedEntity(scene, entity));
+
+    Editor::EditorShell shell;
+    shell.Attach(engine.Worlds(), engine.Services());
+    Editor::DomainPanels panels;
+    panels.Register(shell);
+    ASSERT_TRUE(shell.SetEditorWindowOpen("mesh.appearance", true));
+    const std::string title = "Mesh / Appearance";
+
+    const auto layer = [&]() -> const Runtime::GeometryVectorFieldLayerRecipe* {
+        const auto* recipe = raw.try_get<Runtime::GeometryPresentationRecipe>(entity);
+        return recipe != nullptr
+            ? Runtime::FindGeometryVectorFieldLayer(*recipe, Runtime::GeometryElementDomain::MeshFace, "f:flow")
+            : nullptr;
+    };
+    const auto selectInPopup = [](const char* label) {
+        const auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+        if (popups.empty() || popups.back().Window == nullptr)
+            return false;
+        ImGui::ActivateItemByID(popups.back().Window->GetID(label));
+        return true;
+    };
+
+    int frame = 0;
+    int step = 0;
+    driver->OnFrame = [&](Runtime::Engine& kernel) {
+        ++frame;
+        auto* window = ImGui::FindWindowByName(title.c_str());
+        if (frame < 3)
+            return;
+        if (window == nullptr || frame > 200)
+        {
+            ADD_FAILURE() << "Appearance automation stalled at step " << step;
+            kernel.RequestExit();
+            return;
+        }
+        ImGui::SetWindowSize(window, ImVec2{600.0f, 1100.0f});
+        if (frame % 3 != 0)
+            return;
+        const ImGuiID section = ImHashStr("vector-fields", 0, window->ID);
+        const ImGuiID row = ImHashStr("Facesf:flow", 0, section);
+        const ImGuiID header = ImHashStr("Faces: f:flow###Facesf:flow", 0, row);
+        switch (step)
+        {
+        case 0:
+            // Focus once: refocusing later would close the combo popups the
+            // following steps open. The collapsed section header is opened
+            // through ImGui's own tree state; every control inside it is
+            // driven through the widget itself.
+            ImGui::FocusWindow(window);
+            window->DC.StateStorage->SetInt(ImHashStr("Vector fields", 0, window->ID), 1);
+            break;
+        case 1: ImGui::ActivateItemByID(ImHashStr("Domain", 0, section)); break;
+        case 2: EXPECT_TRUE(selectInPopup("Faces (1)")) << "Domain dropdown did not open"; break;
+        case 3: ImGui::ActivateItemByID(ImHashStr("Property", 0, section)); break;
+        case 4: EXPECT_TRUE(selectInPopup("f:flow")) << "Property dropdown did not open"; break;
+        case 5:
+            ASSERT_NE(layer(), nullptr) << "selecting the property must add the field";
+            EXPECT_TRUE(layer()->Enabled);
+            EXPECT_FALSE(raw.all_of<Extrinsic::Graphics::Components::RenderSurface>(entity));
+            ImGui::ActivateItemByID(ImHashStr("Visible", 0, row));
+            break;
+        case 6:
+            ASSERT_NE(layer(), nullptr);
+            EXPECT_FALSE(layer()->Enabled) << "the Visible checkbox must update the field";
+            ImGui::ActivateItemByID(ImHashStr("#CLOSE", 0, header));
+            break;
+        case 7:
+            EXPECT_EQ(layer(), nullptr) << "the close button must remove the field";
+            kernel.RequestExit();
+            break;
+        default: break;
+        }
+        ++step;
+    };
+    engine.Run();
+    EXPECT_EQ(step, 8);
+    panels.Unregister();
+    shell.Detach();
+    engine.Shutdown();
 }

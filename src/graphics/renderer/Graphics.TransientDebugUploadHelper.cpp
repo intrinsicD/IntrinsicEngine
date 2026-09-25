@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <span>
@@ -28,39 +29,45 @@ namespace Extrinsic::Graphics
         return r | (g << 8) | (b << 16) | (a << 24);
     }
 
-    [[nodiscard]] PackedVertexUploadResult UploadPackedColorVertices(
+    [[nodiscard]] PackedVertexUploadResult UploadRetainedHostBytes(
         RHI::IDevice& device,
         RHI::BufferManager& bufferManager,
         std::optional<RHI::BufferManager::BufferLease>& bufferLease,
         std::uint64_t& capacityBytes,
         std::uint64_t& bufferAllocationCount,
-        std::span<const PackedColorVertex> staging,
-        std::uint64_t initialVertexCount,
-        std::uint64_t maxVertexCount,
+        const std::span<const std::byte> bytes,
+        const std::uint64_t elementBytes,
+        const std::uint64_t initialElementCount,
+        const std::uint64_t maxElementCount,
         const char* debugName)
     {
         PackedVertexUploadResult out{};
-        const std::uint64_t requestedVertexCount = static_cast<std::uint64_t>(staging.size());
-        if (requestedVertexCount > maxVertexCount)
+        if (elementBytes == 0u || bytes.size() % elementBytes != 0u)
+        {
+            out.Overflow = true;
+            return out;
+        }
+        const std::uint64_t requestedElementCount =
+            static_cast<std::uint64_t>(bytes.size()) / elementBytes;
+        if (requestedElementCount > maxElementCount)
         {
             out.Overflow = true;
             return out;
         }
 
-        const std::uint64_t requestedBytes = requestedVertexCount * sizeof(PackedColorVertex);
+        const std::uint64_t requestedBytes = static_cast<std::uint64_t>(bytes.size());
 
         if (!bufferLease.has_value() || capacityBytes < requestedBytes)
         {
-            std::uint64_t newVertexCapacity =
-                std::max<std::uint64_t>(initialVertexCount, requestedVertexCount);
+            std::uint64_t newElementCapacity =
+                std::max<std::uint64_t>(initialElementCount, requestedElementCount);
             if (capacityBytes > 0u)
             {
-                const std::uint64_t previousVertexCapacity =
-                    capacityBytes / sizeof(PackedColorVertex);
-                newVertexCapacity = std::max(newVertexCapacity, previousVertexCapacity * 2u);
+                const std::uint64_t previousElementCapacity = capacityBytes / elementBytes;
+                newElementCapacity = std::max(newElementCapacity, previousElementCapacity * 2u);
             }
-            newVertexCapacity = std::min(newVertexCapacity, maxVertexCount);
-            const std::uint64_t newCapacityBytes = newVertexCapacity * sizeof(PackedColorVertex);
+            newElementCapacity = std::min(newElementCapacity, maxElementCount);
+            const std::uint64_t newCapacityBytes = newElementCapacity * elementBytes;
 
             bufferLease.reset();
             capacityBytes = 0u;
@@ -87,14 +94,35 @@ namespace Extrinsic::Graphics
         }
 
         const RHI::BufferHandle handle = bufferLease->GetHandle();
-        device.WriteBuffer(handle, staging.data(),
-                           static_cast<std::uint64_t>(staging.size() * sizeof(PackedColorVertex)),
-                           0u);
+        device.WriteBuffer(handle, bytes.data(), requestedBytes, 0u);
 
         out.Handle = handle;
         out.BDA = device.GetBufferDeviceAddress(handle);
         out.Uploaded = true;
         return out;
+    }
+
+    [[nodiscard]] PackedVertexUploadResult UploadPackedColorVertices(
+        RHI::IDevice& device,
+        RHI::BufferManager& bufferManager,
+        std::optional<RHI::BufferManager::BufferLease>& bufferLease,
+        std::uint64_t& capacityBytes,
+        std::uint64_t& bufferAllocationCount,
+        std::span<const PackedColorVertex> staging,
+        std::uint64_t initialVertexCount,
+        std::uint64_t maxVertexCount,
+        const char* debugName)
+    {
+        return UploadRetainedHostBytes(device,
+                                       bufferManager,
+                                       bufferLease,
+                                       capacityBytes,
+                                       bufferAllocationCount,
+                                       std::as_bytes(staging),
+                                       sizeof(PackedColorVertex),
+                                       initialVertexCount,
+                                       maxVertexCount,
+                                       debugName);
     }
 
     namespace

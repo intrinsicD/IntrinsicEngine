@@ -15,6 +15,7 @@ picking backlog work; theme priorities and rationale live in
 - `METHOD-044` — Feature-aware patches and distortion-aware atlas merging (tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md)
 - `METHOD-045` — Preserve baseline regions while constructing UV charts (tasks/active/METHOD-045-baseline-preserving-atlas-cuts.md)
 - `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/active/UI-037-linear-domain-action-readiness-tooltips.md)
+- `UI-050` — Appearance vector fields (tasks/active/UI-050-vector-field-property-visualization.md)
 - `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
 
 ## Theme B — Rendering modernization
@@ -148,7 +149,6 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `UI-047` — File paths must be hand-typed into a raw text field (tasks/backlog/ui/UI-047-file-chooser-for-import-and-scene-paths.md)
 - unblocked: `UI-048` — Editor opens empty, hides file operations under View, and never remembers layout (tasks/backlog/ui/UI-048-first-run-workspace-and-layout-persistence.md)
 - unblocked: `UI-049` — Editor panels are sized so that labels clip and results are hidden (tasks/backlog/ui/UI-049-editor-panel-sizing-and-readability.md)
-- unblocked: `UI-050` — Generic vector-property actions in Geometry Visualization (tasks/backlog/ui/UI-050-vector-field-property-visualization.md)
 - unblocked: `UI-051` — A mesh does not pass as a graph or a point cloud in the domain windows (tasks/backlog/ui/UI-051-domain-agnostic-appearance-properties-selection-windows.md)
 
 ## Unthemed
@@ -159,6 +159,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-188` — Sandbox blocks LeakSanitizer during CTest discovery (tasks/backlog/bugs/BUG-188-sandbox-sanitizer-test-discovery.md)
 - unblocked: `BUG-195` — Verification can exhaust host disk space (tasks/backlog/bugs/BUG-195-verification-disk-headroom.md)
 - unblocked: `BUG-220` — Parked-worker wake count flakes under parallel CTest load (tasks/backlog/bugs/BUG-220-parked-worker-wake-count-flake.md)
+- unblocked: `BUG-221` — Vulkan shutdown LSan contract fails on NVIDIA 580.159.04 instance creation (tasks/backlog/bugs/BUG-221-vulkan-shutdown-lsan-nvidia-580-instance-leak.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 
 ## Audits

@@ -24,6 +24,39 @@ namespace Extrinsic::Graphics
             return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z) && IsFinite(value.w);
         }
 
+        [[nodiscard]] bool IsFinite(const glm::mat4& value) noexcept
+        {
+            for (int column = 0; column < 4; ++column)
+            {
+                if (!IsFinite(value[column]))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] bool VectorFieldResourcesValid(const VectorFieldOverlayPacket& packet) noexcept
+        {
+            const bool rowsValid = packet.RowBufferSourceKey.empty()
+                ? packet.RowCount == packet.ElementCount && packet.RowBufferBDA == 0u
+                : packet.RowBufferBDA != 0u;
+            return !packet.Name.empty() && packet.ElementCount > 0u &&
+                   packet.RowCount > 0u && packet.RowCount <= packet.ElementCount &&
+                   packet.PositionBufferBDA != 0u && packet.VectorBufferBDA != 0u &&
+                   rowsValid;
+        }
+
+        [[nodiscard]] bool VectorFieldStyleValid(const VectorFieldOverlayPacket& packet) noexcept
+        {
+            return IsFinite(packet.Scale) && packet.Scale > 0.f &&
+                   IsFinite(packet.Color) && packet.RowStride > 0u &&
+                   IsFinite(packet.LineWidthPx) &&
+                   packet.LineWidthPx >= kVectorFieldMinLineWidthPx &&
+                   packet.LineWidthPx <= kVectorFieldMaxLineWidthPx &&
+                   IsFinite(packet.ObjectToWorld);
+        }
+
         [[nodiscard]] bool ValidRange(const float minValue, const float maxValue) noexcept
         {
             return IsFinite(minValue) && IsFinite(maxValue) && minValue < maxValue;
@@ -142,6 +175,21 @@ namespace Extrinsic::Graphics
         }
     }
 
+    std::uint32_t VectorFieldGlyphCount(const VectorFieldOverlayPacket& packet) noexcept
+    {
+        if (packet.RowStride == 0u || packet.RowCount == 0u)
+        {
+            return 0u;
+        }
+        return packet.RowCount / packet.RowStride +
+               (packet.RowCount % packet.RowStride != 0u ? 1u : 0u);
+    }
+
+    bool IsRenderableVectorFieldPacket(const VectorFieldOverlayPacket& packet) noexcept
+    {
+        return VectorFieldResourcesValid(packet) && VectorFieldStyleValid(packet);
+    }
+
     std::uint32_t ExpectedVisualizationValueStride(
         const VisualizationValueType type) noexcept
     {
@@ -165,7 +213,7 @@ namespace Extrinsic::Graphics
         return 0u;
     }
 
-    bool ValidateVisualizationPropertyBufferUploadDescriptor(
+    bool ValidateVisualizationPropertyBufferShape(
         const VisualizationPropertyBufferUploadDescriptor& descriptor,
         VisualizationPropertyBufferDiagnostics& diagnostics) noexcept
     {
@@ -207,53 +255,62 @@ namespace Extrinsic::Graphics
             valid = false;
         }
 
-        if (valid)
-        {
-            bool finite = true;
-            switch (descriptor.ValueType)
-            {
-            case VisualizationValueType::ScalarFloat:
-                finite = IsValidNumericPayload<float>(
-                    descriptor.Bytes, descriptor.ElementCount, true);
-                break;
-            case VisualizationValueType::VectorFloat3:
-                finite = IsValidNumericPayload<float>(
-                    descriptor.Bytes,
-                    static_cast<std::uint64_t>(descriptor.ElementCount) * 3u);
-                break;
-            case VisualizationValueType::ScalarDouble:
-                finite = IsValidNumericPayload<double>(
-                    descriptor.Bytes, descriptor.ElementCount, true);
-                break;
-            case VisualizationValueType::RgbaFloat4:
-                finite = IsValidNumericPayload<float>(
-                    descriptor.Bytes,
-                    static_cast<std::uint64_t>(descriptor.ElementCount) * 4u);
-                break;
-            case VisualizationValueType::Rgba8:
-            case VisualizationValueType::LabelUint32:
-                break;
-            case VisualizationValueType::Count:
-                finite = false;
-                break;
-            }
-
-            if (!finite)
-            {
-                ++diagnostics.NonFiniteValueCount;
-                valid = false;
-            }
-        }
-
-        if (valid)
-        {
-            ++diagnostics.AcceptedBufferCount;
-        }
-        else
+        if (!valid)
         {
             diagnostics.HasErrors = true;
         }
         return valid;
+    }
+
+    bool ValidateVisualizationPropertyBufferPayload(
+        const VisualizationPropertyBufferUploadDescriptor& descriptor,
+        VisualizationPropertyBufferDiagnostics& diagnostics) noexcept
+    {
+        bool finite = true;
+        switch (descriptor.ValueType)
+        {
+        case VisualizationValueType::ScalarFloat:
+            finite = IsValidNumericPayload<float>(
+                descriptor.Bytes, descriptor.ElementCount, true);
+            break;
+        case VisualizationValueType::VectorFloat3:
+            finite = IsValidNumericPayload<float>(
+                descriptor.Bytes,
+                static_cast<std::uint64_t>(descriptor.ElementCount) * 3u);
+            break;
+        case VisualizationValueType::ScalarDouble:
+            finite = IsValidNumericPayload<double>(
+                descriptor.Bytes, descriptor.ElementCount, true);
+            break;
+        case VisualizationValueType::RgbaFloat4:
+            finite = IsValidNumericPayload<float>(
+                descriptor.Bytes,
+                static_cast<std::uint64_t>(descriptor.ElementCount) * 4u);
+            break;
+        case VisualizationValueType::Rgba8:
+        case VisualizationValueType::LabelUint32:
+            break;
+        case VisualizationValueType::Count:
+            finite = false;
+            break;
+        }
+
+        if (!finite)
+        {
+            ++diagnostics.NonFiniteValueCount;
+            diagnostics.HasErrors = true;
+            return false;
+        }
+        ++diagnostics.AcceptedBufferCount;
+        return true;
+    }
+
+    bool ValidateVisualizationPropertyBufferUploadDescriptor(
+        const VisualizationPropertyBufferUploadDescriptor& descriptor,
+        VisualizationPropertyBufferDiagnostics& diagnostics) noexcept
+    {
+        return ValidateVisualizationPropertyBufferShape(descriptor, diagnostics) &&
+               ValidateVisualizationPropertyBufferPayload(descriptor, diagnostics);
     }
 
     VisualizationPropertyBufferDiagnostics ValidateVisualizationPropertyBufferUploads(
@@ -324,18 +381,17 @@ namespace Extrinsic::Graphics
         for (const VectorFieldOverlayPacket& packet : batch.VectorFields)
         {
             CountDomain(packet.Domain, batch, diagnostics);
-            bool valid = !packet.Name.empty() && packet.ElementCount > 0u &&
-                         packet.PositionBufferBDA != 0u && packet.VectorBufferBDA != 0u &&
-                         IsFinite(packet.Scale) && packet.Scale > 0.f && IsFinite(packet.Color);
-            if (packet.Name.empty() || packet.ElementCount == 0u || packet.PositionBufferBDA == 0u || packet.VectorBufferBDA == 0u)
+            const bool resources = VectorFieldResourcesValid(packet);
+            const bool style = VectorFieldStyleValid(packet);
+            if (!resources)
             {
                 ++diagnostics.MissingAttributeCount;
             }
-            if (!IsFinite(packet.Scale) || packet.Scale <= 0.f || !IsFinite(packet.Color))
+            if (!style)
             {
                 ++diagnostics.InvalidRangeCount;
             }
-            AcceptOrError(valid, diagnostics);
+            AcceptOrError(resources && style, diagnostics);
         }
 
         for (const IsolineOverlayPacket& packet : batch.Isolines)
@@ -416,10 +472,11 @@ namespace Extrinsic::Graphics
         VisualizationOverlaySummary summary{};
         for (const VectorFieldOverlayPacket& packet : batch.VectorFields)
         {
-            if (!packet.Name.empty() && packet.ElementCount > 0u)
+            const std::uint32_t glyphs = VectorFieldGlyphCount(packet);
+            if (!packet.Name.empty() && glyphs > 0u)
             {
                 ++summary.VectorFieldCount;
-                summary.VectorGlyphCount += packet.ElementCount;
+                summary.VectorGlyphCount += glyphs;
             }
         }
         for (const IsolineOverlayPacket& packet : batch.Isolines)

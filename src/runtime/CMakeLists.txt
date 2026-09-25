@@ -248,6 +248,7 @@ target_sources(${target_name}
         Config/Runtime.RenderRecipeActivation.cpp
         Rendering/Runtime.RenderExtraction.cpp
         Rendering/Runtime.RenderExtraction.Recipes.cpp
+        Rendering/Runtime.RenderExtraction.VectorFields.cpp
         Rendering/Runtime.RenderExtraction.Geometry.cpp
         Rendering/Runtime.RenderWorldPool.cpp
         Scene/Runtime.SelectionController.cpp

@@ -1,6 +1,7 @@
 // Per-frame packed vertex uploads for transient debug and visualization overlays.
 module;
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -39,8 +40,23 @@ export namespace Extrinsic::Graphics
 
     [[nodiscard]] std::uint32_t PackVertexColorUnorm4x8(const glm::vec4& color) noexcept;
 
+    // Writes `bytes` into a retained host-visible storage buffer that grows
+    // geometrically in whole `elementBytes` units up to `maxElementCount`.
     // The caller owns frame-slot selection and caps; allocation failure reports
     // Overflow and leaves the slot empty. Call only after the slot is reusable.
+    [[nodiscard]] PackedVertexUploadResult UploadRetainedHostBytes(
+        RHI::IDevice& device,
+        RHI::BufferManager& bufferManager,
+        std::optional<RHI::BufferManager::BufferLease>& bufferLease,
+        std::uint64_t& capacityBytes,
+        std::uint64_t& bufferAllocationCount,
+        std::span<const std::byte> bytes,
+        std::uint64_t elementBytes,
+        std::uint64_t initialElementCount,
+        std::uint64_t maxElementCount,
+        const char* debugName);
+
+    // Packed-vertex form of `UploadRetainedHostBytes`.
     [[nodiscard]] PackedVertexUploadResult UploadPackedColorVertices(
         RHI::IDevice& device,
         RHI::BufferManager& bufferManager,

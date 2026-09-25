@@ -971,6 +971,7 @@ ScopedEditorStatTimer::~ScopedEditorStatTimer()
             out.push_back(EditorVisualizationPropertyInfo{
                 .Name = name,
                 .Domain = domain,
+                .ElementDomain = ToGeometryElementDomain(domain),
                 .ValueKind = kind,
                 .ElementCount = properties.Size(),
                 .ScalarPresetAvailable = scalar,

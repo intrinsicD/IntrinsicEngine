@@ -2240,3 +2240,281 @@ TEST(SandboxEditorUi, NormalInterpretationRejectsInvalidBindingsBeforeMutation)
     EXPECT_FALSE(stored->UseBakedTexture);
     EXPECT_FALSE(registry.Raw().all_of<Runtime::PropertyTextureBakeOutputs>(mesh));
 }
+
+namespace
+{
+    [[nodiscard]] Runtime::GeometryPropertyRef VectorRef(
+        const Runtime::GeometryElementDomain domain,
+        std::string name)
+    {
+        return Runtime::GeometryPropertyRef{
+            .Domain = domain,
+            .Name = std::move(name),
+            .ValueKind = Geometry::PropertyValueKind::Vec3,
+        };
+    }
+
+    [[nodiscard]] const Runtime::GeometryVectorFieldLayerRecipe* FindVectorLayer(
+        ECS::Scene::Registry& registry,
+        const ECS::EntityHandle entity,
+        const Runtime::GeometryElementDomain domain,
+        const std::string_view name)
+    {
+        const auto* recipe =
+            registry.Raw().try_get<Runtime::GeometryPresentationRecipe>(entity);
+        return recipe != nullptr
+            ? Runtime::FindGeometryVectorFieldLayer(*recipe, domain, name)
+            : nullptr;
+    }
+}
+
+TEST(SandboxEditorUi, VectorFieldCommandsValidateAndUseCommandHistory)
+{
+    using D = Runtime::GeometryElementDomain;
+    using Op = Runtime::EditorVectorFieldOperation;
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "VectorFieldCommands");
+    AddTriangleMeshSource(registry, mesh);
+    auto& raw = registry.Raw();
+    raw.get<GS::Vertices>(mesh).Properties.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f, 0.0f, 1.0f});
+    raw.get<GS::Vertices>(mesh).Properties.GetOrAdd<float>("v:heat", 0.0f);
+    raw.get<GS::Faces>(mesh).Properties.GetOrAdd<glm::vec3>("f:flow", glm::vec3{1.0f, 0.0f, 0.0f});
+    // No authored presentation yet: the first vector field creates one.
+    ASSERT_FALSE(raw.all_of<Runtime::GeometryPresentationRecipe>(mesh));
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t stableId = Runtime::SelectionController::ToStableEntityId(mesh);
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const auto apply = [&](const Op op, Runtime::GeometryVectorFieldLayerRecipe layer, const bool style) {
+        return Runtime::ApplyEditorGeometryVectorFieldCommand(
+            context,
+            Runtime::EditorGeometryVectorFieldCommand{
+                .StableEntityId = stableId,
+                .Operation = op,
+                .Layer = std::move(layer),
+                .UseLayerStyle = style,
+            });
+    };
+
+    // Rejections leave the entity untouched.
+    EXPECT_EQ(apply(Op::Add, {.Vector = VectorRef(D::MeshVertex, "v:heat")}, false),
+              Runtime::EditorCommandStatus::InvalidVisualizationProperty);
+    EXPECT_EQ(apply(Op::Add, {.Vector = VectorRef(D::MeshVertex, "v:missing")}, false),
+              Runtime::EditorCommandStatus::InvalidVisualizationProperty);
+    EXPECT_EQ(apply(Op::Add, {.Vector = VectorRef(D::MeshHalfedge, "h:anything")}, false),
+              Runtime::EditorCommandStatus::InvalidVisualizationProperty);
+    EXPECT_EQ(apply(Op::Add, {.Vector = VectorRef(D::MeshFace, "v:normal")}, false),
+              Runtime::EditorCommandStatus::InvalidVisualizationProperty);
+    EXPECT_EQ(apply(Op::Update, {.Vector = VectorRef(D::MeshVertex, "v:normal")}, true),
+              Runtime::EditorCommandStatus::InvalidVisualizationProperty);
+    EXPECT_FALSE(raw.all_of<Runtime::GeometryPresentationRecipe>(mesh));
+    EXPECT_FALSE(history.CanUndo());
+
+    // Add uses bounding-box relative defaults.
+    ASSERT_EQ(apply(Op::Add, {.Vector = VectorRef(D::MeshVertex, "v:normal")}, false),
+              Runtime::EditorCommandStatus::Applied);
+    const auto* added = FindVectorLayer(registry, mesh, D::MeshVertex, "v:normal");
+    ASSERT_NE(added, nullptr);
+    EXPECT_NEAR(added->Length, 0.02f * std::sqrt(2.0f), 1.0e-6f);
+    EXPECT_EQ(added->LengthMode, Runtime::GeometryVectorFieldLengthMode::Normalized);
+    EXPECT_TRUE(added->Enabled);
+    EXPECT_TRUE(added->DepthTested);
+    EXPECT_EQ(added->Stride, 1u);
+    EXPECT_EQ(apply(Op::Add, {.Vector = VectorRef(D::MeshVertex, "v:normal")}, false),
+              Runtime::EditorCommandStatus::NoChange);
+    ASSERT_EQ(apply(Op::Add, {.Vector = VectorRef(D::MeshFace, "f:flow")}, false),
+              Runtime::EditorCommandStatus::Applied);
+    const auto* face = FindVectorLayer(registry, mesh, D::MeshFace, "f:flow");
+    ASSERT_NE(face, nullptr);
+    EXPECT_NE(face->Color, FindVectorLayer(registry, mesh, D::MeshVertex, "v:normal")->Color);
+
+    // Update validates every authored value.
+    Runtime::GeometryVectorFieldLayerRecipe edited = *FindVectorLayer(registry, mesh, D::MeshVertex, "v:normal");
+    const Runtime::GeometryVectorFieldLayerRecipe original = edited;
+    edited.LineWidthPx = 64.0f;
+    EXPECT_EQ(apply(Op::Update, edited, true), Runtime::EditorCommandStatus::InvalidVisualizationProperty);
+    edited.LineWidthPx = 4.0f;
+    edited.Color = {2.0f, 0.0f, 0.0f, 1.0f};
+    EXPECT_EQ(apply(Op::Update, edited, true), Runtime::EditorCommandStatus::InvalidVisualizationProperty);
+    edited.Color = {0.1f, 0.2f, 0.3f, 0.4f};
+    edited.Stride = 0u;
+    EXPECT_EQ(apply(Op::Update, edited, true), Runtime::EditorCommandStatus::InvalidVisualizationProperty);
+    edited.Stride = 3u;
+    edited.Length = std::numeric_limits<float>::infinity();
+    EXPECT_EQ(apply(Op::Update, edited, true), Runtime::EditorCommandStatus::InvalidVisualizationProperty);
+    edited.Length = 0.5f;
+    edited.LengthMode = Runtime::GeometryVectorFieldLengthMode::Raw;
+    edited.MaxGlyphs = 7u;
+    edited.DepthTested = false;
+    // The identity cannot be retargeted by Update.
+    edited.Vector.Name = "v:normal";
+    ASSERT_EQ(apply(Op::Update, edited, true), Runtime::EditorCommandStatus::Applied);
+    EXPECT_EQ(apply(Op::Update, edited, true), Runtime::EditorCommandStatus::NoChange);
+    const auto* updated = FindVectorLayer(registry, mesh, D::MeshVertex, "v:normal");
+    ASSERT_NE(updated, nullptr);
+    EXPECT_FLOAT_EQ(updated->LineWidthPx, 4.0f);
+    EXPECT_EQ(updated->Stride, 3u);
+    EXPECT_EQ(updated->MaxGlyphs, 7u);
+    EXPECT_FALSE(updated->DepthTested);
+    EXPECT_EQ(updated->LengthMode, Runtime::GeometryVectorFieldLengthMode::Raw);
+
+    ASSERT_EQ(apply(Op::Remove, {.Vector = VectorRef(D::MeshVertex, "v:normal")}, false),
+              Runtime::EditorCommandStatus::Applied);
+    EXPECT_EQ(FindVectorLayer(registry, mesh, D::MeshVertex, "v:normal"), nullptr);
+    EXPECT_EQ(apply(Op::Remove, {.Vector = VectorRef(D::MeshVertex, "v:normal")}, false),
+              Runtime::EditorCommandStatus::NoChange);
+
+    // Undo walks back remove, update, second add and first add.
+    ASSERT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+    ASSERT_NE(FindVectorLayer(registry, mesh, D::MeshVertex, "v:normal"), nullptr);
+    EXPECT_FLOAT_EQ(FindVectorLayer(registry, mesh, D::MeshVertex, "v:normal")->LineWidthPx, 4.0f);
+    ASSERT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_FLOAT_EQ(FindVectorLayer(registry, mesh, D::MeshVertex, "v:normal")->LineWidthPx,
+                    original.LineWidthPx);
+    ASSERT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(FindVectorLayer(registry, mesh, D::MeshFace, "f:flow"), nullptr);
+    ASSERT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+    // The first Add created the presentation; undo restores its absence.
+    EXPECT_FALSE(raw.all_of<Runtime::GeometryPresentationRecipe>(mesh));
+
+    ASSERT_EQ(history.Redo().Status, Runtime::EditorCommandHistoryStatus::Redone);
+    ASSERT_EQ(history.Redo().Status, Runtime::EditorCommandHistoryStatus::Redone);
+    ASSERT_EQ(history.Redo().Status, Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_FLOAT_EQ(FindVectorLayer(registry, mesh, D::MeshVertex, "v:normal")->LineWidthPx, 4.0f);
+    ASSERT_EQ(history.Redo().Status, Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_EQ(FindVectorLayer(registry, mesh, D::MeshVertex, "v:normal"), nullptr);
+    EXPECT_NE(FindVectorLayer(registry, mesh, D::MeshFace, "f:flow"), nullptr);
+}
+
+TEST(SandboxEditorUi, VectorFieldModelListsDomainsCandidatesAndLayerStatus)
+{
+    using D = Runtime::GeometryElementDomain;
+    ECS::Scene::Registry registry;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "VectorFieldModel");
+    AddTriangleMeshSource(registry, mesh);
+    auto& raw = registry.Raw();
+    raw.get<GS::Vertices>(mesh).Properties.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f});
+    raw.get<GS::Vertices>(mesh).Properties.GetOrAdd<float>("v:heat", 0.0f);
+    raw.get<GS::Edges>(mesh).Properties.GetOrAdd<glm::vec3>("e:tangent", glm::vec3{0.0f});
+    Runtime::GeometryPresentationRecipe recipe{};
+    recipe.VectorFields.push_back(Runtime::GeometryVectorFieldLayerRecipe{
+        .Vector = VectorRef(D::MeshVertex, "v:normal")});
+    recipe.VectorFields.push_back(Runtime::GeometryVectorFieldLayerRecipe{
+        .Vector = VectorRef(D::MeshFace, "f:gone")});
+
+    const Runtime::EditorVectorFieldModel model = Runtime::BuildEditorVectorFieldModel(
+        Runtime::BuildGeometryAvailability(raw, mesh), &recipe);
+    ASSERT_TRUE(model.Available);
+    std::vector<std::string> labels{};
+    for (const auto& domain : model.Domains)
+        labels.push_back(domain.Label);
+    EXPECT_EQ(labels, (std::vector<std::string>{"Vertices", "Edges", "Faces"}));
+
+    const auto& vertices = model.Domains[0];
+    EXPECT_EQ(vertices.ElementCount, 3u);
+    // Every vec3 is offered, positions included; scalars and vec2 are not.
+    ASSERT_EQ(vertices.Properties.size(), 2u);
+    EXPECT_EQ(vertices.Properties[0].Name, "v:normal");
+    EXPECT_TRUE(vertices.Properties[0].Compatible);
+    EXPECT_TRUE(vertices.Properties[0].Active);
+    EXPECT_EQ(vertices.Properties[1].Name, "v:position");
+    EXPECT_TRUE(vertices.Properties[1].Compatible);
+    EXPECT_FALSE(vertices.Properties[1].Active);
+    ASSERT_EQ(model.Domains[1].Properties.size(), 1u);
+    EXPECT_EQ(model.Domains[1].Properties[0].Name, "e:tangent");
+    EXPECT_FALSE(model.Domains[1].Properties[0].Active);
+    EXPECT_TRUE(model.Domains[2].Properties.empty());
+
+    ASSERT_EQ(model.Layers.size(), 2u);
+    EXPECT_TRUE(model.Layers[0].SourceAvailable);
+    EXPECT_TRUE(model.Layers[0].Status.empty());
+    EXPECT_EQ(model.Layers[1].DomainLabel, "Faces");
+    EXPECT_FALSE(model.Layers[1].SourceAvailable);
+    EXPECT_NE(model.Layers[1].Status.find("Not drawn"), std::string::npos);
+}
+
+TEST(SandboxEditorUi, VectorFieldModelOffersExactlyTheVectorsTheCommandAccepts)
+{
+    using D = Runtime::GeometryElementDomain;
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "VectorFieldParity");
+    AddTriangleMeshSource(registry, mesh);
+    auto& raw = registry.Raw();
+    raw.get<GS::Faces>(mesh).Properties.GetOrAdd<glm::vec3>("f:flow", glm::vec3{1.0f, 0.0f, 0.0f});
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    const std::uint32_t stableId = Runtime::SelectionController::ToStableEntityId(mesh);
+
+    const Runtime::EditorVectorFieldModel model = Runtime::BuildEditorVectorFieldModel(
+        Runtime::BuildGeometryAvailability(raw, mesh), nullptr);
+    std::size_t offered = 0u;
+    for (const auto& domain : model.Domains)
+    {
+        for (const auto& property : domain.Properties)
+        {
+            ++offered;
+            ASSERT_TRUE(property.Compatible) << property.Name;
+            EXPECT_EQ(Runtime::ApplyEditorGeometryVectorFieldCommand(
+                          context,
+                          Runtime::EditorGeometryVectorFieldCommand{
+                              .StableEntityId = stableId,
+                              .Layer = {.Vector = VectorRef(domain.Domain, property.Name)},
+                          }),
+                      Runtime::EditorCommandStatus::Applied)
+                << domain.Label << " " << property.Name;
+        }
+    }
+    EXPECT_EQ(offered, 2u) << "v:position and f:flow";
+    EXPECT_NE(FindVectorLayer(registry, mesh, D::MeshVertex, "v:position"), nullptr);
+    EXPECT_NE(FindVectorLayer(registry, mesh, D::MeshFace, "f:flow"), nullptr);
+}
+
+TEST(SandboxEditorUi, VectorFieldAddCreatesPresentationTransactionallyAndUndoRestoresAbsence)
+{
+    using D = Runtime::GeometryElementDomain;
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "VectorFieldAbsent");
+    AddTriangleMeshSource(registry, mesh);
+    auto& raw = registry.Raw();
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t stableId = Runtime::SelectionController::ToStableEntityId(mesh);
+    const Runtime::EditorGeometryVectorFieldCommand add{
+        .StableEntityId = stableId,
+        .Layer = {.Vector = VectorRef(D::MeshVertex, "v:position")},
+    };
+    const auto absent = [&] {
+        return !raw.any_of<Runtime::GeometryPresentationRecipe,
+                           Runtime::GeometryPresentationRuntimeState>(mesh);
+    };
+    ASSERT_TRUE(absent());
+
+    // A failing history precondition leaves the entity untouched.
+    Intrinsic::Tests::EditorFeatureTestContext failing = MakeContext(registry, selection);
+    failing.CommandHistory = &history;
+    failing.World = Runtime::WorldHandle{};
+    EXPECT_NE(Runtime::ApplyEditorGeometryVectorFieldCommand(failing, add),
+              Runtime::EditorCommandStatus::Applied);
+    EXPECT_TRUE(absent());
+    EXPECT_FALSE(history.CanUndo());
+
+    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    ASSERT_EQ(Runtime::ApplyEditorGeometryVectorFieldCommand(context, add),
+              Runtime::EditorCommandStatus::Applied);
+    EXPECT_NE(FindVectorLayer(registry, mesh, D::MeshVertex, "v:position"), nullptr);
+    EXPECT_EQ(raw.get<Runtime::GeometryPresentationRecipe>(mesh).Shape,
+              Runtime::GeometryPresentationShape::Mesh);
+
+    ASSERT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_TRUE(absent()) << "undo must restore the originally absent components";
+    ASSERT_EQ(history.Redo().Status, Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_NE(FindVectorLayer(registry, mesh, D::MeshVertex, "v:position"), nullptr);
+    ASSERT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_TRUE(absent());
+}

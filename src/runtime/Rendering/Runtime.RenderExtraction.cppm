@@ -251,6 +251,24 @@ export namespace Extrinsic::Runtime
         std::uint32_t VisualizationHtexAtlasPacketCount{0};
         std::uint32_t VisualizationFragmentBakeAtlasPacketCount{0};
 
+        // Vector-field layers (Appearance layers plus explicit vector
+        // recipes). Anchors and live rows are cached per entity and domain;
+        // vector payloads per property. A steady frame rebuilds nothing, so
+        // `VectorFieldCacheScannedElementCount` stays zero.
+        std::uint32_t VectorFieldLayerCount{0};
+        std::uint32_t VectorFieldPacketCount{0};
+        std::uint32_t VectorFieldUnavailableCount{0};
+        std::uint32_t VectorFieldAnchorCacheBuilds{0};
+        std::uint32_t VectorFieldAnchorCacheReuses{0};
+        std::uint32_t VectorFieldPayloadCacheBuilds{0};
+        std::uint32_t VectorFieldPayloadCacheReuses{0};
+        std::uint32_t VectorFieldCacheReleases{0};
+        std::uint32_t VectorFieldNonFiniteVectorCount{0};
+        std::uint64_t VectorFieldCacheScannedElementCount{0};
+        // Live-row bounds checks performed while appending packets; cache
+        // rows are validated when built, so steady frames report zero.
+        std::uint64_t VectorFieldRowIndexCheckCount{0};
+
         // GRAPHICS-036B — read-only mirror of the runtime `RenderWorldPool`
         // diagnostics (GRAPHICS-036 decision 7). The pool (`GRAPHICS-036A`) owns
         // the authoritative atomic counters; these fields surface them on the

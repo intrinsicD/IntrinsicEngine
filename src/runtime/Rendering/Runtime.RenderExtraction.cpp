@@ -1308,6 +1308,8 @@ namespace Extrinsic::Runtime
                 transformView.get<ECS::Components::Transform::WorldMatrix>(entity).Matrix;
 
             ExtractLightsForEntity(registry, entity, worldMatrix);
+            AppendVectorFieldLayers(
+                registry, entity, StableEntityId(entity), worldMatrix, stats);
 
             if (!HasRenderableHint(registry, entity))
             {
@@ -1327,6 +1329,9 @@ namespace Extrinsic::Runtime
         FinalizeAndSubmitSnapshot(renderer,
                                   runtimeSnapshotStorageSlot,
                                   stats);
+        // Borrowed vector-field payloads were read during submission; only
+        // now may unused caches release their storage.
+        ReleaseUnusedVectorFieldCaches(stats);
 
         m_LastStats = stats;
         return m_LastStats;
@@ -1996,6 +2001,8 @@ namespace Extrinsic::Runtime
                         }
                     }
                 }, recipe.Data);
+                const std::size_t vectorFieldsBefore =
+                    m_VisualizationState.Batch.VectorFields.size();
                 AppendVisualizationRecipe(
                     *availabilityThisFrame,
                     recipe,
@@ -2011,6 +2018,14 @@ namespace Extrinsic::Runtime
                         ? std::span<const std::uint32_t>{sidecar->MeshSourceFaceForGpuTriangle}
                         : std::span<const std::uint32_t>{},
                     meshBoundThisFrame ? sidecar->MeshFaceRemapRevision : 0u);
+                // Encoded glyphs are object-space; draw them with the entity.
+                for (std::size_t packet = vectorFieldsBefore;
+                     packet < m_VisualizationState.Batch.VectorFields.size();
+                     ++packet)
+                {
+                    m_VisualizationState.Batch.VectorFields[packet].ObjectToWorld =
+                        worldMatrix;
+                }
             }
             {
                 const auto alreadyEncoded = [](const auto& packets, const auto& recipe) {
@@ -2343,6 +2358,7 @@ namespace Extrinsic::Runtime
             ++m_VisualizationState.RecipeRevision;
         m_VisualizationState.Recipes.clear();
         m_VisualizationState.Batch.Clear();
+        m_VectorFieldCaches.clear();
         m_SceneInteraction = {};
 
         renderer.SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{});

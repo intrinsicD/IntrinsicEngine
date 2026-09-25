@@ -3054,6 +3054,9 @@ BuildEditorDomainWindowModelFromBindings(
             VisualizationTargetAvailableForView(
                 availability,
                 model.VisualizationTarget);
+        model.VectorFields = BuildEditorVectorFieldModel(
+            availability,
+            raw.try_get<GeometryPresentationRecipe>(*selected));
         const EditorGeometryDomainModel geometry =
             BuildGeometryDomainModel(raw, *selected);
         EditorSelectedAnalysisModel selectedAnalysis =

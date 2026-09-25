@@ -1,30 +1,24 @@
-// GRAPHICS-078 — CPU-mock contract for the canonical default-recipe
-// `VisualizationOverlayPass` and its renderer-integrated
-// `"VisualizationOverlayPass"` executor branch.
+// CPU-mock contract for the canonical default-recipe `VisualizationOverlayPass`
+// and its renderer-integrated `"VisualizationOverlayPass"` executor branch.
 //
-// Slice A pinned the recipe-declaration shape (pass appears in the
-// recipe only when at least one visualization-overlay packet exists
-// for the frame) and the executor-taxonomy seams
-// (`SkippedNonOperational` when the device is not operational;
-// `SkippedUnavailable` + `MissingPipelineSkipCount++` when the
-// pipelines are missing on an operational device).
+// Recipe declaration: the pass appears only when at least one overlay packet
+// exists. Executor taxonomy: `SkippedNonOperational` on a non-operational
+// device; `SkippedUnavailable` + `MissingPipelineSkipCount++` when pipelines
+// are missing.
 //
-// Slice B promotes the vector-field lane from `SkippedUnavailable` to
-// `Recorded` by creating two pipeline variants (depth-tested +
-// always-on-top, calls #31 + #32), driving the renderer-owned
-// `VisualizationOverlayUploadHelper` to pack per-frame vertex data,
-// and recording `BindPipeline + PushConstants(16) +
-// Draw(2 * ElementCount, 1, 0, 0)` per submitted vector-field packet
-// (switching pipeline variants on each `DepthTested` flip).
-//
-// Slice C extends to the isoline lane (call indices #33 + #34) and
-// adds per-lane independence + mixed-lane recording coverage that
-// mirrors GRAPHICS-077 Slice C; Slice D adds the opt-in `gpu;vulkan`
-// pixel-readback smoke.
+// Vector fields: one draw record per renderable packet is uploaded into the
+// helper's per-frame-slot buffer, and each packet records
+// `BindPipeline + PushConstants(24) + Draw(9, glyphCount, 0, 0)` — an
+// instanced arrow per sampled live row, expanded on the GPU. Packets with
+// unresolved buffer addresses are skipped. Isolines keep the fixture shape
+// `Draw(2 * IsoValueCount, 1, 0, 0)`. Pixel output is owned by the opt-in
+// `gpu;vulkan` smokes.
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <string>
 #include <type_traits>
@@ -58,18 +52,24 @@ static_assert(!std::is_polymorphic_v<Graphics::VisualizationOverlayUploadHelper>
 
 namespace
 {
+    // Stand-in resident buffer addresses: overlay packets are renderable only
+    // once every source buffer has resolved to a device address.
+    constexpr std::uint64_t kAnchorBDA = 0x10000u;
+    constexpr std::uint64_t kVectorBDA = 0x20000u;
+
     void SubmitOneVectorField(Graphics::IRenderer& renderer, const bool depthTested = true)
     {
-        // A single non-empty vector-field-overlay packet span is enough
-        // to flip `features.EnableVisualizationOverlay` and add the
-        // pass to the recipe. `ElementCount = 1` produces a single
-        // glyph = 2 packed vertices in the helper's host-visible
-        // buffer; the pass records `Draw(2, 1, 0, 0)` per packet.
+        // A single resolved vector-field packet flips
+        // `features.EnableVisualizationOverlay`; `ElementCount = 1` records
+        // one instanced arrow, `Draw(9, 1, 0, 0)`.
         static Graphics::VectorFieldOverlayPacket sPackets[1] = {
             Graphics::VectorFieldOverlayPacket{
                 .Name         = "Test.VectorField",
                 .Domain       = Graphics::VisualizationAttributeDomain::Vertex,
                 .ElementCount = 1u,
+                .RowCount     = 1u,
+                .PositionBufferBDA = kAnchorBDA,
+                .VectorBufferBDA   = kVectorBDA,
                 .Scale        = 1.0f,
                 .Color        = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
                 .DepthTested  = true,
@@ -127,6 +127,9 @@ TEST(VisualizationOverlayPassContract, RecipeDeclaresPassWhenOverlayPacketsExist
             .Name         = "Test.VectorField",
             .Domain       = Graphics::VisualizationAttributeDomain::Vertex,
             .ElementCount = 4u,
+            .RowCount     = 4u,
+            .PositionBufferBDA = kAnchorBDA,
+            .VectorBufferBDA   = kVectorBDA,
             .Scale        = 1.0f,
         },
     }};
@@ -330,11 +333,10 @@ TEST(VisualizationOverlayPassContract, MissingVectorFieldPipelineLeaseSkipsUnava
 
 TEST(VisualizationOverlayPassContract, RecordsVectorFieldBindPipelineAndDraw)
 {
-    // GRAPHICS-078 Slice B — a single sanitized
-    // `VectorFieldOverlayPacket` (`ElementCount = 1`, `DepthTested =
-    // true`) records the canonical per-packet
-    // `BindPipeline(depth-tested) + PushConstants(16) +
-    // Draw(2 * ElementCount, 1, 0, 0)` shape and increments
+    // A single resolved `VectorFieldOverlayPacket` (`ElementCount = 1`,
+    // `DepthTested = true`) records the canonical per-packet
+    // `BindPipeline(depth-tested) + PushConstants(24) +
+    // Draw(9, glyphCount, 0, 0)` shape and increments
     // `VectorFieldRecordsSubmitted` + `VectorFieldRecordsRecorded` by
     // exactly 1.
     MockDevice device;
@@ -368,31 +370,28 @@ TEST(VisualizationOverlayPassContract, RecordsVectorFieldBindPipelineAndDraw)
     EXPECT_EQ(stats.VisualizationOverlayUpload.UploadOverflowCount, 0u);
     EXPECT_EQ(stats.VisualizationOverlayUpload.MissingPipelineSkipCount, 0u);
 
-    // A 16-byte `VisualizationVectorFieldPushConstants` payload must
-    // reach the device command context as part of the per-packet
-    // recording sequence. Other passes in the default recipe also
-    // push 16-byte payloads (e.g. `DebugViewPushConstants` when the
-    // overlay is on, and the GRAPHICS-077 transient-debug push
-    // blocks), so the assertion is "at least one 16-byte push reached
-    // the context" — sufficient to pin the contract without coupling
-    // to the exact ordering of other 16-byte-push consumers.
-    const auto expectedPushSize =
-        static_cast<std::uint32_t>(sizeof(Graphics::VisualizationVectorFieldPushConstants));
-    std::size_t sizedPushCount = 0;
-    for (const std::uint32_t size : device.CommandContext.PushConstantSizes)
-    {
-        if (size == expectedPushSize) { ++sizedPushCount; }
-    }
-    EXPECT_GE(sizedPushCount, 1u)
-        << "expected at least one " << expectedPushSize
-        << "-byte push for the visualization-overlay vector-field packet";
+    // The packet's push block names the scene table and its draw record.
+    static_assert(sizeof(Graphics::VisualizationVectorFieldPushConstants) == 24u);
+    const auto& pushes = device.CommandContext.PushConstantPayloads;
+    const auto push = std::find_if(pushes.begin(), pushes.end(), [](const auto& payload) {
+        return payload.size() == sizeof(Graphics::VisualizationVectorFieldPushConstants);
+    });
+    ASSERT_NE(push, pushes.end());
+    Graphics::VisualizationVectorFieldPushConstants pc{};
+    std::memcpy(&pc, push->data(), sizeof(pc));
+    EXPECT_NE(pc.SceneTableBDA, 0u);
+    EXPECT_NE(pc.RecordBufferBDA, 0u);
+    EXPECT_EQ(pc.RecordIndex, 0u);
 
-    // Note: BDA-value correctness on a real Vulkan device requires
-    // `BufferUsage::Storage` on the helper's vertex buffer (per
-    // `RHI.Device.cppm` and `Backends.Vulkan.Device.cpp` `HasBDA`
-    // gate). The operational BDA validation is owned by the
-    // GRAPHICS-078 Slice D `gpu;vulkan` smoke; this contract test
-    // pins the bind/push/draw command shape only.
+    // One instanced arrow per live row: 9 vertices, ElementCount instances.
+    const auto& draws = device.CommandContext.DrawRecords;
+    EXPECT_EQ(std::count_if(draws.begin(), draws.end(), [](const auto& draw) {
+                  return draw.VertexCount == Graphics::kVisualizationVectorFieldGlyphVertexCount &&
+                         draw.InstanceCount == 1u && draw.FirstVertex == 0u &&
+                         draw.FirstInstance == 0u;
+              }),
+              1);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldGlyphsRecorded, 1u);
 
     renderer->Shutdown();
 }
@@ -403,13 +402,16 @@ TEST(VisualizationOverlayPassContract, SelectsVectorFieldAlwaysOnTopVariantPerPa
     // cause the correct pipeline variant to bind per packet. Three
     // packets [depth-tested, always-on-top, depth-tested] flips the
     // variant twice, so the executor emits 3 BindPipelines + 3
-    // PushConstants + 3 Draws under this pass. Counts the 16-byte
+    // PushConstants + 3 Draws under this pass. Counts the 24-byte
     // pushes attributable to the lane at >= 3.
     static const std::array<Graphics::VectorFieldOverlayPacket, 3> kVectorFields{{
         Graphics::VectorFieldOverlayPacket{
             .Name         = "Test.VectorField.A",
             .Domain       = Graphics::VisualizationAttributeDomain::Vertex,
             .ElementCount = 2u,
+            .RowCount     = 2u,
+            .PositionBufferBDA = kAnchorBDA,
+            .VectorBufferBDA   = kVectorBDA,
             .Scale        = 1.0f,
             .Color        = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
             .DepthTested  = true,
@@ -418,6 +420,9 @@ TEST(VisualizationOverlayPassContract, SelectsVectorFieldAlwaysOnTopVariantPerPa
             .Name         = "Test.VectorField.B",
             .Domain       = Graphics::VisualizationAttributeDomain::Vertex,
             .ElementCount = 3u,
+            .RowCount     = 3u,
+            .PositionBufferBDA = kAnchorBDA,
+            .VectorBufferBDA   = kVectorBDA,
             .Scale        = 1.0f,
             .Color        = glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
             .DepthTested  = false,
@@ -426,6 +431,9 @@ TEST(VisualizationOverlayPassContract, SelectsVectorFieldAlwaysOnTopVariantPerPa
             .Name         = "Test.VectorField.C",
             .Domain       = Graphics::VisualizationAttributeDomain::Vertex,
             .ElementCount = 1u,
+            .RowCount     = 1u,
+            .PositionBufferBDA = kAnchorBDA,
+            .VectorBufferBDA   = kVectorBDA,
             .Scale        = 1.0f,
             .Color        = glm::vec4{0.0f, 0.0f, 1.0f, 1.0f},
             .DepthTested  = true,
@@ -462,11 +470,8 @@ TEST(VisualizationOverlayPassContract, SelectsVectorFieldAlwaysOnTopVariantPerPa
     EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsSubmitted, 3u);
     EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsRecorded, 3u);
 
-    // 3 packets ⇒ 3 16-byte pushes from this pass. Other passes in
-    // the recipe may also push 16-byte payloads, so the contract pin
-    // is "at least 3 sized pushes reached the device". Counting `>= 3`
-    // keeps the test stable if a sibling 16-byte-push consumer
-    // changes.
+    // 3 packets ⇒ 3 vector-field pushes from this pass; counting `>= 3`
+    // keeps the test stable if another pass uses the same push size.
     const auto expectedPushSize =
         static_cast<std::uint32_t>(sizeof(Graphics::VisualizationVectorFieldPushConstants));
     std::size_t sizedPushCount = 0;
@@ -481,34 +486,17 @@ TEST(VisualizationOverlayPassContract, SelectsVectorFieldAlwaysOnTopVariantPerPa
     renderer->Shutdown();
 }
 
-TEST(VisualizationOverlayPassContract, UploadOverflowSkipsUnavailableWithoutFalseRecorded)
+TEST(VisualizationOverlayPassContract, UnresolvedVectorFieldBuffersSkipWithoutFalseRecorded)
 {
-    // GRAPHICS-078 Slice B — adversarial-input pin. A single
-    // `VectorFieldOverlayPacket` whose `2 * ElementCount` exceeds the
-    // per-lane cap (`kMaxVectorFieldVertexCount = 1 << 18 = 262144`)
-    // must fail-close BEFORE the helper's staging-buffer allocation —
-    // otherwise the per-frame packed-vertex staging vector of
-    // size `2 * ElementCount` would attempt a multi-GiB host
-    // allocation (or throw `bad_alloc`) for an adversarial
-    // `ElementCount = UINT32_MAX`. The pass MUST report
-    // `SkippedUnavailable` rather than masking the failure as
-    // `Recorded`. `UploadOverflowCount` ticks once;
-    // `MissingPipelineSkipCount` stays at zero (the pipelines are
-    // healthy, the upload gate is independent of the pipeline gate);
-    // `VectorFieldRecordsRecorded` stays at zero.
-    //
-    // 200 000 * 2 = 400 000 > 262 144 → over the cap by ~140k verts
-    // (~2.1 MiB if the allocation succeeded). Picked deliberately
-    // large enough to overflow the cap but small enough that a buggy
-    // pre-fix run that DOES allocate the buffer still does not OOM
-    // the CI host (so the regression failure mode is "Recorded /
-    // unbounded allocation" rather than "process killed", which
-    // would make the regression hard to diagnose).
+    // A packet whose source buffers never resolved to device addresses must
+    // not be drawn: the pass reports SkippedUnavailable rather than Recorded,
+    // and the pipelines stay healthy.
     static const std::array<Graphics::VectorFieldOverlayPacket, 1> kVectorFields{{
         Graphics::VectorFieldOverlayPacket{
-            .Name         = "Test.VectorField.Overflow",
+            .Name         = "Test.VectorField.Unresolved",
             .Domain       = Graphics::VisualizationAttributeDomain::Vertex,
             .ElementCount = 200000u,
+            .RowCount     = 200000u,
             .Scale        = 1.0f,
             .Color        = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
             .DepthTested  = true,
@@ -538,18 +526,112 @@ TEST(VisualizationOverlayPassContract, UploadOverflowSkipsUnavailableWithoutFals
     const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
     EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
     EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
-    EXPECT_TRUE(stats.Execute.DeviceOperational);
 
     const auto* pass = FindCommandPass(stats, "VisualizationOverlayPass");
     ASSERT_NE(pass, nullptr);
-    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::SkippedUnavailable)
-        << "upload overflow must surface as SkippedUnavailable, not Recorded";
-
+    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::SkippedUnavailable);
     EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsSubmitted, 1u);
     EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsRecorded, 0u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldPacketsSkipped, 1u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.MissingPipelineSkipCount, 0u);
+    EXPECT_EQ(world.Visualization.OverlaySummary.VectorGlyphCount, 200000u);
+
+    renderer->Shutdown();
+}
+
+TEST(VisualizationOverlayPassContract, VectorFieldRecordsCarryPacketStateAndStrideSampling)
+{
+    // The helper uploads one 128-byte record per renderable packet; the
+    // record is the shader contract (transform, buffers, sampling, style).
+    Graphics::VectorFieldOverlayPacket sampled{
+        .Name = "Test.VectorField.Sampled",
+        .RowBufferSourceKey = "rows",
+        .Domain = Graphics::VisualizationAttributeDomain::Face,
+        .ElementCount = 10u,
+        .RowCount = 7u,
+        .RowStride = 3u,
+        .PositionBufferBDA = kAnchorBDA,
+        .VectorBufferBDA = kVectorBDA,
+        .RowBufferBDA = 0x30000u,
+        .ObjectToWorld = glm::mat4{2.0f},
+        .Scale = 0.25f,
+        .NormalizeLength = false,
+        .LineWidthPx = 3.0f,
+        .Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+    };
+    Graphics::VectorFieldOverlayPacket unresolved = sampled;
+    unresolved.RowBufferBDA = 0u;
+    EXPECT_EQ(Graphics::VectorFieldGlyphCount(sampled), 3u);
+    EXPECT_TRUE(Graphics::IsRenderableVectorFieldPacket(sampled));
+    EXPECT_FALSE(Graphics::IsRenderableVectorFieldPacket(unresolved));
+
+    MockDevice device;
+    device.FramesInFlight = 2u;
+    RHI::BufferManager bufferManager{device};
+    Graphics::VisualizationOverlayUploadHelper helper{device, bufferManager};
+    helper.BeginFrame(0u, device.FramesInFlight);
+    const std::array<Graphics::VectorFieldOverlayPacket, 2> packets{unresolved, sampled};
+    const Graphics::VisualizationVectorFieldUploadResult upload = helper.UploadVectorFields(packets);
+    ASSERT_TRUE(upload.Uploaded);
+    EXPECT_EQ(upload.RecordCount, 1u);
+    ASSERT_EQ(upload.RecordIndexForPacket.size(), 2u);
+    EXPECT_EQ(upload.RecordIndexForPacket[0], Graphics::VisualizationVectorFieldUploadResult::kInvalidRecord);
+    EXPECT_EQ(upload.RecordIndexForPacket[1], 0u);
+
+    ASSERT_FALSE(device.BufferWrites.empty());
+    const auto& write = device.BufferWrites.back();
+    ASSERT_EQ(write.Data.size(), sizeof(Graphics::VisualizationVectorFieldDrawRecord));
+    Graphics::VisualizationVectorFieldDrawRecord record{};
+    std::memcpy(&record, write.Data.data(), sizeof(record));
+    EXPECT_EQ(record.ObjectToWorld, glm::mat4{2.0f});
+    EXPECT_EQ(record.PositionBufferBDA, kAnchorBDA);
+    EXPECT_EQ(record.VectorBufferBDA, kVectorBDA);
+    EXPECT_EQ(record.RowBufferBDA, 0x30000u);
+    EXPECT_EQ(record.ElementCount, 10u);
+    EXPECT_EQ(record.RowCount, 7u);
+    EXPECT_EQ(record.RowStride, 3u);
+    EXPECT_EQ(record.PackedColor, 0xFF0000FFu);
+    EXPECT_FLOAT_EQ(record.Scale, 0.25f);
+    EXPECT_FLOAT_EQ(record.LineWidthPx, 3.0f);
+    EXPECT_EQ(record.Flags & Graphics::kVisualizationVectorFieldNormalizeFlag, 0u);
+}
+
+TEST(VisualizationOverlayPassContract, VectorFieldRecordOverflowSkipsUnavailable)
+{
+    // Records are capped per frame slot; exceeding the cap fails closed
+    // before any draw is recorded.
+    std::vector<Graphics::VectorFieldOverlayPacket> packets(
+        (1u << 14) + 1u,
+        Graphics::VectorFieldOverlayPacket{
+            .Name = "Test.VectorField.Many",
+            .ElementCount = 1u,
+            .RowCount = 1u,
+            .PositionBufferBDA = kAnchorBDA,
+            .VectorBufferBDA = kVectorBDA,
+        });
+
+    MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{788u, 1u};
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    renderer->SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
+        .VisualizationVectorFields = std::span<const Graphics::VectorFieldOverlayPacket>{
+            packets.data(), packets.size()},
+    });
+    const Graphics::RenderFrameInput input{.Viewport = {.Width = 64, .Height = 64}};
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    const auto* pass = FindCommandPass(stats, "VisualizationOverlayPass");
+    ASSERT_NE(pass, nullptr);
+    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::SkippedUnavailable);
     EXPECT_EQ(stats.VisualizationOverlayUpload.UploadOverflowCount, 1u);
-    // Pipeline gate is independent of upload — the lane's pipelines
-    // are healthy, so the missing-pipeline counter stays untouched.
+    EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsRecorded, 0u);
     EXPECT_EQ(stats.VisualizationOverlayUpload.MissingPipelineSkipCount, 0u);
 
     renderer->Shutdown();
@@ -574,6 +656,9 @@ TEST(VisualizationOverlayPassContract, PerFrameBufferRecyclingDoesNotLeakVectorF
             .Name         = "Test.VectorField",
             .Domain       = Graphics::VisualizationAttributeDomain::Vertex,
             .ElementCount = 4u,
+            .RowCount     = 4u,
+            .PositionBufferBDA = kAnchorBDA,
+            .VectorBufferBDA   = kVectorBDA,
             .Scale        = 1.0f,
             .Color        = glm::vec4{1.0f},
             .DepthTested  = true,
@@ -636,6 +721,9 @@ TEST(VisualizationOverlayPassContract, UploadHelperPartitionsStorageByFrameSlot)
             .Name         = "Test.VectorField",
             .Domain       = Graphics::VisualizationAttributeDomain::Vertex,
             .ElementCount = 2u,
+            .RowCount     = 2u,
+            .PositionBufferBDA = kAnchorBDA,
+            .VectorBufferBDA   = kVectorBDA,
             .Scale        = 1.0f,
             .Color        = glm::vec4{1.0f},
             .DepthTested  = true,
@@ -679,7 +767,7 @@ TEST(VisualizationOverlayPassContract, UploadHelperPartitionsStorageByFrameSlot)
     ASSERT_TRUE(vectorSlot1.Uploaded);
     ASSERT_TRUE(isolineSlot1.Uploaded);
 
-    EXPECT_NE(vectorSlot0.VertexBuffer, vectorSlot1.VertexBuffer);
+    EXPECT_NE(vectorSlot0.RecordBuffer, vectorSlot1.RecordBuffer);
     EXPECT_NE(isolineSlot0.VertexBuffer, isolineSlot1.VertexBuffer);
     EXPECT_EQ(helper.GetBufferAllocationCount(), 4u);
 
@@ -692,7 +780,7 @@ TEST(VisualizationOverlayPassContract, UploadHelperPartitionsStorageByFrameSlot)
             kIsolines, 1u});
     ASSERT_TRUE(vectorSlot0Again.Uploaded);
     ASSERT_TRUE(isolineSlot0Again.Uploaded);
-    EXPECT_EQ(vectorSlot0Again.VertexBuffer, vectorSlot0.VertexBuffer);
+    EXPECT_EQ(vectorSlot0Again.RecordBuffer, vectorSlot0.RecordBuffer);
     EXPECT_EQ(isolineSlot0Again.VertexBuffer, isolineSlot0.VertexBuffer);
     EXPECT_EQ(helper.GetBufferAllocationCount(), 4u);
 }
@@ -915,6 +1003,9 @@ TEST(VisualizationOverlayPassContract, MixedLaneVectorFieldAndIsolineBothRecord)
             .Name         = "Test.VF",
             .Domain       = Graphics::VisualizationAttributeDomain::Vertex,
             .ElementCount = 2u,
+            .RowCount     = 2u,
+            .PositionBufferBDA = kAnchorBDA,
+            .VectorBufferBDA   = kVectorBDA,
             .Scale        = 1.0f,
             .Color        = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
             .DepthTested  = true,
@@ -1006,6 +1097,9 @@ TEST(VisualizationOverlayPassContract, RetainedOverlayPacketLanesRecordTogether)
             .Name = "GRAPHICS-085.VectorField",
             .Domain = Graphics::VisualizationAttributeDomain::Vertex,
             .ElementCount = 1u,
+            .RowCount     = 1u,
+            .PositionBufferBDA = kAnchorBDA,
+            .VectorBufferBDA   = kVectorBDA,
             .Scale = 1.0f,
             .Color = glm::vec4{1.0f},
             .DepthTested = true,
@@ -1243,6 +1337,9 @@ TEST(VisualizationOverlayPassContract, PerLanePartialSkipKeepsSiblingLaneRecordi
             .Name         = "Test.VF",
             .Domain       = Graphics::VisualizationAttributeDomain::Vertex,
             .ElementCount = 1u,
+            .RowCount     = 1u,
+            .PositionBufferBDA = kAnchorBDA,
+            .VectorBufferBDA   = kVectorBDA,
             .Scale        = 1.0f,
             .Color        = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
             .DepthTested  = true,

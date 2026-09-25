@@ -130,6 +130,71 @@ namespace Extrinsic::Runtime
                 : FaceRingOutcome::Triangulate;
         }
 
+        struct FaceRingInputs
+        {
+            const std::vector<std::uint32_t>* ToVertex{nullptr};
+            const std::vector<std::uint32_t>* NextHalfedge{nullptr};
+            const std::vector<std::uint32_t>* HalfedgeFace{nullptr};
+            const std::vector<std::uint32_t>* FaceHalfedge{nullptr};
+            std::uint32_t VertexCount{0u};
+        };
+
+        // Validates and borrows the canonical face-ring topology rows.
+        [[nodiscard]] MeshSurfaceTopologyStatus ResolveFaceRingInputs(
+            const ECS::Components::GeometrySources::ConstSourceView& view,
+            FaceRingInputs& out)
+        {
+            using namespace ECS::Components::GeometrySources;
+            if (BuildSourceAvailability(view).ProvenanceDomain != Domain::Mesh)
+                return MeshSurfaceTopologyStatus::WrongDomain;
+            if (view.VertexSource == nullptr)
+                return MeshSurfaceTopologyStatus::MissingVertexSource;
+            // Connectivity indexes vertex slots, independent of whichever
+            // position-valued property a caller binds for geometric work.
+            out.VertexCount =
+                static_cast<std::uint32_t>(view.VertexSource->Properties.Size());
+            if (out.VertexCount == 0u)
+                return MeshSurfaceTopologyStatus::EmptyMesh;
+
+            if (view.HalfedgeSource == nullptr)
+                return MeshSurfaceTopologyStatus::MissingHalfedgeTopology;
+            const auto toVertex =
+                view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                    PropertyNames::kHalfedgeToVertex);
+            const auto nextHalfedge =
+                view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                    PropertyNames::kHalfedgeNext);
+            const auto halfedgeFace =
+                view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                    PropertyNames::kHalfedgeFace);
+            if (!toVertex || !nextHalfedge || !halfedgeFace)
+                return MeshSurfaceTopologyStatus::MissingHalfedgeTopology;
+            const std::size_t halfedgeCount = toVertex.Vector().size();
+            if (halfedgeCount == 0u)
+                return MeshSurfaceTopologyStatus::EmptyMesh;
+            if (nextHalfedge.Vector().size() != halfedgeCount
+                || halfedgeFace.Vector().size() != halfedgeCount)
+            {
+                return MeshSurfaceTopologyStatus::InvalidTopology;
+            }
+
+            if (view.FaceSource == nullptr)
+                return MeshSurfaceTopologyStatus::MissingFaceTopology;
+            const auto faceHalfedge =
+                view.FaceSource->Properties.Get<std::uint32_t>(
+                    PropertyNames::kFaceHalfedge);
+            if (!faceHalfedge)
+                return MeshSurfaceTopologyStatus::MissingFaceTopology;
+            if (faceHalfedge.Vector().empty())
+                return MeshSurfaceTopologyStatus::EmptyMesh;
+
+            out.ToVertex = &toVertex.Vector();
+            out.NextHalfedge = &nextHalfedge.Vector();
+            out.HalfedgeFace = &halfedgeFace.Vector();
+            out.FaceHalfedge = &faceHalfedge.Vector();
+            return MeshSurfaceTopologyStatus::Success;
+        }
+
         [[nodiscard]] MeshSurfaceTopologyStatus BuildTopology(
             const ECS::Components::GeometrySources::ConstSourceView& view,
             std::vector<std::uint32_t>* outSurfaceIndices,
@@ -155,49 +220,18 @@ namespace Extrinsic::Runtime
                 return status;
             };
 
-            if (BuildSourceAvailability(view).ProvenanceDomain != Domain::Mesh)
-                return fail(MeshSurfaceTopologyStatus::WrongDomain);
-            if (view.VertexSource == nullptr)
-                return fail(MeshSurfaceTopologyStatus::MissingVertexSource);
-            // Connectivity indexes vertex slots, independent of whichever
-            // position-valued property a caller binds for geometric work.
-            const std::uint32_t vertexCount =
-                static_cast<std::uint32_t>(view.VertexSource->Properties.Size());
-            if (vertexCount == 0u)
-                return fail(MeshSurfaceTopologyStatus::EmptyMesh);
-
-            if (view.HalfedgeSource == nullptr)
-                return fail(MeshSurfaceTopologyStatus::MissingHalfedgeTopology);
-            const auto toVertex =
-                view.HalfedgeSource->Properties.Get<std::uint32_t>(
-                    PropertyNames::kHalfedgeToVertex);
-            const auto nextHalfedge =
-                view.HalfedgeSource->Properties.Get<std::uint32_t>(
-                    PropertyNames::kHalfedgeNext);
-            const auto halfedgeFace =
-                view.HalfedgeSource->Properties.Get<std::uint32_t>(
-                    PropertyNames::kHalfedgeFace);
-            if (!toVertex || !nextHalfedge || !halfedgeFace)
-                return fail(MeshSurfaceTopologyStatus::MissingHalfedgeTopology);
-            const std::size_t halfedgeCount = toVertex.Vector().size();
-            if (halfedgeCount == 0u)
-                return fail(MeshSurfaceTopologyStatus::EmptyMesh);
-            if (nextHalfedge.Vector().size() != halfedgeCount
-                || halfedgeFace.Vector().size() != halfedgeCount)
+            FaceRingInputs inputs{};
+            if (const MeshSurfaceTopologyStatus status = ResolveFaceRingInputs(view, inputs);
+                status != MeshSurfaceTopologyStatus::Success)
             {
-                return fail(MeshSurfaceTopologyStatus::InvalidTopology);
+                return fail(status);
             }
-
-            if (view.FaceSource == nullptr)
-                return fail(MeshSurfaceTopologyStatus::MissingFaceTopology);
-            const auto faceHalfedge =
-                view.FaceSource->Properties.Get<std::uint32_t>(
-                    PropertyNames::kFaceHalfedge);
-            if (!faceHalfedge)
-                return fail(MeshSurfaceTopologyStatus::MissingFaceTopology);
-            const std::size_t faceCount = faceHalfedge.Vector().size();
-            if (faceCount == 0u)
-                return fail(MeshSurfaceTopologyStatus::EmptyMesh);
+            const std::vector<std::uint32_t>& faceHalfedgeRows = *inputs.FaceHalfedge;
+            const std::vector<std::uint32_t>& halfedgeFaceRows = *inputs.HalfedgeFace;
+            const std::vector<std::uint32_t>& nextHalfedgeRows = *inputs.NextHalfedge;
+            const std::vector<std::uint32_t>& toVertexRows = *inputs.ToVertex;
+            const std::uint32_t vertexCount = inputs.VertexCount;
+            const std::size_t faceCount = faceHalfedgeRows.size();
 
             std::vector<std::uint32_t> ring;
             ring.reserve(8u);
@@ -209,10 +243,10 @@ namespace Extrinsic::Runtime
                  ++faceIndex)
             {
                 const FaceRingOutcome outcome = ProduceFaceRing(
-                    faceHalfedge.Vector(),
-                    halfedgeFace.Vector(),
-                    nextHalfedge.Vector(),
-                    toVertex.Vector(),
+                    faceHalfedgeRows,
+                    halfedgeFaceRows,
+                    nextHalfedgeRows,
+                    toVertexRows,
                     static_cast<std::uint32_t>(faceCount),
                     vertexCount,
                     faceIndex,
@@ -382,6 +416,75 @@ namespace Extrinsic::Runtime
     {
         return BuildTopology(
             view, &outSurfaceIndices, &outTriangleToFace, &outCornerHalfedges);
+    }
+
+    MeshSurfaceTopologyStatus BuildMeshFaceCenters(
+        const ECS::Components::GeometrySources::ConstSourceView& view,
+        const std::span<const glm::vec3> vertexPositions,
+        std::vector<glm::vec3>& outCenters,
+        std::vector<std::uint32_t>& outLiveFaces)
+    {
+        outCenters.clear();
+        outLiveFaces.clear();
+        FaceRingInputs inputs{};
+        if (const MeshSurfaceTopologyStatus status = ResolveFaceRingInputs(view, inputs);
+            status != MeshSurfaceTopologyStatus::Success)
+        {
+            return status;
+        }
+        if (vertexPositions.size() != inputs.VertexCount)
+            return MeshSurfaceTopologyStatus::MissingVertexSource;
+
+        const std::size_t faceCount = inputs.FaceHalfedge->size();
+        std::optional<std::vector<bool>> deleted{};
+        if (const auto deletedProperty =
+                view.FaceSource->Properties.Get<bool>("f:deleted");
+            deletedProperty)
+        {
+            deleted = deletedProperty.Vector();
+        }
+
+        outCenters.assign(faceCount, glm::vec3{0.0f});
+        outLiveFaces.reserve(faceCount);
+        std::vector<std::uint32_t> ring;
+        ring.reserve(8u);
+        for (std::size_t faceIndex = 0u; faceIndex < faceCount; ++faceIndex)
+        {
+            if (deleted.has_value() && faceIndex < deleted->size() && (*deleted)[faceIndex])
+                continue;
+            const FaceRingOutcome outcome = ProduceFaceRing(
+                *inputs.FaceHalfedge,
+                *inputs.HalfedgeFace,
+                *inputs.NextHalfedge,
+                *inputs.ToVertex,
+                static_cast<std::uint32_t>(faceCount),
+                inputs.VertexCount,
+                faceIndex,
+                ring);
+            if (outcome == FaceRingOutcome::Invalid)
+            {
+                outCenters.clear();
+                outLiveFaces.clear();
+                return MeshSurfaceTopologyStatus::InvalidTopology;
+            }
+            if (outcome == FaceRingOutcome::Skip)
+                continue;
+
+            glm::dvec3 sum{0.0};
+            bool finite = true;
+            for (const std::uint32_t vertex : ring)
+            {
+                const glm::vec3 position = vertexPositions[vertex];
+                finite = finite && IsFinite(position);
+                sum += glm::dvec3{position};
+            }
+            if (!finite)
+                continue;
+            outCenters[faceIndex] =
+                glm::vec3{sum / static_cast<double>(ring.size())};
+            outLiveFaces.push_back(static_cast<std::uint32_t>(faceIndex));
+        }
+        return MeshSurfaceTopologyStatus::Success;
     }
 
     bool BuildMeshCornerTexcoordSplit(

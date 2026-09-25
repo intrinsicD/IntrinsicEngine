@@ -772,6 +772,114 @@ TEST(RuntimeSceneSerialization,
     EXPECT_TRUE(state->Slots.empty());
 }
 
+TEST(RuntimeSceneSerialization, VectorFieldLayersRoundTripAcrossDomains)
+{
+    ECS::Scene::Registry source;
+    const ECS::EntityHandle sourceEntity = AddGeometryPresentationEntity(source);
+    auto& recipe = source.Raw().get<Runtime::GeometryPresentationRecipe>(sourceEntity);
+    recipe.VectorFields = {
+        Runtime::GeometryVectorFieldLayerRecipe{
+            .Vector = {.Domain = Runtime::GeometryElementDomain::MeshVertex,
+                       .Name = "v:normal",
+                       .ValueKind = Geometry::PropertyValueKind::Vec3},
+            .LengthMode = Runtime::GeometryVectorFieldLengthMode::Normalized,
+            .Length = 0.125f,
+            .LineWidthPx = 3.5f,
+            .Color = {0.25f, 0.5f, 0.75f, 0.5f},
+            .DepthTested = false,
+            .Stride = 4u,
+            .MaxGlyphs = 1000u,
+            .Enabled = false,
+        },
+        Runtime::GeometryVectorFieldLayerRecipe{
+            .Vector = {.Domain = Runtime::GeometryElementDomain::MeshFace,
+                       .Name = "f:flow",
+                       .ValueKind = Geometry::PropertyValueKind::Vec3},
+            .LengthMode = Runtime::GeometryVectorFieldLengthMode::Raw,
+            .Length = 2.0f,
+        },
+        Runtime::GeometryVectorFieldLayerRecipe{
+            .Vector = {.Domain = Runtime::GeometryElementDomain::MeshEdge,
+                       .Name = "e:tangent",
+                       .ValueKind = Geometry::PropertyValueKind::Vec3},
+        },
+    };
+    const std::vector<Runtime::GeometryVectorFieldLayerRecipe> expected = recipe.VectorFields;
+
+    MemoryIOBackend backend;
+    ASSERT_TRUE(Runtime::SaveSceneDocument(source, "vectors.json", backend).has_value());
+    ECS::Scene::Registry loaded;
+    const auto result = Runtime::LoadSceneDocument(loaded, "vectors.json", backend);
+    ASSERT_TRUE(result.has_value()) << static_cast<int>(result.error());
+
+    const ECS::EntityHandle entity = FindEntityByName(loaded, "Mesh Entity");
+    ASSERT_NE(entity, ECS::InvalidEntityHandle);
+    const auto* restored = loaded.Raw().try_get<Runtime::GeometryPresentationRecipe>(entity);
+    ASSERT_NE(restored, nullptr);
+    ASSERT_EQ(restored->VectorFields.size(), expected.size());
+    for (std::size_t i = 0u; i < expected.size(); ++i)
+    {
+        const auto& a = expected[i];
+        const auto& b = restored->VectorFields[i];
+        EXPECT_EQ(b.Vector, a.Vector) << i;
+        EXPECT_EQ(b.LengthMode, a.LengthMode) << i;
+        EXPECT_FLOAT_EQ(b.Length, a.Length) << i;
+        EXPECT_FLOAT_EQ(b.LineWidthPx, a.LineWidthPx) << i;
+        EXPECT_EQ(b.Color, a.Color) << i;
+        EXPECT_EQ(b.DepthTested, a.DepthTested) << i;
+        EXPECT_EQ(b.Stride, a.Stride) << i;
+        EXPECT_EQ(b.MaxGlyphs, a.MaxGlyphs) << i;
+        EXPECT_EQ(b.Enabled, a.Enabled) << i;
+    }
+    // Lane bindings are untouched by the added array.
+    EXPECT_EQ(restored->Presentations.size(), 1u);
+}
+
+TEST(RuntimeSceneSerialization, InvalidVectorFieldLayerRejectsDocument)
+{
+    ECS::Scene::Registry source;
+    const ECS::EntityHandle sourceEntity = AddGeometryPresentationEntity(source);
+    source.Raw().get<Runtime::GeometryPresentationRecipe>(sourceEntity).VectorFields = {
+        Runtime::GeometryVectorFieldLayerRecipe{
+            .Vector = {.Domain = Runtime::GeometryElementDomain::MeshVertex,
+                       .Name = "v:normal",
+                       .ValueKind = Geometry::PropertyValueKind::Vec3},
+        },
+    };
+    MemoryIOBackend backend;
+    ASSERT_TRUE(Runtime::SaveSceneDocument(source, "vectors.json", backend).has_value());
+    const std::string document = backend.Text("vectors.json");
+
+    // Out-of-range width, an unknown mode, a zero stride and a non-vec3
+    // property are all validation failures, not silently defaulted.
+    const nlohmann::json parsed = nlohmann::json::parse(document);
+    {
+        ECS::Scene::Registry loaded;
+        ASSERT_TRUE(Runtime::DeserializeSceneDocument(loaded, parsed.dump()).has_value());
+    }
+    const auto mutate = [&](const auto& edit) {
+        nlohmann::json copy = parsed;
+        bool edited = false;
+        for (auto& entityJson : copy["entities"])
+        {
+            if (entityJson.contains("geometryPresentation"))
+            {
+                edit(entityJson["geometryPresentation"]["vectorFields"][0]);
+                edited = true;
+            }
+        }
+        ASSERT_TRUE(edited);
+        ECS::Scene::Registry loaded;
+        EXPECT_FALSE(Runtime::DeserializeSceneDocument(loaded, copy.dump()).has_value());
+    };
+    mutate([](nlohmann::json& layer) { layer["lineWidthPx"] = 64.0; });
+    mutate([](nlohmann::json& layer) { layer["lengthMode"] = "Sideways"; });
+    mutate([](nlohmann::json& layer) { layer["stride"] = 0; });
+    mutate([](nlohmann::json& layer) { layer["length"] = -1.0; });
+    mutate([](nlohmann::json& layer) { layer.erase("depthTested"); });
+    mutate([](nlohmann::json& layer) { layer["property"]["valueKind"] = "ScalarFloat"; });
+}
+
 TEST(RuntimeSceneSerialization, ReaderStaysPinnedToLegacyValueKindWireStrings)
 {
     // Round-tripping alone would still pass if someone "modernized" BOTH the

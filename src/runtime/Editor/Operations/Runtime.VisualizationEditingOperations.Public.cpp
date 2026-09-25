@@ -144,6 +144,13 @@ EditorCommandStatus ApplyEditorGeometryPresentationSlotPropertyCommand(
       ContextOrEmpty(commands), command);
 }
 
+EditorCommandStatus ApplyEditorGeometryVectorFieldCommand(
+    const EditorVisualizationEditingCommands &commands,
+    const EditorGeometryVectorFieldCommand &command) {
+  return ApplyEditorGeometryVectorFieldCommand(ContextOrEmpty(commands),
+                                               command);
+}
+
 EditorTextureBakeCommandResult ApplyEditorTextureBakeCommand(
     const EditorVisualizationEditingCommands &commands,
     const EditorTextureBakeCommand &command) {

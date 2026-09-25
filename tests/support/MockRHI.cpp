@@ -151,6 +151,7 @@ namespace Extrinsic::Tests
             .FirstVertex = firstVertex,
             .FirstInstance = firstInstance,
         };
+        DrawRecords.push_back(LastDraw);
         Events.push_back(EventKind::Draw);
     }
 

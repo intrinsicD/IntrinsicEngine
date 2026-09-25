@@ -2087,6 +2087,7 @@ intrinsic_test_object_lib(GraphicsContractCpuTestObjs
 
 set(_runtime_graphics_cpu_test_files
     Test.RuntimeRenderExtraction.cpp
+    Test.RuntimeVectorFieldExtraction.cpp
     Test.RuntimeDeviceSelection.cpp
     Test.RuntimeFrameLoopContract.cpp
     Test.RenderWorldPoolPipelined.cpp

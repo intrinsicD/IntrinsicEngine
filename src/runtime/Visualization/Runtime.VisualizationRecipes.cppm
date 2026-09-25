@@ -61,6 +61,8 @@ export namespace Extrinsic::Runtime
         std::uint32_t FlatAutoRangeExpandedCount{0u};
         std::uint32_t RobustAutoRangeClampedCount{0u};
         std::uint64_t ScalarValueScanCount{0u};
+        // Live-row indices bounds-checked by `AppendVectorFieldPacket`.
+        std::uint64_t VectorRowIndexCheckCount{0u};
     };
 
     // RUNTIME-198 Slice A — closed authored data. Each alternative names only
@@ -101,6 +103,9 @@ export namespace Extrinsic::Runtime
         std::uint64_t DirtyStamp{0u};
     };
 
+    // Explicit vector-field recipe with an authored anchor property on the
+    // vector's domain. Persistent Appearance vector fields are
+    // `GeometryVectorFieldLayerRecipe`s with derived anchors instead.
     struct VectorFieldVisualizationRecipe
     {
         GeometryPropertyRef Source{};
@@ -231,6 +236,63 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] VisualizationEncodingResult EncodeVisualizationRecipe(
         const GeometryEntityAvailability& availability,
         const VisualizationRecipe& recipe);
+
+    // Inputs for one vector-field overlay packet. Anchor and vector spans hold
+    // one object-space vec3 per source element; `Rows` optionally lists live
+    // element indices (empty = every element is live). A nonzero BDA replaces
+    // the corresponding span with an externally resident buffer.
+    //
+    // With `CopyPayloads == false` the batch descriptors borrow the spans, so
+    // they must stay valid and unmodified until the batch has been submitted;
+    // borrowed payloads must already be finite. Copied payloads are sanitized:
+    // a row whose anchor or vector is not finite gets a zero vector, which the
+    // renderer draws as nothing. Descriptors whose key is already in the batch
+    // are shared rather than appended again.
+    struct VectorFieldPacketInputs
+    {
+        std::string Name{};
+        Graphics::VisualizationAttributeDomain Domain{
+            Graphics::VisualizationAttributeDomain::Vertex};
+        std::uint32_t ElementCount{0u};
+        std::string AnchorKey{};
+        std::span<const glm::vec3> Anchors{};
+        std::uint64_t AnchorBDA{0u};
+        std::uint64_t AnchorStamp{0u};
+        std::string VectorKey{};
+        std::span<const glm::vec3> Vectors{};
+        std::uint64_t VectorBDA{0u};
+        std::uint64_t VectorStamp{0u};
+        std::string RowKey{};
+        std::span<const std::uint32_t> Rows{};
+        std::uint64_t RowStamp{0u};
+        // The producer guarantees every row is < ElementCount (for example a
+        // cache that built the rows from the element range). The append then
+        // skips its O(rows) bounds check; unverified rows are always checked.
+        bool RowsPrevalidated{false};
+        std::uint32_t Stride{1u};
+        std::uint32_t MaxGlyphs{0u};
+        glm::mat4 ObjectToWorld{1.0f};
+        float Scale{1.0f};
+        bool NormalizeLength{true};
+        float LineWidthPx{2.0f};
+        glm::vec4 Color{1.0f};
+        bool DepthTested{true};
+        bool CopyPayloads{true};
+    };
+
+    // Smallest stride >= `stride` that draws at most `maxGlyphs` of
+    // `rowCount` rows (`maxGlyphs == 0` keeps `stride`).
+    [[nodiscard]] std::uint32_t ResolveVectorFieldRowStride(
+        std::uint32_t rowCount,
+        std::uint32_t stride,
+        std::uint32_t maxGlyphs) noexcept;
+
+    // Appends the packet and its buffer descriptors; on failure the batch is
+    // unchanged and the status names the first violated input.
+    [[nodiscard]] VisualizationRecipeStatus AppendVectorFieldPacket(
+        VisualizationEncodingBatch& batch,
+        const VectorFieldPacketInputs& inputs,
+        VisualizationEncodingDiagnostics* diagnostics = nullptr);
 
     struct VisualizationHtexRecreateRequest
     {
