@@ -97,25 +97,43 @@ export namespace Extrinsic::Graphics
         std::uint64_t ColorBufferBDA{0u};
     };
 
+    // One instanced arrow per sampled live source row. Anchor and vector
+    // buffers hold one object-space vec3 per source element; the optional row
+    // buffer lists live element indices (empty key = every element is live).
+    // Instance `i` draws live row `i * RowStride`. The glyph tip is
+    // `anchor + Scale * (NormalizeLength ? normalize(v) : v)` in object space,
+    // then both endpoints are transformed by `ObjectToWorld`.
     struct VectorFieldOverlayPacket
     {
         std::string Name{};
         std::string PositionBufferSourceKey{};
         std::string VectorBufferSourceKey{};
+        std::string RowBufferSourceKey{};
         VisualizationAttributeDomain Domain{VisualizationAttributeDomain::Vertex};
         std::uint32_t ElementCount{0u};
+        std::uint32_t RowCount{0u};
+        std::uint32_t RowStride{1u};
         std::uint64_t PositionBufferBDA{0u};
         std::uint64_t VectorBufferBDA{0u};
+        std::uint64_t RowBufferBDA{0u};
+        glm::mat4 ObjectToWorld{1.f};
         float Scale{1.f};
+        bool NormalizeLength{true};
+        float LineWidthPx{2.f};
         glm::vec4 Color{1.f};
-        // GRAPHICS-078 Slice B — depth-tested vs always-on-top variant per packet,
-        // resolved by the `VisualizationOverlayPass` to the matching pipeline
-        // lease at record time. Mirrors the `DepthTested` field on
-        // `DebugLinePacket`/`DebugPointPacket`/`DebugTrianglePacket`
-        // (GRAPHICS-010Q two-variant policy). Default true preserves the
-        // existing scene-depth-respecting glyph behavior.
+        // Selects the depth-tested or always-on-top pipeline variant.
         bool DepthTested{true};
     };
+
+    inline constexpr float kVectorFieldMinLineWidthPx = 0.5f;
+    inline constexpr float kVectorFieldMaxLineWidthPx = 32.f;
+
+    // Instances drawn for a packet: ceil(RowCount / RowStride), 0 if invalid.
+    [[nodiscard]] std::uint32_t VectorFieldGlyphCount(
+        const VectorFieldOverlayPacket& packet) noexcept;
+    // True when every buffer address is resolved and the style is in range.
+    [[nodiscard]] bool IsRenderableVectorFieldPacket(
+        const VectorFieldOverlayPacket& packet) noexcept;
 
     struct IsolineOverlayPacket
     {
@@ -212,6 +230,11 @@ export namespace Extrinsic::Graphics
         std::uint32_t StaleDirtyStampCount{0u};
         std::uint32_t UploadDeferralCount{0u};
         std::uint32_t InvalidResourceCount{0u};
+        // Content changes upload into a fresh buffer; the superseded lease
+        // retires through the device's deferred destruction.
+        std::uint32_t ReplacedBufferCount{0u};
+        // Resident keys absent from this submission are released.
+        std::uint32_t EvictedBufferCount{0u};
         bool HasErrors{false};
     };
 
@@ -267,6 +290,17 @@ export namespace Extrinsic::Graphics
     };
 
     [[nodiscard]] std::uint32_t ExpectedVisualizationValueStride(VisualizationValueType type) noexcept;
+    // Counts one input and checks key, type, stride, count and byte size
+    // without reading payload values. Residency uses it to reuse an unchanged
+    // buffer in O(1); the payload scan below runs only before an upload.
+    [[nodiscard]] bool ValidateVisualizationPropertyBufferShape(
+        const VisualizationPropertyBufferUploadDescriptor& descriptor,
+        VisualizationPropertyBufferDiagnostics& diagnostics) noexcept;
+    // Scans a shape-valid payload and counts it accepted or non-finite.
+    [[nodiscard]] bool ValidateVisualizationPropertyBufferPayload(
+        const VisualizationPropertyBufferUploadDescriptor& descriptor,
+        VisualizationPropertyBufferDiagnostics& diagnostics) noexcept;
+    // Shape plus payload validation.
     [[nodiscard]] bool ValidateVisualizationPropertyBufferUploadDescriptor(
         const VisualizationPropertyBufferUploadDescriptor& descriptor,
         VisualizationPropertyBufferDiagnostics& diagnostics) noexcept;

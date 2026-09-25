@@ -550,15 +550,12 @@ minimum quality, and the finite principal range; empty/no-face tensor requests
 return `nullopt`. Storage is `O(V + E + F)` and work is linear on
 bounded-valence meshes.
 
-The reusable `Geometry::Smoothing::CotanSmoothVertexProperty` operation
-remains available for callers that stabilize published fields. It supports
-vertex-domain `float`, `double`, and canonical `glm::vec2/vec3/vec4`
-properties, uses simultaneous Jacobi buffers, offers explicit iteration,
-damping, boundary-pin, and optional active-vertex-mask parameters. An inactive
-vertex keeps its value and contributes to no active neighbour row. The operator
-fails before mutation on invalid parameters, property/mask count mismatches, or
-non-finite live input. It changes neither mesh positions nor topology and leaves
-unrelated properties untouched.
+`Geometry::Smoothing::FilterProperty` stabilizes scalar and vector fields on
+arbitrary weighted domains. Averaging, spectral heat, Taubin, bilateral and
+implicit backward Euler share compact signal buffers, fixed-row constraints,
+and fail-before-publication validation. Mesh positions use the same property
+path. See [property smoothing](../methods/property-smoothing.md) for the
+nonnegative cotangent, lumped-area and boundary-pinning contracts.
 
 ### Scalar-field extrema
 

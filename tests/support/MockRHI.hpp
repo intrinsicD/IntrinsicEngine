@@ -297,6 +297,7 @@ namespace Extrinsic::Tests
         IndirectCountRecord LastDrawIndexedIndirectCount{};
         IndirectCountRecord LastDrawIndirectCount{};
         DrawRecord LastDraw{};
+        std::vector<DrawRecord> DrawRecords{};
         DrawIndexedRecord LastDrawIndexed{};
         ScissorRecord LastScissor{};
         std::uint32_t LastPushConstantSize = 0;

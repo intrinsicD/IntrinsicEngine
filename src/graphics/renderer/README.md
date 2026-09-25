@@ -1416,12 +1416,25 @@ Concretely:
   missing, increments `VectorFieldRecordsSubmitted/Recorded`
   deterministically per packet, and flips the pass status to
   `Recorded` when at least one packet's draw lands.
-  CPU/null contract note: the helper does not have CPU access to
-  `PositionBufferBDA` / `VectorBufferBDA` (those are GPU pointers),
-  so the helper writes deterministic placeholder glyph segments and
-  the packet color into each packed vertex. GRAPHICS-078E validates
-  those placeholders with opt-in Vulkan pixel-readback; actual
-  source-BDA endpoint expansion remains future work.
+  UI-050 replaced this placeholder lane (see the current contract
+  below).
+- Current vector-field contract (UI-050): the helper uploads one 128-byte
+  `VisualizationVectorFieldDrawRecord` per renderable packet (object-to-world
+  matrix, anchor/vector/live-row buffer addresses, row count and stride,
+  packed RGBA, scale, width, normalize flag) into its per-frame-slot record
+  buffer; nothing is expanded on the CPU. `ExecuteVectorFields` pushes
+  `{SceneTableBDA, RecordBufferBDA, RecordIndex}` (24 bytes) and records
+  `Draw(9, ceil(RowCount / RowStride), 0, 0)`: one instanced arrow (six-vertex
+  shaft quad plus three-vertex head) per sampled live row.
+  `visualization_vector_field.vert` reads camera and viewport from the
+  GpuScene table, normalizes by the largest component (so huge and tiny finite
+  vectors keep their direction), drops only exactly-zero or non-finite
+  vectors and endpoints, clips segments against the near plane (clip z >= 0)
+  in homogeneous space, draws a width-sized cap for view-aligned or
+  sub-width arrows, and applies a distance-relative view-space depth bias; the pipelines are
+  `TriangleList`, alpha-blended, `LessEqual`, depth-write off. Packets whose
+  source buffers did not resolve are skipped and counted in
+  `VectorFieldPacketsSkipped`; `VectorFieldGlyphsRecorded` counts instances.
 - GRAPHICS-078 Slice C promotes the isoline lane from
   `SkippedUnavailable` to `Recorded` on the CPU/null path.
   `IsolineOverlayPacket` grows a `bool DepthTested{true}` field
@@ -1476,8 +1489,9 @@ Concretely:
   acceptance test, the per-lane partial-skip independence pin, and
   fail-closed readback coverage). The opt-in Vulkan parity pin is
   `VisualizationOverlaySurfaceGpuSmoke.MixedLanesReadBackExpectedSampleColors`,
-  which samples deterministic vector-field red, isoline green, and
-  clear pixels.
+  which samples a vector-field arrow drawn from resident source buffers under
+  an identity camera (plus its clear mirror), fixture isoline green, and clear
+  pixels.
 - GRAPHICS-085 retires the legacy overlay-packet backend proof at
   `CPUContracted` by composing the already-promoted lanes rather than adding a
   new overlay API. The contract pin
@@ -1710,15 +1724,21 @@ Concretely:
   `GRAPHICS-084` adds the selected property-buffer residency seam for current
   visualization recipes: `VisualizationPropertyBufferUploadDescriptor`
   carries source key, domain, value type, element count, stride, dirty stamp,
-  source-layout stamp, and copied bytes;
+  source-layout stamp, and payload bytes. The bytes are borrowed only for
+  the `SubmitRuntimeSnapshots` call; the renderer keeps metadata and
+  addresses, not payload copies.
   `VisualizationPropertyBufferResidency` validates those
   descriptors, rejects unsupported/zero/non-finite/stale inputs, uploads or
   reuses renderer-owned `RHI::BufferManager` storage buffers, and publishes
   BDAs into scalar/color/vector/isoline packets before
   `ValidateVisualizationPackets(...)` runs. A dirty stamp of zero means the
   producer has no stable stamp and the buffer is uploaded every submission;
-  positive stamps can reuse equal metadata/stamp buffers and reject older
-  submissions. A changed source-layout stamp forces a fresh upload without
+  positive stamps reuse equal metadata/stamp buffers from metadata alone
+  (the payload scan runs only before an upload) and reject older
+  submissions. Changed contents are written to a new buffer and the previous
+  lease is released into the device's per-frame deferred destruction, so a
+  frame still in flight never observes a partial overwrite; keys absent from
+  a submission are evicted. A changed source-layout stamp forces a fresh upload without
   changing the property key; runtime uses it when canonical mesh-vertex
   properties are duplicated through a corner-split GPU surface stream.
   Runtime extraction scopes descriptor source keys with the

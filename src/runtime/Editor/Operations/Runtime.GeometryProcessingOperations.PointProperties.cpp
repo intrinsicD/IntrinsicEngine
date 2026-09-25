@@ -467,7 +467,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             return false;
         if (requireTriangles && capture.HasNonTriangleFaces)
         {
-            diagnostic = "UV atlas generation requires triangular source faces; triangulate the mesh before generating an atlas.";
+            diagnostic = "This operation requires triangular source faces; triangulate the mesh first.";
             return false;
         }
         return true;

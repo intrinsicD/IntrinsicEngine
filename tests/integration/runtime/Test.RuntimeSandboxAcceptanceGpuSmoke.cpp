@@ -102,6 +102,7 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Geometry.Graph;
+import Geometry.PointCloud;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.MeshSurfaceTopology;
@@ -8156,4 +8157,548 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
   EXPECT_NEAR(pixels[6].G, pixels[7].G, 3);
   EXPECT_NEAR(pixels[6].B, pixels[7].B, 3);
   engine.Shutdown();
+}
+
+// --- Appearance vector fields: source-sensitive arrow readback --------------
+//
+// Vector fields are authored through the same validated editor command the
+// Appearance panel uses, then drawn by the instanced overlay shader from the
+// resident anchor/vector buffers and the entity transform. Each scenario edits
+// one input mid-run (vector values, anchor positions, transform, removal) and
+// asserts that the arrow pixels follow that input: the previous arrow location
+// loses the arrow color and the new location gains it.
+namespace
+{
+enum class VectorFieldSmokeEdit : std::uint8_t
+{
+    None,
+    FlipVectors,
+    MoveAnchors,
+    MoveEntity,
+    RemoveField,
+    HideSurface,
+};
+
+constexpr std::uint32_t kVectorFieldEditFrame = 3u;
+constexpr std::uint32_t kVectorFieldTotalFrames = 10u;
+constexpr glm::vec3 kVectorFieldEntityShift{0.4f, 0.3f, 0.0f};
+constexpr glm::vec3 kVectorFieldAnchorShift{0.0f, 0.35f, 0.0f};
+constexpr float kVectorFieldLength = 0.3f;
+// Reference triangle (-0.5,-0.5), (0.5,-0.5), (0,0.5): its face center.
+constexpr glm::vec3 kVectorFieldFaceCenter{0.0f, -1.0f / 6.0f, 0.0f};
+
+[[nodiscard]] RT::EditorCommandStatus ApplyVectorFieldCommandTo(
+    Engine& engine,
+    const EntityHandle entity,
+    const RT::EditorVectorFieldOperation operation,
+    const RT::GeometryVectorFieldLayerRecipe& layer)
+{
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const Intrinsic::Tests::EditorFeatureTestContext context{
+        .Scene = &scene,
+        .Selection = &Selection(engine),
+        .CommandHistory = engine.Services().Find<RT::EditorCommandHistory>(),
+    };
+    return RT::ApplyEditorGeometryVectorFieldCommand(
+        context,
+        RT::EditorGeometryVectorFieldCommand{
+            .StableEntityId = RT::SelectionController::ToStableEntityId(entity),
+            .Operation = operation,
+            .Layer = layer,
+            .UseLayerStyle = true,
+        });
+}
+
+[[nodiscard]] RT::EditorCommandStatus ApplyVectorFieldCommand(
+    Engine& engine,
+    const RT::EditorVectorFieldOperation operation,
+    const RT::GeometryVectorFieldLayerRecipe& layer)
+{
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const auto triangle = FindEntityByName(scene, "ReferenceTriangle");
+    const Intrinsic::Tests::EditorFeatureTestContext context{
+        .Scene = &scene,
+        .Selection = &Selection(engine),
+        .CommandHistory = engine.Services().Find<RT::EditorCommandHistory>(),
+    };
+    return RT::ApplyEditorGeometryVectorFieldCommand(
+        context,
+        RT::EditorGeometryVectorFieldCommand{
+            .StableEntityId = RT::SelectionController::ToStableEntityId(triangle),
+            .Operation = operation,
+            .Layer = layer,
+            .UseLayerStyle = true,
+        });
+}
+
+[[nodiscard]] RT::GeometryVectorFieldLayerRecipe VectorFieldSmokeLayer(
+    const RT::GeometryElementDomain domain,
+    std::string name,
+    const glm::vec4 color,
+    const bool depthTested)
+{
+    return RT::GeometryVectorFieldLayerRecipe{
+        .Vector = {.Domain = domain,
+                   .Name = std::move(name),
+                   .ValueKind = Geometry::PropertyValueKind::Vec3},
+        .LengthMode = RT::GeometryVectorFieldLengthMode::Normalized,
+        .Length = kVectorFieldLength,
+        .LineWidthPx = 8.0f,
+        .Color = color,
+        .DepthTested = depthTested,
+    };
+}
+
+class VectorFieldEditApp final : public Intrinsic::Tests::RuntimeTestModule
+{
+public:
+    explicit VectorFieldEditApp(const VectorFieldSmokeEdit edit) noexcept : m_Edit(edit) {}
+
+    void Resolve() override {}
+
+    void Frame(double, double) override
+    {
+        auto& engine = Kernel();
+        ++m_Frames;
+        if (m_Frames == kVectorFieldEditFrame && m_Edit != VectorFieldSmokeEdit::None)
+            EditStatus = ApplyEdit(engine);
+        if (m_Frames >= kVectorFieldTotalFrames)
+            engine.RequestExit();
+    }
+
+    void Shutdown() override {}
+
+    RT::EditorCommandStatus EditStatus{RT::EditorCommandStatus::NoChange};
+
+private:
+    [[nodiscard]] RT::EditorCommandStatus ApplyEdit(Engine& engine)
+    {
+        auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+        const auto triangle = FindEntityByName(scene, "ReferenceTriangle");
+        auto& raw = scene.Raw();
+        switch (m_Edit)
+        {
+        case VectorFieldSmokeEdit::FlipVectors:
+            // A method publishing new vectors changes only the property.
+            for (glm::vec3& value : raw.get<gs::Faces>(triangle).Properties
+                                        .Get<glm::vec3>("f:flow").Vector())
+                value = -value;
+            return RT::EditorCommandStatus::Applied;
+        case VectorFieldSmokeEdit::MoveAnchors:
+            for (glm::vec3& position : raw.get<gs::Vertices>(triangle).Properties
+                                           .Get<glm::vec3>(gs::PropertyNames::kPosition).Vector())
+                position += kVectorFieldAnchorShift;
+            return RT::EditorCommandStatus::Applied;
+        case VectorFieldSmokeEdit::MoveEntity:
+        {
+            const Intrinsic::Tests::EditorFeatureTestContext context{
+                .Scene = &scene,
+                .Selection = &Selection(engine),
+                .CommandHistory = engine.Services().Find<RT::EditorCommandHistory>(),
+            };
+            return RT::ApplyEditorTransformEdit(
+                context,
+                RT::EditorTransformEditCommand{
+                    .StableEntityId = RT::SelectionController::ToStableEntityId(triangle),
+                    .SetPosition = true,
+                    .Position = kVectorFieldEntityShift,
+                });
+        }
+        case VectorFieldSmokeEdit::RemoveField:
+            return ApplyVectorFieldCommand(
+                engine, RT::EditorVectorFieldOperation::Remove,
+                VectorFieldSmokeLayer(RT::GeometryElementDomain::MeshFace, "f:flow", {}, false));
+        case VectorFieldSmokeEdit::HideSurface:
+            return RT::ApplyEditorRenderHintCommand(
+                Intrinsic::Tests::EditorFeatureTestContext{
+                    .Scene = &scene,
+                    .Selection = &Selection(engine),
+                    .CommandHistory = engine.Services().Find<RT::EditorCommandHistory>(),
+                },
+                RT::EditorRenderHintCommand{
+                    .StableEntityId = RT::SelectionController::ToStableEntityId(triangle),
+                    .SetSurface = true,
+                    .EnableSurface = false,
+                });
+        case VectorFieldSmokeEdit::None:
+            break;
+        }
+        return RT::EditorCommandStatus::NoChange;
+    }
+
+    VectorFieldSmokeEdit m_Edit{VectorFieldSmokeEdit::None};
+    std::uint32_t m_Frames{0u};
+};
+
+struct VectorFieldSmokeFrame
+{
+    std::vector<std::uint8_t> Bytes{};
+    Extrinsic::RHI::Format Format{};
+    std::uint32_t BytesPerPixel{0u};
+    Extrinsic::Core::Extent2D Extent{};
+    Extrinsic::Graphics::RenderGraphFrameStats Stats{};
+    RT::EditorCommandStatus EditStatus{RT::EditorCommandStatus::NoChange};
+    bool Skipped{false};
+    std::string SkipReason{};
+
+    // The presented readback is vertically mirrored relative to
+    // `ProjectReferenceCameraPixel` (the reference triangle's base appears in
+    // the upper half); the first vector-field smoke pins this with an explicit
+    // orientation probe so a convention change fails loudly instead of
+    // silently moving every sample.
+    [[nodiscard]] RgbaPixel At(const glm::vec3 world) const
+    {
+        const auto [x, y] = ProjectReferenceCameraPixel(world, Extent);
+        const auto height = static_cast<std::uint32_t>(Extent.Height);
+        return ReadPixel(Bytes, Format, BytesPerPixel, Extent, x, height - 1u - y);
+    }
+};
+
+// Runs the default sandbox with face (magenta, always on top), vertex
+// (yellow) and edge (red) fields on the reference triangle, applying `edit`
+// mid-run, and returns the final presented frame.
+using VectorFieldSmokeSetup = std::function<void(Engine&)>;
+
+// Default setup: face, vertex and edge fields on the reference triangle.
+void AddReferenceTriangleVectorFields(Engine& engine);
+
+[[nodiscard]] VectorFieldSmokeFrame RunVectorFieldSmoke(
+    const VectorFieldSmokeEdit edit,
+    const VectorFieldSmokeSetup& setup = AddReferenceTriangleVectorFields)
+{
+    VectorFieldSmokeFrame out{};
+    auto app = std::make_unique<VectorFieldEditApp>(edit);
+    auto* appPtr = app.get();
+    auto bootstrap = BootstrapDefaultSandboxAppEngineWithApp(std::move(app));
+    if (bootstrap.Skipped)
+    {
+        out.Skipped = true;
+        out.SkipReason = bootstrap.SkipReason;
+        return out;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+    setup(engine);
+
+    auto& renderer = engine.GetRenderer();
+    auto& device = engine.GetDevice();
+    out.Format = device.GetBackbufferFormat();
+    out.BytesPerPixel = Extrinsic::RHI::BytesPerBlock(out.Format);
+    out.Extent = device.GetBackbufferExtent();
+    if (out.BytesPerPixel < 4u || out.Extent.Width <= 0 || out.Extent.Height <= 0)
+    {
+        engine.Shutdown();
+        out.Skipped = true;
+        out.SkipReason = "Backbuffer format or extent cannot support rgba readback.";
+        return out;
+    }
+    const std::uint64_t size = static_cast<std::uint64_t>(out.BytesPerPixel) *
+                               static_cast<std::uint64_t>(out.Extent.Width) *
+                               static_cast<std::uint64_t>(out.Extent.Height);
+    const auto readback = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = size,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "VectorFieldSmoke.Readback",
+    });
+    if (!readback.IsValid())
+    {
+        engine.Shutdown();
+        out.Skipped = true;
+        out.SkipReason = "Readback buffer allocation failed; gpu;vulkan smoke is opt-in.";
+        return out;
+    }
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(readback);
+    const auto run = DriveAcceptanceAndCapture(engine);
+    EXPECT_TRUE(run.DeviceOperational) << ToString(run.Status.Code) << " " << ToString(run.Status.Reason);
+    EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u);
+    EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
+        << "fallback/validation counters moved during the vector-field run";
+    out.Stats = run.Stats;
+    out.EditStatus = appPtr->EditStatus;
+    out.Bytes.resize(static_cast<std::size_t>(size));
+    device.ReadBuffer(readback, out.Bytes.data(), size, 0u);
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+    device.DestroyBuffer(readback);
+    engine.Shutdown();
+    return out;
+}
+
+void AddReferenceTriangleVectorFields(Engine& engine)
+{
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const auto triangle = FindEntityByName(scene, "ReferenceTriangle");
+    EXPECT_TRUE(IsReferenceTriangleEntityValid(scene, triangle));
+    auto& raw = scene.Raw();
+    raw.get<gs::Faces>(triangle).Properties.GetOrAdd<glm::vec3>("f:flow", glm::vec3{1.0f, 0.0f, 0.0f});
+    raw.get<gs::Vertices>(triangle).Properties.GetOrAdd<glm::vec3>("v:up", glm::vec3{0.0f, 1.0f, 0.0f});
+    raw.get<gs::Edges>(triangle).Properties.GetOrAdd<glm::vec3>("e:down", glm::vec3{0.0f, -1.0f, 0.0f});
+    using D = RT::GeometryElementDomain;
+    EXPECT_EQ(ApplyVectorFieldCommand(engine, RT::EditorVectorFieldOperation::Add,
+                                      VectorFieldSmokeLayer(D::MeshFace, "f:flow", {1, 0, 1, 1}, false)),
+              RT::EditorCommandStatus::Applied);
+    EXPECT_EQ(ApplyVectorFieldCommand(engine, RT::EditorVectorFieldOperation::Add,
+                                      VectorFieldSmokeLayer(D::MeshVertex, "v:up", {1, 1, 0, 1}, true)),
+              RT::EditorCommandStatus::Applied);
+    EXPECT_EQ(ApplyVectorFieldCommand(engine, RT::EditorVectorFieldOperation::Add,
+                                      VectorFieldSmokeLayer(D::MeshEdge, "e:down", {1, 0, 0, 1}, true)),
+              RT::EditorCommandStatus::Applied);
+}
+
+[[nodiscard]] bool IsMagenta(const RgbaPixel p) noexcept
+{
+    return p.R > p.G + 80 && p.B > p.G + 80;
+}
+
+[[nodiscard]] bool IsYellow(const RgbaPixel p) noexcept
+{
+    return p.R > p.B + 80 && p.G > p.B + 80;
+}
+
+[[nodiscard]] bool IsRed(const RgbaPixel p) noexcept
+{
+    return p.R > p.G + 80 && p.R > p.B + 80;
+}
+
+[[nodiscard]] std::string VectorFieldPixelText(const RgbaPixel p)
+{
+    return "(" + std::to_string(p.R) + "," + std::to_string(p.G) + "," +
+           std::to_string(p.B) + ")";
+}
+
+// A third along each arrow lies on the shaft, before the head.
+[[nodiscard]] glm::vec3 ShaftSample(const glm::vec3 anchor, const glm::vec3 direction)
+{
+    return anchor + direction * (kVectorFieldLength / 3.0f);
+}
+} // namespace
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, VectorFieldsDrawArrowsForEveryDomainFromResidentSources)
+{
+    const auto frame = RunVectorFieldSmoke(VectorFieldSmokeEdit::None);
+    if (frame.Skipped)
+        GTEST_SKIP() << frame.SkipReason;
+    EXPECT_EQ(FindPassStatus(frame.Stats, "VisualizationOverlayPass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(frame.Stats);
+    EXPECT_EQ(frame.Stats.VisualizationOverlayUpload.VectorFieldRecordsRecorded, 3u);
+    // One face arrow, three vertex arrows and three edge arrows.
+    EXPECT_EQ(frame.Stats.VisualizationOverlayUpload.VectorFieldGlyphsRecorded, 7u);
+    EXPECT_EQ(frame.Stats.VisualizationOverlayUpload.VectorFieldPacketsSkipped, 0u);
+
+    // Orientation probe: inside the triangle near its base vs. the mirrored
+    // point beside its apex.
+    const auto nearBase = frame.At({0.4f, -0.4f, 0.0f});
+    const auto besideApex = frame.At({0.4f, 0.4f, 0.0f});
+    EXPECT_GT(RgbDistance(nearBase, besideApex), 48)
+        << "orientation probe " << VectorFieldPixelText(nearBase) << " / "
+        << VectorFieldPixelText(besideApex);
+    EXPECT_GT(nearBase.R, 200) << VectorFieldPixelText(nearBase);
+    EXPECT_GT(nearBase.G, 200) << VectorFieldPixelText(nearBase);
+
+    const auto face = frame.At(ShaftSample(kVectorFieldFaceCenter, {1, 0, 0}));
+    const auto faceMirror = frame.At(ShaftSample(kVectorFieldFaceCenter, {-1, 0, 0}));
+    EXPECT_TRUE(IsMagenta(face)) << VectorFieldPixelText(face);
+    EXPECT_FALSE(IsMagenta(faceMirror)) << VectorFieldPixelText(faceMirror);
+    // Vertex (0, 0.5) points up, out of the triangle.
+    const auto vertex = frame.At(ShaftSample({0.0f, 0.5f, 0.0f}, {0, 1, 0}));
+    EXPECT_TRUE(IsYellow(vertex)) << VectorFieldPixelText(vertex);
+    // The bottom edge's midpoint (0, -0.5) points down, out of the triangle.
+    const auto edge = frame.At(ShaftSample({0.0f, -0.5f, 0.0f}, {0, -1, 0}));
+    EXPECT_TRUE(IsRed(edge)) << VectorFieldPixelText(edge);
+    // The background beside the arrows is untouched.
+    const auto beside = frame.At({0.3f, -0.8f, 0.0f});
+    EXPECT_FALSE(IsRed(beside) || IsMagenta(beside) || IsYellow(beside)) << VectorFieldPixelText(beside);
+}
+
+namespace
+{
+// Each edit runs in its own engine so one run stays inside the per-test cap.
+void ExpectFaceArrowMoves(const VectorFieldSmokeEdit edit, const glm::vec3 expected)
+{
+    const glm::vec3 original = ShaftSample(kVectorFieldFaceCenter, {1, 0, 0});
+    const auto frame = RunVectorFieldSmoke(edit);
+    if (frame.Skipped)
+        GTEST_SKIP() << frame.SkipReason;
+    EXPECT_EQ(frame.EditStatus, RT::EditorCommandStatus::Applied);
+    const auto before = frame.At(original);
+    const auto after = frame.At(expected);
+    EXPECT_FALSE(IsMagenta(before)) << "arrow stayed at its old location "
+                                    << VectorFieldPixelText(before);
+    EXPECT_TRUE(IsMagenta(after)) << "arrow did not follow the edit "
+                                  << VectorFieldPixelText(after);
+}
+} // namespace
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, VectorFieldArrowFollowsVectorEdit)
+{
+    ExpectFaceArrowMoves(VectorFieldSmokeEdit::FlipVectors,
+                         ShaftSample(kVectorFieldFaceCenter, {-1, 0, 0}));
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, VectorFieldArrowFollowsAnchorEdit)
+{
+    ExpectFaceArrowMoves(VectorFieldSmokeEdit::MoveAnchors,
+                         ShaftSample(kVectorFieldFaceCenter, {1, 0, 0}) + kVectorFieldAnchorShift);
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, VectorFieldArrowFollowsTransformEdit)
+{
+    ExpectFaceArrowMoves(VectorFieldSmokeEdit::MoveEntity,
+                         ShaftSample(kVectorFieldFaceCenter, {1, 0, 0}) + kVectorFieldEntityShift);
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, VectorFieldsSurviveHiddenSurface)
+{
+    const auto frame = RunVectorFieldSmoke(VectorFieldSmokeEdit::HideSurface);
+    if (frame.Skipped)
+        GTEST_SKIP() << frame.SkipReason;
+    EXPECT_EQ(frame.EditStatus, RT::EditorCommandStatus::Applied);
+    const auto face = frame.At(ShaftSample(kVectorFieldFaceCenter, {1, 0, 0}));
+    EXPECT_TRUE(IsMagenta(face)) << VectorFieldPixelText(face);
+    EXPECT_EQ(frame.Stats.VisualizationOverlayUpload.VectorFieldRecordsRecorded, 3u);
+    // The hidden surface no longer covers its interior.
+    const auto interior = frame.At({-0.1f, -0.3f, 0.0f});
+    EXPECT_LT(RgbDistance(interior, RgbaPixel{170, 203, 231, 255}), 48) << VectorFieldPixelText(interior);
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, VectorFieldStopsDrawingAfterRemoval)
+{
+    const auto frame = RunVectorFieldSmoke(VectorFieldSmokeEdit::RemoveField);
+    if (frame.Skipped)
+        GTEST_SKIP() << frame.SkipReason;
+    EXPECT_EQ(frame.EditStatus, RT::EditorCommandStatus::Applied);
+    const auto face = frame.At(ShaftSample(kVectorFieldFaceCenter, {1, 0, 0}));
+    EXPECT_FALSE(IsMagenta(face)) << VectorFieldPixelText(face);
+    // The remaining fields keep drawing.
+    EXPECT_EQ(frame.Stats.VisualizationOverlayUpload.VectorFieldRecordsRecorded, 2u);
+    const auto vertex = frame.At(ShaftSample({0.0f, 0.5f, 0.0f}, {0, 1, 0}));
+    EXPECT_TRUE(IsYellow(vertex)) << VectorFieldPixelText(vertex);
+}
+
+// Real-GPU behavior of the glyph shader beyond placement: a depth-tested arrow
+// behind the reference triangle is occluded while an always-on-top arrow at
+// the same depth is not; raw vectors keep their relative lengths while
+// normalized ones share one length, including magnitudes whose length()
+// overflows or underflows in float; a view-aligned vector draws a cap; an
+// arrow crossing the camera's near plane is clipped, not dropped. Each field
+// is non-zero only at its own probe point; zero vectors draw nothing.
+namespace
+{
+struct VectorProbe
+{
+    glm::vec3 Anchor;
+    const char* Property;
+    glm::vec3 Vector;
+};
+
+// Anchors are world-space (identity transform). z = -0.5 lies behind the
+// reference triangle at z = 0.
+constexpr std::array<VectorProbe, 8> kVectorProbes{{
+    {{-0.3f, -0.25f, -0.5f}, "v:hidden", {1.0f, 0.0f, 0.0f}},
+    {{0.1f, -0.25f, -0.5f}, "v:front", {1.0f, 0.0f, 0.0f}},
+    {{-0.9f, 0.6f, -0.5f}, "v:raw", {0.4f, 0.0f, 0.0f}},
+    {{-0.9f, 0.35f, -0.5f}, "v:raw", {0.1f, 0.0f, 0.0f}},
+    {{0.4f, 0.6f, -0.5f}, "v:norm", {1.0e30f, 0.0f, 0.0f}},
+    {{0.4f, 0.35f, -0.5f}, "v:norm", {1.0e-30f, 0.0f, 0.0f}},
+    // Along the ray from the reference camera at (0, 0, 3) through the anchor.
+    {{-0.6f, -0.62f, -0.5f}, "v:axis", {-0.6f, -0.62f, -3.5f}},
+    {{0.2f, 0.2f, 2.0f}, "v:near", {0.0f, 0.0f, 1.0f}},
+}};
+
+void AddVectorProbeEntity(Engine& engine)
+{
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    auto& raw = scene.Raw();
+    const EntityHandle probe = scene.Create();
+    raw.emplace<ECSC::Transform::WorldMatrix>(probe).Matrix = glm::mat4{1.0f};
+    Geometry::PointCloud::Cloud cloud;
+    for (const VectorProbe& point : kVectorProbes)
+        (void)cloud.AddPoint(point.Anchor);
+    gs::PopulateFromCloud(raw, probe, cloud);
+    auto& vertices = raw.get<gs::Vertices>(probe).Properties;
+    for (const char* name : {"v:hidden", "v:front", "v:raw", "v:norm", "v:axis", "v:near"})
+    {
+        auto values = vertices.GetOrAdd<glm::vec3>(name, glm::vec3{0.0f});
+        for (std::size_t i = 0u; i < kVectorProbes.size(); ++i)
+        {
+            if (std::string_view{kVectorProbes[i].Property} == name)
+                values.Vector()[i] = kVectorProbes[i].Vector;
+        }
+    }
+
+    using D = RT::GeometryElementDomain;
+    const auto add = [&](const char* name, const glm::vec4 color, const bool depthTested,
+                         const RT::GeometryVectorFieldLengthMode mode, const float length) {
+        auto layer = VectorFieldSmokeLayer(D::PointCloudPoint, name, color, depthTested);
+        layer.LengthMode = mode;
+        layer.Length = length;
+        EXPECT_EQ(ApplyVectorFieldCommandTo(engine, probe, RT::EditorVectorFieldOperation::Add, layer),
+                  RT::EditorCommandStatus::Applied)
+            << name;
+    };
+    using Mode = RT::GeometryVectorFieldLengthMode;
+    add("v:hidden", {0, 1, 0, 1}, true, Mode::Normalized, 0.15f);
+    add("v:front", {0, 0, 1, 1}, false, Mode::Normalized, 0.15f);
+    add("v:raw", {1, 0, 0, 1}, true, Mode::Raw, 1.0f);
+    add("v:norm", {1, 0, 1, 1}, true, Mode::Normalized, 0.2f);
+    add("v:axis", {1, 1, 0, 1}, true, Mode::Normalized, 0.2f);
+    add("v:near", {0, 1, 1, 1}, false, Mode::Normalized, 5.0f);
+}
+
+[[nodiscard]] bool IsGreen(const RgbaPixel p) noexcept
+{
+    return p.G > p.R + 80 && p.G > p.B + 80;
+}
+
+[[nodiscard]] bool IsBlue(const RgbaPixel p) noexcept
+{
+    return p.B > p.R + 80 && p.B > p.G + 80;
+}
+
+[[nodiscard]] bool IsCyan(const RgbaPixel p) noexcept
+{
+    return p.G > p.R + 80 && p.B > p.R + 80;
+}
+} // namespace
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, VectorFieldShaderHandlesDepthLengthModesViewAxisAndNearPlane)
+{
+    const auto frame = RunVectorFieldSmoke(VectorFieldSmokeEdit::None, AddVectorProbeEntity);
+    if (frame.Skipped)
+        GTEST_SKIP() << frame.SkipReason;
+    EXPECT_EQ(frame.Stats.VisualizationOverlayUpload.VectorFieldRecordsRecorded, 6u);
+    const auto along = [](const std::size_t probe, const float distance) {
+        return kVectorProbes[probe].Anchor + glm::vec3{distance, 0.0f, 0.0f};
+    };
+    const auto text = [](const RgbaPixel p) { return VectorFieldPixelText(p); };
+
+    // Depth: the depth-tested arrow behind the triangle is hidden; the
+    // always-on-top arrow at the same depth is drawn.
+    const auto hidden = frame.At(along(0, 0.05f));
+    EXPECT_FALSE(IsGreen(hidden)) << "occluded arrow was drawn " << text(hidden);
+    EXPECT_GT(hidden.R, 200) << "the triangle should cover the hidden arrow " << text(hidden);
+    const auto front = frame.At(along(1, 0.05f));
+    EXPECT_TRUE(IsBlue(front)) << text(front);
+
+    // Raw vectors keep relative length (0.4 vs 0.1).
+    EXPECT_TRUE(IsRed(frame.At(along(2, 0.05f)))) << text(frame.At(along(2, 0.05f)));
+    EXPECT_TRUE(IsRed(frame.At(along(2, 0.3f)))) << text(frame.At(along(2, 0.3f)));
+    EXPECT_TRUE(IsRed(frame.At(along(3, 0.05f)))) << text(frame.At(along(3, 0.05f)));
+    EXPECT_FALSE(IsRed(frame.At(along(3, 0.3f)))) << text(frame.At(along(3, 0.3f)));
+
+    // Normalized: huge (length overflows) and tiny (length underflows)
+    // vectors both draw at the authored 0.2 length.
+    for (const std::size_t probe : {std::size_t{4}, std::size_t{5}})
+    {
+        EXPECT_TRUE(IsMagenta(frame.At(along(probe, 0.1f)))) << probe << " " << text(frame.At(along(probe, 0.1f)));
+        EXPECT_FALSE(IsMagenta(frame.At(along(probe, 0.3f)))) << probe << " " << text(frame.At(along(probe, 0.3f)));
+    }
+
+    // A view-aligned vector draws a width-sized cap at its anchor.
+    EXPECT_TRUE(IsYellow(frame.At(kVectorProbes[6].Anchor))) << text(frame.At(kVectorProbes[6].Anchor));
+
+    // The camera sits at z = 3: this arrow runs from z = 2 through the near
+    // plane to z = 7. Its visible part must still be drawn.
+    const glm::vec3 nearSample = kVectorProbes[7].Anchor + glm::vec3{0.0f, 0.0f, 0.3f};
+    EXPECT_TRUE(IsCyan(frame.At(nearSample))) << text(frame.At(nearSample));
 }

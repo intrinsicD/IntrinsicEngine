@@ -1,9 +1,11 @@
 module;
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -160,6 +162,17 @@ namespace Extrinsic::Runtime
                 {GeometryPresentationProvenance::PropertyBinding,
                  "PropertyBinding"},
             };
+
+        constexpr std::pair<GeometryVectorFieldLengthMode, std::string_view>
+            kVectorFieldLengthModes[]{
+                {GeometryVectorFieldLengthMode::Normalized, "Normalized"},
+                {GeometryVectorFieldLengthMode::Raw, "Raw"},
+            };
+
+        [[nodiscard]] bool UnitInterval(const float value) noexcept
+        {
+            return std::isfinite(value) && value >= 0.0f && value <= 1.0f;
+        }
 
         void AppendDiagnostic(
             GeometryPresentationSlotSnapshot& slot,
@@ -391,6 +404,145 @@ namespace Extrinsic::Runtime
         GeometryPresentationNormalSpace& out) noexcept
     {
         return TryEnumFromString(value, kNormalSpaces, out);
+    }
+
+    std::string_view ToString(
+        const GeometryVectorFieldLengthMode value) noexcept
+    {
+        return EnumToString(value, kVectorFieldLengthModes, "Normalized");
+    }
+
+    bool TryParseGeometryVectorFieldLengthMode(
+        const std::string_view value,
+        GeometryVectorFieldLengthMode& out) noexcept
+    {
+        return TryEnumFromString(value, kVectorFieldLengthModes, out);
+    }
+
+    bool SupportsGeometryVectorFieldDomain(
+        const GeometryElementDomain domain) noexcept
+    {
+        switch (domain)
+        {
+        case GeometryElementDomain::MeshVertex:
+        case GeometryElementDomain::MeshEdge:
+        case GeometryElementDomain::MeshFace:
+        case GeometryElementDomain::GraphNode:
+        case GeometryElementDomain::GraphEdge:
+        case GeometryElementDomain::PointCloudPoint:
+            return true;
+        case GeometryElementDomain::MeshHalfedge:
+        case GeometryElementDomain::GraphHalfedge:
+        case GeometryElementDomain::Unknown:
+            return false;
+        }
+        return false;
+    }
+
+    bool ValidateGeometryVectorFieldLayer(
+        const GeometryVectorFieldLayerRecipe& layer,
+        std::string& reason)
+    {
+        if (!SupportsGeometryVectorFieldDomain(layer.Vector.Domain))
+        {
+            reason = "vector fields need vertex, edge, face, node or point elements";
+            return false;
+        }
+        if (layer.Vector.Name.empty())
+        {
+            reason = "vector field has no property";
+            return false;
+        }
+        if (layer.Vector.ValueKind != Geometry::PropertyValueKind::Vec3)
+        {
+            reason = "vector field property must be a vec3";
+            return false;
+        }
+        if (!std::isfinite(layer.Length) || layer.Length <= 0.0f)
+        {
+            reason = "vector length must be positive and finite";
+            return false;
+        }
+        if (!std::isfinite(layer.LineWidthPx) ||
+            layer.LineWidthPx < kMinGeometryVectorFieldLineWidthPx ||
+            layer.LineWidthPx > kMaxGeometryVectorFieldLineWidthPx)
+        {
+            reason = "vector line width must be between 0.5 and 32 pixels";
+            return false;
+        }
+        if (!UnitInterval(layer.Color.x) || !UnitInterval(layer.Color.y) ||
+            !UnitInterval(layer.Color.z) || !UnitInterval(layer.Color.w))
+        {
+            reason = "vector color components must be within [0, 1]";
+            return false;
+        }
+        if (layer.Stride == 0u || layer.Stride > kMaxGeometryVectorFieldStride)
+        {
+            reason = "vector sampling stride must be between 1 and 16777216";
+            return false;
+        }
+        if (layer.LengthMode != GeometryVectorFieldLengthMode::Normalized &&
+            layer.LengthMode != GeometryVectorFieldLengthMode::Raw)
+        {
+            reason = "unknown vector length mode";
+            return false;
+        }
+        reason.clear();
+        return true;
+    }
+
+    bool ValidateGeometryVectorFieldLayers(
+        const std::span<const GeometryVectorFieldLayerRecipe> layers,
+        std::string& reason)
+    {
+        if (layers.size() > kMaxGeometryVectorFieldLayers)
+        {
+            reason = "an entity supports at most 32 vector fields";
+            return false;
+        }
+        for (std::size_t i = 0u; i < layers.size(); ++i)
+        {
+            if (!ValidateGeometryVectorFieldLayer(layers[i], reason))
+                return false;
+            for (std::size_t j = 0u; j < i; ++j)
+            {
+                if (layers[j].Vector.Domain == layers[i].Vector.Domain &&
+                    layers[j].Vector.Name == layers[i].Vector.Name)
+                {
+                    reason = "vector field '" + layers[i].Vector.Name +
+                             "' is listed twice";
+                    return false;
+                }
+            }
+        }
+        reason.clear();
+        return true;
+    }
+
+    GeometryVectorFieldLayerRecipe* FindGeometryVectorFieldLayer(
+        GeometryPresentationRecipe& recipe,
+        const GeometryElementDomain domain,
+        const std::string_view propertyName) noexcept
+    {
+        for (GeometryVectorFieldLayerRecipe& layer : recipe.VectorFields)
+        {
+            if (layer.Vector.Domain == domain && layer.Vector.Name == propertyName)
+                return &layer;
+        }
+        return nullptr;
+    }
+
+    const GeometryVectorFieldLayerRecipe* FindGeometryVectorFieldLayer(
+        const GeometryPresentationRecipe& recipe,
+        const GeometryElementDomain domain,
+        const std::string_view propertyName) noexcept
+    {
+        for (const GeometryVectorFieldLayerRecipe& layer : recipe.VectorFields)
+        {
+            if (layer.Vector.Domain == domain && layer.Vector.Name == propertyName)
+                return &layer;
+        }
+        return nullptr;
     }
 
     GeometryGeneratedOutputPolicy DefaultGeometryGeneratedOutputPolicyFor(

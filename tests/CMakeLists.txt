@@ -1291,6 +1291,8 @@ if(TARGET ExtrinsicRuntime)
         Test.GeometryValueComparison.cpp
         Test.GeometryPresentation.cpp
         Test.PointCloudGeometryExtraction.cpp
+        Test.ScalarGradientOperations.cpp
+        Test.PropertySmoothingOperations.cpp
         Test.GeodesicsOperations.cpp
         Test.ScalarRidgeOperations.cpp
         Test.ParameterizationOperations.cpp
@@ -1558,6 +1560,7 @@ set(_geometry_test_files
     Test_ShortestPath.cpp
     Test_Subdivision.cpp
     Test_Smoothing.cpp
+    Test.PropertySmoothing.cpp
     Test.QualityMetrics.cpp
     Test.Sampling.cpp
     Test.SurfaceSampling.cpp
@@ -2087,6 +2090,7 @@ intrinsic_test_object_lib(GraphicsContractCpuTestObjs
 
 set(_runtime_graphics_cpu_test_files
     Test.RuntimeRenderExtraction.cpp
+    Test.RuntimeVectorFieldExtraction.cpp
     Test.RuntimeDeviceSelection.cpp
     Test.RuntimeFrameLoopContract.cpp
     Test.RenderWorldPoolPipelined.cpp

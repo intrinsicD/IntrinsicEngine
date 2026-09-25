@@ -1419,6 +1419,64 @@ namespace Extrinsic::Runtime
             return true;
         }
 
+        [[nodiscard]] json GeometryVectorFieldLayerToJson(
+            const GeometryVectorFieldLayerRecipe& layer)
+        {
+            return json{
+                {"property", GeometryPropertyRefToJson(layer.Vector)},
+                {"lengthMode", std::string(ToString(layer.LengthMode))},
+                {"length", layer.Length},
+                {"lineWidthPx", layer.LineWidthPx},
+                {"color", Vec4ToJson(layer.Color)},
+                {"depthTested", layer.DepthTested},
+                {"stride", layer.Stride},
+                {"maxGlyphs", layer.MaxGlyphs},
+                {"enabled", layer.Enabled},
+            };
+        }
+
+        // Every field is required: vector-field layers have one current
+        // format, and a partial layer is rejected rather than defaulted.
+        [[nodiscard]] bool TryReadGeometryVectorFieldLayer(
+            const json& value,
+            GeometryVectorFieldLayerRecipe& out)
+        {
+            if (!value.is_object() ||
+                !value.contains("property") ||
+                !value.contains("lengthMode") || !value["lengthMode"].is_string() ||
+                !value.contains("length") || !value["length"].is_number() ||
+                !value.contains("lineWidthPx") || !value["lineWidthPx"].is_number() ||
+                !value.contains("color") ||
+                !value.contains("depthTested") || !value["depthTested"].is_boolean() ||
+                !value.contains("stride") || !value["stride"].is_number_unsigned() ||
+                !value.contains("maxGlyphs") || !value["maxGlyphs"].is_number_unsigned() ||
+                !value.contains("enabled") || !value["enabled"].is_boolean())
+            {
+                return false;
+            }
+            if (!TryReadGeometryPropertyRef(value["property"], out.Vector) ||
+                !TryParseGeometryVectorFieldLengthMode(
+                    value["lengthMode"].get<std::string>(), out.LengthMode) ||
+                !TryReadVec4(value["color"], out.Color))
+            {
+                return false;
+            }
+            const std::uint64_t stride = value["stride"].get<std::uint64_t>();
+            const std::uint64_t maxGlyphs = value["maxGlyphs"].get<std::uint64_t>();
+            if (stride > std::numeric_limits<std::uint32_t>::max() ||
+                maxGlyphs > std::numeric_limits<std::uint32_t>::max())
+            {
+                return false;
+            }
+            out.Length = value["length"].get<float>();
+            out.LineWidthPx = value["lineWidthPx"].get<float>();
+            out.DepthTested = value["depthTested"].get<bool>();
+            out.Stride = static_cast<std::uint32_t>(stride);
+            out.MaxGlyphs = static_cast<std::uint32_t>(maxGlyphs);
+            out.Enabled = value["enabled"].get<bool>();
+            return true;
+        }
+
         [[nodiscard]] json GeometryPresentationRecipeToJson(
             const GeometryPresentationRecipe& recipe)
         {
@@ -1435,10 +1493,15 @@ namespace Extrinsic::Runtime
             for (const GeometryPresentationBindingRecipe& presentation : recipe.Presentations)
                 presentations.push_back(GeometryPresentationBindingToJson(presentation));
 
+            json vectorFields = json::array();
+            for (const GeometryVectorFieldLayerRecipe& layer : recipe.VectorFields)
+                vectorFields.push_back(GeometryVectorFieldLayerToJson(layer));
+
             return json{
                 {"shape", std::string(ToString(recipe.Shape))},
                 {"lanes", std::move(lanes)},
                 {"presentations", std::move(presentations)},
+                {"vectorFields", std::move(vectorFields)},
             };
         }
 
@@ -1490,6 +1553,24 @@ namespace Extrinsic::Runtime
                         presentationJson, presentation))
                     return false;
                 recipe.Presentations.push_back(std::move(presentation));
+            }
+
+            // Recipes without vector fields may omit the array.
+            if (value.contains("vectorFields"))
+            {
+                if (!value["vectorFields"].is_array())
+                    return false;
+                recipe.VectorFields.reserve(value["vectorFields"].size());
+                for (const json& layerJson : value["vectorFields"])
+                {
+                    GeometryVectorFieldLayerRecipe layer{};
+                    if (!TryReadGeometryVectorFieldLayer(layerJson, layer))
+                        return false;
+                    recipe.VectorFields.push_back(std::move(layer));
+                }
+                std::string reason{};
+                if (!ValidateGeometryVectorFieldLayers(recipe.VectorFields, reason))
+                    return false;
             }
 
             raw.emplace_or_replace<GeometryPresentationRecipe>(

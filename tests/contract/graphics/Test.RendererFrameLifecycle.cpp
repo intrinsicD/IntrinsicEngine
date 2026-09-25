@@ -1822,6 +1822,10 @@ TEST(RendererFrameLifecycle, ParallelRecordingRecordsDynamicUploadPassesThroughA
             .Name = "ParallelRecording.VectorField",
             .Domain = Extrinsic::Graphics::VisualizationAttributeDomain::Vertex,
             .ElementCount = 1u,
+            .RowCount = 1u,
+            // Stand-in resident addresses; unresolved packets are not drawn.
+            .PositionBufferBDA = 0x10000u,
+            .VectorBufferBDA = 0x20000u,
             .Scale = 1.0f,
             .Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
             .DepthTested = true,

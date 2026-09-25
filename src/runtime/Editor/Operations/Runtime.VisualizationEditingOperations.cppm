@@ -26,6 +26,7 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
+import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.TextureBakeModule;
@@ -414,6 +415,7 @@ export namespace Extrinsic::Runtime
     {
         std::string Name{};
         EditorVisualizationPropertyDomain Domain{EditorVisualizationPropertyDomain::MeshVertices};
+        GeometryElementDomain ElementDomain{GeometryElementDomain::Unknown};
         Geometry::PropertyValueKind ValueKind{Geometry::PropertyValueKind::Float};
         std::size_t ElementCount{0u};
         bool ScalarPresetAvailable{false};
@@ -538,6 +540,68 @@ export namespace Extrinsic::Runtime
         GeometryPropertyValueKindFilter ExpectedValueKind{};
         std::string PropertyName{};
     };
+    enum class EditorVectorFieldOperation : std::uint8_t
+    {
+        Add,
+        Update,
+        Remove,
+    };
+
+    // Adds, edits or removes one Appearance vector field. `Layer.Vector`
+    // (domain + name) identifies the field. Add applies defaults — length
+    // relative to the bounding box, a palette color — unless `UseLayerStyle`
+    // is set; Update replaces the style of an existing field. Every change is
+    // validated by `ValidateGeometryVectorFieldLayers` and recorded in the
+    // command history.
+    struct EditorGeometryVectorFieldCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        EditorVectorFieldOperation Operation{EditorVectorFieldOperation::Add};
+        GeometryVectorFieldLayerRecipe Layer{};
+        bool UseLayerStyle{false};
+    };
+
+    struct EditorVectorFieldPropertyOption
+    {
+        std::string Name{};
+        bool Compatible{false};
+        bool Active{false};
+        std::string DisabledReason{};
+    };
+
+    struct EditorVectorFieldDomainOption
+    {
+        GeometryElementDomain Domain{GeometryElementDomain::Unknown};
+        std::string Label{};
+        std::size_t ElementCount{0u};
+        std::vector<EditorVectorFieldPropertyOption> Properties{};
+    };
+
+    struct EditorVectorFieldLayerRow
+    {
+        GeometryVectorFieldLayerRecipe Layer{};
+        std::string DomainLabel{};
+        bool SourceAvailable{false};
+        // User-facing reason when the property no longer resolves.
+        std::string Status{};
+    };
+
+    // Selected-entity vector fields: domains with their vec3 candidates, and
+    // the authored layers.
+    struct EditorVectorFieldModel
+    {
+        bool Available{false};
+        std::vector<EditorVectorFieldDomainOption> Domains{};
+        std::vector<EditorVectorFieldLayerRow> Layers{};
+    };
+
+    [[nodiscard]] const char* DebugNameForEditorVectorFieldDomain(
+        GeometryElementDomain domain) noexcept;
+
+    [[nodiscard]] EditorVectorFieldModel BuildEditorVectorFieldModel(
+        const GeometryEntityAvailability& availability,
+        const GeometryPresentationRecipe* recipe);
+
     struct EditorTextureBakeCommand
     {
         std::uint32_t StableEntityId{0u};
@@ -670,6 +734,10 @@ export namespace Extrinsic::Runtime
         const EditorVisualizationEditingContext& context,
         const EditorGeometryPresentationSlotPropertyCommand& command);
 
+    EditorCommandStatus ApplyEditorGeometryVectorFieldCommand(
+        const EditorVisualizationEditingContext& context,
+        const EditorGeometryVectorFieldCommand& command);
+
     EditorTextureBakeCommandResult
     ApplyEditorTextureBakeCommand(const EditorVisualizationEditingContext& context,
                                   const EditorTextureBakeCommand& command);
@@ -710,6 +778,9 @@ export namespace Extrinsic::Runtime
     EditorCommandStatus ApplyEditorGeometryPresentationSlotPropertyCommand(
         const EditorVisualizationEditingCommands& commands,
         const EditorGeometryPresentationSlotPropertyCommand& command);
+    EditorCommandStatus ApplyEditorGeometryVectorFieldCommand(
+        const EditorVisualizationEditingCommands& commands,
+        const EditorGeometryVectorFieldCommand& command);
     EditorTextureBakeCommandResult ApplyEditorTextureBakeCommand(
         const EditorVisualizationEditingCommands& commands,
         const EditorTextureBakeCommand& command);

@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <chrono>
 #include <cstdint>
 #include <cmath>
@@ -297,11 +298,17 @@ TEST(VisualizationRecipes, EncodesVectorAndIsolineProperties)
         }});
     ASSERT_TRUE(vector.Succeeded());
     ASSERT_EQ(vector.Batch.VectorFields.size(), 1u);
-    ASSERT_EQ(vector.Batch.PropertyBuffers.size(), 1u);
+    // The explicit anchor property and the vectors are both uploaded.
+    ASSERT_EQ(vector.Batch.PropertyBuffers.size(), 2u);
+    EXPECT_EQ(vector.Batch.PropertyBuffers[0].SourceKey, PN::kPosition);
+    EXPECT_EQ(vector.Batch.PropertyBuffers[1].SourceKey, "velocity.upload");
     const G::VectorFieldOverlayPacket& vectorPacket =
         vector.Batch.VectorFields.front();
     EXPECT_EQ(vectorPacket.PositionBufferSourceKey, PN::kPosition);
     EXPECT_EQ(vectorPacket.VectorBufferSourceKey, "velocity.upload");
+    EXPECT_EQ(vectorPacket.RowCount, vectorPacket.ElementCount);
+    EXPECT_TRUE(vectorPacket.RowBufferSourceKey.empty());
+    EXPECT_FALSE(vectorPacket.NormalizeLength);
     EXPECT_FLOAT_EQ(vectorPacket.Scale, 2.5f);
     EXPECT_FALSE(vectorPacket.DepthTested);
 
@@ -991,4 +998,43 @@ TEST(VisualizationRecipes, NumericScalarTwinsShareScalarIsolineAndLabelEncoding)
         {.Data=R::ScalarVisualizationRecipe{.Source=wide}}).Succeeded());
     EXPECT_FALSE(R::EncodeVisualizationRecipe(source.Availability,
         {.Data=R::LabelVisualizationRecipe{.Source=wide}}).Succeeded());
+}
+
+TEST(VisualizationRecipes, VectorFieldPacketChecksUnverifiedRowsOnly)
+{
+    const std::array<glm::vec3, 3> anchors{{{0, 0, 0}, {1, 0, 0}, {2, 0, 0}}};
+    const std::array<glm::vec3, 3> vectors{{{0, 1, 0}, {0, 1, 0}, {0, 1, 0}}};
+    const std::array<std::uint32_t, 2> rows{{0u, 2u}};
+    const std::array<std::uint32_t, 2> badRows{{0u, 3u}};
+    R::VectorFieldPacketInputs inputs{
+        .Name = "field",
+        .ElementCount = 3u,
+        .AnchorKey = "anchors",
+        .Anchors = anchors,
+        .VectorKey = "vectors",
+        .Vectors = vectors,
+        .RowKey = "rows",
+        .Rows = rows,
+        .CopyPayloads = false,
+    };
+
+    R::VisualizationEncodingBatch batch{};
+    R::VisualizationEncodingDiagnostics diagnostics{};
+    ASSERT_EQ(R::AppendVectorFieldPacket(batch, inputs, &diagnostics), R::VisualizationRecipeStatus::Encoded);
+    EXPECT_EQ(diagnostics.VectorRowIndexCheckCount, 2u);
+    ASSERT_EQ(batch.VectorFields.size(), 1u);
+    EXPECT_EQ(batch.VectorFields.front().RowCount, 2u);
+    // Borrowed payloads keep descriptor/payload index parity with empty payloads.
+    EXPECT_EQ(batch.PropertyBuffers.size(), batch.PropertyBufferPayloads.size());
+    EXPECT_EQ(batch.PropertyBuffers[0].Bytes.data(), reinterpret_cast<const std::byte*>(anchors.data()));
+
+    inputs.Rows = badRows;
+    EXPECT_EQ(R::AppendVectorFieldPacket(batch, inputs, &diagnostics),
+              R::VisualizationRecipeStatus::ElementCountMismatch);
+
+    diagnostics = {};
+    inputs.Rows = rows;
+    inputs.RowsPrevalidated = true;
+    ASSERT_EQ(R::AppendVectorFieldPacket(batch, inputs, &diagnostics), R::VisualizationRecipeStatus::Encoded);
+    EXPECT_EQ(diagnostics.VectorRowIndexCheckCount, 0u);
 }

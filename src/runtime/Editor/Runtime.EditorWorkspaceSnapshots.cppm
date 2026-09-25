@@ -70,6 +70,8 @@ export namespace Extrinsic::Runtime
         EditorVisualizationTarget VisualizationTarget{
             EditorVisualizationTarget::Entity};
         EditorVisualizationModel Visualization{};
+        // Entity-level: independent of which base lanes are visible.
+        EditorVectorFieldModel VectorFields{};
         EditorPropertyCatalogModel PropertyCatalog{};
         EditorBoundRenderStateModel BoundState{};
         EditorTextureBakeControlsModel TextureBake{};

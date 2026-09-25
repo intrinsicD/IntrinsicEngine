@@ -185,7 +185,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail::MeshSupport
                 if (trianglesOnly && ring.size() != 3u) *trianglesOnly = false;
                 if (requireTriangles && ring.size() != 3u)
                 {
-                    diagnostic = "UV atlas generation requires triangular source faces; triangulate the mesh before generating an atlas.";
+                    diagnostic = "This operation requires triangular source faces; triangulate the mesh first.";
                     return EditorCommandStatus::InvalidProcessingParameters;
                 }
                 hasFaces = true;

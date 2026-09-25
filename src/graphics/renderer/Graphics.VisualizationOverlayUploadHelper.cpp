@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <span>
@@ -20,8 +21,8 @@ namespace Extrinsic::Graphics
 {
     namespace
     {
-        constexpr std::uint64_t kInitialVectorFieldVertexCount = 256u;
-        constexpr std::uint64_t kMaxVectorFieldVertexCount = 1u << 18; // 262 144 verts (~4 MiB)
+        constexpr std::uint64_t kInitialVectorFieldRecordCount = 16u;
+        constexpr std::uint64_t kMaxVectorFieldRecordCount = 1u << 14; // 16 384 fields (2 MiB)
         // GRAPHICS-078 Slice C — isoline lane shares the per-vertex
         // format and the geometric-growth shape. Caps are independent
         // per lane so a heavy isoline submission does not squeeze the
@@ -48,17 +49,6 @@ namespace Extrinsic::Graphics
             return 1.0f - ((static_cast<float>(pixelY) + 0.5f) / 256.0f) * 2.0f;
         }
 
-        [[nodiscard]] OverlayFixtureSegment MakeVectorFieldFixtureSegment(
-            const std::uint64_t glyphIndex) noexcept
-        {
-            const std::uint32_t lane = static_cast<std::uint32_t>(glyphIndex % 4u);
-            const float y = FixturePixelCenterToNdcY(64u + lane * 12u);
-            return OverlayFixtureSegment{
-                .Start = glm::vec3{FixturePixelCenterToNdcX(48u), y, 0.0f},
-                .End   = glm::vec3{FixturePixelCenterToNdcX(96u), y, 0.0f},
-            };
-        }
-
         [[nodiscard]] OverlayFixtureSegment MakeIsolineFixtureSegment(
             const std::uint64_t isoIndex) noexcept
         {
@@ -83,9 +73,9 @@ namespace Extrinsic::Graphics
     void VisualizationOverlayUploadHelper::EnsureFrameSlots(const std::uint32_t framesInFlight)
     {
         const std::uint32_t slotCount = framesInFlight == 0u ? 1u : framesInFlight;
-        if (m_VectorFieldVertexBufferSlots.size() != slotCount)
+        if (m_VectorFieldRecordBufferSlots.size() != slotCount)
         {
-            m_VectorFieldVertexBufferSlots.resize(slotCount);
+            m_VectorFieldRecordBufferSlots.resize(slotCount);
         }
         if (m_IsolineVertexBufferSlots.size() != slotCount)
         {
@@ -102,9 +92,9 @@ namespace Extrinsic::Graphics
     {
         EnsureFrameSlots(framesInFlight);
         const std::uint32_t slotCount =
-            static_cast<std::uint32_t>(m_VectorFieldVertexBufferSlots.empty()
+            static_cast<std::uint32_t>(m_VectorFieldRecordBufferSlots.empty()
                 ? 1u
-                : m_VectorFieldVertexBufferSlots.size());
+                : m_VectorFieldRecordBufferSlots.size());
         m_ActiveSlot = slotCount == 0u ? 0u : (frameIndex % slotCount);
     }
 
@@ -114,103 +104,72 @@ namespace Extrinsic::Graphics
     {
         VisualizationVectorFieldUploadResult result{};
         result.PacketCount = static_cast<std::uint32_t>(vectorFields.size());
+        result.RecordIndexForPacket.assign(
+            vectorFields.size(), VisualizationVectorFieldUploadResult::kInvalidRecord);
 
         if (vectorFields.empty() || !m_Device->IsOperational())
         {
             return result;
         }
-        if (m_VectorFieldVertexBufferSlots.empty())
+        if (m_VectorFieldRecordBufferSlots.empty())
         {
             EnsureFrameSlots(1u);
         }
 
-        // Two vertices per glyph (anchor + tip). Per-packet vertex
-        // count is `2 * ElementCount`; the helper packs all packets'
-        // glyph endpoints contiguously so the pass can issue
-        // `Draw(2 * ElementCount, 1, 0, 0)` per packet with
-        // `FirstVertex = cumulative endpoint offset` carried in the
-        // push block.
-        std::uint64_t totalEndpointCount = 0u;
-        for (const VectorFieldOverlayPacket& packet : vectorFields)
+        std::vector<VisualizationVectorFieldDrawRecord> records;
+        records.reserve(vectorFields.size());
+        for (std::size_t packetIndex = 0; packetIndex < vectorFields.size(); ++packetIndex)
         {
-            totalEndpointCount += static_cast<std::uint64_t>(packet.ElementCount) * 2u;
-        }
-
-        if (totalEndpointCount == 0u)
-        {
-            return result;
-        }
-
-        // Fail-close BEFORE allocating staging when a packet (or the
-        // accumulated lane payload) would push the helper past
-        // `kMaxVectorFieldVertexCount`. The cap check inside
-        // `UploadPackedColorVertices(...)` would otherwise run only after
-        // the `std::vector<PackedColorVertex>` allocation, so a
-        // single `ElementCount = UINT32_MAX` packet (or any
-        // accumulated payload above the cap) could throw `bad_alloc`
-        // — or attempt a multi-GiB host allocation — before the
-        // overflow gate fires. Mirror the
-        // `UploadPackedColorVertices(...)` overflow signaling so the
-        // executor records `Overflow = true` and the pass reports
-        // `SkippedUnavailable` deterministically.
-        if (totalEndpointCount > kMaxVectorFieldVertexCount)
-        {
-            result.Overflow = true;
-            return result;
-        }
-
-        std::vector<PackedColorVertex> staging(static_cast<std::size_t>(totalEndpointCount));
-        std::size_t writeIndex = 0;
-        for (const VectorFieldOverlayPacket& packet : vectorFields)
-        {
-            const std::uint32_t packedColor = PackVertexColorUnorm4x8(packet.Color);
-            const std::uint64_t endpointCount =
-                static_cast<std::uint64_t>(packet.ElementCount) * 2u;
-            for (std::uint64_t endpoint = 0; endpoint < endpointCount; ++endpoint)
+            const VectorFieldOverlayPacket& packet = vectorFields[packetIndex];
+            if (!IsRenderableVectorFieldPacket(packet))
             {
-                // CPU/null path: the helper does not have CPU access
-                // to `packet.PositionBufferBDA` / `VectorBufferBDA`
-                // (those are GPU pointers), so GRAPHICS-078E emits a
-                // deterministic placeholder glyph segment instead of
-                // claiming source-buffer parity. A future source-BDA
-                // expansion can replace only this fixture-position
-                // calculation while preserving per-packet color
-                // packing and draw shape.
-                const OverlayFixtureSegment segment =
-                    MakeVectorFieldFixtureSegment(endpoint / 2u);
-                const glm::vec3 position = (endpoint % 2u == 0u) ? segment.Start : segment.End;
-                PackedColorVertex& vertex = staging[writeIndex++];
-                vertex.Position[0] = position.x;
-                vertex.Position[1] = position.y;
-                vertex.Position[2] = position.z;
-                vertex.PackedColor = packedColor;
+                continue;
             }
+            result.RecordIndexForPacket[packetIndex] =
+                static_cast<std::uint32_t>(records.size());
+            records.push_back(VisualizationVectorFieldDrawRecord{
+                .ObjectToWorld = packet.ObjectToWorld,
+                .PositionBufferBDA = packet.PositionBufferBDA,
+                .VectorBufferBDA = packet.VectorBufferBDA,
+                .RowBufferBDA = packet.RowBufferBDA,
+                .ElementCount = packet.ElementCount,
+                .RowCount = packet.RowCount,
+                .RowStride = packet.RowStride,
+                .PackedColor = PackVertexColorUnorm4x8(packet.Color),
+                .Scale = packet.Scale,
+                .LineWidthPx = packet.LineWidthPx,
+                .Flags = packet.NormalizeLength ? kVisualizationVectorFieldNormalizeFlag : 0u,
+            });
+        }
+        if (records.empty())
+        {
+            return result;
         }
 
-        UploadBufferSlot& slot = m_VectorFieldVertexBufferSlots[m_ActiveSlot];
-        const PackedVertexUploadResult laneOutput = UploadPackedColorVertices(
+        UploadBufferSlot& slot = m_VectorFieldRecordBufferSlots[m_ActiveSlot];
+        const PackedVertexUploadResult laneOutput = UploadRetainedHostBytes(
             *m_Device,
             *m_BufferManager,
             slot.Buffer,
             slot.CapacityBytes,
             m_BufferAllocationCount,
-            std::span<const PackedColorVertex>{staging.data(), staging.size()},
-            kInitialVectorFieldVertexCount,
-            kMaxVectorFieldVertexCount,
-            "VisualizationOverlay.VectorFieldVertices");
-        if (laneOutput.Overflow)
+            std::as_bytes(std::span<const VisualizationVectorFieldDrawRecord>{records}),
+            sizeof(VisualizationVectorFieldDrawRecord),
+            kInitialVectorFieldRecordCount,
+            kMaxVectorFieldRecordCount,
+            "VisualizationOverlay.VectorFieldRecords");
+        if (laneOutput.Overflow || !laneOutput.Uploaded)
         {
-            result.Overflow = true;
-            return result;
-        }
-        if (!laneOutput.Uploaded)
-        {
+            result.Overflow = laneOutput.Overflow;
+            std::fill(result.RecordIndexForPacket.begin(),
+                      result.RecordIndexForPacket.end(),
+                      VisualizationVectorFieldUploadResult::kInvalidRecord);
             return result;
         }
 
-        result.VertexBuffer = laneOutput.Handle;
-        result.VertexBufferBDA = laneOutput.BDA;
-        result.VertexCount = static_cast<std::uint32_t>(totalEndpointCount);
+        result.RecordBuffer = laneOutput.Handle;
+        result.RecordBufferBDA = laneOutput.BDA;
+        result.RecordCount = static_cast<std::uint32_t>(records.size());
         result.Uploaded = true;
         return result;
     }

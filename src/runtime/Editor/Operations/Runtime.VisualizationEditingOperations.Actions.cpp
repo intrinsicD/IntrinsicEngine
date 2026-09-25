@@ -8,6 +8,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <span>
@@ -813,10 +814,14 @@ namespace {
         {
             return lhs == rhs;
         }
+        // Presence is part of the state so a command that creates the
+        // presentation components can undo back to their absence.
         struct GeometryPresentationEditorState
         {
             GeometryPresentationRecipe Recipe{};
             GeometryPresentationRuntimeState Runtime{};
+            bool RecipePresent{true};
+            bool RuntimePresent{true};
         };
 
         struct GeometryPresentationMutationIdentity
@@ -846,12 +851,14 @@ namespace {
             runtime.RecipeGeneration = currentRuntime != nullptr
                 ? currentRuntime->RecipeGeneration
                 : GeometryPresentationRuntimeState{}.RecipeGeneration;
-            raw.emplace_or_replace<GeometryPresentationRecipe>(
-                entity,
-                state.Recipe);
-            raw.emplace_or_replace<GeometryPresentationRuntimeState>(
-                entity,
-                std::move(runtime));
+            if (state.RecipePresent)
+                raw.emplace_or_replace<GeometryPresentationRecipe>(entity, state.Recipe);
+            else
+                raw.remove<GeometryPresentationRecipe>(entity);
+            if (state.RuntimePresent)
+                raw.emplace_or_replace<GeometryPresentationRuntimeState>(entity, std::move(runtime));
+            else
+                raw.remove<GeometryPresentationRuntimeState>(entity);
             return EditorCommandHistoryStatus::Applied;
         }
 
@@ -862,9 +869,8 @@ namespace {
             entt::registry& raw = scene.Raw();
             const ECS::EntityHandle entity =
                 SelectionController::ToEntityHandle(stableEntityId);
-            auto& runtime =
-                raw.get<GeometryPresentationRuntimeState>(entity);
-            return ++runtime.RecipeGeneration;
+            auto* runtime = raw.try_get<GeometryPresentationRuntimeState>(entity);
+            return runtime != nullptr ? ++runtime->RecipeGeneration : 0u;
         }
 
         struct GeometryPresentationSlotLookup
@@ -934,6 +940,28 @@ namespace {
             return *status;
         }
 
+        // Undo/redo validates by content: a transition applies only while
+        // the entity still holds the recipe and slot statuses this command
+        // last produced. A generation check would reject every second
+        // consecutive undo, because each transition stamps a new generation
+        // (which caches still observe).
+        [[nodiscard]] bool MatchesGeometryPresentationState(
+            const entt::registry& raw,
+            const ECS::EntityHandle entity,
+            const GeometryPresentationEditorState& expected)
+        {
+            const auto* recipe = raw.try_get<GeometryPresentationRecipe>(entity);
+            const auto* runtime = raw.try_get<GeometryPresentationRuntimeState>(entity);
+            const bool recipeMatches = expected.RecipePresent
+                ? recipe != nullptr && *recipe == expected.Recipe
+                : recipe == nullptr;
+            const std::vector<GeometryPresentationSlotStatus> noSlots{};
+            const bool runtimeMatches = expected.RuntimePresent
+                ? (runtime != nullptr ? runtime->Slots : noSlots) == expected.Runtime.Slots
+                : runtime == nullptr;
+            return recipeMatches && runtimeMatches;
+        }
+
         [[nodiscard]] EditorCommandStatus CommitGeometryPresentationChange(
             const EditorVisualizationEditingContext& context,
             const std::uint32_t stableEntityId,
@@ -942,8 +970,7 @@ namespace {
         {
             if (context.CommandHistory != nullptr)
             {
-                const std::uint64_t expectedGeneration =
-                    before.Runtime.RecipeGeneration;
+                GeometryPresentationEditorState expected = before;
                 const EditorCommandHistoryResult result =
                     Internal::ExecuteUndoableEntityMutation(
                         *context.CommandHistory,
@@ -953,12 +980,12 @@ namespace {
                             .World = context.World,
                             .StableEntityId = stableEntityId,
                         },
-                        expectedGeneration,
+                        std::move(expected),
                         std::move(before),
                         std::move(after),
                         [](
                             const GeometryPresentationMutationIdentity& identity,
-                            const std::uint64_t expectedGeneration,
+                            const GeometryPresentationEditorState& expectedState,
                             const GeometryPresentationEditorState&)
                         {
                             if (identity.Scene == nullptr ||
@@ -976,21 +1003,7 @@ namespace {
                             {
                                 return EditorCommandHistoryStatus::StaleEntity;
                             }
-                            if (!raw.all_of<GeometryPresentationRecipe>(entity))
-                            {
-                                return EditorCommandHistoryStatus::
-                                    UnsupportedOperation;
-                            }
-
-                            const auto* runtime =
-                                raw.try_get<GeometryPresentationRuntimeState>(
-                                    entity);
-                            const std::uint64_t currentGeneration =
-                                runtime != nullptr
-                                    ? runtime->RecipeGeneration
-                                    : GeometryPresentationRuntimeState{}
-                                          .RecipeGeneration;
-                            return currentGeneration == expectedGeneration
+                            return MatchesGeometryPresentationState(raw, entity, expectedState)
                                 ? EditorCommandHistoryStatus::Applied
                                 : EditorCommandHistoryStatus::StaleEntity;
                         },
@@ -1005,12 +1018,13 @@ namespace {
                         },
                         [](
                             const GeometryPresentationMutationIdentity& identity,
-                            const std::uint64_t,
-                            const GeometryPresentationEditorState&)
+                            const GeometryPresentationEditorState&,
+                            const GeometryPresentationEditorState& target)
                         {
-                            return StampGeometryPresentationGeneration(
+                            (void)StampGeometryPresentationGeneration(
                                 *identity.Scene,
                                 identity.StableEntityId);
+                            return target;
                         });
                 return ToEditorCommandStatus(result.Status);
             }
@@ -2081,6 +2095,262 @@ ApplyEditorRenderHintCommand(
             slot.Semantic,
             nextReadiness,
             nextProvenance);
+
+        return InvalidateSelectedModelCacheIfApplied(
+            context,
+            CommitGeometryPresentationChange(
+                context,
+                command.StableEntityId,
+                std::move(before),
+                std::move(after)));
+    }
+
+    namespace
+    {
+        [[nodiscard]] GeometryPresentationShape PresentationShapeFor(
+            const GS::Domain domain) noexcept
+        {
+            switch (domain)
+            {
+            case GS::Domain::Mesh: return GeometryPresentationShape::Mesh;
+            case GS::Domain::Graph: return GeometryPresentationShape::Graph;
+            case GS::Domain::PointCloud: return GeometryPresentationShape::PointCloud;
+            default: return GeometryPresentationShape::Unknown;
+            }
+        }
+
+        // Default glyph length: 2% of the position bounding-box diagonal of
+        // the domain's anchor positions, so a new field is legible at any
+        // model scale. Falls back to 1 for empty or degenerate geometry.
+        [[nodiscard]] float DefaultVectorFieldLength(
+            const GeometryEntityAvailability& availability,
+            const GeometryElementDomain domain)
+        {
+            const GeometryElementDomain positionDomain =
+                domain == GeometryElementDomain::GraphEdge
+                    ? GeometryElementDomain::GraphNode
+                    : (domain == GeometryElementDomain::MeshEdge ||
+                       domain == GeometryElementDomain::MeshFace)
+                          ? GeometryElementDomain::MeshVertex
+                          : domain;
+            const Geometry::PropertySet* properties =
+                ResolveGeometryPropertySet(availability, positionDomain);
+            if (properties == nullptr)
+                return 1.0f;
+            const auto positions =
+                properties->Get<glm::vec3>(GS::PropertyNames::kPosition);
+            if (!positions)
+                return 1.0f;
+            glm::vec3 lo{std::numeric_limits<float>::max()};
+            glm::vec3 hi{-std::numeric_limits<float>::max()};
+            bool any = false;
+            for (const glm::vec3& position : positions.Span())
+            {
+                if (!std::isfinite(position.x) || !std::isfinite(position.y) ||
+                    !std::isfinite(position.z))
+                {
+                    continue;
+                }
+                lo = glm::min(lo, position);
+                hi = glm::max(hi, position);
+                any = true;
+            }
+            const float diagonal = any ? glm::length(hi - lo) : 0.0f;
+            return std::isfinite(diagonal) && diagonal > 0.0f
+                ? 0.02f * diagonal
+                : 1.0f;
+        }
+
+        [[nodiscard]] glm::vec4 DefaultVectorFieldColor(const std::size_t index) noexcept
+        {
+            constexpr std::array<glm::vec4, 6> kPalette{{
+                {1.0f, 0.5f, 0.0f, 1.0f},
+                {0.0f, 0.75f, 1.0f, 1.0f},
+                {0.9f, 0.2f, 0.8f, 1.0f},
+                {0.3f, 0.85f, 0.3f, 1.0f},
+                {1.0f, 0.85f, 0.1f, 1.0f},
+                {0.95f, 0.25f, 0.2f, 1.0f},
+            }};
+            return kPalette[index % kPalette.size()];
+        }
+    }
+
+    const char* DebugNameForEditorVectorFieldDomain(
+        const GeometryElementDomain domain) noexcept
+    {
+        switch (domain)
+        {
+        case GeometryElementDomain::MeshVertex: return "Vertices";
+        case GeometryElementDomain::MeshEdge: return "Edges";
+        case GeometryElementDomain::MeshFace: return "Faces";
+        case GeometryElementDomain::GraphNode: return "Nodes";
+        case GeometryElementDomain::GraphEdge: return "Edges";
+        case GeometryElementDomain::PointCloudPoint: return "Points";
+        default: return "Unsupported";
+        }
+    }
+
+    EditorVectorFieldModel BuildEditorVectorFieldModel(
+        const GeometryEntityAvailability& availability,
+        const GeometryPresentationRecipe* recipe)
+    {
+        EditorVectorFieldModel model{};
+        constexpr std::array<GeometryElementDomain, 6> kDomains{
+            GeometryElementDomain::MeshVertex,
+            GeometryElementDomain::MeshEdge,
+            GeometryElementDomain::MeshFace,
+            GeometryElementDomain::GraphNode,
+            GeometryElementDomain::GraphEdge,
+            GeometryElementDomain::PointCloudPoint,
+        };
+        for (const GeometryElementDomain domain : kDomains)
+        {
+            if (!SupportsGeometryElementDomain(availability, domain))
+                continue;
+            const Geometry::PropertySet* properties =
+                ResolveGeometryPropertySet(availability, domain);
+            if (properties == nullptr)
+                continue;
+            EditorVectorFieldDomainOption option{
+                .Domain = domain,
+                .Label = DebugNameForEditorVectorFieldDomain(domain),
+                .ElementCount = ResolveGeometryElementCount(availability, domain),
+            };
+            for (const std::string& name : properties->Properties())
+            {
+                // Any vec3 is a valid field (positions included); only
+                // connectivity/deletion rows are not element values.
+                if (DetectGeometryPropertyValueKind(*properties, name) !=
+                        Geometry::PropertyValueKind::Vec3 ||
+                    IsTopologyProperty(domain, name))
+                {
+                    continue;
+                }
+                const GeometryPropertyResolution resolution = ResolveGeometryProperty(
+                    availability, domain, name, Geometry::PropertyValueKind::Vec3,
+                    option.ElementCount);
+                option.Properties.push_back(EditorVectorFieldPropertyOption{
+                    .Name = name,
+                    .Compatible = resolution.Resolved(),
+                    .Active = recipe != nullptr &&
+                              FindGeometryVectorFieldLayer(*recipe, domain, name) != nullptr,
+                    .DisabledReason = resolution.Resolved()
+                        ? std::string{}
+                        : std::string{ToString(resolution.Status)},
+                });
+            }
+            std::ranges::sort(option.Properties, {}, &EditorVectorFieldPropertyOption::Name);
+            model.Domains.push_back(std::move(option));
+        }
+        model.Available = !model.Domains.empty();
+
+        if (recipe != nullptr)
+        {
+            for (const GeometryVectorFieldLayerRecipe& layer : recipe->VectorFields)
+            {
+                const GeometryPropertyResolution resolution = ResolveGeometryProperty(
+                    availability, layer.Vector.Domain, layer.Vector.Name,
+                    Geometry::PropertyValueKind::Vec3,
+                    ResolveGeometryElementCount(availability, layer.Vector.Domain));
+                model.Layers.push_back(EditorVectorFieldLayerRow{
+                    .Layer = layer,
+                    .DomainLabel = DebugNameForEditorVectorFieldDomain(layer.Vector.Domain),
+                    .SourceAvailable = resolution.Resolved(),
+                    .Status = resolution.Resolved()
+                        ? std::string{}
+                        : "Not drawn: " + std::string{ToString(resolution.Status)},
+                });
+            }
+        }
+        return model;
+    }
+
+    EditorCommandStatus ApplyEditorGeometryVectorFieldCommand(
+        const EditorVisualizationEditingContext& context,
+        const EditorGeometryVectorFieldCommand& command)
+    {
+        if (context.Scene == nullptr)
+            return EditorCommandStatus::MissingScene;
+        entt::registry& raw = context.Scene->Raw();
+        const ECS::EntityHandle entity =
+            SelectionController::ToEntityHandle(command.StableEntityId);
+        if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
+            return EditorCommandStatus::StaleEntity;
+
+        GeometryPropertyRef identity = command.Layer.Vector;
+        identity.ValueKind = Geometry::PropertyValueKind::Vec3;
+        if (!SupportsGeometryVectorFieldDomain(identity.Domain) || identity.Name.empty())
+            return EditorCommandStatus::InvalidVisualizationProperty;
+
+        const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+        const GeometryEntityAvailability availability = BuildGeometryAvailability(view);
+        const auto* current = raw.try_get<GeometryPresentationRecipe>(entity);
+        const auto* currentRuntime = raw.try_get<GeometryPresentationRuntimeState>(entity);
+        // An entity without authored presentation gets one as part of the
+        // same undoable transition; undo restores the absence.
+        GeometryPresentationEditorState before{
+            .Recipe = current != nullptr
+                ? *current
+                : GeometryPresentationRecipe{.Shape = PresentationShapeFor(view.ActiveDomain)},
+            .Runtime = currentRuntime != nullptr ? *currentRuntime
+                                                 : GeometryPresentationRuntimeState{},
+            .RecipePresent = current != nullptr,
+            .RuntimePresent = currentRuntime != nullptr,
+        };
+        GeometryPresentationEditorState after = before;
+        after.RecipePresent = true;
+        after.RuntimePresent = true;
+        GeometryVectorFieldLayerRecipe* existing =
+            FindGeometryVectorFieldLayer(after.Recipe, identity.Domain, identity.Name);
+
+        switch (command.Operation)
+        {
+        case EditorVectorFieldOperation::Add:
+        {
+            if (existing != nullptr)
+                return EditorCommandStatus::NoChange;
+            const GeometryPropertyResolution resolution = ResolveGeometryProperty(
+                availability, identity, ResolveGeometryElementCount(availability, identity.Domain));
+            if (!resolution.Resolved())
+                return EditorCommandStatus::InvalidVisualizationProperty;
+            GeometryVectorFieldLayerRecipe layer = command.Layer;
+            if (!command.UseLayerStyle)
+            {
+                layer = GeometryVectorFieldLayerRecipe{
+                    .Length = DefaultVectorFieldLength(availability, identity.Domain),
+                    .Color = DefaultVectorFieldColor(after.Recipe.VectorFields.size()),
+                };
+            }
+            layer.Vector = identity;
+            after.Recipe.VectorFields.push_back(std::move(layer));
+            break;
+        }
+        case EditorVectorFieldOperation::Update:
+        {
+            if (existing == nullptr)
+                return EditorCommandStatus::InvalidVisualizationProperty;
+            GeometryVectorFieldLayerRecipe layer = command.Layer;
+            layer.Vector = existing->Vector;
+            if (layer == *existing)
+                return EditorCommandStatus::NoChange;
+            *existing = std::move(layer);
+            break;
+        }
+        case EditorVectorFieldOperation::Remove:
+            if (existing == nullptr)
+                return EditorCommandStatus::NoChange;
+            std::erase_if(after.Recipe.VectorFields,
+                          [&](const GeometryVectorFieldLayerRecipe& layer)
+                          {
+                              return layer.Vector.Domain == identity.Domain &&
+                                     layer.Vector.Name == identity.Name;
+                          });
+            break;
+        }
+
+        std::string reason{};
+        if (!ValidateGeometryVectorFieldLayers(after.Recipe.VectorFields, reason))
+            return EditorCommandStatus::InvalidVisualizationProperty;
 
         return InvalidateSelectedModelCacheIfApplied(
             context,

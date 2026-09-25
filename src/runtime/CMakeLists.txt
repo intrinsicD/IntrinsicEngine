@@ -204,6 +204,8 @@ target_sources(${target_name}
         Editor/Operations/Runtime.MeshTopologyOperations.Frame.cpp
         Editor/Operations/Runtime.ParameterizationOperations.Frame.cpp
         Editor/Operations/Runtime.MeshFieldOperations.Curvature.cpp
+        Editor/Operations/Runtime.MeshFieldOperations.Gradient.cpp
+        Editor/Operations/Runtime.MeshFieldOperations.Smoothing.cpp
         Editor/Operations/Runtime.MeshFieldOperations.Geodesics.cpp
         Editor/Operations/Runtime.MeshTopologyOperations.Topology.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
@@ -248,6 +250,7 @@ target_sources(${target_name}
         Config/Runtime.RenderRecipeActivation.cpp
         Rendering/Runtime.RenderExtraction.cpp
         Rendering/Runtime.RenderExtraction.Recipes.cpp
+        Rendering/Runtime.RenderExtraction.VectorFields.cpp
         Rendering/Runtime.RenderExtraction.Geometry.cpp
         Rendering/Runtime.RenderWorldPool.cpp
         Scene/Runtime.SelectionController.cpp

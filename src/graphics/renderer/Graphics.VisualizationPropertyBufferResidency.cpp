@@ -65,16 +65,17 @@ namespace Extrinsic::Graphics
         VisualizationPropertyBufferDiagnostics diagnostics{};
         m_LastAddresses.clear();
         m_LastAddresses.reserve(descriptors.size());
+        ++m_UpdateEpoch;
 
         for (const VisualizationPropertyBufferUploadDescriptor& descriptor : descriptors)
         {
-            if (!ValidateVisualizationPropertyBufferUploadDescriptor(
-                    descriptor, diagnostics))
+            if (!ValidateVisualizationPropertyBufferShape(descriptor, diagnostics))
             {
                 continue;
             }
 
             Entry& entry = m_Entries[descriptor.SourceKey];
+            entry.LastSubmittedEpoch = m_UpdateEpoch;
             if (entry.DirtyStamp > 0u &&
                 descriptor.DirtyStamp > 0u &&
                 descriptor.DirtyStamp < entry.DirtyStamp)
@@ -84,11 +85,19 @@ namespace Extrinsic::Graphics
                 continue;
             }
 
+            // An unchanged buffer is reused without reading its payload, so a
+            // steady frame costs O(1) per submitted buffer.
             if (Reusable(entry, descriptor))
             {
+                ++diagnostics.AcceptedBufferCount;
                 ++diagnostics.ReusedBufferCount;
                 m_LastAddresses.push_back(
                     MakeAddress(descriptor.SourceKey, entry));
+                continue;
+            }
+
+            if (!ValidateVisualizationPropertyBufferPayload(descriptor, diagnostics))
+            {
                 continue;
             }
 
@@ -99,32 +108,39 @@ namespace Extrinsic::Graphics
                 continue;
             }
 
+            // Frames still in flight may read the previous contents through
+            // its address, so changed contents always go to a new buffer. The
+            // superseded lease is released here and destroyed by the device's
+            // per-frame deferred deletion once that frame's work completes.
             const std::uint64_t requestedBytes =
                 static_cast<std::uint64_t>(descriptor.Bytes.size());
-            if (!entry.Lease.has_value() || entry.CapacityBytes < requestedBytes)
+            const bool replacing = entry.Lease.has_value();
+            entry.Lease.reset();
+            entry.CapacityBytes = 0u;
+            entry.BufferBDA = 0u;
+            entry.DirtyStamp = 0u;
+
+            RHI::BufferDesc desc{};
+            desc.SizeBytes = requestedBytes;
+            desc.Usage = RHI::BufferUsage::Storage |
+                         RHI::BufferUsage::TransferDst;
+            desc.HostVisible = true;
+            desc.DebugName = "Visualization.PropertyBuffer";
+
+            auto lease = m_BufferManager->Create(desc);
+            if (!lease.has_value())
             {
-                entry.Lease.reset();
-                entry.CapacityBytes = 0u;
-                entry.BufferBDA = 0u;
+                ++diagnostics.InvalidResourceCount;
+                diagnostics.HasErrors = true;
+                continue;
+            }
 
-                RHI::BufferDesc desc{};
-                desc.SizeBytes = requestedBytes;
-                desc.Usage = RHI::BufferUsage::Storage |
-                             RHI::BufferUsage::TransferDst;
-                desc.HostVisible = true;
-                desc.DebugName = "Visualization.PropertyBuffer";
-
-                auto lease = m_BufferManager->Create(desc);
-                if (!lease.has_value())
-                {
-                    ++diagnostics.InvalidResourceCount;
-                    diagnostics.HasErrors = true;
-                    continue;
-                }
-
-                entry.Lease.emplace(std::move(*lease));
-                entry.CapacityBytes = requestedBytes;
-                ++m_BufferAllocationCount;
+            entry.Lease.emplace(std::move(*lease));
+            entry.CapacityBytes = requestedBytes;
+            ++m_BufferAllocationCount;
+            if (replacing)
+            {
+                ++diagnostics.ReplacedBufferCount;
             }
 
             const RHI::BufferHandle handle = entry.Lease->GetHandle();
@@ -150,6 +166,24 @@ namespace Extrinsic::Graphics
 
             ++diagnostics.UploadedBufferCount;
             m_LastAddresses.push_back(MakeAddress(descriptor.SourceKey, entry));
+        }
+
+        // Producers resubmit every live input each frame; anything absent is
+        // no longer referenced by the newest snapshot. Older snapshots that
+        // are still rendering keep valid addresses because lease destruction
+        // is deferred by the device until the current frame completes.
+        for (auto it = m_Entries.begin(); it != m_Entries.end();)
+        {
+            if (it->second.LastSubmittedEpoch == m_UpdateEpoch)
+            {
+                ++it;
+                continue;
+            }
+            if (it->second.Lease.has_value())
+            {
+                ++diagnostics.EvictedBufferCount;
+            }
+            it = m_Entries.erase(it);
         }
 
         return diagnostics;

@@ -48,3 +48,20 @@ sanitizer settings unchanged. Logs: `focused-asan.log` and
 `focused-asan-host.log` under
 `build/analysis/assetio012-format-catalog-2026-09-14/`. Keep this workflow task
 open; the host retry does not implement automatic supported-context routing.
+
+## Reproduction — 2026-09-25
+Scalar-gradient UI integration reproduced the same discovery-only failure in
+`IntrinsicRuntimeIntegrationTests` after a successful fresh `ci-asan` configure
+and `IntrinsicCpuTests` build. LeakSanitizer reported its ptrace restriction
+before executing tests (`/tmp/scalar-gradient-asan-tests.log`). Host access allowed the unchanged serial CPU selector to complete the
+3,310-registration run (`/tmp/scalar-gradient-asan-host-tests.log`), with no
+sanitizer runtime findings. Two stale menu expectations and their compilation
+metadata check required rebuilding the edited test binary; the final recheck is
+recorded in `/tmp/scalar-gradient-asan-final-tests.log` (46/46 passed). No sanitizer flags,
+suppressions, test labels or host ptrace policy were changed.
+
+Property-smoothing verification on the same date reproduced the discovery
+restriction (`/tmp/property-smoothing-asan-tests.log`). The unchanged serial
+selector then passed all 3,322 registrations with host access
+(`/tmp/property-smoothing-asan-host-tests.log`; two native-window checks skipped
+in the Null/headless configuration). No sanitizer flags or suppressions changed.

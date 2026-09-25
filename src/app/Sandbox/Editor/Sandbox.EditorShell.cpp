@@ -533,10 +533,29 @@ namespace Extrinsic::Sandbox::Editor
                     }
                     wroteButton = true;
                 }
-                if (property.VectorFieldCandidate && !wroteButton)
+                if (property.VectorFieldCandidate)
                 {
-                    ImGui::TextDisabled("Vector-field candidate; adapter residency is not "
-                                        "owned by this UI slice.");
+                    if (wroteButton)
+                        ImGui::SameLine();
+                    if (ImGui::SmallButton("Vector field") && canEditVisualization)
+                    {
+                        (void)ApplyEditorGeometryVectorFieldCommand(
+                            context.VisualizationCommands,
+                            EditorGeometryVectorFieldCommand{
+                                .StableEntityId = selectedStableId,
+                                .Operation = EditorVectorFieldOperation::Add,
+                                .Layer = GeometryVectorFieldLayerRecipe{
+                                    .Vector = GeometryPropertyRef{
+                                        .Domain = property.ElementDomain,
+                                        .Name = property.Name,
+                                        .ValueKind = Geometry::PropertyValueKind::Vec3,
+                                    },
+                                },
+                            });
+                    }
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Show as arrows; edit or remove it under Appearance > Vector fields.");
+                    wroteButton = true;
                 }
                 ImGui::PopID();
             }

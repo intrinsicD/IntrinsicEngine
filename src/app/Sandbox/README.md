@@ -188,6 +188,15 @@ fitting/orientation through the same persisted config. **Show normals** selects
 the output property for Appearance color display on the corresponding surface,
 edge, or point layer. Processing Show actions resolve already-published output
 properties independently of whether the current method parameters can run.
+Mesh / Processing / Faces / Scalar Field Gradient binds a vertex scalar and
+vertex positions, then publishes a face `vec3` property (`f:scalar_gradient` by
+default) with undo/redo. **Show Gradient Vectorfield** adds the output to the
+mesh's Appearance vector fields, with arrows anchored at face centers. Bindings
+persist in `sandbox.scalar_gradient`; files, runtime callers and the panel use
+the same validation path. This operation requires triangle faces and finite
+scalar values; degenerate triangles produce zero vectors. Polygon meshes must
+be triangulated first. Arrow scale, color and visibility use Appearance controls.
+
 Mesh / Processing / Faces / Normals presets full-polygon face-normal computation
 and a face output (`f:normal`), with a button to display its object-space colors. It
 uses the persisted `sandbox.normal_estimation` config and canonical property bindings. The panels own their ImGui
@@ -234,7 +243,13 @@ use the shared Appearance color encoder. METHOD-040 hides unused GMM controls an
 boundary/cleanup diagnostics. It remains experimental and exposes no cut or
 UV-atlas action. Appearance groups surface, edge, and vertex property dropdowns
 for a selected mesh. Surface properties can use the shared UV texture-bake
-command; advanced binding and bake controls are collapsed. `Sandbox.Editor.DomainPanels` registers the existing Appearance,
+command; advanced binding and bake controls are collapsed. Its entity-level
+**Vector fields** section (independent of which lanes are visible) chooses an
+element domain, then a vec3 property, and draws it as arrows; each field has
+visibility, normalized/raw length, width, color, depth test and sampling
+controls and a close button, all through the undoable
+`ApplyEditorGeometryVectorFieldCommand` that Geometry Visualization's
+`Vector field` action also uses. Fields are saved with the scene. `Sandbox.Editor.DomainPanels` registers the existing Appearance,
 Properties, and Selection windows for Mesh, Graph, and PointCloud. It owns their menu paths, lazy per-frame model
 cache, texture-bake and property-widget draft state, and
 result presentation. K-Means and Progressive Poisson command/config/result
@@ -556,3 +571,10 @@ Open **View → Kernel Density**, choose the input/backend/bandwidth and run
 `sandbox.kernel_density` config drives UI and agent commands.
 
 [Point Spacing and Radii](../../../docs/architecture/point-spacing.md) exposes canonical positions, radius output, k, scale and CPU/Vulkan neighborhoods through View and geometry Processing menus. Show radii uses scalar colors; model-space radius rendering is tracked by RUNTIME-222.
+
+Property filtering is available through **View → Smooth Property** and each
+geometry domain's Processing menu. Select a floating scalar/vector input and
+a same-domain output; filter settings round-trip in `sandbox.property_smoothing`.
+Implicit backward Euler supports cotangent weights, lumped mesh areas and boundary
+pinning. Select positions as both input and output to smooth geometry.
+See [property smoothing](../../../docs/methods/property-smoothing.md).

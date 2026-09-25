@@ -1258,7 +1258,8 @@ TEST(SandboxConfigSections, PointPropertySerializersPreserveTokensAndNameBytes)
         Case{D::Unknown, K::Vec3, "samples", R"({"domain":"Unknown","kind":"vec3","name":"samples"})"},
         Case{D::MeshFace, K::Float, "f:weight", R"({"domain":"MeshFace","kind":"float","name":"f:weight"})"},
         Case{D::PointCloudPoint, K::UInt32, "labels", R"({"domain":"PointCloudPoint","kind":"uint32","name":"labels"})"},
-        Case{D::MeshVertex, K::Vec4, "v:color", R"({"domain":"MeshVertex","kind":"invalid","name":"v:color"})"},
+        Case{D::MeshVertex, K::Vec2, "v:uv", R"({"domain":"MeshVertex","kind":"vec2","name":"v:uv"})"},
+        Case{D::MeshVertex, K::Vec4, "v:color", R"({"domain":"MeshVertex","kind":"vec4","name":"v:color"})"},
         Case{D(255), K(255), "", R"({"domain":"invalid","kind":"invalid","name":""})"},
         Case{D::MeshVertex, K::Vec3, std::string{"v:\0\"\\\n", 6}, R"({"domain":"MeshVertex","kind":"vec3","name":"v:\u0000\"\\\n"})"},
     };

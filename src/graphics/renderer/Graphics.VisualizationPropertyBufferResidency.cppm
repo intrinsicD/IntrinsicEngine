@@ -1,6 +1,7 @@
 // Retains GPU property buffers for visualization packets across frame slots.
 module;
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -30,6 +31,9 @@ export namespace Extrinsic::Graphics
         VisualizationPropertyBufferResidency& operator=(
             const VisualizationPropertyBufferResidency&) = delete;
 
+        // Uploads changed descriptors into fresh buffers, reuses unchanged
+        // ones, and evicts keys missing from `descriptors`. Payload bytes are
+        // read only during this call.
         [[nodiscard]] VisualizationPropertyBufferDiagnostics Update(
             std::span<const VisualizationPropertyBufferUploadDescriptor> descriptors);
 
@@ -40,6 +44,10 @@ export namespace Extrinsic::Graphics
         GetLastAddresses() const noexcept;
 
         [[nodiscard]] std::uint64_t GetBufferAllocationCount() const noexcept;
+        [[nodiscard]] std::size_t GetResidentBufferCount() const noexcept
+        {
+            return m_Entries.size();
+        }
 
         void Clear() noexcept;
 
@@ -55,6 +63,7 @@ export namespace Extrinsic::Graphics
             std::uint64_t DirtyStamp{0u};
             std::uint64_t SourceLayoutStamp{0u};
             std::uint64_t BufferBDA{0u};
+            std::uint64_t LastSubmittedEpoch{0u};
         };
 
         [[nodiscard]] static bool Reusable(
@@ -70,5 +79,6 @@ export namespace Extrinsic::Graphics
         std::unordered_map<std::string, Entry> m_Entries{};
         std::vector<VisualizationPropertyBufferAddress> m_LastAddresses{};
         std::uint64_t m_BufferAllocationCount{0u};
+        std::uint64_t m_UpdateEpoch{0u};
     };
 }

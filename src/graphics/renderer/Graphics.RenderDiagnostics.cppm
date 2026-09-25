@@ -196,6 +196,10 @@ export namespace Extrinsic::Graphics
         std::uint64_t VectorFieldRecordsSubmitted = 0;
         std::uint64_t IsolineRecordsSubmitted = 0;
         std::uint64_t VectorFieldRecordsRecorded = 0;
+        // Submitted vector-field packets without a draw (unresolved buffers,
+        // invalid style, missing scene table or failed record upload).
+        std::uint64_t VectorFieldPacketsSkipped = 0;
+        std::uint64_t VectorFieldGlyphsRecorded = 0;
         std::uint64_t IsolineRecordsRecorded = 0;
         std::uint64_t MissingPipelineSkipCount = 0;
     };

@@ -1,4 +1,5 @@
 module;
+
 #include <functional>
 #include <span>
 #include <glm/vec3.hpp>
@@ -326,6 +327,10 @@ namespace Extrinsic::Sandbox::Editor
         DenoiseState Denoise{};
         CurvatureState Curvature{};
         SegmentationState Segmentation{};
+        ProcessingDraftState<Runtime::ScalarGradientConfig, Runtime::EditorScalarGradientResult> Gradient{};
+        std::uint32_t GradientEntity{};
+        ProcessingDraftState<Runtime::PropertySmoothingConfig, Runtime::EditorPropertySmoothingResult> Smoothing{};
+        std::uint32_t SmoothingEntity{};
         GeodesicsState Geodesics{};
         std::uint32_t GeodesicsEntity{0u};
         int GeodesicsSourceVertex{0};
@@ -374,6 +379,8 @@ namespace Extrinsic::Sandbox::Editor
         void DrawDenoiseWindow(bool&, const SandboxEditorContext&);
         void DrawCurvatureWindow(bool&, const SandboxEditorContext&);
         void DrawSegmentationWindow(bool&, const SandboxEditorContext&);
+        void DrawGradientWindow(bool&, const SandboxEditorContext&);
+        void DrawSmoothingWindow(bool&, const SandboxEditorContext&);
         void DrawGeodesicsWindow(bool&, const SandboxEditorContext&);
         void DrawGeodesicsControls(const Runtime::EditorDomainWindowModel&,
                                    const SandboxEditorContext&);
@@ -415,8 +422,15 @@ namespace Extrinsic::Sandbox::Editor
     {
         Unregister();
         Shell = &editorShell;
+        RegisterWindow("view.property_smoothing", {"View"}, "Smooth Property", &Impl::DrawSmoothingWindow);
+        for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
+                 {{"mesh.processing.property_smoothing", "Mesh"}, {"graph.processing.property_smoothing", "Graph"},
+                  {"pointcloud.processing.property_smoothing", "PointCloud"}}})
+            RegisterRedirectWindow(id, {domain, "Processing"}, "Smooth Property", "view.property_smoothing");
         RegisterWindow("mesh.processing.denoise", {"Mesh", "Processing"},
                        "Denoise", &Impl::DrawDenoiseWindow);
+        RegisterWindow("mesh.processing.faces.scalar_gradient", {"Mesh", "Processing", "Faces"},
+                       "Scalar Field Gradient", &Impl::DrawGradientWindow);
         RegisterWindow("mesh.processing.geodesics", {"Mesh", "Geodesics"},
                        "Virtual Source Propagation", &Impl::DrawGeodesicsWindow);
         RegisterWindow("mesh.processing.curvature", {"Mesh", "Processing"},
@@ -516,6 +530,10 @@ namespace Extrinsic::Sandbox::Editor
         ResetModelCache();
         Denoise.LastResult.reset();
         Denoise.Input = {};
+        Gradient = {};
+        GradientEntity = 0u;
+        Smoothing = {};
+        SmoothingEntity = 0u;
         Geodesics = {};
         GeodesicsEntity = 0u;
         GeodesicsSourceVertex = 0;
@@ -2687,6 +2705,166 @@ namespace Extrinsic::Sandbox::Editor
 
 namespace Extrinsic::Sandbox::Editor
 {
+    void MeshProcessingPanels::Impl::DrawSmoothingWindow(bool& open, const SandboxEditorContext& context)
+    {
+        if (!ImGui::Begin("Smooth Property", &open)) { ImGui::End(); return; }
+        const auto previous = SmoothingEntity;
+        DrawProcessingEntity("Entity##PropertySmoothing", context, SmoothingEntity, Smoothing.LastSelectedEntity);
+        if (previous != SmoothingEntity) Smoothing.LastResult.reset();
+        if (const auto active = Runtime::GetEditorPropertySmoothingConfig(context.MeshFields.Commands))
+            Smoothing.Synchronize(*active, Runtime::SerializePropertySmoothingConfig(*active));
+        const auto& model = GetDomainWindowModel(context, Runtime::EditorDomainWindowKind::Mesh, SmoothingEntity);
+        if (!model.HasSelectedEntity || Smoothing.LastApplied.empty())
+        { ImGui::TextDisabled("Select a geometry entity to smooth a property."); ImGui::End(); return; }
+        auto& config = Smoothing.Draft;
+        const auto smoothable = +[](const Runtime::GeometryPropertyRef& ref) {
+            using K = Geometry::PropertyValueKind;
+            return ref.ValueKind == K::Float || ref.ValueKind == K::Double || ref.ValueKind == K::Vec2 ||
+                   ref.ValueKind == K::Vec3 || ref.ValueKind == K::Vec4;
+        };
+        bool changed = DrawProcessingPropertyInput("Input property##Smoothing", model.PropertyCatalog, config.Input, smoothable);
+        if (changed)
+        {
+            config.Output.Domain = config.Input.Domain;
+            config.Output.ValueKind = config.Input.ValueKind;
+        }
+        changed |= DrawProcessingPropertyInput("Neighborhood positions##Smoothing", model.PropertyCatalog, config.Positions,
+            +[](const Runtime::GeometryPropertyRef& ref) { return ref.ValueKind == Geometry::PropertyValueKind::Vec3; });
+        ImGui::TextWrapped("Use positions on the input domain, or vertex/node positions to derive face centers and edge/halfedge midpoints.");
+        changed |= DrawProcessingPropertyName("Output property##Smoothing", config.Output.Name);
+        if (ImGui::Button("Overwrite input property")) { config.Output = config.Input; changed = true; }
+        if (config.Input.ValueKind == Geometry::PropertyValueKind::Float || config.Input.ValueKind == Geometry::PropertyValueKind::Double)
+        {
+            int kind = config.Output.ValueKind == Geometry::PropertyValueKind::Double ? 1 : 0;
+            if (ImGui::Combo("Output storage", &kind, "float\0double\0"))
+            { config.Output.ValueKind = kind ? Geometry::PropertyValueKind::Double : Geometry::PropertyValueKind::Float; changed = true; }
+        }
+        int method = int(config.Filter.Method), laplacian = int(config.Filter.Laplacian), weight = int(config.Weight);
+        if (ImGui::Combo("Method", &method, "Averaging\0Spectral heat\0Taubin\0Bilateral\0Implicit (backward Euler)\0"))
+        { config.Filter.Method = Geometry::Smoothing::PropertyFilter(method); changed = true; }
+        if (ImGui::Combo("Laplacian", &laplacian, "Random walk\0Combinatorial\0Lumped mesh area (implicit)\0"))
+        { config.Filter.Laplacian = Geometry::Smoothing::PropertyLaplacian(laplacian); changed = true; }
+        if (ImGui::Combo("Weights", &weight, "Uniform kNN\0Gaussian kNN\0Inverse-distance kNN\0Nonnegative mesh cotangent\0Uniform mesh edges\0"))
+        { config.Weight = Geometry::Smoothing::PropertyWeight(weight); changed = true; }
+        changed |= ImGui::InputScalar("Iterations", ImGuiDataType_U32, &config.Filter.Iterations);
+        if (config.Weight != Geometry::Smoothing::PropertyWeight::Cotangent && config.Weight != Geometry::Smoothing::PropertyWeight::MeshUniform)
+        {
+            changed |= ImGui::InputScalar("Neighbors", ImGuiDataType_U32, &config.Neighbors);
+            if (config.Weight != Geometry::Smoothing::PropertyWeight::Uniform)
+                changed |= ImGui::InputDouble("Spatial sigma", &config.SpatialSigma);
+        }
+        if (config.Filter.Method == Geometry::Smoothing::PropertyFilter::SpectralHeat)
+            changed |= ImGui::InputDouble("Heat time", &config.Filter.HeatTime);
+        else if (config.Filter.Method == Geometry::Smoothing::PropertyFilter::Implicit)
+        {
+            changed |= ImGui::InputDouble("Time step", &config.Filter.TimeStep);
+            changed |= ImGui::InputDouble("Solver tolerance", &config.Filter.SolverTolerance);
+            changed |= ImGui::InputScalar("Maximum solver iterations", ImGuiDataType_U32, &config.Filter.MaxSolverIterations);
+        }
+        else changed |= ImGui::InputDouble("Lambda", &config.Filter.Lambda);
+        changed |= ImGui::Checkbox("Pin mesh boundary", &config.PreserveBoundary);
+        if (config.Filter.Method == Geometry::Smoothing::PropertyFilter::Taubin)
+            changed |= ImGui::InputDouble("Mu", &config.Filter.Mu);
+        if (config.Filter.Method == Geometry::Smoothing::PropertyFilter::Bilateral)
+            changed |= ImGui::InputDouble("Range sigma (property units)", &config.Filter.RangeSigma);
+        const auto apply = [&](const auto& c) { return Runtime::ApplyEditorPropertySmoothingConfig(context.MeshFields.Commands, c); };
+        if (changed)
+        {
+            Smoothing.LastResult.reset();
+            Smoothing.ConfigDiagnostic = apply(config).Succeeded() ? "" : "Smoothing configuration was rejected.";
+        }
+        const auto readiness = Runtime::PreviewEditorPropertySmoothingCommand(context.MeshFields.Commands, model.SelectedStableId, config);
+        if (DrawProcessingActionButton("Smooth property", readiness))
+            ApplyProcessingExecution(Smoothing, config, apply,
+                [&] { return Runtime::ApplyEditorPropertySmoothingCommand(context.MeshFields.Commands, model.SelectedStableId, config); },
+                std::function<void(Runtime::EditorPropertySmoothingResult)>{}, "Smoothing configuration was rejected.");
+        DrawProcessingPropertyShowButton(context, model.SelectedStableId, config.Output, Smoothing.VisualizationDiagnostic);
+        ImGui::TextDisabled("CPU reference; vectors are filtered componentwise without normalization.");
+        if (Smoothing.LastResult) ImGui::TextWrapped("%s", Smoothing.LastResult->Message.c_str());
+        if (!Smoothing.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Smoothing.ConfigDiagnostic.c_str());
+        if (!Smoothing.VisualizationDiagnostic.empty()) ImGui::TextWrapped("%s", Smoothing.VisualizationDiagnostic.c_str());
+        ImGui::End();
+    }
+
+    void MeshProcessingPanels::Impl::DrawGradientWindow(bool& open, const SandboxEditorContext& context)
+    {
+        if (!ImGui::Begin("Mesh / Processing / Faces / Scalar Field Gradient", &open))
+        {
+            ImGui::End();
+            return;
+        }
+        const auto previous = GradientEntity;
+        DrawProcessingEntity("Entity##ScalarGradient", context, GradientEntity,
+                             Gradient.LastSelectedEntity, Runtime::EditorDomainWindowKind::Mesh);
+        if (previous != GradientEntity)
+        {
+            Gradient.LastResult.reset();
+            Gradient.VisualizationDiagnostic.clear();
+        }
+        if (const auto active = Runtime::GetEditorScalarGradientConfig(context.MeshFields.Commands))
+            Gradient.Synchronize(*active, Runtime::SerializeScalarGradientConfig(*active));
+        const auto& model = GetDomainWindowModel(context, Runtime::EditorDomainWindowKind::Mesh, GradientEntity);
+        if (!model.DomainMatches || !model.Processing.HasSelectedEntity || Gradient.LastApplied.empty())
+        {
+            ImGui::TextDisabled("Choose a mesh entity with a scalar vertex property.");
+            ImGui::End();
+            return;
+        }
+        DrawProcessingCpuBackend();
+        ImGui::TextWrapped("Compute a tangent gradient on each triangle from a vertex scalar field. "
+                           "Degenerate triangles produce zero vectors. Polygon meshes require triangulation.");
+        auto& config = Gradient.Draft;
+        const auto vertex = +[](const Runtime::GeometryPropertyRef& ref) {
+            return ref.Domain == Runtime::GeometryElementDomain::MeshVertex;
+        };
+        bool changed = DrawProcessingPropertyInput("Scalar property##ScalarGradient", model.PropertyCatalog,
+                                                   config.Scalar, vertex, 1u);
+        changed |= DrawProcessingPropertyInput("Positions##ScalarGradient", model.PropertyCatalog,
+                                               config.Positions, vertex, 3u);
+        changed |= DrawProcessingPropertyName("Output face property##ScalarGradient", config.Output.Name);
+        const auto apply = [&](const auto& request) {
+            return Runtime::ApplyEditorScalarGradientConfig(context.MeshFields.Commands, request);
+        };
+        if (changed)
+        {
+            Gradient.LastResult.reset();
+            Gradient.ConfigDiagnostic = apply(config).Succeeded() ? "" : "Scalar gradient configuration was rejected.";
+        }
+        const auto readiness = Runtime::PreviewEditorScalarGradientCommand(context.MeshFields.Commands,
+                                                                           model.SelectedStableId, config);
+        if (DrawProcessingActionButton("Compute Gradient", readiness))
+            ApplyProcessingExecution(Gradient, config, apply,
+                [&] { return Runtime::ApplyEditorScalarGradientCommand(context.MeshFields.Commands,
+                                                                      model.SelectedStableId, config); },
+                std::function<void(Runtime::EditorScalarGradientResult)>{}, "Scalar gradient configuration was rejected.");
+        const bool hasOutput = std::ranges::any_of(model.PropertyCatalog.Rows, [&](const auto& row) {
+            return row.Domain == Runtime::EditorPropertyCatalogDomain::MeshFaces &&
+                   row.Name == config.Output.Name && row.ValueKind == decltype(row.ValueKind)::Vec3 && row.Bindable;
+        });
+        ImGui::BeginDisabled(!hasOutput);
+        if (ImGui::Button("Show Gradient Vectorfield"))
+        {
+            Runtime::EditorGeometryVectorFieldCommand command{
+                .StableEntityId = model.SelectedStableId, .Layer = {.Vector = config.Output}};
+            for (const auto& row : model.VectorFields.Layers)
+                if (row.Layer.Vector == config.Output)
+                {
+                    command.Operation = Runtime::EditorVectorFieldOperation::Update;
+                    command.Layer = row.Layer;
+                    command.Layer.Enabled = true;
+                    break;
+                }
+            const auto status = Runtime::ApplyEditorGeometryVectorFieldCommand(context.VisualizationCommands, command);
+            Gradient.VisualizationDiagnostic = Runtime::DebugNameForEditorCommandStatus(status);
+        }
+        ImGui::EndDisabled();
+        ImGui::TextDisabled("Arrow scale, color and visibility: Appearance > Vector fields.");
+        if (Gradient.LastResult) ImGui::TextWrapped("%s", Gradient.LastResult->Message.c_str());
+        if (!Gradient.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Gradient.ConfigDiagnostic.c_str());
+        if (!Gradient.VisualizationDiagnostic.empty()) ImGui::TextWrapped("%s", Gradient.VisualizationDiagnostic.c_str());
+        ImGui::End();
+    }
+
     void MeshProcessingPanels::Impl::DrawGeodesicsWindow(bool& open,
                                                          const SandboxEditorContext& context)
     {

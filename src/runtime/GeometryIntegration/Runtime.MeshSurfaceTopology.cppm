@@ -64,6 +64,18 @@ export namespace Extrinsic::Runtime
         std::vector<std::uint32_t>& outTriangleToFace,
         std::vector<std::uint32_t>& outCornerHalfedges);
 
+    // Face centers — the arithmetic mean of each face ring's vertex positions,
+    // not an area centroid — in face-row order, plus the rows of live faces.
+    // A face is live when `f:deleted` is unset, its ring is well formed with at
+    // least three vertices, and its vertex positions are finite; other rows keep
+    // a zero center. `vertexPositions` is indexed by vertex slot. Outputs are
+    // cleared on entry and on failure.
+    [[nodiscard]] MeshSurfaceTopologyStatus BuildMeshFaceCenters(
+        const ECS::Components::GeometrySources::ConstSourceView& view,
+        std::span<const glm::vec3> vertexPositions,
+        std::vector<glm::vec3>& outCenters,
+        std::vector<std::uint32_t>& outLiveFaces);
+
     // The compatibility UV-only split used by callers without corner normals:
     // one slot per distinct `(mesh vertex, UV)` pair.
     // This lives here, next to the corner walk, because more than one consumer

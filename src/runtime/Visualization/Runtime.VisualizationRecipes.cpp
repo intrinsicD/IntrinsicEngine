@@ -39,11 +39,7 @@ namespace Extrinsic::Runtime
                 Graphics::VisualizationAttributeDomain::Vertex};
             std::uint64_t BufferBDA{0u};
             std::uint64_t ColorBufferBDA{0u};
-            std::uint64_t PositionBufferBDA{0u};
-            std::uint64_t VectorBufferBDA{0u};
             std::string PropertyBufferSourceKey{};
-            std::string PositionBufferSourceKey{};
-            std::string VectorBufferSourceKey{};
             std::uint64_t DirtyStamp{0u};
             bool AutoRange{true};
             float RangeMin{0.0f};
@@ -52,8 +48,6 @@ namespace Extrinsic::Runtime
             std::uint32_t IsoValueCount{0u};
             float LineWidth{1.0f};
             glm::vec4 OverlayColor{0.0f, 0.0f, 0.0f, 1.0f};
-            float VectorScale{1.0f};
-            glm::vec4 VectorColor{1.0f};
             bool DepthTested{true};
             Graphics::Components::VisualizationConfig::ColorInterpretation Interpretation{};
         };
@@ -593,64 +587,6 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        bool AppendVectorFieldPacket(const Geometry::ConstProperty<glm::vec3>& property,
-                                     VisualizationEncodingBatch& out,
-                                     const VisualizationEncodingOptions& options,
-                                     VisualizationEncodingDiagnostics& stats)
-        {
-            const std::span<const glm::vec3> values = property.Span();
-            if (!ValidateSourceSpan(values, stats))
-                return false;
-
-            if (options.PositionBufferBDA == 0u &&
-                options.PositionBufferSourceKey.empty())
-            {
-                ++stats.InvalidBufferCount;
-                return false;
-            }
-            if (!IsFinite(options.VectorScale) || options.VectorScale <= 0.0f ||
-                !IsFinite(options.VectorColor))
-            {
-                ++stats.InvalidRangeCount;
-                return false;
-            }
-
-            const std::string sourceKey =
-                options.OutputName.empty() ? options.SourceName : options.OutputName;
-            const std::string vectorSourceKey =
-                options.VectorBufferSourceKey.empty()
-                    ? (options.PropertyBufferSourceKey.empty()
-                           ? sourceKey
-                           : options.PropertyBufferSourceKey)
-                    : options.VectorBufferSourceKey;
-            if (options.VectorBufferBDA == 0u)
-            {
-                AppendPropertyBuffer(out,
-                                     vectorSourceKey,
-                                     options.Domain,
-                                     Graphics::VisualizationValueType::VectorFloat3,
-                                     static_cast<std::uint32_t>(values.size()),
-                                     sizeof(glm::vec3),
-                                     options.DirtyStamp,
-                                     CopyBytes(values));
-            }
-
-            out.VectorFields.push_back(Graphics::VectorFieldOverlayPacket{
-                .Name = sourceKey,
-                .PositionBufferSourceKey = options.PositionBufferSourceKey,
-                .VectorBufferSourceKey = vectorSourceKey,
-                .Domain = options.Domain,
-                .ElementCount = static_cast<std::uint32_t>(values.size()),
-                .PositionBufferBDA = options.PositionBufferBDA,
-                .VectorBufferBDA = options.VectorBufferBDA,
-                .Scale = options.VectorScale,
-                .Color = options.VectorColor,
-                .DepthTested = options.DepthTested,
-            });
-            ++stats.PacketAppendCount;
-            return true;
-        }
-
         void EncodeScalarProperty(
             const Geometry::ConstPropertySet& properties,
             VisualizationEncodingBatch& out,
@@ -782,31 +718,6 @@ namespace Extrinsic::Runtime
             { appendLabels(property); return; }
             if (const auto property = properties.Get<double>(options.SourceName); property.IsValid())
             { appendLabels(property); return; }
-            if (properties.Exists(options.SourceName))
-                ++diagnostics.UnsupportedSourceTypeCount;
-            else
-                ++diagnostics.MissingSourceCount;
-        }
-
-        void EncodeVectorProperty(
-            const Geometry::ConstPropertySet& properties,
-            VisualizationEncodingBatch& out,
-            const VisualizationEncodingOptions& options,
-            VisualizationEncodingDiagnostics& diagnostics)
-        {
-            if (options.SourceName.empty())
-            {
-                ++diagnostics.MissingSourceCount;
-                return;
-            }
-
-            if (const auto property = properties.Get<glm::vec3>(options.SourceName);
-                property.IsValid())
-            {
-                (void)AppendVectorFieldPacket(property, out, options, diagnostics);
-                return;
-            }
-
             if (properties.Exists(options.SourceName))
                 ++diagnostics.UnsupportedSourceTypeCount;
             else
@@ -1201,12 +1112,21 @@ namespace Extrinsic::Runtime
                         result.Status = ToRecipeStatus(vectorResolution.Status);
                         return;
                     }
-                    if (resolveSource(
+                    const Geometry::PropertySet* positionProperties = nullptr;
+                    if (authored.PositionBufferBDA == 0u)
+                    {
+                        if (authored.PositionSource.Name.empty())
+                        {
+                            ++result.Diagnostics.InvalidBufferCount;
+                            result.Status = VisualizationRecipeStatus::InvalidBuffer;
+                            return;
+                        }
+                        positionProperties = resolveSource(
                             authored.PositionSource,
                             vectorResolution.ElementCount,
-                            Geometry::PropertyValueKind::Vec3) == nullptr)
-                    {
-                        return;
+                            Geometry::PropertyValueKind::Vec3);
+                        if (positionProperties == nullptr)
+                            return;
                     }
                     const Geometry::PropertySet* properties =
                         ResolveGeometryPropertySet(
@@ -1216,32 +1136,58 @@ namespace Extrinsic::Runtime
                         result.Status = VisualizationRecipeStatus::UnsupportedDomain;
                         return;
                     }
+                    if (vectorResolution.ElementCount >
+                        std::numeric_limits<std::uint32_t>::max())
+                    {
+                        ++result.Diagnostics.ElementCountOverflowCount;
+                        result.Status = VisualizationRecipeStatus::ElementCountOverflow;
+                        return;
+                    }
 
-                    EncodeVectorProperty(
-                        Geometry::ConstPropertySet{*properties},
-                        result.Batch,
-                        VisualizationEncodingOptions{
-                            .SourceName = authored.Source.Name,
-                            .OutputName = authored.OutputName,
-                            .Domain = *domain,
-                            .PositionBufferBDA = authored.PositionBufferBDA,
-                            .VectorBufferBDA = authored.VectorBufferBDA,
-                            .PositionBufferSourceKey =
-                                authored.PositionBufferSourceKey.empty()
-                                    ? authored.PositionSource.Name
-                                    : authored.PositionBufferSourceKey,
-                            .VectorBufferSourceKey = authored.VectorBufferSourceKey,
-                            .DirtyStamp = authored.VectorBufferBDA == 0u
-                                ? properties->FindPropertyRevision(
-                                      authored.Source.Name).value_or(
-                                      authored.DirtyStamp)
-                                : authored.DirtyStamp,
-                            .VectorScale = authored.Scale,
-                            .VectorColor = authored.Color,
-                            .DepthTested = authored.DepthTested,
-                        },
-                        result.Diagnostics);
-                    result.Status = ToRecipeStatus(result.Diagnostics);
+                    const std::string name = authored.OutputName.empty()
+                        ? authored.Source.Name
+                        : authored.OutputName;
+                    VectorFieldPacketInputs inputs{
+                        .Name = name,
+                        .Domain = *domain,
+                        .ElementCount = static_cast<std::uint32_t>(
+                            vectorResolution.ElementCount),
+                        .AnchorKey = authored.PositionBufferSourceKey.empty()
+                            ? authored.PositionSource.Name
+                            : authored.PositionBufferSourceKey,
+                        .AnchorBDA = authored.PositionBufferBDA,
+                        .VectorKey = authored.VectorBufferSourceKey.empty()
+                            ? name
+                            : authored.VectorBufferSourceKey,
+                        .VectorBDA = authored.VectorBufferBDA,
+                        .VectorStamp = authored.VectorBufferBDA == 0u
+                            ? properties->FindPropertyRevision(
+                                  authored.Source.Name).value_or(
+                                  authored.DirtyStamp)
+                            : authored.DirtyStamp,
+                        // Explicit recipes scale raw object-space vectors.
+                        .Scale = authored.Scale,
+                        .NormalizeLength = false,
+                        .Color = authored.Color,
+                        .DepthTested = authored.DepthTested,
+                        .CopyPayloads = true,
+                    };
+                    if (positionProperties != nullptr)
+                    {
+                        inputs.Anchors = positionProperties->Get<glm::vec3>(
+                            authored.PositionSource.Name).Span();
+                        inputs.AnchorStamp = positionProperties->FindPropertyRevision(
+                            authored.PositionSource.Name).value_or(0u);
+                    }
+                    if (authored.VectorBufferBDA == 0u)
+                    {
+                        inputs.Vectors = properties->Get<glm::vec3>(
+                            authored.Source.Name).Span();
+                    }
+                    result.Status = AppendVectorFieldPacket(
+                        result.Batch, inputs, &result.Diagnostics);
+                    if (result.Succeeded())
+                        ++result.Diagnostics.PacketAppendCount;
                 }
                 else if constexpr (std::is_same_v<Recipe, IsolineVisualizationRecipe>)
                 {
@@ -1415,6 +1361,177 @@ namespace Extrinsic::Runtime
         if (!result.Task.IsValid())
             result.Diagnostic = "JobService rejected visualization HTEX recreate request";
         return result;
+    }
+
+    std::uint32_t ResolveVectorFieldRowStride(
+        const std::uint32_t rowCount,
+        const std::uint32_t stride,
+        const std::uint32_t maxGlyphs) noexcept
+    {
+        const std::uint32_t base = std::max(stride, 1u);
+        if (maxGlyphs == 0u || rowCount == 0u)
+            return base;
+        const std::uint64_t needed =
+            (static_cast<std::uint64_t>(rowCount) + maxGlyphs - 1u) / maxGlyphs;
+        return static_cast<std::uint32_t>(
+            std::max<std::uint64_t>(base, needed));
+    }
+
+    VisualizationRecipeStatus AppendVectorFieldPacket(
+        VisualizationEncodingBatch& batch,
+        const VectorFieldPacketInputs& inputs,
+        VisualizationEncodingDiagnostics* diagnostics)
+    {
+        const std::uint32_t count = inputs.ElementCount;
+        if (inputs.Name.empty() || count == 0u)
+            return VisualizationRecipeStatus::EmptySource;
+        if ((inputs.AnchorBDA == 0u && inputs.AnchorKey.empty()) ||
+            (inputs.VectorBDA == 0u && inputs.VectorKey.empty()))
+        {
+            return VisualizationRecipeStatus::InvalidBuffer;
+        }
+        if ((inputs.AnchorBDA == 0u && inputs.Anchors.size() != count) ||
+            (inputs.VectorBDA == 0u && inputs.Vectors.size() != count) ||
+            inputs.Rows.size() > count)
+        {
+            return VisualizationRecipeStatus::ElementCountMismatch;
+        }
+        if (!inputs.RowsPrevalidated)
+        {
+            if (diagnostics != nullptr)
+                diagnostics->VectorRowIndexCheckCount += inputs.Rows.size();
+            for (const std::uint32_t row : inputs.Rows)
+            {
+                if (row >= count)
+                    return VisualizationRecipeStatus::ElementCountMismatch;
+            }
+        }
+        if (!IsFinite(inputs.Scale) || inputs.Scale <= 0.0f ||
+            !IsFinite(inputs.Color) || !IsFinite(inputs.LineWidthPx) ||
+            inputs.LineWidthPx < Graphics::kVectorFieldMinLineWidthPx ||
+            inputs.LineWidthPx > Graphics::kVectorFieldMaxLineWidthPx)
+        {
+            return VisualizationRecipeStatus::InvalidRange;
+        }
+        const bool hasRows = !inputs.Rows.empty() || !inputs.RowKey.empty();
+        const std::uint32_t rowCount = hasRows
+            ? static_cast<std::uint32_t>(inputs.Rows.size())
+            : count;
+        if (rowCount == 0u)
+            return VisualizationRecipeStatus::EmptySource;
+
+        const auto alreadyAppended = [&batch](const std::string& key)
+        {
+            return std::any_of(
+                batch.PropertyBuffers.begin(),
+                batch.PropertyBuffers.end(),
+                [&key](const Graphics::VisualizationPropertyBufferUploadDescriptor& descriptor)
+                {
+                    return descriptor.SourceKey == key;
+                });
+        };
+        const auto appendBorrowed = [&batch](
+            const std::string& key,
+            const Graphics::VisualizationValueType valueType,
+            const std::uint32_t elementCount,
+            const std::uint32_t strideBytes,
+            const std::uint64_t stamp,
+            const std::span<const std::byte> bytes)
+        {
+            // Empty payload keeps descriptor/payload indices aligned.
+            batch.PropertyBufferPayloads.emplace_back();
+            batch.PropertyBuffers.push_back(
+                Graphics::VisualizationPropertyBufferUploadDescriptor{
+                    .SourceKey = key,
+                    .Domain = Graphics::VisualizationAttributeDomain{},
+                    .ValueType = valueType,
+                    .ElementCount = elementCount,
+                    .StrideBytes = strideBytes,
+                    .DirtyStamp = stamp,
+                    .Bytes = bytes,
+                });
+        };
+
+        const auto appendVec3 = [&](const std::string& key,
+                                    const std::span<const glm::vec3> values,
+                                    const std::uint64_t stamp,
+                                    const bool sanitize)
+        {
+            if (alreadyAppended(key))
+                return;
+            if (inputs.CopyPayloads)
+            {
+                std::vector<glm::vec3> copy(values.begin(), values.end());
+                if (sanitize)
+                {
+                    for (std::size_t i = 0u; i < copy.size(); ++i)
+                    {
+                        const bool anchorFinite =
+                            inputs.Anchors.empty() || IsFinite(inputs.Anchors[i]);
+                        if (!IsFinite(copy[i]) || !anchorFinite)
+                            copy[i] = glm::vec3{0.0f};
+                    }
+                }
+                else
+                {
+                    for (glm::vec3& value : copy)
+                    {
+                        if (!IsFinite(value))
+                            value = glm::vec3{0.0f};
+                    }
+                }
+                AppendPropertyBuffer(batch, key, inputs.Domain,
+                                     Graphics::VisualizationValueType::VectorFloat3,
+                                     count, sizeof(glm::vec3), stamp,
+                                     CopyBytes(std::span<const glm::vec3>{copy}));
+                return;
+            }
+            appendBorrowed(key, Graphics::VisualizationValueType::VectorFloat3,
+                           count, sizeof(glm::vec3), stamp, std::as_bytes(values));
+            batch.PropertyBuffers.back().Domain = inputs.Domain;
+        };
+
+        if (inputs.AnchorBDA == 0u)
+            appendVec3(inputs.AnchorKey, inputs.Anchors, inputs.AnchorStamp, false);
+        if (inputs.VectorBDA == 0u)
+            appendVec3(inputs.VectorKey, inputs.Vectors, inputs.VectorStamp, true);
+        if (hasRows && !alreadyAppended(inputs.RowKey))
+        {
+            if (inputs.CopyPayloads)
+            {
+                AppendPropertyBuffer(batch, inputs.RowKey, inputs.Domain,
+                                     Graphics::VisualizationValueType::LabelUint32,
+                                     rowCount, sizeof(std::uint32_t), inputs.RowStamp,
+                                     CopyBytes(inputs.Rows));
+            }
+            else
+            {
+                appendBorrowed(inputs.RowKey, Graphics::VisualizationValueType::LabelUint32,
+                               rowCount, sizeof(std::uint32_t), inputs.RowStamp,
+                               std::as_bytes(inputs.Rows));
+                batch.PropertyBuffers.back().Domain = inputs.Domain;
+            }
+        }
+
+        batch.VectorFields.push_back(Graphics::VectorFieldOverlayPacket{
+            .Name = inputs.Name,
+            .PositionBufferSourceKey = inputs.AnchorBDA == 0u ? inputs.AnchorKey : std::string{},
+            .VectorBufferSourceKey = inputs.VectorBDA == 0u ? inputs.VectorKey : std::string{},
+            .RowBufferSourceKey = hasRows ? inputs.RowKey : std::string{},
+            .Domain = inputs.Domain,
+            .ElementCount = count,
+            .RowCount = rowCount,
+            .RowStride = ResolveVectorFieldRowStride(rowCount, inputs.Stride, inputs.MaxGlyphs),
+            .PositionBufferBDA = inputs.AnchorBDA,
+            .VectorBufferBDA = inputs.VectorBDA,
+            .ObjectToWorld = inputs.ObjectToWorld,
+            .Scale = inputs.Scale,
+            .NormalizeLength = inputs.NormalizeLength,
+            .LineWidthPx = inputs.LineWidthPx,
+            .Color = inputs.Color,
+            .DepthTested = inputs.DepthTested,
+        });
+        return VisualizationRecipeStatus::Encoded;
     }
 
     void VisualizationEncodingBatch::Clear() noexcept

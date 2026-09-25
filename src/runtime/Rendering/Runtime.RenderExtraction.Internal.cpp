@@ -5,6 +5,7 @@ module;
 #include <memory>
 #include <optional>
 #include <span>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -277,6 +278,17 @@ namespace Extrinsic::Runtime
             entt::registry& registry,
             entt::entity entity,
             const glm::mat4& worldMatrix);
+
+        // Vector-field extraction runs for every transformed entity, whether
+        // or not any base lane (surface/edges/points) is visible.
+        void AppendVectorFieldLayers(
+            entt::registry& registry,
+            entt::entity entity,
+            std::uint32_t stableId,
+            const glm::mat4& worldMatrix,
+            RuntimeRenderExtractionStats& stats);
+        // Runs after submission: caches unused this frame are released.
+        void ReleaseUnusedVectorFieldCaches(RuntimeRenderExtractionStats& stats);
         void ReconcileRenderableEntity(
             entt::registry& registry,
             entt::entity entity,
@@ -335,6 +347,49 @@ namespace Extrinsic::Runtime
             VisualizationEncodingBatch Batch{};
         };
         VisualizationRecipeState m_VisualizationState{};
+
+        // Derived glyph anchors and live rows for one entity domain, shared by
+        // every vector field on that domain. `Revisions` records the source
+        // property revisions (global, never reused) the cache was built from.
+        struct VectorFieldAnchorCache
+        {
+            GeometryElementDomain Domain{GeometryElementDomain::Unknown};
+            std::vector<Geometry::PropertyRevision> Revisions{};
+            std::vector<std::size_t> Counts{};
+            // Borrow the canonical position property instead of `Anchors`.
+            bool BorrowPositions{false};
+            std::vector<glm::vec3> Anchors{};
+            bool AllLive{true};
+            std::vector<std::uint32_t> LiveRows{};
+            std::uint64_t Stamp{0u};
+            std::uint64_t LastUsedFrame{0u};
+        };
+
+        // Validated vector payload for one property revision. Finite
+        // properties are borrowed; otherwise a sanitized copy is kept.
+        struct VectorFieldPayloadCache
+        {
+            GeometryElementDomain Domain{GeometryElementDomain::Unknown};
+            std::string Property{};
+            Geometry::PropertyRevision Revision{0u};
+            std::size_t Count{0u};
+            bool Borrow{true};
+            std::vector<glm::vec3> Sanitized{};
+            std::uint32_t NonFiniteCount{0u};
+            std::uint64_t Stamp{0u};
+            std::uint64_t LastUsedFrame{0u};
+        };
+
+        struct VectorFieldEntityCache
+        {
+            std::vector<VectorFieldAnchorCache> Anchors{};
+            std::vector<VectorFieldPayloadCache> Payloads{};
+            std::uint64_t LastUsedFrame{0u};
+        };
+
+        std::unordered_map<std::uint32_t, VectorFieldEntityCache>
+            m_VectorFieldCaches{};
+        std::uint64_t m_VectorFieldFrame{0u};
 
         RuntimeSceneInteractionRenderSnapshot m_SceneInteraction{};
         RuntimeRenderExtractionStats m_LastStats{};
