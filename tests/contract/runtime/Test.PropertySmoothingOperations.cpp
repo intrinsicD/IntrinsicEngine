@@ -339,12 +339,12 @@ TEST(PropertySmoothingOperations, VariationalFitConfigRoundtripAndValidation)
     EXPECT_EQ(valid.CanonicalPayloadJson,payload);
     EXPECT_NE(R::SerializePropertySmoothingConfig({}).find("\"bound_radii\":null"),std::string::npos);
     for (const char* invalid : {"{\"method\":6}","{\"smoothness_penalty\":3}","{\"data_penalty\":3}","{\"fidelity\":2}",
-             "{\"bound\":3}","{\"fit_weight\":0}","{\"noise_level\":-1}","{\"penalty_delta\":0}","{\"bound_radius\":-0.5}",
-             "{\"max_fit_iterations\":0}","{\"fit_tolerance\":1}","{\"bound_radii\":5}",
-             "{\"method\":5,\"bound\":2}","{\"fit_solver\":2}","{\"penalty_delta\":0}",
-             "{\"fit_solver\":1,\"penalty_delta\":0,\"data_penalty\":1}","{\"max_fit_iterations\":100001}",
+             "{\"bound\":3}","{\"fit_weight\":0}","{\"noise_level\":-1}","{\"method\":5,\"penalty_delta\":0}","{\"bound_radius\":-0.5}",
+             "{\"max_fit_iterations\":0}","{\"fit_tolerance\":1}","{\"bound_radii\":5}","{\"penalty_delta\":-1}",
+             "{\"method\":5,\"bound\":2}","{\"fit_solver\":2}",
+             "{\"method\":5,\"fit_solver\":1,\"penalty_delta\":0,\"data_penalty\":1}","{\"max_fit_iterations\":100001}",
              "{\"bound_norm\":2}","{\"smoothness_order\":2}","{\"second_order_weight\":0}",
-             "{\"bound_norm\":1}","{\"smoothness_order\":1}"})
+             "{\"method\":5,\"bound_norm\":1}","{\"method\":5,\"smoothness_order\":1}"})
         EXPECT_FALSE(registration.Validate(invalid,{},R::kPropertySmoothingConfigSectionName).Usable()) << invalid;
     // Unused per-row radius bindings are kept but not required.
     EXPECT_TRUE(registration.Validate("{\"method\":5,\"bound\":1}",{},R::kPropertySmoothingConfigSectionName).Usable());
@@ -352,6 +352,22 @@ TEST(PropertySmoothingOperations, VariationalFitConfigRoundtripAndValidation)
         R::kPropertySmoothingConfigSectionName).Usable()) << "ADMM accepts undamped L1";
     EXPECT_TRUE(registration.Validate("{\"method\":5,\"fit_solver\":1,\"bound_norm\":1,\"smoothness_order\":1,\"second_order_weight\":3}",{},
         R::kPropertySmoothingConfigSectionName).Usable());
+    // Fit-only combinations left over from an earlier fit do not block the other methods.
+    for (unsigned method = 0; method < 5; ++method)
+        EXPECT_TRUE(registration.Validate("{\"method\":" + std::to_string(method) +
+            ",\"fit_solver\":0,\"penalty_delta\":0,\"bound_norm\":1,\"smoothness_order\":1,\"smoothness_penalty\":1}",
+            {},R::kPropertySmoothingConfigSectionName).Usable()) << method;
+    // Specific diagnostics instead of the parameter catalogue.
+    const auto message=[&](const char* payload) {
+        const auto v=registration.Validate(payload,{},R::kPropertySmoothingConfigSectionName);
+        return v.Diagnostics.empty() ? std::string{} : v.Diagnostics.front().Message;
+    };
+    EXPECT_NE(message("{\"method\":5,\"smoothness_order\":1}").find("ADMM"),std::string::npos);
+    EXPECT_NE(message("{\"method\":5,\"penalty_delta\":0}").find("positive penalty delta"),std::string::npos);
+    EXPECT_NE(message("{\"method\":0,\"laplacian\":2}").find("lumped"),std::string::npos);
+    R::PropertySmoothingConfig faces;
+    faces.Input={D::MeshFace,"x",K::Double}; faces.Output={D::MeshFace,"y",K::Double}; faces.Weight=S::PropertyWeight::Cotangent;
+    EXPECT_NE(message(R::SerializePropertySmoothingConfig(faces).c_str()).find("Mesh edge weighting"),std::string::npos);
 }
 
 TEST(PropertySmoothingOperations, SecondOrderFitKeepsAffineSignalsOnEveryDomain)

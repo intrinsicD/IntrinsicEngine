@@ -27,13 +27,16 @@ namespace Geometry::Smoothing
             p.Fidelity <= FitFidelity::NoiseLevel && p.Bound <= FitBound::PerRow &&
             std::isfinite(p.FitWeight) && p.FitWeight > 0 && p.FitWeight <= 1e12 &&
             std::isfinite(p.NoiseLevel) && p.NoiseLevel > 0 &&
-            p.FitAlgorithm <= FitSolver::Admm && std::isfinite(p.PenaltyDelta) &&
+            p.FitAlgorithm <= FitSolver::Admm && std::isfinite(p.PenaltyDelta) && p.PenaltyDelta >= 0 &&
             p.BoundNorm <= FitBoundNorm::Euclidean && p.SmoothnessOrder <= FitOrder::Second &&
-            (p.BoundNorm == FitBoundNorm::PerChannel || p.FitAlgorithm == FitSolver::Admm) &&
-            (p.SmoothnessOrder == FitOrder::First || p.FitAlgorithm == FitSolver::Admm) &&
             std::isfinite(p.SecondOrderWeight) && p.SecondOrderWeight > 0 &&
-            (p.PenaltyDelta > 0 || (p.PenaltyDelta == 0 && p.FitAlgorithm == FitSolver::Admm &&
-                                    p.SmoothnessPenalty != FitPenalty::Huber && p.DataPenalty != FitPenalty::Huber)) &&
+            // Solver-specific fit combinations only matter when the variational fit runs; other
+            // methods ignore these fields, so a draft kept from an earlier fit stays usable.
+            (p.Method != PropertyFilter::VariationalFit ||
+             ((p.BoundNorm == FitBoundNorm::PerChannel || p.FitAlgorithm == FitSolver::Admm) &&
+              (p.SmoothnessOrder == FitOrder::First || p.FitAlgorithm == FitSolver::Admm) &&
+              (p.PenaltyDelta > 0 || (p.FitAlgorithm == FitSolver::Admm &&
+                                      p.SmoothnessPenalty != FitPenalty::Huber && p.DataPenalty != FitPenalty::Huber)))) &&
             std::isfinite(p.BoundRadius) && p.BoundRadius >= 0 &&
             p.MaxFitIterations >= 1 && p.MaxFitIterations <= 100000 &&
             std::isfinite(p.FitTolerance) && p.FitTolerance > 0 && p.FitTolerance < 1 &&

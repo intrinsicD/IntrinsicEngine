@@ -141,6 +141,15 @@ export namespace Extrinsic::Runtime
         GeometryPropertyRef BoundRadii{GeometryElementDomain::MeshVertex, "", Geometry::PropertyValueKind::Double};
         PropertySmoothingBackend Backend{PropertySmoothingBackend::Cpu};
     };
+    // Keeps an edited draft runnable: compares it with the draft before the edit and resolves the
+    // conflicts the edit created in favor of the edited choice. A new input retargets the output
+    // (an overwrite stays an overwrite, otherwise `<input>_smoothed` with the input's storage),
+    // radii and positions to the input's domain family and drops mesh-only weights, boundary
+    // pinning and lumped mass off mesh vertices; a new method drops lumped mass and Vulkan where
+    // they do not apply; fit solver, order, bound shape and penalty edits keep the ADMM-only and
+    // positive-delta requirements. Conflicts an edit of a dependent option creates stay for the
+    // validator to report.
+    void ReconcilePropertySmoothingConfig(PropertySmoothingConfig& draft, const PropertySmoothingConfig& before);
     struct EditorPropertySmoothingResult
     {
         EditorCommandStatus Status{EditorCommandStatus::NoChange};

@@ -2738,11 +2738,7 @@ namespace Extrinsic::Sandbox::Editor
             { f.SmoothnessPenalty = S::FitPenalty(smoothness); changed = true; }
             int order = int(f.SmoothnessOrder);
             if (ImGui::Combo("Smoothness order", &order, "First (differences)\0Second (non-local TGV, ADMM)\0"))
-            {
-                f.SmoothnessOrder = S::FitOrder(order);
-                if (f.SmoothnessOrder == S::FitOrder::Second) f.FitAlgorithm = S::FitSolver::Admm;
-                changed = true;
-            }
+            { f.SmoothnessOrder = S::FitOrder(order); changed = true; }
             if (f.SmoothnessOrder == S::FitOrder::Second)
                 changed |= ImGui::InputDouble("Second-order weight (alpha0/alpha1)", &f.SecondOrderWeight);
             if (ImGui::Combo("Data penalty", &data, "Quadratic\0Huber (robust)\0L1 (robust)\0"))
@@ -2764,11 +2760,7 @@ namespace Extrinsic::Sandbox::Editor
             {
                 int norm = int(f.BoundNorm);
                 if (ImGui::Combo("Bound shape", &norm, "Per channel (box)\0Euclidean (ball, ADMM)\0"))
-                {
-                    f.BoundNorm = S::FitBoundNorm(norm);
-                    if (f.BoundNorm == S::FitBoundNorm::Euclidean) f.FitAlgorithm = S::FitSolver::Admm;
-                    changed = true;
-                }
+                { f.BoundNorm = S::FitBoundNorm(norm); changed = true; }
             }
             if (f.Bound == S::FitBound::PerRow)
             {
@@ -2776,7 +2768,6 @@ namespace Extrinsic::Sandbox::Editor
                     +[](const Runtime::GeometryPropertyRef& ref) {
                         return ref.ValueKind == Geometry::PropertyValueKind::Float || ref.ValueKind == Geometry::PropertyValueKind::Double;
                     });
-                config.BoundRadii.Domain = config.Input.Domain;
             }
             int solver = int(f.FitAlgorithm);
             if (ImGui::Combo("Fit solver", &solver, "Reweighted least squares (reference)\0ADMM (one factorization, delta 0 allowed)\0"))
@@ -2800,17 +2791,13 @@ namespace Extrinsic::Sandbox::Editor
         if (!model.HasSelectedEntity || Smoothing.LastApplied.empty())
         { ImGui::TextDisabled("Select a geometry entity to smooth a property."); ImGui::End(); return; }
         auto& config = Smoothing.Draft;
+        const auto before = config;
         const auto smoothable = +[](const Runtime::GeometryPropertyRef& ref) {
             using K = Geometry::PropertyValueKind;
             return ref.ValueKind == K::Float || ref.ValueKind == K::Double || ref.ValueKind == K::Vec2 ||
                    ref.ValueKind == K::Vec3 || ref.ValueKind == K::Vec4;
         };
         bool changed = DrawProcessingPropertyInput("Input property##Smoothing", model.PropertyCatalog, config.Input, smoothable);
-        if (changed)
-        {
-            config.Output.Domain = config.Input.Domain;
-            config.Output.ValueKind = config.Input.ValueKind;
-        }
         changed |= DrawProcessingPropertyInput("Neighborhood positions##Smoothing", model.PropertyCatalog, config.Positions,
             +[](const Runtime::GeometryPropertyRef& ref) { return ref.ValueKind == Geometry::PropertyValueKind::Vec3; });
         ImGui::TextWrapped("Use positions on the input domain, or vertex/node positions to derive face centers and edge/halfedge midpoints.");
@@ -2824,22 +2811,12 @@ namespace Extrinsic::Sandbox::Editor
         }
         int method = int(config.Filter.Method), laplacian = int(config.Filter.Laplacian), weight = int(config.Weight);
         if (ImGui::Combo("Method", &method, "Averaging\0Spectral heat\0Taubin\0Bilateral\0Implicit (backward Euler)\0Variational fit (robust / TV / bounded)\0"))
-        {
-            config.Filter.Method = Geometry::Smoothing::PropertyFilter(method);
-            if (config.Filter.Method == Geometry::Smoothing::PropertyFilter::VariationalFit) config.Backend = Runtime::PropertySmoothingBackend::Cpu;
-            changed = true;
-        }
+        { config.Filter.Method = Geometry::Smoothing::PropertyFilter(method); changed = true; }
         if (config.Filter.Method != Geometry::Smoothing::PropertyFilter::VariationalFit)
         {
             int backend = int(config.Backend);
             if (ImGui::Combo("Backend##Smoothing", &backend, "CPU reference\0Vulkan (shader double precision)\0"))
-            {
-                config.Backend = Runtime::PropertySmoothingBackend(backend);
-                // Vulkan implicit smoothing runs the conjugate-gradient reference semantics.
-                if (config.Backend == Runtime::PropertySmoothingBackend::Vulkan)
-                    config.Filter.Solver = Geometry::Smoothing::PropertySolver::ConjugateGradient;
-                changed = true;
-            }
+            { config.Backend = Runtime::PropertySmoothingBackend(backend); changed = true; }
         }
         if (ImGui::Combo("Laplacian", &laplacian, "Random walk\0Combinatorial\0Lumped mesh area (implicit, fit)\0"))
         { config.Filter.Laplacian = Geometry::Smoothing::PropertyLaplacian(laplacian); changed = true; }
@@ -2860,11 +2837,7 @@ namespace Extrinsic::Sandbox::Editor
             changed |= ImGui::InputDouble("Time step", &config.Filter.TimeStep);
             int solver = int(config.Filter.Solver);
             if (ImGui::Combo("Solver", &solver, "Sparse Cholesky (direct)\0Conjugate gradient\0"))
-            {
-                config.Filter.Solver = Geometry::Smoothing::PropertySolver(solver);
-                if (config.Filter.Solver == Geometry::Smoothing::PropertySolver::Direct) config.Backend = Runtime::PropertySmoothingBackend::Cpu;
-                changed = true;
-            }
+            { config.Filter.Solver = Geometry::Smoothing::PropertySolver(solver); changed = true; }
             // CG settings also govern the fallback when the Cholesky factorization fails.
             changed |= ImGui::InputDouble("Solver tolerance", &config.Filter.SolverTolerance);
             changed |= ImGui::InputScalar("Maximum solver iterations", ImGuiDataType_U32, &config.Filter.MaxSolverIterations);
@@ -2879,6 +2852,8 @@ namespace Extrinsic::Sandbox::Editor
         const auto apply = [&](const auto& c) { return Runtime::ApplyEditorPropertySmoothingConfig(context.MeshFields.Commands, c); };
         if (changed)
         {
+            // The edited choice wins; options it invalidates fall back so the draft stays runnable.
+            Runtime::ReconcilePropertySmoothingConfig(config, before);
             Smoothing.LastResult.reset();
             Smoothing.ConfigDiagnostic = apply(config).Succeeded() ? "" : "Smoothing configuration was rejected.";
         }
@@ -2888,6 +2863,7 @@ namespace Extrinsic::Sandbox::Editor
                 [&] { return Runtime::ApplyEditorPropertySmoothingCommand(context.MeshFields.Commands, model.SelectedStableId, config,
                           [completion = SmoothingCompletion](Runtime::EditorPropertySmoothingResult result) { *completion = std::move(result); }); },
                 std::function<void(Runtime::EditorPropertySmoothingResult)>{}, "Smoothing configuration was rejected.");
+        if (!readiness.Enabled && !readiness.DisabledReason.empty()) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
         DrawProcessingPropertyShowButton(context, model.SelectedStableId, config.Output, Smoothing.VisualizationDiagnostic);
         ImGui::TextDisabled(fit ? "CPU reference; penalties use the Euclidean norm over vector channels, bounds apply per channel."
                                 : "Vectors are filtered componentwise without normalization.");
