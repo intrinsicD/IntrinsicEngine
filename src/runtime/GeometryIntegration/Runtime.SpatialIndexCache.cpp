@@ -375,8 +375,9 @@ namespace Extrinsic::Runtime
                     for (auto& work : m_Impl->Computations)
                     {
                         if (work->Result->State != SpatialQueryState::Queued) continue;
-                        auto& e = *work->Target;
-                        if (m_Impl->RecordBuild({e.Id}, commands))
+                        if (!work->Target)
+                            work->Output = work->Record(commands, {});
+                        else if (auto& e = *work->Target; m_Impl->RecordBuild({e.Id}, commands))
                             work->Output = work->Record(commands,
                                 {e.Gpu->View().NodesBDA,
                                  m_Impl->Device->GetBufferDeviceAddress(e.Points),
@@ -605,6 +606,22 @@ namespace Extrinsic::Runtime
         work->Record = std::move(record);
         work->Result->Data.resize(readbackBytes);
         s.Computations.push_back(work);
+        return work->Result;
+    }
+    std::shared_ptr<SpatialGpuResult> SpatialIndexCache::QueueGpuCompute(
+        std::size_t readbackBytes,
+        std::function<RHI::BufferHandle(RHI::ICommandContext&, const SpatialGpuIndexView&)> record)
+    {
+        auto work = std::make_shared<Impl::Computation>();
+        if (!GpuQueriesAvailable() || !record || readbackBytes == 0 || readbackBytes > (1u << 28))
+        {
+            work->Result->State = SpatialQueryState::Failed;
+            work->Result->Diagnostic = "GPU computation requires a framed device and bounded result.";
+            return work->Result;
+        }
+        work->Record = std::move(record);
+        work->Result->Data.resize(readbackBytes);
+        m_Impl->Computations.push_back(work);
         return work->Result;
     }
     std::optional<Geometry::PointLBVH::Neighbor> SpatialIndexCache::Nearest(

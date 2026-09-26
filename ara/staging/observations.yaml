@@ -4227,3 +4227,15 @@ observations:
     promoted_to: null
     crystallized_via: null
     stale: false
+
+  - id: O251
+    timestamp: 2026-09-26T23:30+02:00
+    provenance: ai-executed
+    content: Vulkan explicit property filters reproduce the CPU reference bitwise for averaging, Taubin and spectral heat, and within 9.2e-17 relative for bilateral, over 84 editor-path runs on the recorded RTX 3050.
+    context: Same-order per-row accumulation with contraction-free double arithmetic; bilateral uses a custom double exp. One device and driver; no timing claim.
+    potential_type: claim
+    bound_to: [N642]
+    promoted: true
+    promoted_to: logic/claims.md:C111
+    crystallized_via: artifact-commitment
+    stale: false

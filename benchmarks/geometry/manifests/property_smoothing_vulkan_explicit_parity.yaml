@@ -1,0 +1,27 @@
+benchmark_id: geometry.property_smoothing.vulkan_explicit_parity
+method: geometry.property_smoothing
+dataset: builtin.property_smoothing.eight_domains_and_grid.seed81
+params:
+  intent: correctness
+  capability: shader_float64
+  backend: vulkan_compute
+  cases: 84
+  domains: [mesh_vertex, mesh_edge, mesh_halfedge, mesh_face, graph_node, graph_edge, graph_halfedge, point_cloud_point]
+  filters: [averaging, spectral_heat, taubin, bilateral]
+  laplacians: [random_walk, combinatorial]
+  kinds: [float, double, vec2, vec3, vec4]
+  mesh_weights: [cotangent, mesh_uniform]
+  knn_weight: gaussian
+  neighbors: 6
+  iterations: 7
+  spectral_heat_iterations: 2
+  heat_time: 0.6
+  range_sigma: 0.5
+  warmup_iterations: 0
+  measured_iterations: 1
+  # Relative parity bound per case: max |gpu - cpu| <= 1e-12 * max(1, max |input|).
+metrics:
+  - runtime_ms
+  - quality_error_linf
+thresholds:
+  quality_error_linf_max: 1.0e-12

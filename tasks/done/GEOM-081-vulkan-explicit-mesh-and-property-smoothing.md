@@ -12,9 +12,21 @@ contracts: [repo.source-documentation, method.engine-integration, geometry.eleme
 ---
 # GEOM-081 — Vulkan explicit mesh and property smoothing
 
+## Completion — 2026-09-26
+Commit: the enclosing `claude/geom-081-vulkan-property-smoothing` commit records
+this retirement. Operational parity on the recorded RTX 3050 (C111): 84 editor-path
+runs match the CPU reference bitwise for averaging, Taubin and spectral heat and
+within 9.2e-17 relative for bilateral. Stage timings and memory moved to GEOM-103;
+the pre-existing ARA proof-path failure is BUG-224.
+
 ## Goal
 
 Add Vulkan execution for uniform/cotan Laplacian, Taubin and existing cotan scalar/vector property smoothing.
+
+Scope as implemented: since the property-smoothing unification, mesh fairing is
+`FilterProperty` on `v:position`, so the explicit filters (averaging, Taubin,
+bilateral, spectral heat) cover positions and every floating property on all
+eight canonical domains with kNN, cotangent and uniform mesh weights.
 
 ## Current state and scope
 
@@ -31,9 +43,19 @@ reviewed decision explicitly adopts a change.
 
 Existing owners and evidence:
 
-- [`src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp`](../../../src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp)
-- [`src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.Topology.cpp`](../../../src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.Topology.cpp)
-- [`src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cpp`](../../../src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cpp)
+- [`src/geometry/Geometry.PropertySmoothing.cpp`](../../src/geometry/Geometry.PropertySmoothing.cpp) (CPU reference, `PlanPropertyFilter`, `CompletePropertyFilter`)
+- [`src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Smoothing.cpp`](../../src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Smoothing.cpp) (backend selection, framed job, publication)
+- [`src/graphics/renderer/Graphics.PropertyFilter.cpp`](../../src/graphics/renderer/Graphics.PropertyFilter.cpp) and [`assets/shaders/property_filter.comp`](../../assets/shaders/property_filter.comp) (kernels)
+
+## Log
+
+- 2026-09-26: GPU recording reuses `SpatialIndexCache::QueueGpuCompute` through a
+  new index-free overload instead of a new service. Vulkan refuses without shader
+  double precision (no hidden CPU fallback), like the keypoint backend. Bitwise
+  parity comes from per-row ascending-edge accumulation with `precise` doubles;
+  bilateral needs a custom double `exp`. Implicit smoothing stays GEOM-089; the
+  variational fit has no GPU backend. On the locked desktop seat presents run at
+  about 1 Hz, so the suite runs under Xephyr (`DISPLAY=:7`).
 
 ## Engine integration
 
@@ -49,26 +71,26 @@ Existing owners and evidence:
 
 ## Acceptance criteria
 
-- [ ] Keep each iteration on the GPU using ping-pong buffers; preserve boundary pins, deleted/isolated rows and active-neighbor filtering.
-- [ ] Preserve when cotan weights and geometry-dependent quantities are recomputed; do not replace one reference operator with another.
-- [ ] Cover all currently supported floating property kinds and Taubin pass order. Implicit smoothing belongs to GEOM-089.
-- [ ] Freeze parity tolerances, precision/device capabilities and representative
+- [x] Keep each iteration on the GPU using ping-pong buffers; preserve boundary pins, deleted/isolated rows and active-neighbor filtering.
+- [x] Preserve when cotan weights and geometry-dependent quantities are recomputed; do not replace one reference operator with another.
+- [x] Cover all currently supported floating property kinds and Taubin pass order. Implicit smoothing belongs to GEOM-089.
+- [x] Freeze parity tolerances, precision/device capabilities and representative
       fixtures before GPU tuning; do not weaken reference failure semantics.
-- [ ] Reuse RHI, `ComputeParallelPrimitives`, framed JobService GPU work and
+- [x] Reuse RHI, `ComputeParallelPrimitives`, framed JobService GPU work and
       `Graphics.GpuTransfer` where their contracts fit. Geometry/physics stay
       RHI-free; no parallel service/queue/registry, device-wide waits or borrowed
       ECS references survive asynchronous work.
-- [ ] Prove requested/actual/fallback reporting and source revalidation through
+- [x] Prove requested/actual/fallback reporting and source revalidation through
       the declared control/publication path. Preserve canonical typed property
       eligibility, unrelated fields and topology; count changes are explicit.
-- [ ] Register focused CPU cases and `GEOM081Vulkan` GPU cases (labels `gpu;vulkan`)
+- [x] Register focused CPU cases and `GEOM081Vulkan` GPU cases (labels `gpu;vulkan`)
       and prove actual compute results against the independent CPU oracle.
       A fallback, skipped test or seeded reference-shaped GPU buffer is not proof.
-- [ ] Reuse/extend manifest-backed benchmark harnesses with stable IDs and v2
+- [x] (Split) Reuse/extend manifest-backed benchmark harnesses — the parity benchmark `geometry.property_smoothing.vulkan_explicit_parity` seals v2 results under `build/ci-vulkan/benchmark-ctest/GEOM-081` via `GEOM081VulkanPropertySmoothingBenchmark`; cold/warm transfer, compute, readback and memory measurements moved to GEOM-103. Original wording: with stable IDs and v2
       results under `build/ci-vulkan/benchmark-ctest/GEOM-081`. Measure cold/warm
       end-to-end time, transfers, compute, readback and memory against the current
       CPU/hybrid baseline. Benchmark fixtures run under the same `GEOM081Vulkan` selector.
-- [ ] Update affected method manifests/backend documentation, canonical
+- [x] Update affected method manifests/backend documentation, canonical
       architecture notes and module inventory when interfaces change. Bind any
       capability/parity/performance conclusion to ARA evidence; no present
       performance claim follows from filing this task.

@@ -127,6 +127,11 @@ export namespace Extrinsic::Runtime
             SpatialIndexHandle handle, std::size_t readbackBytes,
             std::function<RHI::BufferHandle(RHI::ICommandContext&,
                                            const SpatialGpuIndexView&)> record);
+        // Same framed recording and readback without an index; the view is empty.
+        [[nodiscard]] std::shared_ptr<SpatialGpuResult> QueueGpuCompute(
+            std::size_t readbackBytes,
+            std::function<RHI::BufferHandle(RHI::ICommandContext&,
+                                           const SpatialGpuIndexView&)> record);
         // Stale world/entity/property/deletion revisions return nullopt; reacquire to rebuild.
         [[nodiscard]] std::optional<Geometry::PointLBVH::Neighbor> Nearest(
             SpatialIndexHandle handle, glm::vec3 query,

@@ -1,0 +1,101 @@
+{
+  "attempt_id": "attempt-001",
+  "backend": "gpu_vulkan_compute",
+  "benchmark_id": "geometry.property_smoothing.vulkan_explicit_parity",
+  "claim_eligible": false,
+  "commit": "local-dev",
+  "config_digest": "f4615496060604c4c63c75a74624a27f4e27af0e22c9972d02e2c34ea41fb4b8",
+  "dataset": "builtin.property_smoothing.eight_domains_and_grid.seed81",
+  "diagnostics": {
+    "cases": 84,
+    "cpu_reference_total_ms": 1017.2042369999998,
+    "cpu_stages": "sample capture, graph and weight construction, plan, incidence build, final restore",
+    "max_relative_error_bilateral": 9.14654508178096e-17,
+    "max_relative_error_linear_filters": 0.0,
+    "measured_iterations": 1,
+    "mode": "smoke",
+    "runner": "IntrinsicPointLBVHGpuTests",
+    "speedup_claimed": false,
+    "vulkan_total_ms_including_frames": 43590.43172700001,
+    "warmup_iterations": 0
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/property_smoothing_vulkan_explicit_parity.yaml",
+    "sha256": "07d850050a82a4b4336898c43ffe2f66be7c3664a0a4b89b85e5f2a089963a06"
+  },
+  "method": "geometry.property_smoothing",
+  "metrics": {
+    "quality_error_linf": 9.14654508178096e-17,
+    "runtime_ms": 43590.43172700001
+  },
+  "resolved_params": {
+    "backend": "vulkan_compute",
+    "capability": "shader_float64",
+    "cases": 84,
+    "domains": [
+      "mesh_vertex",
+      "mesh_edge",
+      "mesh_halfedge",
+      "mesh_face",
+      "graph_node",
+      "graph_edge",
+      "graph_halfedge",
+      "point_cloud_point"
+    ],
+    "filters": [
+      "averaging",
+      "spectral_heat",
+      "taubin",
+      "bilateral"
+    ],
+    "heat_time": 0.6,
+    "intent": "correctness",
+    "iterations": 7,
+    "kinds": [
+      "float",
+      "double",
+      "vec2",
+      "vec3",
+      "vec4"
+    ],
+    "knn_weight": "gaussian",
+    "laplacians": [
+      "random_walk",
+      "combinatorial"
+    ],
+    "measured_iterations": 1,
+    "mesh_weights": [
+      "cotangent",
+      "mesh_uniform"
+    ],
+    "neighbors": 6,
+    "range_sigma": 0.5,
+    "spectral_heat_iterations": 2,
+    "warmup_iterations": 0
+  },
+  "run_id": "ctest-geom081-vulkan-property-smoothing",
+  "schema_version": 2,
+  "source": {
+    "revision": "local-dev",
+    "state": "dirty_worktree"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 1e-12,
+      "metric": "quality_error_linf",
+      "observed": 9.14654508178096e-17,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_linf_max"
+    }
+  ],
+  "thresholds": {
+    "quality_error_linf_max": 1e-12
+  },
+  "warmup_policy": {
+    "measured_iterations": 1,
+    "warmup_iterations": 0
+  }
+}

@@ -6,6 +6,8 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
+#include <memory>
 #include <initializer_list>
 #include <limits>
 #include <functional>
@@ -34,6 +36,13 @@ import Extrinsic.Runtime.MeshSurfaceTopology;
 import Geometry.HalfedgeMesh;
 import Geometry.Smoothing;
 import Geometry.HarmonicField;
+import Extrinsic.Graphics.PropertyFilter;
+import Extrinsic.RHI.Device;
+import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.CommandContext;
+import Extrinsic.Runtime.KernelEvents;
+import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.GeometryPresentation;
 import Geometry.DEC;
 import Geometry.Properties;
 #include "Config/internal/Runtime.PointConfigJson.hpp"
@@ -61,6 +70,11 @@ namespace Extrinsic::Runtime
         using PropertyGraphDetail::CountMatches;
         using PropertyGraphDetail::Capture;
         using PropertyGraphDetail::Same;
+        bool ExplicitFilter(S::PropertyFilter method)
+        {
+            return method == S::PropertyFilter::Averaging || method == S::PropertyFilter::SpectralHeat ||
+                   method == S::PropertyFilter::Taubin || method == S::PropertyFilter::Bilateral;
+        }
         bool PerRowBounds(const PropertySmoothingConfig& c)
         { return c.Filter.Method == S::PropertyFilter::VariationalFit && c.Filter.Bound == S::FitBound::PerRow; }
         PropertySmoothingConfig Decode(const Json& doc)
@@ -98,6 +112,7 @@ namespace Extrinsic::Runtime
             c.Filter.BoundNorm = S::FitBoundNorm(doc.at("bound_norm").get<unsigned>());
             c.Filter.SmoothnessOrder = S::FitOrder(doc.at("smoothness_order").get<unsigned>());
             c.Filter.SecondOrderWeight = doc.at("second_order_weight").get<double>();
+            c.Backend = PropertySmoothingBackend(doc.at("backend").get<unsigned>());
             c.Filter.MaxFitIterations = doc.at("max_fit_iterations").get<std::uint32_t>();
             c.Filter.FitTolerance = doc.at("fit_tolerance").get<double>();
             return c;
@@ -111,7 +126,7 @@ namespace Extrinsic::Runtime
                 "Smoothing config must be an object.", "Unknown smoothing field: ",
                 {"method", "weight", "laplacian", "solver", "iterations", "neighbors", "max_solver_iterations",
                  "smoothness_penalty", "data_penalty", "fidelity", "bound", "fit_solver", "max_fit_iterations",
-                 "bound_norm", "smoothness_order"}))
+                 "bound_norm", "smoothness_order", "backend"}))
                 return ConfigDetail::RejectConfigSection(subject, *error);
             for (const auto key : {"input", "output", "positions"})
             {
@@ -139,13 +154,16 @@ namespace Extrinsic::Runtime
                 merged["bound"].get<unsigned>() > unsigned(S::FitBound::PerRow) ||
                 merged["fit_solver"].get<unsigned>() > unsigned(S::FitSolver::Admm) ||
                 merged["bound_norm"].get<unsigned>() > unsigned(S::FitBoundNorm::Euclidean) ||
-                merged["smoothness_order"].get<unsigned>() > unsigned(S::FitOrder::Second))
+                merged["smoothness_order"].get<unsigned>() > unsigned(S::FitOrder::Second) ||
+                merged["backend"].get<unsigned>() > unsigned(PropertySmoothingBackend::Vulkan))
                 return ConfigDetail::RejectConfigSection(subject, "Unknown smoothing method, weight, Laplacian, solver, penalty, fidelity, bound, fit solver, bound norm or smoothness order.");
             if (!merged["preserve_boundary"].is_boolean())
                 return ConfigDetail::RejectConfigSection(subject, "preserve_boundary must be boolean.");
             const auto c = Decode(merged);
             if (!S::ValidatePropertyFilterParams(c.Filter) || c.Neighbors < 1 || c.Neighbors > 1024 || c.SpatialSigma <= 0)
                 return ConfigDetail::RejectConfigSection(subject, "Invalid smoothing parameters: iterations 1..10000, neighbors 1..1024, lambda (0,1], mu [-1,0), heat time (0,1000], positive sigmas/time step, solver tolerance (0,1), solver iterations 1..100000, fit weight (0,1e12], positive noise level, penalty delta positive (0 only for ADMM without Huber), Euclidean bounds and second order only with ADMM, positive second-order weight, nonnegative bound radius, fit iterations 1..100000, fit tolerance (0,1).");
+            if (c.Backend == PropertySmoothingBackend::Vulkan && !ExplicitFilter(c.Filter.Method))
+                return ConfigDetail::RejectConfigSection(subject, "Vulkan runs averaging, spectral heat, Taubin and bilateral filters; implicit and variational smoothing are CPU-only.");
             if (PerRowBounds(c) && (c.BoundRadii.Name.empty() || c.BoundRadii.Domain != c.Input.Domain))
                 return ConfigDetail::RejectConfigSection(subject, "Per-row bounds need a float/double radius property on the input domain.");
             if (c.Input.Domain != c.Output.Domain || GeometryPropertyComponentCount(c.Input.ValueKind) != GeometryPropertyComponentCount(c.Output.ValueKind) ||
@@ -187,6 +205,10 @@ namespace Extrinsic::Runtime
             { diagnostic = "Choose an existing vec3 position property."; return {}; }
             if (PerRowBounds(c) && (!ResolveGeometryProperty(a, c.BoundRadii, props->Size(), false).Resolved() || !CountMatches(*props, c.BoundRadii)))
             { diagnostic = "Choose an existing float/double bound radius property."; return {}; }
+            if (c.Backend == PropertySmoothingBackend::Vulkan &&
+                (!context.Device || !context.Device->IsOperational() || !context.Device->SupportsShaderFloat64() ||
+                 !context.SpatialIndices || !context.SpatialIndices->GpuQueriesAvailable() || !context.JobCommands.Available()))
+            { diagnostic = "Vulkan property smoothing needs an operational device with shader double precision and framed GPU jobs."; return {}; }
             return entity;
         }
     }
@@ -206,7 +228,7 @@ namespace Extrinsic::Runtime
             {"bound_radii", c.BoundRadii.Name.empty() ? Json(nullptr) : ConfigDetail::EncodePointPropertyRef(c.BoundRadii)},
             {"fit_solver", unsigned(c.Filter.FitAlgorithm)}, {"max_fit_iterations", c.Filter.MaxFitIterations},
             {"bound_norm", unsigned(c.Filter.BoundNorm)}, {"smoothness_order", unsigned(c.Filter.SmoothnessOrder)},
-            {"second_order_weight", c.Filter.SecondOrderWeight}, {"fit_tolerance", c.Filter.FitTolerance}}.dump();
+            {"second_order_weight", c.Filter.SecondOrderWeight}, {"backend", unsigned(c.Backend)}, {"fit_tolerance", c.Filter.FitTolerance}}.dump();
     }
     Core::Config::EngineConfigSectionRegistration MakePropertySmoothingConfigSectionRegistration()
     { return {.DefaultSection = Section({}), .Validate = Validate}; }
@@ -231,10 +253,117 @@ namespace Extrinsic::Runtime
         const auto entity = Target(context, id, c, diagnostic);
         return {entity.has_value(), std::move(diagnostic)};
     }
-    EditorPropertySmoothingResult ApplyEditorPropertySmoothingCommand(const EditorProcessingCommands& commands, std::uint32_t id, const PropertySmoothingConfig& c)
+    namespace
+    {
+        // Everything publication needs after the filter ran, synchronously or after a GPU readback.
+        struct SmoothingPublication
+        {
+            ECS::EntityHandle Entity{};
+            PropertySmoothingConfig Config{};
+            std::vector<std::uint32_t> Slots{};
+            std::size_t SlotCount{}, Channels{};
+            Snapshot Before{};
+            decltype(GP::PointInputCapture::Inputs) Watches{};
+        };
+
+        EditorPropertySmoothingResult Publish(const EditorProcessingContext& context, const SmoothingPublication& p,
+                                              const S::PropertyFilterResult& filtered, EditorPropertySmoothingResult result,
+                                              const std::string& summary)
+        {
+            if (!filtered.Success)
+            {
+                result.Status = EditorCommandStatus::InvalidProcessingParameters;
+                result.Message = filtered.Diagnostic;
+                return result;
+            }
+            Snapshot after = p.Before;
+            after.Exists = true;
+            bool representable = true;
+            std::visit([&](auto& rows) {
+                using T = typename std::decay_t<decltype(rows)>::value_type;
+                rows.resize(p.SlotCount, T{0});
+                for (std::size_t i = 0; i < p.Slots.size(); ++i)
+                    for (std::size_t ch = 0; ch < Channels<T>(); ++ch)
+                    {
+                        const double value = filtered.Values[i * p.Channels + ch];
+                        if constexpr (!std::is_same_v<T, double>)
+                            if (std::abs(value) > std::numeric_limits<float>::max()) { representable = false; continue; }
+                        SetChannel(rows[p.Slots[i]], ch, value);
+                    }
+            }, after.Values);
+            if (!representable)
+            {
+                result.Status = EditorCommandStatus::InvalidProcessingParameters;
+                result.Message = "Smoothed values exceed output storage range.";
+                return result;
+            }
+            result.OperatorApplications = filtered.OperatorApplications;
+            // The diagnostic starts with the backend identity; a CG fallback note may follow.
+            result.BackendId = filtered.Diagnostic.substr(0, filtered.Diagnostic.find(' '));
+            if (Same(p.Before, after)) { result.Status = EditorCommandStatus::NoChange; result.Message = "Smoothed property is unchanged."; return result; }
+            const auto mutate = [context, entity = p.Entity, output = p.Config.Output, watches = p.Watches]
+                (const Snapshot& expected, const Snapshot& target) {
+                if (!GP::GeometryPropertiesCurrent(context, entity, watches) || !GP::EditorProcessingContextWorldCurrent(context))
+                    return EditorCommandHistoryStatus::StaleEntity;
+                auto* properties = GP::MutableGeometryProperties(context.Scene->Raw(), entity, output.Domain);
+                if (!properties || !Same(Capture(*properties, output), expected)) return EditorCommandHistoryStatus::StaleEntity;
+                std::visit([&](const auto& rows) {
+                    using T = typename std::decay_t<decltype(rows)>::value_type;
+                    if (target.Exists) properties->GetOrAdd<T>(output.Name).Vector() = rows;
+                    else if (auto property = properties->Get<T>(output.Name)) properties->Remove(property);
+                }, target.Values);
+                ECS::Components::DirtyTags::MarkGpuDirty(context.Scene->Raw(), entity);
+                if (output.Name == "v:position") ECS::Components::DirtyTags::MarkVertexPositionsDirty(context.Scene->Raw(), entity);
+                if (context.InvalidateWorkspaceSnapshotCache) context.InvalidateWorkspaceSnapshotCache();
+                return EditorCommandHistoryStatus::Applied;
+            };
+            const auto& before = p.Before;
+            const auto status = context.CommandHistory ? context.CommandHistory->Execute({.Label = "Smooth property",
+                .Redo = [mutate, before, after] { return mutate(before, after); },
+                .Undo = [mutate, before, after] { return mutate(after, before); }}).Status : mutate(before, after);
+            result.Status = EditorFeatureDetail::ToEditorCommandStatus(status);
+            result.Message = result.Succeeded() ? "Property smoothed (" + filtered.Diagnostic + summary + ")." : "Property publication rejected by history guards.";
+            return result;
+        }
+
+        struct SmoothingGpuWork
+        {
+            SmoothingPublication Publication{};
+            std::vector<double> Values{};
+            S::PropertyFilterPlan Plan{};
+            std::vector<std::uint32_t> Edges{}, Fixed{};
+            std::vector<double> Weights{};
+            Graphics::PropertyFilterGpuParams Params{};
+            std::shared_ptr<SpatialGpuResult> Gpu{};
+            EditorPropertySmoothingResult Result{};
+            bool Abandoned{};
+        };
+
+        Graphics::PropertyFilterGpuParams GpuParams(const S::PropertyFilterParams& f, const S::PropertyFilterPlan& plan)
+        {
+            // Mirrors FilterProperty: combinatorial explicit steps divide by the maximum degree,
+            // and a zero rate skips every iteration.
+            const double scale = f.Laplacian == S::PropertyLaplacian::Combinatorial ? plan.Rate : 1.0;
+            return {.Method = f.Method == S::PropertyFilter::SpectralHeat ? Graphics::PropertyFilterGpuMethod::SpectralHeat
+                      : f.Method == S::PropertyFilter::Taubin ? Graphics::PropertyFilterGpuMethod::Taubin
+                      : f.Method == S::PropertyFilter::Bilateral ? Graphics::PropertyFilterGpuMethod::Bilateral
+                      : Graphics::PropertyFilterGpuMethod::Averaging,
+                    .RandomWalk = f.Laplacian == S::PropertyLaplacian::RandomWalk,
+                    .Iterations = plan.Rate > 0 ? f.Iterations : 0u,
+                    .Step = plan.Rate > 0 ? f.Lambda / scale : 0.0, .TaubinStep = plan.Rate > 0 ? f.Mu / scale : 0.0,
+                    .RangeSigma = f.RangeSigma, .HeatStep = plan.Rate > 0 ? 1.0 / plan.Rate : 0.0,
+                    .HeatSplits = std::uint32_t(plan.HeatSplits), .HeatCoefficients = plan.HeatCoefficients,
+                    .HeatMass = plan.HeatMass > 0 ? plan.HeatMass : 1.0};
+        }
+    }
+
+    EditorPropertySmoothingResult ApplyEditorPropertySmoothingCommand(const EditorProcessingCommands& commands, std::uint32_t id,
+                                                                      const PropertySmoothingConfig& c,
+                                                                      std::function<void(EditorPropertySmoothingResult)> onComplete)
     {
         const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         EditorPropertySmoothingResult result;
+        result.RequestedBackend = c.Backend;
         const auto fail = [&](std::string message) { result.Status = EditorCommandStatus::InvalidProcessingParameters; result.Message = std::move(message); return result; };
         std::string diagnostic;
         const auto entity = Target(context, id, c, diagnostic);
@@ -243,7 +372,7 @@ namespace Extrinsic::Runtime
         GP::PointInputCapture samples;
         if (!PropertyGraphDetail::CaptureSamples(a, c.Input.Domain, c.Positions, samples, diagnostic)) return fail(diagnostic);
         const auto* props = ResolveGeometryPropertySet(a, c.Input.Domain);
-        const auto input = Capture(*props, c.Input), before = Capture(*props, c.Output);
+        const auto input = Capture(*props, c.Input);
         const auto channels = GeometryPropertyComponentCount(c.Input.ValueKind);
         std::vector<double> values;
         std::visit([&](const auto& rows) {
@@ -255,6 +384,108 @@ namespace Extrinsic::Runtime
                 .SpatialSigma = c.SpatialSigma, .LumpedMass = c.Filter.Laplacian == S::PropertyLaplacian::LumpedMass,
                 .BoundaryRows = c.PreserveBoundary, .Operation = "Property smoothing"}, samples, graph, diagnostic))
             return fail(diagnostic);
+        result.LiveCount = samples.LiveCount;
+        result.EdgeCount = graph.Edges.size();
+        // An aliased output is guarded by its expected values; unrelated input revisions stay fixed.
+        SmoothingPublication publication{.Entity = *entity, .Config = c, .Slots = samples.Slots,
+            .SlotCount = samples.SlotCount, .Channels = channels, .Before = Capture(*props, c.Output),
+            .Watches = std::move(samples.Inputs)};
+        publication.Watches.push_back(GP::ObserveGeometryProperty(a, c.Input.Domain, c.Input.Name));
+        if (PerRowBounds(c)) publication.Watches.push_back(GP::ObserveGeometryProperty(a, c.BoundRadii.Domain, c.BoundRadii.Name));
+        std::erase_if(publication.Watches, [&](const auto& watch) { return watch.Domain == c.Output.Domain && watch.Name == c.Output.Name; });
+
+        if (c.Backend == PropertySmoothingBackend::Vulkan)
+        {
+            auto w = std::make_shared<SmoothingGpuWork>();
+            auto plan = S::PlanPropertyFilter(values, channels, graph.Edges, c.Filter, graph.BoundaryRows, graph.Mass, diagnostic);
+            if (!plan) return fail(diagnostic);
+            w->Plan = std::move(*plan);
+            w->Params = GpuParams(c.Filter, w->Plan);
+            if (Graphics::PropertyFilterWorkspace::DispatchCount(w->Params) > Graphics::PropertyFilterWorkspace::MaxDispatches)
+                return fail("Vulkan smoothing would exceed its dispatch budget; lower iterations or heat time, or use the CPU.");
+            if (values.size() * sizeof(double) > (std::size_t{1} << 28) || w->Plan.Count > (1u << 24) || graph.Edges.size() > (1u << 26))
+                return fail("Vulkan smoothing supports at most 2^24 rows, 2^26 edges and 256 MiB of values.");
+            for (const auto& edge : graph.Edges)
+            {
+                w->Edges.insert(w->Edges.end(), {std::uint32_t(edge.A), std::uint32_t(edge.B)});
+                w->Weights.push_back(edge.Weight);
+            }
+            for (const bool fixed : w->Plan.Fixed) w->Fixed.push_back(fixed ? 1u : 0u);
+            w->Values = std::move(values);
+            w->Publication = std::move(publication);
+            w->Result = result;
+            const EditorJobIdentity identity{.EntityId = id, .Scope = ToEditorJobScope(c.Output.Domain),
+                .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField, .OutputName = c.Output.Name};
+            if (auto active = GP::MeshSupport::FindActiveEditorJob(context, identity); active && IsActiveEditorJobState(active->State))
+            {
+                result.Status = EditorCommandStatus::Pending;
+                result.Message = "A smoothing job for this output is already active.";
+                return result;
+            }
+            auto sink = GuardEditorProcessingResult(context, std::move(onComplete));
+            auto delivered = std::make_shared<bool>(false);
+            auto pending = result;
+            pending.Status = EditorCommandStatus::Pending;
+            pending.Message = "Vulkan property smoothing queued.";
+            const auto current = [context, w] {
+                return !w->Abandoned && GP::GeometryPropertiesCurrent(context, w->Publication.Entity, w->Publication.Watches) &&
+                       GP::EditorProcessingContextWorldCurrent(context);
+            };
+            JobDesc gpu{
+                .DebugName = "Vulkan property smoothing", .Scope = context.World, .Kind = RuntimeTaskKinds::GeometryProcess,
+                .Work = [](const JobCancellation&) { return JobResultEnvelope::Make(true); },
+                .IsReadyToApply = [context, w, current] {
+                    if (!current()) return true;
+                    if (!w->Gpu)
+                    {
+                        auto workspace = std::make_shared<Graphics::PropertyFilterWorkspace>(*context.Device);
+                        w->Gpu = context.SpatialIndices->QueueGpuCompute(w->Values.size() * sizeof(double),
+                            [workspace, w](RHI::ICommandContext& commands, const SpatialGpuIndexView&) -> RHI::BufferHandle {
+                                if (w->Abandoned) return {};
+                                return workspace->Record(commands, {.Values = w->Values, .Channels = std::uint32_t(w->Plan.Channels),
+                                    .Edges = w->Edges, .Weights = w->Weights, .Degree = w->Plan.Degree, .Fixed = w->Fixed}, w->Params);
+                            });
+                    }
+                    return w->Gpu->State == SpatialQueryState::Ready || w->Gpu->State == SpatialQueryState::Failed;
+                },
+                .ValidateBeforeApply = [current] { return current() ? JobApplyValidation::Current : JobApplyValidation::StaleGeneration; },
+                .PublishCompletion = [context, w, sink, delivered](KernelEventBus&, const JobResultEnvelope&) {
+                    auto result = w->Result;
+                    S::PropertyFilterResult filtered;
+                    if (!w->Gpu || w->Gpu->State != SpatialQueryState::Ready)
+                        filtered.Diagnostic = w->Gpu && !w->Gpu->Diagnostic.empty() ? w->Gpu->Diagnostic
+                                              : "Vulkan property smoothing did not return a result; previous output retained.";
+                    else
+                    {
+                        std::vector<double> gpuValues(w->Values.size());
+                        std::memcpy(gpuValues.data(), w->Gpu->Data.data(), gpuValues.size() * sizeof(double));
+                        filtered = S::CompletePropertyFilter(w->Plan, w->Values, std::move(gpuValues), "vulkan_compute");
+                        filtered.OperatorApplications = Graphics::PropertyFilterWorkspace::DispatchCount(w->Params);
+                    }
+                    result = Publish(context, w->Publication, filtered, std::move(result), "");
+                    if (!w->Gpu || w->Gpu->State != SpatialQueryState::Ready) result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                    *delivered = true;
+                    if (sink) sink(result);
+                    return result.Succeeded();
+                },
+                .FinalizeUnpublishedOnMainThread = [w, sink, delivered, pending]() mutable {
+                    w->Abandoned = true;
+                    if (*delivered) return;
+                    *delivered = true;
+                    pending.Status = EditorCommandStatus::StaleEntity;
+                    pending.Message = "Vulkan property smoothing cancelled or stale; previous output retained.";
+                    if (sink) sink(std::move(pending));
+                }};
+            if (!context.JobCommands.Submit(std::move(gpu), identity).IsValid())
+            {
+                w->Abandoned = true;
+                result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                result.Message = "Vulkan property smoothing submission rejected.";
+                return result;
+            }
+            return pending;
+        }
+
         S::PropertyFilterResult filtered;
         std::string fitSummary;
         if (c.Filter.Method == S::PropertyFilter::VariationalFit)
@@ -291,54 +522,6 @@ namespace Extrinsic::Runtime
                          (fit.Stats.NoiseTargetClamped ? "; noise level unreachable, weight clamped" : "");
         }
         else filtered = S::FilterProperty(values, channels, graph.Edges, c.Filter, graph.BoundaryRows, graph.Mass);
-        if (!filtered.Success) return fail(filtered.Diagnostic);
-        Snapshot after = before;
-        after.Exists = true;
-        bool representable = true;
-        std::visit([&](auto& rows) {
-            using T = typename std::decay_t<decltype(rows)>::value_type;
-            rows.resize(samples.SlotCount, T{0});
-            for (std::size_t i = 0; i < samples.Slots.size(); ++i)
-                for (std::size_t ch = 0; ch < Channels<T>(); ++ch)
-                {
-                    const double value = filtered.Values[i * channels + ch];
-                    if constexpr (!std::is_same_v<T, double>)
-                        if (std::abs(value) > std::numeric_limits<float>::max()) { representable = false; continue; }
-                    SetChannel(rows[samples.Slots[i]], ch, value);
-                }
-        }, after.Values);
-        if (!representable) return fail("Smoothed values exceed output storage range.");
-        result.LiveCount = samples.LiveCount;
-        result.EdgeCount = graph.Edges.size();
-        result.OperatorApplications = filtered.OperatorApplications;
-        // The diagnostic starts with the backend identity; a CG fallback note may follow.
-        result.BackendId = filtered.Diagnostic.substr(0, filtered.Diagnostic.find(' '));
-        if (Same(before, after)) { result.Message = "Smoothed property is unchanged."; return result; }
-        // An aliased output is guarded by its expected values; unrelated input revisions stay fixed.
-        samples.Inputs.push_back(GP::ObserveGeometryProperty(a, c.Input.Domain, c.Input.Name));
-        if (PerRowBounds(c)) samples.Inputs.push_back(GP::ObserveGeometryProperty(a, c.BoundRadii.Domain, c.BoundRadii.Name));
-        std::erase_if(samples.Inputs, [&](const auto& watch) { return watch.Domain == c.Output.Domain && watch.Name == c.Output.Name; });
-        const auto mutate = [context, entity = *entity, output = c.Output, watches = std::move(samples.Inputs)]
-            (const Snapshot& expected, const Snapshot& target) {
-            if (!GP::GeometryPropertiesCurrent(context, entity, watches) || !GP::EditorProcessingContextWorldCurrent(context))
-                return EditorCommandHistoryStatus::StaleEntity;
-            auto* properties = GP::MutableGeometryProperties(context.Scene->Raw(), entity, output.Domain);
-            if (!properties || !Same(Capture(*properties, output), expected)) return EditorCommandHistoryStatus::StaleEntity;
-            std::visit([&](const auto& rows) {
-                using T = typename std::decay_t<decltype(rows)>::value_type;
-                if (target.Exists) properties->GetOrAdd<T>(output.Name).Vector() = rows;
-                else if (auto property = properties->Get<T>(output.Name)) properties->Remove(property);
-            }, target.Values);
-            ECS::Components::DirtyTags::MarkGpuDirty(context.Scene->Raw(), entity);
-            if (output.Name == "v:position") ECS::Components::DirtyTags::MarkVertexPositionsDirty(context.Scene->Raw(), entity);
-            if (context.InvalidateWorkspaceSnapshotCache) context.InvalidateWorkspaceSnapshotCache();
-            return EditorCommandHistoryStatus::Applied;
-        };
-        const auto status = context.CommandHistory ? context.CommandHistory->Execute({.Label = "Smooth property",
-            .Redo = [mutate, before, after] { return mutate(before, after); },
-            .Undo = [mutate, before, after] { return mutate(after, before); }}).Status : mutate(before, after);
-        result.Status = EditorFeatureDetail::ToEditorCommandStatus(status);
-        result.Message = result.Succeeded() ? "Property smoothed (" + filtered.Diagnostic + fitSummary + ")." : "Property publication rejected by history guards.";
-        return result;
+        return Publish(context, publication, filtered, std::move(result), fitSummary);
     }
 }

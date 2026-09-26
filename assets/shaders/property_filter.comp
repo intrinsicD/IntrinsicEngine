@@ -1,0 +1,108 @@
+#version 460
+// Explicit graph property filters (averaging, Taubin, bilateral, spectral heat) in double
+// precision. Row kernels visit each row's incident edges in ascending edge order, which is the
+// order the CPU reference scatters them, so sums round identically.
+#extension GL_ARB_gpu_shader_fp64 : require
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+layout(local_size_x = 64) in;
+
+layout(buffer_reference, scalar) buffer Doubles { double v[]; };
+layout(buffer_reference, scalar) buffer Uints { uint v[]; };
+
+const uint ModeApply = 0, ModeBilateralWeights = 1, ModeBilateralDegree = 2,
+           ModeScale = 3, ModeAxpy = 4, ModeDivide = 5, ModeCopy = 6;
+
+layout(push_constant, scalar) uniform Push {
+    uint64_t src, dst, edges, weights, baseWeights, offsets, incidences, degree, fixedRows;
+    uint rows, channels, edgeCount, mode;
+    uint randomWalk, reserved;
+    double scalar;
+} pc;
+
+// exp for x <= 0: Cody-Waite reduction by ln 2 and a degree-13 Taylor polynomial on
+// |r| <= ln2/2 (truncation below 5e-18 relative); GLSL has no double-precision exp.
+double ExpNonPositive(double x)
+{
+    if (x < -745.2lf) return 0.0lf;
+    const double invLn2 = 1.44269504088896338700e+00lf;
+    const double ln2Hi = 6.93147180369123816490e-01lf, ln2Lo = 1.90821492927058770002e-10lf;
+    double n = floor(x * invLn2 + 0.5lf);
+    precise double r = (x - n * ln2Hi) - n * ln2Lo;
+    precise double p = 1.0lf / 6227020800.0lf;
+    p = p * r + 1.0lf / 479001600.0lf;
+    p = p * r + 1.0lf / 39916800.0lf;
+    p = p * r + 1.0lf / 3628800.0lf;
+    p = p * r + 1.0lf / 362880.0lf;
+    p = p * r + 1.0lf / 40320.0lf;
+    p = p * r + 1.0lf / 5040.0lf;
+    p = p * r + 1.0lf / 720.0lf;
+    p = p * r + 1.0lf / 120.0lf;
+    p = p * r + 1.0lf / 24.0lf;
+    p = p * r + 1.0lf / 6.0lf;
+    p = p * r + 0.5lf;
+    p = p * r + 1.0lf;
+    p = p * r + 1.0lf;
+    return ldexp(p, int(n));
+}
+
+void main()
+{
+    const uint id = gl_GlobalInvocationID.x;
+    Doubles src = Doubles(pc.src), dst = Doubles(pc.dst);
+    const uint C = pc.channels;
+    if (pc.mode == ModeBilateralWeights)
+    {
+        if (id >= pc.edgeCount) return;
+        const uint a = Uints(pc.edges).v[2 * id], b = Uints(pc.edges).v[2 * id + 1];
+        precise double norm = 0.0lf;
+        for (uint c = 0; c < C; ++c)
+        {
+            precise double d = (src.v[a * C + c] - src.v[b * C + c]) / pc.scalar;
+            norm += d * d;
+        }
+        precise double w = Doubles(pc.baseWeights).v[id] * ExpNonPositive(-0.5lf * norm);
+        Doubles(pc.weights).v[id] = w;
+        return;
+    }
+    if (id >= pc.rows) return;
+    if (pc.mode == ModeBilateralDegree)
+    {
+        precise double sum = 1.0lf;
+        for (uint k = Uints(pc.offsets).v[id]; k < Uints(pc.offsets).v[id + 1]; ++k)
+            sum += Doubles(pc.weights).v[Uints(pc.incidences).v[k]];
+        Doubles(pc.degree).v[id] = sum;
+        return;
+    }
+    if (pc.mode == ModeApply)
+    {
+        const bool frozen = Uints(pc.fixedRows).v[id] != 0;
+        const double divisor = pc.randomWalk != 0 ? Doubles(pc.degree).v[id] : 1.0lf;
+        for (uint c = 0; c < C; ++c)
+        {
+            precise double delta = 0.0lf;
+            for (uint k = Uints(pc.offsets).v[id]; k < Uints(pc.offsets).v[id + 1]; ++k)
+            {
+                const uint e = Uints(pc.incidences).v[k];
+                const uint a = Uints(pc.edges).v[2 * e], b = Uints(pc.edges).v[2 * e + 1];
+                precise double difference = Doubles(pc.weights).v[e] * (src.v[b * C + c] - src.v[a * C + c]);
+                if (a == id) delta += difference;
+                else delta -= difference;
+            }
+            precise double update = !frozen && divisor > 0.0lf ? pc.scalar * delta / divisor : 0.0lf;
+            precise double value = src.v[id * C + c] + update;
+            dst.v[id * C + c] = value;
+        }
+        return;
+    }
+    for (uint c = 0; c < C; ++c)
+    {
+        const uint j = id * C + c;
+        if (pc.mode == ModeScale) { precise double value = pc.scalar * src.v[j]; dst.v[j] = value; }
+        else if (pc.mode == ModeAxpy) { precise double value = dst.v[j] + pc.scalar * src.v[j]; dst.v[j] = value; }
+        else if (pc.mode == ModeDivide) { precise double value = src.v[j] / pc.scalar; dst.v[j] = value; }
+        else dst.v[j] = src.v[j];
+    }
+}

@@ -123,6 +123,9 @@ export namespace Extrinsic::Runtime
     };
 
     inline constexpr std::string_view kPropertySmoothingConfigSectionName = "sandbox.property_smoothing";
+    // Vulkan runs the explicit filters (averaging, spectral heat, Taubin, bilateral) in double
+    // precision and needs an operational device with shader double support; it never falls back.
+    enum class PropertySmoothingBackend : std::uint8_t { Cpu, Vulkan };
     struct PropertySmoothingConfig
     {
         GeometryPropertyRef Input{GeometryElementDomain::MeshVertex, "v:mean_curvature", Geometry::PropertyValueKind::Double};
@@ -136,6 +139,7 @@ export namespace Extrinsic::Runtime
         // Variational fit with FitBound::PerRow: nonnegative float/double radius per input row.
         // An empty name serializes as null; the binding is only resolved when per-row bounds are used.
         GeometryPropertyRef BoundRadii{GeometryElementDomain::MeshVertex, "", Geometry::PropertyValueKind::Double};
+        PropertySmoothingBackend Backend{PropertySmoothingBackend::Cpu};
     };
     struct EditorPropertySmoothingResult
     {
@@ -144,6 +148,8 @@ export namespace Extrinsic::Runtime
         // Variational fit only: data weight used, mass-weighted RMS residual and active bounds.
         double FitWeight{}, RmsResidual{};
         std::size_t ActiveBounds{};
+        PropertySmoothingBackend RequestedBackend{PropertySmoothingBackend::Cpu};
+        // Actual backend: cpu_reference, cpu_sparse_cholesky, cpu_admm_sparse_cholesky, vulkan_compute, ...
         std::string BackendId{"cpu_reference"};
         std::string Message{};
         [[nodiscard]] bool Succeeded() const noexcept
@@ -156,8 +162,11 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::optional<PropertySmoothingConfig> GetEditorPropertySmoothingConfig(const EditorProcessingCommands&);
     [[nodiscard]] ActionReadiness PreviewEditorPropertySmoothingCommand(
         const EditorProcessingCommands&, std::uint32_t stableEntityId, const PropertySmoothingConfig&);
+    // CPU runs publish synchronously. Vulkan returns Pending and delivers the published (or stale
+    // or failed) result to onComplete once the framed readback completes.
     [[nodiscard]] EditorPropertySmoothingResult ApplyEditorPropertySmoothingCommand(
-        const EditorProcessingCommands&, std::uint32_t stableEntityId, const PropertySmoothingConfig&);
+        const EditorProcessingCommands&, std::uint32_t stableEntityId, const PropertySmoothingConfig&,
+        std::function<void(EditorPropertySmoothingResult)> onComplete = {});
 
     // Harmonic/biharmonic/triharmonic interpolation and Poisson solves of a typed property from
     // constrained rows, or random-walker propagation of Int32 seed labels, over the same sample

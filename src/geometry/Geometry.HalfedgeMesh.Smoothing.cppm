@@ -1,7 +1,7 @@
 // Exposes topology-preserving mesh filters and scalar/vector graph filters
 // independently of runtime property storage and domain provenance.
 module;
-
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -31,6 +31,32 @@ export namespace Geometry::Smoothing
         std::size_t OperatorApplications{};
     };
     [[nodiscard]] bool ValidatePropertyFilterParams(const PropertyFilterParams&) noexcept;
+    // Validated preparation shared by FilterProperty and GPU backends of the explicit filters.
+    // Fixed and isolated rows keep their input values. Degree holds the initial weighted degree;
+    // Rate is the maximum degree for combinatorial Laplacians and 1 for random walk. Spectral
+    // heat applies HeatSplits steps of the series sum_k HeatCoefficients[k] (I - L/Rate)^k,
+    // normalized by HeatMass.
+    struct PropertyFilterPlan
+    {
+        std::size_t Count{}, Channels{};
+        std::vector<bool> Fixed{}, Isolated{};
+        std::vector<double> Degree{};
+        double Rate{};
+        std::size_t HeatSplits{};
+        std::array<double, 19> HeatCoefficients{};
+        double HeatMass{};
+    };
+    // Nullopt, with a diagnostic, for invalid parameters, shapes, live values, fixed rows,
+    // masses or neighborhoods.
+    [[nodiscard]] std::optional<PropertyFilterPlan> PlanPropertyFilter(
+        std::span<const double> values, std::size_t channels,
+        std::span<const PropertyEdge> edges, const PropertyFilterParams& params,
+        std::span<const std::size_t> fixedRows, std::span<const double> lumpedMass,
+        std::string& diagnostic);
+    // Restores fixed and isolated rows to their input and rejects non-finite results; shared by
+    // FilterProperty and GPU backends so both publish under the same rules.
+    [[nodiscard]] PropertyFilterResult CompletePropertyFilter(const PropertyFilterPlan& plan,
+        std::span<const double> input, std::vector<double> values, std::string backend);
     // Values are row-major, with 1..4 channels. Failure never returns partial values.
     // Fixed rows retain their input values; implicit solves eliminate them exactly.
     // LumpedMass is implicit-only and requires one positive finite mass per row.
