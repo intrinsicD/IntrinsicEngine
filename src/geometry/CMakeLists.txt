@@ -54,6 +54,8 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.SignedHeatMethod.cppm
         Geometry.HalfedgeMesh.Smoothing.cppm
         Geometry.Smoothing.Types.cppm
+        Geometry.HarmonicField.cppm
+        Geometry.HarmonicField.Types.cppm
         Geometry.HalfedgeMesh.Subdivision.cppm
         Geometry.HalfedgeMesh.SubdivisionSqrt3.cppm
         Geometry.HalfedgeMesh.Utils.cppm
@@ -177,6 +179,7 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.SignedHeatMethod.cpp
         Geometry.HalfedgeMesh.Smoothing.cpp
         Geometry.PropertySmoothing.cpp
+        Geometry.HarmonicField.cpp
         Geometry.HalfedgeMesh.Subdivision.cpp
         Geometry.HalfedgeMesh.SubdivisionSqrt3.cpp
         Geometry.HalfedgeMesh.Utils.cpp
