@@ -575,6 +575,13 @@ Open **View → Kernel Density**, choose the input/backend/bandwidth and run
 Property filtering is available through **View → Smooth Property** and each
 geometry domain's Processing menu. Select a floating scalar/vector input and
 a same-domain output; filter settings round-trip in `sandbox.property_smoothing`.
-Implicit backward Euler supports cotangent weights, lumped mesh areas and boundary
-pinning. Select positions as both input and output to smooth geometry.
+Implicit backward Euler supports cotangent weights, lumped mesh areas, boundary
+pinning, and a sparse Cholesky (default) or conjugate-gradient solver. Select positions as both input and output to smooth geometry.
 See [property smoothing](../../../docs/methods/property-smoothing.md).
+
+**View → Harmonic Field** (and each domain's Processing menu) interpolates a
+floating property from hard-mask, soft-weight or pinned-boundary rows with an
+optional Poisson source (harmonic, biharmonic or triharmonic; zero-mean Neumann
+for unconstrained parts), or propagates Int32 seed labels (random walker) with
+optional confidence and per-label weight fields; settings round-trip in
+`sandbox.harmonic_field`. See [harmonic fields](../../../docs/methods/harmonic-field.md).

@@ -17,6 +17,7 @@ export import Extrinsic.Runtime.GeodesicsConfig;
 export import Extrinsic.Core.Error;
 export import Geometry.Geodesic.Types;
 export import Geometry.Smoothing.Types;
+export import Geometry.HarmonicField.Types;
 export import Geometry.Segmentation.Diagnostics;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.EngineConfigControl;
@@ -151,6 +152,58 @@ export namespace Extrinsic::Runtime
         const EditorProcessingCommands&, std::uint32_t stableEntityId, const PropertySmoothingConfig&);
     [[nodiscard]] EditorPropertySmoothingResult ApplyEditorPropertySmoothingCommand(
         const EditorProcessingCommands&, std::uint32_t stableEntityId, const PropertySmoothingConfig&);
+
+    // Harmonic/biharmonic/triharmonic interpolation and Poisson solves of a typed property from
+    // constrained rows, or random-walker propagation of Int32 seed labels, over the same sample
+    // graphs as property smoothing.
+    inline constexpr std::string_view kHarmonicFieldConfigSectionName = "sandbox.harmonic_field";
+    enum class HarmonicFieldMode : std::uint8_t { Field, Labels };
+    struct HarmonicFieldConfig
+    {
+        HarmonicFieldMode Mode{HarmonicFieldMode::Field};
+        // Field: floating scalar/vector values whose constrained rows are the targets.
+        // Labels: Int32 labels; rows different from Unlabeled are seeds.
+        GeometryPropertyRef Input{GeometryElementDomain::MeshVertex, "v:harmonic_constraints", Geometry::PropertyValueKind::Double};
+        GeometryPropertyRef Output{GeometryElementDomain::MeshVertex, "v:harmonic_field", Geometry::PropertyValueKind::Double};
+        GeometryPropertyRef Positions{GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};
+        // Field constraints on the input domain; an empty name disables the source.
+        GeometryPropertyRef HardMask{GeometryElementDomain::MeshVertex, "", Geometry::PropertyValueKind::Bool};    // true: hard row
+        GeometryPropertyRef SoftWeights{GeometryElementDomain::MeshVertex, "", Geometry::PropertyValueKind::Float}; // > 0: soft row
+        bool PinBoundary{false}; // mesh boundary vertices become hard rows
+        // Field mode, optional: source density f with the input's channel count; the solve uses
+        // b = M f (row masses, or 1 without lumped mass), i.e. -Delta u = f for the harmonic order.
+        GeometryPropertyRef Source{GeometryElementDomain::MeshVertex, "", Geometry::PropertyValueKind::Double};
+        std::int32_t Unlabeled{0};
+        GeometryPropertyRef Confidence{GeometryElementDomain::MeshVertex, "", Geometry::PropertyValueKind::Float}; // optional, labels
+        // Label mode, optional: publishes one float weight field per seed label L as
+        // WeightsPrefix + decimal(L) (skinning/blending weights); empty disables.
+        std::string WeightsPrefix{};
+        Geometry::Smoothing::PropertyWeight Weight{Geometry::Smoothing::PropertyWeight::Cotangent};
+        std::uint32_t Neighbors{12};
+        double SpatialSigma{1.0};
+        Geometry::HarmonicField::Params Field{};
+        bool LumpedMass{false}; // DEC lumped vertex areas for orders > 1 and the source (mesh vertices)
+    };
+    struct EditorHarmonicFieldResult
+    {
+        EditorCommandStatus Status{EditorCommandStatus::NoChange};
+        std::size_t LiveCount{}, EdgeCount{}, FreeRows{}, HardRows{}, SoftRows{}, Components{}, UnconstrainedComponents{};
+        std::size_t GroundedComponents{}, WeightOutputs{};
+        double MaxRelativeResidual{}, MaxCompatibilityDefect{};
+        std::string BackendId{"cpu_reference_sparse_cholesky"};
+        std::string Message{};
+        [[nodiscard]] bool Succeeded() const noexcept
+        { return Status == EditorCommandStatus::Applied || Status == EditorCommandStatus::NoChange; }
+    };
+    [[nodiscard]] std::string SerializeHarmonicFieldConfig(const HarmonicFieldConfig&);
+    [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeHarmonicFieldConfigSectionRegistration();
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorHarmonicFieldConfig(
+        const EditorProcessingCommands&, const HarmonicFieldConfig&);
+    [[nodiscard]] std::optional<HarmonicFieldConfig> GetEditorHarmonicFieldConfig(const EditorProcessingCommands&);
+    [[nodiscard]] ActionReadiness PreviewEditorHarmonicFieldCommand(
+        const EditorProcessingCommands&, std::uint32_t stableEntityId, const HarmonicFieldConfig&);
+    [[nodiscard]] EditorHarmonicFieldResult ApplyEditorHarmonicFieldCommand(
+        const EditorProcessingCommands&, std::uint32_t stableEntityId, const HarmonicFieldConfig&);
 
     inline constexpr std::string_view kScalarGradientConfigSectionName = "sandbox.scalar_gradient";
     struct ScalarGradientConfig

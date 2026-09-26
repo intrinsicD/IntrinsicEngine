@@ -62,4 +62,5 @@ known_limitations:
   - GPU radius capacity is at most 1024 hits per query; total count exposes overflow, including capacity zero.
   - Coordinates and radii are bounded by 1e18; world-space nearest under nonuniform transforms requires an explicit metric conversion.
   - GPU sorting is bitonic and internal bounds use sorted-range unions; no radix-sort, SAH optimization, or performance improvement is claimed.
+  - GPU trees do not refine points that share a 30-bit Morton code, so clustered inputs or far outliers degrade GPU traversal cost (results are unaffected); the CPU tree refines such groups.
   - Standalone GPU views require caller-controlled buffer sizes, submission ordering, and device lifetime.

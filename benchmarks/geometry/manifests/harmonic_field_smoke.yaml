@@ -1,0 +1,18 @@
+benchmark_id: geometry.harmonic_field.smoke
+method: geometry.harmonic_field
+dataset: builtin.path_graph.2048
+params:
+  intent: correctness
+  rows: 2048
+  channels: 3
+  biharmonic_rows: 256
+  workloads: [harmonic_linear, biharmonic_cubic, poisson_quadratic, neumann_zero_mean_line, random_walker_split]
+  weights: uniform
+  solver: sparse_cholesky
+  warmup_iterations: 1
+  measured_iterations: 8
+metrics:
+  - runtime_ms
+  - quality_error_linf
+thresholds:
+  quality_error_linf_max: 1.0e-7

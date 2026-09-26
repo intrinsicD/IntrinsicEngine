@@ -1293,6 +1293,7 @@ if(TARGET ExtrinsicRuntime)
         Test.PointCloudGeometryExtraction.cpp
         Test.ScalarGradientOperations.cpp
         Test.PropertySmoothingOperations.cpp
+        Test.HarmonicFieldOperations.cpp
         Test.GeodesicsOperations.cpp
         Test.ScalarRidgeOperations.cpp
         Test.ParameterizationOperations.cpp
@@ -1561,6 +1562,7 @@ set(_geometry_test_files
     Test_Subdivision.cpp
     Test_Smoothing.cpp
     Test.PropertySmoothing.cpp
+    Test.HarmonicField.cpp
     Test.QualityMetrics.cpp
     Test.Sampling.cpp
     Test.SurfaceSampling.cpp

@@ -33,7 +33,7 @@ target_include_directories(${target_name} PUBLIC .)
 # ExtrinsicECS link policy: only the dependencies actually imported by the
 # component module surface are linked here. The promoted ECS dependency
 # contract is `ecs -> {core, geometry}` (see /AGENTS.md §2). Components import
-# `Geometry.*` types directly (Sphere, AABB, OBB, Octree, ConvexHull,
+# `Geometry.*` types directly (Sphere, AABB, OBB, ConvexHull,
 # Properties, plus HalfedgeMesh/Graph/PointCloud for the `GeometrySources`
 # populate helpers) and use `glm` for transform math; they do not import any
 # `Extrinsic.Asset.*`, `Extrinsic.RHI.*`, `Extrinsic.Graphics.*`,

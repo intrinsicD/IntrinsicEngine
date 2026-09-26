@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 11 |
 | `core` | 41 |
 | `ecs` | 27 |
-| `geometry` | 126 |
+| `geometry` | 128 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 72 |
@@ -168,6 +168,8 @@ Root scanned: `src`
 | `Geometry.HalfedgeMesh.Vertices.Normals` | `src/geometry/Geometry.HalfedgeMesh.Vertices.Normals.cppm` | `geometry` |
 | `Geometry.HalfedgeMesh` | `src/geometry/Geometry.HalfedgeMesh.cppm` | `geometry` |
 | `Geometry.Handle` | `src/geometry/Geometry.Handle.cppm` | `geometry` |
+| `Geometry.HarmonicField.Types` | `src/geometry/Geometry.HarmonicField.Types.cppm` | `geometry` |
+| `Geometry.HarmonicField` | `src/geometry/Geometry.HarmonicField.cppm` | `geometry` |
 | `Geometry.HtexPatch` | `src/geometry/Geometry.HtexPatch.cppm` | `geometry` |
 | `Geometry.IO` | `src/geometry/Geometry.IO.cppm` | `geometry` |
 | `Geometry.ImplicitPlaneField` | `src/geometry/Geometry.ImplicitPlaneField.cppm` | `geometry` |
@@ -455,4 +457,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **428**
+Total modules: **430**

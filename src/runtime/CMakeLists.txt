@@ -181,6 +181,7 @@ target_sources(${target_name}
         Editor/Operations/Runtime.GeometryProcessingOperations.MeshSoup.hpp
         Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.hpp
         Editor/Operations/Runtime.MeshFieldOperations.Properties.hpp
+        Editor/Operations/Runtime.MeshFieldOperations.PropertyGraph.hpp
         Editor/internal/Runtime.EditorWorkspaceSession.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.cpp
     Editor/Runtime.EditorProcessing.cpp
@@ -206,6 +207,8 @@ target_sources(${target_name}
         Editor/Operations/Runtime.MeshFieldOperations.Curvature.cpp
         Editor/Operations/Runtime.MeshFieldOperations.Gradient.cpp
         Editor/Operations/Runtime.MeshFieldOperations.Smoothing.cpp
+        Editor/Operations/Runtime.MeshFieldOperations.PropertyGraph.cpp
+        Editor/Operations/Runtime.MeshFieldOperations.HarmonicField.cpp
         Editor/Operations/Runtime.MeshFieldOperations.Geodesics.cpp
         Editor/Operations/Runtime.MeshTopologyOperations.Topology.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp

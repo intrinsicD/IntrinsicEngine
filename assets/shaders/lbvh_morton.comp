@@ -13,7 +13,9 @@ void main()
     if(i>=pc.count){keys.v[i]=uvec2(LBVH_INVALID);return;}
     LbvhBounds b=LbvhBounds(pc.bounds);
     vec3 p=lbvhPoint(pc.points,pc.stride,i);uvec3 q=uvec3(0);
-    if(b.invalid==0)
-        for(int a=0;a<3;++a) if(b.hi[a]>b.lo[a]) q[a]=uint(clamp((p[a]-b.lo[a])/(b.hi[a]-b.lo[a])*1024.,0.,1023.));
+    // Cubic cells (largest extent on every axis) keep boxes compact for flat inputs; matches CPU PointLBVH.
+    float extent=max(max(b.hi[0]-b.lo[0],b.hi[1]-b.lo[1]),b.hi[2]-b.lo[2]);
+    if(b.invalid==0&&extent>0.)
+        for(int a=0;a<3;++a) q[a]=uint(clamp((p[a]-b.lo[a])/extent*1024.,0.,1023.));
     keys.v[i]=uvec2((spread(q.x)<<2u)|(spread(q.y)<<1u)|spread(q.z),i);
 }

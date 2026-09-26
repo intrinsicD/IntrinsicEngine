@@ -80,7 +80,7 @@ if (x && y && z) tempPos.emplace_back(*x, *y, *z);
 - **Result struct** with diagnostics (iteration counts, element counts, convergence status).
 - **Return type:** `std::optional<Result>` — `std::nullopt` for degenerate input (empty mesh, zero iterations, collinear points).
 - **In-place vs. new mesh:** Topology-modifying operations (simplification, remeshing) work in-place. Topology-restructuring operations (subdivision) take `const Mesh& input, Mesh& output`.
-- **Use acceleration structures:** Select the appropriate acceleration structure — `Geometry::KDTree`, `Geometry::Octree`, or `Geometry::BVH` — whenever it improves the operator's asymptotic cost or practical performance.
+- **Use acceleration structures:** Select the appropriate acceleration structure whenever it improves the operator's asymptotic cost or practical performance: `Geometry::BVH` (also named `Geometry::KDTree`) for element boxes or one-off point k-nearest/radius queries, `Geometry::PointLBVH` (via the runtime spatial index cache for entity data) for shared CPU/GPU point queries, and `Geometry::Octree` when the hierarchy carries per-node data. See [spatial indices](spatial-indices.md).
 - **Add a CUDA variant:** Provide a CUDA-friendly implementation path whenever the operator is a good candidate for GPU execution.
 - **Reuse existing code:** Reuse engine implementations first. If a required algorithm or data structure is missing, add it to the geometry layer (`src/geometry`) and expose it through a new operator entry point instead of duplicating logic inside a feature.
 - **Safety limits:** All `CWRotatedHalfedge` loops have `if (++safety > N) break;` guards.

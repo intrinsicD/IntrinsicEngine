@@ -46,6 +46,10 @@ This index is the canonical entry point for method/paper implementation document
 - [Property smoothing](property-smoothing.md): scalar/vector graph filters,
   spectral heat, Taubin and bilateral filtering through canonical property bindings.
 
+- [Harmonic fields](harmonic-field.md): constrained harmonic/biharmonic/triharmonic
+  interpolation, Poisson and pure-Neumann solves, and random-walker labels and
+  weights on every element domain.
+
 - [Normal estimation](../architecture/normal-estimation.md): canonical-domain PCA and distinct mesh/graph topology normal workflows.
 
 - [`geometry.boundary_first_flattening`](../../methods/geometry/boundary_first_flattening/)

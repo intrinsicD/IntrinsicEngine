@@ -89,9 +89,25 @@ when Vulkan is unavailable or its supported input bounds are exceeded.
 The [method package](../../methods/geometry/point_lbvh/README.md) fixes the
 Karras 2012 radix-tree formulation. The CPU oracle is an independent exhaustive
 scan. The GPU builds bounds, Morton keys, sort order, topology, and node bounds
-without CPU sorting or hierarchy construction. Duplicate Morton codes append
-the original compact index, limiting binary radix depth to 62 and permitting
-a 64-entry traversal stack.
+without CPU sorting or hierarchy construction. CPU and GPU quantize Morton
+keys to 10 bits per axis over cubic cells sized by the largest bounds extent,
+so flat inputs do not get cells stretched along their thin axis.
+
+On the CPU, points that share a cell receive further 10-bit-per-axis Morton
+digits relative to that cell's own bounds, recursively and up to nine digits.
+The original compact index is the final digit, and the radix tree splits on
+the common prefix of these digit strings. Clustered inputs, or a single far
+outlier that compresses the rest of the cloud into a few cells, therefore
+still split spatially instead of by index. This bounds CPU tree depth by 302
+key bits, and CPU traversal uses a 304-entry stack. The GPU appends the index
+directly after the first Morton digit, limiting its depth to 62 with a
+64-entry stack; it does not refine shared cells yet, so its trees degrade on
+such inputs. Query results are identical either way.
+
+CPU and GPU traversal visit the nearer child first and prune children against
+the current limit before pushing. Pruning is strict, so boxes at exactly the
+limit are still visited and results, including index tie-breaks, do not depend
+on visit order.
 
 The current GPU implementation uses a bitonic sorting network and independent
 sorted-range bound unions. These prioritize deterministic, portable execution;
@@ -107,10 +123,18 @@ be finite and within +/-1e18; radii are finite, nonnegative and at most 1e18.
 The GPU caps points/queries at 2^20 and radius capacity at 1024; the CPU tree
 caps points at 2^24. Invalid CPU builds clear previous contents.
 
-This point index does not replace the existing CPU median-split `Geometry.BVH`
-used for face/edge bounds, or `Geometry.KDTree` consumers. It supplies nearest
-k-nearest and radius queries. Triangle distance, ray traversal and renderer
-scene acceleration require other primitives and traversal.
+This point index does not replace the CPU median-split `Geometry.BVH`. That
+tree stores tight bounds of arbitrary element boxes (faces, edge segments, or
+points as degenerate boxes) and provides overlap, k-nearest and radius
+queries against those boxes. `Geometry.KDTree` names the same type
+(`KDTree = BVH`); despite the name it is not a space-partitioning kd-tree.
+Triangle distance, ray traversal and renderer scene acceleration require
+other primitives and traversal.
+
+`Geometry.BVH` and `Geometry.Octree` reject element boxes with non-finite
+coordinates or `Min > Max`; a failed build leaves an empty tree, never the
+previous hierarchy. Octree overlap queries use a growable traversal stack, so
+caller-chosen depth limits are not bounded by a fixed stack size.
 
 ## Consumer leases and framed batches
 

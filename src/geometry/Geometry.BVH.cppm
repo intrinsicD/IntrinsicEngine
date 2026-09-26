@@ -8,6 +8,11 @@ module;
 #include <span>
 #include <vector>
 
+#include <glm/glm.hpp>
+
+// Median-split AABB tree over element bounds (triangles, segments, points as degenerate
+// boxes). Nodes store tight bounds of their elements; every element lives in one leaf.
+// Overlap, k-nearest and radius queries share the tree; distances are to element boxes.
 export module Geometry.BVH;
 
 import Geometry.AABB;
@@ -27,6 +32,8 @@ export namespace Geometry
     };
 
     using BVHBuildResult = SpatialBuildResult;
+    using BVHKNNResult = SpatialKNNResult;
+    using BVHRadiusResult = SpatialRadiusResult;
 
     class BVH
     {
@@ -50,6 +57,8 @@ export namespace Geometry
         [[nodiscard]] std::optional<BVHBuildResult> Build(std::span<const AABB> elementAabbs,
             const BVHBuildParams& params = {});
         [[nodiscard]] std::optional<BVHBuildResult> Build(std::vector<AABB>&& elementAabbs,
+            const BVHBuildParams& params = {});
+        [[nodiscard]] std::optional<BVHBuildResult> BuildFromPoints(std::span<const glm::vec3> points,
             const BVHBuildParams& params = {});
 
         template <SpatialQueryShape Shape>
@@ -90,6 +99,20 @@ export namespace Geometry
         void QueryAABB(const AABB& queryShape, std::vector<ElementIndex>& out) const;
         void QuerySphere(const Sphere& queryShape, std::vector<ElementIndex>& out) const;
         void QueryRay(const Ray& queryShape, std::vector<ElementIndex>& out) const;
+
+        struct RadiusQueryScratch
+        {
+            std::vector<NodeIndex> NodeStack{};
+        };
+
+        // Up to k elements ordered by (squared box distance, element index); nearer child first.
+        [[nodiscard]] std::optional<BVHKNNResult> QueryKNN(const glm::vec3& query, std::uint32_t k,
+            std::vector<ElementIndex>& outElementIndices) const;
+        // Elements whose box lies within the inclusive radius, in ascending element index.
+        [[nodiscard]] std::optional<BVHRadiusResult> QueryRadius(const glm::vec3& query, float radius,
+            std::vector<ElementIndex>& outElementIndices) const;
+        [[nodiscard]] std::optional<BVHRadiusResult> QueryRadius(const glm::vec3& query, float radius,
+            std::vector<ElementIndex>& outElementIndices, RadiusQueryScratch& scratch) const;
 
         [[nodiscard]] const std::vector<AABB>& ElementAabbs() const noexcept { return m_ElementAabbs; }
         [[nodiscard]] const std::vector<ElementIndex>& ElementIndices() const noexcept { return m_ElementIndices; }

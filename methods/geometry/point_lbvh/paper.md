@@ -3,9 +3,14 @@
 Tero Karras, [Maximizing Parallelism in the Construction of BVHs, Octrees,
 and k-d Trees](https://research.nvidia.com/publication/2012-06_maximizing-parallelism-construction-bvhs-octrees-and-k-d-trees),
 HPG 2012, DOI 10.2312/EGGH/HPG12/033-037, defines the binary radix-tree
-construction used here. We use 30-bit Morton codes and append original
-32-bit point indices to disambiguate duplicate codes. Internal nodes follow
-the paper's independent range/split construction; leaves retain source slots.
+construction used here. We use 30-bit Morton codes over cubic cells and
+append original 32-bit point indices to disambiguate duplicate codes. The CPU
+first refines points that share a code with further 30-bit Morton digits over
+that group's own bounds (up to nine digits), then appends the index; the radix
+split uses the common prefix of these digit strings. This keeps clustered
+inputs splitting spatially; it is an engine extension, not part of the paper.
+Internal nodes follow the paper's independent range/split construction; leaves
+retain source slots.
 
 The [2013 Karras/Aila extension](https://research.nvidia.com/publication/2013-07_fast-parallel-construction-high-quality-bounding-volume-hierarchies)
 optimizes tree quality for ray traversal. That optimization is outside this

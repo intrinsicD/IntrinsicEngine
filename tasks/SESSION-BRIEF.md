@@ -34,6 +34,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `PHYSICS-005` — Vulkan SPH fluid reference integration (tasks/backlog/physics/PHYSICS-005-vulkan-sph-fluid.md)
 - unblocked: `PHYSICS-006` — Vulkan particle-spring reference integration (tasks/backlog/physics/PHYSICS-006-vulkan-particle-spring.md)
 - unblocked: `PHYSICS-007` — Vulkan XPBD cloth constraints and integration (tasks/backlog/physics/PHYSICS-007-vulkan-xpbd-cloth.md)
+- unblocked: `PHYSICS-008` — Spatial broadphase and k-DOP hierarchies for deformable collision (tasks/backlog/physics/PHYSICS-008-spatial-broadphase-and-kdop-deformable-collision.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
@@ -101,6 +102,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `GEOM-096` — Vulkan ICP accumulation and solve assessment (tasks/backlog/geometry/GEOM-096-vulkan-icp-accumulation-and-solve-assessment.md)
 - blocked by `GEOM-086`: `GEOM-097` — Vulkan continuous LOP projection (tasks/backlog/geometry/GEOM-097-vulkan-continuous-lop-projection.md)
 - unblocked: `GEOM-098` — Vulkan anisotropic WLOP and EAR stages (tasks/backlog/geometry/GEOM-098-vulkan-anisotropic-wlop-and-ear.md)
+- unblocked: `GEOM-100` — Harmonic-field follow-ups and solver consolidation (tasks/backlog/geometry/GEOM-100-harmonic-field-follow-ups.md)
 - blocked by `METHOD-014`: `HARDEN-084` — Localized CPU/GPU parity signatures (tasks/backlog/methods/HARDEN-084-localized-cpu-gpu-parity-signatures.md)
 - unblocked: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
 - unblocked: `METHOD-003A` — Spatial-query CPU-reference integration intake (tasks/backlog/methods/METHOD-003A-spatial-query-reference-integration-intake.md)
@@ -160,7 +162,9 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-220` — Parked-worker wake count flakes under parallel CTest load (tasks/backlog/bugs/BUG-220-parked-worker-wake-count-flake.md)
 - unblocked: `BUG-221` — Vulkan shutdown LSan contract fails on NVIDIA 580.159.04 instance creation (tasks/backlog/bugs/BUG-221-vulkan-shutdown-lsan-nvidia-580-instance-leak.md)
 - unblocked: `BUG-222` — UV atlas smoke baseline output mismatch (tasks/backlog/bugs/BUG-222-uv-atlas-smoke-baseline-output-mismatch.md)
+- unblocked: `BUG-223` — Watershed extrema tests report zero basins (tasks/backlog/bugs/BUG-223-watershed-extrema-tests-report-zero-basins.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
+- unblocked: `GRAPHICS-147` — Refine shared Morton cells in the GPU point LBVH (tasks/backlog/rendering/GRAPHICS-147-gpu-lbvh-shared-cell-refinement.md)
 
 ## Audits
 

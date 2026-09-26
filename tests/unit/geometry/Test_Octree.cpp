@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <limits>
 #include <random>
 #include <utility>
@@ -607,4 +608,88 @@ TEST(Octree, LargeExtentDifferences)
     std::vector<size_t> results;
     octree.QueryAABB(AABB{{-2000, -2000, -2000}, {2000, 2000, 2000}}, results);
     EXPECT_EQ(results.size(), 2u);
+}
+
+TEST(Octree, FailedRebuildLeavesEmptyTree)
+{
+    Octree octree;
+    std::vector<glm::vec3> points;
+    for (int i = 0; i < 1000; ++i) points.push_back({float(i), 0.0f, 0.0f});
+    ASSERT_TRUE(octree.BuildFromPoints(points, {}, 8, 10));
+
+    // A failed rebuild must not keep nodes that index the new (empty) element array.
+    EXPECT_FALSE(octree.BuildFromPoints(std::vector<glm::vec3>{}, {}, 8, 10));
+    EXPECT_TRUE(octree.m_Nodes.empty());
+    EXPECT_TRUE(octree.GetElementIndices().empty());
+    EXPECT_TRUE(octree.ValidateStructure());
+
+    std::vector<size_t> results{7u};
+    octree.QueryKNN({3.0f, 0.0f, 0.0f}, 4, results);
+    EXPECT_TRUE(results.empty());
+    octree.QueryAABB(AABB{{-1, -1, -1}, {1, 1, 1}}, results);
+    EXPECT_TRUE(results.empty());
+    std::size_t nearest = 0;
+    octree.QueryNearest({3.0f, 0.0f, 0.0f}, nearest);
+    EXPECT_EQ(nearest, std::numeric_limits<std::size_t>::max());
+}
+
+TEST(Octree, RejectsNonFiniteElementsAndClearsPreviousTree)
+{
+    Octree octree;
+    std::vector<glm::vec3> points{{0, 0, 0}, {1, 0, 0}, {2, 0, 0}};
+    ASSERT_TRUE(octree.BuildFromPoints(points, {}, 1, 10));
+    for (const float bad : {std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity()})
+    {
+        points[1].y = bad;
+        EXPECT_FALSE(octree.BuildFromPoints(points, {}, 1, 10));
+        EXPECT_TRUE(octree.m_Nodes.empty());
+        EXPECT_TRUE(octree.ElementAabbs.empty());
+    }
+    // Inverted boxes are invalid too.
+    EXPECT_FALSE(octree.Build(std::vector<AABB>{AABB{}}, {}, 1, 10));
+}
+
+TEST(Octree, OverlapQueryHandlesManyPendingSiblingsInDeepTrees)
+{
+    // Planar staircase: each level holds three single-point octants plus a recursive cluster
+    // in the octant that is visited first, so three siblings stay pending per level. 45 levels
+    // exceed the former fixed 128-entry traversal stack.
+    constexpr int levels = 45;
+    std::vector<glm::vec3> points{{0.0f, 0.0f, 0.0f}};
+    for (int level = 0; level < levels; ++level)
+    {
+        const float c = -std::pow(3.0f, -float(level));
+        points.push_back({c, c, 0.0f});
+        points.push_back({c, 0.0f, 0.0f});
+        points.push_back({0.0f, c, 0.0f});
+    }
+    Octree octree;
+    ASSERT_TRUE(octree.BuildFromPoints(points, {}, 1, 64));
+    ASSERT_TRUE(octree.ValidateStructure());
+
+    // A zero-volume query never takes the contained-node shortcut, so it walks every level.
+    std::vector<size_t> results;
+    octree.QueryAABB(AABB{{-2.0f, -2.0f, 0.0f}, {2.0f, 2.0f, 0.0f}}, results);
+    EXPECT_EQ(results.size(), points.size());
+}
+
+TEST(Octree, QueryNearestBreaksDistanceTiesBySmallestIndex)
+{
+    // Six points at exactly unit distance from the origin, in separate leaves. Traversal
+    // order must not decide the result: the smallest index wins, as in QueryKNN.
+    const std::vector<glm::vec3> points{{0, 0, -1}, {0, -1, 0}, {-1, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+    for (std::size_t rotate = 0; rotate < points.size(); ++rotate)
+    {
+        std::vector<glm::vec3> rotated(points.begin() + rotate, points.end());
+        rotated.insert(rotated.end(), points.begin(), points.begin() + rotate);
+        Octree octree;
+        ASSERT_TRUE(octree.BuildFromPoints(rotated, {}, 1, 10));
+        std::size_t nearest = 99;
+        octree.QueryNearest({0, 0, 0}, nearest);
+        EXPECT_EQ(nearest, 0u) << "rotation " << rotate;
+        std::vector<std::size_t> knn;
+        octree.QueryKNN({0, 0, 0}, 1, knn);
+        ASSERT_EQ(knn.size(), 1u);
+        EXPECT_EQ(knn[0], nearest);
+    }
 }

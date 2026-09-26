@@ -370,7 +370,8 @@ ascending `KeptIndices`/`RejectedIndices` lists, original/kept/rejected counts,
 and a `NonFiniteCount`. The input cloud is never mutated. Output is fully
 deterministic — kept and rejected lists are sorted by original point index and
 the filtered cloud is built in that order, independent of octree traversal —
-and points with non-finite positions are always rejected. Invalid requests fail
+and points with non-finite positions are always rejected. They are left out of
+the octree, so they never enter a finite point's neighborhood. Invalid requests fail
 closed with `EmptyInput`, `InsufficientPoints` (fewer than `K + 1` points),
 `InvalidParameters` (`K == 0`, `SearchRadius <= 0`), or `BuildFailed`. The
 statistical-only distance-distribution diagnostics (`MeanDistance`,

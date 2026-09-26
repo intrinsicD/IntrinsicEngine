@@ -28,6 +28,7 @@
 #include "../geometry/Bench.QualityMetricsSmoke.hpp"
 #include "../geometry/Bench.SignedHeatReferenceSmoke.hpp"
 #include "../geometry/Bench.PropertySmoothingSmoke.hpp"
+#include "../geometry/Bench.HarmonicFieldSmoke.hpp"
 #include "../geometry/Bench.GeodesicsReferenceSmoke.hpp"
 #include "../geometry/Bench.PointLBVHSmoke.hpp"
 #include "../geometry/Bench.RegistrationSpatialSmoke.hpp"
@@ -507,6 +508,19 @@ auto EmitPropertySmoothingSmoke(const std::string& commit) -> EmittedBenchmark {
       [&] { out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
                  << "    \"quality_error_linf\": " << metrics.MaxError << "\n"; },
       [&] { out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+                 << "    \"warmup_iterations\": 1,\n    \"measured_iterations\": 8\n"; });
+}
+
+auto EmitHarmonicFieldSmoke(const std::string& commit) -> EmittedBenchmark {
+  const auto metrics = Intrinsic::Bench::Geometry::RunHarmonicFieldSmoke();
+  std::ostringstream out;
+  out.precision(17);
+  return EmitBenchmarkResult(out, "geometry.harmonic_field.smoke", "geometry.harmonic_field",
+      "cpu_reference_sparse_cholesky", "builtin.path_graph.2048", commit, metrics.Succeeded,
+      [&] { out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+                 << "    \"quality_error_linf\": " << metrics.MaxError << "\n"; },
+      [&] { out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+                 << "    \"mislabeled_rows\": " << metrics.MislabeledRows << ",\n"
                  << "    \"warmup_iterations\": 1,\n    \"measured_iterations\": 8\n"; });
 }
 
@@ -1667,6 +1681,7 @@ auto main(int argc, char **argv) -> int {
   emitted.push_back(EmitProgressivePoissonReferenceSmoke(commit));
   emitted.push_back(EmitSignedHeatReferenceSmoke(commit));
   emitted.push_back(EmitPropertySmoothingSmoke(commit));
+  emitted.push_back(EmitHarmonicFieldSmoke(commit));
   emitted.push_back(EmitGeodesicsReferenceSmoke(commit));
   emitted.push_back(EmitPointLBVHSmoke(commit));
   emitted.push_back(EmitLopLBVHSmoke(commit));

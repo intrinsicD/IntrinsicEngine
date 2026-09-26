@@ -331,6 +331,8 @@ namespace Extrinsic::Sandbox::Editor
         std::uint32_t GradientEntity{};
         ProcessingDraftState<Runtime::PropertySmoothingConfig, Runtime::EditorPropertySmoothingResult> Smoothing{};
         std::uint32_t SmoothingEntity{};
+        ProcessingDraftState<Runtime::HarmonicFieldConfig, Runtime::EditorHarmonicFieldResult> Harmonic{};
+        std::uint32_t HarmonicEntity{};
         GeodesicsState Geodesics{};
         std::uint32_t GeodesicsEntity{0u};
         int GeodesicsSourceVertex{0};
@@ -381,6 +383,7 @@ namespace Extrinsic::Sandbox::Editor
         void DrawSegmentationWindow(bool&, const SandboxEditorContext&);
         void DrawGradientWindow(bool&, const SandboxEditorContext&);
         void DrawSmoothingWindow(bool&, const SandboxEditorContext&);
+        void DrawHarmonicFieldWindow(bool&, const SandboxEditorContext&);
         void DrawGeodesicsWindow(bool&, const SandboxEditorContext&);
         void DrawGeodesicsControls(const Runtime::EditorDomainWindowModel&,
                                    const SandboxEditorContext&);
@@ -427,6 +430,11 @@ namespace Extrinsic::Sandbox::Editor
                  {{"mesh.processing.property_smoothing", "Mesh"}, {"graph.processing.property_smoothing", "Graph"},
                   {"pointcloud.processing.property_smoothing", "PointCloud"}}})
             RegisterRedirectWindow(id, {domain, "Processing"}, "Smooth Property", "view.property_smoothing");
+        RegisterWindow("view.harmonic_field", {"View"}, "Harmonic Field", &Impl::DrawHarmonicFieldWindow);
+        for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
+                 {{"mesh.processing.harmonic_field", "Mesh"}, {"graph.processing.harmonic_field", "Graph"},
+                  {"pointcloud.processing.harmonic_field", "PointCloud"}}})
+            RegisterRedirectWindow(id, {domain, "Processing"}, "Harmonic Field", "view.harmonic_field");
         RegisterWindow("mesh.processing.denoise", {"Mesh", "Processing"},
                        "Denoise", &Impl::DrawDenoiseWindow);
         RegisterWindow("mesh.processing.faces.scalar_gradient", {"Mesh", "Processing", "Faces"},
@@ -2758,6 +2766,10 @@ namespace Extrinsic::Sandbox::Editor
         else if (config.Filter.Method == Geometry::Smoothing::PropertyFilter::Implicit)
         {
             changed |= ImGui::InputDouble("Time step", &config.Filter.TimeStep);
+            int solver = int(config.Filter.Solver);
+            if (ImGui::Combo("Solver", &solver, "Sparse Cholesky (direct)\0Conjugate gradient\0"))
+            { config.Filter.Solver = Geometry::Smoothing::PropertySolver(solver); changed = true; }
+            // CG settings also govern the fallback when the Cholesky factorization fails.
             changed |= ImGui::InputDouble("Solver tolerance", &config.Filter.SolverTolerance);
             changed |= ImGui::InputScalar("Maximum solver iterations", ImGuiDataType_U32, &config.Filter.MaxSolverIterations);
         }
@@ -2783,6 +2795,131 @@ namespace Extrinsic::Sandbox::Editor
         if (Smoothing.LastResult) ImGui::TextWrapped("%s", Smoothing.LastResult->Message.c_str());
         if (!Smoothing.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Smoothing.ConfigDiagnostic.c_str());
         if (!Smoothing.VisualizationDiagnostic.empty()) ImGui::TextWrapped("%s", Smoothing.VisualizationDiagnostic.c_str());
+        ImGui::End();
+    }
+
+    void MeshProcessingPanels::Impl::DrawHarmonicFieldWindow(bool& open, const SandboxEditorContext& context)
+    {
+        using K = Geometry::PropertyValueKind;
+        namespace H = Geometry::HarmonicField;
+        if (!ImGui::Begin("Harmonic Field", &open)) { ImGui::End(); return; }
+        const auto previous = HarmonicEntity;
+        DrawProcessingEntity("Entity##HarmonicField", context, HarmonicEntity, Harmonic.LastSelectedEntity);
+        if (previous != HarmonicEntity) Harmonic.LastResult.reset();
+        if (const auto active = Runtime::GetEditorHarmonicFieldConfig(context.MeshFields.Commands))
+            Harmonic.Synchronize(*active, Runtime::SerializeHarmonicFieldConfig(*active));
+        const auto& model = GetDomainWindowModel(context, Runtime::EditorDomainWindowKind::Mesh, HarmonicEntity);
+        if (!model.HasSelectedEntity || Harmonic.LastApplied.empty())
+        { ImGui::TextDisabled("Select a geometry entity to solve a harmonic field."); ImGui::End(); return; }
+        auto& config = Harmonic.Draft;
+        bool changed = false;
+        int mode = int(config.Mode);
+        if (ImGui::Combo("Mode", &mode, "Interpolate values\0Propagate labels (random walker)\0"))
+        {
+            config.Mode = Runtime::HarmonicFieldMode(mode);
+            const auto kind = config.Mode == Runtime::HarmonicFieldMode::Labels ? K::Int32 : K::Double;
+            config.Input.ValueKind = config.Output.ValueKind = kind;
+            if (config.Mode == Runtime::HarmonicFieldMode::Labels)
+            {
+                config.HardMask.Name.clear(); config.SoftWeights.Name.clear(); config.Source.Name.clear(); config.PinBoundary = false;
+                if (config.Field.Unconstrained == H::UnconstrainedPolicy::ZeroMean) config.Field.Unconstrained = H::UnconstrainedPolicy::Fail;
+            }
+            else { config.Confidence.Name.clear(); config.WeightsPrefix.clear(); }
+            changed = true;
+        }
+        const bool labels = config.Mode == Runtime::HarmonicFieldMode::Labels;
+        const auto floating = +[](const Runtime::GeometryPropertyRef& ref) {
+            return ref.ValueKind == K::Float || ref.ValueKind == K::Double || ref.ValueKind == K::Vec2 ||
+                   ref.ValueKind == K::Vec3 || ref.ValueKind == K::Vec4;
+        };
+        const auto int32 = +[](const Runtime::GeometryPropertyRef& ref) { return ref.ValueKind == K::Int32; };
+        if (DrawProcessingPropertyInput(labels ? "Seed labels##Harmonic" : "Values##Harmonic", model.PropertyCatalog,
+                                        config.Input, labels ? int32 : floating))
+        {
+            config.Output.Domain = config.HardMask.Domain = config.SoftWeights.Domain = config.Confidence.Domain =
+                config.Source.Domain = config.Input.Domain;
+            config.Output.ValueKind = config.Input.ValueKind;
+            changed = true;
+        }
+        changed |= DrawProcessingPropertyInput("Neighborhood positions##Harmonic", model.PropertyCatalog, config.Positions,
+            +[](const Runtime::GeometryPropertyRef& ref) { return ref.ValueKind == K::Vec3; });
+        changed |= DrawProcessingPropertyName(labels ? "Output labels##Harmonic" : "Output property##Harmonic", config.Output.Name);
+        if (!labels && (config.Input.ValueKind == K::Float || config.Input.ValueKind == K::Double))
+        {
+            int kind = config.Output.ValueKind == K::Double ? 1 : 0;
+            if (ImGui::Combo("Output storage", &kind, "float\0double\0"))
+            { config.Output.ValueKind = kind ? K::Double : K::Float; changed = true; }
+        }
+        // An optional binding is enabled by a name; disabling clears it.
+        const auto optionalProperty = [&](const char* toggle, const char* label, Runtime::GeometryPropertyRef& ref,
+                                          bool (*accepts)(const Runtime::GeometryPropertyRef&), const char* defaultName) {
+            bool enabled = !ref.Name.empty();
+            if (ImGui::Checkbox(toggle, &enabled)) { ref.Name = enabled ? defaultName : ""; changed = true; }
+            if (enabled && DrawProcessingPropertyInput(label, model.PropertyCatalog, ref, accepts)) changed = true;
+            ref.Domain = config.Input.Domain;
+        };
+        if (labels)
+        {
+            changed |= ImGui::InputInt("Unlabeled value", &config.Unlabeled);
+            optionalProperty("Write confidence##Harmonic", "Confidence property##Harmonic", config.Confidence,
+                +[](const Runtime::GeometryPropertyRef& ref) { return ref.ValueKind == K::Float || ref.ValueKind == K::Double; },
+                "harmonic_confidence");
+            bool weights = !config.WeightsPrefix.empty();
+            if (ImGui::Checkbox("Write per-label weights##Harmonic", &weights))
+            { config.WeightsPrefix = weights ? "harmonic_weight_" : ""; changed = true; }
+            if (weights)
+            {
+                changed |= DrawProcessingPropertyName("Weight prefix##Harmonic", config.WeightsPrefix);
+                ImGui::TextDisabled("One float field per seed label: prefix + label.");
+            }
+        }
+        else
+        {
+            ImGui::TextWrapped("Constrained rows keep (hard) or pull toward (soft) their input values; other input values are ignored.");
+            optionalProperty("Hard constraint mask##Harmonic", "Hard mask (bool)##Harmonic", config.HardMask,
+                +[](const Runtime::GeometryPropertyRef& ref) { return ref.ValueKind == K::Bool; }, "harmonic_hard");
+            optionalProperty("Soft constraint weights##Harmonic", "Soft weights##Harmonic", config.SoftWeights,
+                +[](const Runtime::GeometryPropertyRef& ref) { return ref.ValueKind == K::Float || ref.ValueKind == K::Double; },
+                "harmonic_weight");
+            changed |= ImGui::Checkbox("Pin mesh boundary##Harmonic", &config.PinBoundary);
+            optionalProperty("Source term (Poisson)##Harmonic", "Source density##Harmonic", config.Source, floating,
+                             "harmonic_source");
+        }
+        int order = int(config.Field.Order) - 1, weight = int(config.Weight);
+        if (ImGui::Combo("Energy", &order, "Harmonic (Dirichlet)\0Biharmonic (Laplacian)\0Triharmonic\0"))
+        { config.Field.Order = H::FieldOrder(order + 1); changed = true; }
+        const bool massMatters = config.Field.Order != H::FieldOrder::Harmonic || !config.Source.Name.empty();
+        if (!massMatters && config.LumpedMass) { config.LumpedMass = false; changed = true; }
+        if (massMatters)
+            changed |= ImGui::Checkbox("Lumped mesh area mass##Harmonic", &config.LumpedMass);
+        if (ImGui::Combo("Weights##Harmonic", &weight, "Uniform kNN\0Gaussian kNN\0Inverse-distance kNN\0Nonnegative mesh cotangent\0Uniform mesh edges\0"))
+        { config.Weight = Geometry::Smoothing::PropertyWeight(weight); changed = true; }
+        if (config.Weight != Geometry::Smoothing::PropertyWeight::Cotangent && config.Weight != Geometry::Smoothing::PropertyWeight::MeshUniform)
+        {
+            changed |= ImGui::InputScalar("Neighbors##Harmonic", ImGuiDataType_U32, &config.Neighbors);
+            if (config.Weight != Geometry::Smoothing::PropertyWeight::Uniform)
+                changed |= ImGui::InputDouble("Spatial sigma##Harmonic", &config.SpatialSigma);
+        }
+        int policy = int(config.Field.Unconstrained);
+        if (ImGui::Combo("Unconstrained components", &policy,
+                         labels ? "Fail\0Keep input\0" : "Fail\0Keep input\0Zero mean (pure Neumann)\0"))
+        { config.Field.Unconstrained = H::UnconstrainedPolicy(policy); changed = true; }
+        const auto apply = [&](const auto& c) { return Runtime::ApplyEditorHarmonicFieldConfig(context.MeshFields.Commands, c); };
+        if (changed)
+        {
+            Harmonic.LastResult.reset();
+            Harmonic.ConfigDiagnostic = apply(config).Succeeded() ? "" : "Harmonic field configuration was rejected.";
+        }
+        const auto readiness = Runtime::PreviewEditorHarmonicFieldCommand(context.MeshFields.Commands, model.SelectedStableId, config);
+        if (DrawProcessingActionButton("Solve harmonic field", readiness))
+            ApplyProcessingExecution(Harmonic, config, apply,
+                [&] { return Runtime::ApplyEditorHarmonicFieldCommand(context.MeshFields.Commands, model.SelectedStableId, config); },
+                std::function<void(Runtime::EditorHarmonicFieldResult)>{}, "Harmonic field configuration was rejected.");
+        DrawProcessingPropertyShowButton(context, model.SelectedStableId, config.Output, Harmonic.VisualizationDiagnostic);
+        ImGui::TextDisabled("CPU reference; one sparse Cholesky factorization serves every channel.");
+        if (Harmonic.LastResult) ImGui::TextWrapped("%s", Harmonic.LastResult->Message.c_str());
+        if (!Harmonic.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Harmonic.ConfigDiagnostic.c_str());
+        if (!Harmonic.VisualizationDiagnostic.empty()) ImGui::TextWrapped("%s", Harmonic.VisualizationDiagnostic.c_str());
         ImGui::End();
     }
 

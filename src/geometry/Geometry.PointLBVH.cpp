@@ -7,6 +7,7 @@ module;
 #include <glm/glm.hpp>
 #include <numeric>
 #include <span>
+#include <utility>
 #include <vector>
 module Geometry.PointLBVH;
 
@@ -26,31 +27,110 @@ namespace Geometry::PointLBVH
             x = (x | (x << 4u)) & 0x030C30C3u;
             return (x | (x << 2u)) & 0x09249249u;
         }
+        // 30-bit Morton code over cubic cells of the given bounds.
+        std::uint32_t MortonCode(glm::vec3 p, glm::vec3 lo, float extent)
+        {
+            glm::uvec3 q{};
+            for (int a = 0; a < 3; ++a)
+                q[a] = extent > 0
+                           ? static_cast<std::uint32_t>(std::clamp((p[a] - lo[a]) / extent * 1024.0f, 0.0f, 1023.0f))
+                           : 0u;
+            return (Spread(q.x) << 2u) | (Spread(q.y) << 1u) | Spread(q.z);
+        }
+        // Keys are digit strings: one 30-bit Morton digit per refinement level, then the 32-bit
+        // source id. Points sharing a cell get a further digit relative to that cell's own
+        // bounds, so clustered inputs keep splitting spatially instead of by id.
+        constexpr int kMaxKeyDigits = 10;
+        constexpr int kMaxRefinement = kMaxKeyDigits - 2;
+        struct KeyDigits
+        {
+            std::array<std::uint32_t, kMaxKeyDigits> Digit{};
+            int Count{};
+        };
+        // Sorts ids[begin,end), which share digits [0,level), by a Morton digit over their own
+        // bounds and recurses into runs that share it. The minimum and maximum of a
+        // non-degenerate run land in different sub-cells, so every level splits the run.
+        void RefineRun(std::span<const glm::vec3> points, std::span<std::uint32_t> ids,
+                       std::span<KeyDigits> keys, int level, std::vector<std::uint64_t>& scratch)
+        {
+            glm::vec3 lo = points[ids[0]], hi = lo;
+            for (const auto id : ids)
+            {
+                lo = glm::min(lo, points[id]);
+                hi = glm::max(hi, points[id]);
+            }
+            const float extent = std::max({hi.x - lo.x, hi.y - lo.y, hi.z - lo.z});
+            if (!(extent > 0) || level > kMaxRefinement)
+                return; // coincident points (or the refinement limit) keep ascending id order
+            scratch.clear();
+            for (const auto id : ids)
+                scratch.push_back((std::uint64_t(MortonCode(points[id], lo, extent)) << 32u) | id);
+            std::ranges::sort(scratch);
+            for (std::size_t i = 0; i < ids.size(); ++i)
+            {
+                ids[i] = static_cast<std::uint32_t>(scratch[i]);
+                keys[i].Digit[level] = static_cast<std::uint32_t>(scratch[i] >> 32u);
+                keys[i].Count = level + 1;
+            }
+            for (std::size_t begin = 0, end; begin < ids.size(); begin = end)
+            {
+                for (end = begin + 1; end < ids.size() && keys[end].Digit[level] == keys[begin].Digit[level]; ++end) {}
+                if (end - begin > 1)
+                    RefineRun(points, ids.subspan(begin, end - begin), keys.subspan(begin, end - begin), level + 1, scratch);
+            }
+        }
+        // Common prefix length in bits of two distinct keys; equal-length digit strings share
+        // their layout up to the first differing digit.
+        int CommonPrefix(const KeyDigits& a, const KeyDigits& b)
+        {
+            int length = 0;
+            for (int level = 0;; ++level)
+            {
+                const int width = level + 1 == a.Count ? 32 : 30;
+                if (a.Digit[level] != b.Digit[level])
+                    return length + std::countl_zero(a.Digit[level] ^ b.Digit[level]) - (32 - width);
+                length += width;
+            }
+        }
         bool Better(Neighbor a, Neighbor b)
         {
             return a.SquaredDistance < b.SquaredDistance ||
                    (a.SquaredDistance == b.SquaredDistance && a.Index < b.Index);
         }
+        float BoxDistance(const Node& node, glm::vec3 query)
+        {
+            return Distance(query, glm::clamp(query, node.Min, node.Max));
+        }
+        // Visits every leaf whose box is within `limit`, nearer child first so shrinking
+        // kNN/nearest limits prune early. Pruning is strict, so boxes at exactly the limit
+        // are still visited and index tie-breaks do not depend on visit order.
         template <typename Visit>
         void Traverse(std::span<const Node> nodes, glm::vec3 query, float& limit, Visit visit)
         {
             if (nodes.empty() || !ValidPoint(query))
                 return;
-            // A radix tree over (30-bit Morton,32-bit index) has depth at most 62.
-            std::array<std::uint32_t, 64> stack{};
+            // Tree depth is at most the key length: nine 30-bit Morton digits and a 32-bit id,
+            // 302 bits. Each expansion replaces one entry by at most two, so 304 entries suffice.
+            struct Entry { std::uint32_t Node; float Distance; };
+            std::array<Entry, 304> stack{};
+            stack[0] = {0u, BoxDistance(nodes[0], query)};
             std::uint32_t size = 1;
             while (size)
             {
-                const auto& node = nodes[stack[--size]];
-                if (Distance(query, glm::clamp(query, node.Min, node.Max)) > limit)
+                const auto entry = stack[--size];
+                if (entry.Distance > limit)
                     continue;
+                const auto& node = nodes[entry.Node];
                 if (node.Object != InvalidIndex)
-                    visit(node.Object);
-                else
                 {
-                    stack[size++] = node.Right;
-                    stack[size++] = node.Left;
+                    visit(node.Object);
+                    continue;
                 }
+                Entry near{node.Left, BoxDistance(nodes[node.Left], query)};
+                Entry far{node.Right, BoxDistance(nodes[node.Right], query)};
+                if (far.Distance < near.Distance) std::swap(near, far);
+                if (far.Distance <= limit) stack[size++] = far;
+                if (near.Distance <= limit) stack[size++] = near;
             }
         }
     } // namespace
@@ -132,24 +212,37 @@ namespace Geometry::PointLBVH
             lo = glm::min(lo, p);
             hi = glm::max(hi, p);
         }
-        std::vector<std::uint64_t> keys;
-        keys.reserve(points.size());
+        // Cubic cells (largest extent on every axis) keep boxes compact for flat inputs;
+        // lbvh_morton.comp uses the same quantization.
+        const float extent = std::max({hi.x - lo.x, hi.y - lo.y, hi.z - lo.z});
+        std::vector<std::uint64_t> sorted;
+        sorted.reserve(points.size());
         for (std::uint32_t i = 0; i < points.size(); ++i)
+            sorted.push_back((std::uint64_t(MortonCode(points[i], lo, extent)) << 32u) | i);
+        std::ranges::sort(sorted);
+        std::vector<std::uint32_t> order(points.size());
+        std::vector<KeyDigits> keys(points.size());
+        for (std::size_t i = 0; i < sorted.size(); ++i)
         {
-            glm::uvec3 q{};
-            for (int a = 0; a < 3; ++a)
-                q[a] = hi[a] > lo[a]
-                           ? static_cast<std::uint32_t>(std::clamp(
-                                 (points[i][a] - lo[a]) / (hi[a] - lo[a]) * 1024.0f, 0.0f, 1023.0f))
-                           : 0u;
-            const auto code = (Spread(q.x) << 2u) | (Spread(q.y) << 1u) | Spread(q.z);
-            keys.push_back((std::uint64_t(code) << 32u) | i);
+            order[i] = static_cast<std::uint32_t>(sorted[i]);
+            keys[i].Digit[0] = static_cast<std::uint32_t>(sorted[i] >> 32u);
+            keys[i].Count = 1;
         }
-        std::ranges::sort(keys);
+        std::vector<std::uint64_t> scratch;
+        for (std::size_t begin = 0, end; begin < keys.size(); begin = end)
+        {
+            for (end = begin + 1; end < keys.size() && keys[end].Digit[0] == keys[begin].Digit[0]; ++end) {}
+            if (end - begin > 1)
+                RefineRun(points, std::span(order).subspan(begin, end - begin),
+                          std::span(keys).subspan(begin, end - begin), 1, scratch);
+        }
+        // The source id is the last digit and makes every key unique.
+        for (std::size_t i = 0; i < keys.size(); ++i)
+            keys[i].Digit[keys[i].Count++] = order[i];
         m_Nodes.resize(2u * points.size() - 1u);
         for (int i = 0; i < n; ++i)
         {
-            const auto id = static_cast<std::uint32_t>(keys[i]);
+            const auto id = order[i];
             m_Nodes[n - 1 + i] = {.Min = points[id],
                                   .Max = points[id],
                                   .Object = id,
@@ -157,7 +250,7 @@ namespace Geometry::PointLBVH
                                   .Last = static_cast<std::uint32_t>(i)};
         }
         auto prefix = [&](int i, int j) {
-            return j < 0 || j >= n ? -1 : std::countl_zero(keys[i] ^ keys[j]);
+            return j < 0 || j >= n ? -1 : CommonPrefix(keys[i], keys[j]);
         };
         for (int i = 0; i < n - 1; ++i)
         {
@@ -186,10 +279,10 @@ namespace Geometry::PointLBVH
             node.Right = split + 1 == last ? n + split : split + 1;
             node.First = first;
             node.Last = last;
-            node.Min = node.Max = points[static_cast<std::uint32_t>(keys[first])];
+            node.Min = node.Max = points[order[first]];
             for (int k = first + 1; k <= last; ++k)
             {
-                auto p = points[static_cast<std::uint32_t>(keys[k])];
+                auto p = points[order[k]];
                 node.Min = glm::min(node.Min, p);
                 node.Max = glm::max(node.Max, p);
             }
