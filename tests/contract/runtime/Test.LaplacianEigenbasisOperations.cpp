@@ -1,4 +1,6 @@
-// UI-056: Laplacian eigenbasis operation — analytic spectrum, mesh lumped mass, config and history.
+// UI-056 / METHOD-051: spectral modes operation — analytic spectrum, mesh lumped mass, modal
+// operators of Hildebrandt et al. 2012, signatures and distances, config and history.
+#include <algorithm>
 #include <cmath>
 #include <numbers>
 #include <string>
@@ -18,6 +20,8 @@ import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.DEC;
+import Geometry.ModalAnalysis;
+import Geometry.Sparse;
 namespace R = Extrinsic::Runtime;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
 namespace S = Geometry::Smoothing;
@@ -133,4 +137,107 @@ TEST(LaplacianEigenbasisOperations, ConfigValidationAndRejections)
     EXPECT_FALSE(R::PreviewEditorLaplacianEigenbasisCommand(h.Commands(), h.Id(), h.Config).Enabled)
         << "an output with another storage type is rejected";
     EXPECT_FALSE(h.Props(D::GraphNode).Exists("eigen_0"));
+}
+
+namespace
+{
+    Geometry::HalfedgeMesh::Mesh Bumpy(int size)
+    {
+        Geometry::HalfedgeMesh::Mesh mesh;
+        std::vector<Geometry::VertexHandle> v;
+        for (int y = 0; y < size; ++y)
+            for (int x = 0; x < size; ++x)
+                v.push_back(mesh.AddVertex({float(x), float(y), 0.5f * std::sin(0.9f * float(x)) * std::cos(0.6f * float(y))}));
+        for (int y = 0; y + 1 < size; ++y)
+            for (int x = 0; x + 1 < size; ++x)
+            {
+                const auto at = [&](int i, int j) { return v[std::size_t(j * size + i)]; };
+                (void)mesh.AddTriangle(at(x, y), at(x + 1, y), at(x + 1, y + 1));
+                (void)mesh.AddTriangle(at(x, y), at(x + 1, y + 1), at(x, y + 1));
+            }
+        return mesh;
+    }
+}
+
+TEST(LaplacianEigenbasisOperations, ModalOperatorsMatchTheGeometryKernels)
+{
+    auto mesh = Bumpy(6);
+    const auto mass = Geometry::DEC::BuildHodgeStar0(mesh, Geometry::DEC::MassMode::Barycentric);
+    for (const auto op : {R::ModalOperator::ModifiedDirichlet, R::ModalOperator::ThinShell})
+    {
+        SCOPED_TRACE(int(op));
+        Harness h(D::MeshVertex);
+        auto copy = mesh;
+        GS::PopulateFromMesh(h.Scene.Raw(), h.Entity, copy);
+        h.Config.Operator = op;
+        h.Config.Positions = {D::MeshVertex, "v:position", K::Vec3};
+        h.Config.LumpedMass = true;
+        h.Config.Count = op == R::ModalOperator::ThinShell ? 9 : 5;
+        h.Config.SkipModes = op == R::ModalOperator::ThinShell ? 6 : 0;
+        h.Config.SignatureOutput = "modal_signature";
+        const auto result = h.Run();
+        ASSERT_TRUE(result.Succeeded()) << result.Message;
+        // Oracle: the same geometry kernel solved directly over every vertex.
+        const bool shell = op == R::ModalOperator::ThinShell;
+        const auto A = shell ? Geometry::ModalAnalysis::BuildThinShellHessian(mesh).Hessian
+                             : Geometry::ModalAnalysis::BuildModifiedDirichletMatrix(mesh).Matrix;
+        const auto M = shell ? Geometry::ModalAnalysis::ExpandMass(mass, 3) : mass;
+        const auto oracle = Geometry::Sparse::SolveSymmetricGeneralizedEigen(A, M, {.Count = h.Config.Count});
+        ASSERT_TRUE(oracle.Succeeded());
+        for (std::size_t j = 0; j < h.Config.Count; ++j)
+            EXPECT_NEAR(result.Eigenvalues[j], oracle.Eigenvalues[j], 1e-8 * std::max(1.0, oracle.Eigenvalues[j])) << j;
+        const auto& props = std::as_const(h.Props(D::MeshVertex));
+        if (shell) EXPECT_TRUE(props.Get<glm::vec3>("eigen_8"));
+        else EXPECT_TRUE(props.Get<float>("eigen_4"));
+        // Σ_v m_v S_t(v) = Σ_{j ≥ skip} e^{-λ_j t} for M-normalized modes.
+        const auto signature = props.Get<float>("modal_signature").Vector();
+        double weighted = 0.0, expected = 0.0;
+        for (std::size_t i = 0; i < signature.size(); ++i) weighted += mass.Diagonal[i] * double(signature[i]);
+        for (std::size_t j = h.Config.SkipModes; j < result.Eigenvalues.size(); ++j) expected += std::exp(-result.Eigenvalues[j] * result.SignatureTime);
+        EXPECT_NEAR(weighted, expected, 1e-5 * expected);
+        EXPECT_GT(result.ScaleMax, result.ScaleMin);
+        ASSERT_TRUE(h.History.Undo().Succeeded());
+        EXPECT_FALSE(h.Props(D::MeshVertex).Exists("modal_signature"));
+    }
+}
+
+TEST(LaplacianEigenbasisOperations, HeatKernelDistanceVanishesAtTheSourceAndRejectsBadSources)
+{
+    Harness h(D::MeshVertex);
+    auto mesh = Bumpy(6);
+    GS::PopulateFromMesh(h.Scene.Raw(), h.Entity, mesh);
+    h.Config.Positions = {D::MeshVertex, "v:position", K::Vec3};
+    h.Config.Weight = S::PropertyWeight::Cotangent;
+    h.Config.LumpedMass = true;
+    h.Config.Count = 8;
+    h.Config.SkipModes = 1;
+    h.Config.DistanceSource = 99;
+    EXPECT_FALSE(h.Run().Succeeded()) << "source outside the live rows";
+    EXPECT_FALSE(h.Props(D::MeshVertex).Exists("eigen_0"));
+    h.Config.DistanceSource = 14;
+    const auto result = h.Run();
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    const auto distance = std::as_const(h.Props(D::MeshVertex)).Get<float>("modal_distance").Vector();
+    EXPECT_EQ(distance[14], 0.0f);
+    EXPECT_GT(*std::ranges::max_element(distance), 0.0f);
+    EXPECT_EQ(result.Outputs.back(), "modal_distance");
+}
+
+TEST(LaplacianEigenbasisOperations, ModalConfigValidation)
+{
+    const auto registration = R::MakeLaplacianEigenbasisConfigSectionRegistration();
+    R::LaplacianEigenbasisConfig c;
+    c.Operator = R::ModalOperator::ThinShell; c.Count = 12; c.SkipModes = 6; c.ShellFlexural = 3.0;
+    c.SignatureOutput = "sig"; c.SignatureScale = 0.25; c.DistanceSource = 4; c.DistanceSamples = 16;
+    const auto payload = R::SerializeLaplacianEigenbasisConfig(c);
+    const auto valid = registration.Validate(payload, {}, R::kLaplacianEigenbasisConfigSectionName);
+    ASSERT_TRUE(valid.Usable());
+    EXPECT_EQ(valid.CanonicalPayloadJson, payload);
+    for (const char* invalid : {"{\"operator\":3}", "{\"operator\":1,\"domain\":5,\"lumped_mass\":false,\"weight\":0}",
+                                "{\"operator\":2,\"shell_flexural\":0,\"shell_length\":0,\"shell_area\":0}",
+                                "{\"shell_area\":-1}", "{\"skip_modes\":10}", "{\"signature_scale\":1.5}",
+                                "{\"distance_samples\":0}", "{\"distance_source\":1.5}",
+                                "{\"signature_output\":\"eigen_2\"}", "{\"distance_source\":0,\"distance_output\":\"\"}",
+                                "{\"signature_output\":\"v:position\"}"})
+        EXPECT_FALSE(registration.Validate(invalid, {}, R::kLaplacianEigenbasisConfigSectionName).Usable()) << invalid;
 }

@@ -2933,7 +2933,7 @@ TEST(SandboxProcessingPanels, LaplacianEigenbasisComputesAndPublishesEigenvector
     bool requested = false;
     h.Driver->OnFrame = [&](R::Engine& engine) {
         ++frames;
-        auto* window = ImGui::FindWindowByName("Laplacian Eigenbasis");
+        auto* window = ImGui::FindWindowByName("Spectral Modes");
         if (window) { ImGui::SetWindowSize(window, {750, 1200}); ImGui::SetWindowPos(window, {0, 0}); ImGui::FocusWindow(window); }
         if (window && frames == 10) { ImGui::ActivateItemByID(window->GetID("Compute eigenbasis")); requested = true; }
         if (std::as_const(vertices).Get<float>("eigen_3"))
@@ -2945,6 +2945,55 @@ TEST(SandboxProcessingPanels, LaplacianEigenbasisComputesAndPublishesEigenvector
             engine.RequestExit();
         }
         if (frames > 60) { ADD_FAILURE() << "Eigenbasis panel did not publish"; engine.RequestExit(); }
+    };
+    h.Engine->Run();
+}
+
+TEST(SandboxProcessingPanels, SpectralModesPublishesThinShellVibrationModesAndDistance)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    Geometry::HalfedgeMesh::Mesh mesh;
+    std::vector<Geometry::VertexHandle> v;
+    for (int y = 0; y < 5; ++y)
+        for (int x = 0; x < 5; ++x) v.push_back(mesh.AddVertex({float(x), float(y), 0.3f * float((x * y) % 3)}));
+    for (int y = 0; y < 4; ++y)
+        for (int x = 0; x < 4; ++x)
+        {
+            ASSERT_TRUE(mesh.AddTriangle(v[std::size_t(y * 5 + x)], v[std::size_t(y * 5 + x + 1)], v[std::size_t((y + 1) * 5 + x + 1)]));
+            ASSERT_TRUE(mesh.AddTriangle(v[std::size_t(y * 5 + x)], v[std::size_t((y + 1) * 5 + x + 1)], v[std::size_t((y + 1) * 5 + x)]));
+        }
+    GS::PopulateFromMesh(scene.Raw(), entity, mesh);
+    auto& vertices = scene.Raw().get<GS::Vertices>(entity).Properties;
+    R::LaplacianEigenbasisConfig modes;
+    modes.Operator = R::ModalOperator::ThinShell;
+    modes.Count = 9;
+    modes.SkipModes = 6;
+    modes.OutputPrefix = "vibration_";
+    modes.DistanceSource = 12;
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto section = R::MakeLaplacianEigenbasisConfigSectionRegistration().DefaultSection;
+    section.PayloadJson = R::SerializeLaplacianEigenbasisConfig(modes);
+    Config::UpsertEngineConfigSection(config.AppSections, section);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.laplacian_eigenbasis", true));
+    int frames = 0;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        ++frames;
+        auto* window = ImGui::FindWindowByName("Spectral Modes");
+        if (window) { ImGui::SetWindowSize(window, {750, 1200}); ImGui::SetWindowPos(window, {0, 0}); ImGui::FocusWindow(window); }
+        if (window && frames == 10) ImGui::ActivateItemByID(window->GetID("Compute eigenbasis"));
+        if (std::as_const(vertices).Get<float>("modal_distance"))
+        {
+            EXPECT_TRUE(std::as_const(vertices).Get<glm::vec3>("vibration_8")) << "vibration modes are vec3 displacements";
+            const auto distance = std::as_const(vertices).Get<float>("modal_distance").Vector();
+            EXPECT_EQ(distance[12], 0.0f);
+            EXPECT_GT(*std::ranges::max_element(distance), 0.0f);
+            engine.RequestExit();
+        }
+        if (frames > 60) { ADD_FAILURE() << "Spectral modes panel did not publish"; engine.RequestExit(); }
     };
     h.Engine->Run();
 }

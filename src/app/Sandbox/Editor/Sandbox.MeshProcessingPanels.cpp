@@ -439,11 +439,11 @@ namespace Extrinsic::Sandbox::Editor
                   {"pointcloud.processing.property_smoothing", "PointCloud"}}})
             RegisterRedirectWindow(id, {domain, "Processing"}, "Smooth Property", "view.property_smoothing");
         RegisterWindow("view.harmonic_field", {"View"}, "Harmonic Field", &Impl::DrawHarmonicFieldWindow);
-        RegisterWindow("view.laplacian_eigenbasis", {"View"}, "Laplacian Eigenbasis", &Impl::DrawEigenbasisWindow);
+        RegisterWindow("view.laplacian_eigenbasis", {"View"}, "Spectral Modes", &Impl::DrawEigenbasisWindow);
         for (const auto& [id, domain] : std::initializer_list<std::pair<const char*, const char*>>
                  {{"mesh.processing.laplacian_eigenbasis", "Mesh"}, {"graph.processing.laplacian_eigenbasis", "Graph"},
                   {"pointcloud.processing.laplacian_eigenbasis", "PointCloud"}})
-            RegisterRedirectWindow(id, {domain, "Processing"}, "Laplacian Eigenbasis", "view.laplacian_eigenbasis");
+            RegisterRedirectWindow(id, {domain, "Processing"}, "Spectral Modes", "view.laplacian_eigenbasis");
         for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
                  {{"mesh.processing.harmonic_field", "Mesh"}, {"graph.processing.harmonic_field", "Graph"},
                   {"pointcloud.processing.harmonic_field", "PointCloud"}}})
@@ -2906,7 +2906,7 @@ namespace Extrinsic::Sandbox::Editor
     {
         namespace S = Geometry::Smoothing;
         using D = Runtime::GeometryElementDomain;
-        if (!ImGui::Begin("Laplacian Eigenbasis", &open)) { ImGui::End(); return; }
+        if (!ImGui::Begin("Spectral Modes", &open)) { ImGui::End(); return; }
         const auto previous = EigenbasisEntity;
         DrawProcessingEntity("Entity##Eigenbasis", context, EigenbasisEntity, Eigenbasis.LastSelectedEntity);
         if (previous != EigenbasisEntity) Eigenbasis.LastResult.reset();
@@ -2914,28 +2914,79 @@ namespace Extrinsic::Sandbox::Editor
             Eigenbasis.Synchronize(*active, Runtime::SerializeLaplacianEigenbasisConfig(*active));
         const auto& model = GetDomainWindowModel(context, Runtime::EditorDomainWindowKind::Mesh, EigenbasisEntity);
         if (!model.HasSelectedEntity || Eigenbasis.LastApplied.empty())
-        { ImGui::TextDisabled("Select a geometry entity to compute a Laplacian eigenbasis."); ImGui::End(); return; }
+        { ImGui::TextDisabled("Select a geometry entity to compute spectral modes."); ImGui::End(); return; }
+        using Op = Runtime::ModalOperator;
         auto& config = Eigenbasis.Draft;
         bool changed = false;
-        int domain = int(config.Domain) - int(D::MeshVertex);
-        if (ImGui::Combo("Domain##Eigenbasis", &domain,
-                         "Mesh vertices\0Mesh edges\0Mesh halfedges\0Mesh faces\0Graph nodes\0Graph halfedges\0Graph edges\0Point cloud points\0"))
-        { config.Domain = D(domain + int(D::MeshVertex)); changed = true; }
+        int op = int(config.Operator);
+        if (ImGui::Combo("Operator##Eigenbasis", &op,
+                         "Graph Laplacian (A = D - W)\0Modified Dirichlet energy (E_D^N)\0Thin-shell vibration (discrete shells Hessian)\0"))
+        {
+            config.Operator = Op(op);
+            if (config.Operator != Op::GraphLaplacian)
+            {
+                config.Domain = config.Positions.Domain = D::MeshVertex;
+                config.LumpedMass = true;
+            }
+            config.SkipModes = config.Operator == Op::ThinShell ? 6u : 0u;
+            if (config.Count <= config.SkipModes) config.Count = config.SkipModes + 10;
+            changed = true;
+        }
+        if (config.Operator == Op::GraphLaplacian)
+        {
+            int domain = int(config.Domain) - int(D::MeshVertex);
+            if (ImGui::Combo("Domain##Eigenbasis", &domain,
+                             "Mesh vertices\0Mesh edges\0Mesh halfedges\0Mesh faces\0Graph nodes\0Graph halfedges\0Graph edges\0Point cloud points\0"))
+            { config.Domain = D(domain + int(D::MeshVertex)); changed = true; }
+        }
         changed |= DrawProcessingPropertyInput("Sample positions##Eigenbasis", model.PropertyCatalog, config.Positions,
             +[](const Runtime::GeometryPropertyRef& ref) { return ref.ValueKind == Geometry::PropertyValueKind::Vec3; });
-        int weight = int(config.Weight);
-        if (ImGui::Combo("Weights##Eigenbasis", &weight, "Uniform kNN\0Gaussian kNN\0Inverse-distance kNN\0Nonnegative mesh cotangent\0Uniform mesh edges\0"))
-        { config.Weight = S::PropertyWeight(weight); changed = true; }
-        if (config.Weight != S::PropertyWeight::Cotangent && config.Weight != S::PropertyWeight::MeshUniform)
+        if (config.Operator == Op::GraphLaplacian)
         {
-            changed |= ImGui::InputScalar("Neighbors##Eigenbasis", ImGuiDataType_U32, &config.Neighbors);
-            if (config.Weight != S::PropertyWeight::Uniform) changed |= ImGui::InputDouble("Spatial sigma##Eigenbasis", &config.SpatialSigma);
+            int weight = int(config.Weight);
+            if (ImGui::Combo("Weights##Eigenbasis", &weight, "Uniform kNN\0Gaussian kNN\0Inverse-distance kNN\0Nonnegative mesh cotangent\0Uniform mesh edges\0"))
+            { config.Weight = S::PropertyWeight(weight); changed = true; }
+            if (config.Weight != S::PropertyWeight::Cotangent && config.Weight != S::PropertyWeight::MeshUniform)
+            {
+                changed |= ImGui::InputScalar("Neighbors##Eigenbasis", ImGuiDataType_U32, &config.Neighbors);
+                if (config.Weight != S::PropertyWeight::Uniform) changed |= ImGui::InputDouble("Spatial sigma##Eigenbasis", &config.SpatialSigma);
+            }
+        }
+        else if (config.Operator == Op::ThinShell)
+        {
+            changed |= ImGui::InputDouble("Flexural weight##Eigenbasis", &config.ShellFlexural);
+            changed |= ImGui::InputDouble("Edge length weight##Eigenbasis", &config.ShellLength);
+            changed |= ImGui::InputDouble("Triangle area weight##Eigenbasis", &config.ShellArea);
         }
         changed |= ImGui::Checkbox("Lumped vertex area mass (mesh vertices)", &config.LumpedMass);
         changed |= ImGui::InputScalar("Eigenpairs", ImGuiDataType_U32, &config.Count);
         changed |= DrawProcessingPropertyName("Output prefix##Eigenbasis", config.OutputPrefix);
         changed |= ImGui::InputScalar("Maximum iterations##Eigenbasis", ImGuiDataType_U32, &config.MaxIterations);
         changed |= ImGui::InputDouble("Tolerance (backward error)##Eigenbasis", &config.Tolerance, 0.0, 0.0, "%.2e");
+        if (ImGui::TreeNode("Modal signature and distance##Eigenbasis"))
+        {
+            changed |= ImGui::InputScalar("Skipped leading modes", ImGuiDataType_U32, &config.SkipModes);
+            bool signature = !config.SignatureOutput.empty();
+            if (ImGui::Checkbox("Publish signature S_t", &signature))
+            { config.SignatureOutput = signature ? "modal_signature" : ""; changed = true; }
+            if (signature)
+            {
+                changed |= DrawProcessingPropertyName("Signature output##Eigenbasis", config.SignatureOutput);
+                float scale = float(config.SignatureScale);
+                if (ImGui::SliderFloat("Scale (t_min .. t_max)##Eigenbasis", &scale, 0.0f, 1.0f))
+                { config.SignatureScale = scale; changed = true; }
+            }
+            bool distance = config.DistanceSource >= 0;
+            if (ImGui::Checkbox("Publish multi-scale distance", &distance))
+            { config.DistanceSource = distance ? 0 : -1; changed = true; }
+            if (distance)
+            {
+                changed |= ImGui::InputScalar("Source row##Eigenbasis", ImGuiDataType_S64, &config.DistanceSource);
+                changed |= DrawProcessingPropertyName("Distance output##Eigenbasis", config.DistanceOutput);
+                changed |= ImGui::InputScalar("Log-scale samples##Eigenbasis", ImGuiDataType_U32, &config.DistanceSamples);
+            }
+            ImGui::TreePop();
+        }
         const auto apply = [&](const auto& c) { return Runtime::ApplyEditorLaplacianEigenbasisConfig(context.MeshFields.Commands, c); };
         if (changed)
         {
@@ -2947,13 +2998,25 @@ namespace Extrinsic::Sandbox::Editor
             ApplyProcessingExecution(Eigenbasis, config, apply,
                 [&] { return Runtime::ApplyEditorLaplacianEigenbasisCommand(context.MeshFields.Commands, model.SelectedStableId, config); },
                 std::function<void(Runtime::EditorLaplacianEigenbasisResult)>{}, "Eigenbasis configuration was rejected.");
-        ImGui::TextDisabled("CPU reference: shift-invert subspace iteration, A = D - W with the selected mass.");
+        ImGui::TextDisabled("CPU reference: shift-invert subspace iteration on the selected operator and mass.");
         if (Eigenbasis.LastResult && !Eigenbasis.LastResult->Eigenvalues.empty() && Eigenbasis.LastResult->Succeeded())
         {
-            (void)Runtime::DrawEditorSpectrumBarWidget("EigenbasisSpectrum", Eigenbasis.LastResult->Eigenvalues, SelectedEigenvector);
-            const Runtime::GeometryPropertyRef selected{config.Domain,
-                config.OutputPrefix + std::to_string(SelectedEigenvector), Geometry::PropertyValueKind::Float};
-            DrawProcessingPropertyShowButton(context, model.SelectedStableId, selected, Eigenbasis.VisualizationDiagnostic);
+            const auto& last = *Eigenbasis.LastResult;
+            (void)Runtime::DrawEditorSpectrumBarWidget("EigenbasisSpectrum", last.Eigenvalues, SelectedEigenvector);
+            const auto selectedIndex = std::size_t(std::max(SelectedEigenvector, 0));
+            if (selectedIndex < last.Outputs.size())
+            {
+                const Runtime::GeometryPropertyRef selected{config.Domain, last.Outputs[selectedIndex],
+                    config.Operator == Op::ThinShell ? Geometry::PropertyValueKind::Vec3 : Geometry::PropertyValueKind::Float};
+                DrawProcessingPropertyShowButton(context, model.SelectedStableId, selected, Eigenbasis.VisualizationDiagnostic);
+            }
+            if (last.ScaleMax > 0.0)
+                ImGui::Text("Scales t in [%.3g, %.3g]%s", last.ScaleMin, last.ScaleMax,
+                            last.SignatureTime > 0.0 ? ("; signature at t = " + std::to_string(last.SignatureTime)).c_str() : "");
+            for (const auto& name : {config.SignatureOutput, config.DistanceOutput})
+                if (!name.empty() && std::ranges::find(last.Outputs, name) != last.Outputs.end())
+                    DrawProcessingPropertyShowButton(context, model.SelectedStableId,
+                        {config.Domain, name, Geometry::PropertyValueKind::Float}, Eigenbasis.VisualizationDiagnostic);
         }
         if (Eigenbasis.LastResult) ImGui::TextWrapped("%s", Eigenbasis.LastResult->Message.c_str());
         if (!Eigenbasis.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Eigenbasis.ConfigDiagnostic.c_str());

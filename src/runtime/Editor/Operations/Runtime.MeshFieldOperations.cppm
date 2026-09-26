@@ -168,11 +168,18 @@ export namespace Extrinsic::Runtime
         const EditorProcessingCommands&, std::uint32_t stableEntityId, const PropertySmoothingConfig&,
         std::function<void(EditorPropertySmoothingResult)> onComplete = {});
 
-    // Smallest eigenpairs of a sample-graph Laplacian A = D - W with unit or lumped-area mass,
-    // published as one float property per eigenvector (GEOM-024 solver; UI-056 viewer).
+    // Smallest eigenpairs of a modal operator with unit or lumped-area mass, published as one
+    // property per mode (GEOM-024 solver; UI-056 viewer; METHOD-051 operators): the sample-graph
+    // Laplacian A = D - W on every point domain, or on mesh vertices the modified Dirichlet
+    // energy E_D^N (float modes) and the rest-state discrete-shells Hessian (vec3 vibration
+    // modes) of Hildebrandt et al. 2012. Optionally publishes the modal signature
+    // S_t(v) = Σ e^{-λt}‖Φ(v)‖² (the heat kernel signature for the Laplacian) and the
+    // multi-scale modal distance to a source row.
+    enum class ModalOperator : std::uint8_t { GraphLaplacian = 0, ModifiedDirichlet = 1, ThinShell = 2 };
     inline constexpr std::string_view kLaplacianEigenbasisConfigSectionName = "sandbox.laplacian_eigenbasis";
     struct LaplacianEigenbasisConfig
     {
+        ModalOperator Operator{ModalOperator::GraphLaplacian};
         GeometryElementDomain Domain{GeometryElementDomain::MeshVertex};
         GeometryPropertyRef Positions{GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};
         Geometry::Smoothing::PropertyWeight Weight{Geometry::Smoothing::PropertyWeight::Cotangent};
@@ -183,11 +190,21 @@ export namespace Extrinsic::Runtime
         std::string OutputPrefix{"eigen_"};
         std::uint32_t MaxIterations{500};
         double Tolerance{1e-10};
+        // Discrete-shells term weights (ThinShell only): flexural, edge length and triangle area.
+        double ShellFlexural{1.0}, ShellLength{1.0}, ShellArea{1.0};
+        // Leading modes left out of signatures and distances (6 rigid motions for ThinShell).
+        std::uint32_t SkipModes{0};
+        std::string SignatureOutput{};  // empty: no signature
+        double SignatureScale{0.5};     // s in [0,1]: t = t_min^(1-s) t_max^s, Sun et al.'s range
+        std::int64_t DistanceSource{-1}; // row slot on Domain; negative: no distance
+        std::string DistanceOutput{"modal_distance"};
+        std::uint32_t DistanceSamples{32};
     };
     struct EditorLaplacianEigenbasisResult
     {
         EditorCommandStatus Status{EditorCommandStatus::NoChange};
         std::size_t LiveCount{}, EdgeCount{}, Iterations{};
+        double ScaleMin{}, ScaleMax{}, SignatureTime{};
         std::vector<double> Eigenvalues{}, RelativeResiduals{};
         std::vector<std::string> Outputs{};
         std::string BackendId{"cpu_reference_subspace_iteration"};

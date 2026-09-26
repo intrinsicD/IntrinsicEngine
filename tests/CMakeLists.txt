@@ -1566,6 +1566,7 @@ set(_geometry_test_files
     Test.HarmonicField.cpp
     Test.VariationalFit.cpp
     Test.SparseEigensolver.cpp
+    Test.ModalAnalysis.cpp
     Test.QualityMetrics.cpp
     Test.Sampling.cpp
     Test.SurfaceSampling.cpp
