@@ -1,7 +1,7 @@
 ---
 id: GEOM-089
 theme: I
-depends_on: [RUNTIME-269]
+depends_on: [RUNTIME-269, GEOM-103]
 template: micro
 workflow_schema: 1
 workflow_profile: micro
@@ -35,6 +35,12 @@ Existing owners and evidence:
 - [`src/geometry/Geometry.HalfedgeMesh.SignedHeatMethod.cpp`](../../../src/geometry/Geometry.HalfedgeMesh.SignedHeatMethod.cpp)
 - [`src/geometry/Geometry.HalfedgeMesh.VectorHeatMethod.cpp`](../../../src/geometry/Geometry.HalfedgeMesh.VectorHeatMethod.cpp)
 - [`src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp`](../../../src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp)
+
+## Log
+
+- 2026-09-27: Paused by operator decision. RUNTIME-269 and slice 1 (CG implicit
+  smoothing) exist on the unmerged branch `claude/runtime-269-vulkan-sparse-solve`;
+  further slices wait for the keep/remove measurement in GEOM-103.
 
 ## Engine integration
 

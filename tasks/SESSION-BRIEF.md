@@ -102,7 +102,7 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `GEOM-086`: `GEOM-097` — Vulkan continuous LOP projection (tasks/backlog/geometry/GEOM-097-vulkan-continuous-lop-projection.md)
 - unblocked: `GEOM-098` — Vulkan anisotropic WLOP and EAR stages (tasks/backlog/geometry/GEOM-098-vulkan-anisotropic-wlop-and-ear.md)
 - unblocked: `GEOM-100` — Harmonic-field follow-ups and solver consolidation (tasks/backlog/geometry/GEOM-100-harmonic-field-follow-ups.md)
-- unblocked: `GEOM-103` — Stage timings for the Vulkan property filters (tasks/backlog/geometry/GEOM-103-property-filter-vulkan-stage-timings.md)
+- unblocked: `GEOM-103` — Measure the Vulkan smoothing backends and decide keep or remove (tasks/backlog/geometry/GEOM-103-vulkan-smoothing-backends-measure-and-decide.md)
 - blocked by `METHOD-014`: `HARDEN-084` — Localized CPU/GPU parity signatures (tasks/backlog/methods/HARDEN-084-localized-cpu-gpu-parity-signatures.md)
 - unblocked: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
 - unblocked: `METHOD-003A` — Spatial-query CPU-reference integration intake (tasks/backlog/methods/METHOD-003A-spatial-query-reference-integration-intake.md)

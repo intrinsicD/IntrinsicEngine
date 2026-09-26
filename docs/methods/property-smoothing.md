@@ -203,8 +203,8 @@ exactly and bilateral within `9.2e-17` relative. The
 [parity benchmark](../../benchmarks/geometry/manifests/property_smoothing_vulkan_explicit_parity.yaml)
 seals this result under `build/ci-vulkan/benchmark-ctest/GEOM-081`; its runtime
 is end-to-end, frame-paced editor time, not a kernel timing or a speedup claim.
-Per-stage transfer, compute and readback timings are tracked in
-[GEOM-103](../../tasks/backlog/geometry/GEOM-103-property-filter-vulkan-stage-timings.md).
+Per-stage timings and the keep/remove decision for the Vulkan backends are tracked in
+[GEOM-103](../../tasks/backlog/geometry/GEOM-103-vulkan-smoothing-backends-measure-and-decide.md).
 Implicit smoothing on the GPU belongs to
 [GEOM-089](../../tasks/backlog/geometry/GEOM-089-vulkan-heat-methods-and-implicit-smoothing.md).
 
