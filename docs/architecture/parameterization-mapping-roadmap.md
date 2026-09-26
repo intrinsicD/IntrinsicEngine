@@ -189,7 +189,7 @@ Primary home: the `Scp` strategy on the family surface, with paper claim capture
 
 Dependencies:
 
-- The `GEOM-063` surface; the [`GEOM-024`](../../tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md) generalized symmetric eigensolver seam (shared with `METHOD-006`); the DEC cotangent/area operators; boundary-loop helpers.
+- The `GEOM-063` surface; the [`GEOM-024`](../../tasks/done/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md) generalized symmetric eigensolver seam (shared with `METHOD-006`); the DEC cotangent/area operators; boundary-loop helpers.
 
 ## Pack 4c — Boundary First Flattening (BFF) boundary control
 

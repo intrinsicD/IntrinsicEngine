@@ -50,6 +50,9 @@ This index is the canonical entry point for method/paper implementation document
   interpolation, Poisson and pure-Neumann solves, and random-walker labels and
   weights on every element domain.
 
+- [Laplacian eigenbasis](laplacian-eigenbasis.md): k smallest eigenpairs of the
+  sample-graph Laplacian, published as eigenvector properties with a spectrum viewer.
+
 - [Normal estimation](../architecture/normal-estimation.md): canonical-domain PCA and distinct mesh/graph topology normal workflows.
 
 - [`geometry.boundary_first_flattening`](../../methods/geometry/boundary_first_flattening/)

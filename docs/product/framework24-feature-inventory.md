@@ -53,7 +53,7 @@ implementation owner; it may not omit the feature.
 | Implicit system | SDF/implicit-plane, marching-cubes, and surface-reconstruction kernels | Kernel; registered interactive workflow equivalence not accepted | `REVIEW-004` |
 | Orthodontic system | No accepted general IntrinsicEngine equivalent identified | Open; the 2026-09-27 audit recommends accepting a superset through generic operations (see REVIEW-004) | `REVIEW-004` |
 | Compute-shader test | Promoted Vulkan compute/readback/parity tests and real K-Means/LOP compute paths | Superseded by stronger operational Vulkan evidence; verify no user workflow is lost | W6; ARA C08-C11 and C34-C36, `REVIEW-004` |
-| Statistics and eigendecomposition | `Geometry.Statistics`, `Geometry.Linalg`, PCA, property plots/metadata | Kernel; generic inspectability is part of W5; spectral basis pending | `UI-051`, `GEOM-024`, `REVIEW-004` |
+| Statistics and eigendecomposition | `Geometry.Statistics`, `Geometry.Linalg`, PCA, property plots/metadata | Kernel; generic inspectability is part of W5; Laplacian eigenbasis viewer landed (GEOM-024, UI-056) | `UI-051`, `REVIEW-004` |
 
 ## Audit rule
 

@@ -55,7 +55,8 @@
     "backlog/runtime/RUNTIME-175-pointcloud-consolidation-runtime-config-integration.md": "59f3922e957e63fad70626410fadb830ba2395dc9079485a61d0f63d8a045d9e",
     "backlog/ui/UI-035-sandbox-pointcloud-consolidation-editor-panel.md": "e4301a1fcf62ee0a95c0365be429a989e4f38372810eca9197c3c787a0422c1e",
     "backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md": "900b23e61ead50e8ce418aab90f3d09af5e5b69bffc22621d20e1287897a2318",
-    "backlog/ui/UI-038-progressive-poisson-destructive-conversion-safety.md": "ae1644b7ad871f02a1831f7dff154af631ff8fc16036fe8dfeb92d3fa0695fd6"
+    "backlog/ui/UI-038-progressive-poisson-destructive-conversion-safety.md": "ae1644b7ad871f02a1831f7dff154af631ff8fc16036fe8dfeb92d3fa0695fd6",
+    "backlog/methods/METHOD-006-cross-field-design-reference-backend.md": "8f85bc0e2c07c9d1f45e5ccd6271a2f5b2a48f5f6c22f7d106e1f0398d85d6bc"
   },
   "effective_date": "2026-08-02",
   "parallel_policy_task": "BUG-128",
@@ -86,7 +87,6 @@
     "backlog/geometry/GEOM-070-sparse-lsqr-lscm-adoption.md": "9f2583a51795e0ac4e8f9272182bdfc177d92c52983041f91a9b99082c7fba16",
     "backlog/geometry/GEOM-072-catmull-clark-crease-masks.md": "059fedd7a421818afc8758f528d7cea129819b1811baf3091c37d878fdaca37b",
     "backlog/methods/HARDEN-084-localized-cpu-gpu-parity-signatures.md": "e50bb6097f680dbf7bda518ea7ab57ca0348f6c01a824f623f69749a70220b2e",
-    "backlog/methods/METHOD-006-cross-field-design-reference-backend.md": "8f85bc0e2c07c9d1f45e5ccd6271a2f5b2a48f5f6c22f7d106e1f0398d85d6bc",
     "backlog/methods/METHOD-021-arap-parameterization-reference-backend.md": "3a18ffab1713fed759f4ec5b38fbe8312d1ef169beeda7554a82ec0a7d775745",
     "backlog/methods/METHOD-022-slim-injective-parameterization-reference-backend.md": "3157953cc5c98bf1ce281cb374990b0be1970ffaa84474232f8de8f2e42fb2a0",
     "backlog/methods/METHOD-024-spectral-conformal-parameterization-reference-backend.md": "a978840c1e5410969bf9fe7b86cc1ab306a79b61e364fe66920f3907371619f5",

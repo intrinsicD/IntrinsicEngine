@@ -85,7 +85,7 @@ Task links retain detailed acceptance criteria, source references and evidence.
 | [BUG-193](../../tasks/backlog/bugs/BUG-193-gpu-pacing-and-watchdog-margin.md) | Keep | Investigate GPU pacing variability and watchdog margin. |
 | [BUG-195](../../tasks/backlog/bugs/BUG-195-verification-disk-headroom.md) | Keep | Verification can exhaust host disk space. |
 | [GEOM-013](../../tasks/backlog/geometry/GEOM-013-feature-preserving-dual-contouring.md) | Keep | Feature-preserving dual contouring. |
-| [GEOM-024](../../tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md) | Revised | Generalized eigensolver remains; the LDLT prerequisite is already delivered. |
+| [GEOM-024](../../tasks/done/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md) | Revised | Generalized eigensolver remains; the LDLT prerequisite is already delivered. |
 | [GEOM-059](../../tasks/backlog/geometry/GEOM-059-kernel-matrices-nystroem-gaussian-process.md) | Keep | Kernel matrices, Nyström approximation, and Gaussian-process interpolation seam. |
 | [GEOM-060](../../tasks/backlog/geometry/GEOM-060-permutohedral-lattice-highdim-filtering.md) | Revised | Lattice remains absent; extend the delivered bilateral owner if justified. |
 | [GEOM-061](../../tasks/backlog/geometry/GEOM-061-grid-downsampling-reduction-strategies.md) | Revised | Index-returning grid reductions remain; BUG-109 is an existing invariant. |

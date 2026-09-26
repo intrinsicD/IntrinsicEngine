@@ -209,6 +209,7 @@ target_sources(${target_name}
         Editor/Operations/Runtime.MeshFieldOperations.Smoothing.cpp
         Editor/Operations/Runtime.MeshFieldOperations.PropertyGraph.cpp
         Editor/Operations/Runtime.MeshFieldOperations.HarmonicField.cpp
+        Editor/Operations/Runtime.MeshFieldOperations.Eigenbasis.cpp
         Editor/Operations/Runtime.MeshFieldOperations.Geodesics.cpp
         Editor/Operations/Runtime.MeshTopologyOperations.Topology.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp

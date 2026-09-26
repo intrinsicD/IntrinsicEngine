@@ -168,6 +168,43 @@ export namespace Extrinsic::Runtime
         const EditorProcessingCommands&, std::uint32_t stableEntityId, const PropertySmoothingConfig&,
         std::function<void(EditorPropertySmoothingResult)> onComplete = {});
 
+    // Smallest eigenpairs of a sample-graph Laplacian A = D - W with unit or lumped-area mass,
+    // published as one float property per eigenvector (GEOM-024 solver; UI-056 viewer).
+    inline constexpr std::string_view kLaplacianEigenbasisConfigSectionName = "sandbox.laplacian_eigenbasis";
+    struct LaplacianEigenbasisConfig
+    {
+        GeometryElementDomain Domain{GeometryElementDomain::MeshVertex};
+        GeometryPropertyRef Positions{GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};
+        Geometry::Smoothing::PropertyWeight Weight{Geometry::Smoothing::PropertyWeight::Cotangent};
+        std::uint32_t Neighbors{12};
+        double SpatialSigma{1.0};
+        bool LumpedMass{true}; // DEC lumped vertex areas; mesh vertices only, else unit mass
+        std::uint32_t Count{10};
+        std::string OutputPrefix{"eigen_"};
+        std::uint32_t MaxIterations{500};
+        double Tolerance{1e-10};
+    };
+    struct EditorLaplacianEigenbasisResult
+    {
+        EditorCommandStatus Status{EditorCommandStatus::NoChange};
+        std::size_t LiveCount{}, EdgeCount{}, Iterations{};
+        std::vector<double> Eigenvalues{}, RelativeResiduals{};
+        std::vector<std::string> Outputs{};
+        std::string BackendId{"cpu_reference_subspace_iteration"};
+        std::string Message{};
+        [[nodiscard]] bool Succeeded() const noexcept
+        { return Status == EditorCommandStatus::Applied || Status == EditorCommandStatus::NoChange; }
+    };
+    [[nodiscard]] std::string SerializeLaplacianEigenbasisConfig(const LaplacianEigenbasisConfig&);
+    [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeLaplacianEigenbasisConfigSectionRegistration();
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorLaplacianEigenbasisConfig(
+        const EditorProcessingCommands&, const LaplacianEigenbasisConfig&);
+    [[nodiscard]] std::optional<LaplacianEigenbasisConfig> GetEditorLaplacianEigenbasisConfig(const EditorProcessingCommands&);
+    [[nodiscard]] ActionReadiness PreviewEditorLaplacianEigenbasisCommand(
+        const EditorProcessingCommands&, std::uint32_t stableEntityId, const LaplacianEigenbasisConfig&);
+    [[nodiscard]] EditorLaplacianEigenbasisResult ApplyEditorLaplacianEigenbasisCommand(
+        const EditorProcessingCommands&, std::uint32_t stableEntityId, const LaplacianEigenbasisConfig&);
+
     // Harmonic/biharmonic/triharmonic interpolation and Poisson solves of a typed property from
     // constrained rows, or random-walker propagation of Int32 seed labels, over the same sample
     // graphs as property smoothing.
