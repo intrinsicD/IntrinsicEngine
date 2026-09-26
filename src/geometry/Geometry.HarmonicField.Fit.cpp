@@ -70,6 +70,12 @@ namespace Geometry::HarmonicField
             // ADMM: L + kM on the free rows, factored once per run.
             std::optional<Sparse::SparseLLT> Factor;
             std::vector<std::size_t> FreeIndex, FreeRows;
+            // Second order: sample positions (3 per row), mean edge length, last ADMM gradients.
+            std::span<const double> Positions;
+            double EdgeLength{1.0};
+            std::vector<double> Gradient;
+            // Unknown coefficients of A1 per edge, built with the factorization.
+            std::vector<std::vector<std::pair<std::size_t, double>>> EdgeTermCache;
 
             double Distance(std::span<const double> x, std::size_t a, std::span<const double> y, std::size_t b) const
             {
@@ -85,7 +91,9 @@ namespace Geometry::HarmonicField
             double Energy(std::span<const double> u, double lambda) const
             {
                 double energy = 0;
-                for (const auto& e : Edges) energy += e.Weight * Rho(P->SmoothnessPenalty, Distance(u, e.A, u, e.B), P->PenaltyDelta);
+                if (Second()) energy = SecondOrderEnergy(u, Gradient);
+                else
+                    for (const auto& e : Edges) energy += e.Weight * Rho(P->SmoothnessPenalty, Distance(u, e.A, u, e.B), P->PenaltyDelta);
                 for (std::size_t i = 0; i < Count; ++i)
                     if (!Fixed[i]) energy += lambda * Mass[i] * Rho(P->DataPenalty, Distance(u, i, F, i), P->PenaltyDelta);
                 return energy;
@@ -178,6 +186,14 @@ namespace Geometry::HarmonicField
                 return u;
             }
 
+            // ADMM unknowns per channel: the free u rows, then (second order) three gradient
+            // components per row. Edge operator A1 = u_a - u_b - <(g_a + g_b)/2, x_a - x_b>; the
+            // second-order operator A2 = h (g_a - g_b) per component.
+            bool Second() const { return P->SmoothnessOrder == Smoothing::FitOrder::Second; }
+            std::size_t GradientIndex(std::size_t row, std::size_t k) const { return FreeRows.size() + 3 * row + k; }
+            double Offset(std::size_t e, std::size_t k) const
+            { return Positions[Edges[e].A * 3 + k] - Positions[Edges[e].B * 3 + k]; }
+
             bool FactorAdmm()
             {
                 if (Factor) return true;
@@ -185,18 +201,34 @@ namespace Geometry::HarmonicField
                 FreeIndex.assign(Count, Count);
                 for (std::size_t i = 0; i < Count; ++i)
                     if (!Fixed[i]) { FreeIndex[i] = FreeRows.size(); FreeRows.push_back(i); }
-                Sparse::SparseBuilder builder(FreeRows.size(), FreeRows.size());
-                builder.Reserve(2 * Edges.size() + FreeRows.size());
-                std::vector<double> diagonal(FreeRows.size());
-                for (std::size_t f = 0; f < FreeRows.size(); ++f) diagonal[f] = k * Mass[FreeRows[f]];
-                for (const auto& e : Edges)
-                    for (const auto [row, col] : {std::pair{e.A, e.B}, std::pair{e.B, e.A}})
+                const std::size_t unknowns = FreeRows.size() + (Second() ? 3 * Count : 0);
+                Sparse::SparseBuilder builder(unknowns, unknowns);
+                builder.Reserve(Edges.size() * (Second() ? 76 : 4) + unknowns);
+                for (std::size_t f = 0; f < FreeRows.size(); ++f) builder.Add(f, f, k * Mass[FreeRows[f]]);
+                double ridge = 0;
+                EdgeTermCache.resize(Edges.size());
+                for (std::size_t e = 0; e < Edges.size(); ++e)
+                {
+                    const auto& edge = Edges[e];
+                    auto& terms = EdgeTermCache[e];
+                    EdgeTerms(e, terms);
+                    for (const auto& [i, a] : terms)
+                        for (const auto& [j, b] : terms) builder.Add(i, j, edge.Weight * a * b);
+                    if (!Second()) continue;
+                    const double w = edge.Weight * EdgeLength * EdgeLength;
+                    ridge += w;
+                    for (std::size_t c = 0; c < 3; ++c)
                     {
-                        if (Fixed[row]) continue;
-                        diagonal[FreeIndex[row]] += e.Weight;
-                        if (!Fixed[col]) builder.Add(FreeIndex[row], FreeIndex[col], -e.Weight);
+                        const auto ga = GradientIndex(edge.A, c), gb = GradientIndex(edge.B, c);
+                        builder.Add(ga, ga, w); builder.Add(gb, gb, w);
+                        builder.Add(ga, gb, -w); builder.Add(gb, ga, -w);
                     }
-                for (std::size_t f = 0; f < FreeRows.size(); ++f) builder.Add(f, f, diagonal[f]);
+                }
+                // Gradient components orthogonal to every edge offset (e.g. normals of a planar
+                // sample set) are otherwise undetermined; a tiny ridge pins them to zero.
+                if (Second())
+                    for (std::size_t i = 0; i < 3 * Count; ++i)
+                        builder.Add(FreeRows.size() + i, FreeRows.size() + i, 1e-10 * std::max(ridge / double(Count), 1e-300));
                 const auto system = builder.Build();
                 Factor.emplace();
                 ++Factorizations;
@@ -208,27 +240,98 @@ namespace Geometry::HarmonicField
                 return true;
             }
 
-            // Scaled ADMM on z = D u (edge weights), r = u - f (data) and s = u - f (bound), both
-            // row-mass weighted. The u-step matrix L + kM does not depend on beta or lambda, so
-            // residual balancing rescales beta without refactoring.
+            // Unknown coefficients of A1 on edge e; fixed u rows are constants, see EdgeConstant.
+            void EdgeTerms(std::size_t e, std::vector<std::pair<std::size_t, double>>& terms) const
+            {
+                terms.clear();
+                const auto& edge = Edges[e];
+                if (!Fixed[edge.A]) terms.emplace_back(FreeIndex[edge.A], 1.0);
+                if (!Fixed[edge.B]) terms.emplace_back(FreeIndex[edge.B], -1.0);
+                if (Second())
+                    for (std::size_t k = 0; k < 3; ++k)
+                    {
+                        terms.emplace_back(GradientIndex(edge.A, k), -0.5 * Offset(e, k));
+                        terms.emplace_back(GradientIndex(edge.B, k), -0.5 * Offset(e, k));
+                    }
+            }
+            double EdgeConstant(std::size_t e, std::size_t c) const
+            {
+                const auto& edge = Edges[e];
+                return (Fixed[edge.A] ? F[edge.A * Channels + c] : 0.0) - (Fixed[edge.B] ? F[edge.B * Channels + c] : 0.0);
+            }
+            // A1 on edge e and channel c for u and gradients g (row-major rows x 3 x channels).
+            double FirstOrderGap(std::span<const double> u, std::span<const double> g, std::size_t e, std::size_t c) const
+            {
+                const auto& edge = Edges[e];
+                double value = u[edge.A * Channels + c] - u[edge.B * Channels + c];
+                if (Second())
+                    for (std::size_t k = 0; k < 3; ++k)
+                        value -= 0.5 * Offset(e, k) * (g[(edge.A * 3 + k) * Channels + c] + g[(edge.B * 3 + k) * Channels + c]);
+                return value;
+            }
+
+            double SecondOrderEnergy(std::span<const double> u, std::span<const double> g) const
+            {
+                double energy = 0;
+                std::vector<double> gap(3 * Channels);
+                for (std::size_t e = 0; e < Edges.size(); ++e)
+                {
+                    double first = 0, second = 0;
+                    for (std::size_t c = 0; c < Channels; ++c)
+                    {
+                        const double a1 = FirstOrderGap(u, g, e, c);
+                        first += a1 * a1;
+                        for (std::size_t k = 0; k < 3; ++k)
+                        {
+                            const double a2 = EdgeLength * (g[(Edges[e].A * 3 + k) * Channels + c] - g[(Edges[e].B * 3 + k) * Channels + c]);
+                            second += a2 * a2;
+                        }
+                    }
+                    energy += Edges[e].Weight * (Rho(P->SmoothnessPenalty, std::sqrt(first), P->PenaltyDelta) +
+                        P->SecondOrderWeight * Rho(P->SmoothnessPenalty, std::sqrt(second), P->PenaltyDelta));
+                }
+                return energy;
+            }
+
+            // Scaled ADMM on z1 = A1 (edge-weighted), z2 = A2 (second order, edge-weighted),
+            // r = u - f (data) and s = u - f (bound), both row-mass weighted. The normal matrix of the
+            // (u, g) step does not depend on beta or lambda, so residual balancing rescales beta
+            // without refactoring.
             std::optional<std::vector<double>> Admm(double lambda, std::size_t& iterations)
             {
                 if (!FactorAdmm()) return {};
-                const bool bounded = !Radius.empty();
+                const bool bounded = !Radius.empty(), second = Second();
+                const bool ball = P->BoundNorm == Smoothing::FitBoundNorm::Euclidean;
                 const std::size_t E = Edges.size(), C = Channels, N = Count;
-                std::vector<double> u(F.begin(), F.end()), z(E * C), p(E * C, 0.0), r(N * C, 0.0), q(N * C, 0.0),
-                    s(bounded ? N * C : 0, 0.0), t(bounded ? N * C : 0, 0.0), rhs(FreeRows.size()), x(FreeRows.size());
+                const std::size_t unknowns = FreeRows.size() + (second ? 3 * N : 0);
+                std::vector<double> u(F.begin(), F.end()), g(second ? 3 * N * C : 0, 0.0);
+                std::vector<double> z1(E * C), p1(E * C, 0.0), z2(second ? 3 * E * C : 0, 0.0), p2(z2.size(), 0.0);
+                std::vector<double> r(N * C, 0.0), q(N * C, 0.0), s(bounded ? N * C : 0, 0.0), t(s.size(), 0.0);
+                std::vector<double> rhs(unknowns), x(unknowns), v(3 * C);
                 for (std::size_t e = 0; e < E; ++e)
-                    for (std::size_t c = 0; c < C; ++c) z[e * C + c] = F[Edges[e].A * C + c] - F[Edges[e].B * C + c];
+                    for (std::size_t c = 0; c < C; ++c) z1[e * C + c] = FirstOrderGap(u, g, e, c);
                 double beta = 1.0 / Scale;
                 const double delta = P->PenaltyDelta;
                 const double tolerance = P->FitTolerance * Scale;
-                std::vector<double> v(C);
+                // Proximal step on one block of `size` coupled components: value <- prox(A x + dual).
+                double dual = 0;
+                const auto prox = [&](FitPenalty penalty, double tau, double* value, std::size_t size) {
+                    double norm = 0;
+                    for (std::size_t j = 0; j < size; ++j) norm += v[j] * v[j];
+                    const double factor = ProxScale(penalty, std::sqrt(norm), delta, tau);
+                    for (std::size_t j = 0; j < size; ++j)
+                    {
+                        const double next = factor * v[j];
+                        dual = std::max(dual, std::abs(next - value[j]));
+                        value[j] = next;
+                    }
+                };
                 for (iterations = 1; iterations <= P->MaxFitIterations; ++iterations)
                 {
-                    // u-step: (L + kM) u = D^T W (z - p) + M (f + r - q) [+ M (f + s - t)], fixed rows eliminated.
+                    // (u, g)-step: normal equations of the four quadratic penalties, fixed rows eliminated.
                     for (std::size_t c = 0; c < C; ++c)
                     {
+                        std::fill(rhs.begin(), rhs.end(), 0.0);
                         for (std::size_t f = 0; f < FreeRows.size(); ++f)
                         {
                             const auto i = FreeRows[f];
@@ -238,71 +341,74 @@ namespace Geometry::HarmonicField
                         }
                         for (std::size_t e = 0; e < E; ++e)
                         {
-                            const auto& edge = Edges[e];
-                            const double y = edge.Weight * (z[e * C + c] - p[e * C + c]);
-                            if (!Fixed[edge.A]) rhs[FreeIndex[edge.A]] += y + (Fixed[edge.B] ? edge.Weight * F[edge.B * C + c] : 0.0);
-                            if (!Fixed[edge.B]) rhs[FreeIndex[edge.B]] += -y + (Fixed[edge.A] ? edge.Weight * F[edge.A * C + c] : 0.0);
+                            const double w = Edges[e].Weight;
+                            const double target = z1[e * C + c] - p1[e * C + c] - EdgeConstant(e, c);
+                            for (const auto& [j, a] : EdgeTermCache[e]) rhs[j] += w * a * target;
+                            if (!second) continue;
+                            for (std::size_t k = 0; k < 3; ++k)
+                            {
+                                const double y = w * EdgeLength * (z2[(e * 3 + k) * C + c] - p2[(e * 3 + k) * C + c]);
+                                rhs[GradientIndex(Edges[e].A, k)] += y;
+                                rhs[GradientIndex(Edges[e].B, k)] -= y;
+                            }
                         }
-                        if (!FreeRows.empty() && !Factor->solve(rhs, x).Succeeded())
+                        if (unknowns && !Factor->solve(rhs, x).Succeeded())
                         { Error = "Sparse Cholesky solve failed; no property was changed."; return {}; }
                         ++Solves;
                         for (std::size_t f = 0; f < FreeRows.size(); ++f) u[FreeRows[f] * C + c] = x[f];
+                        if (second)
+                            for (std::size_t i = 0; i < N; ++i)
+                                for (std::size_t k = 0; k < 3; ++k) g[(i * 3 + k) * C + c] = x[GradientIndex(i, k)];
                     }
                     // Proximal steps and dual updates; residuals in the max norm.
-                    double primal = 0, dual = 0;
-                    const auto prox = [&](FitPenalty penalty, double tau, double* value, const double* shift, const double* base0,
-                                          const double* base1, double sign) {
-                        double norm = 0;
-                        for (std::size_t c = 0; c < C; ++c)
-                        {
-                            v[c] = base0[c] + sign * base1[c] + shift[c];
-                            norm += v[c] * v[c];
-                        }
-                        const double factor = ProxScale(penalty, std::sqrt(norm), delta, tau);
-                        for (std::size_t c = 0; c < C; ++c)
-                        {
-                            const double next = factor * v[c];
-                            dual = std::max(dual, std::abs(next - value[c]));
-                            value[c] = next;
-                        }
-                    };
+                    double primal = 0;
+                    dual = 0;
+                    const auto update = [&](double& multiplier, double gap) { multiplier += gap; primal = std::max(primal, std::abs(gap)); };
                     for (std::size_t e = 0; e < E; ++e)
                     {
-                        prox(P->SmoothnessPenalty, 1 / beta, &z[e * C], &p[e * C], &u[Edges[e].A * C], &u[Edges[e].B * C], -1);
-                        for (std::size_t c = 0; c < C; ++c)
-                        {
-                            const double gap = u[Edges[e].A * C + c] - u[Edges[e].B * C + c] - z[e * C + c];
-                            p[e * C + c] += gap;
-                            primal = std::max(primal, std::abs(gap));
-                        }
+                        const auto& edge = Edges[e];
+                        for (std::size_t c = 0; c < C; ++c) v[c] = FirstOrderGap(u, g, e, c) + p1[e * C + c];
+                        prox(P->SmoothnessPenalty, 1 / beta, &z1[e * C], C);
+                        for (std::size_t c = 0; c < C; ++c) update(p1[e * C + c], FirstOrderGap(u, g, e, c) - z1[e * C + c]);
+                        if (!second) continue;
+                        const auto a2 = [&](std::size_t k, std::size_t c) {
+                            return EdgeLength * (g[(edge.A * 3 + k) * C + c] - g[(edge.B * 3 + k) * C + c]);
+                        };
+                        for (std::size_t j = 0; j < 3 * C; ++j) v[j] = a2(j / C, j % C) + p2[e * 3 * C + j];
+                        prox(P->SmoothnessPenalty, P->SecondOrderWeight / beta, &z2[e * 3 * C], 3 * C);
+                        for (std::size_t j = 0; j < 3 * C; ++j) update(p2[e * 3 * C + j], a2(j / C, j % C) - z2[e * 3 * C + j]);
                     }
                     for (const auto i : FreeRows)
                     {
-                        prox(P->DataPenalty, lambda / beta, &r[i * C], &q[i * C], &u[i * C], &F[i * C], -1);
+                        for (std::size_t c = 0; c < C; ++c) v[c] = u[i * C + c] - F[i * C + c] + q[i * C + c];
+                        prox(P->DataPenalty, lambda / beta, &r[i * C], C);
+                        for (std::size_t c = 0; c < C; ++c) update(q[i * C + c], u[i * C + c] - F[i * C + c] - r[i * C + c]);
+                        if (!bounded) continue;
+                        double norm = 0;
+                        for (std::size_t c = 0; c < C; ++c)
+                        {
+                            v[c] = u[i * C + c] - F[i * C + c] + t[i * C + c];
+                            norm += v[c] * v[c];
+                        }
+                        const double shrink = norm > Radius[i] * Radius[i] ? Radius[i] / std::sqrt(norm) : 1.0;
                         for (std::size_t c = 0; c < C; ++c)
                         {
                             const auto j = i * C + c;
-                            const double gap = u[j] - F[j] - r[j];
-                            q[j] += gap;
-                            primal = std::max(primal, std::abs(gap));
-                            if (!bounded) continue;
-                            const double next = std::clamp(u[j] - F[j] + t[j], -Radius[i], Radius[i]);
+                            const double next = ball ? v[c] * shrink : std::clamp(v[c], -Radius[i], Radius[i]);
                             dual = std::max(dual, std::abs(next - s[j]));
                             s[j] = next;
-                            const double boundGap = u[j] - F[j] - s[j];
-                            t[j] += boundGap;
-                            primal = std::max(primal, std::abs(boundGap));
+                            update(t[j], u[j] - F[j] - s[j]);
                         }
                     }
                     // Dual residual: the largest change of a split variable, in value units.
                     PrimalResidual = primal;
                     DualResidual = dual;
-                    if (primal <= tolerance && DualResidual <= tolerance) break;
-                    if (iterations % 10 == 0 && (primal > 10 * DualResidual || DualResidual > 10 * primal))
+                    if (primal <= tolerance && dual <= tolerance) break;
+                    if (iterations % 10 == 0 && (primal > 10 * dual || dual > 10 * primal))
                     {
-                        const double factor = primal > 10 * DualResidual ? 2.0 : 0.5;
+                        const double factor = primal > 10 * dual ? 2.0 : 0.5;
                         beta *= factor;
-                        for (auto* duals : {&p, &q, &t})
+                        for (auto* duals : {&p1, &p2, &q, &t})
                             for (auto& y : *duals) y /= factor;
                     }
                 }
@@ -313,17 +419,33 @@ namespace Geometry::HarmonicField
                             " iterations; raise the iteration limit or the tolerance. No property was changed.";
                     return {};
                 }
-                // Project onto the feasible set: fixed rows exact, bounds per channel.
+                // Project onto the feasible set: fixed rows exact, bounds per channel or per row.
                 ActiveBounds = 0;
                 for (std::size_t i = 0; i < N; ++i)
+                {
+                    if (Fixed[i])
+                    {
+                        for (std::size_t c = 0; c < C; ++c) u[i * C + c] = F[i * C + c];
+                        continue;
+                    }
+                    if (!bounded) continue;
+                    if (ball)
+                    {
+                        const double deviation = Distance(u, i, F, i);
+                        if (deviation > Radius[i])
+                            for (std::size_t c = 0; c < C; ++c)
+                                u[i * C + c] = F[i * C + c] + (u[i * C + c] - F[i * C + c]) * Radius[i] / deviation;
+                        if (Distance(u, i, F, i) >= Radius[i] - tolerance) ++ActiveBounds;
+                        continue;
+                    }
                     for (std::size_t c = 0; c < C; ++c)
                     {
                         auto& value = u[i * C + c];
-                        if (Fixed[i]) { value = F[i * C + c]; continue; }
-                        if (!bounded) continue;
                         value = std::clamp(value, F[i * C + c] - Radius[i], F[i * C + c] + Radius[i]);
                         if (std::abs(value - F[i * C + c]) >= Radius[i] - tolerance) ++ActiveBounds;
                     }
+                }
+                Gradient = std::move(g);
                 return u;
             }
 
@@ -361,7 +483,7 @@ namespace Geometry::HarmonicField
                           std::span<const Smoothing::PropertyEdge> edges,
                           const Smoothing::PropertyFilterParams& params,
                           std::span<const std::size_t> fixedRows, std::span<const double> lumpedMass,
-                          std::span<const double> boundRadii)
+                          std::span<const double> boundRadii, std::span<const double> positions)
     {
         using Smoothing::FitBound;
         using Smoothing::PropertyLaplacian;
@@ -418,6 +540,21 @@ namespace Geometry::HarmonicField
             problem.Radius.assign(boundRadii.begin(), boundRadii.end());
         }
         double range = 0;
+        if (params.SmoothnessOrder == Smoothing::FitOrder::Second)
+        {
+            if (positions.size() != 3 * count || !std::ranges::all_of(positions, [](double x) { return std::isfinite(x); }))
+                return fail("Second-order fitting needs three finite position coordinates per row.");
+            problem.Positions = positions;
+            double length = 0;
+            for (const auto& e : edges)
+            {
+                double squared = 0;
+                for (std::size_t k = 0; k < 3; ++k)
+                    squared += (positions[e.A * 3 + k] - positions[e.B * 3 + k]) * (positions[e.A * 3 + k] - positions[e.B * 3 + k]);
+                length += std::sqrt(squared);
+            }
+            if (!edges.empty() && length > 0) problem.EdgeLength = length / double(edges.size());
+        }
         for (std::size_t c = 0; c < channels; ++c)
         {
             double lo = values[c], hi = values[c];

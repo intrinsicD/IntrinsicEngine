@@ -330,7 +330,8 @@ TEST(PropertySmoothingOperations, VariationalFitConfigRoundtripAndValidation)
     c.Filter.Fidelity=S::FitFidelity::NoiseLevel; c.Filter.FitWeight=3; c.Filter.NoiseLevel=0.02;
     c.Filter.PenaltyDelta=0.004; c.Filter.Bound=S::FitBound::PerRow; c.Filter.BoundRadius=0.7;
     c.Filter.MaxFitIterations=77; c.Filter.FitTolerance=1e-9; c.Filter.Laplacian=S::PropertyLaplacian::LumpedMass;
-    c.Filter.FitAlgorithm=S::FitSolver::Admm;
+    c.Filter.FitAlgorithm=S::FitSolver::Admm; c.Filter.BoundNorm=S::FitBoundNorm::Euclidean;
+    c.Filter.SmoothnessOrder=S::FitOrder::Second; c.Filter.SecondOrderWeight=2.5;
     c.BoundRadii={D::MeshVertex,"v:tolerance",K::Double};
     const auto payload=R::SerializePropertySmoothingConfig(c);
     const auto valid=registration.Validate(payload,{},R::kPropertySmoothingConfigSectionName);
@@ -341,10 +342,61 @@ TEST(PropertySmoothingOperations, VariationalFitConfigRoundtripAndValidation)
              "{\"bound\":3}","{\"fit_weight\":0}","{\"noise_level\":-1}","{\"penalty_delta\":0}","{\"bound_radius\":-0.5}",
              "{\"max_fit_iterations\":0}","{\"fit_tolerance\":1}","{\"bound_radii\":5}",
              "{\"method\":5,\"bound\":2}","{\"fit_solver\":2}","{\"penalty_delta\":0}",
-             "{\"fit_solver\":1,\"penalty_delta\":0,\"data_penalty\":1}","{\"max_fit_iterations\":100001}"})
+             "{\"fit_solver\":1,\"penalty_delta\":0,\"data_penalty\":1}","{\"max_fit_iterations\":100001}",
+             "{\"bound_norm\":2}","{\"smoothness_order\":2}","{\"second_order_weight\":0}",
+             "{\"bound_norm\":1}","{\"smoothness_order\":1}"})
         EXPECT_FALSE(registration.Validate(invalid,{},R::kPropertySmoothingConfigSectionName).Usable()) << invalid;
     // Unused per-row radius bindings are kept but not required.
     EXPECT_TRUE(registration.Validate("{\"method\":5,\"bound\":1}",{},R::kPropertySmoothingConfigSectionName).Usable());
     EXPECT_TRUE(registration.Validate("{\"method\":5,\"fit_solver\":1,\"penalty_delta\":0,\"smoothness_penalty\":2}",{},
         R::kPropertySmoothingConfigSectionName).Usable()) << "ADMM accepts undamped L1";
+    EXPECT_TRUE(registration.Validate("{\"method\":5,\"fit_solver\":1,\"bound_norm\":1,\"smoothness_order\":1,\"second_order_weight\":3}",{},
+        R::kPropertySmoothingConfigSectionName).Usable());
+}
+
+TEST(PropertySmoothingOperations, SecondOrderFitKeepsAffineSignalsOnEveryDomain)
+{
+    // The harness samples lie on a line with temperature equal to the coordinate: an affine field.
+    for (auto domain : domains)
+    {
+        SCOPED_TRACE(int(domain));
+        SmoothingHarness h(domain);
+        h.Config.Filter.Method=S::PropertyFilter::VariationalFit;
+        h.Config.Filter.FitAlgorithm=S::FitSolver::Admm;
+        h.Config.Filter.SmoothnessOrder=S::FitOrder::Second;
+        h.Config.Filter.SmoothnessPenalty=S::FitPenalty::L1;
+        h.Config.Filter.PenaltyDelta=0;
+        h.Config.Filter.FitWeight=0.01;
+        h.Config.Filter.FitTolerance=1e-10;
+        const auto input=std::as_const(h.Props()).Get<double>("temperature").Vector();
+        const auto result=h.Run(); ASSERT_TRUE(result.Succeeded()) << result.Message;
+        EXPECT_EQ(result.BackendId,"cpu_admm_sparse_cholesky");
+        const auto output=std::as_const(h.Props()).Get<double>("smooth").Vector();
+        for (std::size_t i=0;i<output.size();++i) EXPECT_NEAR(output[i],input[i],1e-6);
+        h.Config.Filter.SmoothnessOrder=S::FitOrder::First;
+        const auto flattened=h.Run(); ASSERT_TRUE(flattened.Succeeded());
+        const auto tv=std::as_const(h.Props()).Get<double>("smooth").Vector();
+        EXPECT_GT(std::abs(tv.front()-input.front()),0.1) << "first order flattens the same ramp";
+    }
+}
+TEST(PropertySmoothingOperations, EuclideanBoundsLimitVectorDeviation)
+{
+    SmoothingHarness h(D::PointCloudPoint);
+    auto flows=h.Props().GetOrAdd<glm::vec3>("flow",glm::vec3{0});
+    for (std::size_t i=0;i<h.Props().Size();++i) flows[i]={float(i),float(i%3),-float(i)};
+    h.Config.Input={D::PointCloudPoint,"flow",K::Vec3};
+    h.Config.Output={D::PointCloudPoint,"flow_fit",K::Vec3};
+    h.Config.Filter.Method=S::PropertyFilter::VariationalFit;
+    h.Config.Filter.FitAlgorithm=S::FitSolver::Admm;
+    h.Config.Filter.FitWeight=0.01;
+    h.Config.Filter.Bound=S::FitBound::Uniform;
+    h.Config.Filter.BoundRadius=0.5;
+    h.Config.Filter.BoundNorm=S::FitBoundNorm::Euclidean;
+    const auto result=h.Run(); ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_GT(result.ActiveBounds,0u);
+    const auto input=std::as_const(h.Props()).Get<glm::vec3>("flow").Vector();
+    const auto output=std::as_const(h.Props()).Get<glm::vec3>("flow_fit").Vector();
+    for (std::size_t i=0;i<output.size();++i) EXPECT_LE(glm::length(output[i]-input[i]),0.5f+1e-5f);
+    h.Config.Filter.FitAlgorithm=S::FitSolver::Reweighted;
+    EXPECT_FALSE(R::PreviewEditorPropertySmoothingCommand(h.Commands(),h.Id(),h.Config).Enabled);
 }

@@ -3,6 +3,7 @@
 #include <limits>
 #include <random>
 #include <vector>
+#include <glm/glm.hpp>
 #include <gtest/gtest.h>
 import Geometry.HarmonicField;
 namespace H = Geometry::HarmonicField;
@@ -367,4 +368,217 @@ TEST(VariationalFit, ZeroDeltaNeedsAdmmAndNoHuberPenalty)
     const auto slow = H::FitProperty(f, 1, Path(4), p);
     EXPECT_FALSE(slow.Success);
     EXPECT_TRUE(slow.Values.empty());
+}
+
+TEST(VariationalFit, EuclideanBoundsLimitTheVectorDeviationAndMatchBoxesForScalars)
+{
+    std::mt19937 rng(29);
+    const std::size_t n = 12, channels = 3;
+    const auto edges = RandomGraph(n, rng);
+    std::uniform_real_distribution<double> value(-2, 2), unit(-1, 1);
+    std::vector<double> f(n * channels);
+    for (auto& x : f) x = value(rng);
+    auto p = Fit(S::FitPenalty::L1, S::FitPenalty::Quadratic, 0.5);
+    p.FitAlgorithm = S::FitSolver::Admm;
+    p.PenaltyDelta = 0.1;
+    p.Bound = S::FitBound::Uniform;
+    p.BoundRadius = 0.3;
+    p.BoundNorm = S::FitBoundNorm::Euclidean;
+    const auto fit = H::FitProperty(f, channels, edges, p);
+    ASSERT_TRUE(fit.Success) << fit.Diagnostic;
+    EXPECT_GT(fit.Stats.ActiveBounds, 0u);
+    const auto deviation = [&](const std::vector<double>& u, std::size_t i) {
+        double sum = 0;
+        for (std::size_t c = 0; c < channels; ++c) sum += (u[i * channels + c] - f[i * channels + c]) * (u[i * channels + c] - f[i * channels + c]);
+        return std::sqrt(sum);
+    };
+    for (std::size_t i = 0; i < n; ++i) EXPECT_LE(deviation(fit.Values, i), 0.3 + 1e-12);
+    const double energy = Energy(fit.Values, f, channels, edges, p);
+    for (int trial = 0; trial < 60; ++trial)
+    {
+        auto moved = fit.Values;
+        for (auto& x : moved) x += 1e-3 * unit(rng);
+        for (std::size_t i = 0; i < n; ++i)
+            if (const double d = deviation(moved, i); d > 0.3)
+                for (std::size_t c = 0; c < channels; ++c)
+                    moved[i * channels + c] = f[i * channels + c] + (moved[i * channels + c] - f[i * channels + c]) * 0.3 / d;
+        EXPECT_GE(Energy(moved, f, channels, edges, p), energy - 1e-9 * std::max(1.0, energy));
+    }
+    // A scalar ball is an interval: the reweighted box reference applies.
+    std::vector<double> scalar(n);
+    for (auto& x : scalar) x = value(rng);
+    const auto ball = H::FitProperty(scalar, 1, edges, p);
+    auto box = p;
+    box.FitAlgorithm = S::FitSolver::Reweighted;
+    box.BoundNorm = S::FitBoundNorm::PerChannel;
+    const auto reference = H::FitProperty(scalar, 1, edges, box);
+    ASSERT_TRUE(ball.Success && reference.Success);
+    for (std::size_t i = 0; i < n; ++i) EXPECT_NEAR(ball.Values[i], reference.Values[i], 1e-6);
+    box.BoundNorm = S::FitBoundNorm::Euclidean;
+    EXPECT_FALSE(H::FitProperty(scalar, 1, edges, box).Success) << "Euclidean bounds need ADMM";
+}
+
+namespace
+{
+    // Random points in a box with symmetric 8-nearest-neighbor edges.
+    std::vector<double> RandomPoints(std::size_t n, std::mt19937& rng, std::vector<Edge>& edges)
+    {
+        std::uniform_real_distribution<double> coordinate(0, 1);
+        std::vector<glm::vec3> points(n);
+        std::vector<double> flat;
+        for (auto& x : points)
+        {
+            x = {float(coordinate(rng)), float(coordinate(rng)), float(coordinate(rng))};
+            flat.insert(flat.end(), {double(x.x), double(x.y), double(x.z)});
+        }
+        edges = *S::BuildPropertyNeighborhood(points, 8, S::PropertyWeight::Uniform, 1.0);
+        return flat;
+    }
+    S::PropertyFilterParams Tgv(double lambda)
+    {
+        auto p = Fit(S::FitPenalty::L1, S::FitPenalty::Quadratic, lambda);
+        p.FitAlgorithm = S::FitSolver::Admm;
+        p.SmoothnessOrder = S::FitOrder::Second;
+        p.PenaltyDelta = 0;
+        p.FitTolerance = 1e-10;
+        return p;
+    }
+}
+
+TEST(VariationalFit, SecondOrderKeepsAffineFieldsThatFirstOrderFlattens)
+{
+    std::mt19937 rng(31);
+    const std::size_t n = 60;
+    std::vector<Edge> edges;
+    const auto x = RandomPoints(n, rng, edges);
+    std::vector<double> f(2 * n);
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        f[2 * i] = 2 * x[3 * i] - x[3 * i + 1] + 0.5 * x[3 * i + 2] + 1;
+        f[2 * i + 1] = -3 * x[3 * i + 2];
+    }
+    auto p = Tgv(0.01);
+    const auto tgv = H::FitProperty(f, 2, edges, p, {}, {}, {}, x);
+    ASSERT_TRUE(tgv.Success) << tgv.Diagnostic;
+    EXPECT_EQ(tgv.Stats.Factorizations, 1u);
+    for (std::size_t j = 0; j < f.size(); ++j) EXPECT_NEAR(tgv.Values[j], f[j], 1e-6);
+    EXPECT_NEAR(tgv.Stats.Energy, 0.0, 1e-6);
+    p.SmoothnessOrder = S::FitOrder::First;
+    const auto tv = H::FitProperty(f, 2, edges, p);
+    ASSERT_TRUE(tv.Success) << tv.Diagnostic;
+    double flattened = 0;
+    for (std::size_t j = 0; j < f.size(); ++j) flattened = std::max(flattened, std::abs(tv.Values[j] - f[j]));
+    EXPECT_GT(flattened, 0.1) << "total variation pulls a ramp toward its mean";
+}
+
+TEST(VariationalFit, SecondOrderAvoidsStaircasingAndKeepsAJump)
+{
+    // A noisy ramp with a jump in the middle, sampled on a line.
+    const std::size_t n = 80;
+    std::vector<double> x(3 * n, 0.0), clean(n), f(n);
+    std::mt19937 rng(37);
+    std::uniform_real_distribution<double> noise(-0.05, 0.05);
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        x[3 * i] = double(i) / double(n);
+        clean[i] = x[3 * i] + (2 * i < n ? 0.0 : 1.0);
+        f[i] = clean[i] + noise(rng);
+    }
+    const auto edges = Path(n);
+    auto p = Tgv(5.0);
+    p.SecondOrderWeight = 4;
+    const auto tgv = H::FitProperty(f, 1, edges, p, {}, {}, {}, x);
+    p.SmoothnessOrder = S::FitOrder::First;
+    const auto tv = H::FitProperty(f, 1, edges, p);
+    ASSERT_TRUE(tgv.Success && tv.Success) << tgv.Diagnostic << tv.Diagnostic;
+    const auto error = [&](const std::vector<double>& u) {
+        double sum = 0;
+        for (std::size_t i = 0; i < n; ++i) sum += (u[i] - clean[i]) * (u[i] - clean[i]);
+        return std::sqrt(sum / double(n));
+    };
+    const auto plateaus = [&](const std::vector<double>& u) {
+        std::size_t flat = 0;
+        for (std::size_t i = 0; i + 1 < n; ++i) flat += std::abs(u[i + 1] - u[i]) < 1e-6;
+        return flat;
+    };
+    const double noiseRms = 0.1 / std::sqrt(12.0);
+    EXPECT_LT(error(tgv.Values), 0.6 * error(tv.Values));
+    EXPECT_LT(error(tgv.Values), 0.5 * noiseRms);
+    EXPECT_GT(plateaus(tv.Values), n / 4) << "TV staircases the ramp";
+    EXPECT_LT(plateaus(tgv.Values), n / 10);
+    EXPECT_GT(tgv.Values[n / 2] - tgv.Values[n / 2 - 1], 0.9) << "the jump survives";
+}
+
+TEST(VariationalFit, QuadraticSecondOrderMatchesADenseOracle)
+{
+    std::mt19937 rng(41);
+    const std::size_t n = 12;
+    std::vector<Edge> edges;
+    const auto x = RandomPoints(n, rng, edges);
+    std::uniform_real_distribution<double> value(-1, 1);
+    std::vector<double> f(n);
+    for (auto& v : f) v = value(rng);
+    auto p = Tgv(0.3);
+    p.SmoothnessPenalty = S::FitPenalty::Quadratic;
+    p.SecondOrderWeight = 0.7;
+    p.FitTolerance = 1e-12;
+    const auto fit = H::FitProperty(f, 1, edges, p, {}, {}, {}, x);
+    ASSERT_TRUE(fit.Success) << fit.Diagnostic;
+    // Unknowns (u, g); stationarity of sum w |A1|^2 + alpha sum w h^2 |g_a - g_b|^2 + lambda sum |u - f|^2.
+    double h = 0;
+    for (const auto& e : edges)
+        h += std::sqrt(std::pow(x[3 * e.A] - x[3 * e.B], 2) + std::pow(x[3 * e.A + 1] - x[3 * e.B + 1], 2) +
+                       std::pow(x[3 * e.A + 2] - x[3 * e.B + 2], 2));
+    h /= double(edges.size());
+    const std::size_t m = 4 * n;
+    std::vector<std::vector<double>> A(m, std::vector<double>(m + 1, 0.0));
+    for (std::size_t i = 0; i < n; ++i) { A[i][i] += 0.3; A[i][m] += 0.3 * f[i]; }
+    for (const auto& e : edges)
+    {
+        std::vector<std::pair<std::size_t, double>> a{{e.A, 1.0}, {e.B, -1.0}};
+        for (std::size_t k = 0; k < 3; ++k)
+        {
+            const double d = x[3 * e.A + k] - x[3 * e.B + k];
+            a.push_back({n + 3 * e.A + k, -0.5 * d});
+            a.push_back({n + 3 * e.B + k, -0.5 * d});
+        }
+        for (auto [i, ai] : a) for (auto [j, aj] : a) A[i][j] += e.Weight * ai * aj;
+        for (std::size_t k = 0; k < 3; ++k)
+        {
+            const auto ga = n + 3 * e.A + k, gb = n + 3 * e.B + k;
+            const double w = 0.7 * e.Weight * h * h;
+            A[ga][ga] += w; A[gb][gb] += w; A[ga][gb] -= w; A[gb][ga] -= w;
+        }
+    }
+    for (std::size_t col = 0; col < m; ++col)
+    {
+        std::size_t pivot = col;
+        for (std::size_t row = col + 1; row < m; ++row) if (std::abs(A[row][col]) > std::abs(A[pivot][col])) pivot = row;
+        std::swap(A[col], A[pivot]);
+        for (std::size_t row = 0; row < m; ++row)
+            if (row != col)
+            {
+                const double factor = A[row][col] / A[col][col];
+                for (std::size_t k = col; k <= m; ++k) A[row][k] -= factor * A[col][k];
+            }
+    }
+    for (std::size_t i = 0; i < n; ++i) EXPECT_NEAR(fit.Values[i], A[i][m] / A[i][i], 1e-6);
+}
+
+TEST(VariationalFit, SecondOrderNeedsAdmmAndPositions)
+{
+    const std::vector<double> f{0, 1, 2, 3}, x{0, 0, 0, 1, 0, 0, 2, 0, 0, 3, 0, 0};
+    auto p = Tgv(1.0);
+    EXPECT_FALSE(H::FitProperty(f, 1, Path(4), p).Success) << "positions are required";
+    const std::vector<double> nan{0, 0, 0, std::nan(""), 0, 0, 2, 0, 0, 3, 0, 0};
+    EXPECT_FALSE(H::FitProperty(f, 1, Path(4), p, {}, {}, {}, nan).Success);
+    const auto ramp = H::FitProperty(f, 1, Path(4), p, {}, {}, {}, x);
+    ASSERT_TRUE(ramp.Success) << ramp.Diagnostic;
+    for (std::size_t i = 0; i < 4; ++i) EXPECT_NEAR(ramp.Values[i], f[i], 1e-7);
+    p.FitAlgorithm = S::FitSolver::Reweighted;
+    p.PenaltyDelta = 0.1;
+    EXPECT_FALSE(H::FitProperty(f, 1, Path(4), p, {}, {}, {}, x).Success);
+    p.FitAlgorithm = S::FitSolver::Admm;
+    p.SecondOrderWeight = 0;
+    EXPECT_FALSE(H::FitProperty(f, 1, Path(4), p, {}, {}, {}, x).Success);
 }

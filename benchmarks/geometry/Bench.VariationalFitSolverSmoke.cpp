@@ -70,8 +70,43 @@ namespace Intrinsic::Bench::Geometry
         for (std::size_t i = 0; i < m; ++i)
             metrics.ExactTvStepError = std::max(metrics.ExactTvStepError,
                 std::abs(tv.Values[i] - (i < m / 2 ? 1.0 / m : 1.0 - 1.0 / m)));
+        // Non-local TGV keeps the affine part of the kNN line signal and does not staircase a noisy
+        // ramp with a jump, where first-order TV does.
+        S::PropertyFilterParams tgv{.Method = S::PropertyFilter::VariationalFit};
+        tgv.SmoothnessPenalty = S::FitPenalty::L1;
+        tgv.FitAlgorithm = S::FitSolver::Admm;
+        tgv.SmoothnessOrder = S::FitOrder::Second;
+        tgv.PenaltyDelta = 0;
+        tgv.FitTolerance = 1e-10;
+        tgv.MaxFitIterations = 100000;
+        std::vector<double> positions, ramp(n), clean(n), noisy(n);
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            positions.insert(positions.end(), {double(points[i].x), 0.0, 0.0});
+            ramp[i] = 3.0 * points[i].x - 1.0;
+            clean[i] = points[i].x + (2 * i < n ? 0.0 : 1.0);
+            noisy[i] = clean[i] + (f[i] - (2 * i < n ? 0.0 : 1.0)) * 0.5;
+        }
+        tgv.FitWeight = 0.01;
+        const auto affine = H::FitProperty(ramp, 1, *edges, tgv, {}, {}, {}, positions);
+        if (!affine.Success) return {};
+        for (std::size_t i = 0; i < n; ++i) metrics.TgvAffineError = std::max(metrics.TgvAffineError, std::abs(affine.Values[i] - ramp[i]));
+        tgv.FitWeight = 5.0;
+        tgv.SecondOrderWeight = 4.0;
+        const auto second = H::FitProperty(noisy, 1, *edges, tgv, {}, {}, {}, positions);
+        tgv.SmoothnessOrder = S::FitOrder::First;
+        const auto first = H::FitProperty(noisy, 1, *edges, tgv);
+        if (!second.Success || !first.Success) return {};
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            metrics.TgvRampRmsError += (second.Values[i] - clean[i]) * (second.Values[i] - clean[i]) / double(n);
+            metrics.TvRampRmsError += (first.Values[i] - clean[i]) * (first.Values[i] - clean[i]) / double(n);
+        }
+        metrics.TgvRampRmsError = std::sqrt(metrics.TgvRampRmsError);
+        metrics.TvRampRmsError = std::sqrt(metrics.TvRampRmsError);
         metrics.Succeeded = metrics.MaxValueDelta <= 1e-4 && metrics.RelativeEnergyDelta <= 1e-6 &&
-                            metrics.ExactTvStepError <= 1e-9 && metrics.AdmmFactorizations == 1;
+                            metrics.ExactTvStepError <= 1e-9 && metrics.AdmmFactorizations == 1 &&
+                            metrics.TgvAffineError <= 1e-6 && metrics.TgvRampRmsError < metrics.TvRampRmsError;
         return metrics;
     }
 }

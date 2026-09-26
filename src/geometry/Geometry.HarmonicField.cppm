@@ -95,14 +95,17 @@ export namespace Geometry::HarmonicField
     // squares and bounds by a primal-dual active set per channel; every step is a harmonic Solve.
     // FitSolver::Admm splits D u, the data residual and the bound residual off, factors L + kM once
     // and applies closed-form proximal steps; it also accepts delta = 0 (exact L1). The final ADMM
-    // iterate is projected onto the fixed rows and bounds. boundRadii: one
-    // nonnegative radius per row, required for FitBound::PerRow. Failure never returns values.
+    // iterate is projected onto the fixed rows and bounds. ADMM alone offers Euclidean bounds and
+    // the second-order (non-local TGV) smoothness. boundRadii: one nonnegative radius per row,
+    // required for FitBound::PerRow. positions: three finite coordinates per row, required for
+    // FitOrder::Second. Failure never returns values.
     [[nodiscard]] FitResult FitProperty(std::span<const double> values, std::size_t channels,
                                         std::span<const Smoothing::PropertyEdge> edges,
                                         const Smoothing::PropertyFilterParams& params,
                                         std::span<const std::size_t> fixedRows = {},
                                         std::span<const double> lumpedMass = {},
-                                        std::span<const double> boundRadii = {});
+                                        std::span<const double> boundRadii = {},
+                                        std::span<const double> positions = {});
 
     struct LabelResult
     {

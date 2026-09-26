@@ -66,7 +66,17 @@ fixed rows. Runtime can pin mesh boundary vertices for any filter.
   Norms are Euclidean over channels. Each penalty is quadratic `r^2`, Huber
   (`r^2` up to delta, then `2 delta r - delta^2`) or L1 smoothed below delta
   (`r`, and `r^2/(2 delta) + delta/2` below). L1 smoothness is total variation
-  (edge-preserving); Huber or L1 data terms are robust to outliers. Row masses
+  (edge-preserving); Huber or L1 data terms are robust to outliers. The
+  **second-order** smoothness (ADMM only) is non-local total generalized
+  variation: every row carries a gradient `g` in the sample space, and each
+  edge penalizes `rho_s(|u_a-u_b-<(g_a+g_b)/2, x_a-x_b>|)` plus
+  `alpha rho_s(h |g_a-g_b|)`, with `h` the mean edge length and `alpha` the
+  dimensionless second-order weight (default 2, the usual `alpha0 = 2 alpha1`).
+  Affine fields cost nothing, so L1 fits of smoothly varying signals such as
+  curvature do not staircase, while jumps survive. It uses the sample
+  positions the graph was built from (face centers and edge midpoints on
+  derived domains); gradient directions no edge offset spans get a `1e-10`
+  relative ridge. Row masses
   `m` follow the Laplacian choice: weighted degree (random walk; 1 for isolated
   rows), 1 (combinatorial) or lumped mesh area. With both penalties quadratic
   and no tolerance this is exactly one implicit step with `dt = 1/lambda`.
@@ -75,7 +85,8 @@ fixed rows. Runtime can pin mesh boundary vertices for any filter.
   whose mass-weighted RMS residual equals the noise level (to `1e-4` relative);
   a target outside that range clamps the weight and is reported. The tolerance
   is one radius for every row or a float/double radius property (radius 0 pins
-  a row). The kernel is `Geometry::HarmonicField::FitProperty` with two solvers:
+  a row), applied per channel (box) or, with ADMM, to the Euclidean deviation
+  of vector rows (ball). The kernel is `Geometry::HarmonicField::FitProperty` with two solvers:
   - **Reweighted least squares** (reference, `cpu_reference_sparse_cholesky`):
     non-quadratic penalties use iteratively reweighted least squares (edge
     weight `w rho'(r)/(2r)`, the quadratic majorizer, so the energy never
@@ -86,10 +97,12 @@ fixed rows. Runtime can pin mesh boundary vertices for any filter.
     Delta must be positive.
   - **ADMM** (`cpu_admm_sparse_cholesky`): scaled ADMM with the splits
     `z = D u` (edge-weighted), `r = u - f` and, with a tolerance, `s = u - f`
-    (both mass-weighted). The u-step matrix `L + kM` (`k` = 1, or 2 with a
-    tolerance) is independent of the penalty parameter and the data weight, so
+    (both mass-weighted), plus `z2 = h (g_a - g_b)` for second order. The
+    normal matrix of the `(u, g)` step (`L + kM`, `k` = 1 or 2 with a tolerance,
+    for first order) is independent of the penalty parameter and the data weight, so
     it is factored once per run, including every noise-level bisection step;
-    penalties become closed-form proximal steps and the tolerance a clamp. The
+    penalties become closed-form proximal steps and the tolerance a clamp or a
+    ball projection. The
     penalty parameter starts at `1/range` and is rebalanced by factors of two
     when primal and dual residuals differ tenfold. It stops when the max-norm
     primal residual and the largest split-variable change are both below the
@@ -142,10 +155,10 @@ face-center construction and guarded editor history.
 | Least-structured input | A floating signal with 1–4 channels and a weighted undirected graph; spatial graph construction accepts vec3 samples. |
 | Entity/domain sources | All eight canonical domains; explicit same-domain sample positions, or vertex/node positions for derived face centers and edge/halfedge midpoints. |
 | Runtime owner | `Runtime.MeshFieldOperations.Smoothing.cpp`; uses canonical resolution, point/deletion capture, face-center construction, DEC and editor history. |
-| Config/agent | `sandbox.property_smoothing`, registered in the sandbox config tree; serialization and preview/apply use the same validator as execution admission. Fit fields: `smoothness_penalty`, `data_penalty`, `fidelity`, `fit_weight`, `noise_level`, `penalty_delta`, `bound`, `bound_radius`, `bound_radii` (null unless bound; required on the input domain for per-row bounds), `fit_solver`, `max_fit_iterations` (1–100000), `fit_tolerance`. |
-| UI | View → Smooth Property, also reachable from Mesh/Graph/PointCloud → Processing. Input property, output name/storage, positions, filter, Laplacian, weights and parameters are configurable; **Variational fit** adds penalties, fixed weight or noise level, the tolerance bound with its radius property, and the solver. |
+| Config/agent | `sandbox.property_smoothing`, registered in the sandbox config tree; serialization and preview/apply use the same validator as execution admission. Fit fields: `smoothness_penalty`, `data_penalty`, `fidelity`, `fit_weight`, `noise_level`, `penalty_delta`, `bound`, `bound_radius`, `bound_radii` (null unless bound; required on the input domain for per-row bounds), `fit_solver`, `max_fit_iterations` (1–100000), `fit_tolerance`, `bound_norm`, `smoothness_order`, `second_order_weight`; Euclidean bounds and second order require `fit_solver` ADMM. |
+| UI | View → Smooth Property, also reachable from Mesh/Graph/PointCloud → Processing. Input property, output name/storage, positions, filter, Laplacian, weights and parameters are configurable; **Variational fit** adds penalties, fixed weight or noise level, the tolerance bound with its radius property and shape (vector inputs), smoothness order with second-order weight, and the solver; choosing a ball or second order selects ADMM. |
 | Publication | Same domain and cardinality; only the named output changes. Existing deleted output slots remain bitwise untouched; new deleted output slots are zero. In-place writes, including positions, use guarded undo/redo. |
-| Verification | `Test.PropertySmoothing.cpp` (including direct-vs-CG implicit parity), `Test.VariationalFit.cpp` (implicit-step equivalence, closed-form TV, outlier rejection, perturbation optimality for every penalty/bound pair and both solvers, ADMM-to-reference parity with one factorization, exact undamped TV, discrepancy target), `Test.PropertySmoothingOperations.cpp`, and the real ImGui actions in `Test.SandboxProcessingPanels.cpp`. The bound-radius property is a publication guard. |
+| Verification | `Test.PropertySmoothing.cpp` (including direct-vs-CG implicit parity), `Test.VariationalFit.cpp` (implicit-step equivalence, closed-form TV, outlier rejection, perturbation optimality for every penalty/bound pair and both solvers, ADMM-to-reference parity with one factorization, exact undamped TV, discrepancy target, Euclidean bounds, second-order affine reproduction, staircasing and a dense quadratic oracle), `Test.PropertySmoothingOperations.cpp`, and the real ImGui actions in `Test.SandboxProcessingPanels.cpp`. The bound-radius property is a publication guard. |
 
 The default output type follows the chosen input in the UI. Scalar output
 storage can also be float or double. Conversion rejects nonfinite results or
@@ -179,6 +192,8 @@ solver convergence and representability before a single history transaction.
 - Morozov, *On the Solution of Functional Equations by the Method of Regularization*, 1966: the discrepancy principle for choosing the data weight.
 - Boyd, Parikh, Chu, Peleato and Eckstein, *Distributed Optimization and Statistical Learning via the Alternating Direction Method of Multipliers*, Found. Trends Mach. Learn. 2011: scaled ADMM, residual stopping and penalty balancing.
 - Goldstein and Osher, *The Split Bregman Method for L1-Regularized Problems*, SIAM J. Imaging Sci. 2009: splitting the gradient for total variation.
+- Bredies, Kunisch and Pock, *Total Generalized Variation*, SIAM J. Imaging Sci. 2010: the second-order TGV regularizer.
+- Ranftl, Bredies and Pock, *Non-Local Total Generalized Variation for Optical Flow Estimation*, ECCV 2014: per-sample affine models on arbitrary neighborhoods, the form used for second order here.
 - Hintermüller, Ito and Kunisch, *The Primal-Dual Active Set Strategy as a Semismooth Newton Method*, SIAM J. Optim. 2002: the active-set iteration for the tolerance bounds.
 - [Gadde, Narang and Ortega, *Bilateral Filter: Graph Spectral Interpretation and Extensions*](https://arxiv.org/abs/1303.2685): graph interpretation of bilateral weights. This implementation uses iterative bilateral filtering, not their complete family of spectral designs.
 
@@ -201,8 +216,14 @@ both runtimes and iteration counts. In the unoptimized `ci` build ADMM took
 0.24 s (821 iterations, one factorization) versus 1.1 s for reweighting
 (390 factorizations); this is a single-machine debug measurement, not a
 performance claim. Tolerances are per-channel boxes, not Euclidean balls, for
-vector properties. The smoothness term is first order (Dirichlet or TV) and
-staircases smoothly varying fields; a second-order TGV penalty is tracked in
-[GEOM-102](../../tasks/backlog/geometry/GEOM-102-second-order-tgv-property-fit.md).
-Solver options from the literature are recorded in
-[GEOM-101](../../tasks/backlog/geometry/GEOM-101-delta-free-variational-fit-solver.md).
+vector properties unless the Euclidean ADMM ball is chosen. First-order TV
+staircases smoothly varying fields; the second-order order avoids that but has
+only the ADMM solver, whose quadratic case is checked against a dense oracle
+and whose L1 case against affine reproduction and the ramp-with-jump
+comparison in the smoke (TGV RMS error must stay below TV's). Its `(u, g)`
+system has four unknowns per row and a denser factor, and on a surface the
+normal gradient component is only fixed by the ridge. Solver options from the
+literature are recorded in
+[GEOM-101](../../tasks/done/GEOM-101-delta-free-variational-fit-solver.md) and
+the second-order design in
+[GEOM-102](../../tasks/done/GEOM-102-second-order-tgv-property-fit.md).
