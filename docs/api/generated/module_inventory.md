@@ -15,7 +15,7 @@ Root scanned: `src`
 | `geometry` | 128 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 73 |
+| `graphics/renderer` | 74 |
 | `graphics/rhi` | 18 |
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
@@ -293,6 +293,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.SelectionSystem` | `src/graphics/renderer/Graphics.SelectionSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.ShadowSystem` | `src/graphics/renderer/Graphics.ShadowSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.SharedRenderRecipeExecution` | `src/graphics/renderer/Graphics.SharedRenderRecipeExecution.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.SparseConjugateGradient` | `src/graphics/renderer/Graphics.SparseConjugateGradient.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.SpatialDebugVisualizers` | `src/graphics/renderer/Graphics.SpatialDebugVisualizers.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.TransformSyncSystem` | `src/graphics/renderer/Graphics.TransformSyncSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.TransientDebugUploadHelper` | `src/graphics/renderer/Graphics.TransientDebugUploadHelper.cppm` | `graphics/renderer` |
@@ -458,4 +459,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **431**
+Total modules: **432**

@@ -410,7 +410,9 @@ TEST(PropertySmoothingOperations, VulkanBackendConfigAndAdmission)
     const auto payload=R::SerializePropertySmoothingConfig(c);
     const auto valid=registration.Validate(payload,{},R::kPropertySmoothingConfigSectionName);
     ASSERT_TRUE(valid.Usable()); EXPECT_EQ(valid.CanonicalPayloadJson,payload);
-    for (const char* invalid : {"{\"backend\":2}","{\"backend\":1,\"method\":4}","{\"backend\":1,\"method\":5}"})
+    EXPECT_TRUE(registration.Validate("{\"backend\":1,\"method\":4,\"solver\":1}",{},R::kPropertySmoothingConfigSectionName).Usable())
+        << "conjugate-gradient implicit smoothing runs on Vulkan";
+    for (const char* invalid : {"{\"backend\":2}","{\"backend\":1,\"method\":4}","{\"backend\":1,\"method\":4,\"solver\":0}","{\"backend\":1,\"method\":5}"})
         EXPECT_FALSE(registration.Validate(invalid,{},R::kPropertySmoothingConfigSectionName).Usable()) << invalid;
     // Without a device the request is refused before any work; nothing falls back to the CPU.
     SmoothingHarness h;

@@ -1,7 +1,7 @@
 ---
 id: GEOM-103
 theme: I
-depends_on: [GEOM-081]
+depends_on: [GEOM-081, RUNTIME-269]
 template: micro
 workflow_schema: 1
 workflow_profile: micro
@@ -24,11 +24,10 @@ Operator decision 2026-09-27: pause further GPU slices until this is answered.
 
 - **GEOM-081** (on `main`): Vulkan averaging, Taubin, bilateral and spectral heat;
   parity proven (C111), speed unmeasured.
-- **RUNTIME-269 + GEOM-089 slice 1** (local branch
-  `claude/runtime-269-vulkan-sparse-solve`, commit `ced6ad864`, **not merged**):
-  device Jacobi CG mirroring `Sparse::SolveCG` and conjugate-gradient implicit
-  smoothing on Vulkan; parity proven (C112 on that branch), speed unmeasured. Merge
-  or drop it according to this task's outcome.
+- **RUNTIME-269 + GEOM-089 slice 1** (commit `ced6ad864`, merged to `main` on
+  2026-09-27 by operator request): device Jacobi CG mirroring `Sparse::SolveCG` and
+  conjugate-gradient implicit smoothing on Vulkan; parity proven (C112), speed
+  unmeasured. Keep or remove it according to this task's outcome.
 
 The sealed benchmark runtimes are frame-paced end-to-end editor times on 300-row
 fixtures in a Debug build (locked desktop seat or Xephyr); they say nothing about

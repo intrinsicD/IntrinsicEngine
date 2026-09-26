@@ -3136,7 +3136,7 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
                 snapshot.LastEndFrameMicros = ElapsedMicros(endFrameBegin);
                 snapshot.LastQueueSubmitMicros = queueSubmitMicros;
             });
-            Core::Log::Error("[VulkanDevice::EndFrame] vkQueueSubmit2 failed for guarded multi-queue Vulkan frame");
+            Core::Log::Error("[VulkanDevice::EndFrame] vkQueueSubmit2 failed for guarded multi-queue Vulkan frame (VkResult {})", static_cast<int>(result));
             ProcessResourcePoolDeletions();
             return;
         }

@@ -2816,14 +2816,20 @@ namespace Extrinsic::Sandbox::Editor
         if (ImGui::Combo("Method", &method, "Averaging\0Spectral heat\0Taubin\0Bilateral\0Implicit (backward Euler)\0Variational fit (robust / TV / bounded)\0"))
         {
             config.Filter.Method = Geometry::Smoothing::PropertyFilter(method);
-            if (config.Filter.Method >= Geometry::Smoothing::PropertyFilter::Implicit) config.Backend = Runtime::PropertySmoothingBackend::Cpu;
+            if (config.Filter.Method == Geometry::Smoothing::PropertyFilter::VariationalFit) config.Backend = Runtime::PropertySmoothingBackend::Cpu;
             changed = true;
         }
-        if (config.Filter.Method < Geometry::Smoothing::PropertyFilter::Implicit)
+        if (config.Filter.Method != Geometry::Smoothing::PropertyFilter::VariationalFit)
         {
             int backend = int(config.Backend);
             if (ImGui::Combo("Backend##Smoothing", &backend, "CPU reference\0Vulkan (shader double precision)\0"))
-            { config.Backend = Runtime::PropertySmoothingBackend(backend); changed = true; }
+            {
+                config.Backend = Runtime::PropertySmoothingBackend(backend);
+                // Vulkan implicit smoothing runs the conjugate-gradient reference semantics.
+                if (config.Backend == Runtime::PropertySmoothingBackend::Vulkan)
+                    config.Filter.Solver = Geometry::Smoothing::PropertySolver::ConjugateGradient;
+                changed = true;
+            }
         }
         if (ImGui::Combo("Laplacian", &laplacian, "Random walk\0Combinatorial\0Lumped mesh area (implicit, fit)\0"))
         { config.Filter.Laplacian = Geometry::Smoothing::PropertyLaplacian(laplacian); changed = true; }
@@ -2844,7 +2850,11 @@ namespace Extrinsic::Sandbox::Editor
             changed |= ImGui::InputDouble("Time step", &config.Filter.TimeStep);
             int solver = int(config.Filter.Solver);
             if (ImGui::Combo("Solver", &solver, "Sparse Cholesky (direct)\0Conjugate gradient\0"))
-            { config.Filter.Solver = Geometry::Smoothing::PropertySolver(solver); changed = true; }
+            {
+                config.Filter.Solver = Geometry::Smoothing::PropertySolver(solver);
+                if (config.Filter.Solver == Geometry::Smoothing::PropertySolver::Direct) config.Backend = Runtime::PropertySmoothingBackend::Cpu;
+                changed = true;
+            }
             // CG settings also govern the fallback when the Cholesky factorization fails.
             changed |= ImGui::InputDouble("Solver tolerance", &config.Filter.SolverTolerance);
             changed |= ImGui::InputScalar("Maximum solver iterations", ImGuiDataType_U32, &config.Filter.MaxSolverIterations);

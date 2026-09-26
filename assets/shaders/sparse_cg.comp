@@ -1,0 +1,215 @@
+#version 460
+// Jacobi-preconditioned conjugate gradient for real SPD CSR systems in double precision. The
+// kernel sequence mirrors Geometry::Sparse::SolveCG step by step (stopping rule, breakdown and
+// non-finite checks, iteration counting); a per-solve state word ends the work on device, so
+// the remaining recorded dispatches become no-ops. SpMV sums each row in column order like the
+// CPU; dot products use a deterministic workgroup tree and a sequential sum of group partials.
+#extension GL_ARB_gpu_shader_fp64 : require
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+layout(local_size_x = 256) in;
+
+layout(buffer_reference, scalar) buffer Doubles { double v[]; };
+layout(buffer_reference, scalar) buffer Uints { uint v[]; };
+// Status values mirror Geometry::Sparse::CGConvergenceReason.
+layout(buffer_reference, scalar) buffer State {
+    uint status, iterations, done, reserved;
+    double initialResidual, residual, relative;
+    double rz, alpha, beta, bNorm, tolerance;
+};
+
+const uint ModeDiagonal = 0, ModeInitialize = 1, ModeInitialDots = 2, ModeInitialScalar = 3,
+           ModeSpmv = 4, ModeDotPAp = 5, ModeAlpha = 6, ModeUpdateXR = 7, ModeDotRR = 8,
+           ModeResidual = 9, ModePrecondition = 10, ModeBeta = 11, ModeUpdateP = 12,
+           ModeFinalize = 13, ModeChainRhs = 14;
+const uint StatusConverged = 1, StatusMaxIterations = 2, StatusBreakdown = 4, StatusNonFinite = 5;
+
+layout(push_constant, scalar) uniform Push {
+    uint64_t offsets, columns, values, b, x, state, work, partials, rhsDiagonal, rhsConstant, previous;
+    uint rows, mode, groups, reserved;
+    double tolerance;
+} pc;
+
+shared double lane[256];
+
+// Work vectors: diagInv, r, z, p, Ap, each `rows` long.
+double W(uint vector, uint i) { return Doubles(pc.work).v[vector * pc.rows + i]; }
+void SetW(uint vector, uint i, double value) { Doubles(pc.work).v[vector * pc.rows + i] = value; }
+const uint Dinv = 0, R = 1, Z = 2, P = 3, AP = 4;
+
+bool Finite(double x) { return !isnan(x) && !isinf(x); }
+
+double RowTimes(uint row, uint vector, bool fromX)
+{
+    precise double sum = 0.0lf;
+    for (uint k = Uints(pc.offsets).v[row]; k < Uints(pc.offsets).v[row + 1]; ++k)
+    {
+        const uint col = Uints(pc.columns).v[k];
+        const double value = fromX ? Doubles(pc.x).v[col] : W(vector, col);
+        sum += Doubles(pc.values).v[k] * value;
+    }
+    return sum;
+}
+
+// Workgroup tree sum of `value`, written to partials[region * groups + group].
+void Partial(uint region, double value)
+{
+    const uint t = gl_LocalInvocationID.x;
+    lane[t] = value;
+    barrier();
+    for (uint stride = 128; stride > 0; stride >>= 1)
+    {
+        if (t < stride) { precise double s = lane[t] + lane[t + stride]; lane[t] = s; }
+        barrier();
+    }
+    if (t == 0) Doubles(pc.partials).v[region * pc.groups + gl_WorkGroupID.x] = lane[0];
+}
+
+double SumPartials(uint region)
+{
+    precise double sum = 0.0lf;
+    for (uint g = 0; g < pc.groups; ++g) sum += Doubles(pc.partials).v[region * pc.groups + g];
+    return sum;
+}
+
+void Stop(State s, uint status) { s.status = status; s.done = 1; }
+
+void main()
+{
+    const uint i = gl_GlobalInvocationID.x;
+    const bool row = i < pc.rows;
+    const bool scalarThread = gl_GlobalInvocationID.x == 0;
+    // Only solve-scoped modes have a state; Diagonal and ChainRhs run without one. Reduction
+    // modes need every lane at the barrier; row modes only act on valid rows.
+    const bool stateful = pc.mode != ModeDiagonal && pc.mode != ModeChainRhs;
+    State s = State(pc.state);
+    const bool done = stateful && s.done != 0;
+    switch (pc.mode)
+    {
+    case ModeDiagonal:
+        if (!row) return;
+        {
+            double inv = 1.0lf;
+            for (uint k = Uints(pc.offsets).v[i]; k < Uints(pc.offsets).v[i + 1]; ++k)
+                if (Uints(pc.columns).v[k] == i)
+                {
+                    const double d = Doubles(pc.values).v[k];
+                    inv = abs(d) > 1e-15lf ? 1.0lf / d : 1.0lf;
+                    break;
+                }
+            SetW(Dinv, i, inv);
+        }
+        return;
+    case ModeChainRhs:
+        // b = diagonal * previous solution + constant for chained solves (implicit steps); the
+        // previous solution is also the warm start.
+        if (!row) return;
+        {
+            const double previous = Doubles(pc.previous).v[i];
+            precise double value = Doubles(pc.rhsDiagonal).v[i] * previous + Doubles(pc.rhsConstant).v[i];
+            Doubles(pc.b).v[i] = value;
+            Doubles(pc.x).v[i] = previous;
+        }
+        return;
+    case ModeInitialize:
+        if (!row) return;
+        {
+            const double ax = RowTimes(i, 0, true);
+            precise double r = Doubles(pc.b).v[i] - ax;
+            precise double z = W(Dinv, i) * r;
+            SetW(R, i, r); SetW(Z, i, z); SetW(P, i, z);
+        }
+        return;
+    case ModeInitialDots:
+        {
+            const double bi = row ? Doubles(pc.b).v[i] : 0.0lf;
+            const double ri = row ? W(R, i) : 0.0lf;
+            const double zi = row ? W(Z, i) : 0.0lf;
+            precise double bb = bi * bi; Partial(0, bb);
+            precise double rr = ri * ri; Partial(1, rr);
+            precise double rz = ri * zi; Partial(2, rz);
+        }
+        return;
+    case ModeInitialScalar:
+        if (!scalarThread) return;
+        {
+            s.status = 0; s.iterations = 0; s.done = 0;
+            s.rz = SumPartials(2);
+            s.bNorm = max(sqrt(SumPartials(0)), 1.0lf);
+            precise double tol = pc.tolerance * s.bNorm;
+            s.tolerance = tol;
+            s.initialResidual = sqrt(SumPartials(1));
+            s.residual = s.initialResidual;
+            s.relative = s.residual / s.bNorm;
+            if (s.residual <= s.tolerance) Stop(s, StatusConverged);
+        }
+        return;
+    case ModeSpmv:
+        if (!row || done) return;
+        SetW(AP, i, RowTimes(i, P, false));
+        return;
+    case ModeDotPAp:
+        if (done) return;
+        { precise double v = row ? W(P, i) * W(AP, i) : 0.0lf; Partial(0, v); }
+        return;
+    case ModeAlpha:
+        if (!scalarThread || done) return;
+        {
+            const double pAp = SumPartials(0);
+            if (!Finite(pAp) || !Finite(s.rz)) { Stop(s, StatusNonFinite); return; }
+            if (abs(pAp) < 1e-30lf) { Stop(s, StatusBreakdown); return; }
+            s.alpha = s.rz / pAp;
+        }
+        return;
+    case ModeUpdateXR:
+        if (!row || done) return;
+        {
+            precise double x = Doubles(pc.x).v[i] + s.alpha * W(P, i);
+            precise double r = W(R, i) - s.alpha * W(AP, i);
+            Doubles(pc.x).v[i] = x;
+            SetW(R, i, r);
+        }
+        return;
+    case ModeDotRR:
+        if (done) return;
+        { const double r = row ? W(R, i) : 0.0lf; precise double v = r * r; Partial(1, v); }
+        return;
+    case ModeResidual:
+        if (!scalarThread || done) return;
+        {
+            s.iterations += 1;
+            s.residual = sqrt(SumPartials(1));
+            s.relative = s.residual / s.bNorm;
+            if (!Finite(s.residual)) { Stop(s, StatusNonFinite); return; }
+            if (s.residual <= s.tolerance) Stop(s, StatusConverged);
+        }
+        return;
+    case ModePrecondition:
+        if (done) return;
+        {
+            double v = 0.0lf;
+            if (row) { precise double z = W(Dinv, i) * W(R, i); SetW(Z, i, z); precise double rz = W(R, i) * z; v = rz; }
+            Partial(2, v);
+        }
+        return;
+    case ModeBeta:
+        if (!scalarThread || done) return;
+        {
+            const double rzNew = SumPartials(2);
+            if (abs(s.rz) < 1e-30lf) { Stop(s, StatusBreakdown); return; }
+            s.beta = rzNew / s.rz;
+            s.rz = rzNew;
+        }
+        return;
+    case ModeUpdateP:
+        if (!row || done) return;
+        { precise double p = W(Z, i) + s.beta * W(P, i); SetW(P, i, p); }
+        return;
+    case ModeFinalize:
+        if (!scalarThread) return;
+        if (s.done == 0) Stop(s, StatusMaxIterations);
+        return;
+    }
+}

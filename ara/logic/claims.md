@@ -2387,3 +2387,14 @@
 - **Dependencies**: []
 - **Tags**: Vulkan, Operational, property smoothing, CPU-reference parity, double precision
 - **From staging**: O251
+
+## C112: Bounded Vulkan conjugate-gradient parity and implicit-smoothing consumer
+- **Statement**: RUNTIME-269's `Graphics.SparseConjugateGradient`, recorded in chunks of at most 2048 dispatches through the framed runtime queue on the recorded NVIDIA RTX 3050 (driver 590.48.01, Vulkan 1.4.325, shader float64, Debug ci-vulkan with validation), returns the same status and iteration count as `Geometry::Sparse::SolveCG` on a heat step, a regularized Poisson system, implicit-smoothing systems with warm starts and chained steps, an iteration-limit case, a zero-matrix breakdown and a non-finite case; converged solutions agree within 3.4e-16 relative. Conjugate-gradient implicit property smoothing through this kernel matches the CPU CG reference within 3.42e-16 relative over 24 editor-path runs, fails without publication on non-convergence and rejects stale input.
+- **Status**: supported — Operational for the named device, driver and fixtures; agreement is within rounding (tree-ordered dot products), not bitwise. No factorization, complex, indefinite or rectangular support; no timing, memory or speedup claim (GEOM-103).
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: A RUNTIME269Vulkan or GEOM089Vulkan case skips, falls back, times out, loses the device, reports a status or iteration count different from the CPU oracle (gap above 2), exceeds 1e-6 relative solution difference on the well-conditioned systems or 1e-9 on implicit smoothing, or publishes after non-convergence or stale input.
+- **Proof**: [ara/evidence/diagnostics/runtime269_vulkan_sparse_cg_20260927/record.json, ara/evidence/diagnostics/runtime269_vulkan_sparse_cg_20260927/sealed-result.json, tests/integration/graphics/Test.SparseSolveGpuSmoke.cpp, tests/integration/graphics/Test.PropertySmoothingGpuSmoke.cpp, assets/shaders/sparse_cg.comp, src/graphics/renderer/Graphics.SparseConjugateGradient.cpp]
+- **Dependencies**: [C111]
+- **Tags**: Vulkan, Operational, conjugate gradient, implicit smoothing, CPU-reference parity, double precision
+- **From staging**: O252

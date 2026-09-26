@@ -37,6 +37,7 @@ import Geometry.HalfedgeMesh;
 import Geometry.Smoothing;
 import Geometry.HarmonicField;
 import Extrinsic.Graphics.PropertyFilter;
+import Extrinsic.Graphics.SparseConjugateGradient;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.CommandContext;
@@ -162,8 +163,9 @@ namespace Extrinsic::Runtime
             const auto c = Decode(merged);
             if (!S::ValidatePropertyFilterParams(c.Filter) || c.Neighbors < 1 || c.Neighbors > 1024 || c.SpatialSigma <= 0)
                 return ConfigDetail::RejectConfigSection(subject, "Invalid smoothing parameters: iterations 1..10000, neighbors 1..1024, lambda (0,1], mu [-1,0), heat time (0,1000], positive sigmas/time step, solver tolerance (0,1), solver iterations 1..100000, fit weight (0,1e12], positive noise level, penalty delta positive (0 only for ADMM without Huber), Euclidean bounds and second order only with ADMM, positive second-order weight, nonnegative bound radius, fit iterations 1..100000, fit tolerance (0,1).");
-            if (c.Backend == PropertySmoothingBackend::Vulkan && !ExplicitFilter(c.Filter.Method))
-                return ConfigDetail::RejectConfigSection(subject, "Vulkan runs averaging, spectral heat, Taubin and bilateral filters; implicit and variational smoothing are CPU-only.");
+            if (c.Backend == PropertySmoothingBackend::Vulkan && !ExplicitFilter(c.Filter.Method) &&
+                !(c.Filter.Method == S::PropertyFilter::Implicit && c.Filter.Solver == S::PropertySolver::ConjugateGradient))
+                return ConfigDetail::RejectConfigSection(subject, "Vulkan runs averaging, spectral heat, Taubin, bilateral and conjugate-gradient implicit smoothing; direct implicit and variational smoothing are CPU-only.");
             if (PerRowBounds(c) && (c.BoundRadii.Name.empty() || c.BoundRadii.Domain != c.Input.Domain))
                 return ConfigDetail::RejectConfigSection(subject, "Per-row bounds need a float/double radius property on the input domain.");
             if (c.Input.Domain != c.Output.Domain || GeometryPropertyComponentCount(c.Input.ValueKind) != GeometryPropertyComponentCount(c.Output.ValueKind) ||
@@ -334,6 +336,12 @@ namespace Extrinsic::Runtime
             std::vector<std::uint32_t> Edges{}, Fixed{};
             std::vector<double> Weights{};
             Graphics::PropertyFilterGpuParams Params{};
+            // Implicit smoothing: the assembled system as chained CG solves (iterations x channels).
+            bool Implicit{};
+            std::vector<std::uint32_t> Offsets{}, Columns{};
+            S::PropertyImplicitSystem System{};
+            std::vector<double> ChannelMajor{}, SeedRhs{};
+            std::shared_ptr<Graphics::SparseConjugateGradientWorkspace> Solver{};
             std::shared_ptr<SpatialGpuResult> Gpu{};
             EditorPropertySmoothingResult Result{};
             bool Abandoned{};
@@ -400,6 +408,40 @@ namespace Extrinsic::Runtime
             auto plan = S::PlanPropertyFilter(values, channels, graph.Edges, c.Filter, graph.BoundaryRows, graph.Mass, diagnostic);
             if (!plan) return fail(diagnostic);
             w->Plan = std::move(*plan);
+            w->Implicit = c.Filter.Method == S::PropertyFilter::Implicit;
+            if (w->Implicit)
+            {
+                auto system = S::AssemblePropertyImplicitSystem(w->Plan, values, graph.Edges, c.Filter, graph.Mass, diagnostic);
+                if (!system) return fail(diagnostic);
+                w->System = std::move(*system);
+                const auto rows = w->Plan.Count;
+                if (rows > (1u << 24) || w->System.Matrix.NonZeros() > (1u << 26) ||
+                    Graphics::SparseConjugateGradientWorkspace::ReadbackBytes(std::uint32_t(rows), c.Filter.Iterations * std::uint32_t(channels)) >
+                        (std::uint64_t{1} << 28))
+                    return fail("Vulkan implicit smoothing supports at most 2^24 rows, 2^26 nonzeros and 256 MiB of solutions.");
+                for (const auto offset : w->System.Matrix.RowOffsets) w->Offsets.push_back(std::uint32_t(offset));
+                for (const auto column : w->System.Matrix.ColIndices) w->Columns.push_back(std::uint32_t(column));
+                // Channel-major seeds: the first step of channel k starts from the input values.
+                w->ChannelMajor.resize(values.size());
+                w->SeedRhs.resize(values.size());
+                for (std::size_t k = 0; k < channels; ++k)
+                    for (std::size_t i = 0; i < rows; ++i)
+                    {
+                        const double x = values[i * channels + k];
+                        w->ChannelMajor[k * rows + i] = x;
+                        w->SeedRhs[k * rows + i] = w->System.RhsDiagonal[i] * x + w->System.RhsConstant[k * rows + i];
+                    }
+                // Chained solves share one right-hand-side diagonal across channels.
+                std::vector<double> diagonal;
+                for (std::size_t k = 0; k < channels; ++k)
+                    diagonal.insert(diagonal.end(), w->System.RhsDiagonal.begin(), w->System.RhsDiagonal.end());
+                w->System.RhsDiagonal = std::move(diagonal);
+                w->Values = std::move(values);
+                w->Publication = std::move(publication);
+                w->Result = result;
+            }
+            else
+            {
             w->Params = GpuParams(c.Filter, w->Plan);
             if (Graphics::PropertyFilterWorkspace::DispatchCount(w->Params) > Graphics::PropertyFilterWorkspace::MaxDispatches)
                 return fail("Vulkan smoothing would exceed its dispatch budget; lower iterations or heat time, or use the CPU.");
@@ -414,6 +456,7 @@ namespace Extrinsic::Runtime
             w->Values = std::move(values);
             w->Publication = std::move(publication);
             w->Result = result;
+            }
             const EditorJobIdentity identity{.EntityId = id, .Scope = ToEditorJobScope(c.Output.Domain),
                 .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField, .OutputName = c.Output.Name};
             if (auto active = GP::MeshSupport::FindActiveEditorJob(context, identity); active && IsActiveEditorJobState(active->State))
@@ -436,6 +479,41 @@ namespace Extrinsic::Runtime
                 .Work = [](const JobCancellation&) { return JobResultEnvelope::Make(true); },
                 .IsReadyToApply = [context, w, current] {
                     if (!current()) return true;
+                    if (w->Implicit)
+                    {
+                        // One bounded chunk per framed submission; observe each readback first.
+                        const auto queue = [&] {
+                            w->Gpu = context.SpatialIndices->QueueGpuCompute(
+                                Graphics::SparseConjugateGradientWorkspace::ReadbackBytes(std::uint32_t(w->Plan.Count),
+                                    w->Publication.Config.Filter.Iterations * std::uint32_t(w->Plan.Channels)),
+                                [solver = w->Solver, w](RHI::ICommandContext& commands, const SpatialGpuIndexView&) -> RHI::BufferHandle {
+                                    if (w->Abandoned) return {};
+                                    return solver->RecordNext(commands);
+                                });
+                        };
+                        if (!w->Solver)
+                        {
+                            w->Solver = std::make_shared<Graphics::SparseConjugateGradientWorkspace>(*context.Device);
+                            const auto& f = w->Publication.Config.Filter;
+                            const auto channelCount = std::uint32_t(w->Plan.Channels);
+                            if (!w->Solver->Begin({.Matrix = {.Rows = std::uint32_t(w->Plan.Count), .RowOffsets = w->Offsets,
+                                    .Columns = w->Columns, .Values = w->System.Matrix.Values},
+                                    .Solves = f.Iterations * channelCount, .RightHandSides = w->SeedRhs, .InitialGuesses = w->ChannelMajor,
+                                    .RhsDiagonal = w->System.RhsDiagonal, .RhsConstant = w->System.RhsConstant,
+                                    .ChainStride = channelCount, .MaxIterations = f.MaxSolverIterations, .Tolerance = f.SolverTolerance}))
+                                return true;
+                            queue();
+                            return false;
+                        }
+                        if (!w->Gpu || w->Gpu->State == SpatialQueryState::Failed) return true;
+                        if (w->Gpu->State != SpatialQueryState::Ready) return false;
+                        if (!w->Solver->Finished())
+                        {
+                            w->Solver->Observe(w->Gpu->Data);
+                            if (!w->Solver->Finished()) { queue(); return false; }
+                        }
+                        return true;
+                    }
                     if (!w->Gpu)
                     {
                         auto workspace = std::make_shared<Graphics::PropertyFilterWorkspace>(*context.Device);
@@ -455,6 +533,37 @@ namespace Extrinsic::Runtime
                     if (!w->Gpu || w->Gpu->State != SpatialQueryState::Ready)
                         filtered.Diagnostic = w->Gpu && !w->Gpu->Diagnostic.empty() ? w->Gpu->Diagnostic
                                               : "Vulkan property smoothing did not return a result; previous output retained.";
+                    else if (w->Implicit)
+                    {
+                        // Every chained solve must converge, as on the CPU; the last step of each
+                        // channel is the result.
+                        const std::size_t rows = w->Plan.Count, channelCount = w->Plan.Channels;
+                        const std::size_t solves = std::size_t(w->Publication.Config.Filter.Iterations) * channelCount;
+                        bool converged = w->Solver && w->Solver->Finished() &&
+                            w->Gpu->Data.size() == Graphics::SparseConjugateGradientWorkspace::ReadbackBytes(std::uint32_t(rows), std::uint32_t(solves));
+                        std::size_t applications = 0;
+                        for (std::size_t k = 0; converged && k < solves; ++k)
+                        {
+                            Graphics::SparseCgReport report{};
+                            std::memcpy(&report, w->Gpu->Data.data() + k * sizeof(report), sizeof(report));
+                            converged = report.Status == Graphics::SparseCgStatus::Converged;
+                            applications += report.Iterations + 1;
+                        }
+                        if (!converged) filtered.Diagnostic = "Implicit solver failed to converge on Vulkan; no property was changed.";
+                        else
+                        {
+                            std::vector<double> gpuValues(w->Values.size());
+                            const std::byte* solutions = w->Gpu->Data.data() + solves * sizeof(Graphics::SparseCgReport);
+                            for (std::size_t k = 0; k < channelCount; ++k)
+                            {
+                                const std::size_t solve = solves - channelCount + k;
+                                for (std::size_t i = 0; i < rows; ++i)
+                                    std::memcpy(&gpuValues[i * channelCount + k], solutions + (solve * rows + i) * sizeof(double), sizeof(double));
+                            }
+                            filtered = S::CompletePropertyFilter(w->Plan, w->Values, std::move(gpuValues), "vulkan_compute");
+                            filtered.OperatorApplications = applications;
+                        }
+                    }
                     else
                     {
                         std::vector<double> gpuValues(w->Values.size());
@@ -463,7 +572,8 @@ namespace Extrinsic::Runtime
                         filtered.OperatorApplications = Graphics::PropertyFilterWorkspace::DispatchCount(w->Params);
                     }
                     result = Publish(context, w->Publication, filtered, std::move(result), "");
-                    if (!w->Gpu || w->Gpu->State != SpatialQueryState::Ready) result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                    if (!w->Gpu || w->Gpu->State != SpatialQueryState::Ready || !filtered.Success)
+                        result.Status = EditorCommandStatus::GeometryProcessingFailed;
                     *delivered = true;
                     if (sink) sink(result);
                     return result.Succeeded();

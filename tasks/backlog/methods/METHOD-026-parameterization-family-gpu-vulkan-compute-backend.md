@@ -53,7 +53,7 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, method.e
   transfer/readback operation, never through a
   per-iteration CPU round trip or device-wide `ReadBuffer` stall.
 - Reuse the bounded sparse kernels owned by
-  [RUNTIME-269](../runtime/RUNTIME-269-shared-vulkan-sparse-solve-kernels.md).
+  [RUNTIME-269](../../done/RUNTIME-269-shared-vulkan-sparse-solve-kernels.md).
   This task retains ARAP/SLIM assembly, constraints, iteration control and
   injectivity checks; the shared solver is not a second method owner.
 - Gating: reference parity (`METHOD-021`/`022`) and completion of the

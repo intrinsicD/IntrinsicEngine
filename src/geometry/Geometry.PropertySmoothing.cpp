@@ -153,7 +153,6 @@ namespace Geometry::Smoothing
         if (!plan) return fail(std::move(planDiagnostic));
         const std::size_t count = plan->Count;
         const auto& fixed = plan->Fixed;
-        const auto& isolated = plan->Isolated;
         const double rate = plan->Rate;
         std::vector<double> degree = plan->Degree, weights;
         weights.reserve(edges.size());
@@ -180,39 +179,11 @@ namespace Geometry::Smoothing
         };
         if (p.Method == PropertyFilter::Implicit)
         {
-            // Solve (M + dt L) x = M b. Random walk uses M = D, preserving symmetry;
-            // combinatorial uses unit mass; custom mass supports area-aware fairing.
-            // The operator is fixed for the run, so it is assembled once with fixed
-            // rows eliminated: they become identity rows and their coupling moves
-            // into the free right-hand side, keeping the system SPD.
-            std::vector<double> mass(count, 1.0), diagonal(count);
-            for (std::size_t i = 0; i < count; ++i)
-            {
-                if (!isolated[i]) mass[i] = p.Laplacian == PropertyLaplacian::RandomWalk
-                    ? degree[i] : p.Laplacian == PropertyLaplacian::LumpedMass ? lumpedMass[i] : 1.0;
-                diagonal[i] = fixed[i] ? 1.0 : mass[i];
-            }
-            struct Coupling { std::size_t Free, Fixed; double Weight; };
-            std::vector<Coupling> couplings;
-            Sparse::SparseBuilder builder(count, count);
-            builder.Reserve(2 * edges.size() + count);
-            for (const auto& edge : edges)
-            {
-                const double w = p.TimeStep * edge.Weight;
-                for (const auto [row, col] : {std::pair{edge.A, edge.B}, std::pair{edge.B, edge.A}})
-                {
-                    if (fixed[row]) continue;
-                    diagonal[row] += w;
-                    if (fixed[col]) couplings.push_back({row, col, w});
-                    else builder.Add(row, col, -w);
-                }
-            }
-            for (std::size_t i = 0; i < count; ++i) builder.Add(i, i, diagonal[i]);
-            const auto system = builder.Build();
-            if (!system.Valid || !std::ranges::all_of(diagonal, [](double x) { return std::isfinite(x); }))
-                return fail("Unable to assemble implicit system.");
+            std::string diagnostic;
+            const auto system = AssemblePropertyImplicitSystem(*plan, input, edges, p, lumpedMass, diagnostic);
+            if (!system) return fail(std::move(diagnostic));
             Sparse::SparseLLT cholesky;
-            const bool direct = p.Solver == PropertySolver::Direct && cholesky.factor(system.Matrix).Succeeded();
+            const bool direct = p.Solver == PropertySolver::Direct && cholesky.factor(system->Matrix).Succeeded();
             const Sparse::CGParams solver{p.MaxSolverIterations, p.SolverTolerance};
             std::vector<double> rhs(count), solved(count);
             for (std::size_t iteration = 0; iteration < p.Iterations; ++iteration)
@@ -220,11 +191,9 @@ namespace Geometry::Smoothing
                 {
                     for (std::size_t i = 0; i < count; ++i)
                     {
-                        solved[i] = fixed[i] ? input[i * channels + c] : values[i * channels + c];
-                        rhs[i] = fixed[i] ? solved[i] : mass[i] * solved[i];
+                        solved[i] = values[i * channels + c];
+                        rhs[i] = system->RhsDiagonal[i] * solved[i] + system->RhsConstant[c * count + i];
                     }
-                    for (const auto& coupling : couplings)
-                        rhs[coupling.Free] += coupling.Weight * input[coupling.Fixed * channels + c];
                     if (direct)
                     {
                         if (!cholesky.solve(rhs, solved).Succeeded())
@@ -233,7 +202,7 @@ namespace Geometry::Smoothing
                     }
                     else
                     {
-                        const auto status = Sparse::SolveCG(system.Matrix, rhs, solved, solver);
+                        const auto status = Sparse::SolveCG(system->Matrix, rhs, solved, solver);
                         result.OperatorApplications += status.Iterations + 1;
                         if (!status.Converged) return fail("Implicit solver failed to converge; no property was changed.");
                     }
@@ -292,6 +261,63 @@ namespace Geometry::Smoothing
             result.Diagnostic.empty() ? std::string{"cpu_reference"} : std::move(result.Diagnostic));
         completed.OperatorApplications = result.OperatorApplications;
         return completed;
+    }
+
+    std::optional<PropertyImplicitSystem> AssemblePropertyImplicitSystem(const PropertyFilterPlan& plan,
+        std::span<const double> input, std::span<const PropertyEdge> edges, const PropertyFilterParams& p,
+        std::span<const double> lumpedMass, std::string& diagnostic)
+    {
+        // Solve (M + dt L) x = M b. Random walk uses M = D, preserving symmetry; combinatorial uses
+        // unit mass; custom mass supports area-aware fairing. Fixed rows become identity rows and
+        // their coupling moves into the free right-hand side, keeping the system SPD.
+        const std::size_t count = plan.Count, channels = plan.Channels;
+        if (p.Method != PropertyFilter::Implicit || input.size() != count * channels ||
+            (p.Laplacian == PropertyLaplacian::LumpedMass && lumpedMass.size() != count))
+        {
+            diagnostic = "Implicit system needs the implicit method and a matching plan.";
+            return {};
+        }
+        PropertyImplicitSystem system;
+        std::vector<double> mass(count, 1.0), diagonal(count);
+        for (std::size_t i = 0; i < count; ++i)
+        {
+            if (!plan.Isolated[i]) mass[i] = p.Laplacian == PropertyLaplacian::RandomWalk
+                ? plan.Degree[i] : p.Laplacian == PropertyLaplacian::LumpedMass ? lumpedMass[i] : 1.0;
+            diagonal[i] = plan.Fixed[i] ? 1.0 : mass[i];
+        }
+        system.RhsDiagonal.resize(count);
+        system.RhsConstant.assign(channels * count, 0.0);
+        for (std::size_t i = 0; i < count; ++i)
+        {
+            system.RhsDiagonal[i] = plan.Fixed[i] ? 0.0 : mass[i];
+            if (plan.Fixed[i])
+                for (std::size_t c = 0; c < channels; ++c) system.RhsConstant[c * count + i] = input[i * channels + c];
+        }
+        Sparse::SparseBuilder builder(count, count);
+        builder.Reserve(2 * edges.size() + count);
+        for (const auto& edge : edges)
+        {
+            const double w = p.TimeStep * edge.Weight;
+            for (const auto [row, col] : {std::pair{edge.A, edge.B}, std::pair{edge.B, edge.A}})
+            {
+                if (plan.Fixed[row]) continue;
+                diagonal[row] += w;
+                if (plan.Fixed[col])
+                    for (std::size_t c = 0; c < channels; ++c)
+                        system.RhsConstant[c * count + row] += w * input[col * channels + c];
+                else builder.Add(row, col, -w);
+            }
+        }
+        for (std::size_t i = 0; i < count; ++i) builder.Add(i, i, diagonal[i]);
+        auto built = builder.Build();
+        if (!built.Valid || !std::ranges::all_of(diagonal, [](double x) { return std::isfinite(x); }) ||
+            !std::ranges::all_of(system.RhsConstant, [](double x) { return std::isfinite(x); }))
+        {
+            diagnostic = "Unable to assemble implicit system.";
+            return {};
+        }
+        system.Matrix = std::move(built.Matrix);
+        return system;
     }
 
     PropertyFilterResult CompletePropertyFilter(const PropertyFilterPlan& plan,

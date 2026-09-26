@@ -43,7 +43,6 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `GEOM-078` — Intrinsic surface-sample point cloud with contiguous face ranges (tasks/backlog/geometry/GEOM-078-intrinsic-surface-sample-point-cloud.md)
 - blocked by `GRAPHICS-105`: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
-- unblocked: `RUNTIME-269` — Shared Vulkan sparse solve kernels for existing methods (tasks/backlog/runtime/RUNTIME-269-shared-vulkan-sparse-solve-kernels.md)
 
 ## Theme G — Active bugs
 
@@ -91,8 +90,8 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `GEOM-086` — Vulkan Gaussian-mixture EM fitting (tasks/backlog/geometry/GEOM-086-vulkan-gaussian-mixture-em.md)
 - unblocked: `GEOM-087` — Vulkan geometry quality metrics (tasks/backlog/geometry/GEOM-087-vulkan-geometry-quality-metrics.md)
 - unblocked: `GEOM-088` — Vulkan Loop, sqrt3 and Catmull-Clark subdivision (tasks/backlog/geometry/GEOM-088-vulkan-mesh-subdivision.md)
-- blocked by `RUNTIME-269`: `GEOM-089` — Vulkan heat methods and implicit smoothing (tasks/backlog/geometry/GEOM-089-vulkan-heat-methods-and-implicit-smoothing.md)
-- blocked by `RUNTIME-269`: `GEOM-090` — Assess Vulkan LSCM, harmonic and BFF parameterization (tasks/backlog/geometry/GEOM-090-vulkan-one-shot-parameterization-assessment.md)
+- blocked by `GEOM-103`: `GEOM-089` — Vulkan heat methods and implicit smoothing (tasks/backlog/geometry/GEOM-089-vulkan-heat-methods-and-implicit-smoothing.md)
+- unblocked: `GEOM-090` — Assess Vulkan LSCM, harmonic and BFF parameterization (tasks/backlog/geometry/GEOM-090-vulkan-one-shot-parameterization-assessment.md)
 - blocked by `GEOM-080`: `GEOM-091` — Vulkan stages for existing curvature segmentation (tasks/backlog/geometry/GEOM-091-vulkan-curvature-segmentation-stages.md)
 - unblocked: `GEOM-092` — Vulkan SPFH and FPFH descriptor kernels (tasks/backlog/geometry/GEOM-092-vulkan-fpfh-descriptor-kernels.md)
 - unblocked: `GEOM-093` — Vulkan kernel-density and compact-density reductions (tasks/backlog/geometry/GEOM-093-vulkan-density-estimation-and-weight-kernels.md)

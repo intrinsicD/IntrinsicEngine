@@ -12,6 +12,7 @@ target_sources(${target_name}
         Graphics.PointLBVH.cppm
         Graphics.PointKeypoints.cppm
         Graphics.PropertyFilter.cppm
+        Graphics.SparseConjugateGradient.cppm
         Graphics.FrameRecipe.cppm
         Graphics.RenderDiagnostics.cppm
         Graphics.RenderRecipeConfig.cppm
@@ -59,6 +60,7 @@ target_sources(${target_name}
         Graphics.PointLBVH.cpp
         Graphics.PointKeypoints.cpp
         Graphics.PropertyFilter.cpp
+        Graphics.SparseConjugateGradient.cpp
         Graphics.CurrentRendererContractAdapter.cpp
         Graphics.RenderRecipeConfig.cpp
         Graphics.RenderCommandRouter.cpp

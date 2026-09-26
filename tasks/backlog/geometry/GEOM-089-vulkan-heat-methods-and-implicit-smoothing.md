@@ -38,9 +38,17 @@ Existing owners and evidence:
 
 ## Log
 
-- 2026-09-27: Paused by operator decision. RUNTIME-269 and slice 1 (CG implicit
-  smoothing) exist on the unmerged branch `claude/runtime-269-vulkan-sparse-solve`;
-  further slices wait for the keep/remove measurement in GEOM-103.
+- 2026-09-27: Slice 1 (implicit Laplacian smoothing) landed (branch
+  `claude/runtime-269-vulkan-sparse-solve`, merged to `main` on 2026-09-27): conjugate-gradient implicit smoothing
+  runs on Vulkan through RUNTIME-269, with the backward-Euler system assembled once by
+  the shared `AssemblePropertyImplicitSystem`. `GEOM089VulkanImplicitSmoothing`
+  matches the CPU CG reference within 3.4e-16 relative over 24 editor-path runs,
+  including non-convergence (no publication) and stale input. Direct (Cholesky)
+  implicit stays CPU-only. Remaining slices: heat geodesics (A/B systems), signed
+  heat (C/D, LDLT oracle), vector heat (complex Hermitian; needs a reviewed real
+  embedding before any GPU claim).
+- 2026-09-27: Paused by operator decision: further slices wait for the keep/remove
+  measurement in GEOM-103, which may also remove slice 1.
 
 ## Engine integration
 
