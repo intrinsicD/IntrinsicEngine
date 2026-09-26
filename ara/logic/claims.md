@@ -2376,3 +2376,14 @@
 - **Dependencies**: [C109]
 - **Tags**: Vulkan, Operational, property baking, raw values, UV workspace, bounded pixel readback
 - **From staging**: O245
+
+## C111: Bounded Vulkan explicit property-filter parity
+- **Statement**: GEOM-081's `vulkan_compute` backend for property smoothing, run through the editor command path on the recorded NVIDIA RTX 3050 (driver 590.48.01, Vulkan 1.4.325, shader float64, Debug ci-vulkan build with validation), reproduces the CPU reference exactly for averaging, Taubin and spectral heat and within 9.15e-17 relative for bilateral across 84 runs covering all eight element domains, both Laplacians, float/double/vec2/vec4 kinds, kNN, cotangent and uniform mesh weights, pinned boundaries, deleted rows and in-place positions. A changed input while the job is pending publishes nothing. No validation-layer errors were reported.
+- **Status**: supported — Operational parity for the named device, driver and fixtures; bitwise agreement depends on correctly rounded double add, multiply and divide on the device. No cross-device, timing, memory or speedup claim (GEOM-103).
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Any GEOM081Vulkan case skips, falls back, times out, reports a backend other than `vulkan_compute`, exceeds `1e-12 * max(1, max |input|)` absolute difference, or publishes after a stale input; or the source differs from the tested revision.
+- **Proof**: [ara/evidence/diagnostics/geom081_vulkan_property_filters_20260926/record.json, ara/evidence/diagnostics/geom081_vulkan_property_filters_20260926/sealed-result.json, tests/integration/graphics/Test.PropertySmoothingGpuSmoke.cpp, assets/shaders/property_filter.comp, src/graphics/renderer/Graphics.PropertyFilter.cpp]
+- **Dependencies**: []
+- **Tags**: Vulkan, Operational, property smoothing, CPU-reference parity, double precision
+- **From staging**: O251

@@ -330,6 +330,9 @@ namespace Extrinsic::Sandbox::Editor
         ProcessingDraftState<Runtime::ScalarGradientConfig, Runtime::EditorScalarGradientResult> Gradient{};
         std::uint32_t GradientEntity{};
         ProcessingDraftState<Runtime::PropertySmoothingConfig, Runtime::EditorPropertySmoothingResult> Smoothing{};
+        // Vulkan smoothing completes on a later frame; the shared mailbox outlives the panel.
+        std::shared_ptr<std::optional<Runtime::EditorPropertySmoothingResult>> SmoothingCompletion{
+            std::make_shared<std::optional<Runtime::EditorPropertySmoothingResult>>()};
         std::uint32_t SmoothingEntity{};
         ProcessingDraftState<Runtime::HarmonicFieldConfig, Runtime::EditorHarmonicFieldResult> Harmonic{};
         std::uint32_t HarmonicEntity{};
@@ -2780,6 +2783,7 @@ namespace Extrinsic::Sandbox::Editor
         const auto previous = SmoothingEntity;
         DrawProcessingEntity("Entity##PropertySmoothing", context, SmoothingEntity, Smoothing.LastSelectedEntity);
         if (previous != SmoothingEntity) Smoothing.LastResult.reset();
+        if (*SmoothingCompletion) { Smoothing.LastResult = std::move(**SmoothingCompletion); SmoothingCompletion->reset(); }
         if (const auto active = Runtime::GetEditorPropertySmoothingConfig(context.MeshFields.Commands))
             Smoothing.Synchronize(*active, Runtime::SerializePropertySmoothingConfig(*active));
         const auto& model = GetDomainWindowModel(context, Runtime::EditorDomainWindowKind::Mesh, SmoothingEntity);
@@ -2810,7 +2814,17 @@ namespace Extrinsic::Sandbox::Editor
         }
         int method = int(config.Filter.Method), laplacian = int(config.Filter.Laplacian), weight = int(config.Weight);
         if (ImGui::Combo("Method", &method, "Averaging\0Spectral heat\0Taubin\0Bilateral\0Implicit (backward Euler)\0Variational fit (robust / TV / bounded)\0"))
-        { config.Filter.Method = Geometry::Smoothing::PropertyFilter(method); changed = true; }
+        {
+            config.Filter.Method = Geometry::Smoothing::PropertyFilter(method);
+            if (config.Filter.Method >= Geometry::Smoothing::PropertyFilter::Implicit) config.Backend = Runtime::PropertySmoothingBackend::Cpu;
+            changed = true;
+        }
+        if (config.Filter.Method < Geometry::Smoothing::PropertyFilter::Implicit)
+        {
+            int backend = int(config.Backend);
+            if (ImGui::Combo("Backend##Smoothing", &backend, "CPU reference\0Vulkan (shader double precision)\0"))
+            { config.Backend = Runtime::PropertySmoothingBackend(backend); changed = true; }
+        }
         if (ImGui::Combo("Laplacian", &laplacian, "Random walk\0Combinatorial\0Lumped mesh area (implicit, fit)\0"))
         { config.Filter.Laplacian = Geometry::Smoothing::PropertyLaplacian(laplacian); changed = true; }
         if (ImGui::Combo("Weights", &weight, "Uniform kNN\0Gaussian kNN\0Inverse-distance kNN\0Nonnegative mesh cotangent\0Uniform mesh edges\0"))
@@ -2851,11 +2865,17 @@ namespace Extrinsic::Sandbox::Editor
         const auto readiness = Runtime::PreviewEditorPropertySmoothingCommand(context.MeshFields.Commands, model.SelectedStableId, config);
         if (DrawProcessingActionButton("Smooth property", readiness))
             ApplyProcessingExecution(Smoothing, config, apply,
-                [&] { return Runtime::ApplyEditorPropertySmoothingCommand(context.MeshFields.Commands, model.SelectedStableId, config); },
+                [&] { return Runtime::ApplyEditorPropertySmoothingCommand(context.MeshFields.Commands, model.SelectedStableId, config,
+                          [completion = SmoothingCompletion](Runtime::EditorPropertySmoothingResult result) { *completion = std::move(result); }); },
                 std::function<void(Runtime::EditorPropertySmoothingResult)>{}, "Smoothing configuration was rejected.");
         DrawProcessingPropertyShowButton(context, model.SelectedStableId, config.Output, Smoothing.VisualizationDiagnostic);
         ImGui::TextDisabled(fit ? "CPU reference; penalties use the Euclidean norm over vector channels, bounds apply per channel."
-                                : "CPU reference; vectors are filtered componentwise without normalization.");
+                                : "Vectors are filtered componentwise without normalization.");
+        if (Smoothing.LastResult)
+            ImGui::TextDisabled("Requested: %s; ran: %s",
+                Smoothing.LastResult->RequestedBackend == Runtime::PropertySmoothingBackend::Vulkan ? "Vulkan" : "CPU",
+                Smoothing.LastResult->Status == Runtime::EditorCommandStatus::Pending ? "pending"
+                : Smoothing.LastResult->Succeeded() ? Smoothing.LastResult->BackendId.c_str() : "not run");
         if (Smoothing.LastResult) ImGui::TextWrapped("%s", Smoothing.LastResult->Message.c_str());
         if (!Smoothing.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Smoothing.ConfigDiagnostic.c_str());
         if (!Smoothing.VisualizationDiagnostic.empty()) ImGui::TextWrapped("%s", Smoothing.VisualizationDiagnostic.c_str());

@@ -400,3 +400,26 @@ TEST(PropertySmoothingOperations, EuclideanBoundsLimitVectorDeviation)
     h.Config.Filter.FitAlgorithm=S::FitSolver::Reweighted;
     EXPECT_FALSE(R::PreviewEditorPropertySmoothingCommand(h.Commands(),h.Id(),h.Config).Enabled);
 }
+
+TEST(PropertySmoothingOperations, VulkanBackendConfigAndAdmission)
+{
+    const auto registration=R::MakePropertySmoothingConfigSectionRegistration();
+    R::PropertySmoothingConfig c;
+    c.Backend=R::PropertySmoothingBackend::Vulkan;
+    c.Filter.Method=S::PropertyFilter::Bilateral;
+    const auto payload=R::SerializePropertySmoothingConfig(c);
+    const auto valid=registration.Validate(payload,{},R::kPropertySmoothingConfigSectionName);
+    ASSERT_TRUE(valid.Usable()); EXPECT_EQ(valid.CanonicalPayloadJson,payload);
+    for (const char* invalid : {"{\"backend\":2}","{\"backend\":1,\"method\":4}","{\"backend\":1,\"method\":5}"})
+        EXPECT_FALSE(registration.Validate(invalid,{},R::kPropertySmoothingConfigSectionName).Usable()) << invalid;
+    // Without a device the request is refused before any work; nothing falls back to the CPU.
+    SmoothingHarness h;
+    h.Config.Backend=R::PropertySmoothingBackend::Vulkan;
+    const auto preview=R::PreviewEditorPropertySmoothingCommand(h.Commands(),h.Id(),h.Config);
+    EXPECT_FALSE(preview.Enabled);
+    EXPECT_NE(preview.DisabledReason.find("double precision"),std::string::npos);
+    const auto result=h.Run();
+    EXPECT_FALSE(result.Succeeded());
+    EXPECT_EQ(result.RequestedBackend,R::PropertySmoothingBackend::Vulkan);
+    EXPECT_FALSE(h.Props().Exists("smooth"));
+}

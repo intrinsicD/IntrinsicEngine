@@ -27,7 +27,6 @@ its dependencies, conditional gates, scope and verification.
 
 - [GEOM-079 — Vulkan topology-normal and local PCA kernels](GEOM-079-vulkan-topology-and-pca-normal-kernels.md)
 - [GEOM-080 — Vulkan mesh curvature and principal directions](GEOM-080-vulkan-mesh-curvature.md)
-- [GEOM-081 — Vulkan explicit mesh and property smoothing](GEOM-081-vulkan-explicit-mesh-and-property-smoothing.md)
 - [GEOM-082 — Vulkan bilateral mesh denoising](GEOM-082-vulkan-bilateral-mesh-denoising.md)
 - [GEOM-083 — Vulkan intrinsic surface sampling](GEOM-083-vulkan-intrinsic-surface-sampling.md)
 - [GEOM-084 — Vulkan voxel downsampling](GEOM-084-vulkan-voxel-downsampling.md)
@@ -45,6 +44,7 @@ its dependencies, conditional gates, scope and verification.
 - [GEOM-096 — Vulkan ICP accumulation and solve assessment](GEOM-096-vulkan-icp-accumulation-and-solve-assessment.md)
 - [GEOM-097 — Vulkan continuous LOP projection](GEOM-097-vulkan-continuous-lop-projection.md)
 - [GEOM-098 — Vulkan anisotropic WLOP and EAR stages](GEOM-098-vulkan-anisotropic-wlop-and-ear.md)
+- [GEOM-103 — Stage timings for the Vulkan property filters](GEOM-103-property-filter-vulkan-stage-timings.md)
 
 Completed and superseded work is recorded in the
 [retirement log](../../done/RETIREMENT-LOG.md) and Git history.

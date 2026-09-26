@@ -76,16 +76,13 @@ namespace Geometry::Smoothing
         return edges;
     }
 
-    PropertyFilterResult FilterProperty(std::span<const double> input, std::size_t channels,
+    std::optional<PropertyFilterPlan> PlanPropertyFilter(std::span<const double> input, std::size_t channels,
         std::span<const PropertyEdge> edges, const PropertyFilterParams& p,
-        std::span<const std::size_t> fixedRows, std::span<const double> lumpedMass)
+        std::span<const std::size_t> fixedRows, std::span<const double> lumpedMass, std::string& diagnostic)
     {
-        PropertyFilterResult result;
-        const auto fail = [&](const char* diagnostic) {
-            result.Success = false;
-            result.Values.clear();
-            result.Diagnostic = diagnostic;
-            return result;
+        const auto fail = [&](const char* message) -> std::optional<PropertyFilterPlan> {
+            diagnostic = message;
+            return {};
         };
         if (p.Method == PropertyFilter::VariationalFit)
             return fail("Variational fitting is solved by HarmonicField::FitProperty.");
@@ -93,33 +90,74 @@ namespace Geometry::Smoothing
             return fail("Invalid filter parameters or property shape.");
         if (!std::ranges::all_of(input, [](double x) { return std::isfinite(x); }))
             return fail("Property contains non-finite live values.");
-        const std::size_t count = input.size() / channels;
-        std::vector<bool> fixed(count, false);
+        PropertyFilterPlan plan;
+        plan.Channels = channels;
+        const std::size_t count = plan.Count = input.size() / channels;
+        plan.Fixed.assign(count, false);
         for (auto row : fixedRows)
         {
-            if (row >= count || fixed[row]) return fail("Invalid or duplicate fixed row.");
-            fixed[row] = true;
+            if (row >= count || plan.Fixed[row]) return fail("Invalid or duplicate fixed row.");
+            plan.Fixed[row] = true;
         }
         if (p.Laplacian == PropertyLaplacian::LumpedMass &&
             (lumpedMass.size() != count || !std::ranges::all_of(lumpedMass,
                 [](double m) { return std::isfinite(m) && m > 0; })))
             return fail("Lumped-mass Laplacian requires positive finite row masses.");
-        std::vector<double> degree(count, 0.0), weights;
-        weights.reserve(edges.size());
+        plan.Degree.assign(count, 0.0);
         for (const auto& edge : edges)
         {
             if (edge.A >= count || edge.B >= count || edge.A == edge.B || !std::isfinite(edge.Weight) || edge.Weight < 0)
                 return fail("Invalid nonnegative property neighborhood.");
-            degree[edge.A] += edge.Weight;
-            degree[edge.B] += edge.Weight;
-            weights.push_back(edge.Weight);
+            plan.Degree[edge.A] += edge.Weight;
+            plan.Degree[edge.B] += edge.Weight;
         }
-        if (!std::ranges::all_of(degree, [](double x) { return std::isfinite(x); }))
+        if (!std::ranges::all_of(plan.Degree, [](double x) { return std::isfinite(x); }))
             return fail("Neighborhood degree overflow.");
-        std::vector<bool> isolated(count);
-        for (std::size_t i = 0; i < count; ++i) isolated[i] = degree[i] == 0;
-        const double maxDegree = *std::max_element(degree.begin(), degree.end());
-        const double rate = p.Laplacian == PropertyLaplacian::RandomWalk ? 1.0 : maxDegree;
+        plan.Isolated.resize(count);
+        for (std::size_t i = 0; i < count; ++i) plan.Isolated[i] = plan.Degree[i] == 0;
+        const double maxDegree = *std::max_element(plan.Degree.begin(), plan.Degree.end());
+        plan.Rate = p.Laplacian == PropertyLaplacian::RandomWalk ? 1.0 : maxDegree;
+        if (p.Method == PropertyFilter::SpectralHeat && plan.Rate > 0)
+        {
+            // exp(-t L) = exp(-a) sum a^k/k! (I-L/rate)^k, a=t*rate.
+            // Split a into <=1 intervals so all terms are nonnegative and well conditioned.
+            const double total = p.HeatTime * plan.Rate;
+            if (!std::isfinite(total) || total > 10000) return fail("Heat time times maximum degree exceeds 10000; reduce time or use random-walk Laplacian.");
+            plan.HeatSplits = static_cast<std::size_t>(std::max(1.0, std::ceil(total)));
+            const double a = total / double(plan.HeatSplits);
+            double coefficient = std::exp(-a);
+            plan.HeatCoefficients[0] = plan.HeatMass = coefficient;
+            for (unsigned k = 1; k <= 18; ++k)
+            {
+                coefficient *= a / k;
+                plan.HeatCoefficients[k] = coefficient;
+                plan.HeatMass += coefficient;
+            }
+        }
+        return plan;
+    }
+
+    PropertyFilterResult FilterProperty(std::span<const double> input, std::size_t channels,
+        std::span<const PropertyEdge> edges, const PropertyFilterParams& p,
+        std::span<const std::size_t> fixedRows, std::span<const double> lumpedMass)
+    {
+        PropertyFilterResult result;
+        const auto fail = [&](std::string diagnostic) {
+            result.Success = false;
+            result.Values.clear();
+            result.Diagnostic = std::move(diagnostic);
+            return result;
+        };
+        std::string planDiagnostic;
+        const auto plan = PlanPropertyFilter(input, channels, edges, p, fixedRows, lumpedMass, planDiagnostic);
+        if (!plan) return fail(std::move(planDiagnostic));
+        const std::size_t count = plan->Count;
+        const auto& fixed = plan->Fixed;
+        const auto& isolated = plan->Isolated;
+        const double rate = plan->Rate;
+        std::vector<double> degree = plan->Degree, weights;
+        weights.reserve(edges.size());
+        for (const auto& edge : edges) weights.push_back(edge.Weight);
         std::vector<double> values(input.begin(), input.end()), next(input.size()), delta(input.size());
         const auto apply = [&](const std::vector<double>& source, std::vector<double>& target, double step) {
             std::fill(delta.begin(), delta.end(), 0.0);
@@ -206,28 +244,19 @@ namespace Geometry::Smoothing
         }
         else if (p.Method == PropertyFilter::SpectralHeat && rate > 0)
         {
-            // exp(-t L) = exp(-a) sum a^k/k! (I-L/rate)^k, a=t*rate.
-            // Split a into <=1 intervals so all terms are nonnegative and well conditioned.
-            const double total = p.HeatTime * rate;
-            if (!std::isfinite(total) || total > 10000) return fail("Heat time times maximum degree exceeds 10000; reduce time or use random-walk Laplacian.");
-            const auto steps = static_cast<std::size_t>(std::max(1.0, std::ceil(total)));
-            const double a = total / double(steps);
             std::vector<double> term(input.size()), sum(input.size());
             for (std::size_t iteration = 0; iteration < p.Iterations; ++iteration)
-                for (std::size_t split = 0; split < steps; ++split)
+                for (std::size_t split = 0; split < plan->HeatSplits; ++split)
                 {
                     term = values;
-                    double coefficient = std::exp(-a), mass = coefficient;
-                    for (std::size_t j = 0; j < values.size(); ++j) sum[j] = coefficient * term[j];
+                    for (std::size_t j = 0; j < values.size(); ++j) sum[j] = plan->HeatCoefficients[0] * term[j];
                     for (unsigned k = 1; k <= 18; ++k)
                     {
                         apply(term, next, 1.0 / rate);
                         term.swap(next);
-                        coefficient *= a / k;
-                        mass += coefficient;
-                        for (std::size_t j = 0; j < values.size(); ++j) sum[j] += coefficient * term[j];
+                        for (std::size_t j = 0; j < values.size(); ++j) sum[j] += plan->HeatCoefficients[k] * term[j];
                     }
-                    for (std::size_t j = 0; j < values.size(); ++j) values[j] = sum[j] / mass;
+                    for (std::size_t j = 0; j < values.size(); ++j) values[j] = sum[j] / plan->HeatMass;
                 }
         }
         else if (rate > 0)
@@ -259,14 +288,33 @@ namespace Geometry::Smoothing
                     values.swap(next);
                 }
             }
-        for (std::size_t i = 0; i < count; ++i)
-            if (isolated[i] || fixed[i])
+        auto completed = CompletePropertyFilter(*plan, input, std::move(values),
+            result.Diagnostic.empty() ? std::string{"cpu_reference"} : std::move(result.Diagnostic));
+        completed.OperatorApplications = result.OperatorApplications;
+        return completed;
+    }
+
+    PropertyFilterResult CompletePropertyFilter(const PropertyFilterPlan& plan,
+        std::span<const double> input, std::vector<double> values, std::string backend)
+    {
+        PropertyFilterResult result;
+        const auto channels = plan.Channels;
+        if (values.size() != input.size() || input.size() != plan.Count * channels)
+        {
+            result.Diagnostic = "Filter result has the wrong shape; no property was changed.";
+            return result;
+        }
+        for (std::size_t i = 0; i < plan.Count; ++i)
+            if (plan.Isolated[i] || plan.Fixed[i])
                 for (std::size_t c = 0; c < channels; ++c) values[i * channels + c] = input[i * channels + c];
         if (!std::ranges::all_of(values, [](double x) { return std::isfinite(x); }))
-            return fail("Filter produced non-finite values; no property was changed.");
+        {
+            result.Diagnostic = "Filter produced non-finite values; no property was changed.";
+            return result;
+        }
         result.Success = true;
         result.Values = std::move(values);
-        if (result.Diagnostic.empty()) result.Diagnostic = "cpu_reference";
+        result.Diagnostic = std::move(backend);
         return result;
     }
 }

@@ -11,6 +11,7 @@ target_sources(${target_name}
         Graphics.ComputeParallelPrimitives.cppm
         Graphics.PointLBVH.cppm
         Graphics.PointKeypoints.cppm
+        Graphics.PropertyFilter.cppm
         Graphics.FrameRecipe.cppm
         Graphics.RenderDiagnostics.cppm
         Graphics.RenderRecipeConfig.cppm
@@ -57,6 +58,7 @@ target_sources(${target_name}
         Graphics.ComputeParallelPrimitives.cpp
         Graphics.PointLBVH.cpp
         Graphics.PointKeypoints.cpp
+        Graphics.PropertyFilter.cpp
         Graphics.CurrentRendererContractAdapter.cpp
         Graphics.RenderRecipeConfig.cpp
         Graphics.RenderCommandRouter.cpp

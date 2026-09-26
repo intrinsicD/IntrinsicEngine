@@ -13758,3 +13758,14 @@ tree:
     - ara/evidence/diagnostics/hktex_task_plan_20260924/record.json
     - ara/evidence/diagnostics/hktex_task_plan_20260924/resolutions.md
     status: open
+
+  - id: N642
+    type: experiment
+    title: Run the explicit property filters on Vulkan with CPU-reference parity
+    provenance: ai-executed
+    timestamp: 2026-09-26T23:30+02:00
+    result: Operator-requested GEOM-081 adds double-precision Vulkan kernels for averaging, Taubin, spectral heat and bilateral filters, recorded through the framed spatial-index queue without an index. 84 editor-path runs on an RTX 3050 match the CPU reference bitwise for the linear filters and within 9.2e-17 relative for bilateral. C111 records the bounded claim; stage timings stay unmeasured (GEOM-103).
+    evidence:
+    - ara/evidence/diagnostics/geom081_vulkan_property_filters_20260926/record.json
+    - ara/evidence/diagnostics/geom081_vulkan_property_filters_20260926/sealed-result.json
+    status: resolved

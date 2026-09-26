@@ -155,19 +155,58 @@ face-center construction and guarded editor history.
 | Least-structured input | A floating signal with 1–4 channels and a weighted undirected graph; spatial graph construction accepts vec3 samples. |
 | Entity/domain sources | All eight canonical domains; explicit same-domain sample positions, or vertex/node positions for derived face centers and edge/halfedge midpoints. |
 | Runtime owner | `Runtime.MeshFieldOperations.Smoothing.cpp`; uses canonical resolution, point/deletion capture, face-center construction, DEC and editor history. |
-| Config/agent | `sandbox.property_smoothing`, registered in the sandbox config tree; serialization and preview/apply use the same validator as execution admission. Fit fields: `smoothness_penalty`, `data_penalty`, `fidelity`, `fit_weight`, `noise_level`, `penalty_delta`, `bound`, `bound_radius`, `bound_radii` (null unless bound; required on the input domain for per-row bounds), `fit_solver`, `max_fit_iterations` (1–100000), `fit_tolerance`, `bound_norm`, `smoothness_order`, `second_order_weight`; Euclidean bounds and second order require `fit_solver` ADMM. |
-| UI | View → Smooth Property, also reachable from Mesh/Graph/PointCloud → Processing. Input property, output name/storage, positions, filter, Laplacian, weights and parameters are configurable; **Variational fit** adds penalties, fixed weight or noise level, the tolerance bound with its radius property and shape (vector inputs), smoothness order with second-order weight, and the solver; choosing a ball or second order selects ADMM. |
+| Config/agent | `sandbox.property_smoothing`, registered in the sandbox config tree; serialization and preview/apply use the same validator as execution admission. Fit fields: `smoothness_penalty`, `data_penalty`, `fidelity`, `fit_weight`, `noise_level`, `penalty_delta`, `bound`, `bound_radius`, `bound_radii` (null unless bound; required on the input domain for per-row bounds), `fit_solver`, `max_fit_iterations` (1–100000), `fit_tolerance`, `bound_norm`, `smoothness_order`, `second_order_weight`; Euclidean bounds and second order require `fit_solver` ADMM. `backend` (0 CPU, 1 Vulkan) is limited to the explicit filters. |
+| UI | View → Smooth Property, also reachable from Mesh/Graph/PointCloud → Processing. Input property, output name/storage, positions, filter, Laplacian, weights, backend (explicit filters) and parameters are configurable, with requested/actual backend feedback; **Variational fit** adds penalties, fixed weight or noise level, the tolerance bound with its radius property and shape (vector inputs), smoothness order with second-order weight, and the solver; choosing a ball or second order selects ADMM. |
 | Publication | Same domain and cardinality; only the named output changes. Existing deleted output slots remain bitwise untouched; new deleted output slots are zero. In-place writes, including positions, use guarded undo/redo. |
-| Verification | `Test.PropertySmoothing.cpp` (including direct-vs-CG implicit parity), `Test.VariationalFit.cpp` (implicit-step equivalence, closed-form TV, outlier rejection, perturbation optimality for every penalty/bound pair and both solvers, ADMM-to-reference parity with one factorization, exact undamped TV, discrepancy target, Euclidean bounds, second-order affine reproduction, staircasing and a dense quadratic oracle), `Test.PropertySmoothingOperations.cpp`, and the real ImGui actions in `Test.SandboxProcessingPanels.cpp`. The bound-radius property is a publication guard. |
+| Verification | `Test.PropertySmoothing.cpp` (including direct-vs-CG implicit parity), `Test.VariationalFit.cpp` (implicit-step equivalence, closed-form TV, outlier rejection, perturbation optimality for every penalty/bound pair and both solvers, ADMM-to-reference parity with one factorization, exact undamped TV, discrepancy target, Euclidean bounds, second-order affine reproduction, staircasing and a dense quadratic oracle), `Test.PropertySmoothingOperations.cpp`, the real ImGui actions in `Test.SandboxProcessingPanels.cpp`, and the Vulkan parity/stale suite `GEOM081VulkanPropertySmoothing` in `Test.PropertySmoothingGpuSmoke.cpp`. The bound-radius property is a publication guard. |
 
 The default output type follows the chosen input in the UI. Scalar output
 storage can also be float or double. Conversion rejects nonfinite results or
 float overflow before publication. Existing output storage must match the
 configured kind. Structural topology and deletion properties cannot be outputs.
 
-GPU follow-up owners are [GEOM-081](../../tasks/backlog/geometry/GEOM-081-vulkan-explicit-mesh-and-property-smoothing.md)
-for explicit property filters and [GEOM-089](../../tasks/backlog/geometry/GEOM-089-vulkan-heat-methods-and-implicit-smoothing.md)
-for heat/sparse execution; this integration offers only CPU execution.
+## Vulkan backend
+
+Averaging, spectral heat, Taubin and bilateral also run on Vulkan
+(`backend` 1, `vulkan_compute`); implicit smoothing and the variational fit are
+CPU-only and the validator rejects a Vulkan request for them. Admission needs an
+operational device with shader double precision, the framed spatial-index GPU
+queue and editor jobs; there is no hidden CPU fallback, and the result reports
+the requested and actual backend.
+
+The CPU stages are sample capture, graph and weight construction,
+`PlanPropertyFilter` (validation, degrees, rate, fixed/isolated rows, spectral
+coefficients), the per-row incidence build and `CompletePropertyFilter` (restoring
+fixed and isolated rows, the finiteness check). Every iteration runs on the GPU:
+`Graphics.PropertyFilter` uploads the rows, edges and weights, then records
+ping-pong double-precision dispatches of `property_filter.comp` (one row per
+thread, bilateral weights one edge per thread) and reads the final buffer back
+through `SpatialIndexCache::QueueGpuCompute` without an index. Each row visits its
+incident edges in ascending edge order with contraction-free (`precise`)
+arithmetic, which is the order the CPU reference scatters them, so averaging,
+Taubin and spectral heat are bitwise identical to the CPU reference on the
+tested device. Bilateral weights use a Cody-Waite plus degree-13 Taylor `exp`,
+since GLSL has no double-precision `exp`. The parity bound frozen per case is
+`max |gpu - cpu| <= 1e-12 * max(1, max |input|)`.
+
+Publication, stale-input detection and undo/redo are shared with the CPU path;
+a changed input, topology or output while the job is pending publishes nothing.
+A run is refused above 2^24 rows, 2^26 edges, 256 MiB of values or 2^20
+dispatches (spectral heat records `splits * 39` dispatches per iteration).
+
+`GEOM081VulkanPropertySmoothing` compares 84 GPU runs with the CPU reference
+through the editor command path: all eight domains, all four filters, both
+Laplacians, float/double/vec2/vec4 kinds, kNN, cotangent and uniform mesh
+weights, pinned boundaries, deleted rows and in-place positions. On an NVIDIA
+RTX 3050 (Vulkan 1.4, driver as of 2026-09-26) the linear filters matched
+exactly and bilateral within `9.2e-17` relative. The
+[parity benchmark](../../benchmarks/geometry/manifests/property_smoothing_vulkan_explicit_parity.yaml)
+seals this result under `build/ci-vulkan/benchmark-ctest/GEOM-081`; its runtime
+is end-to-end, frame-paced editor time, not a kernel timing or a speedup claim.
+Per-stage transfer, compute and readback timings are tracked in
+[GEOM-103](../../tasks/backlog/geometry/GEOM-103-property-filter-vulkan-stage-timings.md).
+Implicit smoothing on the GPU belongs to
+[GEOM-089](../../tasks/backlog/geometry/GEOM-089-vulkan-heat-methods-and-implicit-smoothing.md).
 
 The CPU operation runs synchronously when invoked. Neighborhoods are fixed
 throughout a run, including when the output overwrites the positions. Lumped

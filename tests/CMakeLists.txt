@@ -1806,6 +1806,7 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
     intrinsic_test_object_lib(PointLBVHGpuTestObjs
         SOURCES integration/graphics/Test.PointLBVHGpuSmoke.cpp
                 integration/graphics/Test.PointConstructionGpuSmoke.cpp
+                integration/graphics/Test.PropertySmoothingGpuSmoke.cpp
         DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
     )
     intrinsic_test_executable(IntrinsicPointLBVHGpuTests
@@ -1814,6 +1815,32 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
         LABELS integration graphics gpu vulkan
     )
     intrinsic_add_glsl_shaders(IntrinsicPointLBVHGpuTests)
+    # GEOM-081: the parity smoke is also the benchmark producer. The wrapper hands the
+    # run_and_seal output directory to the test through the environment.
+    find_package(Python3 COMPONENTS Interpreter)
+    if(Python3_Interpreter_FOUND)
+        set(_geom081_bench_dir "${CMAKE_BINARY_DIR}/benchmark-ctest/GEOM-081")
+        file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/benchmark-ctest/geom081_vulkan_benchmark.sh"
+            CONTENT "#!/bin/sh\nmkdir -p \"$1\"\nINTRINSIC_GEOM081_BENCHMARK_OUTPUT=\"$1/geometry.property_smoothing.vulkan_explicit_parity.json\" exec \"$<TARGET_FILE:IntrinsicPointLBVHGpuTests>\" --gtest_filter=GEOM081VulkanPropertySmoothing.ExplicitFiltersMatchTheCpuReferenceOnEveryDomainAndKind\n"
+            FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+        add_test(NAME GEOM081VulkanPropertySmoothingBenchmark.Run
+            COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/benchmark/run_and_seal.py"
+                --executable "${CMAKE_BINARY_DIR}/benchmark-ctest/geom081_vulkan_benchmark.sh"
+                --output "${_geom081_bench_dir}"
+                --manifests-root "${CMAKE_SOURCE_DIR}/benchmarks"
+                --run-id "ctest-geom081-vulkan-property-smoothing"
+                --attempt-id "attempt-001")
+        set_tests_properties(GEOM081VulkanPropertySmoothingBenchmark.Run PROPERTIES
+            ENVIRONMENT "LSAN_OPTIONS=detect_leaks=0;ASAN_OPTIONS=detect_leaks=0"
+            LABELS "benchmark;geometry;runtime;gpu;vulkan" TIMEOUT 180
+            FIXTURES_SETUP GEOM081VulkanPropertySmoothingBenchmark)
+        add_test(NAME GEOM081VulkanPropertySmoothingBenchmark.Validate
+            COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/benchmark/validate_benchmark_results.py"
+                --root "${_geom081_bench_dir}" --strict)
+        set_tests_properties(GEOM081VulkanPropertySmoothingBenchmark.Validate PROPERTIES
+            LABELS "benchmark;geometry;runtime;gpu;vulkan" TIMEOUT 30
+            FIXTURES_REQUIRED GEOM081VulkanPropertySmoothingBenchmark)
+    endif()
     set(_graphics_vulkan_smoke_test_files
         Test.BufferReadbackGpuSmoke.cpp
         Test.ComputeParallelPrimitivesGpuSmoke.cpp
@@ -2854,6 +2881,7 @@ if(_intrinsic_registered_test_targets)
     # present pacing. The fixture stops itself at 70 s with round/frame diagnostics.
     string(APPEND _intrinsic_property_fixup_script
         "if(DEFINED IntrinsicPointLBVHGpuTests_TESTS)\n"
+        "  set_tests_properties(GEOM081VulkanPropertySmoothing.ExplicitFiltersMatchTheCpuReferenceOnEveryDomainAndKind GEOM081VulkanPropertySmoothing.StaleInputRejectsPublication PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(PointConstructionGpuSmoke.QueriesMatchReferenceAcrossDomainsAndGeneratedGeometryRenders PointConstructionGpuSmoke.StaleCancelledAndPartialSubmissionCreateNoEntity PROPERTIES TIMEOUT 180)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.NormalNeighborhoodsPublishAcrossDomainsAndRejectIncompleteSupport PROPERTIES TIMEOUT 120)\n"

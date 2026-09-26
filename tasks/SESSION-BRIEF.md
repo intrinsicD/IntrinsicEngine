@@ -84,7 +84,6 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `METHOD-040`: `GEOM-076` — Evidence-gated curvature-region UV atlas cuts (tasks/backlog/geometry/GEOM-076-curvature-region-guided-uv-atlas-cuts.md)
 - unblocked: `GEOM-079` — Vulkan topology-normal and local PCA kernels (tasks/backlog/geometry/GEOM-079-vulkan-topology-and-pca-normal-kernels.md)
 - unblocked: `GEOM-080` — Vulkan mesh curvature and principal directions (tasks/backlog/geometry/GEOM-080-vulkan-mesh-curvature.md)
-- unblocked: `GEOM-081` — Vulkan explicit mesh and property smoothing (tasks/backlog/geometry/GEOM-081-vulkan-explicit-mesh-and-property-smoothing.md)
 - unblocked: `GEOM-082` — Vulkan bilateral mesh denoising (tasks/backlog/geometry/GEOM-082-vulkan-bilateral-mesh-denoising.md)
 - blocked by `GEOM-078`: `GEOM-083` — Vulkan intrinsic surface sampling (tasks/backlog/geometry/GEOM-083-vulkan-intrinsic-surface-sampling.md)
 - unblocked: `GEOM-084` — Vulkan voxel downsampling (tasks/backlog/geometry/GEOM-084-vulkan-voxel-downsampling.md)
@@ -103,6 +102,7 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `GEOM-086`: `GEOM-097` — Vulkan continuous LOP projection (tasks/backlog/geometry/GEOM-097-vulkan-continuous-lop-projection.md)
 - unblocked: `GEOM-098` — Vulkan anisotropic WLOP and EAR stages (tasks/backlog/geometry/GEOM-098-vulkan-anisotropic-wlop-and-ear.md)
 - unblocked: `GEOM-100` — Harmonic-field follow-ups and solver consolidation (tasks/backlog/geometry/GEOM-100-harmonic-field-follow-ups.md)
+- unblocked: `GEOM-103` — Stage timings for the Vulkan property filters (tasks/backlog/geometry/GEOM-103-property-filter-vulkan-stage-timings.md)
 - blocked by `METHOD-014`: `HARDEN-084` — Localized CPU/GPU parity signatures (tasks/backlog/methods/HARDEN-084-localized-cpu-gpu-parity-signatures.md)
 - unblocked: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
 - unblocked: `METHOD-003A` — Spatial-query CPU-reference integration intake (tasks/backlog/methods/METHOD-003A-spatial-query-reference-integration-intake.md)
@@ -163,6 +163,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-221` — Vulkan shutdown LSan contract fails on NVIDIA 580.159.04 instance creation (tasks/backlog/bugs/BUG-221-vulkan-shutdown-lsan-nvidia-580-instance-leak.md)
 - unblocked: `BUG-222` — UV atlas smoke baseline output mismatch (tasks/backlog/bugs/BUG-222-uv-atlas-smoke-baseline-output-mismatch.md)
 - unblocked: `BUG-223` — Watershed extrema tests report zero basins (tasks/backlog/bugs/BUG-223-watershed-extrema-tests-report-zero-basins.md)
+- unblocked: `BUG-224` — ARA claims cite renamed curvature paths (tasks/backlog/bugs/BUG-224-ara-claims-cite-renamed-curvature-paths.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 - unblocked: `GRAPHICS-147` — Refine shared Morton cells in the GPU point LBVH (tasks/backlog/rendering/GRAPHICS-147-gpu-lbvh-shared-cell-refinement.md)
 
