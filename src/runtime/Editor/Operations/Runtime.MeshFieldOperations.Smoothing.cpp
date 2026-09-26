@@ -78,6 +78,25 @@ namespace Extrinsic::Runtime
         }
         bool PerRowBounds(const PropertySmoothingConfig& c)
         { return c.Filter.Method == S::PropertyFilter::VariationalFit && c.Filter.Bound == S::FitBound::PerRow; }
+        // Specific reasons for the method/solver combinations a user can reach by switching controls;
+        // plain range errors fall through to the generic parameter message.
+        std::optional<std::string> FilterConflict(const PropertySmoothingConfig& c)
+        {
+            const auto& f = c.Filter;
+            if (f.Laplacian == S::PropertyLaplacian::LumpedMass && f.Method != S::PropertyFilter::Implicit &&
+                f.Method != S::PropertyFilter::VariationalFit)
+                return "The lumped mesh-area Laplacian applies to implicit smoothing and the variational fit only; choose random walk or combinatorial.";
+            if (f.Method != S::PropertyFilter::VariationalFit) return std::nullopt;
+            if (f.FitAlgorithm == S::FitSolver::Reweighted)
+            {
+                if (f.SmoothnessOrder == S::FitOrder::Second) return "Second-order (TGV) smoothness needs the ADMM fit solver.";
+                if (f.BoundNorm == S::FitBoundNorm::Euclidean) return "Euclidean (ball) bounds need the ADMM fit solver.";
+                if (!(f.PenaltyDelta > 0)) return "The reweighted fit solver needs a positive penalty delta; use ADMM for delta 0.";
+            }
+            if (!(f.PenaltyDelta > 0) && (f.SmoothnessPenalty == S::FitPenalty::Huber || f.DataPenalty == S::FitPenalty::Huber))
+                return "Huber penalties need a positive penalty delta.";
+            return std::nullopt;
+        }
         PropertySmoothingConfig Decode(const Json& doc)
         {
             PropertySmoothingConfig c;
@@ -161,6 +180,7 @@ namespace Extrinsic::Runtime
             if (!merged["preserve_boundary"].is_boolean())
                 return ConfigDetail::RejectConfigSection(subject, "preserve_boundary must be boolean.");
             const auto c = Decode(merged);
+            if (auto conflict = FilterConflict(c)) return ConfigDetail::RejectConfigSection(subject, *conflict);
             if (!S::ValidatePropertyFilterParams(c.Filter) || c.Neighbors < 1 || c.Neighbors > 1024 || c.SpatialSigma <= 0)
                 return ConfigDetail::RejectConfigSection(subject, "Invalid smoothing parameters: iterations 1..10000, neighbors 1..1024, lambda (0,1], mu [-1,0), heat time (0,1000], positive sigmas/time step, solver tolerance (0,1), solver iterations 1..100000, fit weight (0,1e12], positive noise level, penalty delta positive (0 only for ADMM without Huber), Euclidean bounds and second order only with ADMM, positive second-order weight, nonnegative bound radius, fit iterations 1..100000, fit tolerance (0,1).");
             if (c.Backend == PropertySmoothingBackend::Vulkan && !ExplicitFilter(c.Filter.Method) &&
@@ -174,10 +194,16 @@ namespace Extrinsic::Runtime
                 (IsStructuralVertexProperty(c.Output.Name) && c.Output.Name != "v:position") ||
                 (c.Output.Name == "v:position" && (c.Output.ValueKind != K::Vec3 || c.Output.Domain != c.Positions.Domain)))
                 return ConfigDetail::RejectConfigSection(subject, "Output must have matching channels on the input domain and cannot replace structural storage.");
-            if ((c.Weight == S::PropertyWeight::Cotangent || c.Weight == S::PropertyWeight::MeshUniform ||
-                 c.PreserveBoundary || c.Filter.Laplacian == S::PropertyLaplacian::LumpedMass) &&
-                (c.Input.Domain != D::MeshVertex || c.Positions.Domain != D::MeshVertex))
-                return ConfigDetail::RejectConfigSection(subject, "Mesh topology, boundary pinning and lumped mass require mesh vertices and vertex positions.");
+            if (c.Input.Domain != D::MeshVertex || c.Positions.Domain != D::MeshVertex)
+            {
+                const auto meshOnly = [&](std::string_view option) {
+                    return ConfigDetail::RejectConfigSection(subject, std::string{option} +
+                        " needs mesh-vertex input and vertex positions; choose kNN weights, the random-walk or combinatorial Laplacian, or a mesh-vertex property.");
+                };
+                if (c.Weight == S::PropertyWeight::Cotangent || c.Weight == S::PropertyWeight::MeshUniform) return meshOnly("Mesh edge weighting");
+                if (c.PreserveBoundary) return meshOnly("Boundary pinning");
+                if (c.Filter.Laplacian == S::PropertyLaplacian::LumpedMass) return meshOnly("The lumped mesh-area Laplacian");
+            }
             return {.State = Core::Config::EngineConfigState::Valid,
                     .CanonicalPayloadJson = SerializePropertySmoothingConfig(c),
                     .ParsedFieldCount = static_cast<std::uint32_t>(doc.size())};
@@ -213,6 +239,60 @@ namespace Extrinsic::Runtime
             { diagnostic = "Vulkan property smoothing needs an operational device with shader double precision and framed GPU jobs."; return {}; }
             return entity;
         }
+    }
+
+    void ReconcilePropertySmoothingConfig(PropertySmoothingConfig& c, const PropertySmoothingConfig& before)
+    {
+        auto& f = c.Filter;
+        const auto& b = before.Filter;
+        constexpr double kDefaultDelta = S::PropertyFilterParams{}.PenaltyDelta;
+        const bool meshFamily = c.Input.Domain >= D::MeshVertex && c.Input.Domain <= D::MeshFace;
+        const bool graphFamily = c.Input.Domain >= D::GraphNode && c.Input.Domain <= D::GraphEdge;
+        if (!(c.Input == before.Input))
+        {
+            if (before.Output.Name == before.Input.Name && before.Output.Domain == before.Input.Domain) c.Output = c.Input;
+            else c.Output = {c.Input.Domain, c.Input.Name + "_smoothed", c.Input.ValueKind};
+            c.BoundRadii.Domain = c.Input.Domain;
+            // Positions stay when they sit on the input domain or its family's vertices/nodes.
+            if (c.Positions.Domain != c.Input.Domain)
+            {
+                if (meshFamily && c.Positions.Domain != D::MeshVertex) c.Positions = {D::MeshVertex, "v:position", K::Vec3};
+                else if (graphFamily && c.Positions.Domain != D::GraphNode) c.Positions = {D::GraphNode, "v:position", K::Vec3};
+                else if (c.Input.Domain == D::PointCloudPoint) c.Positions = {D::PointCloudPoint, "p:position", K::Vec3};
+            }
+        }
+        if ((!(c.Input == before.Input) || !(c.Positions == before.Positions)) &&
+            (c.Input.Domain != D::MeshVertex || c.Positions.Domain != D::MeshVertex))
+        {
+            if (c.Weight == S::PropertyWeight::Cotangent || c.Weight == S::PropertyWeight::MeshUniform) c.Weight = S::PropertyWeight::Uniform;
+            c.PreserveBoundary = false;
+            if (f.Laplacian == S::PropertyLaplacian::LumpedMass) f.Laplacian = S::PropertyLaplacian::RandomWalk;
+        }
+        if (f.Method != b.Method)
+        {
+            if (f.Laplacian == S::PropertyLaplacian::LumpedMass && f.Method != S::PropertyFilter::Implicit &&
+                f.Method != S::PropertyFilter::VariationalFit)
+                f.Laplacian = S::PropertyLaplacian::RandomWalk;
+            if (c.Backend == PropertySmoothingBackend::Vulkan && (f.Method == S::PropertyFilter::VariationalFit ||
+                (f.Method == S::PropertyFilter::Implicit && f.Solver == S::PropertySolver::Direct)))
+                c.Backend = PropertySmoothingBackend::Cpu;
+        }
+        if (c.Backend != before.Backend && c.Backend == PropertySmoothingBackend::Vulkan) f.Solver = S::PropertySolver::ConjugateGradient;
+        if (f.Solver != b.Solver && f.Solver == S::PropertySolver::Direct) c.Backend = PropertySmoothingBackend::Cpu;
+        // Variational fit: the edited fit option wins over the solver.
+        if (f.FitAlgorithm != b.FitAlgorithm && f.FitAlgorithm == S::FitSolver::Reweighted)
+        {
+            f.SmoothnessOrder = S::FitOrder::First;
+            f.BoundNorm = S::FitBoundNorm::PerChannel;
+            if (!(f.PenaltyDelta > 0)) f.PenaltyDelta = kDefaultDelta;
+        }
+        if ((f.SmoothnessOrder != b.SmoothnessOrder && f.SmoothnessOrder == S::FitOrder::Second) ||
+            (f.BoundNorm != b.BoundNorm && f.BoundNorm == S::FitBoundNorm::Euclidean))
+            f.FitAlgorithm = S::FitSolver::Admm;
+        const bool penaltyEdited = f.SmoothnessPenalty != b.SmoothnessPenalty || f.DataPenalty != b.DataPenalty;
+        const bool huber = f.SmoothnessPenalty == S::FitPenalty::Huber || f.DataPenalty == S::FitPenalty::Huber;
+        if (penaltyEdited && !(f.PenaltyDelta > 0) && (huber || f.FitAlgorithm == S::FitSolver::Reweighted)) f.PenaltyDelta = kDefaultDelta;
+        if (f.Bound != b.Bound && f.Bound == S::FitBound::PerRow) c.BoundRadii.Domain = c.Input.Domain;
     }
 
     std::string SerializePropertySmoothingConfig(const PropertySmoothingConfig& c)

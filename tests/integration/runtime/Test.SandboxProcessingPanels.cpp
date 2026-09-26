@@ -64,6 +64,7 @@ import Extrinsic.Sandbox.Editor.MethodPanels;
 import Extrinsic.Sandbox.Editor.Shell;
 import Geometry.Graph;
 import Geometry.HalfedgeMesh;
+import Geometry.Curvature;
 import Geometry.PointCloud;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.TextureBakeModule;
@@ -3043,6 +3044,112 @@ TEST(SandboxProcessingPanels, PropertySmoothingVariationalFitHonorsPerRowBounds)
         if(frames>60) { ADD_FAILURE()<<"Variational fit did not publish"; engine.RequestExit(); }
     };
     h.Engine->Run();
+}
+
+// Drives the Smooth Property panel's own combos and button through one session on a real
+// mean-curvature field: method, penalty, solver and order switches, then vector and face inputs.
+TEST(SandboxProcessingPanels, PropertySmoothingSessionSwitchesMethodsSolversAndInputs)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    Geometry::HalfedgeMesh::Mesh mesh;
+    std::vector<Geometry::VertexHandle> v;
+    for (int y = 0; y < 8; ++y)
+        for (int x = 0; x < 8; ++x)
+            v.push_back(mesh.AddVertex({0.3f * float(x), 0.3f * float(y), 0.3f * std::sin(float(x)) * std::cos(0.7f * float(y)) + 0.02f * float((x * 7 + y * 3) % 5)}));
+    for (int y = 0; y < 7; ++y)
+        for (int x = 0; x < 7; ++x)
+        {
+            ASSERT_TRUE(mesh.AddTriangle(v[std::size_t(y * 8 + x)], v[std::size_t(y * 8 + x + 1)], v[std::size_t((y + 1) * 8 + x + 1)]));
+            ASSERT_TRUE(mesh.AddTriangle(v[std::size_t(y * 8 + x)], v[std::size_t((y + 1) * 8 + x + 1)], v[std::size_t((y + 1) * 8 + x)]));
+        }
+    ASSERT_TRUE(Geometry::Curvature::ComputeMeanCurvature(mesh).has_value());
+    GS::PopulateFromMesh(scene.Raw(), entity, mesh);
+    auto& vertices = scene.Raw().get<GS::Vertices>(entity).Properties;
+    auto& faces = scene.Raw().get<GS::Faces>(entity).Properties;
+    ASSERT_TRUE(vertices.Exists("v:mean_curvature"));
+    {
+        auto directions = vertices.GetOrAdd<glm::vec3>("v:direction", glm::vec3(0));
+        for (std::size_t i = 0; i < vertices.Size(); ++i) directions[i] = {float(i % 3), float(i % 5), 1.0f};
+        auto roughness = faces.GetOrAdd<double>("f:roughness", 0.0);
+        for (std::size_t f = 0; f < faces.Size(); ++f) roughness[f] = f % 2 ? 1.0 : -1.0;
+    }
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto section = R::MakePropertySmoothingConfigSectionRegistration().DefaultSection;
+    section.PayloadJson = R::SerializePropertySmoothingConfig({});
+    Config::UpsertEngineConfigSection(config.AppSections, section);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.property_smoothing", true));
+
+    using Action = std::function<void(ImGuiWindow*)>;
+    const auto combo = [](const char* label, int index, const char* item) {
+        return std::vector<Action>{
+            [=](ImGuiWindow* w) { ImGui::ActivateItemByID(w->GetID(label)); },
+            [=](ImGuiWindow*) {
+                const auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+                ASSERT_FALSE(popups.empty()) << label;
+                auto* popup = popups.back().Window;
+                ASSERT_NE(popup, nullptr);
+                // ImGui::Combo and the property chooser both push an integer scope per item.
+                const auto scope = ImHashData(&index, sizeof(index), popup->IDStack.back());
+                ImGui::ActivateItemByID(ImHashStr(item, 0, scope));
+            }};
+    };
+    std::vector<double> lastScalar;
+    std::string failure;
+    const auto snapshotChanged = [&](const char* step) {
+        return Action{[&, step](ImGuiWindow*) {
+            const auto out = std::as_const(vertices).Get<double>("smoothed");
+            ASSERT_TRUE(out) << step;
+            const auto values = out.Vector();
+            EXPECT_NE(values, lastScalar) << step << ": the button did not publish a new result";
+            lastScalar = values;
+        }};
+    };
+    const auto click = Action{[](ImGuiWindow* w) { ImGui::ActivateItemByID(w->GetID("Smooth property")); }};
+    const auto idle = Action{[](ImGuiWindow*) {}};
+    std::vector<Action> script;
+    const auto add = [&](std::vector<Action> actions) { for (auto& a : actions) { script.push_back(std::move(a)); script.push_back(idle); script.push_back(idle); } };
+    const auto run = [&](const char* step) { add({click, idle, snapshotChanged(step)}); };
+    run("averaging");
+    add(combo("Method", 5, "Variational fit (robust / TV / bounded)"));
+    add(combo("Smoothness penalty", 2, "L1 (total variation)"));
+    add(combo("Fit solver", 1, "ADMM (one factorization, delta 0 allowed)"));
+    run("total variation ADMM");
+    add(combo("Smoothness order", 1, "Second (non-local TGV, ADMM)"));
+    run("TGV");
+    add(combo("Fit solver", 0, "Reweighted least squares (reference)"));
+    run("reweighted after TGV");
+    add(combo("Method", 4, "Implicit (backward Euler)"));
+    add(combo("Laplacian", 2, "Lumped mesh area (implicit, fit)"));
+    run("implicit lumped");
+    add(combo("Method", 0, "Averaging"));
+    run("averaging after lumped implicit");
+    add(combo("Input property##Smoothing", int(R::GeometryElementDomain::MeshVertex), "MeshVertex: v:direction"));
+    add({click, idle, Action{[&](ImGuiWindow*) {
+        EXPECT_TRUE(std::as_const(vertices).Get<glm::vec3>("v:direction_smoothed")) << "vector input publishes a vec3 output";
+    }}});
+    add(combo("Weights", 3, "Nonnegative mesh cotangent"));
+    add(combo("Input property##Smoothing", int(R::GeometryElementDomain::MeshFace), "MeshFace: f:roughness"));
+    add({click, idle, Action{[&](ImGuiWindow*) {
+        EXPECT_TRUE(std::as_const(faces).Get<double>("f:roughness_smoothed")) << "face input with mesh weights left selected";
+    }}});
+
+    int frames = 0;
+    std::size_t next = 0;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        ++frames;
+        auto* window = ImGui::FindWindowByName("Smooth Property");
+        // Focusing the panel closes open combo popups, so only focus it while none is open.
+        if (window) { ImGui::SetWindowSize(window, {750, 1400}); ImGui::SetWindowPos(window, {0, 0}); }
+        if (window && ImGui::GetCurrentContext()->OpenPopupStack.empty()) ImGui::FocusWindow(window);
+        if (window && frames >= 10 && next < script.size()) script[next++](window);
+        if (next == script.size() || frames > 600) engine.RequestExit();
+    };
+    h.Engine->Run();
+    EXPECT_EQ(next, script.size()) << "the scripted session did not finish";
 }
 
 TEST(SandboxProcessingPanels, PropertySmoothingExecutesConfiguredPropertyAndPublishes)

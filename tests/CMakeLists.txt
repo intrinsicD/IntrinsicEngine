@@ -1293,6 +1293,7 @@ if(TARGET ExtrinsicRuntime)
         Test.PointCloudGeometryExtraction.cpp
         Test.ScalarGradientOperations.cpp
         Test.PropertySmoothingOperations.cpp
+        Test.PropertySmoothingWorkflows.cpp
         Test.LaplacianEigenbasisOperations.cpp
         Test.HarmonicFieldOperations.cpp
         Test.GeodesicsOperations.cpp
