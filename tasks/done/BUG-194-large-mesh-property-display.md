@@ -15,13 +15,22 @@ contracts:
 ---
 # BUG-194 — Large-mesh property display and geodesic controls
 
+
+## Completion — 2026-09-27
+Commit: the enclosing `claude/close-bug-194` commit records this retirement.
+The unreachable-geodesic, resident scalar publication and geodesic control
+repairs landed earlier with their regressions and Vulkan readbacks. The remaining
+Show-latency / duplicate keypoint-job report was not reproduced by any probe and
+the operator confirmed on 2026-09-27 that it no longer occurs. Closed as not
+reproducible; a recurrence gets a new bug with the exact workflow steps.
+
 ## Goal
 Fix the reported delayed Show saliency/mask behavior and uniformly pink geodesic
 distances on dragon.obj. Use the common entity chooser in a geodesic control
 layout consistent with normal estimation, initially following scene selection.
 
 ## Acceptance criteria
-- [ ] Diagnose Show latency on the supplied dragon mesh and fix the confirmed shared cause.
+- [x] Diagnose Show latency on the supplied dragon mesh and fix the confirmed shared cause. Closed as no longer reproducible: the operator confirmed on 2026-09-27 that neither the delayed Show nor the "keypoint job already active" response occurs any more; no further shared cause was confirmed.
 - [x] Valid infinite geodesic distances no longer suppress the entire reachable field; preserve stored values and distinguish unreachable regions.
 - [x] Scalar/mask publication reuses resident geometry; property changes and undo/redo still refresh visualization, and real position edits still update geometry.
 - [x] Geodesic controls choose/follow an entity, keep vertex sources entity-local, and apply edited config through the common validated lane.
