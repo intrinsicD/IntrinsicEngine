@@ -444,7 +444,7 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         std::string_view Id;
         std::vector<std::string> MenuPath;
     };
-    const std::array<ExpectedWindow, 74> expected{{
+    const std::array<ExpectedWindow, 78> expected{{
         {"pointcloud.appearance", {"PointCloud"}},
         {"pointcloud.properties", {"PointCloud"}},
         {"pointcloud.selection", {"PointCloud"}},
