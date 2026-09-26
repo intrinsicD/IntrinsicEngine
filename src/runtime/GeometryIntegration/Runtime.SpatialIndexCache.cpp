@@ -2,6 +2,7 @@ module;
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <functional>
 #include <glm/gtc/quaternion.hpp>
 #include <cstdint>
 #include <entt/entity/entity.hpp>
