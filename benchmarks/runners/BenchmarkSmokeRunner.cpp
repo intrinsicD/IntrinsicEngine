@@ -29,6 +29,7 @@
 #include "../geometry/Bench.SignedHeatReferenceSmoke.hpp"
 #include "../geometry/Bench.PropertySmoothingSmoke.hpp"
 #include "../geometry/Bench.HarmonicFieldSmoke.hpp"
+#include "../geometry/Bench.VariationalFitSolverSmoke.hpp"
 #include "../geometry/Bench.GeodesicsReferenceSmoke.hpp"
 #include "../geometry/Bench.PointLBVHSmoke.hpp"
 #include "../geometry/Bench.RegistrationSpatialSmoke.hpp"
@@ -522,6 +523,26 @@ auto EmitHarmonicFieldSmoke(const std::string& commit) -> EmittedBenchmark {
       [&] { out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
                  << "    \"mislabeled_rows\": " << metrics.MislabeledRows << ",\n"
                  << "    \"warmup_iterations\": 1,\n    \"measured_iterations\": 8\n"; });
+}
+
+auto EmitVariationalFitSolverSmoke(const std::string& commit) -> EmittedBenchmark {
+  const auto m = Intrinsic::Bench::Geometry::RunVariationalFitSolverSmoke();
+  std::ostringstream out;
+  out.precision(17);
+  return EmitBenchmarkResult(out, "geometry.property_smoothing.variational_fit_solvers.smoke", "geometry.property_smoothing",
+      "cpu_admm_sparse_cholesky", "builtin.knn_line_step.256.k12", commit, m.Succeeded,
+      [&] { out << "    \"runtime_ms\": " << m.RuntimeMilliseconds << ",\n"
+                 << "    \"quality_error_linf\": " << m.MaxValueDelta << "\n"; },
+      [&] { out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+                 << "    \"reweighted_runtime_ms\": " << m.ReweightedRuntimeMilliseconds << ",\n"
+                 << "    \"relative_energy_delta\": " << m.RelativeEnergyDelta << ",\n"
+                 << "    \"exact_tv_step_error_linf\": " << m.ExactTvStepError << ",\n"
+                 << "    \"reference_backend\": \"cpu_reference_sparse_cholesky\",\n"
+                 << "    \"admm_iterations\": " << m.AdmmIterations << ",\n"
+                 << "    \"reweighted_iterations\": " << m.ReweightedIterations << ",\n"
+                 << "    \"admm_factorizations\": " << m.AdmmFactorizations << ",\n"
+                 << "    \"reweighted_factorizations\": " << m.ReweightedFactorizations << ",\n"
+                 << "    \"warmup_iterations\": 1,\n    \"measured_iterations\": 1\n"; });
 }
 
 auto EmitSignedHeatReferenceSmoke(const std::string &commit)
@@ -1682,6 +1703,7 @@ auto main(int argc, char **argv) -> int {
   emitted.push_back(EmitSignedHeatReferenceSmoke(commit));
   emitted.push_back(EmitPropertySmoothingSmoke(commit));
   emitted.push_back(EmitHarmonicFieldSmoke(commit));
+  emitted.push_back(EmitVariationalFitSolverSmoke(commit));
   emitted.push_back(EmitGeodesicsReferenceSmoke(commit));
   emitted.push_back(EmitPointLBVHSmoke(commit));
   emitted.push_back(EmitLopLBVHSmoke(commit));

@@ -5,6 +5,7 @@ module;
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <initializer_list>
 #include <limits>
 #include <functional>
@@ -32,6 +33,7 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.MeshSurfaceTopology;
 import Geometry.HalfedgeMesh;
 import Geometry.Smoothing;
+import Geometry.HarmonicField;
 import Geometry.DEC;
 import Geometry.Properties;
 #include "Config/internal/Runtime.PointConfigJson.hpp"
@@ -59,6 +61,8 @@ namespace Extrinsic::Runtime
         using PropertyGraphDetail::CountMatches;
         using PropertyGraphDetail::Capture;
         using PropertyGraphDetail::Same;
+        bool PerRowBounds(const PropertySmoothingConfig& c)
+        { return c.Filter.Method == S::PropertyFilter::VariationalFit && c.Filter.Bound == S::FitBound::PerRow; }
         PropertySmoothingConfig Decode(const Json& doc)
         {
             PropertySmoothingConfig c;
@@ -80,6 +84,19 @@ namespace Extrinsic::Runtime
             c.Filter.MaxSolverIterations = doc.at("max_solver_iterations").get<std::uint32_t>();
             c.Filter.Solver = S::PropertySolver(doc.at("solver").get<unsigned>());
             c.PreserveBoundary = doc.at("preserve_boundary").get<bool>();
+            c.Filter.SmoothnessPenalty = S::FitPenalty(doc.at("smoothness_penalty").get<unsigned>());
+            c.Filter.DataPenalty = S::FitPenalty(doc.at("data_penalty").get<unsigned>());
+            c.Filter.Fidelity = S::FitFidelity(doc.at("fidelity").get<unsigned>());
+            c.Filter.FitWeight = doc.at("fit_weight").get<double>();
+            c.Filter.NoiseLevel = doc.at("noise_level").get<double>();
+            c.Filter.PenaltyDelta = doc.at("penalty_delta").get<double>();
+            c.Filter.Bound = S::FitBound(doc.at("bound").get<unsigned>());
+            c.Filter.BoundRadius = doc.at("bound_radius").get<double>();
+            if (doc.at("bound_radii").is_null()) c.BoundRadii.Name.clear();
+            else ConfigDetail::DecodePointPropertyRef(doc.at("bound_radii"), c.BoundRadii);
+            c.Filter.FitAlgorithm = S::FitSolver(doc.at("fit_solver").get<unsigned>());
+            c.Filter.MaxFitIterations = doc.at("max_fit_iterations").get<std::uint32_t>();
+            c.Filter.FitTolerance = doc.at("fit_tolerance").get<double>();
             return c;
         }
         Core::Config::EngineConfigSectionValidationResult Validate(
@@ -89,7 +106,8 @@ namespace Extrinsic::Runtime
             auto merged = Json::parse(SerializePropertySmoothingConfig({}));
             if (auto error = ConfigDetail::ValidatePointConfigFields(doc, merged,
                 "Smoothing config must be an object.", "Unknown smoothing field: ",
-                {"method", "weight", "laplacian", "solver", "iterations", "neighbors", "max_solver_iterations"}))
+                {"method", "weight", "laplacian", "solver", "iterations", "neighbors", "max_solver_iterations",
+                 "smoothness_penalty", "data_penalty", "fidelity", "bound", "fit_solver", "max_fit_iterations"}))
                 return ConfigDetail::RejectConfigSection(subject, *error);
             for (const auto key : {"input", "output", "positions"})
             {
@@ -98,19 +116,31 @@ namespace Extrinsic::Runtime
                     valid |= ConfigDetail::ValidatePointPropertyRef(merged[key], kind) == ConfigDetail::PointPropertyValidation::Valid;
                 if (!valid) return ConfigDetail::RejectConfigSection(subject, "Bindings require floating scalar or vector properties on a resolved domain.");
             }
-            for (const auto key : {"spatial_sigma", "lambda", "mu", "heat_time", "range_sigma", "time_step", "solver_tolerance"})
+            if (!merged["bound_radii"].is_null() &&
+                ConfigDetail::ValidatePointPropertyRef(merged["bound_radii"], K::Float) != ConfigDetail::PointPropertyValidation::Valid &&
+                ConfigDetail::ValidatePointPropertyRef(merged["bound_radii"], K::Double) != ConfigDetail::PointPropertyValidation::Valid)
+                return ConfigDetail::RejectConfigSection(subject, "bound_radii must be null or a float/double property reference.");
+            for (const auto key : {"spatial_sigma", "lambda", "mu", "heat_time", "range_sigma", "time_step", "solver_tolerance",
+                                   "fit_weight", "noise_level", "penalty_delta", "bound_radius", "fit_tolerance"})
                 if (!merged[key].is_number() || !std::isfinite(merged[key].get<double>()))
                     return ConfigDetail::RejectConfigSection(subject, "Filter parameters must be finite numbers.");
-            if (merged["method"].get<unsigned>() > unsigned(S::PropertyFilter::Implicit) ||
+            if (merged["method"].get<unsigned>() > unsigned(S::PropertyFilter::VariationalFit) ||
                 merged["weight"].get<unsigned>() > unsigned(S::PropertyWeight::MeshUniform) ||
                 merged["laplacian"].get<unsigned>() > unsigned(S::PropertyLaplacian::LumpedMass) ||
-                merged["solver"].get<unsigned>() > unsigned(S::PropertySolver::ConjugateGradient))
-                return ConfigDetail::RejectConfigSection(subject, "Unknown smoothing method, weight, Laplacian or solver.");
+                merged["solver"].get<unsigned>() > unsigned(S::PropertySolver::ConjugateGradient) ||
+                merged["smoothness_penalty"].get<unsigned>() > unsigned(S::FitPenalty::L1) ||
+                merged["data_penalty"].get<unsigned>() > unsigned(S::FitPenalty::L1) ||
+                merged["fidelity"].get<unsigned>() > unsigned(S::FitFidelity::NoiseLevel) ||
+                merged["bound"].get<unsigned>() > unsigned(S::FitBound::PerRow) ||
+                merged["fit_solver"].get<unsigned>() > unsigned(S::FitSolver::Admm))
+                return ConfigDetail::RejectConfigSection(subject, "Unknown smoothing method, weight, Laplacian, solver, penalty, fidelity, bound or fit solver.");
             if (!merged["preserve_boundary"].is_boolean())
                 return ConfigDetail::RejectConfigSection(subject, "preserve_boundary must be boolean.");
             const auto c = Decode(merged);
             if (!S::ValidatePropertyFilterParams(c.Filter) || c.Neighbors < 1 || c.Neighbors > 1024 || c.SpatialSigma <= 0)
-                return ConfigDetail::RejectConfigSection(subject, "Invalid smoothing parameters: iterations 1..10000, neighbors 1..1024, lambda (0,1], mu [-1,0), heat time (0,1000], positive sigmas/time step, solver tolerance (0,1), solver iterations 1..100000.");
+                return ConfigDetail::RejectConfigSection(subject, "Invalid smoothing parameters: iterations 1..10000, neighbors 1..1024, lambda (0,1], mu [-1,0), heat time (0,1000], positive sigmas/time step, solver tolerance (0,1), solver iterations 1..100000, fit weight (0,1e12], positive noise level, penalty delta positive (0 only for ADMM without Huber), nonnegative bound radius, fit iterations 1..100000, fit tolerance (0,1).");
+            if (PerRowBounds(c) && (c.BoundRadii.Name.empty() || c.BoundRadii.Domain != c.Input.Domain))
+                return ConfigDetail::RejectConfigSection(subject, "Per-row bounds need a float/double radius property on the input domain.");
             if (c.Input.Domain != c.Output.Domain || GeometryPropertyComponentCount(c.Input.ValueKind) != GeometryPropertyComponentCount(c.Output.ValueKind) ||
                 c.Positions.ValueKind != K::Vec3 || c.Input.Name.empty() || c.Output.Name.empty() || c.Positions.Name.empty() ||
                 IsTopologyProperty(c.Output.Domain, c.Output.Name) ||
@@ -148,6 +178,8 @@ namespace Extrinsic::Runtime
             const auto* positions = ResolveGeometryPropertySet(a, c.Positions.Domain);
             if (!positions || !ResolveGeometryProperty(a, c.Positions, positions->Size(), false).Resolved())
             { diagnostic = "Choose an existing vec3 position property."; return {}; }
+            if (PerRowBounds(c) && (!ResolveGeometryProperty(a, c.BoundRadii, props->Size(), false).Resolved() || !CountMatches(*props, c.BoundRadii)))
+            { diagnostic = "Choose an existing float/double bound radius property."; return {}; }
             return entity;
         }
     }
@@ -160,7 +192,12 @@ namespace Extrinsic::Runtime
             {"iterations", c.Filter.Iterations}, {"neighbors", c.Neighbors}, {"spatial_sigma", c.SpatialSigma},
             {"lambda", c.Filter.Lambda}, {"mu", c.Filter.Mu}, {"heat_time", c.Filter.HeatTime}, {"range_sigma", c.Filter.RangeSigma},
             {"time_step", c.Filter.TimeStep}, {"solver_tolerance", c.Filter.SolverTolerance},
-            {"max_solver_iterations", c.Filter.MaxSolverIterations}, {"solver", unsigned(c.Filter.Solver)}, {"preserve_boundary", c.PreserveBoundary}}.dump();
+            {"max_solver_iterations", c.Filter.MaxSolverIterations}, {"solver", unsigned(c.Filter.Solver)}, {"preserve_boundary", c.PreserveBoundary},
+            {"smoothness_penalty", unsigned(c.Filter.SmoothnessPenalty)}, {"data_penalty", unsigned(c.Filter.DataPenalty)},
+            {"fidelity", unsigned(c.Filter.Fidelity)}, {"fit_weight", c.Filter.FitWeight}, {"noise_level", c.Filter.NoiseLevel},
+            {"penalty_delta", c.Filter.PenaltyDelta}, {"bound", unsigned(c.Filter.Bound)}, {"bound_radius", c.Filter.BoundRadius},
+            {"bound_radii", c.BoundRadii.Name.empty() ? Json(nullptr) : ConfigDetail::EncodePointPropertyRef(c.BoundRadii)},
+            {"fit_solver", unsigned(c.Filter.FitAlgorithm)}, {"max_fit_iterations", c.Filter.MaxFitIterations}, {"fit_tolerance", c.Filter.FitTolerance}}.dump();
     }
     Core::Config::EngineConfigSectionRegistration MakePropertySmoothingConfigSectionRegistration()
     { return {.DefaultSection = Section({}), .Validate = Validate}; }
@@ -209,7 +246,38 @@ namespace Extrinsic::Runtime
                 .SpatialSigma = c.SpatialSigma, .LumpedMass = c.Filter.Laplacian == S::PropertyLaplacian::LumpedMass,
                 .BoundaryRows = c.PreserveBoundary, .Operation = "Property smoothing"}, samples, graph, diagnostic))
             return fail(diagnostic);
-        const auto filtered = S::FilterProperty(values, channels, graph.Edges, c.Filter, graph.BoundaryRows, graph.Mass);
+        S::PropertyFilterResult filtered;
+        std::string fitSummary;
+        if (c.Filter.Method == S::PropertyFilter::VariationalFit)
+        {
+            std::vector<double> radii;
+            if (PerRowBounds(c))
+            {
+                bool valid = true;
+                std::visit([&](const auto& stored) {
+                    for (const auto slot : samples.Slots)
+                    {
+                        const double r = Channel(stored[slot], 0);
+                        valid &= std::isfinite(r) && r >= 0;
+                        radii.push_back(r);
+                    }
+                }, Capture(*props, c.BoundRadii).Values);
+                if (!valid) return fail("Bound radii must be finite and nonnegative.");
+            }
+            const auto fit = Geometry::HarmonicField::FitProperty(values, channels, graph.Edges, c.Filter,
+                                                                  graph.BoundaryRows, graph.Mass, radii);
+            filtered = {.Success = fit.Success, .Diagnostic = fit.Diagnostic, .Values = fit.Values,
+                        .OperatorApplications = fit.Stats.Solves};
+            result.FitWeight = fit.Stats.FitWeight;
+            result.RmsResidual = fit.Stats.RmsResidual;
+            result.ActiveBounds = fit.Stats.ActiveBounds;
+            const auto number = [](double x) { char text[32]; std::snprintf(text, sizeof text, "%.6g", x); return std::string{text}; };
+            fitSummary = "; weight " + number(fit.Stats.FitWeight) + ", RMS residual " +
+                         number(fit.Stats.RmsResidual) + ", " + std::to_string(fit.Stats.Iterations) +
+                         " iteration(s), " + std::to_string(fit.Stats.Factorizations) + " factorization(s), " + std::to_string(fit.Stats.ActiveBounds) + " active bound(s)" +
+                         (fit.Stats.NoiseTargetClamped ? "; noise level unreachable, weight clamped" : "");
+        }
+        else filtered = S::FilterProperty(values, channels, graph.Edges, c.Filter, graph.BoundaryRows, graph.Mass);
         if (!filtered.Success) return fail(filtered.Diagnostic);
         Snapshot after = before;
         after.Exists = true;
@@ -235,6 +303,7 @@ namespace Extrinsic::Runtime
         if (Same(before, after)) { result.Message = "Smoothed property is unchanged."; return result; }
         // An aliased output is guarded by its expected values; unrelated input revisions stay fixed.
         samples.Inputs.push_back(GP::ObserveGeometryProperty(a, c.Input.Domain, c.Input.Name));
+        if (PerRowBounds(c)) samples.Inputs.push_back(GP::ObserveGeometryProperty(a, c.BoundRadii.Domain, c.BoundRadii.Name));
         std::erase_if(samples.Inputs, [&](const auto& watch) { return watch.Domain == c.Output.Domain && watch.Name == c.Output.Name; });
         const auto mutate = [context, entity = *entity, output = c.Output, watches = std::move(samples.Inputs)]
             (const Snapshot& expected, const Snapshot& target) {
@@ -256,7 +325,7 @@ namespace Extrinsic::Runtime
             .Redo = [mutate, before, after] { return mutate(before, after); },
             .Undo = [mutate, before, after] { return mutate(after, before); }}).Status : mutate(before, after);
         result.Status = EditorFeatureDetail::ToEditorCommandStatus(status);
-        result.Message = result.Succeeded() ? "Property smoothed (" + filtered.Diagnostic + ")." : "Property publication rejected by history guards.";
+        result.Message = result.Succeeded() ? "Property smoothed (" + filtered.Diagnostic + fitSummary + ")." : "Property publication rejected by history guards.";
         return result;
     }
 }

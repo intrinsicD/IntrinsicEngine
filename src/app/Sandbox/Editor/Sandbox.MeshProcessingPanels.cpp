@@ -2713,6 +2713,48 @@ namespace Extrinsic::Sandbox::Editor
 
 namespace Extrinsic::Sandbox::Editor
 {
+    namespace
+    {
+        bool DrawVariationalFitSettings(Runtime::PropertySmoothingConfig& config, const Runtime::EditorPropertyCatalogModel& catalog)
+        {
+            namespace S = Geometry::Smoothing;
+            auto& f = config.Filter;
+            bool changed = false;
+            int smoothness = int(f.SmoothnessPenalty), data = int(f.DataPenalty), fidelity = int(f.Fidelity), bound = int(f.Bound);
+            if (ImGui::Combo("Smoothness penalty", &smoothness, "Quadratic (Dirichlet)\0Huber\0L1 (total variation)\0"))
+            { f.SmoothnessPenalty = S::FitPenalty(smoothness); changed = true; }
+            if (ImGui::Combo("Data penalty", &data, "Quadratic\0Huber (robust)\0L1 (robust)\0"))
+            { f.DataPenalty = S::FitPenalty(data); changed = true; }
+            if (f.SmoothnessPenalty != S::FitPenalty::Quadratic || f.DataPenalty != S::FitPenalty::Quadratic)
+                changed |= ImGui::InputDouble("Penalty delta (property units)", &f.PenaltyDelta);
+            if (ImGui::Combo("Data weight", &fidelity, "Fixed weight\0Match noise level (discrepancy)\0"))
+            { f.Fidelity = S::FitFidelity(fidelity); changed = true; }
+            if (f.Fidelity == S::FitFidelity::FixedWeight) changed |= ImGui::InputDouble("Fit weight", &f.FitWeight);
+            else changed |= ImGui::InputDouble("Noise level (RMS, property units)", &f.NoiseLevel);
+            if (ImGui::Combo("Tolerance bound", &bound, "None\0Uniform radius\0Per-row radius property\0"))
+            {
+                f.Bound = S::FitBound(bound);
+                if (f.Bound == S::FitBound::PerRow && config.BoundRadii.Name.empty()) config.BoundRadii.Name = "tolerance";
+                changed = true;
+            }
+            if (f.Bound == S::FitBound::Uniform) changed |= ImGui::InputDouble("Bound radius (property units)", &f.BoundRadius);
+            if (f.Bound == S::FitBound::PerRow)
+            {
+                changed |= DrawProcessingPropertyInput("Radius property##Smoothing", catalog, config.BoundRadii,
+                    +[](const Runtime::GeometryPropertyRef& ref) {
+                        return ref.ValueKind == Geometry::PropertyValueKind::Float || ref.ValueKind == Geometry::PropertyValueKind::Double;
+                    });
+                config.BoundRadii.Domain = config.Input.Domain;
+            }
+            int solver = int(f.FitAlgorithm);
+            if (ImGui::Combo("Fit solver", &solver, "Reweighted least squares (reference)\0ADMM (one factorization, delta 0 allowed)\0"))
+            { f.FitAlgorithm = S::FitSolver(solver); changed = true; }
+            changed |= ImGui::InputScalar("Maximum fit iterations", ImGuiDataType_U32, &f.MaxFitIterations);
+            changed |= ImGui::InputDouble("Fit tolerance (relative)", &f.FitTolerance, 0.0, 0.0, "%.2e");
+            return changed;
+        }
+    }
+
     void MeshProcessingPanels::Impl::DrawSmoothingWindow(bool& open, const SandboxEditorContext& context)
     {
         if (!ImGui::Begin("Smooth Property", &open)) { ImGui::End(); return; }
@@ -2748,13 +2790,14 @@ namespace Extrinsic::Sandbox::Editor
             { config.Output.ValueKind = kind ? Geometry::PropertyValueKind::Double : Geometry::PropertyValueKind::Float; changed = true; }
         }
         int method = int(config.Filter.Method), laplacian = int(config.Filter.Laplacian), weight = int(config.Weight);
-        if (ImGui::Combo("Method", &method, "Averaging\0Spectral heat\0Taubin\0Bilateral\0Implicit (backward Euler)\0"))
+        if (ImGui::Combo("Method", &method, "Averaging\0Spectral heat\0Taubin\0Bilateral\0Implicit (backward Euler)\0Variational fit (robust / TV / bounded)\0"))
         { config.Filter.Method = Geometry::Smoothing::PropertyFilter(method); changed = true; }
-        if (ImGui::Combo("Laplacian", &laplacian, "Random walk\0Combinatorial\0Lumped mesh area (implicit)\0"))
+        if (ImGui::Combo("Laplacian", &laplacian, "Random walk\0Combinatorial\0Lumped mesh area (implicit, fit)\0"))
         { config.Filter.Laplacian = Geometry::Smoothing::PropertyLaplacian(laplacian); changed = true; }
         if (ImGui::Combo("Weights", &weight, "Uniform kNN\0Gaussian kNN\0Inverse-distance kNN\0Nonnegative mesh cotangent\0Uniform mesh edges\0"))
         { config.Weight = Geometry::Smoothing::PropertyWeight(weight); changed = true; }
-        changed |= ImGui::InputScalar("Iterations", ImGuiDataType_U32, &config.Filter.Iterations);
+        const bool fit = config.Filter.Method == Geometry::Smoothing::PropertyFilter::VariationalFit;
+        if (!fit) changed |= ImGui::InputScalar("Iterations", ImGuiDataType_U32, &config.Filter.Iterations);
         if (config.Weight != Geometry::Smoothing::PropertyWeight::Cotangent && config.Weight != Geometry::Smoothing::PropertyWeight::MeshUniform)
         {
             changed |= ImGui::InputScalar("Neighbors", ImGuiDataType_U32, &config.Neighbors);
@@ -2773,6 +2816,7 @@ namespace Extrinsic::Sandbox::Editor
             changed |= ImGui::InputDouble("Solver tolerance", &config.Filter.SolverTolerance);
             changed |= ImGui::InputScalar("Maximum solver iterations", ImGuiDataType_U32, &config.Filter.MaxSolverIterations);
         }
+        else if (fit) changed |= DrawVariationalFitSettings(config, model.PropertyCatalog);
         else changed |= ImGui::InputDouble("Lambda", &config.Filter.Lambda);
         changed |= ImGui::Checkbox("Pin mesh boundary", &config.PreserveBoundary);
         if (config.Filter.Method == Geometry::Smoothing::PropertyFilter::Taubin)
@@ -2791,7 +2835,8 @@ namespace Extrinsic::Sandbox::Editor
                 [&] { return Runtime::ApplyEditorPropertySmoothingCommand(context.MeshFields.Commands, model.SelectedStableId, config); },
                 std::function<void(Runtime::EditorPropertySmoothingResult)>{}, "Smoothing configuration was rejected.");
         DrawProcessingPropertyShowButton(context, model.SelectedStableId, config.Output, Smoothing.VisualizationDiagnostic);
-        ImGui::TextDisabled("CPU reference; vectors are filtered componentwise without normalization.");
+        ImGui::TextDisabled(fit ? "CPU reference; penalties use the Euclidean norm over vector channels, bounds apply per channel."
+                                : "CPU reference; vectors are filtered componentwise without normalization.");
         if (Smoothing.LastResult) ImGui::TextWrapped("%s", Smoothing.LastResult->Message.c_str());
         if (!Smoothing.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Smoothing.ConfigDiagnostic.c_str());
         if (!Smoothing.VisualizationDiagnostic.empty()) ImGui::TextWrapped("%s", Smoothing.VisualizationDiagnostic.c_str());

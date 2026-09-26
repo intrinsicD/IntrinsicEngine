@@ -1563,6 +1563,7 @@ set(_geometry_test_files
     Test_Smoothing.cpp
     Test.PropertySmoothing.cpp
     Test.HarmonicField.cpp
+    Test.VariationalFit.cpp
     Test.QualityMetrics.cpp
     Test.Sampling.cpp
     Test.SurfaceSampling.cpp

@@ -6,7 +6,9 @@ params:
   rows: 2048
   channels: 3
   biharmonic_rows: 256
-  workloads: [harmonic_linear, biharmonic_cubic, poisson_quadratic, neumann_zero_mean_line, random_walker_split]
+  tv_step_rows: 256
+  tv_penalty_delta: 1.0e-9
+  workloads: [harmonic_linear, biharmonic_cubic, poisson_quadratic, neumann_zero_mean_line, variational_tv_step, random_walker_split]
   weights: uniform
   solver: sparse_cholesky
   warmup_iterations: 1
