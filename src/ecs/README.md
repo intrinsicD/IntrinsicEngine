@@ -180,7 +180,7 @@ imports before they reach the layering allowlist.
   `entt::registry` storage used by the typed `Registry` wrapper.
 - `src/ecs/Components/CMakeLists.txt` links `IntrinsicGeometry` and
   `glm::glm` only — components import data-only `Geometry.*` types
-  (AABB, OBB, Octree, ConvexHull, Properties, and geometry containers for
+  (AABB, OBB, ConvexHull, Properties, and geometry containers for
   `GeometrySources` population) and use `glm` for transform/pose math.
   `Collider` and `RigidBody` are ECS-owned authoring descriptors; they do
   not import a physics world, runtime bridge, graphics state, or live asset
@@ -297,8 +297,7 @@ counterpart:
 
 - `Geometry::Sphere`, `Geometry::AABB`, `Geometry::OBB` — bounding volumes
   on `Culling.Local` / `Culling.World` and `Light::AmbientLight`.
-- `Geometry::Octree`, `Geometry::ConvexHull` — spatial proxies on
-  `Culling.Proxy`.
+- `Geometry::ConvexHull` — spatial proxy on `Culling.Proxy`.
 - `Geometry::PropertySet` (via `ObserverPtr`) — non-owning property set
   views on `GeometrySources::{Vertices,Edges,Faces,Halfedges,Tetrahedra}`.
 

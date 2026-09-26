@@ -91,12 +91,23 @@ Karras 2012 radix-tree formulation. The CPU oracle is an independent exhaustive
 scan. The GPU builds bounds, Morton keys, sort order, topology, and node bounds
 without CPU sorting or hierarchy construction. CPU and GPU quantize Morton
 keys to 10 bits per axis over cubic cells sized by the largest bounds extent,
-so flat inputs do not get cells stretched along their thin axis. Duplicate
-Morton codes append the original compact index, limiting binary radix depth
-to 62 and permitting a 64-entry traversal stack. CPU traversal visits the
-nearer child first and prunes children against the current limit before
-pushing; pruning is strict, so results do not depend on visit order. GPU
-traversal still visits children in fixed order.
+so flat inputs do not get cells stretched along their thin axis.
+
+On the CPU, points that share a cell receive further 10-bit-per-axis Morton
+digits relative to that cell's own bounds, recursively and up to nine digits.
+The original compact index is the final digit, and the radix tree splits on
+the common prefix of these digit strings. Clustered inputs, or a single far
+outlier that compresses the rest of the cloud into a few cells, therefore
+still split spatially instead of by index. This bounds CPU tree depth by 302
+key bits, and CPU traversal uses a 304-entry stack. The GPU appends the index
+directly after the first Morton digit, limiting its depth to 62 with a
+64-entry stack; it does not refine shared cells yet, so its trees degrade on
+such inputs. Query results are identical either way.
+
+CPU and GPU traversal visit the nearer child first and prune children against
+the current limit before pushing. Pruning is strict, so boxes at exactly the
+limit are still visited and results, including index tie-breaks, do not depend
+on visit order.
 
 The current GPU implementation uses a bitonic sorting network and independent
 sorted-range bound unions. These prioritize deterministic, portable execution;

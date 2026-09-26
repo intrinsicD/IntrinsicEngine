@@ -169,7 +169,9 @@ namespace Geometry
 
         double minDistSq = std::numeric_limits<double>::max();
 
-        using TraversalElement = std::pair<float, NodeIndex>;
+        // Double keys keep node bounds exact; equal-distance nodes stay eligible so ties resolve
+        // to the smallest element index, matching QueryKNN.
+        using TraversalElement = std::pair<double, NodeIndex>;
         std::priority_queue<TraversalElement, std::vector<TraversalElement>, std::greater<>> pq;
 
         constexpr NodeIndex rootIndex = 0;
@@ -179,11 +181,11 @@ namespace Geometry
 
         while (!pq.empty())
         {
-            const float nodeDistSq = pq.top().first;
+            const double nodeDistSq = pq.top().first;
             const NodeIndex nodeIdx = pq.top().second;
             pq.pop();
 
-            if (nodeDistSq >= minDistSq)
+            if (nodeDistSq > minDistSq)
             {
                 break;
             }
@@ -200,7 +202,7 @@ namespace Geometry
                     assert(elemIdx < ElementAabbs.size());
                     const double elemDistSq = SquaredDistance(ElementAabbs[elemIdx], queryPoint);
 
-                    if (elemDistSq < minDistSq)
+                    if (elemDistSq < minDistSq || (elemDistSq == minDistSq && elemIdx < out))
                     {
                         minDistSq = elemDistSq;
                         out = elemIdx;
@@ -216,7 +218,7 @@ namespace Geometry
                     assert(elemIdx < ElementAabbs.size());
                     const double elemDistSq = SquaredDistance(ElementAabbs[elemIdx], queryPoint);
 
-                    if (elemDistSq < minDistSq)
+                    if (elemDistSq < minDistSq || (elemDistSq == minDistSq && elemIdx < out))
                     {
                         minDistSq = elemDistSq;
                         out = elemIdx;
@@ -235,7 +237,7 @@ namespace Geometry
                             const NodeIndex childIndex = node.BaseChildIndex + childOffset;
 
                             const double childDistSq = SquaredDistance(m_Nodes[childIndex].Aabb, queryPoint);
-                            if (childDistSq < minDistSq)
+                            if (childDistSq <= minDistSq)
                             {
                                 pq.emplace(childDistSq, childIndex);
                             }

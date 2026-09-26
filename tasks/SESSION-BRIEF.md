@@ -162,6 +162,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-222` — UV atlas smoke baseline output mismatch (tasks/backlog/bugs/BUG-222-uv-atlas-smoke-baseline-output-mismatch.md)
 - unblocked: `BUG-223` — Watershed extrema tests report zero basins (tasks/backlog/bugs/BUG-223-watershed-extrema-tests-report-zero-basins.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
+- unblocked: `GRAPHICS-147` — Refine shared Morton cells in the GPU point LBVH (tasks/backlog/rendering/GRAPHICS-147-gpu-lbvh-shared-cell-refinement.md)
 
 ## Audits
 

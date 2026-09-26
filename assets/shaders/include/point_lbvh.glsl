@@ -24,6 +24,17 @@ float lbvhDistance(vec3 a,vec3 b)
     precise float squared=(d.x*d.x+d.y*d.y)+d.z*d.z;
     return squared;
 }
+float lbvhBoxDistance(LbvhNode node,vec3 q) { return lbvhDistance(q,clamp(q,node.lo,node.hi)); }
+// Orders an internal node's children by box distance. Pushing the far child first visits the
+// near one first, so nearest/kNN limits shrink early; strict pruning keeps results order-independent.
+void lbvhOrderChildren(LbvhNodes tree,LbvhNode node,vec3 q,out uint nearChild,out float nearDistance,
+                       out uint farChild,out float farDistance)
+{
+    float left=lbvhBoxDistance(tree.v[node.left],q),right=lbvhBoxDistance(tree.v[node.right],q);
+    bool leftNear=left<=right;
+    nearChild=leftNear?node.left:node.right; nearDistance=leftNear?left:right;
+    farChild=leftNear?node.right:node.left; farDistance=leftNear?right:left;
+}
 LbvhNeighbor lbvhNearest(uint64_t nodes,uint count,vec3 q,uint excluded)
 {
     LbvhNeighbor best=LbvhNeighbor(LBVH_INVALID,uintBitsToFloat(0x7f800000u));
@@ -33,14 +44,18 @@ LbvhNeighbor lbvhNearest(uint64_t nodes,uint count,vec3 q,uint excluded)
     while(size>0)
     {
         LbvhNode node=tree.v[stack[--size]];
-        if(lbvhDistance(q,clamp(q,node.lo,node.hi))>best.distance) continue;
+        if(lbvhBoxDistance(node,q)>best.distance) continue;
         if(node.object!=LBVH_INVALID)
         {
             if(node.object==excluded) continue;
             float d=lbvhDistance(q,node.lo);
             if(d<best.distance || (d==best.distance && node.object<best.index)) best=LbvhNeighbor(node.object,d);
+            continue;
         }
-        else { stack[size++]=node.right; stack[size++]=node.left; }
+        uint nearChild,farChild;float nearDistance,farDistance;
+        lbvhOrderChildren(tree,node,q,nearChild,nearDistance,farChild,farDistance);
+        if(farDistance<=best.distance) stack[size++]=farChild;
+        if(nearDistance<=best.distance) stack[size++]=nearChild;
     }
     return best;
 }

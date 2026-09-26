@@ -672,3 +672,24 @@ TEST(Octree, OverlapQueryHandlesManyPendingSiblingsInDeepTrees)
     octree.QueryAABB(AABB{{-2.0f, -2.0f, 0.0f}, {2.0f, 2.0f, 0.0f}}, results);
     EXPECT_EQ(results.size(), points.size());
 }
+
+TEST(Octree, QueryNearestBreaksDistanceTiesBySmallestIndex)
+{
+    // Six points at exactly unit distance from the origin, in separate leaves. Traversal
+    // order must not decide the result: the smallest index wins, as in QueryKNN.
+    const std::vector<glm::vec3> points{{0, 0, -1}, {0, -1, 0}, {-1, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+    for (std::size_t rotate = 0; rotate < points.size(); ++rotate)
+    {
+        std::vector<glm::vec3> rotated(points.begin() + rotate, points.end());
+        rotated.insert(rotated.end(), points.begin(), points.begin() + rotate);
+        Octree octree;
+        ASSERT_TRUE(octree.BuildFromPoints(rotated, {}, 1, 10));
+        std::size_t nearest = 99;
+        octree.QueryNearest({0, 0, 0}, nearest);
+        EXPECT_EQ(nearest, 0u) << "rotation " << rotate;
+        std::vector<std::size_t> knn;
+        octree.QueryKNN({0, 0, 0}, 1, knn);
+        ASSERT_EQ(knn.size(), 1u);
+        EXPECT_EQ(knn[0], nearest);
+    }
+}

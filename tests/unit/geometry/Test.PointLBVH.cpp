@@ -1,5 +1,7 @@
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
+#include <cmath>
+#include <cstdint>
 #include <limits>
 #include <random>
 #include <vector>
@@ -174,4 +176,55 @@ TEST(PointLBVH, SuppliedNormalNeighborhoodsRejectMalformedLayout)
     offsets = {0,1,1,2}; EXPECT_FALSE(N::Estimate(points, N::Neighborhoods{offsets, indices}));
     offsets = {0,3,3,3}; indices[1]=3;
     EXPECT_FALSE(N::Estimate(points, N::Neighborhoods{offsets, indices}));
+}
+TEST(PointLBVH, PointsSharingAMortonCellSplitSpatially)
+{
+    // One far outlier puts the whole cluster into a single 10-bit Morton cell. Cluster ids are
+    // in scrambled x order, so splitting that cell by id would give overlapping children.
+    std::vector<glm::vec3> points{{1000, 1000, 1000}};
+    for (int i = 0; i < 64; ++i)
+        points.push_back({float((i * 37) % 64) * 1.0e-6f, 0, 0});
+    LB::Index index;
+    ASSERT_TRUE(index.Build(points));
+    const auto nodes = index.Nodes();
+    int checked = 0;
+    for (const auto& node : nodes)
+    {
+        if (node.Object != LB::InvalidIndex || node.Max.x > 1.0f)
+            continue; // leaves, and nodes that contain the outlier
+        const auto& left = nodes[node.Left];
+        const auto& right = nodes[node.Right];
+        EXPECT_LT(left.Max.x, right.Min.x) << "children of a cluster node overlap";
+        ++checked;
+    }
+    EXPECT_EQ(checked, 63); // every internal node over the 64 cluster points
+}
+TEST(PointLBVH, KNearestMatchesOracleOnClusteredOutlierAndCoincidentData)
+{
+    std::mt19937 rng(41);
+    std::uniform_real_distribution<float> unit(0, 1);
+    std::vector<glm::vec3> points{{1.0e6f, -1.0e6f, 3.0e5f}};
+    for (int i = 0; i < 1500; ++i)
+    {
+        // Nested clusters over six orders of magnitude, plus exact duplicates.
+        const float scale = std::pow(10.0f, -float(i % 7));
+        points.push_back(glm::vec3(unit(rng), unit(rng), unit(rng)) * scale);
+        if (i % 50 == 0)
+            points.push_back(points.back());
+    }
+    LB::Index index;
+    ASSERT_TRUE(index.Build(points));
+    for (std::uint32_t k : {1u, 8u, 33u})
+        for (std::uint32_t q = 0; q < points.size(); q += 7)
+        {
+            const auto tree = index.KNearest(points[q], k, q);
+            const auto oracle = LB::KNearestReference(points, points[q], k, q);
+            ASSERT_EQ(tree.size(), oracle.size());
+            for (std::size_t j = 0; j < tree.size(); ++j)
+            {
+                EXPECT_EQ(tree[j].Index, oracle[j].Index) << "k=" << k << " q=" << q;
+                EXPECT_EQ(tree[j].SquaredDistance, oracle[j].SquaredDistance);
+            }
+            EXPECT_EQ(index.Nearest(points[q], q).Index, LB::NearestReference(points, points[q], q).Index);
+        }
 }

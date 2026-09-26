@@ -26,8 +26,15 @@ void main()
     while(size>0)
     {
         LbvhNode node=tree.v[stack[--size]];
-        if(lbvhDistance(q,clamp(q,node.lo,node.hi))>limit)continue;
-        if(node.object==LBVH_INVALID){stack[size++]=node.right;stack[size++]=node.left;continue;}
+        if(lbvhBoxDistance(node,q)>limit)continue;
+        if(node.object==LBVH_INVALID)
+        {
+            uint nearChild,farChild;float nearDistance,farDistance;
+            lbvhOrderChildren(tree,node,q,nearChild,nearDistance,farChild,farDistance);
+            if(farDistance<=limit)stack[size++]=farChild;
+            if(nearDistance<=limit)stack[size++]=nearChild;
+            continue;
+        }
         if(node.object==excluded)continue;
         float distance=lbvhDistance(q,node.lo);if(distance>limit)continue;
         if(pc.kNearestCount>0)
