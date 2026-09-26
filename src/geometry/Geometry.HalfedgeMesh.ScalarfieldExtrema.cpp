@@ -1157,6 +1157,14 @@ namespace Geometry::ScalarfieldExtrema
         values.resize(mesh.VerticesSize(), std::numeric_limits<double>::quiet_NaN());
         return Extract(mesh, std::span<const double>{values}, params);
     }
+    Result Extract(const HalfedgeMesh::Mesh& mesh, std::span<const double> vertexValues)
+    {
+        return Extract(mesh, vertexValues, kScalarDefaults);
+    }
+    Result Extract(const HalfedgeMesh::Mesh& mesh, std::string_view vertexProperty)
+    {
+        return Extract(mesh, vertexProperty, kScalarDefaults);
+    }
     MeshFeatures SnapToMesh(const HalfedgeMesh::Mesh& mesh, const Result& result,
                             std::span<const std::uint32_t> segments)
     {

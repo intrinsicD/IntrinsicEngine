@@ -105,6 +105,9 @@ jobs:
       - name: Validate layering (strict mode)
         run: python3 tools/repo/check_layering.py --root src --strict
 
+      - name: Reject known compiler hazards
+        run: python3 tools/repo/check_compiler_hazards.py
+
       - name: Reconcile CPU test routing
         run: |
           python3 tests/regression/tooling/Test.TestGateRouting.py \

@@ -137,11 +137,17 @@ export namespace Geometry::ScalarfieldExtrema
     // their vertex; no sharp edges are emitted. `vertexValues` is aligned to
     // vertex storage slots; a size mismatch fails with MissingProperty, as does
     // a missing or non-float/double `vertexProperty`.
+    // The two-argument forms use kScalarDefaults. They are overloads, not a
+    // `const Params& = kScalarDefaults` default argument: Clang 20.1 (the CI
+    // compiler) folds every integral member read through such a parameter to
+    // the default's value, so Algorithm always read HessianRidge (BUG-223).
     [[nodiscard]] Result Extract(const HalfedgeMesh::Mesh& mesh,
                                  std::span<const double> vertexValues,
-                                 const Params& params = kScalarDefaults);
+                                 const Params& params);
+    [[nodiscard]] Result Extract(const HalfedgeMesh::Mesh& mesh, std::span<const double> vertexValues);
     [[nodiscard]] Result Extract(const HalfedgeMesh::Mesh& mesh, std::string_view vertexProperty,
-                                 const Params& params = kScalarDefaults);
+                                 const Params& params);
+    [[nodiscard]] Result Extract(const HalfedgeMesh::Mesh& mesh, std::string_view vertexProperty);
     // Curvature preset: principal ridges/valleys from a multi-scale fitted shape
     // operator S = -dN (normal reversal exchanges ridge/valley roles), mean
     // curvature ridges/valleys and sharp edges. params.Algorithm must be

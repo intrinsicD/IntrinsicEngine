@@ -1137,7 +1137,7 @@
   deterministic labels/boundaries, violates same-cardinality topology-preserving
   publication or source parity, or an equivalent Sandbox run cannot display
   face-region and boundary-edge outputs together after successful segmentation.
-- **Proof**: [tests/unit/geometry/Test.CurvatureSegmentation.cpp,
+- **Proof**: [tests/unit/geometry/Test.Segmentation.cpp,
   tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp,
   tests/integration/runtime/Test.SandboxCurvatureSegmentationPanel.cpp,
   tasks/evidence/METHOD-037/commands/focused-tests.json,
@@ -1332,8 +1332,8 @@
   invariance, become nondeterministic, accept malformed inputs, or the
   implementation allocates a dense face-pair structure instead of bounded
   sparse surface-graph workspaces.
-- **Proof**: [src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cppm,
-  src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cpp,
+- **Proof**: [src/geometry/Geometry.HalfedgeMesh.Segmentation.Features.cppm,
+  src/geometry/Geometry.HalfedgeMesh.Segmentation.Features.cpp,
   tests/unit/geometry/Test.CurvaturePatchContract.cpp,
   methods/geometry/curvature_segmentation/feature_aligned_intake.md,
   ara/evidence/benchmarks/method039_feature_patch_feature_smoke.json,
@@ -1360,8 +1360,8 @@
   fixture, and one-dual-step seed perturbation produce a valid connected
   partition with area-weighted VI at most `0.01` while preserving its hard
   constraints and exact accepted-delta/full-energy agreement.
-- **Proof**: [src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cppm,
-  src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp,
+- **Proof**: [src/geometry/Geometry.HalfedgeMesh.Segmentation.Patches.cppm,
+  src/geometry/Geometry.HalfedgeMesh.Segmentation.Patches.cpp,
   tests/unit/geometry/Test.CurvaturePatchContract.cpp,
   methods/geometry/curvature_segmentation/feature_aligned_intake.md,
   ara/evidence/benchmarks/method039_feature_patch_seed_refutation.json,
@@ -1788,7 +1788,7 @@
 - **Proof**: [N466,
   methods/geometry/curvature_segmentation/feature_boundary_review.md,
   ara/evidence/diagnostics/curvature_frog_2026-09-06/objective_analysis.json,
-  src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp]
+  src/geometry/Geometry.HalfedgeMesh.Segmentation.Patches.cpp]
 - **Dependencies**: []
 - **Tags**: geometry, curvature segmentation, analytical example, representation
 - **From staging**: O174
@@ -1821,7 +1821,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Replaying the bound source and unchanged fixtures violates their geometric or failure assertions, or the retained logs/XML disagree with the stated selected/passed case counts.
-- **Proof**: [N476, tests/unit/geometry/Test.CurvatureExtrema.cpp, tasks/evidence/METHOD-041/source-hashes.json, tasks/evidence/METHOD-041/cpu.log, tasks/evidence/METHOD-041/asan.log, tasks/evidence/METHOD-041/ubsan.log, tasks/evidence/METHOD-041/asan-IntrinsicGeometryCurvatureExtremaTests.xml, tasks/evidence/METHOD-041/ubsan-IntrinsicGeometryCurvatureExtremaTests.xml]
+- **Proof**: [N476, tests/unit/geometry/Test.ScalarfieldExtrema.cpp, tasks/evidence/METHOD-041/source-hashes.json, tasks/evidence/METHOD-041/cpu.log, tasks/evidence/METHOD-041/asan.log, tasks/evidence/METHOD-041/ubsan.log, tasks/evidence/METHOD-041/asan-IntrinsicGeometryCurvatureExtremaTests.xml, tasks/evidence/METHOD-041/ubsan-IntrinsicGeometryCurvatureExtremaTests.xml]
 - **Dependencies**: []
 - **Tags**: geometry, curvature extrema, CPU, ASan, UBSan, bounded fixtures
 - **From staging**: O181

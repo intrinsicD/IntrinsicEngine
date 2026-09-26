@@ -13,6 +13,14 @@ contract_review: ARA proof-path maintenance under the existing ARA workflow; no 
 ---
 # BUG-224 — ARA claims cite renamed curvature paths
 
+
+## Completion — 2026-09-27
+Commit: the enclosing `claude/bug-cleanup-224-223-160` commit records this
+retirement. `git log --follow` shows every cited file was a pure rename in
+`c9011aff4` (similarity 95–99 %, no split or merge), so the seven proof paths in
+C38, C44, C45, C58 and C61 now name the renamed files; the evidence itself moved
+unchanged. `check_ara_claims.py --strict` reports OK for 112 claims.
+
 ## Goal
 - Make `python3 tools/agents/check_ara_claims.py --root . --strict` pass again without weakening the check.
 
@@ -28,8 +36,8 @@ claims C38, C44, C45, C58 and C61 still cite the old names. Some old files
 each path needs checking against the renamed content, not a blind substitution.
 
 ## Acceptance criteria
-- [ ] Each stale proof path points at the file that now holds the cited evidence, or the claim records why the evidence moved.
-- [ ] `check_ara_claims.py --strict` reports no errors.
+- [x] Each stale proof path points at the file that now holds the cited evidence, or the claim records why the evidence moved.
+- [x] `check_ara_claims.py --strict` reports no errors.
 
 ## Verification
 ```bash

@@ -10,8 +10,7 @@ map.
 ## Convergence
 
 - This category normally corresponds to **Theme G — Active bugs** in the
-  convergence map. `BUG-160` belongs to the temporary Theme J product gate
-  because chart fragmentation still blocks the import golden workflow.
+  convergence map.
 - Bug fixes that touch multiple layers must respect the same dependency
   anchors as feature work and should still ship as small, scoped patches per
   [`docs/agent/review.md`](../../../docs/agent/review.md).
