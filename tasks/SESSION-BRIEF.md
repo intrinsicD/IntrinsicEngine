@@ -34,6 +34,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `PHYSICS-005` — Vulkan SPH fluid reference integration (tasks/backlog/physics/PHYSICS-005-vulkan-sph-fluid.md)
 - unblocked: `PHYSICS-006` — Vulkan particle-spring reference integration (tasks/backlog/physics/PHYSICS-006-vulkan-particle-spring.md)
 - unblocked: `PHYSICS-007` — Vulkan XPBD cloth constraints and integration (tasks/backlog/physics/PHYSICS-007-vulkan-xpbd-cloth.md)
+- unblocked: `PHYSICS-008` — Spatial broadphase and k-DOP hierarchies for deformable collision (tasks/backlog/physics/PHYSICS-008-spatial-broadphase-and-kdop-deformable-collision.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
