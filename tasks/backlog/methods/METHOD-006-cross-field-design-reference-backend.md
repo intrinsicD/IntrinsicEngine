@@ -3,6 +3,15 @@ id: METHOD-006
 theme: I
 depends_on: [GEOM-024]
 maturity_target: CPUContracted
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: [repo.source-documentation, method.engine-integration]
 ---
 # METHOD-006 — Surface cross-field design CPU reference backend
 
@@ -34,7 +43,12 @@ maturity_target: CPUContracted
   rather than importing implementation internals or creating a premature
   transport framework. The selected formulation's generalized
   smallest-eigenvalue problem `A z = λ M z` is supplied by
-  [`GEOM-024`](../geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md).
+  [`GEOM-024`](../../done/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md).
+  GEOM-024 landed on 2026-09-27 as a **real symmetric** solver
+  (`Geometry.Sparse::SolveSymmetricGeneralizedEigen`). Knöppel et al.'s problem is
+  complex Hermitian: solve it through the real 2n embedding
+  `[[Re, -Im], [Im, Re]]` (each eigenvalue appears twice; take one vector of the
+  pair) and record that choice and its cost in the method contract.
 
 ## Variants and default selection
 
@@ -124,7 +138,7 @@ maturity_target: CPUContracted
       selected paper's formula; do not import Vector Heat implementation
       internals.
 - [ ] Step 3: assemble Dirichlet energy in `z = e^{iNθ}` per face; alignment constraints become soft / hard pins.
-- [ ] Step 4: solve the smallest-eigenvalue generalized eigenproblem `A z = λ M z` via the sparse symmetric (generalized) eigensolver seam from [`GEOM-024`](../geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md) (LOBPCG or shift-invert).
+- [ ] Step 4: solve the smallest-eigenvalue generalized eigenproblem `A z = λ M z` via the sparse symmetric (generalized) eigensolver seam from [`GEOM-024`](../../done/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md) (LOBPCG or shift-invert).
 - [ ] Step 5: compute singularity indices by accumulating period jumps around each vertex.
 
 ### Benchmark
@@ -158,6 +172,18 @@ maturity_target: CPUContracted
       present either as a planned engine backend.
 - [ ] Register/document the stable correctness-smoke ID and built-in dataset.
 - [ ] Regenerate module inventory.
+
+## Engine integration
+
+| Field | Disposition |
+| --- | --- |
+| Least-structured input | A triangle mesh with optional alignment constraints (boundary, feature edges, principal curvature). |
+| Compatible entity sources | Mesh faces/vertices of halfedge meshes; point clouds and graphs have no face frames and are out of scope. |
+| RuntimeModule | Deferred to adoption planning in [METHOD-003A](METHOD-003A-spatial-query-reference-integration-intake.md), as for the other CPU-reference method packages. |
+| Config/agent | Typed reference parameters now; METHOD-003A owns serializable engine controls at adoption. |
+| UI | METHOD-003A owns adoption; the vector-field overlay (retired UI-050) can display the result. |
+| Publication | Return per-face cross-field representatives and singularity indices; publication planning belongs to METHOD-003A. |
+| End-to-end tests | Reference/oracle tests here; METHOD-003A allocates editor coverage at adoption. |
 
 ## Acceptance criteria
 - [ ] The globally optimal `N = 4` formulation is the sole public strategy;

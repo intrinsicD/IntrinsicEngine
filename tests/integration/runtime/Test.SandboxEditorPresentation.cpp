@@ -426,7 +426,7 @@ TEST(SandboxEditorPresentation, DefaultDrawStartsWithOnlyMenuBarVisible)
 
     EXPECT_TRUE(ImGuiWindowExists("##MainMenuBar"));
     const auto menu = shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), 88u);
+    ASSERT_EQ(menu.size(), 92u);
     for (const Runtime::EditorWindowMenuEntry& entry : menu)
     {
         EXPECT_FALSE(entry.Open) << entry.Id;
@@ -444,7 +444,7 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         std::string_view Id;
         std::vector<std::string> MenuPath;
     };
-    const std::array<ExpectedWindow, 78> expected{{
+    const std::array<ExpectedWindow, 82> expected{{
         {"pointcloud.appearance", {"PointCloud"}},
         {"pointcloud.properties", {"PointCloud"}},
         {"pointcloud.selection", {"PointCloud"}},
@@ -485,6 +485,10 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         {"mesh.processing.harmonic_field", {"Mesh", "Processing"}},
         {"graph.processing.harmonic_field", {"Graph", "Processing"}},
         {"pointcloud.processing.harmonic_field", {"PointCloud", "Processing"}},
+        {"view.laplacian_eigenbasis", {"View"}},
+        {"mesh.processing.laplacian_eigenbasis", {"Mesh", "Processing"}},
+        {"graph.processing.laplacian_eigenbasis", {"Graph", "Processing"}},
+        {"pointcloud.processing.laplacian_eigenbasis", {"PointCloud", "Processing"}},
         {"graph.processing.vertices.normals", {"Graph", "Processing", "Vertices"}},
         {"pointcloud.processing.vertices.normals", {"PointCloud", "Processing", "Vertices"}},
         {"view.normal_estimation", {"View"}},

@@ -2,6 +2,8 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <limits>
+#include <string>
 #include <memory>
 #include <span>
 #include <vector>
@@ -309,4 +311,57 @@ export namespace Geometry::Sparse
         std::span<const double> fixedValues,
         std::span<double> x,
         const CGParams& params = {});
+
+    // -------------------------------------------------------------------------
+    // Sparse symmetric generalized eigensolver
+    // -------------------------------------------------------------------------
+    // Smallest eigenpairs of A z = lambda M z for symmetric A and SPD M, by shift-invert
+    // block subspace iteration with Rayleigh-Ritz in the M-inner product (Bathe) over the
+    // SparseLDLT factorization of A - sigma M. The LDLT is SPD-only, so sigma must lie below
+    // every eigenvalue: the default shift is slightly negative, which suits positive
+    // semidefinite A such as Laplacians; an indefinite A needs an explicit shift below its
+    // spectrum. Convergence is judged per Ritz pair on the relative residual.
+    enum class SymmetricEigenStatus : std::uint8_t
+    {
+        Success = 0,
+        NotConverged,
+        NumericalIssue,
+        DimensionMismatch,
+        InvalidInput
+    };
+
+    struct SymmetricEigenParams
+    {
+        std::size_t Count{6};             // k eigenpairs, 1 <= k < n
+        // NaN selects -1e-6 * (sum |A_ii|) / (sum M_ii), a relative shift just below zero.
+        double Shift{std::numeric_limits<double>::quiet_NaN()};
+        std::size_t MaxIterations{500};   // subspace iterations
+        double Tolerance{1e-10};          // relative residual every returned pair must reach
+        std::size_t SubspaceDimension{0}; // block size q; 0 selects min(n, max(2k, k + 8)); k < q <= n
+        std::uint64_t Seed{0x1ee7u};      // deterministic start block
+    };
+
+    struct SymmetricEigenResult
+    {
+        SymmetricEigenStatus Status{SymmetricEigenStatus::InvalidInput};
+        // Ascending eigenvalues and their M-orthonormal eigenvectors, eigenvector j stored
+        // contiguously at [j * n, (j + 1) * n). The largest-magnitude entry of each vector
+        // is positive (sign convention).
+        std::vector<double> Eigenvalues{};
+        std::vector<double> Eigenvectors{};
+        // Operations counts shifted solves (one per block column and iteration).
+        std::size_t Rows{}, ConvergedCount{}, Iterations{}, Operations{};
+        double Shift{};
+        // Per pair, the normwise backward error |A z - lambda M z|_2 / ((|A|_inf + |lambda| |M|_inf) |z|_2).
+        std::vector<double> RelativeResiduals{};
+        SparseFactorizationDiagnostics ShiftFactorization{};
+        std::string Diagnostic{};
+
+        [[nodiscard]] bool Succeeded() const noexcept { return Status == SymmetricEigenStatus::Success; }
+    };
+
+    [[nodiscard]] SymmetricEigenResult SolveSymmetricGeneralizedEigen(
+        const SparseMatrix& A, const SparseMatrix& M, const SymmetricEigenParams& params = {});
+    [[nodiscard]] SymmetricEigenResult SolveSymmetricGeneralizedEigen(
+        const SparseMatrix& A, const DiagonalMatrix& M, const SymmetricEigenParams& params = {});
 }

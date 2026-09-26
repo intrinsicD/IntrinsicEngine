@@ -2903,6 +2903,52 @@ TEST(SandboxProcessingPanels, FaceScalarGradientComputesAndShowsVectorfield)
     h.Engine->Run();
 }
 
+TEST(SandboxProcessingPanels, LaplacianEigenbasisComputesAndPublishesEigenvectors)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    Geometry::HalfedgeMesh::Mesh mesh;
+    std::vector<Geometry::VertexHandle> v;
+    for (int y = 0; y < 5; ++y)
+        for (int x = 0; x < 5; ++x) v.push_back(mesh.AddVertex({float(x), float(y), 0.1f * float((x + y) % 2)}));
+    for (int y = 0; y < 4; ++y)
+        for (int x = 0; x < 4; ++x)
+        {
+            ASSERT_TRUE(mesh.AddTriangle(v[std::size_t(y * 5 + x)], v[std::size_t(y * 5 + x + 1)], v[std::size_t((y + 1) * 5 + x + 1)]));
+            ASSERT_TRUE(mesh.AddTriangle(v[std::size_t(y * 5 + x)], v[std::size_t((y + 1) * 5 + x + 1)], v[std::size_t((y + 1) * 5 + x)]));
+        }
+    GS::PopulateFromMesh(scene.Raw(), entity, mesh);
+    auto& vertices = scene.Raw().get<GS::Vertices>(entity).Properties;
+    R::LaplacianEigenbasisConfig eigenbasis;
+    eigenbasis.Count = 4;
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto section = R::MakeLaplacianEigenbasisConfigSectionRegistration().DefaultSection;
+    section.PayloadJson = R::SerializeLaplacianEigenbasisConfig(eigenbasis);
+    Config::UpsertEngineConfigSection(config.AppSections, section);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.laplacian_eigenbasis", true));
+    int frames = 0;
+    bool requested = false;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        ++frames;
+        auto* window = ImGui::FindWindowByName("Laplacian Eigenbasis");
+        if (window) { ImGui::SetWindowSize(window, {750, 1200}); ImGui::SetWindowPos(window, {0, 0}); ImGui::FocusWindow(window); }
+        if (window && frames == 10) { ImGui::ActivateItemByID(window->GetID("Compute eigenbasis")); requested = true; }
+        if (std::as_const(vertices).Get<float>("eigen_3"))
+        {
+            EXPECT_TRUE(requested);
+            const auto first = std::as_const(vertices).Get<float>("eigen_0").Vector();
+            for (const float value : first) EXPECT_NEAR(value, first.front(), 1e-4f) << "first eigenvector spans the constants";
+            EXPECT_FALSE(std::as_const(vertices).Get<float>("eigen_4")) << "exactly the requested count";
+            engine.RequestExit();
+        }
+        if (frames > 60) { ADD_FAILURE() << "Eigenbasis panel did not publish"; engine.RequestExit(); }
+    };
+    h.Engine->Run();
+}
+
 TEST(SandboxProcessingPanels, PropertySmoothingVariationalFitHonorsPerRowBounds)
 {
     PanelHarness h;

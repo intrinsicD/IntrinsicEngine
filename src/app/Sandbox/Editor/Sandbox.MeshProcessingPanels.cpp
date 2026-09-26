@@ -34,6 +34,7 @@ import Extrinsic.Runtime.ScalarRidgeOperations;
 import Extrinsic.Sandbox.Editor.Shell;
 
 import Extrinsic.Runtime.EditorCommon;
+import Extrinsic.Runtime.EditorPropertyWidgets;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.EditorJobProjection;
@@ -336,6 +337,9 @@ namespace Extrinsic::Sandbox::Editor
         std::uint32_t SmoothingEntity{};
         ProcessingDraftState<Runtime::HarmonicFieldConfig, Runtime::EditorHarmonicFieldResult> Harmonic{};
         std::uint32_t HarmonicEntity{};
+        ProcessingDraftState<Runtime::LaplacianEigenbasisConfig, Runtime::EditorLaplacianEigenbasisResult> Eigenbasis{};
+        std::uint32_t EigenbasisEntity{};
+        int SelectedEigenvector{};
         GeodesicsState Geodesics{};
         std::uint32_t GeodesicsEntity{0u};
         int GeodesicsSourceVertex{0};
@@ -387,6 +391,7 @@ namespace Extrinsic::Sandbox::Editor
         void DrawGradientWindow(bool&, const SandboxEditorContext&);
         void DrawSmoothingWindow(bool&, const SandboxEditorContext&);
         void DrawHarmonicFieldWindow(bool&, const SandboxEditorContext&);
+        void DrawEigenbasisWindow(bool&, const SandboxEditorContext&);
         void DrawGeodesicsWindow(bool&, const SandboxEditorContext&);
         void DrawGeodesicsControls(const Runtime::EditorDomainWindowModel&,
                                    const SandboxEditorContext&);
@@ -434,6 +439,11 @@ namespace Extrinsic::Sandbox::Editor
                   {"pointcloud.processing.property_smoothing", "PointCloud"}}})
             RegisterRedirectWindow(id, {domain, "Processing"}, "Smooth Property", "view.property_smoothing");
         RegisterWindow("view.harmonic_field", {"View"}, "Harmonic Field", &Impl::DrawHarmonicFieldWindow);
+        RegisterWindow("view.laplacian_eigenbasis", {"View"}, "Laplacian Eigenbasis", &Impl::DrawEigenbasisWindow);
+        for (const auto& [id, domain] : std::initializer_list<std::pair<const char*, const char*>>
+                 {{"mesh.processing.laplacian_eigenbasis", "Mesh"}, {"graph.processing.laplacian_eigenbasis", "Graph"},
+                  {"pointcloud.processing.laplacian_eigenbasis", "PointCloud"}})
+            RegisterRedirectWindow(id, {domain, "Processing"}, "Laplacian Eigenbasis", "view.laplacian_eigenbasis");
         for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
                  {{"mesh.processing.harmonic_field", "Mesh"}, {"graph.processing.harmonic_field", "Graph"},
                   {"pointcloud.processing.harmonic_field", "PointCloud"}}})
@@ -2889,6 +2899,65 @@ namespace Extrinsic::Sandbox::Editor
         if (Smoothing.LastResult) ImGui::TextWrapped("%s", Smoothing.LastResult->Message.c_str());
         if (!Smoothing.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Smoothing.ConfigDiagnostic.c_str());
         if (!Smoothing.VisualizationDiagnostic.empty()) ImGui::TextWrapped("%s", Smoothing.VisualizationDiagnostic.c_str());
+        ImGui::End();
+    }
+
+    void MeshProcessingPanels::Impl::DrawEigenbasisWindow(bool& open, const SandboxEditorContext& context)
+    {
+        namespace S = Geometry::Smoothing;
+        using D = Runtime::GeometryElementDomain;
+        if (!ImGui::Begin("Laplacian Eigenbasis", &open)) { ImGui::End(); return; }
+        const auto previous = EigenbasisEntity;
+        DrawProcessingEntity("Entity##Eigenbasis", context, EigenbasisEntity, Eigenbasis.LastSelectedEntity);
+        if (previous != EigenbasisEntity) Eigenbasis.LastResult.reset();
+        if (const auto active = Runtime::GetEditorLaplacianEigenbasisConfig(context.MeshFields.Commands))
+            Eigenbasis.Synchronize(*active, Runtime::SerializeLaplacianEigenbasisConfig(*active));
+        const auto& model = GetDomainWindowModel(context, Runtime::EditorDomainWindowKind::Mesh, EigenbasisEntity);
+        if (!model.HasSelectedEntity || Eigenbasis.LastApplied.empty())
+        { ImGui::TextDisabled("Select a geometry entity to compute a Laplacian eigenbasis."); ImGui::End(); return; }
+        auto& config = Eigenbasis.Draft;
+        bool changed = false;
+        int domain = int(config.Domain) - int(D::MeshVertex);
+        if (ImGui::Combo("Domain##Eigenbasis", &domain,
+                         "Mesh vertices\0Mesh edges\0Mesh halfedges\0Mesh faces\0Graph nodes\0Graph halfedges\0Graph edges\0Point cloud points\0"))
+        { config.Domain = D(domain + int(D::MeshVertex)); changed = true; }
+        changed |= DrawProcessingPropertyInput("Sample positions##Eigenbasis", model.PropertyCatalog, config.Positions,
+            +[](const Runtime::GeometryPropertyRef& ref) { return ref.ValueKind == Geometry::PropertyValueKind::Vec3; });
+        int weight = int(config.Weight);
+        if (ImGui::Combo("Weights##Eigenbasis", &weight, "Uniform kNN\0Gaussian kNN\0Inverse-distance kNN\0Nonnegative mesh cotangent\0Uniform mesh edges\0"))
+        { config.Weight = S::PropertyWeight(weight); changed = true; }
+        if (config.Weight != S::PropertyWeight::Cotangent && config.Weight != S::PropertyWeight::MeshUniform)
+        {
+            changed |= ImGui::InputScalar("Neighbors##Eigenbasis", ImGuiDataType_U32, &config.Neighbors);
+            if (config.Weight != S::PropertyWeight::Uniform) changed |= ImGui::InputDouble("Spatial sigma##Eigenbasis", &config.SpatialSigma);
+        }
+        changed |= ImGui::Checkbox("Lumped vertex area mass (mesh vertices)", &config.LumpedMass);
+        changed |= ImGui::InputScalar("Eigenpairs", ImGuiDataType_U32, &config.Count);
+        changed |= DrawProcessingPropertyName("Output prefix##Eigenbasis", config.OutputPrefix);
+        changed |= ImGui::InputScalar("Maximum iterations##Eigenbasis", ImGuiDataType_U32, &config.MaxIterations);
+        changed |= ImGui::InputDouble("Tolerance (backward error)##Eigenbasis", &config.Tolerance, 0.0, 0.0, "%.2e");
+        const auto apply = [&](const auto& c) { return Runtime::ApplyEditorLaplacianEigenbasisConfig(context.MeshFields.Commands, c); };
+        if (changed)
+        {
+            Eigenbasis.LastResult.reset();
+            Eigenbasis.ConfigDiagnostic = apply(config).Succeeded() ? "" : "Eigenbasis configuration was rejected.";
+        }
+        const auto readiness = Runtime::PreviewEditorLaplacianEigenbasisCommand(context.MeshFields.Commands, model.SelectedStableId, config);
+        if (DrawProcessingActionButton("Compute eigenbasis", readiness))
+            ApplyProcessingExecution(Eigenbasis, config, apply,
+                [&] { return Runtime::ApplyEditorLaplacianEigenbasisCommand(context.MeshFields.Commands, model.SelectedStableId, config); },
+                std::function<void(Runtime::EditorLaplacianEigenbasisResult)>{}, "Eigenbasis configuration was rejected.");
+        ImGui::TextDisabled("CPU reference: shift-invert subspace iteration, A = D - W with the selected mass.");
+        if (Eigenbasis.LastResult && !Eigenbasis.LastResult->Eigenvalues.empty() && Eigenbasis.LastResult->Succeeded())
+        {
+            (void)Runtime::DrawEditorSpectrumBarWidget("EigenbasisSpectrum", Eigenbasis.LastResult->Eigenvalues, SelectedEigenvector);
+            const Runtime::GeometryPropertyRef selected{config.Domain,
+                config.OutputPrefix + std::to_string(SelectedEigenvector), Geometry::PropertyValueKind::Float};
+            DrawProcessingPropertyShowButton(context, model.SelectedStableId, selected, Eigenbasis.VisualizationDiagnostic);
+        }
+        if (Eigenbasis.LastResult) ImGui::TextWrapped("%s", Eigenbasis.LastResult->Message.c_str());
+        if (!Eigenbasis.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Eigenbasis.ConfigDiagnostic.c_str());
+        if (!Eigenbasis.VisualizationDiagnostic.empty()) ImGui::TextWrapped("%s", Eigenbasis.VisualizationDiagnostic.c_str());
         ImGui::End();
     }
 

@@ -1,4 +1,5 @@
 module;
+#include <span>
 
 #include <cstddef>
 #include <string>
@@ -52,4 +53,9 @@ export namespace Extrinsic::Runtime
         std::string_view widgetId,
         const Geometry::ConstPropertySet& properties,
         EditorPropertyPlotWidgetState& state);
+
+    // Draws an ImPlot bar chart of a spectrum (e.g. Laplacian eigenvalues) and a slider that
+    // selects one index; returns true when the selection changed.
+    [[nodiscard]] bool DrawEditorSpectrumBarWidget(
+        std::string_view widgetId, std::span<const double> values, int& selected);
 }

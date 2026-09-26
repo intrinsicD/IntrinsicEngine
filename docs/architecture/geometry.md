@@ -153,7 +153,21 @@
   vertex-based approximation of the paper's edge-based Crouzeix-Raviart
   connection discretization and reports explicit invalid-input,
   degenerate-boundary, factorization/solve, and non-finite-result statuses.
-- Optional Spectra or SuiteSparse/CHOLMOD seams are deferred until CPU reference
+- `Geometry.Sparse::SolveSymmetricGeneralizedEigen` computes the k smallest
+  eigenpairs of `A z = lambda M z` (symmetric `A`, SPD `M`, sparse or diagonal) by
+  shift-invert block subspace iteration with Rayleigh-Ritz in the M-inner product
+  (Bathe), reusing one `SparseLDLT` factorization of `A - sigma M`. Block size
+  defaults to `min(n, max(2k, k + 8))`, the start block comes from a fixed-seed
+  SplitMix64, eigenvalues are ascending, eigenvectors M-orthonormal with the
+  largest-magnitude entry positive, and every pair must reach the normwise backward
+  error `|A z - lambda M z| / ((|A| + |lambda| |M|) |z|)` below the tolerance;
+  otherwise `NotConverged` returns the best Ritz pairs. The LDLT is SPD-only, so the
+  shift must lie below the spectrum: the default `-1e-6 * sum|A_ii| / sum M_ii` suits
+  positive semidefinite operators such as Laplacians, and indefinite `A` needs an
+  explicit shift (`NumericalIssue` otherwise). Spectra (MPL-2.0, like Eigen) was
+  evaluated for GEOM-024 and rejected because it throws in 65 places and cannot
+  build under the project-wide `-fno-exceptions` policy.
+- Optional SuiteSparse/CHOLMOD seams are deferred until CPU reference
   parity and benchmark manifests justify a second backend.
 - `Geometry.PCA` exports the closed-form symmetric 3×3 eigensolver
   `Geometry::PCA::SymmetricEigen3` (and its `Geometry::PCA::Eigen3` result). It is

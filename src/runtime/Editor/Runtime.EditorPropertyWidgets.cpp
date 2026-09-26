@@ -1,4 +1,5 @@
 module;
+#include <span>
 
 #include <algorithm>
 #include <cmath>
@@ -217,4 +218,24 @@ namespace Extrinsic::Runtime
         ImGui::PopID();
         return selectionChanged;
     }
+
+    bool DrawEditorSpectrumBarWidget(std::string_view widgetId, std::span<const double> values, int& selected)
+    {
+        if (values.empty()) return false;
+        ImGui::PushID(widgetId.data(), widgetId.data() + widgetId.size());
+        const int count = static_cast<int>(std::min(values.size(), static_cast<std::size_t>(std::numeric_limits<int>::max())));
+        if (ImPlot::BeginPlot("##Spectrum", ImVec2(-1.0f, 200.0f)))
+        {
+            ImPlot::SetupAxes("index", "eigenvalue", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+            ImPlot::PlotBars("eigenvalue", values.data(), count, 0.67);
+            ImPlot::EndPlot();
+        }
+        const int previous = selected;
+        selected = std::clamp(selected, 0, count - 1);
+        ImGui::SliderInt("Eigenvector", &selected, 0, count - 1);
+        ImGui::Text("lambda_%d = %.6g", selected, values[static_cast<std::size_t>(selected)]);
+        ImGui::PopID();
+        return selected != previous;
+    }
 }
+

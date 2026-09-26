@@ -234,6 +234,7 @@ target_sources(${target_name}
         Geometry.Support.cpp
         Geometry.SupportRadius.cpp
         Geometry.Sparse.cpp
+        Geometry.Sparse.Eigensolver.cpp
         Geometry.SurfaceReconstruction.cpp
         Geometry.Triangle.cpp
         Geometry.UvAtlas.Validation.cpp
