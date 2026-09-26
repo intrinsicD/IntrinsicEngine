@@ -1,0 +1,25 @@
+benchmark_id: geometry.property_smoothing.variational_fit_solvers.smoke
+method: geometry.property_smoothing
+dataset: builtin.knn_line_step.256.k12
+params:
+  intent: correctness
+  rows: 256
+  neighbors: 12
+  weights: uniform
+  signal: unit_step_plus_uniform_noise_0.2_mt19937_seed_20260926
+  smoothness_penalty: l1
+  data_penalty: quadratic
+  fit_weight: 0.05
+  penalty_delta: 1.0e-6
+  fit_tolerance: 1.0e-8
+  solvers: [reweighted_reference, admm]
+  exact_tv_step_rows: 128
+  exact_tv_penalty_delta: 0.0
+  warmup_iterations: 1
+  measured_iterations: 1
+  # Diagnostics also gate status: relative_energy_delta <= 1e-6, exact_tv_step_error_linf <= 1e-9, admm_factorizations == 1.
+metrics:
+  - runtime_ms
+  - quality_error_linf
+thresholds:
+  quality_error_linf_max: 1.0e-4

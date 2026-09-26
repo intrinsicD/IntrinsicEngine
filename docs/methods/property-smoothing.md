@@ -75,15 +75,33 @@ fixed rows. Runtime can pin mesh boundary vertices for any filter.
   whose mass-weighted RMS residual equals the noise level (to `1e-4` relative);
   a target outside that range clamps the weight and is reported. The tolerance
   is one radius for every row or a float/double radius property (radius 0 pins
-  a row). The kernel is `Geometry::HarmonicField::FitProperty`: non-quadratic
-  penalties use iteratively reweighted least squares (edge weight
-  `w rho'(r)/(2r)`, the quadratic majorizer, so the energy never increases),
-  and tolerances a primal-dual active set per channel whose active rows become
-  hard rows at their bound. Every step is one sparse Cholesky
-  `HarmonicField::Solve`. Reweighting stops when no value changes by more than
-  the relative tolerance times the input range; exceeding the iteration limit,
-  an unsettled active set or a failed factorization publishes nothing. Results
-  report the weight, RMS residual, reweighting iterations and active bounds.
+  a row). The kernel is `Geometry::HarmonicField::FitProperty` with two solvers:
+  - **Reweighted least squares** (reference, `cpu_reference_sparse_cholesky`):
+    non-quadratic penalties use iteratively reweighted least squares (edge
+    weight `w rho'(r)/(2r)`, the quadratic majorizer, so the energy never
+    increases), and tolerances a primal-dual active set per channel whose
+    active rows become hard rows at their bound. Every step is one sparse
+    Cholesky `HarmonicField::Solve`, i.e. one factorization. It stops when no
+    value changes by more than the relative tolerance times the input range.
+    Delta must be positive.
+  - **ADMM** (`cpu_admm_sparse_cholesky`): scaled ADMM with the splits
+    `z = D u` (edge-weighted), `r = u - f` and, with a tolerance, `s = u - f`
+    (both mass-weighted). The u-step matrix `L + kM` (`k` = 1, or 2 with a
+    tolerance) is independent of the penalty parameter and the data weight, so
+    it is factored once per run, including every noise-level bisection step;
+    penalties become closed-form proximal steps and the tolerance a clamp. The
+    penalty parameter starts at `1/range` and is rebalanced by factors of two
+    when primal and dual residuals differ tenfold. It stops when the max-norm
+    primal residual and the largest split-variable change are both below the
+    tolerance times the input range; the final iterate is projected onto the
+    fixed rows and bounds. ADMM also accepts `delta = 0` without Huber
+    penalties: undamped L1, i.e. exact total variation or least absolute
+    deviation.
+
+  Exceeding the iteration limit, an unsettled active set or a failed
+  factorization publishes nothing. Results report the weight, RMS residual,
+  iterations, factorizations and active bounds (ADMM counts rows within the
+  tolerance of their bound).
 
 Spatial weights use the symmetric union of k-nearest neighborhoods: uniform,
 Gaussian `exp(-distance^2/(2 spatial_sigma^2))`, or inverse distance. Inverse
@@ -124,10 +142,10 @@ face-center construction and guarded editor history.
 | Least-structured input | A floating signal with 1–4 channels and a weighted undirected graph; spatial graph construction accepts vec3 samples. |
 | Entity/domain sources | All eight canonical domains; explicit same-domain sample positions, or vertex/node positions for derived face centers and edge/halfedge midpoints. |
 | Runtime owner | `Runtime.MeshFieldOperations.Smoothing.cpp`; uses canonical resolution, point/deletion capture, face-center construction, DEC and editor history. |
-| Config/agent | `sandbox.property_smoothing`, registered in the sandbox config tree; serialization and preview/apply use the same validator as execution admission. Fit fields: `smoothness_penalty`, `data_penalty`, `fidelity`, `fit_weight`, `noise_level`, `penalty_delta`, `bound`, `bound_radius`, `bound_radii` (null unless bound; required on the input domain for per-row bounds), `max_fit_iterations`, `fit_tolerance`. |
-| UI | View → Smooth Property, also reachable from Mesh/Graph/PointCloud → Processing. Input property, output name/storage, positions, filter, Laplacian, weights and parameters are configurable; **Variational fit** adds penalties, fixed weight or noise level, and the tolerance bound with its radius property. |
+| Config/agent | `sandbox.property_smoothing`, registered in the sandbox config tree; serialization and preview/apply use the same validator as execution admission. Fit fields: `smoothness_penalty`, `data_penalty`, `fidelity`, `fit_weight`, `noise_level`, `penalty_delta`, `bound`, `bound_radius`, `bound_radii` (null unless bound; required on the input domain for per-row bounds), `fit_solver`, `max_fit_iterations` (1–100000), `fit_tolerance`. |
+| UI | View → Smooth Property, also reachable from Mesh/Graph/PointCloud → Processing. Input property, output name/storage, positions, filter, Laplacian, weights and parameters are configurable; **Variational fit** adds penalties, fixed weight or noise level, the tolerance bound with its radius property, and the solver. |
 | Publication | Same domain and cardinality; only the named output changes. Existing deleted output slots remain bitwise untouched; new deleted output slots are zero. In-place writes, including positions, use guarded undo/redo. |
-| Verification | `Test.PropertySmoothing.cpp` (including direct-vs-CG implicit parity), `Test.VariationalFit.cpp` (implicit-step equivalence, closed-form TV, outlier rejection, perturbation optimality for every penalty/bound pair, discrepancy target), `Test.PropertySmoothingOperations.cpp`, and the real ImGui actions in `Test.SandboxProcessingPanels.cpp`. The bound-radius property is a publication guard. |
+| Verification | `Test.PropertySmoothing.cpp` (including direct-vs-CG implicit parity), `Test.VariationalFit.cpp` (implicit-step equivalence, closed-form TV, outlier rejection, perturbation optimality for every penalty/bound pair and both solvers, ADMM-to-reference parity with one factorization, exact undamped TV, discrepancy target), `Test.PropertySmoothingOperations.cpp`, and the real ImGui actions in `Test.SandboxProcessingPanels.cpp`. The bound-radius property is a publication guard. |
 
 The default output type follows the chosen input in the UI. Scalar output
 storage can also be float or double. Conversion rejects nonfinite results or
@@ -159,6 +177,8 @@ solver convergence and representability before a single history transaction.
 - Vogel and Oman, *Iterative Methods for Total Variation Denoising*, SIAM J. Sci. Comput. 1996, and Chan and Mulet, *On the Convergence of the Lagged Diffusivity Fixed Point Method in Total Variation Image Restoration*, SIAM J. Numer. Anal. 1999: the reweighting iteration used here and its linear convergence.
 - Huber, *Robust Estimation of a Location Parameter*, 1964: the Huber penalty.
 - Morozov, *On the Solution of Functional Equations by the Method of Regularization*, 1966: the discrepancy principle for choosing the data weight.
+- Boyd, Parikh, Chu, Peleato and Eckstein, *Distributed Optimization and Statistical Learning via the Alternating Direction Method of Multipliers*, Found. Trends Mach. Learn. 2011: scaled ADMM, residual stopping and penalty balancing.
+- Goldstein and Osher, *The Split Bregman Method for L1-Regularized Problems*, SIAM J. Imaging Sci. 2009: splitting the gradient for total variation.
 - Hintermüller, Ito and Kunisch, *The Primal-Dual Active Set Strategy as a Semismooth Newton Method*, SIAM J. Optim. 2002: the active-set iteration for the tolerance bounds.
 - [Gadde, Narang and Ortega, *Bilateral Filter: Graph Spectral Interpretation and Extensions*](https://arxiv.org/abs/1303.2685): graph interpretation of bilateral weights. This implementation uses iterative bilateral filtering, not their complete family of spectral designs.
 
@@ -169,11 +189,20 @@ runtime plus maximum error. It supplies a correctness workload, not a performanc
 comparison or GPU parity claim.
 
 Variational-fit limitations: reweighting converges linearly and slows as delta
-shrinks on plateaus; its reweighted edge and data weights grow like `1/delta`, so
-very small deltas also lose Cholesky accuracy (the smoke benchmark's TV step
-keeps `delta = 1e-9`). Each iteration refactors the system, and noise-level
-fitting repeats the fit per bisection step. Tolerances are per channel boxes,
-not Euclidean balls, for vector properties. The smoothness term is first order
-(Dirichlet or TV), not biharmonic. A delta-free total-variation solver (ADMM or
-primal-dual with one reused factorization) is tracked in
+shrinks on plateaus, and its weights grow like `1/delta`, so very small deltas
+also lose Cholesky accuracy (the harmonic-field smoke's TV step keeps
+`delta = 1e-9`); it refactors every iteration. ADMM avoids both, but needs more,
+cheaper iterations and converges to its tolerance rather than exactly. The
+[solver comparison smoke](../../benchmarks/geometry/manifests/property_smoothing_variational_fit_solvers_smoke.yaml)
+runs L1 smoothing with `delta = 1e-6` on a 256-row kNN graph and gates
+ADMM-to-reference value parity (`1e-4`), relative energy agreement (`1e-6`),
+one ADMM factorization and the exact undamped TV step (`1e-9`); it records
+both runtimes and iteration counts. In the unoptimized `ci` build ADMM took
+0.24 s (821 iterations, one factorization) versus 1.1 s for reweighting
+(390 factorizations); this is a single-machine debug measurement, not a
+performance claim. Tolerances are per-channel boxes, not Euclidean balls, for
+vector properties. The smoothness term is first order (Dirichlet or TV) and
+staircases smoothly varying fields; a second-order TGV penalty is tracked in
+[GEOM-102](../../tasks/backlog/geometry/GEOM-102-second-order-tgv-property-fit.md).
+Solver options from the literature are recorded in
 [GEOM-101](../../tasks/backlog/geometry/GEOM-101-delta-free-variational-fit-solver.md).

@@ -32,6 +32,9 @@ export namespace Geometry::Smoothing
     enum class FitFidelity : std::uint8_t { FixedWeight, NoiseLevel };
     // Optional per-channel bound |u - f| <= radius: one radius for every row, or one per row.
     enum class FitBound : std::uint8_t { None, Uniform, PerRow };
+    // Iteratively reweighted least squares (reference; one factorization per iteration, delta > 0)
+    // or ADMM (one factorization per run; also solves undamped L1 with delta = 0).
+    enum class FitSolver : std::uint8_t { Reweighted, Admm };
 
     struct PropertyFilterParams
     {
@@ -52,10 +55,13 @@ export namespace Geometry::Smoothing
         FitFidelity Fidelity{FitFidelity::FixedWeight};
         double FitWeight{1.0};
         double NoiseLevel{0.1};    // property units
-        double PenaltyDelta{0.01}; // property units
+        double PenaltyDelta{0.01}; // property units; 0 only for ADMM without Huber penalties
         FitBound Bound{FitBound::None};
         double BoundRadius{0.1};   // property units
+        FitSolver FitAlgorithm{FitSolver::Reweighted};
         std::uint32_t MaxFitIterations{1000};
-        double FitTolerance{1e-6}; // relative change between reweighting iterations
+        // Reweighting: largest change between iterations; ADMM: primal and dual residuals.
+        // Both relative to the input's value range.
+        double FitTolerance{1e-6};
     };
 }

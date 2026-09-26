@@ -1,6 +1,6 @@
-// Variational fitting: iteratively reweighted least squares for Huber/L1 penalties, a primal-dual
-// active set for per-channel bounds and a log-space bisection on the data weight for a target noise
-// level. Every inner step is a harmonic Solve with reweighted edges and soft rows.
+// Variational fitting with two solvers: iteratively reweighted least squares plus a primal-dual
+// active set (reference; every step a harmonic Solve), and ADMM with one factorization of L + kM and
+// closed-form proximal steps. A log-space bisection on the data weight meets a target noise level.
 module;
 #include <algorithm>
 #include <cmath>
@@ -11,6 +11,7 @@ module;
 #include <string>
 #include <vector>
 module Geometry.HarmonicField;
+import Geometry.Sparse;
 
 namespace Geometry::HarmonicField
 {
@@ -39,6 +40,20 @@ namespace Geometry::HarmonicField
             }
         }
 
+        // argmin_z tau rho(|z|) + |z - v|^2 / 2, as a factor on v with norm g = |v|.
+        double ProxScale(FitPenalty penalty, double g, double delta, double tau)
+        {
+            switch (penalty)
+            {
+            case FitPenalty::Huber:
+                return g <= delta * (1 + 2 * tau) ? 1 / (1 + 2 * tau) : 1 - 2 * tau * delta / g;
+            case FitPenalty::L1:
+                if (g <= delta + tau) return delta > 0 ? 1 / (1 + tau / delta) : 0.0;
+                return 1 - tau / g;
+            default: return 1 / (1 + 2 * tau);
+            }
+        }
+
         struct Problem
         {
             std::span<const double> F;
@@ -49,8 +64,12 @@ namespace Geometry::HarmonicField
             std::vector<std::size_t> FixedRows;
             std::vector<double> Mass, Radius; // Radius empty without bounds
             double Scale{1.0};                // value range, for the relative change test
-            std::size_t Solves{}, ActiveBounds{};
+            std::size_t Solves{}, Factorizations{}, ActiveBounds{};
+            double PrimalResidual{}, DualResidual{};
             std::string Error;
+            // ADMM: L + kM on the free rows, factored once per run.
+            std::optional<Sparse::SparseLLT> Factor;
+            std::vector<std::size_t> FreeIndex, FreeRows;
 
             double Distance(std::span<const double> x, std::size_t a, std::span<const double> y, std::size_t b) const
             {
@@ -97,6 +116,7 @@ namespace Geometry::HarmonicField
                         if (!Fixed[i]) softRows.push_back({i, soft[i]});
                     const auto solved = Solve(F, Channels, weighted, harmonic, FixedRows, softRows);
                     ++Solves;
+                    ++Factorizations;
                     if (!solved.Success) { Error = solved.Diagnostic; return {}; }
                     ActiveBounds = 0;
                     return solved.Values;
@@ -125,6 +145,7 @@ namespace Geometry::HarmonicField
                         std::ranges::sort(hard);
                         const auto solved = Solve(target, 1, weighted, harmonic, hard, softRows);
                         ++Solves;
+                        ++Factorizations;
                         if (!solved.Success) { Error = solved.Diagnostic; return {}; }
                         const auto& x = solved.Values;
                         // Half gradient of the channel energy; zero on free rows up to the solve residual.
@@ -154,6 +175,155 @@ namespace Geometry::HarmonicField
                     if (!settled) { Error = "Bounded fit did not settle its active set; no property was changed."; return {}; }
                     ActiveBounds += static_cast<std::size_t>(std::ranges::count_if(active, [](auto a) { return a != 0; }));
                 }
+                return u;
+            }
+
+            bool FactorAdmm()
+            {
+                if (Factor) return true;
+                const double k = Radius.empty() ? 1.0 : 2.0;
+                FreeIndex.assign(Count, Count);
+                for (std::size_t i = 0; i < Count; ++i)
+                    if (!Fixed[i]) { FreeIndex[i] = FreeRows.size(); FreeRows.push_back(i); }
+                Sparse::SparseBuilder builder(FreeRows.size(), FreeRows.size());
+                builder.Reserve(2 * Edges.size() + FreeRows.size());
+                std::vector<double> diagonal(FreeRows.size());
+                for (std::size_t f = 0; f < FreeRows.size(); ++f) diagonal[f] = k * Mass[FreeRows[f]];
+                for (const auto& e : Edges)
+                    for (const auto [row, col] : {std::pair{e.A, e.B}, std::pair{e.B, e.A}})
+                    {
+                        if (Fixed[row]) continue;
+                        diagonal[FreeIndex[row]] += e.Weight;
+                        if (!Fixed[col]) builder.Add(FreeIndex[row], FreeIndex[col], -e.Weight);
+                    }
+                for (std::size_t f = 0; f < FreeRows.size(); ++f) builder.Add(f, f, diagonal[f]);
+                const auto system = builder.Build();
+                Factor.emplace();
+                ++Factorizations;
+                if (!system.Valid || !Factor->factor(system.Matrix).Succeeded())
+                {
+                    Error = "Sparse Cholesky factorization of the ADMM system failed; no property was changed.";
+                    return false;
+                }
+                return true;
+            }
+
+            // Scaled ADMM on z = D u (edge weights), r = u - f (data) and s = u - f (bound), both
+            // row-mass weighted. The u-step matrix L + kM does not depend on beta or lambda, so
+            // residual balancing rescales beta without refactoring.
+            std::optional<std::vector<double>> Admm(double lambda, std::size_t& iterations)
+            {
+                if (!FactorAdmm()) return {};
+                const bool bounded = !Radius.empty();
+                const std::size_t E = Edges.size(), C = Channels, N = Count;
+                std::vector<double> u(F.begin(), F.end()), z(E * C), p(E * C, 0.0), r(N * C, 0.0), q(N * C, 0.0),
+                    s(bounded ? N * C : 0, 0.0), t(bounded ? N * C : 0, 0.0), rhs(FreeRows.size()), x(FreeRows.size());
+                for (std::size_t e = 0; e < E; ++e)
+                    for (std::size_t c = 0; c < C; ++c) z[e * C + c] = F[Edges[e].A * C + c] - F[Edges[e].B * C + c];
+                double beta = 1.0 / Scale;
+                const double delta = P->PenaltyDelta;
+                const double tolerance = P->FitTolerance * Scale;
+                std::vector<double> v(C);
+                for (iterations = 1; iterations <= P->MaxFitIterations; ++iterations)
+                {
+                    // u-step: (L + kM) u = D^T W (z - p) + M (f + r - q) [+ M (f + s - t)], fixed rows eliminated.
+                    for (std::size_t c = 0; c < C; ++c)
+                    {
+                        for (std::size_t f = 0; f < FreeRows.size(); ++f)
+                        {
+                            const auto i = FreeRows[f];
+                            double target = F[i * C + c] + r[i * C + c] - q[i * C + c];
+                            if (bounded) target += F[i * C + c] + s[i * C + c] - t[i * C + c];
+                            rhs[f] = Mass[i] * target;
+                        }
+                        for (std::size_t e = 0; e < E; ++e)
+                        {
+                            const auto& edge = Edges[e];
+                            const double y = edge.Weight * (z[e * C + c] - p[e * C + c]);
+                            if (!Fixed[edge.A]) rhs[FreeIndex[edge.A]] += y + (Fixed[edge.B] ? edge.Weight * F[edge.B * C + c] : 0.0);
+                            if (!Fixed[edge.B]) rhs[FreeIndex[edge.B]] += -y + (Fixed[edge.A] ? edge.Weight * F[edge.A * C + c] : 0.0);
+                        }
+                        if (!FreeRows.empty() && !Factor->solve(rhs, x).Succeeded())
+                        { Error = "Sparse Cholesky solve failed; no property was changed."; return {}; }
+                        ++Solves;
+                        for (std::size_t f = 0; f < FreeRows.size(); ++f) u[FreeRows[f] * C + c] = x[f];
+                    }
+                    // Proximal steps and dual updates; residuals in the max norm.
+                    double primal = 0, dual = 0;
+                    const auto prox = [&](FitPenalty penalty, double tau, double* value, const double* shift, const double* base0,
+                                          const double* base1, double sign) {
+                        double norm = 0;
+                        for (std::size_t c = 0; c < C; ++c)
+                        {
+                            v[c] = base0[c] + sign * base1[c] + shift[c];
+                            norm += v[c] * v[c];
+                        }
+                        const double factor = ProxScale(penalty, std::sqrt(norm), delta, tau);
+                        for (std::size_t c = 0; c < C; ++c)
+                        {
+                            const double next = factor * v[c];
+                            dual = std::max(dual, std::abs(next - value[c]));
+                            value[c] = next;
+                        }
+                    };
+                    for (std::size_t e = 0; e < E; ++e)
+                    {
+                        prox(P->SmoothnessPenalty, 1 / beta, &z[e * C], &p[e * C], &u[Edges[e].A * C], &u[Edges[e].B * C], -1);
+                        for (std::size_t c = 0; c < C; ++c)
+                        {
+                            const double gap = u[Edges[e].A * C + c] - u[Edges[e].B * C + c] - z[e * C + c];
+                            p[e * C + c] += gap;
+                            primal = std::max(primal, std::abs(gap));
+                        }
+                    }
+                    for (const auto i : FreeRows)
+                    {
+                        prox(P->DataPenalty, lambda / beta, &r[i * C], &q[i * C], &u[i * C], &F[i * C], -1);
+                        for (std::size_t c = 0; c < C; ++c)
+                        {
+                            const auto j = i * C + c;
+                            const double gap = u[j] - F[j] - r[j];
+                            q[j] += gap;
+                            primal = std::max(primal, std::abs(gap));
+                            if (!bounded) continue;
+                            const double next = std::clamp(u[j] - F[j] + t[j], -Radius[i], Radius[i]);
+                            dual = std::max(dual, std::abs(next - s[j]));
+                            s[j] = next;
+                            const double boundGap = u[j] - F[j] - s[j];
+                            t[j] += boundGap;
+                            primal = std::max(primal, std::abs(boundGap));
+                        }
+                    }
+                    // Dual residual: the largest change of a split variable, in value units.
+                    PrimalResidual = primal;
+                    DualResidual = dual;
+                    if (primal <= tolerance && DualResidual <= tolerance) break;
+                    if (iterations % 10 == 0 && (primal > 10 * DualResidual || DualResidual > 10 * primal))
+                    {
+                        const double factor = primal > 10 * DualResidual ? 2.0 : 0.5;
+                        beta *= factor;
+                        for (auto* duals : {&p, &q, &t})
+                            for (auto& y : *duals) y /= factor;
+                    }
+                }
+                if (iterations > P->MaxFitIterations)
+                {
+                    --iterations;
+                    Error = "ADMM did not converge in " + std::to_string(P->MaxFitIterations) +
+                            " iterations; raise the iteration limit or the tolerance. No property was changed.";
+                    return {};
+                }
+                // Project onto the feasible set: fixed rows exact, bounds per channel.
+                ActiveBounds = 0;
+                for (std::size_t i = 0; i < N; ++i)
+                    for (std::size_t c = 0; c < C; ++c)
+                    {
+                        auto& value = u[i * C + c];
+                        if (Fixed[i]) { value = F[i * C + c]; continue; }
+                        if (!bounded) continue;
+                        value = std::clamp(value, F[i * C + c] - Radius[i], F[i * C + c] + Radius[i]);
+                        if (std::abs(value - F[i * C + c]) >= Radius[i] - tolerance) ++ActiveBounds;
+                    }
                 return u;
             }
 
@@ -262,9 +432,11 @@ namespace Geometry::HarmonicField
 
         std::size_t iterations = 0;
         double lambda = params.FitWeight;
+        const bool admm = params.FitAlgorithm == Smoothing::FitSolver::Admm;
+        const auto run = [&](double weight) { return admm ? problem.Admm(weight, iterations) : problem.Fit(weight, iterations); };
         std::optional<std::vector<double>> fitted;
         if (params.Fidelity == Smoothing::FitFidelity::FixedWeight)
-            fitted = problem.Fit(lambda, iterations);
+            fitted = run(lambda);
         else
         {
             // The residual decreases with the data weight (strictly for quadratic penalties), so
@@ -276,7 +448,7 @@ namespace Geometry::HarmonicField
             double lo = balanced * 1e-8, hi = balanced * 1e8;
             const auto at = [&](double weight) {
                 lambda = weight;
-                fitted = problem.Fit(weight, iterations);
+                fitted = run(weight);
                 return fitted ? problem.RmsResidual(*fitted) : -1.0;
             };
             if (const double r = at(lo); r < 0) return fail(problem.Error);
@@ -297,14 +469,17 @@ namespace Geometry::HarmonicField
         if (!std::ranges::all_of(*fitted, [](double x) { return std::isfinite(x); }))
             return fail("Variational fit produced non-finite values; no property was changed.");
         result.Values = std::move(*fitted);
-        result.Stats.ReweightIterations = iterations;
+        result.Stats.Iterations = iterations;
         result.Stats.Solves = problem.Solves;
+        result.Stats.Factorizations = problem.Factorizations;
+        result.Stats.PrimalResidual = problem.PrimalResidual;
+        result.Stats.DualResidual = problem.DualResidual;
         result.Stats.ActiveBounds = problem.ActiveBounds;
         result.Stats.FitWeight = lambda;
         result.Stats.RmsResidual = problem.RmsResidual(result.Values);
         result.Stats.Energy = problem.Energy(result.Values, lambda);
         result.Success = true;
-        result.Diagnostic = "cpu_reference_sparse_cholesky";
+        result.Diagnostic = admm ? "cpu_admm_sparse_cholesky" : "cpu_reference_sparse_cholesky";
         return result;
     }
 }

@@ -2746,8 +2746,11 @@ namespace Extrinsic::Sandbox::Editor
                     });
                 config.BoundRadii.Domain = config.Input.Domain;
             }
-            changed |= ImGui::InputScalar("Maximum reweighting iterations", ImGuiDataType_U32, &f.MaxFitIterations);
-            changed |= ImGui::InputDouble("Reweighting tolerance (relative)", &f.FitTolerance, 0.0, 0.0, "%.2e");
+            int solver = int(f.FitAlgorithm);
+            if (ImGui::Combo("Fit solver", &solver, "Reweighted least squares (reference)\0ADMM (one factorization, delta 0 allowed)\0"))
+            { f.FitAlgorithm = S::FitSolver(solver); changed = true; }
+            changed |= ImGui::InputScalar("Maximum fit iterations", ImGuiDataType_U32, &f.MaxFitIterations);
+            changed |= ImGui::InputDouble("Fit tolerance (relative)", &f.FitTolerance, 0.0, 0.0, "%.2e");
             return changed;
         }
     }

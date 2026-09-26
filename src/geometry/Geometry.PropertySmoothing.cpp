@@ -27,9 +27,11 @@ namespace Geometry::Smoothing
             p.Fidelity <= FitFidelity::NoiseLevel && p.Bound <= FitBound::PerRow &&
             std::isfinite(p.FitWeight) && p.FitWeight > 0 && p.FitWeight <= 1e12 &&
             std::isfinite(p.NoiseLevel) && p.NoiseLevel > 0 &&
-            std::isfinite(p.PenaltyDelta) && p.PenaltyDelta > 0 &&
+            p.FitAlgorithm <= FitSolver::Admm && std::isfinite(p.PenaltyDelta) &&
+            (p.PenaltyDelta > 0 || (p.PenaltyDelta == 0 && p.FitAlgorithm == FitSolver::Admm &&
+                                    p.SmoothnessPenalty != FitPenalty::Huber && p.DataPenalty != FitPenalty::Huber)) &&
             std::isfinite(p.BoundRadius) && p.BoundRadius >= 0 &&
-            p.MaxFitIterations >= 1 && p.MaxFitIterations <= 10000 &&
+            p.MaxFitIterations >= 1 && p.MaxFitIterations <= 100000 &&
             std::isfinite(p.FitTolerance) && p.FitTolerance > 0 && p.FitTolerance < 1 &&
             std::isfinite(p.TimeStep) && p.TimeStep > 0 &&
             std::isfinite(p.SolverTolerance) && p.SolverTolerance > 0 && p.SolverTolerance < 1 &&

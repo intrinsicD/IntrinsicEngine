@@ -60,7 +60,10 @@ export namespace Geometry::HarmonicField
 
     struct FitDiagnostics
     {
-        std::size_t ReweightIterations{}, Solves{};
+        // Reweighting or ADMM iterations of the final data weight; triangular solves or
+        // harmonic Solves over the whole run.
+        std::size_t Iterations{}, Solves{};
+        std::size_t Factorizations{};
         // (row, channel) bounds active at the solution.
         std::size_t ActiveBounds{};
         // Data weight used; the chosen one under FitFidelity::NoiseLevel.
@@ -70,6 +73,8 @@ export namespace Geometry::HarmonicField
         double Energy{};
         // NoiseLevel only: the target lies outside the residuals reachable in the weight bracket.
         bool NoiseTargetClamped{};
+        // ADMM only: final max-norm primal and dual residuals.
+        double PrimalResidual{}, DualResidual{};
     };
 
     struct FitResult
@@ -86,8 +91,11 @@ export namespace Geometry::HarmonicField
     // Norms are Euclidean over channels. Row masses m follow params.Laplacian: weighted degree
     // (random walk; 1 for isolated rows), 1 (combinatorial) or lumpedMass. With quadratic
     // penalties and no bound this is one implicit diffusion step (M + L / lambda) u = M f.
-    // Non-quadratic penalties are minimized by iteratively reweighted least squares, bounds by a
-    // primal-dual active set per channel; every step is a harmonic Solve. boundRadii: one
+    // FitSolver::Reweighted minimizes non-quadratic penalties by iteratively reweighted least
+    // squares and bounds by a primal-dual active set per channel; every step is a harmonic Solve.
+    // FitSolver::Admm splits D u, the data residual and the bound residual off, factors L + kM once
+    // and applies closed-form proximal steps; it also accepts delta = 0 (exact L1). The final ADMM
+    // iterate is projected onto the fixed rows and bounds. boundRadii: one
     // nonnegative radius per row, required for FitBound::PerRow. Failure never returns values.
     [[nodiscard]] FitResult FitProperty(std::span<const double> values, std::size_t channels,
                                         std::span<const Smoothing::PropertyEdge> edges,

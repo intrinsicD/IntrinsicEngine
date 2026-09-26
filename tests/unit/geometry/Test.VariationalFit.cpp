@@ -39,7 +39,7 @@ namespace
         p.DataPenalty = data;
         p.FitWeight = lambda;
         p.FitTolerance = 1e-11;
-        p.MaxFitIterations = 10000;
+        p.MaxFitIterations = 100000;
         return p;
     }
 
@@ -81,7 +81,7 @@ TEST(VariationalFit, QuadraticFitIsOneImplicitDiffusionStepForEveryMass)
         p.Laplacian = laplacian;
         const auto fit = H::FitProperty(f, 2, edges, p, fixed, masses);
         ASSERT_TRUE(fit.Success) << fit.Diagnostic;
-        EXPECT_EQ(fit.Stats.ReweightIterations, 1u);
+        EXPECT_EQ(fit.Stats.Iterations, 1u);
         S::PropertyFilterParams implicit{.Method = S::PropertyFilter::Implicit, .Laplacian = laplacian, .TimeStep = 1 / 0.4};
         const auto step = S::FilterProperty(f, 2, edges, implicit, fixed, masses);
         ASSERT_TRUE(step.Success) << step.Diagnostic;
@@ -146,8 +146,10 @@ TEST(VariationalFit, EveryPenaltyAndBoundReachesAConstrainedMinimum)
     for (auto smoothness : {S::FitPenalty::Quadratic, S::FitPenalty::Huber, S::FitPenalty::L1})
         for (auto data : {S::FitPenalty::Quadratic, S::FitPenalty::Huber, S::FitPenalty::L1})
             for (auto bound : {S::FitBound::None, S::FitBound::Uniform})
+                for (auto solver : {S::FitSolver::Reweighted, S::FitSolver::Admm})
             {
                 auto p = Fit(smoothness, data, 0.7);
+                p.FitAlgorithm = solver;
                 p.PenaltyDelta = 0.2;
                 p.Bound = bound;
                 p.BoundRadius = 0.3;
@@ -170,7 +172,8 @@ TEST(VariationalFit, EveryPenaltyAndBoundReachesAConstrainedMinimum)
                         if (bound == S::FitBound::Uniform) moved[j] = std::clamp(moved[j], f[j] - 0.3, f[j] + 0.3);
                     }
                     EXPECT_GE(Energy(moved, f, channels, edges, p), energy - 1e-9 * std::max(1.0, energy))
-                        << "smoothness " << int(smoothness) << " data " << int(data) << " bound " << int(bound);
+                        << "smoothness " << int(smoothness) << " data " << int(data) << " bound " << int(bound)
+                        << " solver " << int(solver);
                 }
             }
 }
@@ -268,4 +271,100 @@ TEST(VariationalFit, InvalidInputsAndNonConvergenceReturnNoValues)
     auto lumped = p;
     lumped.Laplacian = S::PropertyLaplacian::LumpedMass;
     EXPECT_TRUE(rejected(lumped));
+}
+
+TEST(VariationalFit, AdmmMatchesTheReweightedReferenceWithOneFactorization)
+{
+    std::mt19937 rng(17);
+    const std::size_t n = 16, channels = 2;
+    const auto edges = RandomGraph(n, rng);
+    std::uniform_real_distribution<double> value(-2, 2);
+    std::vector<double> f(n * channels);
+    for (auto& x : f) x = value(rng);
+    const std::vector<std::size_t> fixed{4};
+    for (auto smoothness : {S::FitPenalty::Quadratic, S::FitPenalty::Huber, S::FitPenalty::L1})
+        for (auto data : {S::FitPenalty::Quadratic, S::FitPenalty::Huber, S::FitPenalty::L1})
+            for (auto bound : {S::FitBound::None, S::FitBound::Uniform})
+            {
+                SCOPED_TRACE(int(smoothness) * 100 + int(data) * 10 + int(bound));
+                auto p = Fit(smoothness, data, 0.7);
+                p.PenaltyDelta = 0.2;
+                p.Bound = bound;
+                p.BoundRadius = 0.3;
+                const auto reference = H::FitProperty(f, channels, edges, p, fixed);
+                p.FitAlgorithm = S::FitSolver::Admm;
+                const auto admm = H::FitProperty(f, channels, edges, p, fixed);
+                ASSERT_TRUE(reference.Success && admm.Success) << reference.Diagnostic << admm.Diagnostic;
+                EXPECT_EQ(admm.Diagnostic, "cpu_admm_sparse_cholesky");
+                EXPECT_EQ(admm.Stats.Factorizations, 1u);
+                EXPECT_LE(admm.Stats.PrimalResidual, 1e-11 * 4);
+                EXPECT_NEAR(admm.Stats.Energy, reference.Stats.Energy, 1e-8 * std::max(1.0, reference.Stats.Energy));
+                for (std::size_t j = 0; j < f.size(); ++j) EXPECT_NEAR(admm.Values[j], reference.Values[j], 1e-6);
+                EXPECT_EQ(admm.Values[4 * channels], f[4 * channels]);
+            }
+}
+
+TEST(VariationalFit, AdmmSolvesUndampedTotalVariationExactly)
+{
+    auto p = Fit(S::FitPenalty::L1, S::FitPenalty::Quadratic, 2.0);
+    p.FitAlgorithm = S::FitSolver::Admm;
+    p.PenaltyDelta = 0;
+    const auto pair = H::FitProperty(std::vector<double>{0, 1}, 1, Path(2), p);
+    ASSERT_TRUE(pair.Success) << pair.Diagnostic;
+    EXPECT_NEAR(pair.Values[0], 0.25, 1e-9);
+    EXPECT_NEAR(pair.Values[1], 0.75, 1e-9);
+    std::vector<double> f(10, 0.0);
+    std::fill(f.begin() + 5, f.end(), 1.0);
+    p.FitWeight = 1.0;
+    const auto step = H::FitProperty(f, 1, Path(10), p);
+    ASSERT_TRUE(step.Success) << step.Diagnostic;
+    for (std::size_t i = 0; i < 10; ++i) EXPECT_NEAR(step.Values[i], i < 5 ? 0.1 : 0.9, 1e-9);
+    // Undamped L1 data with quadratic smoothness removes the outlier's pull except a residue.
+    std::vector<double> spike(11, 0.0);
+    spike[5] = 10;
+    auto robust = Fit(S::FitPenalty::Quadratic, S::FitPenalty::L1, 1.0);
+    robust.FitAlgorithm = S::FitSolver::Admm;
+    robust.PenaltyDelta = 0;
+    const auto cleaned = H::FitProperty(spike, 1, Path(11), robust);
+    ASSERT_TRUE(cleaned.Success) << cleaned.Diagnostic;
+    EXPECT_LT(cleaned.Values[5], 0.5);
+}
+
+TEST(VariationalFit, AdmmNoiseLevelReusesItsFactorization)
+{
+    std::mt19937 rng(23);
+    const std::size_t n = 40;
+    const auto edges = RandomGraph(n, rng);
+    std::normal_distribution<double> noise(0, 0.2);
+    std::vector<double> f(n);
+    for (std::size_t i = 0; i < n; ++i) f[i] = std::sin(0.3 * double(i)) + noise(rng);
+    auto p = Fit(S::FitPenalty::L1, S::FitPenalty::Quadratic, 1.0);
+    p.FitAlgorithm = S::FitSolver::Admm;
+    p.PenaltyDelta = 0;
+    p.FitTolerance = 1e-9;
+    p.Fidelity = S::FitFidelity::NoiseLevel;
+    p.NoiseLevel = 0.15;
+    const auto fit = H::FitProperty(f, 1, edges, p);
+    ASSERT_TRUE(fit.Success) << fit.Diagnostic;
+    EXPECT_EQ(fit.Stats.Factorizations, 1u);
+    EXPECT_FALSE(fit.Stats.NoiseTargetClamped);
+    EXPECT_NEAR(fit.Stats.RmsResidual, 0.15, 0.15 * 1e-3);
+}
+
+TEST(VariationalFit, ZeroDeltaNeedsAdmmAndNoHuberPenalty)
+{
+    const std::vector<double> f{0, 1, 0, 1};
+    auto p = Fit(S::FitPenalty::L1, S::FitPenalty::Quadratic, 1.0);
+    p.PenaltyDelta = 0;
+    EXPECT_FALSE(H::FitProperty(f, 1, Path(4), p).Success) << "reweighting weights 1/delta are undefined";
+    p.FitAlgorithm = S::FitSolver::Admm;
+    EXPECT_TRUE(H::FitProperty(f, 1, Path(4), p).Success);
+    p.DataPenalty = S::FitPenalty::Huber;
+    EXPECT_FALSE(H::FitProperty(f, 1, Path(4), p).Success) << "Huber with delta 0 is no penalty";
+    p.DataPenalty = S::FitPenalty::Quadratic;
+    p.MaxFitIterations = 1;
+    p.FitTolerance = 1e-14;
+    const auto slow = H::FitProperty(f, 1, Path(4), p);
+    EXPECT_FALSE(slow.Success);
+    EXPECT_TRUE(slow.Values.empty());
 }

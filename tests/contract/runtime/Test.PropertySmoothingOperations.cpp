@@ -276,8 +276,9 @@ TEST(PropertySmoothingOperations, ImplicitNonconvergenceLeavesOutputAndHistoryUn
 TEST(PropertySmoothingOperations, VariationalFitBindsPerRowBoundsAndReportsTheFit)
 {
     for (auto domain : {D::MeshVertex,D::GraphEdge,D::PointCloudPoint})
+    for (auto solver : {S::FitSolver::Reweighted,S::FitSolver::Admm})
     {
-        SCOPED_TRACE(int(domain));
+        SCOPED_TRACE(int(domain)*10+int(solver));
         SmoothingHarness h(domain);
         auto& props=h.Props();
         auto radii=props.GetOrAdd<float>("tolerance",0.25f);
@@ -288,9 +289,10 @@ TEST(PropertySmoothingOperations, VariationalFitBindsPerRowBoundsAndReportsTheFi
         h.Config.Filter.FitWeight=0.01;
         h.Config.Filter.Bound=S::FitBound::PerRow;
         h.Config.BoundRadii={domain,"tolerance",K::Float};
+        h.Config.Filter.FitAlgorithm=solver;
         const auto input=std::as_const(props).Get<double>("temperature").Vector();
         const auto result=h.Run(); ASSERT_TRUE(result.Succeeded()) << result.Message;
-        EXPECT_EQ(result.BackendId,"cpu_reference_sparse_cholesky");
+        EXPECT_EQ(result.BackendId,solver==S::FitSolver::Admm ? "cpu_admm_sparse_cholesky" : "cpu_reference_sparse_cholesky");
         EXPECT_GT(result.ActiveBounds,0u);
         EXPECT_GT(result.OperatorApplications,1u);
         EXPECT_NEAR(result.FitWeight,0.01,1e-15);
@@ -328,6 +330,7 @@ TEST(PropertySmoothingOperations, VariationalFitConfigRoundtripAndValidation)
     c.Filter.Fidelity=S::FitFidelity::NoiseLevel; c.Filter.FitWeight=3; c.Filter.NoiseLevel=0.02;
     c.Filter.PenaltyDelta=0.004; c.Filter.Bound=S::FitBound::PerRow; c.Filter.BoundRadius=0.7;
     c.Filter.MaxFitIterations=77; c.Filter.FitTolerance=1e-9; c.Filter.Laplacian=S::PropertyLaplacian::LumpedMass;
+    c.Filter.FitAlgorithm=S::FitSolver::Admm;
     c.BoundRadii={D::MeshVertex,"v:tolerance",K::Double};
     const auto payload=R::SerializePropertySmoothingConfig(c);
     const auto valid=registration.Validate(payload,{},R::kPropertySmoothingConfigSectionName);
@@ -337,8 +340,11 @@ TEST(PropertySmoothingOperations, VariationalFitConfigRoundtripAndValidation)
     for (const char* invalid : {"{\"method\":6}","{\"smoothness_penalty\":3}","{\"data_penalty\":3}","{\"fidelity\":2}",
              "{\"bound\":3}","{\"fit_weight\":0}","{\"noise_level\":-1}","{\"penalty_delta\":0}","{\"bound_radius\":-0.5}",
              "{\"max_fit_iterations\":0}","{\"fit_tolerance\":1}","{\"bound_radii\":5}",
-             "{\"method\":5,\"bound\":2}"})
+             "{\"method\":5,\"bound\":2}","{\"fit_solver\":2}","{\"penalty_delta\":0}",
+             "{\"fit_solver\":1,\"penalty_delta\":0,\"data_penalty\":1}","{\"max_fit_iterations\":100001}"})
         EXPECT_FALSE(registration.Validate(invalid,{},R::kPropertySmoothingConfigSectionName).Usable()) << invalid;
     // Unused per-row radius bindings are kept but not required.
     EXPECT_TRUE(registration.Validate("{\"method\":5,\"bound\":1}",{},R::kPropertySmoothingConfigSectionName).Usable());
+    EXPECT_TRUE(registration.Validate("{\"method\":5,\"fit_solver\":1,\"penalty_delta\":0,\"smoothness_penalty\":2}",{},
+        R::kPropertySmoothingConfigSectionName).Usable()) << "ADMM accepts undamped L1";
 }

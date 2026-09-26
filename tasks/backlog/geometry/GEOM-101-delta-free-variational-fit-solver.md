@@ -57,10 +57,19 @@ separately as a second-order penalty in
 
 ## Acceptance criteria
 
-- [ ] An ADMM backend minimizes the same energy (parity with IRLS for `delta > 0`) and the undamped L1/TV energy for `delta = 0`, and reports backend identity, iterations and primal/dual residuals.
-- [ ] Parity against the IRLS reference as delta shrinks, the two-row and step closed forms, and the perturbation-optimality test in `Test.VariationalFit.cpp`.
+- [x] An ADMM backend minimizes the same energy (parity with IRLS for `delta > 0`) and the undamped L1/TV energy for `delta = 0`, and reports backend identity, iterations and primal/dual residuals.
+- [x] Parity against the IRLS reference as delta shrinks, the two-row and step closed forms, and the perturbation-optimality test in `Test.VariationalFit.cpp`.
 - [ ] Optional Euclidean-ball tolerances for vector properties.
-- [ ] Smoke benchmark records iterations and runtime against IRLS on a kNN point cloud; `docs/methods/property-smoothing.md` limitations updated.
+- [x] Smoke benchmark records iterations and runtime against IRLS on a kNN point cloud; `docs/methods/property-smoothing.md` limitations updated.
+
+## Log
+
+- 2026-09-26: ADMM slice landed on `claude/variational-property-fit` as
+  `FitSolver::Admm` (one factorization per run, `delta = 0` allowed without
+  Huber). Parity with the reweighted reference is tested for every penalty and
+  bound pair; the solver-comparison smoke records both backends. Open: the
+  Euclidean-ball tolerance for vector properties; cut pursuit or
+  reconditioning as a later optimized backend.
 
 ## Engine integration
 
