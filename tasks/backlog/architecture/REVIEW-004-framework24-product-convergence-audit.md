@@ -105,6 +105,22 @@ See the [shared spatial-index consumer inventory](../../../docs/architecture/spa
       statements.
 - [ ] Record the exact revision-bound audit report under `docs/reports/`.
 
+## Gap audit input (2026-09-27)
+
+A source-level audit of Framework24's 252 library headers and viewer systems found
+the remaining method gaps and allocated them: METHOD-049/050, RUNTIME-273/UI-055
+(CPD with fast E-step and UI), RUNTIME-274/275, GEOM-104..108, and a priority note
+on GEOM-024. Recommended dispositions:
+- Orthodontic system: only 3 of 10 Framework24 handlers do anything (PCA jaw plane,
+  signed heightfield, local-maximum cusp candidates that are then discarded); the
+  others are stubs. Accept a superset through generic operations (PCA plane, signed
+  distance, `ScalarfieldExtrema`, harmonic fields, segmentation) instead of a port.
+- Not ported on purpose: least-squares embedding, convex cross-validation estimator,
+  iterative rotation alignment, vertex variance analysis (no paper, experimental or
+  broken); the permutohedral stub (GEOM-060 owns the real seam); grid Poisson
+  (data race; progressive Poisson supersedes it); simplex LP (unused); union
+  samplers, matrix helpers, split-path, plane/quad-to-mesh, PMP/AGI formats (trivial).
+
 ## Acceptance criteria
 
 - [ ] W1-W6 are all `Accepted` with no known unowned in-scope gap.

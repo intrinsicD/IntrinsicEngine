@@ -15,6 +15,7 @@ its dependencies, conditional gates, scope and verification.
 - [UI-048 — Editor opens empty, hides file operations under View, and never remembers layout](UI-048-first-run-workspace-and-layout-persistence.md)
 - [UI-049 — Editor panels are sized so that labels clip and results are hidden](UI-049-editor-panel-sizing-and-readability.md)
 - [UI-051 — A mesh does not pass as a graph or a point cloud in the domain windows](UI-051-domain-agnostic-appearance-properties-selection-windows.md)
+- [UI-055 — Coherent Point Drift editor panel](UI-055-coherent-point-drift-editor-panel.md)
 
 Completed and superseded work is recorded in the
 [retirement log](../../done/RETIREMENT-LOG.md) and Git history.
