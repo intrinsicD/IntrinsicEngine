@@ -160,6 +160,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-220` — Parked-worker wake count flakes under parallel CTest load (tasks/backlog/bugs/BUG-220-parked-worker-wake-count-flake.md)
 - unblocked: `BUG-221` — Vulkan shutdown LSan contract fails on NVIDIA 580.159.04 instance creation (tasks/backlog/bugs/BUG-221-vulkan-shutdown-lsan-nvidia-580-instance-leak.md)
 - unblocked: `BUG-222` — UV atlas smoke baseline output mismatch (tasks/backlog/bugs/BUG-222-uv-atlas-smoke-baseline-output-mismatch.md)
+- unblocked: `BUG-223` — Watershed extrema tests report zero basins (tasks/backlog/bugs/BUG-223-watershed-extrema-tests-report-zero-basins.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 
 ## Audits
