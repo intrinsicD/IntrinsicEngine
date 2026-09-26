@@ -42,6 +42,7 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.Segmentation.Patches.cppm
         Geometry.HalfedgeMesh.Segmentation.Multicut.cppm
         Geometry.HalfedgeMesh.DEC.cppm
+        Geometry.HalfedgeMesh.ModalAnalysis.cppm
         Geometry.HalfedgeMesh.Features.cppm
         Geometry.Geodesic.Types.cppm
         Geometry.HalfedgeMesh.Geodesic.cppm
@@ -167,6 +168,7 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.Segmentation.Multicut.cpp
         CurvatureBoundaryGraph.cpp
         Geometry.HalfedgeMesh.DEC.cpp
+        Geometry.HalfedgeMesh.ModalAnalysis.cpp
         Geometry.HalfedgeMesh.Features.cpp
         Geometry.HalfedgeMesh.Geodesic.cpp
         Geometry.HalfedgeMesh.Geodesic.VirtualSource.cpp

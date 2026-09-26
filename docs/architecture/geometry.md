@@ -167,6 +167,17 @@
   explicit shift (`NumericalIssue` otherwise). Spectra (MPL-2.0, like Eigen) was
   evaluated for GEOM-024 and rejected because it throws in 65 places and cannot
   build under the project-wide `-fno-exceptions` policy.
+- `Geometry.ModalAnalysis` assembles the operators of Hildebrandt et al., "Modal
+  shape analysis beyond Laplacian" (CAGD 2012) over mesh vertex slots: the modified
+  Dirichlet energy `A_ij = <N_i, N_j> S_ij` (exact cotan `S`, area-weighted unit
+  normals) and the rest-state Hessian `sum_i w_i grad f_i grad f_i^T` of the
+  discrete-shells energy (Grinspun et al. 2003; dihedral angle, edge length and
+  triangle area terms, 3#V rows with coordinate `c` of vertex `v` at `3v + c`).
+  Only first derivatives are used (the paper's Lemma 1); the Hessian keeps the six
+  rigid motions in its nullspace. `ComputeModalSignature` and `ComputeModalDistance`
+  evaluate the multi-scale signature `sum_j exp(-lambda_j t) |Phi_j(v)|^2` and the
+  log-scale distance of eq. 31 from any eigenpairs (the heat kernel signature for the
+  cotan Laplacian), with Sun et al.'s default scale range.
 - Optional SuiteSparse/CHOLMOD seams are deferred until CPU reference
   parity and benchmark manifests justify a second backend.
 - `Geometry.PCA` exports the closed-form symmetric 3×3 eigensolver
