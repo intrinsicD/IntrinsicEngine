@@ -89,4 +89,4 @@ For a before/after reproduction, apply only the same benchmark harness to
 The regression executes the built-in CPU FastStaged path. It adds no GPU
 evidence and does not measure parsing, runtime publication, rendering, or
 end-to-end import. BENCH-001 retains representative matched product timing and
-memory work. BUG-160 retains the separate chart-fragmentation defect.
+memory work. The separate chart-fragmentation defect (BUG-160) was closed on 2026-09-27 after METHOD-047.

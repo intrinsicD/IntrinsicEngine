@@ -9,6 +9,7 @@
 #include <numbers>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -1078,4 +1079,40 @@ TEST(UvAtlasQuality, PackingAlignsThinChartsToTexelCentersWithoutChangingDensity
   EXPECT_EQ(result.Diagnostics.ChartCount, 2u);
   EXPECT_LT(result.Diagnostics.Validation.MaxConformalDistortion, 1.01);
   EXPECT_LT(result.Diagnostics.Validation.MaxAreaDistortion, 1.01);
+}
+
+TEST(UvAtlasQuality, SmoothCurvedMeshesKeepFewChartsWithTheDefaultBackend) {
+  // BUG-160: fixed seed-plane growth once split smooth surfaces into roughly one
+  // chart per face (about 90k charts for 100k faces). The default FastStaged
+  // path must keep a handful of charts on smooth closed, genus-one and open
+  // surfaces, with no single-triangle charts.
+  IndexedMesh wave;
+  const std::uint32_t n = 40u;
+  for (std::uint32_t y = 0u; y <= n; ++y)
+    for (std::uint32_t x = 0u; x <= n; ++x) {
+      const float u = 4.0f * float(x) / float(n), v = 4.0f * float(y) / float(n);
+      (void)wave.AddVertex({u, v, 0.4f * std::sin(3.0f * u) * std::cos(2.0f * v)});
+    }
+  for (std::uint32_t y = 0u; y < n; ++y)
+    for (std::uint32_t x = 0u; x < n; ++x) {
+      const std::uint32_t a = y * (n + 1u) + x;
+      (void)wave.AddTriangle(a, a + 1u, a + n + 2u);
+      (void)wave.AddTriangle(a, a + n + 2u, a + n + 1u);
+    }
+  const std::vector<std::pair<const char *, IndexedMesh>> meshes{
+      {"sphere", MakeSphere(40u, 80u)}, {"torus", MakeTorus(80u, 30u)}, {"wave", wave}};
+  for (const auto &[name, mesh] : meshes) {
+    SCOPED_TRACE(name);
+    Atlas::UvAtlasOptions options{};
+    options.PreserveValidAuthoredUvs = false;
+    options.ForceRegenerate = true;
+    options.AllowXAtlasFallback = false;
+    ASSERT_EQ(options.Method, Atlas::UvAtlasMethod::FastStaged) << "the default backend is measured";
+    const auto result = Atlas::ResolveUvAtlas(InputFor(mesh), options);
+    ExpectAcceptedAtlas(mesh, result, options);
+    const auto &d = result.Diagnostics;
+    EXPECT_LE(d.ChartCount, 16u);
+    EXPECT_EQ(d.SingleTriangleChartCount, 0u);
+    EXPECT_LE(d.ChartCount * 200u, d.InputFaceCount) << "at least 200 faces per chart";
+  }
 }

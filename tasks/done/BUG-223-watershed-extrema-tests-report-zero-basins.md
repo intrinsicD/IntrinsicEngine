@@ -13,6 +13,30 @@ contract_review: Correctness diagnosis of an existing scalar-field method under 
 ---
 # BUG-223 — Watershed extrema tests report zero basins
 
+
+## Completion — 2026-09-27
+Commit: the enclosing `claude/bug-cleanup-224-223-160` commit records this
+retirement.
+
+Both tests pass on the canonical `ci` preset (Clang 23) and fail with Clang
+20.1.2, the hosted CI compiler (reproduced in `build/ci-clang20`). Root cause is
+a Clang 20 miscompile, not the watershed algorithm: `Extract` took
+`const Params& params = kScalarDefaults`, and Clang 20 folds every integral
+member read through a `const T&` parameter whose default argument names a
+constant to the default's value, even at `-O0` (the IR passes a literal `i32 0`
+for `params.Algorithm`; memory holds 1). `Algorithm` therefore always read
+`HessianRidge`, so the watershed branch never ran, and `MaximumNeighbors` and
+`MaximumWorkItems` were pinned to their defaults. A 10-line standalone repro
+(no modules) shows the same; `= {}` and `= T{}` defaults are unaffected, Clang 23
+is correct. This also affected the editor's Scalar Ridges operation in every
+Clang 20 build.
+
+Fix: the two `Extract` defaults became forwarding overloads, keeping every
+caller unchanged. Both tests pass under Clang 20 (19/19 in the file) and Clang
+23; the tests are unchanged. `tools/repo/check_compiler_hazards.py` (run in
+`ci-linux-clang.yml`, synthetic cases in `Test.CheckCompilerHazards.py`, run in
+`ci-docs.yml`) rejects the pattern repository-wide; no other occurrence exists.
+
 ## Goal
 
 Find why the watershed scalar-field extrema path reports no minima or basins
@@ -45,9 +69,9 @@ extraction) or an environment difference is not yet established.
 
 ## Acceptance criteria
 
-- [ ] Run both tests on the canonical `ci` preset and record whether they fail there.
-- [ ] If they fail: identify the first failing revision and the root cause in the watershed path, fix it, and keep both tests unchanged.
-- [ ] If they pass on `ci` only: identify the environment-dependent behavior (dependency version, uninitialized state or undefined behavior) and make the method independent of it.
+- [x] Run both tests on the canonical `ci` preset and record whether they fail there.
+- [x] If they fail: identify the first failing revision and the root cause in the watershed path, fix it, and keep both tests unchanged.
+- [x] If they pass on `ci` only: identify the environment-dependent behavior (dependency version, uninitialized state or undefined behavior) and make the method independent of it.
 
 ## Verification
 

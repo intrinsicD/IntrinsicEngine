@@ -16,10 +16,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 - [BUG-193 — GPU pacing and watchdog margin](BUG-193-gpu-pacing-and-watchdog-margin.md): controlled follow-up to the corrected Vulkan fixture budgets; preserve finite-work and backend assertions.
 
-- [`BUG-160` — FastStaged fixed seed planes fragment smooth meshes into tiny
-  charts](BUG-160-fast-staged-atlas-chart-fragmentation.md): the seed-normal and
-  seed-plane admission rule produced about 90k charts on a 100k-face
-  diagnostic and must be repaired or lose default selection after matched A/B.
 
 The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
@@ -62,6 +58,10 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 - Closed 2026-09-17: [BUG-203 — Manual geometry import frame budget](../../done/BUG-203-manual-import-frame-budget.md).
   Controlled 513-frame decode passes 25 repetitions with bounded completion waiting;
   full CPU gate passes, with explicit timeout failure and unchanged apply assertions.
+
+- Closed 2026-09-27: [`BUG-160` — FastStaged chart fragmentation](../../done/BUG-160-fast-staged-atlas-chart-fragmentation.md).
+  Superseded by METHOD-047's cone growth and fragment merging; smooth 50k–100k-face
+  meshes keep 3–11 charts (xatlas 1–16) and a frozen regression guards the bound.
 
 - Closed 2026-09-17: [BUG-202 — Duplicate dropped import frame budget](../../done/BUG-202-duplicate-drop-frame-budget.md).
   Reused bounded completion waiting; a real decode barrier reproduces the old

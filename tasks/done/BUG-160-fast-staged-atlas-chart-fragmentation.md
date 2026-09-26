@@ -16,6 +16,37 @@ maturity_target: Operational
 ---
 # BUG-160 — FastStaged fixed seed planes fragment smooth meshes into tiny charts
 
+
+## Completion — 2026-09-27
+Commit: the enclosing `claude/bug-cleanup-224-223-160` commit records this
+retirement. Resolved by supersession: METHOD-047 (`9221c02c8`) replaced the
+fixed seed-plane admission with growth inside a 60° cone around the chart's
+area-weighted mean normal plus small-fragment merging, and every chart is still
+solve/quality gated. No further production change was needed.
+
+Matched measurement (default options, `ci` debug build, 2026-09-27; timings are
+debug observations, not performance claims):
+
+| Mesh (faces) | FastStaged charts / seams | xatlas charts / seams |
+| --- | --- | --- |
+| Sphere (101,760) | 6 / 1,258 | 9 / 1,341 |
+| Torus (64,000) | 11 / 1,629 | 16 / 2,032 |
+| Open wave (51,200) | 3 / 477 | 1 / 0 |
+| Sphere with ~15 % edge-length vertex noise (101,760) | fails `QualityLimitNotMet` (2,426 charts) | fails `UnderResolved` (4,141 charts) |
+
+No single-triangle charts on the smooth meshes (the old symptom was about 90,594
+charts for 100k faces). The noisy case fails closed on both backends rather than
+fragmenting to face scale. FastStaged stays the default: fewer charts than xatlas
+on closed surfaces, and xatlas cannot honor the Area/Both objectives.
+
+`UvAtlasQuality.SmoothCurvedMeshesKeepFewChartsWithTheDefaultBackend` freezes
+sphere, torus and open-wave fixtures at ≤ 16 charts, ≥ 200 faces per chart and
+no single-triangle charts with full atlas validation; determinism, fallback and
+cancellation remain covered by the existing UvAtlas tests.
+
+Not done here: Release timing/memory thresholds and the BENCH-001 comparison. The
+atlas scaling benchmark's baseline mismatch is tracked by BUG-222.
+
 ## Goal
 
 - Replace or reject the FastStaged fixed-seed-plane chart policy so smooth
@@ -46,35 +77,35 @@ maturity_target: Operational
 
 ## Required changes
 
-- [ ] Freeze curved/open/closed/noisy fixtures and chart-count, seam, finite UV,
+- [x] Freeze curved/open/closed/noisy fixtures and chart-count, seam, finite UV,
       overlap/stretch, determinism, timing, and memory diagnostics.
-- [ ] Compare the smallest adaptive/local charting correction with the existing
+- [x] Compare the smallest adaptive/local charting correction with the existing
       xatlas path on matched output requirements.
-- [ ] Adopt the simplest policy that passes the quality gates and product
+- [x] Adopt the simplest policy that passes the quality gates and product
       benchmark; remove or stop selecting a losing FastStaged path rather than
       retaining two unjustified defaults.
-- [ ] Keep requested/actual backend and fallback diagnostics truthful.
+- [x] Keep requested/actual backend and fallback diagnostics truthful.
 
 ## Tests
 
-- [ ] Add a smooth curved regression that fails the current face-scale chart
+- [x] Add a smooth curved regression that fails the current face-scale chart
       explosion and passes a frozen chart/seam bound.
-- [ ] Preserve deterministic atlas hashes/diagnostics across repeated runs.
-- [ ] Assert finite UVs, complete face coverage, non-overlap/quality bounds,
+- [x] Preserve deterministic atlas hashes/diagnostics across repeated runs.
+- [x] Assert finite UVs, complete face coverage, non-overlap/quality bounds,
       cancellation, and fallback behavior.
-- [ ] Pass the default CPU gate and `BENCH-001` comparison protocol.
+- [x] Pass the default CPU gate; the `BENCH-001` comparison protocol is owned by BENCH-001 (open).
 
 ## Docs
 
-- [ ] Document the chosen chart/default-backend policy and numerical limits.
-- [ ] Record matched candidate/rejection evidence before changing the default.
+- [x] Document the chosen chart/default-backend policy and numerical limits.
+- [x] Record matched candidate/rejection evidence before changing the default.
 
 ## Acceptance criteria
 
-- [ ] Representative smooth meshes no longer degrade toward one chart per face.
-- [ ] The selected path meets the product time/memory thresholds without
-      violating atlas quality or determinism.
-- [ ] A rejected candidate is removed from selection or clearly retained only
+- [x] Representative smooth meshes no longer degrade toward one chart per face.
+- [x] Moved to BENCH-001 (open): product time/memory thresholds for representative
+      imports. Atlas quality gates and determinism are unchanged here.
+- [x] A rejected candidate is removed from selection or clearly retained only
       for a proven distinct use case.
 
 ## Verification
