@@ -34,6 +34,8 @@ its dependencies, conditional gates, scope and verification.
 - [METHOD-036 — Normal-orientation method comparison evidence (publication protocol)](METHOD-036-orientation-comparison-evidence.md)
 
 - [METHOD-048 — Full HKTex mesh textures and measured default adoption](METHOD-048-hktex-mesh-textures.md)
+- [METHOD-049 — Accelerated Coherent Point Drift E-step and low-rank nonrigid solve](METHOD-049-coherent-point-drift-accelerated-e-step.md)
+- [METHOD-050 — Bayesian Coherent Point Drift reference backend](METHOD-050-bayesian-coherent-point-drift-reference.md)
 
 Theme I remains paused behind REVIEW-004 except explicit operator direction
 and named product dependencies. A retired prerequisite does not prove a

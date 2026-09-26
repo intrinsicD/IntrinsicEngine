@@ -45,6 +45,11 @@ its dependencies, conditional gates, scope and verification.
 - [GEOM-097 — Vulkan continuous LOP projection](GEOM-097-vulkan-continuous-lop-projection.md)
 - [GEOM-098 — Vulkan anisotropic WLOP and EAR stages](GEOM-098-vulkan-anisotropic-wlop-and-ear.md)
 - [GEOM-103 — Measure the Vulkan smoothing backends and decide keep or remove](GEOM-103-vulkan-smoothing-backends-measure-and-decide.md)
+- [GEOM-104 — Per-point PCA geometric features](GEOM-104-point-pca-geometric-features.md)
+- [GEOM-105 — Octree level-of-detail point sampling](GEOM-105-octree-level-of-detail-sampling.md)
+- [GEOM-106 — Center-surround saliency of scalar properties](GEOM-106-center-surround-scalar-saliency.md)
+- [GEOM-107 — Wachspress, mean-value and modified-face-normal Laplacian weights](GEOM-107-additional-mesh-laplacian-weights.md)
+- [GEOM-108 — Small Framework24 parity helpers](GEOM-108-framework24-small-parity-helpers.md)
 
 Completed and superseded work is recorded in the
 [retirement log](../../done/RETIREMENT-LOG.md) and Git history.

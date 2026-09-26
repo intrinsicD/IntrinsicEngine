@@ -110,6 +110,15 @@ anticipates a Spectra-class addition).
 - [ ] Regenerate `docs/api/generated/module_inventory.md` if the module
       surface changes.
 
+## Priority note (2026-09-27 Framework24 gap audit)
+
+This is the only nontrivial numerical capability still missing relative to
+Framework24 (`bcg_sparse_matrix_eigendecomposition.h`, Spectra). It unblocks manifold
+harmonics and spectral filtering, HKS/WKS descriptors, SCP (METHOD-024) and cross
+fields (METHOD-006); raise its priority. Framework24 also has an eigendecomposition
+viewer (eigenvalue bar chart, eigenvector shown as a scalar field); allocate its
+editor follow-up once this seam lands.
+
 ## Acceptance criteria
 - [ ] `Geometry.Sparse` exposes a generalized symmetric eigensolver returning
       the k smallest eigenpairs with structured diagnostics.

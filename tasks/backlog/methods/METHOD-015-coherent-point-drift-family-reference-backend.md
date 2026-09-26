@@ -19,10 +19,14 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, method.e
 - Add a CPU reference method package for the Coherent Point Drift point-set registration family — rigid, affine, and nonrigid variants sharing one EM core — as the probabilistic complement to the existing deterministic `Geometry.Registration::AlignICP` pipeline.
 
 ## Non-goals
-- No Bayesian CPD in this task; it requires a separately allocated follow-up
-  method task if prioritized.
-- No fast Gauss transform, permutohedral, or low-rank acceleration — the reference is an explicit O(N·M) EM; optimized backends open only after reference parity (`GEOM-060` is the named lattice seam).
-- No editor/UI integration (a follow-up UI task can reuse the retired `UI-029` ICP-editor pattern).
+- No Bayesian CPD in this task; it is allocated as
+  [METHOD-050](METHOD-050-bayesian-coherent-point-drift-reference.md).
+- No fast Gauss transform, permutohedral, or low-rank acceleration — the reference is an explicit O(N·M) EM; the optimized backends are
+  [METHOD-049](METHOD-049-coherent-point-drift-accelerated-e-step.md), opened after reference parity.
+- No editor/UI integration here; it is allocated as
+  [RUNTIME-273](../runtime/RUNTIME-273-coherent-point-drift-editor-operation.md) and
+  [UI-055](../ui/UI-055-coherent-point-drift-editor-panel.md). Keep the result and
+  observer API sufficient for their step mode and live traces.
 - No claim that CPD supersedes ICP; both stay public with documented trade-offs.
 
 ## Context
@@ -79,11 +83,11 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, method.e
 | --- | --- |
 | Least-structured input | Two finite point-position spans on any compatible element domains, plus explicit variant and EM parameters. |
 | Compatible entity sources | Every canonical property/topology source satisfying the input above; binding is owned by METHOD-003A after reference acceptance and selection. |
-| RuntimeModule | Deferred to [METHOD-003A](METHOD-003A-spatial-query-reference-integration-intake.md), which allocates the concrete operation owner without widening this reference slice. |
-| Config/agent | Typed reference parameters now; METHOD-003A owns validated serializable engine controls at adoption. |
-| UI | METHOD-003A owns adoption/discovery planning; no editor-integrated claim from this CPU slice. |
-| Publication | Return the selected transform or slot-aligned displacement result; later adoption must separate source-transform application from explicit nonrigid property publication. METHOD-003A owns engine publication planning. |
-| End-to-end tests | Reference/oracle and method tests here; METHOD-003A allocates compatible-source/config/publication/UI coverage at adoption. |
+| RuntimeModule | [RUNTIME-273](../runtime/RUNTIME-273-coherent-point-drift-editor-operation.md) owns the editor operation. |
+| Config/agent | Typed reference parameters now; RUNTIME-273 owns `sandbox.coherent_point_drift`. |
+| UI | [UI-055](../ui/UI-055-coherent-point-drift-editor-panel.md). |
+| Publication | Return the selected transform or slot-aligned displacement result; RUNTIME-273 separates source-transform application from explicit nonrigid property publication. |
+| End-to-end tests | Reference/oracle and method tests here; RUNTIME-273/UI-055 own compatible-source/config/publication/UI coverage. |
 
 ## Spatial acceleration consideration
 
@@ -176,6 +180,7 @@ python3 tools/agents/validate_tasks.py --root tasks --strict
 
 ## Maturity
 - Target: `CPUContracted`. The CPU reference is the correctness oracle for
-  later optimized backends (fast Gauss transform via the `GEOM-060`
-  permutohedral seam, low-rank nonrigid) and for any separately scoped
-  Bayesian method; those open as distinct tasks per `AGENTS.md` §6.
+  the optimized backends in METHOD-049 (fast Gauss transform, low-rank
+  nonrigid, Nyström, bounded truncation) and for Bayesian CPD in METHOD-050.
+- Operator priority 2026-09-27: CPD is to be reimplemented completely, with the
+  fast method and a proper editor UI; this reference is the first link.
