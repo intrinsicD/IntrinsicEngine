@@ -56,7 +56,7 @@ namespace
 TEST(PropertySmoothingOperations, AllDomainsAndFiltersPublishWithUndoRedo)
 {
     for (auto domain : domains)
-        for (auto method : {S::PropertyFilter::Averaging,S::PropertyFilter::SpectralHeat,S::PropertyFilter::Taubin,S::PropertyFilter::Bilateral,S::PropertyFilter::Implicit})
+        for (auto method : {S::PropertyFilter::Averaging,S::PropertyFilter::SpectralHeat,S::PropertyFilter::Taubin,S::PropertyFilter::Bilateral,S::PropertyFilter::Implicit,S::PropertyFilter::VariationalFit})
         {
             SCOPED_TRACE(int(domain));
             SCOPED_TRACE(int(method));
@@ -271,4 +271,74 @@ TEST(PropertySmoothingOperations, ImplicitNonconvergenceLeavesOutputAndHistoryUn
     EXPECT_FALSE(h.Run().Succeeded());
     EXPECT_EQ(std::as_const(h.Props()).Get<double>("smooth").Vector(),before);
     EXPECT_FALSE(h.History.Undo().Succeeded());
+}
+
+TEST(PropertySmoothingOperations, VariationalFitBindsPerRowBoundsAndReportsTheFit)
+{
+    for (auto domain : {D::MeshVertex,D::GraphEdge,D::PointCloudPoint})
+    {
+        SCOPED_TRACE(int(domain));
+        SmoothingHarness h(domain);
+        auto& props=h.Props();
+        auto radii=props.GetOrAdd<float>("tolerance",0.25f);
+        radii[0]=0.f;
+        h.Config.Filter.Method=S::PropertyFilter::VariationalFit;
+        h.Config.Filter.SmoothnessPenalty=S::FitPenalty::L1;
+        h.Config.Filter.PenaltyDelta=1e-6;
+        h.Config.Filter.FitWeight=0.01;
+        h.Config.Filter.Bound=S::FitBound::PerRow;
+        h.Config.BoundRadii={domain,"tolerance",K::Float};
+        const auto input=std::as_const(props).Get<double>("temperature").Vector();
+        const auto result=h.Run(); ASSERT_TRUE(result.Succeeded()) << result.Message;
+        EXPECT_EQ(result.BackendId,"cpu_reference_sparse_cholesky");
+        EXPECT_GT(result.ActiveBounds,0u);
+        EXPECT_GT(result.OperatorApplications,1u);
+        EXPECT_NEAR(result.FitWeight,0.01,1e-15);
+        const auto output=std::as_const(props).Get<double>("smooth").Vector();
+        EXPECT_EQ(output[0],input[0]) << "a zero radius pins the row";
+        for (std::size_t i=0;i<output.size();++i) EXPECT_LE(std::abs(output[i]-input[i]),0.25+1e-9);
+        // The radius property guards the publication like the input does.
+        radii[1]=0.5f;
+        EXPECT_FALSE(h.History.Undo().Succeeded());
+        EXPECT_EQ(std::as_const(props).Get<double>("smooth").Vector(),output);
+        radii[1]=-1.f;
+        EXPECT_FALSE(h.Run().Succeeded());
+        h.Config.BoundRadii.Name="missing";
+        EXPECT_FALSE(R::PreviewEditorPropertySmoothingCommand(h.Commands(),h.Id(),h.Config).Enabled);
+    }
+}
+TEST(PropertySmoothingOperations, VariationalFitNoiseLevelMatchesTheResidual)
+{
+    SmoothingHarness h;
+    h.Config.Filter.Method=S::PropertyFilter::VariationalFit;
+    h.Config.Filter.Fidelity=S::FitFidelity::NoiseLevel;
+    h.Config.Filter.NoiseLevel=0.2;
+    h.Config.Filter.DataPenalty=S::FitPenalty::Huber;
+    h.Config.Filter.PenaltyDelta=0.5;
+    const auto result=h.Run(); ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_NEAR(result.RmsResidual,0.2,0.2*2e-4);
+    EXPECT_NE(result.Message.find("RMS residual"),std::string::npos);
+}
+TEST(PropertySmoothingOperations, VariationalFitConfigRoundtripAndValidation)
+{
+    const auto registration=R::MakePropertySmoothingConfigSectionRegistration();
+    R::PropertySmoothingConfig c;
+    c.Filter.Method=S::PropertyFilter::VariationalFit;
+    c.Filter.SmoothnessPenalty=S::FitPenalty::Huber; c.Filter.DataPenalty=S::FitPenalty::L1;
+    c.Filter.Fidelity=S::FitFidelity::NoiseLevel; c.Filter.FitWeight=3; c.Filter.NoiseLevel=0.02;
+    c.Filter.PenaltyDelta=0.004; c.Filter.Bound=S::FitBound::PerRow; c.Filter.BoundRadius=0.7;
+    c.Filter.MaxFitIterations=77; c.Filter.FitTolerance=1e-9; c.Filter.Laplacian=S::PropertyLaplacian::LumpedMass;
+    c.BoundRadii={D::MeshVertex,"v:tolerance",K::Double};
+    const auto payload=R::SerializePropertySmoothingConfig(c);
+    const auto valid=registration.Validate(payload,{},R::kPropertySmoothingConfigSectionName);
+    ASSERT_TRUE(valid.Usable()) << (valid.Diagnostics.empty() ? "" : valid.Diagnostics.front().Message);
+    EXPECT_EQ(valid.CanonicalPayloadJson,payload);
+    EXPECT_NE(R::SerializePropertySmoothingConfig({}).find("\"bound_radii\":null"),std::string::npos);
+    for (const char* invalid : {"{\"method\":6}","{\"smoothness_penalty\":3}","{\"data_penalty\":3}","{\"fidelity\":2}",
+             "{\"bound\":3}","{\"fit_weight\":0}","{\"noise_level\":-1}","{\"penalty_delta\":0}","{\"bound_radius\":-0.5}",
+             "{\"max_fit_iterations\":0}","{\"fit_tolerance\":1}","{\"bound_radii\":5}",
+             "{\"method\":5,\"bound\":2}"})
+        EXPECT_FALSE(registration.Validate(invalid,{},R::kPropertySmoothingConfigSectionName).Usable()) << invalid;
+    // Unused per-row radius bindings are kept but not required.
+    EXPECT_TRUE(registration.Validate("{\"method\":5,\"bound\":1}",{},R::kPropertySmoothingConfigSectionName).Usable());
 }

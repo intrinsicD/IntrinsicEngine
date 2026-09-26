@@ -133,11 +133,17 @@ export namespace Extrinsic::Runtime
         std::uint32_t Neighbors{12};
         double SpatialSigma{1.0};
         bool PreserveBoundary{false};
+        // Variational fit with FitBound::PerRow: nonnegative float/double radius per input row.
+        // An empty name serializes as null; the binding is only resolved when per-row bounds are used.
+        GeometryPropertyRef BoundRadii{GeometryElementDomain::MeshVertex, "", Geometry::PropertyValueKind::Double};
     };
     struct EditorPropertySmoothingResult
     {
         EditorCommandStatus Status{EditorCommandStatus::NoChange};
         std::size_t LiveCount{}, EdgeCount{}, OperatorApplications{};
+        // Variational fit only: data weight used, mass-weighted RMS residual and active bounds.
+        double FitWeight{}, RmsResidual{};
+        std::size_t ActiveBounds{};
         std::string BackendId{"cpu_reference"};
         std::string Message{};
         [[nodiscard]] bool Succeeded() const noexcept

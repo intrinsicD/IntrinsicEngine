@@ -2903,6 +2903,53 @@ TEST(SandboxProcessingPanels, FaceScalarGradientComputesAndShowsVectorfield)
     h.Engine->Run();
 }
 
+TEST(SandboxProcessingPanels, PropertySmoothingVariationalFitHonorsPerRowBounds)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a=mesh.AddVertex({0,0,0}), b=mesh.AddVertex({1,0,0}), c=mesh.AddVertex({0,1,0});
+    ASSERT_TRUE(mesh.AddTriangle(a,b,c));
+    GS::PopulateFromMesh(scene.Raw(),entity,mesh);
+    auto& vertices=scene.Raw().get<GS::Vertices>(entity).Properties;
+    vertices.GetOrAdd<double>("curvature",0.).Vector()={0,3,6};
+    vertices.GetOrAdd<float>("tolerance",0.f).Vector()={0.f,0.5f,0.5f};
+    R::PropertySmoothingConfig smoothing;
+    smoothing.Input={R::GeometryElementDomain::MeshVertex,"curvature",Geometry::PropertyValueKind::Double};
+    smoothing.Output={R::GeometryElementDomain::MeshVertex,"fitted",Geometry::PropertyValueKind::Double};
+    smoothing.Filter.Method=Geometry::Smoothing::PropertyFilter::VariationalFit;
+    smoothing.Filter.Bound=Geometry::Smoothing::FitBound::PerRow;
+    smoothing.BoundRadii={R::GeometryElementDomain::MeshVertex,"tolerance",Geometry::PropertyValueKind::Float};
+    auto config=h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto section=R::MakePropertySmoothingConfigSectionRegistration().DefaultSection;
+    section.PayloadJson=R::SerializePropertySmoothingConfig(smoothing);
+    Config::UpsertEngineConfigSection(config.AppSections,section);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene,entity));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.property_smoothing",true));
+    int frames=0;
+    bool requested=false;
+    h.Driver->OnFrame=[&](R::Engine& engine) {
+        ++frames;
+        auto* window=ImGui::FindWindowByName("Smooth Property");
+        if(window) { ImGui::SetWindowSize(window,{750,1200}); ImGui::SetWindowPos(window,{0,0}); ImGui::FocusWindow(window); }
+        if(window && frames==10) { ImGui::ActivateItemByID(window->GetID("Smooth property")); requested=true; }
+        const auto output=std::as_const(vertices).Get<double>("fitted");
+        if(output)
+        {
+            EXPECT_TRUE(requested);
+            EXPECT_EQ(output[0],0.0);
+            EXPECT_NEAR(output[1],3.0,0.5+1e-12);
+            EXPECT_NE(output[1],3.0);
+            EXPECT_NEAR(output[2],5.5,1e-12) << "the upper row is held at its bound";
+            engine.RequestExit();
+        }
+        if(frames>60) { ADD_FAILURE()<<"Variational fit did not publish"; engine.RequestExit(); }
+    };
+    h.Engine->Run();
+}
+
 TEST(SandboxProcessingPanels, PropertySmoothingExecutesConfiguredPropertyAndPublishes)
 {
     PanelHarness h;

@@ -1,5 +1,6 @@
 // Constrained harmonic, biharmonic and triharmonic interpolation and Poisson solves of 1..N-channel
-// signals on a nonnegative weighted graph, plus random-walker label propagation built on it.
+// signals on a nonnegative weighted graph, plus variational (robust, total-variation, bounded) fitting
+// and random-walker label propagation built on it.
 module;
 
 #include <cstddef>
@@ -56,6 +57,44 @@ export namespace Geometry::HarmonicField
                                std::span<const SoftConstraint> softRows = {},
                                std::span<const double> mass = {},
                                std::span<const double> source = {});
+
+    struct FitDiagnostics
+    {
+        std::size_t ReweightIterations{}, Solves{};
+        // (row, channel) bounds active at the solution.
+        std::size_t ActiveBounds{};
+        // Data weight used; the chosen one under FitFidelity::NoiseLevel.
+        double FitWeight{};
+        // sqrt(sum m |u - f|^2 / sum m) over rows that are not fixed.
+        double RmsResidual{};
+        double Energy{};
+        // NoiseLevel only: the target lies outside the residuals reachable in the weight bracket.
+        bool NoiseTargetClamped{};
+    };
+
+    struct FitResult
+    {
+        bool Success{};
+        std::string Diagnostic{};
+        std::vector<double> Values{};
+        FitDiagnostics Stats{};
+    };
+
+    // Variational fit of a 1..N-channel signal f (params.Method == VariationalFit):
+    //   minimize sum_edges w rho_s(|u_a - u_b|) + lambda sum_rows m rho_d(|u_i - f_i|)
+    //   subject to u = f on fixed rows and, if params.Bound is set, |u_ic - f_ic| <= radius_i.
+    // Norms are Euclidean over channels. Row masses m follow params.Laplacian: weighted degree
+    // (random walk; 1 for isolated rows), 1 (combinatorial) or lumpedMass. With quadratic
+    // penalties and no bound this is one implicit diffusion step (M + L / lambda) u = M f.
+    // Non-quadratic penalties are minimized by iteratively reweighted least squares, bounds by a
+    // primal-dual active set per channel; every step is a harmonic Solve. boundRadii: one
+    // nonnegative radius per row, required for FitBound::PerRow. Failure never returns values.
+    [[nodiscard]] FitResult FitProperty(std::span<const double> values, std::size_t channels,
+                                        std::span<const Smoothing::PropertyEdge> edges,
+                                        const Smoothing::PropertyFilterParams& params,
+                                        std::span<const std::size_t> fixedRows = {},
+                                        std::span<const double> lumpedMass = {},
+                                        std::span<const double> boundRadii = {});
 
     struct LabelResult
     {

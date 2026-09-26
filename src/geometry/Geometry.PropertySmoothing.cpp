@@ -19,9 +19,18 @@ namespace Geometry::Smoothing
 {
     bool ValidatePropertyFilterParams(const PropertyFilterParams& p) noexcept
     {
-        return p.Method <= PropertyFilter::Implicit && p.Laplacian <= PropertyLaplacian::LumpedMass &&
+        return p.Method <= PropertyFilter::VariationalFit && p.Laplacian <= PropertyLaplacian::LumpedMass &&
             p.Solver <= PropertySolver::ConjugateGradient &&
-            (p.Laplacian != PropertyLaplacian::LumpedMass || p.Method == PropertyFilter::Implicit) &&
+            (p.Laplacian != PropertyLaplacian::LumpedMass || p.Method == PropertyFilter::Implicit ||
+             p.Method == PropertyFilter::VariationalFit) &&
+            p.SmoothnessPenalty <= FitPenalty::L1 && p.DataPenalty <= FitPenalty::L1 &&
+            p.Fidelity <= FitFidelity::NoiseLevel && p.Bound <= FitBound::PerRow &&
+            std::isfinite(p.FitWeight) && p.FitWeight > 0 && p.FitWeight <= 1e12 &&
+            std::isfinite(p.NoiseLevel) && p.NoiseLevel > 0 &&
+            std::isfinite(p.PenaltyDelta) && p.PenaltyDelta > 0 &&
+            std::isfinite(p.BoundRadius) && p.BoundRadius >= 0 &&
+            p.MaxFitIterations >= 1 && p.MaxFitIterations <= 10000 &&
+            std::isfinite(p.FitTolerance) && p.FitTolerance > 0 && p.FitTolerance < 1 &&
             std::isfinite(p.TimeStep) && p.TimeStep > 0 &&
             std::isfinite(p.SolverTolerance) && p.SolverTolerance > 0 && p.SolverTolerance < 1 &&
             p.MaxSolverIterations > 0 && p.MaxSolverIterations <= 100000 &&
@@ -72,6 +81,8 @@ namespace Geometry::Smoothing
             result.Diagnostic = diagnostic;
             return result;
         };
+        if (p.Method == PropertyFilter::VariationalFit)
+            return fail("Variational fitting is solved by HarmonicField::FitProperty.");
         if (!ValidatePropertyFilterParams(p) || channels < 1 || channels > 4 || input.empty() || input.size() % channels)
             return fail("Invalid filter parameters or property shape.");
         if (!std::ranges::all_of(input, [](double x) { return std::isfinite(x); }))

@@ -180,6 +180,7 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.Smoothing.cpp
         Geometry.PropertySmoothing.cpp
         Geometry.HarmonicField.cpp
+        Geometry.HarmonicField.Fit.cpp
         Geometry.HalfedgeMesh.Subdivision.cpp
         Geometry.HalfedgeMesh.SubdivisionSqrt3.cpp
         Geometry.HalfedgeMesh.Utils.cpp

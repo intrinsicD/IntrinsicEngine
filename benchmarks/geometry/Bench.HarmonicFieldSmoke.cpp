@@ -13,8 +13,8 @@ namespace Intrinsic::Bench::Geometry
         using Edge = ::Geometry::Smoothing::PropertyEdge;
         // Harmonic fields on a path are linear between hard rows; interior biharmonic rows are
         // fourth differences, so four pins reproduce a cubic; a constant source gives a quadratic
-        // (Poisson); unit flux through a free path gives a zero-mean line (grounded Neumann); seeds
-        // split labels at the midpoint.
+        // (Poisson); unit flux through a free path gives a zero-mean line (grounded Neumann); a
+        // total-variation fit shrinks a step without blurring it; seeds split labels at the midpoint.
         constexpr std::size_t n = 2048, channels = 3;
         // The biharmonic system's condition number grows like rows^4, so the cubic runs on a
         // shorter path to keep the 1e-7 accuracy bound meaningful.
@@ -58,6 +58,21 @@ namespace Intrinsic::Bench::Geometry
             if (!neumann.Success) { metrics.Succeeded = false; return; }
             for (std::size_t i = 0; i < n; ++i)
                 metrics.MaxError = std::max(metrics.MaxError, std::abs(neumann.Values[i] - (0.5 - double(i) * h)));
+
+            // Total-variation fit of a unit step: each plateau of m rows moves 1 / (2 lambda m)
+            // toward the other and stays flat.
+            std::vector<double> step(nb, 0.0);
+            std::fill(step.begin() + nb / 2, step.end(), 1.0);
+            ::Geometry::Smoothing::PropertyFilterParams tv{.Method = ::Geometry::Smoothing::PropertyFilter::VariationalFit,
+                .Laplacian = ::Geometry::Smoothing::PropertyLaplacian::Combinatorial};
+            tv.SmoothnessPenalty = ::Geometry::Smoothing::FitPenalty::L1;
+            tv.PenaltyDelta = 1e-9; // bias ~ delta * rows; smaller deltas lose Cholesky accuracy (weights ~ 1 / delta)
+            tv.FitTolerance = 1e-12;
+            const auto fit = H::FitProperty(step, 1, shortPath, tv);
+            if (!fit.Success) { metrics.Succeeded = false; return; }
+            const double shift = 1.0 / double(nb);
+            for (std::size_t i = 0; i < nb; ++i)
+                metrics.MaxError = std::max(metrics.MaxError, std::abs(fit.Values[i] - (i < nb / 2 ? shift : 1.0 - shift)));
 
             std::vector<std::int32_t> labels(n, 0);
             labels[0] = 1; labels[n - 1] = 2;
