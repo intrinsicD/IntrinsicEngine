@@ -5,12 +5,16 @@ module;
 #include <cmath>
 #include <cstdint>
 #include <optional>
+#include <queue>
+#include <utility>
 #include <span>
 #include <vector>
 
 #include <glm/glm.hpp>
 
 module Geometry.BVH;
+
+import Geometry.Validation;
 
 namespace Geometry
 {
@@ -27,6 +31,11 @@ namespace Geometry
         [[nodiscard]] float CentroidAxis(const AABB& box, const std::uint8_t axis)
         {
             return (box.Min[axis] + box.Max[axis]) * 0.5f;
+        }
+
+        [[nodiscard]] float NodeDistanceSquared(const glm::vec3& p, const BVH::Node& node)
+        {
+            return static_cast<float>(SquaredDistance(node.Aabb, p));
         }
 
         [[nodiscard]] AABB ComputeBounds(const std::vector<AABB>& elementAabbs,
@@ -54,6 +63,16 @@ namespace Geometry
     {
         m_ElementAabbs = std::move(elementAabbs);
         return BuildFromOwned(params);
+    }
+
+    std::optional<BVHBuildResult> BVH::BuildFromPoints(std::span<const glm::vec3> points,
+        const BVHBuildParams& params)
+    {
+        std::vector<AABB> aabbs;
+        aabbs.reserve(points.size());
+        for (const glm::vec3& p : points)
+            aabbs.push_back(AABB{.Min = p, .Max = p});
+        return Build(std::move(aabbs), params);
     }
 
     void BVH::QueryAABB(const AABB& queryShape, std::vector<ElementIndex>& out) const
@@ -89,9 +108,10 @@ namespace Geometry
             return std::nullopt;
         }
 
+        // Non-finite coordinates would break nth_element's strict weak ordering.
         for (const AABB& box : m_ElementAabbs)
         {
-            if (!box.IsValid())
+            if (!Validation::IsValid(box))
                 return std::nullopt;
         }
 
@@ -187,6 +207,175 @@ namespace Geometry
             .ElementCount = m_ElementAabbs.size(),
             .NodeCount = m_Nodes.size(),
             .MaxDepthReached = maxDepthReached,
+        };
+    }
+
+    std::optional<BVHKNNResult> BVH::QueryKNN(const glm::vec3& query, const std::uint32_t k,
+        std::vector<ElementIndex>& outElementIndices) const
+    {
+        outElementIndices.clear();
+        if (m_Nodes.empty() || k == 0)
+        {
+            return std::nullopt;
+        }
+
+        using Candidate = std::pair<float, ElementIndex>; // dist2, element index
+        auto maxHeapCmp = [](const Candidate& a, const Candidate& b)
+        {
+            if (a.first != b.first) return a.first < b.first;
+            return a.second < b.second;
+        };
+
+        std::priority_queue<Candidate, std::vector<Candidate>, decltype(maxHeapCmp)> best(maxHeapCmp);
+        std::vector<NodeIndex> stack;
+        stack.push_back(0u);
+
+        std::size_t visitedNodes = 0;
+        std::size_t distanceEvaluations = 0;
+
+        while (!stack.empty())
+        {
+            const NodeIndex nodeIndex = stack.back();
+            stack.pop_back();
+            ++visitedNodes;
+
+            const Node& node = m_Nodes[nodeIndex];
+            const float nodeLowerBound = NodeDistanceSquared(query, node);
+            if (best.size() == k && nodeLowerBound > best.top().first)
+            {
+                continue;
+            }
+
+            if (node.IsLeaf)
+            {
+                const std::size_t end = static_cast<std::size_t>(node.FirstElement) + node.NumElements;
+                for (std::size_t i = node.FirstElement; i < end; ++i)
+                {
+                    const ElementIndex elementIndex = m_ElementIndices[i];
+                    const float dist2 = static_cast<float>(SquaredDistance(m_ElementAabbs[elementIndex], query));
+                    ++distanceEvaluations;
+
+                    if (best.size() < k)
+                    {
+                        best.emplace(dist2, elementIndex);
+                    }
+                    else if (dist2 < best.top().first || (dist2 == best.top().first && elementIndex < best.top().second))
+                    {
+                        best.pop();
+                        best.emplace(dist2, elementIndex);
+                    }
+                }
+                continue;
+            }
+
+            const Node& left = m_Nodes[node.Left];
+            const Node& right = m_Nodes[node.Right];
+            const float leftBound = NodeDistanceSquared(query, left);
+            const float rightBound = NodeDistanceSquared(query, right);
+
+            if (leftBound <= rightBound)
+            {
+                stack.push_back(node.Right);
+                stack.push_back(node.Left);
+            }
+            else
+            {
+                stack.push_back(node.Left);
+                stack.push_back(node.Right);
+            }
+        }
+
+        std::vector<Candidate> ordered;
+        ordered.reserve(best.size());
+        while (!best.empty())
+        {
+            ordered.push_back(best.top());
+            best.pop();
+        }
+
+        std::sort(ordered.begin(), ordered.end(), [](const Candidate& a, const Candidate& b)
+        {
+            if (a.first != b.first) return a.first < b.first;
+            return a.second < b.second;
+        });
+
+        outElementIndices.reserve(ordered.size());
+        for (const auto [dist2, index] : ordered)
+        {
+            static_cast<void>(dist2);
+            outElementIndices.push_back(index);
+        }
+
+        return BVHKNNResult{
+            .ReturnedCount = outElementIndices.size(),
+            .VisitedNodes = visitedNodes,
+            .DistanceEvaluations = distanceEvaluations,
+            .MaxDistanceSquared = ordered.empty() ? 0.0f : ordered.back().first,
+        };
+    }
+
+    std::optional<BVHRadiusResult> BVH::QueryRadius(const glm::vec3& query, const float radius,
+        std::vector<ElementIndex>& outElementIndices) const
+    {
+        RadiusQueryScratch scratch{};
+        return QueryRadius(query, radius, outElementIndices, scratch);
+    }
+
+    std::optional<BVHRadiusResult> BVH::QueryRadius(const glm::vec3& query, const float radius,
+        std::vector<ElementIndex>& outElementIndices, RadiusQueryScratch& scratch) const
+    {
+        outElementIndices.clear();
+        if (m_Nodes.empty() || !std::isfinite(radius) || radius < 0.0f)
+        {
+            return std::nullopt;
+        }
+
+        const float radius2 = radius * radius;
+
+        scratch.NodeStack.clear();
+        scratch.NodeStack.push_back(0u);
+
+        std::size_t visitedNodes = 0;
+        std::size_t distanceEvaluations = 0;
+
+        while (!scratch.NodeStack.empty())
+        {
+            const NodeIndex nodeIndex = scratch.NodeStack.back();
+            scratch.NodeStack.pop_back();
+            ++visitedNodes;
+
+            const Node& node = m_Nodes[nodeIndex];
+            if (NodeDistanceSquared(query, node) > radius2)
+            {
+                continue;
+            }
+
+            if (node.IsLeaf)
+            {
+                const std::size_t end = static_cast<std::size_t>(node.FirstElement) + node.NumElements;
+                for (std::size_t i = node.FirstElement; i < end; ++i)
+                {
+                    const ElementIndex elementIndex = m_ElementIndices[i];
+                    const float dist2 = static_cast<float>(SquaredDistance(m_ElementAabbs[elementIndex], query));
+                    ++distanceEvaluations;
+                    if (dist2 <= radius2)
+                    {
+                        outElementIndices.push_back(elementIndex);
+                    }
+                }
+                continue;
+            }
+
+            scratch.NodeStack.push_back(node.Left);
+            scratch.NodeStack.push_back(node.Right);
+        }
+
+        std::sort(outElementIndices.begin(), outElementIndices.end());
+
+        return BVHRadiusResult{
+            .ReturnedCount = outElementIndices.size(),
+            .VisitedNodes = visitedNodes,
+            .DistanceEvaluations = distanceEvaluations,
         };
     }
 }

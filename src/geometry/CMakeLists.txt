@@ -186,7 +186,6 @@ target_sources(${target_name}
         Geometry.HtexPatch.cpp
         Geometry.IO.cpp
         Geometry.ImplicitPlaneField.cpp
-        Geometry.KDTree.cpp
         Geometry.KMeans.cpp
         Geometry.Linalg.cpp
         Geometry.MarchingCubes.cpp

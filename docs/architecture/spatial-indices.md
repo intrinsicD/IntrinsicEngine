@@ -123,12 +123,15 @@ be finite and within +/-1e18; radii are finite, nonnegative and at most 1e18.
 The GPU caps points/queries at 2^20 and radius capacity at 1024; the CPU tree
 caps points at 2^24. Invalid CPU builds clear previous contents.
 
-This point index does not replace the existing CPU median-split `Geometry.BVH`
-used for face/edge bounds, or `Geometry.KDTree` consumers. It supplies nearest
-k-nearest and radius queries. Triangle distance, ray traversal and renderer
-scene acceleration require other primitives and traversal.
+This point index does not replace the CPU median-split `Geometry.BVH`. That
+tree stores tight bounds of arbitrary element boxes (faces, edge segments, or
+points as degenerate boxes) and provides overlap, k-nearest and radius
+queries against those boxes. `Geometry.KDTree` names the same type
+(`KDTree = BVH`); despite the name it is not a space-partitioning kd-tree.
+Triangle distance, ray traversal and renderer scene acceleration require
+other primitives and traversal.
 
-`Geometry.KDTree` and `Geometry.Octree` reject element boxes with non-finite
+`Geometry.BVH` and `Geometry.Octree` reject element boxes with non-finite
 coordinates or `Min > Max`; a failed build leaves an empty tree, never the
 previous hierarchy. Octree overlap queries use a growable traversal stack, so
 caller-chosen depth limits are not bounded by a fixed stack size.

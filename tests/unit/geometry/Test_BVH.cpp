@@ -2,6 +2,9 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
+#include <limits>
+#include <type_traits>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -9,6 +12,7 @@
 import Geometry.AABB;
 import Geometry.Sphere;
 import Geometry.BVH;
+import Geometry.KDTree;
 import Geometry.Properties;
 import Geometry.Ray;
 
@@ -106,4 +110,38 @@ TEST(BVH, QueryRayIncludesBoundaryCoincidentBoxes)
 
     EXPECT_NE(std::find(overlaps.begin(), overlaps.end(), 0u), overlaps.end());
     EXPECT_EQ(std::find(overlaps.begin(), overlaps.end(), 1u), overlaps.end());
+}
+
+TEST(BVH, KDTreeNamesAliasTheSharedTree)
+{
+    static_assert(std::is_same_v<Geometry::KDTree, Geometry::BVH>);
+    static_assert(std::is_same_v<Geometry::KDTreeBuildParams, Geometry::BVHBuildParams>);
+}
+
+TEST(BVH, RejectsInfiniteBoxesAndClearsPreviousTree)
+{
+    Geometry::BVH bvh;
+    std::vector<Geometry::AABB> boxes{{{0, 0, 0}, {1, 1, 1}}, {{2, 0, 0}, {3, 1, 1}}};
+    ASSERT_TRUE(bvh.Build(boxes).has_value());
+    boxes[1].Max.x = std::numeric_limits<float>::infinity();
+    EXPECT_FALSE(bvh.Build(boxes).has_value());
+    EXPECT_TRUE(bvh.Nodes().empty());
+}
+
+TEST(BVH, KnnAndRadiusUseElementBoxDistances)
+{
+    // Extended boxes along x; distances are to the boxes, not their centers.
+    std::vector<Geometry::AABB> boxes;
+    for (int i = 0; i < 40; ++i)
+        boxes.push_back({{float(i) * 3.0f, 0, 0}, {float(i) * 3.0f + 2.0f, 1, 1}});
+    Geometry::BVH bvh;
+    ASSERT_TRUE(bvh.Build(boxes).has_value());
+
+    const glm::vec3 query{10.5f, 0.5f, 0.5f}; // inside box 3 ([9,11]); box 4 starts at 12
+    std::vector<std::uint32_t> out;
+    ASSERT_TRUE(bvh.QueryKNN(query, 3, out).has_value());
+    EXPECT_EQ(out, (std::vector<std::uint32_t>{3, 4, 2}));
+    // Box 2 ends at x = 8, exactly 2.5 away: the radius boundary is inclusive.
+    ASSERT_TRUE(bvh.QueryRadius(query, 2.5f, out).has_value());
+    EXPECT_EQ(out, (std::vector<std::uint32_t>{2, 3, 4}));
 }
