@@ -15,9 +15,14 @@ params:
   solvers: [reweighted_reference, admm]
   exact_tv_step_rows: 128
   exact_tv_penalty_delta: 0.0
+  tgv_affine_fit_weight: 0.01
+  tgv_ramp_fit_weight: 5.0
+  tgv_second_order_weight: 4.0
+  tgv_ramp_noise_scale: 0.5
   warmup_iterations: 1
   measured_iterations: 1
-  # Diagnostics also gate status: relative_energy_delta <= 1e-6, exact_tv_step_error_linf <= 1e-9, admm_factorizations == 1.
+  # Diagnostics also gate status: relative_energy_delta <= 1e-6, exact_tv_step_error_linf <= 1e-9, admm_factorizations == 1,
+  # tgv_affine_error_linf <= 1e-6 and tgv_ramp_rms_error < tv_ramp_rms_error.
 metrics:
   - runtime_ms
   - quality_error_linf

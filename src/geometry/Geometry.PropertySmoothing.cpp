@@ -28,6 +28,10 @@ namespace Geometry::Smoothing
             std::isfinite(p.FitWeight) && p.FitWeight > 0 && p.FitWeight <= 1e12 &&
             std::isfinite(p.NoiseLevel) && p.NoiseLevel > 0 &&
             p.FitAlgorithm <= FitSolver::Admm && std::isfinite(p.PenaltyDelta) &&
+            p.BoundNorm <= FitBoundNorm::Euclidean && p.SmoothnessOrder <= FitOrder::Second &&
+            (p.BoundNorm == FitBoundNorm::PerChannel || p.FitAlgorithm == FitSolver::Admm) &&
+            (p.SmoothnessOrder == FitOrder::First || p.FitAlgorithm == FitSolver::Admm) &&
+            std::isfinite(p.SecondOrderWeight) && p.SecondOrderWeight > 0 &&
             (p.PenaltyDelta > 0 || (p.PenaltyDelta == 0 && p.FitAlgorithm == FitSolver::Admm &&
                                     p.SmoothnessPenalty != FitPenalty::Huber && p.DataPenalty != FitPenalty::Huber)) &&
             std::isfinite(p.BoundRadius) && p.BoundRadius >= 0 &&

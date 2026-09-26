@@ -35,6 +35,13 @@ export namespace Geometry::Smoothing
     // Iteratively reweighted least squares (reference; one factorization per iteration, delta > 0)
     // or ADMM (one factorization per run; also solves undamped L1 with delta = 0).
     enum class FitSolver : std::uint8_t { Reweighted, Admm };
+    // Bound on vector rows: every channel within the radius, or the Euclidean deviation (ADMM only).
+    enum class FitBoundNorm : std::uint8_t { PerChannel, Euclidean };
+    // First order penalizes rho_s(|u_a - u_b|). Second order (ADMM only) is non-local TGV: every row
+    // carries a gradient g from its sample position, and edges penalize
+    // rho_s(|u_a - u_b - <(g_a + g_b)/2, x_a - x_b>|) + SecondOrderWeight rho_s(h |g_a - g_b|),
+    // h the mean edge length, so affine fields cost nothing.
+    enum class FitOrder : std::uint8_t { First, Second };
 
     struct PropertyFilterParams
     {
@@ -58,6 +65,9 @@ export namespace Geometry::Smoothing
         double PenaltyDelta{0.01}; // property units; 0 only for ADMM without Huber penalties
         FitBound Bound{FitBound::None};
         double BoundRadius{0.1};   // property units
+        FitBoundNorm BoundNorm{FitBoundNorm::PerChannel};
+        FitOrder SmoothnessOrder{FitOrder::First};
+        double SecondOrderWeight{2.0}; // alpha0 / alpha1, dimensionless through h
         FitSolver FitAlgorithm{FitSolver::Reweighted};
         std::uint32_t MaxFitIterations{1000};
         // Reweighting: largest change between iterations; ADMM: primal and dual residuals.

@@ -95,6 +95,9 @@ namespace Extrinsic::Runtime
             if (doc.at("bound_radii").is_null()) c.BoundRadii.Name.clear();
             else ConfigDetail::DecodePointPropertyRef(doc.at("bound_radii"), c.BoundRadii);
             c.Filter.FitAlgorithm = S::FitSolver(doc.at("fit_solver").get<unsigned>());
+            c.Filter.BoundNorm = S::FitBoundNorm(doc.at("bound_norm").get<unsigned>());
+            c.Filter.SmoothnessOrder = S::FitOrder(doc.at("smoothness_order").get<unsigned>());
+            c.Filter.SecondOrderWeight = doc.at("second_order_weight").get<double>();
             c.Filter.MaxFitIterations = doc.at("max_fit_iterations").get<std::uint32_t>();
             c.Filter.FitTolerance = doc.at("fit_tolerance").get<double>();
             return c;
@@ -107,7 +110,8 @@ namespace Extrinsic::Runtime
             if (auto error = ConfigDetail::ValidatePointConfigFields(doc, merged,
                 "Smoothing config must be an object.", "Unknown smoothing field: ",
                 {"method", "weight", "laplacian", "solver", "iterations", "neighbors", "max_solver_iterations",
-                 "smoothness_penalty", "data_penalty", "fidelity", "bound", "fit_solver", "max_fit_iterations"}))
+                 "smoothness_penalty", "data_penalty", "fidelity", "bound", "fit_solver", "max_fit_iterations",
+                 "bound_norm", "smoothness_order"}))
                 return ConfigDetail::RejectConfigSection(subject, *error);
             for (const auto key : {"input", "output", "positions"})
             {
@@ -121,7 +125,8 @@ namespace Extrinsic::Runtime
                 ConfigDetail::ValidatePointPropertyRef(merged["bound_radii"], K::Double) != ConfigDetail::PointPropertyValidation::Valid)
                 return ConfigDetail::RejectConfigSection(subject, "bound_radii must be null or a float/double property reference.");
             for (const auto key : {"spatial_sigma", "lambda", "mu", "heat_time", "range_sigma", "time_step", "solver_tolerance",
-                                   "fit_weight", "noise_level", "penalty_delta", "bound_radius", "fit_tolerance"})
+                                   "fit_weight", "noise_level", "penalty_delta", "bound_radius", "fit_tolerance",
+                                   "second_order_weight"})
                 if (!merged[key].is_number() || !std::isfinite(merged[key].get<double>()))
                     return ConfigDetail::RejectConfigSection(subject, "Filter parameters must be finite numbers.");
             if (merged["method"].get<unsigned>() > unsigned(S::PropertyFilter::VariationalFit) ||
@@ -132,13 +137,15 @@ namespace Extrinsic::Runtime
                 merged["data_penalty"].get<unsigned>() > unsigned(S::FitPenalty::L1) ||
                 merged["fidelity"].get<unsigned>() > unsigned(S::FitFidelity::NoiseLevel) ||
                 merged["bound"].get<unsigned>() > unsigned(S::FitBound::PerRow) ||
-                merged["fit_solver"].get<unsigned>() > unsigned(S::FitSolver::Admm))
-                return ConfigDetail::RejectConfigSection(subject, "Unknown smoothing method, weight, Laplacian, solver, penalty, fidelity, bound or fit solver.");
+                merged["fit_solver"].get<unsigned>() > unsigned(S::FitSolver::Admm) ||
+                merged["bound_norm"].get<unsigned>() > unsigned(S::FitBoundNorm::Euclidean) ||
+                merged["smoothness_order"].get<unsigned>() > unsigned(S::FitOrder::Second))
+                return ConfigDetail::RejectConfigSection(subject, "Unknown smoothing method, weight, Laplacian, solver, penalty, fidelity, bound, fit solver, bound norm or smoothness order.");
             if (!merged["preserve_boundary"].is_boolean())
                 return ConfigDetail::RejectConfigSection(subject, "preserve_boundary must be boolean.");
             const auto c = Decode(merged);
             if (!S::ValidatePropertyFilterParams(c.Filter) || c.Neighbors < 1 || c.Neighbors > 1024 || c.SpatialSigma <= 0)
-                return ConfigDetail::RejectConfigSection(subject, "Invalid smoothing parameters: iterations 1..10000, neighbors 1..1024, lambda (0,1], mu [-1,0), heat time (0,1000], positive sigmas/time step, solver tolerance (0,1), solver iterations 1..100000, fit weight (0,1e12], positive noise level, penalty delta positive (0 only for ADMM without Huber), nonnegative bound radius, fit iterations 1..100000, fit tolerance (0,1).");
+                return ConfigDetail::RejectConfigSection(subject, "Invalid smoothing parameters: iterations 1..10000, neighbors 1..1024, lambda (0,1], mu [-1,0), heat time (0,1000], positive sigmas/time step, solver tolerance (0,1), solver iterations 1..100000, fit weight (0,1e12], positive noise level, penalty delta positive (0 only for ADMM without Huber), Euclidean bounds and second order only with ADMM, positive second-order weight, nonnegative bound radius, fit iterations 1..100000, fit tolerance (0,1).");
             if (PerRowBounds(c) && (c.BoundRadii.Name.empty() || c.BoundRadii.Domain != c.Input.Domain))
                 return ConfigDetail::RejectConfigSection(subject, "Per-row bounds need a float/double radius property on the input domain.");
             if (c.Input.Domain != c.Output.Domain || GeometryPropertyComponentCount(c.Input.ValueKind) != GeometryPropertyComponentCount(c.Output.ValueKind) ||
@@ -197,7 +204,9 @@ namespace Extrinsic::Runtime
             {"fidelity", unsigned(c.Filter.Fidelity)}, {"fit_weight", c.Filter.FitWeight}, {"noise_level", c.Filter.NoiseLevel},
             {"penalty_delta", c.Filter.PenaltyDelta}, {"bound", unsigned(c.Filter.Bound)}, {"bound_radius", c.Filter.BoundRadius},
             {"bound_radii", c.BoundRadii.Name.empty() ? Json(nullptr) : ConfigDetail::EncodePointPropertyRef(c.BoundRadii)},
-            {"fit_solver", unsigned(c.Filter.FitAlgorithm)}, {"max_fit_iterations", c.Filter.MaxFitIterations}, {"fit_tolerance", c.Filter.FitTolerance}}.dump();
+            {"fit_solver", unsigned(c.Filter.FitAlgorithm)}, {"max_fit_iterations", c.Filter.MaxFitIterations},
+            {"bound_norm", unsigned(c.Filter.BoundNorm)}, {"smoothness_order", unsigned(c.Filter.SmoothnessOrder)},
+            {"second_order_weight", c.Filter.SecondOrderWeight}, {"fit_tolerance", c.Filter.FitTolerance}}.dump();
     }
     Core::Config::EngineConfigSectionRegistration MakePropertySmoothingConfigSectionRegistration()
     { return {.DefaultSection = Section({}), .Validate = Validate}; }
@@ -264,8 +273,12 @@ namespace Extrinsic::Runtime
                 }, Capture(*props, c.BoundRadii).Values);
                 if (!valid) return fail("Bound radii must be finite and nonnegative.");
             }
+            // Second order measures gradients against the same sample points the graph was built from.
+            std::vector<double> positions;
+            if (c.Filter.SmoothnessOrder == S::FitOrder::Second)
+                for (const auto& point : samples.Points) positions.insert(positions.end(), {point.x, point.y, point.z});
             const auto fit = Geometry::HarmonicField::FitProperty(values, channels, graph.Edges, c.Filter,
-                                                                  graph.BoundaryRows, graph.Mass, radii);
+                                                                  graph.BoundaryRows, graph.Mass, radii, positions);
             filtered = {.Success = fit.Success, .Diagnostic = fit.Diagnostic, .Values = fit.Values,
                         .OperatorApplications = fit.Stats.Solves};
             result.FitWeight = fit.Stats.FitWeight;

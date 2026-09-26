@@ -2723,6 +2723,15 @@ namespace Extrinsic::Sandbox::Editor
             int smoothness = int(f.SmoothnessPenalty), data = int(f.DataPenalty), fidelity = int(f.Fidelity), bound = int(f.Bound);
             if (ImGui::Combo("Smoothness penalty", &smoothness, "Quadratic (Dirichlet)\0Huber\0L1 (total variation)\0"))
             { f.SmoothnessPenalty = S::FitPenalty(smoothness); changed = true; }
+            int order = int(f.SmoothnessOrder);
+            if (ImGui::Combo("Smoothness order", &order, "First (differences)\0Second (non-local TGV, ADMM)\0"))
+            {
+                f.SmoothnessOrder = S::FitOrder(order);
+                if (f.SmoothnessOrder == S::FitOrder::Second) f.FitAlgorithm = S::FitSolver::Admm;
+                changed = true;
+            }
+            if (f.SmoothnessOrder == S::FitOrder::Second)
+                changed |= ImGui::InputDouble("Second-order weight (alpha0/alpha1)", &f.SecondOrderWeight);
             if (ImGui::Combo("Data penalty", &data, "Quadratic\0Huber (robust)\0L1 (robust)\0"))
             { f.DataPenalty = S::FitPenalty(data); changed = true; }
             if (f.SmoothnessPenalty != S::FitPenalty::Quadratic || f.DataPenalty != S::FitPenalty::Quadratic)
@@ -2738,6 +2747,16 @@ namespace Extrinsic::Sandbox::Editor
                 changed = true;
             }
             if (f.Bound == S::FitBound::Uniform) changed |= ImGui::InputDouble("Bound radius (property units)", &f.BoundRadius);
+            if (f.Bound != S::FitBound::None && Runtime::GeometryPropertyComponentCount(config.Input.ValueKind) > 1)
+            {
+                int norm = int(f.BoundNorm);
+                if (ImGui::Combo("Bound shape", &norm, "Per channel (box)\0Euclidean (ball, ADMM)\0"))
+                {
+                    f.BoundNorm = S::FitBoundNorm(norm);
+                    if (f.BoundNorm == S::FitBoundNorm::Euclidean) f.FitAlgorithm = S::FitSolver::Admm;
+                    changed = true;
+                }
+            }
             if (f.Bound == S::FitBound::PerRow)
             {
                 changed |= DrawProcessingPropertyInput("Radius property##Smoothing", catalog, config.BoundRadii,

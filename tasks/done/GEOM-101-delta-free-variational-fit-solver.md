@@ -12,6 +12,15 @@ contracts: [method.engine-integration, geometry.element-domain-sources]
 ---
 # GEOM-101 — Delta-free variational-fit solver
 
+## Completion — 2026-09-26
+Commit: `6d81b54b9` (ADMM), merge `f012f9bb0`; ball bounds in the enclosing follow-up commit.
+ADMM solver merged to `main` in `f012f9bb0` (implementation `6d81b54b9`);
+Euclidean-ball bounds on `claude/variational-fit-follow-ups`, whose commit
+records this retirement. CPUContracted: ADMM parity with the reweighted
+reference is tested and smoke-gated; the reweighted solver remains the
+reference. Cut pursuit and reconditioning stay literature candidates, not
+scheduled work.
+
 ## Goal
 
 Solve the property-smoothing **Variational fit** (`HarmonicField::FitProperty`)
@@ -59,7 +68,7 @@ separately as a second-order penalty in
 
 - [x] An ADMM backend minimizes the same energy (parity with IRLS for `delta > 0`) and the undamped L1/TV energy for `delta = 0`, and reports backend identity, iterations and primal/dual residuals.
 - [x] Parity against the IRLS reference as delta shrinks, the two-row and step closed forms, and the perturbation-optimality test in `Test.VariationalFit.cpp`.
-- [ ] Optional Euclidean-ball tolerances for vector properties.
+- [x] Optional Euclidean-ball tolerances for vector properties.
 - [x] Smoke benchmark records iterations and runtime against IRLS on a kNN point cloud; `docs/methods/property-smoothing.md` limitations updated.
 
 ## Log
@@ -67,9 +76,9 @@ separately as a second-order penalty in
 - 2026-09-26: ADMM slice landed on `claude/variational-property-fit` as
   `FitSolver::Admm` (one factorization per run, `delta = 0` allowed without
   Huber). Parity with the reweighted reference is tested for every penalty and
-  bound pair; the solver-comparison smoke records both backends. Open: the
-  Euclidean-ball tolerance for vector properties; cut pursuit or
-  reconditioning as a later optimized backend.
+  bound pair; the solver-comparison smoke records both backends.
+- 2026-09-26: Euclidean-ball bounds added as `FitBoundNorm::Euclidean` (ADMM
+  only; scalar balls match the reweighted box reference).
 
 ## Engine integration
 
