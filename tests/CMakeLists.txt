@@ -1807,6 +1807,7 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
         SOURCES integration/graphics/Test.PointLBVHGpuSmoke.cpp
                 integration/graphics/Test.PointConstructionGpuSmoke.cpp
                 integration/graphics/Test.PropertySmoothingGpuSmoke.cpp
+                integration/graphics/Test.SparseSolveGpuSmoke.cpp
         DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
     )
     intrinsic_test_executable(IntrinsicPointLBVHGpuTests
@@ -1834,6 +1835,27 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
             ENVIRONMENT "LSAN_OPTIONS=detect_leaks=0;ASAN_OPTIONS=detect_leaks=0"
             LABELS "benchmark;geometry;runtime;gpu;vulkan" TIMEOUT 180
             FIXTURES_SETUP GEOM081VulkanPropertySmoothingBenchmark)
+        set(_runtime269_bench_dir "${CMAKE_BINARY_DIR}/benchmark-ctest/RUNTIME-269")
+        file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/benchmark-ctest/runtime269_vulkan_benchmark.sh"
+            CONTENT "#!/bin/sh\nmkdir -p \"$1\"\nINTRINSIC_RUNTIME269_BENCHMARK_OUTPUT=\"$1/runtime.sparse_cg.vulkan_parity.json\" exec \"$<TARGET_FILE:IntrinsicPointLBVHGpuTests>\" --gtest_filter=RUNTIME269VulkanSparseSolve.MatchesTheCpuConjugateGradientOnConsumerSystemsAndFailures\n"
+            FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+        add_test(NAME RUNTIME269VulkanSparseSolveBenchmark.Run
+            COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/benchmark/run_and_seal.py"
+                --executable "${CMAKE_BINARY_DIR}/benchmark-ctest/runtime269_vulkan_benchmark.sh"
+                --output "${_runtime269_bench_dir}"
+                --manifests-root "${CMAKE_SOURCE_DIR}/benchmarks"
+                --run-id "ctest-runtime269-vulkan-sparse-cg"
+                --attempt-id "attempt-001")
+        set_tests_properties(RUNTIME269VulkanSparseSolveBenchmark.Run PROPERTIES
+            ENVIRONMENT "LSAN_OPTIONS=detect_leaks=0;ASAN_OPTIONS=detect_leaks=0"
+            LABELS "benchmark;geometry;runtime;gpu;vulkan" TIMEOUT 180
+            FIXTURES_SETUP RUNTIME269VulkanSparseSolveBenchmark)
+        add_test(NAME RUNTIME269VulkanSparseSolveBenchmark.Validate
+            COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/benchmark/validate_benchmark_results.py"
+                --root "${_runtime269_bench_dir}" --strict)
+        set_tests_properties(RUNTIME269VulkanSparseSolveBenchmark.Validate PROPERTIES
+            LABELS "benchmark;geometry;runtime;gpu;vulkan" TIMEOUT 30
+            FIXTURES_REQUIRED RUNTIME269VulkanSparseSolveBenchmark)
         add_test(NAME GEOM081VulkanPropertySmoothingBenchmark.Validate
             COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/tools/benchmark/validate_benchmark_results.py"
                 --root "${_geom081_bench_dir}" --strict)
@@ -2882,6 +2904,8 @@ if(_intrinsic_registered_test_targets)
     string(APPEND _intrinsic_property_fixup_script
         "if(DEFINED IntrinsicPointLBVHGpuTests_TESTS)\n"
         "  set_tests_properties(GEOM081VulkanPropertySmoothing.ExplicitFiltersMatchTheCpuReferenceOnEveryDomainAndKind GEOM081VulkanPropertySmoothing.StaleInputRejectsPublication PROPERTIES TIMEOUT 120)\n"
+        "  set_tests_properties(RUNTIME269VulkanSparseSolve.MatchesTheCpuConjugateGradientOnConsumerSystemsAndFailures PROPERTIES TIMEOUT 120)\n"
+        "  set_tests_properties(GEOM089VulkanImplicitSmoothing.ConjugateGradientStepsMatchTheCpuReference PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(PointConstructionGpuSmoke.QueriesMatchReferenceAcrossDomainsAndGeneratedGeometryRenders PointConstructionGpuSmoke.StaleCancelledAndPartialSubmissionCreateNoEntity PROPERTIES TIMEOUT 180)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.NormalNeighborhoodsPublishAcrossDomainsAndRejectIncompleteSupport PROPERTIES TIMEOUT 120)\n"

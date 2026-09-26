@@ -1,7 +1,7 @@
 ---
 id: GEOM-103
 theme: I
-depends_on: [GEOM-081]
+depends_on: [GEOM-081, RUNTIME-269]
 template: micro
 workflow_schema: 1
 workflow_profile: micro
@@ -10,13 +10,14 @@ evidence_skip_reason: interactive backlog note split from GEOM-081; any resultin
 contract_schema: 1
 contracts: [method.engine-integration]
 ---
-# GEOM-103 — Stage timings for the Vulkan property filters
+# GEOM-103 — Stage timings for the Vulkan property filters and sparse CG
 
 ## Goal
 
-Measure what GEOM-081 left unmeasured: cold/warm transfer, compute and readback
-time and device memory of the Vulkan explicit property filters, against the CPU
-reference on representative sizes.
+Measure what GEOM-081 and RUNTIME-269 left unmeasured: cold/warm transfer, compute
+and readback time and device memory of the Vulkan property filters and the chunked
+device conjugate gradient (including chunk count and per-chunk readback latency),
+against the CPU reference on representative sizes.
 
 ## Context
 

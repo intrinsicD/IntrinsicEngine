@@ -13769,3 +13769,15 @@ tree:
     - ara/evidence/diagnostics/geom081_vulkan_property_filters_20260926/record.json
     - ara/evidence/diagnostics/geom081_vulkan_property_filters_20260926/sealed-result.json
     status: resolved
+
+  - id: N643
+    type: experiment
+    title: Solve consumer SPD systems with a device conjugate gradient and run implicit smoothing on it
+    provenance: ai-executed
+    timestamp: 2026-09-27T01:30+02:00
+    result: Operator-requested RUNTIME-269 adds a chunked double-precision Jacobi CG mirroring Sparse::SolveCG; its first consumer runs conjugate-gradient implicit smoothing on Vulkan. Status and iteration counts match the CPU on every tested system; converged solutions agree within 3.4e-16 relative. A single unchunked command buffer lost the device. C112 records the bounded claim.
+    also_depends_on: [N642]
+    evidence:
+    - ara/evidence/diagnostics/runtime269_vulkan_sparse_cg_20260927/record.json
+    - ara/evidence/diagnostics/runtime269_vulkan_sparse_cg_20260927/sealed-result.json
+    status: resolved

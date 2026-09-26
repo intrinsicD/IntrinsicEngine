@@ -44,7 +44,7 @@ its dependencies, conditional gates, scope and verification.
 - [GEOM-096 — Vulkan ICP accumulation and solve assessment](GEOM-096-vulkan-icp-accumulation-and-solve-assessment.md)
 - [GEOM-097 — Vulkan continuous LOP projection](GEOM-097-vulkan-continuous-lop-projection.md)
 - [GEOM-098 — Vulkan anisotropic WLOP and EAR stages](GEOM-098-vulkan-anisotropic-wlop-and-ear.md)
-- [GEOM-103 — Stage timings for the Vulkan property filters](GEOM-103-property-filter-vulkan-stage-timings.md)
+- [GEOM-103 — Stage timings for the Vulkan property filters and sparse CG](GEOM-103-property-filter-vulkan-stage-timings.md)
 
 Completed and superseded work is recorded in the
 [retirement log](../../done/RETIREMENT-LOG.md) and Git history.

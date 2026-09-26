@@ -1,0 +1,37 @@
+{
+  "tasks": ["RUNTIME-269", "GEOM-089 slice 1"],
+  "date": "2026-09-27",
+  "base_revision": "61208522b",
+  "environment": {
+    "device": "NVIDIA GeForce RTX 3050",
+    "driver": "NVIDIA 590.48.01",
+    "vulkan_api": "1.4.325",
+    "shader_float64": true,
+    "preset": "ci-vulkan",
+    "build_type": "Debug",
+    "compiler": "clang++-23",
+    "display": "Xephyr :7 nested in the locked desktop seat",
+    "render_validation": true,
+    "gpu_assisted_validation": "clean for RUNTIME269 and GEOM081 stale suites (VK_LAYER_ENABLES=VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT)"
+  },
+  "commands": [
+    "DISPLAY=:7 ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R 'RUNTIME269Vulkan|GEOM089Vulkan|GEOM081Vulkan' --timeout 180",
+    "python3 tools/benchmark/validate_benchmark_results.py --root build/ci-vulkan/benchmark-ctest/RUNTIME-269 --strict"
+  ],
+  "outcomes": {
+    "runtime269_systems": ["heat_step", "regularized_poisson", "implicit_three_warm_starts", "implicit_chained_steps", "max_iterations", "breakdown_zero_matrix", "non_finite"],
+    "runtime269_status_matches": true,
+    "runtime269_max_iteration_gap": 0,
+    "runtime269_converged_solves": 14,
+    "runtime269_max_relative_solution_delta": 3.434752482434078e-16,
+    "runtime269_chunks": 16,
+    "geom089_implicit_editor_cases": 24,
+    "geom089_implicit_max_relative_error": 3.42e-16,
+    "geom089_nonconvergence_publishes_nothing": true,
+    "stale_implicit_input_rejected": true,
+    "selected_vulkan_ctest": "8/8 passed"
+  },
+  "negative_finding": "Recording every iteration in one command buffer (over 10^5 dispatches) lost the device (VkResult -4); chunks of 2048 dispatches with status readback are used instead.",
+  "not_measured": "Stage timings, memory and chunk latency (GEOM-103); runtime_ms is frame-paced end-to-end time.",
+  "unsupported": "Complex Hermitian (vector heat), rectangular least squares, indefinite systems; no GPU factorization."
+}

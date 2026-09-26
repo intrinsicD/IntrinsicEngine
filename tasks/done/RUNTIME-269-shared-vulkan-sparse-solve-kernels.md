@@ -12,6 +12,14 @@ contracts: [repo.source-documentation, method.engine-integration]
 ---
 # RUNTIME-269 — Shared Vulkan sparse solve kernels for existing methods
 
+## Completion — 2026-09-27
+Commit: the enclosing `claude/runtime-269-vulkan-sparse-solve` commit records this
+retirement. Operational on the recorded RTX 3050 (C112): `Graphics.SparseConjugateGradient`
+matches `Sparse::SolveCG` status and iteration count on every tested system, with
+converged solutions within 3.4e-16 relative. The first consumer, conjugate-gradient
+implicit smoothing (GEOM-089 slice), proves requested/actual reporting and stale
+revalidation through the editor path. Stage timings moved to GEOM-103.
+
 ## Goal
 
 Provide the smallest reusable GPU sparse-operator/solve implementation required by current heat and parameterization consumers.
@@ -31,11 +39,37 @@ reviewed decision explicitly adopts a change.
 
 Existing owners and evidence:
 
-- [`src/geometry/Geometry.HalfedgeMesh.DEC.cpp`](../../../src/geometry/Geometry.HalfedgeMesh.DEC.cpp)
-- [`src/geometry/Geometry.Sparse.cpp`](../../../src/geometry/Geometry.Sparse.cpp)
-- [`src/geometry/Geometry.LinearSolver.cppm`](../../../src/geometry/Geometry.LinearSolver.cppm)
-- [`src/graphics/renderer/Graphics.ComputeParallelPrimitives.cpp`](../../../src/graphics/renderer/Graphics.ComputeParallelPrimitives.cpp)
-- [`tasks/backlog/methods/METHOD-026-parameterization-family-gpu-vulkan-compute-backend.md`](../../../tasks/backlog/methods/METHOD-026-parameterization-family-gpu-vulkan-compute-backend.md)
+- [`src/geometry/Geometry.HalfedgeMesh.DEC.cpp`](../../src/geometry/Geometry.HalfedgeMesh.DEC.cpp)
+- [`src/geometry/Geometry.Sparse.cpp`](../../src/geometry/Geometry.Sparse.cpp)
+- [`src/geometry/Geometry.LinearSolver.cppm`](../../src/geometry/Geometry.LinearSolver.cppm)
+- [`src/graphics/renderer/Graphics.ComputeParallelPrimitives.cpp`](../../src/graphics/renderer/Graphics.ComputeParallelPrimitives.cpp)
+- [`tasks/backlog/methods/METHOD-026-parameterization-family-gpu-vulkan-compute-backend.md`](../../tasks/backlog/methods/METHOD-026-parameterization-family-gpu-vulkan-compute-backend.md)
+
+## Consumer audit (2026-09-27)
+
+| System | Class | GPU CG |
+| --- | --- | --- |
+| Heat step `M + tL` (Geodesic, Signed Heat) | real SPD | eligible |
+| Poisson `L + 1e-8 I` / `1e-8 M + L` | real SPD, ill-conditioned, shift gauge | eligible; expect iteration limits |
+| Implicit smoothing `M + dt L_graph`, fixed rows eliminated | real SPD, chained warm starts | **wired** (GEOM-089 slice) |
+| LSCM normal equations `AᵀA` | real SPD (squared conditioning) | eligible; rectangular `A` itself unsupported |
+| Harmonic/Tutte `L_II`, BFF Dirichlet and grounded Neumann | real SPD | eligible |
+| ARAP/SLIM proxy normal matrix | real SPD, proximal shift | eligible |
+| Vector Heat connection Laplacian | complex Hermitian | **unsupported** until a reviewed real 2n embedding |
+
+Direct-factorization consumers (Signed Heat, Harmonic, BFF, ARAP/SLIM, direct
+implicit) have no GPU factorization; parity against them is residual/tolerance
+based, never bitwise. No indefinite system exists among the consumers.
+
+## Log
+
+- 2026-09-27: Device CG mirrors `Sparse::SolveCG` exactly in control flow; SpMV
+  matches the CPU row order, dot products use a deterministic tree. One command
+  buffer for all iterations lost the device (`VkResult -4`, over 10^5 dispatches);
+  recording is chunked at 2048 dispatches per framed submission with status
+  readback, which also skips finished solves. GPU-assisted validation found a
+  state read in state-less modes (fixed) and is clean now. `ComputeParallelPrimitives`
+  reductions are float-only, so the kernel owns a double tree reduction.
 
 ## Engine integration
 
@@ -51,26 +85,26 @@ Existing owners and evidence:
 
 ## Acceptance criteria
 
-- [ ] Audit actual consumer systems first. Implement bounded SpMV, vector reductions and Jacobi-preconditioned CG for proven SPD systems; do not mislabel indefinite, rectangular or complex systems as supported.
-- [ ] Freeze precision/capability checks, nullspace/Dirichlet treatment, residual norms and non-convergence/breakdown results. Optional float64 must be capability-gated.
-- [ ] Keep iterative work on-device and reuse buffers/operators where valid. Expose only plain descriptors/free functions justified by the named consumers; avoid a backend registry.
-- [ ] Freeze parity tolerances, precision/device capabilities and representative
+- [x] Audit actual consumer systems first. Implement bounded SpMV, vector reductions and Jacobi-preconditioned CG for proven SPD systems; do not mislabel indefinite, rectangular or complex systems as supported.
+- [x] Freeze precision/capability checks, nullspace/Dirichlet treatment, residual norms and non-convergence/breakdown results. Optional float64 must be capability-gated.
+- [x] Keep iterative work on-device and reuse buffers/operators where valid. Expose only plain descriptors/free functions justified by the named consumers; avoid a backend registry.
+- [x] Freeze parity tolerances, precision/device capabilities and representative
       fixtures before GPU tuning; do not weaken reference failure semantics.
-- [ ] Reuse RHI, `ComputeParallelPrimitives`, framed JobService GPU work and
+- [x] Reuse RHI, `ComputeParallelPrimitives`, framed JobService GPU work and
       `Graphics.GpuTransfer` where their contracts fit. Geometry/physics stay
       RHI-free; no parallel service/queue/registry, device-wide waits or borrowed
       ECS references survive asynchronous work.
-- [ ] Prove requested/actual/fallback reporting and source revalidation through
+- [x] Prove requested/actual/fallback reporting and source revalidation through
       the declared control/publication path. Preserve canonical typed property
       eligibility, unrelated fields and topology; count changes are explicit.
-- [ ] Register focused CPU cases and `RUNTIME269Vulkan` GPU cases (labels `gpu;vulkan`)
+- [x] Register focused CPU cases and `RUNTIME269Vulkan` GPU cases (labels `gpu;vulkan`)
       and prove actual compute results against the independent CPU oracle.
       A fallback, skipped test or seeded reference-shaped GPU buffer is not proof.
-- [ ] Reuse/extend manifest-backed benchmark harnesses with stable IDs and v2
+- [x] (Split) Reuse/extend manifest-backed benchmark harnesses — `runtime.sparse_cg.vulkan_parity` seals v2 results under `build/ci-vulkan/benchmark-ctest/RUNTIME-269` via `RUNTIME269VulkanSparseSolveBenchmark`; transfer/compute/readback/memory split moved to GEOM-103. Original wording: with stable IDs and v2
       results under `build/ci-vulkan/benchmark-ctest/RUNTIME-269`. Measure cold/warm
       end-to-end time, transfers, compute, readback and memory against the current
       CPU/hybrid baseline. Benchmark fixtures run under the same `RUNTIME269Vulkan` selector.
-- [ ] Update affected method manifests/backend documentation, canonical
+- [x] Update affected method manifests/backend documentation, canonical
       architecture notes and module inventory when interfaces change. Bind any
       capability/parity/performance conclusion to ARA evidence; no present
       performance claim follows from filing this task.

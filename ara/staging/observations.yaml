@@ -4239,3 +4239,15 @@ observations:
     promoted_to: logic/claims.md:C111
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O252
+    timestamp: 2026-09-27T01:30+02:00
+    provenance: ai-executed
+    content: A chunked device Jacobi CG reproduces Sparse::SolveCG status and iteration counts on heat, regularized Poisson, implicit-smoothing, chained, iteration-limit, breakdown and non-finite systems, with converged solutions within 3.4e-16 relative; implicit smoothing through it matches the CPU CG reference over 24 editor-path runs.
+    context: One device and driver; dot products use a tree order, so agreement is within rounding, not bitwise. Unchunked recording lost the device.
+    potential_type: claim
+    bound_to: [N643]
+    promoted: true
+    promoted_to: logic/claims.md:C112
+    crystallized_via: artifact-commitment
+    stale: false

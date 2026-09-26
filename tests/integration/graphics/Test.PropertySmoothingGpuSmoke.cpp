@@ -60,6 +60,8 @@ namespace
         Runtime::PropertySmoothingConfig Config;
         std::size_t Entity{};
         bool Stale{}; // edit the input while the GPU job is pending
+        double Bound{1e-12}; // max |gpu - cpu| relative to max(1, max |input|)
+        bool ExpectFailure{};
     };
 
     class SmoothingApp final : public Intrinsic::Tests::RuntimeTestModule
@@ -202,10 +204,55 @@ namespace
                 scalar.Weight = S::PropertyWeight::MeshUniform;
                 Cases.push_back({"grid_float_method" + std::to_string(int(method)), scalar, 8});
             }
+            if (ImplicitOnly)
+            {
+                // GEOM-089: implicit smoothing through the device conjugate gradient (RUNTIME-269).
+                Cases.clear();
+                const auto implicit = [&](Runtime::PropertySmoothingConfig c) {
+                    c.Filter.Method = S::PropertyFilter::Implicit;
+                    c.Filter.Solver = S::PropertySolver::ConjugateGradient;
+                    c.Filter.Iterations = 3;
+                    c.Filter.TimeStep = 2.0;
+                    c.Filter.SolverTolerance = 1e-10;
+                    return c;
+                };
+                for (std::size_t d = 0; d < 8; ++d)
+                    for (const auto laplacian : {S::PropertyLaplacian::RandomWalk, S::PropertyLaplacian::Combinatorial})
+                        Cases.push_back({"implicit_domain" + std::to_string(d + 1) + "_laplacian" + std::to_string(int(laplacian)),
+                                         implicit(make(Domain(d + 1), "signal", K::Double, S::PropertyFilter::Averaging, laplacian)), d, false, 1e-9});
+                Cases.push_back({"implicit_vec4", implicit(make(Domain::PointCloudPoint, "flow", K::Vec4, S::PropertyFilter::Averaging,
+                                                                  S::PropertyLaplacian::RandomWalk)), 7, false, 1e-9});
+                for (const auto laplacian : {S::PropertyLaplacian::LumpedMass, S::PropertyLaplacian::Combinatorial})
+                    for (const auto weight : {S::PropertyWeight::Cotangent, S::PropertyWeight::MeshUniform})
+                    {
+                        auto g = implicit(make(Domain::MeshVertex, "uv", K::Vec2, S::PropertyFilter::Averaging, laplacian));
+                        g.Positions = {Domain::MeshVertex, "v:position", K::Vec3};
+                        g.Weight = weight;
+                        g.PreserveBoundary = true;
+                        Cases.push_back({"implicit_grid_uv_laplacian" + std::to_string(int(laplacian)) + "_weight" + std::to_string(int(weight)), g, 8, false, 1e-9});
+                    }
+                auto positions = implicit(make(Domain::MeshVertex, "v:position", K::Vec3, S::PropertyFilter::Averaging, S::PropertyLaplacian::LumpedMass));
+                positions.Positions = {Domain::MeshVertex, "v:position", K::Vec3};
+                positions.Weight = S::PropertyWeight::Cotangent;
+                positions.PreserveBoundary = true;
+                Cases.push_back({"implicit_grid_positions", positions, 8, false, 1e-9});
+                auto scalar = implicit(make(Domain::MeshVertex, "heat", K::Float, S::PropertyFilter::Averaging, S::PropertyLaplacian::RandomWalk));
+                scalar.Positions = {Domain::MeshVertex, "v:position", K::Vec3};
+                scalar.Weight = S::PropertyWeight::MeshUniform;
+                Cases.push_back({"implicit_grid_float", scalar, 8, false, 1e-9});
+                auto stalled = implicit(make(Domain::GraphNode, "signal", K::Double, S::PropertyFilter::Averaging, S::PropertyLaplacian::Combinatorial));
+                stalled.Filter.MaxSolverIterations = 1;
+                stalled.Filter.SolverTolerance = 1e-14;
+                Cases.push_back({"implicit_nonconvergence", stalled, 4, false, 0.0, true});
+            }
             if (StaleOnly)
             {
                 auto c = make(Domain::GraphNode, "signal", K::Double, S::PropertyFilter::Taubin, S::PropertyLaplacian::RandomWalk);
-                Cases = {{"stale_input", c, 4, true}};
+                auto implicit = c;
+                implicit.Filter.Method = S::PropertyFilter::Implicit;
+                implicit.Filter.Solver = S::PropertySolver::ConjugateGradient;
+                implicit.Output.Name = "gpu_implicit_out";
+                Cases = {{"stale_input", c, 4, true}, {"stale_implicit_input", implicit, 4, true}};
             }
         }
 
@@ -311,6 +358,17 @@ namespace
                 EXPECT_FALSE(Props(current.Entity, c.Output.Domain).Exists(c.Output.Name)) << "stale work must not publish";
                 return;
             }
+            if (current.ExpectFailure)
+            {
+                EXPECT_EQ(gpu.Status, Runtime::EditorCommandStatus::GeometryProcessingFailed) << gpu.Message;
+                EXPECT_FALSE(Props(current.Entity, c.Output.Domain).Exists(c.Output.Name)) << "a failed solve must not publish";
+                auto reference = c;
+                reference.Backend = Runtime::PropertySmoothingBackend::Cpu;
+                EXPECT_FALSE(Runtime::ApplyEditorPropertySmoothingCommand(Runtime::BindEditorProcessingCommands(Context),
+                    Runtime::SelectionController::ToStableEntityId(Entities[current.Entity]), reference).Succeeded());
+                ++Compared;
+                return;
+            }
             ASSERT_TRUE(gpu.Succeeded()) << current.Name << ": " << gpu.Message;
             EXPECT_EQ(gpu.RequestedBackend, Runtime::PropertySmoothingBackend::Vulkan);
             EXPECT_EQ(gpu.BackendId, "vulkan_compute") << current.Name;
@@ -336,7 +394,7 @@ namespace
             for (std::size_t j = 0; j < cpuValues.size(); ++j) error = std::max(error, std::abs(cpuValues[j] - gpuValues[j]));
             const bool bilateral = c.Filter.Method == S::PropertyFilter::Bilateral;
             (bilateral ? MaxBilateralError : MaxLinearError) = std::max(bilateral ? MaxBilateralError : MaxLinearError, error / std::max(range, 1.0));
-            EXPECT_LE(error, 1e-12 * std::max(range, 1.0)) << current.Name;
+            EXPECT_LE(error, current.Bound * std::max(range, 1.0)) << current.Name;
             if (c.Output.Name != c.Input.Name)
             {
                 RemoveOutput(current.Entity, reference.Output);
@@ -357,7 +415,7 @@ namespace
         std::chrono::steady_clock::time_point Started{}, PhaseStarted{};
         std::size_t Next{}, Compared{}, Frames{};
         double MaxLinearError{}, MaxBilateralError{}, GpuMs{}, CpuMs{};
-        bool Waiting{}, Done{}, TimedOut{}, StaleOnly{};
+        bool Waiting{}, Done{}, TimedOut{}, StaleOnly{}, ImplicitOnly{};
     };
 
     bool Prepare(Extrinsic::Core::Config::EngineConfig& config)
@@ -424,4 +482,25 @@ TEST(GEOM081VulkanPropertySmoothing, StaleInputRejectsPublication)
     ASSERT_TRUE(engine.GetDevice().IsOperational());
     ASSERT_FALSE(run->TimedOut);
     ASSERT_TRUE(run->Done);
+}
+
+TEST(GEOM089VulkanImplicitSmoothing, ConjugateGradientStepsMatchTheCpuReference)
+{
+    Extrinsic::Core::Config::EngineConfig config;
+    if (!Prepare(config)) GTEST_SKIP() << "GLFW unavailable";
+    auto app = std::make_unique<SmoothingApp>();
+    auto* run = app.get();
+    run->ImplicitOnly = true;
+    Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(app));
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.Initialize();
+    Shutdown shutdown{engine};
+    if (!engine.GetDevice().SupportsShaderFloat64()) GTEST_SKIP() << "Shader float64 unavailable";
+    engine.Run();
+    ASSERT_TRUE(engine.GetDevice().IsOperational());
+    ASSERT_FALSE(run->TimedOut);
+    ASSERT_TRUE(run->Done);
+    EXPECT_EQ(run->Compared, run->Cases.size());
+    std::printf("GEOM-089 implicit parity: %zu cases, max relative error %.3g; GPU %.1f ms, CPU %.1f ms\n",
+                run->Compared, run->MaxLinearError, run->GpuMs, run->CpuMs);
 }

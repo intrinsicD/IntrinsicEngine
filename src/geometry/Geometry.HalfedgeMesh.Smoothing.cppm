@@ -18,6 +18,7 @@ export import Geometry.Smoothing.Types;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.DEC;
+export import Geometry.Sparse;
 
 export namespace Geometry::Smoothing
 {
@@ -53,6 +54,20 @@ export namespace Geometry::Smoothing
         std::span<const PropertyEdge> edges, const PropertyFilterParams& params,
         std::span<const std::size_t> fixedRows, std::span<const double> lumpedMass,
         std::string& diagnostic);
+    // Backward-Euler system of the implicit filter, assembled once per run with fixed rows
+    // eliminated into identity rows. Every step and channel c solves
+    //   Matrix x = RhsDiagonal * x_previous + RhsConstant[c * rows ...]
+    // starting from x_previous; RhsDiagonal is the row mass (0 on fixed rows) and RhsConstant the
+    // coupling to fixed rows (their input value on fixed rows). Shared by the CPU solvers and GPU
+    // backends so both solve the same system.
+    struct PropertyImplicitSystem
+    {
+        Sparse::SparseMatrix Matrix{};
+        std::vector<double> RhsDiagonal{}, RhsConstant{};
+    };
+    [[nodiscard]] std::optional<PropertyImplicitSystem> AssemblePropertyImplicitSystem(
+        const PropertyFilterPlan& plan, std::span<const double> values, std::span<const PropertyEdge> edges,
+        const PropertyFilterParams& params, std::span<const double> lumpedMass, std::string& diagnostic);
     // Restores fixed and isolated rows to their input and rejects non-finite results; shared by
     // FilterProperty and GPU backends so both publish under the same rules.
     [[nodiscard]] PropertyFilterResult CompletePropertyFilter(const PropertyFilterPlan& plan,

@@ -36,6 +36,18 @@ Existing owners and evidence:
 - [`src/geometry/Geometry.HalfedgeMesh.VectorHeatMethod.cpp`](../../../src/geometry/Geometry.HalfedgeMesh.VectorHeatMethod.cpp)
 - [`src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp`](../../../src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp)
 
+## Log
+
+- 2026-09-27: Slice 1 (implicit Laplacian smoothing) landed on
+  `claude/runtime-269-vulkan-sparse-solve`: conjugate-gradient implicit smoothing
+  runs on Vulkan through RUNTIME-269, with the backward-Euler system assembled once by
+  the shared `AssemblePropertyImplicitSystem`. `GEOM089VulkanImplicitSmoothing`
+  matches the CPU CG reference within 3.4e-16 relative over 24 editor-path runs,
+  including non-convergence (no publication) and stale input. Direct (Cholesky)
+  implicit stays CPU-only. Remaining slices: heat geodesics (A/B systems), signed
+  heat (C/D, LDLT oracle), vector heat (complex Hermitian; needs a reviewed real
+  embedding before any GPU claim).
+
 ## Engine integration
 
 | Field | Disposition |

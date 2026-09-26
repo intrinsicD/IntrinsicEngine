@@ -1,0 +1,77 @@
+{
+  "attempt_id": "attempt-001",
+  "backend": "gpu_vulkan_compute",
+  "benchmark_id": "runtime.sparse_cg.vulkan_parity",
+  "claim_eligible": false,
+  "commit": "local-dev",
+  "config_digest": "0d8c9a239e5ac8839f7dfe5bf3762fc0da7cb1bb8a109416b7f30d76e58eb7f1",
+  "dataset": "builtin.sparse_cg.consumer_systems.seed269",
+  "diagnostics": {
+    "chunks": 16,
+    "converged_solves": 14,
+    "cpu_reference_total_ms": 33.780851999999996,
+    "cpu_stages": "matrix assembly, CSR narrowing, upload",
+    "max_iteration_gap": 0.0,
+    "measured_iterations": 1,
+    "mode": "smoke",
+    "runner": "IntrinsicPointLBVHGpuTests",
+    "speedup_claimed": false,
+    "warmup_iterations": 0
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/sparse_cg_vulkan_parity.yaml",
+    "sha256": "47ad0ecdb1dbe33f1bba40668f3660a2cb20ba8dfaf0a5ded2082749d0cf0a3f"
+  },
+  "method": "geometry.sparse_cg",
+  "metrics": {
+    "quality_error_linf": 3.434752482434078e-16,
+    "runtime_ms": 4763.758991
+  },
+  "resolved_params": {
+    "backend": "vulkan_compute",
+    "capability": "shader_float64",
+    "chunk_dispatches": 2048,
+    "graph_rows": 300,
+    "heat_grid": "18x18",
+    "intent": "correctness",
+    "max_iterations": 2000,
+    "measured_iterations": 1,
+    "preconditioner": "jacobi",
+    "systems": [
+      "heat_step",
+      "regularized_poisson",
+      "implicit_three_warm_starts",
+      "implicit_chained_steps",
+      "max_iterations",
+      "breakdown_zero_matrix",
+      "non_finite"
+    ],
+    "tolerance": 1e-08,
+    "warmup_iterations": 0
+  },
+  "run_id": "ctest-runtime269-vulkan-sparse-cg",
+  "schema_version": 2,
+  "source": {
+    "revision": "local-dev",
+    "state": "dirty_worktree"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 1e-06,
+      "metric": "quality_error_linf",
+      "observed": 3.434752482434078e-16,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_linf_max"
+    }
+  ],
+  "thresholds": {
+    "quality_error_linf_max": 1e-06
+  },
+  "warmup_policy": {
+    "measured_iterations": 1,
+    "warmup_iterations": 0
+  }
+}
