@@ -2,11 +2,13 @@
 module;
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 export module Extrinsic.Runtime.GeodesicsConfig;
 export import Extrinsic.Runtime.GeometryProperty.Types;
+export import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 export namespace Extrinsic::Runtime
@@ -35,4 +37,5 @@ export namespace Extrinsic::Runtime
     void SetGeodesicsConfig(Core::Config::EngineConfig& config, const GeodesicsConfig& value);
     [[nodiscard]] Core::Config::EngineConfigSectionRegistration
     MakeGeodesicsConfigSectionRegistration();
+    [[nodiscard]] std::span<const ConfigFieldSpec> GeodesicsConfigFieldSpecs() noexcept;
 }

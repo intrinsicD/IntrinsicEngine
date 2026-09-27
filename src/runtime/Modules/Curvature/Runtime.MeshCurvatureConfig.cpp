@@ -7,14 +7,39 @@ module;
 #include <string_view>
 #include <utility>
 #include <limits>
+#include <span>
 #include <nlohmann/json.hpp>
 module Extrinsic.Runtime.MeshCurvatureConfig;
 #include "Config/internal/Runtime.PointConfigJson.hpp"
+#include "Config/internal/Runtime.ConfigFieldJson.hpp"
 namespace Extrinsic::Runtime
 {
     namespace
     {
         using Json = nlohmann::json;
+        using FT = ConfigFieldType;
+        using K = Geometry::PropertyValueKind;
+        constexpr std::array<K, 1> kVec3{K::Vec3};
+        constexpr std::array<K, 1> kDouble{K::Double};
+        constexpr std::array<GeometryElementDomain, 1> kVertex{GeometryElementDomain::MeshVertex};
+        constexpr std::array<std::string_view, 4> kOutputNames{"All", "Mean", "Gaussian", "Principal directions"};
+        constexpr ConfigFieldSpec Ref(std::string_view name, std::span<const K> kinds, std::string_view description)
+        {
+            return {.Name = name, .Type = FT::PropertyRef, .Description = description, .RefKinds = kinds,
+                    .RefDomains = kVertex, .AnyScalar = true};
+        }
+        constexpr std::array kFields{
+            ConfigFieldSpec{.Name = "entity", .Type = FT::UInt, .Description = "Stable id of the mesh entity."},
+            ConfigFieldSpec{.Name = "output", .Type = FT::Enum, .Description = "Curvature quantities to publish.", .EnumNames = kOutputNames},
+            ConfigFieldSpec{.Name = "publish_directions", .Type = FT::Bool, .Description = "Also publish principal directions."},
+            Ref("positions", kVec3, "Vertex positions."),
+            Ref("mean", kDouble, "Scalar vertex property receiving mean curvature."),
+            Ref("gaussian", kDouble, "Scalar vertex property receiving Gaussian curvature."),
+            Ref("min_principal", kDouble, "Scalar vertex property receiving the minimum principal curvature."),
+            Ref("max_principal", kDouble, "Scalar vertex property receiving the maximum principal curvature."),
+            Ref("direction1", kVec3, "Vec3 vertex property receiving the first principal direction."),
+            Ref("direction2", kVec3, "Vec3 vertex property receiving the second principal direction."),
+        };
         struct Slot { const char* Key; GeometryPropertyRef MeshCurvatureConfig::* Member; };
         constexpr std::array slots{
             Slot{"positions", &MeshCurvatureConfig::Positions},
@@ -70,32 +95,18 @@ namespace Extrinsic::Runtime
         using namespace Core::Config;
         using ConfigDetail::RejectConfigSection;
         EngineConfigSectionValidationResult result;
-        auto doc = ConfigDetail::ParseConfigJson(payload, false);
-        if (!doc.is_object()) return RejectConfigSection(subject, "Mesh curvature config must be an object.");
-        const auto defaults = Encode({});
-        for (const auto& [key, value] : doc.items())
-            if (!defaults.contains(key)) return RejectConfigSection(subject, "Unknown curvature field: " + key);
-        for (const auto& [key, value] : defaults.items())
-            if (!doc.contains(key)) doc[key] = value;
-        if (!doc["entity"].is_number_unsigned() || doc["entity"].get<std::uint64_t>() > std::numeric_limits<std::uint32_t>::max() ||
-            !doc["output"].is_number_unsigned() || doc["output"].get<std::uint64_t>() > 3 ||
-            !doc["publish_directions"].is_boolean())
-            return RejectConfigSection(subject, "Invalid curvature entity, output mode or direction control.");
+        const auto input = ConfigDetail::ParseConfigJson(payload, false);
+        auto doc = Encode({});
+        if (auto error = ConfigDetail::ValidateDeclaredFields(input, doc, kFields,
+                "Mesh curvature config must be an object.", "Unknown curvature field: "))
+            return RejectConfigSection(subject, *error);
         MeshCurvatureConfig bindings;
-        for (const auto& slot : slots)
-        {
-            const auto& ref = doc[slot.Key];
-            if (!ref.is_object() || ref.size() != 3 || !ref.contains("domain") || ref["domain"] != ToString(GeometryElementDomain::MeshVertex) ||
-                ConfigDetail::ValidatePointPropertyRef(ref, (bindings.*slot.Member).ValueKind, true) !=
-                    ConfigDetail::PointPropertyValidation::Valid)
-                return RejectConfigSection(subject, "Curvature requires typed mesh vertex bindings.");
-            ConfigDetail::DecodePointPropertyRef(ref, bindings.*slot.Member);
-        }
+        for (const auto& slot : slots) ConfigDetail::DecodePointPropertyRef(doc[slot.Key], bindings.*slot.Member);
         if (!IsValidMeshCurvaturePropertyBindings(bindings))
             return RejectConfigSection(subject, "Curvature property names must be distinct and must not replace structural vertex storage.");
         result.State=EngineConfigState::Valid;
         result.CanonicalPayloadJson=ConfigDetail::SerializeConfigJson(doc);
-        result.ParsedFieldCount=static_cast<std::uint32_t>(doc.size());
+        result.ParsedFieldCount=static_cast<std::uint32_t>(input.size());
         return result;
     }
     std::optional<MeshCurvatureConfig> GetMeshCurvatureConfig(const Core::Config::EngineConfig& config)
@@ -115,5 +126,11 @@ namespace Extrinsic::Runtime
     void SetMeshCurvatureConfig(Core::Config::EngineConfig& config, const MeshCurvatureConfig& value)
     { Core::Config::UpsertEngineConfigSection(config.AppSections, Section(value)); }
     Core::Config::EngineConfigSectionRegistration MakeMeshCurvatureConfigSectionRegistration()
-    { return {.DefaultSection=Section({}), .Validate=ValidateMeshCurvatureConfigSection}; }
+    {
+        return {.DefaultSection = Section({}), .Validate = ValidateMeshCurvatureConfigSection,
+                .SchemaJson = ConfigDetail::BuildSectionSchemaJson(kMeshCurvatureConfigSectionSchemaId, "Mesh Curvature",
+                    "Mean, Gaussian and principal curvatures with principal directions on mesh vertices.",
+                    kFields, Encode({}))};
+    }
+    std::span<const ConfigFieldSpec> MeshCurvatureConfigFieldSpecs() noexcept { return kFields; }
 }

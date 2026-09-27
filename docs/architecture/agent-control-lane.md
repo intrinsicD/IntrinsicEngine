@@ -47,7 +47,7 @@ launch flag: no module, thread or socket.
   preview/apply with `RuntimeConfigControlSource::AgentCli`, the mesh-field
   `Preview*/Apply*` commands, and the panels' Show recipe
   (`MakeEditorPropertyVisualizationRecipe`). There is no generic scene or property write.
-- Naming: `scene_*`, `entity_*`, `config_sections`, `config_get`, `config_preview`,
+- Naming: `scene_*`, `entity_*`, `config_sections`, `config_schema`, `config_get`, `config_preview`,
   `history`, `jobs`, `log`, `preview_*` and `view_screenshot` are read-only
   (`readOnlyHint`); `select_entity`, `import_file`, `show_property`, `config_apply`,
   `run_mesh_operation`, `undo`, `redo` change state, and `view_capture` writes a PNG
@@ -68,7 +68,7 @@ launch flag: no module, thread or socket.
 ## Planned capability tasks
 
 Schemas from declarative config field tables:
-[CORE-010](../../tasks/backlog/architecture/CORE-010-config-section-schema-export.md),
+[CORE-010](../../tasks/done/CORE-010-config-section-schema-export.md),
 [RUNTIME-276](../../tasks/backlog/runtime/RUNTIME-276-declarative-config-field-specs.md),
 [UI-057](../../tasks/backlog/ui/UI-057-schema-driven-field-hints.md).
 Structured readiness:

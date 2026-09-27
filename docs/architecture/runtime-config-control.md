@@ -198,6 +198,18 @@ unchanged.
 
 ## UI And Agent Parity
 
+Section fields are declared once, in `ConfigFieldSpec` tables owned next to each
+section's codec (RUNTIME-276; the mesh-field family so far: smoothing, harmonic
+field, spectral modes, scalar gradient, geodesics, mesh curvature).
+`ConfigDetail::ValidateDeclaredFields` performs the strict merge plus type, range
+and enum checks from the table; the section validator keeps only cross-field
+rules. `ConfigDetail::BuildSectionSchemaJson` generates the registration's
+`SchemaJson`, and `PropertySmoothingConfigFieldSpecs()` (and siblings) give the
+editor descriptions, ranges and enum names without JSON. Agents read the same
+data through `config_schema` (the full export or one section) and the `schema`
+member of `config_get`; `config_preview`/`config_apply` stay generic over
+sections and point to it.
+
 `Extrinsic.Sandbox.Editor.Shell` keeps the ImGui widget and draft-buffer
 state. Its `Runtime::EditorWorkspaceAttachment` carries the opaque attachment
 epoch. `PrepareEditorWorkspaceSnapshotFrame(...)` and the four feature-owned

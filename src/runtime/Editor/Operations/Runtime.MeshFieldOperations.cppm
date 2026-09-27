@@ -6,6 +6,7 @@ module;
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 export module Extrinsic.Runtime.MeshFieldOperations;
@@ -15,6 +16,7 @@ export import Extrinsic.Runtime.MeshCurvatureConfig;
 export import Extrinsic.Runtime.CurvatureSegmentationConfig;
 export import Extrinsic.Runtime.GeodesicsConfig;
 export import Extrinsic.Core.Error;
+export import Extrinsic.Runtime.ConfigFieldSpec;
 export import Geometry.Geodesic.Types;
 export import Geometry.Smoothing.Types;
 export import Geometry.HarmonicField.Types;
@@ -166,6 +168,8 @@ export namespace Extrinsic::Runtime
     };
     [[nodiscard]] std::string SerializePropertySmoothingConfig(const PropertySmoothingConfig&);
     [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakePropertySmoothingConfigSectionRegistration();
+    // Declared fields of the section: validation, generated schema and editor hints.
+    [[nodiscard]] std::span<const ConfigFieldSpec> PropertySmoothingConfigFieldSpecs() noexcept;
     [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorPropertySmoothingConfig(
         const EditorProcessingCommands&, const PropertySmoothingConfig&);
     [[nodiscard]] std::optional<PropertySmoothingConfig> GetEditorPropertySmoothingConfig(const EditorProcessingCommands&);
@@ -223,6 +227,7 @@ export namespace Extrinsic::Runtime
     };
     [[nodiscard]] std::string SerializeLaplacianEigenbasisConfig(const LaplacianEigenbasisConfig&);
     [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeLaplacianEigenbasisConfigSectionRegistration();
+    [[nodiscard]] std::span<const ConfigFieldSpec> LaplacianEigenbasisConfigFieldSpecs() noexcept;
     [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorLaplacianEigenbasisConfig(
         const EditorProcessingCommands&, const LaplacianEigenbasisConfig&);
     [[nodiscard]] std::optional<LaplacianEigenbasisConfig> GetEditorLaplacianEigenbasisConfig(const EditorProcessingCommands&);
@@ -275,6 +280,7 @@ export namespace Extrinsic::Runtime
     };
     [[nodiscard]] std::string SerializeHarmonicFieldConfig(const HarmonicFieldConfig&);
     [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeHarmonicFieldConfigSectionRegistration();
+    [[nodiscard]] std::span<const ConfigFieldSpec> HarmonicFieldConfigFieldSpecs() noexcept;
     [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorHarmonicFieldConfig(
         const EditorProcessingCommands&, const HarmonicFieldConfig&);
     [[nodiscard]] std::optional<HarmonicFieldConfig> GetEditorHarmonicFieldConfig(const EditorProcessingCommands&);
@@ -302,6 +308,7 @@ export namespace Extrinsic::Runtime
     };
     [[nodiscard]] std::string SerializeScalarGradientConfig(const ScalarGradientConfig&);
     [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeScalarGradientConfigSectionRegistration();
+    [[nodiscard]] std::span<const ConfigFieldSpec> ScalarGradientConfigFieldSpecs() noexcept;
     [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorScalarGradientConfig(
         const EditorProcessingCommands&, const ScalarGradientConfig&);
     [[nodiscard]] std::optional<ScalarGradientConfig> GetEditorScalarGradientConfig(const EditorProcessingCommands&);

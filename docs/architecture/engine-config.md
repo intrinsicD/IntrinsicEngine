@@ -17,6 +17,18 @@ fail-closed. Application-owned values use registered records under
 `app.sections`; Core treats each payload as canonical opaque JSON and never
 imports the application DTO or field vocabulary.
 
+A section registration may carry `SchemaJson`, the JSON Schema of its payload
+object (CORE-010). `ExportEngineConfigSchema(registry)` returns one document
+whose `$defs` hold every registered section in name order with `x-schema-id` and
+`x-schema-version`; a section without a schema appears as
+`{"type":"object","x-schema-missing":true}`. The generated schemas are
+authoritative for section field names, types, ranges and enum names: they come
+from the owners' declarative `ConfigFieldSpec` tables (`Extrinsic.Runtime.ConfigFieldSpec`,
+RUNTIME-276), the same tables their validators check. Enums stay integer-coded;
+`x-enum-names` lists their meaning. Property references carry `x-property-kinds`
+and `x-domains`. `Test.EngineConfigSectionSchemas.cpp` keeps schema and validator
+in agreement.
+
 ```json
 {
   "schema": "intrinsic.core.engine-config",

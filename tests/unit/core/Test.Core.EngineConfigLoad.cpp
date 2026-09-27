@@ -515,3 +515,31 @@ TEST(CoreEngineConfigLoad, InvalidCoreFieldsRetainReferenceWithDiagnostics)
     EXPECT_TRUE(result.Preview.Config.Render.EnableValidation);
     EXPECT_EQ(result.Preview.Config.Simulation.WorkerThreadCount, 6u);
 }
+
+// CORE-010: sections carry an optional JSON Schema; the export is one document with a
+// `$defs` entry per registration in registry (name) order.
+TEST(CoreEngineConfigSections, SchemaExportListsEverySectionInNameOrder)
+{
+    EngineConfigSectionRegistry registry{};
+    EngineConfigSectionRegistration zeta = FakeRegistration("zeta", "zeta.schema");
+    zeta.SchemaJson = R"({"type":"object","properties":{"enabled":{"type":"boolean"}},"additionalProperties":false})";
+    EXPECT_TRUE(registry.Register(std::move(zeta)));
+    EXPECT_TRUE(registry.Register(FakeRegistration("alpha", "alpha.schema")));
+    EngineConfigSectionRegistration notObject = FakeRegistration("broken", "broken.schema");
+    notObject.SchemaJson = "[1,2]";
+    EXPECT_FALSE(registry.Register(std::move(notObject))) << "a schema must be a JSON object";
+
+    const std::string exported = ExportEngineConfigSchema(registry);
+    EXPECT_NE(exported.find(R"("$schema":"https://json-schema.org/draft/2020-12/schema")"), std::string::npos) << exported;
+    const auto alpha = exported.find(R"("alpha":{)");
+    const auto zetaPos = exported.find(R"("zeta":{)");
+    ASSERT_NE(alpha, std::string::npos) << exported;
+    ASSERT_NE(zetaPos, std::string::npos) << exported;
+    EXPECT_LT(alpha, zetaPos) << "registry order";
+    EXPECT_NE(exported.find(R"("alpha":{"type":"object","x-schema-missing":true,"x-schema-id":"alpha.schema")"),
+              std::string::npos) << exported;
+    EXPECT_NE(exported.find(R"("enabled":{"type":"boolean"})"), std::string::npos) << exported;
+    EXPECT_NE(exported.find(R"("x-schema-id":"zeta.schema","x-schema-version":)" + std::to_string(kFakeSchemaVersion)),
+              std::string::npos) << exported;
+    EXPECT_EQ(exported, ExportEngineConfigSchema(registry)) << "deterministic";
+}

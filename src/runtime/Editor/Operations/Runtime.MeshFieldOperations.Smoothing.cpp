@@ -22,6 +22,7 @@ module;
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 #include <nlohmann/json.hpp>
+#include <array>
 module Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Scene.Registry;
@@ -47,6 +48,7 @@ import Extrinsic.Runtime.GeometryPresentation;
 import Geometry.DEC;
 import Geometry.Properties;
 #include "Config/internal/Runtime.PointConfigJson.hpp"
+#include "Config/internal/Runtime.ConfigFieldJson.hpp"
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
@@ -64,6 +66,61 @@ namespace Extrinsic::Runtime
         using K = Geometry::PropertyValueKind;
         using Json = nlohmann::json;
         constexpr std::string_view kSchema = "intrinsic.runtime.sandbox.property_smoothing";
+        using FT = ConfigFieldType;
+        constexpr std::array<K, 5> kFloating{K::Float, K::Double, K::Vec2, K::Vec3, K::Vec4};
+        constexpr std::array<K, 1> kVec3{K::Vec3};
+        constexpr std::array<K, 2> kFloatScalar{K::Float, K::Double};
+        constexpr std::array<std::string_view, 5> kWeightNames{"Uniform kNN", "Gaussian kNN", "Inverse-distance kNN",
+                                                               "Nonnegative mesh cotangent", "Uniform mesh edges"};
+        constexpr std::array<std::string_view, 6> kMethodNames{"Averaging", "Spectral heat", "Taubin", "Bilateral",
+                                                               "Implicit (backward Euler)", "Variational fit (robust / TV / bounded)"};
+        constexpr std::array<std::string_view, 3> kLaplacianNames{"Random walk", "Combinatorial", "Lumped mesh area (implicit, fit)"};
+        constexpr std::array<std::string_view, 2> kSolverNames{"Sparse Cholesky (direct)", "Conjugate gradient"};
+        constexpr std::array<std::string_view, 3> kSmoothnessPenaltyNames{"Quadratic (Dirichlet)", "Huber", "L1 (total variation)"};
+        constexpr std::array<std::string_view, 3> kDataPenaltyNames{"Quadratic", "Huber (robust)", "L1 (robust)"};
+        constexpr std::array<std::string_view, 2> kFidelityNames{"Fixed weight", "Match noise level (discrepancy)"};
+        constexpr std::array<std::string_view, 3> kBoundNames{"None", "Uniform radius", "Per-row radius property"};
+        constexpr std::array<std::string_view, 2> kFitSolverNames{"Reweighted least squares (reference)",
+                                                                  "ADMM (one factorization, delta 0 allowed)"};
+        constexpr std::array<std::string_view, 2> kBoundNormNames{"Per channel (box)", "Euclidean (ball, ADMM)"};
+        constexpr std::array<std::string_view, 2> kOrderNames{"First (differences)", "Second (non-local TGV, ADMM)"};
+        constexpr std::array<std::string_view, 2> kBackendNames{"CPU reference", "Vulkan (shader double precision)"};
+        constexpr std::array kFields{
+            ConfigFieldSpec{.Name = "input", .Type = FT::PropertyRef, .Description = "Floating scalar or vector property to smooth.", .RefKinds = kFloating},
+            ConfigFieldSpec{.Name = "output", .Type = FT::PropertyRef, .Description = "Property receiving the result, on the input domain with the input's channel count.", .RefKinds = kFloating},
+            ConfigFieldSpec{.Name = "positions", .Type = FT::PropertyRef, .Description = "Positions that define neighborhoods and distances.", .RefKinds = kVec3},
+            ConfigFieldSpec{.Name = "weight", .Type = FT::Enum, .Description = "Neighbor weighting; the mesh weights need mesh-vertex input.", .EnumNames = kWeightNames},
+            ConfigFieldSpec{.Name = "method", .Type = FT::Enum, .Description = "Smoothing filter.", .EnumNames = kMethodNames},
+            ConfigFieldSpec{.Name = "laplacian", .Type = FT::Enum, .Description = "Laplacian normalization.", .EnumNames = kLaplacianNames},
+            ConfigFieldSpec{.Name = "iterations", .Type = FT::UInt, .Description = "Filter passes of the explicit methods.", .Min = 1, .Max = 10000},
+            ConfigFieldSpec{.Name = "neighbors", .Type = FT::UInt, .Description = "k of the k-nearest-neighbor graph.", .Min = 1, .Max = 1024},
+            ConfigFieldSpec{.Name = "spatial_sigma", .Type = FT::Float, .Description = "Distance scale of Gaussian and bilateral weights (position units).", .Min = 0, .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "lambda", .Type = FT::Float, .Description = "Step size of averaging, bilateral and Taubin passes.", .Min = 0, .Max = 1, .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "mu", .Type = FT::Float, .Description = "Taubin's negative inflation step.", .Min = -1, .Max = 0, .ExclusiveMax = true},
+            ConfigFieldSpec{.Name = "heat_time", .Type = FT::Float, .Description = "Diffusion time of the spectral heat filter.", .Min = 0, .Max = 1000, .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "range_sigma", .Type = FT::Float, .Description = "Value scale of the bilateral filter (property units).", .Min = 0, .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "time_step", .Type = FT::Float, .Description = "Backward-Euler time step of implicit smoothing.", .Min = 0, .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "solver_tolerance", .Type = FT::Float, .Description = "Relative residual at which conjugate gradient stops.", .Min = 0, .Max = 1, .ExclusiveMin = true, .ExclusiveMax = true},
+            ConfigFieldSpec{.Name = "max_solver_iterations", .Type = FT::UInt, .Description = "Conjugate-gradient iteration cap.", .Min = 1, .Max = 100000},
+            ConfigFieldSpec{.Name = "solver", .Type = FT::Enum, .Description = "Linear solver of implicit smoothing.", .EnumNames = kSolverNames},
+            ConfigFieldSpec{.Name = "preserve_boundary", .Type = FT::Bool, .Description = "Keep mesh-boundary values fixed (mesh-vertex input only)."},
+            ConfigFieldSpec{.Name = "smoothness_penalty", .Type = FT::Enum, .Description = "Penalty on neighbor differences in the variational fit.", .EnumNames = kSmoothnessPenaltyNames},
+            ConfigFieldSpec{.Name = "data_penalty", .Type = FT::Enum, .Description = "Penalty on deviation from the input in the variational fit.", .EnumNames = kDataPenaltyNames},
+            ConfigFieldSpec{.Name = "fidelity", .Type = FT::Enum, .Description = "Fixed data weight, or the weight whose RMS residual matches the noise level.", .EnumNames = kFidelityNames},
+            ConfigFieldSpec{.Name = "fit_weight", .Type = FT::Float, .Description = "Data weight of the variational fit.", .Min = 0, .Max = 1e12, .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "noise_level", .Type = FT::Float, .Description = "Target RMS residual (property units).", .Min = 0, .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "penalty_delta", .Type = FT::Float, .Description = "Huber/L1 smoothing threshold (property units); 0 only with ADMM and no Huber penalty.", .Min = 0},
+            ConfigFieldSpec{.Name = "bound", .Type = FT::Enum, .Description = "Tolerance bound on the deviation from the input.", .EnumNames = kBoundNames},
+            ConfigFieldSpec{.Name = "bound_radius", .Type = FT::Float, .Description = "Uniform bound radius (property units).", .Min = 0},
+            ConfigFieldSpec{.Name = "bound_radii", .Type = FT::PropertyRef, .Description = "Per-row bound radii on the input domain.", .Nullable = true, .RefKinds = kFloatScalar},
+            ConfigFieldSpec{.Name = "fit_solver", .Type = FT::Enum, .Description = "Variational-fit algorithm.", .EnumNames = kFitSolverNames},
+            ConfigFieldSpec{.Name = "max_fit_iterations", .Type = FT::UInt, .Description = "Variational-fit iteration cap.", .Min = 1, .Max = 100000},
+            ConfigFieldSpec{.Name = "bound_norm", .Type = FT::Enum, .Description = "Bound shape on vector properties.", .EnumNames = kBoundNormNames},
+            ConfigFieldSpec{.Name = "smoothness_order", .Type = FT::Enum, .Description = "First-order differences or second-order non-local TGV.", .EnumNames = kOrderNames},
+            ConfigFieldSpec{.Name = "second_order_weight", .Type = FT::Float, .Description = "Weight of the second-order TGV term.", .Min = 0, .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "backend", .Type = FT::Enum, .Description = "CPU reference or Vulkan for the explicit filters and CG implicit smoothing.", .EnumNames = kBackendNames},
+            ConfigFieldSpec{.Name = "fit_tolerance", .Type = FT::Float, .Description = "Relative change at which the variational fit stops.", .Min = 0, .Max = 1, .ExclusiveMin = true, .ExclusiveMax = true},
+        };
         using PropertyGraphDetail::Snapshot;
         using PropertyGraphDetail::Channels;
         using PropertyGraphDetail::Channel;
@@ -142,47 +199,14 @@ namespace Extrinsic::Runtime
         {
             const auto doc = Json::parse(payload, nullptr, false);
             auto merged = Json::parse(SerializePropertySmoothingConfig({}));
-            if (auto error = ConfigDetail::ValidatePointConfigFields(doc, merged,
-                "Smoothing config must be an object.", "Unknown smoothing field: ",
-                {"method", "weight", "laplacian", "solver", "iterations", "neighbors", "max_solver_iterations",
-                 "smoothness_penalty", "data_penalty", "fidelity", "bound", "fit_solver", "max_fit_iterations",
-                 "bound_norm", "smoothness_order", "backend"}))
+            if (auto error = ConfigDetail::ValidateDeclaredFields(doc, merged, kFields,
+                    "Smoothing config must be an object.", "Unknown smoothing field: "))
                 return ConfigDetail::RejectConfigSection(subject, *error);
-            for (const auto key : {"input", "output", "positions"})
-            {
-                bool valid = false;
-                for (auto kind : {K::Float, K::Double, K::Vec2, K::Vec3, K::Vec4})
-                    valid |= ConfigDetail::ValidatePointPropertyRef(merged[key], kind) == ConfigDetail::PointPropertyValidation::Valid;
-                if (!valid) return ConfigDetail::RejectConfigSection(subject, "Bindings require floating scalar or vector properties on a resolved domain.");
-            }
-            if (!merged["bound_radii"].is_null() &&
-                ConfigDetail::ValidatePointPropertyRef(merged["bound_radii"], K::Float) != ConfigDetail::PointPropertyValidation::Valid &&
-                ConfigDetail::ValidatePointPropertyRef(merged["bound_radii"], K::Double) != ConfigDetail::PointPropertyValidation::Valid)
-                return ConfigDetail::RejectConfigSection(subject, "bound_radii must be null or a float/double property reference.");
-            for (const auto key : {"spatial_sigma", "lambda", "mu", "heat_time", "range_sigma", "time_step", "solver_tolerance",
-                                   "fit_weight", "noise_level", "penalty_delta", "bound_radius", "fit_tolerance",
-                                   "second_order_weight"})
-                if (!merged[key].is_number() || !std::isfinite(merged[key].get<double>()))
-                    return ConfigDetail::RejectConfigSection(subject, "Filter parameters must be finite numbers.");
-            if (merged["method"].get<unsigned>() > unsigned(S::PropertyFilter::VariationalFit) ||
-                merged["weight"].get<unsigned>() > unsigned(S::PropertyWeight::MeshUniform) ||
-                merged["laplacian"].get<unsigned>() > unsigned(S::PropertyLaplacian::LumpedMass) ||
-                merged["solver"].get<unsigned>() > unsigned(S::PropertySolver::ConjugateGradient) ||
-                merged["smoothness_penalty"].get<unsigned>() > unsigned(S::FitPenalty::L1) ||
-                merged["data_penalty"].get<unsigned>() > unsigned(S::FitPenalty::L1) ||
-                merged["fidelity"].get<unsigned>() > unsigned(S::FitFidelity::NoiseLevel) ||
-                merged["bound"].get<unsigned>() > unsigned(S::FitBound::PerRow) ||
-                merged["fit_solver"].get<unsigned>() > unsigned(S::FitSolver::Admm) ||
-                merged["bound_norm"].get<unsigned>() > unsigned(S::FitBoundNorm::Euclidean) ||
-                merged["smoothness_order"].get<unsigned>() > unsigned(S::FitOrder::Second) ||
-                merged["backend"].get<unsigned>() > unsigned(PropertySmoothingBackend::Vulkan))
-                return ConfigDetail::RejectConfigSection(subject, "Unknown smoothing method, weight, Laplacian, solver, penalty, fidelity, bound, fit solver, bound norm or smoothness order.");
-            if (!merged["preserve_boundary"].is_boolean())
-                return ConfigDetail::RejectConfigSection(subject, "preserve_boundary must be boolean.");
             const auto c = Decode(merged);
             if (auto conflict = FilterConflict(c)) return ConfigDetail::RejectConfigSection(subject, *conflict);
-            if (!S::ValidatePropertyFilterParams(c.Filter) || c.Neighbors < 1 || c.Neighbors > 1024 || c.SpatialSigma <= 0)
-                return ConfigDetail::RejectConfigSection(subject, "Invalid smoothing parameters: iterations 1..10000, neighbors 1..1024, lambda (0,1], mu [-1,0), heat time (0,1000], positive sigmas/time step, solver tolerance (0,1), solver iterations 1..100000, fit weight (0,1e12], positive noise level, penalty delta positive (0 only for ADMM without Huber), Euclidean bounds and second order only with ADMM, positive second-order weight, nonnegative bound radius, fit iterations 1..100000, fit tolerance (0,1).");
+            // Ranges come from kFields; the geometry check keeps its solver/penalty combinations.
+            if (!S::ValidatePropertyFilterParams(c.Filter))
+                return ConfigDetail::RejectConfigSection(subject, "Invalid smoothing parameter combination: penalty delta 0 needs ADMM without Huber penalties; Euclidean bounds and second order need ADMM; the lumped Laplacian applies to implicit smoothing and the fit.");
             if (c.Backend == PropertySmoothingBackend::Vulkan && !ExplicitFilter(c.Filter.Method) &&
                 !(c.Filter.Method == S::PropertyFilter::Implicit && c.Filter.Solver == S::PropertySolver::ConjugateGradient))
                 return ConfigDetail::RejectConfigSection(subject, "Vulkan runs averaging, spectral heat, Taubin, bilateral and conjugate-gradient implicit smoothing; direct implicit and variational smoothing are CPU-only.");
@@ -313,7 +337,14 @@ namespace Extrinsic::Runtime
             {"second_order_weight", c.Filter.SecondOrderWeight}, {"backend", unsigned(c.Backend)}, {"fit_tolerance", c.Filter.FitTolerance}}.dump();
     }
     Core::Config::EngineConfigSectionRegistration MakePropertySmoothingConfigSectionRegistration()
-    { return {.DefaultSection = Section({}), .Validate = Validate}; }
+    {
+        return {.DefaultSection = Section({}), .Validate = Validate,
+                .SchemaJson = ConfigDetail::BuildSectionSchemaJson(kSchema, "Smooth Property",
+                    "Smooths a scalar or vector property over mesh edges or a kNN graph (averaging, spectral heat, "
+                    "Taubin, bilateral, implicit, variational fit).",
+                    kFields, Json::parse(SerializePropertySmoothingConfig({})))};
+    }
+    std::span<const ConfigFieldSpec> PropertySmoothingConfigFieldSpecs() noexcept { return kFields; }
     RuntimeEngineConfigApplyResult ApplyEditorPropertySmoothingConfig(const EditorProcessingCommands& commands, const PropertySmoothingConfig& c)
     {
         return ApplyEditorProcessingConfig(commands, Validate(SerializePropertySmoothingConfig(c), {}, kPropertySmoothingConfigSectionName),

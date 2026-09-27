@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 6 |
-| `runtime` | 102 |
+| `runtime` | 103 |
 
 ## Modules
 
@@ -373,6 +373,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.CameraControllers` | `src/runtime/Cameras/Runtime.CameraControllers.cppm` | `runtime` |
 | `Extrinsic.Runtime.CameraFocusCommand` | `src/runtime/Cameras/Runtime.CameraFocusCommand.cppm` | `runtime` |
 | `Extrinsic.Runtime.CameraModule` | `src/runtime/Cameras/Runtime.CameraModule.cppm` | `runtime` |
+| `Extrinsic.Runtime.ConfigFieldSpec` | `src/runtime/Config/Runtime.ConfigFieldSpec.cppm` | `runtime` |
 | `Extrinsic.Runtime.EngineConfigBoot` | `src/runtime/Config/Runtime.EngineConfigBoot.cppm` | `runtime` |
 | `Extrinsic.Runtime.EngineConfigControl` | `src/runtime/Config/Runtime.EngineConfigControl.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderRecipeActivation` | `src/runtime/Config/Runtime.RenderRecipeActivation.cppm` | `runtime` |
@@ -464,4 +465,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **437**
+Total modules: **438**

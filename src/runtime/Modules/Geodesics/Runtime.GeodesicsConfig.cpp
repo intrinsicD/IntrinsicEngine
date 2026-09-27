@@ -1,5 +1,7 @@
 module;
 #include <algorithm>
+#include <array>
+#include <span>
 #include <limits>
 #include <initializer_list>
 #include <utility>
@@ -7,11 +9,26 @@ module;
 module Extrinsic.Runtime.GeodesicsConfig;
 
 #include "Config/internal/Runtime.PointConfigJson.hpp"
+#include "Config/internal/Runtime.ConfigFieldJson.hpp"
 namespace Extrinsic::Runtime
 {
     namespace
     {
         using Json = nlohmann::json;
+        using FT = ConfigFieldType;
+        using K = Geometry::PropertyValueKind;
+        constexpr std::array<K, 1> kVec3{K::Vec3};
+        constexpr std::array<K, 1> kBool{K::Bool};
+        constexpr std::array<K, 1> kDouble{K::Double};
+        constexpr std::array<GeometryElementDomain, 1> kVertex{GeometryElementDomain::MeshVertex};
+        constexpr std::array kFields{
+            ConfigFieldSpec{.Name = "source_vertices", .Type = FT::UIntArray, .Description = "Source vertex indices."},
+            ConfigFieldSpec{.Name = "source_vertex_property", .Type = FT::PropertyRef, .Description = "Scalar vertex property; vertices with a finite nonzero value are added as sources.", .Nullable = true, .RefKinds = kBool, .RefDomains = kVertex, .AnyScalar = true},
+            ConfigFieldSpec{.Name = "max_halfedge_expansions", .Type = FT::UInt, .Description = "Work limit of the window propagation.", .Min = 1},
+            ConfigFieldSpec{.Name = "position_property", .Type = FT::PropertyRef, .Description = "Vertex positions.", .RefKinds = kVec3, .RefDomains = kVertex},
+            ConfigFieldSpec{.Name = "distance_property", .Type = FT::PropertyRef, .Description = "Scalar vertex property receiving the geodesic distance.", .RefKinds = kDouble, .RefDomains = kVertex, .AnyScalar = true},
+            ConfigFieldSpec{.Name = "source_mask_property", .Type = FT::PropertyRef, .Description = "Scalar vertex property marking the sources.", .RefKinds = kBool, .RefDomains = kVertex, .AnyScalar = true},
+        };
         Core::Config::EngineConfigSection Section(const GeodesicsConfig& value)
         {
             return {.Name = std::string{kGeodesicsConfigSectionName},
@@ -35,73 +52,30 @@ namespace Extrinsic::Runtime
         std::string_view payload, std::string_view, std::string_view subject)
     {
         using namespace Core::Config;
-        EngineConfigSectionValidationResult result;
-        auto doc = Json::parse(payload, nullptr, false);
-        auto reject = [&](std::string message) {
-            result.Diagnostics.push_back({.Code = EngineConfigDiagnosticCode::InvalidValue,
-                                          .Subject = std::string{subject},
-                                          .Message = std::move(message)});
-            return result;
-        };
-        if (!doc.is_object())
-            return reject("Geodesics config must be an object.");
-        for (auto it = doc.begin(); it != doc.end(); ++it)
-            if (it.key() != "source_vertices" && it.key() != "source_vertex_property" &&
-                it.key() != "max_halfedge_expansions" &&
-                it.key() != "position_property" && it.key() != "distance_property" &&
-                it.key() != "source_mask_property")
-                return reject("Unknown geodesics field: " + it.key());
+        const auto reject = [&](std::string message) { return ConfigDetail::RejectConfigSection(subject, std::move(message)); };
+        const auto doc = Json::parse(payload, nullptr, false);
+        auto merged = Json::parse(SerializeGeodesicsConfig({}));
+        if (auto error = ConfigDetail::ValidateDeclaredFields(doc, merged, kFields,
+                "Geodesics config must be an object.", "Unknown geodesics field: "))
+            return reject(*error);
         GeodesicsConfig config;
-        if (doc.contains("source_vertices"))
+        config.SourceVertices = merged["source_vertices"].get<std::vector<std::uint32_t>>();
+        config.MaxHalfedgeExpansions = merged["max_halfedge_expansions"].get<std::uint32_t>();
+        if (!merged["source_vertex_property"].is_null())
         {
-            const auto& sources = doc["source_vertices"];
-            if (!sources.is_array())
-                return reject("source_vertices must be an array of vertex indices.");
-            for (const auto& source : sources)
-            {
-                if (!source.is_number_unsigned() ||
-                    source.get<std::uint64_t>() > std::numeric_limits<std::uint32_t>::max())
-                    return reject("source_vertices requires unsigned 32-bit indices.");
-                config.SourceVertices.push_back(source.get<std::uint32_t>());
-            }
-        }
-        if (doc.contains("source_vertex_property") && !doc["source_vertex_property"].is_null())
-        {
-            const auto& ref = doc["source_vertex_property"];
-            if (ConfigDetail::ValidatePointPropertyRef(ref, Geometry::PropertyValueKind::Bool, true) !=
-                    ConfigDetail::PointPropertyValidation::Valid ||
-                ref["domain"] != ToString(GeometryElementDomain::MeshVertex))
-                return reject("source_vertex_property requires a scalar mesh vertex property reference.");
-            ConfigDetail::DecodePointPropertyRef(ref, config.SourceVertexProperty);
-            if (GeometryPropertyComponentCount(config.SourceVertexProperty.ValueKind) != 1u ||
-                config.SourceVertexProperty.Name.find('\0') != std::string::npos ||
+            ConfigDetail::DecodePointPropertyRef(merged["source_vertex_property"], config.SourceVertexProperty);
+            if (config.SourceVertexProperty.Name.find('\0') != std::string::npos ||
                 IsStructuralVertexProperty(config.SourceVertexProperty.Name))
                 return reject("source_vertex_property must name a scalar, non-structural vertex property.");
-        }
-        if (doc.contains("max_halfedge_expansions"))
-        {
-            const auto& limit = doc["max_halfedge_expansions"];
-            if (!limit.is_number_unsigned() || limit.get<std::uint64_t>() == 0 ||
-                limit.get<std::uint64_t>() > std::numeric_limits<std::uint32_t>::max())
-                return reject(
-                    "max_halfedge_expansions must be a positive unsigned 32-bit integer.");
-            config.MaxHalfedgeExpansions = limit.get<std::uint32_t>();
         }
         for (const auto& [key, ref] : {
                  std::pair{"position_property", &config.PositionProperty},
                  std::pair{"distance_property", &config.DistanceProperty},
                  std::pair{"source_mask_property", &config.SourceMaskProperty}})
         {
-            if (doc.contains(key))
-            {
-                if (ConfigDetail::ValidatePointPropertyRef(doc[key], ref->ValueKind, ref != &config.PositionProperty) !=
-                        ConfigDetail::PointPropertyValidation::Valid ||
-                    doc[key]["domain"] != ToString(GeometryElementDomain::MeshVertex))
-                    return reject(std::string{key} + " requires a typed mesh vertex property reference.");
-                ConfigDetail::DecodePointPropertyRef(doc[key], *ref);
-            }
+            ConfigDetail::DecodePointPropertyRef(merged[key], *ref);
             const bool input = ref == &config.PositionProperty;
-            if (ref->Name.empty() || ref->Name.find('\0') != std::string::npos ||
+            if (ref->Name.find('\0') != std::string::npos ||
                 (IsStructuralVertexProperty(ref->Name) && (!input || ref->Name != "v:position")))
                 return reject("Geodesics bindings must not replace structural vertex storage.");
         }
@@ -111,6 +85,7 @@ namespace Extrinsic::Runtime
             (!config.SourceVertexProperty.Name.empty() &&
              config.SourceVertexProperty.Name == config.DistanceProperty.Name))
             return reject("Geodesics input and output properties must be distinct.");
+        EngineConfigSectionValidationResult result;
         result.State = EngineConfigState::Valid;
         result.CanonicalPayloadJson = SerializeGeodesicsConfig(config);
         result.ParsedFieldCount = static_cast<std::uint32_t>(doc.size());
@@ -144,6 +119,10 @@ namespace Extrinsic::Runtime
     }
     Core::Config::EngineConfigSectionRegistration MakeGeodesicsConfigSectionRegistration()
     {
-        return {.DefaultSection = Section({}), .Validate = ValidateGeodesicsConfigSection};
+        return {.DefaultSection = Section({}), .Validate = ValidateGeodesicsConfigSection,
+                .SchemaJson = ConfigDetail::BuildSectionSchemaJson(kGeodesicsConfigSectionSchemaId, "Geodesics",
+                    "Exact polyhedral geodesic distance from source vertices on a triangle mesh.",
+                    kFields, Json::parse(SerializeGeodesicsConfig({})))};
     }
+    std::span<const ConfigFieldSpec> GeodesicsConfigFieldSpecs() noexcept { return kFields; }
 }

@@ -60,7 +60,7 @@ TEST(AgentOperations, EditorOperationsHaveUniqueNamesAndValidSchemas)
         EXPECT_EQ(schema.value("type", ""), "object");
         EXPECT_FALSE(spec.Description.empty());
         const bool reader = spec.Name.starts_with("scene_") || spec.Name.starts_with("entity_") || spec.Name == "history" ||
-                            spec.Name.starts_with("config_sections") || spec.Name == "config_get" || spec.Name == "config_preview" ||
+                            spec.Name.starts_with("config_sections") || spec.Name == "config_schema" || spec.Name == "config_get" || spec.Name == "config_preview" ||
                             spec.Name == "jobs" || spec.Name == "log" || spec.Name.starts_with("preview_");
         EXPECT_EQ(spec.ReadOnly, reader) << "read-only flag follows the naming convention";
     }

@@ -8771,3 +8771,5 @@ Retain terminal job outcomes while pending consumers reference them, so reaping 
 - 2026-09-27 — **PROC-035**: `tools/agents/mcp_bridge.py` (stdlib only) and the `.mcp.json` `intrinsic-sandbox` entry; starts without a Sandbox, connects lazily and announces tools with list-changed notifications. Operational with Claude Code. [Task](PROC-035-mcp-bridge-and-client-config.md).
 
 - 2026-09-27 — **UI-062**: File > Save Screenshot / Save Window Screenshot, F12 and View > Screenshot over `Extrinsic.Runtime.ViewCapture`; disabled with the reason on Null, a notice names the saved file. Operational in a live Sandbox; controls live in their own window. [Task](UI-062-save-screenshot-and-capture-controls.md).
+
+- 2026-09-28 — **CORE-010**: `EngineConfigSectionRegistration::SchemaJson` and `ExportEngineConfigSchema` (one `$defs` document for every registered section) with the read-only `config_schema` agent operation; `config_get` returns the section schema. [Task](CORE-010-config-section-schema-export.md).

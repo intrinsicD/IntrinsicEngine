@@ -957,7 +957,8 @@ namespace Extrinsic::Core::Config
 
         const std::optional<std::string> defaultPayload =
             CanonicalObjectJson(section.PayloadJson);
-        if (!defaultPayload.has_value())
+        if (!defaultPayload.has_value() ||
+            (!registration.SchemaJson.empty() && !CanonicalObjectJson(registration.SchemaJson).has_value()))
         {
             return false;
         }
@@ -1010,6 +1011,27 @@ namespace Extrinsic::Core::Config
     EngineConfigSectionRegistry::Entries() const noexcept
     {
         return m_Entries;
+    }
+
+    std::string ExportEngineConfigSchema(const EngineConfigSectionRegistry& registry)
+    {
+        nlohmann::ordered_json defs = nlohmann::ordered_json::object();
+        for (const EngineConfigSectionRegistration& entry : registry.Entries())
+        {
+            nlohmann::ordered_json schema = entry.SchemaJson.empty()
+                ? nlohmann::ordered_json{{"type", "object"}, {"x-schema-missing", true}}
+                : nlohmann::ordered_json::parse(entry.SchemaJson, nullptr, false);
+            schema["x-schema-id"] = entry.DefaultSection.SchemaId;
+            schema["x-schema-version"] = entry.DefaultSection.SchemaVersion;
+            defs[entry.DefaultSection.Name] = std::move(schema);
+        }
+        nlohmann::ordered_json document{
+            {"$schema", "https://json-schema.org/draft/2020-12/schema"},
+            {"title", "IntrinsicEngine config sections"},
+            {"description", "Payload schemas of the registered engine-config sections; enums are integer-coded with x-enum-names."},
+            {"$defs", std::move(defs)},
+        };
+        return document.dump(-1, ' ', false, nlohmann::ordered_json::error_handler_t::replace);
     }
 
     void PopulateEngineConfigSectionDefaults(
