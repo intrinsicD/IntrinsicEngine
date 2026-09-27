@@ -32,6 +32,7 @@ import Extrinsic.Runtime.PhysicsModule;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.TextureBakeModule;
+import Extrinsic.Runtime.ViewCapture;
 
 import Extrinsic.Sandbox;
 import Extrinsic.Sandbox.ConfigSections;
@@ -471,6 +472,7 @@ int main(int argc, char** argv)
     engine.AddModule(std::move(physicsModule));
     engine.EmplaceModule<Extrinsic::Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Extrinsic::Runtime::CameraModule>();
+    engine.EmplaceModule<Extrinsic::Runtime::ViewCaptureModule>();
     engine.EmplaceModule<Extrinsic::Runtime::ClusteringModule>();
     engine.EmplaceModule<Extrinsic::Runtime::SpatialIndexCache>();
     engine.EmplaceModule<

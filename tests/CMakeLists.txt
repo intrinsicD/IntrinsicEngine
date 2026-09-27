@@ -1295,6 +1295,7 @@ if(TARGET ExtrinsicRuntime)
         Test.PropertySmoothingOperations.cpp
         Test.PropertySmoothingWorkflows.cpp
         Test.AgentOperations.cpp
+        Test.ViewCapture.cpp
         Test.LaplacianEigenbasisOperations.cpp
         Test.HarmonicFieldOperations.cpp
         Test.GeodesicsOperations.cpp
@@ -1882,6 +1883,7 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
         Test.TransientDebugSurfaceGpuSmoke.cpp
         Test.UvViewGpuSmoke.cpp
         Test.VisualizationOverlaySurfaceGpuSmoke.cpp
+        Test.ViewCaptureGpuSmoke.cpp
         Test.VulkanBootstrapSmoke.cpp
     )
     intrinsic_resolve_test_sources(_graphics_vulkan_smoke_test_sources
@@ -1892,6 +1894,7 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
         SOURCES
             ${_graphics_vulkan_smoke_test_sources}
         DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore imgui_core_lib
+             tinygltf stb
     )
 endif()
 
@@ -2546,7 +2549,7 @@ endif()
 if(TARGET GraphicsVulkanSmokeTestObjs)
     intrinsic_test_executable(IntrinsicGraphicsVulkanSmokeTests
         OBJECTS GraphicsVulkanSmokeTestObjs RuntimeTestModuleSupportObjs GraphicsTestSupportObjs
-        LINK_LIBS ExtrinsicRuntime ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
+        LINK_LIBS ExtrinsicRuntime ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore tinygltf
         LABELS gpu vulkan graphics
     )
     intrinsic_add_glsl_shaders(IntrinsicGraphicsVulkanSmokeTests)

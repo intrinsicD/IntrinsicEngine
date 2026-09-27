@@ -8,3 +8,6 @@ vcpkg_installed/
 # Local ImGui state
 imgui.ini
 __pycache__/
+
+# Sandbox screenshots (File > Save Screenshot, F12, agent view_capture)
+/screenshots/

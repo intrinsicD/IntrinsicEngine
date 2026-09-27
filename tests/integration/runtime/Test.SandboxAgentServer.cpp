@@ -32,6 +32,7 @@ import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.ViewCapture;
 import Extrinsic.Sandbox.ConfigSections;
 import Extrinsic.Sandbox.Editor.Shell;
 import Geometry.HalfedgeMesh;
@@ -104,6 +105,7 @@ TEST(SandboxAgentServer, ClientRunsSmoothingThroughTheSocketAndUndoesIt)
     engine.EmplaceModule<R::SceneInteractionModule>();
     engine.EmplaceModule<R::SceneDocumentModule>();
     engine.EmplaceModule<R::AsyncWorkModule>();
+    engine.EmplaceModule<R::ViewCaptureModule>(std::filesystem::temp_directory_path());
     auto* server = &engine.EmplaceModule<R::AgentServerModule>(
         R::AgentServerOptions{.SocketPath = socketPath, .AllowedRoots = {std::filesystem::temp_directory_path().string()}});
     engine.Initialize();
@@ -180,6 +182,10 @@ TEST(SandboxAgentServer, ClientRunsSmoothingThroughTheSocketAndUndoesIt)
         check(undone["undone"].size() == 2u, "undo: " + undone.dump());
         auto outside = c.Tool("import_file", {{"path", "/etc/passwd"}}, &isError);
         check(isError, "paths outside the roots are refused");
+        // Screenshots need an operational render device; the Null backend refuses with the reason.
+        auto screenshot = c.Tool("view_screenshot", {{"region", "window"}}, &isError);
+        check(isError && screenshot.dump().find("operational render device") != std::string::npos,
+              "view_screenshot on Null: " + screenshot.dump());
         auto unknown = c.Request("tools/call", {{"name", "delete_everything"}});
         check(unknown["error"]["code"] == -32602, "unknown tool");
         done.store(true);
@@ -198,7 +204,7 @@ TEST(SandboxAgentServer, ClientRunsSmoothingThroughTheSocketAndUndoesIt)
     EXPECT_TRUE(done.load()) << "client did not finish";
     EXPECT_TRUE(smoothedSeen) << "the agent's smoothing published its output";
     EXPECT_FALSE(vertices.Exists("smooth")) << "the agent's undo removed it again";
-    EXPECT_EQ(server->Status().CallsHandled, 14u) << "one main-thread call per request";
+    EXPECT_EQ(server->Status().CallsHandled, 15u) << "one main-thread call per request";
     const auto& lastApply = engine.Services().Find<R::EngineConfigControl>()->GetEngineConfigControlState().LastApply;
     EXPECT_EQ(lastApply.Source, R::RuntimeConfigControlSource::AgentCli) << "config_apply records the agent as the source";
     engine.Shutdown();
@@ -257,6 +263,46 @@ TEST(SandboxAgentServer, ConnectionWindowShowsTheClientAndDisconnectsIt)
     EXPECT_TRUE(clicked) << "the window showed the connected client";
     EXPECT_TRUE(closed.load()) << "Disconnect agent closed the client's connection";
     EXPECT_FALSE(server->Status().ClientConnected);
+    shell.Detach();
+    engine.Shutdown();
+}
+
+// UI-062: the Screenshot window and F12 go through the same capture queue as the agent
+// tools; on the Null backend the window's Save PNG stays disabled and nothing is queued.
+TEST(SandboxScreenshotWindow, SavePngIsDisabledWithoutAnOperationalDevice)
+{
+    Config::EngineConfig config{};
+    config.Simulation.WorkerThreadCount = 1u;
+    config.ReferenceScene.Enabled = false;
+    config.Camera.Enabled = false;
+    config.Window.Backend = Config::WindowBackend::Null;
+    auto driver = std::make_unique<Driver>();
+    Driver* frames = driver.get();
+    Intrinsic::Tests::RuntimeTestKernel engine{config, std::move(driver)};
+    engine.EmplaceModule<R::SceneInteractionModule>();
+    engine.EmplaceModule<R::EditorUiModule>();
+    auto* capture = &engine.EmplaceModule<R::ViewCaptureModule>(std::filesystem::temp_directory_path());
+    engine.Initialize();
+    Editor::EditorShell shell;
+    shell.Attach(engine.Worlds(), engine.Services());
+    ASSERT_TRUE(shell.SetEditorWindowOpen("view.screenshot", true));
+
+    int frameCount = 0;
+    bool windowSeen = false;
+    frames->OnFrame = [&](R::Engine& kernel) {
+        ++frameCount;
+        if (auto* window = ImGui::FindWindowByName("Screenshot"); window != nullptr && frameCount > 3)
+        {
+            windowSeen = true;
+            ImGui::ActivateItemByID(window->GetID("Save PNG"));
+            ImGui::GetIO().AddKeyEvent(ImGuiKey_F12, (frameCount % 2) == 0);
+        }
+        if (frameCount > 12) kernel.RequestExit();
+    };
+    engine.Run();
+    EXPECT_TRUE(windowSeen);
+    EXPECT_TRUE(capture->UnavailableReason().has_value());
+    EXPECT_FALSE(capture->LastFinished().has_value()) << "a disabled Save PNG / F12 must not queue captures";
     shell.Detach();
     engine.Shutdown();
 }

@@ -10,6 +10,7 @@ module;
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 export module Extrinsic.Runtime.AgentServer;
@@ -34,6 +35,10 @@ export namespace Extrinsic::Runtime
         AgentProtocol(const AgentOperationRegistry& registry, bool readOnly) noexcept
             : m_Registry(&registry), m_ReadOnly(readOnly) {}
         [[nodiscard]] std::optional<std::string> Handle(std::string_view message, const AgentOperationContext& context);
+        // Replies for deferred tool calls that finished this frame.
+        [[nodiscard]] std::vector<std::string> PollPending(const AgentOperationContext& context);
+        [[nodiscard]] std::size_t PendingCount() const noexcept { return m_Pending.size(); }
+        void DropPending() noexcept { m_Pending.clear(); }
         [[nodiscard]] bool Initialized() const noexcept { return m_Initialized; }
         [[nodiscard]] const std::string& ClientName() const noexcept { return m_ClientName; }
 
@@ -42,6 +47,7 @@ export namespace Extrinsic::Runtime
         bool m_ReadOnly{false};
         bool m_Initialized{false};
         std::string m_ClientName{};
+        std::vector<std::pair<std::string, AgentOperationContinuation>> m_Pending{}; // (JSON id, continuation)
     };
 
     struct AgentServerOptions

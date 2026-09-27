@@ -13,6 +13,25 @@ contract_review: Reviewed the catalog; menu and panel controls over the RUNTIME-
 ---
 # UI-062 — Save Screenshot menu and capture controls
 
+## Completion — 2026-09-27
+Commit: the enclosing `claude/view-capture` commit records this retirement.
+Operational on the operator's host (live Sandbox under Xephyr, 2026-09-27): File >
+Save Screenshot, File > Save Window Screenshot, F12, and View > Screenshot (region,
+Save PNG, folder, last result) all saved PNGs; a "Saved ..." notice names the file.
+
+Deviations from the planned text, all deliberate:
+- The command is `ViewCaptureModule::Request(ViewCaptureRequest)` from
+  `Extrinsic.Runtime.ViewCapture` (the first RUNTIME-281 slice), not an
+  `EditorViewCaptureCommand`; camera presets and the colormap-strip toggle wait for
+  the rest of RUNTIME-281.
+- The controls live in their own View > Screenshot window instead of a block in
+  `view.camera_render`; that window is drawn inside `DrawFixedWindow`, which would
+  have needed another state parameter threaded through.
+- Captures go to `<working directory>/screenshots/` with timestamped names (no
+  path chooser; UI-047 has not landed). `/screenshots/` is git-ignored.
+- Tests: `SandboxScreenshotWindow.SavePngIsDisabledWithoutAnOperationalDevice`
+  (Null: Save PNG and F12 queue nothing) and `ViewCaptureGpuSmoke` (saved file).
+
 ## Goal
 Let users save the viewport as a PNG with a camera preset, size and colormap strip.
 
@@ -26,8 +45,8 @@ Let users save the viewport as a PNG with a camera preset, size and colormap str
 - Agent/CLI: `view_capture` (RUNTIME-281).
 
 ## Acceptance criteria
-- [ ] Menu item and Capture block issue `EditorViewCaptureCommand`; disabled with the runtime reason on Null/non-operational devices.
-- [ ] ImGui test on Null verifies the disabled reason; a `gpu;vulkan` test (or the RUNTIME-281 smoke) covers a saved file.
+- [x] Menu item and Capture block issue `EditorViewCaptureCommand`; disabled with the runtime reason on Null/non-operational devices.
+- [x] ImGui test on Null verifies the disabled reason; a `gpu;vulkan` test (or the RUNTIME-281 smoke) covers a saved file.
 
 ## Verification
 ```bash

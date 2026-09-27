@@ -20,6 +20,7 @@ target_sources(${target_name}
         GeometryIntegration/Runtime.GeometryPresentation.cppm
         Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cppm
         Rendering/Runtime.RenderArtifactPublication.cppm
+        Rendering/Runtime.ViewCapture.cppm
         Modules/Clustering/Runtime.ClusteringConfig.cppm
         Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm
         Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm
@@ -138,6 +139,7 @@ target_sources(${target_name}
         GeometryIntegration/Runtime.GeometryPresentation.cpp
         Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cpp
         Rendering/Runtime.RenderArtifactPublication.cpp
+        Rendering/Runtime.ViewCapture.cpp
         Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp
         Modules/Curvature/Runtime.MeshCurvatureConfig.cpp
         Modules/Geodesics/Runtime.GeodesicsConfig.cpp
@@ -229,6 +231,7 @@ target_sources(${target_name}
         Config/Runtime.EngineConfigControl.cpp
         Agent/Runtime.AgentOperations.cpp
         Agent/Runtime.AgentOperations.Editor.cpp
+        Agent/Runtime.AgentOperations.Capture.cpp
         Agent/Runtime.AgentServer.cpp
         Kernel/Runtime.InputActions.cpp
         Kernel/Runtime.KernelEvents.cpp
