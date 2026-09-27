@@ -70,6 +70,24 @@ namespace Extrinsic::Graphics
             RuntimeFrameCommandHookHandle) noexcept = default;
     };
 
+    export enum class BackbufferCaptureState : std::uint8_t
+    {
+        Unknown = 0, // no such ticket, or its result was already taken
+        Pending,
+        Ready,
+        Failed,
+    };
+
+    export struct BackbufferCaptureResult
+    {
+        BackbufferCaptureState State{BackbufferCaptureState::Unknown};
+        std::uint32_t Width{0};
+        std::uint32_t Height{0};
+        bool Srgb{false}; // pixels carry sRGB-encoded values
+        Core::Std::vector<std::uint8_t> Rgba8{};
+        Core::Std::string Diagnostic{};
+    };
+
     // SpatialDebugAabb's required owner supplies the vec3 definition. The forward
     // header supplies its name; span still requires a complete element type here.
     static_assert(sizeof(glm::vec3) > 0);
@@ -345,6 +363,17 @@ namespace Extrinsic::Graphics
         virtual void ClearActiveFrameRecipeOverride() noexcept = 0;
         [[nodiscard]] virtual const Core::Std::optional<FrameRecipeOverride>&
         GetActiveFrameRecipeOverride() const noexcept = 0;
+
+        // GRAPHICS-109 — one-shot capture of the next presented frame (editor
+        // UI included) as tightly packed, top-down RGBA8 pixels in the
+        // backbuffer's encoding. The renderer owns the host buffer: it is
+        // allocated before the next frame, the copy is recorded after that
+        // frame's graph, and the pixels are read once the frame slot has been
+        // reused. Returns ticket 0 when the device is not operational.
+        [[nodiscard]] virtual std::uint64_t RequestBackbufferCapture() = 0;
+        // Pending until the readback lands; a Ready or Failed result is handed
+        // out once, after which the ticket reports Unknown.
+        [[nodiscard]] virtual BackbufferCaptureResult TakeBackbufferCapture(std::uint64_t ticket) = 0;
 
         // GRAPHICS-076E — opt-in backbuffer-to-host readback wiring for the
         // canonical default recipe's visible-triangle parity harness. The

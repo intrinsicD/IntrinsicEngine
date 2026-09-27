@@ -1596,6 +1596,7 @@ namespace Extrinsic::Graphics
 
         bool RebuildOperationalResources(RHI::IDevice& device) override
         {
+            FailBackbufferCapture("Render device was rebuilt before the capture completed.");
             m_Device = &device;
             if (!device.IsOperational())
             {
@@ -1645,6 +1646,7 @@ namespace Extrinsic::Graphics
 
         void Shutdown() override
         {
+            FailBackbufferCapture("Renderer shut down before the capture completed.");
             ReleaseAllFrameTransientResources();
             m_Device = nullptr;
             ClearRuntimeSnapshotSlots();
@@ -1932,6 +1934,7 @@ namespace Extrinsic::Graphics
             // exposure-history mirror is never anchored to stale
             // pre-rebuild bytes.
             DrainCompletedHistogramSlots();
+            AdvanceBackbufferCapture();
             const bool began = m_Device->BeginFrame(outFrame);
             if (began)
             {
@@ -3540,6 +3543,11 @@ namespace Extrinsic::Graphics
                     const bool visualizationOverlayRecordedThisFrame =
                         CommandRecordPassRecorded(ToFramePassId(FrameRecipePassKind::VisualizationOverlay));
 
+                    if (graphExecuted)
+                    {
+                        RecordBackbufferCaptureCopy(graphicsContext, frame);
+                    }
+
                     // GRAPHICS-076E / GRAPHICS-077E / GRAPHICS-078E —
                     // opt-in pixel-readback hooks: copy after the executor's
                     // final Present transition and restore Present layout
@@ -4358,6 +4366,33 @@ namespace Extrinsic::Graphics
         GetActiveFrameRecipeOverride() const noexcept override
         {
             return m_ActiveFrameRecipeOverride;
+        }
+
+        [[nodiscard]] std::uint64_t RequestBackbufferCapture() override
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational() || m_BackbufferCapture.has_value())
+            {
+                return 0u;
+            }
+            m_BackbufferCapture = BackbufferCaptureSlot{
+                .Ticket = m_NextBackbufferCaptureTicket++,
+                .RequestedFrame = m_Device->GetGlobalFrameNumber(),
+            };
+            return m_BackbufferCapture->Ticket;
+        }
+
+        [[nodiscard]] BackbufferCaptureResult TakeBackbufferCapture(const std::uint64_t ticket) override
+        {
+            if (ticket != 0u && ticket == m_CompletedBackbufferCaptureTicket)
+            {
+                m_CompletedBackbufferCaptureTicket = 0u;
+                return std::exchange(m_CompletedBackbufferCapture, BackbufferCaptureResult{});
+            }
+            if (ticket != 0u && m_BackbufferCapture.has_value() && m_BackbufferCapture->Ticket == ticket)
+            {
+                return BackbufferCaptureResult{.State = BackbufferCaptureState::Pending};
+            }
+            return BackbufferCaptureResult{};
         }
 
         void SetDefaultRecipeBackbufferReadbackBuffer(RHI::BufferHandle handle) noexcept override
@@ -7694,6 +7729,143 @@ namespace Extrinsic::Graphics
         // seeded bytes, etc.) leaves the local decode buffer zeroed and
         // therefore falls through to the `EntityId == 0` NoHit branch —
         // safe by construction.
+        // Frames a capture may wait for an executed frame (minimized window,
+        // failing graph) before it fails instead of hanging its caller.
+        static constexpr std::uint64_t kBackbufferCaptureFrameBudget = 240u;
+
+        void FinishBackbufferCapture(BackbufferCaptureResult result)
+        {
+            if (!m_BackbufferCapture.has_value())
+            {
+                return;
+            }
+            if (m_BackbufferCapture->Buffer.IsValid() && m_Device != nullptr)
+            {
+                m_Device->DestroyBuffer(m_BackbufferCapture->Buffer);
+            }
+            m_CompletedBackbufferCaptureTicket = m_BackbufferCapture->Ticket;
+            m_CompletedBackbufferCapture = std::move(result);
+            m_BackbufferCapture.reset();
+        }
+
+        void FailBackbufferCapture(std::string diagnostic)
+        {
+            FinishBackbufferCapture(BackbufferCaptureResult{
+                .State = BackbufferCaptureState::Failed,
+                .Diagnostic = std::move(diagnostic),
+            });
+        }
+
+        // Runs before `IDevice::BeginFrame`: allocates the host buffer for a
+        // new request and reads a recorded copy back once its frame slot has
+        // been reused (the device waited on that slot's fence), which is the
+        // case when `framesInFlight` further frames have ended.
+        void AdvanceBackbufferCapture()
+        {
+            if (!m_BackbufferCapture.has_value())
+            {
+                return;
+            }
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                FailBackbufferCapture("Render device is not operational.");
+                return;
+            }
+            BackbufferCaptureSlot& capture = *m_BackbufferCapture;
+            const std::uint64_t frameNumber = m_Device->GetGlobalFrameNumber();
+            if (!capture.Copied)
+            {
+                if (frameNumber > capture.RequestedFrame + kBackbufferCaptureFrameBudget)
+                {
+                    FailBackbufferCapture("No frame was presented for the capture (window minimized?).");
+                    return;
+                }
+                const Core::Extent2D extent = m_Device->GetBackbufferExtent();
+                const RHI::Format format = m_Device->GetBackbufferFormat();
+                const auto width = static_cast<std::uint32_t>(std::max(extent.Width, 0));
+                const auto height = static_cast<std::uint32_t>(std::max(extent.Height, 0));
+                if (capture.Buffer.IsValid() &&
+                    (capture.Width != width || capture.Height != height || capture.Format != format))
+                {
+                    m_Device->DestroyBuffer(capture.Buffer); // resized before the copy recorded
+                    capture.Buffer = {};
+                }
+                if (!capture.Buffer.IsValid())
+                {
+                    if (format != RHI::Format::RGBA8_UNORM && format != RHI::Format::RGBA8_SRGB &&
+                        format != RHI::Format::BGRA8_UNORM && format != RHI::Format::BGRA8_SRGB)
+                    {
+                        FailBackbufferCapture("Backbuffer format is not an 8-bit RGBA/BGRA format.");
+                        return;
+                    }
+                    if (width == 0u || height == 0u)
+                    {
+                        return; // minimized; the frame budget bounds the wait
+                    }
+                    capture.Width = width;
+                    capture.Height = height;
+                    capture.Format = format;
+                    capture.Buffer = m_Device->CreateBuffer(RHI::BufferDesc{
+                        .SizeBytes = std::uint64_t{4u} * width * height,
+                        .Usage = RHI::BufferUsage::TransferDst,
+                        .HostVisible = true,
+                        .DebugName = "BackbufferCapture.Readback",
+                    });
+                    if (!capture.Buffer.IsValid())
+                    {
+                        FailBackbufferCapture("Could not allocate the capture readback buffer.");
+                    }
+                }
+                return;
+            }
+            const std::uint64_t framesInFlight = std::max<std::uint64_t>(1u, m_Device->GetFramesInFlight());
+            if (capture.IssuedFrame + framesInFlight >= frameNumber)
+            {
+                return;
+            }
+            BackbufferCaptureResult result{
+                .State = BackbufferCaptureState::Ready,
+                .Width = capture.Width,
+                .Height = capture.Height,
+                .Srgb = capture.Format == RHI::Format::RGBA8_SRGB || capture.Format == RHI::Format::BGRA8_SRGB,
+            };
+            result.Rgba8.resize(std::size_t{4u} * capture.Width * capture.Height);
+            m_Device->ReadBuffer(capture.Buffer, result.Rgba8.data(), result.Rgba8.size(), 0u);
+            const bool bgra = capture.Format == RHI::Format::BGRA8_UNORM || capture.Format == RHI::Format::BGRA8_SRGB;
+            for (std::size_t i = 0; i < result.Rgba8.size(); i += 4u)
+            {
+                if (bgra)
+                {
+                    std::swap(result.Rgba8[i], result.Rgba8[i + 2u]);
+                }
+                result.Rgba8[i + 3u] = 255u; // swapchain alpha is not meaningful
+            }
+            FinishBackbufferCapture(std::move(result));
+        }
+
+        void RecordBackbufferCaptureCopy(RHI::ICommandContext& graphicsContext, const RHI::FrameHandle& frame)
+        {
+            if (!m_BackbufferCapture.has_value() || m_BackbufferCapture->Copied ||
+                !m_BackbufferCapture->Buffer.IsValid() || m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return;
+            }
+            BackbufferCaptureSlot& capture = *m_BackbufferCapture;
+            const Core::Extent2D extent = m_Device->GetBackbufferExtent();
+            const RHI::TextureHandle backbuffer = m_Device->GetBackbufferHandle(frame);
+            if (!backbuffer.IsValid() || static_cast<std::uint32_t>(std::max(extent.Width, 0)) != capture.Width ||
+                static_cast<std::uint32_t>(std::max(extent.Height, 0)) != capture.Height)
+            {
+                return; // reallocated before the next frame
+            }
+            graphicsContext.TextureBarrier(backbuffer, RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc);
+            graphicsContext.CopyTextureToBuffer(backbuffer, RHI::TextureLayout::TransferSrc, 0u, 0u,
+                                                capture.Buffer, 0u, 0u, 0u, 0u, 0u);
+            graphicsContext.TextureBarrier(backbuffer, RHI::TextureLayout::TransferSrc, RHI::TextureLayout::Present);
+            capture.Copied = true;
+            capture.IssuedFrame = m_Device->GetGlobalFrameNumber();
+        }
+
         void DrainCompletedPickingSlots()
         {
             if (m_Device == nullptr || !m_Device->IsOperational())
@@ -10439,6 +10611,23 @@ namespace Extrinsic::Graphics
         // `"SurfacePass"` deferred executor branch added in this slice.
         FrameRecipeLightingPath              m_LightingPath{FrameRecipeLightingPath::Forward};
         std::optional<FrameRecipeOverride>   m_ActiveFrameRecipeOverride{};
+        // GRAPHICS-109 — at most one backbuffer capture in flight plus the
+        // last finished result until its ticket is taken.
+        struct BackbufferCaptureSlot
+        {
+            std::uint64_t Ticket{0u};
+            std::uint64_t RequestedFrame{0u};
+            RHI::BufferHandle Buffer{};
+            std::uint32_t Width{0u};
+            std::uint32_t Height{0u};
+            RHI::Format Format{RHI::Format::Undefined};
+            bool Copied{false};
+            std::uint64_t IssuedFrame{0u};
+        };
+        std::optional<BackbufferCaptureSlot> m_BackbufferCapture{};
+        std::uint64_t                        m_NextBackbufferCaptureTicket{1u};
+        BackbufferCaptureResult              m_CompletedBackbufferCapture{};
+        std::uint64_t                        m_CompletedBackbufferCaptureTicket{0u};
         // GRAPHICS-076E — opt-in default-recipe readback target. Invalid
         // handle = disabled (default).
         RHI::BufferHandle                    m_DefaultRecipeReadbackBuffer{};

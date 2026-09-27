@@ -48,9 +48,14 @@ launch flag: no module, thread or socket.
   `Preview*/Apply*` commands, and the panels' Show recipe
   (`MakeEditorPropertyVisualizationRecipe`). There is no generic scene or property write.
 - Naming: `scene_*`, `entity_*`, `config_sections`, `config_get`, `config_preview`,
-  `history`, `jobs`, `log` and `preview_*` are read-only (`readOnlyHint`);
-  `select_entity`, `import_file`, `show_property`, `config_apply`,
-  `run_mesh_operation`, `undo`, `redo` change state.
+  `history`, `jobs`, `log`, `preview_*` and `view_screenshot` are read-only
+  (`readOnlyHint`); `select_entity`, `import_file`, `show_property`, `config_apply`,
+  `run_mesh_operation`, `undo`, `redo` change state, and `view_capture` writes a PNG
+  inside the allowed roots.
+- Screenshots complete a few frames after the call: an operation may return an
+  `AgentOperationContinuation`, which the server polls each frame and answers with
+  the original JSON-RPC id; a reconnecting client drops pending replies. Both tools
+  call `ViewCaptureModule`, the queue behind File > Save Screenshot and F12.
 - Mutating calls run under `ScopedEditorCommandLabelPrefix("Agent: ")`, so the
   undo history shows each agent change and the operator can undo it.
 - Excluded by design: raw ECS or property-buffer writes, code execution, RHI
@@ -78,7 +83,7 @@ jobs ([RUNTIME-279](../../tasks/backlog/runtime/RUNTIME-279-editor-job-snapshot-
 selection queries ([RUNTIME-280](../../tasks/backlog/runtime/RUNTIME-280-selection-query-operations.md),
 [UI-061](../../tasks/backlog/ui/UI-061-select-by-query-controls.md)),
 view capture ([RUNTIME-281](../../tasks/backlog/runtime/RUNTIME-281-deterministic-view-capture-command.md),
-[UI-062](../../tasks/backlog/ui/UI-062-save-screenshot-and-capture-controls.md)),
+[UI-062](../../tasks/done/UI-062-save-screenshot-and-capture-controls.md)),
 headless batch ([RUNTIME-282](../../tasks/backlog/runtime/RUNTIME-282-headless-batch-cli.md)),
 property IO ([GEOIO-005](../../tasks/backlog/geometry/GEOIO-005-property-attributes-and-table-io.md),
 [RUNTIME-283](../../tasks/backlog/runtime/RUNTIME-283-property-import-export-operations.md),

@@ -53,6 +53,7 @@ import Extrinsic.Runtime.VisualizationRecipes;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.AgentServer;
+import Extrinsic.Runtime.ViewCapture;
 import Extrinsic.Runtime.ParameterizationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationTypes;
 
@@ -385,10 +386,33 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::EndMenu();
         }
 
-        void DrawMainMenuBar(EditorWindowRegistry* windowRegistry)
+        // File > Save Screenshot: requests go to the runtime capture queue; the menu only
+        // reports its availability. Returns the ticket of a started capture (0 otherwise).
+        std::uint64_t DrawFileMenu(Runtime::ViewCaptureModule* capture)
+        {
+            if (capture == nullptr || !ImGui::BeginMenu("File"))
+                return 0u;
+            std::uint64_t ticket = 0u;
+            const auto unavailable = capture->UnavailableReason();
+            ImGui::BeginDisabled(unavailable.has_value());
+            if (ImGui::MenuItem("Save Screenshot", "F12"))
+                ticket = capture->Request({.Region = Runtime::ViewCaptureRegion::Viewport});
+            if (ImGui::MenuItem("Save Window Screenshot"))
+                ticket = capture->Request({.Region = Runtime::ViewCaptureRegion::Window});
+            ImGui::EndDisabled();
+            if (unavailable.has_value())
+                ImGui::TextDisabled("%s", unavailable->c_str());
+            else
+                ImGui::TextDisabled("Saved to %s", capture->ScreenshotDirectory().string().c_str());
+            ImGui::EndMenu();
+            return ticket;
+        }
+
+        std::uint64_t DrawMainMenuBar(EditorWindowRegistry* windowRegistry, Runtime::ViewCaptureModule* capture)
         {
             if (!ImGui::BeginMainMenuBar())
-                return;
+                return 0u;
+            const std::uint64_t captureTicket = DrawFileMenu(capture);
             std::vector<EditorWindowMenuEntry> registeredEntries{};
             if (windowRegistry != nullptr)
                 registeredEntries = windowRegistry->BuildMenuModel();
@@ -423,6 +447,7 @@ namespace Extrinsic::Sandbox::Editor
                     kFixedRootMenus);
             }
             ImGui::EndMainMenuBar();
+            return captureTicket;
         }
 
         void DrawVisualizationPropertyPresets(
@@ -1999,6 +2024,13 @@ namespace Extrinsic::Sandbox::Editor
 
             Runtime::EditorWorkspaceAttachment Attachment{};
             Runtime::EditorUiHost* Host{nullptr};
+            Runtime::ViewCaptureModule* ViewCapture{nullptr};
+            // The capture the user started last (menu, F12 or window) and when it finished,
+            // for the short "Saved ..." notice; agent captures stay silent.
+            std::uint64_t UserCaptureTicket{0u};
+            double UserCaptureNoticeUntil{0.0};
+            std::string UserCaptureNotice{};
+            int ScreenshotRegionIndex{0};
             Runtime::EditorUiFrameContributionHandle FrameContribution{};
             BuiltinWindowHandles BuiltinHandles{};
             std::vector<Runtime::EditorWindowHandle> RegisteredWindows{};
@@ -2173,7 +2205,9 @@ namespace Extrinsic::Sandbox::Editor
                         host->SetSceneViewport(Runtime::EditorSceneViewportRect{
                             .X = x, .Y = y, .Width = width, .Height = height});
                     };
-                DrawMainMenuBar(&Host->Windows());
+                if (const std::uint64_t ticket = DrawMainMenuBar(&Host->Windows(), ViewCapture))
+                    UserCaptureTicket = ticket;
+                DrawScreenshotShortcutAndNotice();
                 // Copy: an observer may add or remove observers.
                 const auto observers = FrameObservers;
                 for (const auto& [id, observer] : observers)
@@ -2221,6 +2255,80 @@ namespace Extrinsic::Sandbox::Editor
                 });
             }
 
+            void DrawScreenshotShortcutAndNotice()
+            {
+                if (ViewCapture == nullptr)
+                    return;
+                if (ImGui::IsKeyPressed(ImGuiKey_F12, false) && !ImGui::GetIO().WantTextInput &&
+                    !ViewCapture->UnavailableReason().has_value())
+                    UserCaptureTicket = ViewCapture->Request({.Region = Runtime::ViewCaptureRegion::Viewport});
+                if (UserCaptureTicket != 0u)
+                {
+                    const Runtime::ViewCaptureStatus status = ViewCapture->Status(UserCaptureTicket);
+                    if (status.State == Runtime::ViewCaptureState::Completed ||
+                        status.State == Runtime::ViewCaptureState::Failed ||
+                        status.State == Runtime::ViewCaptureState::Unknown)
+                    {
+                        UserCaptureNotice = status.State == Runtime::ViewCaptureState::Completed
+                            ? "Saved " + status.Path
+                            : "Screenshot failed: " + status.Diagnostic;
+                        UserCaptureNoticeUntil = ImGui::GetTime() + 4.0;
+                        UserCaptureTicket = 0u;
+                    }
+                }
+                if (UserCaptureNotice.empty() || ImGui::GetTime() > UserCaptureNoticeUntil)
+                    return;
+                const ImGuiViewport* viewport = ImGui::GetMainViewport();
+                ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x - 12.0f,
+                                               viewport->WorkPos.y + viewport->WorkSize.y - 12.0f),
+                                        ImGuiCond_Always, ImVec2(1.0f, 1.0f));
+                ImGui::SetNextWindowBgAlpha(0.85f);
+                if (ImGui::Begin("##ScreenshotNotice", nullptr,
+                                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
+                                     ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+                                     ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs))
+                    ImGui::TextUnformatted(UserCaptureNotice.c_str());
+                ImGui::End();
+            }
+
+            void RegisterScreenshotWindow()
+            {
+                (void)RegisterEditorWindow(EditorWindowDescriptor{
+                    .Id = "view.screenshot",
+                    .MenuPath = {"View"},
+                    .Title = "Screenshot",
+                    .Draw = [this](bool& open, const SandboxEditorContext&)
+                    {
+                        if (!ImGui::Begin("Screenshot", &open)) { ImGui::End(); return; }
+                        const auto unavailable = ViewCapture->UnavailableReason();
+                        constexpr const char* kRegions[] = {"Viewport (3D scene)", "Whole window (with panels)"};
+                        ImGui::Combo("Region", &ScreenshotRegionIndex, kRegions, 2);
+                        ImGui::BeginDisabled(unavailable.has_value());
+                        if (ImGui::Button("Save PNG"))
+                            UserCaptureTicket = ViewCapture->Request({
+                                .Region = ScreenshotRegionIndex == 1 ? Runtime::ViewCaptureRegion::Window
+                                                                     : Runtime::ViewCaptureRegion::Viewport});
+                        ImGui::EndDisabled();
+                        ImGui::SameLine();
+                        ImGui::TextDisabled("F12 saves the viewport from anywhere.");
+                        if (unavailable.has_value())
+                            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "%s", unavailable->c_str());
+                        ImGui::Text("Folder: %s", ViewCapture->ScreenshotDirectory().string().c_str());
+                        if (UserCaptureTicket != 0u)
+                            ImGui::TextDisabled("Capturing...");
+                        else if (const auto last = ViewCapture->LastFinished())
+                        {
+                            if (last->State == Runtime::ViewCaptureState::Completed)
+                                ImGui::TextWrapped("Last: %s (%ux%u)", last->Path.empty() ? "(agent, not saved)" : last->Path.c_str(),
+                                                   last->Width, last->Height);
+                            else
+                                ImGui::TextWrapped("Last capture failed: %s", last->Diagnostic.c_str());
+                        }
+                        ImGui::End();
+                    },
+                });
+            }
+
             Runtime::EditorWindowHandle RegisterEditorWindow(
                 EditorWindowDescriptor descriptor)
             {
@@ -2263,6 +2371,9 @@ namespace Extrinsic::Sandbox::Editor
                 RegisterBuiltinWindows();
                 if (auto* agent = services.Find<Runtime::AgentServerModule>())
                     RegisterAgentConnectionWindow(*agent);
+                ViewCapture = services.Find<Runtime::ViewCaptureModule>();
+                if (ViewCapture != nullptr)
+                    RegisterScreenshotWindow();
                 Attachment.Attach(worlds, services);
                 if (!Attachment.IsAttached())
                 {
@@ -2291,6 +2402,8 @@ namespace Extrinsic::Sandbox::Editor
                 FrameContribution = {};
                 UnregisterAllWindows();
                 Host = nullptr;
+                ViewCapture = nullptr;
+                UserCaptureTicket = 0u;
                 Attachment.Detach();
             }
         };

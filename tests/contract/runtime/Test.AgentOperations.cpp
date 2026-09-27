@@ -1,7 +1,9 @@
 // RUNTIME-287/288: agent operation registry, MCP protocol core, read-only policy, path
 // containment and the "Agent:" history label, without sockets or an engine.
 #include <filesystem>
+#include <cstdint>
 #include <string>
+#include <string_view>
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 import Extrinsic.Runtime.AgentServer;
@@ -150,4 +152,76 @@ TEST(AgentOperations, PathsStayInsideAllowedRoots)
     EXPECT_FALSE(R::ResolveAgentPath(context, root.string() + "-sibling/x.obj")) << "prefix siblings are outside";
     EXPECT_FALSE(R::ResolveAgentPath(context, ""));
     EXPECT_FALSE(R::ResolveAgentPath(R::AgentOperationContext{}, "a.obj")) << "no roots, no files";
+}
+
+TEST(AgentOperations, DeferredCallsReplyWhenTheirContinuationFinishes)
+{
+    R::AgentOperationRegistry registry;
+    int polls = 0;
+    ASSERT_TRUE(registry.Register({.Name = "slow", .Title = "Slow", .ReadOnly = true,
+        .Invoke = [&polls](const R::AgentOperationContext&, std::string_view) {
+            R::AgentOperationOutcome outcome{};
+            outcome.Continuation = [&polls](const R::AgentOperationContext&, R::AgentOperationOutcome& out) {
+                if (++polls < 3) return false;
+                out = R::AgentOperationOutcome{.Text = R"({"done":true})", .Images = {{.Base64Data = "AAAA"}}};
+                return true;
+            };
+            return outcome; }}));
+    R::AgentProtocol protocol{registry, false};
+    const R::AgentOperationContext context{};
+    const Json request{{"jsonrpc", "2.0"}, {"id", "call-7"}, {"method", "tools/call"}, {"params", {{"name", "slow"}}}};
+    EXPECT_FALSE(protocol.Handle(request.dump(), context).has_value()) << "the reply waits for the continuation";
+    EXPECT_EQ(protocol.PendingCount(), 1u);
+    EXPECT_TRUE(protocol.PollPending(context).empty());
+    EXPECT_TRUE(protocol.PollPending(context).empty());
+    const auto replies = protocol.PollPending(context);
+    ASSERT_EQ(replies.size(), 1u);
+    const Json reply = Json::parse(replies.front());
+    EXPECT_EQ(reply["id"], "call-7");
+    EXPECT_EQ(reply["result"]["isError"], false);
+    EXPECT_EQ(reply["result"]["content"][0]["text"], R"({"done":true})");
+    EXPECT_EQ(reply["result"]["content"][1]["type"], "image");
+    EXPECT_EQ(protocol.PendingCount(), 0u);
+
+    EXPECT_FALSE(protocol.Handle(request.dump(), context).has_value());
+    protocol.DropPending(); // a reconnecting client never sees the old reply
+    EXPECT_TRUE(protocol.PollPending(context).empty());
+}
+
+TEST(AgentOperations, CaptureToolsFailClearlyWithoutTheCaptureServiceOrOutsideTheRoots)
+{
+    R::AgentOperationRegistry registry;
+    R::RegisterViewCaptureAgentOperations(registry);
+    R::AgentProtocol protocol{registry, true};
+    const auto root = std::filesystem::temp_directory_path().string();
+    const R::AgentOperationContext context{.AllowedRoots = {root}};
+    const auto tools = Call(protocol, context, {{"jsonrpc", "2.0"}, {"id", 1}, {"method", "tools/list"}});
+    ASSERT_EQ(tools["result"]["tools"].size(), 1u) << "read-only sessions only get view_screenshot";
+    EXPECT_EQ(tools["result"]["tools"][0]["name"], "view_screenshot");
+
+    const auto shot = Call(protocol, context, {{"jsonrpc", "2.0"}, {"id", 2}, {"method", "tools/call"},
+                                               {"params", {{"name", "view_screenshot"}}}});
+    EXPECT_EQ(shot["result"]["isError"], true);
+    const auto badRegion = Call(protocol, context, {{"jsonrpc", "2.0"}, {"id", 3}, {"method", "tools/call"},
+                                                    {"params", {{"name", "view_screenshot"}, {"arguments", {{"region", "desk"}}}}}});
+    EXPECT_EQ(badRegion["result"]["isError"], true);
+
+    R::AgentProtocol writer{registry, false};
+    const auto outside = Call(writer, context, {{"jsonrpc", "2.0"}, {"id", 4}, {"method", "tools/call"},
+                                                {"params", {{"name", "view_capture"}, {"arguments", {{"path", "/etc/shot.png"}}}}}});
+    EXPECT_EQ(outside["result"]["isError"], true);
+    EXPECT_NE(outside["result"]["content"][0]["text"].get<std::string>().find("allowed roots"), std::string::npos);
+}
+
+TEST(AgentOperations, Base64MatchesTheRfcVectors)
+{
+    const auto encode = [](std::string_view text) {
+        return R::EncodeBase64({reinterpret_cast<const std::uint8_t*>(text.data()), text.size()}); };
+    EXPECT_EQ(encode(""), "");
+    EXPECT_EQ(encode("f"), "Zg==");
+    EXPECT_EQ(encode("fo"), "Zm8=");
+    EXPECT_EQ(encode("foo"), "Zm9v");
+    EXPECT_EQ(encode("foob"), "Zm9vYg==");
+    EXPECT_EQ(encode("fooba"), "Zm9vYmE=");
+    EXPECT_EQ(encode("foobar"), "Zm9vYmFy");
 }

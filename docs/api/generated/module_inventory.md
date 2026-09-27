@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 6 |
-| `runtime` | 101 |
+| `runtime` | 102 |
 
 ## Modules
 
@@ -455,6 +455,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.RenderArtifactPublication` | `src/runtime/Rendering/Runtime.RenderArtifactPublication.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Rendering/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderWorldPool` | `src/runtime/Rendering/Runtime.RenderWorldPool.cppm` | `runtime` |
+| `Extrinsic.Runtime.ViewCapture` | `src/runtime/Rendering/Runtime.ViewCapture.cppm` | `runtime` |
 | `Extrinsic.Runtime.ReferenceScene` | `src/runtime/Scene/Runtime.ReferenceScene.cppm` | `runtime` |
 | `Extrinsic.Runtime.SceneDocumentModule` | `src/runtime/Scene/Runtime.SceneDocumentModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.SceneInteractionModule` | `src/runtime/Scene/Runtime.SceneInteractionModule.cppm` | `runtime` |
@@ -463,4 +464,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **436**
+Total modules: **437**

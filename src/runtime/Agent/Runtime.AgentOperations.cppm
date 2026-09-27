@@ -18,6 +18,7 @@ import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.ViewCapture;
 
 export namespace Extrinsic::Runtime
 {
@@ -27,11 +28,20 @@ export namespace Extrinsic::Runtime
         std::string Base64Data{};
     };
 
+    struct AgentOperationContext;
+    struct AgentOperationOutcome;
+
+    // Polled once per frame on the main thread until it returns true with the final outcome.
+    using AgentOperationContinuation =
+        std::function<bool(const AgentOperationContext&, AgentOperationOutcome& outcome)>;
+
     struct AgentOperationOutcome
     {
         bool IsError{false};
         std::string Text{"{}"}; // JSON document (or a plain message for errors)
         std::vector<AgentImage> Images{};
+        // Set by operations that finish on a later frame (captures); the reply waits for it.
+        AgentOperationContinuation Continuation{};
     };
 
     // Borrowed engine services for one call on the main thread; any may be null.
@@ -41,6 +51,7 @@ export namespace Extrinsic::Runtime
         EngineConfigControl* ConfigControl{nullptr};
         JobService* Jobs{nullptr};
         EditorCommandHistory* History{nullptr};
+        ViewCaptureModule* ViewCapture{nullptr};
         // Canonical absolute directories file arguments must stay inside.
         std::vector<std::string> AllowedRoots{};
         std::uint64_t FrameIndex{0};
@@ -84,4 +95,8 @@ export namespace Extrinsic::Runtime
 
     // Scene, selection, config, history, jobs, log and mesh-field operations.
     void RegisterEditorAgentOperations(AgentOperationRegistry& registry);
+    // view_screenshot (image only) and view_capture (PNG file) over ViewCaptureModule.
+    void RegisterViewCaptureAgentOperations(AgentOperationRegistry& registry);
+
+    [[nodiscard]] std::string EncodeBase64(std::span<const std::uint8_t> bytes);
 }

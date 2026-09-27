@@ -28,6 +28,7 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Runtime.ViewCapture;
 import Extrinsic.Runtime.WorldRegistry;
 
 namespace Extrinsic::Runtime
@@ -44,6 +45,14 @@ namespace Extrinsic::Runtime
         Json ResultResponse(const Json& id, Json result)
         {
             return {{"jsonrpc", "2.0"}, {"id", id}, {"result", std::move(result)}};
+        }
+        Json ToolResultResponse(const Json& id, const AgentOperationOutcome& outcome)
+        {
+            Json content = Json::array();
+            content.push_back({{"type", "text"}, {"text", outcome.Text}});
+            for (const auto& image : outcome.Images)
+                content.push_back({{"type", "image"}, {"data", image.Base64Data}, {"mimeType", image.MimeType}});
+            return ResultResponse(id, {{"content", content}, {"isError", outcome.IsError}});
         }
         Json ParsedSchema(const std::string& text)
         {
@@ -128,14 +137,28 @@ namespace Extrinsic::Runtime
             if (m_Registry->Find(name) == nullptr) return Dump(ErrorResponse(id, -32602, "Unknown tool: " + name));
             const auto argsIt = params.find("arguments");
             const std::string arguments = argsIt != params.end() && argsIt->is_object() ? Dump(*argsIt) : "{}";
-            const auto outcome = InvokeAgentOperation(*m_Registry, name, context, arguments, m_ReadOnly);
-            Json content = Json::array();
-            content.push_back({{"type", "text"}, {"text", outcome.Text}});
-            for (const auto& image : outcome.Images)
-                content.push_back({{"type", "image"}, {"data", image.Base64Data}, {"mimeType", image.MimeType}});
-            return Dump(ResultResponse(id, {{"content", content}, {"isError", outcome.IsError}}));
+            auto outcome = InvokeAgentOperation(*m_Registry, name, context, arguments, m_ReadOnly);
+            if (outcome.Continuation)
+            {
+                m_Pending.emplace_back(Dump(id), std::move(outcome.Continuation));
+                return std::nullopt;
+            }
+            return Dump(ToolResultResponse(id, outcome));
         }
         return Dump(ErrorResponse(id, -32601, "Method not found: " + method));
+    }
+
+    std::vector<std::string> AgentProtocol::PollPending(const AgentOperationContext& context)
+    {
+        std::vector<std::string> replies;
+        for (auto it = m_Pending.begin(); it != m_Pending.end();)
+        {
+            AgentOperationOutcome outcome{};
+            if (!it->second(context, outcome)) { ++it; continue; }
+            replies.push_back(Dump(ToolResultResponse(Json::parse(it->first, nullptr, false), outcome)));
+            it = m_Pending.erase(it);
+        }
+        return replies;
     }
 
     struct AgentServerModule::Impl
@@ -151,6 +174,7 @@ namespace Extrinsic::Runtime
         std::deque<std::pair<std::uint64_t, std::string>> Outbound{};
         AgentServerStatus Status{};
         std::uint64_t Generation{0};
+        std::uint64_t PendingGeneration{0};
         bool DisconnectRequested{false};
 
         std::atomic_bool Stop{false};
@@ -232,9 +256,21 @@ namespace Extrinsic::Runtime
                 .ConfigControl = frame.Services.Find<EngineConfigControl>(),
                 .Jobs = &frame.Jobs,
                 .History = frame.Services.Find<EditorCommandHistory>(),
+                .ViewCapture = frame.Services.Find<ViewCaptureModule>(),
                 .AllowedRoots = Options.AllowedRoots,
                 .FrameIndex = frame.FrameIndex,
             };
+            {
+                // Deferred replies belong to the client that asked; a reconnect drops them.
+                std::scoped_lock lock{Mutex};
+                if (PendingGeneration != Generation) Protocol->DropPending();
+                PendingGeneration = Generation;
+            }
+            for (auto& reply : Protocol->PollPending(context))
+            {
+                std::scoped_lock lock{Mutex};
+                Outbound.emplace_back(PendingGeneration, std::move(reply));
+            }
             for (std::uint32_t call = 0; call < Options.MaxCallsPerFrame; ++call)
             {
                 std::pair<std::uint64_t, std::string> message;
@@ -276,6 +312,7 @@ namespace Extrinsic::Runtime
         }
         m_Impl->Options = std::move(options);
         RegisterEditorAgentOperations(m_Impl->Registry);
+        RegisterViewCaptureAgentOperations(m_Impl->Registry);
         m_Impl->Protocol = std::make_unique<AgentProtocol>(m_Impl->Registry, m_Impl->Options.ReadOnly);
         m_Impl->Status.ReadOnly = m_Impl->Options.ReadOnly;
         m_Impl->Status.SocketPath = m_Impl->Options.SocketPath;

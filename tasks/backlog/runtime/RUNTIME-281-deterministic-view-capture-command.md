@@ -15,6 +15,20 @@ contracts: [repo.source-documentation]
 ---
 # RUNTIME-281 — Deterministic view capture command
 
+## Progress — 2026-09-27 (slice A, `claude/view-capture`)
+Done: `Extrinsic.Runtime.ViewCapture` (`ViewCaptureModule`: queued requests, one
+renderer capture at a time, viewport crop via `ResolveSceneViewportPixels` or whole
+window, PNG through the existing stb writer, `.partial` + rename so failures leave
+no file, Null/non-operational fail-closed with a reason); agent tools
+`view_screenshot` (read-only, image only) and `view_capture` (file inside the
+allowed roots, image unless `path_only`), answered through deferred
+`AgentOperationContinuation` replies; UI-062 callers; CPU tests
+(`Test.ViewCapture.cpp`, `Test.AgentOperations.cpp`) and the `gpu;vulkan`
+`ViewCaptureGpuSmoke` (PNG size and triangle-versus-clear pixels, current camera).
+Remaining: camera presets with fit-to-entity, width/height override, property
+visualization apply/restore with colormap range metadata and legend strip, and
+`SavedToFile` artifact publication.
+
 ## Goal
 - Capture the viewport to a PNG from a named camera preset or explicit camera,
   optionally with a property visualization and colormap-range metadata, through one
@@ -33,7 +47,7 @@ contracts: [repo.source-documentation]
 
 ## Control surfaces
 - Config: N/A (per-call command; capture resolution defaults follow GRAPHICS-109's render-output config).
-- UI: File > Save Screenshot… and the Capture block in `view.camera_render` (UI-062).
+- UI: File > Save Screenshot…, F12 and View > Screenshot (UI-062, retired); presets and legend controls join that window.
 - Agent/CLI: `view_capture {…}` (mutating: writes a file; returns MCP `image` content capped at 2048² unless `path_only:true`, plus camera/range/colormap/artifact metadata); `--capture` in RUNTIME-282.
 
 ## Required changes

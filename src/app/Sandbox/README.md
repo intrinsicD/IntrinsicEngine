@@ -536,6 +536,16 @@ See [the agent control lane](../../../docs/architecture/agent-control-lane.md).
 build/ci-vulkan/bin/ExtrinsicSandbox --agent-socket
 ```
 
+## Screenshots
+
+**File > Save Screenshot** (or **F12** anywhere) saves the 3D viewport as
+`screenshots/intrinsic-<date>-<time>-<n>.png` under the working directory;
+**File > Save Window Screenshot** includes the panels. **View > Screenshot** picks
+the region and shows the folder and the last result, and a short notice names the
+saved file. Agents use the same queue: `view_screenshot` returns the image without
+writing a file (read-only), `view_capture` saves inside the allowed roots. On the
+Null backend the controls are disabled with the reason.
+
 ## Frame-Pacing Diagnostics
 
 `UI-030` adds an explicit bounded capture mode to `ExtrinsicSandbox`:

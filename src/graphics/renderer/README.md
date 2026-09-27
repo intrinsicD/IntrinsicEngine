@@ -169,6 +169,15 @@ path completes. Picking and histogram readback issue counters plus per-slot
 metadata route through guarded helpers before the render-thread `BeginFrame()`
 drains consume them.
 
+Screenshots use `IRenderer::RequestBackbufferCapture()` / `TakeBackbufferCapture()`
+(GRAPHICS-109): at most one renderer-owned host buffer, allocated in `BeginFrame()`
+for the current backbuffer extent, filled by the post-graph copy triplet on the next
+executed frame, and read back as top-down RGBA8 once `framesInFlight` later frames
+have ended (BGRA swizzled, alpha forced opaque). It captures the presented frame,
+editor UI included; a non-operational device returns ticket 0, and resizes,
+device rebuilds, shutdown or 240 frames without a presented frame fail the ticket.
+PNG encoding and file writes belong to `Extrinsic.Runtime.ViewCapture`.
+
 Native GPU pass profiling is default-off diagnostic instrumentation selected
 by the immutable `RenderFrameInput::EnableGpuProfiling` bit and copied into the
 matching `RenderWorld`. The renderer resolves the accepted queue lane first,
