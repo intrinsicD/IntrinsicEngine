@@ -15,6 +15,26 @@ contracts: [repo.source-documentation]
 ---
 # RUNTIME-281 — Deterministic view capture command
 
+## Progress — 2026-09-28 (slice B, `claude/config-schemas`)
+Done: `ViewCapturePreset` (current, front, back, left, right, top, bottom, isometric)
+framing `FitEntity` or every entity with world bounds, settling 3 frames, and
+restoring the main camera exactly through the new `ICameraController::Clone()`
+(re-seed fallback for controllers without it); `LegendEntity` appends a 24 px
+colormap strip (LUT sampled like the frame, sRGB-encoded for sRGB backbuffers) and
+returns `ViewCaptureLegend` (property, colormap, min/max, auto flag) from the
+entity's effective scalar lane, with automatic ranges resolved through
+`EncodeVisualizationRecipe` (the renderer's robust range). Agent tools take
+`preset`, `fit_entity`, `legend_entity`; View > Screenshot has a Camera combo and a
+legend checkbox for the selected entity. Tests: preset axes, legend compositor,
+camera clones, agent argument errors, and `ViewCaptureGpuSmoke.FrontPresetWithLegendRestoresTheCamera`.
+Deviations: presets frame bounds instead of taking explicit eye/target/up; the
+legend describes the visualization already shown (agents call `show_property` and
+`undo`) instead of applying and restoring one per capture; the strip has no text
+labels (range is metadata). The reference triangle has no world bounds, so presets
+on an otherwise empty scene fail with a diagnostic.
+Remaining: explicit camera parameters, width/height override (needs GRAPHICS-109's
+offscreen target), `SavedToFile` artifact publication, the CLI path (RUNTIME-282).
+
 ## Progress — 2026-09-27 (slice A, `claude/view-capture`)
 Done: `Extrinsic.Runtime.ViewCapture` (`ViewCaptureModule`: queued requests, one
 renderer capture at a time, viewport crop via `ResolveSceneViewportPixels` or whole

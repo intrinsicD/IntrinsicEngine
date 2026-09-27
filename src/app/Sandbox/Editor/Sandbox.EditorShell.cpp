@@ -54,6 +54,7 @@ import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.AgentServer;
 import Extrinsic.Runtime.ViewCapture;
+import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ParameterizationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationTypes;
 
@@ -2025,12 +2026,15 @@ namespace Extrinsic::Sandbox::Editor
             Runtime::EditorWorkspaceAttachment Attachment{};
             Runtime::EditorUiHost* Host{nullptr};
             Runtime::ViewCaptureModule* ViewCapture{nullptr};
+            const Runtime::SelectionController* Selection{nullptr};
             // The capture the user started last (menu, F12 or window) and when it finished,
             // for the short "Saved ..." notice; agent captures stay silent.
             std::uint64_t UserCaptureTicket{0u};
             double UserCaptureNoticeUntil{0.0};
             std::string UserCaptureNotice{};
             int ScreenshotRegionIndex{0};
+            int ScreenshotPresetIndex{0};
+            bool ScreenshotLegend{false};
             Runtime::EditorUiFrameContributionHandle FrameContribution{};
             BuiltinWindowHandles BuiltinHandles{};
             std::vector<Runtime::EditorWindowHandle> RegisteredWindows{};
@@ -2303,11 +2307,29 @@ namespace Extrinsic::Sandbox::Editor
                         const auto unavailable = ViewCapture->UnavailableReason();
                         constexpr const char* kRegions[] = {"Viewport (3D scene)", "Whole window (with panels)"};
                         ImGui::Combo("Region", &ScreenshotRegionIndex, kRegions, 2);
-                        ImGui::BeginDisabled(unavailable.has_value());
+                        constexpr const char* kPresets[] = {"Current view", "Front", "Back", "Left", "Right",
+                                                            "Top", "Bottom", "Isometric"};
+                        ImGui::Combo("Camera", &ScreenshotPresetIndex, kPresets, 8);
+                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))
+                            ImGui::SetTooltip("Presets frame the selected entity (or the whole scene) for the shot "
+                                              "and restore your view afterwards.");
+                        const auto selected = Selection != nullptr ? Selection->SelectedStableIds()
+                                                                   : std::span<const std::uint32_t>{};
+                        const std::uint32_t selectedId = selected.empty() ? 0u : selected.front();
+                        ImGui::Checkbox("Colormap legend (selected entity)", &ScreenshotLegend);
+                        if (ScreenshotLegend && selectedId == 0u)
+                            ImGui::TextDisabled("Select the entity whose scalar coloring the legend shows.");
+                        ImGui::BeginDisabled(unavailable.has_value() || (ScreenshotLegend && selectedId == 0u));
                         if (ImGui::Button("Save PNG"))
+                        {
+                            const auto preset = static_cast<Runtime::ViewCapturePreset>(ScreenshotPresetIndex);
                             UserCaptureTicket = ViewCapture->Request({
                                 .Region = ScreenshotRegionIndex == 1 ? Runtime::ViewCaptureRegion::Window
-                                                                     : Runtime::ViewCaptureRegion::Viewport});
+                                                                     : Runtime::ViewCaptureRegion::Viewport,
+                                .Preset = preset,
+                                .FitEntity = preset == Runtime::ViewCapturePreset::Current ? 0u : selectedId,
+                                .LegendEntity = ScreenshotLegend ? selectedId : 0u});
+                        }
                         ImGui::EndDisabled();
                         ImGui::SameLine();
                         ImGui::TextDisabled("F12 saves the viewport from anywhere.");
@@ -2319,8 +2341,14 @@ namespace Extrinsic::Sandbox::Editor
                         else if (const auto last = ViewCapture->LastFinished())
                         {
                             if (last->State == Runtime::ViewCaptureState::Completed)
+                            {
                                 ImGui::TextWrapped("Last: %s (%ux%u)", last->Path.empty() ? "(agent, not saved)" : last->Path.c_str(),
                                                    last->Width, last->Height);
+                                if (last->Legend)
+                                    ImGui::TextWrapped("Legend: %s, %s, %g to %g%s", last->Legend->Property.c_str(),
+                                                       last->Legend->Colormap.c_str(), last->Legend->Min, last->Legend->Max,
+                                                       last->Legend->AutoRange ? " (auto)" : "");
+                            }
                             else
                                 ImGui::TextWrapped("Last capture failed: %s", last->Diagnostic.c_str());
                         }
@@ -2372,6 +2400,7 @@ namespace Extrinsic::Sandbox::Editor
                 if (auto* agent = services.Find<Runtime::AgentServerModule>())
                     RegisterAgentConnectionWindow(*agent);
                 ViewCapture = services.Find<Runtime::ViewCaptureModule>();
+                Selection = services.Find<Runtime::SelectionController>();
                 if (ViewCapture != nullptr)
                     RegisterScreenshotWindow();
                 Attachment.Attach(worlds, services);
@@ -2403,6 +2432,7 @@ namespace Extrinsic::Sandbox::Editor
                 UnregisterAllWindows();
                 Host = nullptr;
                 ViewCapture = nullptr;
+                Selection = nullptr;
                 UserCaptureTicket = 0u;
                 Attachment.Detach();
             }

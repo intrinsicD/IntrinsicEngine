@@ -45,6 +45,9 @@ namespace Extrinsic::Runtime
         virtual void Update(const Platform::Input::Context& input, double deltaSeconds) noexcept = 0;
         [[nodiscard]] virtual Graphics::CameraViewInput GetView(Core::Extent2D viewport) const noexcept = 0;
         [[nodiscard]] virtual Core::Config::CameraControllerKind Kind() const noexcept = 0;
+        // A copy of the controller's full state (screenshots restore the view
+        // with it); nullptr when the controller cannot be copied.
+        [[nodiscard]] virtual std::unique_ptr<ICameraController> Clone() const { return nullptr; }
     };
 
     export class OrbitCameraController final : public ICameraController
@@ -58,6 +61,10 @@ namespace Extrinsic::Runtime
         void Update(const Platform::Input::Context& input, double deltaSeconds) noexcept override;
         [[nodiscard]] Graphics::CameraViewInput GetView(Core::Extent2D viewport) const noexcept override;
         [[nodiscard]] Core::Config::CameraControllerKind Kind() const noexcept override;
+        [[nodiscard]] std::unique_ptr<ICameraController> Clone() const override
+        {
+            return std::make_unique<OrbitCameraController>(*this);
+        }
 
         [[nodiscard]] float Radius() const noexcept { return m_Radius; }
         [[nodiscard]] float MinRadius() const noexcept { return m_MinRadius; }
@@ -91,6 +98,10 @@ namespace Extrinsic::Runtime
         void Update(const Platform::Input::Context& input, double deltaSeconds) noexcept override;
         [[nodiscard]] Graphics::CameraViewInput GetView(Core::Extent2D viewport) const noexcept override;
         [[nodiscard]] Core::Config::CameraControllerKind Kind() const noexcept override;
+        [[nodiscard]] std::unique_ptr<ICameraController> Clone() const override
+        {
+            return std::make_unique<FlyCameraController>(*this);
+        }
 
     private:
         glm::vec3 m_Position{0.0f, 0.0f, 4.0f};
@@ -116,6 +127,10 @@ namespace Extrinsic::Runtime
         void Update(const Platform::Input::Context& input, double deltaSeconds) noexcept override;
         [[nodiscard]] Graphics::CameraViewInput GetView(Core::Extent2D viewport) const noexcept override;
         [[nodiscard]] Core::Config::CameraControllerKind Kind() const noexcept override;
+        [[nodiscard]] std::unique_ptr<ICameraController> Clone() const override
+        {
+            return std::make_unique<FreeLookCameraController>(*this);
+        }
 
     private:
         glm::vec3 m_Position{0.0f, 0.0f, 4.0f};
@@ -143,6 +158,10 @@ namespace Extrinsic::Runtime
         void Update(const Platform::Input::Context& input, double deltaSeconds) noexcept override;
         [[nodiscard]] Graphics::CameraViewInput GetView(Core::Extent2D viewport) const noexcept override;
         [[nodiscard]] Core::Config::CameraControllerKind Kind() const noexcept override;
+        [[nodiscard]] std::unique_ptr<ICameraController> Clone() const override
+        {
+            return std::make_unique<TopDownCameraController>(*this);
+        }
 
         [[nodiscard]] float OrthographicHeight() const noexcept { return m_OrthographicHeight; }
         [[nodiscard]] float MinOrthographicHeight() const noexcept { return m_MinOrthographicHeight; }

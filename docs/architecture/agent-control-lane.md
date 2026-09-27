@@ -55,7 +55,10 @@ launch flag: no module, thread or socket.
 - Screenshots complete a few frames after the call: an operation may return an
   `AgentOperationContinuation`, which the server polls each frame and answers with
   the original JSON-RPC id; a reconnecting client drops pending replies. Both tools
-  call `ViewCaptureModule`, the queue behind File > Save Screenshot and F12.
+  call `ViewCaptureModule`, the queue behind File > Save Screenshot and F12, and
+  accept a camera `preset` (restored afterwards, so `view_screenshot` stays
+  read-only), `fit_entity`, and `legend_entity`, which appends a colormap strip and
+  returns the property, colormap and the range the renderer uses.
 - Mutating calls run under `ScopedEditorCommandLabelPrefix("Agent: ")`, so the
   undo history shows each agent change and the operator can undo it.
 - Excluded by design: raw ECS or property-buffer writes, code execution, RHI

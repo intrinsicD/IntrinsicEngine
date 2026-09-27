@@ -50,6 +50,8 @@ class Engine:
         self.next_id = 1
         self.server_info: dict = {}
         self.last_error = ""
+        self.generation = 0     # counts successful connections (a restarted Sandbox is a new one)
+        self.delivered = False  # whether the last request reached the socket
 
     @property
     def connected(self) -> bool:
@@ -58,11 +60,12 @@ class Engine:
     def connect(self) -> bool:
         if self.sock is not None:
             return True
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
-            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.settimeout(self.timeout)
             sock.connect(self.path)
         except OSError as error:
+            sock.close()
             self.last_error = f"{self.path}: {error.strerror or error}"
             return False
         self.sock, self.reader = sock, sock.makefile("r", encoding="utf-8", newline="\n")
@@ -74,7 +77,14 @@ class Engine:
             return False
         self.server_info = reply["result"].get("serverInfo", {})
         self.send({"jsonrpc": "2.0", "method": "notifications/initialized"})
+        self.generation += 1
         return True
+
+    def probe(self) -> bool:
+        """Reconnects when the current connection no longer answers (e.g. the Sandbox restarted)."""
+        if self.sock is not None and self.request("ping") is None:
+            self.close()
+        return self.connect()
 
     def close(self, reason: str = "") -> None:
         if self.sock is not None:
@@ -99,8 +109,10 @@ class Engine:
     def request(self, method: str, params: dict | None = None) -> dict | None:
         message_id = f"bridge-{self.next_id}"
         self.next_id += 1
+        self.delivered = False
         if not self.send({"jsonrpc": "2.0", "id": message_id, "method": method, "params": params or {}}):
             return None
+        self.delivered = True
         try:
             while True:
                 line = self.reader.readline()
@@ -120,13 +132,16 @@ class Bridge:
         self.engine = engine
         self.out = out
         self.tools_visible = False  # whether the client last saw the Sandbox's tools
+        self.tools_generation = 0   # connection whose tools the client last saw
 
     def write(self, message: dict) -> None:
         self.out.write(json.dumps(message) + "\n")
         self.out.flush()
 
     def notify_tools_changed_if_needed(self) -> None:
-        if self.tools_visible != self.engine.connected:
+        # A restarted Sandbox may be a different build, so a new connection also refreshes the list.
+        if self.tools_visible != self.engine.connected or (
+                self.engine.connected and self.tools_generation != self.engine.generation):
             self.write({"jsonrpc": "2.0", "method": "notifications/tools/list_changed"})
 
     def status_text(self) -> str:
@@ -158,21 +173,25 @@ class Bridge:
                 if reply is not None and "result" in reply:
                     tools += reply["result"].get("tools", [])
             self.tools_visible = self.engine.connected
+            self.tools_generation = self.engine.generation
             return result({"tools": tools})
         if method == "tools/call":
             params = message.get("params", {})
             if params.get("name") == STATUS_TOOL["name"]:
-                self.engine.connect()
+                self.engine.probe()
                 self.notify_tools_changed_if_needed()
                 return result({"content": [{"type": "text", "text": self.status_text()}], "isError": False})
             if not self.engine.connect():
                 self.notify_tools_changed_if_needed()
                 return result({"content": [{"type": "text", "text": self.status_text()}], "isError": True})
             reply = self.engine.request("tools/call", params)
+            if reply is None and not self.engine.delivered and self.engine.connect():
+                reply = self.engine.request("tools/call", params)  # never reached the old connection
             if reply is None:
                 self.notify_tools_changed_if_needed()
                 return result({"content": [{"type": "text", "text": self.status_text()}], "isError": True})
             reply["id"] = message_id
+            self.notify_tools_changed_if_needed()
             return reply
         return {"jsonrpc": "2.0", "id": message_id, "error": {"code": -32601, "message": f"Method not found: {method}"}}
 

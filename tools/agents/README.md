@@ -56,5 +56,9 @@ Agent workflow and task policy tooling.
 `mcp_bridge.py` connects an MCP client (the `intrinsic-sandbox` entry in
 `.mcp.json`) to a Sandbox started with `--agent-socket`; stdlib only. See
 [the agent control lane](../../docs/architecture/agent-control-lane.md).
+After a Sandbox restart, `sandbox_status` probes the old connection, reconnects and
+announces the (possibly changed) tool list; a call whose send failed is retried
+once on the new connection. Clients that cache tool schemas still see new tools
+only after they re-read the list.
 Regression cases: `tests/regression/tooling/Test.McpBridge.py`.
 

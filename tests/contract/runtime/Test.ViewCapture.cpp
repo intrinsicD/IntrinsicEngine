@@ -8,12 +8,14 @@
 #include <string>
 #include <unistd.h>
 #include <vector>
+#include <glm/glm.hpp>
 #include <gtest/gtest.h>
 #include "RuntimeTestModule.hpp"
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.Runtime.ViewCapture;
+import Extrinsic.Runtime.CameraControllers;
 namespace R = Extrinsic::Runtime;
 namespace
 {
@@ -142,4 +144,61 @@ TEST(ViewCapture, FailsClosedOnTheNullDevice)
     ASSERT_TRUE(frames->Capture->LastFinished().has_value());
     EXPECT_EQ(frames->Capture->LastFinished()->Ticket, frames->Ticket);
     std::filesystem::remove_all(dir);
+}
+
+TEST(ViewCapture, PresetAxesAreOrthonormalAndLookAlongTheirAxis)
+{
+    using P = R::ViewCapturePreset;
+    for (const auto preset : {P::Current, P::Front, P::Back, P::Left, P::Right, P::Top, P::Bottom, P::Isometric})
+    {
+        const auto axes = R::ViewCapturePresetAxesFor(preset);
+        EXPECT_NEAR(glm::length(axes.Forward), 1.0f, 1e-6f) << R::ToString(preset);
+        EXPECT_NEAR(glm::length(axes.Up), 1.0f, 1e-6f) << R::ToString(preset);
+        EXPECT_NEAR(glm::dot(axes.Forward, axes.Up), 0.0f, 1e-6f) << R::ToString(preset);
+    }
+    EXPECT_EQ(R::ViewCapturePresetAxesFor(P::Front).Forward, glm::vec3(0, 0, -1));
+    EXPECT_EQ(R::ViewCapturePresetAxesFor(P::Right).Forward, glm::vec3(-1, 0, 0));
+    EXPECT_EQ(R::ViewCapturePresetAxesFor(P::Top).Forward, glm::vec3(0, -1, 0));
+    EXPECT_GT(R::ViewCapturePresetAxesFor(P::Isometric).Up.y, 0.0f) << "isometric keeps +Y up";
+}
+
+TEST(ViewCapture, LegendAppendsAColormapStripBelowTheImage)
+{
+    auto image = Gradient(40, 10);
+    const auto original = image.Rgba8;
+    const std::vector<std::uint8_t> lut{255, 0, 0, 0, 255, 0, 0, 0, 255}; // red, green, blue
+    R::AppendViewCaptureLegend(image, lut);
+    ASSERT_EQ(image.Height, 10u + R::kViewCaptureLegendHeight);
+    ASSERT_EQ(image.Rgba8.size(), std::size_t{4} * 40 * image.Height);
+    EXPECT_TRUE(std::equal(original.begin(), original.end(), image.Rgba8.begin())) << "the capture stays untouched";
+    const auto pixel = [&](std::uint32_t x, std::uint32_t y) { return &image.Rgba8[(std::size_t(y) * 40 + x) * 4]; };
+    const std::uint32_t stripRow = 10 + R::kViewCaptureLegendHeight / 2;
+    EXPECT_EQ(pixel(4, stripRow)[0], 255u) << "min end";
+    EXPECT_EQ(pixel(35, stripRow)[2], 255u) << "max end";
+    EXPECT_EQ(pixel(20, stripRow)[1], 255u) << "middle";
+    EXPECT_EQ(pixel(0, stripRow)[0], 24u) << "margin";
+    EXPECT_EQ(pixel(20, 10)[0], 24u) << "top margin row";
+    EXPECT_EQ(R::EncodeViewCapturePng(image).empty(), false);
+}
+
+// Screenshots restore the view through ICameraController::Clone (exact state, not a re-seed).
+TEST(ViewCapture, CameraClonesKeepTheExactView)
+{
+    R::OrbitCameraController orbit;
+    orbit.Focus({.Center = {3.0f, -2.0f, 7.0f}, .Radius = 0.5f});
+    const auto before = orbit.GetView({640, 480});
+    const auto copy = orbit.Clone();
+    ASSERT_NE(copy, nullptr);
+    orbit.Focus({.Center = {-10.0f, 0.0f, 0.0f}, .Radius = 4.0f});
+    const auto restored = copy->GetView({640, 480});
+    EXPECT_EQ(restored.Position, before.Position);
+    EXPECT_EQ(restored.Forward, before.Forward);
+    EXPECT_EQ(restored.FarPlane, before.FarPlane);
+    for (const auto kind : {Extrinsic::Core::Config::CameraControllerKind::Orbit, Extrinsic::Core::Config::CameraControllerKind::Fly,
+                            Extrinsic::Core::Config::CameraControllerKind::FreeLook, Extrinsic::Core::Config::CameraControllerKind::TopDown})
+    {
+        const auto controller = R::CreateCameraController(kind);
+        ASSERT_NE(controller->Clone(), nullptr);
+        EXPECT_EQ(controller->Clone()->Kind(), kind);
+    }
 }
