@@ -1294,6 +1294,7 @@ if(TARGET ExtrinsicRuntime)
         Test.ScalarGradientOperations.cpp
         Test.PropertySmoothingOperations.cpp
         Test.PropertySmoothingWorkflows.cpp
+        Test.AgentOperations.cpp
         Test.LaplacianEigenbasisOperations.cpp
         Test.HarmonicFieldOperations.cpp
         Test.GeodesicsOperations.cpp
@@ -1403,6 +1404,7 @@ if(TARGET ExtrinsicSandboxEditor)
             Test.SandboxCurvatureSegmentationPanel.cpp
             Test.SandboxDescriptorAnalysisPanel.cpp
             Test.SandboxProcessingPanels.cpp
+            Test.SandboxAgentServer.cpp
             Test.SandboxParameterizationPanel.cpp
             Test.SandboxPointCloudConsolidationPanel.cpp
     )
@@ -1777,6 +1779,7 @@ intrinsic_test_object_lib(CoreWrapperUnitTestObjs
 )
 
 set(_platform_test_files
+    Test.LocalSocket.cpp
     Test.NullPlatform.cpp
     Test.PlatformLayering.cpp
 )

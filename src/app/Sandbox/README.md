@@ -523,6 +523,19 @@ This acceptance does not claim every asset format, KTX decode, post-upload
 material re-resolution, advanced PBR, transparent selection, Gaussian splats, or
 scene serialization parity.
 
+## Agent Control Lane
+
+`--agent-socket [path]` lets an MCP client (Claude Code through
+`tools/agents/mcp_bridge.py`) drive this Sandbox session through the editor's
+validated operations; `--agent-readonly` allows reads only and `--agent-root <dir>`
+(repeatable) bounds file arguments. **View > Agent Connection** shows the client
+and disconnects it. Agent changes appear in the undo history as `Agent: ...`.
+See [the agent control lane](../../../docs/architecture/agent-control-lane.md).
+
+```bash
+build/ci-vulkan/bin/ExtrinsicSandbox --agent-socket
+```
+
 ## Frame-Pacing Diagnostics
 
 `UI-030` adds an explicit bounded capture mode to `ExtrinsicSandbox`:

@@ -50,3 +50,11 @@ Agent workflow and task policy tooling.
 - `work_graphs/` contains checked-in strict JSON topology. The default
   `review-diamond.v1.json` has one write lane, three parallel read-only checks,
   a join, a high-risk independent gate, and one final source-binding node.
+
+## MCP bridge
+
+`mcp_bridge.py` connects an MCP client (the `intrinsic-sandbox` entry in
+`.mcp.json`) to a Sandbox started with `--agent-socket`; stdlib only. See
+[the agent control lane](../../docs/architecture/agent-control-lane.md).
+Regression cases: `tests/regression/tooling/Test.McpBridge.py`.
+

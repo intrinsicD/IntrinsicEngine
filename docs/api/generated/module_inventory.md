@@ -19,8 +19,8 @@ Root scanned: `src`
 | `graphics/rhi` | 18 |
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
-| `platform` | 5 |
-| `runtime` | 99 |
+| `platform` | 6 |
+| `runtime` | 101 |
 
 ## Modules
 
@@ -357,9 +357,12 @@ Root scanned: `src`
 | `Extrinsic.Physics.World` | `src/physics/Physics.World.cppm` | `physics` |
 | `Extrinsic.Platform.Window` | `src/platform/Platform.IWindow.cppm` | `platform` |
 | `Extrinsic.Platform.Input` | `src/platform/Platform.Input.cppm` | `platform` |
+| `Extrinsic.Platform.LocalSocket` | `src/platform/Platform.LocalSocket.cppm` | `platform` |
 | `Extrinsic.Platform.Backend.Glfw` | `src/platform/backends/glfw/Platform.Backend.Glfw.cppm` | `platform` |
 | `Extrinsic.Platform.Backend.GlfwVulkanSurface` | `src/platform/backends/glfw/Platform.Backend.GlfwVulkanSurface.cppm` | `platform` |
 | `Extrinsic.Platform.Backend.Null` | `src/platform/backends/null/Platform.Backend.Null.cppm` | `platform` |
+| `Extrinsic.Runtime.AgentOperations` | `src/runtime/Agent/Runtime.AgentOperations.cppm` | `runtime` |
+| `Extrinsic.Runtime.AgentServer` | `src/runtime/Agent/Runtime.AgentServer.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetIngestStateMachine` | `src/runtime/AssetWorkflow/Runtime.AssetIngestStateMachine.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetWorkflowGeometryMaterialization` | `src/runtime/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetWorkflowModelMaterialization` | `src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cppm` | `runtime` |
@@ -460,4 +463,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **433**
+Total modules: **436**

@@ -259,7 +259,9 @@ Agent/CLI callers use the same `EngineConfigControl` methods with
 does not require any ImGui frame. If the module is omitted, editor recipe and
 engine-config states are null, their command callbacks remain empty, and both
 availability flags are false. Boot or programmatic profiling config remains
-effective without composing the editor UI.
+effective without composing the editor UI. The MCP agent lane
+([agent control lane](agent-control-lane.md)) applies sections through this path
+with `AgentCli` as the recorded source.
 
 ## Curvature Segmentation Editor Operation
 

@@ -2,6 +2,7 @@ module;
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -121,6 +122,26 @@ EditorCommandStatus ApplyEditorVisualizationRecipeCommand(
     const EditorVisualizationRecipeCommand &command) {
   return ApplyEditorVisualizationRecipeCommand(ContextOrEmpty(commands),
                                                command);
+}
+
+VisualizationRecipe MakeEditorPropertyVisualizationRecipe(
+    const GeometryPropertyRef &property, const bool normalDirection) {
+  using Kind = Geometry::PropertyValueKind;
+  VisualizationRecipe recipe;
+  if (property.ValueKind == Kind::Vec2 || property.ValueKind == Kind::Vec3 ||
+      property.ValueKind == Kind::Vec4) {
+    ColorVisualizationRecipe color{.Source = property,
+                                   .OutputName = property.Name + ".colors"};
+    color.Interpretation =
+        normalDirection
+            ? decltype(ColorVisualizationRecipe{}.Interpretation)::NormalDirection
+            : decltype(ColorVisualizationRecipe{}.Interpretation)::Components;
+    recipe.Data = std::move(color);
+  } else {
+    recipe.Data = ScalarVisualizationRecipe{
+        .Source = property, .OutputName = property.Name + ".colors"};
+  }
+  return recipe;
 }
 
 EditorCommandStatus ApplyEditorVertexChannelBindingCommand(

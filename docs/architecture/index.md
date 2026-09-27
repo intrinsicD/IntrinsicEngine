@@ -23,6 +23,7 @@ Status labels:
 - [Runtime](runtime.md) (`canonical`)
 - [Sandbox editor feature boundaries](sandbox-editor-feature-boundaries.md) (`canonical`)
 - [Runtime config control](runtime-config-control.md) (`canonical`)
+- [Agent control lane (MCP)](agent-control-lane.md) (`canonical`)
 - [Engine config file](engine-config.md) (`canonical`)
 - [Graphics](graphics.md) (`canonical`) — reduced to the contract layer per [`DOCS-001`](../../tasks/archive/DOCS-001-reduce-graphics-architecture-prose.md); embedded decision records relocated to ADRs `0004..0018` (see Pointers section).
 - [Geometry](geometry.md) (`canonical`)

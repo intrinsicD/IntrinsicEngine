@@ -52,6 +52,7 @@ import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.VisualizationRecipes;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.AgentServer;
 import Extrinsic.Runtime.ParameterizationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationTypes;
 
@@ -2186,6 +2187,40 @@ namespace Extrinsic::Sandbox::Editor
                 ActivePreparedFrame.reset();
             }
 
+            // Present only when the Sandbox runs with --agent-socket: shows who is
+            // connected and lets the user drop the agent's connection.
+            void RegisterAgentConnectionWindow(Runtime::AgentServerModule& agent)
+            {
+                (void)RegisterEditorWindow(EditorWindowDescriptor{
+                    .Id = "view.agent_connection",
+                    .MenuPath = {"View"},
+                    .Title = "Agent Connection",
+                    .Draw = [&agent](bool& open, const SandboxEditorContext&)
+                    {
+                        if (!ImGui::Begin("Agent Connection", &open)) { ImGui::End(); return; }
+                        const auto status = agent.Status();
+                        ImGui::Text("Socket: %s", status.SocketPath.c_str());
+                        if (!status.Listening)
+                            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Not listening: %s", status.LastError.c_str());
+                        else if (status.ClientConnected)
+                            ImGui::Text("Connected: %s", status.ClientName.empty() ? "(client)" : status.ClientName.c_str());
+                        else
+                            ImGui::TextDisabled("Waiting for a client (tools/agents/mcp_bridge.py).");
+                        ImGui::Text("Mode: %s", status.ReadOnly ? "read-only" : "read and write (changes are undoable, labeled 'Agent:')");
+                        ImGui::Text("Calls handled: %llu", static_cast<unsigned long long>(status.CallsHandled));
+                        if (ImGui::TreeNode("Allowed file roots"))
+                        {
+                            for (const auto& root : status.AllowedRoots) ImGui::BulletText("%s", root.c_str());
+                            ImGui::TreePop();
+                        }
+                        ImGui::BeginDisabled(!status.ClientConnected);
+                        if (ImGui::Button("Disconnect agent")) agent.DisconnectClient();
+                        ImGui::EndDisabled();
+                        ImGui::End();
+                    },
+                });
+            }
+
             Runtime::EditorWindowHandle RegisterEditorWindow(
                 EditorWindowDescriptor descriptor)
             {
@@ -2226,6 +2261,8 @@ namespace Extrinsic::Sandbox::Editor
                 }
 
                 RegisterBuiltinWindows();
+                if (auto* agent = services.Find<Runtime::AgentServerModule>())
+                    RegisterAgentConnectionWindow(*agent);
                 Attachment.Attach(worlds, services);
                 if (!Attachment.IsAttached())
                 {

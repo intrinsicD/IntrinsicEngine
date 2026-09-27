@@ -259,18 +259,8 @@ namespace Extrinsic::Sandbox::Editor
         const SandboxEditorContext& context, const std::uint32_t entity,
         const Runtime::GeometryPropertyRef& property, const bool normalDirection)
     {
-        Runtime::VisualizationRecipe recipe;
-        using Kind = Geometry::PropertyValueKind;
-        if (property.ValueKind == Kind::Vec2 || property.ValueKind == Kind::Vec3 ||
-            property.ValueKind == Kind::Vec4)
-            recipe.Data = Runtime::ColorVisualizationRecipe{.Source=property, .OutputName=property.Name+".colors",
-                .Interpretation = normalDirection
-                    ? decltype(Runtime::ColorVisualizationRecipe{}.Interpretation)::NormalDirection
-                    : decltype(Runtime::ColorVisualizationRecipe{}.Interpretation)::Components};
-        else
-            recipe.Data = Runtime::ScalarVisualizationRecipe{.Source=property, .OutputName=property.Name+".colors"};
         return Runtime::ApplyEditorVisualizationRecipeCommand(context.VisualizationCommands,
-            {.StableEntityId=entity, .Recipe=std::move(recipe)});
+            {.StableEntityId=entity, .Recipe=Runtime::MakeEditorPropertyVisualizationRecipe(property, normalDirection)});
     }
 
     bool DrawProcessingPropertyShowButton(const SandboxEditorContext& context,
