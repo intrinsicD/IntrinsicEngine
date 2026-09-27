@@ -4,6 +4,7 @@ module;
 
 #include <algorithm>
 #include <array>
+#include <format>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -1620,6 +1621,75 @@ namespace Extrinsic::Sandbox::Editor
         if (!readiness.Enabled)
             DrawDisabledReasonTooltip(readiness.DisabledReason);
         return clicked;
+    }
+
+    std::string FormatConfigFieldHint(const Runtime::ConfigFieldSpec& field, const std::string_view defaultValue)
+    {
+        std::string text{field.Description};
+        if (const auto range = Runtime::DescribeConfigFieldRange(field);
+            !range.empty() && field.Type != Runtime::ConfigFieldType::Enum)
+            text += (text.empty() ? "" : "\n") + std::string("Accepted: ") + range;
+        if (!defaultValue.empty()) text += (text.empty() ? "" : "\n") + std::string("Default: ") + std::string(defaultValue);
+        return text;
+    }
+
+    void DrawConfigFieldHint(const Runtime::ConfigFieldSpec* field, const std::string_view defaultValue)
+    {
+        if (field == nullptr || !ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip | ImGuiHoveredFlags_AllowWhenDisabled))
+            return;
+        const std::string text = FormatConfigFieldHint(*field, defaultValue);
+        ImGui::BeginTooltip();
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 28.0f);
+        ImGui::TextUnformatted(text.c_str());
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    }
+
+    bool DrawSpecInputDouble(const char* label, const std::span<const Runtime::ConfigFieldSpec> fields,
+                             const std::string_view name, double& value, const double defaultValue, const char* format)
+    {
+        const auto* field = Runtime::FindConfigFieldSpec(fields, name);
+        bool changed = ImGui::InputDouble(label, &value, 0.0, 0.0, format);
+        if (changed && field != nullptr) value = Runtime::ClampToConfigFieldRange(*field, value);
+        DrawConfigFieldHint(field, std::format("{}", defaultValue));
+        return changed;
+    }
+
+    bool DrawSpecInputUInt(const char* label, const std::span<const Runtime::ConfigFieldSpec> fields,
+                           const std::string_view name, std::uint32_t& value, const std::uint32_t defaultValue)
+    {
+        const auto* field = Runtime::FindConfigFieldSpec(fields, name);
+        bool changed = ImGui::InputScalar(label, ImGuiDataType_U32, &value);
+        if (changed && field != nullptr)
+            value = static_cast<std::uint32_t>(Runtime::ClampToConfigFieldRange(*field, double(value)));
+        DrawConfigFieldHint(field, std::to_string(defaultValue));
+        return changed;
+    }
+
+    bool DrawSpecEnumCombo(const char* label, const std::span<const Runtime::ConfigFieldSpec> fields,
+                           const std::string_view name, int& value, const int defaultValue)
+    {
+        const auto* field = Runtime::FindConfigFieldSpec(fields, name);
+        if (field == nullptr || field->EnumNames.empty()) return false;
+        const int first = static_cast<int>(field->Min.value_or(0.0));
+        const int count = static_cast<int>(field->EnumNames.size());
+        int index = std::clamp(value - first, 0, count - 1);
+        // ImGui::Combo pushes one integer ID per item, like the panels' literal combos.
+        const bool changed = ImGui::Combo(label, &index,
+            [](void* data, int i) { return static_cast<const Runtime::ConfigFieldSpec*>(data)->EnumNames[std::size_t(i)].data(); },
+            const_cast<Runtime::ConfigFieldSpec*>(field), count);
+        if (changed) value = first + index;
+        const int defaultIndex = defaultValue - first;
+        DrawConfigFieldHint(field, defaultIndex >= 0 && defaultIndex < count
+                                       ? field->EnumNames[std::size_t(defaultIndex)] : std::string_view{});
+        return changed;
+    }
+
+    void DrawSpecCheckbox(const char* label, const std::span<const Runtime::ConfigFieldSpec> fields,
+                          const std::string_view name, bool& value, const bool defaultValue, bool& changed)
+    {
+        changed |= ImGui::Checkbox(label, &value);
+        DrawConfigFieldHint(Runtime::FindConfigFieldSpec(fields, name), defaultValue ? "on" : "off");
     }
 
     void DrawDisabledReasonTooltip(const std::string_view disabledReason)

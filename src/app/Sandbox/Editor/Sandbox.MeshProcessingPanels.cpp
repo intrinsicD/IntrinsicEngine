@@ -2728,52 +2728,45 @@ namespace Extrinsic::Sandbox::Editor
 {
     namespace
     {
+        // Smooth Property controls take descriptions, ranges and enum names from the section's field table.
+        const Runtime::PropertySmoothingConfig kSmoothingDefaults{};
+
         bool DrawVariationalFitSettings(Runtime::PropertySmoothingConfig& config, const Runtime::EditorPropertyCatalogModel& catalog)
         {
             namespace S = Geometry::Smoothing;
+            const auto fields = Runtime::PropertySmoothingConfigFieldSpecs();
+            const auto& d = kSmoothingDefaults.Filter;
             auto& f = config.Filter;
-            bool changed = false;
-            int smoothness = int(f.SmoothnessPenalty), data = int(f.DataPenalty), fidelity = int(f.Fidelity), bound = int(f.Bound);
-            if (ImGui::Combo("Smoothness penalty", &smoothness, "Quadratic (Dirichlet)\0Huber\0L1 (total variation)\0"))
-            { f.SmoothnessPenalty = S::FitPenalty(smoothness); changed = true; }
-            int order = int(f.SmoothnessOrder);
-            if (ImGui::Combo("Smoothness order", &order, "First (differences)\0Second (non-local TGV, ADMM)\0"))
-            { f.SmoothnessOrder = S::FitOrder(order); changed = true; }
+            bool changed = DrawSpecEnumCombo("Smoothness penalty", fields, "smoothness_penalty", f.SmoothnessPenalty, d.SmoothnessPenalty);
+            changed |= DrawSpecEnumCombo("Smoothness order", fields, "smoothness_order", f.SmoothnessOrder, d.SmoothnessOrder);
             if (f.SmoothnessOrder == S::FitOrder::Second)
-                changed |= ImGui::InputDouble("Second-order weight (alpha0/alpha1)", &f.SecondOrderWeight);
-            if (ImGui::Combo("Data penalty", &data, "Quadratic\0Huber (robust)\0L1 (robust)\0"))
-            { f.DataPenalty = S::FitPenalty(data); changed = true; }
+                changed |= DrawSpecInputDouble("Second-order weight (alpha0/alpha1)", fields, "second_order_weight", f.SecondOrderWeight, d.SecondOrderWeight);
+            changed |= DrawSpecEnumCombo("Data penalty", fields, "data_penalty", f.DataPenalty, d.DataPenalty);
             if (f.SmoothnessPenalty != S::FitPenalty::Quadratic || f.DataPenalty != S::FitPenalty::Quadratic)
-                changed |= ImGui::InputDouble("Penalty delta (property units)", &f.PenaltyDelta);
-            if (ImGui::Combo("Data weight", &fidelity, "Fixed weight\0Match noise level (discrepancy)\0"))
-            { f.Fidelity = S::FitFidelity(fidelity); changed = true; }
-            if (f.Fidelity == S::FitFidelity::FixedWeight) changed |= ImGui::InputDouble("Fit weight", &f.FitWeight);
-            else changed |= ImGui::InputDouble("Noise level (RMS, property units)", &f.NoiseLevel);
-            if (ImGui::Combo("Tolerance bound", &bound, "None\0Uniform radius\0Per-row radius property\0"))
+                changed |= DrawSpecInputDouble("Penalty delta (property units)", fields, "penalty_delta", f.PenaltyDelta, d.PenaltyDelta);
+            changed |= DrawSpecEnumCombo("Data weight", fields, "fidelity", f.Fidelity, d.Fidelity);
+            if (f.Fidelity == S::FitFidelity::FixedWeight) changed |= DrawSpecInputDouble("Fit weight", fields, "fit_weight", f.FitWeight, d.FitWeight);
+            else changed |= DrawSpecInputDouble("Noise level (RMS, property units)", fields, "noise_level", f.NoiseLevel, d.NoiseLevel);
+            if (DrawSpecEnumCombo("Tolerance bound", fields, "bound", f.Bound, d.Bound))
             {
-                f.Bound = S::FitBound(bound);
                 if (f.Bound == S::FitBound::PerRow && config.BoundRadii.Name.empty()) config.BoundRadii.Name = "tolerance";
                 changed = true;
             }
-            if (f.Bound == S::FitBound::Uniform) changed |= ImGui::InputDouble("Bound radius (property units)", &f.BoundRadius);
+            if (f.Bound == S::FitBound::Uniform)
+                changed |= DrawSpecInputDouble("Bound radius (property units)", fields, "bound_radius", f.BoundRadius, d.BoundRadius);
             if (f.Bound != S::FitBound::None && Runtime::GeometryPropertyComponentCount(config.Input.ValueKind) > 1)
-            {
-                int norm = int(f.BoundNorm);
-                if (ImGui::Combo("Bound shape", &norm, "Per channel (box)\0Euclidean (ball, ADMM)\0"))
-                { f.BoundNorm = S::FitBoundNorm(norm); changed = true; }
-            }
+                changed |= DrawSpecEnumCombo("Bound shape", fields, "bound_norm", f.BoundNorm, d.BoundNorm);
             if (f.Bound == S::FitBound::PerRow)
             {
                 changed |= DrawProcessingPropertyInput("Radius property##Smoothing", catalog, config.BoundRadii,
                     +[](const Runtime::GeometryPropertyRef& ref) {
                         return ref.ValueKind == Geometry::PropertyValueKind::Float || ref.ValueKind == Geometry::PropertyValueKind::Double;
                     });
+                DrawConfigFieldHint(Runtime::FindConfigFieldSpec(fields, "bound_radii"), {});
             }
-            int solver = int(f.FitAlgorithm);
-            if (ImGui::Combo("Fit solver", &solver, "Reweighted least squares (reference)\0ADMM (one factorization, delta 0 allowed)\0"))
-            { f.FitAlgorithm = S::FitSolver(solver); changed = true; }
-            changed |= ImGui::InputScalar("Maximum fit iterations", ImGuiDataType_U32, &f.MaxFitIterations);
-            changed |= ImGui::InputDouble("Fit tolerance (relative)", &f.FitTolerance, 0.0, 0.0, "%.2e");
+            changed |= DrawSpecEnumCombo("Fit solver", fields, "fit_solver", f.FitAlgorithm, d.FitAlgorithm);
+            changed |= DrawSpecInputUInt("Maximum fit iterations", fields, "max_fit_iterations", f.MaxFitIterations, d.MaxFitIterations);
+            changed |= DrawSpecInputDouble("Fit tolerance (relative)", fields, "fit_tolerance", f.FitTolerance, d.FitTolerance, "%.2e");
             return changed;
         }
     }
@@ -2797,11 +2790,18 @@ namespace Extrinsic::Sandbox::Editor
             return ref.ValueKind == K::Float || ref.ValueKind == K::Double || ref.ValueKind == K::Vec2 ||
                    ref.ValueKind == K::Vec3 || ref.ValueKind == K::Vec4;
         };
+        namespace S = Geometry::Smoothing;
+        const auto fields = Runtime::PropertySmoothingConfigFieldSpecs();
+        const auto& defaults = kSmoothingDefaults;
+        const auto hint = [&](std::string_view field) { DrawConfigFieldHint(Runtime::FindConfigFieldSpec(fields, field), {}); };
         bool changed = DrawProcessingPropertyInput("Input property##Smoothing", model.PropertyCatalog, config.Input, smoothable);
+        hint("input");
         changed |= DrawProcessingPropertyInput("Neighborhood positions##Smoothing", model.PropertyCatalog, config.Positions,
             +[](const Runtime::GeometryPropertyRef& ref) { return ref.ValueKind == Geometry::PropertyValueKind::Vec3; });
+        hint("positions");
         ImGui::TextWrapped("Use positions on the input domain, or vertex/node positions to derive face centers and edge/halfedge midpoints.");
         changed |= DrawProcessingPropertyName("Output property##Smoothing", config.Output.Name);
+        hint("output");
         if (ImGui::Button("Overwrite input property")) { config.Output = config.Input; changed = true; }
         if (config.Input.ValueKind == Geometry::PropertyValueKind::Float || config.Input.ValueKind == Geometry::PropertyValueKind::Double)
         {
@@ -2809,46 +2809,37 @@ namespace Extrinsic::Sandbox::Editor
             if (ImGui::Combo("Output storage", &kind, "float\0double\0"))
             { config.Output.ValueKind = kind ? Geometry::PropertyValueKind::Double : Geometry::PropertyValueKind::Float; changed = true; }
         }
-        int method = int(config.Filter.Method), laplacian = int(config.Filter.Laplacian), weight = int(config.Weight);
-        if (ImGui::Combo("Method", &method, "Averaging\0Spectral heat\0Taubin\0Bilateral\0Implicit (backward Euler)\0Variational fit (robust / TV / bounded)\0"))
-        { config.Filter.Method = Geometry::Smoothing::PropertyFilter(method); changed = true; }
-        if (config.Filter.Method != Geometry::Smoothing::PropertyFilter::VariationalFit)
+        changed |= DrawSpecEnumCombo("Method", fields, "method", config.Filter.Method, defaults.Filter.Method);
+        if (config.Filter.Method != S::PropertyFilter::VariationalFit)
+            changed |= DrawSpecEnumCombo("Backend##Smoothing", fields, "backend", config.Backend, defaults.Backend);
+        changed |= DrawSpecEnumCombo("Laplacian", fields, "laplacian", config.Filter.Laplacian, defaults.Filter.Laplacian);
+        changed |= DrawSpecEnumCombo("Weights", fields, "weight", config.Weight, defaults.Weight);
+        const bool fit = config.Filter.Method == S::PropertyFilter::VariationalFit;
+        if (!fit) changed |= DrawSpecInputUInt("Iterations", fields, "iterations", config.Filter.Iterations, defaults.Filter.Iterations);
+        if (config.Weight != S::PropertyWeight::Cotangent && config.Weight != S::PropertyWeight::MeshUniform)
         {
-            int backend = int(config.Backend);
-            if (ImGui::Combo("Backend##Smoothing", &backend, "CPU reference\0Vulkan (shader double precision)\0"))
-            { config.Backend = Runtime::PropertySmoothingBackend(backend); changed = true; }
+            changed |= DrawSpecInputUInt("Neighbors", fields, "neighbors", config.Neighbors, defaults.Neighbors);
+            if (config.Weight != S::PropertyWeight::Uniform)
+                changed |= DrawSpecInputDouble("Spatial sigma", fields, "spatial_sigma", config.SpatialSigma, defaults.SpatialSigma);
         }
-        if (ImGui::Combo("Laplacian", &laplacian, "Random walk\0Combinatorial\0Lumped mesh area (implicit, fit)\0"))
-        { config.Filter.Laplacian = Geometry::Smoothing::PropertyLaplacian(laplacian); changed = true; }
-        if (ImGui::Combo("Weights", &weight, "Uniform kNN\0Gaussian kNN\0Inverse-distance kNN\0Nonnegative mesh cotangent\0Uniform mesh edges\0"))
-        { config.Weight = Geometry::Smoothing::PropertyWeight(weight); changed = true; }
-        const bool fit = config.Filter.Method == Geometry::Smoothing::PropertyFilter::VariationalFit;
-        if (!fit) changed |= ImGui::InputScalar("Iterations", ImGuiDataType_U32, &config.Filter.Iterations);
-        if (config.Weight != Geometry::Smoothing::PropertyWeight::Cotangent && config.Weight != Geometry::Smoothing::PropertyWeight::MeshUniform)
+        if (config.Filter.Method == S::PropertyFilter::SpectralHeat)
+            changed |= DrawSpecInputDouble("Heat time", fields, "heat_time", config.Filter.HeatTime, defaults.Filter.HeatTime);
+        else if (config.Filter.Method == S::PropertyFilter::Implicit)
         {
-            changed |= ImGui::InputScalar("Neighbors", ImGuiDataType_U32, &config.Neighbors);
-            if (config.Weight != Geometry::Smoothing::PropertyWeight::Uniform)
-                changed |= ImGui::InputDouble("Spatial sigma", &config.SpatialSigma);
-        }
-        if (config.Filter.Method == Geometry::Smoothing::PropertyFilter::SpectralHeat)
-            changed |= ImGui::InputDouble("Heat time", &config.Filter.HeatTime);
-        else if (config.Filter.Method == Geometry::Smoothing::PropertyFilter::Implicit)
-        {
-            changed |= ImGui::InputDouble("Time step", &config.Filter.TimeStep);
-            int solver = int(config.Filter.Solver);
-            if (ImGui::Combo("Solver", &solver, "Sparse Cholesky (direct)\0Conjugate gradient\0"))
-            { config.Filter.Solver = Geometry::Smoothing::PropertySolver(solver); changed = true; }
+            changed |= DrawSpecInputDouble("Time step", fields, "time_step", config.Filter.TimeStep, defaults.Filter.TimeStep);
+            changed |= DrawSpecEnumCombo("Solver", fields, "solver", config.Filter.Solver, defaults.Filter.Solver);
             // CG settings also govern the fallback when the Cholesky factorization fails.
-            changed |= ImGui::InputDouble("Solver tolerance", &config.Filter.SolverTolerance);
-            changed |= ImGui::InputScalar("Maximum solver iterations", ImGuiDataType_U32, &config.Filter.MaxSolverIterations);
+            changed |= DrawSpecInputDouble("Solver tolerance", fields, "solver_tolerance", config.Filter.SolverTolerance, defaults.Filter.SolverTolerance);
+            changed |= DrawSpecInputUInt("Maximum solver iterations", fields, "max_solver_iterations", config.Filter.MaxSolverIterations,
+                                         defaults.Filter.MaxSolverIterations);
         }
         else if (fit) changed |= DrawVariationalFitSettings(config, model.PropertyCatalog);
-        else changed |= ImGui::InputDouble("Lambda", &config.Filter.Lambda);
-        changed |= ImGui::Checkbox("Pin mesh boundary", &config.PreserveBoundary);
-        if (config.Filter.Method == Geometry::Smoothing::PropertyFilter::Taubin)
-            changed |= ImGui::InputDouble("Mu", &config.Filter.Mu);
-        if (config.Filter.Method == Geometry::Smoothing::PropertyFilter::Bilateral)
-            changed |= ImGui::InputDouble("Range sigma (property units)", &config.Filter.RangeSigma);
+        else changed |= DrawSpecInputDouble("Lambda", fields, "lambda", config.Filter.Lambda, defaults.Filter.Lambda);
+        DrawSpecCheckbox("Pin mesh boundary", fields, "preserve_boundary", config.PreserveBoundary, defaults.PreserveBoundary, changed);
+        if (config.Filter.Method == S::PropertyFilter::Taubin)
+            changed |= DrawSpecInputDouble("Mu", fields, "mu", config.Filter.Mu, defaults.Filter.Mu);
+        if (config.Filter.Method == S::PropertyFilter::Bilateral)
+            changed |= DrawSpecInputDouble("Range sigma (property units)", fields, "range_sigma", config.Filter.RangeSigma, defaults.Filter.RangeSigma);
         const auto apply = [&](const auto& c) { return Runtime::ApplyEditorPropertySmoothingConfig(context.MeshFields.Commands, c); };
         if (changed)
         {

@@ -8773,3 +8773,5 @@ Retain terminal job outcomes while pending consumers reference them, so reaping 
 - 2026-09-27 — **UI-062**: File > Save Screenshot / Save Window Screenshot, F12 and View > Screenshot over `Extrinsic.Runtime.ViewCapture`; disabled with the reason on Null, a notice names the saved file. Operational in a live Sandbox; controls live in their own window. [Task](UI-062-save-screenshot-and-capture-controls.md).
 
 - 2026-09-28 — **CORE-010**: `EngineConfigSectionRegistration::SchemaJson` and `ExportEngineConfigSchema` (one `$defs` document for every registered section) with the read-only `config_schema` agent operation; `config_get` returns the section schema. [Task](CORE-010-config-section-schema-export.md).
+
+- 2026-09-28 — **UI-057**: field-table driven hints (description, accepted values, default), clamped numeric inputs and `EnumNames` combos in `Sandbox.PanelSupport`, adopted by every Smooth Property parameter; other families listed as follow-ups. [Task](UI-057-schema-driven-field-hints.md).

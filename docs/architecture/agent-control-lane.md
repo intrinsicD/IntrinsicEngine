@@ -70,7 +70,7 @@ launch flag: no module, thread or socket.
 Schemas from declarative config field tables:
 [CORE-010](../../tasks/done/CORE-010-config-section-schema-export.md),
 [RUNTIME-276](../../tasks/backlog/runtime/RUNTIME-276-declarative-config-field-specs.md),
-[UI-057](../../tasks/backlog/ui/UI-057-schema-driven-field-hints.md).
+[UI-057](../../tasks/done/UI-057-schema-driven-field-hints.md).
 Structured readiness:
 [RUNTIME-277](../../tasks/backlog/runtime/RUNTIME-277-structured-action-readiness-reasons.md),
 [UI-058](../../tasks/backlog/ui/UI-058-all-reasons-readiness-tooltips.md).

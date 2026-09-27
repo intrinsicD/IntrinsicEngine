@@ -209,6 +209,10 @@ editor descriptions, ranges and enum names without JSON. Agents read the same
 data through `config_schema` (the full export or one section) and the `schema`
 member of `config_get`; `config_preview`/`config_apply` stay generic over
 sections and point to it.
+The Sandbox panels read the same tables through `Sandbox.PanelSupport`'s
+`DrawSpec*` controls (UI-057): hover hints with description, accepted values and
+default, numeric inputs clamped to the declared range, and combos labeled from
+`EnumNames`. The Smooth Property panel uses them for every parameter.
 
 `Extrinsic.Sandbox.Editor.Shell` keeps the ImGui widget and draft-buffer
 state. Its `Runtime::EditorWorkspaceAttachment` carries the opaque attachment

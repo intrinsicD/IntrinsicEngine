@@ -22,7 +22,6 @@ its dependencies, conditional gates, scope and verification.
 Each window is the user-facing surface of a runtime capability that agents reach
 through the same runtime functions ([ARCH-019](../../done/ARCH-019-agent-control-lane-mcp.md)).
 
-- [UI-057 — Schema-driven field hints and ranges in processing panels](UI-057-schema-driven-field-hints.md)
 - [UI-058 — All-reasons readiness tooltip and offending-control markers](UI-058-all-reasons-readiness-tooltips.md)
 - [UI-059 — Property Inspector window](UI-059-property-inspector-window.md)
 - [UI-060 — Jobs window](UI-060-jobs-window.md)
