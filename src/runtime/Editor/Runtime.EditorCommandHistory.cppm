@@ -7,6 +7,7 @@ module;
 #include <functional>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 export module Extrinsic.Runtime.EditorCommandHistory;
@@ -94,6 +95,10 @@ export namespace Extrinsic::Runtime
         void MarkSaved(std::string path = {});
         void SetActivePath(std::string path);
         void SetCapacity(std::size_t capacity);
+        // Prepended to every label recorded while set (e.g. "Agent: " for
+        // commands issued through the agent lane); empty disables it.
+        void SetLabelPrefix(std::string prefix) { m_LabelPrefix = std::move(prefix); }
+        [[nodiscard]] const std::string& LabelPrefix() const noexcept { return m_LabelPrefix; }
 
         [[nodiscard]] EditorCommandHistorySnapshot Snapshot() const;
         [[nodiscard]] std::size_t Capacity() const noexcept { return m_Capacity; }
@@ -118,6 +123,31 @@ export namespace Extrinsic::Runtime
         std::uint64_t m_SavedRevision{0u};
         bool m_HasActivePath{false};
         std::string m_ActivePath{};
+        std::string m_LabelPrefix{};
+    };
+
+    // Sets a history label prefix for the lifetime of the scope and restores
+    // the previous prefix afterwards; a null history is a no-op.
+    class ScopedEditorCommandLabelPrefix
+    {
+    public:
+        ScopedEditorCommandLabelPrefix(EditorCommandHistory* history, std::string prefix)
+            : m_History(history)
+        {
+            if (m_History == nullptr) return;
+            m_Previous = m_History->LabelPrefix();
+            m_History->SetLabelPrefix(std::move(prefix));
+        }
+        ~ScopedEditorCommandLabelPrefix()
+        {
+            if (m_History != nullptr) m_History->SetLabelPrefix(std::move(m_Previous));
+        }
+        ScopedEditorCommandLabelPrefix(const ScopedEditorCommandLabelPrefix&) = delete;
+        ScopedEditorCommandLabelPrefix& operator=(const ScopedEditorCommandLabelPrefix&) = delete;
+
+    private:
+        EditorCommandHistory* m_History{nullptr};
+        std::string m_Previous{};
     };
 
     struct EditorSelectionReplaceCommand

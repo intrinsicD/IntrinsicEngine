@@ -133,7 +133,7 @@ namespace Extrinsic::Runtime
     EditorCommandHistoryResult EditorCommandHistory::Execute(
         EditorCommandRecord command)
     {
-        command.Label = NonEmptyLabel(std::move(command.Label));
+        command.Label = m_LabelPrefix + NonEmptyLabel(std::move(command.Label));
         if (!command.Redo || !command.Undo)
             return MakeResult(EditorCommandHistoryStatus::InvalidCommand, command.Label);
 
@@ -153,7 +153,7 @@ namespace Extrinsic::Runtime
     EditorCommandHistoryResult EditorCommandHistory::Record(
         EditorCommandRecord command)
     {
-        command.Label = NonEmptyLabel(std::move(command.Label));
+        command.Label = m_LabelPrefix + NonEmptyLabel(std::move(command.Label));
         if (!command.Redo || !command.Undo)
             return MakeResult(EditorCommandHistoryStatus::InvalidCommand, command.Label);
 
@@ -207,7 +207,7 @@ namespace Extrinsic::Runtime
     {
         AdvanceRevision(true);
         return MakeResult(EditorCommandHistoryStatus::Recorded,
-                          NonEmptyLabel(std::move(label)));
+                          m_LabelPrefix + NonEmptyLabel(std::move(label)));
     }
 
     void EditorCommandHistory::ClearHistory()

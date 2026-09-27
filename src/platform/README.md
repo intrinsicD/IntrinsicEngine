@@ -8,6 +8,9 @@ explicit backend modules under `backends/`.
 
 - `Extrinsic.Platform.Window` (interface; see `Platform.IWindow.cppm`)
 - `Extrinsic.Platform.Input`
+- `Extrinsic.Platform.LocalSocket` — owner-only (0600) Unix-domain stream
+  listener/connection with timeout-bounded, non-throwing I/O for the opt-in agent
+  control lane; `Unsupported` on platforms without Unix-domain sockets.
 
 ## Backends
 

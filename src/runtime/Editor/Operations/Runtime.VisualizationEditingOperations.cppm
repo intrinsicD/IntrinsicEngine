@@ -769,6 +769,11 @@ export namespace Extrinsic::Runtime
     EditorCommandStatus ApplyEditorVisualizationRecipeCommand(
         const EditorVisualizationEditingCommands& commands,
         const EditorVisualizationRecipeCommand& command);
+    // The "Show <property>" recipe shared by processing panels and the agent lane:
+    // vector properties as component colors (or normal directions), scalars as a
+    // colormapped field, published as "<name>.colors".
+    [[nodiscard]] VisualizationRecipe MakeEditorPropertyVisualizationRecipe(
+        const GeometryPropertyRef& property, bool normalDirection = false);
     EditorCommandStatus ApplyEditorVertexChannelBindingCommand(
         const EditorVisualizationEditingCommands& commands,
         const EditorVertexChannelBindingCommand& command);

@@ -17,5 +17,21 @@ its dependencies, conditional gates, scope and verification.
 - [UI-051 — A mesh does not pass as a graph or a point cloud in the domain windows](UI-051-domain-agnostic-appearance-properties-selection-windows.md)
 - [UI-055 — Coherent Point Drift editor panel](UI-055-coherent-point-drift-editor-panel.md)
 
+## Agent lane and inspection windows
+
+Each window is the user-facing surface of a runtime capability that agents reach
+through the same runtime functions ([ARCH-019](../../done/ARCH-019-agent-control-lane-mcp.md)).
+
+- [UI-057 — Schema-driven field hints and ranges in processing panels](UI-057-schema-driven-field-hints.md)
+- [UI-058 — All-reasons readiness tooltip and offending-control markers](UI-058-all-reasons-readiness-tooltips.md)
+- [UI-059 — Property Inspector window](UI-059-property-inspector-window.md)
+- [UI-060 — Jobs window](UI-060-jobs-window.md)
+- [UI-061 — Select-by-query controls and "use selection as mask/source"](UI-061-select-by-query-controls.md)
+- [UI-062 — Save Screenshot menu and capture controls](UI-062-save-screenshot-and-capture-controls.md)
+- [UI-063 — File > Properties import/export window](UI-063-properties-import-export-window.md)
+- [UI-064 — History window](UI-064-history-window.md)
+- [UI-065 — Diagnostics / Log window](UI-065-diagnostics-log-window.md)
+- [UI-066 — Mesh Health window](UI-066-mesh-health-window.md)
+
 Completed and superseded work is recorded in the
 [retirement log](../../done/RETIREMENT-LOG.md) and Git history.

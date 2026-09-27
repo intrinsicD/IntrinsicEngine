@@ -574,3 +574,26 @@ TEST(EditorCommandHistory, CorruptHierarchyDeletePlanFailsWithoutPartialMutation
     EXPECT_EQ(childAfter.Parent, childBefore.Parent);
     EXPECT_EQ(childAfter.NextSibling, childBefore.NextSibling);
 }
+
+TEST(EditorCommandHistory, LabelPrefixScopesNestAndRestore)
+{
+    Extrinsic::Runtime::EditorCommandHistory history;
+    const auto record = [&](const char* label) {
+        (void)history.Execute({.Label = label,
+                               .Redo = [] { return Extrinsic::Runtime::EditorCommandHistoryStatus::Applied; },
+                               .Undo = [] { return Extrinsic::Runtime::EditorCommandHistoryStatus::Applied; }});
+        return history.Snapshot().UndoLabel;
+    };
+    {
+        const Extrinsic::Runtime::ScopedEditorCommandLabelPrefix agent{&history, "Agent: "};
+        EXPECT_EQ(record("Smooth"), "Agent: Smooth");
+        {
+            const Extrinsic::Runtime::ScopedEditorCommandLabelPrefix inner{&history, "Batch: "};
+            EXPECT_EQ(record("Import"), "Batch: Import");
+        }
+        EXPECT_EQ(record("Undo target"), "Agent: Undo target") << "the outer prefix is restored";
+        EXPECT_EQ(history.MarkDirty("Touch").Label, "Agent: Touch");
+    }
+    EXPECT_EQ(record("Panel"), "Panel");
+    const Extrinsic::Runtime::ScopedEditorCommandLabelPrefix none{nullptr, "ignored"};
+}

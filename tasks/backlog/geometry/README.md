@@ -22,6 +22,12 @@ its dependencies, conditional gates, scope and verification.
 - [GEOM-076 — Evidence-gated curvature-region UV atlas cuts](GEOM-076-curvature-region-guided-uv-atlas-cuts.md)
 - [GEOM-078 — Intrinsic surface-sample point cloud with contiguous face ranges](GEOM-078-intrinsic-surface-sample-point-cloud.md)
 
+## Agent lane and inspection kernels
+
+- [GEOM-109 — `Geometry.Properties.Statistics`: statistics, histogram and comparison](GEOM-109-property-statistics-and-comparison.md)
+- [GEOM-110 — Connected components and per-component topology/genus](GEOM-110-connected-components-and-topology.md)
+- [GEOIO-005 — PLY arbitrary property attributes and CSV/NPY property-table IO](GEOIO-005-property-attributes-and-table-io.md)
+
 ## Vulkan candidates
 
 - [GEOM-079 — Vulkan topology-normal and local PCA kernels](GEOM-079-vulkan-topology-and-pca-normal-kernels.md)

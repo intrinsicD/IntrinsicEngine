@@ -32,6 +32,7 @@ This index tracks long-lived architecture decisions for IntrinsicEngine.
 26. [0026 — Runtime-module scope by composition and consumer cohesion](0026-runtime-module-scope-by-consumer-contract.md)
 27. [0027 — Right-sized runtime composition mechanism](0027-right-sized-runtime-composition.md)
 28. [0028 — Declarative graphics state at the RHI boundary](0028-declarative-graphics-state-rhi-boundary.md)
+29. [0029 — Agent control lane over a local socket](0029-agent-control-lane.md)
 
 ## Conventions
 

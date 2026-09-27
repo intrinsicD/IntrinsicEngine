@@ -7,6 +7,8 @@ its dependencies, conditional gates, scope and verification.
 ## Tasks
 
 - [REVIEW-004 — Framework24 product-convergence audit](REVIEW-004-framework24-product-convergence-audit.md)
+- [CORE-010 — `EngineConfigSectionRegistration::SchemaJson` and `ExportEngineConfigSchema`](CORE-010-config-section-schema-export.md)
+- [CORE-011 — `LogEntry` sequence, timestamp and category with `TakeSnapshotSince`](CORE-011-log-entry-cursor-stream.md)
 
 Completed and superseded work is recorded in the
 [retirement log](../../done/RETIREMENT-LOG.md) and Git history.

@@ -28,9 +28,11 @@ target_sources(${target_name}
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Platform.Input.cppm
         Platform.IWindow.cppm
+        Platform.LocalSocket.cppm
         backends/null/Platform.Backend.Null.cppm
         PRIVATE
         Platform.CreateWindow.cpp
+        Platform.LocalSocket.cpp
         Platform.Input.cpp
         backends/null/Platform.Backend.Null.cpp
 )

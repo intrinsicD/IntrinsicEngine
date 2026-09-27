@@ -2,7 +2,16 @@
   "mcpServers": {
     "knowledge-graph": {
       "command": "graphify-mcp",
-      "args": ["--graph", "build/knowledge-graph/graphify-out/graph.json"]
+      "args": [
+        "--graph",
+        "build/knowledge-graph/graphify-out/graph.json"
+      ]
+    },
+    "intrinsic-sandbox": {
+      "command": "python3",
+      "args": [
+        "tools/agents/mcp_bridge.py"
+      ]
     }
   }
 }

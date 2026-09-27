@@ -20,6 +20,7 @@ import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.AssetWorkflowModule;
+import Extrinsic.Runtime.AgentServer;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.ClusteringModule;
@@ -47,6 +48,8 @@ namespace
     struct ParsedCli
     {
         FramePacingCaptureOptions Capture{};
+        // Opt-in agent control lane (MCP over an owner-only Unix socket).
+        std::optional<Extrinsic::Runtime::AgentServerOptions> Agent{};
         bool Valid = true;
         std::string Error{};
     };
@@ -112,6 +115,29 @@ namespace
                     parsed.Error = "--frame-pacing-frames requires a positive integer";
                     return parsed;
                 }
+            }
+            else if (arg == "--agent-socket" || arg.starts_with("--agent-socket="))
+            {
+                auto& agent = parsed.Agent ? *parsed.Agent : parsed.Agent.emplace();
+                if (arg.size() > 15u) agent.SocketPath = std::string{arg.substr(15u)};
+                else if (index + 1u < args.size() && !args[index + 1u].starts_with("--"))
+                    agent.SocketPath = std::string{args[++index]};
+            }
+            else if (arg == "--agent-readonly")
+            {
+                (parsed.Agent ? *parsed.Agent : parsed.Agent.emplace()).ReadOnly = true;
+            }
+            else if (arg == "--agent-root" || arg.starts_with("--agent-root="))
+            {
+                std::string root = arg.size() > 13u ? std::string{arg.substr(13u)} : std::string{};
+                if (root.empty() && index + 1u < args.size()) root = std::string{args[++index]};
+                if (root.empty())
+                {
+                    parsed.Valid = false;
+                    parsed.Error = "--agent-root requires a directory";
+                    return parsed;
+                }
+                (parsed.Agent ? *parsed.Agent : parsed.Agent.emplace()).AllowedRoots.push_back(std::move(root));
             }
             else if (arg.starts_with("--frame-pacing-frames="))
             {
@@ -439,6 +465,8 @@ int main(int argc, char** argv)
         engine.AddModule(std::move(captureModule));
     }
 
+    if (cli.Agent)
+        engine.AddModule(std::make_unique<Extrinsic::Runtime::AgentServerModule>(*cli.Agent));
     engine.AddModule(std::move(configControl));
     engine.AddModule(std::move(physicsModule));
     engine.EmplaceModule<Extrinsic::Runtime::AsyncWorkModule>();
