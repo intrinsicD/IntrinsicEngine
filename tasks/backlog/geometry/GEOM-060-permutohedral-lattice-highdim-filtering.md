@@ -32,7 +32,8 @@ contracts: [repo.source-documentation, geometry.element-domain-sources]
 - Owner/layer: `src/geometry`; `geometry -> core` only.
 - Paper: Adams, Baek, Davis — "Fast High-Dimensional Filtering Using the Permutohedral Lattice", Computer Graphics Forum (Eurographics) 2010.
 - Port source: framework24 `lib_bcg_framework/include/bcg_permutohedral_lattice.h` (untested in bcg; this port adds a brute-force oracle test).
-- Named future consumers: the fast Gauss transform for the nonrigid Coherent Point Drift optimized backend (follow-up to `METHOD-015`) and bilateral point-cloud/mesh filtering fast paths (`Geometry.PointCloud.Utils`, retired `GEOM-042`).
+- Named future consumers: the Coherent Point Drift lattice E-step (METHOD-058, FilterReg-style, for the middle sigma phase that METHOD-049/053 leave dense) and bilateral point-cloud/mesh filtering fast paths (`Geometry.PointCloud.Utils`, retired `GEOM-042`).
+- 2026-09-28 planning (Fable 5.1, Codex): METHOD-058 needs asymmetric stages - splat at one point set and slice at another (sources to targets and back) - vector values (four channels: 1 and x), double accumulation, and unnormalized Gaussian sums; the constant-signal invariance below applies to the normalized filter only. Expose both.
 
 ## Spatial acceleration consideration
 
@@ -47,6 +48,7 @@ See the [shared spatial-index consumer inventory](../../../docs/architecture/spa
 ## Required changes
 - [ ] Add module `Geometry.PermutohedralLattice` (`.cppm` + `.cpp`): build the lattice from d-dimensional feature vectors and expose a one-call `Filter(features, values)` entry plus the reusable splat/blur/slice stages.
 - [ ] Support feature dimensions at least 2 through 6 with documented accuracy behavior versus dimension.
+- [ ] Asymmetric splat/slice (splat features A, slice features B), multi-channel values, unnormalized and normalized results (METHOD-058).
 - [ ] Deterministic: identical inputs produce bitwise-identical outputs (fixed traversal order; no hash-iteration-order dependence in results).
 - [ ] Fail-closed on empty inputs, mismatched feature/value counts, and non-finite features.
 - [ ] Register the module in `src/geometry/CMakeLists.txt`.

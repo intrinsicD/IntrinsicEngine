@@ -21,6 +21,7 @@ editor equivalent (inventory row "Grid, sampler, subsampling, octree sampling").
 ## Acceptance criteria
 - [ ] One editor operation and its own panel ("Point Sampling") offering every `Geometry.PointSampling` method (GEOM-111/112/113: random, exact and weighted farthest point, progressive Poisson profiles, the approximate FPS family, sample elimination) with their parameters, plus voxel centroid, the GEOM-061 per-voxel strategies, and octree levels once GEOM-105 lands; the progressive Poisson panel is linked and publishes through the same path.
 - [ ] Output chosen explicitly: a new point-cloud entity, or a Bool selection property on the source (no silent in-place deletion); deterministic with a seed.
+- [ ] Backend combo (CPU / Vulkan through RUNTIME-290) and progressive prefix streaming from the seam's `Extend`.
 - [ ] Works on point clouds, graph nodes and mesh vertices; config section with one validator; undoable publication; contract and ImGui tests.
 
 ## Engine integration

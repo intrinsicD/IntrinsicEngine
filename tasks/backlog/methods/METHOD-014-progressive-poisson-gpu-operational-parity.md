@@ -7,6 +7,8 @@ depends_on:
   - RUNTIME-194
   - RUNTIME-195
   - RUNTIME-202
+  - GEOM-111
+  - GRAPHICS-148
 maturity_target: ParityProven
 workflow_schema: 1
 workflow_profile: standard
@@ -48,6 +50,22 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, method.e
   test uses a CPU-reference-shaped seeded payload. Preserve that useful test,
   but it does not establish acceptance-kernel compute parity or public GPU
   execution; those remain acceptance criteria here.
+- 2026-09-28 GPU planning (Fable 5.1, Codex):
+  - Defect to fix here: `assets/shaders/progressive_poisson_build_cells.comp`
+    writes the hash key and value non-atomically without probing (last writer
+    wins, key/value can tear); the CUDA original uses 64-bit `atomicCAS`.
+    Replace the hash with GRAPHICS-148 sorted cell keys and segment heads
+    (deterministic, no int64 atomics) rather than adding atomics.
+  - The CPU oracle now lives in the geometry layer
+    (`src/geometry/ProgressivePoisson/`, exposed as
+    `Geometry.PointSampling` `Method::ProgressivePoisson` by GEOM-111);
+    GEOM-112's options (Bounded profile, SpatiallyBalanced ordering) extend
+    the parity matrix once they land.
+  - Hazards from the CUDA source: warp ballot/shuffle chunk walks become
+    size-agnostic subgroup ops or plain loops; `cub::DevicePartition` maps to
+    the existing compaction; phases, retries and repairs run as bounded
+    dispatches (no grid-wide sync, watchdog-safe). Execution plugs into the
+    shared RUNTIME-290 seam.
 
 ## Control surfaces
 - Config: registered app section

@@ -23,6 +23,7 @@ contracts: [method.engine-integration, geometry.element-domain-sources]
 - [ ] Shared runtime config struct + validator + panel helper; the runtime enum mirrors `PointSamplingMethod` with a static_assert.
 - [ ] CPD: `subsample_method`, target subsample, landmark method; consolidation: initial-sample method (CPU and GPU paths identical).
 - [ ] Agent fields and contract tests per consumer.
+- [ ] Backend axis (`cpu_reference` / `gpu_vulkan_compute`) through the RUNTIME-290 seam with requested/actual/fallback reporting; small landmark sets (CPD) stay on the CPU.
 
 ## Engine integration
 
