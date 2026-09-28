@@ -120,6 +120,13 @@ namespace Extrinsic::Runtime
             return {.Status = status, .Method = config.Method, .Output = config.Output, .Message = std::move(message)};
         }
 
+        // The config enum mirrors the geometry policy numerically.
+        static_assert(std::uint8_t(CoherentPointDriftEStep::Reference) == std::uint8_t(CPD::EStepPolicy::Reference) &&
+                      std::uint8_t(CoherentPointDriftEStep::Dense) == std::uint8_t(CPD::EStepPolicy::Dense) &&
+                      std::uint8_t(CoherentPointDriftEStep::Truncated) == std::uint8_t(CPD::EStepPolicy::Truncated) &&
+                      std::uint8_t(CoherentPointDriftEStep::Auto) == std::uint8_t(CPD::EStepPolicy::Auto) &&
+                      std::uint8_t(CoherentPointDriftEStep::FastGauss) == std::uint8_t(CPD::EStepPolicy::FastGauss));
+
         std::size_t MinimumPoints(CoherentPointDriftMethod method) noexcept
         {
             return method == CoherentPointDriftMethod::Affine ? 4u : 3u;
@@ -157,10 +164,13 @@ namespace Extrinsic::Runtime
                 return Failure(config, EditorCommandStatus::InvalidProcessingParameters,
                                "Coherent Point Drift needs at least " + std::to_string(minimum) +
                                    " live points on each side.");
-            if (config.Method == CoherentPointDriftMethod::Nonrigid && sourceCapture.LiveCount > CPD::kMaxNonrigidSourcePoints)
+            const std::size_t nonrigidLimit = config.LowRank > 0u ? CPD::kMaxLowRankSourcePoints : CPD::kMaxNonrigidSourcePoints;
+            if (config.Method == CoherentPointDriftMethod::Nonrigid && sourceCapture.LiveCount > nonrigidLimit)
                 return Failure(config, EditorCommandStatus::InvalidProcessingParameters,
-                               "Nonrigid CPD handles at most " + std::to_string(CPD::kMaxNonrigidSourcePoints) +
-                                   " source points (dense kernel); subsample the source or use rigid/affine.");
+                               config.LowRank > 0u
+                                   ? "Low-rank nonrigid CPD handles at most " + std::to_string(nonrigidLimit) + " source points."
+                                   : "Nonrigid CPD with the full kernel handles at most " + std::to_string(nonrigidLimit) +
+                                         " source points; set a low rank (for example 100) or subsample the source.");
             const auto* sourceTransform = raw.try_get<ECSC::Transform::Component>(*source);
             if (config.Output == CoherentPointDriftOutput::SourceTransform && sourceTransform == nullptr)
                 return Failure(config, EditorCommandStatus::MissingTransform, "The source entity has no Transform to drive.");
@@ -194,7 +204,9 @@ namespace Extrinsic::Runtime
                                       .MaxIterations = config.MaxIterations, .Tolerance = config.Tolerance,
                                       .InitialSigma2 = config.InitialSigma2, .Sigma2Floor = config.Sigma2Floor,
                                       .NormalizeInputs = config.NormalizeInputs, .EstimateScale = config.EstimateScale,
-                                      .AllowReflection = config.AllowReflection, .Beta = config.Beta, .Lambda = config.Lambda};
+                                      .AllowReflection = config.AllowReflection, .Beta = config.Beta, .Lambda = config.Lambda,
+                                      .EStep = CPD::EStepPolicy(config.EStep), .EStepTolerance = config.EStepTolerance,
+                                      .Threads = config.Threads, .LowRank = config.LowRank};
             return std::nullopt;
         }
 
@@ -218,6 +230,10 @@ namespace Extrinsic::Runtime
             result.MatchedWeight = current.MatchedWeight;
             result.Transform = current.Transform;
             result.Termination = std::string(CPD::ToString(current.Stop));
+            result.Backend = std::string(current.Backend);
+            result.EStepErrorBound = current.EStepErrorBound;
+            result.KernelRank = current.KernelRank;
+            result.KernelApproximationError = current.KernelApproximationError;
             result.MeanDisplacement = preview.empty() ? 0.0 : displacement / double(preview.size());
             if (!current.Succeeded())
             {
@@ -252,7 +268,9 @@ namespace Extrinsic::Runtime
                 std::scoped_lock lock{run.Mutex};
                 run.Snapshot.Trace.push_back({.Iteration = trace.Iteration, .Sigma2 = trace.Sigma2,
                                               .NegativeLogLikelihood = trace.NegativeLogLikelihood,
-                                              .Objective = trace.Objective, .MatchedWeight = trace.MatchedWeight});
+                                              .Objective = trace.Objective, .MatchedWeight = trace.MatchedWeight,
+                                              .EStep = std::string(CPD::ToString(trace.EStep)),
+                                              .EStepErrorBound = trace.EStepErrorBound});
             };
             while (!run.Solver.Finished())
             {
@@ -538,6 +556,7 @@ namespace Extrinsic::Runtime
         auto& snapshot = run->Snapshot;
         snapshot.Phase = Phase::Ready;
         snapshot.Result = {.Status = EditorCommandStatus::Pending, .Method = resolved.Method, .Output = resolved.Output,
+                           .Backend = std::string(CPD::BackendId(run->Params.EStep)),
                            .SourcePointCount = run->SourceWorld.size(), .TargetPointCount = run->TargetWorld.size(),
                            .Message = "Coherent Point Drift is ready."};
         snapshot.SourcePreview = run->SourceWorld;
@@ -602,7 +621,7 @@ namespace Extrinsic::Runtime
         const auto status = Submit(context, run, 0u, [sink](EditorCoherentPointDriftResult result) { if (sink) sink(std::move(result)); });
         auto pending = SnapshotEditorCoherentPointDrift(run).Result;
         pending.Status = status;
-        pending.Message = status == EditorCommandStatus::Pending ? "Coherent Point Drift queued (cpu_reference)."
+        pending.Message = status == EditorCommandStatus::Pending ? "Coherent Point Drift queued (" + pending.Backend + ")."
                                                                  : pending.Message;
         return pending;
     }

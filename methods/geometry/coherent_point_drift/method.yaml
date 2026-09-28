@@ -1,7 +1,7 @@
 id: geometry.coherent_point_drift
 name: Coherent Point Drift point-set registration (rigid, affine, nonrigid)
 domain: geometry
-status: reference
+status: optimized
 paper:
   title: "Point Set Registration: Coherent Point Drift"
   authors: Andriy Myronenko and Xubo Song
@@ -11,20 +11,27 @@ paper:
 inputs:
   - Two finite float3 point spans (fixed target, moving source) from any canonical element domain
   - Variant (rigid default, affine, nonrigid), outlier weight w in [0,1), EM limits, sigma^2 floor, nonrigid beta/lambda
+  - E-step policy (reference, dense, truncated, fast Gauss, auto) with its error tolerance, thread count, nonrigid low rank
 outputs:
   - Rigid similarity (rotation, scale, translation) or affine transform, or the nonrigidly displaced source positions
   - Final sigma^2, negative log-likelihood, iterations, termination reason, objective and sigma^2 histories, backend identity
+  - Per-iteration E-step policy and error bound, kernel evaluations, low-rank kernel rank and sampled approximation error
 backends:
   - cpu_reference
+  - cpu_optimized # policies report cpu_dense_parallel, cpu_truncated, cpu_ifgt or cpu_auto
 metrics:
   - runtime_ms
   - quality_error_l2
+  - quality_error_linf
 correctness_tests:
   - ../../../tests/unit/geometry/Test.CoherentPointDrift.cpp
+  - ../../../tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp
 benchmarks:
   - ../../../benchmarks/geometry/manifests/coherent_point_drift_reference_smoke.yaml
+  - ../../../benchmarks/geometry/manifests/coherent_point_drift_accelerated_smoke.yaml
+  - ../../../benchmarks/geometry/manifests/coherent_point_drift_accelerated.yaml
 known_limitations:
-  - Explicit O(N*M) E-step per iteration (O(N+M) memory); fast summation and low-rank solves are METHOD-049.
-  - Nonrigid solves a dense M x M system per iteration (O(M^3)) and is limited to 8192 source points.
+  - The reference E-step is O(N*M) per iteration; the dense parallel policy keeps that cost, the truncated policy reaches it only while sigma is wide, and the fast Gauss transform does not beat dense in 3-D at tight tolerances.
+  - The full-kernel nonrigid solve is O(M^3) per iteration and limited to 8192 source points; the low-rank solve (k eigenpairs, Nystroem) allows 1,000,000 with an approximation error reported, not bounded.
   - EM is local; large rotations, symmetric shapes and reflections need a nearby start (see paper.md).
   - Beta, lambda and the sigma^2 values are dimensionless under the default input normalization.

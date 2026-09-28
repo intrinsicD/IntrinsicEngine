@@ -1,0 +1,23 @@
+# METHOD-049 - smoke parity of the optimized Coherent Point Drift backends (dense parallel,
+# truncated, auto E-step; low-rank nonrigid) against the METHOD-015 reference.
+benchmark_id: geometry.coherent_point_drift.accelerated.smoke
+method: geometry.coherent_point_drift
+dataset: builtin.cpd_fixtures.seed101
+params:
+  intent: correctness
+  seed: 101
+  rigid_points: 1000
+  nonrigid_points: 300
+  e_step_tolerance: 1.0e-8
+  low_rank: 60
+  warmup_iterations: 0
+  measured_iterations: 1
+metrics:
+  - runtime_ms
+  - quality_error_linf
+  - quality_error_l2
+thresholds:
+  # quality_error_linf: max point difference of dense/truncated/auto rigid runs to the reference.
+  quality_error_linf_max: 1.0e-6
+  # quality_error_l2: max point difference of the low-rank nonrigid run to the full solve.
+  quality_error_l2_max: 2.0e-3

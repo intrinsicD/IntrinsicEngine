@@ -111,6 +111,8 @@ export namespace Extrinsic::Runtime
         double NegativeLogLikelihood{0.0};
         double Objective{0.0};             // NLL plus the nonrigid coherence term
         double MatchedWeight{0.0};         // sum of inlier responsibilities
+        std::string EStep{"reference"};    // E-step policy that ran this iteration
+        double EStepErrorBound{0.0};       // its max relative responsibility error (0: exact)
     };
 
     enum class EditorCoherentPointDriftPhase : std::uint8_t
@@ -141,6 +143,9 @@ export namespace Extrinsic::Runtime
         // World-space source->target map for rigid and affine runs.
         glm::dmat4 Transform{1.0};
         double MeanDisplacement{0.0}; // mean |T(y) - y| in world units
+        double EStepErrorBound{0.0};  // max over the run (0: exact)
+        std::uint32_t KernelRank{0u}; // low-rank nonrigid eigenpairs
+        double KernelApproximationError{0.0};
         std::string Message{};
 
         [[nodiscard]] bool Succeeded() const noexcept { return Status == EditorCommandStatus::Applied; }

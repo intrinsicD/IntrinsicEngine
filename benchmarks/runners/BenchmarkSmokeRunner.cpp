@@ -34,6 +34,7 @@
 #include "../geometry/Bench.PointLBVHSmoke.hpp"
 #include "../geometry/Bench.RegistrationSpatialSmoke.hpp"
 #include "../geometry/Bench.CoherentPointDriftReferenceSmoke.hpp"
+#include "../geometry/Bench.CoherentPointDriftAcceleratedSmoke.hpp"
 #include "../geometry/Bench.SimplificationQualitySmoke.hpp"
 #include "../geometry/Bench.SurfaceSamplingSmoke.hpp"
 #include "../geometry/Bench.UvAtlasSmoke.hpp"
@@ -716,6 +717,33 @@ auto EmitCoherentPointDriftReferenceSmoke(const std::string& commit) -> EmittedB
             variant("rigid", r.Rigid, false);
             variant("affine", r.Affine, false);
             variant("nonrigid", r.Nonrigid, true);
+        });
+}
+
+auto EmitCoherentPointDriftAcceleratedSmoke(const std::string& commit) -> EmittedBenchmark
+{
+    const auto r = Intrinsic::Bench::Geometry::RunCoherentPointDriftAcceleratedSmoke();
+    // METHOD-049 frozen parity tolerances (Test.CoherentPointDriftAccelerated.cpp).
+    const bool passed = r.Succeeded && r.MaxRigidParity <= 1e-6 && r.LowRankParity <= 2e-3;
+    std::ostringstream out;
+    out.precision(9);
+    return EmitBenchmarkResult(out, "geometry.coherent_point_drift.accelerated.smoke",
+        "geometry.coherent_point_drift", "cpu_optimized", "builtin.cpd_fixtures.seed101", commit, passed,
+        [&] {
+            out << "    \"runtime_ms\": " << r.RuntimeMilliseconds
+                << ",\n    \"quality_error_linf\": " << r.MaxRigidParity
+                << ",\n    \"quality_error_l2\": " << r.LowRankParity << '\n';
+        }, [&] {
+            out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+                << "    \"mode\": \"correctness_smoke\",\n"
+                << "    \"rigid_reference_ms\": " << r.ReferenceMilliseconds
+                << ",\n    \"rigid_dense_ms\": " << r.DenseMilliseconds
+                << ",\n    \"rigid_truncated_ms\": " << r.TruncatedMilliseconds
+                << ",\n    \"rigid_auto_ms\": " << r.AutoMilliseconds
+                << ",\n    \"truncated_error_bound\": " << r.TruncatedErrorBound
+                << ",\n    \"nonrigid_full_ms\": " << r.FullNonrigidMilliseconds
+                << ",\n    \"nonrigid_low_rank_ms\": " << r.LowRankMilliseconds
+                << ",\n    \"kernel_approximation_error\": " << r.KernelApproximationError << '\n';
         });
 }
 
@@ -1744,6 +1772,7 @@ auto main(int argc, char **argv) -> int {
   emitted.push_back(EmitPointLBVHKnnSmoke(commit));
   emitted.push_back(EmitRegistrationSpatialSmoke(commit));
   emitted.push_back(EmitCoherentPointDriftReferenceSmoke(commit));
+  emitted.push_back(EmitCoherentPointDriftAcceleratedSmoke(commit));
   emitted.push_back(EmitCurvatureSegmentationReferenceSmoke(commit));
   emitted.push_back(EmitPointCloudConsolidationReferenceSmoke(commit));
   emitted.push_back(EmitLopFamilyComparisonSmoke(commit));

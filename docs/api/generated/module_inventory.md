@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 11 |
 | `core` | 41 |
 | `ecs` | 27 |
-| `geometry` | 130 |
+| `geometry` | 131 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 74 |
@@ -216,6 +216,7 @@ Root scanned: `src`
 | `Geometry.Queries` | `src/geometry/Geometry.Queries.cppm` | `geometry` |
 | `Geometry.Ray` | `src/geometry/Geometry.Ray.cppm` | `geometry` |
 | `Geometry.Raycast` | `src/geometry/Geometry.Raycast.cppm` | `geometry` |
+| `Geometry.Registration.CoherentPointDrift.EStep` | `src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cppm` | `geometry` |
 | `Geometry.Registration.CoherentPointDrift` | `src/geometry/Geometry.Registration.CoherentPointDrift.cppm` | `geometry` |
 | `Geometry.Registration` | `src/geometry/Geometry.Registration.cppm` | `geometry` |
 | `Geometry.Robust` | `src/geometry/Geometry.Robust.cppm` | `geometry` |
@@ -467,4 +468,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **440**
+Total modules: **441**

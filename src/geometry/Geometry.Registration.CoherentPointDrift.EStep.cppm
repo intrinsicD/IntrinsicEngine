@@ -1,0 +1,120 @@
+// Accelerated Coherent Point Drift building blocks (METHOD-049), validated against the
+// METHOD-015 reference in Geometry.Registration.CoherentPointDrift.
+//
+// E-step: the sufficient statistics P1 = P 1, Pt1 = P^T 1 and PX = P X of the responsibilities
+// P(m | x_n) of the Gaussian-mixture-plus-uniform model, with the reference's log-sum-exp
+// shift, evaluated in parallel with results that do not depend on the thread count:
+//   - Dense:     exact, O(N M) kernel evaluations, parallel.
+//   - Truncated: per target row keeps the sources within r_n^2 = d_min,n^2 + 2 sigma^2
+//                ln(M / tol). The dropped kernel mass is then at most tol times the kept
+//                mass, so every row denominator has relative error <= tol (reported, not
+//                assumed). Neighborhoods come from kd-trees; pays off once sigma is small
+//                against the point-set extent.
+//   - FastGauss: improved fast Gauss transform (Yang et al. 2003) for both passes, with
+//                clusters, expansion order and cutoff chosen from the Raykar et al. (2005)
+//                bound so every denominator and P1 entry has relative error <= tol; falls
+//                back to dense when no plan meets the bound. Pays off for wide kernels.
+//   - Auto:      truncated while its radius stays below the extent, otherwise the fast Gauss
+//                transform when its planned cost is well below the dense cost, else dense.
+// Rows are processed in fixed blocks (their count depends only on N and M) that scatter into
+// per-block partial sums reduced in block order, so each kernel term is evaluated once; above
+// Settings::PartialBudgetBytes a two-pass form (target pass for the denominators, source pass
+// for P1/PX) is used instead. Both are thread-count independent.
+//
+// Low-rank kernel: k leading eigenpairs of the nonrigid Gram matrix G_ij =
+// exp(-|y_i - y_j|^2 / (2 beta^2)) from a Nystroem approximation on farthest-point
+// landmarks, with an a-posteriori relative error measured on sampled exact rows.
+module;
+
+#include <cstdint>
+#include <memory>
+#include <span>
+#include <string_view>
+#include <vector>
+
+export module Geometry.Registration.CoherentPointDrift.EStep;
+
+export namespace Geometry::CoherentPointDrift
+{
+    enum class EStepPolicy : std::uint8_t
+    {
+        Reference = 0, // METHOD-015 streamed single-threaded pass (canonical)
+        Dense,
+        Truncated,
+        Auto,
+        FastGauss, // improved fast Gauss transform with a computed error bound (wide kernels)
+    };
+
+    [[nodiscard]] std::string_view ToString(EStepPolicy value) noexcept;
+    // Backend identity reported in results ("cpu_reference", "cpu_dense_parallel", ...).
+    [[nodiscard]] std::string_view BackendId(EStepPolicy value) noexcept;
+}
+
+export namespace Geometry::CoherentPointDrift::EStep
+{
+    // Structure-of-arrays view of 3-D points (normalized coordinates).
+    struct PointSet
+    {
+        std::span<const double> X{}, Y{}, Z{};
+        [[nodiscard]] std::size_t Size() const noexcept { return X.size(); }
+    };
+
+    struct Settings
+    {
+        EStepPolicy Policy{EStepPolicy::Dense};
+        // Truncated: bound on each row denominator's relative error, in (0, 1).
+        double Tolerance{1.0e-6};
+        std::uint32_t Threads{0u}; // 0: hardware concurrency
+        // Memory for per-row-block partial sums (4 doubles per source point and block). When the
+        // fixed block count does not fit, a two-pass evaluation (twice the kernel terms, no
+        // partial sums) is used instead.
+        std::size_t PartialBudgetBytes{std::size_t{128} << 20};
+    };
+
+    struct Sums
+    {
+        std::vector<double> P1{}, Pt1{}, PXx{}, PXy{}, PXz{};
+        double LogDenominatorSum{0.0}; // sum_n log(sum_m exp(-|x_n - y_m|^2 / 2 sigma^2) + c)
+        double Matched{0.0};           // sum_n Pt1_n
+        EStepPolicy Used{EStepPolicy::Dense};
+        double ErrorBound{0.0};        // max relative error of a row denominator or P1 entry (0: exact)
+        std::uint64_t KernelEvaluations{0u};
+    };
+
+    [[nodiscard]] std::uint32_t ResolveThreads(std::uint32_t requested) noexcept;
+
+    class Evaluator
+    {
+    public:
+        Evaluator();
+        ~Evaluator();
+        Evaluator(Evaluator&&) noexcept;
+        Evaluator& operator=(Evaluator&&) noexcept;
+
+        // The target is fixed for the evaluator's lifetime (its spatial index is cached).
+        void SetTarget(PointSet target);
+        // logOutlier = log c of the uniform component (-inf for no outliers). Returns false
+        // when every row's mass went to the outlier term or a value is not finite.
+        [[nodiscard]] bool Evaluate(PointSet moved, double sigma2, double logOutlier, const Settings& settings,
+                                    Sums& out);
+
+    private:
+        struct Impl;
+        std::unique_ptr<Impl> m_Impl;
+    };
+
+    struct LowRankKernel
+    {
+        std::uint32_t Rank{0u};
+        std::uint32_t Landmarks{0u};
+        std::vector<double> Basis{};       // points x Rank, column-major, orthonormal columns
+        std::vector<double> Eigenvalues{}; // descending, positive
+        // sqrt(sum |g - g~|^2 / sum |g|^2) over sampled exact kernel rows.
+        double EstimatedRelativeError{0.0};
+    };
+
+    // G ~= Basis diag(Eigenvalues) Basis^T for G_ij = exp(-|p_i - p_j|^2 / (2 beta^2)).
+    // Returns false for empty input, a non-positive beta or rank, or a numerically empty kernel.
+    [[nodiscard]] bool BuildLowRankGaussianKernel(PointSet points, double beta, std::uint32_t rank,
+                                                  std::uint32_t threads, LowRankKernel& out);
+}

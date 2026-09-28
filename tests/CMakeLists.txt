@@ -1584,6 +1584,7 @@ set(_geometry_test_files
     Test.PointCloudKernels.cpp
     Test_Registration.cpp
     Test.CoherentPointDrift.cpp
+    Test.CoherentPointDriftAccelerated.cpp
     Test_PointCloudRobustness.cpp
     Test.PointCloudOutlierRemoval.cpp
     Test.KernelDensity.cpp

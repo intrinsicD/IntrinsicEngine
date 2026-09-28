@@ -237,6 +237,8 @@ TEST(CoherentPointDrift, RunsAreDeterministicObservedOrNotAndStepModeMatches)
     EXPECT_TRUE(solver.Finished());
     EXPECT_EQ(stepped.Sigma2, first.Sigma2);
     EXPECT_EQ(stepped.Transform, first.Transform);
+    // Step() returns false on the final iteration, so it ran one more time than it returned true.
+    EXPECT_EQ(steps + 1u, stepped.Iterations + (stepped.Stop == CPD::Termination::Converged ? 1u : 0u));
 }
 
 TEST(CoherentPointDrift, TerminatesOnTheSigmaFloorAndTheIterationCap)

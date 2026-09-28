@@ -78,12 +78,17 @@ TEST(CoherentPointDriftOperations, ConfigRoundTripsAndRejectsUnstorableOutputs)
     EXPECT_FALSE(registration.SchemaJson.empty());
     R::CoherentPointDriftConfig config{.SourceStableEntityId = 3, .TargetStableEntityId = 4, .Method = M::Nonrigid,
                                        .OutlierWeight = 0.2, .Beta = 1.5, .Output = O::DisplacementProperty,
-                                       .DisplacementName = "warp"};
+                                       .DisplacementName = "warp", .EStep = R::CoherentPointDriftEStep::Truncated,
+                                       .EStepTolerance = 1e-4, .Threads = 3, .LowRank = 40};
     const auto decoded = R::DecodeCoherentPointDriftConfig(R::SerializeCoherentPointDriftConfig(config));
     ASSERT_TRUE(decoded.has_value());
     EXPECT_EQ(decoded->Method, M::Nonrigid);
     EXPECT_EQ(decoded->DisplacementName, "warp");
     EXPECT_EQ(decoded->Beta, 1.5);
+    EXPECT_EQ(decoded->EStep, R::CoherentPointDriftEStep::Truncated);
+    EXPECT_EQ(decoded->EStepTolerance, 1e-4);
+    EXPECT_EQ(decoded->Threads, 3u);
+    EXPECT_EQ(decoded->LowRank, 40u);
     const auto invalid = [&](R::CoherentPointDriftConfig c) {
         return !registration.Validate(R::SerializeCoherentPointDriftConfig(c), {}, "test").Usable();
     };
@@ -92,6 +97,9 @@ TEST(CoherentPointDriftOperations, ConfigRoundTripsAndRejectsUnstorableOutputs)
     EXPECT_TRUE(invalid({.Output = O::DisplacementProperty, .DisplacementName = "v:position"}));
     EXPECT_TRUE(invalid({.SourceStableEntityId = 5, .TargetStableEntityId = 5}));
     EXPECT_TRUE(invalid({.OutlierWeight = 1.0}));
+    EXPECT_TRUE(invalid({.EStepTolerance = 0.0}));
+    EXPECT_TRUE(invalid({.EStepTolerance = 1.0}));
+    EXPECT_TRUE(invalid({.LowRank = 5000}));
     EXPECT_FALSE(registration.Validate(R"({"no_such_field":1})", {}, "test").Usable());
 }
 
@@ -111,7 +119,8 @@ TEST(CoherentPointDriftOperations, RigidPublishesTheSourceTransformOnEveryPointD
             const auto result = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), {
                 .SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target), .OutlierWeight = 0.0});
             ASSERT_TRUE(result.Succeeded()) << result.Message;
-            EXPECT_EQ(result.Backend, "cpu_reference");
+            EXPECT_EQ(result.Backend, "cpu_auto") << "the editor default is the automatic E-step";
+            EXPECT_EQ(result.EStepErrorBound <= 1e-6, true);
             EXPECT_EQ(result.SourcePointCount, 120u);
             auto& transform = s.Registry.Raw().get<T::Component>(source);
             EXPECT_NEAR(transform.Position.x, 0.5f, 2e-3f);
@@ -169,6 +178,21 @@ TEST(CoherentPointDriftOperations, AffineWritesPositionsAndNonrigidWritesADispla
     EXPECT_EQ(props->Get<glm::vec3>("v:position")[3], points[3]) << "displacement output leaves positions alone";
     ASSERT_TRUE(s.History.Undo().Succeeded());
     EXPECT_FALSE(props->Exists("warp"));
+
+    // Low-rank kernel with the exact reference E-step reaches the same field.
+    const auto lowRank = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), {
+        .SourceStableEntityId = Id(source), .TargetStableEntityId = Id(bentTarget), .Method = M::Nonrigid,
+        .OutlierWeight = 0.0, .Output = O::DisplacementProperty, .DisplacementName = "warp",
+        .EStep = R::CoherentPointDriftEStep::Reference, .LowRank = 40});
+    ASSERT_TRUE(lowRank.Succeeded()) << lowRank.Message;
+    EXPECT_EQ(lowRank.Backend, "cpu_reference");
+    EXPECT_GT(lowRank.KernelRank, 0u);
+    EXPECT_LE(lowRank.KernelRank, 40u);
+    const auto lowRankWarp = props->Get<glm::vec3>("warp");
+    ASSERT_TRUE(lowRankWarp);
+    double lowRankError = 0.0;
+    for (std::size_t i = 0; i < points.size(); ++i) lowRankError += glm::length(points[i] + lowRankWarp[i] - bent[i]);
+    EXPECT_LT(lowRankError / double(points.size()), 0.02);
 }
 
 TEST(CoherentPointDriftOperations, StepModeTracesEachIterationAndAppliesTheCurrentEstimate)

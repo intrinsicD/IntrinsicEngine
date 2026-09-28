@@ -784,6 +784,12 @@ named vec3 displacement property in source-local space for affine and nonrigid r
 `ApplyEditorCoherentPointDriftCommand` chains start, a full run and publication with one
 terminal callback; agents reach it through `run_registration`.
 
+The section also selects the METHOD-049 backends: `e_step` (reference, dense, truncated,
+auto, fast Gauss; the editor default is auto with `e_step_tolerance` 1e-6), `threads` and
+the nonrigid `low_rank`, which lifts the full-kernel limit of 8192 source points. Results
+and each trace row carry the backend, the E-step policy that ran and its error bound;
+low-rank runs report the kernel rank and its sampled approximation error.
+
 ### Sandbox Editor ICP Registration
 
 The `ICP Registration` panel is reachable from the `View` menu through

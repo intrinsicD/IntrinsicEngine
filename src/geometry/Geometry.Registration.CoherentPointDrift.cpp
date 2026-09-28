@@ -115,8 +115,19 @@ namespace Geometry::CoherentPointDrift
         double RigidScale{1.0};
         Eigen::Matrix3d Linear{Eigen::Matrix3d::Identity()};
         Eigen::Vector3d Translation{Eigen::Vector3d::Zero()};
-        // Nonrigid: T(Y) = Y + G W.
+        // Nonrigid: T(Y) = Y + G W. With LowRank, G ~= Basis diag(Eigenvalues) Basis^T and only
+        // Basis^T W is kept.
         Eigen::MatrixXd Kernel{}, Coefficients{};
+        Eigen::MatrixXd Basis{}, BasisCoefficients{};
+        Eigen::VectorXd Eigenvalues{};
+        double KernelError{0.0};
+
+        // Optimized E-step (Params::EStep != Reference).
+        EStep::Evaluator Accelerated{};
+        EStep::Sums AcceleratedSums{};
+        EStepPolicy LastPolicy{EStepPolicy::Reference};
+        double LastErrorBound{0.0}, MaxErrorBound{0.0};
+        std::uint64_t LastKernelEvaluations{0u}, TotalKernelEvaluations{0u};
 
         // E-step sufficient statistics: P1 = P 1, Pt1 = P^T 1, PX = P X.
         std::vector<double> P1{}, Pt1{}, Scratch{};
@@ -125,16 +136,50 @@ namespace Geometry::CoherentPointDrift
         // Responsibilities P(m | x_n) of the Gaussian-mixture-plus-uniform model, streamed row
         // by row (target point by target point) with a log-sum-exp shift so small sigma^2 cannot
         // underflow every term. Returns false when every target point went to the outlier term.
-        bool ExpectationStep(double& negativeLogLikelihood, double& matched)
+        [[nodiscard]] double LogOutlierConstant() const
         {
             const std::size_t n = Target.Size(), m = Moved.Size();
             const double w = Config.OutlierWeight;
-            const double twoSigma2 = 2.0 * Sigma2;
             // c = (2 pi sigma^2)^{D/2} * w/(1-w) * M/N (paper eq. 7); log for overflow safety.
-            const double logC = w > 0.0
-                ? 0.5 * kDimension * std::log(std::numbers::pi * twoSigma2) + std::log(w / (1.0 - w)) +
+            return w > 0.0
+                ? 0.5 * kDimension * std::log(std::numbers::pi * 2.0 * Sigma2) + std::log(w / (1.0 - w)) +
                       std::log(double(m) / double(n))
                 : -std::numeric_limits<double>::infinity();
+        }
+
+        // p(x) = (1-w)/M (2 pi sigma^2)^{-D/2} (sum_m exp(a_m) + c); NLL = -sum_n log p(x_n).
+        [[nodiscard]] double NegativeLogLikelihood(const double logDenominatorSum) const
+        {
+            const double n = double(Target.Size()), m = double(Moved.Size());
+            return -(logDenominatorSum + n * (std::log((1.0 - Config.OutlierWeight) / m) -
+                                              0.5 * kDimension * std::log(std::numbers::pi * 2.0 * Sigma2)));
+        }
+
+        bool AcceleratedExpectationStep(double& negativeLogLikelihood, double& matched)
+        {
+            EStep::Sums& sums = AcceleratedSums;
+            const EStep::Settings settings{.Policy = Config.EStep, .Tolerance = Config.EStepTolerance,
+                                           .Threads = Config.Threads};
+            if (!Accelerated.Evaluate({Moved.X, Moved.Y, Moved.Z}, Sigma2, LogOutlierConstant(), settings, sums))
+                return false;
+            P1.swap(sums.P1); Pt1.swap(sums.Pt1);
+            PX.X.swap(sums.PXx); PX.Y.swap(sums.PXy); PX.Z.swap(sums.PXz);
+            negativeLogLikelihood = NegativeLogLikelihood(sums.LogDenominatorSum);
+            matched = sums.Matched;
+            LastPolicy = sums.Used;
+            LastErrorBound = sums.ErrorBound;
+            LastKernelEvaluations = sums.KernelEvaluations;
+            MaxErrorBound = std::max(MaxErrorBound, LastErrorBound);
+            TotalKernelEvaluations += LastKernelEvaluations;
+            return std::isfinite(negativeLogLikelihood);
+        }
+
+        bool ExpectationStep(double& negativeLogLikelihood, double& matched)
+        {
+            if (Config.EStep != EStepPolicy::Reference) return AcceleratedExpectationStep(negativeLogLikelihood, matched);
+            const std::size_t n = Target.Size(), m = Moved.Size();
+            const double twoSigma2 = 2.0 * Sigma2;
+            const double logC = LogOutlierConstant();
             std::fill(P1.begin(), P1.end(), 0.0);
             std::fill(PX.X.begin(), PX.X.end(), 0.0);
             std::fill(PX.Y.begin(), PX.Y.end(), 0.0);
@@ -180,10 +225,11 @@ namespace Geometry::CoherentPointDrift
                 Pt1[j] = row;
                 total += row;
             }
-            // p(x) = (1-w)/M (2 pi sigma^2)^{-D/2} (sum_m exp(a_m) + c); NLL = -sum_n log p(x_n).
-            negativeLogLikelihood = -(logSum + double(n) * (std::log((1.0 - w) / double(m)) -
-                                                            0.5 * kDimension * std::log(std::numbers::pi * twoSigma2)));
+            negativeLogLikelihood = NegativeLogLikelihood(logSum);
             matched = total;
+            LastPolicy = EStepPolicy::Reference;
+            LastKernelEvaluations = std::uint64_t(n) * std::uint64_t(m);
+            TotalKernelEvaluations += LastKernelEvaluations;
             return std::isfinite(negativeLogLikelihood) && total > std::numeric_limits<double>::min() * double(n);
         }
 
@@ -245,8 +291,55 @@ namespace Geometry::CoherentPointDrift
             return Status::Success;
         }
 
+        // Woodbury form of (d(P1) Q L Q^T + a I) W = F with a = lambda sigma^2:
+        // W = (F - d(P1) Q (a L^{-1} + Q^T d(P1) Q)^{-1} Q^T F) / a.
+        Status LowRankNonrigidStep(double matched)
+        {
+            const Eigen::Index m = Eigen::Index(Source.Size());
+            const Eigen::Map<const Eigen::VectorXd> p1(P1.data(), m);
+            Eigen::MatrixXd f(m, 3);
+            for (Eigen::Index i = 0; i < m; ++i)
+            {
+                const std::size_t k = std::size_t(i);
+                f(i, 0) = PX.X[k] - P1[k] * Source.X[k];
+                f(i, 1) = PX.Y[k] - P1[k] * Source.Y[k];
+                f(i, 2) = PX.Z[k] - P1[k] * Source.Z[k];
+            }
+            const double a = Config.Lambda * Sigma2;
+            const Eigen::MatrixXd weighted = p1.asDiagonal() * Basis;
+            Eigen::MatrixXd inner = Basis.transpose() * weighted;
+            inner.diagonal() += a * Eigenvalues.cwiseInverse();
+            const Eigen::LDLT<Eigen::MatrixXd> ldlt(inner);
+            if (ldlt.info() != Eigen::Success) return Status::SingularSystem;
+            const Eigen::MatrixXd z = ldlt.solve(Basis.transpose() * f);
+            const Eigen::MatrixXd w = (f - weighted * z) / a;
+            BasisCoefficients = Basis.transpose() * w;
+            if (!BasisCoefficients.allFinite()) return Status::SingularSystem;
+            const Eigen::MatrixXd displacement = Basis * (Eigenvalues.asDiagonal() * BasisCoefficients);
+            return FinishNonrigid(displacement, matched);
+        }
+
+        Status FinishNonrigid(const Eigen::MatrixXd& displacement, double matched)
+        {
+            const Eigen::Index m = Eigen::Index(Source.Size());
+            double xPx = 0.0, xTerm = 0.0, tTerm = 0.0;
+            for (std::size_t j = 0; j < Target.Size(); ++j) xPx += Pt1[j] * Target.At(j).squaredNorm();
+            for (Eigen::Index i = 0; i < m; ++i)
+            {
+                const std::size_t k = std::size_t(i);
+                const Eigen::Vector3d moved = Source.At(k) + displacement.row(i).transpose();
+                Moved.Set(k, moved);
+                xTerm += PX.X[k] * moved.x() + PX.Y[k] * moved.y() + PX.Z[k] * moved.z();
+                tTerm += P1[k] * moved.squaredNorm();
+            }
+            // sigma^2 = (tr(X^T d(Pt1) X) - 2 tr((PX)^T T) + tr(T^T d(P1) T)) / (Np D)
+            Sigma2 = (xPx - 2.0 * xTerm + tTerm) / (matched * kDimension);
+            return Status::Success;
+        }
+
         Status NonrigidStep(double matched)
         {
+            if (Config.LowRank > 0u) return LowRankNonrigidStep(matched);
             const Eigen::Index m = Eigen::Index(Source.Size());
             // (d(P1) G + lambda sigma^2 I) W = PX - d(P1) Y
             Eigen::MatrixXd system = Kernel;
@@ -263,20 +356,7 @@ namespace Geometry::CoherentPointDrift
             const Eigen::PartialPivLU<Eigen::MatrixXd> lu(system);
             Coefficients = lu.solve(rhs);
             if (!Coefficients.allFinite()) return Status::SingularSystem;
-            const Eigen::MatrixXd displacement = Kernel * Coefficients;
-            double xPx = 0.0, xTerm = 0.0, tTerm = 0.0;
-            for (std::size_t j = 0; j < Target.Size(); ++j) xPx += Pt1[j] * Target.At(j).squaredNorm();
-            for (Eigen::Index i = 0; i < m; ++i)
-            {
-                const std::size_t k = std::size_t(i);
-                const Eigen::Vector3d moved = Source.At(k) + displacement.row(i).transpose();
-                Moved.Set(k, moved);
-                xTerm += PX.X[k] * moved.x() + PX.Y[k] * moved.y() + PX.Z[k] * moved.z();
-                tTerm += P1[k] * moved.squaredNorm();
-            }
-            // sigma^2 = (tr(X^T d(Pt1) X) - 2 tr((PX)^T T) + tr(T^T d(P1) T)) / (Np D)
-            Sigma2 = (xPx - 2.0 * xTerm + tTerm) / (matched * kDimension);
-            return Status::Success;
+            return FinishNonrigid(Kernel * Coefficients, matched);
         }
 
         void ApplyLinear()
@@ -287,7 +367,11 @@ namespace Geometry::CoherentPointDrift
         // lambda/2 tr(W^T G W), the motion-coherence term of the nonrigid objective.
         [[nodiscard]] double Coherence() const
         {
-            if (Config.Method != Variant::Nonrigid || Coefficients.size() == 0) return 0.0;
+            if (Config.Method != Variant::Nonrigid) return 0.0;
+            if (Config.LowRank > 0u)
+                return BasisCoefficients.size() == 0 ? 0.0
+                    : 0.5 * Config.Lambda * (BasisCoefficients.transpose() * Eigenvalues.asDiagonal() * BasisCoefficients).trace();
+            if (Coefficients.size() == 0) return 0.0;
             return 0.5 * Config.Lambda * (Coefficients.transpose() * Kernel * Coefficients).trace();
         }
 
@@ -320,9 +404,13 @@ namespace Geometry::CoherentPointDrift
             !std::isfinite(params.InitialSigma2) || !(params.Sigma2Floor > 0.0) || !std::isfinite(params.Sigma2Floor) ||
             (params.Method == Variant::Nonrigid &&
              (!(params.Beta > 0.0) || !std::isfinite(params.Beta) || !(params.Lambda > 0.0) || !std::isfinite(params.Lambda))) ||
-            params.Method > Variant::Nonrigid)
+            params.Method > Variant::Nonrigid || params.EStep > EStepPolicy::FastGauss ||
+            (params.EStep != EStepPolicy::Reference &&
+             !(params.EStepTolerance > 0.0 && params.EStepTolerance < 1.0)))
             return fail(Status::InvalidParameters);
-        if (params.Method == Variant::Nonrigid && source.size() > kMaxNonrigidSourcePoints) return fail(Status::TooLarge);
+        if (params.Method == Variant::Nonrigid &&
+            source.size() > (params.LowRank > 0u ? kMaxLowRankSourcePoints : kMaxNonrigidSourcePoints))
+            return fail(Status::TooLarge);
 
         const std::size_t n = target.size(), m = source.size();
         s.Target.Resize(n); s.Source.Resize(m); s.Moved.Resize(m); s.PX.Resize(m);
@@ -366,7 +454,20 @@ namespace Geometry::CoherentPointDrift
         }
         if (!(s.Sigma2 > params.Sigma2Floor)) s.Sigma2 = std::max(s.Sigma2, params.Sigma2Floor);
 
-        if (params.Method == Variant::Nonrigid)
+        if (params.EStep != EStepPolicy::Reference) s.Accelerated.SetTarget({s.Target.X, s.Target.Y, s.Target.Z});
+        if (params.Method == Variant::Nonrigid && params.LowRank > 0u)
+        {
+            EStep::LowRankKernel kernel;
+            if (!EStep::BuildLowRankGaussianKernel({s.Source.X, s.Source.Y, s.Source.Z}, params.Beta, params.LowRank,
+                                                   params.Threads, kernel))
+                return fail(Status::SingularSystem);
+            const Eigen::Index rank = Eigen::Index(kernel.Rank);
+            s.Basis = Eigen::Map<const Eigen::MatrixXd>(kernel.Basis.data(), Eigen::Index(m), rank);
+            s.Eigenvalues = Eigen::Map<const Eigen::VectorXd>(kernel.Eigenvalues.data(), rank);
+            s.KernelError = kernel.EstimatedRelativeError;
+            s.BasisCoefficients = Eigen::MatrixXd::Zero(rank, 3);
+        }
+        else if (params.Method == Variant::Nonrigid)
         {
             const Eigen::Index count = Eigen::Index(m);
             s.Kernel.resize(count, count);
@@ -440,7 +541,9 @@ namespace Geometry::CoherentPointDrift
             const Result current = Current();
             observer(IterationTrace{.Iteration = s.Iterations - 1u, .Sigma2 = current.Sigma2,
                                     .NegativeLogLikelihood = nll, .Objective = objective,
-                                    .MatchedWeight = matched, .Transform = current.Transform});
+                                    .MatchedWeight = matched, .Transform = current.Transform,
+                                    .EStep = s.LastPolicy, .EStepErrorBound = s.LastErrorBound,
+                                    .KernelEvaluations = s.LastKernelEvaluations});
         }
         if (floor) s.Stop = Termination::SigmaFloor;
         else if (s.Iterations >= s.Config.MaxIterations) s.Stop = Termination::IterationCap;
@@ -469,6 +572,11 @@ namespace Geometry::CoherentPointDrift
         result.MatchedWeight = s.LastMatched;
         result.ObjectiveHistory = s.ObjectiveHistory;
         result.Sigma2History = s.Sigma2History;
+        result.Backend = BackendId(s.Config.EStep);
+        result.EStepErrorBound = s.MaxErrorBound;
+        result.KernelEvaluations = s.TotalKernelEvaluations;
+        result.KernelRank = std::uint32_t(s.Eigenvalues.size());
+        result.KernelApproximationError = s.KernelError;
         if (s.Config.Method != Variant::Nonrigid)
         {
             // x_w = Scale (L y + t) + mu_x with y = (y_w - mu_y) / Scale:

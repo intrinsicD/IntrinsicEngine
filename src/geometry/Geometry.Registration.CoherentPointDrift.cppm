@@ -4,10 +4,16 @@
 // rigid (rotation, optional uniform scale, translation), affine, and nonrigid (a
 // displacement field regularized by a Gaussian kernel, "motion coherence").
 //
-// This is the CPU reference backend: explicit O(N*M) E-step per iteration with O(N+M)
-// memory (the responsibility matrix is never stored), deterministic and single-threaded.
-// The nonrigid M-step solves a dense M x M system per iteration (O(M^3)), so it is
-// limited to kMaxNonrigidSourcePoints source points.
+// The default is the CPU reference backend (METHOD-015): explicit O(N*M) E-step per
+// iteration with O(N+M) memory (the responsibility matrix is never stored), deterministic
+// and single-threaded. The nonrigid M-step solves a dense M x M system per iteration
+// (O(M^3)), so it is limited to kMaxNonrigidSourcePoints source points.
+//
+// Optimized backends (METHOD-049, Geometry.Registration.CoherentPointDrift.EStep) are
+// opt-in through Params::EStep and Params::LowRank: a parallel dense E-step, a truncated
+// E-step with a computed per-row error bound, an automatic choice between them, and a
+// low-rank (Nystroem eigenpair) nonrigid M-step that lifts the source-size limit to
+// kMaxLowRankSourcePoints. Results report the backend and the error bounds.
 module;
 
 #include <cstdint>
@@ -20,6 +26,8 @@ module;
 #include <glm/glm.hpp>
 
 export module Geometry.Registration.CoherentPointDrift;
+
+export import Geometry.Registration.CoherentPointDrift.EStep;
 
 export namespace Geometry::CoherentPointDrift
 {
@@ -36,7 +44,7 @@ export namespace Geometry::CoherentPointDrift
         EmptyInput,
         NonFiniteInput,
         InvalidParameters,
-        TooLarge,        // nonrigid source beyond kMaxNonrigidSourcePoints
+        TooLarge,        // nonrigid source beyond kMaxNonrigidSourcePoints (kMaxLowRankSourcePoints with LowRank)
         SingularSystem,  // affine source covariance or nonrigid system not invertible
         NumericalFailure // all mass on the outlier component, or a non-finite update
     };
@@ -50,6 +58,7 @@ export namespace Geometry::CoherentPointDrift
     };
 
     inline constexpr std::uint32_t kMaxNonrigidSourcePoints = 8192;
+    inline constexpr std::uint32_t kMaxLowRankSourcePoints = 1'000'000;
     inline constexpr std::string_view kBackendId = "cpu_reference";
 
     // Units: with NormalizeInputs (default) both point sets are centered on their own
@@ -77,6 +86,14 @@ export namespace Geometry::CoherentPointDrift
         // Nonrigid: Gaussian kernel width (beta) and coherence weight (lambda).
         double Beta{2.0};
         double Lambda{3.0};
+        // E-step backend (Reference keeps the METHOD-015 path) and, for Truncated/Auto, the
+        // bound on each row denominator's relative error.
+        EStepPolicy EStep{EStepPolicy::Reference};
+        double EStepTolerance{1.0e-6};
+        // Worker threads for the optimized E-step and kernel setup; 0 uses all cores.
+        std::uint32_t Threads{0u};
+        // Nonrigid: 0 solves with the full Gram matrix; k > 0 uses its k leading eigenpairs.
+        std::uint32_t LowRank{0u};
     };
 
     struct IterationTrace
@@ -87,6 +104,9 @@ export namespace Geometry::CoherentPointDrift
         double Objective{0.0};                 // NLL plus the nonrigid coherence term
         double MatchedWeight{0.0};             // Np = sum of inlier responsibilities
         glm::dmat4 Transform{1.0};             // rigid/affine source->target after the update; identity for nonrigid
+        EStepPolicy EStep{EStepPolicy::Reference}; // policy that evaluated this iteration's E-step
+        double EStepErrorBound{0.0};           // max relative row-denominator error (0: exact)
+        std::uint64_t KernelEvaluations{0u};
     };
 
     // Called once per completed iteration; runs observed and unobserved are identical.
@@ -111,7 +131,12 @@ export namespace Geometry::CoherentPointDrift
         std::vector<glm::dvec3> TransformedSource{};
         std::vector<double> ObjectiveHistory{};
         std::vector<double> Sigma2History{};
-        std::string_view Backend{kBackendId};
+        std::string_view Backend{kBackendId};  // BackendId(Params::EStep)
+        double EStepErrorBound{0.0};           // max over all iterations
+        std::uint64_t KernelEvaluations{0u};   // total over all iterations
+        // Low-rank nonrigid: eigenpairs used and the kernel's sampled relative error.
+        std::uint32_t KernelRank{0u};
+        double KernelApproximationError{0.0};
 
         [[nodiscard]] bool Succeeded() const noexcept { return State == Status::Success; }
     };

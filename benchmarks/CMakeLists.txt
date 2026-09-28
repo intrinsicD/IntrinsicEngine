@@ -42,6 +42,7 @@ add_executable(IntrinsicBenchmarkSmoke
     geometry/Bench.PointLBVHSmoke.cpp
     geometry/Bench.RegistrationSpatialSmoke.cpp
     geometry/Bench.CoherentPointDriftReferenceSmoke.cpp
+    geometry/Bench.CoherentPointDriftAcceleratedSmoke.cpp
     geometry/Bench_SimplificationQualitySmoke.cpp
     geometry/Bench_SurfaceSamplingSmoke.cpp
     geometry/Bench_UvAtlasSmoke.cpp
@@ -349,3 +350,12 @@ if(BUILD_TESTING)
     set_tests_properties(IntrinsicUvAtlasRemapSmoke.Run PROPERTIES
         LABELS "benchmark;regression;geometry" TIMEOUT 60)
 endif()
+
+# METHOD-049 opt-in scaling benchmark for the optimized Coherent Point Drift backends;
+# run on a Release build (not a default CTest).
+add_executable(IntrinsicCoherentPointDriftScaling runners/CoherentPointDriftScalingRunner.cpp)
+set_target_properties(IntrinsicCoherentPointDriftScaling PROPERTIES CXX_SCAN_FOR_MODULES ON)
+target_compile_features(IntrinsicCoherentPointDriftScaling PRIVATE cxx_std_23)
+target_compile_options(IntrinsicCoherentPointDriftScaling PRIVATE ${INTRINSIC_COMPILE_FLAGS})
+target_link_options(IntrinsicCoherentPointDriftScaling PRIVATE ${INTRINSIC_LINK_FLAGS})
+target_link_libraries(IntrinsicCoherentPointDriftScaling PRIVATE ExtrinsicCore IntrinsicGeometry)

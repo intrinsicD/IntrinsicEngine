@@ -23,6 +23,11 @@ export namespace Extrinsic::Runtime
     // cannot hold an affine shear), the source position property itself, or a named vec3
     // displacement property on the source domain (affine and nonrigid).
     enum class CoherentPointDriftOutput : std::uint8_t { SourceTransform, Positions, DisplacementProperty };
+    // E-step backend (METHOD-049): the single-threaded reference, exact parallel dense,
+    // truncated or fast Gauss transform (both with a computed relative error bound), or
+    // automatic (fast Gauss or dense while the kernel is wide, truncated once it is narrow).
+    // Values match Geometry::CoherentPointDrift::EStepPolicy.
+    enum class CoherentPointDriftEStep : std::uint8_t { Reference, Dense, Truncated, Auto, FastGauss };
 
     struct CoherentPointDriftConfig
     {
@@ -44,6 +49,10 @@ export namespace Extrinsic::Runtime
         double Lambda{3.0};
         CoherentPointDriftOutput Output{CoherentPointDriftOutput::SourceTransform};
         std::string DisplacementName{"cpd_displacement"};
+        CoherentPointDriftEStep EStep{CoherentPointDriftEStep::Auto};
+        double EStepTolerance{1.0e-6};
+        std::uint32_t Threads{0u};  // 0: all cores
+        std::uint32_t LowRank{0u};  // nonrigid: 0 solves with the full kernel, k > 0 with k eigenpairs
     };
 
     [[nodiscard]] std::string SerializeCoherentPointDriftConfig(const CoherentPointDriftConfig& config);

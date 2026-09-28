@@ -28,6 +28,10 @@ namespace Extrinsic::Runtime
                                                                "Nonrigid (coherent displacement field)"};
         constexpr std::array<std::string_view, 3> kOutputNames{"Source transform (rigid)", "Overwrite source positions",
                                                                "Displacement property"};
+        constexpr std::array<std::string_view, 5> kEStepNames{"Reference (exact, single thread)", "Dense (exact, parallel)",
+                                                              "Truncated (bounded error, parallel)",
+                                                              "Auto (fast Gauss or dense while wide, then truncated)",
+                                                              "Fast Gauss transform (bounded error, parallel)"};
         constexpr std::array kFields{
             ConfigFieldSpec{.Name = "source", .Type = FT::UInt, .Description = "Stable id of the moving entity."},
             ConfigFieldSpec{.Name = "target", .Type = FT::UInt, .Description = "Stable id of the fixed entity."},
@@ -46,6 +50,10 @@ namespace Extrinsic::Runtime
             ConfigFieldSpec{.Name = "lambda", .Type = FT::Float, .Description = "Nonrigid: coherence weight; larger values give smoother motion.", .Min = 0, .Max = 1e6, .ExclusiveMin = true},
             ConfigFieldSpec{.Name = "output", .Type = FT::Enum, .Description = "Where the result is written; the source transform is available for rigid registration only.", .EnumNames = kOutputNames},
             ConfigFieldSpec{.Name = "displacement_name", .Type = FT::String, .Description = "Name of the vec3 displacement property written on the source domain.", .NonEmpty = true},
+            ConfigFieldSpec{.Name = "e_step", .Type = FT::Enum, .Description = "How responsibilities are evaluated each iteration; every option reports its backend and error bound.", .EnumNames = kEStepNames},
+            ConfigFieldSpec{.Name = "e_step_tolerance", .Type = FT::Float, .Description = "Truncated, fast Gauss and Auto: bound on each point's relative responsibility error.", .Min = 0, .Max = 1, .ExclusiveMin = true, .ExclusiveMax = true},
+            ConfigFieldSpec{.Name = "threads", .Type = FT::UInt, .Description = "Worker threads for the parallel E-step; 0 uses all cores.", .Min = 0, .Max = 256},
+            ConfigFieldSpec{.Name = "low_rank", .Type = FT::UInt, .Description = "Nonrigid: 0 solves with the full kernel (at most 8192 source points); k > 0 uses k kernel eigenpairs and allows large sources.", .Min = 0, .Max = 2000},
         };
 
         Json Encode(const CoherentPointDriftConfig& c)
@@ -58,7 +66,9 @@ namespace Extrinsic::Runtime
                         {"initial_sigma2", c.InitialSigma2}, {"sigma2_floor", c.Sigma2Floor},
                         {"normalize", c.NormalizeInputs}, {"estimate_scale", c.EstimateScale},
                         {"allow_reflection", c.AllowReflection}, {"beta", c.Beta}, {"lambda", c.Lambda},
-                        {"output", unsigned(c.Output)}, {"displacement_name", c.DisplacementName}};
+                        {"output", unsigned(c.Output)}, {"displacement_name", c.DisplacementName},
+                        {"e_step", unsigned(c.EStep)}, {"e_step_tolerance", c.EStepTolerance},
+                        {"threads", c.Threads}, {"low_rank", c.LowRank}};
         }
 
         CoherentPointDriftConfig Decode(const Json& doc)
@@ -81,6 +91,10 @@ namespace Extrinsic::Runtime
             c.Lambda = doc.at("lambda").get<double>();
             c.Output = CoherentPointDriftOutput(doc.at("output").get<unsigned>());
             c.DisplacementName = doc.at("displacement_name").get<std::string>();
+            c.EStep = CoherentPointDriftEStep(doc.at("e_step").get<unsigned>());
+            c.EStepTolerance = doc.at("e_step_tolerance").get<double>();
+            c.Threads = doc.at("threads").get<std::uint32_t>();
+            c.LowRank = doc.at("low_rank").get<std::uint32_t>();
             return c;
         }
 

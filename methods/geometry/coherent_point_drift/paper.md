@@ -90,5 +90,70 @@ zero or NaN), or the iteration cap (IterationCap).
   settles at a proper rotation even with reflections allowed (confirmed with an
   independent NumPy implementation); a small InitialSigma2 near the right pose recovers
   the reflection.
-- Spatial indices are not used: truncating Gaussian responsibilities needs a proven tail
-  bound (METHOD-049), see `docs/architecture/spatial-index-consumers.md`.
+- The reference uses no spatial index; the truncated METHOD-049 E-step below carries the
+  required tail bound (`docs/architecture/spatial-index-consumers.md`).
+
+## Accelerated backends (METHOD-049)
+
+Opt-in through `Params::EStep` and `Params::LowRank`; the reference stays canonical and
+every optimized run reports its backend (`cpu_dense_parallel`, `cpu_truncated`,
+`cpu_ifgt`, `cpu_auto`), the policy each iteration used, and its error bound.
+
+**Blocked single pass.** Target rows are split into B fixed blocks (B depends only on N
+and M, at most 32). Each row computes its shifted terms e_m = exp((d_min^2 - d_m^2) /
+2 sigma^2) once, as the reference does (d_min comes from a kd-tree query with the same
+arithmetic, so the largest term is exactly 1), normalizes them by its denominator and
+adds P_mn, P_mn x_n to its block's partial P1/PX; partials are reduced in block order.
+Results are therefore bitwise identical for any thread count and differ from the
+reference only by summation order. Dense rows use this form only while a block's partials
+(4 M doubles) stay within 512 KiB, because each dense row writes all of them; larger
+sources, and any case beyond `PartialBudgetBytes`, use a two-pass form (denominators
+over targets, then P1/PX over sources, reading shared arrays), which evaluates each
+kernel term twice. Truncated rows touch only their kept sources and stay single-pass.
+
+**Truncation bound.** For row n let d_n = min_m |x_n - y_m| and keep the sources with
+|x_n - y_m|^2 <= r_n^2 = d_n^2 + 2 sigma^2 ln(M / tol). Every dropped term is at most
+exp(-r_n^2 / 2 sigma^2) = (tol / M) exp(-d_n^2 / 2 sigma^2), i.e. tol/M times the largest
+kept term, so the dropped mass is at most ((M - k_n)/M) tol times the kept mass
+(k_n kept terms). The row denominator (kept mass plus the outlier constant c) therefore
+has relative error at most ((M - k_n)/M) tol / (S_n + c e^{-a_max}) <= tol, where S_n >= 1
+is the shifted kept sum. The run reports the maximum over rows and iterations
+(`EStepErrorBound`); kept responsibilities inherit the same relative bound. Neighborhoods
+come from a balanced double-precision kd-tree over the moving source, rebuilt per
+iteration. `Auto` counts the kept pairs of 64 evenly spaced rows and truncates when they
+are under 40% of all pairs; otherwise it uses the fast Gauss transform if its plan is
+clearly cheaper, else the dense rows.
+
+**Exponential.** Optimized rows use a branch-free exp for non-positive arguments
+(magic-constant rounding, Cody-Waite reduction, degree-13 Taylor polynomial on
+|r| <= ln 2 / 2; relative error below 3e-16, arguments below -708 give 0). The row kernels
+(distances, exponentials, scatter) are compiled for AVX2 and a baseline target
+(`target_clones`), so they vectorize on either; sums stay in index order.
+
+**Low-rank nonrigid.** G ~= Q L Q^T from a Nystroem approximation: max(2k, k + 32)
+farthest-point landmarks Z, W = G(Z, Z) = U S U^T on its positive spectrum, F = G(Y, Z) U
+S^{-1/2} (formed in row blocks, never stored), eigenpairs of F^T F give the k leading
+(Q, L). The M-step solves (d(P1) Q L Q^T + a I) W = F_rhs, a = lambda sigma^2, with the
+Woodbury identity W = (F_rhs - d(P1) Q (a L^{-1} + Q^T d(P1) Q)^{-1} Q^T F_rhs) / a in
+O(M k^2); T(Y) = Y + Q L (Q^T W) and the coherence term is lambda/2 tr((Q^T W)^T L
+(Q^T W)). `KernelApproximationError` is sqrt(sum |g - g~|^2 / sum |g|^2) over 32 exact
+kernel rows. This lifts the nonrigid limit to 1,000,000 source points.
+
+**Fast Gauss transform (`FastGauss`, IFGT).** Both passes as improved fast Gauss
+transforms (Yang et al. 2003): sources grouped by farthest-point clustering, the kernel
+factored as exp(-|dt|^2/h^2) exp(-|ds|^2/h^2) exp(2 dt.ds/h^2) with the last factor's
+Taylor series truncated below total degree p (coefficients 2^|a|/a!), and clusters farther
+than r_y from a target skipped. Per unit of source weight the error is at most
+(2 r_x r_y / h^2)^p / p! + exp(-(r_y - r_x)^2 / h^2) (Raykar et al. 2005): the remainder
+of exp(z) is at most |z|^p/p! e^|z|, and e^(|z| - |dt|^2/h^2 - |ds|^2/h^2) <= 1. The plan (K, p,
+r_y) minimizes (sources + targets K) terms under that bound, aimed at tol times the
+previous E-step's 1% quantile of den_n / M (pass 1, weights 1) and of P1_m / sum_n w_n
+(pass 2, weights w_n = 1/den_n and x_n / den_n). A posteriori each denominator's
+relative error is M e1 / den_n and each P1 entry's is e2 sum_n w_n / P1_m; entries above
+tol are recomputed exactly, so the reported bound (denominator plus P1, at most 2 tol) is
+rigorous. Measured on the scaling fixture at tol 1e-6 the plans need p = 20-24 (up to
+2300 terms per cluster and channel) and exceed the dense cost at 10^4 points; `Auto`
+therefore rarely selects it in 3-D, and the explicit policy is slower than dense there
+(`geometry.coherent_point_drift.accelerated`). E-step Nystroem is not offered because its
+error has no a-priori bound; the permutohedral lattice (GEOM-060) is the remaining
+candidate for wide kernels.

@@ -109,6 +109,7 @@ target_sources(${target_name}
         Geometry.Raycast.cppm
         Geometry.Registration.cppm
         Geometry.Registration.CoherentPointDrift.cppm
+        Geometry.Registration.CoherentPointDrift.EStep.cppm
         Geometry.Robust.cppm
         Geometry.RobustPredicates.cppm
         Geometry.Rotation.cppm
@@ -225,6 +226,7 @@ target_sources(${target_name}
         Geometry.Raycast.cpp
         Geometry.Registration.cpp
         Geometry.Registration.CoherentPointDrift.cpp
+        Geometry.Registration.CoherentPointDrift.EStep.cpp
         Geometry.Robust.cpp
         Geometry.RobustPredicates.cpp
         Geometry.Rotation.cpp
