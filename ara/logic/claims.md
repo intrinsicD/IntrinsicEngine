@@ -2398,3 +2398,25 @@
 - **Dependencies**: [C111]
 - **Tags**: Vulkan, Operational, conjugate gradient, implicit smoothing, CPU-reference parity, double precision
 - **From staging**: O252
+
+## C113: Bounded CPU acceleration of Coherent Point Drift
+- **Statement**: METHOD-049's optimized E-steps and low-rank nonrigid solve, run with 16 threads on the recorded i9-11900KF (Release, no -march=native) on the bumpy-ellipsoid clutter fixture, register rigidly 19x faster than the METHOD-015 reference at 10^4 points (auto; dense 12.5x) and 2.2x faster than the dense-parallel backend at 10^5 points, with every rigid policy within 1.4e-12 of its oracle and identical ground-truth RMS. The low-rank (k = 50) nonrigid solve is 26x faster than the full kernel at 10^3 points (max delta 2.8e-5) and registers 10^4 and 10^5 points, beyond the full kernel's 8192-point limit, to RMS 1.3e-5. The fast Gauss transform was slower than dense at every measured size.
+- **Status**: supported — same-host timings for one fixture and one thread count; no cross-host, memory or GPU claim, and no reference timing at 10^5 points. Truncated and fast-Gauss results are bounded (reported per-row relative error <= tol), not exact; dense-parallel is exact up to rounding and thread-count independent.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: A rerun of `IntrinsicCoherentPointDriftScaling` at the recorded revision on the recorded host shows auto/reference below 10x at 10^4 points or auto/dense below 1.5x at 10^5, a rigid parity delta above 1e-4, a reported truncation bound above tol, or thread-count-dependent results in `Test.CoherentPointDriftAccelerated.cpp`.
+- **Proof**: [ara/evidence/diagnostics/method049_cpd_accelerated_20260928/record.json, ara/evidence/diagnostics/method049_cpd_accelerated_20260928/sealed-result.json, ara/evidence/diagnostics/method049_cpd_accelerated_20260928/iteration-trace.log.gz, benchmarks/geometry/manifests/coherent_point_drift_accelerated.yaml, tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp, src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cpp]
+- **Dependencies**: []
+- **Tags**: registration, Coherent Point Drift, CPU optimized, bounded approximation, performance
+- **From staging**: O253
+
+## C114: Bayesian Coherent Point Drift update and its posterior-variance scale collapse
+- **Statement**: METHOD-050's Bayesian CPD reproduces an independent NumPy implementation of Hirose's Algorithm 1 to 1e-9 per iteration (sigma^2 and scale). Including the paper's posterior-variance terms collapses the scale on smooth kernels (1 to 0.002 in eight iterations, beta 1, lambda 2) in both implementations; without them, as in Hirose's reference code by default, the same fixture converges to 1e-5. Registered positions are recovered to RMS <= 0.02 under weak priors, but the similarity/deformation split is identifiable only under a strong prior; subsampled runs keep point correspondences only while the samples are dense (400 of 800 points, RMS <= 0.005).
+- **Status**: supported — small synthetic fixtures; no scan-scale or benchmark-suite claim.
+- **Provenance**: ai-executed
+- **Crystallized via**: empirical-resolution
+- **Falsification criteria**: `Test.CoherentPointDriftBayesian.cpp` fails, or an independent implementation of Algorithm 1 with the variance terms converges to the true scale on the documented bend fixture.
+- **Proof**: [tests/unit/geometry/Test.CoherentPointDriftBayesian.cpp, methods/geometry/coherent_point_drift/paper.md, src/geometry/Geometry.Registration.CoherentPointDrift.cpp]
+- **Dependencies**: []
+- **Tags**: registration, Bayesian CPD, variational Bayes, CPU reference
+- **From staging**: O254

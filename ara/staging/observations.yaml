@@ -4251,3 +4251,27 @@ observations:
     promoted_to: logic/claims.md:C112
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O253
+    timestamp: 2026-09-28T15:30+02:00
+    provenance: ai-executed
+    content: Optimized Coherent Point Drift E-steps (blocked dense, tree-ordered truncated with a proven per-row bound, auto) reach 19x the single-threaded reference at 10^4 points and 2.2x dense at 10^5 on 16 threads with point deltas <= 1.4e-12; a Nystroem low-rank nonrigid solve is 26x faster than the full kernel at 10^3; the fast Gauss transform loses to dense in 3-D at tol 1e-6.
+    context: One host (i9-11900KF, 16 threads), Release without -march=native, one clutter fixture; truncation cost per kept pair is about 3.7 dense pairs, so wide-kernel iterations stay dense-bound.
+    potential_type: claim
+    bound_to: [N644]
+    promoted: true
+    promoted_to: logic/claims.md:C113
+    crystallized_via: artifact-commitment
+    stale: false
+
+  - id: O254
+    timestamp: 2026-09-28T15:30+02:00
+    provenance: ai-executed
+    content: The C++ BCPD update matches an independent NumPy implementation of Hirose's Algorithm 1 to 1e-9 per iteration; the paper's posterior-variance terms collapse the scale on smooth kernels in both, and are off by default as in the reference code.
+    context: Small unit-cube fixtures; the similarity/deformation split is not identifiable under weak priors, so tests check positions and, under a strong prior, the similarity.
+    potential_type: claim
+    bound_to: [N645]
+    promoted: true
+    promoted_to: logic/claims.md:C114
+    crystallized_via: empirical-resolution
+    stale: false

@@ -1,0 +1,50 @@
+{
+  "benchmark_id": "geometry.coherent_point_drift.accelerated",
+  "method": "geometry.coherent_point_drift",
+  "backend": "cpu_optimized",
+  "dataset": "builtin.cpd_bumpy_ellipsoid_scaling.v1",
+  "commit": "cc5344978b297cd6eec234fe70d05dedf72f87ee",
+  "metrics": {
+    "runtime_ms": 369087.849,
+    "quality_error_l2": 0.0112911309,
+    "quality_error_linf": 1.38586447e-12
+  },
+  "diagnostics": {
+    "runner": "IntrinsicCoherentPointDriftScaling",
+    "mode": "performance_scaling_profile",
+    "threads": 16,
+    "hardware_concurrency": 16,
+    "e_step_tolerance": 1e-06,
+    "sizes": [
+      {"points": 1000, "rigid": [
+        {"name": "rigid_reference", "status": "success", "backend": "cpu_reference", "iterations": 25, "termination": "converged", "runtime_ms": 188.402498, "ms_per_iteration": 7.53609992, "rms_error_to_truth": 0.00037056028, "sigma2": 1.59899932e-05, "kernel_evaluations": 26000000, "e_step_error_bound": 0, "kernel_rank": 0, "kernel_approximation_error": 0},
+        {"name": "rigid_dense", "status": "success", "backend": "cpu_dense_parallel", "iterations": 25, "termination": "converged", "runtime_ms": 28.261999, "ms_per_iteration": 1.13047996, "rms_error_to_truth": 0.00037056028, "sigma2": 1.59899932e-05, "kernel_evaluations": 26000000, "e_step_error_bound": 0, "kernel_rank": 0, "kernel_approximation_error": 0, "max_point_delta": 4.99600361e-16, "parity_against": "rigid_reference"},
+        {"name": "rigid_truncated", "status": "success", "backend": "cpu_truncated", "iterations": 25, "termination": "converged", "runtime_ms": 26.015925, "ms_per_iteration": 1.040637, "rms_error_to_truth": 0.00037056028, "sigma2": 1.59899932e-05, "kernel_evaluations": 14310574, "e_step_error_bound": 9.98999916e-07, "kernel_rank": 0, "kernel_approximation_error": 0, "max_point_delta": 1.38586447e-12, "parity_against": "rigid_reference"},
+        {"name": "rigid_fast_gauss", "status": "success", "backend": "cpu_ifgt", "iterations": 25, "termination": "converged", "runtime_ms": 1811.46755, "ms_per_iteration": 72.4587021, "rms_error_to_truth": 0.00037056028, "sigma2": 1.59899932e-05, "kernel_evaluations": 22455000, "e_step_error_bound": 1.91736139e-06, "kernel_rank": 0, "kernel_approximation_error": 0, "max_point_delta": 7.73351782e-13, "parity_against": "rigid_reference"},
+        {"name": "rigid_auto", "status": "success", "backend": "cpu_auto", "iterations": 25, "termination": "converged", "runtime_ms": 28.722037, "ms_per_iteration": 1.14888148, "rms_error_to_truth": 0.00037056028, "sigma2": 1.59899932e-05, "kernel_evaluations": 15800744, "e_step_error_bound": 9.98999916e-07, "kernel_rank": 0, "kernel_approximation_error": 0, "max_point_delta": 7.72084899e-13, "parity_against": "rigid_reference"}
+      ], "nonrigid": [
+        {"name": "nonrigid_full_auto", "status": "success", "backend": "cpu_auto", "iterations": 23, "termination": "sigma_floor", "runtime_ms": 1097.41789, "ms_per_iteration": 47.7138213, "rms_error_to_truth": 7.3114015e-06, "sigma2": 6.79481536e-11, "kernel_evaluations": 14706411, "e_step_error_bound": 9.99e-07, "kernel_rank": 0, "kernel_approximation_error": 0},
+        {"name": "nonrigid_lowrank50_auto", "status": "success", "backend": "cpu_auto", "iterations": 23, "termination": "sigma_floor", "runtime_ms": 42.235918, "ms_per_iteration": 1.83634426, "rms_error_to_truth": 1.24836365e-05, "sigma2": 6.79481536e-11, "kernel_evaluations": 14706411, "e_step_error_bound": 9.99e-07, "kernel_rank": 50, "kernel_approximation_error": 8.88512123e-09, "max_point_delta": 2.77484689e-05, "parity_against": "nonrigid_full_auto"},
+        {"name": "nonrigid_lowrank150_auto", "status": "success", "backend": "cpu_auto", "iterations": 23, "termination": "sigma_floor", "runtime_ms": 67.45377, "ms_per_iteration": 2.93277261, "rms_error_to_truth": 7.33023194e-06, "sigma2": 6.79481536e-11, "kernel_evaluations": 14706411, "e_step_error_bound": 9.99e-07, "kernel_rank": 73, "kernel_approximation_error": 1.96392606e-10, "max_point_delta": 2.72331263e-07, "parity_against": "nonrigid_full_auto"}
+      ]},
+      {"points": 10000, "rigid": [
+        {"name": "rigid_reference", "status": "success", "backend": "cpu_reference", "iterations": 35, "termination": "converged", "runtime_ms": 27720.9512, "ms_per_iteration": 792.027178, "rms_error_to_truth": 0.000138222094, "sigma2": 1.60262942e-05, "kernel_evaluations": 3600000000, "e_step_error_bound": 0, "kernel_rank": 0, "kernel_approximation_error": 0},
+        {"name": "rigid_dense", "status": "success", "backend": "cpu_dense_parallel", "iterations": 35, "termination": "converged", "runtime_ms": 2129.07204, "ms_per_iteration": 60.8306299, "rms_error_to_truth": 0.000138222094, "sigma2": 1.60262942e-05, "kernel_evaluations": 3600000000, "e_step_error_bound": 0, "kernel_rank": 0, "kernel_approximation_error": 0, "max_point_delta": 2.39937279e-15, "parity_against": "rigid_reference"},
+        {"name": "rigid_truncated", "status": "success", "backend": "cpu_truncated", "iterations": 35, "termination": "converged", "runtime_ms": 2057.90295, "ms_per_iteration": 58.7972271, "rms_error_to_truth": 0.000138222094, "sigma2": 1.60262942e-05, "kernel_evaluations": 1681807519, "e_step_error_bound": 9.99899918e-07, "kernel_rank": 0, "kernel_approximation_error": 0, "max_point_delta": 6.94388367e-14, "parity_against": "rigid_reference"},
+        {"name": "rigid_fast_gauss", "status": "success", "backend": "cpu_ifgt", "iterations": 35, "termination": "converged", "runtime_ms": 5367.75084, "ms_per_iteration": 153.36431, "rms_error_to_truth": 0.000138222094, "sigma2": 1.60262942e-05, "kernel_evaluations": 3508850000, "e_step_error_bound": 1.16976776e-06, "kernel_rank": 0, "kernel_approximation_error": 0, "max_point_delta": 4.14685856e-15, "parity_against": "rigid_reference"},
+        {"name": "rigid_auto", "status": "success", "backend": "cpu_auto", "iterations": 35, "termination": "converged", "runtime_ms": 1378.4815, "ms_per_iteration": 39.3851857, "rms_error_to_truth": 0.000138222094, "sigma2": 1.60262942e-05, "kernel_evaluations": 1822475299, "e_step_error_bound": 9.99899918e-07, "kernel_rank": 0, "kernel_approximation_error": 0, "max_point_delta": 4.95766794e-14, "parity_against": "rigid_reference"}
+      ], "nonrigid": [
+        {"name": "nonrigid_lowrank50_auto", "status": "success", "backend": "cpu_auto", "iterations": 31, "termination": "sigma_floor", "runtime_ms": 1421.75508, "ms_per_iteration": 45.863067, "rms_error_to_truth": 1.2246178e-05, "sigma2": 6.78087713e-11, "kernel_evaluations": 1620782153, "e_step_error_bound": 9.999e-07, "kernel_rank": 50, "kernel_approximation_error": 8.84163653e-09},
+        {"name": "nonrigid_lowrank150_auto", "status": "success", "backend": "cpu_auto", "iterations": 31, "termination": "sigma_floor", "runtime_ms": 1621.83003, "ms_per_iteration": 52.3170978, "rms_error_to_truth": 3.14141684e-06, "sigma2": 6.78087713e-11, "kernel_evaluations": 1620781833, "e_step_error_bound": 9.999e-07, "kernel_rank": 74, "kernel_approximation_error": 1.81057048e-10, "max_point_delta": 4.41521512e-05, "parity_against": "nonrigid_lowrank50_auto"}
+      ]},
+      {"points": 100000, "rigid": [
+        {"name": "rigid_dense", "status": "success", "backend": "cpu_dense_parallel", "iterations": 48, "termination": "converged", "runtime_ms": 429994.469, "ms_per_iteration": 8958.21811, "rms_error_to_truth": 4.96497562e-05, "sigma2": 1.61702534e-05, "kernel_evaluations": 980000000000, "e_step_error_bound": 0, "kernel_rank": 0, "kernel_approximation_error": 0},
+        {"name": "rigid_auto", "status": "success", "backend": "cpu_auto", "iterations": 48, "termination": "converged", "runtime_ms": 369087.849, "ms_per_iteration": 7689.33019, "rms_error_to_truth": 4.96497562e-05, "sigma2": 1.61702534e-05, "kernel_evaluations": 392707449043, "e_step_error_bound": 9.99989576e-07, "kernel_rank": 0, "kernel_approximation_error": 0, "max_point_delta": 1.00459971e-13, "parity_against": "rigid_dense"}
+      ], "nonrigid": [
+        {"name": "nonrigid_lowrank50_auto", "status": "success", "backend": "cpu_auto", "iterations": 60, "termination": "iteration_cap", "runtime_ms": 341131.689, "ms_per_iteration": 5685.52815, "rms_error_to_truth": 0.00895142538, "sigma2": 4.79229338e-06, "kernel_evaluations": 312737857252, "e_step_error_bound": 1.58185554e-06, "kernel_rank": 50, "kernel_approximation_error": 8.61534396e-09},
+        {"name": "nonrigid_lowrank150_auto", "status": "success", "backend": "cpu_auto", "iterations": 60, "termination": "iteration_cap", "runtime_ms": 343767.8, "ms_per_iteration": 5729.46334, "rms_error_to_truth": 0.0112911309, "sigma2": 5.8575181e-06, "kernel_evaluations": 312731987179, "e_step_error_bound": 1.58185554e-06, "kernel_rank": 74, "kernel_approximation_error": 1.59942416e-10, "max_point_delta": 0.0166951261, "parity_against": "nonrigid_lowrank50_auto"}
+      ]}
+    ]
+  },
+  "status": "failed"
+}

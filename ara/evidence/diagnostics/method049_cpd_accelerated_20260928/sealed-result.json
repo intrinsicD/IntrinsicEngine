@@ -1,0 +1,418 @@
+{
+  "attempt_id": "attempt-001",
+  "backend": "cpu_optimized",
+  "benchmark_id": "geometry.coherent_point_drift.accelerated",
+  "claim_eligible": false,
+  "commit": "d6b6ab49457ee99d9e54ea66100038168ffc59ce",
+  "config_digest": "6c3e15869cb03ec729fa0cc2b7267bc0a30549c702608ec3869f744d3bc1240a",
+  "dataset": "builtin.cpd_bumpy_ellipsoid_scaling.v1",
+  "diagnostics": {
+    "e_step_tolerance": 1e-06,
+    "hardware_concurrency": 16,
+    "mode": "performance_scaling_profile",
+    "runner": "IntrinsicCoherentPointDriftScaling",
+    "sizes": [
+      {
+        "nonrigid": [
+          {
+            "backend": "cpu_auto",
+            "e_step_error_bound": 9.99e-07,
+            "iterations": 23,
+            "kernel_approximation_error": 0,
+            "kernel_evaluations": 15427155,
+            "kernel_rank": 0,
+            "ms_per_iteration": 49.7697714,
+            "name": "nonrigid_full_auto",
+            "rms_error_to_truth": 7.31140278e-06,
+            "runtime_ms": 1144.70474,
+            "sigma2": 6.79481536e-11,
+            "status": "success",
+            "termination": "sigma_floor"
+          },
+          {
+            "backend": "cpu_auto",
+            "e_step_error_bound": 9.99e-07,
+            "iterations": 23,
+            "kernel_approximation_error": 8.88512123e-09,
+            "kernel_evaluations": 15427155,
+            "kernel_rank": 50,
+            "max_point_delta": 2.77489315e-05,
+            "ms_per_iteration": 1.89083391,
+            "name": "nonrigid_lowrank50_auto",
+            "parity_against": "nonrigid_full_auto",
+            "rms_error_to_truth": 1.24836369e-05,
+            "runtime_ms": 43.48918,
+            "sigma2": 6.79481536e-11,
+            "status": "success",
+            "termination": "sigma_floor"
+          },
+          {
+            "backend": "cpu_auto",
+            "e_step_error_bound": 9.99e-07,
+            "iterations": 23,
+            "kernel_approximation_error": 1.96392606e-10,
+            "kernel_evaluations": 15427155,
+            "kernel_rank": 73,
+            "max_point_delta": 2.67307386e-07,
+            "ms_per_iteration": 3.04284974,
+            "name": "nonrigid_lowrank150_auto",
+            "parity_against": "nonrigid_full_auto",
+            "rms_error_to_truth": 7.33023279e-06,
+            "runtime_ms": 69.985544,
+            "sigma2": 6.79481536e-11,
+            "status": "success",
+            "termination": "sigma_floor"
+          }
+        ],
+        "points": 1000,
+        "rigid": [
+          {
+            "backend": "cpu_reference",
+            "e_step_error_bound": 0,
+            "iterations": 25,
+            "kernel_approximation_error": 0,
+            "kernel_evaluations": 26000000,
+            "kernel_rank": 0,
+            "ms_per_iteration": 7.54931992,
+            "name": "rigid_reference",
+            "rms_error_to_truth": 0.00037056028,
+            "runtime_ms": 188.732998,
+            "sigma2": 1.59899932e-05,
+            "status": "success",
+            "termination": "converged"
+          },
+          {
+            "backend": "cpu_dense_parallel",
+            "e_step_error_bound": 0,
+            "iterations": 25,
+            "kernel_approximation_error": 0,
+            "kernel_evaluations": 26000000,
+            "kernel_rank": 0,
+            "max_point_delta": 4.99600361e-16,
+            "ms_per_iteration": 1.1645648,
+            "name": "rigid_dense",
+            "parity_against": "rigid_reference",
+            "rms_error_to_truth": 0.00037056028,
+            "runtime_ms": 29.11412,
+            "sigma2": 1.59899932e-05,
+            "status": "success",
+            "termination": "converged"
+          },
+          {
+            "backend": "cpu_truncated",
+            "e_step_error_bound": 9.98999916e-07,
+            "iterations": 25,
+            "kernel_approximation_error": 0,
+            "kernel_evaluations": 14310574,
+            "kernel_rank": 0,
+            "max_point_delta": 1.38358497e-12,
+            "ms_per_iteration": 1.41070952,
+            "name": "rigid_truncated",
+            "parity_against": "rigid_reference",
+            "rms_error_to_truth": 0.00037056028,
+            "runtime_ms": 35.267738,
+            "sigma2": 1.59899932e-05,
+            "status": "success",
+            "termination": "converged"
+          },
+          {
+            "backend": "cpu_ifgt",
+            "e_step_error_bound": 1.91736139e-06,
+            "iterations": 25,
+            "kernel_approximation_error": 0,
+            "kernel_evaluations": 22455000,
+            "kernel_rank": 0,
+            "max_point_delta": 7.73850655e-13,
+            "ms_per_iteration": 71.9874405,
+            "name": "rigid_fast_gauss",
+            "parity_against": "rigid_reference",
+            "rms_error_to_truth": 0.00037056028,
+            "runtime_ms": 1799.68601,
+            "sigma2": 1.59899932e-05,
+            "status": "success",
+            "termination": "converged"
+          },
+          {
+            "backend": "cpu_auto",
+            "e_step_error_bound": 9.98999916e-07,
+            "iterations": 25,
+            "kernel_approximation_error": 0,
+            "kernel_evaluations": 16503192,
+            "kernel_rank": 0,
+            "max_point_delta": 6.26395124e-13,
+            "ms_per_iteration": 1.18795968,
+            "name": "rigid_auto",
+            "parity_against": "rigid_reference",
+            "rms_error_to_truth": 0.00037056028,
+            "runtime_ms": 29.698992,
+            "sigma2": 1.59899932e-05,
+            "status": "success",
+            "termination": "converged"
+          }
+        ]
+      },
+      {
+        "nonrigid": [
+          {
+            "backend": "cpu_auto",
+            "e_step_error_bound": 9.999e-07,
+            "iterations": 31,
+            "kernel_approximation_error": 8.84163653e-09,
+            "kernel_evaluations": 1756224437,
+            "kernel_rank": 50,
+            "ms_per_iteration": 47.7765323,
+            "name": "nonrigid_lowrank50_auto",
+            "rms_error_to_truth": 1.22462045e-05,
+            "runtime_ms": 1481.0725,
+            "sigma2": 6.78087713e-11,
+            "status": "success",
+            "termination": "sigma_floor"
+          },
+          {
+            "backend": "cpu_auto",
+            "e_step_error_bound": 9.999e-07,
+            "iterations": 31,
+            "kernel_approximation_error": 1.81057048e-10,
+            "kernel_evaluations": 1756224159,
+            "kernel_rank": 74,
+            "max_point_delta": 4.41432694e-05,
+            "ms_per_iteration": 53.712585,
+            "name": "nonrigid_lowrank150_auto",
+            "parity_against": "nonrigid_lowrank50_auto",
+            "rms_error_to_truth": 3.14444321e-06,
+            "runtime_ms": 1665.09014,
+            "sigma2": 6.78087713e-11,
+            "status": "success",
+            "termination": "sigma_floor"
+          }
+        ],
+        "points": 10000,
+        "rigid": [
+          {
+            "backend": "cpu_reference",
+            "e_step_error_bound": 0,
+            "iterations": 35,
+            "kernel_approximation_error": 0,
+            "kernel_evaluations": 3600000000,
+            "kernel_rank": 0,
+            "ms_per_iteration": 791.260491,
+            "name": "rigid_reference",
+            "rms_error_to_truth": 0.000138222094,
+            "runtime_ms": 27694.1172,
+            "sigma2": 1.60262942e-05,
+            "status": "success",
+            "termination": "converged"
+          },
+          {
+            "backend": "cpu_dense_parallel",
+            "e_step_error_bound": 0,
+            "iterations": 35,
+            "kernel_approximation_error": 0,
+            "kernel_evaluations": 3600000000,
+            "kernel_rank": 0,
+            "max_point_delta": 2.39937279e-15,
+            "ms_per_iteration": 63.1025907,
+            "name": "rigid_dense",
+            "parity_against": "rigid_reference",
+            "rms_error_to_truth": 0.000138222094,
+            "runtime_ms": 2208.59067,
+            "sigma2": 1.60262942e-05,
+            "status": "success",
+            "termination": "converged"
+          },
+          {
+            "backend": "cpu_truncated",
+            "e_step_error_bound": 9.99899918e-07,
+            "iterations": 35,
+            "kernel_approximation_error": 0,
+            "kernel_evaluations": 1681807519,
+            "kernel_rank": 0,
+            "max_point_delta": 6.98964148e-14,
+            "ms_per_iteration": 65.7464725,
+            "name": "rigid_truncated",
+            "parity_against": "rigid_reference",
+            "rms_error_to_truth": 0.000138222094,
+            "runtime_ms": 2301.12654,
+            "sigma2": 1.60262942e-05,
+            "status": "success",
+            "termination": "converged"
+          },
+          {
+            "backend": "cpu_ifgt",
+            "e_step_error_bound": 1.16976776e-06,
+            "iterations": 35,
+            "kernel_approximation_error": 0,
+            "kernel_evaluations": 3508850000,
+            "kernel_rank": 0,
+            "max_point_delta": 6.04485597e-15,
+            "ms_per_iteration": 156.638001,
+            "name": "rigid_fast_gauss",
+            "parity_against": "rigid_reference",
+            "rms_error_to_truth": 0.000138222094,
+            "runtime_ms": 5482.33002,
+            "sigma2": 1.60262942e-05,
+            "status": "success",
+            "termination": "converged"
+          },
+          {
+            "backend": "cpu_auto",
+            "e_step_error_bound": 9.99899918e-07,
+            "iterations": 35,
+            "kernel_approximation_error": 0,
+            "kernel_evaluations": 1961327651,
+            "kernel_rank": 0,
+            "max_point_delta": 4.09377334e-14,
+            "ms_per_iteration": 41.5444919,
+            "name": "rigid_auto",
+            "parity_against": "rigid_reference",
+            "rms_error_to_truth": 0.000138222094,
+            "runtime_ms": 1454.05722,
+            "sigma2": 1.60262942e-05,
+            "status": "success",
+            "termination": "converged"
+          }
+        ]
+      },
+      {
+        "nonrigid": [
+          {
+            "backend": "cpu_auto",
+            "e_step_error_bound": 1.58185554e-06,
+            "iterations": 92,
+            "kernel_approximation_error": 8.61534396e-09,
+            "kernel_evaluations": 346357768265,
+            "kernel_rank": 50,
+            "ms_per_iteration": 1889.24458,
+            "name": "nonrigid_lowrank50_auto",
+            "rms_error_to_truth": 1.27905327e-05,
+            "runtime_ms": 173810.501,
+            "sigma2": 6.77284895e-11,
+            "status": "success",
+            "termination": "sigma_floor"
+          },
+          {
+            "backend": "cpu_auto",
+            "e_step_error_bound": 1.58185554e-06,
+            "iterations": 116,
+            "kernel_approximation_error": 1.59942416e-10,
+            "kernel_evaluations": 346360684429,
+            "kernel_rank": 74,
+            "max_point_delta": 5.20013409e-05,
+            "ms_per_iteration": 1566.97045,
+            "name": "nonrigid_lowrank150_auto",
+            "parity_against": "nonrigid_lowrank50_auto",
+            "rms_error_to_truth": 4.3293358e-06,
+            "runtime_ms": 181768.572,
+            "sigma2": 6.77284895e-11,
+            "status": "success",
+            "termination": "sigma_floor"
+          }
+        ],
+        "points": 100000,
+        "rigid": [
+          {
+            "backend": "cpu_dense_parallel",
+            "e_step_error_bound": 0,
+            "iterations": 48,
+            "kernel_approximation_error": 0,
+            "kernel_evaluations": 980000000000,
+            "kernel_rank": 0,
+            "ms_per_iteration": 9090.58038,
+            "name": "rigid_dense",
+            "rms_error_to_truth": 4.96497562e-05,
+            "runtime_ms": 436347.858,
+            "sigma2": 1.61702534e-05,
+            "status": "success",
+            "termination": "converged"
+          },
+          {
+            "backend": "cpu_auto",
+            "e_step_error_bound": 9.99989576e-07,
+            "iterations": 48,
+            "kernel_approximation_error": 0,
+            "kernel_evaluations": 426734211542,
+            "kernel_rank": 0,
+            "max_point_delta": 8.13507351e-14,
+            "ms_per_iteration": 4131.11064,
+            "name": "rigid_auto",
+            "parity_against": "rigid_dense",
+            "rms_error_to_truth": 4.96497562e-05,
+            "runtime_ms": 198293.311,
+            "sigma2": 1.61702534e-05,
+            "status": "success",
+            "termination": "converged"
+          }
+        ]
+      }
+    ],
+    "threads": 16
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/coherent_point_drift_accelerated.yaml",
+    "sha256": "efdcf542fdac44f78babb1f7fc054c82976ec55332849284929b3f20d309ca49"
+  },
+  "method": "geometry.coherent_point_drift",
+  "metrics": {
+    "quality_error_l2": 0.00037056028,
+    "quality_error_linf": 1.38358497e-12,
+    "runtime_ms": 198293.311
+  },
+  "resolved_params": {
+    "build_preset": "ci-release",
+    "e_step_tolerance": 1e-06,
+    "evidence": "ara/evidence/diagnostics/method049_cpd_accelerated/",
+    "fixture": "bumpy ellipsoid surface samples; target rotated 0.35 rad, translated, noise 0.004, 5% uniform clutter",
+    "intent": "performance_scaling_profile",
+    "nonrigid_max_iterations": 150,
+    "nonrigid_runs": [
+      "full kernel with auto E-step (<= 2000 points)",
+      "low rank 50 and 150 with auto E-step"
+    ],
+    "outlier_weight": 0.05,
+    "rigid_runs": [
+      "reference",
+      "truncated and fast_gauss (<= 10000 points)",
+      "dense",
+      "auto"
+    ],
+    "runner": "IntrinsicCoherentPointDriftScaling",
+    "sizes": [
+      1000,
+      10000,
+      100000
+    ],
+    "threads": "all hardware threads",
+    "timing_statistic": "single_run_wall_clock"
+  },
+  "run_id": "method049-scaling-20260928",
+  "schema_version": 2,
+  "source": {
+    "revision": "d6b6ab49457ee99d9e54ea66100038168ffc59ce",
+    "state": "clean_commit"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 0.001,
+      "metric": "quality_error_l2",
+      "observed": 0.00037056028,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_l2_max"
+    },
+    {
+      "limit": 0.0001,
+      "metric": "quality_error_linf",
+      "observed": 1.38358497e-12,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_linf_max"
+    }
+  ],
+  "thresholds": {
+    "quality_error_l2_max": 0.001,
+    "quality_error_linf_max": 0.0001
+  },
+  "warmup_policy": {}
+}

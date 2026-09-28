@@ -1,0 +1,31 @@
+{
+  "task": "METHOD-049",
+  "date": "2026-09-28",
+  "source_revision": "d6b6ab49457ee99d9e54ea66100038168ffc59ce",
+  "environment": {
+    "cpu": "Intel Core i9-11900KF (8 cores, 16 threads), threads used: 16",
+    "compiler": "clang++ 23.0.0",
+    "preset": "ci-release",
+    "build_type": "Release, no -march=native (AVX2 row kernels via target_clones)"
+  },
+  "commands": [
+    "cmake --build --preset ci-release --target IntrinsicCoherentPointDriftScaling",
+    "GITHUB_SHA=d6b6ab49457ee99d9e54ea66100038168ffc59ce CPD_SCALING_TRACE=1 build/ci-release/bin/IntrinsicCoherentPointDriftScaling <dir> 1000 10000 100000",
+    "python3 tools/benchmark/seal_benchmark_results.py --root <dir> --manifests-root benchmarks --run-id method049-scaling-20260928 --source-state clean_commit --source-revision d6b6ab49457ee99d9e54ea66100038168ffc59ce --replace",
+    "python3 tools/benchmark/validate_benchmark_results.py --root <dir> --strict"
+  ],
+  "outcomes": {
+    "rigid_speedup_vs_reference": {"1000_points": {"dense": 6.5, "auto": 6.4}, "10000_points": {"dense": 12.5, "truncated": 12.0, "auto": 19.0}},
+    "rigid_100000_points": {"dense_ms": 436348, "auto_ms": 198293, "auto_vs_dense": 2.2, "reference": "not run (single-threaded O(N M) would take hours)"},
+    "rigid_max_point_delta": "<= 1.4e-12 (bounded policies at tol 1e-6) against the reference, 8.1e-14 auto against dense at 100000 points",
+    "rigid_rms_to_truth": "identical across policies per size (3.7e-4, 1.4e-4, 5.0e-5)",
+    "fast_gauss": "slower than dense at every measured size (1.8 s vs 29 ms at 1000, 5.5 s vs 2.2 s at 10000); plans need expansion orders 18-24; at 100000 points one explicit iteration took 19.7 s vs 8.8 s dense in a profiling run",
+    "nonrigid_low_rank": {"1000_points": "43 ms (k=50) vs 1145 ms full kernel, max delta 2.8e-5", "10000_and_100000_points": "full kernel not applicable (limit 8192); RMS to truth 1.2e-5 (k=50) and 3-4e-6 (k=150)"},
+    "gate": "passed: quality_error_l2 3.7e-4 <= 1e-3, quality_error_linf 1.4e-12 <= 1e-4"
+  },
+  "deviations": [
+    "First bound run (source cc5344978, first-run-result.json, first-run-trace.log.gz) failed the gate: nonrigid low-rank hit the 60-iteration cap at 100000 points (RMS 0.009-0.011) and truncated rows ran about ten times slower in index order. The cap was raised to 150 and truncated rows moved to tree order before this run.",
+    "During the first run a Debug compile overlapped about three dense iterations at 100000 points (about +5% on those iterations); the final run had no concurrent builds."
+  ],
+  "not_measured": "Memory peak; cross-host timings; the reference at 100000 points."
+}

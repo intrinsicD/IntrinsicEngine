@@ -13781,3 +13781,26 @@ tree:
     - ara/evidence/diagnostics/runtime269_vulkan_sparse_cg_20260927/record.json
     - ara/evidence/diagnostics/runtime269_vulkan_sparse_cg_20260927/sealed-result.json
     status: resolved
+
+  - id: N644
+    type: experiment
+    title: Accelerate the Coherent Point Drift E-step and nonrigid solve with bounded, thread-count independent CPU backends
+    provenance: ai-executed
+    timestamp: 2026-09-28T15:30+02:00
+    result: METHOD-049 adds dense-parallel, truncated (per-row relative error <= tol, proven and reported), fast Gauss (IFGT with a posteriori exact fixups) and auto E-steps plus a Nystroem low-rank nonrigid solve. On a clutter fixture (Release, 16 threads) rigid auto is 19x faster than the reference at 10^4 points and 2.2x faster than dense at 10^5 with point deltas <= 1.4e-12; low rank is 26x faster than the full kernel at 10^3 and runs beyond its 8192-point limit. The fast Gauss transform needs expansion orders 18-24 at tol 1e-6 in 3-D and was slower than dense at every size. C113 records the bounded claim.
+    evidence:
+    - ara/evidence/diagnostics/method049_cpd_accelerated_20260928/record.json
+    - ara/evidence/diagnostics/method049_cpd_accelerated_20260928/sealed-result.json
+    status: resolved
+
+  - id: N645
+    type: experiment
+    title: Implement Bayesian Coherent Point Drift and check its updates against an independent implementation
+    provenance: ai-executed
+    timestamp: 2026-09-28T15:30+02:00
+    result: METHOD-050 implements Hirose's Algorithm 1 as a solver variant; per-iteration sigma^2 and scale match an independent NumPy implementation to 1e-9. With the posterior-variance terms the scale collapses (1 to 0.002 in eight iterations on a smooth bend) in both implementations; Hirose's reference code enables those terms only on request, and without them the fixture converges to 1e-5. Sparse subsamples keep shape but not point correspondences. C114 records the claim.
+    also_depends_on: [N644]
+    evidence:
+    - tests/unit/geometry/Test.CoherentPointDriftBayesian.cpp
+    - methods/geometry/coherent_point_drift/paper.md
+    status: resolved
