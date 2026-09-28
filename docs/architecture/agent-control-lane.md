@@ -50,7 +50,7 @@ launch flag: no module, thread or socket.
 - Naming: `scene_*`, `entity_*`, `config_sections`, `config_schema`, `config_get`, `config_preview`,
   `history`, `jobs`, `log`, `preview_*` (including `preview_registration`) and `view_screenshot` are read-only
   (`readOnlyHint`); `select_entity`, `import_file`, `show_property`, `config_apply`,
-  `run_mesh_operation`, `run_registration` (ICP or Coherent Point Drift from their config sections; the
+  `run_mesh_operation`, `run_point_sampling` (the `sandbox.point_sampling` section), `run_registration` (ICP or Coherent Point Drift from their config sections; the
   reply waits for the job), `undo`, `redo` change state, and `view_capture` writes a PNG
   inside the allowed roots.
 - Screenshots complete a few frames after the call: an operation may return an

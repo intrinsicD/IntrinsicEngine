@@ -1306,6 +1306,7 @@ if(TARGET ExtrinsicRuntime)
         Test.SpatialIndexCache.cpp
         Test.RegistrationDomains.cpp
         Test.CoherentPointDriftOperations.cpp
+        Test.PointSamplingOperations.cpp
         Test.NormalEstimation.cpp
         Test.OutlierAnalysis.cpp
         Test.KernelDensityOperations.cpp

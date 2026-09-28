@@ -212,6 +212,15 @@ TEST(SandboxAgentServer, ClientRunsSmoothingThroughTheSocketAndUndoesIt)
         auto cpdUndo = c.Tool("undo", {}, &isError);
         check(!isError && cpdUndo["undone"].size() == 1u, "cpd undo: " + cpdUndo.dump());
         check(std::as_const(vertices).Get<glm::vec3>("v:position")[0] == beforeCpd, "undo restored the source positions");
+        // RUNTIME-274: standalone point sampling through its section.
+        auto samplingConfig = c.Tool("config_apply", {{"section", "sandbox.point_sampling"},
+            {"payload", {{"source", stableId}, {"count", 8}}}}, &isError);
+        check(!isError, "point sampling config_apply: " + samplingConfig.dump());
+        check(c.Tool("preview_point_sampling")["enabled"] == true, "preview_point_sampling");
+        auto sampled = c.Tool("run_point_sampling", Json::object(), &isError);
+        check(!isError && sampled["succeeded"] == true && sampled["samples"] == 8, "run_point_sampling: " + sampled.dump());
+        check(std::as_const(vertices).Exists("v:sample_rank"), "sampling published the rank property");
+        c.Tool("undo");
         auto outside = c.Tool("import_file", {{"path", "/etc/passwd"}}, &isError);
         check(isError, "paths outside the roots are refused");
         // Screenshots need an operational render device; the Null backend refuses with the reason.
@@ -236,7 +245,7 @@ TEST(SandboxAgentServer, ClientRunsSmoothingThroughTheSocketAndUndoesIt)
     EXPECT_TRUE(done.load()) << "client did not finish";
     EXPECT_TRUE(smoothedSeen) << "the agent's smoothing published its output";
     EXPECT_FALSE(vertices.Exists("smooth")) << "the agent's undo removed it again";
-    EXPECT_EQ(server->Status().CallsHandled, 21u) << "one main-thread call per request";
+    EXPECT_EQ(server->Status().CallsHandled, 25u) << "one main-thread call per request";
     const auto& lastApply = engine.Services().Find<R::EngineConfigControl>()->GetEngineConfigControlState().LastApply;
     EXPECT_EQ(lastApply.Source, R::RuntimeConfigControlSource::AgentCli) << "config_apply records the agent as the source";
     engine.Shutdown();

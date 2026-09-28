@@ -54,6 +54,7 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
+import Geometry.PointCloud;
 import Geometry.HalfedgeMesh.IO;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
@@ -733,6 +734,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             std::string Name{};
             std::optional<Geometry::HalfedgeMesh::Mesh> Mesh{};
             std::optional<Geometry::Graph::Graph> Graph{};
+            std::optional<Geometry::PointCloud::Cloud> Cloud{};
             std::uint64_t Metadata{};
             std::array<Geometry::PropertyRevision, 4> Revisions{};
         };
@@ -776,6 +778,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         generated->Name = std::move(request.Name);
         generated->Mesh = std::move(request.Mesh);
         generated->Graph = std::move(request.Graph);
+        generated->Cloud = std::move(request.Cloud);
         auto& raw = context.Scene->Raw();
         generated->Identity = {request.IdentityHigh, 1};
         for (auto e : raw.view<ECS::Components::StableId>())
@@ -807,11 +810,18 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             registry.emplace<ECS::Components::StableId>(entity, generated->Identity);
             if (generated->Mesh)
                 GS::PopulateFromMesh(registry, entity, *generated->Mesh);
-            else
+            else if (generated->Graph)
                 GS::PopulateFromGraph(registry, entity, *generated->Graph);
+            else
+            {
+                // Populate consumes a copy so redo after undo starts from the same cloud.
+                Geometry::PointCloud::Cloud cloud = *generated->Cloud;
+                GS::PopulateFromCloud(registry, entity, cloud);
+            }
             const auto authored = ApplyAssetImportAuthoringRecipe(
                 generated->Mesh ? Assets::AssetPayloadKind::Mesh
-                                : Assets::AssetPayloadKind::Graph,
+                : generated->Graph ? Assets::AssetPayloadKind::Graph
+                                   : Assets::AssetPayloadKind::PointCloud,
                 true, true, entity, scene);
             if (!authored)
             {

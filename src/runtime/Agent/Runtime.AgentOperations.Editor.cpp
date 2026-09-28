@@ -29,6 +29,7 @@ import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.RegistrationOperations;
+import Extrinsic.Runtime.PointSamplingOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.GeometryProperty.Types;
 import Geometry.Properties.Types;
@@ -498,6 +499,25 @@ namespace Extrinsic::Runtime
                     {"e_step_sampled_error", r.EStepSampledError},
                     {"kernel_rank", r.KernelRank}, {"kernel_approximation_error", r.KernelApproximationError}};
         }
+        // RUNTIME-274: the standalone sampling operation on the sandbox.point_sampling section.
+        AgentOperationOutcome RunPointSampling(const AgentOperationContext& context, bool preview)
+        {
+            if (context.Attachment == nullptr || !context.Attachment->IsAttached()) return Fail(kNoWorkspace);
+            const auto commands = PrepareEditorRegistrationFrame(*context.Attachment).Commands;
+            const auto config = GetEditorPointSamplingConfig(commands);
+            if (!config) return Fail("The sandbox.point_sampling section is unavailable.");
+            if (preview)
+            {
+                const auto ready = PreviewEditorPointSamplingCommand(commands, *config);
+                return Ok({{"enabled", ready.Enabled}, {"reason", ready.DisabledReason}});
+            }
+            const auto r = ApplyEditorPointSamplingCommand(commands, *config);
+            const Json json{{"status", DebugNameForEditorCommandStatus(r.Status)}, {"succeeded", r.Succeeded()},
+                            {"message", r.Message}, {"method", r.Method}, {"input_points", r.InputCount},
+                            {"samples", r.SampleCount}, {"output_entity", r.OutputEntityId},
+                            {"milliseconds", r.Milliseconds}, {"distance_pairs", r.DistancePairs}};
+            return {.IsError = !r.Succeeded(), .Text = Dump(json)};
+        }
         // Both methods run their configured section (config_apply first). A queued job
         // answers once it has published or failed.
         AgentOperationOutcome RunRegistration(const AgentOperationContext& context, std::string_view arguments, bool preview)
@@ -608,6 +628,13 @@ namespace Extrinsic::Runtime
             "Register the configured source entity onto the target with ICP or Coherent Point Drift and publish the "
             "result (source transform, positions or a displacement property) as one undoable step; answers when done.",
             registration, false, [](const AgentOperationContext& c, std::string_view a) { return RunRegistration(c, a, false); });
+        add("preview_point_sampling", "Preview point sampling",
+            "Whether the configured point sampling (sandbox.point_sampling) can run, and why not.", none, true,
+            [](const AgentOperationContext& c, std::string_view) { return RunPointSampling(c, true); });
+        add("run_point_sampling", "Run point sampling",
+            "Order the configured entity's points with the chosen sampling method (sandbox.point_sampling; config_apply "
+            "first) and publish rank/selection properties or a new point cloud as one undoable step.",
+            none, false, [](const AgentOperationContext& c, std::string_view) { return RunPointSampling(c, false); });
         const std::string meshField = Schema(
             R"({"operation":{"type":"string","enum":)" + OperationEnum() +
                 R"(,"description":"Mesh-field operation; its settings come from the matching config section (config_apply first)."},)" +

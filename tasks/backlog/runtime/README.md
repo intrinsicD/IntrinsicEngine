@@ -37,7 +37,6 @@ The canonical property-domain contract for method integration is
 - [`RUNTIME-218` — Default scene lighting and light authoring](RUNTIME-218-default-scene-lighting-and-light-authoring.md)
   owns default scene lighting and editor light authoring.
 - [`RUNTIME-222` — Model-space point radius rendering](RUNTIME-222-model-space-point-radius-rendering.md)
-- [RUNTIME-274 — Point-cloud subsampling editor workflow](RUNTIME-274-point-cloud-subsampling-workflow.md)
 - [RUNTIME-290 — Shared Vulkan execution seam for Geometry.PointSampling](RUNTIME-290-point-sampling-vulkan-execution-seam.md)
 - [RUNTIME-275 — Gaussian noise editor operation](RUNTIME-275-gaussian-noise-editor-operation.md)
   owns published radius-property binding and camera projection in model-space units.

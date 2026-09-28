@@ -803,6 +803,18 @@ landmarks are picked (every `Geometry.PointSampling` method; exact farthest poin
 cloud consolidation takes the same block as `initial_*` for its initial samples (Random keeps
 the seeded legacy subsample; CPU and Vulkan paths share `SelectInitialSamples`).
 
+### Point Sampling Operation
+
+`Extrinsic.Runtime.PointSamplingOperations` (RUNTIME-274) runs any `Geometry.PointSampling`
+method on one entity's point domain (point clouds, graph nodes, mesh vertices) from the
+`sandbox.point_sampling` section: `count` samples (0 orders every point), the shared sampling
+block without a prefix, an optional float `weights` property (importance weights or Poisson
+priority scores), and the output — a float rank plus a bool selection property on the source
+(one undoable step) or a new point-cloud entity with the samples in world space. Points are
+sampled in the entity's world frame, so parented entities are refused. The editor's "Point
+Sampling" window and the agent tools `preview_point_sampling` / `run_point_sampling` use it;
+it runs synchronously on the CPU until RUNTIME-290 adds the Vulkan backend.
+
 ### Sandbox Editor ICP Registration
 
 The `ICP Registration` panel is reachable from the `View` menu through

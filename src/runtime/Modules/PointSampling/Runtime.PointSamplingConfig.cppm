@@ -11,6 +11,9 @@ module;
 #include <string_view>
 export module Extrinsic.Runtime.PointSamplingConfig;
 export import Extrinsic.Runtime.ConfigFieldSpec;
+export import Extrinsic.Runtime.GeometryProperty.Types;
+import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.EngineLoad;
 import Geometry.PointSampling;
 export namespace Extrinsic::Runtime
 {
@@ -65,4 +68,35 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] Geometry::PointSampling::Params ToPointSamplingParams(const PointSamplingConfig& config,
                                                                         std::span<const double> weights = {},
                                                                         std::span<const float> scores = {});
+
+    // The standalone point-sampling operation (RUNTIME-274): orders the points of one entity's
+    // point domain with the chosen method and publishes either a rank and selection property
+    // pair on that domain or a new point-cloud entity with the first `Count` samples.
+    inline constexpr std::string_view kPointSamplingConfigSectionName = "sandbox.point_sampling";
+    inline constexpr std::string_view kPointSamplingConfigSectionSchemaId = "intrinsic.runtime.sandbox.point_sampling";
+    enum class PointSamplingOutput : std::uint8_t { Properties = 0, PointCloud };
+
+    struct PointSamplingOperationConfig
+    {
+        std::uint32_t SourceStableEntityId{0u};
+        // Unknown domain resolves to the entity's primary point domain.
+        GeometryPropertyRef Positions{GeometryElementDomain::Unknown, "v:position", Geometry::PropertyValueKind::Vec3};
+        std::uint32_t Count{1024u}; // 0: order every point
+        PointSamplingConfig Sampling{};
+        // Optional float property on the positions' domain: importance weights (farthest point,
+        // coupled sieve; positive) or priority scores (Poisson feature priority). Empty: none.
+        std::string WeightsName{};
+        PointSamplingOutput Output{PointSamplingOutput::Properties};
+        std::string RankName{"v:sample_rank"};         // float rank in the order, -1 when unranked
+        std::string SelectedName{"v:sample_selected"}; // true for the first Count samples
+    };
+
+    [[nodiscard]] std::string SerializePointSamplingOperationConfig(const PointSamplingOperationConfig& config);
+    [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidatePointSamplingOperationConfigSection(
+        std::string_view payload, std::string_view reference, std::string_view subject);
+    [[nodiscard]] std::optional<PointSamplingOperationConfig> GetPointSamplingOperationConfig(const Core::Config::EngineConfig& config);
+    void SetPointSamplingOperationConfig(Core::Config::EngineConfig& config, const PointSamplingOperationConfig& value);
+    [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakePointSamplingConfigSectionRegistration();
+    [[nodiscard]] std::span<const ConfigFieldSpec> PointSamplingOperationFieldSpecs() noexcept;
+    [[nodiscard]] std::optional<PointSamplingOperationConfig> DecodePointSamplingOperationConfig(std::string_view payload);
 }

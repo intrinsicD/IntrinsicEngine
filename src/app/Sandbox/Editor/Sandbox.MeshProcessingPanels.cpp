@@ -29,6 +29,7 @@ module Extrinsic.Sandbox.Editor.MeshProcessingPanels;
 
 import Extrinsic.Runtime.NormalOperations;
 import Extrinsic.Runtime.RegistrationOperations;
+import Extrinsic.Runtime.PointSamplingOperations;
 import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.MeshTopologyOperations;
 import Extrinsic.Runtime.ParameterizationOperations;
@@ -319,6 +320,15 @@ namespace Extrinsic::Sandbox::Editor
             std::string LastApplied{};
         };
 
+        struct PointSamplingState
+        {
+            std::optional<std::vector<std::uint32_t>> LastSelected{};
+            Runtime::PointSamplingOperationConfig Draft{};
+            std::string LastApplied{}, ConfigDiagnostic{};
+            std::array<char, 128> WeightsName{}, RankName{}, SelectedName{};
+            std::optional<Runtime::EditorPointSamplingResult> LastResult{};
+        };
+
         struct CoherentPointDriftState
         {
             std::optional<std::vector<std::uint32_t>> LastSelectedSource{}, LastSelectedTarget{};
@@ -373,6 +383,7 @@ namespace Extrinsic::Sandbox::Editor
         SimplifyState Simplify{};
         RegistrationState Registration{};
         CoherentPointDriftState CoherentPointDrift{};
+        PointSamplingState PointSampling{};
         NormalsState Normals{};
         OutliersState Outliers{};
         KeypointsState Keypoints{};
@@ -432,6 +443,7 @@ namespace Extrinsic::Sandbox::Editor
         void DrawBilateralWindow(bool&, const SandboxEditorContext&);
         void DrawRegistrationWindow(bool&, const SandboxEditorContext&);
         void DrawCoherentPointDriftWindow(bool&, const SandboxEditorContext&);
+        void DrawPointSamplingWindow(bool&, const SandboxEditorContext&);
         void ClearCoherentPointDriftPreview();
 
         void DrawDenoiseControls(
@@ -562,6 +574,7 @@ namespace Extrinsic::Sandbox::Editor
             RegisterRedirectWindow(id, {domain, "Processing"}, "ICP Registration",
                                    "view.registration");
         RegisterWindow("view.coherent_point_drift", {"View"}, "Coherent Point Drift", &Impl::DrawCoherentPointDriftWindow);
+        RegisterWindow("view.point_sampling", {"View"}, "Point Sampling", &Impl::DrawPointSamplingWindow);
         for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
                  {{"mesh.processing.coherent_point_drift", "Mesh"}, {"graph.processing.coherent_point_drift", "Graph"},
                   {"pointcloud.processing.coherent_point_drift", "PointCloud"}}})
@@ -3827,6 +3840,108 @@ namespace Extrinsic::Sandbox::Editor
                 if (!ScalarRidgesVisualizationDiagnostic.empty())
                     ImGui::TextWrapped("%s", ScalarRidgesVisualizationDiagnostic.c_str());
             }
+        }
+        ImGui::End();
+    }
+
+    // RUNTIME-274: the standalone sampling window. Every Geometry.PointSampling method with its
+    // own parameters; results go to rank/selection properties or a new point cloud.
+    void MeshProcessingPanels::Impl::DrawPointSamplingWindow(bool& open, const SandboxEditorContext& context)
+    {
+        auto& state = PointSampling;
+        const auto& commands = context.Registration.Commands;
+        ImGui::SetNextWindowSize(ImVec2(420.0f, 560.0f), ImGuiCond_FirstUseEver);
+        if (!ImGui::Begin("Point Sampling", &open))
+        {
+            ImGui::End();
+            return;
+        }
+        ImGui::TextWrapped("Orders an entity's points so that every prefix is a well-spread subsample, with a choice "
+                           "of method: exact farthest point (hole sieve), progressive Poisson disk, relaxed greedy "
+                           "batches, sample elimination, random.");
+        const auto active = Runtime::GetEditorPointSamplingConfig(commands).value_or(Runtime::PointSamplingOperationConfig{});
+        const auto activeText = Runtime::SerializePointSamplingOperationConfig(active);
+        if (activeText != state.LastApplied)
+        {
+            state.Draft = active;
+            state.LastApplied = activeText;
+            state.ConfigDiagnostic.clear();
+            std::snprintf(state.WeightsName.data(), state.WeightsName.size(), "%s", active.WeightsName.c_str());
+            std::snprintf(state.RankName.data(), state.RankName.size(), "%s", active.RankName.c_str());
+            std::snprintf(state.SelectedName.data(), state.SelectedName.size(), "%s", active.SelectedName.c_str());
+        }
+        auto& config = state.Draft;
+        const auto fields = Runtime::PointSamplingOperationFieldSpecs();
+        const Runtime::PointSamplingOperationConfig defaults{};
+        const auto hint = [&](std::string_view field) { DrawConfigFieldHint(Runtime::FindConfigFieldSpec(fields, field), {}); };
+        bool changed = DrawProcessingEntity("Points##Sampling", context, config.SourceStableEntityId, state.LastSelected);
+        hint("source");
+        {
+            const auto catalog = Runtime::GetEditorRegistrationInputCatalog(commands, config.SourceStableEntityId);
+            const auto preview = std::string(Runtime::ToString(config.Positions.Domain)) + ": " + config.Positions.Name;
+            if (ImGui::BeginCombo("Positions##Sampling", preview.c_str()))
+            {
+                for (const auto& row : catalog.Entries)
+                {
+                    const auto title = std::string(Runtime::ToString(row.Ref.Domain)) + ": " + row.Ref.Name + " (" +
+                                       std::to_string(row.ElementCount) + ")";
+                    if (ImGui::Selectable(title.c_str(), row.Ref == config.Positions)) { config.Positions = row.Ref; changed = true; }
+                }
+                ImGui::EndCombo();
+            }
+            hint("positions");
+        }
+        changed |= DrawSpecInputUInt("Samples##Sampling", fields, "count", config.Count, defaults.Count);
+        ImGui::SeparatorText("Method");
+        changed |= DrawPointSamplingControls("Sampling", fields, "", config.Sampling, defaults.Sampling);
+        const bool weighted = config.Sampling.Method == Runtime::PointSamplingMethod::FarthestPoint ||
+                              config.Sampling.Method == Runtime::PointSamplingMethod::CoupledSieve ||
+                              (config.Sampling.Method == Runtime::PointSamplingMethod::ProgressivePoisson &&
+                               config.Sampling.PoissonSelection == Runtime::PointSamplingPoissonSelection::FeaturePriority);
+        if (weighted)
+        {
+            if (ImGui::InputText("Weights property##Sampling", state.WeightsName.data(), state.WeightsName.size()))
+            {
+                config.WeightsName = state.WeightsName.data();
+                changed = true;
+            }
+            hint("weights");
+        }
+        ImGui::SeparatorText("Output");
+        changed |= DrawSpecEnumCombo("Output##Sampling", fields, "output", config.Output, defaults.Output);
+        if (config.Output == Runtime::PointSamplingOutput::Properties)
+        {
+            if (ImGui::InputText("Rank property##Sampling", state.RankName.data(), state.RankName.size()))
+            {
+                config.RankName = state.RankName.data();
+                changed = true;
+            }
+            hint("rank_name");
+            if (ImGui::InputText("Selection property##Sampling", state.SelectedName.data(), state.SelectedName.size()))
+            {
+                config.SelectedName = state.SelectedName.data();
+                changed = true;
+            }
+            hint("selected_name");
+        }
+        if (changed)
+        {
+            const auto applied = Runtime::ApplyEditorPointSamplingConfig(commands, config);
+            state.ConfigDiagnostic = applied.Succeeded() ? std::string{}
+                : Runtime::PreviewEditorPointSamplingCommand(commands, config).DisabledReason;
+            if (!applied.Succeeded() && state.ConfigDiagnostic.empty()) state.ConfigDiagnostic = "Settings were rejected.";
+        }
+        if (!state.ConfigDiagnostic.empty()) ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.3f, 1.0f), "%s", state.ConfigDiagnostic.c_str());
+        const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
+            commands, Runtime::PreviewEditorPointSamplingCommand(commands, config));
+        if (DrawProcessingActionButton("Sample##Sampling", readiness))
+            state.LastResult = Runtime::ApplyEditorPointSamplingCommand(commands, config);
+        if (!readiness.Enabled && !readiness.DisabledReason.empty()) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
+        if (state.LastResult)
+        {
+            const auto& r = *state.LastResult;
+            ImGui::Text("%s   %u of %u points   %.2f ms", r.Method.c_str(), r.SampleCount, r.InputCount, r.Milliseconds);
+            if (!r.Message.empty()) ImGui::TextWrapped("%s", r.Message.c_str());
         }
         ImGui::End();
     }

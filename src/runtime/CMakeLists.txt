@@ -53,6 +53,7 @@ target_sources(${target_name}
         Editor/Operations/Runtime.PointCloudServiceOperations.cppm
         Editor/Operations/Runtime.NormalOperations.cppm
         Editor/Operations/Runtime.RegistrationOperations.cppm
+        Editor/Operations/Runtime.PointSamplingOperations.cppm
         Editor/Operations/Runtime.MeshFieldOperations.cppm
         Editor/Operations/Runtime.MeshTopologyOperations.cppm
         Editor/Operations/Runtime.ParameterizationOperations.cppm
@@ -165,6 +166,7 @@ target_sources(${target_name}
         Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
         Config/internal/Runtime.PointNormalsRegistrationConfigCodecs.cpp
         Modules/PointSampling/Runtime.PointSamplingConfig.cpp
+        Modules/PointSampling/Runtime.PointSamplingOperationConfig.cpp
         Modules/Registration/Runtime.CoherentPointDriftConfig.cpp
         Config/internal/Runtime.PointFeaturesConfigCodecs.cpp
         Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp
@@ -199,6 +201,7 @@ target_sources(${target_name}
         Editor/Operations/Runtime.PointCloudServiceOperations.cpp
         Editor/Operations/Runtime.NormalOperations.cpp
         Editor/Operations/Runtime.RegistrationOperations.cpp
+        Editor/Operations/Runtime.PointSamplingOperations.cpp
         Editor/Operations/Runtime.MeshFieldOperations.cpp
         Editor/Operations/Runtime.MeshTopologyOperations.cpp
     Editor/Operations/Runtime.PointFieldOperations.Frame.cpp

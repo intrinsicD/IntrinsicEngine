@@ -20,7 +20,7 @@ editor equivalent (inventory row "Grid, sampler, subsampling, octree sampling").
 
 ## Acceptance criteria
 - [ ] One editor operation and its own panel ("Point Sampling") offering every `Geometry.PointSampling` method (GEOM-111/112/113: random, exact and weighted farthest point, progressive Poisson profiles, the approximate FPS family, sample elimination) with their parameters, plus voxel centroid, the GEOM-061 per-voxel strategies, and octree levels once GEOM-105 lands; the progressive Poisson panel is linked and publishes through the same path.
-- [ ] Output chosen explicitly: a new point-cloud entity, or a Bool selection property on the source (no silent in-place deletion); deterministic with a seed.
+- [x] Output chosen explicitly: a new point-cloud entity, or a Bool selection property on the source (no silent in-place deletion); deterministic with a seed.
 - [ ] Backend combo (CPU / Vulkan through RUNTIME-290) and progressive prefix streaming from the seam's `Extend`.
 - [ ] Works on point clouds, graph nodes and mesh vertices; config section with one validator; undoable publication; contract and ImGui tests.
 
@@ -43,3 +43,14 @@ cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -R 'Subsampl' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Log
+- 2026-09-28 slice 1: `Extrinsic.Runtime.PointSamplingOperations` with the `sandbox.point_sampling`
+  section (every `Geometry.PointSampling` method with its parameters, optional float weights or
+  priority scores, output as undoable rank/selection properties or a new point-cloud entity via
+  the generated-entity helper, which now accepts point clouds), the "Point Sampling" window in the
+  View menu and the agent tools `preview_point_sampling` / `run_point_sampling`; contract tests
+  cover every method, weights, validation, parented refusal and undo. Remaining: voxel centroid and
+  the GEOM-061 per-voxel strategies and octree levels (their kernels are not implemented yet),
+  mesh/graph-domain contract rows, an ImGui panel test, and the Vulkan backend (RUNTIME-290).
+

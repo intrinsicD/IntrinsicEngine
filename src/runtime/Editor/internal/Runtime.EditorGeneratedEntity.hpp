@@ -1,7 +1,7 @@
-// Undoable publication of a new root-level mesh or graph entity derived from a
-// source entity. Include after editor/common, ECS registry, Geometry.HalfedgeMesh
-// and Geometry.Graph imports; the global module fragment supplies entt, glm,
-// integer, optional and string types.
+// Undoable publication of a new root-level mesh, graph or point-cloud entity derived
+// from a source entity. Include after editor/common, ECS registry, Geometry.HalfedgeMesh,
+// Geometry.Graph and Geometry.PointCloud imports; the global module fragment supplies
+// entt, glm, integer, optional and string types.
 #pragma once
 extern "C++"
 {
@@ -11,9 +11,10 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     {
         entt::entity Source{entt::null};
         std::string Name{};
-        // Exactly one of Mesh or Graph, in world coordinates.
+        // Exactly one of Mesh, Graph or Cloud, in world coordinates.
         std::optional<Geometry::HalfedgeMesh::Mesh> Mesh{};
         std::optional<Geometry::Graph::Graph> Graph{};
+        std::optional<Geometry::PointCloud::Cloud> Cloud{};
         // StableId.High reserved for this producer; Low is allocated past the
         // largest existing id in that range.
         std::uint64_t IdentityHigh{};

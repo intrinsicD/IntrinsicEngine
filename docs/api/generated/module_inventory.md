@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 6 |
-| `runtime` | 105 |
+| `runtime` | 106 |
 
 ## Modules
 
@@ -389,6 +389,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.PointCloudServiceOperations` | `src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointConstructionOperations` | `src/runtime/Editor/Operations/Runtime.PointConstructionOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointFieldOperations` | `src/runtime/Editor/Operations/Runtime.PointFieldOperations.cppm` | `runtime` |
+| `Extrinsic.Runtime.PointSamplingOperations` | `src/runtime/Editor/Operations/Runtime.PointSamplingOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointSetOperations` | `src/runtime/Editor/Operations/Runtime.PointSetOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.RegistrationOperations` | `src/runtime/Editor/Operations/Runtime.RegistrationOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderRecipeEditingOperations` | `src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.cppm` | `runtime` |
@@ -470,4 +471,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **443**
+Total modules: **444**

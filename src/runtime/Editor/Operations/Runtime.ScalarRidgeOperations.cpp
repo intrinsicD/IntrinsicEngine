@@ -31,6 +31,7 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GeometryAvailability;
 import Geometry.Graph;
 import Geometry.HalfedgeMesh;
+import Geometry.PointCloud;
 import Geometry.HalfedgeMesh.ScalarfieldExtrema;
 import Geometry.Properties;
 
