@@ -1,8 +1,10 @@
 // Coherent Point Drift point-set registration (Myronenko & Song, TPAMI 2010): the source
 // points are the centroids of an isotropic Gaussian mixture with a uniform outlier
-// component, fitted to the target points by EM. One shared E-step feeds three M-steps:
-// rigid (rotation, optional uniform scale, translation), affine, and nonrigid (a
-// displacement field regularized by a Gaussian kernel, "motion coherence").
+// component, fitted to the target points by EM. One shared E-step feeds four M-steps:
+// rigid (rotation, optional uniform scale, translation), affine, nonrigid (a
+// displacement field regularized by a Gaussian kernel, "motion coherence"), and Bayesian
+// (Hirose, TPAMI 2021: a similarity transform of a Gaussian-process deformation, fitted by
+// variational Bayes with per-point mixing weights and posterior variances).
 //
 // The default is the CPU reference backend (METHOD-015): explicit O(N*M) E-step per
 // iteration with O(N+M) memory (the responsibility matrix is never stored), deterministic
@@ -18,6 +20,7 @@ module;
 
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <span>
 #include <string_view>
@@ -36,6 +39,7 @@ export namespace Geometry::CoherentPointDrift
         Rigid = 0, // default
         Affine,
         Nonrigid,
+        Bayesian, // BCPD: T(y) = s R (y + v(y)) + t
     };
 
     enum class Status : std::uint8_t
@@ -57,7 +61,7 @@ export namespace Geometry::CoherentPointDrift
         IterationCap, // Params::MaxIterations reached before convergence
     };
 
-    inline constexpr std::uint32_t kMaxNonrigidSourcePoints = 8192;
+    inline constexpr std::uint32_t kMaxNonrigidSourcePoints = 8192; // full kernel (nonrigid and Bayesian)
     inline constexpr std::uint32_t kMaxLowRankSourcePoints = 1'000'000;
     inline constexpr std::string_view kBackendId = "cpu_reference";
 
@@ -92,8 +96,25 @@ export namespace Geometry::CoherentPointDrift
         double EStepTolerance{1.0e-6};
         // Worker threads for the optimized E-step and kernel setup; 0 uses all cores.
         std::uint32_t Threads{0u};
-        // Nonrigid: 0 solves with the full Gram matrix; k > 0 uses its k leading eigenpairs.
+        // Nonrigid/Bayesian: 0 solves with the full Gram matrix; k > 0 uses its k leading eigenpairs.
         std::uint32_t LowRank{0u};
+        // Bayesian: OutlierWeight is omega, Beta and Lambda the kernel width and deformation
+        // prior; Gamma scales the data-derived initial sigma^2, Kappa is the Dirichlet
+        // concentration of the mixing weights (infinity keeps them equal), and
+        // SubsampleSource > 0 registers that many farthest-point samples of the source and
+        // interpolates their deformation to every source point (Gaussian-process mean).
+        double Gamma{1.0};
+        double Kappa{std::numeric_limits<double>::infinity()};
+        std::uint32_t SubsampleSource{0u};
+        // Bayesian: register against that many farthest-point samples of the target (0 = all).
+        // Subsample both sets together (BCPD++): source samples against the full target leave
+        // unmatched target points that bias the fit unless OutlierWeight > 0.
+        std::uint32_t SubsampleTarget{0u};
+        // Bayesian: also use the deformation's posterior variances in the E-step weights and in
+        // the scale and sigma^2 updates (the paper's full variational update). Off by default,
+        // like Hirose's reference implementation: with smooth kernels these terms bias the scale
+        // downward and can collapse it (see paper.md).
+        bool PosteriorVarianceTerms{false};
     };
 
     struct IterationTrace
@@ -103,7 +124,7 @@ export namespace Geometry::CoherentPointDrift
         double NegativeLogLikelihood{0.0};     // data term at the parameters entering this iteration
         double Objective{0.0};                 // NLL plus the nonrigid coherence term
         double MatchedWeight{0.0};             // Np = sum of inlier responsibilities
-        glm::dmat4 Transform{1.0};             // rigid/affine source->target after the update; identity for nonrigid
+        glm::dmat4 Transform{1.0};             // rigid/affine map (Bayesian: its similarity) after the update; identity for nonrigid
         EStepPolicy EStep{EStepPolicy::Reference}; // policy that evaluated this iteration's E-step
         double EStepErrorBound{0.0};           // max relative row-denominator error (0: exact)
         std::uint64_t KernelEvaluations{0u};
@@ -121,12 +142,13 @@ export namespace Geometry::CoherentPointDrift
         double Sigma2{0.0};                // world units^2
         double NegativeLogLikelihood{0.0}; // at the last E-step
         double MatchedWeight{0.0};
-        // Rigid: Linear = Scale * Rotation; affine: the fitted matrix. Nonrigid: identity.
+        // Rigid and Bayesian: Linear = Scale * Rotation (Bayesian: the similarity part, applied
+        // after the deformation); affine: the fitted matrix. Nonrigid: identity.
         glm::dmat3 Linear{1.0};
         glm::dmat3 Rotation{1.0};
         double Scale{1.0};
         glm::dvec3 Translation{0.0};
-        glm::dmat4 Transform{1.0};         // y -> Linear * y + Translation (rigid/affine)
+        glm::dmat4 Transform{1.0};         // y -> Linear * y + Translation (rigid/affine; Bayesian: the similarity alone)
         // T(y_m) in world units for every source point, in source order (all variants).
         std::vector<glm::dvec3> TransformedSource{};
         std::vector<double> ObjectiveHistory{};

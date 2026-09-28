@@ -716,7 +716,8 @@ auto EmitCoherentPointDriftReferenceSmoke(const std::string& commit) -> EmittedB
                 << "    \"regime\": \"full overlap, noise 0.005, outlier weight 0.05 (rigid/affine), w = 0 nonrigid\",\n";
             variant("rigid", r.Rigid, false);
             variant("affine", r.Affine, false);
-            variant("nonrigid", r.Nonrigid, true);
+            variant("nonrigid", r.Nonrigid, false);
+            variant("bayesian", r.Bayesian, true);
         });
 }
 

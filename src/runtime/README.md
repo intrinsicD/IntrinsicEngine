@@ -788,7 +788,10 @@ The section also selects the METHOD-049 backends: `e_step` (reference, dense, tr
 auto, fast Gauss; the editor default is auto with `e_step_tolerance` 1e-6), `threads` and
 the nonrigid `low_rank`, which lifts the full-kernel limit of 8192 source points. Results
 and each trace row carry the backend, the E-step policy that ran and its error bound;
-low-rank runs report the kernel rank and its sampled approximation error.
+low-rank runs report the kernel rank and its sampled approximation error. The `bayesian`
+method (METHOD-050, BCPD) adds `gamma`, `kappa` (0 keeps equal mixing weights) and
+`subsample` (farthest-point samples registered, deformation interpolated to every point);
+like nonrigid it writes positions or a displacement property.
 
 ### Sandbox Editor ICP Registration
 

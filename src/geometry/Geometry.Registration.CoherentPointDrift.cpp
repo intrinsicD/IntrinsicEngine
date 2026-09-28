@@ -44,6 +44,20 @@ namespace Geometry::CoherentPointDrift
             return out;
         }
 
+        // Digamma for x > 0: recurrence up to x >= 6, then the asymptotic series (error < 1e-12).
+        double Digamma(double x) noexcept
+        {
+            double result = 0.0;
+            while (x < 6.0)
+            {
+                result -= 1.0 / x;
+                x += 1.0;
+            }
+            const double f = 1.0 / (x * x);
+            return result + std::log(x) - 0.5 / x -
+                   f * (1.0 / 12.0 - f * (1.0 / 120.0 - f * (1.0 / 252.0 - f * (1.0 / 240.0 - f / 132.0))));
+        }
+
         glm::dmat4 AffineMatrix(const Eigen::Matrix3d& linear, const Eigen::Vector3d& translation)
         {
             glm::dmat4 out{1.0};
@@ -61,6 +75,7 @@ namespace Geometry::CoherentPointDrift
         case Variant::Rigid: return "rigid";
         case Variant::Affine: return "affine";
         case Variant::Nonrigid: return "nonrigid";
+        case Variant::Bayesian: return "bayesian";
         }
         return "unknown";
     }
@@ -122,6 +137,22 @@ namespace Geometry::CoherentPointDrift
         Eigen::VectorXd Eigenvalues{};
         double KernelError{0.0};
 
+        // Bayesian: T(y) = s R (y + v) + t with the posterior mean displacement v (M x 3), per-point
+        // posterior variances, log mixing weights and the E-step source log-weights built from them.
+        Eigen::MatrixXd Displacement{};
+        Eigen::VectorXd PosteriorVariance{}, LogAlpha{};
+        std::vector<double> SourceLogWeight{};
+        double WeightShift{0.0};
+        double Volume{1.0}; // target bounding-box volume (normalized) for the uniform outlier density
+        // Subsampled Bayesian runs register Source = the samples; FullSource keeps every point.
+        Points FullSource{};
+        std::vector<std::uint32_t> Samples{};
+        // Kernel-form coefficients of the displacement: v = G KernelWeights (full kernel, M x 3) or
+        // v = Basis KernelWeights (low rank, k x 3); interpolation evaluates the same expansions at
+        // new points (low rank through the Nystroem extension).
+        Eigen::MatrixXd KernelWeights{};
+        Eigen::MatrixXd LandmarkPoints{}, Extension{};
+
         // Optimized E-step (Params::EStep != Reference).
         EStep::Evaluator Accelerated{};
         EStep::Sums AcceleratedSums{};
@@ -140,6 +171,12 @@ namespace Geometry::CoherentPointDrift
         {
             const std::size_t n = Target.Size(), m = Moved.Size();
             const double w = Config.OutlierWeight;
+            // BCPD: omega / V against (1 - omega) (2 pi sigma^2)^{-D/2}; the mixing weights alpha_m
+            // are in the source log-weights.
+            if (Config.Method == Variant::Bayesian)
+                return w > 0.0 ? 0.5 * kDimension * std::log(std::numbers::pi * 2.0 * Sigma2) + std::log(w / (1.0 - w)) -
+                                     std::log(Volume)
+                               : -std::numeric_limits<double>::infinity();
             // c = (2 pi sigma^2)^{D/2} * w/(1-w) * M/N (paper eq. 7); log for overflow safety.
             return w > 0.0
                 ? 0.5 * kDimension * std::log(std::numbers::pi * 2.0 * Sigma2) + std::log(w / (1.0 - w)) +
@@ -151,7 +188,9 @@ namespace Geometry::CoherentPointDrift
         [[nodiscard]] double NegativeLogLikelihood(const double logDenominatorSum) const
         {
             const double n = double(Target.Size()), m = double(Moved.Size());
-            return -(logDenominatorSum + n * (std::log((1.0 - Config.OutlierWeight) / m) -
+            // Bayesian mixing weights are inside the denominators already.
+            const double mixing = Config.Method == Variant::Bayesian ? 1.0 : 1.0 / m;
+            return -(logDenominatorSum + n * (std::log((1.0 - Config.OutlierWeight) * mixing) -
                                               0.5 * kDimension * std::log(std::numbers::pi * 2.0 * Sigma2)));
         }
 
@@ -160,7 +199,8 @@ namespace Geometry::CoherentPointDrift
             EStep::Sums& sums = AcceleratedSums;
             const EStep::Settings settings{.Policy = Config.EStep, .Tolerance = Config.EStepTolerance,
                                            .Threads = Config.Threads};
-            if (!Accelerated.Evaluate({Moved.X, Moved.Y, Moved.Z}, Sigma2, LogOutlierConstant(), settings, sums))
+            if (!Accelerated.Evaluate({Moved.X, Moved.Y, Moved.Z}, Sigma2, LogOutlierConstant(), settings, sums,
+                                      SourceLogWeight))
                 return false;
             P1.swap(sums.P1); Pt1.swap(sums.Pt1);
             PX.X.swap(sums.PXx); PX.Y.swap(sums.PXy); PX.Z.swap(sums.PXz);
@@ -197,14 +237,22 @@ namespace Geometry::CoherentPointDrift
                     e[i] = dx * dx + dy * dy + dz * dz;
                     minDistance = std::min(minDistance, e[i]);
                 }
-                // Shifted by the largest exponent a_max = -minDistance / (2 sigma^2).
-                const double aMax = -minDistance / twoSigma2;
+                // Shifted by the largest exponent a_max = -minDistance / (2 sigma^2) (plus the largest
+                // source log-weight for Bayesian runs, so every weighted term stays <= 1).
+                const double aMax = -minDistance / twoSigma2 + WeightShift;
                 double sum = 0.0;
-                for (std::size_t i = 0; i < m; ++i)
-                {
-                    e[i] = std::exp((minDistance - e[i]) / twoSigma2);
-                    sum += e[i];
-                }
+                if (SourceLogWeight.empty())
+                    for (std::size_t i = 0; i < m; ++i)
+                    {
+                        e[i] = std::exp((minDistance - e[i]) / twoSigma2);
+                        sum += e[i];
+                    }
+                else
+                    for (std::size_t i = 0; i < m; ++i)
+                    {
+                        e[i] = std::exp((minDistance - e[i]) / twoSigma2 + SourceLogWeight[i] - WeightShift);
+                        sum += e[i];
+                    }
                 // log(sum_m exp(a_m) + c) = a_max + log(sum + c * exp(-a_max)).
                 const double logOutlier = logC - aMax;
                 const double logDenominator = logOutlier > 700.0
@@ -288,6 +336,131 @@ namespace Geometry::CoherentPointDrift
             // sigma^2 = (tr(X^T d(Pt1) X^) - tr(A B^T)) / (Np D)
             Sigma2 = (targetSpread - (cross * Linear.transpose()).trace()) / (matched * kDimension);
             ApplyLinear();
+            return Status::Success;
+        }
+
+        // E-step source log-weights of BCPD: log alpha_m - s^2 D sigma_m^2 / (2 sigma^2).
+        void UpdateBayesianWeights()
+        {
+            const std::size_t m = Source.Size();
+            SourceLogWeight.resize(m);
+            const double factor = RigidScale * RigidScale * kDimension / (2.0 * Sigma2);
+            WeightShift = -std::numeric_limits<double>::infinity();
+            for (std::size_t i = 0; i < m; ++i)
+            {
+                SourceLogWeight[i] = LogAlpha[Eigen::Index(i)] - factor * PosteriorVariance[Eigen::Index(i)];
+                WeightShift = std::max(WeightShift, SourceLogWeight[i]);
+            }
+        }
+
+        // One variational-Bayes update of BCPD (Hirose 2021, Algorithm 1) after the E-step:
+        // deformation posterior (mean and per-point variances), mixing weights, similarity,
+        // then sigma^2. u = y + v is the deformed source, T(y) = s R u + t.
+        Status BayesianStep(double matched)
+        {
+            const Eigen::Index m = Eigen::Index(Source.Size());
+            const double scale = RigidScale, ratio = scale * scale / Sigma2;
+            // b = (s^2/sigma^2) nu o (T^{-1}(x^) - y), using nu_m T^{-1}(x^_m) = R^T (PX_m - nu_m t) / s.
+            Eigen::MatrixXd b(m, 3);
+            Eigen::VectorXd precision(m);
+            for (Eigen::Index i = 0; i < m; ++i)
+            {
+                const std::size_t k = std::size_t(i);
+                const Eigen::Vector3d px{PX.X[k], PX.Y[k], PX.Z[k]};
+                const Eigen::Vector3d r = Rotation.transpose() * (px - P1[k] * Translation) / scale - P1[k] * Source.At(k);
+                b.row(i) = ratio * r.transpose();
+                precision(i) = ratio * P1[k];
+            }
+            const double lambda = Config.Lambda;
+            const bool variances = Config.PosteriorVarianceTerms;
+            if (Config.LowRank > 0u)
+            {
+                // Posterior over v = Q a with prior a ~ N(0, L / lambda): Sigma = Q (lambda L^{-1} + Q^T D Q)^{-1} Q^T.
+                Eigen::MatrixXd inner = Basis.transpose() * precision.asDiagonal() * Basis;
+                inner.diagonal() += lambda * Eigenvalues.cwiseInverse();
+                const Eigen::LLT<Eigen::MatrixXd> llt(inner);
+                if (llt.info() != Eigen::Success) return Status::SingularSystem;
+                const Eigen::MatrixXd covariance = llt.solve(Eigen::MatrixXd::Identity(inner.rows(), inner.cols()));
+                KernelWeights = covariance * (Basis.transpose() * b);
+                Displacement = Basis * KernelWeights;
+                if (variances)
+                {
+                    const Eigen::MatrixXd projected = Basis * covariance;
+                    PosteriorVariance = (projected.cwiseProduct(Basis)).rowwise().sum();
+                }
+            }
+            else
+            {
+                // Sigma = (lambda G^{-1} + D)^{-1} = G/lambda - G D^{1/2} (lambda I + D^{1/2} G D^{1/2})^{-1} D^{1/2} G / lambda.
+                const Eigen::VectorXd root = precision.cwiseSqrt();
+                Eigen::MatrixXd system = root.asDiagonal() * Kernel * root.asDiagonal();
+                system.diagonal().array() += lambda;
+                const Eigen::LLT<Eigen::MatrixXd> llt(system);
+                if (llt.info() != Eigen::Success) return Status::SingularSystem;
+                const Eigen::MatrixXd rootKernel = root.asDiagonal() * Kernel; // D^{1/2} G
+                if (variances)
+                {
+                    const Eigen::MatrixXd whitened = llt.matrixL().solve(rootKernel);
+                    PosteriorVariance = (Kernel.diagonal() - whitened.colwise().squaredNorm().transpose()) / lambda;
+                }
+                // Sigma b = G z with z = (b - D^{1/2} (lambda I + K)^{-1} D^{1/2} G b) / lambda.
+                const Eigen::MatrixXd kernelB = Kernel * b;
+                KernelWeights = (b - root.asDiagonal() * llt.solve(root.asDiagonal() * kernelB)) / lambda;
+                Displacement = Kernel * KernelWeights;
+            }
+            PosteriorVariance = PosteriorVariance.cwiseMax(0.0);
+            if (!Displacement.allFinite() || !PosteriorVariance.allFinite()) return Status::NumericalFailure;
+
+            // Mixing weights: E[log alpha_m] under the Dirichlet posterior (equal for kappa = inf).
+            if (std::isinf(Config.Kappa)) LogAlpha.setConstant(-std::log(double(m)));
+            else
+            {
+                const double normalizer = Digamma(Config.Kappa * double(m) + matched);
+                for (Eigen::Index i = 0; i < m; ++i) LogAlpha(i) = Digamma(Config.Kappa + P1[std::size_t(i)]) - normalizer;
+            }
+
+            // Similarity from the deformed source u = y + v, weighted by nu; E[u] carries sigma_m^2 I.
+            Eigen::Vector3d xBar = Eigen::Vector3d::Zero(), uBar = Eigen::Vector3d::Zero();
+            double varianceBar = 0.0;
+            for (Eigen::Index i = 0; i < m; ++i)
+            {
+                const std::size_t k = std::size_t(i);
+                xBar += Eigen::Vector3d{PX.X[k], PX.Y[k], PX.Z[k]};
+                uBar += P1[k] * (Source.At(k) + Displacement.row(i).transpose());
+                varianceBar += P1[k] * PosteriorVariance(i);
+            }
+            xBar /= matched; uBar /= matched; varianceBar /= matched;
+            Eigen::Matrix3d cross = Eigen::Matrix3d::Zero(), spread = Eigen::Matrix3d::Zero();
+            for (Eigen::Index i = 0; i < m; ++i)
+            {
+                const std::size_t k = std::size_t(i);
+                const Eigen::Vector3d u = Source.At(k) + Displacement.row(i).transpose() - uBar;
+                cross += (Eigen::Vector3d{PX.X[k], PX.Y[k], PX.Z[k]} - P1[k] * xBar) * u.transpose();
+                spread += P1[k] * u * u.transpose();
+            }
+            cross /= matched;
+            spread = spread / matched + varianceBar * Eigen::Matrix3d::Identity();
+            const Eigen::JacobiSVD<Eigen::Matrix3d> svd(cross, Eigen::ComputeFullU | Eigen::ComputeFullV);
+            Eigen::Matrix3d correction = Eigen::Matrix3d::Identity();
+            if (!Config.AllowReflection)
+                correction(2, 2) = (svd.matrixU() * svd.matrixV().transpose()).determinant() < 0.0 ? -1.0 : 1.0;
+            Rotation = svd.matrixU() * correction * svd.matrixV().transpose();
+            RigidScale = Config.EstimateScale ? (Rotation.transpose() * cross).trace() / spread.trace() : 1.0;
+            Linear = RigidScale * Rotation;
+            Translation = xBar - Linear * uBar;
+
+            double xPx = 0.0, xTerm = 0.0, tTerm = 0.0;
+            for (std::size_t j = 0; j < Target.Size(); ++j) xPx += Pt1[j] * Target.At(j).squaredNorm();
+            for (Eigen::Index i = 0; i < m; ++i)
+            {
+                const std::size_t k = std::size_t(i);
+                const Eigen::Vector3d moved = Linear * (Source.At(k) + Displacement.row(i).transpose()) + Translation;
+                Moved.Set(k, moved);
+                xTerm += PX.X[k] * moved.x() + PX.Y[k] * moved.y() + PX.Z[k] * moved.z();
+                tTerm += P1[k] * moved.squaredNorm();
+            }
+            // sigma^2 = sum_mn P_mn |x_n - T(u_m)|^2 / (Np D) + s^2 sigma_bar^2
+            Sigma2 = (xPx - 2.0 * xTerm + tTerm) / (matched * kDimension) + RigidScale * RigidScale * varianceBar;
             return Status::Success;
         }
 
@@ -402,17 +575,27 @@ namespace Geometry::CoherentPointDrift
         if (!(params.OutlierWeight >= 0.0 && params.OutlierWeight < 1.0) || params.MaxIterations == 0u ||
             !(params.Tolerance >= 0.0) || !std::isfinite(params.Tolerance) || !(params.InitialSigma2 >= 0.0) ||
             !std::isfinite(params.InitialSigma2) || !(params.Sigma2Floor > 0.0) || !std::isfinite(params.Sigma2Floor) ||
-            (params.Method == Variant::Nonrigid &&
+            ((params.Method == Variant::Nonrigid || params.Method == Variant::Bayesian) &&
              (!(params.Beta > 0.0) || !std::isfinite(params.Beta) || !(params.Lambda > 0.0) || !std::isfinite(params.Lambda))) ||
-            params.Method > Variant::Nonrigid || params.EStep > EStepPolicy::FastGauss ||
+            (params.Method == Variant::Bayesian &&
+             (!(params.Gamma > 0.0) || !std::isfinite(params.Gamma) || !(params.Kappa > 0.0) ||
+              (params.SubsampleSource > 0u && params.SubsampleSource < 4u) ||
+              (params.SubsampleTarget > 0u && params.SubsampleTarget < 4u))) ||
+            params.Method > Variant::Bayesian || params.EStep > EStepPolicy::FastGauss ||
             (params.EStep != EStepPolicy::Reference &&
              !(params.EStepTolerance > 0.0 && params.EStepTolerance < 1.0)))
             return fail(Status::InvalidParameters);
-        if (params.Method == Variant::Nonrigid &&
-            source.size() > (params.LowRank > 0u ? kMaxLowRankSourcePoints : kMaxNonrigidSourcePoints))
+        const bool deforming = params.Method == Variant::Nonrigid || params.Method == Variant::Bayesian;
+        const bool subsampled = params.Method == Variant::Bayesian && params.SubsampleSource > 0u &&
+                                params.SubsampleSource < source.size();
+        // The kernel covers the registered points: every source point, or the Bayesian samples.
+        const std::size_t registered = subsampled ? params.SubsampleSource : source.size();
+        if (deforming && (registered > (params.LowRank > 0u ? kMaxLowRankSourcePoints : kMaxNonrigidSourcePoints) ||
+                          source.size() > kMaxLowRankSourcePoints))
             return fail(Status::TooLarge);
 
-        const std::size_t n = target.size(), m = source.size();
+        std::size_t n = target.size();
+        std::size_t m = source.size();
         s.Target.Resize(n); s.Source.Resize(m); s.Moved.Resize(m); s.PX.Resize(m);
         s.P1.assign(m, 0.0); s.Pt1.assign(n, 0.0); s.Scratch.assign(m, 0.0);
         for (std::size_t j = 0; j < n; ++j) s.MeanX += Eigen::Vector3d(target[j].x, target[j].y, target[j].z);
@@ -436,6 +619,46 @@ namespace Geometry::CoherentPointDrift
             s.Source.Set(i, (Eigen::Vector3d(source[i].x, source[i].y, source[i].z) - s.MeanY) / s.Scale);
             s.Moved.Set(i, s.Source.At(i));
         }
+        // Farthest-point samples from point 0 (ties: lowest index).
+        const auto farthest = [](const Points& points, const std::size_t count)
+        {
+            std::vector<std::uint32_t> chosen;
+            std::vector<double> distance(points.Size(), std::numeric_limits<double>::infinity());
+            std::size_t next = 0;
+            while (chosen.size() < count)
+            {
+                chosen.push_back(std::uint32_t(next));
+                const Eigen::Vector3d center = points.At(next);
+                for (std::size_t i = 0; i < points.Size(); ++i)
+                    distance[i] = std::min(distance[i], (points.At(i) - center).squaredNorm());
+                next = std::size_t(std::max_element(distance.begin(), distance.end()) - distance.begin());
+                if (!(distance[next] > 0.0)) break; // the rest duplicates the samples
+            }
+            return chosen;
+        };
+        if (params.Method == Variant::Bayesian && params.SubsampleTarget > 0u && params.SubsampleTarget < n)
+        {
+            const Points full = s.Target;
+            const auto chosen = farthest(full, params.SubsampleTarget);
+            n = chosen.size();
+            s.Target.Resize(n);
+            s.Pt1.assign(n, 0.0);
+            for (std::size_t k = 0; k < n; ++k) s.Target.Set(k, full.At(chosen[k]));
+        }
+        if (subsampled)
+        {
+            // Source becomes the samples; FullSource keeps every point for the interpolation.
+            s.FullSource = s.Source;
+            s.Samples = farthest(s.FullSource, registered);
+            m = s.Samples.size();
+            s.Source.Resize(m); s.Moved.Resize(m); s.PX.Resize(m);
+            s.P1.assign(m, 0.0); s.Scratch.assign(m, 0.0);
+            for (std::size_t k = 0; k < m; ++k)
+            {
+                s.Source.Set(k, s.FullSource.At(s.Samples[k]));
+                s.Moved.Set(k, s.Source.At(k));
+            }
+        }
 
         // Mean squared pair distance, from centered sums in O(N + M):
         // sum_nm |x_n - y_m|^2 = M sum|x - x_bar|^2 + N sum|y - y_bar|^2 + N M |x_bar - y_bar|^2.
@@ -451,11 +674,23 @@ namespace Geometry::CoherentPointDrift
             for (std::size_t i = 0; i < m; ++i) sy += (s.Source.At(i) - yBar).squaredNorm();
             s.Sigma2 = (double(m) * sx + double(n) * sy + double(n) * double(m) * (xBar - yBar).squaredNorm()) /
                        (kDimension * double(n) * double(m));
+            if (params.Method == Variant::Bayesian) s.Sigma2 *= params.Gamma;
         }
         if (!(s.Sigma2 > params.Sigma2Floor)) s.Sigma2 = std::max(s.Sigma2, params.Sigma2Floor);
 
         if (params.EStep != EStepPolicy::Reference) s.Accelerated.SetTarget({s.Target.X, s.Target.Y, s.Target.Z});
-        if (params.Method == Variant::Nonrigid && params.LowRank > 0u)
+        if (params.Method == Variant::Bayesian)
+        {
+            // Start: v = 0, zero posterior variances, equal mixing weights, identity similarity; the
+            // uniform outlier density is over the target's bounding box.
+            s.Displacement = Eigen::MatrixXd::Zero(Eigen::Index(m), 3);
+            s.PosteriorVariance = Eigen::VectorXd::Zero(Eigen::Index(m)); // stays zero without variance terms
+            s.LogAlpha = Eigen::VectorXd::Constant(Eigen::Index(m), -std::log(double(m)));
+            Eigen::Vector3d lo = Eigen::Vector3d::Constant(std::numeric_limits<double>::infinity()), hi = -lo;
+            for (std::size_t j = 0; j < n; ++j) { lo = lo.cwiseMin(s.Target.At(j)); hi = hi.cwiseMax(s.Target.At(j)); }
+            s.Volume = std::max((hi - lo).cwiseMax(1e-6).prod(), 1e-12);
+        }
+        if (deforming && params.LowRank > 0u)
         {
             EStep::LowRankKernel kernel;
             if (!EStep::BuildLowRankGaussianKernel({s.Source.X, s.Source.Y, s.Source.Z}, params.Beta, params.LowRank,
@@ -466,8 +701,16 @@ namespace Geometry::CoherentPointDrift
             s.Eigenvalues = Eigen::Map<const Eigen::VectorXd>(kernel.Eigenvalues.data(), rank);
             s.KernelError = kernel.EstimatedRelativeError;
             s.BasisCoefficients = Eigen::MatrixXd::Zero(rank, 3);
+            if (subsampled)
+            {
+                s.LandmarkPoints.resize(Eigen::Index(kernel.LandmarkIndices.size()), 3);
+                for (std::size_t l = 0; l < kernel.LandmarkIndices.size(); ++l)
+                    s.LandmarkPoints.row(Eigen::Index(l)) = s.Source.At(kernel.LandmarkIndices[l]).transpose();
+                s.Extension = Eigen::Map<const Eigen::MatrixXd>(kernel.Extension.data(),
+                                                                Eigen::Index(kernel.LandmarkIndices.size()), rank);
+            }
         }
-        else if (params.Method == Variant::Nonrigid)
+        else if (deforming)
         {
             const Eigen::Index count = Eigen::Index(m);
             s.Kernel.resize(count, count);
@@ -494,6 +737,7 @@ namespace Geometry::CoherentPointDrift
         State& s = *m_State;
         if (s.Ended) return false;
         double nll = 0.0, matched = 0.0;
+        if (s.Config.Method == Variant::Bayesian) s.UpdateBayesianWeights();
         if (!s.ExpectationStep(nll, matched))
         {
             s.Fail(Status::NumericalFailure);
@@ -519,6 +763,7 @@ namespace Geometry::CoherentPointDrift
         case Variant::Rigid: status = s.RigidStep(matched); break;
         case Variant::Affine: status = s.AffineStep(matched); break;
         case Variant::Nonrigid: status = s.NonrigidStep(matched); break;
+        case Variant::Bayesian: status = s.BayesianStep(matched); break;
         }
         if (status != Status::Success)
         {
@@ -583,10 +828,37 @@ namespace Geometry::CoherentPointDrift
             // x_w = L y_w + (mu_x + Scale t - L mu_y).
             const Eigen::Vector3d translation = s.MeanX + s.Scale * s.Translation - s.Linear * s.MeanY;
             result.Linear = ToGlm(s.Linear);
-            result.Rotation = ToGlm(s.Config.Method == Variant::Rigid ? s.Rotation : Eigen::Matrix3d::Identity());
-            result.Scale = s.Config.Method == Variant::Rigid ? s.RigidScale : 1.0;
+            const bool similarity = s.Config.Method == Variant::Rigid || s.Config.Method == Variant::Bayesian;
+            result.Rotation = ToGlm(similarity ? s.Rotation : Eigen::Matrix3d::Identity());
+            result.Scale = similarity ? s.RigidScale : 1.0;
             result.Translation = {translation.x(), translation.y(), translation.z()};
             result.Transform = AffineMatrix(s.Linear, translation);
+        }
+        if (!s.Samples.empty())
+        {
+            // Subsampled Bayesian run: evaluate the samples' kernel expansion (the posterior mean
+            // deformation) at every source point.
+            const double inverse = -1.0 / (2.0 * s.Config.Beta * s.Config.Beta);
+            const bool lowRank = s.Config.LowRank > 0u;
+            const Eigen::MatrixXd coefficients = s.KernelWeights.size() == 0
+                ? Eigen::MatrixXd::Zero(lowRank ? s.Extension.cols() : Eigen::Index(s.Samples.size()), 3)
+                : (lowRank ? Eigen::MatrixXd(s.Extension * s.KernelWeights) : s.KernelWeights);
+            const Eigen::Index centers = lowRank ? s.LandmarkPoints.rows() : Eigen::Index(s.Samples.size());
+            result.TransformedSource.resize(s.FullSource.Size());
+            for (std::size_t i = 0; i < s.FullSource.Size(); ++i)
+            {
+                const Eigen::Vector3d y = s.FullSource.At(i);
+                Eigen::Vector3d v = Eigen::Vector3d::Zero();
+                for (Eigen::Index k = 0; k < centers; ++k)
+                {
+                    const Eigen::Vector3d center = lowRank ? Eigen::Vector3d(s.LandmarkPoints.row(k).transpose())
+                                                           : s.Source.At(std::size_t(k));
+                    v += std::exp(inverse * (y - center).squaredNorm()) * coefficients.row(k).transpose();
+                }
+                const Eigen::Vector3d world = s.Scale * (s.Linear * (y + v) + s.Translation) + s.MeanX;
+                result.TransformedSource[i] = {world.x(), world.y(), world.z()};
+            }
+            return result;
         }
         result.TransformedSource.resize(s.Moved.Size());
         for (std::size_t i = 0; i < s.Moved.Size(); ++i)

@@ -2821,11 +2821,19 @@ namespace Extrinsic::Sandbox::Editor
             DrawSpecCheckbox("Estimate scale##CPD", fields, "estimate_scale", config.EstimateScale, defaults.EstimateScale, changed);
             DrawSpecCheckbox("Allow reflection##CPD", fields, "allow_reflection", config.AllowReflection, defaults.AllowReflection, changed);
         }
-        if (config.Method == Runtime::CoherentPointDriftMethod::Nonrigid)
+        const bool bayesian = config.Method == Runtime::CoherentPointDriftMethod::Bayesian;
+        if (config.Method == Runtime::CoherentPointDriftMethod::Nonrigid || bayesian)
         {
             changed |= DrawSpecInputDouble("Beta (kernel width)##CPD", fields, "beta", config.Beta, defaults.Beta);
             changed |= DrawSpecInputDouble("Lambda (smoothness)##CPD", fields, "lambda", config.Lambda, defaults.Lambda);
             changed |= DrawSpecInputUInt("Low rank (0 = full kernel)##CPD", fields, "low_rank", config.LowRank, defaults.LowRank);
+        }
+        if (bayesian)
+        {
+            DrawSpecCheckbox("Estimate scale##CPD", fields, "estimate_scale", config.EstimateScale, defaults.EstimateScale, changed);
+            changed |= DrawSpecInputDouble("Gamma (initial sigma^2 factor)##CPD", fields, "gamma", config.Gamma, defaults.Gamma);
+            changed |= DrawSpecInputDouble("Kappa (0 = equal weights)##CPD", fields, "kappa", config.Kappa, defaults.Kappa);
+            changed |= DrawSpecInputUInt("Subsample (0 = all points)##CPD", fields, "subsample", config.Subsample, defaults.Subsample);
         }
         if (ImGui::TreeNode("Performance##CPD"))
         {

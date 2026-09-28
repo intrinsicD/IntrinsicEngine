@@ -1,5 +1,6 @@
 // METHOD-015: Coherent Point Drift reference on built-in deterministic fixtures, one per
-// variant (rigid similarity, affine map, smooth nonrigid bend), with ground-truth errors.
+// variant (rigid similarity, affine map, smooth nonrigid bend, METHOD-050 Bayesian similarity
+// plus deformation), with ground-truth errors.
 #pragma once
 #include <cstdint>
 namespace Intrinsic::Bench::Geometry
@@ -16,7 +17,7 @@ namespace Intrinsic::Bench::Geometry
     };
     struct CoherentPointDriftReferenceSmokeResult
     {
-        CoherentPointDriftVariantMetrics Rigid{}, Affine{}, Nonrigid{};
+        CoherentPointDriftVariantMetrics Rigid{}, Affine{}, Nonrigid{}, Bayesian{};
         double RuntimeMilliseconds{}; // mean over measured iterations, all three variants
         double MaxRmsError{};
         bool Succeeded{};

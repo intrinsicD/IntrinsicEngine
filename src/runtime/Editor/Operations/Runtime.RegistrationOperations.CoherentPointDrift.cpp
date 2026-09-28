@@ -10,6 +10,7 @@ module;
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -103,6 +104,7 @@ namespace Extrinsic::Runtime
             case CoherentPointDriftMethod::Rigid: return CPD::Variant::Rigid;
             case CoherentPointDriftMethod::Affine: return CPD::Variant::Affine;
             case CoherentPointDriftMethod::Nonrigid: return CPD::Variant::Nonrigid;
+            case CoherentPointDriftMethod::Bayesian: return CPD::Variant::Bayesian;
             }
             return CPD::Variant::Rigid;
         }
@@ -165,11 +167,16 @@ namespace Extrinsic::Runtime
                                "Coherent Point Drift needs at least " + std::to_string(minimum) +
                                    " live points on each side.");
             const std::size_t nonrigidLimit = config.LowRank > 0u ? CPD::kMaxLowRankSourcePoints : CPD::kMaxNonrigidSourcePoints;
-            if (config.Method == CoherentPointDriftMethod::Nonrigid && sourceCapture.LiveCount > nonrigidLimit)
+            // Bayesian runs may register a subsample; the kernel then covers only the samples.
+            const bool deforming = config.Method == CoherentPointDriftMethod::Nonrigid ||
+                                   config.Method == CoherentPointDriftMethod::Bayesian;
+            const std::size_t kernelPoints = config.Method == CoherentPointDriftMethod::Bayesian && config.Subsample > 0u
+                ? std::min<std::size_t>(config.Subsample, sourceCapture.LiveCount) : sourceCapture.LiveCount;
+            if (deforming && (kernelPoints > nonrigidLimit || sourceCapture.LiveCount > CPD::kMaxLowRankSourcePoints))
                 return Failure(config, EditorCommandStatus::InvalidProcessingParameters,
                                config.LowRank > 0u
                                    ? "Low-rank nonrigid CPD handles at most " + std::to_string(nonrigidLimit) + " source points."
-                                   : "Nonrigid CPD with the full kernel handles at most " + std::to_string(nonrigidLimit) +
+                                   : "Nonrigid and Bayesian CPD with the full kernel handle at most " + std::to_string(nonrigidLimit) +
                                          " source points; set a low rank (for example 100) or subsample the source.");
             const auto* sourceTransform = raw.try_get<ECSC::Transform::Component>(*source);
             if (config.Output == CoherentPointDriftOutput::SourceTransform && sourceTransform == nullptr)
@@ -206,7 +213,9 @@ namespace Extrinsic::Runtime
                                       .NormalizeInputs = config.NormalizeInputs, .EstimateScale = config.EstimateScale,
                                       .AllowReflection = config.AllowReflection, .Beta = config.Beta, .Lambda = config.Lambda,
                                       .EStep = CPD::EStepPolicy(config.EStep), .EStepTolerance = config.EStepTolerance,
-                                      .Threads = config.Threads, .LowRank = config.LowRank};
+                                      .Threads = config.Threads, .LowRank = config.LowRank, .Gamma = config.Gamma,
+                                      .Kappa = config.Kappa > 0.0 ? config.Kappa : std::numeric_limits<double>::infinity(),
+                                      .SubsampleSource = config.Subsample};
             return std::nullopt;
         }
 

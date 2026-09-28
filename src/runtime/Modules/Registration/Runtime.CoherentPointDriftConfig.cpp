@@ -24,8 +24,9 @@ namespace Extrinsic::Runtime
         using FT = ConfigFieldType;
         using K = Geometry::PropertyValueKind;
         constexpr std::array<K, 1> kVec3{K::Vec3};
-        constexpr std::array<std::string_view, 3> kMethodNames{"Rigid (rotation, translation, optional scale)", "Affine",
-                                                               "Nonrigid (coherent displacement field)"};
+        constexpr std::array<std::string_view, 4> kMethodNames{"Rigid (rotation, translation, optional scale)", "Affine",
+                                                               "Nonrigid (coherent displacement field)",
+                                                               "Bayesian (similarity plus coherent deformation, BCPD)"};
         constexpr std::array<std::string_view, 3> kOutputNames{"Source transform (rigid)", "Overwrite source positions",
                                                                "Displacement property"};
         constexpr std::array<std::string_view, 5> kEStepNames{"Reference (exact, single thread)", "Dense (exact, parallel)",
@@ -53,7 +54,10 @@ namespace Extrinsic::Runtime
             ConfigFieldSpec{.Name = "e_step", .Type = FT::Enum, .Description = "How responsibilities are evaluated each iteration; every option reports its backend and error bound.", .EnumNames = kEStepNames},
             ConfigFieldSpec{.Name = "e_step_tolerance", .Type = FT::Float, .Description = "Truncated, fast Gauss and Auto: bound on each point's relative responsibility error.", .Min = 0, .Max = 1, .ExclusiveMin = true, .ExclusiveMax = true},
             ConfigFieldSpec{.Name = "threads", .Type = FT::UInt, .Description = "Worker threads for the parallel E-step; 0 uses all cores.", .Min = 0, .Max = 256},
-            ConfigFieldSpec{.Name = "low_rank", .Type = FT::UInt, .Description = "Nonrigid: 0 solves with the full kernel (at most 8192 source points); k > 0 uses k kernel eigenpairs and allows large sources.", .Min = 0, .Max = 2000},
+            ConfigFieldSpec{.Name = "low_rank", .Type = FT::UInt, .Description = "Nonrigid and Bayesian: 0 solves with the full kernel (at most 8192 source points); k > 0 uses k kernel eigenpairs and allows large sources.", .Min = 0, .Max = 2000},
+            ConfigFieldSpec{.Name = "gamma", .Type = FT::Float, .Description = "Bayesian: factor on the data-derived initial sigma^2.", .Min = 0, .Max = 100, .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "kappa", .Type = FT::Float, .Description = "Bayesian: Dirichlet concentration of the mixing weights; small values adapt them to uneven density, 0 keeps them equal.", .Min = 0, .Max = 1e6},
+            ConfigFieldSpec{.Name = "subsample", .Type = FT::UInt, .Description = "Bayesian: register this many farthest-point samples and interpolate the deformation to every point (0 = all points, else at least 4).", .Min = 0, .Max = 1000000},
         };
 
         Json Encode(const CoherentPointDriftConfig& c)
@@ -68,7 +72,8 @@ namespace Extrinsic::Runtime
                         {"allow_reflection", c.AllowReflection}, {"beta", c.Beta}, {"lambda", c.Lambda},
                         {"output", unsigned(c.Output)}, {"displacement_name", c.DisplacementName},
                         {"e_step", unsigned(c.EStep)}, {"e_step_tolerance", c.EStepTolerance},
-                        {"threads", c.Threads}, {"low_rank", c.LowRank}};
+                        {"threads", c.Threads}, {"low_rank", c.LowRank}, {"gamma", c.Gamma}, {"kappa", c.Kappa},
+                        {"subsample", c.Subsample}};
         }
 
         CoherentPointDriftConfig Decode(const Json& doc)
@@ -95,6 +100,9 @@ namespace Extrinsic::Runtime
             c.EStepTolerance = doc.at("e_step_tolerance").get<double>();
             c.Threads = doc.at("threads").get<std::uint32_t>();
             c.LowRank = doc.at("low_rank").get<std::uint32_t>();
+            c.Gamma = doc.at("gamma").get<double>();
+            c.Kappa = doc.at("kappa").get<double>();
+            c.Subsample = doc.at("subsample").get<std::uint32_t>();
             return c;
         }
 
@@ -128,6 +136,8 @@ namespace Extrinsic::Runtime
             return reject("The displacement property needs its own name and cannot replace topology or deletion data.");
         if (c.SourceStableEntityId != 0u && c.SourceStableEntityId == c.TargetStableEntityId)
             return reject("Source and target must be different entities.");
+        if (c.Subsample > 0u && c.Subsample < 4u)
+            return reject("Subsample needs at least 4 points (or 0 for all points).");
         return {.State = Core::Config::EngineConfigState::Valid,
                 .CanonicalPayloadJson = SerializeCoherentPointDriftConfig(c),
                 .ParsedFieldCount = static_cast<std::uint32_t>(input.is_object() ? input.size() : 0u)};

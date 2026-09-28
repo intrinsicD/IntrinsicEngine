@@ -109,7 +109,9 @@ reference only by summation order. Dense rows use this form only while a block's
 (4 M doubles) stay within 512 KiB, because each dense row writes all of them; larger
 sources, and any case beyond `PartialBudgetBytes`, use a two-pass form (denominators
 over targets, then P1/PX over sources, reading shared arrays), which evaluates each
-kernel term twice. Truncated rows touch only their kept sources and stay single-pass.
+kernel term twice. Truncated rows touch only their kept sources and stay single-pass; they run in target
+kd-tree order and accumulate by source-tree slot, so each block's neighborhoods are
+contiguous in memory (about ten times faster than index order at 10^5 points).
 
 **Truncation bound.** For row n let d_n = min_m |x_n - y_m| and keep the sources with
 |x_n - y_m|^2 <= r_n^2 = d_n^2 + 2 sigma^2 ln(M / tol). Every dropped term is at most
@@ -121,7 +123,7 @@ is the shifted kept sum. The run reports the maximum over rows and iterations
 (`EStepErrorBound`); kept responsibilities inherit the same relative bound. Neighborhoods
 come from a balanced double-precision kd-tree over the moving source, rebuilt per
 iteration. `Auto` counts the kept pairs of 64 evenly spaced rows and truncates when they
-are under 40% of all pairs; otherwise it uses the fast Gauss transform if its plan is
+are under 25% of all pairs (a kept pair measured at about 3.7 dense pairs); otherwise it uses the fast Gauss transform if its plan is
 clearly cheaper, else the dense rows.
 
 **Exponential.** Optimized rows use a branch-free exp for non-positive arguments
@@ -157,3 +159,47 @@ therefore rarely selects it in 3-D, and the explicit policy is slower than dense
 (`geometry.coherent_point_drift.accelerated`). E-step Nystroem is not offered because its
 error has no a-priori bound; the permutohedral lattice (GEOM-060) is the remaining
 candidate for wide kernels.
+## Bayesian Coherent Point Drift (METHOD-050)
+
+Hirose, *A Bayesian Formulation of Coherent Point Drift*, IEEE TPAMI 43(7), 2021,
+doi:10.1109/TPAMI.2020.2971687. `Variant::Bayesian` models the target as
+T(y_m) = s R (y_m + v_m) + t with a Gaussian-process deformation prior
+v ~ N(0, lambda^{-1} G (x) I_D), G_ij = exp(-|y_i - y_j|^2 / 2 beta^2), mixing weights alpha
+with a Dirichlet(kappa) prior and a uniform outlier term with weight omega over the
+target's bounding box. Each iteration (Hirose's Algorithm 1) runs the shared E-step with
+source log-weights log alpha_m - s^2 D sigma_m^2 / (2 sigma^2), then:
+
+- Deformation posterior with precision d_m = s^2 nu_m / sigma^2 and b = d o (T^{-1}(x^) - y):
+  mean v = Sigma b = G z, z = (b - D^{1/2} (lambda I + D^{1/2} G D^{1/2})^{-1} D^{1/2} G b) /
+  lambda (one Cholesky factor of an SPD matrix); variances diag Sigma = (diag G - colsq(L^{-1}
+  D^{1/2} G)) / lambda. Low rank (METHOD-049 Nystroem eigenpairs): Sigma = Q (lambda L^{-1} +
+  Q^T D Q)^{-1} Q^T in O(M k^2).
+- alpha_m = exp(psi(kappa + nu_m) - psi(kappa M + N^)) (equal weights for kappa = infinity).
+- Similarity from u = y + v: R from the SVD of S_xu (reflection-free unless allowed),
+  s = tr(R^T S_xu) / tr(S_uu), t = x_bar - s R u_bar.
+- sigma^2 = sum_mn P_mn |x_n - T(u_m)|^2 / (N^ D) + s^2 sigma_bar^2.
+
+**Posterior-variance terms are off by default.** With them, a smooth kernel lets the
+deformation absorb scale while sigma_bar^2 inflates tr(S_uu), which lowers s, which lowers
+the precision and raises the variances again: on a 60-point bend (beta 1, lambda 2) the
+scale falls from 1 to 0.002 in eight iterations. An independent NumPy implementation of
+Algorithm 1 reproduces this to 1e-9 (sigma^2 and s per iteration), so it is the update, not
+a coding error. Hirose's reference implementation also enables these terms only on request
+(option `-a`) and starts from zero variances; `Params::PosteriorVarianceTerms` does the same.
+Without them the fixture converges to 1e-5 in about twenty iterations.
+
+**Similarity versus deformation.** A smooth, nearly linear field is cheap under the
+kernel prior, so the split between s R t and v is not identifiable unless lambda is large;
+registered positions are. Tests check the similarity only under a strong prior.
+
+**Subsampling (BCPD++, Hirose 2021, section 5).** `SubsampleSource` registers that many
+farthest-point samples and evaluates the posterior mean's kernel expansion at every source
+point: v(y) = sum_k g(y, y_k) z_k for the full kernel, or the Nystroem extension k(y, Z) E a
+for low rank; nothing inverts G. The samples' fit is only as good as their density: each
+sample settles on the centroid of its target cell, so point correspondences survive at
+400 of 800 points (RMS 0.002) but not at 250 of 1200 in a volumetric cloud (RMS 0.06), where
+only the shape is kept. `SubsampleTarget` thins the target as well; with omega = 0 and
+non-corresponding samples EM stalls at the iteration cap, so subsampled runs need omega > 0.
+
+Implementation from the paper; the reference code was read only to compare the scale
+update and the default for the variance terms. No code was copied.

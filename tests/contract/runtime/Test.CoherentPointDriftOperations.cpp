@@ -139,6 +139,10 @@ TEST(CoherentPointDriftOperations, RigidPublishesTheSourceTransformOnEveryPointD
 
 TEST(CoherentPointDriftOperations, AffineWritesPositionsAndNonrigidWritesADisplacementProperty)
 {
+    const auto registration = R::MakeCoherentPointDriftConfigSectionRegistration();
+    const auto invalidConfig = [&](R::CoherentPointDriftConfig c) {
+        return !registration.Validate(R::SerializeCoherentPointDriftConfig(c), {}, "test").Usable();
+    };
     Scene s;
     const auto points = Cloud(150, 9);
     std::vector<glm::vec3> affine, bent;
@@ -193,6 +197,18 @@ TEST(CoherentPointDriftOperations, AffineWritesPositionsAndNonrigidWritesADispla
     double lowRankError = 0.0;
     for (std::size_t i = 0; i < points.size(); ++i) lowRankError += glm::length(points[i] + lowRankWarp[i] - bent[i]);
     EXPECT_LT(lowRankError / double(points.size()), 0.02);
+
+    // Bayesian (similarity plus deformation) through the same command, written as a displacement.
+    const auto bayesian = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), {
+        .SourceStableEntityId = Id(source), .TargetStableEntityId = Id(bentTarget), .Method = M::Bayesian,
+        .OutlierWeight = 0.0, .Beta = 1.0, .Lambda = 2.0, .Output = O::DisplacementProperty, .DisplacementName = "warp"});
+    ASSERT_TRUE(bayesian.Succeeded()) << bayesian.Message;
+    const auto bayesianWarp = props->Get<glm::vec3>("warp");
+    ASSERT_TRUE(bayesianWarp);
+    double bayesianError = 0.0;
+    for (std::size_t i = 0; i < points.size(); ++i) bayesianError += glm::length(points[i] + bayesianWarp[i] - bent[i]);
+    EXPECT_LT(bayesianError / double(points.size()), 0.02);
+    EXPECT_TRUE(invalidConfig({.Subsample = 2}));
 }
 
 TEST(CoherentPointDriftOperations, StepModeTracesEachIterationAndAppliesTheCurrentEstimate)

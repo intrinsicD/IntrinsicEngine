@@ -9,7 +9,9 @@
 // size, quality_error_l2 the largest RMS error to the ground truth, quality_error_linf the
 // largest parity delta; diagnostics hold every run per size.
 //   CPD_SCALING_TRACE=1 prints each iteration's E-step policy, time and kernel evaluations;
-//   CPD_SCALING_ONLY=<text> runs only the runs whose name contains <text> (no parity).
+//   CPD_SCALING_ONLY=<text> runs only the runs whose name contains <text> (no parity);
+//   CPD_SCALING_ALL=1 also runs the truncated and fast Gauss policies above the reference cap;
+//   CPD_SCALING_ITERATIONS=<k> caps every run at k iterations (profiling).
 //
 // Fixture per size S: S points sampled on a bumpy closed surface (seeded), the target is a
 // rotated, translated and noisy copy with 5% of its points replaced by uniform clutter.
@@ -116,6 +118,8 @@ namespace
     {
         Run run;
         run.Name = name;
+        CPD::Params limited = params;
+        if (const char* cap = std::getenv("CPD_SCALING_ITERATIONS")) limited.MaxIterations = std::uint32_t(std::strtoul(cap, nullptr, 10));
         if (const char* only = std::getenv("CPD_SCALING_ONLY"); only && name.find(only) == std::string::npos)
         {
             run.Result.State = CPD::Status::InvalidParameters;
@@ -124,7 +128,7 @@ namespace
         const auto start = std::chrono::steady_clock::now();
         const bool trace = std::getenv("CPD_SCALING_TRACE") != nullptr;
         auto last = std::chrono::steady_clock::now();
-        run.Result = CPD::Register(f.Target, f.Source, params, [&](const CPD::IterationTrace& t)
+        run.Result = CPD::Register(f.Target, f.Source, limited, [&](const CPD::IterationTrace& t)
         {
             if (!trace) return;
             const auto now = std::chrono::steady_clock::now();
@@ -207,7 +211,7 @@ int main(int argc, char** argv)
             // while sigma is wide (about 150 s per wide iteration at 100000 points); Auto
             // chooses per iteration instead (see paper.md).
             if ((policy == CPD::EStepPolicy::FastGauss || policy == CPD::EStepPolicy::Truncated) &&
-                count > kReferenceRigidCap)
+                count > kReferenceRigidCap && !std::getenv("CPD_SCALING_ALL"))
                 continue;
             CPD::Params p = base;
             p.EStep = policy;
@@ -217,7 +221,7 @@ int main(int argc, char** argv)
         for (std::size_t r = 1; r < rigidRuns.size(); ++r) Compare(rigidRuns[r], rigidRuns[0]);
 
         const Fixture bent = BentFixture(count);
-        const CPD::Params nonrigid{.Method = CPD::Variant::Nonrigid, .MaxIterations = 60, .EStepTolerance = 1e-6};
+        const CPD::Params nonrigid{.Method = CPD::Variant::Nonrigid, .MaxIterations = 150, .EStepTolerance = 1e-6};
         std::vector<Run> nonrigidRuns;
         if (count <= kFullNonrigidCap)
         {

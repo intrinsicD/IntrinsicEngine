@@ -15,6 +15,7 @@ params:
   fixture: bumpy ellipsoid surface samples; target rotated 0.35 rad, translated, noise 0.004, 5% uniform clutter
   rigid_runs: [reference, truncated and fast_gauss (<= 10000 points), dense, auto]
   nonrigid_runs: [full kernel with auto E-step (<= 2000 points), low rank 50 and 150 with auto E-step]
+  nonrigid_max_iterations: 150
   e_step_tolerance: 1.0e-6
   outlier_weight: 0.05
   threads: all hardware threads

@@ -116,27 +116,28 @@ namespace Geometry::CoherentPointDrift::EStep
             return x >= -708.0 ? p * scale : 0.0;
         }
 
-        // values[i] <- exp((minimum - values[i]) * inverseTwoSigma2); returns their sum (added
-        // in index order). Compiled for AVX2 and a baseline target; the loader picks one.
+        // values[i] <- exp((minimum - values[i]) * inverseTwoSigma2 + logWeight[i]) with logWeight <= 0;
+        // returns their sum (added in index order). Compiled for AVX2 and a baseline target.
         __attribute__((target_clones("avx2", "default")))
-        double ExponentiateShifted(double* values, const std::size_t count, const double minimum,
+        double ExponentiateShifted(double* values, const double* logWeight, const std::size_t count, const double minimum,
                                    const double inverseTwoSigma2) noexcept
         {
-            for (std::size_t i = 0; i < count; ++i) values[i] = ExpNonPositive((minimum - values[i]) * inverseTwoSigma2);
+            for (std::size_t i = 0; i < count; ++i)
+                values[i] = ExpNonPositive((minimum - values[i]) * inverseTwoSigma2 + logWeight[i]);
             double sum = 0.0;
             for (std::size_t i = 0; i < count; ++i) sum += values[i];
             return sum;
         }
 
-        // Dense row: out[i] = exp((minimum - |q - s_i|^2) * inverseTwoSigma2) with minimum the row's
-        // smallest squared distance; returns the sum in index order.
+        // Dense row: out[i] = exp((minimum - |q - s_i|^2) * inverseTwoSigma2 + logWeight[i]) with minimum
+        // the row's smallest squared distance and logWeight <= 0; returns the sum in index order.
         __attribute__((target_clones("avx2", "default")))
-        double DenseRowTerms(const double* sx, const double* sy, const double* sz, const std::size_t count, const double qx,
-                             const double qy, const double qz, const double minimum, const double inverseTwoSigma2,
-                             double* out) noexcept
+        double DenseRowTerms(const double* sx, const double* sy, const double* sz, const double* logWeight,
+                             const std::size_t count, const double qx, const double qy, const double qz, const double minimum,
+                             const double inverseTwoSigma2, double* out) noexcept
         {
             for (std::size_t i = 0; i < count; ++i)
-                out[i] = ExpNonPositive((minimum - Squared(qx, qy, qz, sx[i], sy[i], sz[i])) * inverseTwoSigma2);
+                out[i] = ExpNonPositive((minimum - Squared(qx, qy, qz, sx[i], sy[i], sz[i])) * inverseTwoSigma2 + logWeight[i]);
             double sum = 0.0;
             for (std::size_t i = 0; i < count; ++i) sum += out[i];
             return sum;
@@ -157,15 +158,16 @@ namespace Geometry::CoherentPointDrift::EStep
             }
         }
 
-        // Source row of the two-pass form: out[j] = exp(-|t_j - q|^2 / 2 sigma^2 - logDenominator[j]).
+        // Source row of the two-pass form: out[j] = exp(-|t_j - q|^2 / 2 sigma^2 + logWeight - logDenominator[j]).
         __attribute__((target_clones("avx2", "default")))
         void SourceRowTerms(const double* tx, const double* ty, const double* tz, const double* logDenominator,
                             const std::size_t count, const double qx, const double qy, const double qz,
-                            const double inverseTwoSigma2, double* out) noexcept
+                            const double inverseTwoSigma2, const double logWeight, double* out) noexcept
         {
-            // The argument is <= 0 up to rounding: the row's largest term is part of its denominator.
+            // The argument is <= 0 up to rounding: the term is part of its row's denominator.
             for (std::size_t j = 0; j < count; ++j)
-                out[j] = ExpNonPositive(std::min(-Squared(tx[j], ty[j], tz[j], qx, qy, qz) * inverseTwoSigma2 - logDenominator[j], 0.0));
+                out[j] = ExpNonPositive(
+                    std::min(-Squared(tx[j], ty[j], tz[j], qx, qy, qz) * inverseTwoSigma2 + logWeight - logDenominator[j], 0.0));
         }
 
         // log(sum_m exp(a_m) + c) from the shifted sum S = sum_m exp(a_m - a_max), as in the reference.
@@ -246,8 +248,15 @@ namespace Geometry::CoherentPointDrift::EStep
 
             [[nodiscard]] double NearestSquared(const double qx, const double qy, const double qz) const
             {
+                return Nearest(qx, qy, qz).first;
+            }
+
+            // Smallest squared distance and its slot (the first slot in tree order among ties).
+            [[nodiscard]] std::pair<double, std::size_t> Nearest(const double qx, const double qy, const double qz) const
+            {
                 double best = std::numeric_limits<double>::infinity();
-                if (m_Nodes.empty()) return best;
+                std::size_t bestSlot = 0u;
+                if (m_Nodes.empty()) return {best, bestSlot};
                 std::array<std::uint32_t, 128> stack{};
                 std::size_t top = 0;
                 stack[top++] = 0u;
@@ -258,7 +267,11 @@ namespace Geometry::CoherentPointDrift::EStep
                     if (node.Left == kNone)
                     {
                         for (std::uint32_t i = node.Begin; i < node.End; ++i)
-                            best = std::min(best, Squared(qx, qy, qz, m_X[i], m_Y[i], m_Z[i]));
+                            if (const double d2 = Squared(qx, qy, qz, m_X[i], m_Y[i], m_Z[i]); d2 < best)
+                            {
+                                best = d2;
+                                bestSlot = i;
+                            }
                         continue;
                     }
                     const double left = BoxDistance2(m_Nodes[node.Left], qx, qy, qz);
@@ -267,7 +280,7 @@ namespace Geometry::CoherentPointDrift::EStep
                     if (left <= right) { stack[top++] = node.Right; stack[top++] = node.Left; }
                     else { stack[top++] = node.Left; stack[top++] = node.Right; }
                 }
-                return best;
+                return {best, bestSlot};
             }
 
             // visit(slot, d2) for every point with d2 <= radius2, in tree order.
@@ -596,6 +609,10 @@ namespace Geometry::CoherentPointDrift::EStep
         // Blocked single pass: per row block, partial P1 and PX over all sources (4 x M each).
         std::vector<double> Partial{};
         bool SourceTreeCurrent{false}; // SourceTree already indexes this call's moved points
+        // Source log-weights of this call shifted to max 0 (zeros when unweighted), the shift and
+        // the sum of the shifted weights.
+        std::vector<double> LogWeight{}, SlotWeight{};
+        double LogWeightShift{0.0}, WeightSum{0.0};
         // Fast Gauss transform state: farthest-point order of the fixed target, scratch.
         static constexpr std::size_t kMaxClusters = 256u;
         Clustering TargetCurve{}, TargetClusters{}, SourceCurve{}, SourceClusters{};
@@ -616,9 +633,11 @@ namespace Geometry::CoherentPointDrift::EStep
             if (n == 0 || m == 0) return;
             std::vector<double> scale(n);
             double weightSum = 0.0;
+            // Denominators relative to the total source weight; P1 without its own source weight.
+            const double logTotal = LogWeightShift + std::log(WeightSum);
             for (std::size_t j = 0; j < n; ++j)
             {
-                scale[j] = std::exp(LogDenominator[j] - std::log(double(m)));
+                scale[j] = std::exp(LogDenominator[j] - logTotal);
                 weightSum += std::exp(-LogDenominator[j]);
             }
             const auto quantile = [](std::vector<double>& values)
@@ -630,7 +649,7 @@ namespace Geometry::CoherentPointDrift::EStep
             DenominatorScale = quantile(scale);
             if (!(weightSum > 0.0) || !std::isfinite(weightSum)) return;
             std::vector<double> share(m);
-            for (std::size_t i = 0; i < m; ++i) share[i] = p1[i] / weightSum;
+            for (std::size_t i = 0; i < m; ++i) share[i] = p1[i] * std::exp(-(LogWeight[i] + LogWeightShift)) / weightSum;
             P1Scale = quantile(share);
             HasScales = std::isfinite(DenominatorScale) && DenominatorScale > 0.0 && std::isfinite(P1Scale) && P1Scale > 0.0;
         }
@@ -643,9 +662,9 @@ namespace Geometry::CoherentPointDrift::EStep
             const std::size_t m = moved.Size();
             scratch.resize(m);
             const double minDistance = SourceTree.NearestSquared(target.X[j], target.Y[j], target.Z[j]);
-            const double sum = DenseRowTerms(moved.X.data(), moved.Y.data(), moved.Z.data(), m, target.X[j], target.Y[j],
-                                             target.Z[j], minDistance, 1.0 / twoSigma2, scratch.data());
-            const double aMax = -minDistance / twoSigma2;
+            const double sum = DenseRowTerms(moved.X.data(), moved.Y.data(), moved.Z.data(), LogWeight.data(), m, target.X[j],
+                                             target.Y[j], target.Z[j], minDistance, 1.0 / twoSigma2, scratch.data());
+            const double aMax = -minDistance / twoSigma2 + LogWeightShift;
             LogDenominator[j] = LogSumWithOutlier(aMax, sum, logC);
             out.Pt1[j] = sum * std::exp(aMax - LogDenominator[j]);
         }
@@ -672,8 +691,8 @@ namespace Geometry::CoherentPointDrift::EStep
                     double total = 0.0;
                     for (std::size_t i = 0; i < m; ++i)
                         total += std::exp(-Squared(TargetX[j], TargetY[j], TargetZ[j], moved.X[i], moved.Y[i], moved.Z[i]) /
-                                          (h * h));
-                    smallest = std::min(smallest, total / double(m));
+                                              (h * h) + LogWeight[i]);
+                    smallest = std::min(smallest, total / WeightSum);
                 }
                 denominatorScale = p1Scale = smallest;
             }
@@ -699,26 +718,27 @@ namespace Geometry::CoherentPointDrift::EStep
             if (!SourceTreeCurrent) SourceTree.Build(moved);
             SourceTreeCurrent = false;
             FarthestPointClusters(moved, sourcePlan.Clusters, threads, SourceClusters);
-            Weights.assign(m, 1.0);
+            Weights.resize(m);
+            for (std::size_t i = 0; i < m; ++i) Weights[i] = std::exp(LogWeight[i]);
             Transformed.assign(n, 0.0);
             ImprovedFastGaussTransform(moved, SourceClusters, Weights, 1u, target, h, sourcePlan, SourceLayout, Transformed,
                                        threads);
-            // Pass 1: |S_n - S~_n| <= M e1, so the denominator's relative error is M e1 / den_n.
-            const double outlier = std::exp(logC);
+            // Pass 1: |S_n - S~_n| <= Q e1 for the shifted source weights (sum Q); the denominator is
+            // e^shift S_n + c, so its relative error is Q e1 e^shift / den_n.
             std::vector<std::uint32_t> exactRows;
             for (std::size_t j = 0; j < n; ++j)
             {
                 const double sum = std::max(Transformed[j], 0.0);
-                const double denominator = sum + outlier;
-                const double bound = double(m) * sourcePlan.UnitError / denominator;
-                if (!(bound <= tolerance) || !(denominator > 0.0))
+                const double logDenominator = LogSumWithOutlier(LogWeightShift, sum, logC);
+                const double bound = WeightSum * sourcePlan.UnitError * std::exp(LogWeightShift - logDenominator);
+                if (!(bound <= tolerance) || !std::isfinite(logDenominator))
                 {
                     exactRows.push_back(std::uint32_t(j));
                     RowBound[j] = 0.0;
                     continue;
                 }
-                LogDenominator[j] = std::log(denominator);
-                out.Pt1[j] = sum / denominator;
+                LogDenominator[j] = logDenominator;
+                out.Pt1[j] = sum * std::exp(LogWeightShift - logDenominator);
                 RowBound[j] = bound;
             }
             ParallelFor(exactRows.size(), 8, threads, [&](const std::size_t begin, const std::size_t end)
@@ -754,10 +774,11 @@ namespace Geometry::CoherentPointDrift::EStep
                     continue;
                 }
                 sourceBound = std::max(sourceBound, bound);
-                out.P1[i] = p1;
-                out.PXx[i] = Transformed[m + i];
-                out.PXy[i] = Transformed[2u * m + i];
-                out.PXz[i] = Transformed[3u * m + i];
+                const double weight = std::exp(LogWeight[i] + LogWeightShift);
+                out.P1[i] = weight * p1;
+                out.PXx[i] = weight * Transformed[m + i];
+                out.PXy[i] = weight * Transformed[2u * m + i];
+                out.PXz[i] = weight * Transformed[3u * m + i];
             }
             const double inverseTwoSigma2 = 1.0 / twoSigma2;
             ParallelFor(exactSources.size(), 8, threads, [&](const std::size_t begin, const std::size_t end)
@@ -767,7 +788,7 @@ namespace Geometry::CoherentPointDrift::EStep
                 {
                     const std::size_t i = exactSources[k];
                     SourceRowTerms(target.X.data(), target.Y.data(), target.Z.data(), LogDenominator.data(), n, moved.X[i],
-                                   moved.Y[i], moved.Z[i], inverseTwoSigma2, p.data());
+                                   moved.Y[i], moved.Z[i], inverseTwoSigma2, LogWeight[i] + LogWeightShift, p.data());
                     double p1 = 0.0, px = 0.0, py = 0.0, pz = 0.0;
                     for (std::size_t j = 0; j < n; ++j)
                     {
@@ -810,11 +831,19 @@ namespace Geometry::CoherentPointDrift::EStep
             const double tau = std::log(double(m) / tolerance);
             const double inverseTwoSigma2 = 1.0 / twoSigma2;
             Partial.assign(blocks * 4u * m, 0.0);
+            // Truncated rows run in target-tree order and accumulate by source-tree slot, so a
+            // block's neighborhoods are spatially coherent and contiguous in memory.
+            if (truncated)
+            {
+                SlotWeight.resize(m);
+                for (std::size_t slot = 0; slot < m; ++slot) SlotWeight[slot] = LogWeight[SourceTree.Original(slot)];
+            }
             ParallelFor(blocks, 1, threads, [&](const std::size_t firstBlock, const std::size_t lastBlock)
             {
-                std::vector<double> value;
+                std::vector<double> value, weight;
                 std::vector<std::uint32_t> index;
                 value.reserve(truncated ? 256u : m);
+                weight.reserve(truncated ? 256u : 0u);
                 index.reserve(truncated ? 256u : 0u);
                 for (std::size_t b = firstBlock; b < lastBlock; ++b)
                 {
@@ -822,31 +851,38 @@ namespace Geometry::CoherentPointDrift::EStep
                     double* px = p1 + m;
                     double* py = px + m;
                     double* pz = py + m;
-                    for (std::size_t j = b * n / blocks; j < (b + 1) * n / blocks; ++j)
+                    for (std::size_t row = b * n / blocks; row < (b + 1) * n / blocks; ++row)
                     {
+                        const std::size_t j = truncated ? TargetTree.Original(row) : row;
                         const double x = target.X[j], y = target.Y[j], z = target.Z[j];
                         // Exact nearest squared distance (same arithmetic as the row terms), so the
                         // largest term is exp(0) = 1.
-                        const double minDistance = SourceTree.NearestSquared(x, y, z);
+                        const auto [minDistance, nearestSlot] = SourceTree.Nearest(x, y, z);
+                        // Shifted weight of the nearest source: its term is the kept lower bound.
+                        const double nearestWeight = LogWeight[SourceTree.Original(nearestSlot)];
+                        // Truncated rows index sources by tree slot (partials in slot order).
                         value.clear();
+                        weight.clear();
                         index.clear();
                         double sum = 0.0;
                         if (truncated)
                         {
-                            SourceTree.ForEachWithin(x, y, z, minDistance + twoSigma2 * tau, [&](const std::size_t slot, const double d2)
+                            SourceTree.ForEachWithin(x, y, z, minDistance + twoSigma2 * (tau - nearestWeight),
+                                                     [&](const std::size_t slot, const double d2)
                             {
-                                index.push_back(SourceTree.Original(slot));
+                                index.push_back(std::uint32_t(slot));
+                                weight.push_back(SlotWeight[slot]);
                                 value.push_back(d2);
                             });
-                            sum = ExponentiateShifted(value.data(), value.size(), minDistance, inverseTwoSigma2);
+                            sum = ExponentiateShifted(value.data(), weight.data(), value.size(), minDistance, inverseTwoSigma2);
                         }
                         else
                         {
                             value.resize(m);
-                            sum = DenseRowTerms(moved.X.data(), moved.Y.data(), moved.Z.data(), m, x, y, z, minDistance,
-                                                inverseTwoSigma2, value.data());
+                            sum = DenseRowTerms(moved.X.data(), moved.Y.data(), moved.Z.data(), LogWeight.data(), m, x, y, z,
+                                                minDistance, inverseTwoSigma2, value.data());
                         }
-                        const double aMax = -minDistance / twoSigma2;
+                        const double aMax = -minDistance / twoSigma2 + LogWeightShift;
                         const double logDenominator = LogSumWithOutlier(aMax, sum, logC);
                         const double inverse = std::exp(aMax - logDenominator);
                         LogDenominator[j] = logDenominator;
@@ -854,10 +890,12 @@ namespace Geometry::CoherentPointDrift::EStep
                         RowEvaluations[j] = value.size();
                         if (truncated)
                         {
-                            // Dropped mass <= (M - kept)/M tol e^{a_max}; the denominator is at least
-                            // e^{a_max} (sum + c e^{-a_max}).
+                            // Each dropped term is at most tol/M times the nearest term, so the dropped
+                            // mass is at most (M - kept)/M tol e^{w_nearest} in the row's shifted units;
+                            // the denominator is (sum + c e^{-a_max}) in those units.
                             const double outlierShifted = std::exp(std::min(logC - aMax, 700.0));
-                            RowBound[j] = (double(m - value.size()) / double(m)) * tolerance / (sum + outlierShifted);
+                            RowBound[j] = (double(m - value.size()) / double(m)) * tolerance * std::exp(nearestWeight) /
+                                          (sum + outlierShifted);
                         }
                         if (!truncated)
                             ScatterRow(value.data(), m, inverse, x, y, z, p1, px, py, pz);
@@ -876,14 +914,15 @@ namespace Geometry::CoherentPointDrift::EStep
             });
             ParallelFor(m, 1024, threads, [&](const std::size_t begin, const std::size_t end)
             {
-                for (std::size_t i = begin; i < end; ++i)
+                for (std::size_t k = begin; k < end; ++k)
                 {
                     double p1 = 0.0, px = 0.0, py = 0.0, pz = 0.0;
                     for (std::size_t b = 0; b < blocks; ++b)
                     {
                         const double* block = Partial.data() + b * 4u * m;
-                        p1 += block[i]; px += block[m + i]; py += block[2u * m + i]; pz += block[3u * m + i];
+                        p1 += block[k]; px += block[m + k]; py += block[2u * m + k]; pz += block[3u * m + k];
                     }
+                    const std::size_t i = truncated ? SourceTree.Original(k) : k;
                     out.P1[i] = p1; out.PXx[i] = px; out.PXy[i] = py; out.PXz[i] = pz;
                 }
             });
@@ -914,9 +953,9 @@ namespace Geometry::CoherentPointDrift::EStep
                 {
                     const double x = target.X[j], y = target.Y[j], z = target.Z[j];
                     const double minDistance = SourceTree.NearestSquared(x, y, z);
-                    const double sum = DenseRowTerms(moved.X.data(), moved.Y.data(), moved.Z.data(), m, x, y, z, minDistance,
-                                                     1.0 / twoSigma2, e.data());
-                    const double aMax = -minDistance / twoSigma2;
+                    const double sum = DenseRowTerms(moved.X.data(), moved.Y.data(), moved.Z.data(), LogWeight.data(), m, x, y,
+                                                     z, minDistance, 1.0 / twoSigma2, e.data());
+                    const double aMax = -minDistance / twoSigma2 + LogWeightShift;
                     LogDenominator[j] = LogSumWithOutlier(aMax, sum, logC);
                     out.Pt1[j] = sum * std::exp(aMax - LogDenominator[j]);
                     RowEvaluations[j] = m;
@@ -931,7 +970,7 @@ namespace Geometry::CoherentPointDrift::EStep
                 {
                     const double qx = moved.X[i], qy = moved.Y[i], qz = moved.Z[i];
                     SourceRowTerms(target.X.data(), target.Y.data(), target.Z.data(), LogDenominator.data(), n, qx, qy, qz,
-                                   inverseTwoSigma2, p.data());
+                                   inverseTwoSigma2, LogWeight[i] + LogWeightShift, p.data());
                     double p1 = 0.0, px = 0.0, py = 0.0, pz = 0.0;
                     for (std::size_t j = 0; j < n; ++j)
                     {
@@ -962,16 +1001,17 @@ namespace Geometry::CoherentPointDrift::EStep
                 {
                     const std::size_t j = TargetTree.Original(slot);
                     const double x = TargetTree.X(slot), y = TargetTree.Y(slot), z = TargetTree.Z(slot);
-                    const double minDistance = SourceTree.NearestSquared(x, y, z);
-                    const double radius2 = minDistance + extra;
+                    const auto [minDistance, nearestSlot] = SourceTree.Nearest(x, y, z);
+                    const double nearestWeight = LogWeight[SourceTree.Original(nearestSlot)];
+                    const double radius2 = minDistance + extra - twoSigma2 * nearestWeight;
                     double sum = 0.0;
                     std::uint64_t kept = 0;
-                    SourceTree.ForEachWithin(x, y, z, radius2, [&](std::size_t, const double d2)
+                    SourceTree.ForEachWithin(x, y, z, radius2, [&](const std::size_t sourceSlot, const double d2)
                     {
-                        sum += std::exp((minDistance - d2) / twoSigma2);
+                        sum += std::exp((minDistance - d2) / twoSigma2 + LogWeight[SourceTree.Original(sourceSlot)]);
                         ++kept;
                     });
-                    const double aMax = -minDistance / twoSigma2;
+                    const double aMax = -minDistance / twoSigma2 + LogWeightShift;
                     LogDenominator[j] = LogSumWithOutlier(aMax, sum, logC);
                     out.Pt1[j] = sum * std::exp(aMax - LogDenominator[j]);
                     radius2Tree[slot] = radius2;
@@ -979,7 +1019,7 @@ namespace Geometry::CoherentPointDrift::EStep
                     // Dropped mass <= (M - kept) exp(-radius2 / 2 sigma^2) = (M - kept)/M tol e^{a_max};
                     // the denominator is at least e^{a_max} (sum + c e^{-a_max}).
                     const double outlierShifted = std::exp(std::min(logC - aMax, 700.0));
-                    RowBound[j] = (double(m - kept) / double(m)) * tolerance / (sum + outlierShifted);
+                    RowBound[j] = (double(m - kept) / double(m)) * tolerance * std::exp(nearestWeight) / (sum + outlierShifted);
                 }
             });
             TargetTree.SetRadii(radius2Tree);
@@ -990,7 +1030,8 @@ namespace Geometry::CoherentPointDrift::EStep
                     double p1 = 0.0, px = 0.0, py = 0.0, pz = 0.0;
                     TargetTree.ForEachReaching(moved.X[i], moved.Y[i], moved.Z[i], [&](const std::size_t slot, const double d2)
                     {
-                        const double p = std::exp(-d2 / twoSigma2 - LogDenominator[TargetTree.Original(slot)]);
+                        const double p = std::exp(-d2 / twoSigma2 + LogWeight[i] + LogWeightShift -
+                                                  LogDenominator[TargetTree.Original(slot)]);
                         p1 += p;
                         px += p * TargetTree.X(slot);
                         py += p * TargetTree.Y(slot);
@@ -1017,12 +1058,23 @@ namespace Geometry::CoherentPointDrift::EStep
     }
 
     bool Evaluator::Evaluate(const PointSet moved, const double sigma2, const double logOutlier, const Settings& settings,
-                             Sums& out)
+                             Sums& out, const std::span<const double> sourceLogWeights)
     {
         Impl& s = *m_Impl;
         const std::size_t n = s.TargetX.size(), m = moved.Size();
         if (n == 0 || m == 0 || !(sigma2 > 0.0) || !(settings.Tolerance > 0.0 && settings.Tolerance < 1.0))
             return false;
+        if (!sourceLogWeights.empty() &&
+            (sourceLogWeights.size() != m || !std::ranges::all_of(sourceLogWeights, [](const double w) { return std::isfinite(w); })))
+            return false;
+        s.LogWeightShift = sourceLogWeights.empty() ? 0.0 : *std::ranges::max_element(sourceLogWeights);
+        s.LogWeight.resize(m);
+        s.WeightSum = 0.0;
+        for (std::size_t i = 0; i < m; ++i)
+        {
+            s.LogWeight[i] = sourceLogWeights.empty() ? 0.0 : sourceLogWeights[i] - s.LogWeightShift;
+            s.WeightSum += std::exp(s.LogWeight[i]);
+        }
         const std::uint32_t threads = ResolveThreads(settings.Threads);
         const double twoSigma2 = 2.0 * sigma2;
         s.Resize(n, m, out);
@@ -1032,8 +1084,8 @@ namespace Geometry::CoherentPointDrift::EStep
         s.SourceTreeCurrent = false;
         if (used == EStepPolicy::Auto)
         {
-            // Truncation pays while it keeps a minority of the pairs: measure the kept share on 64
-            // spread rows. Otherwise the fast Gauss transform when its plan is clearly cheaper.
+            // Truncation pays while it keeps few of the pairs: measure the kept share on 64 spread
+            // rows. Otherwise the fast Gauss transform when its plan is clearly cheaper.
             used = EStepPolicy::Dense;
             const double extra = twoSigma2 * std::log(double(m) / settings.Tolerance);
             if (std::sqrt(extra) < Diagonal(s.Target(), moved))
@@ -1049,7 +1101,9 @@ namespace Geometry::CoherentPointDrift::EStep
                     s.SourceTree.ForEachWithin(s.TargetX[j], s.TargetY[j], s.TargetZ[j], minDistance + extra,
                                                [&](std::size_t, double) { ++kept; });
                 }
-                if (double(kept) < 0.4 * double(samples) * double(m)) used = EStepPolicy::Truncated;
+                // Measured break-even: a kept pair costs about 3.7 dense pairs (neighbor search and
+                // scatter), so truncation pays below about a quarter of the pairs.
+                if (double(kept) < 0.25 * double(samples) * double(m)) used = EStepPolicy::Truncated;
             }
             if (used == EStepPolicy::Dense &&
                 s.PlanFastGauss(moved, sigma2, settings.Tolerance, true, threads, sourcePlan, targetPlan))
@@ -1214,6 +1268,8 @@ namespace Geometry::CoherentPointDrift::EStep
         out.Rank = std::uint32_t(r);
         out.Landmarks = std::uint32_t(count);
         out.Basis.assign(basis.data(), basis.data() + basis.size());
+        out.LandmarkIndices.assign(landmarks.begin(), landmarks.end());
+        out.Extension.assign(toBasis.data(), toBasis.data() + toBasis.size());
         return std::isfinite(out.EstimatedRelativeError);
     }
 }

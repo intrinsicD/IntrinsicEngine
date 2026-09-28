@@ -93,6 +93,18 @@ namespace Intrinsic::Bench::Geometry
         const Fixture affine = Linear(glm::dmat3{1.2, 0.1, -0.05, 0.2, 0.8, 0.1, -0.1, 0.15, 1.1}, {-0.3, 0.5, 0.2},
                                       CPD::Variant::Affine, 202);
         const Fixture bend = Bend();
+        // Bayesian: a similarity of the bent sheet (the split is not identifiable; positions are).
+        Fixture bayesian = Bend();
+        {
+            const glm::dmat3 turn = glm::dmat3(glm::rotate(glm::dmat4(1.0), 0.3, glm::normalize(glm::dvec3(0.4, 1, 0.2))));
+            for (auto& p : bayesian.Truth) p = glm::vec3(turn * glm::dvec3(p) + glm::dvec3(0.2, -0.1, 0.1));
+            bayesian.Target = bayesian.Truth;
+            bayesian.Params = {};
+            bayesian.Params.Method = CPD::Variant::Bayesian;
+            bayesian.Params.Beta = 1.0;
+            bayesian.Params.Lambda = 2.0;
+            bayesian.Params.MaxIterations = 150;
+        }
         CoherentPointDriftReferenceSmokeResult result;
         result.Succeeded = true;
         for (int run = 0; run < kWarmup + kMeasured; ++run)
@@ -101,14 +113,16 @@ namespace Intrinsic::Bench::Geometry
             const auto r = CPD::Register(rigid.Target, rigid.Source, rigid.Params);
             const auto a = CPD::Register(affine.Target, affine.Source, affine.Params);
             const auto n = CPD::Register(bend.Target, bend.Source, bend.Params);
+            const auto b = CPD::Register(bayesian.Target, bayesian.Source, bayesian.Params);
             const auto end = std::chrono::steady_clock::now();
             if (run < kWarmup) continue;
             result.RuntimeMilliseconds += std::chrono::duration<double, std::milli>(end - start).count() / kMeasured;
             result.Rigid = Measure(rigid, r);
             result.Affine = Measure(affine, a);
             result.Nonrigid = Measure(bend, n);
+            result.Bayesian = Measure(bayesian, b);
         }
-        for (const auto* m : {&result.Rigid, &result.Affine, &result.Nonrigid})
+        for (const auto* m : {&result.Rigid, &result.Affine, &result.Nonrigid, &result.Bayesian})
         {
             result.Succeeded = result.Succeeded && m->Succeeded;
             result.MaxRmsError = std::max(result.MaxRmsError, m->RmsError);

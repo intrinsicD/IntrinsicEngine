@@ -18,7 +18,7 @@ export namespace Extrinsic::Runtime
     inline constexpr std::string_view kCoherentPointDriftConfigSectionSchemaId =
         "intrinsic.runtime.sandbox.coherent_point_drift";
 
-    enum class CoherentPointDriftMethod : std::uint8_t { Rigid, Affine, Nonrigid };
+    enum class CoherentPointDriftMethod : std::uint8_t { Rigid, Affine, Nonrigid, Bayesian };
     // Where a result goes: the source entity's Transform (rigid only; the TRS component
     // cannot hold an affine shear), the source position property itself, or a named vec3
     // displacement property on the source domain (affine and nonrigid).
@@ -52,7 +52,13 @@ export namespace Extrinsic::Runtime
         CoherentPointDriftEStep EStep{CoherentPointDriftEStep::Auto};
         double EStepTolerance{1.0e-6};
         std::uint32_t Threads{0u};  // 0: all cores
-        std::uint32_t LowRank{0u};  // nonrigid: 0 solves with the full kernel, k > 0 with k eigenpairs
+        std::uint32_t LowRank{0u};  // nonrigid/Bayesian: 0 solves with the full kernel, k > 0 with k eigenpairs
+        // Bayesian (METHOD-050): initial sigma^2 factor, Dirichlet concentration of the mixing
+        // weights (0 keeps them equal, i.e. infinity) and farthest-point samples to register
+        // before interpolating the deformation to all points (0 = all points).
+        double Gamma{1.0};
+        double Kappa{0.0};
+        std::uint32_t Subsample{0u};
     };
 
     [[nodiscard]] std::string SerializeCoherentPointDriftConfig(const CoherentPointDriftConfig& config);

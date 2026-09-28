@@ -93,10 +93,12 @@ export namespace Geometry::CoherentPointDrift::EStep
 
         // The target is fixed for the evaluator's lifetime (its spatial index is cached).
         void SetTarget(PointSet target);
-        // logOutlier = log c of the uniform component (-inf for no outliers). Returns false
-        // when every row's mass went to the outlier term or a value is not finite.
+        // logOutlier = log c of the uniform component (-inf for no outliers). Optional finite
+        // source log-weights w_m multiply each source's kernel term by exp(w_m) (Bayesian CPD's
+        // mixing and variance factors); empty means unweighted. Returns false when every row's
+        // mass went to the outlier term or a value is not finite.
         [[nodiscard]] bool Evaluate(PointSet moved, double sigma2, double logOutlier, const Settings& settings,
-                                    Sums& out);
+                                    Sums& out, std::span<const double> sourceLogWeights = {});
 
     private:
         struct Impl;
@@ -111,6 +113,10 @@ export namespace Geometry::CoherentPointDrift::EStep
         std::vector<double> Eigenvalues{}; // descending, positive
         // sqrt(sum |g - g~|^2 / sum |g|^2) over sampled exact kernel rows.
         double EstimatedRelativeError{0.0};
+        // Nystroem extension to any point y: basis row(y) = [k(y, p_l) for l in LandmarkIndices] * Extension
+        // (Landmarks x Rank, column-major); for the input points it reproduces Basis.
+        std::vector<std::uint32_t> LandmarkIndices{};
+        std::vector<double> Extension{};
     };
 
     // G ~= Basis diag(Eigenvalues) Basis^T for G_ij = exp(-|p_i - p_j|^2 / (2 beta^2)).

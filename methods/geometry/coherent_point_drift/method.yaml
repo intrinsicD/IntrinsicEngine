@@ -1,5 +1,5 @@
 id: geometry.coherent_point_drift
-name: Coherent Point Drift point-set registration (rigid, affine, nonrigid)
+name: Coherent Point Drift point-set registration (rigid, affine, nonrigid, Bayesian)
 domain: geometry
 status: optimized
 paper:
@@ -10,7 +10,8 @@ paper:
   url: "https://doi.org/10.1109/TPAMI.2010.46"
 inputs:
   - Two finite float3 point spans (fixed target, moving source) from any canonical element domain
-  - Variant (rigid default, affine, nonrigid), outlier weight w in [0,1), EM limits, sigma^2 floor, nonrigid beta/lambda
+  - Variant (rigid default, affine, nonrigid, Bayesian), outlier weight w in [0,1), EM limits, sigma^2 floor, nonrigid/Bayesian beta/lambda
+  - Bayesian gamma, kappa, source/target subsampling and the optional posterior-variance terms (Hirose 2021)
   - E-step policy (reference, dense, truncated, fast Gauss, auto) with its error tolerance, thread count, nonrigid low rank
 outputs:
   - Rigid similarity (rotation, scale, translation) or affine transform, or the nonrigidly displaced source positions
@@ -26,6 +27,7 @@ metrics:
 correctness_tests:
   - ../../../tests/unit/geometry/Test.CoherentPointDrift.cpp
   - ../../../tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp
+  - ../../../tests/unit/geometry/Test.CoherentPointDriftBayesian.cpp
 benchmarks:
   - ../../../benchmarks/geometry/manifests/coherent_point_drift_reference_smoke.yaml
   - ../../../benchmarks/geometry/manifests/coherent_point_drift_accelerated_smoke.yaml
@@ -33,5 +35,6 @@ benchmarks:
 known_limitations:
   - The reference E-step is O(N*M) per iteration; the dense parallel policy keeps that cost, the truncated policy reaches it only while sigma is wide, and the fast Gauss transform does not beat dense in 3-D at tight tolerances.
   - The full-kernel nonrigid solve is O(M^3) per iteration and limited to 8192 source points; the low-rank solve (k eigenpairs, Nystroem) allows 1,000,000 with an approximation error reported, not bounded.
+  - Bayesian: the similarity/deformation split is not identifiable under weak priors; posterior-variance terms can collapse the scale and are off by default; sparse subsamples keep shape, not correspondences.
   - EM is local; large rotations, symmetric shapes and reflections need a nearby start (see paper.md).
   - Beta, lambda and the sigma^2 values are dimensionless under the default input normalization.

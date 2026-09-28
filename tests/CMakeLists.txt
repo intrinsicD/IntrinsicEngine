@@ -1585,6 +1585,7 @@ set(_geometry_test_files
     Test_Registration.cpp
     Test.CoherentPointDrift.cpp
     Test.CoherentPointDriftAccelerated.cpp
+    Test.CoherentPointDriftBayesian.cpp
     Test_PointCloudRobustness.cpp
     Test.PointCloudOutlierRemoval.cpp
     Test.KernelDensity.cpp

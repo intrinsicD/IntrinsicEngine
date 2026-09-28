@@ -6,7 +6,7 @@ params:
   seed: 101
   warmup_iterations: 1
   measured_iterations: 3
-  fixtures: rigid similarity (400 points), affine map (400 points), nonrigid bend (12x12 sheet)
+  fixtures: rigid similarity (400 points), affine map (400 points), nonrigid bend (12x12 sheet), bayesian rotated bend (12x12 sheet)
 metrics:
   - runtime_ms
   - quality_error_l2
