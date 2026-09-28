@@ -1,0 +1,31 @@
+{
+  "task": "METHOD-056",
+  "date": "2026-09-29",
+  "source_revision": "de87fd33f170e2b2239b5d6beb29bb7978681868",
+  "environment": {
+    "cpu": "Intel Core i9-11900KF (8 cores, 16 threads), CPU E-steps use all hardware threads",
+    "gpu": "NVIDIA GeForce RTX 3050 (8 GiB), driver 590.48.01, subgroup 32, shader float64",
+    "display": "Xephyr :7 (nested X server), 64x64 window, VSync off, validation layers off",
+    "compiler": "clang++ 23.0.0",
+    "preset": "ci-vulkan-release",
+    "build_type": "Release, no -march=native"
+  },
+  "commands": [
+    "cmake --build build/ci-vulkan-release --target IntrinsicPointLBVHGpuTests",
+    "GITHUB_SHA=de87fd33f170e2b2239b5d6beb29bb7978681868 INTRINSIC_METHOD056_SCALING_OUTPUT=<dir> DISPLAY=:7 build/ci-vulkan-release/bin/IntrinsicPointLBVHGpuTests --gtest_filter=METHOD056VulkanCpdEStep.ScalingProfile > run-progress.log",
+    "python3 tools/benchmark/seal_benchmark_results.py --root <dir> --manifests-root benchmarks --run-id method056-vulkan-e-step-scaling-20260929 --source-state clean_commit --source-revision de87fd33f170e2b2239b5d6beb29bb7978681868 --claim-eligible --replace",
+    "python3 tools/benchmark/validate_benchmark_results.py --root <dir> --strict"
+  ],
+  "timing": "One untimed Vulkan warmup at 1000 points; Vulkan medians of 3 runs (2 at 10^5), CPU runs 3 (1 at 10^5); min/max in sealed-result.json. Device E-steps include the frame latency of the readback path (submit, frames in flight, transfer).",
+  "outcomes": {
+    "rigid_100000_points": "Vulkan 18.9 s vs CPU twin 186.0 s (9.8x), Auto 188.9 s (10.0x), Nystroem 121.0 s (6.4x), dense 413.6 s (21.9x); 21 of 48 iterations on the device, the rest CPU truncated",
+    "rigid_10000_points": "Vulkan 374 ms vs CPU twin 1317 ms (3.5x), Auto 1376 ms, Nystroem 1077 ms, dense 2180 ms",
+    "rigid_1000_points": "Vulkan 79 ms vs CPU twin 23 ms: frame latency dominates (16 device E-steps, 70 ms of worker wait)",
+    "device_e_step_100000": "8.65 s worker wait over 21 device E-steps (about 0.41 s each including frame latency) against about 8.6 s per dense CPU iteration",
+    "parity": "max registered-point delta to the CPU twin 2.7e-11 (10^5), 1.4e-12 (10^4), 3.5e-12 (10^3); RMS to the ground truth equal to 3 significant digits; E-step statistics in the gpu;vulkan smoke within 1e-7 relative of CPU dense, two device runs bitwise equal",
+    "gate": "passed: quality_error_l2 3.7e-4 <= 1e-3, quality_error_linf 2.7e-11 <= 1e-4"
+  },
+  "attempts": "A first run at 6a4f9b4d0 aborted at 10^5 points when the Xephyr server died (X connection broken); a complete second run at 6a4f9b4d0 could not be sealed because the result named the policy backend (gpu_vulkan_fp32_dense) instead of a backend class. de87fd33f reports gpu_vulkan_compute (reported_backend in diagnostics); this run is the third, unmodified.",
+  "limitations": "One host, one GPU, one fixture (rigid). Kernel terms are fp32: accuracy is measured, not bounded. Small inputs lose to the CPU because each device E-step waits several frames. Deterministic on one device and driver, not bitwise across vendors.",
+  "not_measured": "Nonrigid and Bayesian runs on the device; memory peak; other GPUs; the editor path's JobService occupancy under concurrent jobs (the solver worker blocks for the device E-step, 46% of the 10^5 run's wall time here)."
+}

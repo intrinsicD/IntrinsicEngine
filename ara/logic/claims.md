@@ -2443,3 +2443,14 @@
 - **Tags**: point sampling, farthest point, Poisson disk, sample elimination, CPU reference
 - **From staging**: O256
 
+## C117: Vulkan dense E-step for Coherent Point Drift
+- **Statement**: METHOD-056's Vulkan E-step (fp32 kernel terms, Kahan tile sums into fp64, run where the Auto choice would be dense and read back through the frame loop), on the recorded RTX 3050 with the solver on the recorded i9-11900KF (Release), registers 10^5 points of the bumpy-ellipsoid fixture rigidly in 18.9 s instead of 186.0 s for its CPU twin (the same policy route with the CPU dense pass, 9.8x), 188.9 s for Auto (10.0x) and 121.0 s for the Nystroem E-step (6.4x), with registered points within 2.7e-11 of the CPU twin and unchanged RMS to the ground truth (3.5x at 10^4 points); its E-step statistics stay within 1e-7 relative of CPU dense and repeat bitwise on the device, while at 10^3 points frame latency makes it 3.4x slower than the CPU.
+- **Status**: supported — one host, one GPU, one rigid fixture; fp32 accuracy measured, not bounded; nonrigid and Bayesian device runs not measured.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: A rerun of `METHOD056VulkanCpdEStep.ScalingProfile` at the recorded revision on the recorded host shows Vulkan/CPU-twin above 0.2 at 10^5 points or a registered-point delta above 1e-4; or `METHOD056VulkanCpdEStep.DenseStatisticsAndRegistrationMatchTheCpu` finds a denominator, Pt1, P1 or PX error above 1e-5 relative or two device runs differing.
+- **Proof**: [ara/evidence/diagnostics/method056_cpd_vulkan_e_step_20260929/record.json, ara/evidence/diagnostics/method056_cpd_vulkan_e_step_20260929/sealed-result.json, ara/evidence/diagnostics/method056_cpd_vulkan_e_step_20260929/run-progress.log, tests/integration/graphics/Test.CoherentPointDriftGpuEStepSmoke.cpp, tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp, assets/shaders/cpd_estep_target_pass.comp, assets/shaders/cpd_estep_source_pass.comp]
+- **Dependencies**: [C113, C115]
+- **Tags**: registration, Coherent Point Drift, Vulkan, GPU E-step, performance
+- **From staging**: O257
+

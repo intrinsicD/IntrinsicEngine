@@ -4300,3 +4300,15 @@ observations:
     crystallized_via: artifact-commitment
     stale: false
 
+  - id: O257
+    timestamp: 2026-09-29T12:00+02:00
+    provenance: ai-executed
+    content: Moving only the wide-kernel (dense) CPD E-steps to Vulkan, with fp32 terms and fp64 sums, cuts a 10^5-point rigid registration from about 190 s (CPU twin, Auto) to 19 s on an RTX 3050 with identical results to 1e-10; the remaining CPU truncated iterations and the frame-paced readback (about 0.4 s per device E-step) now dominate, and small inputs lose to the CPU.
+    context: One host and GPU, one rigid fixture, readback through SpatialIndexCache::QueueGpuCompute under Xephyr; an off-frame compute submit and a device truncated path are the next levers.
+    potential_type: claim
+    bound_to: [N648]
+    promoted: true
+    promoted_to: logic/claims.md:C117
+    crystallized_via: artifact-commitment
+    stale: false
+

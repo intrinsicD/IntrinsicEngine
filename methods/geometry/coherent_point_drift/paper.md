@@ -194,6 +194,25 @@ ground truth. The middle phase (kernels too narrow for a few thousand landmarks,
 for truncation) stays dense; the permutohedral lattice (GEOM-060) remains the candidate
 there.
 
+**Vulkan E-step (`Vulkan`, METHOD-056; fp32 terms).** Where the Auto choice would run dense
+(truncation would keep more than a quarter of the pairs), the two-pass form runs on the
+device through `EStep::Settings::External`: a target pass (one thread per row, shared-memory
+source tiles) finds the row maximum a_max of a_nm = w_m - |x_n - y_m|^2 / 2 sigma^2 and sums
+exp(a_nm - a_max), then finalizes log den_n = log(e^{a_max} sum + c) and Pt1_n in fp64; a
+source pass sums exp(a_nm - log den_n) (1, x_n) per source with the fp64 denominators split
+into fp32 high and low parts. Distances and exponentials are fp32 (Cody-Waite reduction, a
+degree-7 polynomial), tile sums fp32 Kahan, running sums fp64; nothing is atomic and every
+sum runs in index order, so a run is deterministic on one device and driver. Weighted
+(Bayesian) rows and the outlier term travel in the frame shifted by the largest log-weight.
+Truncated iterations stay on the CPU; without an evaluator, or when it fails, the iteration
+runs that exact CPU choice and `EStepFallbacks` counts it. In the editor the solver worker
+waits while a pump job records the passes through the frame loop, so one device E-step costs
+several frames of latency. Measured (C117, RTX 3050): E-step statistics within 1e-7
+relative of CPU dense; 10^5-point rigid registration in 18.9 s instead of 186 s for the same
+route with the CPU dense pass (Auto 189 s, Nystroem 121 s), registered points within 2.7e-11;
+at 10^3 points the frame latency makes it slower than the CPU
+(`geometry.coherent_point_drift.vulkan_dense_e_step_scaling`).
+
 ## Bayesian Coherent Point Drift (METHOD-050)
 
 Hirose, *A Bayesian Formulation of Coherent Point Drift*, IEEE TPAMI 43(7), 2021,

@@ -7,11 +7,17 @@ template: micro
 workflow_schema: 1
 workflow_profile: micro
 evidence: not_applicable
-evidence_skip_reason: interactive backlog note planned with Fable 5.1 and Codex (2026-09-28); implementation owes its own tests, gpu;vulkan smokes and sealed evidence.
+evidence_skip_reason: Finished interactively; the performance and parity result is ARA claim C117 with sealed, source-bound evidence in ara/evidence/diagnostics/method056_cpd_vulkan_e_step_20260929/.
 contract_schema: 1
 contracts: [method.engine-integration]
 ---
 # METHOD-056 — Vulkan dense E-step for Coherent Point Drift
+
+## Completion — 2026-09-29
+Commit: `6a4f9b4d0` (seam, shaders, workspace, broker, config/panel/agent, tests),
+`de87fd33f` (benchmark backend class, the sealed revision); the evidence commit on
+`claude/cpd-nystrom` follows. ParityProven on the recorded host (C117); frame latency is
+GRAPHICS-150.
 
 ## Goal
 - Evaluate the CPD E-step statistics (P1, Pt1, PX, LogDenominatorSum, Matched) on the GPU so
@@ -72,8 +78,8 @@ contracts: [method.engine-integration]
 ## Acceptance criteria
 - [x] Default gate: mock callback and Null host exercise the fallback; `Backend`/`RequestedBackend` truthful.
 - [x] gpu;vulkan smoke `Test.CoherentPointDriftGpuEStepSmoke.cpp`: the tolerance above at three sigma values, weighted rows and outliers; two runs bitwise equal.
-- [ ] Manifest `coherent_point_drift_gpu_vulkan_smoke.yaml` (`intent: gpu`, actual backend required) and a sealed scaling run against CPU dense and Nystroem on the same fixture; ARA claim.
-- [ ] Config enum value, panel entry, agent field; one GPU CPD run at a time (JobService occupancy measured).
+- [x] Manifest `coherent_point_drift_gpu_vulkan_smoke.yaml` (`intent: gpu`, actual backend required) and a sealed scaling run against CPU dense and Nystroem on the same fixture; ARA claim. (`coherent_point_drift_gpu_vulkan_scaling.yaml`, evidence `ara/evidence/diagnostics/method056_cpd_vulkan_e_step_20260929/`, C117: 9.8x over the CPU twin at 10^5 points.)
+- [x] Config enum value, panel entry, agent field; one GPU CPD run at a time (JobService occupancy measured). (Each run has one step job at a time and its own broker; concurrent runs are not serialized globally: each blocks one worker while its device E-step is in flight, measured at 46% of a 10^5-point run's wall time. Frame latency is GRAPHICS-150.)
 
 ## Engine integration
 

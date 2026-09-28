@@ -13828,3 +13828,14 @@ tree:
     - ara/evidence/diagnostics/geom113_point_sampling_comparison_20260928/sealed-result.json
     status: resolved
 
+  - id: N648
+    type: experiment
+    title: Run the dense Coherent Point Drift E-step on Vulkan behind the CPU policy seam
+    provenance: ai-executed
+    timestamp: 2026-09-29T12:00+02:00
+    result: METHOD-056 adds EStepPolicy::Vulkan with an external evaluator seam, a per-run runtime broker that lets the solver worker wait while a pump job records the two-pass kernels through SpatialIndexCache::QueueGpuCompute, and fp32/fp64 target and source pass shaders. The gpu;vulkan smoke measures 1e-7 relative parity and bitwise repeatability; a sealed scaling run finds 9.8x over the CPU twin at 10^5 points with registered points within 2.7e-11. C117 records the claim.
+    evidence:
+    - ara/evidence/diagnostics/method056_cpd_vulkan_e_step_20260929/record.json
+    - ara/evidence/diagnostics/method056_cpd_vulkan_e_step_20260929/sealed-result.json
+    status: resolved
+
