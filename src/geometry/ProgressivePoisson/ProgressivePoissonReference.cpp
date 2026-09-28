@@ -14,6 +14,7 @@
 #include "ProgressivePoissonReference.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -287,9 +288,165 @@ namespace Intrinsic::Methods::Geometry::ProgressivePoissonReference
             return (bestSq == sentinel) ? sentinel : std::sqrt(bestSq);
         }
 
+        // BestOfCandidates score: squared distance to the nearest accepted point in the 3^d
+        // cell neighborhood, capped at the squared cell size (points outside the neighborhood
+        // are at least one cell away, so the cap is exact).
+        [[nodiscard]] float LocalClearanceSq(const CellMap& map, const float* px, const float* py, const float* pz,
+                                             std::uint32_t idx, float invCell, float capSq,
+                                             float ox, float oy, float oz, int dim)
+        {
+            const float qx = px[idx], qy = py[idx], qz = (dim == 3) ? pz[idx] : 0.0f;
+            const CellCoord c = PointCell(qx, qy, qz, invCell, ox, oy, oz, dim);
+            float best = capSq;
+            const int zlo = (dim == 3) ? -1 : 0;
+            const int zhi = (dim == 3) ? 1 : 0;
+            for (int dz = zlo; dz <= zhi; ++dz)
+                for (int dy = -1; dy <= 1; ++dy)
+                    for (int dx = -1; dx <= 1; ++dx)
+                    {
+                        const auto it = map.find(PackCell(c.X + dx, c.Y + dy, c.Z + dz, dim));
+                        if (it == map.end())
+                            continue;
+                        for (const std::uint32_t other : it->second)
+                        {
+                            const float ex = px[other] - qx;
+                            const float ey = py[other] - qy;
+                            float d2 = ex * ex + ey * ey;
+                            if (dim == 3)
+                            {
+                                const float ez = pz[other] - qz;
+                                d2 += ez * ez;
+                            }
+                            best = std::min(best, d2);
+                        }
+                    }
+            return best;
+        }
+
+        // Morton key of a position already shifted into the padded frame, normalized by the
+        // padded extent; 21 bits per axis in 2-D and 3-D (the CUDA sampler's quantization).
+        [[nodiscard]] std::uint32_t QuantizeUnit(float u)
+        {
+            constexpr std::uint32_t kMax = (1u << 21) - 1u;
+            if (!(u > 0.0f))
+                return 0u;
+            if (u >= 1.0f)
+                return kMax;
+            const auto q = static_cast<std::uint32_t>(u * static_cast<float>(1u << 21));
+            return q > kMax ? kMax : q;
+        }
+
+        template <int Dim>
+        [[nodiscard]] std::uint64_t MortonKey(const float* px, const float* py, const float* pz, std::uint32_t id,
+                                              float invExtent)
+        {
+            const std::uint32_t qx = QuantizeUnit(px[id] * invExtent);
+            const std::uint32_t qy = QuantizeUnit(py[id] * invExtent);
+            const std::uint32_t qz = Dim == 3 ? QuantizeUnit(pz[id] * invExtent) : 0u;
+            std::uint64_t key = 0;
+            for (std::uint32_t b = 0; b < 21u; ++b)
+            {
+                if constexpr (Dim == 3)
+                {
+                    key |= static_cast<std::uint64_t>((qx >> b) & 1u) << (3u * b);
+                    key |= static_cast<std::uint64_t>((qy >> b) & 1u) << (3u * b + 1u);
+                    key |= static_cast<std::uint64_t>((qz >> b) & 1u) << (3u * b + 2u);
+                }
+                else
+                {
+                    key |= static_cast<std::uint64_t>((qx >> b) & 1u) << (2u * b);
+                    key |= static_cast<std::uint64_t>((qy >> b) & 1u) << (2u * b + 1u);
+                }
+            }
+            return key;
+        }
+
+        // Permutes one completed level segment. Any subset of a level prefix keeps the level's
+        // minimum distance, so neither ordering can break the guarantee.
+        template <int Dim>
+        void PermuteLevel(std::uint32_t* segment, std::uint32_t count, const float* px, const float* py,
+                          const float* pz, float extent, WithinLevelOrdering ordering, std::uint32_t shuffleSeed,
+                          std::uint32_t level)
+        {
+            if (count < 2)
+                return;
+            if (ordering == WithinLevelOrdering::RandomShuffle)
+            {
+                SplitMix64 rng(static_cast<std::uint64_t>(shuffleSeed) +
+                               0x9e3779b9ull * (static_cast<std::uint64_t>(level) + 1u));
+                for (std::uint32_t i = count - 1; i > 0; --i)
+                {
+                    const std::uint32_t j = rng.Bounded(i + 1);
+                    std::swap(segment[i], segment[j]);
+                }
+                return;
+            }
+            // Spatially balanced: ids ascending, stable Morton sort, bit-reversed emission.
+            std::vector<std::uint32_t> ids(segment, segment + count);
+            std::sort(ids.begin(), ids.end());
+            const float invExtent = 1.0f / extent;
+            std::vector<std::uint64_t> keys(count);
+            for (std::uint32_t k = 0; k < count; ++k)
+                keys[k] = MortonKey<Dim>(px, py, pz, ids[k], invExtent);
+            std::vector<std::uint32_t> rank(count);
+            for (std::uint32_t k = 0; k < count; ++k)
+                rank[k] = k;
+            std::stable_sort(rank.begin(), rank.end(),
+                             [&](std::uint32_t a, std::uint32_t b) { return keys[a] < keys[b]; });
+            std::uint32_t bits = 0;
+            while ((std::uint64_t{1} << bits) < count)
+                ++bits;
+            std::uint32_t out = 0;
+            for (std::uint64_t j = 0; j < (std::uint64_t{1} << bits); ++j)
+            {
+                std::uint32_t reversed = 0;
+                for (std::uint32_t b = 0; b < bits; ++b)
+                    reversed |= ((static_cast<std::uint32_t>(j) >> b) & 1u) << (bits - 1u - b);
+                if (reversed < count)
+                    segment[out++] = ids[rank[reversed]];
+            }
+        }
+
+        // Padded bounding-box frame shared by Compute and ReorderWithinLevels.
+        struct Frame
+        {
+            float Min[3]{0.0f, 0.0f, 0.0f};
+            float Pad{0.0f};
+            float Extent{1.0f};
+        };
+
+        template <int Dim>
+        [[nodiscard]] Frame MakeFrame(const float* hx, const float* hy, const float* hz, std::uint32_t n)
+        {
+            Frame f;
+            float bmax[3] = {hx[0], hy[0], (Dim == 3 ? hz[0] : 0.0f)};
+            f.Min[0] = hx[0]; f.Min[1] = hy[0]; f.Min[2] = Dim == 3 ? hz[0] : 0.0f;
+            for (std::uint32_t i = 1; i < n; ++i)
+            {
+                f.Min[0] = std::min(f.Min[0], hx[i]);
+                bmax[0] = std::max(bmax[0], hx[i]);
+                f.Min[1] = std::min(f.Min[1], hy[i]);
+                bmax[1] = std::max(bmax[1], hy[i]);
+                if constexpr (Dim == 3)
+                {
+                    f.Min[2] = std::min(f.Min[2], hz[i]);
+                    bmax[2] = std::max(bmax[2], hz[i]);
+                }
+            }
+            float extent = (Dim == 3)
+                               ? std::max({bmax[0] - f.Min[0], bmax[1] - f.Min[1], bmax[2] - f.Min[2]})
+                               : std::max(bmax[0] - f.Min[0], bmax[1] - f.Min[1]);
+            if (extent < 1e-12f)
+                extent = 1.0f;
+            f.Pad = extent * 0.01f;
+            f.Extent = extent + 2.0f * f.Pad;
+            return f;
+        }
+
         template <int Dim>
         Result ComputeImpl(const float* hx, const float* hy, const float* hz,
-                           std::uint32_t n, const Config& cfg, Diagnostics diag)
+                           std::uint32_t n, const Config& cfg, Diagnostics diag,
+                           std::span<const float> priorityScores)
         {
             Result result;
             result.Diag = diag;
@@ -301,36 +458,15 @@ namespace Intrinsic::Methods::Geometry::ProgressivePoissonReference
             }
 
             // ── Normalize: bbox -> shift into the positive orthant with padding ──
-            float bmin[3] = {hx[0], hy[0], (Dim == 3 ? hz[0] : 0.0f)};
-            float bmax[3] = {hx[0], hy[0], (Dim == 3 ? hz[0] : 0.0f)};
-            for (std::uint32_t i = 1; i < n; ++i)
-            {
-                bmin[0] = std::min(bmin[0], hx[i]);
-                bmax[0] = std::max(bmax[0], hx[i]);
-                bmin[1] = std::min(bmin[1], hy[i]);
-                bmax[1] = std::max(bmax[1], hy[i]);
-                if constexpr (Dim == 3)
-                {
-                    bmin[2] = std::min(bmin[2], hz[i]);
-                    bmax[2] = std::max(bmax[2], hz[i]);
-                }
-            }
-
-            float extent = (Dim == 3)
-                               ? std::max({bmax[0] - bmin[0], bmax[1] - bmin[1], bmax[2] - bmin[2]})
-                               : std::max(bmax[0] - bmin[0], bmax[1] - bmin[1]);
-            if (extent < 1e-12f)
-                extent = 1.0f;
-            const float pad = extent * 0.01f;
-            extent += 2.0f * pad;
-
+            const Frame frame = MakeFrame<Dim>(hx, hy, hz, n);
+            const float extent = frame.Extent;
             std::vector<float> sx(n), sy(n), sz(n, 0.0f);
             for (std::uint32_t i = 0; i < n; ++i)
             {
-                sx[i] = hx[i] - bmin[0] + pad;
-                sy[i] = hy[i] - bmin[1] + pad;
+                sx[i] = hx[i] - frame.Min[0] + frame.Pad;
+                sy[i] = hy[i] - frame.Min[1] + frame.Pad;
                 if constexpr (Dim == 3)
-                    sz[i] = hz[i] - bmin[2] + pad;
+                    sz[i] = hz[i] - frame.Min[2] + frame.Pad;
             }
             const float* px = sx.data();
             const float* py = sy.data();
@@ -342,6 +478,10 @@ namespace Intrinsic::Methods::Geometry::ProgressivePoissonReference
             result.Diag.UsedAlpha = alpha;
 
             constexpr int kPhases = (Dim == 3) ? 8 : 4;
+            const bool priority = cfg.Selection == CellSelection::FeaturePriority;
+            const std::uint32_t retries = std::min<std::uint32_t>(cfg.MaxCellRetries, 8u);
+            const std::uint32_t repairLevels = std::min(cfg.RepairCoarseLevels, cfg.MaxLevels);
+            const std::uint32_t exhaustiveLevels = std::min(cfg.ExhaustiveCoarseLevels, cfg.MaxLevels);
 
             std::vector<std::uint32_t> remaining(n);
             for (std::uint32_t i = 0; i < n; ++i)
@@ -355,6 +495,7 @@ namespace Intrinsic::Methods::Geometry::ProgressivePoissonReference
                 const float rL = cell * alpha;
                 const float rSq = rL * rL;
                 const float invC = 1.0f / cell;
+                const float capSq = cell * cell;
                 if (L == 0)
                     result.BaseRadius = rL;
 
@@ -376,41 +517,152 @@ namespace Intrinsic::Methods::Geometry::ProgressivePoissonReference
                     globalMap[PackCell(c.X, c.Y, c.Z, Dim)].push_back(idx);
                 }
 
+                // Phase visit order: ascending, or the CUDA sampler's seeded Fisher-Yates.
+                std::array<int, kPhases> phases{};
+                for (int ph = 0; ph < kPhases; ++ph)
+                    phases[static_cast<std::size_t>(ph)] = ph;
+                if (cfg.RandomizePhaseOrder)
+                {
+                    std::uint32_t h = MixU32(cfg.PhaseOrderSeed ^ (0x9e3779b9u * (L + 1u)));
+                    for (int i = kPhases - 1; i >= 1; --i)
+                    {
+                        h = MixU32(h + 0x9e3779b9u);
+                        std::swap(phases[static_cast<std::size_t>(i)], phases[h % static_cast<std::uint32_t>(i + 1)]);
+                    }
+                }
+
+                // Per-level policy: coarse levels may be promoted to Exhaustive.
+                CellSelection policy = cfg.Selection;
+                if ((policy == CellSelection::Bounded || policy == CellSelection::BestOfCandidates) &&
+                    L < exhaustiveLevels)
+                    policy = CellSelection::Exhaustive;
+                const std::uint32_t contenders = L < repairLevels ? 1u + retries : 1u;
+
                 std::unordered_set<std::uint64_t> claimed; // one winner per cell this level
                 const std::uint32_t levelStart = static_cast<std::uint32_t>(result.Order.size());
-
-                for (int ph = 0; ph < kPhases && !remaining.empty(); ++ph)
-                {
-                    std::vector<std::uint32_t> next;
-                    next.reserve(remaining.size());
-                    for (const std::uint32_t idx : remaining)
+                const int bands = priority && cfg.PriorityTwoBands ? 2 : 1;
+                for (int band = 0; band < bands && !remaining.empty(); ++band)
+                    for (const int ph : phases)
                     {
-                        const float qx = px[idx];
-                        const float qy = py[idx];
-                        const float qz = pz[idx];
-                        const CellCoord c = PointCell(qx, qy, qz, invC, ox, oy, oz, Dim);
-                        if (PhaseOfCell(c, Dim) != ph)
+                        if (remaining.empty())
+                            break;
+                        // Candidate lists per cell of this phase, in remaining order; cells in
+                        // order of first appearance. Same-phase cells are >= 2 cells apart, so
+                        // their winners cannot conflict and the cell order does not matter.
+                        std::unordered_map<std::uint64_t, std::uint32_t> listOf;
+                        std::vector<std::vector<std::uint32_t>> lists; // positions in `remaining`
+                        std::vector<std::uint64_t> listKeys;
+                        for (std::uint32_t pos = 0; pos < remaining.size(); ++pos)
                         {
-                            next.push_back(idx);
-                            continue;
+                            const std::uint32_t idx = remaining[pos];
+                            if (bands == 2 && (priorityScores[idx] >= cfg.PriorityBandThreshold) != (band == 0))
+                                continue;
+                            const CellCoord c = PointCell(px[idx], py[idx], pz[idx], invC, ox, oy, oz, Dim);
+                            if (PhaseOfCell(c, Dim) != ph)
+                                continue;
+                            const std::uint64_t key = PackCell(c.X, c.Y, c.Z, Dim);
+                            if (claimed.contains(key))
+                                continue;
+                            const auto [it, inserted] = listOf.try_emplace(key, static_cast<std::uint32_t>(lists.size()));
+                            if (inserted)
+                            {
+                                lists.emplace_back();
+                                listKeys.push_back(key);
+                            }
+                            lists[it->second].push_back(pos);
                         }
-                        if (HasNeighborWithin(globalMap, px, py, pz, qx, qy, qz, invC, rSq, ox, oy, oz, Dim))
+                        const auto feasible = [&](const std::uint32_t idx)
                         {
-                            next.push_back(idx); // conflict — carry to next level
-                            continue;
-                        }
-                        const std::uint64_t key = PackCell(c.X, c.Y, c.Z, Dim);
-                        if (!claimed.insert(key).second)
+                            return !HasNeighborWithin(globalMap, px, py, pz, px[idx], py[idx], pz[idx], invC, rSq,
+                                                      ox, oy, oz, Dim);
+                        };
+                        std::vector<std::uint32_t> winners; // positions in `remaining`
+                        for (std::size_t k = 0; k < lists.size(); ++k)
                         {
-                            next.push_back(idx); // cell already taken this level
-                            continue;
+                            const auto& list = lists[k];
+                            std::uint32_t winner = std::numeric_limits<std::uint32_t>::max();
+                            switch (policy)
+                            {
+                            case CellSelection::Exhaustive:
+                            case CellSelection::Bounded:
+                            {
+                                const std::size_t limit = policy == CellSelection::Exhaustive
+                                                              ? list.size()
+                                                              : std::min<std::size_t>(list.size(), contenders);
+                                for (std::size_t t = 0; t < limit; ++t)
+                                    if (feasible(remaining[list[t]]))
+                                    {
+                                        winner = list[t];
+                                        break;
+                                    }
+                                break;
+                            }
+                            case CellSelection::BestOfCandidates:
+                            {
+                                float best = -1.0f;
+                                const std::size_t limit = std::min<std::size_t>(list.size(), cfg.CandidateBudget);
+                                for (std::size_t t = 0; t < limit; ++t)
+                                {
+                                    const std::uint32_t idx = remaining[list[t]];
+                                    if (!feasible(idx))
+                                        continue;
+                                    const float score = LocalClearanceSq(globalMap, px, py, pz, idx, invC, capSq, ox,
+                                                                         oy, oz, Dim);
+                                    if (score > best)
+                                    {
+                                        best = score;
+                                        winner = list[t];
+                                    }
+                                }
+                                break;
+                            }
+                            case CellSelection::FeaturePriority:
+                            {
+                                for (const std::uint32_t pos : list)
+                                {
+                                    const std::uint32_t idx = remaining[pos];
+                                    if (!feasible(idx))
+                                        continue;
+                                    if (winner == std::numeric_limits<std::uint32_t>::max())
+                                    {
+                                        winner = pos;
+                                        continue;
+                                    }
+                                    const std::uint32_t current = remaining[winner];
+                                    const float a = priorityScores[idx], b = priorityScores[current];
+                                    // Bitwise-equal scores (-0 == +0) tie to the lowest input index.
+                                    if (a > b || (a == b && idx < current))
+                                        winner = pos;
+                                }
+                                break;
+                            }
+                            }
+                            if (winner != std::numeric_limits<std::uint32_t>::max())
+                            {
+                                winners.push_back(winner);
+                                claimed.insert(listKeys[k]);
+                            }
                         }
-                        // Accept.
-                        result.Order.push_back(idx);
-                        globalMap[key].push_back(idx);
+                        if (winners.empty())
+                            continue;
+                        // Emit this phase's winners in remaining order (stable), then drop them.
+                        std::sort(winners.begin(), winners.end());
+                        std::vector<std::uint8_t> taken(remaining.size(), 0u);
+                        for (const std::uint32_t pos : winners)
+                        {
+                            const std::uint32_t idx = remaining[pos];
+                            taken[pos] = 1u;
+                            result.Order.push_back(idx);
+                            const CellCoord c = PointCell(px[idx], py[idx], pz[idx], invC, ox, oy, oz, Dim);
+                            globalMap[PackCell(c.X, c.Y, c.Z, Dim)].push_back(idx);
+                        }
+                        std::vector<std::uint32_t> next;
+                        next.reserve(remaining.size() - winners.size());
+                        for (std::uint32_t pos = 0; pos < remaining.size(); ++pos)
+                            if (!taken[pos])
+                                next.push_back(remaining[pos]);
+                        remaining.swap(next);
                     }
-                    remaining.swap(next);
-                }
 
                 const std::uint32_t acceptedThisLevel =
                     static_cast<std::uint32_t>(result.Order.size()) - levelStart;
@@ -419,15 +671,8 @@ namespace Intrinsic::Methods::Geometry::ProgressivePoissonReference
                 result.Diag.LevelRadii.push_back(rL);
 
                 if (cfg.ShuffleWithinLevels && acceptedThisLevel > 1)
-                {
-                    SplitMix64 rng(static_cast<std::uint64_t>(cfg.ShuffleSeed) +
-                                   0x9e3779b9ull * (static_cast<std::uint64_t>(L) + 1u));
-                    for (std::uint32_t i = acceptedThisLevel - 1; i > 0; --i)
-                    {
-                        const std::uint32_t j = rng.Bounded(i + 1);
-                        std::swap(result.Order[levelStart + i], result.Order[levelStart + j]);
-                    }
-                }
+                    PermuteLevel<Dim>(result.Order.data() + levelStart, acceptedThisLevel, px, py, pz, extent,
+                                      cfg.Ordering, cfg.ShuffleSeed, L);
             }
 
             result.Diag.AcceptedCount = static_cast<std::uint32_t>(result.Order.size());
@@ -439,6 +684,11 @@ namespace Intrinsic::Methods::Geometry::ProgressivePoissonReference
             // per-level measured min-distance diagnostic is the EXACT minimum
             // pairwise distance of the prefix, found via the adaptive-grid shell
             // search (correct for sparse prefixes, not just adjacent cells).
+            if (!cfg.ComputeSplatRadii)
+            {
+                result.Diag.Code = ValidationCode::Valid;
+                return result; // order only: no radii and no per-level min distance
+            }
             result.SplatRadii.assign(result.Order.size(), 0.0f);
             const int numLevels = static_cast<int>(result.LevelOffsets.size()) - 1;
             for (int L = 0; L < numLevels; ++L)
@@ -487,7 +737,19 @@ namespace Intrinsic::Methods::Geometry::ProgressivePoissonReference
         }
     } // namespace
 
-    Result Compute(std::span<const glm::vec3> points, const Config& configIn)
+    Config WithProfile(Config base, const Profile profile)
+    {
+        switch (profile)
+        {
+        case Profile::Fast: base.Selection = CellSelection::Bounded; base.MaxCellRetries = 0; base.RepairCoarseLevels = 0; break;
+        case Profile::Balanced: base.Selection = CellSelection::Bounded; base.MaxCellRetries = 1; base.RepairCoarseLevels = 4; break;
+        case Profile::Quality: base.Selection = CellSelection::Bounded; base.MaxCellRetries = 2; base.RepairCoarseLevels = 4; break;
+        case Profile::Hapds: base.Selection = CellSelection::Exhaustive; break;
+        }
+        return base;
+    }
+
+    Result Compute(std::span<const glm::vec3> points, const Config& configIn, std::span<const float> priorityScores)
     {
         Config cfg = configIn;
         Diagnostics diag;
@@ -506,6 +768,19 @@ namespace Intrinsic::Methods::Geometry::ProgressivePoissonReference
         if (!AllFinite(points, use3d))
         {
             invalid.Diag.Code = ValidationCode::NonFiniteInput;
+            return invalid;
+        }
+
+        // Policy misuse fails closed, as the CUDA sampler's argument checks do.
+        const bool priority = cfg.Selection == CellSelection::FeaturePriority;
+        if (cfg.Selection > CellSelection::FeaturePriority || cfg.Ordering > WithinLevelOrdering::SpatiallyBalanced ||
+            (priority && ((!points.empty() && priorityScores.size() != points.size()) ||
+                          !std::all_of(priorityScores.begin(), priorityScores.end(), [](float v) { return std::isfinite(v); }) ||
+                          !std::isfinite(cfg.PriorityBandThreshold) || cfg.ExhaustiveCoarseLevels != 0u)) ||
+            (!priority && (!priorityScores.empty() || cfg.PriorityTwoBands)) ||
+            (cfg.Selection == CellSelection::BestOfCandidates && (cfg.CandidateBudget < 1u || cfg.CandidateBudget > 32u)))
+        {
+            invalid.Diag.Code = ValidationCode::InvalidConfig;
             return invalid;
         }
 
@@ -533,8 +808,73 @@ namespace Intrinsic::Methods::Geometry::ProgressivePoissonReference
         }
 
         if (use3d)
-            return ComputeImpl<3>(px.data(), py.data(), pz.data(), n, cfg, diag);
-        return ComputeImpl<2>(px.data(), py.data(), nullptr, n, cfg, diag);
+            return ComputeImpl<3>(px.data(), py.data(), pz.data(), n, cfg, diag, priorityScores);
+        return ComputeImpl<2>(px.data(), py.data(), nullptr, n, cfg, diag, priorityScores);
+    }
+
+    Result ReorderWithinLevels(const Result& cached, std::span<const glm::vec3> points, std::uint32_t dimension,
+                               WithinLevelOrdering ordering, std::uint32_t shuffleSeed)
+    {
+        Result out = cached;
+        const auto fail = [&](ValidationCode code) {
+            Result invalid;
+            invalid.LevelOffsets.push_back(0);
+            invalid.Diag = cached.Diag;
+            invalid.Diag.Code = code;
+            return invalid;
+        };
+        if (dimension != 2 && dimension != 3)
+            return fail(ValidationCode::InvalidDimension);
+        const auto n = static_cast<std::uint32_t>(points.size());
+        const auto& offsets = cached.LevelOffsets;
+        bool wellFormed = !offsets.empty() && offsets.front() == 0u && offsets.back() == cached.Order.size() &&
+                          std::is_sorted(offsets.begin(), offsets.end()) &&
+                          (cached.SplatRadii.empty() || cached.SplatRadii.size() == cached.Order.size()) &&
+                          ordering <= WithinLevelOrdering::SpatiallyBalanced;
+        std::vector<std::uint8_t> seen(n, 0u);
+        for (const std::uint32_t id : cached.Order)
+        {
+            if (id >= n || seen[id]) { wellFormed = false; break; }
+            seen[id] = 1u;
+        }
+        if (!wellFormed)
+            return fail(ValidationCode::InvalidConfig);
+        if (cached.Order.empty())
+            return out;
+        if (!AllFinite(points, dimension == 3))
+            return fail(ValidationCode::NonFiniteInput);
+        std::vector<float> hx(n), hy(n), hz(n, 0.0f);
+        for (std::uint32_t i = 0; i < n; ++i)
+        {
+            hx[i] = points[i].x;
+            hy[i] = points[i].y;
+            if (dimension == 3) hz[i] = points[i].z;
+        }
+        const auto run = [&]<int Dim>() {
+            const Frame frame = MakeFrame<Dim>(hx.data(), hy.data(), hz.data(), n);
+            std::vector<float> sx(n), sy(n), sz(n, 0.0f);
+            for (std::uint32_t i = 0; i < n; ++i)
+            {
+                sx[i] = hx[i] - frame.Min[0] + frame.Pad;
+                sy[i] = hy[i] - frame.Min[1] + frame.Pad;
+                if constexpr (Dim == 3) sz[i] = hz[i] - frame.Min[2] + frame.Pad;
+            }
+            // Radii belong to ids; carry them through the permutation.
+            std::vector<float> radiusOf;
+            if (!cached.SplatRadii.empty())
+            {
+                radiusOf.assign(n, 0.0f);
+                for (std::size_t r = 0; r < cached.Order.size(); ++r) radiusOf[cached.Order[r]] = cached.SplatRadii[r];
+            }
+            for (std::size_t L = 0; L + 1 < offsets.size(); ++L)
+                PermuteLevel<Dim>(out.Order.data() + offsets[L], offsets[L + 1] - offsets[L], sx.data(), sy.data(),
+                                  sz.data(), frame.Extent, ordering, shuffleSeed, static_cast<std::uint32_t>(L));
+            if (!radiusOf.empty())
+                for (std::size_t r = 0; r < out.Order.size(); ++r) out.SplatRadii[r] = radiusOf[out.Order[r]];
+        };
+        if (dimension == 3) run.template operator()<3>();
+        else run.template operator()<2>();
+        return out;
     }
 
     float MinPairwiseDistance(std::span<const glm::vec3> points, std::span<const std::uint32_t> order,

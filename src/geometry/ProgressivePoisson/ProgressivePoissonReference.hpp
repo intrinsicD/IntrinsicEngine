@@ -36,7 +36,34 @@ namespace Intrinsic::Methods::Geometry::ProgressivePoissonReference
     {
         Valid,            ///< Ran to completion (includes the empty-input case).
         InvalidDimension, ///< Config.Dimension not in {2,3}.
-        NonFiniteInput    ///< A used input coordinate was NaN/Inf.
+        NonFiniteInput,   ///< A used input coordinate was NaN/Inf.
+        InvalidConfig     ///< Policy misuse: priority scores missing/non-finite/unexpected,
+                          ///< two bands or coarse exhaustive levels with the wrong policy,
+                          ///< candidate budget outside [1, 32], malformed cached result.
+    };
+
+    /// How a level cell chooses among its candidates in one phase (GEOM-112; mirrors the
+    /// CUDA `CellSelectionPolicy`). The CPU reference fixes the candidate list order to the
+    /// order of the remaining points, where the GPU arbitrates it.
+    enum class CellSelection : std::uint8_t
+    {
+        Bounded = 0,          ///< Test at most 1 + retries candidates (retries only on the
+                              ///< RepairCoarseLevels coarsest levels); a cell can stay empty.
+        Exhaustive = 1,       ///< Test candidates until the first feasible one (HAPDS saturation).
+        BestOfCandidates = 2, ///< Among the first CandidateBudget feasible candidates, the largest
+                              ///< squared clearance to earlier points in the 3^d neighborhood,
+                              ///< capped at the squared cell size (ties: earliest).
+        FeaturePriority = 3   ///< Among all feasible candidates, the highest priority score
+                              ///< (ties: lowest input index); needs PriorityScores.
+    };
+
+    /// Permutation applied within each completed level (any subset of a level prefix keeps
+    /// the minimum distance).
+    enum class WithinLevelOrdering : std::uint8_t
+    {
+        RandomShuffle = 0,    ///< Seeded Fisher-Yates (SplitMix64).
+        SpatiallyBalanced = 1 ///< Stable Morton order of the normalized position (ties: index),
+                              ///< emitted in bit-reversed rank order.
     };
 
     /// Sampler knobs. Mirrors the reference `SamplerConfig`
@@ -52,7 +79,24 @@ namespace Intrinsic::Methods::Geometry::ProgressivePoissonReference
         std::uint32_t GridOriginSeed = 1337u;
         bool ShuffleWithinLevels = true;    ///< Permute each level's segment so mid-level prefixes densify uniformly.
         std::uint32_t ShuffleSeed = 0x51ed270bu;
+        // GEOM-112: the remaining CUDA sampler options.
+        CellSelection Selection = CellSelection::Exhaustive;
+        std::uint32_t MaxCellRetries = 1;        ///< Bounded: extra contenders per cell (clamped to 8).
+        std::uint32_t RepairCoarseLevels = 4;    ///< Bounded: coarsest levels that use the retries.
+        std::uint32_t ExhaustiveCoarseLevels = 0;///< Bounded/BestOfCandidates: coarsest levels run Exhaustive.
+        std::uint32_t CandidateBudget = 4;       ///< BestOfCandidates: inspected candidates, [1, 32].
+        bool RandomizePhaseOrder = false;        ///< Visit the 2^d phases of a level in a seeded permutation.
+        std::uint32_t PhaseOrderSeed = 0x2f1a9c53u;
+        bool PriorityTwoBands = false;           ///< FeaturePriority: scores >= threshold first, then the rest.
+        float PriorityBandThreshold = 0.0f;
+        WithinLevelOrdering Ordering = WithinLevelOrdering::RandomShuffle; ///< Used when ShuffleWithinLevels.
+        bool ComputeSplatRadii = true;           ///< false: order only (no radii, no per-level min distance).
     };
+
+    /// Named profiles of the CUDA sampler (Fast: Bounded 0/0, Balanced: Bounded 1/4,
+    /// Quality: Bounded 2/4, HAPDS: Exhaustive), applied to a base config.
+    enum class Profile : std::uint8_t { Fast = 0, Balanced, Quality, Hapds };
+    [[nodiscard]] Config WithProfile(Config base, Profile profile);
 
     struct Diagnostics
     {
@@ -84,7 +128,16 @@ namespace Intrinsic::Methods::Geometry::ProgressivePoissonReference
     /// of points. Deterministic for a fixed (points, config). Fails closed with an
     /// explicit diagnostic code (and an empty ordering) on invalid input. The
     /// caller owns `points`; the result references it only by index.
-    [[nodiscard]] Result Compute(std::span<const glm::vec3> points, const Config& config);
+    [[nodiscard]] Result Compute(std::span<const glm::vec3> points, const Config& config,
+                                 std::span<const float> priorityScores = {});
+
+    /// Re-permute every level segment of an existing result with `ordering` without
+    /// re-running selection: same ids per level, same level offsets and base radius, and each
+    /// id keeps its splat radius. `points` are the original input the result refers to.
+    /// Fails closed (InvalidConfig, empty order) on a malformed cached result.
+    [[nodiscard]] Result ReorderWithinLevels(const Result& cached, std::span<const glm::vec3> points,
+                                             std::uint32_t dimension, WithinLevelOrdering ordering,
+                                             std::uint32_t shuffleSeed = 0x51ed270bu);
 
     /// Exact measured minimum pairwise distance over the prefix `order[0..count)`.
     /// Builds a uniform grid sized to ~1 point/cell from the prefix's own bounding

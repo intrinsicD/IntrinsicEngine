@@ -100,6 +100,26 @@ command/config seam, planning-only Vulkan-compute seam, executable backend, and
 CPU/GPU parity lineage; METHOD-014 owns the remaining operational compute and
 public parity work.
 
+## Sampler options (GEOM-112)
+
+The CPU reference now carries every option of the CUDA sampler, with candidate lists in the
+order of the remaining points (the GPU arbitrates it):
+
+| Option | CPU behavior |
+| --- | --- |
+| `Selection = Exhaustive` (default) | first feasible candidate per cell (HAPDS saturation); unchanged results |
+| `Selection = Bounded`, `MaxCellRetries`, `RepairCoarseLevels` | at most 1 + retries candidates per cell and phase, retries on the coarsest levels only |
+| `ExhaustiveCoarseLevels` | Bounded/BestOfCandidates run Exhaustive on the coarsest levels |
+| `Selection = BestOfCandidates`, `CandidateBudget` | largest capped local clearance among the first budget candidates |
+| `Selection = FeaturePriority`, `PriorityTwoBands`, `PriorityBandThreshold` | highest priority score among all feasible candidates (ties: lowest index), optionally in two bands |
+| `RandomizePhaseOrder`, `PhaseOrderSeed` | the CUDA sampler's hashed Fisher-Yates phase permutation |
+| `Ordering = SpatiallyBalanced` | Morton order emitted in bit-reversed ranks; equals the CUDA sequences exactly |
+| `ComputeSplatRadii = false` | order only (no radii, no per-level minimum distance) |
+| `WithProfile(Fast/Balanced/Quality/Hapds)`, `ReorderWithinLevels` | named profiles and cached-result reordering |
+
+Every policy keeps the level-boundary minimum-distance guarantee (tested); only Exhaustive
+and FeaturePriority saturate cells.
+
 ## Known limitations
 
 See `method.yaml` `known_limitations` and `paper.md` "Degenerate/edge cases".

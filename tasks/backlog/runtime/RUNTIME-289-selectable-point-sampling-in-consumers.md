@@ -21,6 +21,7 @@ contracts: [method.engine-integration, geometry.element-domain-sources]
 
 ## Acceptance criteria
 - [ ] Shared runtime config struct + validator + panel helper; the runtime enum mirrors `PointSamplingMethod` with a static_assert.
+- [ ] The progressive Poisson options of GEOM-112 (cell policy, retries, budget, priority property and bands, phase order, ordering, order-only, profiles) are fields of the shared block.
 - [ ] CPD: `subsample_method`, target subsample, landmark method; consolidation: initial-sample method (CPU and GPU paths identical).
 - [ ] Agent fields and contract tests per consumer.
 - [ ] Backend axis (`cpu_reference` / `gpu_vulkan_compute`) through the RUNTIME-290 seam with requested/actual/fallback reporting; small landmark sets (CPD) stay on the CPU.

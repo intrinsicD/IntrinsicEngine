@@ -242,3 +242,209 @@ TEST(ProgressivePoissonReference, AlphaOutOfRangeDefaultsToSqrtDOverTwo)
     EXPECT_TRUE(r.Diag.AlphaDefaulted);
     EXPECT_NEAR(r.Diag.UsedAlpha, 0.5f * 1.41421356f, 1e-5f);
 }
+
+// ── GEOM-112: the remaining CUDA sampler options ─────────────────────────────
+namespace
+{
+    // The level-boundary guarantee: every prefix ending at a level boundary keeps r_L.
+    void ExpectLevelGuarantee(const std::vector<glm::vec3>& pts, const ppr::Result& r, int dim, const char* label)
+    {
+        ASSERT_EQ(r.Diag.Code, ppr::ValidationCode::Valid) << label;
+        for (std::size_t L = 0; L + 1 < r.LevelOffsets.size(); ++L)
+        {
+            const std::uint32_t le = r.LevelOffsets[L + 1];
+            if (le < 2)
+                continue;
+            const float measured = ppr::MinPairwiseDistance(pts, r.Order, le, static_cast<std::uint32_t>(dim));
+            EXPECT_GE(measured, r.Diag.LevelRadii[L] * 0.9999f) << label << " level " << L;
+        }
+    }
+
+    std::vector<float> ScoresFromX(const std::vector<glm::vec3>& pts)
+    {
+        std::vector<float> scores;
+        for (const auto& p : pts)
+            scores.push_back(p.x);
+        return scores;
+    }
+}
+
+TEST_P(ProgressivePoissonReferenceDim, EveryCellPolicyKeepsTheLevelGuarantee)
+{
+    const int dim = GetParam();
+    const auto pts = UniformCube(3000, 77u, dim);
+    const auto scores = ScoresFromX(pts);
+    ppr::Config base;
+    base.Dimension = static_cast<std::uint32_t>(dim);
+    for (const auto profile : {ppr::Profile::Fast, ppr::Profile::Balanced, ppr::Profile::Quality, ppr::Profile::Hapds})
+        ExpectLevelGuarantee(pts, ppr::Compute(pts, ppr::WithProfile(base, profile)), dim, "profile");
+    ppr::Config best = base;
+    best.Selection = ppr::CellSelection::BestOfCandidates;
+    best.CandidateBudget = 8;
+    ExpectLevelGuarantee(pts, ppr::Compute(pts, best), dim, "best-of-candidates");
+    for (const bool twoBands : {false, true})
+    {
+        ppr::Config priority = base;
+        priority.Selection = ppr::CellSelection::FeaturePriority;
+        priority.PriorityTwoBands = twoBands;
+        priority.PriorityBandThreshold = 0.5f;
+        ExpectLevelGuarantee(pts, ppr::Compute(pts, priority, scores), dim, twoBands ? "priority-2" : "priority-1");
+    }
+    ppr::Config phases = base;
+    phases.RandomizePhaseOrder = true;
+    const auto shuffledPhases = ppr::Compute(pts, phases);
+    ExpectLevelGuarantee(pts, shuffledPhases, dim, "random-phase-order");
+    EXPECT_NE(shuffledPhases.Order, ppr::Compute(pts, base).Order);
+    ppr::Config coarse = ppr::WithProfile(base, ppr::Profile::Fast);
+    coarse.ExhaustiveCoarseLevels = 2;
+    ExpectLevelGuarantee(pts, ppr::Compute(pts, coarse), dim, "exhaustive-coarse");
+}
+
+TEST(ProgressivePoissonReference, BoundedCellsAreASubsetOfExhaustiveSaturationAtLevelZero)
+{
+    const auto pts = UniformCube(4000, 5u, 3);
+    ppr::Config exhaustive;
+    const auto full = ppr::Compute(pts, exhaustive);
+    const auto fast = ppr::Compute(pts, ppr::WithProfile(exhaustive, ppr::Profile::Fast));
+    ASSERT_GE(full.Diag.LevelCounts.size(), 1u);
+    ASSERT_GE(fast.Diag.LevelCounts.size(), 1u);
+    // Level 0 starts from the same empty state: a bounded cell can only stay empty where an
+    // exhaustive cell finds a feasible candidate.
+    EXPECT_LE(fast.Diag.LevelCounts[0], full.Diag.LevelCounts[0]);
+    // A budget of one candidate is the bounded single contender.
+    ppr::Config budgetOne;
+    budgetOne.Selection = ppr::CellSelection::BestOfCandidates;
+    budgetOne.CandidateBudget = 1;
+    EXPECT_EQ(ppr::Compute(pts, budgetOne).Order, fast.Order);
+}
+
+TEST(ProgressivePoissonReference, FeaturePriorityPicksTheHighestFeasibleScorePerCell)
+{
+    // One level-0 cell holds every point: its winner is the highest score (ties: lowest index).
+    std::vector<glm::vec3> pts{{0.10f, 0.1f, 0.1f}, {0.12f, 0.1f, 0.1f}, {0.14f, 0.1f, 0.1f}, {0.16f, 0.1f, 0.1f}};
+    pts.push_back({1.0f, 1.0f, 1.0f}); // sets the extent; lands in another cell
+    const std::vector<float> scores{0.2f, 0.9f, 0.9f, 0.5f, 0.0f};
+    ppr::Config cfg;
+    cfg.GridWidth = 1;
+    cfg.RandomizeGridOrigin = false;
+    cfg.ShuffleWithinLevels = false;
+    cfg.Selection = ppr::CellSelection::FeaturePriority;
+    const auto r = ppr::Compute(pts, cfg, scores);
+    ASSERT_EQ(r.Diag.Code, ppr::ValidationCode::Valid);
+    ASSERT_GE(r.LevelOffsets.size(), 2u);
+    const std::vector<std::uint32_t> level0(r.Order.begin(), r.Order.begin() + r.LevelOffsets[1]);
+    EXPECT_NE(std::find(level0.begin(), level0.end(), 1u), level0.end()) << "score 0.9 at the lowest index wins";
+    EXPECT_EQ(std::find(level0.begin(), level0.end(), 2u), level0.end());
+}
+
+TEST(ProgressivePoissonReference, SpatiallyBalancedOrderingPermutesOnlyWithinLevels)
+{
+    const auto pts = UniformCube(5000, 9u, 3);
+    ppr::Config shuffled;
+    ppr::Config balanced;
+    balanced.Ordering = ppr::WithinLevelOrdering::SpatiallyBalanced;
+    const auto a = ppr::Compute(pts, shuffled);
+    const auto b = ppr::Compute(pts, balanced);
+    ASSERT_EQ(a.LevelOffsets, b.LevelOffsets);
+    EXPECT_NE(a.Order, b.Order);
+    for (std::size_t L = 0; L + 1 < a.LevelOffsets.size(); ++L)
+    {
+        std::vector<std::uint32_t> sa(a.Order.begin() + a.LevelOffsets[L], a.Order.begin() + a.LevelOffsets[L + 1]);
+        std::vector<std::uint32_t> sb(b.Order.begin() + b.LevelOffsets[L], b.Order.begin() + b.LevelOffsets[L + 1]);
+        std::sort(sa.begin(), sa.end());
+        std::sort(sb.begin(), sb.end());
+        EXPECT_EQ(sa, sb) << "level " << L;
+    }
+    // Reordering a cached result reproduces the direct run, and radii stay with their ids.
+    const auto reordered = ppr::ReorderWithinLevels(a, pts, 3u, ppr::WithinLevelOrdering::SpatiallyBalanced);
+    ASSERT_EQ(reordered.Diag.Code, ppr::ValidationCode::Valid);
+    EXPECT_EQ(reordered.Order, b.Order);
+    EXPECT_EQ(reordered.SplatRadii, b.SplatRadii);
+    ppr::Result broken = a;
+    broken.Order[0] = broken.Order[1];
+    EXPECT_EQ(ppr::ReorderWithinLevels(broken, pts, 3u, ppr::WithinLevelOrdering::SpatiallyBalanced).Diag.Code,
+              ppr::ValidationCode::InvalidConfig);
+}
+
+TEST(ProgressivePoissonReference, OrderOnlyModeSkipsRadiiWithTheSameOrder)
+{
+    const auto pts = UniformCube(2000, 13u, 3);
+    ppr::Config full;
+    ppr::Config orderOnly;
+    orderOnly.ComputeSplatRadii = false;
+    const auto a = ppr::Compute(pts, full);
+    const auto b = ppr::Compute(pts, orderOnly);
+    EXPECT_EQ(a.Order, b.Order);
+    EXPECT_TRUE(b.SplatRadii.empty());
+    EXPECT_TRUE(b.Diag.LevelMinDistance.empty());
+}
+
+TEST(ProgressivePoissonReference, PolicyMisuseFailsClosed)
+{
+    const auto pts = UniformCube(100, 3u, 3);
+    const auto scores = ScoresFromX(pts);
+    const auto code = [&](ppr::Config c, std::span<const float> s = {}) { return ppr::Compute(pts, c, s).Diag.Code; };
+    ppr::Config priority;
+    priority.Selection = ppr::CellSelection::FeaturePriority;
+    EXPECT_EQ(code(priority), ppr::ValidationCode::InvalidConfig) << "scores missing";
+    EXPECT_EQ(code(priority, std::span<const float>(scores).first(10)), ppr::ValidationCode::InvalidConfig);
+    std::vector<float> nan = scores;
+    nan[3] = std::numeric_limits<float>::quiet_NaN();
+    EXPECT_EQ(code(priority, nan), ppr::ValidationCode::InvalidConfig);
+    ppr::Config coarse = priority;
+    coarse.ExhaustiveCoarseLevels = 1;
+    EXPECT_EQ(code(coarse, scores), ppr::ValidationCode::InvalidConfig);
+    EXPECT_EQ(code(ppr::Config{}, scores), ppr::ValidationCode::InvalidConfig) << "scores without the policy";
+    ppr::Config bands;
+    bands.PriorityTwoBands = true;
+    EXPECT_EQ(code(bands), ppr::ValidationCode::InvalidConfig);
+    for (const std::uint32_t budget : {0u, 33u})
+    {
+        ppr::Config best;
+        best.Selection = ppr::CellSelection::BestOfCandidates;
+        best.CandidateBudget = budget;
+        EXPECT_EQ(code(best), ppr::ValidationCode::InvalidConfig) << budget;
+    }
+    EXPECT_EQ(code(priority, scores), ppr::ValidationCode::Valid);
+}
+
+// Fixtures and expected sequences of the CUDA sampler's reorder_within_levels test
+// (test_progressive_poisson.cu, "Cached reorder helper"): the CPU ordering matches exactly.
+TEST(ProgressivePoissonReference, SpatiallyBalancedMatchesTheCudaSamplerSequences)
+{
+    const auto balanced = ppr::WithinLevelOrdering::SpatiallyBalanced;
+    const auto reorder = [&](std::vector<std::uint32_t> order, std::vector<std::uint32_t> offsets,
+                             const std::vector<glm::vec3>& pts, std::uint32_t dim) {
+        ppr::Result cached;
+        cached.Order = std::move(order);
+        cached.LevelOffsets = std::move(offsets);
+        return ppr::ReorderWithinLevels(cached, pts, dim, balanced);
+    };
+    {   // 2-D, nine collinear points: bit-reversed ranks.
+        std::vector<glm::vec3> pts;
+        std::vector<std::uint32_t> order;
+        for (std::uint32_t i = 0; i < 9; ++i) { pts.push_back({0.1f * float(i + 1), 0.5f, 0.0f}); order.push_back(8 - i); }
+        EXPECT_EQ(reorder(order, {0, 9}, pts, 2).Order, (std::vector<std::uint32_t>{0, 8, 4, 2, 6, 1, 5, 3, 7}));
+    }
+    {   // 3-D, two levels of 4 and 7 with a scrambled cached order.
+        std::vector<glm::vec3> pts;
+        for (std::uint32_t i = 0; i < 11; ++i) pts.push_back({0.05f * float(i), 0.3f, 0.7f});
+        EXPECT_EQ(reorder({3, 1, 2, 0, 10, 5, 7, 9, 4, 6, 8}, {0, 4, 11}, pts, 3).Order,
+                  (std::vector<std::uint32_t>{0, 2, 1, 3, 4, 8, 6, 10, 5, 9, 7}));
+    }
+    {   // Coincident points: Morton ties keep ascending ids.
+        const std::vector<glm::vec3> pts(3, glm::vec3{0.4f, 0.6f, 0.0f});
+        EXPECT_EQ(reorder({2, 0, 1}, {0, 3}, pts, 2).Order, (std::vector<std::uint32_t>{0, 2, 1}));
+    }
+    {   // Power-of-two count.
+        std::vector<glm::vec3> pts;
+        for (std::uint32_t i = 0; i < 8; ++i) pts.push_back({float(i), 0.0f, 0.0f});
+        EXPECT_EQ(reorder({0, 1, 2, 3, 4, 5, 6, 7}, {0, 8}, pts, 2).Order,
+                  (std::vector<std::uint32_t>{0, 4, 2, 6, 1, 5, 3, 7}));
+    }
+    {   // Empty and singleton results are returned unchanged.
+        EXPECT_TRUE(reorder({}, {0}, {}, 2).Order.empty());
+        const std::vector<glm::vec3> pts{{0.0f, 0.0f, 0.0f}, {0.5f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}};
+        EXPECT_EQ(reorder({1}, {0, 1}, pts, 2).Order, (std::vector<std::uint32_t>{1}));
+    }
+}

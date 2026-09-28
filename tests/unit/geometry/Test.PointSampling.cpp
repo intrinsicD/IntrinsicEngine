@@ -191,3 +191,29 @@ TEST(PointSampling, ProgressivePoissonMatchesTheMethod012Reference)
     EXPECT_EQ(PS::Order(points, {.Method = PS::Method::ProgressivePoisson, .Poisson = {.Dimension = 4u}}, 10).State,
               PS::Status::InvalidParameters);
 }
+
+TEST(PointSampling, PoissonProfilesAndPriorityReachTheReference)
+{
+    std::vector<glm::vec3> points;
+    std::mt19937 random(31);
+    std::uniform_real_distribution<float> uniform(-1.0f, 1.0f);
+    for (int i = 0; i < 2000; ++i) points.push_back({uniform(random), uniform(random), uniform(random)});
+    namespace PPR = Intrinsic::Methods::Geometry::ProgressivePoissonReference;
+    const PS::PoissonSettings fast = PS::WithProfile({}, PS::PoissonProfile::Fast);
+    const auto viaApi = PS::Order(points, {.Method = PS::Method::ProgressivePoisson, .Poisson = fast}, points.size());
+    const auto direct = PPR::Compute(points, PPR::WithProfile({}, PPR::Profile::Fast));
+    ASSERT_TRUE(viaApi.Succeeded());
+    EXPECT_EQ(viaApi.Order, direct.Order);
+    std::vector<float> scores;
+    for (const auto& p : points) scores.push_back(p.y);
+    PS::PoissonSettings priority{};
+    priority.Selection = PS::PoissonCellSelection::FeaturePriority;
+    priority.ComputeSplatRadii = false;
+    const auto prioritized = PS::Order(points, {.Method = PS::Method::ProgressivePoisson, .Poisson = priority,
+                                                .PriorityScores = scores}, 50);
+    ASSERT_TRUE(prioritized.Succeeded());
+    EXPECT_EQ(prioritized.Order.size(), 50u);
+    EXPECT_TRUE(prioritized.SplatRadii.empty());
+    EXPECT_EQ(PS::Order(points, {.Method = PS::Method::ProgressivePoisson, .Poisson = priority}, 50).State,
+              PS::Status::InvalidParameters) << "priority without scores";
+}

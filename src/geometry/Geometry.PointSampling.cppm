@@ -59,7 +59,15 @@ export namespace Geometry::PointSampling
         [[nodiscard]] std::size_t Size() const noexcept { return X.size(); }
     };
 
-    // ProgressivePoisson knobs (METHOD-012 `Config`, one-to-one).
+    // ProgressivePoisson cell policy and within-level ordering (GEOM-112; the CUDA sampler's
+    // CellSelectionPolicy and WithinLevelOrdering).
+    enum class PoissonCellSelection : std::uint8_t { Bounded = 0, Exhaustive, BestOfCandidates, FeaturePriority };
+    enum class PoissonOrdering : std::uint8_t { RandomShuffle = 0, SpatiallyBalanced };
+    // Named profiles: Fast (Bounded, no retries), Balanced (1 retry on 4 coarse levels),
+    // Quality (2 retries), Hapds (Exhaustive).
+    enum class PoissonProfile : std::uint8_t { Fast = 0, Balanced, Quality, Hapds };
+
+    // ProgressivePoisson knobs (METHOD-012 / GEOM-112 `Config`, one-to-one).
     struct PoissonSettings
     {
         std::uint32_t Dimension{3u};      // 2 ignores z
@@ -70,7 +78,19 @@ export namespace Geometry::PointSampling
         std::uint32_t GridOriginSeed{1337u};
         bool ShuffleWithinLevels{true};
         std::uint32_t ShuffleSeed{0x51ed270bu};
+        PoissonCellSelection Selection{PoissonCellSelection::Exhaustive};
+        std::uint32_t MaxCellRetries{1u};
+        std::uint32_t RepairCoarseLevels{4u};
+        std::uint32_t ExhaustiveCoarseLevels{0u};
+        std::uint32_t CandidateBudget{4u};
+        bool RandomizePhaseOrder{false};
+        std::uint32_t PhaseOrderSeed{0x2f1a9c53u};
+        bool PriorityTwoBands{false};
+        float PriorityBandThreshold{0.0f};
+        PoissonOrdering Ordering{PoissonOrdering::RandomShuffle};
+        bool ComputeSplatRadii{true};
     };
+    [[nodiscard]] PoissonSettings WithProfile(PoissonSettings base, PoissonProfile profile) noexcept;
 
     struct Params
     {
@@ -83,6 +103,8 @@ export namespace Geometry::PointSampling
         // FarthestPoint: points per Morton leaf block.
         std::uint32_t LeafSize{32u};
         PoissonSettings Poisson{};
+        // ProgressivePoisson FeaturePriority: one finite score per point (higher preferred).
+        std::span<const float> PriorityScores{};
     };
 
     struct Result

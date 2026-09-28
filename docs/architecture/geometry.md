@@ -501,7 +501,10 @@ progressive order, so any prefix is the subsample of that size, for a selectable
 farthest-point order through a hole sieve over Morton leaf blocks: pruned updates, order
 and clearances bitwise equal to a brute-force float64 scan, optional importance weights)
 and `ProgressivePoisson` (the METHOD-012 reference, compiled into this layer from
-`src/geometry/ProgressivePoisson/`). `FarthestPointSieve` extends an order incrementally.
+`src/geometry/ProgressivePoisson/`, with every option of the CUDA sampler since GEOM-112:
+bounded, exhaustive, best-of-candidates and feature-priority cell policies, randomized phase
+order, spatially balanced within-level ordering, order-only mode and named profiles).
+`FarthestPointSieve` extends an order incrementally.
 Registration subsampling and Nystroem landmarks use it; GEOM-112/113 add the remaining
 sampling methods and RUNTIME-289 makes the method selectable at every consumer.
 

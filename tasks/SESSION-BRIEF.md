@@ -129,7 +129,6 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `GEOM-106` — Center-surround saliency of scalar properties (tasks/backlog/geometry/GEOM-106-center-surround-scalar-saliency.md)
 - unblocked: `GEOM-107` — Wachspress, mean-value and modified-face-normal Laplacian weights (tasks/backlog/geometry/GEOM-107-additional-mesh-laplacian-weights.md)
 - unblocked: `GEOM-108` — Small Framework24 parity helpers (tasks/backlog/geometry/GEOM-108-framework24-small-parity-helpers.md)
-- blocked by `GEOM-111`: `GEOM-112` — Complete CPU port of phase-parallel progressive Poisson sampling (tasks/backlog/geometry/GEOM-112-progressive-poisson-complete-cpu-port.md)
 - blocked by `GEOM-111`: `GEOM-113` — Approximate FPS family and sampling baselines on the CPU (tasks/backlog/geometry/GEOM-113-approximate-fps-family-and-sampling-baselines.md)
 - unblocked: `GRAPHICS-148` — Vulkan radix sort and sorted-segment primitives (tasks/backlog/rendering/GRAPHICS-148-vulkan-radix-sort-primitive.md)
 - unblocked: `GRAPHICS-149` — Compute capability probes and exact-arithmetic shader policy (tasks/backlog/rendering/GRAPHICS-149-compute-capability-probes-and-numeric-policy.md)

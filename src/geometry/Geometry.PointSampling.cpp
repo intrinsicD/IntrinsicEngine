@@ -314,37 +314,65 @@ namespace Geometry::PointSampling
 
     namespace
     {
-        Result Poisson(const std::span<const glm::vec3> points, const PoissonSettings& settings, const std::size_t count)
+        namespace PPR = Intrinsic::Methods::Geometry::ProgressivePoissonReference;
+        static_assert(std::uint8_t(PoissonCellSelection::Bounded) == std::uint8_t(PPR::CellSelection::Bounded) &&
+                      std::uint8_t(PoissonCellSelection::Exhaustive) == std::uint8_t(PPR::CellSelection::Exhaustive) &&
+                      std::uint8_t(PoissonCellSelection::BestOfCandidates) == std::uint8_t(PPR::CellSelection::BestOfCandidates) &&
+                      std::uint8_t(PoissonCellSelection::FeaturePriority) == std::uint8_t(PPR::CellSelection::FeaturePriority) &&
+                      std::uint8_t(PoissonOrdering::SpatiallyBalanced) == std::uint8_t(PPR::WithinLevelOrdering::SpatiallyBalanced) &&
+                      std::uint8_t(PoissonProfile::Hapds) == std::uint8_t(PPR::Profile::Hapds));
+
+        [[nodiscard]] PPR::Config ToConfig(const PoissonSettings& s)
         {
-            namespace PPR = Intrinsic::Methods::Geometry::ProgressivePoissonReference;
+            return PPR::Config{.Dimension = s.Dimension, .GridWidth = s.GridWidth, .MaxLevels = s.MaxLevels,
+                               .RadiusAlpha = s.RadiusAlpha, .RandomizeGridOrigin = s.RandomizeGridOrigin,
+                               .GridOriginSeed = s.GridOriginSeed, .ShuffleWithinLevels = s.ShuffleWithinLevels,
+                               .ShuffleSeed = s.ShuffleSeed, .Selection = PPR::CellSelection(s.Selection),
+                               .MaxCellRetries = s.MaxCellRetries, .RepairCoarseLevels = s.RepairCoarseLevels,
+                               .ExhaustiveCoarseLevels = s.ExhaustiveCoarseLevels, .CandidateBudget = s.CandidateBudget,
+                               .RandomizePhaseOrder = s.RandomizePhaseOrder, .PhaseOrderSeed = s.PhaseOrderSeed,
+                               .PriorityTwoBands = s.PriorityTwoBands, .PriorityBandThreshold = s.PriorityBandThreshold,
+                               .Ordering = PPR::WithinLevelOrdering(s.Ordering), .ComputeSplatRadii = s.ComputeSplatRadii};
+        }
+
+        Result Poisson(const std::span<const glm::vec3> points, const PoissonSettings& settings,
+                       const std::span<const float> scores, const std::size_t count)
+        {
             Result result;
             if (points.empty())
             {
                 result.State = Status::EmptyInput;
                 return result;
             }
-            const PPR::Config config{.Dimension = settings.Dimension, .GridWidth = settings.GridWidth,
-                                     .MaxLevels = settings.MaxLevels, .RadiusAlpha = settings.RadiusAlpha,
-                                     .RandomizeGridOrigin = settings.RandomizeGridOrigin,
-                                     .GridOriginSeed = settings.GridOriginSeed,
-                                     .ShuffleWithinLevels = settings.ShuffleWithinLevels,
-                                     .ShuffleSeed = settings.ShuffleSeed};
-            PPR::Result computed = PPR::Compute(points, config);
+            PPR::Result computed = PPR::Compute(points, ToConfig(settings), scores);
             switch (computed.Diag.Code)
             {
             case PPR::ValidationCode::Valid: break;
             case PPR::ValidationCode::InvalidDimension: result.State = Status::InvalidParameters; return result;
             case PPR::ValidationCode::NonFiniteInput: result.State = Status::NonFiniteInput; return result;
+            case PPR::ValidationCode::InvalidConfig: result.State = Status::InvalidParameters; return result;
             }
             const std::size_t k = std::min(count, computed.Order.size());
             computed.Order.resize(k);
-            computed.SplatRadii.resize(k);
+            if (!computed.SplatRadii.empty()) computed.SplatRadii.resize(k);
             result.Order = std::move(computed.Order);
             result.SplatRadii = std::move(computed.SplatRadii);
             result.LevelOffsets = std::move(computed.LevelOffsets);
             result.BaseRadius = computed.BaseRadius;
             return result;
         }
+    }
+
+    PoissonSettings WithProfile(PoissonSettings base, const PoissonProfile profile) noexcept
+    {
+        switch (profile)
+        {
+        case PoissonProfile::Fast: base.Selection = PoissonCellSelection::Bounded; base.MaxCellRetries = 0u; base.RepairCoarseLevels = 0u; break;
+        case PoissonProfile::Balanced: base.Selection = PoissonCellSelection::Bounded; base.MaxCellRetries = 1u; base.RepairCoarseLevels = 4u; break;
+        case PoissonProfile::Quality: base.Selection = PoissonCellSelection::Bounded; base.MaxCellRetries = 2u; base.RepairCoarseLevels = 4u; break;
+        case PoissonProfile::Hapds: base.Selection = PoissonCellSelection::Exhaustive; break;
+        }
+        return base;
     }
 
     Result Order(const PointView points, const Params& params, const std::size_t count)
@@ -360,7 +388,7 @@ namespace Geometry::PointSampling
             std::vector<glm::vec3> converted(points.Size());
             for (std::size_t i = 0; i < converted.size(); ++i)
                 converted[i] = glm::vec3(float(points.X[i]), float(points.Y[i]), float(points.Z[i]));
-            return Poisson(converted, params.Poisson, count);
+            return Poisson(converted, params.Poisson, params.PriorityScores, count);
         }
         switch (params.Method)
         {
@@ -397,7 +425,8 @@ namespace Geometry::PointSampling
 
     Result Order(const std::span<const glm::vec3> points, const Params& params, const std::size_t count)
     {
-        if (params.Method == Method::ProgressivePoisson) return Poisson(points, params.Poisson, count);
+        if (params.Method == Method::ProgressivePoisson)
+            return Poisson(points, params.Poisson, params.PriorityScores, count);
         std::vector<double> x(points.size()), y(points.size()), z(points.size());
         for (std::size_t i = 0; i < points.size(); ++i)
         {

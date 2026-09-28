@@ -26,7 +26,6 @@ its dependencies, conditional gates, scope and verification.
 
 - [GEOM-109 — `Geometry.Properties.Statistics`: statistics, histogram and comparison](GEOM-109-property-statistics-and-comparison.md)
 - [GEOM-110 — Connected components and per-component topology/genus](GEOM-110-connected-components-and-topology.md)
-- [GEOM-112 — Complete CPU port of phase-parallel progressive Poisson sampling](GEOM-112-progressive-poisson-complete-cpu-port.md)
 - [GEOM-113 — Approximate FPS family and sampling baselines on the CPU](GEOM-113-approximate-fps-family-and-sampling-baselines.md)
 - [GEOIO-005 — PLY arbitrary property attributes and CSV/NPY property-table IO](GEOIO-005-property-attributes-and-table-io.md)
 
