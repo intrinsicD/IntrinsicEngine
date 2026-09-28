@@ -1,0 +1,26 @@
+size 1000
+  rigid_reference: success, 25 iterations, median 184.339 ms (184.035 - 184.614, 3 runs), rms 0.00037056
+  rigid_dense: success, 25 iterations, median 28.2471 ms (28.1928 - 28.667, 3 runs), rms 0.00037056
+  rigid_truncated: success, 25 iterations, median 34.6501 ms (34.0985 - 35.0022, 3 runs), rms 0.00037056
+  rigid_fast_gauss: success, 25 iterations, median 1782.85 ms (1772.57 - 1783.53, 3 runs), rms 0.00037056
+  rigid_auto: success, 25 iterations, median 29.1112 ms (28.9645 - 30.0229, 3 runs), rms 0.00037056
+  rigid_dense_1thread: success, 25 iterations, median 116.232 ms (114.689 - 118.225, 3 runs), rms 0.00037056
+  rigid_auto_1thread: success, 25 iterations, median 88.2358 ms (87.774 - 91.1785, 3 runs), rms 0.00037056
+  nonrigid_full_auto: success, 23 iterations, median 1097.7 ms (1093.8 - 1097.89, 3 runs), rms 7.3114e-06
+  nonrigid_lowrank50_auto: success, 23 iterations, median 41.0067 ms (40.9599 - 41.2374, 3 runs), rms 1.24836e-05
+  nonrigid_lowrank150_auto: success, 23 iterations, median 67.3366 ms (66.6756 - 68.825, 3 runs), rms 7.33023e-06
+size 10000
+  rigid_reference: success, 35 iterations, median 27521.2 ms (27489 - 27523.4, 3 runs), rms 0.000138222
+  rigid_dense: success, 35 iterations, median 2202.96 ms (2196.3 - 2214.07, 3 runs), rms 0.000138222
+  rigid_truncated: success, 35 iterations, median 2314.36 ms (2303.11 - 2314.44, 3 runs), rms 0.000138222
+  rigid_fast_gauss: success, 35 iterations, median 5284.46 ms (5241.59 - 5354.36, 3 runs), rms 0.000138222
+  rigid_auto: success, 35 iterations, median 1385.59 ms (1383.86 - 1388.4, 3 runs), rms 0.000138222
+  rigid_dense_1thread: success, 35 iterations, median 14737.1 ms (14702.2 - 14744, 3 runs), rms 0.000138222
+  rigid_auto_1thread: success, 35 iterations, median 8592.23 ms (8588.59 - 8613.41, 3 runs), rms 0.000138222
+  nonrigid_lowrank50_auto: success, 31 iterations, median 1397.74 ms (1392.18 - 1398.54, 3 runs), rms 1.2246e-05
+  nonrigid_lowrank150_auto: success, 31 iterations, median 1571.04 ms (1563.75 - 1575.73, 3 runs), rms 3.14133e-06
+size 100000
+  rigid_dense: success, 48 iterations, median 433736 ms (433399 - 434074, 2 runs), rms 4.96498e-05
+  rigid_auto: success, 48 iterations, median 197877 ms (197856 - 197897, 2 runs), rms 4.96498e-05
+  nonrigid_lowrank50_auto: success, 84 iterations, median 169939 ms (169908 - 169969, 2 runs), rms 1.23988e-05
+  nonrigid_lowrank150_auto: success, 100 iterations, median 177056 ms (176830 - 177283, 2 runs), rms 3.0355e-06

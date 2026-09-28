@@ -13787,7 +13787,7 @@ tree:
     title: Accelerate the Coherent Point Drift E-step and nonrigid solve with bounded, thread-count independent CPU backends
     provenance: ai-executed
     timestamp: 2026-09-28T15:30+02:00
-    result: METHOD-049 adds dense-parallel, truncated (per-row relative error <= tol, proven and reported), fast Gauss (IFGT with a posteriori exact fixups) and auto E-steps plus a Nystroem low-rank nonrigid solve. On a clutter fixture (Release, 16 threads) rigid auto is 19x faster than the reference at 10^4 points and 2.2x faster than dense at 10^5 with point deltas <= 1.4e-12; low rank is 26x faster than the full kernel at 10^3 and runs beyond its 8192-point limit. The fast Gauss transform needs expansion orders 18-24 at tol 1e-6 in 3-D and was slower than dense at every size. C113 records the bounded claim.
+    result: METHOD-049 adds dense-parallel, truncated (per-row relative error <= tol, proven and reported), fast Gauss (IFGT with a posteriori exact fixups) and auto E-steps plus a Nystroem low-rank nonrigid solve. On a clutter fixture (Release, 16 threads, medians of repeated runs) rigid auto is 19.9x faster than the reference at 10^4 points and 2.2x faster than dense at 10^5 with point deltas <= 1.4e-12; low rank is 26.8x faster than the full kernel at 10^3 and runs beyond its 8192-point limit. The fast Gauss transform needs expansion orders 18-24 at tol 1e-6 in 3-D and was slower than dense at every size. C113 records the bounded claim.
     evidence:
     - ara/evidence/diagnostics/method049_cpd_accelerated_20260928/record.json
     - ara/evidence/diagnostics/method049_cpd_accelerated_20260928/sealed-result.json

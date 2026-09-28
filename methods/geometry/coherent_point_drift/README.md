@@ -38,9 +38,12 @@ and failure states: [paper.md](paper.md).
 
 `LowRank = k` replaces the nonrigid/Bayesian Gram matrix by k Nystroem eigenpairs (O(M k^2)
 per iteration, up to 1,000,000 source points) and reports its sampled kernel error.
-Measured (claim C113, 16 threads, Release): rigid auto 19x the reference at 10^4 points
-and 2.2x dense at 10^5 with deltas <= 1.4e-12; low rank 50 is 26x faster than the full
-kernel at 10^3 points. Wide-kernel iterations remain dense-bound.
+Measured (claim C113, 16 threads, Release, medians): rigid auto 19.9x the reference at
+10^4 points (6.7x of the dense speedup from threads) and 2.2x dense at 10^5 with deltas
+<= 1.4e-12; low rank 50 is 26.8x faster than the full kernel at 10^3 points. Reference
+parity is measured up to 10^4 points (rigid) and 10^3 (low rank); beyond that it is chained.
+A requested rank is an upper bound (`KernelRank` reports the effective one). Wide-kernel
+iterations remain dense-bound.
 
 ## Bayesian CPD (METHOD-050)
 

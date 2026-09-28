@@ -15,8 +15,11 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, method.e
 
 ## Completion — 2026-09-28
 Commit: `cc5344978` (backends), `d6b6ab494` (tree-ordered truncation, weighted E-step);
-the enclosing `claude/cpd` commit records retirement and evidence. Maturity reached:
-`ParityProven` for the CPU backends on the recorded host and fixture (claim C113).
+review fixes `54927242f`, whose sealed rerun (medians of repeated runs) is the evidence.
+Maturity reached: `ParityProven` for the CPU backends on the recorded host and fixture
+(claim C113), scoped: reference parity is proven for rigid policies up to 10^4 points and
+for the low-rank solve at 10^3; beyond that it is chained (auto against dense at 10^5, low
+rank 150 against 50 at 10^4 and 10^5).
 
 Landed: `Geometry.Registration.CoherentPointDrift.EStep` with `Dense` (blocked single pass
 or two-pass, thread-count independent, AVX2/baseline row kernels), `Truncated`
@@ -38,6 +41,11 @@ agent fields; smoke and scaling benchmarks.
 - Benchmark sizes 10^3/10^4/10^5 as required; the reference runs to 10^4 only, and the
   10^5 comparison is auto against dense. The first bound run failed its gate (low-rank
   iteration cap, slow truncation); both were fixed and the rerun passed (record.json).
+- Independent review (Fable 5.1, Codex) found a weighted-row overflow, an out-of-bounds read
+  in subsampled BCPD, understated fast-Gauss bounds, backend misreporting and single-run
+  timings with the observer in the timed region; all fixed in `54927242f` and re-measured.
+- A requested low rank k is an upper bound: numerically null eigenpairs are dropped
+  (k = 150 gives an effective rank of 73-74 on the scaling fixture).
 
 
 ## Goal

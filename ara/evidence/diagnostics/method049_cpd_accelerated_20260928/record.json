@@ -1,31 +1,35 @@
 {
   "task": "METHOD-049",
   "date": "2026-09-28",
-  "source_revision": "d6b6ab49457ee99d9e54ea66100038168ffc59ce",
+  "source_revision": "54927242f3829e5a811c12a620bdd6d59c58e773",
   "environment": {
-    "cpu": "Intel Core i9-11900KF (8 cores, 16 threads), threads used: 16",
+    "cpu": "Intel Core i9-11900KF (8 cores, 16 threads), threads used: 16 (plus single-thread runs up to 10^4 points)",
     "compiler": "clang++ 23.0.0",
     "preset": "ci-release",
     "build_type": "Release, no -march=native (AVX2 row kernels via target_clones)"
   },
   "commands": [
-    "cmake --build --preset ci-release --target IntrinsicCoherentPointDriftScaling",
-    "GITHUB_SHA=d6b6ab49457ee99d9e54ea66100038168ffc59ce CPD_SCALING_TRACE=1 build/ci-release/bin/IntrinsicCoherentPointDriftScaling <dir> 1000 10000 100000",
-    "python3 tools/benchmark/seal_benchmark_results.py --root <dir> --manifests-root benchmarks --run-id method049-scaling-20260928 --source-state clean_commit --source-revision d6b6ab49457ee99d9e54ea66100038168ffc59ce --replace",
+    "cmake --build build/ci-release --target IntrinsicCoherentPointDriftScaling",
+    "GITHUB_SHA=54927242f3829e5a811c12a620bdd6d59c58e773 build/ci-release/bin/IntrinsicCoherentPointDriftScaling <dir> 1000 10000 100000 2> run-progress.log",
+    "python3 tools/benchmark/seal_benchmark_results.py --root <dir> --manifests-root benchmarks --run-id method049-scaling-rerun-20260928 --source-state clean_commit --source-revision 54927242f3829e5a811c12a620bdd6d59c58e773 --claim-eligible --replace",
     "python3 tools/benchmark/validate_benchmark_results.py --root <dir> --strict"
   ],
+  "timing": "One untimed warmup (rigid auto and low-rank nonrigid at 1000 points); each configuration measured 3 times up to 10^4 points and 2 times at 10^5; runtime_ms is the median, min/max per run in sealed-result.json (spread <= 2% everywhere). No iteration observer inside the timed region.",
   "outcomes": {
-    "rigid_speedup_vs_reference": {"1000_points": {"dense": 6.5, "auto": 6.4}, "10000_points": {"dense": 12.5, "truncated": 12.0, "auto": 19.0}},
-    "rigid_100000_points": {"dense_ms": 436348, "auto_ms": 198293, "auto_vs_dense": 2.2, "reference": "not run (single-threaded O(N M) would take hours)"},
-    "rigid_max_point_delta": "<= 1.4e-12 (bounded policies at tol 1e-6) against the reference, 8.1e-14 auto against dense at 100000 points",
+    "rigid_speedup_vs_reference": {"1000_points": {"dense": 6.5, "auto": 6.3}, "10000_points": {"dense": 12.5, "truncated": 11.9, "auto": 19.9}},
+    "parallel_speedup_16_threads_vs_1": {"10000_points": {"dense": 6.7, "auto": 6.2}, "1000_points": {"dense": 4.1, "auto": 3.0}},
+    "single_thread_dense_vs_reference": "1.9x at 10^4 points (vectorized row kernels, same exact arithmetic up to summation order)",
+    "rigid_100000_points": {"dense_ms": 433736, "auto_ms": 197877, "auto_vs_dense": 2.19, "reference": "not run (single-threaded O(N M) would take hours)"},
+    "rigid_max_point_delta": "<= 1.4e-12 against the reference (all policies, <= 10^4 points); 8.1e-14 auto against dense at 10^5 points",
     "rigid_rms_to_truth": "identical across policies per size (3.7e-4, 1.4e-4, 5.0e-5)",
-    "fast_gauss": "slower than dense at every measured size (1.8 s vs 29 ms at 1000, 5.5 s vs 2.2 s at 10000); plans need expansion orders 18-24; at 100000 points one explicit iteration took 19.7 s vs 8.8 s dense in a profiling run",
-    "nonrigid_low_rank": {"1000_points": "43 ms (k=50) vs 1145 ms full kernel, max delta 2.8e-5", "10000_and_100000_points": "full kernel not applicable (limit 8192); RMS to truth 1.2e-5 (k=50) and 3-4e-6 (k=150)"},
+    "fast_gauss": "slower than dense at every measured size (1.78 s vs 28 ms at 10^3, 5.3 s vs 2.2 s at 10^4) and reported as cpu_mixed: some iterations found no plan meeting the bound and fell back to dense",
+    "nonrigid_low_rank": {"1000_points": "41 ms (k=50) vs 1098 ms full kernel (26.8x), max delta 2.8e-5 (k=50) and 2.7e-7 (k=150, effective rank 73) against the full kernel", "10000_and_100000_points": "full kernel not applicable (limit 8192); parity only low rank 150 vs 50 (<= 5.2e-5); RMS to truth 1.2e-5 (k=50) and 3.0-3.1e-6 (k=150, effective rank 74)"},
     "gate": "passed: quality_error_l2 3.7e-4 <= 1e-3, quality_error_linf 1.4e-12 <= 1e-4"
   },
+  "parity_scope": "Parity against the METHOD-015 reference is proven for rigid policies up to 10^4 points and for the low-rank nonrigid solve at 10^3 points (against the reference-parity full kernel); beyond that it is chained (auto vs dense at 10^5, low rank 150 vs 50 at 10^4 and 10^5).",
   "deviations": [
-    "First bound run (source cc5344978, first-run-result.json, first-run-trace.log.gz) failed the gate: nonrigid low-rank hit the 60-iteration cap at 100000 points (RMS 0.009-0.011) and truncated rows ran about ten times slower in index order. The cap was raised to 150 and truncated rows moved to tree order before this run.",
-    "During the first run a Debug compile overlapped about three dense iterations at 100000 points (about +5% on those iterations); the final run had no concurrent builds."
+    "Supersedes the single-run evidence bound to d6b6ab494 (superseded-d6b6ab494/), which Fable and Codex reviewed: it timed one run per configuration with the trace observer inside the timed region. Timings moved by under 5% (10^4 auto 1454 -> 1386 ms, 10^5 auto 198293 -> 197877 ms); rigid parity and RMS are unchanged, while the low-rank runs at 10^5 now stop after 84 and 100 iterations (was 92 and 116) with RMS 1.24e-5 and 3.0e-6, after the review fixes to the low-rank M-step.",
+    "The first bound run (source cc5344978, first-run-result.json, first-run-trace.log.gz) failed the gate: nonrigid low-rank hit the 60-iteration cap at 100000 points and truncated rows ran about ten times slower in index order."
   ],
-  "not_measured": "Memory peak; cross-host timings; the reference at 100000 points."
+  "not_measured": "Memory peak; cross-host timings; the reference at 100000 points; explicit truncated and fast Gauss policies at 100000 points (skipped above the reference cap, see paper.md)."
 }
