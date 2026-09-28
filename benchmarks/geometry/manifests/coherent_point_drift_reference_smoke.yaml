@@ -1,0 +1,14 @@
+benchmark_id: geometry.coherent_point_drift.reference.smoke
+method: geometry.coherent_point_drift
+dataset: builtin.cpd_fixtures.seed101
+params:
+  intent: correctness
+  seed: 101
+  warmup_iterations: 1
+  measured_iterations: 3
+  fixtures: rigid similarity (400 points), affine map (400 points), nonrigid bend (12x12 sheet)
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  quality_error_l2_max: 0.02

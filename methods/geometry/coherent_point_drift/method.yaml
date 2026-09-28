@@ -1,0 +1,30 @@
+id: geometry.coherent_point_drift
+name: Coherent Point Drift point-set registration (rigid, affine, nonrigid)
+domain: geometry
+status: reference
+paper:
+  title: "Point Set Registration: Coherent Point Drift"
+  authors: Andriy Myronenko and Xubo Song
+  year: 2010
+  doi: "10.1109/TPAMI.2010.46"
+  url: "https://doi.org/10.1109/TPAMI.2010.46"
+inputs:
+  - Two finite float3 point spans (fixed target, moving source) from any canonical element domain
+  - Variant (rigid default, affine, nonrigid), outlier weight w in [0,1), EM limits, sigma^2 floor, nonrigid beta/lambda
+outputs:
+  - Rigid similarity (rotation, scale, translation) or affine transform, or the nonrigidly displaced source positions
+  - Final sigma^2, negative log-likelihood, iterations, termination reason, objective and sigma^2 histories, backend identity
+backends:
+  - cpu_reference
+metrics:
+  - runtime_ms
+  - quality_error_l2
+correctness_tests:
+  - ../../../tests/unit/geometry/Test.CoherentPointDrift.cpp
+benchmarks:
+  - ../../../benchmarks/geometry/manifests/coherent_point_drift_reference_smoke.yaml
+known_limitations:
+  - Explicit O(N*M) E-step per iteration (O(N+M) memory); fast summation and low-rank solves are METHOD-049.
+  - Nonrigid solves a dense M x M system per iteration (O(M^3)) and is limited to 8192 source points.
+  - EM is local; large rotations, symmetric shapes and reflections need a nearby start (see paper.md).
+  - Beta, lambda and the sigma^2 values are dimensionless under the default input normalization.

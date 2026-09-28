@@ -41,6 +41,7 @@ add_executable(IntrinsicBenchmarkSmoke
     geometry/Bench.VariationalFitSolverSmoke.cpp
     geometry/Bench.PointLBVHSmoke.cpp
     geometry/Bench.RegistrationSpatialSmoke.cpp
+    geometry/Bench.CoherentPointDriftReferenceSmoke.cpp
     geometry/Bench_SimplificationQualitySmoke.cpp
     geometry/Bench_SurfaceSamplingSmoke.cpp
     geometry/Bench_UvAtlasSmoke.cpp

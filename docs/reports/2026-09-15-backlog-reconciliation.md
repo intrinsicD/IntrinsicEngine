@@ -108,7 +108,7 @@ Task links retain detailed acceptance criteria, source references and evidence.
 | [METHOD-007](../../tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md) | Keep | Constrained Delaunay tetrahedralization reference backend. |
 | [METHOD-007A](../../tasks/backlog/methods/METHOD-007A-cdt-engine-integration-intake.md) | Keep | CDT engine-integration intake and ownership. |
 | [METHOD-014](../../tasks/backlog/methods/METHOD-014-progressive-poisson-gpu-operational-parity.md) | Revised | Actual Vulkan result/parity remains; typed operation and facade deletion are delivered. |
-| [METHOD-015](../../tasks/backlog/methods/METHOD-015-coherent-point-drift-family-reference-backend.md) | Keep | Coherent Point Drift registration family reference backend. |
+| [METHOD-015](../../tasks/done/METHOD-015-coherent-point-drift-family-reference-backend.md) | Keep | Coherent Point Drift registration family reference backend. |
 | [METHOD-021](../../tasks/backlog/methods/METHOD-021-arap-parameterization-reference-backend.md) | Keep | ARAP (local/global) parameterization reference backend. |
 | [METHOD-022](../../tasks/backlog/methods/METHOD-022-slim-injective-parameterization-reference-backend.md) | Keep | SLIM locally-injective parameterization reference backend. |
 | [METHOD-024](../../tasks/backlog/methods/METHOD-024-spectral-conformal-parameterization-reference-backend.md) | Keep | Spectral Conformal Parameterization (SCP) reference backend. |

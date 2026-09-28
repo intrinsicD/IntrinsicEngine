@@ -8775,3 +8775,5 @@ Retain terminal job outcomes while pending consumers reference them, so reaping 
 - 2026-09-28 — **CORE-010**: `EngineConfigSectionRegistration::SchemaJson` and `ExportEngineConfigSchema` (one `$defs` document for every registered section) with the read-only `config_schema` agent operation; `config_get` returns the section schema. [Task](CORE-010-config-section-schema-export.md).
 
 - 2026-09-28 — **UI-057**: field-table driven hints (description, accepted values, default), clamped numeric inputs and `EnumNames` combos in `Sandbox.PanelSupport`, adopted by every Smooth Property parameter; other families listed as follow-ups. [Task](UI-057-schema-driven-field-hints.md).
+
+- 2026-09-28 — **METHOD-015**: Coherent Point Drift CPU reference (rigid default, affine, nonrigid) on one streamed E-step with step solver, observer, 9 unit tests and a validated ground-truth smoke; CPUContracted, optimized backend METHOD-049. [Task](METHOD-015-coherent-point-drift-family-reference-backend.md).

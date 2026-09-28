@@ -33,6 +33,7 @@
 #include "../geometry/Bench.GeodesicsReferenceSmoke.hpp"
 #include "../geometry/Bench.PointLBVHSmoke.hpp"
 #include "../geometry/Bench.RegistrationSpatialSmoke.hpp"
+#include "../geometry/Bench.CoherentPointDriftReferenceSmoke.hpp"
 #include "../geometry/Bench.SimplificationQualitySmoke.hpp"
 #include "../geometry/Bench.SurfaceSamplingSmoke.hpp"
 #include "../geometry/Bench.UvAtlasSmoke.hpp"
@@ -685,6 +686,36 @@ auto EmitRegistrationSpatialSmoke(const std::string& commit) -> EmittedBenchmark
                 << ",\n    \"reference_total_ms\": " << r.ReferenceMilliseconds
                 << ",\n    \"lbvh_cold_total_ms\": " << r.ColdMilliseconds
                 << ",\n    \"lbvh_warm_total_ms\": " << r.WarmMilliseconds << '\n';
+        });
+}
+
+auto EmitCoherentPointDriftReferenceSmoke(const std::string& commit) -> EmittedBenchmark
+{
+    const auto r = Intrinsic::Bench::Geometry::RunCoherentPointDriftReferenceSmoke();
+    // Ground-truth RMS bound for the noise-0.005 fixtures (METHOD-015 tolerances).
+    const bool passed = r.Succeeded && r.MaxRmsError <= 0.02;
+    std::ostringstream out;
+    out.precision(9);
+    const auto variant = [&out](const char* name, const Intrinsic::Bench::Geometry::CoherentPointDriftVariantMetrics& m, bool last) {
+        out << "    \"" << name << "\": {\"succeeded\": " << (m.Succeeded ? "true" : "false")
+            << ", \"rms_error\": " << m.RmsError << ", \"initial_rms_error\": " << m.InitialRmsError
+            << ", \"sigma2\": " << m.Sigma2 << ", \"negative_log_likelihood\": " << m.NegativeLogLikelihood
+            << ", \"iterations\": " << m.Iterations << ", \"termination\": \"" << m.Termination << "\"}"
+            << (last ? "\n" : ",\n");
+    };
+    return EmitBenchmarkResult(out, "geometry.coherent_point_drift.reference.smoke",
+        "geometry.coherent_point_drift", "cpu_reference", "builtin.cpd_fixtures.seed101", commit, passed,
+        [&] {
+            out << "    \"runtime_ms\": " << r.RuntimeMilliseconds
+                << ",\n    \"quality_error_l2\": " << r.MaxRmsError << '\n';
+        }, [&] {
+            out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+                << "    \"mode\": \"correctness_smoke\",\n"
+                << "    \"warmup_iterations\": 1,\n    \"measured_iterations\": 3,\n"
+                << "    \"regime\": \"full overlap, noise 0.005, outlier weight 0.05 (rigid/affine), w = 0 nonrigid\",\n";
+            variant("rigid", r.Rigid, false);
+            variant("affine", r.Affine, false);
+            variant("nonrigid", r.Nonrigid, true);
         });
 }
 
@@ -1712,6 +1743,7 @@ auto main(int argc, char **argv) -> int {
   emitted.push_back(EmitLopLBVHSmoke(commit));
   emitted.push_back(EmitPointLBVHKnnSmoke(commit));
   emitted.push_back(EmitRegistrationSpatialSmoke(commit));
+  emitted.push_back(EmitCoherentPointDriftReferenceSmoke(commit));
   emitted.push_back(EmitCurvatureSegmentationReferenceSmoke(commit));
   emitted.push_back(EmitPointCloudConsolidationReferenceSmoke(commit));
   emitted.push_back(EmitLopFamilyComparisonSmoke(commit));

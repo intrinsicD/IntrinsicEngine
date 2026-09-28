@@ -143,3 +143,4 @@ production adoption (METHOD-045).
 - [Virtual-source geodesics](../../methods/geometry/geodesics_virtual_source/README.md): CPU reference, config, mesh panel, and distance properties.
 
 - [Rigid ICP registration](../../methods/geometry/registration/README.md): canonical operands and selectable correspondence providers with a shared CPU solve.
+- [Coherent Point Drift](../../methods/geometry/coherent_point_drift/README.md): rigid, affine and nonrigid CPD CPU reference (soft correspondences, outlier weight, step solver).
