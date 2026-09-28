@@ -1710,9 +1710,38 @@ namespace Extrinsic::Runtime
             if (!object.has_value())
                 return config;
 
+            // The shared "initial_*" sampling block is checked by its own field specs.
+            json plain = json::object();
+            json sampling = json::object();
+            for (const auto& [key, value] : object->items())
+                (key.starts_with("initial_") ? sampling : plain)[key] = value;
+            if (!sampling.empty())
+            {
+                json merged = json::object();
+                ConfigDetail::EncodePointSampling(merged, "initial_", config.InitialSampling);
+                PointSamplingConfig parsed = config.InitialSampling;
+                std::optional<std::string> error = ConfigDetail::ValidateDeclaredFields(
+                    sampling, merged, PointSamplingFieldSpecs("initial_"), "Initial sampling must be an object.",
+                    "Unknown initial sampling field: ");
+                if (!error)
+                {
+                    ConfigDetail::DecodePointSampling(merged, "initial_", parsed);
+                    error = ValidatePointSamplingConfig(parsed);
+                }
+                if (error)
+                    AddWarning(context, Core::Config::EngineConfigDiagnosticCode::InvalidValue,
+                               FieldSubject(context.Path, "initial_method"),
+                               *error + " Reference default retained.");
+                else
+                {
+                    config.InitialSampling = parsed;
+                    for (std::size_t k = 0; k < sampling.size(); ++k) CountParsed(context);
+                }
+            }
+
             AddUnknownFieldDiagnostics(
                 context,
-                *object,
+                plain,
                 {"backend",
                  "strategy",
                  "support_radius_mode",
@@ -2874,7 +2903,7 @@ namespace Extrinsic::Runtime
     std::string SerializePointCloudConsolidationConfig(
         const PointCloudConsolidationConfig& config)
     {
-        return ConfigDetail::SerializeConfigJson(json::object({
+        json doc = json::object({
             {"gpu_query_batch_size", config.GpuQueryBatchSize},
             {"gpu_radius_capacity", config.GpuRadiusCapacity},
             {"backend", std::string{ToConfigString(config.Backend)}},
@@ -2899,7 +2928,9 @@ namespace Extrinsic::Runtime
             {"clop_mixture_relative_tolerance", config.ClopMixtureRelativeTolerance},
             {"clop_covariance_floor", config.ClopCovarianceFloor},
             {"ear_edge_sensitivity", config.EarEdgeSensitivity},
-        }));
+        });
+        ConfigDetail::EncodePointSampling(doc, "initial_", config.InitialSampling);
+        return ConfigDetail::SerializeConfigJson(doc);
     }
 
     Core::Config::EngineConfigSectionValidationResult

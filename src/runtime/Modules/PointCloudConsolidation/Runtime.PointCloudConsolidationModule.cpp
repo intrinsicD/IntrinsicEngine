@@ -273,6 +273,9 @@ namespace Extrinsic::Runtime
                 .ConvergenceTolerance = config.ConvergenceTolerance,
                 .TargetPointCount = config.TargetPointCount,
                 .Seed = config.Seed,
+                .InitialSampling = config.InitialSampling.Method == PointSamplingMethod::Random
+                    ? std::nullopt
+                    : std::optional{ToPointSamplingParams(config.InitialSampling)},
                 .MaxInputPointCount = kMaximumPointCount,
                 .MaxOutputPointCount = kMaximumPointCount,
             };
@@ -1331,24 +1334,14 @@ namespace Extrinsic::Runtime
             if (target == 0u || target > snapshot.Positions.size())
                 return false;
 
-            Geometry::PointCloud::Cloud cloud{};
-            cloud.Reserve(snapshot.Positions.size());
-            for (const glm::vec3 position : snapshot.Positions)
-                static_cast<void>(cloud.AddPoint(position));
-            const auto sample = Geometry::PointCloud::RandomSubsample(
-                cloud,
-                Geometry::PointCloud::SubsampleParams{
-                    .TargetCount = target,
-                    .Seed = snapshot.Params.Seed,
-                });
-            if (!sample.has_value() ||
-                sample->Subsampled.Positions().size() != target)
-            {
+            // The CPU reference's own selection, so both paths start from the same samples.
+            std::vector<std::size_t> indices;
+            if (!Consolidation::SelectInitialSamples(snapshot.Positions, target, snapshot.Params.Seed,
+                                                     snapshot.Params.InitialSampling, indices))
                 return false;
-            }
-            snapshot.GpuInitialPositions.assign(
-                sample->Subsampled.Positions().begin(),
-                sample->Subsampled.Positions().end());
+            snapshot.GpuInitialPositions.clear();
+            for (const std::size_t i : indices)
+                snapshot.GpuInitialPositions.push_back(snapshot.Positions[i]);
             return true;
         }
 

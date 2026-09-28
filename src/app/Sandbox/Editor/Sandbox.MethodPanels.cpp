@@ -55,6 +55,7 @@ import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
 
 #include "Sandbox.PanelSupport.hpp"
+#include "Sandbox.PointSamplingControls.hpp"
 #include "Sandbox.PointCloudConsolidationPanel.hpp"
 
 namespace Extrinsic::Sandbox::Editor
@@ -1028,6 +1029,14 @@ namespace Extrinsic::Sandbox::Editor
                 "Seed##PointCloudConsolidation",
                 ImGuiDataType_U32,
                 &config.Seed);
+            if (ImGui::TreeNode("Initial samples##PointCloudConsolidation"))
+            {
+                // Random keeps the seeded legacy subsample (the Seed above).
+                changed |= DrawPointSamplingControls("ConsolidationInitial", Runtime::PointSamplingFieldSpecs("initial_"),
+                                                     "initial_", config.InitialSampling,
+                                                     Runtime::PointCloudConsolidationConfig{}.InitialSampling);
+                ImGui::TreePop();
+            }
 
             ImGui::SeparatorText("Strategy parameters");
             using Strategy = Runtime::PointCloudConsolidationStrategy;

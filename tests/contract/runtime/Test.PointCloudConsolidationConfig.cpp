@@ -174,3 +174,24 @@ TEST(PointCloudConsolidationConfig, VulkanLbvhControlsRoundTrip)
             R::SerializePointCloudConsolidationConfig(value), {}, "test").Usable());
     }
 }
+
+// RUNTIME-289: the initial samples' method is part of the section.
+TEST(PointCloudConsolidationConfig, InitialSamplingRoundTripsAndInvalidBlocksKeepTheDefault)
+{
+    namespace R = Extrinsic::Runtime;
+    Extrinsic::Core::Config::EngineConfig engine;
+    R::PointCloudConsolidationConfig value;
+    EXPECT_EQ(value.InitialSampling.Method, R::PointSamplingMethod::Random) << "legacy seeded subsample by default";
+    value.InitialSampling.Method = R::PointSamplingMethod::FlatGreedy;
+    value.InitialSampling.Beta = 1.3;
+    R::SetPointCloudConsolidationConfig(engine, value);
+    const auto read = R::GetPointCloudConsolidationConfig(engine);
+    ASSERT_TRUE(read);
+    EXPECT_EQ(read->InitialSampling.Method, R::PointSamplingMethod::FlatGreedy);
+    EXPECT_EQ(read->InitialSampling.Beta, 1.3);
+    const auto result = R::ValidatePointCloudConsolidationConfigSection(
+        R"({"initial_method": 3, "initial_eta": 1.0, "initial_candidate_cap": 8})", {}, "test");
+    EXPECT_FALSE(result.Diagnostics.empty()) << "eta 1 with a cap of 8 is rejected with a warning";
+    const auto bad = R::ValidatePointCloudConsolidationConfigSection(R"({"initial_beta": 0.5})", {}, "test");
+    EXPECT_FALSE(bad.Diagnostics.empty());
+}

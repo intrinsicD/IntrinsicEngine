@@ -1,5 +1,6 @@
 // Point-set projection strategies, diagnostics and externally queried neighborhood steps.
 module;
+#include <optional>
 
 #include <cstddef>
 #include <cstdint>
@@ -15,6 +16,7 @@ module;
 
 export module Geometry.PointCloud.Consolidation;
 export import Geometry.PointCloud.Consolidation.Types;
+export import Geometry.PointSampling;
 
 import Geometry.PointCloud;
 import Geometry.PointLBVH;
@@ -98,6 +100,10 @@ export namespace Geometry::PointCloud::Consolidation
         // retain the downsample-only contract.
         std::size_t TargetPointCount{0u};
         std::uint32_t Seed{42u};
+        // How the initial samples are chosen (RUNTIME-289): empty keeps the seeded
+        // PointCloud::RandomSubsample; otherwise the first TargetPointCount points of the
+        // Geometry.PointSampling order (a method that returns fewer fails the run).
+        std::optional<PointSampling::Params> InitialSampling{};
         // Deterministic caller-controlled guard for the serial reference's
         // input-sized allocations. The default preserves the API's natural
         // platform limit; callers with a fixed memory budget can lower it.
@@ -169,6 +175,13 @@ export namespace Geometry::PointCloud::Consolidation
     [[nodiscard]] Result Consolidate(
         std::span<const glm::vec3> positions,
         const Params& params = {});
+
+    // The initial sample indices (ascending) of `target` points: the seeded
+    // RandomSubsample without `sampling`, else the first `target` points of its order. Shared
+    // by the CPU reference and the runtime's GPU path so both start from the same samples.
+    [[nodiscard]] bool SelectInitialSamples(std::span<const glm::vec3> positions, std::size_t target,
+                                            std::uint32_t seed, const std::optional<PointSampling::Params>& sampling,
+                                            std::vector<std::size_t>& indices);
 
     // Authored normals are consumed without mutation. They are normalized on
     // a method-local copy and must match the position count. Isotropic

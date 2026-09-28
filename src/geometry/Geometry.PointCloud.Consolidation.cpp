@@ -468,28 +468,17 @@ namespace Geometry::PointCloud::Consolidation
             const std::span<const glm::vec3> positions,
             const std::size_t target,
             const std::uint32_t seed,
+            const std::optional<PointSampling::Params>& sampling,
             std::vector<glm::vec3>& projected,
             std::vector<std::size_t>& selectedIndices)
         {
-            Cloud cloud{};
-            cloud.Reserve(positions.size());
-            for (const glm::vec3 point : positions)
-                static_cast<void>(cloud.AddPoint(point));
-
-            const auto sample = RandomSubsample(
-                cloud,
-                SubsampleParams{
-                    .TargetCount = target,
-                    .Seed = seed,
-                });
-            if (!sample.has_value())
+            if (!SelectInitialSamples(positions, target, seed, sampling, selectedIndices))
                 return false;
-            projected.assign(
-                sample->Subsampled.Positions().begin(),
-                sample->Subsampled.Positions().end());
-            selectedIndices = sample->SelectedIndices;
-            return projected.size() == target &&
-                selectedIndices.size() == target;
+            projected.clear();
+            projected.reserve(selectedIndices.size());
+            for (const std::size_t i : selectedIndices)
+                projected.push_back(positions[i]);
+            return projected.size() == target;
         }
 
         [[nodiscard]] bool NormalizeNormal(
@@ -1985,6 +1974,33 @@ namespace Geometry::PointCloud::Consolidation
         return StrategyKind::Ear;
     }
 
+    bool SelectInitialSamples(const std::span<const glm::vec3> positions, const std::size_t target,
+                              const std::uint32_t seed, const std::optional<PointSampling::Params>& sampling,
+                              std::vector<std::size_t>& indices)
+    {
+        indices.clear();
+        if (target == 0u || target > positions.size())
+            return false;
+        if (!sampling)
+        {
+            Cloud cloud{};
+            cloud.Reserve(positions.size());
+            for (const glm::vec3 point : positions)
+                static_cast<void>(cloud.AddPoint(point));
+            const auto sample = RandomSubsample(cloud, SubsampleParams{.TargetCount = target, .Seed = seed});
+            if (!sample.has_value())
+                return false;
+            indices = sample->SelectedIndices;
+            return indices.size() == target;
+        }
+        const auto order = PointSampling::Order(positions, *sampling, target);
+        if (!order.Succeeded() || order.Order.size() != target)
+            return false;
+        indices.assign(order.Order.begin(), order.Order.end());
+        std::sort(indices.begin(), indices.end());
+        return true;
+    }
+
     Result Consolidate(
         const std::span<const glm::vec3> positions,
         const Params& params)
@@ -2090,7 +2106,7 @@ namespace Geometry::PointCloud::Consolidation
         std::vector<glm::vec3> projected{};
         std::vector<std::size_t> selectedIndices{};
         if (!InitializeProjected(
-                positions, initialTarget, params.Seed,
+                positions, initialTarget, params.Seed, params.InitialSampling,
                 projected, selectedIndices))
         {
             result.State = Status::NumericalFailure;
@@ -2364,7 +2380,7 @@ namespace Geometry::PointCloud::Consolidation
                 : params.TargetPointCount;
             std::vector<std::size_t> selectedIndices{};
             if (!InitializeProjected(
-                    source, std::min(target, source.size()), params.Seed,
+                    source, std::min(target, source.size()), params.Seed, params.InitialSampling,
                     Projected, selectedIndices))
             {
                 Fail(Status::NumericalFailure);
@@ -2599,7 +2615,7 @@ namespace Geometry::PointCloud::Consolidation
         if (!result.Succeeded()) return result;
         std::vector<std::size_t> selected;
         if (!InitializeProjected(source, params.TargetPointCount ? params.TargetPointCount : source.size(),
-            params.Seed, result.Positions, selected)) result.State = Status::NumericalFailure;
+            params.Seed, params.InitialSampling, result.Positions, selected)) result.State = Status::NumericalFailure;
         result.Diagnostics.OutputPointCount = result.Positions.size();
         return result;
     }

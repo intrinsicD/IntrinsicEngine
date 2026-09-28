@@ -8,6 +8,7 @@ module;
 
 export module Extrinsic.Runtime.PointCloudConsolidationConfig;
 
+export import Extrinsic.Runtime.PointSamplingConfig;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 
@@ -67,6 +68,9 @@ export namespace Extrinsic::Runtime
         double ConvergenceTolerance{1.0e-4};
         std::uint32_t TargetPointCount{0u};
         std::uint32_t Seed{42u};
+        // How the initial samples are picked ("initial_*", RUNTIME-289); Random keeps the
+        // seeded legacy subsample driven by `Seed`.
+        PointSamplingConfig InitialSampling{.Method = PointSamplingMethod::Random};
 
         std::uint32_t GpuQueryBatchSize{4096u};
         std::uint32_t GpuRadiusCapacity{256u};

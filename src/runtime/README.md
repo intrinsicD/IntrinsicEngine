@@ -799,7 +799,9 @@ like nonrigid it writes positions or a displacement property. The shared
 `Extrinsic.Runtime.PointSamplingConfig` block (RUNTIME-289) makes the sampling method
 selectable: `subsample_*` chooses how the Bayesian source and target subsamples
 (`subsample`, `subsample_target`) are picked, `landmark_*` how the low-rank and Nystroem
-landmarks are picked (every `Geometry.PointSampling` method; exact farthest point by default).
+landmarks are picked (every `Geometry.PointSampling` method; exact farthest point by default). Point
+cloud consolidation takes the same block as `initial_*` for its initial samples (Random keeps
+the seeded legacy subsample; CPU and Vulkan paths share `SelectInitialSamples`).
 
 ### Sandbox Editor ICP Registration
 

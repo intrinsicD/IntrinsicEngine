@@ -8,6 +8,7 @@
 #include <limits>
 #include <span>
 #include <variant>
+#include <random>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -1907,4 +1908,29 @@ TEST(PointCloudConsolidation, NeighborhoodProjectionFiltersStrictShellsAndTinySu
     EXPECT_EQ(expected.Diagnostics.AttractionContributionCount, 6u);
     for (const bool useRadius : {false, true})
         ExpectProjectionResult(ProjectWithRows(source, normals, params, useRadius), expected);
+}
+
+// RUNTIME-289: selectable initial samples, shared with the runtime's GPU path.
+TEST(PointCloudConsolidation, InitialSamplesFollowTheSelectedMethod)
+{
+    std::vector<glm::vec3> points;
+    std::mt19937 random(12u);
+    std::uniform_real_distribution<float> uniform(-1.0f, 1.0f);
+    for (int i = 0; i < 600; ++i) points.push_back({uniform(random), uniform(random), 0.1f * uniform(random)});
+    std::vector<std::size_t> legacy, farthest;
+    ASSERT_TRUE(Consolidation::SelectInitialSamples(points, 120, 42u, std::nullopt, legacy));
+    ASSERT_TRUE(Consolidation::SelectInitialSamples(points, 120, 42u, Geometry::PointSampling::Params{}, farthest));
+    EXPECT_EQ(legacy.size(), 120u);
+    EXPECT_TRUE(std::is_sorted(farthest.begin(), farthest.end()));
+    const auto order = Geometry::PointSampling::Order(std::span<const glm::vec3>(points), {}, 120);
+    std::vector<std::size_t> expected(order.Order.begin(), order.Order.end());
+    std::sort(expected.begin(), expected.end());
+    EXPECT_EQ(farthest, expected);
+    std::vector<std::size_t> none;
+    EXPECT_FALSE(Consolidation::SelectInitialSamples(points, 700, 42u, std::nullopt, none));
+    Consolidation::Params params{.TargetPointCount = 120, .InitialSampling = Geometry::PointSampling::Params{}};
+    params.Method = Consolidation::LopStrategy{};
+    const auto result = Consolidation::Consolidate(points, params);
+    EXPECT_NE(result.State, Consolidation::Status::NumericalFailure);
+    EXPECT_EQ(result.Positions.size(), 120u);
 }
