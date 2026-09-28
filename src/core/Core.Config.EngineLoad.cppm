@@ -91,6 +91,8 @@ namespace Extrinsic::Core::Config
         EngineConfigSection DefaultSection{};
         EngineConfigSectionValidator Validate{};
         EngineConfigSectionChangedCallback OnChanged{};
+        // Optional JSON Schema of the payload object; when set it must be a JSON object.
+        std::string SchemaJson{};
     };
 
     export class EngineConfigSectionRegistry final
@@ -132,6 +134,11 @@ namespace Extrinsic::Core::Config
                                             EngineConfigDiagnosticCode code) noexcept;
     export [[nodiscard]] std::uint32_t CountByState(const EngineConfigLoadResult& result,
                                                     EngineConfigState state) noexcept;
+    // One JSON Schema document for every registered section: `$defs` keyed by section
+    // name (registry order) carrying `x-schema-id`/`x-schema-version`; a section without
+    // a schema appears as `{"type":"object","x-schema-missing":true}`.
+    export [[nodiscard]] std::string ExportEngineConfigSchema(const EngineConfigSectionRegistry& registry);
+
     export void PopulateEngineConfigSectionDefaults(
         EngineConfig& config,
         const EngineConfigSectionRegistry& registry);

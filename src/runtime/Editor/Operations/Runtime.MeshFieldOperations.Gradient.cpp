@@ -2,6 +2,7 @@
 module;
 #include "GeometryIntegration/Runtime.GeometryValueComparison.hpp"
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <initializer_list>
@@ -29,6 +30,7 @@ import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.Properties;
 #include "Config/internal/Runtime.PointConfigJson.hpp"
+#include "Config/internal/Runtime.ConfigFieldJson.hpp"
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.hpp"
@@ -42,6 +44,17 @@ namespace Extrinsic::Runtime
         namespace MS = GeometryProcessingDetail::MeshSupport;
         using Json = nlohmann::json;
         constexpr std::string_view kSchema = "intrinsic.runtime.sandbox.scalar_gradient";
+        using FT = ConfigFieldType;
+        using K = Geometry::PropertyValueKind;
+        constexpr std::array<K, 1> kVec3{K::Vec3};
+        constexpr std::array<K, 1> kScalar{K::Double};
+        constexpr std::array<GeometryElementDomain, 1> kVertex{GeometryElementDomain::MeshVertex};
+        constexpr std::array<GeometryElementDomain, 1> kFace{GeometryElementDomain::MeshFace};
+        constexpr std::array kFields{
+            ConfigFieldSpec{.Name = "positions", .Type = FT::PropertyRef, .Description = "Vertex positions.", .RefKinds = kVec3, .RefDomains = kVertex},
+            ConfigFieldSpec{.Name = "scalar", .Type = FT::PropertyRef, .Description = "Scalar vertex property to differentiate (any scalar storage).", .RefKinds = kScalar, .RefDomains = kVertex, .AnyScalar = true},
+            ConfigFieldSpec{.Name = "output", .Type = FT::PropertyRef, .Description = "Face vec3 property receiving the per-face gradient.", .RefKinds = kVec3, .RefDomains = kFace},
+        };
 
         ScalarGradientConfig DecodeGradient(const Json& doc)
         {
@@ -56,20 +69,13 @@ namespace Extrinsic::Runtime
         {
             const auto doc = Json::parse(payload, nullptr, false);
             auto merged = Json::parse(SerializeScalarGradientConfig({}));
-            if (auto error = ConfigDetail::ValidatePointConfigFields(
-                    doc, merged, "Scalar gradient config must be an object.", "Unknown gradient field: ", {}))
+            if (auto error = ConfigDetail::ValidateDeclaredFields(doc, merged, kFields,
+                    "Scalar gradient config must be an object.", "Unknown gradient field: "))
                 return ConfigDetail::RejectConfigSection(subject, *error);
             for (const auto key : {"positions", "scalar", "output"})
             {
-                const bool scalar = std::string_view{key} == "scalar";
                 const auto domain = std::string_view{key} == "output"
                     ? GeometryElementDomain::MeshFace : GeometryElementDomain::MeshVertex;
-                if (ConfigDetail::ValidatePointPropertyRef(merged[key], scalar
-                        ? Geometry::PropertyValueKind::Double : Geometry::PropertyValueKind::Vec3, scalar)
-                        != ConfigDetail::PointPropertyValidation::Valid ||
-                    merged[key]["domain"] != ToString(domain))
-                    return ConfigDetail::RejectConfigSection(subject,
-                        "Gradient requires vertex positions (vec3), a vertex scalar and a face vec3 output.");
                 const auto name = merged[key]["name"].get<std::string>();
                 if (name.find('\0') != std::string::npos ||
                     (std::string_view{key} == "output" && IsTopologyProperty(domain, name)))
@@ -125,8 +131,12 @@ namespace Extrinsic::Runtime
     }
     Core::Config::EngineConfigSectionRegistration MakeScalarGradientConfigSectionRegistration()
     {
-        return {.DefaultSection = GradientSection({}), .Validate = ValidateGradient};
+        return {.DefaultSection = GradientSection({}), .Validate = ValidateGradient,
+                .SchemaJson = ConfigDetail::BuildSectionSchemaJson(kSchema, "Scalar Gradient",
+                    "Per-face gradient of a scalar vertex property on a triangle mesh.",
+                    kFields, Json::parse(SerializeScalarGradientConfig({})))};
     }
+    std::span<const ConfigFieldSpec> ScalarGradientConfigFieldSpecs() noexcept { return kFields; }
     RuntimeEngineConfigApplyResult ApplyEditorScalarGradientConfig(
         const EditorProcessingCommands& commands, const ScalarGradientConfig& c)
     {

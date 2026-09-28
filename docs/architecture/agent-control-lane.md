@@ -47,7 +47,7 @@ launch flag: no module, thread or socket.
   preview/apply with `RuntimeConfigControlSource::AgentCli`, the mesh-field
   `Preview*/Apply*` commands, and the panels' Show recipe
   (`MakeEditorPropertyVisualizationRecipe`). There is no generic scene or property write.
-- Naming: `scene_*`, `entity_*`, `config_sections`, `config_get`, `config_preview`,
+- Naming: `scene_*`, `entity_*`, `config_sections`, `config_schema`, `config_get`, `config_preview`,
   `history`, `jobs`, `log`, `preview_*` and `view_screenshot` are read-only
   (`readOnlyHint`); `select_entity`, `import_file`, `show_property`, `config_apply`,
   `run_mesh_operation`, `undo`, `redo` change state, and `view_capture` writes a PNG
@@ -55,7 +55,10 @@ launch flag: no module, thread or socket.
 - Screenshots complete a few frames after the call: an operation may return an
   `AgentOperationContinuation`, which the server polls each frame and answers with
   the original JSON-RPC id; a reconnecting client drops pending replies. Both tools
-  call `ViewCaptureModule`, the queue behind File > Save Screenshot and F12.
+  call `ViewCaptureModule`, the queue behind File > Save Screenshot and F12, and
+  accept a camera `preset` (restored afterwards, so `view_screenshot` stays
+  read-only), `fit_entity`, and `legend_entity`, which appends a colormap strip and
+  returns the property, colormap and the range the renderer uses.
 - Mutating calls run under `ScopedEditorCommandLabelPrefix("Agent: ")`, so the
   undo history shows each agent change and the operator can undo it.
 - Excluded by design: raw ECS or property-buffer writes, code execution, RHI
@@ -68,9 +71,9 @@ launch flag: no module, thread or socket.
 ## Planned capability tasks
 
 Schemas from declarative config field tables:
-[CORE-010](../../tasks/backlog/architecture/CORE-010-config-section-schema-export.md),
+[CORE-010](../../tasks/done/CORE-010-config-section-schema-export.md),
 [RUNTIME-276](../../tasks/backlog/runtime/RUNTIME-276-declarative-config-field-specs.md),
-[UI-057](../../tasks/backlog/ui/UI-057-schema-driven-field-hints.md).
+[UI-057](../../tasks/done/UI-057-schema-driven-field-hints.md).
 Structured readiness:
 [RUNTIME-277](../../tasks/backlog/runtime/RUNTIME-277-structured-action-readiness-reasons.md),
 [UI-058](../../tasks/backlog/ui/UI-058-all-reasons-readiness-tooltips.md).

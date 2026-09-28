@@ -68,6 +68,7 @@ target_sources(${target_name}
         Kernel/Runtime.Engine.cppm
         Config/Runtime.EngineConfigBoot.cppm
         Config/Runtime.EngineConfigControl.cppm
+        Config/Runtime.ConfigFieldSpec.cppm
         Agent/Runtime.AgentOperations.cppm
         Agent/Runtime.AgentServer.cppm
         Kernel/Runtime.FramePacingDiagnostics.cppm
@@ -229,6 +230,7 @@ target_sources(${target_name}
         Kernel/Runtime.Engine.cpp
         Config/Runtime.EngineConfigBoot.cpp
         Config/Runtime.EngineConfigControl.cpp
+        Config/Runtime.ConfigFieldSpec.cpp
         Agent/Runtime.AgentOperations.cpp
         Agent/Runtime.AgentOperations.Editor.cpp
         Agent/Runtime.AgentOperations.Capture.cpp

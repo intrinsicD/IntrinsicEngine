@@ -26,6 +26,7 @@ class FakeSandbox:
         self.server.bind(path)
         self.server.listen(1)
         self.calls = []
+        self.connection = None
         self.thread = threading.Thread(target=self.serve, daemon=True)
         self.thread.start()
 
@@ -34,6 +35,7 @@ class FakeSandbox:
             connection, _ = self.server.accept()
         except OSError:
             return
+        self.connection = connection
         with connection, connection.makefile("r") as reader:
             for line in reader:
                 message = json.loads(line)
@@ -54,6 +56,14 @@ class FakeSandbox:
 
     def close(self) -> None:
         self.server.close()
+
+    def stop(self) -> None:
+        """Like a Sandbox exit: the listener and the client's connection go away."""
+        self.server.close()
+        if self.connection is not None:
+            self.connection.shutdown(socket.SHUT_RDWR)
+        self.thread.join(timeout=5)
+        os.unlink(self.path)
 
 
 class McpBridgeTests(unittest.TestCase):
@@ -112,6 +122,42 @@ class McpBridgeTests(unittest.TestCase):
         self.assertEqual(self.call("ping")["result"], {})
         self.assertEqual(self.call("resources/list")["error"]["code"], -32601)
         self.assertIsNone(self.bridge.handle({"jsonrpc": "2.0", "method": "notifications/initialized"}))
+
+    def test_a_restarted_sandbox_is_reconnected_and_refreshes_the_tools(self):
+        first = FakeSandbox(self.path)
+        self.call("initialize")
+        self.call("tools/list")
+        first.stop()
+        second = FakeSandbox(self.path)
+        try:
+            self.written()
+            status = self.call("tools/call", {"name": "sandbox_status", "arguments": {}})
+            self.assertTrue(json.loads(status["result"]["content"][0]["text"])["connected"],
+                            "sandbox_status probes the stale connection and reconnects")
+            self.assertIn({"jsonrpc": "2.0", "method": "notifications/tools/list_changed"}, self.written(),
+                          "the new Sandbox's tools are announced")
+            reply = self.call("tools/call", {"name": "scene_entities", "arguments": {}})
+            self.assertFalse(reply["result"]["isError"])
+            self.assertIn("tools/call", second.calls)
+        finally:
+            second.close()
+
+    def test_a_call_that_never_left_is_retried_on_a_new_connection(self):
+        first = FakeSandbox(self.path)
+        self.call("initialize")
+        first.stop()
+        second = FakeSandbox(self.path)
+        try:
+            # The bridge still holds the dead connection; the send fails, so the call is retried.
+            reply = None
+            for _ in range(3):  # the first send into a reset socket may still be accepted by the kernel
+                reply = self.call("tools/call", {"name": "scene_entities", "arguments": {"n": 2}})
+                if not reply["result"]["isError"]:
+                    break
+            self.assertFalse(reply["result"]["isError"], reply)
+            self.assertIn("tools/call", second.calls)
+        finally:
+            second.close()
 
     def test_endpoints_are_unix_socket_paths_only(self):
         # A host:port string is treated as a (missing) socket path, never as a network address.

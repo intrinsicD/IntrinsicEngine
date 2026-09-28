@@ -167,6 +167,13 @@ TEST(SandboxAgentServer, ClientRunsSmoothingThroughTheSocketAndUndoesIt)
                                                       {"payload", {{"iterations", 0}}}}, &isError);
         check(isError && !rejected["diagnostics"].empty(), "invalid config is rejected: " + rejected.dump());
 
+        // CORE-010/RUNTIME-276: the generated schema reaches the agent.
+        auto sectionSchema = c.Tool("config_schema", {{"section", std::string(R::kPropertySmoothingConfigSectionName)}});
+        check(sectionSchema["properties"]["iterations"]["maximum"] == 10000 &&
+              sectionSchema["properties"]["method"]["x-enum-names"].size() == 6u,
+              "config_schema section: " + sectionSchema.dump().substr(0, 400));
+        auto fullSchema = c.Tool("config_schema");
+        check(fullSchema["$defs"].contains(std::string(R::kPropertySmoothingConfigSectionName)), "config_schema export");
         auto preview = c.Tool("preview_mesh_operation", {{"operation", "property_smoothing"}, {"entity", stableId}});
         check(preview["enabled"] == true, "preview: " + preview.dump());
         auto run = c.Tool("run_mesh_operation", {{"operation", "property_smoothing"}, {"entity", stableId}}, &isError);
@@ -204,7 +211,7 @@ TEST(SandboxAgentServer, ClientRunsSmoothingThroughTheSocketAndUndoesIt)
     EXPECT_TRUE(done.load()) << "client did not finish";
     EXPECT_TRUE(smoothedSeen) << "the agent's smoothing published its output";
     EXPECT_FALSE(vertices.Exists("smooth")) << "the agent's undo removed it again";
-    EXPECT_EQ(server->Status().CallsHandled, 15u) << "one main-thread call per request";
+    EXPECT_EQ(server->Status().CallsHandled, 17u) << "one main-thread call per request";
     const auto& lastApply = engine.Services().Find<R::EngineConfigControl>()->GetEngineConfigControlState().LastApply;
     EXPECT_EQ(lastApply.Source, R::RuntimeConfigControlSource::AgentCli) << "config_apply records the agent as the source";
     engine.Shutdown();

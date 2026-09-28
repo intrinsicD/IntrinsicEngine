@@ -14,6 +14,28 @@ contracts: [repo.source-documentation, repo.task-contract-discovery, geometry.el
 ---
 # RUNTIME-276 — Declarative `ConfigFieldSpec` tables, schema generation and conformance test
 
+## Progress — 2026-09-28 (slice A, `claude/config-schemas`)
+Done: `Extrinsic.Runtime.ConfigFieldSpec` (Bool, UInt, Int, Float, Enum with a first
+value, String, UIntArray, PropertyRef with kinds/domains/any-scalar/nullable) and the
+internal `Runtime.ConfigFieldJson.hpp` (`ValidateDeclaredFields`,
+`BuildSectionSchemaJson`); tables, generated `SchemaJson` and table-driven `Validate`
+for smoothing, harmonic field, Laplacian eigenbasis, scalar gradient, geodesics and
+mesh curvature (per-owner accessors such as `PropertySmoothingConfigFieldSpecs()`);
+`Test.EngineConfigSectionSchemas.cpp` in `tests/integration/runtime` (the registry
+is app-owned) checks keys, defaults, every enum value, every bound and the
+rejection past it for every section that has a schema.
+Deviations: the accessor is `FindConfigFieldSpec(fields, name)` over an owner's
+table rather than `(section, field)`, so no central section map is needed; the
+agent config tools stay generic over sections, so the schema reaches agents
+through `config_schema` and `config_get` instead of per-section `inputSchema`
+(tools/list is static and one inputSchema cannot follow the `section` argument).
+Schema defaults are the omitted-field values of each validator's merge (for the
+harmonic field this is `pin_boundary:false`, while its registered default section
+pins the boundary). Known limit: a table bound that is looser than an owner's
+backstop check (e.g. `ValidatePropertyFilterParams`) is not detected when the
+backstop rejects with a different message.
+Remaining: slices B and C.
+
 ## Goal
 - Give every Sandbox config section one declarative field table that both generates
   its JSON Schema (`SchemaJson`, CORE-010) and replaces the mechanical parts of its
@@ -37,8 +59,8 @@ contracts: [repo.source-documentation, repo.task-contract-discovery, geometry.el
 - Agent/CLI: `config_preview`/`config_apply` agent operations use the section `SchemaJson` as their per-section `inputSchema`; `config_schema` returns it.
 
 ## Required changes
-- [ ] `ConfigDetail::BuildSectionSchemaJson(title, description, fields)` and `ConfigDetail::ValidateDeclaredFields(doc, merged, fields, subject)` in `Runtime.FeatureConfigCodecs.Detail.cpp`; `FindConfigFieldSpec` public accessor.
-- [ ] Slice A — mesh-field family (smoothing, harmonic field, Laplacian eigenbasis, scalar gradient, geodesics, mesh curvature): tables, generated `SchemaJson`, `Validate` reduced to table check + cross-field rules.
+- [x] `ConfigDetail::BuildSectionSchemaJson(title, description, fields)` and `ConfigDetail::ValidateDeclaredFields(doc, merged, fields, subject)` in `Runtime.FeatureConfigCodecs.Detail.cpp`; `FindConfigFieldSpec` public accessor.
+- [x] Slice A — mesh-field family (smoothing, harmonic field, Laplacian eigenbasis, scalar gradient, geodesics, mesh curvature): tables, generated `SchemaJson`, `Validate` reduced to table check + cross-field rules.
 - [ ] Slice B — point families (normal estimation, outlier analysis, kernel density, point spacing, bilateral filter, keypoints, descriptors, density weight, point construction, registration).
 - [ ] Slice C — remaining sections (clustering, curvature segmentation, progressive Poisson, parameterization, point-cloud consolidation, physics module, selection).
 - [ ] Registrations in `src/app/Sandbox/Sandbox.ConfigSections.cpp` set `SchemaJson` from the owners.

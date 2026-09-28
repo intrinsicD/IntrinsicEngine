@@ -14,6 +14,23 @@ contracts: [repo.source-documentation, repo.task-contract-discovery]
 ---
 # CORE-010 — `EngineConfigSectionRegistration::SchemaJson` and `ExportEngineConfigSchema`
 
+## Completion — 2026-09-28
+Commit: the enclosing `claude/config-schemas` commit records this retirement.
+`EngineConfigSectionRegistration::SchemaJson` (rejected at `Register` unless it is a
+JSON object) and `ExportEngineConfigSchema(registry)` (`$defs` in registry name order
+with `x-schema-id`/`x-schema-version`, `x-schema-missing` placeholders, deterministic).
+The read-only agent operation `config_schema {section?}` returns the export or one
+section; `config_get` also returns the section's `schema`.
+
+Deviations from the planned text, all deliberate:
+- Core's implementation unit already parses JSON with nlohmann (`CanonicalObjectJson`),
+  so the export is composed with it instead of string concatenation; the core
+  interface stays JSON-free.
+- The runtime-side check that the export parses with one `$defs` entry per
+  registration is `EngineConfigSectionSchemas.ExportContainsEverySandboxSection`
+  in `tests/integration/runtime` (the full registry is app-owned), next to the
+  unit test `CoreEngineConfigSections.SchemaExportListsEverySectionInNameOrder`.
+
 ## Goal
 - Let every registered engine-config section carry a machine-readable JSON Schema
   string and export all registered sections as one schema document, keeping core
@@ -35,20 +52,20 @@ contracts: [repo.source-documentation, repo.task-contract-discovery]
 - Agent/CLI: `config_schema {section?}` read-only agent operation (registered in `Runtime.AgentOperations`).
 
 ## Required changes
-- [ ] Add `std::string SchemaJson{}` to `EngineConfigSectionRegistration` (opaque, may be empty).
-- [ ] Add `std::string ExportEngineConfigSchema(const EngineConfigSectionRegistry&)` in `Core.Config.EngineLoad` returning one document (`$schema`, `$defs` keyed by section `Name` with `x-schema-id` and `x-schema-version`; sections without a schema appear as `{"type":"object"}` with `x-schema-missing:true`), deterministic order, composed by string concatenation of the opaque per-section strings (no JSON library in core).
-- [ ] Register a read-only `config_schema` agent operation in the runtime config family (RUNTIME-287 registry) that returns the export or one section.
+- [x] Add `std::string SchemaJson{}` to `EngineConfigSectionRegistration` (opaque, may be empty).
+- [x] Add `std::string ExportEngineConfigSchema(const EngineConfigSectionRegistry&)` in `Core.Config.EngineLoad` returning one document (`$schema`, `$defs` keyed by section `Name` with `x-schema-id` and `x-schema-version`; sections without a schema appear as `{"type":"object"}` with `x-schema-missing:true`), deterministic order, composed by string concatenation of the opaque per-section strings (no JSON library in core).
+- [x] Register a read-only `config_schema` agent operation in the runtime config family (RUNTIME-287 registry) that returns the export or one section.
 
 ## Tests
-- [ ] `tests/unit/core` test: export ordering, missing-schema placeholder, section metadata; runtime contract test parses the export with nlohmann and checks one `$defs` entry per registration.
+- [x] `tests/unit/core` test: export ordering, missing-schema placeholder, section metadata; runtime contract test parses the export with nlohmann and checks one `$defs` entry per registration.
 
 ## Docs
-- [ ] `docs/architecture/runtime-config-control.md` and `docs/architecture/engine-config.md` document schema export; module inventory regenerated.
+- [x] `docs/architecture/runtime-config-control.md` and `docs/architecture/engine-config.md` document schema export; module inventory regenerated.
 
 ## Acceptance criteria
-- [ ] Every registration can carry a schema; the export is a single well-formed JSON document for the full Sandbox registry.
-- [ ] Core stays JSON-library-free; layering check passes.
-- [ ] `config_schema` agent operation returns the same document the export function produces.
+- [x] Every registration can carry a schema; the export is a single well-formed JSON document for the full Sandbox registry.
+- [x] Core stays JSON-library-free; layering check passes.
+- [x] `config_schema` agent operation returns the same document the export function produces.
 
 ## Verification
 ```bash

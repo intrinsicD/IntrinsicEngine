@@ -3195,3 +3195,54 @@ TEST(SandboxProcessingPanels, PropertySmoothingExecutesConfiguredPropertyAndPubl
     };
     h.Engine->Run();
 }
+
+// UI-057: Smooth Property parameters come from the section's field table: typed values are
+// clamped to the declared range, and the hover hint carries the table's description,
+// accepted range and default.
+TEST(SandboxProcessingPanels, PropertySmoothingControlsClampToTheFieldTableAndShowItsHint)
+{
+    const auto fields = R::PropertySmoothingConfigFieldSpecs();
+    const auto* neighbors = R::FindConfigFieldSpec(fields, "neighbors");
+    ASSERT_NE(neighbors, nullptr);
+    const auto hint = Editor::FormatConfigFieldHint(*neighbors, "12");
+    EXPECT_NE(hint.find(neighbors->Description), std::string::npos) << hint;
+    EXPECT_NE(hint.find("Accepted: 1 to 1024"), std::string::npos) << hint;
+    EXPECT_NE(hint.find("Default: 12"), std::string::npos) << hint;
+    const auto* lambda = R::FindConfigFieldSpec(fields, "lambda");
+    ASSERT_NE(lambda, nullptr);
+    EXPECT_NE(Editor::FormatConfigFieldHint(*lambda, {}).find("greater than 0, at most 1"), std::string::npos);
+
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0, 0, 0}), b = mesh.AddVertex({1, 0, 0}), c = mesh.AddVertex({0, 1, 0});
+    ASSERT_TRUE(mesh.AddTriangle(a, b, c));
+    GS::PopulateFromMesh(scene.Raw(), entity, mesh);
+    scene.Raw().get<GS::Vertices>(entity).Properties.GetOrAdd<double>("v:mean_curvature", 0.0);
+    R::PropertySmoothingConfig smoothing;
+    smoothing.Weight = Geometry::Smoothing::PropertyWeight::Uniform; // shows the Neighbors input
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto section = R::MakePropertySmoothingConfigSectionRegistration().DefaultSection;
+    section.PayloadJson = R::SerializePropertySmoothingConfig(smoothing);
+    Config::UpsertEngineConfigSection(config.AppSections, section);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.property_smoothing", true));
+    const auto activeNeighbors = [&] {
+        const auto& active = h.Control().GetEngineConfigControlState().ActiveConfig;
+        const auto* stored = Config::FindEngineConfigSection(active.AppSections, R::kPropertySmoothingConfigSectionName);
+        return stored ? stored->PayloadJson : std::string{};
+    };
+    int frames = 0;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        ++frames;
+        auto* window = ImGui::FindWindowByName("Smooth Property");
+        if (window) { ImGui::SetWindowSize(window, {750, 1200}); ImGui::SetWindowPos(window, {0, 0}); ImGui::FocusWindow(window); }
+        if (window && frames >= 10 && frames < 16) EditScalarControl(window, "Neighbors", frames - 10, "5000");
+        if (frames == 20) engine.RequestExit();
+    };
+    h.Engine->Run();
+    EXPECT_NE(activeNeighbors().find("\"neighbors\":1024"), std::string::npos)
+        << "5000 neighbors were clamped to the declared maximum and applied: " << activeNeighbors();
+}

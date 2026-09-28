@@ -60,7 +60,7 @@ TEST(AgentOperations, EditorOperationsHaveUniqueNamesAndValidSchemas)
         EXPECT_EQ(schema.value("type", ""), "object");
         EXPECT_FALSE(spec.Description.empty());
         const bool reader = spec.Name.starts_with("scene_") || spec.Name.starts_with("entity_") || spec.Name == "history" ||
-                            spec.Name.starts_with("config_sections") || spec.Name == "config_get" || spec.Name == "config_preview" ||
+                            spec.Name.starts_with("config_sections") || spec.Name == "config_schema" || spec.Name == "config_get" || spec.Name == "config_preview" ||
                             spec.Name == "jobs" || spec.Name == "log" || spec.Name.starts_with("preview_");
         EXPECT_EQ(spec.ReadOnly, reader) << "read-only flag follows the naming convention";
     }
@@ -211,6 +211,12 @@ TEST(AgentOperations, CaptureToolsFailClearlyWithoutTheCaptureServiceOrOutsideTh
                                                 {"params", {{"name", "view_capture"}, {"arguments", {{"path", "/etc/shot.png"}}}}}});
     EXPECT_EQ(outside["result"]["isError"], true);
     EXPECT_NE(outside["result"]["content"][0]["text"].get<std::string>().find("allowed roots"), std::string::npos);
+    const auto badPreset = Call(protocol, context, {{"jsonrpc", "2.0"}, {"id", 5}, {"method", "tools/call"},
+                                                    {"params", {{"name", "view_screenshot"}, {"arguments", {{"preset", "sideways"}}}}}});
+    EXPECT_EQ(badPreset["result"]["isError"], true);
+    const auto fitWithoutPreset = Call(protocol, context, {{"jsonrpc", "2.0"}, {"id", 6}, {"method", "tools/call"},
+        {"params", {{"name", "view_screenshot"}, {"arguments", {{"fit_entity", 3}}}}}});
+    EXPECT_NE(fitWithoutPreset["result"]["content"][0]["text"].get<std::string>().find("needs a preset"), std::string::npos);
 }
 
 TEST(AgentOperations, Base64MatchesTheRfcVectors)

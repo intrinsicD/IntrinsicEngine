@@ -8,6 +8,7 @@
 #include <initializer_list>
 #include <limits>
 #include <numbers>
+#include <span>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -25,8 +26,11 @@ import Extrinsic.Runtime.ParameterizationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.ProgressivePoissonConfig;
 import Extrinsic.Runtime.GeometryProperty.Types;
+import Extrinsic.Runtime.ConfigFieldSpec;
+import Geometry.Properties.Types;
 
 #include "Config/internal/Runtime.PointConfigJson.hpp"
+#include "Config/internal/Runtime.ConfigFieldJson.hpp"
 
 namespace Extrinsic::Runtime::ConfigDetail
 {
@@ -174,6 +178,219 @@ namespace Extrinsic::Runtime::ConfigDetail
                 return "Unknown element domain.";
         }
         return std::nullopt;
+    }
+
+    namespace
+    {
+        using Kind = Geometry::PropertyValueKind;
+        constexpr Kind kFirstScalar = Kind::Bool, kLastScalar = Kind::Double;
+
+        // Accepted kind tokens of a property-ref field, in enum order.
+        std::vector<std::string> RefKindTokens(const ConfigFieldSpec& field)
+        {
+            std::vector<std::string> tokens;
+            for (unsigned i = unsigned(Kind::Bool); i <= unsigned(Kind::Vec4); ++i)
+            {
+                const auto kind = Kind(i);
+                bool accepted = std::ranges::find(field.RefKinds, kind) != field.RefKinds.end();
+                if (field.AnyScalar && kind >= kFirstScalar && kind <= kLastScalar)
+                    for (const auto listed : field.RefKinds)
+                        accepted |= GeometryPropertyComponentCount(listed) == 1u;
+                if (accepted) tokens.emplace_back(PointPropertyKindToken(kind));
+            }
+            return tokens;
+        }
+        std::vector<std::string> RefDomainTokens(const ConfigFieldSpec& field)
+        {
+            std::vector<std::string> tokens;
+            if (field.RefDomains.empty())
+                for (unsigned i = 0; i <= unsigned(GeometryElementDomain::PointCloudPoint); ++i)
+                    tokens.emplace_back(ToString(GeometryElementDomain(i)));
+            else
+                for (const auto domain : field.RefDomains) tokens.emplace_back(ToString(domain));
+            return tokens;
+        }
+        std::string JoinTokens(const std::vector<std::string>& tokens, std::string_view last)
+        {
+            std::string text;
+            for (std::size_t i = 0; i < tokens.size(); ++i)
+                text += (i == 0 ? "" : i + 1 == tokens.size() ? std::string(last) : std::string(", ")) + tokens[i];
+            return text;
+        }
+        bool InRange(const ConfigFieldSpec& field, double value)
+        {
+            if (field.Min && (field.ExclusiveMin ? !(value > *field.Min) : !(value >= *field.Min))) return false;
+            if (field.Max && (field.ExclusiveMax ? !(value < *field.Max) : !(value <= *field.Max))) return false;
+            return true;
+        }
+        std::string RangeError(const ConfigFieldSpec& field)
+        {
+            return std::string(field.Name) + " must be " + DescribeConfigFieldRange(field) + ".";
+        }
+        std::optional<std::string> CheckField(const ConfigFieldSpec& field, const nlohmann::json& value)
+        {
+            const std::string name{field.Name};
+            switch (field.Type)
+            {
+            case ConfigFieldType::Bool:
+                if (!value.is_boolean()) return name + " must be boolean.";
+                return std::nullopt;
+            case ConfigFieldType::UInt:
+                if (!value.is_number_unsigned() || value.get<std::uint64_t>() > std::numeric_limits<std::uint32_t>::max())
+                    return name + " must be an unsigned 32-bit integer.";
+                return InRange(field, double(value.get<std::uint64_t>())) ? std::nullopt : std::optional{RangeError(field)};
+            case ConfigFieldType::Int:
+                if (!value.is_number_integer() ||
+                    (value.is_number_unsigned() && value.get<std::uint64_t>() > std::uint64_t(std::numeric_limits<std::int64_t>::max())))
+                    return name + " must be an integer.";
+                return InRange(field, double(value.get<std::int64_t>())) ? std::nullopt : std::optional{RangeError(field)};
+            case ConfigFieldType::Float:
+                if (!value.is_number() || !std::isfinite(value.get<double>())) return name + " must be a finite number.";
+                return InRange(field, value.get<double>()) ? std::nullopt : std::optional{RangeError(field)};
+            case ConfigFieldType::Enum:
+            {
+                const auto first = std::uint64_t(field.Min.value_or(0.0));
+                if (!value.is_number_unsigned() || value.get<std::uint64_t>() < first ||
+                    value.get<std::uint64_t>() >= first + field.EnumNames.size())
+                    return "Unknown " + name + " value; " + DescribeConfigFieldRange(field) + " (numbered from " +
+                           std::to_string(first) + ").";
+                return std::nullopt;
+            }
+            case ConfigFieldType::String:
+                if (value.is_null() && field.Nullable) return std::nullopt;
+                if (!value.is_string() || (field.NonEmpty && value.get<std::string>().empty()))
+                    return name + (field.Nullable ? " must be null or a" : " must be a") +
+                           (field.NonEmpty ? " nonempty string." : " string.");
+                return std::nullopt;
+            case ConfigFieldType::UIntArray:
+                if (!value.is_array()) return name + " must be an array of unsigned 32-bit integers.";
+                for (const auto& item : value)
+                    if (!item.is_number_unsigned() || item.get<std::uint64_t>() > std::numeric_limits<std::uint32_t>::max())
+                        return name + " must be an array of unsigned 32-bit integers.";
+                return std::nullopt;
+            case ConfigFieldType::PropertyRef:
+            {
+                if (value.is_null() && field.Nullable) return std::nullopt;
+                bool valid = false;
+                for (const auto kind : field.RefKinds)
+                    valid |= ValidatePointPropertyRef(value, kind, field.AnyScalar) == PointPropertyValidation::Valid;
+                if (valid && !field.RefDomains.empty())
+                {
+                    bool domain = false;
+                    for (const auto allowed : field.RefDomains) domain |= value["domain"] == ToString(allowed);
+                    valid = domain;
+                }
+                if (!valid)
+                    return name + (field.Nullable ? " must be null or a " : " needs a ") +
+                           JoinTokens(RefKindTokens(field), " or ") + " property reference" +
+                           (field.RefDomains.empty() ? "" : " on " + JoinTokens(RefDomainTokens(field), " or ")) + ".";
+                return std::nullopt;
+            }
+            }
+            return name + " has an undeclared type.";
+        }
+    }
+
+    std::optional<std::string> ValidateDeclaredFields(
+        const nlohmann::json& input, nlohmann::json& merged, const std::span<const ConfigFieldSpec> fields,
+        const std::string_view objectError, const std::string_view unknownFieldPrefix)
+    {
+        if (!input.is_object()) return std::string(objectError);
+        for (auto it = input.begin(); it != input.end(); ++it)
+        {
+            if (!merged.contains(it.key()) || FindConfigFieldSpec(fields, it.key()) == nullptr)
+                return std::string(unknownFieldPrefix) + it.key();
+            merged[it.key()] = it.value();
+        }
+        for (const auto& field : fields)
+        {
+            const auto it = merged.find(std::string(field.Name));
+            if (it == merged.end()) return std::string(field.Name) + " is declared but has no default.";
+            if (auto error = CheckField(field, *it)) return error;
+        }
+        return std::nullopt;
+    }
+
+    std::string BuildSectionSchemaJson(
+        const std::string_view schemaId, const std::string_view title, const std::string_view description,
+        const std::span<const ConfigFieldSpec> fields, const nlohmann::json& defaults)
+    {
+        using OJson = nlohmann::ordered_json;
+        OJson properties = OJson::object();
+        for (const auto& field : fields)
+        {
+            OJson p = OJson::object();
+            const auto bound = [&](const char* inclusive, const char* exclusive, const std::optional<double>& v, bool excl) {
+                if (!v) return;
+                if (field.Type == ConfigFieldType::Float) p[excl ? exclusive : inclusive] = *v;
+                else p[excl ? exclusive : inclusive] = std::int64_t(*v);
+            };
+            switch (field.Type)
+            {
+            case ConfigFieldType::Bool: p["type"] = "boolean"; break;
+            case ConfigFieldType::UInt:
+                p["type"] = "integer";
+                p["minimum"] = std::int64_t(field.Min.value_or(0.0));
+                p["maximum"] = std::int64_t(field.Max.value_or(double(std::numeric_limits<std::uint32_t>::max())));
+                if (field.ExclusiveMin) { p.erase("minimum"); bound("minimum", "exclusiveMinimum", field.Min, true); }
+                if (field.ExclusiveMax) { p.erase("maximum"); bound("maximum", "exclusiveMaximum", field.Max, true); }
+                break;
+            case ConfigFieldType::Int:
+                p["type"] = "integer";
+                bound("minimum", "exclusiveMinimum", field.Min, field.ExclusiveMin);
+                bound("maximum", "exclusiveMaximum", field.Max, field.ExclusiveMax);
+                break;
+            case ConfigFieldType::Float:
+                p["type"] = "number";
+                bound("minimum", "exclusiveMinimum", field.Min, field.ExclusiveMin);
+                bound("maximum", "exclusiveMaximum", field.Max, field.ExclusiveMax);
+                break;
+            case ConfigFieldType::Enum:
+            {
+                p["type"] = "integer";
+                OJson values = OJson::array(), names = OJson::array();
+                const auto first = std::int64_t(field.Min.value_or(0.0));
+                for (std::size_t i = 0; i < field.EnumNames.size(); ++i)
+                {
+                    values.push_back(first + std::int64_t(i));
+                    names.push_back(std::string(field.EnumNames[i]));
+                }
+                p["enum"] = std::move(values);
+                p["x-enum-names"] = std::move(names);
+                break;
+            }
+            case ConfigFieldType::String:
+                p["type"] = field.Nullable ? OJson::array({"string", "null"}) : OJson("string");
+                if (field.NonEmpty) p["minLength"] = 1;
+                break;
+            case ConfigFieldType::UIntArray:
+                p["type"] = "array";
+                p["items"] = {{"type", "integer"}, {"minimum", 0}, {"maximum", std::numeric_limits<std::uint32_t>::max()}};
+                break;
+            case ConfigFieldType::PropertyRef:
+            {
+                const auto kinds = RefKindTokens(field);
+                const auto domains = RefDomainTokens(field);
+                p["type"] = field.Nullable ? OJson::array({"object", "null"}) : OJson("object");
+                p["properties"] = {{"domain", {{"type", "string"}, {"enum", domains}}},
+                                   {"name", {{"type", "string"}, {"minLength", 1}}},
+                                   {"kind", {{"type", "string"}, {"enum", kinds}}}};
+                p["required"] = {"domain", "name", "kind"};
+                p["additionalProperties"] = false;
+                p["x-property-kinds"] = kinds;
+                p["x-domains"] = domains;
+                break;
+            }
+            }
+            if (!field.Description.empty()) p["description"] = std::string(field.Description);
+            if (const auto it = defaults.find(std::string(field.Name)); it != defaults.end())
+                p["default"] = OJson::parse(it->dump());
+            properties[std::string(field.Name)] = std::move(p);
+        }
+        OJson schema{{"$schema", "https://json-schema.org/draft/2020-12/schema"}, {"$id", std::string(schemaId)},
+                     {"title", std::string(title)}, {"description", std::string(description)}, {"type", "object"},
+                     {"properties", std::move(properties)}, {"additionalProperties", false}};
+        return schema.dump(-1, ' ', false, OJson::error_handler_t::replace);
     }
 
     void DecodePointPropertyRef(const nlohmann::json& value, GeometryPropertyRef& ref)

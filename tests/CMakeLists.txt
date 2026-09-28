@@ -1406,6 +1406,7 @@ if(TARGET ExtrinsicSandboxEditor)
             Test.SandboxDescriptorAnalysisPanel.cpp
             Test.SandboxProcessingPanels.cpp
             Test.SandboxAgentServer.cpp
+            Test.EngineConfigSectionSchemas.cpp
             Test.SandboxParameterizationPanel.cpp
             Test.SandboxPointCloudConsolidationPanel.cpp
     )

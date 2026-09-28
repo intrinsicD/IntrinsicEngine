@@ -22,6 +22,7 @@ module;
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 #include <nlohmann/json.hpp>
+#include <array>
 module Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Scene.Registry;
@@ -39,6 +40,7 @@ import Geometry.Smoothing;
 import Geometry.Sparse;
 import Geometry.Properties;
 #include "Config/internal/Runtime.PointConfigJson.hpp"
+#include "Config/internal/Runtime.ConfigFieldJson.hpp"
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
@@ -59,6 +61,36 @@ namespace Extrinsic::Runtime
         using Json = nlohmann::json;
         constexpr std::string_view kSchema = "intrinsic.runtime.sandbox.laplacian_eigenbasis";
         constexpr std::uint32_t kMaxCount = 256;
+        using FT = ConfigFieldType;
+        constexpr std::array<K, 1> kVec3{K::Vec3};
+        constexpr std::array<std::string_view, 3> kOperatorNames{"Graph Laplacian (A = D - W)", "Modified Dirichlet energy (E_D^N)",
+                                                                 "Thin-shell vibration (discrete shells Hessian)"};
+        constexpr std::array<std::string_view, 8> kDomainNames{"Mesh vertices", "Mesh edges", "Mesh halfedges", "Mesh faces",
+                                                               "Graph nodes", "Graph halfedges", "Graph edges", "Point cloud points"};
+        constexpr std::array<std::string_view, 5> kWeightNames{"Uniform kNN", "Gaussian kNN", "Inverse-distance kNN",
+                                                               "Nonnegative mesh cotangent", "Uniform mesh edges"};
+        constexpr std::array kFields{
+            ConfigFieldSpec{.Name = "operator", .Type = FT::Enum, .Description = "Operator whose low modes are computed; the mesh operators need mesh vertices.", .EnumNames = kOperatorNames},
+            ConfigFieldSpec{.Name = "domain", .Type = FT::Enum, .Description = "Element domain of the graph Laplacian.", .Min = 1, .EnumNames = kDomainNames},
+            ConfigFieldSpec{.Name = "positions", .Type = FT::PropertyRef, .Description = "Sample positions (vertex/node positions derive face centers and edge midpoints).", .RefKinds = kVec3},
+            ConfigFieldSpec{.Name = "weight", .Type = FT::Enum, .Description = "Graph Laplacian weighting; the mesh weights need mesh vertices.", .EnumNames = kWeightNames},
+            ConfigFieldSpec{.Name = "neighbors", .Type = FT::UInt, .Description = "k of the k-nearest-neighbor graph.", .Min = 1, .Max = 1024},
+            ConfigFieldSpec{.Name = "spatial_sigma", .Type = FT::Float, .Description = "Distance scale of Gaussian weights (position units).", .Min = 0, .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "lumped_mass", .Type = FT::Bool, .Description = "Generalized problem with lumped vertex areas (mesh vertices only)."},
+            ConfigFieldSpec{.Name = "count", .Type = FT::UInt, .Description = "Number of modes.", .Min = 1, .Max = kMaxCount},
+            ConfigFieldSpec{.Name = "output_prefix", .Type = FT::String, .Description = "Mode properties are named <prefix><index>.", .NonEmpty = true},
+            ConfigFieldSpec{.Name = "max_iterations", .Type = FT::UInt, .Description = "Subspace-iteration cap.", .Min = 1, .Max = 100000},
+            ConfigFieldSpec{.Name = "tolerance", .Type = FT::Float, .Description = "Relative eigen-residual at which iteration stops.", .Min = 0, .Max = 1, .ExclusiveMin = true, .ExclusiveMax = true},
+            ConfigFieldSpec{.Name = "shell_flexural", .Type = FT::Float, .Description = "Thin shell: bending weight.", .Min = 0},
+            ConfigFieldSpec{.Name = "shell_length", .Type = FT::Float, .Description = "Thin shell: edge-length weight.", .Min = 0},
+            ConfigFieldSpec{.Name = "shell_area", .Type = FT::Float, .Description = "Thin shell: triangle-area weight.", .Min = 0},
+            ConfigFieldSpec{.Name = "skip_modes", .Type = FT::UInt, .Description = "Leading modes left out of signatures and distances (below count).", .Max = kMaxCount - 1},
+            ConfigFieldSpec{.Name = "signature_output", .Type = FT::String, .Description = "Heat-kernel signature property; empty for none."},
+            ConfigFieldSpec{.Name = "signature_scale", .Type = FT::Float, .Description = "Signature time between the smallest (0) and largest (1) scale.", .Min = 0, .Max = 1},
+            ConfigFieldSpec{.Name = "distance_source", .Type = FT::Int, .Description = "Row of the modal distance source; negative for none."},
+            ConfigFieldSpec{.Name = "distance_output", .Type = FT::String, .Description = "Modal distance property (needed with a source)."},
+            ConfigFieldSpec{.Name = "distance_samples", .Type = FT::UInt, .Description = "Time samples of the modal distance.", .Min = 1, .Max = 4096},
+        };
 
         LaplacianEigenbasisConfig Decode(const Json& doc)
         {
@@ -103,35 +135,14 @@ namespace Extrinsic::Runtime
         {
             const auto doc = Json::parse(payload, nullptr, false);
             auto merged = Json::parse(SerializeLaplacianEigenbasisConfig({}));
-            if (auto error = ConfigDetail::ValidatePointConfigFields(doc, merged,
-                "Eigenbasis config must be an object.", "Unknown eigenbasis field: ",
-                {"operator", "domain", "weight", "neighbors", "count", "max_iterations", "skip_modes", "distance_samples"}))
+            if (auto error = ConfigDetail::ValidateDeclaredFields(doc, merged, kFields,
+                    "Eigenbasis config must be an object.", "Unknown eigenbasis field: "))
                 return ConfigDetail::RejectConfigSection(subject, *error);
             const auto reject = [&](std::string message) { return ConfigDetail::RejectConfigSection(subject, std::move(message)); };
-            if (ConfigDetail::ValidatePointPropertyRef(merged["positions"], K::Vec3) != ConfigDetail::PointPropertyValidation::Valid)
-                return reject("Positions need a vec3 property reference.");
-            for (const auto key : {"spatial_sigma", "tolerance", "shell_flexural", "shell_length", "shell_area", "signature_scale"})
-                if (!merged[key].is_number() || !std::isfinite(merged[key].get<double>()))
-                    return reject("spatial_sigma, tolerance, shell weights and signature_scale must be finite numbers.");
-            if (!merged["lumped_mass"].is_boolean()) return reject("lumped_mass must be boolean.");
-            if (!merged["distance_source"].is_number_integer()) return reject("distance_source must be an integer.");
-            if (!merged["output_prefix"].is_string() || merged["output_prefix"].get<std::string>().empty())
-                return reject("output_prefix must be a nonempty string.");
-            if (!merged["signature_output"].is_string() || !merged["distance_output"].is_string())
-                return reject("signature_output and distance_output must be strings.");
-            if (merged["operator"].get<unsigned>() > unsigned(ModalOperator::ThinShell)) return reject("Unknown modal operator.");
-            const auto domain = merged["domain"].get<unsigned>();
-            if (domain < unsigned(D::MeshVertex) || domain > unsigned(D::PointCloudPoint) ||
-                merged["weight"].get<unsigned>() > unsigned(S::PropertyWeight::MeshUniform))
-                return reject("Unknown domain or weight.");
             const auto c = Decode(merged);
-            if (c.Count < 1 || c.Count > kMaxCount || c.Neighbors < 1 || c.Neighbors > 1024 || !(c.SpatialSigma > 0) ||
-                c.MaxIterations < 1 || c.MaxIterations > 100000 || !(c.Tolerance > 0) || !(c.Tolerance < 1))
-                return reject("Invalid parameters: count 1..256, neighbors 1..1024, positive sigma, iterations 1..100000, tolerance (0,1).");
-            if (c.ShellFlexural < 0 || c.ShellLength < 0 || c.ShellArea < 0 || !(c.ShellFlexural + c.ShellLength + c.ShellArea > 0))
-                return reject("Shell weights must be nonnegative and not all zero.");
-            if (c.SkipModes >= c.Count || c.SignatureScale < 0 || c.SignatureScale > 1 || c.DistanceSamples < 1 || c.DistanceSamples > 4096)
-                return reject("Invalid signature parameters: skipped modes below count, scale in [0,1], distance samples 1..4096.");
+            if (!(c.ShellFlexural + c.ShellLength + c.ShellArea > 0))
+                return reject("Shell weights must not all be zero.");
+            if (c.SkipModes >= c.Count) return reject("count must exceed skip_modes.");
             if (c.DistanceSource >= 0 && c.DistanceOutput.empty()) return reject("Distance output must be named.");
             const auto outputs = Outputs(c);
             for (std::size_t i = 0; i < outputs.size(); ++i)
@@ -193,7 +204,14 @@ namespace Extrinsic::Runtime
             {"distance_samples", c.DistanceSamples}}.dump();
     }
     Core::Config::EngineConfigSectionRegistration MakeLaplacianEigenbasisConfigSectionRegistration()
-    { return {.DefaultSection = Section({}), .Validate = Validate}; }
+    {
+        return {.DefaultSection = Section({}), .Validate = Validate,
+                .SchemaJson = ConfigDetail::BuildSectionSchemaJson(kSchema, "Spectral Modes",
+                    "Low eigenmodes of a graph Laplacian, the modified Dirichlet energy or thin-shell vibration, with "
+                    "optional heat-kernel signature and modal distance.",
+                    kFields, Json::parse(SerializeLaplacianEigenbasisConfig({})))};
+    }
+    std::span<const ConfigFieldSpec> LaplacianEigenbasisConfigFieldSpecs() noexcept { return kFields; }
     RuntimeEngineConfigApplyResult ApplyEditorLaplacianEigenbasisConfig(const EditorProcessingCommands& commands, const LaplacianEigenbasisConfig& c)
     {
         return ApplyEditorProcessingConfig(commands, Validate(SerializeLaplacianEigenbasisConfig(c), {}, kLaplacianEigenbasisConfigSectionName),

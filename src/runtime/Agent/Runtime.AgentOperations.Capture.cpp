@@ -3,6 +3,7 @@
 // until the renderer's readback lands a few frames later.
 module;
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -34,7 +35,24 @@ namespace Extrinsic::Runtime
             ViewCaptureRegion Region{ViewCaptureRegion::Viewport};
             std::string Path{};
             bool PathOnly{false};
+            ViewCapturePreset Preset{ViewCapturePreset::Current};
+            std::uint32_t FitEntity{0};
+            std::uint32_t LegendEntity{0};
         };
+        constexpr std::array kPresets{ViewCapturePreset::Current, ViewCapturePreset::Front, ViewCapturePreset::Back,
+                                      ViewCapturePreset::Left, ViewCapturePreset::Right, ViewCapturePreset::Top,
+                                      ViewCapturePreset::Bottom, ViewCapturePreset::Isometric};
+        std::optional<std::uint32_t> EntityArgument(const Json& args, const char* key, std::string& error)
+        {
+            const auto it = args.find(key);
+            if (it == args.end()) return 0u;
+            if (!it->is_number_unsigned() || it->get<std::uint64_t>() == 0 || it->get<std::uint64_t>() > UINT32_MAX)
+            {
+                error = std::string(key) + " must be a stable entity id from scene_entities.";
+                return std::nullopt;
+            }
+            return it->get<std::uint32_t>();
+        }
 
         std::optional<CaptureArguments> ParseArguments(std::string_view text, std::string& error)
         {
@@ -52,6 +70,20 @@ namespace Extrinsic::Runtime
                 if (!it->is_string()) { error = "path must be a string."; return std::nullopt; }
                 out.Path = it->get<std::string>();
             }
+            if (const auto it = args.find("preset"); it != args.end())
+            {
+                bool known = false;
+                for (const auto preset : kPresets)
+                    if (it->is_string() && *it == ToString(preset)) { out.Preset = preset; known = true; }
+                if (!known) { error = "preset must be one of current, front, back, left, right, top, bottom, isometric."; return std::nullopt; }
+            }
+            const auto fit = EntityArgument(args, "fit_entity", error);
+            const auto legend = EntityArgument(args, "legend_entity", error);
+            if (!fit || !legend) return std::nullopt;
+            out.FitEntity = *fit;
+            out.LegendEntity = *legend;
+            if (out.FitEntity != 0 && out.Preset == ViewCapturePreset::Current)
+            { error = "fit_entity needs a preset other than current."; return std::nullopt; }
             if (const auto it = args.find("path_only"); it != args.end())
             {
                 if (!it->is_boolean()) { error = "path_only must be a boolean."; return std::nullopt; }
@@ -81,7 +113,13 @@ namespace Extrinsic::Runtime
                 const bool inline_ = returnImage && !status.Png.empty() && status.Width <= kMaxInlineImageSide &&
                                      status.Height <= kMaxInlineImageSide;
                 Json result{{"ticket", status.Ticket}, {"region", std::string(ToString(status.Region))},
+                            {"preset", std::string(ToString(status.Preset))},
                             {"width", status.Width}, {"height", status.Height}, {"image_returned", inline_}};
+                if (status.Legend)
+                    result["legend"] = {{"property", status.Legend->Property}, {"colormap", status.Legend->Colormap},
+                                        {"min", status.Legend->Min}, {"max", status.Legend->Max},
+                                        {"auto_range", status.Legend->AutoRange},
+                                        {"strip", "bottom rows, min on the left, max on the right"}};
                 if (!status.Path.empty()) result["path"] = status.Path;
                 out = AgentOperationOutcome{.Text = Dump(result)};
                 if (inline_) out.Images.push_back({.MimeType = "image/png", .Base64Data = EncodeBase64(status.Png)});
@@ -91,7 +129,10 @@ namespace Extrinsic::Runtime
         }
 
         constexpr std::string_view kRegionSchema =
-            R"("region":{"type":"string","enum":["viewport","window"],"description":"viewport: the 3D scene rectangle (default); window: the whole Sandbox window with its panels"})";
+            R"("region":{"type":"string","enum":["viewport","window"],"description":"viewport: the 3D scene rectangle (default); window: the whole Sandbox window with its panels"},)"
+            R"("preset":{"type":"string","enum":["current","front","back","left","right","top","bottom","isometric"],"description":"Camera for the shot (default current); presets frame fit_entity or the whole scene, and the view is restored afterwards"},)"
+            R"("fit_entity":{"type":"integer","minimum":1,"description":"Stable entity id a preset frames"},)"
+            R"("legend_entity":{"type":"integer","minimum":1,"description":"Append a colormap strip for this entity's scalar coloring and return its range"})";
     }
 
     std::string EncodeBase64(const std::span<const std::uint8_t> bytes)
@@ -123,7 +164,8 @@ namespace Extrinsic::Runtime
             .Name = "view_screenshot",
             .Title = "Look at the Sandbox",
             .Description = "Returns a PNG of what the Sandbox shows right now (the 3D viewport by default, or the "
-                           "whole window with its panels) without writing a file. Completes a few frames later.",
+                           "whole window with its panels) without writing a file; presets move the camera for the shot and restore it. "
+                           "Completes a few frames later.",
             .InputSchemaJson = std::string(R"({"type":"object","properties":{)") + std::string(kRegionSchema) +
                                R"(},"additionalProperties":false})",
             .ReadOnly = true,
@@ -132,8 +174,10 @@ namespace Extrinsic::Runtime
                 std::string error;
                 const auto args = ParseArguments(argumentsJson, error);
                 if (!args) return Fail(std::move(error));
-                if (!args->Path.empty() || args->PathOnly) return Fail("view_screenshot takes only 'region'; use view_capture to save a file.");
-                return StartCapture(context, ViewCaptureRequest{.Region = args->Region, .SaveToFile = false}, true);
+                if (!args->Path.empty() || args->PathOnly) return Fail("view_screenshot does not save files; use view_capture for a path.");
+                return StartCapture(context, ViewCaptureRequest{.Region = args->Region, .SaveToFile = false,
+                                                                .Preset = args->Preset, .FitEntity = args->FitEntity,
+                                                                .LegendEntity = args->LegendEntity}, true);
             },
         });
         (void)registry.Register({
@@ -154,7 +198,8 @@ namespace Extrinsic::Runtime
                 // A given path names the file; otherwise a timestamped file goes to screenshots/.
                 const auto resolved = ResolveAgentPath(context, args->Path.empty() ? "screenshots" : args->Path);
                 if (!resolved) return Fail("path '" + args->Path + "' is outside the Sandbox's allowed roots.");
-                ViewCaptureRequest request{.Region = args->Region, .SaveToFile = true};
+                ViewCaptureRequest request{.Region = args->Region, .SaveToFile = true, .Preset = args->Preset,
+                                           .FitEntity = args->FitEntity, .LegendEntity = args->LegendEntity};
                 (args->Path.empty() ? request.OutputDirectory : request.OutputPath) = *resolved;
                 return StartCapture(context, std::move(request), !args->PathOnly);
             },

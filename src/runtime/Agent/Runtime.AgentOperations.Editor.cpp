@@ -246,8 +246,24 @@ namespace Extrinsic::Runtime
             Json sections = Json::array();
             for (const auto& entry : context.ConfigControl->SectionRegistry().Entries())
                 sections.push_back({{"section", entry.DefaultSection.Name}, {"schema_id", entry.DefaultSection.SchemaId},
-                                    {"schema_version", entry.DefaultSection.SchemaVersion}});
+                                    {"schema_version", entry.DefaultSection.SchemaVersion},
+                                    {"has_schema", !entry.SchemaJson.empty()}});
             return Ok({{"sections", sections}});
+        }
+
+        // The ExportEngineConfigSchema document, or one section's entry of its $defs.
+        AgentOperationOutcome ConfigSchema(const AgentOperationContext& context, std::string_view arguments)
+        {
+            if (context.ConfigControl == nullptr) return Fail("Engine config control is unavailable.");
+            const auto args = ParseObject(arguments);
+            if (!args) return Fail("Arguments must be a JSON object.");
+            const auto& registry = context.ConfigControl->SectionRegistry();
+            const std::string document = Core::Config::ExportEngineConfigSchema(registry);
+            const auto section = String(*args, "section");
+            if (!section) return {.IsError = false, .Text = document};
+            if (registry.Find(*section) == nullptr) return Fail("Unknown config section '" + *section + "'.");
+            const Json parsed = Json::parse(document, nullptr, false);
+            return Ok(parsed["$defs"][*section]);
         }
 
         AgentOperationOutcome ConfigGet(const AgentOperationContext& context, std::string_view arguments)
@@ -261,8 +277,10 @@ namespace Extrinsic::Runtime
             const auto& active = context.ConfigControl->GetEngineConfigControlState().ActiveConfig;
             const auto* current = Core::Config::FindEngineConfigSection(active.AppSections, *section);
             const auto& payload = current != nullptr ? current->PayloadJson : registration->DefaultSection.PayloadJson;
-            return Ok({{"section", *section}, {"active", current != nullptr}, {"payload", ParsedOrString(payload)},
-                       {"defaults", ParsedOrString(registration->DefaultSection.PayloadJson)}});
+            Json result{{"section", *section}, {"active", current != nullptr}, {"payload", ParsedOrString(payload)},
+                        {"defaults", ParsedOrString(registration->DefaultSection.PayloadJson)}};
+            if (!registration->SchemaJson.empty()) result["schema"] = ParsedOrString(registration->SchemaJson);
+            return Ok(result);
         }
 
         struct SectionUpdate
@@ -475,13 +493,18 @@ namespace Extrinsic::Runtime
             [](const AgentOperationContext& c, std::string_view a) { return UndoRedo(c, a, false); });
         add("config_sections", "Config sections", "List the engine config sections operations read their settings from.",
             none, true, ConfigSections);
-        add("config_get", "Get config section", "Active payload and defaults of one config section.",
+        add("config_schema", "Config schema",
+            "JSON Schema of the config section payloads (all sections, or one with 'section'): field descriptions, "
+            "ranges, integer-coded enums with x-enum-names, and property-reference kinds and domains.",
+            Schema("{" + kSectionProperty + "}"), true, ConfigSchema);
+        add("config_get", "Get config section", "Active payload, defaults and payload schema of one config section.",
             Schema("{" + kSectionProperty + "}", R"(["section"])"), true, ConfigGet);
         add("config_preview", "Validate config section",
             "Validate a section payload without applying it; returns the canonical payload or diagnostics.",
             Schema("{" + kSectionProperty + "," + kPayloadProperty + "}", R"(["section","payload"])"), true, ConfigPreview);
         add("config_apply", "Apply config section",
-            "Validate and apply a section payload to the running engine (same path as the panels; recorded as an agent change).",
+            "Validate and apply a section payload to the running engine (same path as the panels; recorded as an agent change). "
+            "The payload follows the section's schema from config_schema or config_get.",
             Schema("{" + kSectionProperty + "," + kPayloadProperty + "}", R"(["section","payload"])"), false, ConfigApply);
         add("jobs", "Jobs", "Background jobs with state, progress and elapsed time.", none, true, Jobs);
         add("log", "Engine log",

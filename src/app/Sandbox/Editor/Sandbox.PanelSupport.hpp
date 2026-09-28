@@ -74,6 +74,31 @@ namespace Extrinsic::Sandbox::Editor
     [[nodiscard]] bool DrawProcessingActionButton(
         const char* label, const Runtime::ActionReadiness& readiness);
 
+    // UI-057: parameter controls driven by a config section's field table. Hovering a
+    // control shows the field's description, accepted values and default; numeric input
+    // is clamped to the declared bounds and enum combos are labeled from EnumNames, so
+    // the panel, the validator and the agent schema read the same declaration.
+    [[nodiscard]] std::string FormatConfigFieldHint(const Runtime::ConfigFieldSpec& field, std::string_view defaultValue);
+    void DrawConfigFieldHint(const Runtime::ConfigFieldSpec* field, std::string_view defaultValue);
+    bool DrawSpecInputDouble(const char* label, std::span<const Runtime::ConfigFieldSpec> fields, std::string_view name,
+                             double& value, double defaultValue, const char* format = "%.6g");
+    bool DrawSpecInputUInt(const char* label, std::span<const Runtime::ConfigFieldSpec> fields, std::string_view name,
+                           std::uint32_t& value, std::uint32_t defaultValue);
+    // `value` is the payload's integer code (first name = the field's Min).
+    bool DrawSpecEnumCombo(const char* label, std::span<const Runtime::ConfigFieldSpec> fields, std::string_view name,
+                           int& value, int defaultValue);
+    template <class TEnum>
+    bool DrawSpecEnumCombo(const char* label, std::span<const Runtime::ConfigFieldSpec> fields, std::string_view name,
+                           TEnum& value, TEnum defaultValue)
+    {
+        int code = static_cast<int>(value);
+        if (!DrawSpecEnumCombo(label, fields, name, code, static_cast<int>(defaultValue))) return false;
+        value = static_cast<TEnum>(code);
+        return true;
+    }
+    void DrawSpecCheckbox(const char* label, std::span<const Runtime::ConfigFieldSpec> fields, std::string_view name,
+                          bool& value, bool defaultValue, bool& changed);
+
     extern "C++"
     {
         struct SandboxEditorFrame final : Runtime::EditorWorkspaceSnapshot

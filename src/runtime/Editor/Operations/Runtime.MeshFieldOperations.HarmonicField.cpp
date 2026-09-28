@@ -20,6 +20,8 @@ module;
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 #include <nlohmann/json.hpp>
+#include <array>
+#include <span>
 module Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Scene.Registry;
@@ -34,6 +36,7 @@ import Geometry.HalfedgeMesh;
 import Geometry.HarmonicField;
 import Geometry.Properties;
 #include "Config/internal/Runtime.PointConfigJson.hpp"
+#include "Config/internal/Runtime.ConfigFieldJson.hpp"
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
@@ -52,6 +55,36 @@ namespace Extrinsic::Runtime
         using K = Geometry::PropertyValueKind;
         using Json = nlohmann::json;
         constexpr std::string_view kSchema = "intrinsic.runtime.sandbox.harmonic_field";
+        using FT = ConfigFieldType;
+        constexpr std::array<K, 6> kFieldOrLabel{K::Int32, K::Float, K::Double, K::Vec2, K::Vec3, K::Vec4};
+        constexpr std::array<K, 5> kFloating{K::Float, K::Double, K::Vec2, K::Vec3, K::Vec4};
+        constexpr std::array<K, 2> kFloatScalar{K::Float, K::Double};
+        constexpr std::array<K, 1> kVec3{K::Vec3};
+        constexpr std::array<K, 1> kBool{K::Bool};
+        constexpr std::array<std::string_view, 2> kModeNames{"Field (interpolate values)", "Labels (propagate seed labels)"};
+        constexpr std::array<std::string_view, 5> kWeightNames{"Uniform kNN", "Gaussian kNN", "Inverse-distance kNN",
+                                                               "Nonnegative mesh cotangent", "Uniform mesh edges"};
+        constexpr std::array<std::string_view, 3> kOrderNames{"Harmonic (Dirichlet)", "Biharmonic (Laplacian)", "Triharmonic"};
+        constexpr std::array<std::string_view, 3> kPolicyNames{"Fail", "Keep input", "Zero mean (pure Neumann)"};
+        constexpr std::array kFields{
+            ConfigFieldSpec{.Name = "mode", .Type = FT::Enum, .Description = "Interpolate a floating field, or propagate Int32 seed labels.", .EnumNames = kModeNames},
+            ConfigFieldSpec{.Name = "input", .Type = FT::PropertyRef, .Description = "Field mode: floating scalar/vector values; label mode: Int32 seed labels.", .RefKinds = kFieldOrLabel},
+            ConfigFieldSpec{.Name = "output", .Type = FT::PropertyRef, .Description = "Result property on the input domain.", .RefKinds = kFieldOrLabel},
+            ConfigFieldSpec{.Name = "positions", .Type = FT::PropertyRef, .Description = "Positions that define neighborhoods and distances.", .RefKinds = kVec3},
+            ConfigFieldSpec{.Name = "hard_mask", .Type = FT::PropertyRef, .Description = "Field mode: rows whose values are fixed.", .Nullable = true, .RefKinds = kBool},
+            ConfigFieldSpec{.Name = "soft_weights", .Type = FT::PropertyRef, .Description = "Field mode: per-row weights pulling towards the input.", .Nullable = true, .RefKinds = kFloatScalar},
+            ConfigFieldSpec{.Name = "pin_boundary", .Type = FT::Bool, .Description = "Field mode: keep mesh-boundary values fixed."},
+            ConfigFieldSpec{.Name = "source", .Type = FT::PropertyRef, .Description = "Field mode: right-hand side with the input's channel count.", .Nullable = true, .RefKinds = kFloating},
+            ConfigFieldSpec{.Name = "unlabeled", .Type = FT::Int, .Description = "Label mode: the label that marks unseeded rows.", .Min = -2147483648.0, .Max = 2147483647.0},
+            ConfigFieldSpec{.Name = "confidence", .Type = FT::PropertyRef, .Description = "Label mode: optional per-row confidence output.", .Nullable = true, .RefKinds = kFloatScalar},
+            ConfigFieldSpec{.Name = "weights_prefix", .Type = FT::String, .Description = "Label mode: prefix of optional per-label weight outputs.", .Nullable = true, .NonEmpty = true},
+            ConfigFieldSpec{.Name = "weight", .Type = FT::Enum, .Description = "Neighbor weighting; the mesh weights need mesh-vertex input.", .EnumNames = kWeightNames},
+            ConfigFieldSpec{.Name = "neighbors", .Type = FT::UInt, .Description = "k of the k-nearest-neighbor graph.", .Min = 1, .Max = 1024},
+            ConfigFieldSpec{.Name = "spatial_sigma", .Type = FT::Float, .Description = "Distance scale of Gaussian weights (position units).", .Min = 0, .ExclusiveMin = true},
+            ConfigFieldSpec{.Name = "order", .Type = FT::Enum, .Description = "Energy order.", .Min = 1, .EnumNames = kOrderNames},
+            ConfigFieldSpec{.Name = "unconstrained", .Type = FT::Enum, .Description = "Handling of components without constraints.", .EnumNames = kPolicyNames},
+            ConfigFieldSpec{.Name = "lumped_mass", .Type = FT::Bool, .Description = "Weight by lumped mesh areas (orders above harmonic and the source)."},
+        };
 
         bool Floating(K k) { return k == K::Float || k == K::Double || k == K::Vec2 || k == K::Vec3 || k == K::Vec4; }
         bool Scalar(K k) { return k == K::Float || k == K::Double; }
@@ -104,45 +137,16 @@ namespace Extrinsic::Runtime
         {
             const auto doc = Json::parse(payload, nullptr, false);
             auto merged = Json::parse(SerializeHarmonicFieldConfig({}));
-            if (auto error = ConfigDetail::ValidatePointConfigFields(doc, merged,
-                "Harmonic field config must be an object.", "Unknown harmonic field: ",
-                {"mode", "weight", "neighbors", "order", "unconstrained"}))
+            if (auto error = ConfigDetail::ValidateDeclaredFields(doc, merged, kFields,
+                    "Harmonic field config must be an object.", "Unknown harmonic field: "))
                 return ConfigDetail::RejectConfigSection(subject, *error);
             const auto reject = [&](std::string message) { return ConfigDetail::RejectConfigSection(subject, std::move(message)); };
-            if (merged["mode"].get<unsigned>() > unsigned(HarmonicFieldMode::Labels))
-                return reject("Unknown harmonic field mode.");
             const bool labels = merged["mode"].get<unsigned>() == unsigned(HarmonicFieldMode::Labels);
             for (const auto key : {"input", "output"})
                 if (labels ? !ValidRef(merged[key], {K::Int32}) : !ValidRef(merged[key], {K::Float, K::Double, K::Vec2, K::Vec3, K::Vec4}))
                     return reject(labels ? "Label mode binds Int32 input and output properties."
                                          : "Field mode binds floating scalar or vector input and output properties.");
-            if (!ValidRef(merged["positions"], {K::Vec3}))
-                return reject("Positions need a vec3 property reference.");
-            if (!merged["hard_mask"].is_null() && !ValidRef(merged["hard_mask"], {K::Bool}))
-                return reject("hard_mask must be null or a bool property reference.");
-            for (const auto key : {"soft_weights", "confidence"})
-                if (!merged[key].is_null() && !ValidRef(merged[key], {K::Float, K::Double}))
-                    return reject(std::string(key) + " must be null or a float/double property reference.");
-            if (!merged["source"].is_null() && !ValidRef(merged["source"], {K::Float, K::Double, K::Vec2, K::Vec3, K::Vec4}))
-                return reject("source must be null or a floating scalar or vector property reference.");
-            if (!merged["weights_prefix"].is_null() &&
-                (!merged["weights_prefix"].is_string() || merged["weights_prefix"].get<std::string>().empty()))
-                return reject("weights_prefix must be null or a nonempty string.");
-            for (const auto key : {"pin_boundary", "lumped_mass"})
-                if (!merged[key].is_boolean()) return reject(std::string(key) + " must be boolean.");
-            if (!merged["unlabeled"].is_number_integer() ||
-                merged["unlabeled"].get<std::int64_t>() < std::numeric_limits<std::int32_t>::min() ||
-                merged["unlabeled"].get<std::int64_t>() > std::numeric_limits<std::int32_t>::max())
-                return reject("unlabeled must be a 32-bit signed integer.");
-            if (!merged["spatial_sigma"].is_number() || !std::isfinite(merged["spatial_sigma"].get<double>()) ||
-                merged["spatial_sigma"].get<double>() <= 0)
-                return reject("spatial_sigma must be a positive finite number.");
-            if (merged["weight"].get<unsigned>() > unsigned(S::PropertyWeight::MeshUniform) ||
-                merged["order"].get<unsigned>() < 1 || merged["order"].get<unsigned>() > unsigned(H::FieldOrder::Triharmonic) ||
-                merged["unconstrained"].get<unsigned>() > unsigned(H::UnconstrainedPolicy::ZeroMean))
-                return reject("Unknown weight, order or unconstrained-component policy.");
             const auto c = Decode(merged);
-            if (c.Neighbors < 1 || c.Neighbors > 1024) return reject("Neighbors must be in 1..1024.");
             const auto domain = c.Input.Domain;
             if (c.Output.Domain != domain || (!c.HardMask.Name.empty() && c.HardMask.Domain != domain) ||
                 (!c.SoftWeights.Name.empty() && c.SoftWeights.Domain != domain) ||
@@ -254,8 +258,13 @@ namespace Extrinsic::Runtime
     {
         HarmonicFieldConfig defaults;
         defaults.PinBoundary = true; // the default section must validate: field mode needs a constraint source
-        return {.DefaultSection = Section(defaults), .Validate = Validate};
+        return {.DefaultSection = Section(defaults), .Validate = Validate,
+                .SchemaJson = ConfigDetail::BuildSectionSchemaJson(kSchema, "Harmonic Field",
+                    "Harmonic, biharmonic or triharmonic interpolation of a property from constraints, or seed-label "
+                    "propagation, over mesh edges or a kNN graph.",
+                    kFields, Json::parse(SerializeHarmonicFieldConfig({})))};
     }
+    std::span<const ConfigFieldSpec> HarmonicFieldConfigFieldSpecs() noexcept { return kFields; }
     RuntimeEngineConfigApplyResult ApplyEditorHarmonicFieldConfig(const EditorProcessingCommands& commands, const HarmonicFieldConfig& c)
     {
         return ApplyEditorProcessingConfig(commands, Validate(SerializeHarmonicFieldConfig(c), {}, kHarmonicFieldConfigSectionName),

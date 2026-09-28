@@ -2,10 +2,12 @@
 module;
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 export module Extrinsic.Runtime.MeshCurvatureConfig;
 export import Extrinsic.Runtime.GeometryProperty.Types;
+export import Extrinsic.Runtime.ConfigFieldSpec;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 export namespace Extrinsic::Runtime
@@ -37,4 +39,5 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::optional<MeshCurvatureConfig> GetMeshCurvatureConfig(const Core::Config::EngineConfig& config);
     void SetMeshCurvatureConfig(Core::Config::EngineConfig& config, const MeshCurvatureConfig& value);
     [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeMeshCurvatureConfigSectionRegistration();
+    [[nodiscard]] std::span<const ConfigFieldSpec> MeshCurvatureConfigFieldSpecs() noexcept;
 }
