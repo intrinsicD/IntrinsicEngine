@@ -31,6 +31,17 @@ observer. Formulation, units and failure states: [paper.md](paper.md).
 | Rigid, affine | O(N*M) E-step + O(N+M) | O(N+M) |
 | Nonrigid | O(N*M) + O(M^3) LU | O(M^2) kernel, M <= 8192 |
 
+## In the editor
+
+`Runtime.RegistrationOperations` (RUNTIME-273) runs CPD on any two point-domain entities
+from the `sandbox.coherent_point_drift` section: a run captures both sets in world space,
+iterates on a worker (all at once or step by step), streams a per-iteration trace and the
+moving source positions, and publishes on Apply as one undoable step. Rigid results
+drive the source Transform; affine and nonrigid results (which a TRS transform cannot
+hold) overwrite the source positions or write a named vec3 displacement property in the
+source's local space. Agents use `preview_registration` and `run_registration`
+(`{"method": "cpd"}`).
+
 ## Evidence
 
 - Tests: `tests/unit/geometry/Test.CoherentPointDrift.cpp` (rigid/affine/nonrigid

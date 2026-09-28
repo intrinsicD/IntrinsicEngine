@@ -768,6 +768,22 @@ history cursor. Successful transitions stamp `DirtyVertexTexcoords` and
 `DirtyVertexAttributes` only after publication, while the transaction retains
 no selected-model cache or other session-owned state.
 
+### Coherent Point Drift Registration
+
+`Extrinsic.Runtime.RegistrationOperations` also owns Coherent Point Drift (RUNTIME-273,
+reference `Geometry.Registration.CoherentPointDrift`). `StartEditorCoherentPointDrift`
+validates `sandbox.coherent_point_drift` (`Extrinsic.Runtime.CoherentPointDriftConfig`,
+declared in a `ConfigFieldSpec` table) and captures both operands in world space;
+`StepEditorCoherentPointDrift` queues one job running N iterations or to the end, with
+cancellation checked every iteration; the worker alone touches the solver and publishes a
+mutex-guarded snapshot (phase, trace, moving source positions) after each iteration, read by
+`SnapshotEditorCoherentPointDrift`. `ApplyEditorCoherentPointDrift` revalidates captured
+property revisions and both entity transforms, then publishes one history entry: the source
+Transform for rigid results (mirrored results are refused), or the source positions or a
+named vec3 displacement property in source-local space for affine and nonrigid results.
+`ApplyEditorCoherentPointDriftCommand` chains start, a full run and publication with one
+terminal callback; agents reach it through `run_registration`.
+
 ### Sandbox Editor ICP Registration
 
 The `ICP Registration` panel is reachable from the `View` menu through

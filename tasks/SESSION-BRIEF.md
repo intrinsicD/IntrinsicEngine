@@ -159,13 +159,12 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `RUNTIME-210` — Signed Heat runtime and config integration (tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md)
 - unblocked: `RUNTIME-211` — K-Means property-domain integration (tasks/backlog/runtime/RUNTIME-211-kmeans-property-domain-integration.md)
 - unblocked: `RUNTIME-212` — Progressive Poisson property-domain publication (tasks/backlog/runtime/RUNTIME-212-progressive-poisson-property-domain-publication.md)
-- unblocked: `RUNTIME-273` — Coherent Point Drift editor operation (tasks/backlog/runtime/RUNTIME-273-coherent-point-drift-editor-operation.md)
 - blocked by `GEOM-061`: `RUNTIME-274` — Point-cloud subsampling editor workflow (tasks/backlog/runtime/RUNTIME-274-point-cloud-subsampling-workflow.md)
 - unblocked: `RUNTIME-275` — Gaussian noise editor operation (tasks/backlog/runtime/RUNTIME-275-gaussian-noise-editor-operation.md)
 - blocked by `RUNTIME-210`: `UI-042` — Signed Heat mesh method panel (tasks/backlog/ui/UI-042-signed-heat-mesh-panel.md)
 - blocked by `RUNTIME-211`: `UI-043` — K-Means property-domain panel (tasks/backlog/ui/UI-043-kmeans-property-domain-panel.md)
 - blocked by `RUNTIME-212`: `UI-044` — Progressive Poisson property-domain panel (tasks/backlog/ui/UI-044-progressive-poisson-property-domain-panel.md)
-- blocked by `RUNTIME-273`: `UI-055` — Coherent Point Drift editor panel (tasks/backlog/ui/UI-055-coherent-point-drift-editor-panel.md)
+- unblocked: `UI-055` — Coherent Point Drift editor panel (tasks/backlog/ui/UI-055-coherent-point-drift-editor-panel.md)
 
 ## Theme J — Framework24 product convergence
 

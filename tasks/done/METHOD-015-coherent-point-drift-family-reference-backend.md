@@ -56,7 +56,7 @@ Deviations from the planned text, all deliberate:
 - No fast Gauss transform, permutohedral, or low-rank acceleration — the reference is an explicit O(N·M) EM; the optimized backends are
   [METHOD-049](../backlog/methods/METHOD-049-coherent-point-drift-accelerated-e-step.md), opened after reference parity.
 - No editor/UI integration here; it is allocated as
-  [RUNTIME-273](../backlog/runtime/RUNTIME-273-coherent-point-drift-editor-operation.md) and
+  [RUNTIME-273](RUNTIME-273-coherent-point-drift-editor-operation.md) and
   [UI-055](../backlog/ui/UI-055-coherent-point-drift-editor-panel.md). Keep the result and
   observer API sufficient for their step mode and live traces.
 - No claim that CPD supersedes ICP; both stay public with documented trade-offs.
@@ -115,7 +115,7 @@ Deviations from the planned text, all deliberate:
 | --- | --- |
 | Least-structured input | Two finite point-position spans on any compatible element domains, plus explicit variant and EM parameters. |
 | Compatible entity sources | Every canonical property/topology source satisfying the input above; binding is owned by METHOD-003A after reference acceptance and selection. |
-| RuntimeModule | [RUNTIME-273](../backlog/runtime/RUNTIME-273-coherent-point-drift-editor-operation.md) owns the editor operation. |
+| RuntimeModule | [RUNTIME-273](RUNTIME-273-coherent-point-drift-editor-operation.md) owns the editor operation. |
 | Config/agent | Typed reference parameters now; RUNTIME-273 owns `sandbox.coherent_point_drift`. |
 | UI | [UI-055](../backlog/ui/UI-055-coherent-point-drift-editor-panel.md). |
 | Publication | Return the selected transform or slot-aligned displacement result; RUNTIME-273 separates source-transform application from explicit nonrigid property publication. |

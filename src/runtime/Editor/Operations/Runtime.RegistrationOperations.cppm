@@ -1,14 +1,19 @@
-// Iterative-closest-point alignment of named point bindings through shared processing commands.
+// Point-set registration of named point bindings through shared processing commands:
+// iterative closest point (ICP) and Coherent Point Drift (CPD, RUNTIME-273).
 module;
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
+#include <vector>
+#include <glm/glm.hpp>
 export module Extrinsic.Runtime.RegistrationOperations;
 export import Extrinsic.Runtime.EditorProcessing;
 export import Extrinsic.Runtime.EditorCommon;
 export import Extrinsic.Runtime.RegistrationConfig;
+export import Extrinsic.Runtime.CoherentPointDriftConfig;
 export import Extrinsic.Core.Error;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
@@ -93,4 +98,92 @@ export namespace Extrinsic::Runtime
         const EditorProcessingCommands&);
     [[nodiscard]] EditorRegistrationResult ApplyEditorConfiguredRegistrationCommand(
         const EditorProcessingCommands&, std::function<void(EditorRegistrationResult)> onComplete = {});
+
+    // --- Coherent Point Drift (RUNTIME-273) -------------------------------------------
+    // A run captures both point sets in world space, iterates on a worker (all at once or
+    // step by step for inspection), streams a per-iteration trace and the moving source
+    // positions, and publishes only on Apply, as one undoable history entry after
+    // revalidating the inputs and entity transforms.
+    struct EditorCoherentPointDriftTrace
+    {
+        std::uint32_t Iteration{0u};
+        double Sigma2{0.0};                // world units^2
+        double NegativeLogLikelihood{0.0};
+        double Objective{0.0};             // NLL plus the nonrigid coherence term
+        double MatchedWeight{0.0};         // sum of inlier responsibilities
+    };
+
+    enum class EditorCoherentPointDriftPhase : std::uint8_t
+    {
+        Ready,     // captured, no iteration yet
+        Running,   // a step job is in flight
+        Paused,    // stepped, not finished; more steps or Apply
+        Finished,  // converged, sigma floor or iteration cap; Apply publishes
+        Failed,
+        Cancelled,
+        Applied,
+    };
+    [[nodiscard]] const char* ToString(EditorCoherentPointDriftPhase phase) noexcept;
+
+    struct EditorCoherentPointDriftResult
+    {
+        EditorCommandStatus Status{EditorCommandStatus::NoChange};
+        CoherentPointDriftMethod Method{CoherentPointDriftMethod::Rigid};
+        CoherentPointDriftOutput Output{CoherentPointDriftOutput::SourceTransform};
+        std::string Backend{"cpu_reference"};
+        std::string Termination{"none"};
+        std::size_t SourcePointCount{0u};
+        std::size_t TargetPointCount{0u};
+        std::uint32_t Iterations{0u};
+        double Sigma2{0.0};
+        double NegativeLogLikelihood{0.0};
+        double MatchedWeight{0.0};
+        // World-space source->target map for rigid and affine runs.
+        glm::dmat4 Transform{1.0};
+        double MeanDisplacement{0.0}; // mean |T(y) - y| in world units
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept { return Status == EditorCommandStatus::Applied; }
+    };
+
+    struct EditorCoherentPointDriftSnapshot
+    {
+        EditorCoherentPointDriftPhase Phase{EditorCoherentPointDriftPhase::Ready};
+        EditorCoherentPointDriftResult Result{};
+        std::vector<EditorCoherentPointDriftTrace> Trace{};
+        std::vector<glm::vec3> SourcePreview{}; // current T(y), world space, capture order
+        std::vector<glm::vec3> Target{};        // fixed points, world space
+        std::uint64_t Revision{0u};             // increments with every update
+    };
+
+    struct EditorCoherentPointDriftRun;
+    using EditorCoherentPointDriftRunHandle = std::shared_ptr<EditorCoherentPointDriftRun>;
+
+    [[nodiscard]] ActionReadiness PreviewEditorCoherentPointDriftCommand(
+        const EditorProcessingCommands&, const CoherentPointDriftConfig&);
+    // Validates the config and captures both point sets; nothing iterates yet. On failure
+    // returns null and fills `failure`.
+    [[nodiscard]] EditorCoherentPointDriftRunHandle StartEditorCoherentPointDrift(
+        const EditorProcessingCommands&, const CoherentPointDriftConfig&, EditorCoherentPointDriftResult& failure);
+    // Queues `iterations` EM iterations (0 = until the run ends) as one background job.
+    // Pending on success; rejected while a step is running or after the run ended.
+    [[nodiscard]] EditorCommandStatus StepEditorCoherentPointDrift(
+        const EditorProcessingCommands&, const EditorCoherentPointDriftRunHandle&, std::uint32_t iterations);
+    // Stops a running step after its current iteration; the run becomes Cancelled.
+    void CancelEditorCoherentPointDrift(const EditorCoherentPointDriftRunHandle&);
+    [[nodiscard]] EditorCoherentPointDriftSnapshot SnapshotEditorCoherentPointDrift(const EditorCoherentPointDriftRunHandle&);
+    // Publishes the current estimate (Paused or Finished runs).
+    [[nodiscard]] EditorCoherentPointDriftResult ApplyEditorCoherentPointDrift(
+        const EditorProcessingCommands&, const EditorCoherentPointDriftRunHandle&);
+    // Start, run to the end and publish; onComplete receives the terminal result of a
+    // queued run (immediate outcomes return directly).
+    [[nodiscard]] EditorCoherentPointDriftResult ApplyEditorCoherentPointDriftCommand(
+        const EditorProcessingCommands&, const CoherentPointDriftConfig&,
+        std::function<void(EditorCoherentPointDriftResult)> onComplete = {});
+    [[nodiscard]] EditorCoherentPointDriftResult ApplyEditorConfiguredCoherentPointDrift(
+        const EditorProcessingCommands&, std::function<void(EditorCoherentPointDriftResult)> onComplete = {});
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorCoherentPointDriftConfig(
+        const EditorProcessingCommands&, const CoherentPointDriftConfig&, std::string sourceId = {});
+    [[nodiscard]] std::optional<CoherentPointDriftConfig> GetEditorCoherentPointDriftConfig(
+        const EditorProcessingCommands&);
 }

@@ -131,6 +131,15 @@ TEST(SandboxAgentServer, ClientRunsSmoothingThroughTheSocketAndUndoesIt)
         for (std::size_t i = 0; i < vertices.Size(); ++i) rough[i] = (i % 2) ? 1.0 : -1.0;
     }
     const auto stableId = R::SelectionController::ToStableEntityId(entity);
+    // A shifted copy of the grid as a point cloud: the CPD target.
+    const auto cloud = scene.Create();
+    {
+        auto& points = scene.Raw().emplace<GS::Vertices>(cloud).Properties;
+        points.Resize(36);
+        auto positions = points.GetOrAdd<glm::vec3>("v:position");
+        for (std::size_t i = 0; i < 36; ++i) positions[i] = glm::vec3(float(i % 6) + 0.5f, float(i / 6), 0.0f);
+    }
+    const auto cloudId = R::SelectionController::ToStableEntityId(cloud);
 
     std::atomic_bool done{false};
     std::vector<std::string> failures;
@@ -187,6 +196,17 @@ TEST(SandboxAgentServer, ClientRunsSmoothingThroughTheSocketAndUndoesIt)
         // Showing a property is an undoable step too, like the panel's Show button.
         auto undone = c.Tool("undo", {{"steps", 2}});
         check(undone["undone"].size() == 2u, "undo: " + undone.dump());
+        // RUNTIME-273: CPD through the configured section; the reply waits for the job.
+        auto cpdConfig = c.Tool("config_apply", {{"section", "sandbox.coherent_point_drift"},
+            {"payload", {{"source", stableId}, {"target", cloudId}, {"output", 1}, {"outlier_weight", 0.0}}}}, &isError);
+        check(!isError, "cpd config_apply: " + cpdConfig.dump());
+        auto cpdReady = c.Tool("preview_registration", {{"method", "cpd"}});
+        check(cpdReady["enabled"] == true, "preview_registration: " + cpdReady.dump());
+        auto cpd = c.Tool("run_registration", {{"method", "cpd"}}, &isError);
+        check(!isError && cpd["succeeded"] == true && cpd["iterations"].get<int>() > 0,
+              "run_registration cpd: " + cpd.dump());
+        check(std::abs(vertices.Get<glm::vec3>("v:position")[0].x - 0.5f) < 1e-2f, "cpd moved the source positions");
+        c.Tool("undo");
         auto outside = c.Tool("import_file", {{"path", "/etc/passwd"}}, &isError);
         check(isError, "paths outside the roots are refused");
         // Screenshots need an operational render device; the Null backend refuses with the reason.
@@ -211,7 +231,7 @@ TEST(SandboxAgentServer, ClientRunsSmoothingThroughTheSocketAndUndoesIt)
     EXPECT_TRUE(done.load()) << "client did not finish";
     EXPECT_TRUE(smoothedSeen) << "the agent's smoothing published its output";
     EXPECT_FALSE(vertices.Exists("smooth")) << "the agent's undo removed it again";
-    EXPECT_EQ(server->Status().CallsHandled, 17u) << "one main-thread call per request";
+    EXPECT_EQ(server->Status().CallsHandled, 21u) << "one main-thread call per request";
     const auto& lastApply = engine.Services().Find<R::EngineConfigControl>()->GetEngineConfigControlState().LastApply;
     EXPECT_EQ(lastApply.Source, R::RuntimeConfigControlSource::AgentCli) << "config_apply records the agent as the source";
     engine.Shutdown();

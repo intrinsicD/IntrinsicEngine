@@ -36,6 +36,7 @@ target_sources(${target_name}
         Modules/PointConstruction/Runtime.PointConstructionConfig.cppm
         Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm
         Modules/Registration/Runtime.RegistrationConfig.cppm
+        Modules/Registration/Runtime.CoherentPointDriftConfig.cppm
         Modules/Parameterization/Runtime.ParameterizationConfig.cppm
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm
@@ -162,6 +163,7 @@ target_sources(${target_name}
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp
         Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
         Config/internal/Runtime.PointNormalsRegistrationConfigCodecs.cpp
+        Modules/Registration/Runtime.CoherentPointDriftConfig.cpp
         Config/internal/Runtime.PointFeaturesConfigCodecs.cpp
         Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp
         Editor/Runtime.EditorCommandHistory.cpp
@@ -206,6 +208,7 @@ target_sources(${target_name}
         Editor/Operations/Runtime.GeometryProcessingOperations.Frame.cpp
         Editor/Operations/Runtime.NormalOperations.Frame.cpp
         Editor/Operations/Runtime.RegistrationOperations.Frame.cpp
+        Editor/Operations/Runtime.RegistrationOperations.CoherentPointDrift.cpp
         Editor/Operations/Runtime.MeshFieldOperations.Frame.cpp
         Editor/Operations/Runtime.MeshTopologyOperations.Frame.cpp
         Editor/Operations/Runtime.ParameterizationOperations.Frame.cpp

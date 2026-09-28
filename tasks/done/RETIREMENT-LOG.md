@@ -8777,3 +8777,5 @@ Retain terminal job outcomes while pending consumers reference them, so reaping 
 - 2026-09-28 — **UI-057**: field-table driven hints (description, accepted values, default), clamped numeric inputs and `EnumNames` combos in `Sandbox.PanelSupport`, adopted by every Smooth Property parameter; other families listed as follow-ups. [Task](UI-057-schema-driven-field-hints.md).
 
 - 2026-09-28 — **METHOD-015**: Coherent Point Drift CPU reference (rigid default, affine, nonrigid) on one streamed E-step with step solver, observer, 9 unit tests and a validated ground-truth smoke; CPUContracted, optimized backend METHOD-049. [Task](METHOD-015-coherent-point-drift-family-reference-backend.md).
+
+- 2026-09-28 — **RUNTIME-273**: Coherent Point Drift editor operation: `sandbox.coherent_point_drift` (field-table schema), start/step/cancel/snapshot/apply runs on the job service with per-iteration trace and preview, guarded undoable publication (rigid transform; affine/nonrigid positions or displacement), agent `preview_registration`/`run_registration`. [Task](RUNTIME-273-coherent-point-drift-editor-operation.md).

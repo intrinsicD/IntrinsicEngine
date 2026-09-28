@@ -20,6 +20,7 @@ import Extrinsic.Runtime.DescriptorAnalysisConfig;
 import Extrinsic.Runtime.DensityWeightConfig;
 import Extrinsic.Runtime.PointConstructionConfig;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.CoherentPointDriftConfig;
 import Extrinsic.Runtime.CurvatureSegmentationConfig;
 import Extrinsic.Runtime.ParameterizationConfig;
 import Extrinsic.Runtime.PhysicsModule;
@@ -40,6 +41,7 @@ namespace Extrinsic::Sandbox
             !registry.Register(Runtime::MakeLaplacianEigenbasisConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeMeshCurvatureConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeRegistrationConfigSectionRegistration()) ||
+            !registry.Register(Runtime::MakeCoherentPointDriftConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeNormalEstimationConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeOutlierAnalysisConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeKernelDensityConfigSectionRegistration()) ||

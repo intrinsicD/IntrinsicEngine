@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 6 |
-| `runtime` | 103 |
+| `runtime` | 104 |
 
 ## Modules
 
@@ -452,6 +452,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.PointSpacingConfig` | `src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressivePoissonConfig` | `src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressivePoissonGpuBackend` | `src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cppm` | `runtime` |
+| `Extrinsic.Runtime.CoherentPointDriftConfig` | `src/runtime/Modules/Registration/Runtime.CoherentPointDriftConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.RegistrationConfig` | `src/runtime/Modules/Registration/Runtime.RegistrationConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.TextureBakeModule` | `src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderArtifactPublication` | `src/runtime/Rendering/Runtime.RenderArtifactPublication.cppm` | `runtime` |
@@ -466,4 +467,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **439**
+Total modules: **440**

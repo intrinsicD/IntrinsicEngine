@@ -7,11 +7,13 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
+#include <glm/glm.hpp>
 #include <nlohmann/json.hpp>
 
 module Extrinsic.Runtime.AgentOperations;
@@ -25,6 +27,7 @@ import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.MeshFieldOperations;
+import Extrinsic.Runtime.RegistrationOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.GeometryProperty.Types;
 import Geometry.Properties.Types;
@@ -460,6 +463,82 @@ namespace Extrinsic::Runtime
         }
     }
 
+    namespace
+    {
+        // ---- registration (ICP, Coherent Point Drift) --------------------------------------
+        Json TransformJson(const glm::dmat4& m)
+        {
+            Json rows = Json::array();
+            for (int r = 0; r < 4; ++r) rows.push_back({m[0][r], m[1][r], m[2][r], m[3][r]});
+            return rows;
+        }
+        Json RegistrationJson(const EditorRegistrationResult& r)
+        {
+            return {{"method", "icp"}, {"status", DebugNameForEditorCommandStatus(r.Status)},
+                    {"succeeded", r.Succeeded()}, {"message", r.Message},
+                    {"backend", ToString(r.ActualBackend)}, {"requested_backend", ToString(r.RequestedBackend)},
+                    {"iterations", r.IterationsPerformed}, {"converged", r.Converged}, {"rmse", r.FinalRMSE},
+                    {"inliers", r.FinalInlierCount}, {"source_points", r.SourcePointCount}, {"target_points", r.TargetPointCount}};
+        }
+        Json CoherentPointDriftJson(const EditorCoherentPointDriftResult& r)
+        {
+            return {{"method", "cpd"}, {"status", DebugNameForEditorCommandStatus(r.Status)},
+                    {"succeeded", r.Succeeded()}, {"message", r.Message}, {"backend", r.Backend},
+                    {"variant", unsigned(r.Method)}, {"output", unsigned(r.Output)}, {"termination", r.Termination},
+                    {"iterations", r.Iterations}, {"sigma2", r.Sigma2}, {"negative_log_likelihood", r.NegativeLogLikelihood},
+                    {"matched_weight", r.MatchedWeight}, {"mean_displacement", r.MeanDisplacement},
+                    {"transform", TransformJson(r.Transform)}, {"source_points", r.SourcePointCount},
+                    {"target_points", r.TargetPointCount}};
+        }
+        // Both methods run their configured section (config_apply first). A queued job
+        // answers once it has published or failed.
+        AgentOperationOutcome RunRegistration(const AgentOperationContext& context, std::string_view arguments, bool preview)
+        {
+            const auto args = ParseObject(arguments);
+            const auto method = args ? String(*args, "method") : std::nullopt;
+            if (!method || (*method != "icp" && *method != "cpd")) return Fail("Pass {\"method\": \"icp\" | \"cpd\"}.");
+            if (context.Attachment == nullptr || !context.Attachment->IsAttached()) return Fail(kNoWorkspace);
+            const auto commands = PrepareEditorRegistrationFrame(*context.Attachment).Commands;
+            if (*method == "icp")
+            {
+                const auto config = GetEditorRegistrationConfig(commands);
+                if (!config) return Fail("The sandbox.registration section is unavailable.");
+                if (preview)
+                {
+                    const auto ready = PreviewEditorRegistrationCommand(commands, *config);
+                    return Ok({{"method", "icp"}, {"enabled", ready.Enabled}, {"reason", ready.DisabledReason}});
+                }
+                auto done = std::make_shared<std::optional<EditorRegistrationResult>>();
+                auto result = ApplyEditorConfiguredRegistrationCommand(commands,
+                    [done](EditorRegistrationResult r) { *done = std::move(r); });
+                if (result.Status != EditorCommandStatus::Pending)
+                    return {.IsError = !result.Succeeded(), .Text = Dump(RegistrationJson(result))};
+                return {.Continuation = [done](const AgentOperationContext&, AgentOperationOutcome& out) {
+                    if (!done->has_value()) return false;
+                    out = {.IsError = !(*done)->Succeeded(), .Text = Dump(RegistrationJson(**done))};
+                    return true;
+                }};
+            }
+            const auto config = GetEditorCoherentPointDriftConfig(commands);
+            if (!config) return Fail("The sandbox.coherent_point_drift section is unavailable.");
+            if (preview)
+            {
+                const auto ready = PreviewEditorCoherentPointDriftCommand(commands, *config);
+                return Ok({{"method", "cpd"}, {"enabled", ready.Enabled}, {"reason", ready.DisabledReason}});
+            }
+            auto done = std::make_shared<std::optional<EditorCoherentPointDriftResult>>();
+            auto result = ApplyEditorConfiguredCoherentPointDrift(commands,
+                [done](EditorCoherentPointDriftResult r) { *done = std::move(r); });
+            if (result.Status != EditorCommandStatus::Pending)
+                return {.IsError = !result.Succeeded(), .Text = Dump(CoherentPointDriftJson(result))};
+            return {.Continuation = [done](const AgentOperationContext&, AgentOperationOutcome& out) {
+                if (!done->has_value()) return false;
+                out = {.IsError = !(*done)->Succeeded(), .Text = Dump(CoherentPointDriftJson(**done))};
+                return true;
+            }};
+        }
+    }
+
     void RegisterEditorAgentOperations(AgentOperationRegistry& registry)
     {
         const auto add = [&](const char* name, const char* title, std::string description, std::string schema,
@@ -511,6 +590,16 @@ namespace Extrinsic::Runtime
             "Recent engine log entries (warnings, errors, Vulkan validation messages).",
             Schema(R"({"limit":{"type":"integer","minimum":1,"maximum":1000,"default":100},"min_level":{"type":"string","enum":["debug","info","warning","error"],"default":"info"}})"),
             true, Log);
+        const std::string registration = Schema(
+            R"({"method":{"type":"string","enum":["icp","cpd"],"description":"icp uses sandbox.registration, cpd uses sandbox.coherent_point_drift (config_apply first)."}})",
+            R"(["method"])");
+        add("preview_registration", "Preview registration",
+            "Whether the configured ICP or Coherent Point Drift registration can run, and why not.", registration, true,
+            [](const AgentOperationContext& c, std::string_view a) { return RunRegistration(c, a, true); });
+        add("run_registration", "Run registration",
+            "Register the configured source entity onto the target with ICP or Coherent Point Drift and publish the "
+            "result (source transform, positions or a displacement property) as one undoable step; answers when done.",
+            registration, false, [](const AgentOperationContext& c, std::string_view a) { return RunRegistration(c, a, false); });
         const std::string meshField = Schema(
             R"({"operation":{"type":"string","enum":)" + OperationEnum() +
                 R"(,"description":"Mesh-field operation; its settings come from the matching config section (config_apply first)."},)" +
