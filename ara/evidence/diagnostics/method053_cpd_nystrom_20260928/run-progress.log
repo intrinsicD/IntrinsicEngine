@@ -1,0 +1,32 @@
+size 1000
+  rigid_reference: success, 25 iterations, median 185.225 ms (184.844 - 185.915, 3 runs), rms 0.00037056
+  rigid_dense: success, 25 iterations, median 28.5033 ms (28.2356 - 28.5382, 3 runs), rms 0.00037056
+  rigid_truncated: success, 25 iterations, median 33.7275 ms (33.5699 - 34.2402, 3 runs), rms 0.00037056
+  rigid_fast_gauss: success, 25 iterations, median 1791.89 ms (1767.4 - 1819.55, 3 runs), rms 0.00037056
+  rigid_auto: success, 25 iterations, median 29.0398 ms (28.9789 - 29.1247, 3 runs), rms 0.00037056
+  rigid_nystrom: success, 25 iterations, median 23.2838 ms (23.2677 - 23.2844, 3 runs), rms 0.00037056
+  rigid_dense_1thread: success, 25 iterations, median 113.386 ms (112.118 - 117.201, 3 runs), rms 0.00037056
+  rigid_auto_1thread: success, 25 iterations, median 88.4919 ms (86.909 - 89.3936, 3 runs), rms 0.00037056
+  nonrigid_full_auto: success, 23 iterations, median 1093.87 ms (1092.47 - 1099.51, 3 runs), rms 7.3114e-06
+  nonrigid_lowrank50_auto: success, 23 iterations, median 41.216 ms (40.726 - 41.6911, 3 runs), rms 1.24836e-05
+  nonrigid_lowrank150_auto: success, 23 iterations, median 65.5097 ms (65.4598 - 65.771, 3 runs), rms 7.33023e-06
+  nonrigid_lowrank50_nystrom: success, 23 iterations, median 35.3885 ms (35.1789 - 35.5994, 3 runs), rms 1.24836e-05
+size 10000
+  rigid_reference: success, 35 iterations, median 27585.5 ms (27578.9 - 27696.8, 3 runs), rms 0.000138222
+  rigid_dense: success, 35 iterations, median 2220.15 ms (2211.58 - 2260.46, 3 runs), rms 0.000138222
+  rigid_truncated: success, 35 iterations, median 2331.8 ms (2308.7 - 2380.9, 3 runs), rms 0.000138222
+  rigid_fast_gauss: success, 35 iterations, median 5332.41 ms (5325.38 - 5338.22, 3 runs), rms 0.000138222
+  rigid_auto: success, 35 iterations, median 1394.29 ms (1394.04 - 1398.12, 3 runs), rms 0.000138222
+  rigid_nystrom: success, 35 iterations, median 1097.43 ms (1091.41 - 1109.07, 3 runs), rms 0.000138222
+  rigid_dense_1thread: success, 35 iterations, median 15082.6 ms (15065.8 - 15142.7, 3 runs), rms 0.000138222
+  rigid_auto_1thread: success, 35 iterations, median 8778.53 ms (8751.57 - 8826.55, 3 runs), rms 0.000138222
+  nonrigid_lowrank50_auto: success, 31 iterations, median 1411.11 ms (1404 - 1419.48, 3 runs), rms 1.2246e-05
+  nonrigid_lowrank150_auto: success, 31 iterations, median 1561.92 ms (1561.9 - 1566.11, 3 runs), rms 3.14133e-06
+  nonrigid_lowrank50_nystrom: success, 31 iterations, median 903.677 ms (898.176 - 903.848, 3 runs), rms 1.2246e-05
+size 100000
+  rigid_dense: success, 48 iterations, median 435193 ms (434794 - 435593, 2 runs), rms 4.96498e-05
+  rigid_auto: success, 48 iterations, median 197636 ms (196747 - 198524, 2 runs), rms 4.96498e-05
+  rigid_nystrom: success, 48 iterations, median 128496 ms (128070 - 128921, 2 runs), rms 4.96453e-05
+  nonrigid_lowrank50_auto: success, 84 iterations, median 170426 ms (169991 - 170861, 2 runs), rms 1.23988e-05
+  nonrigid_lowrank150_auto: success, 100 iterations, median 176136 ms (175795 - 176477, 2 runs), rms 3.0355e-06
+  nonrigid_lowrank50_nystrom: success, 84 iterations, median 30515.8 ms (30386.5 - 30645.1, 2 runs), rms 1.23988e-05

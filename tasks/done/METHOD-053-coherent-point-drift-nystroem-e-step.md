@@ -2,15 +2,24 @@
 id: METHOD-053
 theme: I
 depends_on: [METHOD-049]
+maturity_target: ParityProven
 template: micro
 workflow_schema: 1
 workflow_profile: micro
 evidence: not_applicable
-evidence_skip_reason: interactive backlog note; implementation owes its own parity tests and sealed benchmark evidence.
+evidence_skip_reason: Finished interactively; the performance and parity result is ARA claim C115 with sealed, source-bound evidence in ara/evidence/diagnostics/method053_cpd_nystrom_20260928/.
 contract_schema: 1
 contracts: [method.engine-integration]
 ---
 # METHOD-053 — Nystroem E-step for Coherent Point Drift (opt-in, a-posteriori error)
+
+## Completion — 2026-09-28
+Commit: `172266400` (E-step, config, panel, agent, tests); the evidence commit on
+`claude/cpd-nystrom` records the sealed benchmark. Maturity reached: `ParityProven` for the
+CPU policy on the recorded host and fixture (claim C115): registered points within 1.2e-8
+of the exact run; 1.54x (rigid) and 5.59x (low-rank nonrigid) over Auto at 10^5 points.
+The error is an a-posteriori estimate, not a bound; the middle sigma phase stays dense
+(permutohedral lattice: GEOM-060 and the GPU follow-ups).
 
 ## Goal
 - Speed up the wide-kernel iterations of Coherent Point Drift, which dominate at 10^5
@@ -29,7 +38,7 @@ contracts: [method.engine-integration]
 ## Acceptance criteria
 - [x] `EStepPolicy::Nystrom` computing P1, Pt1, PX from L landmark columns (O((2M + N) L) per iteration), thread-count independent, with the sampled relative error reported as `EStepSampledError` (never presented as a bound).
 - [x] Hand-over (Nystroem while sigma is wide, exact Auto choice of truncated/dense once narrow), built into the `Nystrom` policy rather than a flag on `Auto`, so `Auto` stays exact; landmarks double on rejection within half the dense cost.
-- [ ] Parity against the reference on the METHOD-049 fixtures (registered-point delta and RMS to truth), and a sealed rerun of `geometry.coherent_point_drift.accelerated` with the new policy.
+- [x] Parity against the reference on the METHOD-049 fixtures (registered-point delta and RMS to truth), and a sealed rerun of `geometry.coherent_point_drift.accelerated` with the new policy.
 - [x] Config enum value, panel entry and agent field (the config enum mirrors `EStepPolicy`).
 
 ## Engine integration

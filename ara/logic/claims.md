@@ -2420,3 +2420,15 @@
 - **Dependencies**: []
 - **Tags**: registration, Bayesian CPD, variational Bayes, CPU reference
 - **From staging**: O254
+
+## C115: Nystroem E-step for Coherent Point Drift with sampled-error fallback
+- **Statement**: METHOD-053's Nystroem E-step (landmark low-rank kernel, sampled a-posteriori error, exact fallback above a 1e-3 limit), run with 16 threads on the recorded i9-11900KF (Release) on the bumpy-ellipsoid fixture, registers 10^5 points rigidly in 128.5 s instead of 197.6 s for the exact Auto E-step (1.54x) and solves the low-rank (k = 50) nonrigid problem in 30.5 s instead of 170.4 s (5.59x), with registered points within 1.2e-8 of the exact run and unchanged RMS to the ground truth (medians of 2 runs; 1.27x and 1.56x at 10^4 points).
+- **Status**: supported — same-host timings for one fixture; the per-iteration error is estimated on 64 sampled rows and is not a bound; the middle sigma phase still runs dense.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: A rerun of `IntrinsicCoherentPointDriftScaling` at the recorded revision on the recorded host shows Nystroem/Auto above 0.8 for rigid or above 0.4 for nonrigid low rank at 10^5 points, a registered-point delta above 1e-4 against the exact run, or thread-count-dependent results in `Test.CoherentPointDriftAccelerated.cpp`.
+- **Proof**: [ara/evidence/diagnostics/method053_cpd_nystrom_20260928/record.json, ara/evidence/diagnostics/method053_cpd_nystrom_20260928/sealed-result.json, ara/evidence/diagnostics/method053_cpd_nystrom_20260928/run-progress.log, ara/evidence/diagnostics/method053_cpd_nystrom_20260928/single-run-trace.log.gz, tests/unit/geometry/Test.CoherentPointDriftAccelerated.cpp, src/geometry/Geometry.Registration.CoherentPointDrift.EStep.cpp]
+- **Dependencies**: [C113]
+- **Tags**: registration, Coherent Point Drift, Nystroem, approximate E-step, performance
+- **From staging**: O255
+

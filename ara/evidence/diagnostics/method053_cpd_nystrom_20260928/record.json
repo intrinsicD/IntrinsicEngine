@@ -1,0 +1,28 @@
+{
+  "task": "METHOD-053",
+  "date": "2026-09-28",
+  "source_revision": "1722664005831cc5a6f4c9df80836f59ec965a2e",
+  "environment": {
+    "cpu": "Intel Core i9-11900KF (8 cores, 16 threads), threads used: 16",
+    "compiler": "clang++ 23.0.0",
+    "preset": "ci-release",
+    "build_type": "Release, no -march=native"
+  },
+  "commands": [
+    "cmake --build build/ci-release --target IntrinsicCoherentPointDriftScaling",
+    "GITHUB_SHA=1722664005831cc5a6f4c9df80836f59ec965a2e build/ci-release/bin/IntrinsicCoherentPointDriftScaling <dir> 1000 10000 100000 2> run-progress.log",
+    "python3 tools/benchmark/seal_benchmark_results.py --root <dir> --manifests-root benchmarks --run-id method053-nystrom-scaling-20260928 --source-state clean_commit --source-revision 1722664005831cc5a6f4c9df80836f59ec965a2e --claim-eligible --replace",
+    "python3 tools/benchmark/validate_benchmark_results.py --root <dir> --strict"
+  ],
+  "timing": "One untimed warmup; median of 3 runs up to 10^4 points and 2 at 10^5 (min/max in sealed-result.json). single-run-trace.log.gz is a separate traced single run (observer inside the timed region) showing per-iteration policies and landmark growth.",
+  "outcomes": {
+    "rigid_nystrom_vs_auto": {"1000_points": "23.3 ms vs 29.0 ms (Nystrom never pays at this size: exact Auto choice without the fast Gauss probe)", "10000_points": "1097 ms vs 1394 ms (1.27x)", "100000_points": "128.5 s vs 197.6 s (1.54x); 3.39x faster than dense"},
+    "nonrigid_lowrank50_nystrom_vs_auto": {"1000_points": "35.4 ms vs 41.2 ms", "10000_points": "904 ms vs 1411 ms (1.56x)", "100000_points": "30.5 s vs 170.4 s (5.59x)"},
+    "parity": "max registered-point delta 6.6e-10 against the reference at 10^4 (rigid), 1.2e-8 against dense at 10^5 (rigid), <= 6.0e-10 against low-rank auto (nonrigid); RMS to truth unchanged to 3 significant digits",
+    "sampled_error": "largest accepted sampled relative error 9.7e-4 (limit 1e-3)",
+    "policy_split_100000_rigid": "8 Nystrom iterations (landmarks growing 256 -> 1024), 13 dense, 27 truncated (traced single run)",
+    "gate": "passed: quality_error_l2 3.7e-4 <= 1e-3, quality_error_linf 1.2e-8 <= 1e-4"
+  },
+  "limitations": "The Nystrom error is an a-posteriori estimate on 64 sampled rows, not a bound (the worst row was within about 3x of the estimate on the unit fixtures). The middle sigma phase remains dense. One host, one fixture.",
+  "not_measured": "Memory peak; cross-host timings; other fixtures."
+}

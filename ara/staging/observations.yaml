@@ -4275,3 +4275,16 @@ observations:
     promoted_to: logic/claims.md:C114
     crystallized_via: empirical-resolution
     stale: false
+
+  - id: O255
+    timestamp: 2026-09-28T22:30+02:00
+    provenance: ai-executed
+    content: A Nystroem E-step with a sampled a-posteriori error check and exact fallback speeds up Coherent Point Drift at 10^5 points 1.54x (rigid) and 5.59x (low-rank nonrigid) over the exact Auto E-step, with registered points within 1.2e-8 of the exact run.
+    context: One host (i9-11900KF, 16 threads), Release, one fixture; landmarks grow from 256 to 1024 while the approximation fails; the error is estimated, not bounded; the middle sigma phase stays dense.
+    potential_type: claim
+    bound_to: [N646]
+    promoted: true
+    promoted_to: logic/claims.md:C115
+    crystallized_via: artifact-commitment
+    stale: false
+

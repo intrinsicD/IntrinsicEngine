@@ -8,12 +8,12 @@ picking backlog work; theme priorities and rationale live in
 
 ## Active tasks
 
+- `GEOM-111` — Unified progressive point sampling (`Geometry.PointSampling`) (tasks/active/GEOM-111-unified-progressive-point-sampling.md)
 - `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/active/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
 - `METHOD-044` — Feature-aware patches and distortion-aware atlas merging (tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md)
 - `METHOD-045` — Preserve baseline regions while constructing UV charts (tasks/active/METHOD-045-baseline-preserving-atlas-cuts.md)
-- `METHOD-053` — Nystroem E-step for Coherent Point Drift (opt-in, a-posteriori error) (tasks/active/METHOD-053-coherent-point-drift-nystroem-e-step.md)
 - `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/active/UI-037-linear-domain-action-readiness-tooltips.md)
 - `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
 
@@ -129,6 +129,8 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `GEOM-106` — Center-surround saliency of scalar properties (tasks/backlog/geometry/GEOM-106-center-surround-scalar-saliency.md)
 - unblocked: `GEOM-107` — Wachspress, mean-value and modified-face-normal Laplacian weights (tasks/backlog/geometry/GEOM-107-additional-mesh-laplacian-weights.md)
 - unblocked: `GEOM-108` — Small Framework24 parity helpers (tasks/backlog/geometry/GEOM-108-framework24-small-parity-helpers.md)
+- blocked by `GEOM-111`: `GEOM-112` — Complete CPU port of phase-parallel progressive Poisson sampling (tasks/backlog/geometry/GEOM-112-progressive-poisson-complete-cpu-port.md)
+- blocked by `GEOM-111`: `GEOM-113` — Approximate FPS family and sampling baselines on the CPU (tasks/backlog/geometry/GEOM-113-approximate-fps-family-and-sampling-baselines.md)
 - blocked by `METHOD-014`: `HARDEN-084` — Localized CPU/GPU parity signatures (tasks/backlog/methods/HARDEN-084-localized-cpu-gpu-parity-signatures.md)
 - unblocked: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
 - unblocked: `METHOD-003A` — Spatial-query CPU-reference integration intake (tasks/backlog/methods/METHOD-003A-spatial-query-reference-integration-intake.md)
@@ -157,11 +159,13 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `METHOD-048` — Full HKTex mesh authoring, compiled rendering and measured default adoption (tasks/backlog/methods/METHOD-048-hktex-mesh-textures.md)
 - unblocked: `METHOD-052` — Anderson acceleration for Coherent Point Drift EM (tasks/backlog/methods/METHOD-052-coherent-point-drift-anderson-acceleration.md)
 - unblocked: `METHOD-054` — Geodesic Bayesian Coherent Point Drift (GBCPD) (tasks/backlog/methods/METHOD-054-geodesic-bayesian-coherent-point-drift.md)
+- blocked by `GEOM-111`: `METHOD-055` — Vulkan compute port of the hole-sieve farthest-point sampler (tasks/backlog/methods/METHOD-055-vulkan-hole-sieve-farthest-point-sampling.md)
 - unblocked: `RUNTIME-210` — Signed Heat runtime and config integration (tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md)
 - unblocked: `RUNTIME-211` — K-Means property-domain integration (tasks/backlog/runtime/RUNTIME-211-kmeans-property-domain-integration.md)
 - unblocked: `RUNTIME-212` — Progressive Poisson property-domain publication (tasks/backlog/runtime/RUNTIME-212-progressive-poisson-property-domain-publication.md)
 - blocked by `GEOM-061`: `RUNTIME-274` — Point-cloud subsampling editor workflow (tasks/backlog/runtime/RUNTIME-274-point-cloud-subsampling-workflow.md)
 - unblocked: `RUNTIME-275` — Gaussian noise editor operation (tasks/backlog/runtime/RUNTIME-275-gaussian-noise-editor-operation.md)
+- blocked by `GEOM-111`: `RUNTIME-289` — Selectable point sampling wherever points are chosen (tasks/backlog/runtime/RUNTIME-289-selectable-point-sampling-in-consumers.md)
 - blocked by `RUNTIME-210`: `UI-042` — Signed Heat mesh method panel (tasks/backlog/ui/UI-042-signed-heat-mesh-panel.md)
 - blocked by `RUNTIME-211`: `UI-043` — K-Means property-domain panel (tasks/backlog/ui/UI-043-kmeans-property-domain-panel.md)
 - blocked by `RUNTIME-212`: `UI-044` — Progressive Poisson property-domain panel (tasks/backlog/ui/UI-044-progressive-poisson-property-domain-panel.md)

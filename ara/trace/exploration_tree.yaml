@@ -13804,3 +13804,16 @@ tree:
     - tests/unit/geometry/Test.CoherentPointDriftBayesian.cpp
     - methods/geometry/coherent_point_drift/paper.md
     status: resolved
+
+  - id: N646
+    type: experiment
+    title: Approximate the wide-kernel Coherent Point Drift E-step with Nystroem landmarks and an a-posteriori error check
+    provenance: ai-executed
+    timestamp: 2026-09-28T22:30+02:00
+    result: METHOD-053 adds a Nystroem E-step in landmark space ((2M + N) L kernel terms per iteration) whose sampled error decides between accepting it, doubling the landmarks within half the dense cost, or running the iteration exactly. At 10^5 points it removes the widest dense iterations (8 of 48 rigid, 17 of 84 low-rank nonrigid) and speeds registration up 1.54x and 5.59x with registered points within 1.2e-8 of the exact run. C115 records the claim.
+    also_depends_on: [N644]
+    evidence:
+    - ara/evidence/diagnostics/method053_cpd_nystrom_20260928/record.json
+    - ara/evidence/diagnostics/method053_cpd_nystrom_20260928/sealed-result.json
+    status: resolved
+
