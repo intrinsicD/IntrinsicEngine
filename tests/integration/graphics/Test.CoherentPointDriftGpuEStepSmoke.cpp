@@ -563,7 +563,7 @@ TEST(METHOD056VulkanCpdEStep, DenseStatisticsAndRegistrationMatchTheCpu)
     if (const auto* output = std::getenv("INTRINSIC_METHOD056_BENCHMARK_OUTPUT"))
     {
         const nlohmann::json json{{"benchmark_id", "geometry.coherent_point_drift.vulkan_dense_e_step_smoke"},
-            {"method", "geometry.coherent_point_drift"}, {"backend", "gpu_vulkan_fp32_dense"},
+            {"method", "geometry.coherent_point_drift"}, {"backend", "gpu_vulkan_compute"},
             {"dataset", "builtin.cpd.rigid_cloud.seed91_1000_and_parity_1500x1400.seed93"}, {"commit", "local-dev"},
             {"metrics", {{"runtime_ms", run->EditorMs}, {"quality_error_linf", pointError}}},
             {"diagnostics", {{"runner", "IntrinsicPointLBVHGpuTests"}, {"mode", "smoke"}, {"parity_cases", run->ParityCases},
@@ -601,13 +601,14 @@ TEST(METHOD056VulkanCpdEStep, ScalingProfile)
     std::ostringstream json;
     json.precision(9);
     json << "{\n  \"benchmark_id\": \"geometry.coherent_point_drift.vulkan_dense_e_step_scaling\",\n"
-         << "  \"method\": \"geometry.coherent_point_drift\",\n  \"backend\": \"gpu_vulkan_fp32_dense\",\n"
+         << "  \"method\": \"geometry.coherent_point_drift\",\n  \"backend\": \"gpu_vulkan_compute\",\n"
          << "  \"dataset\": \"builtin.cpd_bumpy_ellipsoid_scaling.v1\",\n"
          << "  \"commit\": \"" << (commit ? commit : "local-dev") << "\",\n"
          << "  \"metrics\": {\n    \"runtime_ms\": " << run->VulkanMilliseconds << ",\n    \"quality_error_l2\": "
          << run->WorstRms << ",\n    \"quality_error_linf\": " << run->WorstParity << "\n  },\n"
          << "  \"diagnostics\": {\n    \"runner\": \"IntrinsicPointLBVHGpuTests --gtest_filter=METHOD056VulkanCpdEStep.ScalingProfile\",\n"
-         << "    \"mode\": \"performance_scaling_profile\",\n    \"device_subgroup_size\": " << device.SubgroupSize() << ",\n"
+         << "    \"mode\": \"performance_scaling_profile\",\n    \"reported_backend\": \"gpu_vulkan_fp32_dense\",\n"
+         << "    \"device_subgroup_size\": " << device.SubgroupSize() << ",\n"
          << "    \"validation_layers\": false,\n    \"vsync\": false,\n"
          << "    \"e_step_tolerance\": 1e-06,\n    \"sizes\": [\n" << run->Sizes << "    ]\n  },\n"
          << "  \"status\": \"" << (passed ? "passed" : "failed") << "\"\n}\n";
