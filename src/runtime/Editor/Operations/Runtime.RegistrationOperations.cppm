@@ -146,6 +146,9 @@ export namespace Extrinsic::Runtime
         double MeanDisplacement{0.0}; // mean |T(y) - y| in world units
         double EStepErrorBound{0.0};  // max over the run (0: exact)
         double EStepSampledError{0.0}; // Nystrom: max sampled error estimate over the run
+        // Vulkan: iterations meant for the device that ran on the CPU, and why the last one did.
+        std::uint32_t EStepFallbacks{0u};
+        std::string GpuDiagnostic{};
         std::uint32_t KernelRank{0u}; // low-rank nonrigid eigenpairs
         double KernelApproximationError{0.0};
         std::string Message{};

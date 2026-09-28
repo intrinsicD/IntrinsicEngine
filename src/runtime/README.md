@@ -792,7 +792,15 @@ auto, fast Gauss, and the approximate METHOD-053 Nystroem with `nystrom_landmark
 the nonrigid `low_rank`, which lifts the full-kernel limit of 8192 source points. Results
 carry the backend that actually ran (`cpu_auto` or `cpu_mixed` when iterations used
 different policies); each trace row carries the E-step policy that ran and its error bound;
-low-rank runs report the kernel rank and its sampled approximation error. The `bayesian`
+low-rank runs report the kernel rank and its sampled approximation error. The `vulkan`
+E-step (METHOD-056) runs the dense two-pass form on the device while the kernel is wide:
+`Extrinsic.Runtime.CoherentPointDriftGpuEStep` is a per-run broker whose `Evaluate` (the
+solver's external evaluator) blocks the step worker while a companion pump job, polled on
+the main thread through `IsReadyToApply`, records it with `SpatialIndexCache::QueueGpuCompute`
+(`Extrinsic.Graphics.CoherentPointDriftEStep`) and hands the readback back. Without the job
+lane, an operational device with shader float64, or after a device failure or timeout, the
+iterations run the exact CPU choice; results count them in `e_step_fallbacks` and say why in
+`gpu_diagnostic`. The `bayesian`
 method (METHOD-050, BCPD) adds `gamma`, `kappa` (0 keeps equal mixing weights) and
 `subsample` (farthest-point samples registered, deformation interpolated to every point);
 like nonrigid it writes positions or a displacement property. The shared

@@ -33,6 +33,7 @@ namespace Geometry::CoherentPointDrift
         case EStepPolicy::Auto: return "auto";
         case EStepPolicy::FastGauss: return "fast_gauss";
         case EStepPolicy::Nystrom: return "nystrom";
+        case EStepPolicy::Vulkan: return "vulkan";
         }
         return "unknown";
     }
@@ -47,6 +48,7 @@ namespace Geometry::CoherentPointDrift
         case EStepPolicy::Auto: return "cpu_auto";
         case EStepPolicy::FastGauss: return "cpu_ifgt";
         case EStepPolicy::Nystrom: return "cpu_nystrom";
+        case EStepPolicy::Vulkan: return "gpu_vulkan_fp32_dense";
         }
         return "unknown";
     }
@@ -672,6 +674,34 @@ namespace Geometry::CoherentPointDrift::EStep
         double NystromRejectedSigma2{0.0};
         bool TargetLandmarksExhausted{false}; // the target order ended (duplicates) before the request
         std::size_t NystromLandmarks{0u}; // count that last passed (the next call starts there)
+
+        std::uint64_t TargetGeneration{0u}; // process-unique per SetTarget, for external evaluators
+
+        // External (Vulkan) rows; false when the evaluator is absent, fails or returns non-finite
+        // or negative statistics (the caller then runs the CPU choice).
+        bool ExternalRows(const Settings& settings, const PointSet& moved, const double sigma2, const double logC,
+                          Sums& out)
+        {
+            const std::size_t n = TargetX.size(), m = moved.Size();
+            if (!settings.External) return false;
+            const ExternalRequest request{.Target = Target(), .Moved = moved, .TargetGeneration = TargetGeneration,
+                .Sigma2 = sigma2, .LogOutlier = logC - LogWeightShift, .LogWeights = LogWeight,
+                .LogDenominator = LogDenominator, .Pt1 = out.Pt1, .P1 = out.P1,
+                .PXx = out.PXx, .PXy = out.PXy, .PXz = out.PXz};
+            if (!settings.External(request)) return false;
+            for (std::size_t j = 0; j < n; ++j)
+            {
+                if (!std::isfinite(LogDenominator[j]) || !(out.Pt1[j] >= 0.0) || !std::isfinite(out.Pt1[j])) return false;
+                LogDenominator[j] += LogWeightShift;
+                RowBound[j] = 0.0;
+                RowEvaluations[j] = m;
+            }
+            for (std::size_t i = 0; i < m; ++i)
+                if (!(out.P1[i] >= 0.0) || !std::isfinite(out.P1[i]) || !std::isfinite(out.PXx[i]) ||
+                    !std::isfinite(out.PXy[i]) || !std::isfinite(out.PXz[i]))
+                    return false;
+            return true;
+        }
 
         void UpdateScales(const std::vector<double>& p1)
         {
@@ -1312,6 +1342,8 @@ namespace Geometry::CoherentPointDrift::EStep
         s.TargetLandmarksExhausted = false;
         s.NystromRejectedSigma2 = 0.0;
         s.NystromLandmarks = 0u;
+        static std::atomic<std::uint64_t> generations{0u};
+        s.TargetGeneration = ++generations;
     }
 
     bool Evaluator::Evaluate(const PointSet moved, const double sigma2, const double logOutlier, const Settings& settings,
@@ -1344,7 +1376,14 @@ namespace Geometry::CoherentPointDrift::EStep
         // between truncated and dense (the fast Gauss transform loses to dense in 3-D).
         double sampledError = 0.0;
         std::uint64_t nystromEvaluations = 0u;
-        bool nystrom = false, allowFastGauss = true;
+        bool nystrom = false, allowFastGauss = true, wantExternal = false, external = false;
+        if (used == EStepPolicy::Vulkan)
+        {
+            // The device runs what Auto would run densely; truncation stays on the CPU.
+            used = EStepPolicy::Auto;
+            allowFastGauss = false;
+            wantExternal = true;
+        }
         if (used == EStepPolicy::Nystrom)
         {
             if (!(settings.NystromLandmarks >= 2u && std::isfinite(settings.NystromErrorLimit) && settings.NystromErrorLimit > 0.0))
@@ -1416,11 +1455,23 @@ namespace Geometry::CoherentPointDrift::EStep
         else if (used == EStepPolicy::FastGauss &&
                  !s.PlanFastGauss(moved, sigma2, settings.Tolerance, false, threads, sourcePlan, targetPlan))
             used = EStepPolicy::Dense; // no plan meets the bound
+        bool externalFallback = false;
+        if (wantExternal && used == EStepPolicy::Dense)
+        {
+            external = s.ExternalRows(settings, moved, sigma2, logOutlier, out);
+            if (external) used = EStepPolicy::Vulkan;
+            else
+            {
+                externalFallback = true;
+                s.Resize(n, m, out);
+            }
+        }
         s.ExtraEvaluations = 0u;
         s.FixedEntries = 0u;
-        const std::size_t blocks = used == EStepPolicy::FastGauss || nystrom
+        // The external form is two-pass (every pair twice), like blocks == 0.
+        const std::size_t blocks = used == EStepPolicy::FastGauss || nystrom || external
             ? 0u : Impl::RowBlocks(n, m, settings.PartialBudgetBytes, used == EStepPolicy::Truncated);
-        if (nystrom) {}
+        if (nystrom || external) {}
         else if (used == EStepPolicy::FastGauss)
             s.FastGaussRows(moved, sigma2, logOutlier, settings.Tolerance, sourcePlan, targetPlan, out, threads);
         else if (blocks > 0u)
@@ -1446,6 +1497,7 @@ namespace Geometry::CoherentPointDrift::EStep
         if (blocks == 0u && used != EStepPolicy::FastGauss && !nystrom) out.KernelEvaluations *= 2u;
         out.KernelEvaluations += s.ExtraEvaluations + nystromEvaluations;
         out.SampledError = nystrom ? sampledError : 0.0;
+        out.ExternalFallback = externalFallback;
         s.SourceTreeCurrent = false;
         s.UpdateScales(out.P1);
         return std::isfinite(out.LogDenominatorSum) && out.Matched > std::numeric_limits<double>::min() * double(n);

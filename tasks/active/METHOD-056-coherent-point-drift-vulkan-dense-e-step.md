@@ -45,9 +45,33 @@ contracts: [method.engine-integration]
 
 - Numeric policy: `docs/architecture/compute-parallel-primitives.md` §"Device Capabilities And Exact-Arithmetic Policy" (GRAPHICS-149).
 
+## Decisions (implementation, 2026-09-29)
+- Seam as designed: `EStep::Settings::External` (`ExternalRequest`: target, moved, target
+  generation, sigma^2, log c and log-weights in the frame shifted by the largest log-weight,
+  output spans); `EStepPolicy::Vulkan` runs it where Auto would run dense, keeps truncation
+  on the CPU, and otherwise falls back to that exact CPU choice (`Sums::ExternalFallback`,
+  `Result::EStepFallbacks`). Backend reporting follows Nystroem: `gpu_vulkan_fp32_dense` when
+  the device ran an iteration, else `cpu_auto`.
+- Runtime owner is a per-run broker (`Runtime.CoherentPointDriftGpuEStep`), not a module
+  participant: the step worker blocks in `Evaluate`; a companion pump job (High priority,
+  trivial work) is polled through `IsReadyToApply` on the main thread every drain and records
+  through `SpatialIndexCache::QueueGpuCompute`, which already owns framing and readback. A
+  failure or a 60 s timeout closes the broker (later iterations do not wait); a run without
+  the job lane never installs the evaluator (a synchronous wait would deadlock).
+- Buffers are host-visible `CreateBuffer` allocations kept by the workspace across a run's
+  iterations (target uploaded once per generation); the pump job releases them on the main
+  thread when the step job ends, since a run can outlive the device.
+- Kernels: fp32 distances and Cody-Waite exp (degree-7 polynomial), fp32 Kahan tile sums
+  added to fp64 accumulators, fp64 log/exp for the per-row finalization; the source pass
+  splits each fp64 log-denominator into fp32 high and low parts. Dispatches are bounded to
+  2^30 kernel pairs. Devices without shader float64 are refused (CPU fallback with a
+  diagnostic); the compensated-fp32 variant is not implemented.
+- Latency: a device E-step takes 4-6 frames (submit, frames in flight, transfer readback);
+  an off-frame compute submit stays a GRAPHICS follow-up.
+
 ## Acceptance criteria
-- [ ] Default gate: mock callback and Null host exercise the fallback; `Backend`/`RequestedBackend` truthful.
-- [ ] gpu;vulkan smoke `Test.CoherentPointDriftGpuEStepSmoke.cpp`: the tolerance above at three sigma values, weighted rows and outliers; two runs bitwise equal.
+- [x] Default gate: mock callback and Null host exercise the fallback; `Backend`/`RequestedBackend` truthful.
+- [x] gpu;vulkan smoke `Test.CoherentPointDriftGpuEStepSmoke.cpp`: the tolerance above at three sigma values, weighted rows and outliers; two runs bitwise equal.
 - [ ] Manifest `coherent_point_drift_gpu_vulkan_smoke.yaml` (`intent: gpu`, actual backend required) and a sealed scaling run against CPU dense and Nystroem on the same fixture; ARA claim.
 - [ ] Config enum value, panel entry, agent field; one GPU CPD run at a time (JobService occupancy measured).
 

@@ -39,12 +39,15 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorCommon;
+import Extrinsic.Runtime.CoherentPointDriftGpuEStep;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
+import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Vertices.Normals;
@@ -73,6 +76,9 @@ namespace Extrinsic::Runtime
         glm::dmat4 SourceModel{1.0};
         std::vector<glm::vec3> SourceWorld{}, TargetWorld{};
         CPD::Params Params{};
+        // Vulkan E-step (METHOD-056): the worker-to-main-thread broker, or why there is none.
+        std::shared_ptr<CoherentPointDriftGpuEStep> GpuEStep{};
+        std::string GpuUnavailable{};
 
         // Worker-owned; only one step job runs at a time (Busy).
         CPD::Solver Solver{};
@@ -133,7 +139,8 @@ namespace Extrinsic::Runtime
                       std::uint8_t(CoherentPointDriftEStep::Truncated) == std::uint8_t(CPD::EStepPolicy::Truncated) &&
                       std::uint8_t(CoherentPointDriftEStep::Auto) == std::uint8_t(CPD::EStepPolicy::Auto) &&
                       std::uint8_t(CoherentPointDriftEStep::FastGauss) == std::uint8_t(CPD::EStepPolicy::FastGauss) &&
-                      std::uint8_t(CoherentPointDriftEStep::Nystrom) == std::uint8_t(CPD::EStepPolicy::Nystrom));
+                      std::uint8_t(CoherentPointDriftEStep::Nystrom) == std::uint8_t(CPD::EStepPolicy::Nystrom) &&
+                      std::uint8_t(CoherentPointDriftEStep::Vulkan) == std::uint8_t(CPD::EStepPolicy::Vulkan));
 
         std::size_t MinimumPoints(CoherentPointDriftMethod method) noexcept
         {
@@ -239,6 +246,24 @@ namespace Extrinsic::Runtime
                                       .SubsampleSource = config.Subsample, .SubsampleTarget = config.SubsampleTarget,
                                       .SubsampleSampling = ToPointSamplingParams(config.SubsampleSampling),
                                       .LandmarkSampling = ToPointSamplingParams(config.LandmarkSampling)};
+            if (config.EStep == CoherentPointDriftEStep::Vulkan)
+            {
+                // The worker waits for results the main thread records, so a device E-step needs
+                // the job lane and a framed device; otherwise every iteration runs on the CPU.
+                if (!context.JobCommands.Available())
+                    run->GpuUnavailable = "No job lane; the Vulkan E-step ran on the CPU.";
+                else if (context.SpatialIndices == nullptr || context.Device == nullptr || !context.Device->IsOperational())
+                    run->GpuUnavailable = "No operational Vulkan device; the E-step ran on the CPU.";
+                else if (!context.Device->SupportsShaderFloat64())
+                    run->GpuUnavailable = "The Vulkan device lacks shader float64; the E-step ran on the CPU.";
+                else
+                {
+                    run->GpuEStep = std::make_shared<CoherentPointDriftGpuEStep>(*context.SpatialIndices, *context.Device);
+                    run->Params.EStepExternal = [broker = run->GpuEStep](const CPD::EStep::ExternalRequest& request) {
+                        return broker->Evaluate(request);
+                    };
+                }
+            }
             return std::nullopt;
         }
 
@@ -265,6 +290,8 @@ namespace Extrinsic::Runtime
             result.Backend = std::string(current.Backend);
             result.EStepErrorBound = current.EStepErrorBound;
             result.EStepSampledError = current.EStepSampledError;
+            result.EStepFallbacks = current.EStepFallbacks;
+            result.GpuDiagnostic = run.GpuEStep ? run.GpuEStep->Diagnostic() : run.GpuUnavailable;
             result.KernelRank = current.KernelRank;
             result.KernelApproximationError = current.KernelApproximationError;
             result.MeanDisplacement = preview.empty() ? 0.0 : displacement / double(preview.size());
@@ -523,6 +550,7 @@ namespace Extrinsic::Runtime
             }
             if (!context.JobCommands.Available())
             {
+                if (run->GpuEStep) run->GpuEStep->Close("No job lane; the Vulkan E-step ran on the CPU.");
                 RunSteps(*run, iterations, JobCancellation{});
                 run->Busy = false;
                 if (publish) publish(Publish(context, *run));
@@ -538,10 +566,12 @@ namespace Extrinsic::Runtime
                 .EstimatedCost = std::uint32_t(std::min<std::size_t>(1u << 20, 1u + work / 1024u)),
                 .Work = [run, iterations](const JobCancellation& cancellation) -> JobResultEnvelope {
                     RunSteps(*run, iterations, cancellation);
+                    if (run->GpuEStep) run->GpuEStep->SetWorkerActive(false);
                     return JobResultEnvelope::Make(true);
                 },
                 .ValidateBeforeApply = [] { return JobApplyValidation::Current; },
                 .PublishCompletion = [context, run, publish, delivered](KernelEventBus&, const JobResultEnvelope&) {
+                    if (run->GpuEStep) run->GpuEStep->SetWorkerActive(false);
                     run->Busy = false;
                     if (publish && !*delivered)
                     {
@@ -551,6 +581,7 @@ namespace Extrinsic::Runtime
                     return true;
                 },
                 .FinalizeUnpublishedOnMainThread = [context, run, publish, delivered] {
+                    if (run->GpuEStep) run->GpuEStep->SetWorkerActive(false);
                     run->Busy = false;
                     {
                         std::scoped_lock lock{run->Mutex};
@@ -567,9 +598,42 @@ namespace Extrinsic::Runtime
                     }
                 },
             };
+            if (run->GpuEStep && !run->GpuEStep->Closed())
+            {
+                // The step worker waits on this job, which pumps its device E-steps on the main
+                // thread every drain until the worker is done.
+                run->GpuEStep->SetWorkerActive(true);
+                auto broker = run->GpuEStep;
+                JobDesc pump{
+                    .DebugName = "Sandbox.CoherentPointDrift.VulkanEStep",
+                    .Scope = context.World,
+                    // Ahead of the step job, so its trivial work never waits behind a blocked worker.
+                    .Priority = Core::Dag::TaskPriority::High,
+                    .Kind = RuntimeTaskKinds::GeometryProcess,
+                    .Work = [](const JobCancellation&) { return JobResultEnvelope::Make(true); },
+                    .IsReadyToApply = [broker] {
+                        broker->Pump();
+                        return !broker->WorkerActive();
+                    },
+                    .ValidateBeforeApply = [] { return JobApplyValidation::Current; },
+                    .PublishCompletion = [broker](KernelEventBus&, const JobResultEnvelope&) {
+                        broker->ReleaseDeviceResources();
+                        return true;
+                    },
+                    .FinalizeUnpublishedOnMainThread = [broker] {
+                        broker->Close("The Vulkan E-step pump was cancelled; the run continues on the CPU.");
+                        broker->ReleaseDeviceResources();
+                    },
+                };
+                auto identity = Identity(*run);
+                identity.OutputName = "coherent_point_drift.vulkan_e_step";
+                if (!context.JobCommands.Submit(std::move(pump), std::move(identity)).IsValid())
+                    run->GpuEStep->Close("The job lane rejected the Vulkan E-step pump; the run continues on the CPU.");
+            }
             const JobToken token = context.JobCommands.Submit(std::move(desc), Identity(*run));
             if (!token.IsValid())
             {
+                if (run->GpuEStep) run->GpuEStep->SetWorkerActive(false);
                 run->Busy = false;
                 std::scoped_lock lock{run->Mutex};
                 run->Snapshot.Phase = Phase::Failed;

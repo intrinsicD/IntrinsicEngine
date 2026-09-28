@@ -1,0 +1,32 @@
+# METHOD-056 - Vulkan dense E-step scaling against CPU dense, Auto and Nystroem on the
+# METHOD-049 fixture (builtin.cpd_bumpy_ellipsoid_scaling.v1, shared header
+# benchmarks/runners/CoherentPointDriftScalingFixture.hpp).
+#
+# Opt-in (ci-vulkan-release, Xephyr or a real display):
+#   INTRINSIC_METHOD056_SCALING_OUTPUT=<dir> [INTRINSIC_METHOD056_SCALING_SIZES="1000 10000 100000"]
+#   IntrinsicPointLBVHGpuTests --gtest_filter=METHOD056VulkanCpdEStep.ScalingProfile
+# The solver runs on a worker thread; each device E-step is recorded by the frame loop
+# (SpatialIndexCache::QueueGpuCompute) and read back frames later, so runtimes include
+# frame latency. Parity is the max point delta to the CPU twin (the same policy route with
+# the CPU dense pass where the device ran). Same-host evidence, not a cross-host guarantee.
+benchmark_id: geometry.coherent_point_drift.vulkan_dense_e_step_scaling
+method: geometry.coherent_point_drift
+dataset: builtin.cpd_bumpy_ellipsoid_scaling.v1
+params:
+  intent: performance_scaling_profile
+  required_backend: gpu_vulkan_fp32_dense
+  runner: IntrinsicPointLBVHGpuTests --gtest_filter=METHOD056VulkanCpdEStep.ScalingProfile
+  build_preset: ci-vulkan-release
+  sizes: [1000, 10000, 100000]
+  rigid_runs: [vulkan, vulkan_cpu_twin, dense, auto, nystrom]
+  outlier_weight: 0.05
+  max_iterations: 100
+  e_step_tolerance: 1.0e-6
+  validation_layers: false
+  warmup_iterations: 1  # one untimed Vulkan rigid run at 1000 points
+  measured_iterations: 3  # Vulkan 3 (2 above 10000 points), CPU runs 3 (1 above 10000 points)
+  timing_statistic: median_wall_clock
+metrics: [runtime_ms, quality_error_l2, quality_error_linf]
+thresholds:
+  quality_error_l2_max: 0.001
+  quality_error_linf_max: 1.0e-4

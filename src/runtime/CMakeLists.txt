@@ -38,6 +38,7 @@ target_sources(${target_name}
         Modules/Registration/Runtime.RegistrationConfig.cppm
         Modules/PointSampling/Runtime.PointSamplingConfig.cppm
         Modules/Registration/Runtime.CoherentPointDriftConfig.cppm
+        Modules/Registration/Runtime.CoherentPointDriftGpuEStep.cppm
         Modules/Parameterization/Runtime.ParameterizationConfig.cppm
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm
@@ -168,6 +169,7 @@ target_sources(${target_name}
         Modules/PointSampling/Runtime.PointSamplingConfig.cpp
         Modules/PointSampling/Runtime.PointSamplingOperationConfig.cpp
         Modules/Registration/Runtime.CoherentPointDriftConfig.cpp
+        Modules/Registration/Runtime.CoherentPointDriftGpuEStep.cpp
         Config/internal/Runtime.PointFeaturesConfigCodecs.cpp
         Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp
         Editor/Runtime.EditorCommandHistory.cpp

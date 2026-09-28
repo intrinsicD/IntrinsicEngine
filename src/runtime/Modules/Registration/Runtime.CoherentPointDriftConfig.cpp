@@ -31,11 +31,12 @@ namespace Extrinsic::Runtime
                                                                "Bayesian (similarity plus coherent deformation, BCPD)"};
         constexpr std::array<std::string_view, 3> kOutputNames{"Source transform (rigid)", "Overwrite source positions",
                                                                "Displacement property"};
-        constexpr std::array<std::string_view, 6> kEStepNames{"Reference (exact, single thread)", "Dense (exact, parallel)",
+        constexpr std::array<std::string_view, 7> kEStepNames{"Reference (exact, single thread)", "Dense (exact, parallel)",
                                                               "Truncated (bounded error, parallel)",
                                                               "Auto (fast Gauss or dense while wide, then truncated)",
                                                               "Fast Gauss transform (bounded error, parallel)",
-                                                              "Nystroem (approximate while wide, then exact)"};
+                                                              "Nystroem (approximate while wide, then exact)",
+                                                              "Vulkan (dense on the GPU while wide, fp32 terms)"};
         constexpr std::array kBaseFields{
             ConfigFieldSpec{.Name = "source", .Type = FT::UInt, .Description = "Stable id of the moving entity."},
             ConfigFieldSpec{.Name = "target", .Type = FT::UInt, .Description = "Stable id of the fixed entity."},

@@ -22,6 +22,10 @@
 //                and an iteration whose estimate exceeds Settings::NystromErrorLimit is redone
 //                exactly with the Auto choice between truncated and dense. Skipped (exact) where
 //                its planned cost is not below half the dense cost, i.e. for small inputs.
+//   - Vulkan:    the dense two-pass form on a device through Settings::External (METHOD-056;
+//                fp32 kernel terms, fp64 sums, so not exact). Iterations where Auto would truncate
+//                stay on the CPU truncated path; without an evaluator, or when it fails, the
+//                iteration runs with the exact Auto choice between truncated and dense.
 // Rows are processed in fixed blocks (their count depends only on N and M) that scatter into
 // per-block partial sums reduced in block order, so each kernel term is evaluated once; above
 // Settings::PartialBudgetBytes a two-pass form (target pass for the denominators, source pass
@@ -53,6 +57,7 @@ export namespace Geometry::CoherentPointDrift
         Auto,
         FastGauss, // improved fast Gauss transform with a computed error bound (wide kernels)
         Nystrom,   // landmark low-rank kernel, sampled error estimate, exact fallback (wide kernels)
+        Vulkan,    // dense two-pass form on a device via Settings::External, exact CPU fallback
     };
 
     [[nodiscard]] std::string_view ToString(EStepPolicy value) noexcept;
@@ -68,6 +73,25 @@ export namespace Geometry::CoherentPointDrift::EStep
         std::span<const double> X{}, Y{}, Z{};
         [[nodiscard]] std::size_t Size() const noexcept { return X.size(); }
     };
+
+    // External (device) evaluation of the dense two-pass form, in the frame of shifted source
+    // log-weights (every LogWeights entry <= 0, all 0 when unweighted). With
+    // a_nm = LogWeights_m - |x_n - y_m|^2 / (2 sigma^2) it writes, per target n,
+    //   LogDenominator_n = log(sum_m exp(a_nm) + exp(LogOutlier)),  Pt1_n = sum_m exp(a_nm - LogDenominator_n),
+    // and per source m
+    //   P1_m = sum_n exp(a_nm - LogDenominator_n),  PX_m = sum_n exp(a_nm - LogDenominator_n) x_n.
+    // Returns false when it cannot (no device, refused shape, device failure); the iteration then
+    // runs on the CPU. Called on the thread that evaluates.
+    struct ExternalRequest
+    {
+        PointSet Target{}, Moved{};
+        std::uint64_t TargetGeneration{0u}; // differs whenever the target differs
+        double Sigma2{0.0};
+        double LogOutlier{0.0}; // -inf: no uniform component
+        std::span<const double> LogWeights{};
+        std::span<double> LogDenominator{}, Pt1{}, P1{}, PXx{}, PXy{}, PXz{};
+    };
+    using ExternalEvaluator = std::function<bool(const ExternalRequest&)>;
 
     struct Settings
     {
@@ -85,6 +109,8 @@ export namespace Geometry::CoherentPointDrift::EStep
         double NystromErrorLimit{1.0e-3};
         // Nystrom: how the landmarks are chosen from each set (default exact farthest point).
         PointSampling::Params NystromSampling{};
+        // Vulkan: the device evaluator (empty: every iteration falls back to the CPU).
+        ExternalEvaluator External{};
     };
 
     struct Sums
@@ -102,6 +128,8 @@ export namespace Geometry::CoherentPointDrift::EStep
         // 0 when the iteration ran exactly).
         double SampledError{0.0};
         std::uint64_t KernelEvaluations{0u};
+        // Vulkan: the external evaluator was wanted (Auto would not truncate) but was absent or failed.
+        bool ExternalFallback{false};
     };
 
     [[nodiscard]] std::uint32_t ResolveThreads(std::uint32_t requested) noexcept;

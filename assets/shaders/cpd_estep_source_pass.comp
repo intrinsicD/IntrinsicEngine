@@ -1,0 +1,58 @@
+#version 460
+// CPD E-step source pass (METHOD-056): one thread per source y_m sums
+// p_nm = exp(a_nm - LogDenominator_n) and p_nm x_n over shared-memory target tiles, with the
+// target pass's fp64 denominators split into fp32 high and low parts.
+#include "cpd_estep_common.glslinc"
+
+shared vec4 sTargets[CPD_TILE]; // x, y, z, high part of LogDenominator
+shared float sLow[CPD_TILE];
+
+void main()
+{
+    const uint local = gl_LocalInvocationID.x;
+    const bool inRange = gl_GlobalInvocationID.x < pc.count;
+    const uint i = pc.first + gl_GlobalInvocationID.x;
+    const vec4 y = inRange ? CpdPoints(pc.source).v[i] : vec4(0.0);
+    CpdDoubles results = CpdDoubles(pc.results);
+
+    double p1 = 0.0lf, px = 0.0lf, py = 0.0lf, pz = 0.0lf;
+    for (uint base = 0u; base < pc.targetCount; base += CPD_TILE)
+    {
+        const uint k = base + local;
+        if (k < pc.targetCount)
+        {
+            const double logDenominator = results.v[k];
+            const float high = float(logDenominator);
+            precise double low = logDenominator - double(high);
+            sTargets[local] = vec4(CpdPoints(pc.target).v[k].xyz, high);
+            sLow[local] = float(low);
+        }
+        barrier();
+        const uint end = min(CPD_TILE, pc.targetCount - base);
+        float s1 = 0.0, c1 = 0.0, sx = 0.0, cx = 0.0, sy = 0.0, cy = 0.0, sz = 0.0, cz = 0.0;
+        for (uint j = 0u; j < end; ++j)
+        {
+            const vec4 x = sTargets[j];
+            precise float t = (CpdExponent(x.xyz, y) - x.w) - sLow[j];
+            const float p = CpdExpF(t);
+            CpdKahan(s1, c1, p);
+            precise float qx = p * x.x;
+            precise float qy = p * x.y;
+            precise float qz = p * x.z;
+            CpdKahan(sx, cx, qx);
+            CpdKahan(sy, cy, qy);
+            CpdKahan(sz, cz, qz);
+        }
+        p1 += CpdKahanValue(s1, c1);
+        px += CpdKahanValue(sx, cx);
+        py += CpdKahanValue(sy, cy);
+        pz += CpdKahanValue(sz, cz);
+        barrier();
+    }
+    if (!inRange) return;
+    const uint n2 = 2u * pc.targetCount, m = pc.sourceCount;
+    results.v[n2 + i] = p1;
+    results.v[n2 + m + i] = px;
+    results.v[n2 + 2u * m + i] = py;
+    results.v[n2 + 3u * m + i] = pz;
+}

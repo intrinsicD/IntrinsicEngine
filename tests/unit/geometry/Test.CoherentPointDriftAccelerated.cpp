@@ -376,6 +376,125 @@ TEST(CoherentPointDriftAccelerated, AutoUsesDenseForWideAndTruncatedForNarrowKer
     EXPECT_LE(MaxTransformDifference(reference, result), 1e-4);
 }
 
+namespace
+{
+    // The ExternalRequest contract in plain doubles: what a device evaluator must compute.
+    bool ReferenceExternal(const CPD::EStep::ExternalRequest& r, std::size_t& calls)
+    {
+        ++calls;
+        const std::size_t n = r.Target.Size(), m = r.Moved.Size();
+        const auto a = [&](std::size_t j, std::size_t i) {
+            const double dx = r.Target.X[j] - r.Moved.X[i], dy = r.Target.Y[j] - r.Moved.Y[i], dz = r.Target.Z[j] - r.Moved.Z[i];
+            return r.LogWeights[i] - (dx * dx + dy * dy + dz * dz) / (2.0 * r.Sigma2);
+        };
+        for (std::size_t j = 0; j < n; ++j)
+        {
+            double top = -std::numeric_limits<double>::infinity(), sum = 0.0;
+            for (std::size_t i = 0; i < m; ++i) top = std::max(top, a(j, i));
+            for (std::size_t i = 0; i < m; ++i) sum += std::exp(a(j, i) - top);
+            r.LogDenominator[j] = top + std::log(sum + std::exp(r.LogOutlier - top));
+            r.Pt1[j] = sum * std::exp(top - r.LogDenominator[j]);
+        }
+        for (std::size_t i = 0; i < m; ++i)
+        {
+            double p1 = 0.0, px = 0.0, py = 0.0, pz = 0.0;
+            for (std::size_t j = 0; j < n; ++j)
+            {
+                const double p = std::exp(a(j, i) - r.LogDenominator[j]);
+                p1 += p; px += p * r.Target.X[j]; py += p * r.Target.Y[j]; pz += p * r.Target.Z[j];
+            }
+            r.P1[i] = p1; r.PXx[i] = px; r.PXy[i] = py; r.PXz[i] = pz;
+        }
+        return true;
+    }
+}
+
+TEST(CoherentPointDriftAccelerated, VulkanPolicyRunsWideKernelsOnTheExternalEvaluator)
+{
+    // METHOD-056 seam: wide kernels go to the evaluator (here the contract in doubles, so the
+    // statistics match dense), narrow ones to the CPU truncated path; weighted rows and the
+    // outlier term travel in the shifted frame.
+    const Soa target(Cloud(240, 61)), moved(Rigid(Cloud(220, 62), 0.2, {0.1, 0.0, 0.05}, 0.01, 4));
+    std::vector<double> logWeights(220);
+    for (std::size_t i = 0; i < logWeights.size(); ++i) logWeights[i] = -3.0 + 0.01 * double(i);
+    CPD::EStep::Evaluator evaluator;
+    evaluator.SetTarget(target.View());
+    std::size_t calls = 0;
+    const CPD::EStep::Settings vulkan{.Policy = CPD::EStepPolicy::Vulkan, .Tolerance = 1e-6,
+        .External = [&calls](const CPD::EStep::ExternalRequest& r) { return ReferenceExternal(r, calls); }};
+    for (const bool weighted : {false, true})
+    {
+        const std::span<const double> weights = weighted ? std::span<const double>(logWeights) : std::span<const double>{};
+        CPD::EStep::Sums device, dense;
+        ASSERT_TRUE(evaluator.Evaluate(moved.View(), 0.5, std::log(0.02), vulkan, device, weights));
+        ASSERT_TRUE(evaluator.Evaluate(moved.View(), 0.5, std::log(0.02), {.Policy = CPD::EStepPolicy::Dense}, dense, weights));
+        EXPECT_EQ(device.Used, CPD::EStepPolicy::Vulkan);
+        EXPECT_FALSE(device.ExternalFallback);
+        EXPECT_EQ(device.KernelEvaluations, 2u * 240u * 220u);
+        EXPECT_NEAR(device.LogDenominatorSum, dense.LogDenominatorSum, 1e-9 * std::abs(dense.LogDenominatorSum));
+        EXPECT_NEAR(device.Matched, dense.Matched, 1e-10 * dense.Matched);
+        for (std::size_t i = 0; i < dense.P1.size(); ++i)
+        {
+            ASSERT_NEAR(device.P1[i], dense.P1[i], 1e-12 * (1.0 + dense.P1[i]));
+            ASSERT_NEAR(device.PXy[i], dense.PXy[i], 1e-12 * (1.0 + std::abs(dense.PXy[i])));
+        }
+    }
+    EXPECT_EQ(calls, 2u);
+    CPD::EStep::Sums narrow;
+    ASSERT_TRUE(evaluator.Evaluate(moved.View(), 1e-4, std::log(0.02), vulkan, narrow));
+    EXPECT_EQ(narrow.Used, CPD::EStepPolicy::Truncated);
+    EXPECT_FALSE(narrow.ExternalFallback);
+    EXPECT_EQ(calls, 2u) << "narrow kernels stay on the CPU";
+}
+
+TEST(CoherentPointDriftAccelerated, VulkanPolicyFallsBackToTheCpuAndSaysSo)
+{
+    const Soa target(Cloud(200, 63)), moved(Cloud(190, 64));
+    CPD::EStep::Evaluator evaluator;
+    evaluator.SetTarget(target.View());
+    CPD::EStep::Sums dense;
+    ASSERT_TRUE(evaluator.Evaluate(moved.View(), 0.5, std::log(0.02), {.Policy = CPD::EStepPolicy::Dense}, dense));
+    const auto failing = [](const CPD::EStep::ExternalRequest&) { return false; };
+    const auto poisoned = [](const CPD::EStep::ExternalRequest& r) {
+        std::size_t calls = 0;
+        ReferenceExternal(r, calls);
+        r.P1[3] = std::numeric_limits<double>::quiet_NaN();
+        return true;
+    };
+    for (const CPD::EStep::ExternalEvaluator& external :
+         {CPD::EStep::ExternalEvaluator{}, CPD::EStep::ExternalEvaluator{failing}, CPD::EStep::ExternalEvaluator{poisoned}})
+    {
+        CPD::EStep::Sums sums;
+        ASSERT_TRUE(evaluator.Evaluate(moved.View(), 0.5, std::log(0.02),
+                                       {.Policy = CPD::EStepPolicy::Vulkan, .External = external}, sums));
+        EXPECT_EQ(sums.Used, CPD::EStepPolicy::Dense);
+        EXPECT_TRUE(sums.ExternalFallback);
+        EXPECT_EQ(sums.LogDenominatorSum, dense.LogDenominatorSum) << "the fallback is the exact dense pass";
+        EXPECT_EQ(sums.P1, dense.P1);
+    }
+
+    // Solver reporting: the device backend when it ran, otherwise the exact Auto choice with
+    // every device-bound iteration counted as a fallback.
+    const auto source = Cloud(300, 65);
+    const auto registered = Rigid(source, 0.4, {0.2, -0.1, 0.1}, 0.003, 8);
+    std::size_t calls = 0;
+    CPD::Params params{.OutlierWeight = 0.05, .MaxIterations = 60, .EStep = CPD::EStepPolicy::Vulkan};
+    const auto cpu = CPD::Register(registered, source, params);
+    ASSERT_TRUE(cpu.Succeeded());
+    EXPECT_EQ(cpu.RequestedBackend, "gpu_vulkan_fp32_dense");
+    EXPECT_EQ(cpu.Backend, "cpu_auto");
+    EXPECT_GT(cpu.EStepFallbacks, 0u);
+    params.EStepExternal = [&calls](const CPD::EStep::ExternalRequest& r) { return ReferenceExternal(r, calls); };
+    std::vector<CPD::IterationTrace> trace;
+    const auto device = CPD::Register(registered, source, params, [&](const CPD::IterationTrace& t) { trace.push_back(t); });
+    ASSERT_TRUE(device.Succeeded());
+    EXPECT_EQ(device.Backend, "gpu_vulkan_fp32_dense");
+    EXPECT_EQ(device.EStepFallbacks, 0u);
+    EXPECT_EQ(calls, std::size_t(cpu.EStepFallbacks));
+    EXPECT_EQ(trace.front().EStep, CPD::EStepPolicy::Vulkan);
+    EXPECT_LE(MaxTransformDifference(cpu, device), 1e-9);
+}
+
 TEST(CoherentPointDriftAccelerated, LowRankNonrigidConvergesToTheFullSolution)
 {
     const auto source = Cloud(400, 3);

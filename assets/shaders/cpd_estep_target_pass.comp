@@ -1,0 +1,109 @@
+#version 460
+// CPD E-step target pass (METHOD-056): one thread per target row x_n computes the row maximum
+// a_max of a_nm over every source, then sum_m exp(a_nm - a_max) over shared-memory source tiles,
+// and finally, in fp64 as the CPU does,
+//   LogDenominator_n = log(exp(a_max) sum + exp(logOutlier)),  Pt1_n = sum exp(a_max - LogDenominator_n).
+#include "cpd_estep_common.glslinc"
+
+shared vec4 sSources[CPD_TILE];
+
+// exp for fp64 (GLSL has none): Cody-Waite reduction and a degree-13 Taylor polynomial, as
+// property_filter.comp's ExpNonPositive, here for |x| <= 745.
+double ExpD(double x)
+{
+    if (x < -745.2lf) return 0.0lf;
+    const double invLn2 = 1.44269504088896338700e+00lf;
+    const double ln2Hi = 6.93147180369123816490e-01lf, ln2Lo = 1.90821492927058770002e-10lf;
+    double n = floor(x * invLn2 + 0.5lf);
+    precise double r = (x - n * ln2Hi) - n * ln2Lo;
+    precise double p = 1.0lf / 6227020800.0lf;
+    p = p * r + 1.0lf / 479001600.0lf;
+    p = p * r + 1.0lf / 39916800.0lf;
+    p = p * r + 1.0lf / 3628800.0lf;
+    p = p * r + 1.0lf / 362880.0lf;
+    p = p * r + 1.0lf / 40320.0lf;
+    p = p * r + 1.0lf / 5040.0lf;
+    p = p * r + 1.0lf / 720.0lf;
+    p = p * r + 1.0lf / 120.0lf;
+    p = p * r + 1.0lf / 24.0lf;
+    p = p * r + 1.0lf / 6.0lf;
+    p = p * r + 0.5lf;
+    p = p * r + 1.0lf;
+    p = p * r + 1.0lf;
+    return ldexp(p, int(n));
+}
+
+// log for positive fp64: v = m 2^e with m in [sqrt(1/2), sqrt(2)), log m = 2 atanh(s) with
+// s = (m - 1) / (m + 1), |s| <= 0.172; the series to s^23 truncates below 1e-17.
+double LogD(double v)
+{
+    int e;
+    double m = frexp(v, e);
+    if (m < 0.70710678118654752440lf) { m = m * 2.0lf; e = e - 1; }
+    precise double s = (m - 1.0lf) / (m + 1.0lf);
+    precise double s2 = s * s;
+    precise double q = 1.0lf / 23.0lf;
+    q = q * s2 + 1.0lf / 21.0lf;
+    q = q * s2 + 1.0lf / 19.0lf;
+    q = q * s2 + 1.0lf / 17.0lf;
+    q = q * s2 + 1.0lf / 15.0lf;
+    q = q * s2 + 1.0lf / 13.0lf;
+    q = q * s2 + 1.0lf / 11.0lf;
+    q = q * s2 + 1.0lf / 9.0lf;
+    q = q * s2 + 1.0lf / 7.0lf;
+    q = q * s2 + 1.0lf / 5.0lf;
+    q = q * s2 + 1.0lf / 3.0lf;
+    q = q * s2 + 1.0lf;
+    precise double result = double(e) * 6.93147180559945309417e-01lf + 2.0lf * s * q;
+    return result;
+}
+
+void main()
+{
+    const uint local = gl_LocalInvocationID.x;
+    const bool inRange = gl_GlobalInvocationID.x < pc.count;
+    const uint row = pc.first + gl_GlobalInvocationID.x;
+    const vec3 x = inRange ? CpdPoints(pc.target).v[row].xyz : vec3(0.0);
+
+    float rowMax = -3.402823466e38;
+    for (uint base = 0u; base < pc.sourceCount; base += CPD_TILE)
+    {
+        const uint k = base + local;
+        sSources[local] = k < pc.sourceCount ? CpdPoints(pc.source).v[k] : vec4(0.0);
+        barrier();
+        const uint end = min(CPD_TILE, pc.sourceCount - base);
+        for (uint j = 0u; j < end; ++j) rowMax = max(rowMax, CpdExponent(x, sSources[j]));
+        barrier();
+    }
+
+    double sum = 0.0lf;
+    for (uint base = 0u; base < pc.sourceCount; base += CPD_TILE)
+    {
+        const uint k = base + local;
+        sSources[local] = k < pc.sourceCount ? CpdPoints(pc.source).v[k] : vec4(0.0);
+        barrier();
+        const uint end = min(CPD_TILE, pc.sourceCount - base);
+        float s = 0.0, c = 0.0;
+        for (uint j = 0u; j < end; ++j)
+        {
+            precise float t = CpdExponent(x, sSources[j]) - rowMax;
+            CpdKahan(s, c, CpdExpF(t));
+        }
+        sum += CpdKahanValue(s, c);
+        barrier();
+    }
+    if (!inRange) return;
+
+    const double aMax = double(rowMax);
+    double logDenominator;
+    if (pc.hasOutlier == 0u) logDenominator = aMax + LogD(sum);
+    else
+    {
+        const double logOutlier = pc.logOutlier - aMax;
+        // log1p(sum e^{-logOutlier}) is below 1e-290 there.
+        logDenominator = logOutlier > 700.0lf ? pc.logOutlier : aMax + LogD(sum + ExpD(logOutlier));
+    }
+    CpdDoubles results = CpdDoubles(pc.results);
+    results.v[row] = logDenominator;
+    results.v[pc.targetCount + row] = sum * ExpD(aMax - logDenominator);
+}

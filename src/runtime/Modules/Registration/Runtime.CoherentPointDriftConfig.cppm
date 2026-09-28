@@ -27,9 +27,10 @@ export namespace Extrinsic::Runtime
     // E-step backend (METHOD-049): the single-threaded reference, exact parallel dense,
     // truncated or fast Gauss transform (both with a computed relative error bound), or
     // automatic (fast Gauss or dense while the kernel is wide, truncated once it is narrow), or
-    // Nystroem (METHOD-053: approximate while wide, sampled error estimate, exact once narrow).
-    // Values match Geometry::CoherentPointDrift::EStepPolicy.
-    enum class CoherentPointDriftEStep : std::uint8_t { Reference, Dense, Truncated, Auto, FastGauss, Nystrom };
+    // Nystroem (METHOD-053: approximate while wide, sampled error estimate, exact once narrow), or
+    // Vulkan (METHOD-056: dense on the device while wide, truncated on the CPU once narrow; the
+    // CPU choice without a framed device). Values match Geometry::CoherentPointDrift::EStepPolicy.
+    enum class CoherentPointDriftEStep : std::uint8_t { Reference, Dense, Truncated, Auto, FastGauss, Nystrom, Vulkan };
 
     struct CoherentPointDriftConfig
     {

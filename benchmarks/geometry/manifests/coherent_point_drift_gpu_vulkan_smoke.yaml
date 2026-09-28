@@ -1,0 +1,25 @@
+# METHOD-056 - Vulkan dense E-step of Coherent Point Drift against the CPU dense E-step.
+#
+# gpu;vulkan smoke (IntrinsicPointLBVHGpuTests, METHOD056VulkanCpdEStep.DenseStatisticsAndRegistrationMatchTheCpu);
+# INTRINSIC_METHOD056_BENCHMARK_OUTPUT=<file> writes the result. The device must run: the
+# test fails when the backend is not gpu_vulkan_fp32_dense or any iteration fell back.
+benchmark_id: geometry.coherent_point_drift.vulkan_dense_e_step_smoke
+method: geometry.coherent_point_drift
+dataset: builtin.cpd.rigid_cloud.seed91_1000_and_parity_1500x1400.seed93
+params:
+  intent: gpu
+  capability: shader_float64
+  required_backend: gpu_vulkan_fp32_dense
+  parity_cases: 12  # sigma^2 in {0.2, 0.6, 2.0} x weighted rows x outlier term
+  repeatability_checks: 2
+  editor_run: rigid, 1000 points, outlier weight 0.05, e_step vulkan
+  warmup_iterations: 0
+  measured_iterations: 1
+  # Frozen before measuring: |log den| <= 1e-5, Pt1/P1 relative <= 1e-5, PX <= 1e-5 P1 max|x|,
+  # registered points <= 1e-4 of the extent against the CPU twin, two device runs bitwise equal.
+metrics:
+  - runtime_ms
+  - quality_error_linf
+thresholds:
+  smoke_runtime_ms_max: 180000
+  quality_error_linf_max: 0.0002

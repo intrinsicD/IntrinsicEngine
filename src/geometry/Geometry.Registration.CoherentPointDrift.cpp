@@ -161,6 +161,7 @@ namespace Geometry::CoherentPointDrift
         EStep::Sums AcceleratedSums{};
         EStepPolicy LastPolicy{EStepPolicy::Reference};
         std::uint32_t UsedPolicies{0u}; // bit per EStepPolicy that ran an iteration
+        std::uint32_t EStepFallbacks{0u};
         // Current() caches the (expensive) subsampled interpolation per solver state.
         std::uint64_t Revision{0u};
         mutable std::uint64_t CachedRevision{~std::uint64_t{0}};
@@ -208,7 +209,8 @@ namespace Geometry::CoherentPointDrift
             const EStep::Settings settings{.Policy = Config.EStep, .Tolerance = Config.EStepTolerance,
                                            .Threads = Config.Threads, .NystromLandmarks = Config.NystromLandmarks,
                                            .NystromErrorLimit = Config.NystromErrorLimit,
-                                           .NystromSampling = Config.LandmarkSampling};
+                                           .NystromSampling = Config.LandmarkSampling,
+                                           .External = Config.EStepExternal};
             if (!Accelerated.Evaluate({Moved.X, Moved.Y, Moved.Z}, Sigma2, LogOutlierConstant(), settings, sums,
                                       SourceLogWeight))
                 return false;
@@ -219,6 +221,7 @@ namespace Geometry::CoherentPointDrift
             LastPolicy = sums.Used;
             LastErrorBound = sums.ErrorBound;
             LastSampledError = sums.SampledError;
+            if (sums.ExternalFallback) ++EStepFallbacks;
             MaxSampledError = std::max(MaxSampledError, LastSampledError);
             LastKernelEvaluations = sums.KernelEvaluations;
             MaxErrorBound = std::max(MaxErrorBound, LastErrorBound);
@@ -614,7 +617,7 @@ namespace Geometry::CoherentPointDrift
              (!(params.Gamma > 0.0) || !std::isfinite(params.Gamma) || !(params.Kappa > 0.0) ||
               (params.SubsampleSource > 0u && params.SubsampleSource < 4u) ||
               (params.SubsampleTarget > 0u && params.SubsampleTarget < 4u))) ||
-            params.Method > Variant::Bayesian || params.EStep > EStepPolicy::Nystrom ||
+            params.Method > Variant::Bayesian || params.EStep > EStepPolicy::Vulkan ||
             (params.EStep != EStepPolicy::Reference &&
              !(params.EStepTolerance > 0.0 && params.EStepTolerance < 1.0)) ||
             (params.EStep == EStepPolicy::Nystrom &&
@@ -854,16 +857,18 @@ namespace Geometry::CoherentPointDrift
             result.Backend = BackendId(EStepPolicy(std::countr_zero(s.UsedPolicies)));
         else if (s.UsedPolicies != 0u)
         {
-            // Nystrom reports itself only when an iteration was approximated; otherwise the exact
-            // Auto choice ran every iteration.
-            const bool approximated = (s.UsedPolicies >> unsigned(EStepPolicy::Nystrom)) & 1u;
-            result.Backend = s.Config.EStep == EStepPolicy::Nystrom && approximated ? BackendId(EStepPolicy::Nystrom)
-                : s.Config.EStep == EStepPolicy::Auto || s.Config.EStep == EStepPolicy::Nystrom
+            // Nystrom and Vulkan report themselves only when they ran an iteration; otherwise the
+            // exact Auto choice ran every iteration.
+            const bool delegating = s.Config.EStep == EStepPolicy::Nystrom || s.Config.EStep == EStepPolicy::Vulkan;
+            const bool ran = (s.UsedPolicies >> unsigned(s.Config.EStep)) & 1u;
+            result.Backend = delegating && ran ? BackendId(s.Config.EStep)
+                : s.Config.EStep == EStepPolicy::Auto || delegating
                     ? BackendId(EStepPolicy::Auto) : std::string_view{"cpu_mixed"};
         }
         result.EStepErrorBound = s.MaxErrorBound;
         result.EStepSampledError = s.MaxSampledError;
         result.KernelEvaluations = s.TotalKernelEvaluations;
+        result.EStepFallbacks = s.EStepFallbacks;
         result.KernelRank = std::uint32_t(s.Eigenvalues.size());
         result.KernelApproximationError = s.KernelError;
         if (s.Config.Method != Variant::Nonrigid)

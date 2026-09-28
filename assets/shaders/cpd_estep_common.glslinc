@@ -1,0 +1,72 @@
+// Shared state of the Coherent Point Drift device E-step (METHOD-056). Both passes evaluate the
+// kernel exponent a_nm = w_m - |x_n - y_m|^2 / (2 sigma^2) with the same fp32 operations, so the
+// target pass's row denominators and the source pass's responsibilities see identical terms.
+// Kernel terms are fp32 (Cody-Waite exp), tile sums fp32 Kahan, running sums fp64; nothing is
+// atomic and every sum runs in index order, so a run is deterministic on one device and driver.
+#extension GL_ARB_gpu_shader_fp64 : require
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+#define CPD_TILE 128u
+
+layout(local_size_x = CPD_TILE) in;
+
+layout(buffer_reference, scalar) readonly buffer CpdPoints { vec4 v[]; };  // x, y, z, (source: log-weight)
+layout(buffer_reference, scalar) buffer CpdDoubles { double v[]; };
+
+// results: [LogDenominator n][Pt1 n][P1 m][PXx m][PXy m][PXz m]
+layout(push_constant, scalar) uniform Push {
+    uint64_t target, source, results;
+    double logOutlier;       // shifted by the largest source log-weight
+    float inverseTwoSigma2;
+    uint targetCount, sourceCount;
+    uint first, count;       // the rows (target pass) or sources (source pass) of this dispatch
+    uint hasOutlier;
+} pc;
+
+float CpdExponent(vec3 x, vec4 y)
+{
+    precise float dx = x.x - y.x;
+    precise float dy = x.y - y.y;
+    precise float dz = x.z - y.z;
+    precise float d2 = dx * dx;
+    d2 = d2 + dy * dy;
+    d2 = d2 + dz * dz;
+    precise float a = y.w - d2 * pc.inverseTwoSigma2;
+    return a;
+}
+
+// exp(t) in fp32 for t <= ~0: Cody-Waite reduction by ln 2 (the high part has 16 significant
+// bits, so n * ln2Hi is exact) and a degree-7 Taylor polynomial on |r| <= ln2/2 (truncation below
+// 0.1 ulp). Terms below e^-87 are dropped (fp32 underflow).
+float CpdExpF(float t)
+{
+    if (t < -87.0) return 0.0;
+    precise float n = floor(t * 1.44269504 + 0.5);
+    precise float r = (t - n * 0.693145751953125) - n * 1.42860682030941723212e-6;
+    precise float p = 1.0 / 5040.0;
+    p = p * r + 1.0 / 720.0;
+    p = p * r + 1.0 / 120.0;
+    p = p * r + 1.0 / 24.0;
+    p = p * r + 1.0 / 6.0;
+    p = p * r + 0.5;
+    p = p * r + 1.0;
+    p = p * r + 1.0;
+    return ldexp(p, int(n));
+}
+
+// Kahan step: s + c carries the running sum (c the negated lost low part).
+void CpdKahan(inout float s, inout float c, float value)
+{
+    precise float y = value - c;
+    precise float t = s + y;
+    c = (t - s) - y;
+    s = t;
+}
+
+double CpdKahanValue(float s, float c)
+{
+    precise double v = double(s) - double(c);
+    return v;
+}

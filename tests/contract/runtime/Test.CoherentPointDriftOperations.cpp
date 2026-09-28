@@ -405,6 +405,39 @@ TEST(CoherentPointDriftOperations, NystromEStepReportsItsBackendAndSampledError)
     EXPECT_NEAR(s.Registry.Raw().get<T::Component>(source).Position.x, 0.1f, 1e-3f);
 }
 
+TEST(CoherentPointDriftOperations, VulkanEStepWithoutADeviceRunsOnTheCpuAndSaysWhy)
+{
+    // METHOD-056: without a framed device (synchronous and queued runs alike) every device-bound
+    // iteration runs the exact CPU choice, and the result names the requested backend's absence.
+    Scene s;
+    const auto points = Cloud(300, 29);
+    std::vector<glm::vec3> moved;
+    for (const auto& p : points) moved.push_back(p + glm::vec3(0.15f, -0.1f, 0.05f));
+    const auto source = Make(s.Registry, D::PointCloudPoint, points);
+    const auto target = Make(s.Registry, D::PointCloudPoint, moved);
+    const R::CoherentPointDriftConfig config{.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
+                                             .EStep = R::CoherentPointDriftEStep::Vulkan};
+    const auto immediate = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), config);
+    ASSERT_TRUE(immediate.Succeeded()) << immediate.Message;
+    EXPECT_EQ(immediate.Backend, "cpu_auto");
+    EXPECT_GT(immediate.EStepFallbacks, 0u);
+    EXPECT_NE(immediate.GpuDiagnostic.find("job lane"), std::string::npos) << immediate.GpuDiagnostic;
+    EXPECT_NEAR(s.Registry.Raw().get<T::Component>(source).Position.x, 0.15f, 1e-3f);
+
+    Extrinsic::Tests::EditorJobHarness jobs;
+    jobs.Attach(s.Context);
+    R::EditorCoherentPointDriftResult queued;
+    auto next = config;
+    next.Output = O::DisplacementProperty;
+    (void)R::ApplyEditorCoherentPointDriftCommand(s.Commands(), next,
+        [&](R::EditorCoherentPointDriftResult result) { queued = std::move(result); });
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    ASSERT_TRUE(queued.Succeeded()) << queued.Message;
+    EXPECT_EQ(queued.Backend, "cpu_auto");
+    EXPECT_GT(queued.EStepFallbacks, 0u);
+    EXPECT_NE(queued.GpuDiagnostic.find("Vulkan device"), std::string::npos) << queued.GpuDiagnostic;
+}
+
 TEST(CoherentPointDriftOperations, SamplingMethodsAreSelectableForSubsamplesAndLandmarks)
 {
     const auto registration = R::MakeCoherentPointDriftConfigSectionRegistration();

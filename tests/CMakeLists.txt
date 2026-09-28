@@ -1824,8 +1824,11 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
                 integration/graphics/Test.PropertySmoothingGpuSmoke.cpp
                 integration/graphics/Test.SparseSolveGpuSmoke.cpp
                 integration/graphics/Test.ComputeCapabilitiesGpuSmoke.cpp
+                integration/graphics/Test.CoherentPointDriftGpuEStepSmoke.cpp
         DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
     )
+    # METHOD-056: the Vulkan CPD scaling profile shares the METHOD-049 fixtures.
+    target_include_directories(PointLBVHGpuTestObjs PRIVATE ${CMAKE_SOURCE_DIR}/benchmarks/runners)
     intrinsic_test_executable(IntrinsicPointLBVHGpuTests
         OBJECTS PointLBVHGpuTestObjs RuntimeTestModuleSupportObjs
         LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore

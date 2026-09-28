@@ -15,12 +15,12 @@ Root scanned: `src`
 | `geometry` | 132 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 74 |
+| `graphics/renderer` | 75 |
 | `graphics/rhi` | 18 |
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 6 |
-| `runtime` | 106 |
+| `runtime` | 107 |
 
 ## Modules
 
@@ -258,6 +258,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.Component.RenderGeometry` | `src/graphics/renderer/Components/Graphics.Component.RenderGeometry.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Component.VisualizationConfig` | `src/graphics/renderer/Components/Graphics.Component.VisualizationConfig.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.CameraSnapshots` | `src/graphics/renderer/Graphics.CameraSnapshots.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.CoherentPointDriftEStep` | `src/graphics/renderer/Graphics.CoherentPointDriftEStep.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Colormap` | `src/graphics/renderer/Graphics.Colormap.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.ColormapSystem` | `src/graphics/renderer/Graphics.ColormapSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.ComputeParallelPrimitives` | `src/graphics/renderer/Graphics.ComputeParallelPrimitives.cppm` | `graphics/renderer` |
@@ -457,6 +458,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.ProgressivePoissonConfig` | `src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressivePoissonGpuBackend` | `src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cppm` | `runtime` |
 | `Extrinsic.Runtime.CoherentPointDriftConfig` | `src/runtime/Modules/Registration/Runtime.CoherentPointDriftConfig.cppm` | `runtime` |
+| `Extrinsic.Runtime.CoherentPointDriftGpuEStep` | `src/runtime/Modules/Registration/Runtime.CoherentPointDriftGpuEStep.cppm` | `runtime` |
 | `Extrinsic.Runtime.RegistrationConfig` | `src/runtime/Modules/Registration/Runtime.RegistrationConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.TextureBakeModule` | `src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderArtifactPublication` | `src/runtime/Rendering/Runtime.RenderArtifactPublication.cppm` | `runtime` |
@@ -471,4 +473,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **444**
+Total modules: **446**

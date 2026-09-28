@@ -125,6 +125,8 @@ export namespace Geometry::CoherentPointDrift
         // are chosen (RUNTIME-289); the default is exact farthest point from point 0.
         PointSampling::Params SubsampleSampling{};
         PointSampling::Params LandmarkSampling{};
+        // Vulkan E-step: the device evaluator (METHOD-056); empty runs every iteration on the CPU.
+        EStep::ExternalEvaluator EStepExternal{};
     };
 
     struct IterationTrace
@@ -166,13 +168,15 @@ export namespace Geometry::CoherentPointDrift
         std::vector<double> Sigma2History{};
         // Backend that ran every iteration (BackendId of that policy); "cpu_auto" when Auto mixed
         // policies, "cpu_nystrom" when Nystrom approximated some iterations and ran the rest
-        // exactly ("cpu_auto" when it approximated none), "cpu_mixed" when an explicit policy fell
-        // back (fast Gauss to dense).
+        // exactly ("cpu_auto" when it approximated none), likewise "gpu_vulkan_fp32_dense" when the
+        // device ran some iterations, "cpu_mixed" when an explicit policy fell back (fast Gauss to dense).
         std::string_view Backend{kBackendId};
         std::string_view RequestedBackend{kBackendId}; // BackendId(Params::EStep)
         double EStepErrorBound{0.0};           // max over all iterations
         double EStepSampledError{0.0};         // Nystrom: max sampled error over accepted iterations
         std::uint64_t KernelEvaluations{0u};   // total over all iterations
+        // Vulkan: iterations meant for the device that ran on the CPU (no evaluator or it failed).
+        std::uint32_t EStepFallbacks{0u};
         // Low-rank nonrigid: eigenpairs used and the kernel's sampled relative error.
         std::uint32_t KernelRank{0u};
         double KernelApproximationError{0.0};
