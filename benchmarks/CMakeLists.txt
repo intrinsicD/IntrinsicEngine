@@ -360,3 +360,11 @@ target_compile_features(IntrinsicCoherentPointDriftScaling PRIVATE cxx_std_23)
 target_compile_options(IntrinsicCoherentPointDriftScaling PRIVATE ${INTRINSIC_COMPILE_FLAGS})
 target_link_options(IntrinsicCoherentPointDriftScaling PRIVATE ${INTRINSIC_LINK_FLAGS})
 target_link_libraries(IntrinsicCoherentPointDriftScaling PRIVATE ExtrinsicCore IntrinsicGeometry)
+
+# GEOM-113 opt-in comparison of every Geometry.PointSampling method; run on a Release build.
+add_executable(IntrinsicPointSamplingComparison runners/PointSamplingComparisonRunner.cpp)
+set_target_properties(IntrinsicPointSamplingComparison PROPERTIES CXX_SCAN_FOR_MODULES ON)
+target_compile_features(IntrinsicPointSamplingComparison PRIVATE cxx_std_23)
+target_compile_options(IntrinsicPointSamplingComparison PRIVATE ${INTRINSIC_COMPILE_FLAGS})
+target_link_options(IntrinsicPointSamplingComparison PRIVATE ${INTRINSIC_LINK_FLAGS})
+target_link_libraries(IntrinsicPointSamplingComparison PRIVATE ExtrinsicCore IntrinsicGeometry)

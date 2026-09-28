@@ -31,6 +31,11 @@ namespace Geometry::PointSampling
         case Method::Random: return "random";
         case Method::FarthestPoint: return "farthest_point";
         case Method::ProgressivePoisson: return "progressive_poisson";
+        case Method::CoupledSieve: return "coupled_sieve";
+        case Method::FlatGreedy: return "flat_greedy";
+        case Method::SampleElimination: return "sample_elimination";
+        case Method::LazyGreedy: return "lazy_greedy";
+        case Method::Tournament: return "tournament";
         }
         return "unknown";
     }
@@ -95,6 +100,25 @@ namespace Geometry::PointSampling
                 }
             }
             return static_cast<std::uint64_t>(product >> 64);
+        }
+    }
+
+    namespace Detail
+    {
+        Status ValidatePoints(const PointView points) { return Validate(points); }
+        double SquaredDistance(const double ax, const double ay, const double az, const double bx, const double by,
+                               const double bz) noexcept
+        {
+            return Squared(ax, ay, az, bx, by, bz);
+        }
+        std::uint32_t MixU32(std::uint32_t x) noexcept
+        {
+            x ^= x >> 16;
+            x *= 0x7feb352du;
+            x ^= x >> 15;
+            x *= 0x846ca68bu;
+            x ^= x >> 16;
+            return x;
         }
     }
 
@@ -375,9 +399,99 @@ namespace Geometry::PointSampling
         return base;
     }
 
+    // Eta-relaxed batches (the CUDA coupled sieve's order definition). Within a batch the tree
+    // is only pruned of the accepted points, whose own leaves are refreshed by Select; every
+    // other node keeps a valid upper bound, so the root peek returns the next point by
+    // batch-start priority. Accepted points then update the clearances together.
+    std::size_t FarthestPointSieve::ExtendRelaxed(const std::size_t count, const double eta, const std::uint32_t cap)
+    {
+        const std::size_t n = m_X.size(), target = std::min(count, n);
+        if (m_BatchOffsets.empty()) m_BatchOffsets.push_back(0u);
+        std::vector<std::size_t> accepted;
+        while (m_Order.size() < target)
+        {
+            if (m_Order.empty())
+            {
+                const std::size_t position = m_PositionOf[m_First];
+                m_Order.push_back(m_Ids[position]);
+                m_Clearance.push_back(std::numeric_limits<double>::infinity());
+                Select(position);
+                if (m_Order.size() < n) Update(position);
+                m_BatchOffsets.push_back(std::uint32_t(m_Order.size()));
+                continue;
+            }
+            if (m_Winner[1] < 0) break;
+            const double threshold = (eta * eta) * m_MaxKey[1];
+            accepted.clear();
+            for (std::uint32_t j = 0; j < cap && m_Winner[1] >= 0; ++j)
+            {
+                const std::size_t position = m_PositionOf[std::size_t(m_Winner[1])];
+                double clear = m_Clear[position];
+                for (const std::size_t a : accepted)
+                {
+                    const double d = Squared(m_X[position], m_Y[position], m_Z[position], m_X[a], m_Y[a], m_Z[a]);
+                    ++m_Pairs;
+                    clear = std::min(clear, d);
+                }
+                const double priority = m_Weighted ? m_Weight[position] * clear : clear;
+                // Candidate 0 is the exact winner (priority U >= eta^2 U).
+                if (j > 0 && !(priority >= threshold)) break;
+                m_Order.push_back(m_Ids[position]);
+                m_Clearance.push_back(priority);
+                Select(position);
+                accepted.push_back(position);
+            }
+            if (m_Order.size() < n)
+                for (const std::size_t a : accepted) Update(a);
+            m_BatchOffsets.push_back(std::uint32_t(m_Order.size()));
+        }
+        return m_Order.size();
+    }
+
+    namespace
+    {
+        // Cuts an order and its batch offsets at the requested count.
+        void CutBatches(Result& result, const std::size_t count)
+        {
+            if (result.Order.size() <= count) return;
+            result.Order.resize(count);
+            if (!result.Clearance.empty()) result.Clearance.resize(count);
+            std::erase_if(result.BatchOffsets, [&](const std::uint32_t offset) { return offset >= count; });
+            result.BatchOffsets.push_back(std::uint32_t(count));
+        }
+    }
+
     Result Order(const PointView points, const Params& params, const std::size_t count)
     {
         Result result;
+        if (params.Method == Method::FlatGreedy || params.Method == Method::LazyGreedy)
+        {
+            result = params.Method == Method::FlatGreedy ? Detail::FlatGreedyOrder(points, params, count)
+                                                         : Detail::LazyGreedyOrder(points, params, count);
+            if (result.Succeeded()) CutBatches(result, count);
+            return result;
+        }
+        if (params.Method == Method::SampleElimination) return Detail::SampleEliminationOrder(points, params, count);
+        if (params.Method == Method::Tournament) return Detail::TournamentOrder(points, params, count);
+        if (params.Method == Method::CoupledSieve)
+        {
+            if (!(params.Eta > 0.0 && params.Eta <= 1.0) || params.CandidateCap < 1u || params.CandidateCap > 32u ||
+                (params.Eta == 1.0 && params.CandidateCap != 1u))
+            {
+                result.State = Status::InvalidParameters;
+                return result;
+            }
+            FarthestPointSieve sieve;
+            result.State = sieve.Build(points, params.FirstIndex, params.Weights, params.LeafSize);
+            if (!result.Succeeded()) return result;
+            sieve.ExtendRelaxed(count, params.Eta, params.CandidateCap);
+            result.Order.assign(sieve.Order().begin(), sieve.Order().end());
+            result.Clearance.assign(sieve.Clearance().begin(), sieve.Clearance().end());
+            result.BatchOffsets.assign(sieve.BatchOffsets().begin(), sieve.BatchOffsets().end());
+            result.DistancePairs = sieve.DistancePairs();
+            CutBatches(result, count);
+            return result;
+        }
         if (params.Method == Method::ProgressivePoisson)
         {
             if (points.Y.size() != points.Size() || points.Z.size() != points.Size())
@@ -406,7 +520,12 @@ namespace Geometry::PointSampling
             result.Order = std::move(permutation);
             return result;
         }
-        case Method::ProgressivePoisson: break; // handled above
+        case Method::ProgressivePoisson:
+        case Method::CoupledSieve:
+        case Method::FlatGreedy:
+        case Method::SampleElimination:
+        case Method::LazyGreedy:
+        case Method::Tournament: break; // handled above
         case Method::FarthestPoint:
         {
             FarthestPointSieve sieve;

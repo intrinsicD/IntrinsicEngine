@@ -504,7 +504,12 @@ and `ProgressivePoisson` (the METHOD-012 reference, compiled into this layer fro
 `src/geometry/ProgressivePoisson/`, with every option of the CUDA sampler since GEOM-112:
 bounded, exhaustive, best-of-candidates and feature-priority cell policies, randomized phase
 order, spatially balanced within-level ordering, order-only mode and named profiles).
-`FarthestPointSieve` extends an order incrementally.
+`FarthestPointSieve` extends an order incrementally. GEOM-113 adds CPU references of the
+operator's GPU-oriented methods: `CoupledSieve` (eta-relaxed batches on the same sieve; eta = 1
+is exact), `FlatGreedy` and `LazyGreedy` (beta-greedy independent batches; beta = 1 is exact),
+the `Tournament` hierarchy baseline, and Yuksel's progressive `SampleElimination`. Batch methods
+compute whole batches so every requested count is a prefix of one order; the opt-in runner
+`IntrinsicPointSamplingComparison` compares all methods (time, nearest-neighbor CV, coverage).
 Registration subsampling and Nystroem landmarks use it; GEOM-112/113 add the remaining
 sampling methods and RUNTIME-289 makes the method selectable at every consumer.
 

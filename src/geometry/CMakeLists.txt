@@ -233,6 +233,7 @@ target_sources(${target_name}
         Geometry.Rotation.cpp
         Geometry.RotationAveraging.cpp
         Geometry.PointSampling.cpp
+        Geometry.PointSampling.Approximate.cpp
         ProgressivePoisson/ProgressivePoissonReference.cpp
         Geometry.Sampling.cpp
         Geometry.SDF.cpp

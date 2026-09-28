@@ -1,0 +1,24 @@
+# GEOM-113 — comparison of every Geometry.PointSampling method (opt-in, Release).
+#
+# IntrinsicPointSamplingComparison on the ci-release preset; not a default CTest. Timings
+# are same-host evidence. runtime_ms is exact farthest point for 4096 of the box's points;
+# quality_error_l2 counts guarantee violations (failed methods or eta/beta bound breaches on
+# prefixes up to 1024), which must be zero. Per-method NN coefficient of variation and
+# coverage radius (relative to exact farthest point) are diagnostics.
+benchmark_id: geometry.point_sampling.comparison
+method: geometry.point_sampling
+dataset: builtin.point_sampling_box_and_surface.v1
+params:
+  intent: method_comparison
+  runner: IntrinsicPointSamplingComparison
+  build_preset: ci-release
+  points: 20000
+  prefixes: [256, 1024, 4096]
+  fixtures: [uniform unit box, bumpy ellipsoid surface]
+  methods: [random, farthest_point, coupled_sieve eta 0.95 cap 32, flat_greedy beta 1.1, lazy_greedy beta 1.1, progressive_poisson hapds/fast/spatially balanced, sample_elimination, tournament]
+  warmup_iterations: 1
+  measured_iterations: 3
+  timing_statistic: median_wall_clock
+metrics: [runtime_ms, quality_error_l2]
+thresholds:
+  quality_error_l2_max: 0

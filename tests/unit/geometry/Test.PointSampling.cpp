@@ -217,3 +217,172 @@ TEST(PointSampling, PoissonProfilesAndPriorityReachTheReference)
     EXPECT_EQ(PS::Order(points, {.Method = PS::Method::ProgressivePoisson, .Poisson = priority}, 50).State,
               PS::Status::InvalidParameters) << "priority without scores";
 }
+
+// ── GEOM-113: approximate farthest-point family and sample elimination ──────
+namespace
+{
+    // Brute force: the largest (weighted) clearance among the points not yet in `prefix`.
+    double LargestRemainingKey(const Soa& p, const std::vector<std::uint32_t>& prefix, const std::vector<double>& weights)
+    {
+        std::vector<bool> taken(p.Size(), false);
+        for (const std::uint32_t id : prefix) taken[id] = true;
+        double best = -1.0;
+        for (std::size_t i = 0; i < p.Size(); ++i)
+        {
+            if (taken[i]) continue;
+            double clear = std::numeric_limits<double>::infinity();
+            for (const std::uint32_t id : prefix)
+            {
+                const double dx = p.X[i] - p.X[id], dy = p.Y[i] - p.Y[id], dz = p.Z[i] - p.Z[id];
+                double s = dx * dx;
+                s += dy * dy;
+                s += dz * dz;
+                clear = std::min(clear, s);
+            }
+            best = std::max(best, weights.empty() ? clear : weights[i] * clear);
+        }
+        return best;
+    }
+
+    void ExpectPermutationPrefix(const PS::Result& r, const std::size_t n)
+    {
+        ASSERT_TRUE(r.Succeeded()) << PS::ToString(r.State);
+        EXPECT_EQ(std::set<std::uint32_t>(r.Order.begin(), r.Order.end()).size(), r.Order.size());
+        for (const std::uint32_t id : r.Order) ASSERT_LT(id, n);
+    }
+}
+
+TEST(PointSampling, CoupledSieveWithEtaOneIsExactFarthestPoint)
+{
+    const Soa points = Cloud(1500, 41u, false, 30);
+    std::vector<double> weights(points.Size());
+    std::mt19937 random(8);
+    std::uniform_real_distribution<double> uniform(1.0, 4.0);
+    for (auto& w : weights) w = uniform(random);
+    for (const bool weighted : {false, true})
+    {
+        const std::span<const double> w = weighted ? std::span<const double>(weights) : std::span<const double>{};
+        const auto exact = PS::Order(points.View(), {.Weights = w}, points.Size());
+        const auto coupled = PS::Order(points.View(), {.Method = PS::Method::CoupledSieve, .Weights = w, .Eta = 1.0,
+                                                       .CandidateCap = 1u}, points.Size());
+        ASSERT_TRUE(coupled.Succeeded());
+        EXPECT_EQ(coupled.Order, exact.Order);
+        EXPECT_EQ(coupled.Clearance, exact.Clearance);
+    }
+    EXPECT_EQ(PS::Order(points.View(), {.Method = PS::Method::CoupledSieve, .Eta = 1.0, .CandidateCap = 4u}, 10).State,
+              PS::Status::InvalidParameters) << "eta = 1 needs a one-point cap";
+}
+
+TEST(PointSampling, CoupledSieveKeepsTheEtaBoundOnEveryPrefix)
+{
+    const Soa points = Cloud(600, 42u, false, 10);
+    const double eta = 0.8;
+    const auto r = PS::Order(points.View(), {.Method = PS::Method::CoupledSieve, .Eta = eta, .CandidateCap = 16u}, 250);
+    ExpectPermutationPrefix(r, points.Size());
+    ASSERT_EQ(r.Order.size(), 250u);
+    ASSERT_EQ(r.BatchOffsets.back(), 250u);
+    EXPECT_LT(r.BatchOffsets.size(), 250u) << "batches hold several points";
+    for (std::size_t k = 1; k < r.Order.size(); ++k)
+    {
+        const std::vector<std::uint32_t> prefix(r.Order.begin(), r.Order.begin() + std::ptrdiff_t(k));
+        // The emitted point's priority reaches eta^2 of the largest remaining priority.
+        ASSERT_GE(r.Clearance[k], eta * eta * LargestRemainingKey(points, prefix, {}) * (1.0 - 1e-12)) << k;
+    }
+    // Every count is a prefix of the same order.
+    const auto shorter = PS::Order(points.View(), {.Method = PS::Method::CoupledSieve, .Eta = eta, .CandidateCap = 16u}, 97);
+    EXPECT_TRUE(std::equal(shorter.Order.begin(), shorter.Order.end(), r.Order.begin()));
+}
+
+TEST(PointSampling, FlatGreedyKeepsTheBetaBoundAndBetaOneIsExact)
+{
+    const Soa points = Cloud(800, 43u, false, 12);
+    const auto exact = PS::Order(points.View(), {}, points.Size());
+    const auto betaOne = PS::Order(points.View(), {.Method = PS::Method::FlatGreedy, .Beta = 1.0}, points.Size());
+    ASSERT_TRUE(betaOne.Succeeded());
+    EXPECT_EQ(betaOne.Order, exact.Order);
+    const double beta = 1.25;
+    for (const auto priority : {PS::GreedyPriority::Random, PS::GreedyPriority::Clearance, PS::GreedyPriority::CoverageGain})
+    {
+        const auto r = PS::Order(points.View(), {.Method = PS::Method::FlatGreedy, .Beta = beta, .BatchPriority = priority,
+                                                 .BatchOrdering = priority}, 300);
+        ExpectPermutationPrefix(r, points.Size());
+        ASSERT_EQ(r.Order.size(), 300u);
+        // Each batch's points keep clearance >= U / beta against the prefix and each other.
+        for (std::size_t b = 1; b + 1 < r.BatchOffsets.size(); ++b)
+        {
+            const std::uint32_t begin = r.BatchOffsets[b];
+            const std::vector<std::uint32_t> prefix(r.Order.begin(), r.Order.begin() + begin);
+            const double largest = LargestRemainingKey(points, prefix, {});
+            if (!(largest > 0.0)) break; // duplicate tail
+            for (std::uint32_t k = begin; k < r.BatchOffsets[b + 1]; ++k)
+                ASSERT_GE(r.Clearance[k], largest / (beta * beta) * (1.0 - 1e-12)) << "batch " << b;
+        }
+        const auto shorter = PS::Order(points.View(), {.Method = PS::Method::FlatGreedy, .Beta = beta,
+                                                       .BatchPriority = priority, .BatchOrdering = priority}, 111);
+        EXPECT_TRUE(std::equal(shorter.Order.begin(), shorter.Order.end(), r.Order.begin()));
+    }
+}
+
+TEST(PointSampling, SampleEliminationSpreadsItsPrefixes)
+{
+    const Soa points = Cloud(3000, 44u, false, 0);
+    const auto r = PS::Order(points.View(), {.Method = PS::Method::SampleElimination}, 400);
+    ExpectPermutationPrefix(r, points.Size());
+    ASSERT_EQ(r.Order.size(), 400u);
+    EXPECT_EQ(PS::Order(points.View(), {.Method = PS::Method::SampleElimination}, 400).Order, r.Order) << "deterministic";
+    const auto random = PS::Order(points.View(), {.Method = PS::Method::Random, .Seed = 5u}, 400);
+    const auto minSpacing = [&](const std::vector<std::uint32_t>& order, const std::size_t count) {
+        double best = std::numeric_limits<double>::infinity();
+        for (std::size_t a = 0; a < count; ++a)
+            for (std::size_t b = a + 1; b < count; ++b)
+            {
+                const double dx = points.X[order[a]] - points.X[order[b]], dy = points.Y[order[a]] - points.Y[order[b]],
+                             dz = points.Z[order[a]] - points.Z[order[b]];
+                best = std::min(best, dx * dx + dy * dy + dz * dz);
+            }
+        return std::sqrt(best);
+    };
+    // Progressive prefixes spread far better than random subsets (measured 3.5-5x). The full
+    // first elimination keeps some close pairs at the unbounded boundary, as the method does
+    // without tiling, so it is not compared.
+    for (const std::size_t prefix : {std::size_t{25}, std::size_t{50}, std::size_t{200}})
+        EXPECT_GT(minSpacing(r.Order, prefix), 2.0 * minSpacing(random.Order, prefix)) << prefix;
+    EXPECT_EQ(PS::Order(points.View(), {.Method = PS::Method::SampleElimination, .ManifoldDimension = 4u}, 10).State,
+              PS::Status::InvalidParameters);
+}
+
+TEST(PointSampling, LazyGreedyKeepsTheBetaBoundAndBetaOneIsExact)
+{
+    const Soa points = Cloud(700, 45u, false, 8);
+    const auto exact = PS::Order(points.View(), {}, points.Size());
+    EXPECT_EQ(PS::Order(points.View(), {.Method = PS::Method::LazyGreedy, .Beta = 1.0}, points.Size()).Order, exact.Order);
+    const double beta = 1.2;
+    for (const auto priority : {PS::LazyPriority::Random, PS::LazyPriority::VoidDensity})
+    {
+        const auto r = PS::Order(points.View(), {.Method = PS::Method::LazyGreedy, .Beta = beta,
+                                                 .LazyBatchPriority = priority}, 250);
+        ExpectPermutationPrefix(r, points.Size());
+        ASSERT_EQ(r.Order.size(), 250u);
+        for (std::size_t b = 1; b + 1 < r.BatchOffsets.size(); ++b)
+        {
+            const std::uint32_t begin = r.BatchOffsets[b];
+            const std::vector<std::uint32_t> prefix(r.Order.begin(), r.Order.begin() + begin);
+            const double largest = LargestRemainingKey(points, prefix, {});
+            if (!(largest > 0.0)) break;
+            for (std::uint32_t k = begin; k < r.BatchOffsets[b + 1]; ++k)
+                ASSERT_GE(r.Clearance[k], largest / (beta * beta) * (1.0 - 1e-12)) << "batch " << b;
+        }
+    }
+}
+
+TEST(PointSampling, TournamentIsACompleteHierarchicalOrder)
+{
+    const Soa points = Cloud(1000, 46u, false, 0);
+    const auto r = PS::Order(points.View(), {.Method = PS::Method::Tournament}, points.Size());
+    ExpectPermutationPrefix(r, points.Size());
+    ASSERT_EQ(r.Order.size(), points.Size());
+    const auto prefix = PS::Order(points.View(), {.Method = PS::Method::Tournament}, 64);
+    EXPECT_TRUE(std::equal(prefix.Order.begin(), prefix.Order.end(), r.Order.begin()));
+    // A comparison baseline, not a quality method: its prefixes are not claimed to spread.
+    EXPECT_EQ(PS::Order(points.View(), {.Method = PS::Method::Tournament}, points.Size()).Order, r.Order);
+}
