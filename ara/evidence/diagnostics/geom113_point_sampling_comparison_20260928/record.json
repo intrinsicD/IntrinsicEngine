@@ -1,0 +1,23 @@
+{
+  "task": "GEOM-113",
+  "date": "2026-09-28",
+  "source_revision": "36a3a2b0ecc2664824259cbd059507f21ae5d2fd",
+  "environment": {"cpu": "Intel Core i9-11900KF (single-threaded sampling)", "compiler": "clang++ 23.0.0", "preset": "ci-release"},
+  "commands": [
+    "cmake --build build/ci-release --target IntrinsicPointSamplingComparison",
+    "GITHUB_SHA=36a3a2b0ecc2664824259cbd059507f21ae5d2fd build/ci-release/bin/IntrinsicPointSamplingComparison <dir> 20000 2> run-progress.log",
+    "python3 tools/benchmark/seal_benchmark_results.py --root <dir> --manifests-root benchmarks --run-id geom113-sampling-comparison-20260928 --source-state clean_commit --source-revision 36a3a2b0ecc2664824259cbd059507f21ae5d2fd --claim-eligible --replace"
+  ],
+  "timing": "One warmup, median of 3 runs per method and prefix size; 20000 points per fixture.",
+  "outcomes": {
+    "exact_farthest_point": "4096 samples of 20000 in 15.6 ms (box) and 10.6 ms (surface); coverage radius is the reference (1.0): only the coupled sieve comes within 0.1% (sometimes marginally below, as greedy FPS is not optimal); every other method is at least 2.5% worse",
+    "coupled_sieve_eta095": "coverage within 0.1% of exact FPS at the same CPU time; its gain is GPU batching (METHOD-060)",
+    "flat_and_lazy_greedy_beta110": "coverage 1.03-1.08x exact FPS; 13-20x slower than the sieve on the CPU because their batches rescan all points (GPU-oriented designs, METHOD-061/062)",
+    "progressive_poisson": "whole hierarchy in 29-43 ms; coverage 1.3-1.8x FPS; nearest-neighbor CV 0.11-0.24",
+    "sample_elimination": "most even at k=4096 on the box (CV 0.070) but degrades and slows at large input/output ratios (k=256 of 20000: CV 0.74, 1.7 s), as its weight limiting prescribes",
+    "tournament": "2.7 ms, a hierarchy baseline with 1.7-2.7x FPS coverage",
+    "guarantees": "no eta/beta bound violation on any batch (quality_error_l2 = 0)"
+  },
+  "known_artifacts": "coverage_vs_fps is 0 for random because it runs before the farthest-point reference in the method loop; its absolute coverage_radius is reported.",
+  "not_measured": "GPU backends (METHOD-014/055/060-062), memory, other hosts."
+}

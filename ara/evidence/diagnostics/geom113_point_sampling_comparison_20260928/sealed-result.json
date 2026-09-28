@@ -1,0 +1,789 @@
+{
+  "attempt_id": "attempt-001",
+  "backend": "cpu_reference",
+  "benchmark_id": "geometry.point_sampling.comparison",
+  "claim_eligible": true,
+  "commit": "36a3a2b0ecc2664824259cbd059507f21ae5d2fd",
+  "config_digest": "9116b3f8ae076f1298f08750f3aa190c3c7b805d5297a2d6d6092c4fdface3e8",
+  "dataset": "builtin.point_sampling_box_and_surface.v1",
+  "diagnostics": {
+    "fixtures": [
+      {
+        "fixture": "uniform_box",
+        "methods": [
+          {
+            "name": "random",
+            "prefixes": [
+              {
+                "coverage_radius": 0.280833115,
+                "coverage_vs_fps": 0,
+                "k": 256,
+                "nn_cv": 0.377792193,
+                "runtime_ms": 0.067576,
+                "runtime_ms_max": 0.080706,
+                "runtime_ms_min": 0.067466,
+                "samples": 256
+              },
+              {
+                "coverage_radius": 0.166235004,
+                "coverage_vs_fps": 0,
+                "k": 1024,
+                "nn_cv": 0.372795853,
+                "runtime_ms": 0.065117,
+                "runtime_ms_max": 0.06531,
+                "runtime_ms_min": 0.064852,
+                "samples": 1024
+              },
+              {
+                "coverage_radius": 0.108896284,
+                "coverage_vs_fps": 0,
+                "k": 4096,
+                "nn_cv": 0.362784736,
+                "runtime_ms": 0.072104,
+                "runtime_ms_max": 0.072669,
+                "runtime_ms_min": 0.072043,
+                "samples": 4096
+              }
+            ]
+          },
+          {
+            "name": "farthest_point",
+            "prefixes": [
+              {
+                "coverage_radius": 0.14218227,
+                "coverage_vs_fps": 1,
+                "k": 256,
+                "nn_cv": 0.0678878734,
+                "runtime_ms": 4.007997,
+                "runtime_ms_max": 4.046682,
+                "runtime_ms_min": 4.003973,
+                "samples": 256
+              },
+              {
+                "coverage_radius": 0.082879562,
+                "coverage_vs_fps": 1,
+                "k": 1024,
+                "nn_cv": 0.0758607402,
+                "runtime_ms": 7.097508,
+                "runtime_ms_max": 7.141449,
+                "runtime_ms_min": 7.049755,
+                "samples": 1024
+              },
+              {
+                "coverage_radius": 0.0470281079,
+                "coverage_vs_fps": 1,
+                "k": 4096,
+                "nn_cv": 0.0912018488,
+                "runtime_ms": 15.559663,
+                "runtime_ms_max": 15.579279,
+                "runtime_ms_min": 15.52767,
+                "samples": 4096
+              }
+            ]
+          },
+          {
+            "name": "coupled_sieve_eta095",
+            "prefixes": [
+              {
+                "coverage_radius": 0.14218227,
+                "coverage_vs_fps": 1,
+                "k": 256,
+                "nn_cv": 0.0678878734,
+                "runtime_ms": 4.023053,
+                "runtime_ms_max": 4.075598,
+                "runtime_ms_min": 3.989844,
+                "samples": 256
+              },
+              {
+                "coverage_radius": 0.0828760169,
+                "coverage_vs_fps": 0.999957225,
+                "k": 1024,
+                "nn_cv": 0.0756212605,
+                "runtime_ms": 7.120954,
+                "runtime_ms_max": 7.339646,
+                "runtime_ms_min": 7.038716,
+                "samples": 1024
+              },
+              {
+                "coverage_radius": 0.0470270449,
+                "coverage_vs_fps": 0.999977397,
+                "k": 4096,
+                "nn_cv": 0.0912975752,
+                "runtime_ms": 15.765232,
+                "runtime_ms_max": 15.948953,
+                "runtime_ms_min": 15.635231,
+                "samples": 4096
+              }
+            ]
+          },
+          {
+            "name": "flat_greedy_beta110",
+            "prefixes": [
+              {
+                "coverage_radius": 0.147660078,
+                "coverage_vs_fps": 1.03852666,
+                "k": 256,
+                "nn_cv": 0.07507059,
+                "runtime_ms": 18.854711,
+                "runtime_ms_max": 18.907415,
+                "runtime_ms_min": 18.839817,
+                "samples": 256
+              },
+              {
+                "coverage_radius": 0.0892369243,
+                "coverage_vs_fps": 1.07670603,
+                "k": 1024,
+                "nn_cv": 0.0797950276,
+                "runtime_ms": 54.437841,
+                "runtime_ms_max": 55.503595,
+                "runtime_ms_min": 54.423183,
+                "samples": 1024
+              },
+              {
+                "coverage_radius": 0.0499572518,
+                "coverage_vs_fps": 1.06228496,
+                "k": 4096,
+                "nn_cv": 0.091832233,
+                "runtime_ms": 204.287992,
+                "runtime_ms_max": 204.651921,
+                "runtime_ms_min": 204.066139,
+                "samples": 4096
+              }
+            ]
+          },
+          {
+            "name": "lazy_greedy_beta110",
+            "prefixes": [
+              {
+                "coverage_radius": 0.1503772,
+                "coverage_vs_fps": 1.0576368,
+                "k": 256,
+                "nn_cv": 0.0926415387,
+                "runtime_ms": 16.554524,
+                "runtime_ms_max": 16.607545,
+                "runtime_ms_min": 16.294167,
+                "samples": 256
+              },
+              {
+                "coverage_radius": 0.0886811171,
+                "coverage_vs_fps": 1.06999983,
+                "k": 1024,
+                "nn_cv": 0.081636216,
+                "runtime_ms": 56.198767,
+                "runtime_ms_max": 56.287772,
+                "runtime_ms_min": 55.984012,
+                "samples": 1024
+              },
+              {
+                "coverage_radius": 0.0498865361,
+                "coverage_vs_fps": 1.06078127,
+                "k": 4096,
+                "nn_cv": 0.101040889,
+                "runtime_ms": 207.720057,
+                "runtime_ms_max": 208.840364,
+                "runtime_ms_min": 207.333539,
+                "samples": 4096
+              }
+            ]
+          },
+          {
+            "name": "progressive_poisson_hapds",
+            "prefixes": [
+              {
+                "coverage_radius": 0.198075025,
+                "coverage_vs_fps": 1.39310637,
+                "k": 256,
+                "nn_cv": 0.167658275,
+                "runtime_ms": 31.672769,
+                "runtime_ms_max": 32.069657,
+                "runtime_ms_min": 31.478823,
+                "samples": 256
+              },
+              {
+                "coverage_radius": 0.116835038,
+                "coverage_vs_fps": 1.40969662,
+                "k": 1024,
+                "nn_cv": 0.218385877,
+                "runtime_ms": 31.963448,
+                "runtime_ms_max": 32.046916,
+                "runtime_ms_min": 31.769911,
+                "samples": 1024
+              },
+              {
+                "coverage_radius": 0.0641126591,
+                "coverage_vs_fps": 1.36328383,
+                "k": 4096,
+                "nn_cv": 0.241719821,
+                "runtime_ms": 31.816673,
+                "runtime_ms_max": 31.985107,
+                "runtime_ms_min": 31.438649,
+                "samples": 4096
+              }
+            ]
+          },
+          {
+            "name": "progressive_poisson_fast",
+            "prefixes": [
+              {
+                "coverage_radius": 0.220200949,
+                "coverage_vs_fps": 1.54872298,
+                "k": 256,
+                "nn_cv": 0.125951055,
+                "runtime_ms": 28.790261,
+                "runtime_ms_max": 28.943462,
+                "runtime_ms_min": 28.732387,
+                "samples": 256
+              },
+              {
+                "coverage_radius": 0.126917517,
+                "coverage_vs_fps": 1.53134879,
+                "k": 1024,
+                "nn_cv": 0.19118396,
+                "runtime_ms": 28.641135,
+                "runtime_ms_max": 28.712461,
+                "runtime_ms_min": 28.545546,
+                "samples": 1024
+              },
+              {
+                "coverage_radius": 0.0762453638,
+                "coverage_vs_fps": 1.6212722,
+                "k": 4096,
+                "nn_cv": 0.238711093,
+                "runtime_ms": 28.635088,
+                "runtime_ms_max": 28.729101,
+                "runtime_ms_min": 28.49314,
+                "samples": 4096
+              }
+            ]
+          },
+          {
+            "name": "progressive_poisson_balanced",
+            "prefixes": [
+              {
+                "coverage_radius": 0.188964758,
+                "coverage_vs_fps": 1.3290318,
+                "k": 256,
+                "nn_cv": 0.112289383,
+                "runtime_ms": 33.794991,
+                "runtime_ms_max": 33.824518,
+                "runtime_ms_min": 33.640686,
+                "samples": 256
+              },
+              {
+                "coverage_radius": 0.110103491,
+                "coverage_vs_fps": 1.32847578,
+                "k": 1024,
+                "nn_cv": 0.196112809,
+                "runtime_ms": 33.912975,
+                "runtime_ms_max": 33.920534,
+                "runtime_ms_min": 33.636662,
+                "samples": 1024
+              },
+              {
+                "coverage_radius": 0.0687192737,
+                "coverage_vs_fps": 1.46123833,
+                "k": 4096,
+                "nn_cv": 0.232927675,
+                "runtime_ms": 33.724849,
+                "runtime_ms_max": 33.820819,
+                "runtime_ms_min": 33.658133,
+                "samples": 4096
+              }
+            ]
+          },
+          {
+            "name": "sample_elimination",
+            "prefixes": [
+              {
+                "coverage_radius": 0.262166518,
+                "coverage_vs_fps": 1.8438763,
+                "k": 256,
+                "nn_cv": 0.739663331,
+                "runtime_ms": 1739.14028,
+                "runtime_ms_max": 1746.09395,
+                "runtime_ms_min": 1713.25,
+                "samples": 256
+              },
+              {
+                "coverage_radius": 0.111359672,
+                "coverage_vs_fps": 1.34363249,
+                "k": 1024,
+                "nn_cv": 0.161823343,
+                "runtime_ms": 521.37384,
+                "runtime_ms_max": 522.287551,
+                "runtime_ms_min": 521.21313,
+                "samples": 1024
+              },
+              {
+                "coverage_radius": 0.0619260485,
+                "coverage_vs_fps": 1.31678801,
+                "k": 4096,
+                "nn_cv": 0.0695620088,
+                "runtime_ms": 183.643474,
+                "runtime_ms_max": 184.310701,
+                "runtime_ms_min": 182.775941,
+                "samples": 4096
+              }
+            ]
+          },
+          {
+            "name": "tournament",
+            "prefixes": [
+              {
+                "coverage_radius": 0.242179189,
+                "coverage_vs_fps": 1.70330091,
+                "k": 256,
+                "nn_cv": 0.411811606,
+                "runtime_ms": 2.722382,
+                "runtime_ms_max": 3.242768,
+                "runtime_ms_min": 2.661861,
+                "samples": 256
+              },
+              {
+                "coverage_radius": 0.161423769,
+                "coverage_vs_fps": 1.9476909,
+                "k": 1024,
+                "nn_cv": 0.340091718,
+                "runtime_ms": 2.662498,
+                "runtime_ms_max": 2.694375,
+                "runtime_ms_min": 2.658081,
+                "samples": 1024
+              },
+              {
+                "coverage_radius": 0.0904162506,
+                "coverage_vs_fps": 1.92260022,
+                "k": 4096,
+                "nn_cv": 0.319523722,
+                "runtime_ms": 2.686031,
+                "runtime_ms_max": 2.694764,
+                "runtime_ms_min": 2.641007,
+                "samples": 4096
+              }
+            ]
+          }
+        ],
+        "points": 20000
+      },
+      {
+        "fixture": "bumpy_ellipsoid_surface",
+        "methods": [
+          {
+            "name": "random",
+            "prefixes": [
+              {
+                "coverage_radius": 0.297391926,
+                "coverage_vs_fps": 0,
+                "k": 256,
+                "nn_cv": 0.561819107,
+                "runtime_ms": 0.062646,
+                "runtime_ms_max": 0.064119,
+                "runtime_ms_min": 0.062554,
+                "samples": 256
+              },
+              {
+                "coverage_radius": 0.164797946,
+                "coverage_vs_fps": 0,
+                "k": 1024,
+                "nn_cv": 0.531867095,
+                "runtime_ms": 0.066345,
+                "runtime_ms_max": 0.066839,
+                "runtime_ms_min": 0.0662,
+                "samples": 1024
+              },
+              {
+                "coverage_radius": 0.109962647,
+                "coverage_vs_fps": 0,
+                "k": 4096,
+                "nn_cv": 0.540646965,
+                "runtime_ms": 0.070959,
+                "runtime_ms_max": 0.070966,
+                "runtime_ms_min": 0.070722,
+                "samples": 4096
+              }
+            ]
+          },
+          {
+            "name": "farthest_point",
+            "prefixes": [
+              {
+                "coverage_radius": 0.147410688,
+                "coverage_vs_fps": 1,
+                "k": 256,
+                "nn_cv": 0.0827027849,
+                "runtime_ms": 3.099213,
+                "runtime_ms_max": 3.145805,
+                "runtime_ms_min": 3.09146,
+                "samples": 256
+              },
+              {
+                "coverage_radius": 0.0715533446,
+                "coverage_vs_fps": 1,
+                "k": 1024,
+                "nn_cv": 0.0977497428,
+                "runtime_ms": 5.040357,
+                "runtime_ms_max": 5.058865,
+                "runtime_ms_min": 5.030795,
+                "samples": 1024
+              },
+              {
+                "coverage_radius": 0.0326385679,
+                "coverage_vs_fps": 1,
+                "k": 4096,
+                "nn_cv": 0.124498534,
+                "runtime_ms": 10.595308,
+                "runtime_ms_max": 10.743051,
+                "runtime_ms_min": 10.511544,
+                "samples": 4096
+              }
+            ]
+          },
+          {
+            "name": "coupled_sieve_eta095",
+            "prefixes": [
+              {
+                "coverage_radius": 0.147410688,
+                "coverage_vs_fps": 1,
+                "k": 256,
+                "nn_cv": 0.0827027849,
+                "runtime_ms": 3.2716,
+                "runtime_ms_max": 3.37491,
+                "runtime_ms_min": 3.269057,
+                "samples": 256
+              },
+              {
+                "coverage_radius": 0.0715533446,
+                "coverage_vs_fps": 1,
+                "k": 1024,
+                "nn_cv": 0.0979111606,
+                "runtime_ms": 5.109744,
+                "runtime_ms_max": 5.163199,
+                "runtime_ms_min": 5.078558,
+                "samples": 1024
+              },
+              {
+                "coverage_radius": 0.0326275214,
+                "coverage_vs_fps": 0.999661551,
+                "k": 4096,
+                "nn_cv": 0.124392079,
+                "runtime_ms": 10.681712,
+                "runtime_ms_max": 10.713321,
+                "runtime_ms_min": 10.566241,
+                "samples": 4096
+              }
+            ]
+          },
+          {
+            "name": "flat_greedy_beta110",
+            "prefixes": [
+              {
+                "coverage_radius": 0.157207185,
+                "coverage_vs_fps": 1.06645717,
+                "k": 256,
+                "nn_cv": 0.0947167319,
+                "runtime_ms": 32.814867,
+                "runtime_ms_max": 32.973384,
+                "runtime_ms_min": 32.617917,
+                "samples": 256
+              },
+              {
+                "coverage_radius": 0.0741719942,
+                "coverage_vs_fps": 1.03659717,
+                "k": 1024,
+                "nn_cv": 0.1016618,
+                "runtime_ms": 76.36102,
+                "runtime_ms_max": 76.501644,
+                "runtime_ms_min": 75.817285,
+                "samples": 1024
+              },
+              {
+                "coverage_radius": 0.0344765805,
+                "coverage_vs_fps": 1.05631413,
+                "k": 4096,
+                "nn_cv": 0.124000147,
+                "runtime_ms": 226.090103,
+                "runtime_ms_max": 226.413607,
+                "runtime_ms_min": 224.650944,
+                "samples": 4096
+              }
+            ]
+          },
+          {
+            "name": "lazy_greedy_beta110",
+            "prefixes": [
+              {
+                "coverage_radius": 0.151122928,
+                "coverage_vs_fps": 1.02518298,
+                "k": 256,
+                "nn_cv": 0.0972536993,
+                "runtime_ms": 17.608837,
+                "runtime_ms_max": 17.874419,
+                "runtime_ms_min": 17.514492,
+                "samples": 256
+              },
+              {
+                "coverage_radius": 0.0739603255,
+                "coverage_vs_fps": 1.03363897,
+                "k": 1024,
+                "nn_cv": 0.103398327,
+                "runtime_ms": 59.003169,
+                "runtime_ms_max": 59.196105,
+                "runtime_ms_min": 58.857713,
+                "samples": 1024
+              },
+              {
+                "coverage_radius": 0.0336773166,
+                "coverage_vs_fps": 1.0318258,
+                "k": 4096,
+                "nn_cv": 0.12601242,
+                "runtime_ms": 209.721955,
+                "runtime_ms_max": 209.933314,
+                "runtime_ms_min": 208.535541,
+                "samples": 4096
+              }
+            ]
+          },
+          {
+            "name": "progressive_poisson_hapds",
+            "prefixes": [
+              {
+                "coverage_radius": 0.20269966,
+                "coverage_vs_fps": 1.3750676,
+                "k": 256,
+                "nn_cv": 0.119653174,
+                "runtime_ms": 40.805361,
+                "runtime_ms_max": 41.041229,
+                "runtime_ms_min": 40.649948,
+                "samples": 256
+              },
+              {
+                "coverage_radius": 0.12090991,
+                "coverage_vs_fps": 1.68978698,
+                "k": 1024,
+                "nn_cv": 0.135382243,
+                "runtime_ms": 40.79276,
+                "runtime_ms_max": 40.917684,
+                "runtime_ms_min": 40.720675,
+                "samples": 1024
+              },
+              {
+                "coverage_radius": 0.0587465582,
+                "coverage_vs_fps": 1.79991225,
+                "k": 4096,
+                "nn_cv": 0.132474902,
+                "runtime_ms": 40.930916,
+                "runtime_ms_max": 41.019728,
+                "runtime_ms_min": 40.921511,
+                "samples": 4096
+              }
+            ]
+          },
+          {
+            "name": "progressive_poisson_fast",
+            "prefixes": [
+              {
+                "coverage_radius": 0.203879938,
+                "coverage_vs_fps": 1.38307433,
+                "k": 256,
+                "nn_cv": 0.12575917,
+                "runtime_ms": 36.707339,
+                "runtime_ms_max": 36.73356,
+                "runtime_ms_min": 36.489222,
+                "samples": 256
+              },
+              {
+                "coverage_radius": 0.102919295,
+                "coverage_vs_fps": 1.43835758,
+                "k": 1024,
+                "nn_cv": 0.124549431,
+                "runtime_ms": 36.550498,
+                "runtime_ms_max": 36.577416,
+                "runtime_ms_min": 36.42031,
+                "samples": 1024
+              },
+              {
+                "coverage_radius": 0.0505870917,
+                "coverage_vs_fps": 1.54991763,
+                "k": 4096,
+                "nn_cv": 0.162158616,
+                "runtime_ms": 36.392572,
+                "runtime_ms_max": 36.511273,
+                "runtime_ms_min": 36.362975,
+                "samples": 4096
+              }
+            ]
+          },
+          {
+            "name": "progressive_poisson_balanced",
+            "prefixes": [
+              {
+                "coverage_radius": 0.194592017,
+                "coverage_vs_fps": 1.32006722,
+                "k": 256,
+                "nn_cv": 0.123634761,
+                "runtime_ms": 42.990443,
+                "runtime_ms_max": 43.108643,
+                "runtime_ms_min": 42.621003,
+                "samples": 256
+              },
+              {
+                "coverage_radius": 0.111664276,
+                "coverage_vs_fps": 1.56057381,
+                "k": 1024,
+                "nn_cv": 0.1133656,
+                "runtime_ms": 42.728161,
+                "runtime_ms_max": 42.904634,
+                "runtime_ms_min": 42.684501,
+                "samples": 1024
+              },
+              {
+                "coverage_radius": 0.0549472146,
+                "coverage_vs_fps": 1.68350568,
+                "k": 4096,
+                "nn_cv": 0.129024365,
+                "runtime_ms": 42.759699,
+                "runtime_ms_max": 42.947877,
+                "runtime_ms_min": 42.64876,
+                "samples": 4096
+              }
+            ]
+          },
+          {
+            "name": "sample_elimination",
+            "prefixes": [
+              {
+                "coverage_radius": 0.225925546,
+                "coverage_vs_fps": 1.53262664,
+                "k": 256,
+                "nn_cv": 0.525753441,
+                "runtime_ms": 605.750482,
+                "runtime_ms_max": 608.431816,
+                "runtime_ms_min": 604.674368,
+                "samples": 256
+              },
+              {
+                "coverage_radius": 0.101144368,
+                "coverage_vs_fps": 1.41355193,
+                "k": 1024,
+                "nn_cv": 0.161913753,
+                "runtime_ms": 181.833421,
+                "runtime_ms_max": 182.081661,
+                "runtime_ms_min": 181.279467,
+                "samples": 1024
+              },
+              {
+                "coverage_radius": 0.0499433317,
+                "coverage_vs_fps": 1.53019372,
+                "k": 4096,
+                "nn_cv": 0.117352953,
+                "runtime_ms": 79.554629,
+                "runtime_ms_max": 79.985646,
+                "runtime_ms_min": 79.165567,
+                "samples": 4096
+              }
+            ]
+          },
+          {
+            "name": "tournament",
+            "prefixes": [
+              {
+                "coverage_radius": 0.253495375,
+                "coverage_vs_fps": 1.71965398,
+                "k": 256,
+                "nn_cv": 0.597947318,
+                "runtime_ms": 2.739635,
+                "runtime_ms_max": 2.778346,
+                "runtime_ms_min": 2.705067,
+                "samples": 256
+              },
+              {
+                "coverage_radius": 0.15366855,
+                "coverage_vs_fps": 2.14760821,
+                "k": 1024,
+                "nn_cv": 0.508664915,
+                "runtime_ms": 2.734091,
+                "runtime_ms_max": 2.790775,
+                "runtime_ms_min": 2.722199,
+                "samples": 1024
+              },
+              {
+                "coverage_radius": 0.0880409882,
+                "coverage_vs_fps": 2.69745255,
+                "k": 4096,
+                "nn_cv": 0.438537198,
+                "runtime_ms": 2.728228,
+                "runtime_ms_max": 2.746679,
+                "runtime_ms_min": 2.712002,
+                "samples": 4096
+              }
+            ]
+          }
+        ],
+        "points": 20000
+      }
+    ],
+    "mode": "method_comparison",
+    "runner": "IntrinsicPointSamplingComparison"
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/geometry_point_sampling_comparison.yaml",
+    "sha256": "03af2620520ae96475934d035445a8c7730ce1e9948d90e8cfda55996adf69c6"
+  },
+  "method": "geometry.point_sampling",
+  "metrics": {
+    "quality_error_l2": 0,
+    "runtime_ms": 15.559663
+  },
+  "resolved_params": {
+    "build_preset": "ci-release",
+    "fixtures": [
+      "uniform unit box",
+      "bumpy ellipsoid surface"
+    ],
+    "intent": "method_comparison",
+    "measured_iterations": 3,
+    "methods": [
+      "random",
+      "farthest_point",
+      "coupled_sieve eta 0.95 cap 32",
+      "flat_greedy beta 1.1",
+      "lazy_greedy beta 1.1",
+      "progressive_poisson hapds/fast/spatially balanced",
+      "sample_elimination",
+      "tournament"
+    ],
+    "points": 20000,
+    "prefixes": [
+      256,
+      1024,
+      4096
+    ],
+    "runner": "IntrinsicPointSamplingComparison",
+    "timing_statistic": "median_wall_clock",
+    "warmup_iterations": 1
+  },
+  "run_id": "geom113-sampling-comparison-20260928",
+  "schema_version": 2,
+  "source": {
+    "revision": "36a3a2b0ecc2664824259cbd059507f21ae5d2fd",
+    "state": "clean_commit"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 0,
+      "metric": "quality_error_l2",
+      "observed": 0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_l2_max"
+    }
+  ],
+  "thresholds": {
+    "quality_error_l2_max": 0
+  },
+  "warmup_policy": {
+    "measured_iterations": 3,
+    "warmup_iterations": 1
+  }
+}

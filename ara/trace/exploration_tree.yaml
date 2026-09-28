@@ -13817,3 +13817,14 @@ tree:
     - ara/evidence/diagnostics/method053_cpd_nystrom_20260928/sealed-result.json
     status: resolved
 
+  - id: N647
+    type: experiment
+    title: Port the operator's CUDA sampling research to CPU references and compare every method
+    provenance: ai-executed
+    timestamp: 2026-09-28T23:30+02:00
+    result: GEOM-111/112/113 add Geometry.PointSampling with random, exact and weighted farthest point (hole sieve, bitwise equal to brute force), the complete progressive Poisson sampler, the coupled eta-sieve, flat and lazy beta-greedy, the tournament baseline and progressive weighted sample elimination. A sealed comparison on 20000-point box and surface fixtures finds exact farthest point fastest and best-covering on the CPU, all eta/beta bounds kept, and the approximate family slower single-threaded. C116 records the claim.
+    evidence:
+    - ara/evidence/diagnostics/geom113_point_sampling_comparison_20260928/record.json
+    - ara/evidence/diagnostics/geom113_point_sampling_comparison_20260928/sealed-result.json
+    status: resolved
+

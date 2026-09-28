@@ -2432,3 +2432,14 @@
 - **Tags**: registration, Coherent Point Drift, Nystroem, approximate E-step, performance
 - **From staging**: O255
 
+## C116: CPU exact farthest-point sampling through the hole sieve, compared with the approximate family
+- **Statement**: GEOM-111/113's CPU port of the operator's hole sieve orders 4096 of 20000 points in exact farthest-point order in 15.6 ms (uniform box) and 10.6 ms (bumpy surface) on the recorded i9-11900KF (single thread, Release), bitwise equal to a brute-force float64 scan in the unit tests, with a coverage radius no other compared method beats by more than 0.1% (the coupled sieve at eta 0.95 is within 0.1% either way, since greedy farthest point is not optimal; every other method is at least 2.5% worse); the flat and lazy beta-greedy methods keep their bounds on every batch but run 13-20x slower on the CPU, progressive Poisson builds its whole hierarchy in 29-43 ms at 1.3-1.8x the coverage radius, and weighted sample elimination is the most even at moderate reduction ratios but degrades at large ones.
+- **Status**: supported — one host, two synthetic fixtures, CPU references only; no GPU claim.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: A rerun of `IntrinsicPointSamplingComparison` at the recorded revision on the recorded host reports a guarantee violation (quality_error_l2 > 0), exact farthest point slower than 50 ms for 4096 of 20000 points, or another method with a coverage radius more than 1% below exact farthest point at any measured prefix; or `Test.PointSampling.cpp` finds the sieve order differing from the brute-force scan.
+- **Proof**: [ara/evidence/diagnostics/geom113_point_sampling_comparison_20260928/record.json, ara/evidence/diagnostics/geom113_point_sampling_comparison_20260928/sealed-result.json, ara/evidence/diagnostics/geom113_point_sampling_comparison_20260928/run-progress.log, tests/unit/geometry/Test.PointSampling.cpp, src/geometry/Geometry.PointSampling.cpp, src/geometry/Geometry.PointSampling.Approximate.cpp]
+- **Dependencies**: []
+- **Tags**: point sampling, farthest point, Poisson disk, sample elimination, CPU reference
+- **From staging**: O256
+
