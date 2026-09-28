@@ -96,6 +96,7 @@ namespace Extrinsic::Graphics
         bool DepthTested{true};
     };
 
+    // Transient debug triangles are drawn two-sided (no culling), so their winding does not matter.
     export struct DebugTrianglePacket
     {
         glm::vec3 A{0.f};

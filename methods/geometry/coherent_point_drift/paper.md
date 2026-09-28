@@ -96,8 +96,12 @@ zero or NaN), or the iteration cap (IterationCap).
 ## Accelerated backends (METHOD-049)
 
 Opt-in through `Params::EStep` and `Params::LowRank`; the reference stays canonical and
-every optimized run reports its backend (`cpu_dense_parallel`, `cpu_truncated`,
-`cpu_ifgt`, `cpu_auto`), the policy each iteration used, and its error bound.
+every optimized run reports the backend that actually ran (`cpu_dense_parallel`,
+`cpu_truncated`, `cpu_ifgt`; `cpu_auto` when `Auto` mixed policies, `cpu_mixed` when an
+explicit policy fell back, e.g. fast Gauss to dense), the requested one
+(`RequestedBackend`), the policy each iteration used, and its error bound. Weighted rows
+(Bayesian CPD's per-source log-weights) are shifted by their largest weighted exponent, not
+by the nearest source, so no weighted term can overflow.
 
 **Blocked single pass.** Target rows are split into B fixed blocks (B depends only on N
 and M, at most 32). Each row computes its shifted terms e_m = exp((d_min^2 - d_m^2) /
@@ -105,7 +109,8 @@ and M, at most 32). Each row computes its shifted terms e_m = exp((d_min^2 - d_m
 arithmetic, so the largest term is exactly 1), normalizes them by its denominator and
 adds P_mn, P_mn x_n to its block's partial P1/PX; partials are reduced in block order.
 Results are therefore bitwise identical for any thread count and differ from the
-reference only by summation order. Dense rows use this form only while a block's partials
+reference only by summation order. The 32-block cap bounds partial-sum memory (32 x 4 M
+doubles) but also caps the parallelism of one E-step at 32 row blocks. Dense rows use this form only while a block's partials
 (4 M doubles) stay within 512 KiB, because each dense row writes all of them; larger
 sources, and any case beyond `PartialBudgetBytes`, use a two-pass form (denominators
 over targets, then P1/PX over sources, reading shared arrays), which evaluates each
@@ -120,7 +125,9 @@ kept term, so the dropped mass is at most ((M - k_n)/M) tol times the kept mass
 (k_n kept terms). The row denominator (kept mass plus the outlier constant c) therefore
 has relative error at most ((M - k_n)/M) tol / (S_n + c e^{-a_max}) <= tol, where S_n >= 1
 is the shifted kept sum. The run reports the maximum over rows and iterations
-(`EStepErrorBound`); kept responsibilities inherit the same relative bound. Neighborhoods
+(`EStepErrorBound`, <= tol for truncation); kept responsibilities inherit the same relative
+bound, and each P1 entry additionally carries an absolute error <= N tol / M from dropped
+pairs. Neighborhoods
 come from a balanced double-precision kd-tree over the moving source, rebuilt per
 iteration. `Auto` counts the kept pairs of 64 evenly spaced rows and truncates when they
 are under 25% of all pairs (a kept pair measured at about 3.7 dense pairs); otherwise it uses the fast Gauss transform if its plan is
@@ -139,7 +146,10 @@ S^{-1/2} (formed in row blocks, never stored), eigenpairs of F^T F give the k le
 Woodbury identity W = (F_rhs - d(P1) Q (a L^{-1} + Q^T d(P1) Q)^{-1} Q^T F_rhs) / a in
 O(M k^2); T(Y) = Y + Q L (Q^T W) and the coherence term is lambda/2 tr((Q^T W)^T L
 (Q^T W)). `KernelApproximationError` is sqrt(sum |g - g~|^2 / sum |g|^2) over 32 exact
-kernel rows. This lifts the nonrigid limit to 1,000,000 source points.
+kernel rows. This lifts the nonrigid limit to 1,000,000 source points. `KernelRank`
+reports the effective rank: eigenpairs below the numerical floor of W are dropped, so a
+smooth kernel can yield fewer than requested (k = 150 gives about 73 on the scaling
+fixture at beta 2).
 
 **Fast Gauss transform (`FastGauss`, IFGT).** Both passes as improved fast Gauss
 transforms (Yang et al. 2003): sources grouped by farthest-point clustering, the kernel
@@ -151,14 +161,17 @@ of exp(z) is at most |z|^p/p! e^|z|, and e^(|z| - |dt|^2/h^2 - |ds|^2/h^2) <= 1.
 r_y) minimizes (sources + targets K) terms under that bound, aimed at tol times the
 previous E-step's 1% quantile of den_n / M (pass 1, weights 1) and of P1_m / sum_n w_n
 (pass 2, weights w_n = 1/den_n and x_n / den_n). A posteriori each denominator's
-relative error is M e1 / den_n and each P1 entry's is e2 sum_n w_n / P1_m; entries above
-tol are recomputed exactly, so the reported bound (denominator plus P1, at most 2 tol) is
-rigorous. Measured on the scaling fixture at tol 1e-6 the plans need p = 20-24 (up to
+relative error is M e1 / den_n and each P1 entry's is e2 sum_n w_n / P1_m. These are
+measured against the approximate values, so a measured b is reported as b / (1 - b), the
+bound relative to the exact value; entries above tol are recomputed exactly, so the
+reported bound (denominator plus P1, about 2 tol at most) is rigorous. PX is bounded only
+absolutely, by that bound times max |x| P1. Measured on the scaling fixture at tol 1e-6 the plans need p = 20-24 (up to
 2300 terms per cluster and channel) and exceed the dense cost at 10^4 points; `Auto`
 therefore rarely selects it in 3-D, and the explicit policy is slower than dense there
 (`geometry.coherent_point_drift.accelerated`). E-step Nystroem is not offered because its
 error has no a-priori bound; the permutohedral lattice (GEOM-060) is the remaining
 candidate for wide kernels.
+
 ## Bayesian Coherent Point Drift (METHOD-050)
 
 Hirose, *A Bayesian Formulation of Coherent Point Drift*, IEEE TPAMI 43(7), 2021,
@@ -173,7 +186,9 @@ source log-weights log alpha_m - s^2 D sigma_m^2 / (2 sigma^2), then:
   mean v = Sigma b = G z, z = (b - D^{1/2} (lambda I + D^{1/2} G D^{1/2})^{-1} D^{1/2} G b) /
   lambda (one Cholesky factor of an SPD matrix); variances diag Sigma = (diag G - colsq(L^{-1}
   D^{1/2} G)) / lambda. Low rank (METHOD-049 Nystroem eigenpairs): Sigma = Q (lambda L^{-1} +
-  Q^T D Q)^{-1} Q^T in O(M k^2).
+  Q^T D Q)^{-1} Q^T in O(M k^2). The full-kernel form keeps G and the Cholesky factor
+  (two dense M x M matrices, about 1 GiB at the 8192-point limit), so larger sources need
+  the low rank or subsampling.
 - alpha_m = exp(psi(kappa + nu_m) - psi(kappa M + N^)) (equal weights for kappa = infinity).
 - Similarity from u = y + v: R from the SVD of S_xu (reflection-free unless allowed),
   s = tr(R^T S_xu) / tr(S_uu), t = x_bar - s R u_bar.
@@ -183,8 +198,9 @@ source log-weights log alpha_m - s^2 D sigma_m^2 / (2 sigma^2), then:
 deformation absorb scale while sigma_bar^2 inflates tr(S_uu), which lowers s, which lowers
 the precision and raises the variances again: on a 60-point bend (beta 1, lambda 2) the
 scale falls from 1 to 0.002 in eight iterations. An independent NumPy implementation of
-Algorithm 1 reproduces this to 1e-9 (sigma^2 and s per iteration), so it is the update, not
-a coding error. Hirose's reference implementation also enables these terms only on request
+Algorithm 1 (`ara/evidence/diagnostics/method050_bcpd_numpy_20260928/`) reproduces this to
+relative 1e-7, and the run without the terms to 1e-9 (sigma^2 and s per iteration;
+replayed by `Test.CoherentPointDriftBayesian.cpp`), so it is the update, not a coding error. Hirose's reference implementation also enables these terms only on request
 (option `-a`) and starts from zero variances; `Params::PosteriorVarianceTerms` does the same.
 Without them the fixture converges to 1e-5 in about twenty iterations.
 

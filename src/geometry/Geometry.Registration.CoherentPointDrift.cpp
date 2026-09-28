@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -157,6 +158,11 @@ namespace Geometry::CoherentPointDrift
         EStep::Evaluator Accelerated{};
         EStep::Sums AcceleratedSums{};
         EStepPolicy LastPolicy{EStepPolicy::Reference};
+        std::uint32_t UsedPolicies{0u}; // bit per EStepPolicy that ran an iteration
+        // Current() caches the (expensive) subsampled interpolation per solver state.
+        std::uint64_t Revision{0u};
+        mutable std::uint64_t CachedRevision{~std::uint64_t{0}};
+        mutable std::vector<glm::dvec3> CachedFullSource{};
         double LastErrorBound{0.0}, MaxErrorBound{0.0};
         std::uint64_t LastKernelEvaluations{0u}, TotalKernelEvaluations{0u};
 
@@ -237,9 +243,9 @@ namespace Geometry::CoherentPointDrift
                     e[i] = dx * dx + dy * dy + dz * dz;
                     minDistance = std::min(minDistance, e[i]);
                 }
-                // Shifted by the largest exponent a_max = -minDistance / (2 sigma^2) (plus the largest
-                // source log-weight for Bayesian runs, so every weighted term stays <= 1).
-                const double aMax = -minDistance / twoSigma2 + WeightShift;
+                // Shifted by the largest exponent a_max = -minDistance / (2 sigma^2) (Bayesian runs:
+                // the largest weighted exponent), so every term stays <= 1.
+                double aMax = -minDistance / twoSigma2;
                 double sum = 0.0;
                 if (SourceLogWeight.empty())
                     for (std::size_t i = 0; i < m; ++i)
@@ -248,11 +254,22 @@ namespace Geometry::CoherentPointDrift
                         sum += e[i];
                     }
                 else
+                {
+                    // Weighted: shift by the row's true largest weighted exponent, so a down-weighted
+                    // nearest source cannot underflow the whole row.
+                    double top = -std::numeric_limits<double>::infinity();
                     for (std::size_t i = 0; i < m; ++i)
                     {
-                        e[i] = std::exp((minDistance - e[i]) / twoSigma2 + SourceLogWeight[i] - WeightShift);
+                        e[i] = (minDistance - e[i]) / twoSigma2 + SourceLogWeight[i] - WeightShift;
+                        top = std::max(top, e[i]);
+                    }
+                    for (std::size_t i = 0; i < m; ++i)
+                    {
+                        e[i] = std::exp(e[i] - top);
                         sum += e[i];
                     }
+                    aMax += WeightShift + top;
+                }
                 // log(sum_m exp(a_m) + c) = a_max + log(sum + c * exp(-a_max)).
                 const double logOutlier = logC - aMax;
                 const double logDenominator = logOutlier > 700.0
@@ -412,7 +429,9 @@ namespace Geometry::CoherentPointDrift
             if (!Displacement.allFinite() || !PosteriorVariance.allFinite()) return Status::NumericalFailure;
 
             // Mixing weights: E[log alpha_m] under the Dirichlet posterior (equal for kappa = inf).
-            if (std::isinf(Config.Kappa)) LogAlpha.setConstant(-std::log(double(m)));
+            // kappa M overflowing counts as infinity (equal weights).
+            if (std::isinf(Config.Kappa) || !std::isfinite(Config.Kappa * double(m) + matched))
+                LogAlpha.setConstant(-std::log(double(m)));
             else
             {
                 const double normalizer = Digamma(Config.Kappa * double(m) + matched);
@@ -445,7 +464,8 @@ namespace Geometry::CoherentPointDrift
             if (!Config.AllowReflection)
                 correction(2, 2) = (svd.matrixU() * svd.matrixV().transpose()).determinant() < 0.0 ? -1.0 : 1.0;
             Rotation = svd.matrixU() * correction * svd.matrixV().transpose();
-            RigidScale = Config.EstimateScale ? (Rotation.transpose() * cross).trace() / spread.trace() : 1.0;
+            RigidScale = Config.EstimateScale && spread.trace() > 0.0 ? (Rotation.transpose() * cross).trace() / spread.trace()
+                                                                      : 1.0;
             Linear = RigidScale * Rotation;
             Translation = xBar - Linear * uBar;
 
@@ -485,11 +505,11 @@ namespace Geometry::CoherentPointDrift
             const Eigen::LDLT<Eigen::MatrixXd> ldlt(inner);
             if (ldlt.info() != Eigen::Success) return Status::SingularSystem;
             const Eigen::MatrixXd z = ldlt.solve(Basis.transpose() * f);
-            const Eigen::MatrixXd w = (f - weighted * z) / a;
-            BasisCoefficients = Basis.transpose() * w;
+            // Q^T W = ((a L^{-1} + Q^T d(P1) Q) z - Q^T d(P1) Q z) / a = L^{-1} z, so the displacement
+            // G W = Q L Q^T W is Q z; forming W itself would amplify rounding by 1/a near the floor.
+            BasisCoefficients = Eigenvalues.cwiseInverse().asDiagonal() * z;
             if (!BasisCoefficients.allFinite()) return Status::SingularSystem;
-            const Eigen::MatrixXd displacement = Basis * (Eigenvalues.asDiagonal() * BasisCoefficients);
-            return FinishNonrigid(displacement, matched);
+            return FinishNonrigid(Basis * z, matched);
         }
 
         Status FinishNonrigid(const Eigen::MatrixXd& displacement, double matched)
@@ -546,6 +566,13 @@ namespace Geometry::CoherentPointDrift
                     : 0.5 * Config.Lambda * (BasisCoefficients.transpose() * Eigenvalues.asDiagonal() * BasisCoefficients).trace();
             if (Coefficients.size() == 0) return 0.0;
             return 0.5 * Config.Lambda * (Coefficients.transpose() * Kernel * Coefficients).trace();
+        }
+
+        // Rigid/affine map, or the Bayesian similarity, in world units:
+        // x_w = Scale (L y + t) + mu_x with y = (y_w - mu_y) / Scale, i.e. L y_w + (mu_x + Scale t - L mu_y).
+        [[nodiscard]] glm::dmat4 WorldTransform() const
+        {
+            return AffineMatrix(Linear, MeanX + Scale * Translation - Linear * MeanY);
         }
 
         void Fail(Status status)
@@ -738,6 +765,7 @@ namespace Geometry::CoherentPointDrift
         if (s.Ended) return false;
         double nll = 0.0, matched = 0.0;
         if (s.Config.Method == Variant::Bayesian) s.UpdateBayesianWeights();
+        ++s.Revision;
         if (!s.ExpectationStep(nll, matched))
         {
             s.Fail(Status::NumericalFailure);
@@ -781,12 +809,14 @@ namespace Geometry::CoherentPointDrift
         ++s.Iterations;
         s.ObjectiveHistory.push_back(objective);
         s.Sigma2History.push_back(s.Sigma2 * s.Scale * s.Scale);
+        s.UsedPolicies |= 1u << unsigned(s.LastPolicy);
         if (observer)
         {
-            const Result current = Current();
-            observer(IterationTrace{.Iteration = s.Iterations - 1u, .Sigma2 = current.Sigma2,
+            // Built directly: Current() would copy histories and, when subsampled, interpolate.
+            observer(IterationTrace{.Iteration = s.Iterations - 1u, .Sigma2 = s.Sigma2 * s.Scale * s.Scale,
                                     .NegativeLogLikelihood = nll, .Objective = objective,
-                                    .MatchedWeight = matched, .Transform = current.Transform,
+                                    .MatchedWeight = matched,
+                                    .Transform = s.Config.Method == Variant::Nonrigid ? glm::dmat4(1.0) : s.WorldTransform(),
                                     .EStep = s.LastPolicy, .EStepErrorBound = s.LastErrorBound,
                                     .KernelEvaluations = s.LastKernelEvaluations});
         }
@@ -817,7 +847,12 @@ namespace Geometry::CoherentPointDrift
         result.MatchedWeight = s.LastMatched;
         result.ObjectiveHistory = s.ObjectiveHistory;
         result.Sigma2History = s.Sigma2History;
-        result.Backend = BackendId(s.Config.EStep);
+        result.RequestedBackend = BackendId(s.Config.EStep);
+        result.Backend = result.RequestedBackend;
+        if (std::popcount(s.UsedPolicies) == 1)
+            result.Backend = BackendId(EStepPolicy(std::countr_zero(s.UsedPolicies)));
+        else if (s.UsedPolicies != 0u)
+            result.Backend = s.Config.EStep == EStepPolicy::Auto ? BackendId(EStepPolicy::Auto) : std::string_view{"cpu_mixed"};
         result.EStepErrorBound = s.MaxErrorBound;
         result.KernelEvaluations = s.TotalKernelEvaluations;
         result.KernelRank = std::uint32_t(s.Eigenvalues.size());
@@ -828,36 +863,45 @@ namespace Geometry::CoherentPointDrift
             // x_w = L y_w + (mu_x + Scale t - L mu_y).
             const Eigen::Vector3d translation = s.MeanX + s.Scale * s.Translation - s.Linear * s.MeanY;
             result.Linear = ToGlm(s.Linear);
+            result.Transform = s.WorldTransform();
             const bool similarity = s.Config.Method == Variant::Rigid || s.Config.Method == Variant::Bayesian;
             result.Rotation = ToGlm(similarity ? s.Rotation : Eigen::Matrix3d::Identity());
             result.Scale = similarity ? s.RigidScale : 1.0;
             result.Translation = {translation.x(), translation.y(), translation.z()};
-            result.Transform = AffineMatrix(s.Linear, translation);
         }
         if (!s.Samples.empty())
         {
             // Subsampled Bayesian run: evaluate the samples' kernel expansion (the posterior mean
-            // deformation) at every source point.
-            const double inverse = -1.0 / (2.0 * s.Config.Beta * s.Config.Beta);
-            const bool lowRank = s.Config.LowRank > 0u;
-            const Eigen::MatrixXd coefficients = s.KernelWeights.size() == 0
-                ? Eigen::MatrixXd::Zero(lowRank ? s.Extension.cols() : Eigen::Index(s.Samples.size()), 3)
-                : (lowRank ? Eigen::MatrixXd(s.Extension * s.KernelWeights) : s.KernelWeights);
-            const Eigen::Index centers = lowRank ? s.LandmarkPoints.rows() : Eigen::Index(s.Samples.size());
-            result.TransformedSource.resize(s.FullSource.Size());
-            for (std::size_t i = 0; i < s.FullSource.Size(); ++i)
+            // deformation) at every source point, in parallel, once per solver state.
+            if (s.CachedRevision != s.Revision)
             {
-                const Eigen::Vector3d y = s.FullSource.At(i);
-                Eigen::Vector3d v = Eigen::Vector3d::Zero();
+                const double inverse = -1.0 / (2.0 * s.Config.Beta * s.Config.Beta);
+                const bool lowRank = s.Config.LowRank > 0u;
+                const Eigen::Index centers = lowRank ? s.LandmarkPoints.rows() : Eigen::Index(s.Samples.size());
+                const Eigen::MatrixXd coefficients = s.KernelWeights.size() == 0
+                    ? Eigen::MatrixXd::Zero(centers, 3)
+                    : (lowRank ? Eigen::MatrixXd(s.Extension * s.KernelWeights) : s.KernelWeights);
+                Eigen::MatrixXd centerPoints(centers, 3);
                 for (Eigen::Index k = 0; k < centers; ++k)
+                    centerPoints.row(k) = lowRank ? Eigen::RowVector3d(s.LandmarkPoints.row(k))
+                                                  : Eigen::RowVector3d(s.Source.At(std::size_t(k)).transpose());
+                s.CachedFullSource.resize(s.FullSource.Size());
+                EStep::ParallelRange(s.FullSource.Size(), 256, s.Config.Threads, [&](const std::size_t begin, const std::size_t end)
                 {
-                    const Eigen::Vector3d center = lowRank ? Eigen::Vector3d(s.LandmarkPoints.row(k).transpose())
-                                                           : s.Source.At(std::size_t(k));
-                    v += std::exp(inverse * (y - center).squaredNorm()) * coefficients.row(k).transpose();
-                }
-                const Eigen::Vector3d world = s.Scale * (s.Linear * (y + v) + s.Translation) + s.MeanX;
-                result.TransformedSource[i] = {world.x(), world.y(), world.z()};
+                    for (std::size_t i = begin; i < end; ++i)
+                    {
+                        const Eigen::Vector3d y = s.FullSource.At(i);
+                        Eigen::Vector3d v = Eigen::Vector3d::Zero();
+                        for (Eigen::Index k = 0; k < centers; ++k)
+                            v += std::exp(inverse * (y - centerPoints.row(k).transpose()).squaredNorm()) *
+                                 coefficients.row(k).transpose();
+                        const Eigen::Vector3d world = s.Scale * (s.Linear * (y + v) + s.Translation) + s.MeanX;
+                        s.CachedFullSource[i] = {world.x(), world.y(), world.z()};
+                    }
+                });
+                s.CachedRevision = s.Revision;
             }
+            result.TransformedSource = s.CachedFullSource;
             return result;
         }
         result.TransformedSource.resize(s.Moved.Size());

@@ -2824,16 +2824,16 @@ namespace Extrinsic::Sandbox::Editor
         const bool bayesian = config.Method == Runtime::CoherentPointDriftMethod::Bayesian;
         if (config.Method == Runtime::CoherentPointDriftMethod::Nonrigid || bayesian)
         {
-            changed |= DrawSpecInputDouble("Beta (kernel width)##CPD", fields, "beta", config.Beta, defaults.Beta);
-            changed |= DrawSpecInputDouble("Lambda (smoothness)##CPD", fields, "lambda", config.Lambda, defaults.Lambda);
-            changed |= DrawSpecInputUInt("Low rank (0 = full kernel)##CPD", fields, "low_rank", config.LowRank, defaults.LowRank);
+            changed |= DrawSpecInputDouble("Kernel width (beta)##CPD", fields, "beta", config.Beta, defaults.Beta);
+            changed |= DrawSpecInputDouble("Smoothness (lambda)##CPD", fields, "lambda", config.Lambda, defaults.Lambda);
+            changed |= DrawSpecInputUInt("Kernel rank##CPD", fields, "low_rank", config.LowRank, defaults.LowRank);
         }
         if (bayesian)
         {
             DrawSpecCheckbox("Estimate scale##CPD", fields, "estimate_scale", config.EstimateScale, defaults.EstimateScale, changed);
-            changed |= DrawSpecInputDouble("Gamma (initial sigma^2 factor)##CPD", fields, "gamma", config.Gamma, defaults.Gamma);
-            changed |= DrawSpecInputDouble("Kappa (0 = equal weights)##CPD", fields, "kappa", config.Kappa, defaults.Kappa);
-            changed |= DrawSpecInputUInt("Subsample (0 = all points)##CPD", fields, "subsample", config.Subsample, defaults.Subsample);
+            changed |= DrawSpecInputDouble("Gamma##CPD", fields, "gamma", config.Gamma, defaults.Gamma);
+            changed |= DrawSpecInputDouble("Kappa##CPD", fields, "kappa", config.Kappa, defaults.Kappa);
+            changed |= DrawSpecInputUInt("Subsample##CPD", fields, "subsample", config.Subsample, defaults.Subsample);
         }
         if (ImGui::TreeNode("Performance##CPD"))
         {
@@ -2842,14 +2842,14 @@ namespace Extrinsic::Sandbox::Editor
                 changed |= DrawSpecInputDouble("Error tolerance##CPD", fields, "e_step_tolerance", config.EStepTolerance,
                                                defaults.EStepTolerance, "%.1e");
             if (config.EStep != Runtime::CoherentPointDriftEStep::Reference)
-                changed |= DrawSpecInputUInt("Threads (0 = all cores)##CPD", fields, "threads", config.Threads, defaults.Threads);
+                changed |= DrawSpecInputUInt("Threads##CPD", fields, "threads", config.Threads, defaults.Threads);
             ImGui::TreePop();
         }
         if (ImGui::TreeNode("Convergence##CPD"))
         {
             changed |= DrawSpecInputUInt("Max iterations##CPD", fields, "max_iterations", config.MaxIterations, defaults.MaxIterations);
             changed |= DrawSpecInputDouble("Tolerance##CPD", fields, "tolerance", config.Tolerance, defaults.Tolerance, "%.2e");
-            changed |= DrawSpecInputDouble("Initial sigma^2 (0 = auto)##CPD", fields, "initial_sigma2", config.InitialSigma2,
+            changed |= DrawSpecInputDouble("Initial sigma^2##CPD", fields, "initial_sigma2", config.InitialSigma2,
                                            defaults.InitialSigma2, "%.4g");
             changed |= DrawSpecInputDouble("Sigma^2 floor##CPD", fields, "sigma2_floor", config.Sigma2Floor, defaults.Sigma2Floor, "%.2e");
             DrawSpecCheckbox("Normalize inputs##CPD", fields, "normalize", config.NormalizeInputs, defaults.NormalizeInputs, changed);
@@ -2940,7 +2940,7 @@ namespace Extrinsic::Sandbox::Editor
                                state.LastResult->Message.c_str());
             ImGui::PopStyleColor();
         }
-        if (ImGui::Checkbox("Preview moving source in the viewport##CPD", &state.LivePreview) && !state.LivePreview)
+        if (ImGui::Checkbox("Preview in viewport##CPD", &state.LivePreview) && !state.LivePreview)
             ClearCoherentPointDriftPreview();
 
         if (hasRun)

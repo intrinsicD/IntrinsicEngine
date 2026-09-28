@@ -4,6 +4,7 @@
 module;
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -482,9 +483,14 @@ namespace Extrinsic::Runtime
         }
         Json CoherentPointDriftJson(const EditorCoherentPointDriftResult& r)
         {
+            constexpr std::array<std::string_view, 4> kVariants{"rigid", "affine", "nonrigid", "bayesian"};
+            constexpr std::array<std::string_view, 3> kOutputs{"source_transform", "positions", "displacement_property"};
+            const auto named = [](const auto& names, auto value) {
+                return std::size_t(value) < names.size() ? std::string(names[std::size_t(value)]) : std::string("unknown");
+            };
             return {{"method", "cpd"}, {"status", DebugNameForEditorCommandStatus(r.Status)},
                     {"succeeded", r.Succeeded()}, {"message", r.Message}, {"backend", r.Backend},
-                    {"variant", unsigned(r.Method)}, {"output", unsigned(r.Output)}, {"termination", r.Termination},
+                    {"variant", named(kVariants, r.Method)}, {"output", named(kOutputs, r.Output)}, {"termination", r.Termination},
                     {"iterations", r.Iterations}, {"sigma2", r.Sigma2}, {"negative_log_likelihood", r.NegativeLogLikelihood},
                     {"matched_weight", r.MatchedWeight}, {"mean_displacement", r.MeanDisplacement},
                     {"transform", TransformJson(r.Transform)}, {"source_points", r.SourcePointCount},

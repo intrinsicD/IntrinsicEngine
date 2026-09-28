@@ -17,6 +17,8 @@ layout(location = 0) flat out uint vConfigSlot;
 layout(location = 1) out float vVisualizationScalar;
 layout(location = 2) out vec4 vVisualizationColor;
 
+invariant gl_Position;
+
 void main() {
     const uint instanceSlot = gl_InstanceIndex;
     const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;

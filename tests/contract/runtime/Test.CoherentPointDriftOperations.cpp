@@ -21,7 +21,10 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Component.Transform;
+import Extrinsic.ECS.Component.Hierarchy;
+import Extrinsic.ECS.Component.DirtyTags;
 import Geometry.Graph;
+import Geometry.HalfedgeMesh;
 namespace R = Extrinsic::Runtime;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
 namespace T = Extrinsic::ECS::Components::Transform;
@@ -322,4 +325,57 @@ TEST(CoherentPointDriftOperations, QueuedRunsCompleteOnTheJobServiceAndDeliverOn
     EXPECT_EQ(delivered, 1);
     ASSERT_TRUE(last.Succeeded()) << last.Message;
     EXPECT_NEAR(s.Registry.Raw().get<T::Component>(source).Position.y, 0.3f, 1e-3f);
+}
+
+TEST(CoherentPointDriftOperations, DeformedMeshesGetRecomputedNormalsAndParentedEntitiesAreRefused)
+{
+    Scene s;
+    // An 8 x 5 planar grid, wound counter-clockwise seen from +z, with stored +z normals.
+    constexpr int kColumns = 8, kRows = 5;
+    Geometry::HalfedgeMesh::Mesh mesh;
+    std::vector<Geometry::VertexHandle> v;
+    std::vector<glm::vec3> points;
+    for (int r = 0; r < kRows; ++r)
+        for (int c = 0; c < kColumns; ++c)
+        {
+            points.push_back({0.25f * float(c) - 0.9f, 0.25f * float(r) - 0.5f, 0.0f});
+            v.push_back(mesh.AddVertex(points.back()));
+        }
+    for (int r = 0; r + 1 < kRows; ++r)
+        for (int c = 0; c + 1 < kColumns; ++c)
+        {
+            const auto at = [&](int rr, int cc) { return v[std::size_t(rr * kColumns + cc)]; };
+            ASSERT_TRUE(mesh.AddTriangle(at(r, c), at(r, c + 1), at(r + 1, c + 1)).has_value());
+            ASSERT_TRUE(mesh.AddTriangle(at(r, c), at(r + 1, c + 1), at(r + 1, c)).has_value());
+        }
+    mesh.VertexProperties().GetOrAdd<glm::vec3>("v:normal").Vector().assign(points.size(), glm::vec3(0.0f, 0.0f, 1.0f));
+    const auto source = s.Registry.Create();
+    s.Registry.Raw().emplace<T::Component>(source);
+    GS::PopulateFromMesh(s.Registry.Raw(), source, mesh);
+    // The target is the grid tilted by 25 degrees about x.
+    const glm::mat3 tilt = glm::mat3(glm::rotate(glm::mat4(1.0f), glm::radians(25.0f), glm::vec3(1.0f, 0.0f, 0.0f)));
+    std::vector<glm::vec3> tilted;
+    for (const auto& p : points) tilted.push_back(tilt * p);
+    const auto target = Make(s.Registry, D::PointCloudPoint, tilted);
+
+    const R::CoherentPointDriftConfig config{.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
+        .SourcePositions = {D::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3},
+        .OutlierWeight = 0.0, .Output = O::Positions};
+    const auto result = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), config);
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    auto* props = R::ResolveGeometryPropertySet(R::BuildGeometryAvailability(s.Registry.Raw(), source), D::MeshVertex);
+    const glm::vec3 expected = tilt * glm::vec3(0.0f, 0.0f, 1.0f);
+    for (const std::size_t i : {std::size_t{0}, std::size_t{17}, points.size() - 1u})
+        EXPECT_GT(glm::dot(props->Get<glm::vec3>("v:normal")[i], expected), 0.999f) << "vertex " << i;
+    EXPECT_TRUE(s.Registry.Raw().all_of<Extrinsic::ECS::Components::DirtyTags::DirtyVertexNormals>(source));
+    ASSERT_TRUE(s.History.Undo().Succeeded());
+    EXPECT_EQ(props->Get<glm::vec3>("v:normal")[17], glm::vec3(0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(props->Get<glm::vec3>("v:position")[17], points[17]);
+
+    // Parented entities: the operation maps points with the local transform only.
+    const auto parent = s.Registry.Create();
+    s.Registry.Raw().emplace<Extrinsic::ECS::Components::Hierarchy::Component>(source).Parent = parent;
+    const auto parented = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), config);
+    EXPECT_EQ(parented.Status, R::EditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_NE(parented.Message.find("unparented"), std::string::npos) << parented.Message;
 }

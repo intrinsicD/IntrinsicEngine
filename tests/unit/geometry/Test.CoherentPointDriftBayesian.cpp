@@ -1,6 +1,6 @@
 // METHOD-050: Bayesian Coherent Point Drift (Hirose, TPAMI 2021) as a variant of the
-// METHOD-015 solver. The update equations were checked iteration by iteration against an
-// independent NumPy implementation of Hirose's Algorithm 1 (sigma^2 and scale to 1e-9).
+// METHOD-015 solver, pinned per iteration to an independent NumPy implementation of Hirose's
+// Algorithm 1 (MatchesAnIndependentImplementationOfAlgorithmOne).
 // Frozen tolerances (unit-cube fixtures, noise 0.003):
 //   similarity only (strong prior):  scale within 0.02, rotation within 0.02 rad
 //   similarity + smooth deformation: RMS to the ground truth <= 0.02 (the split between
@@ -14,6 +14,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <limits>
 #include <random>
 #include <vector>
@@ -164,6 +166,88 @@ TEST(CoherentPointDriftBayesian, SubsampledRunsUpsampleTheDeformationToEveryPoin
         ASSERT_EQ(upsampled.TransformedSource.size(), f.Source.size());
         EXPECT_LE(Rms(upsampled, f.Truth), 0.005) << lowRank;
     }
+}
+
+TEST(CoherentPointDriftBayesian, MatchesAnIndependentImplementationOfAlgorithmOne)
+{
+    // Per-iteration sigma^2 and scale of ara/evidence/diagnostics/method050_bcpd_numpy_20260928/
+    // bcpd_reference.py (lambda 2, beta 1, scale estimated, omega 0, kappa infinity, gamma 1, no
+    // normalization) on its 60-point bend, without and with the posterior-variance terms. With them
+    // the scale collapses toward 0 in both implementations (C114).
+    const auto read = [](const char* name)
+    {
+        std::vector<glm::vec3> points;
+        std::ifstream file(std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() / "data" / "cpd" / name);
+        double x = 0.0, y = 0.0, z = 0.0;
+        while (file >> x >> y >> z) points.push_back(glm::vec3(float(x), float(y), float(z)));
+        return points;
+    };
+    const auto source = read("bcpd_bend_source.txt"), target = read("bcpd_bend_target.txt");
+    ASSERT_EQ(source.size(), 60u);
+    ASSERT_EQ(target.size(), 60u);
+    const std::vector<std::pair<double, double>> withoutVariances{
+        {0.17219708619094717, 0.86321587352928586},
+        {0.15071412582226754, 0.82906642847552825},
+        {0.13110234778436036, 0.80947437374534637},
+        {0.11223954888496192, 0.79802063779045196},
+        {0.095782465433470562, 0.79129673899736186},
+        {0.081667080601551645, 0.78742888729848326},
+        {0.068650276733532231, 0.78550745681590073},
+        {0.055288697985051864, 0.78514793537434668}};
+    const std::vector<std::pair<double, double>> withVariances{
+        {0.19277420635387874, 0.47451678497149369},
+        {0.20258323769859418, 0.27130434162801043},
+        {0.20906435691919192, 0.1543991838580589},
+        {0.21392036691908695, 0.087556540539058453},
+        {0.21674089371964023, 0.043423583375999955},
+        {0.21768348018808456, 0.017578513240393463},
+        {0.21786485534491182, 0.0064306768484834551},
+        {0.21789056526368941, 0.0023016823808220013}};
+    for (const bool variances : {false, true})
+    {
+        CPD::Params params = Bayesian();
+        params.NormalizeInputs = false;
+        params.Lambda = 2.0;
+        params.Beta = 1.0;
+        params.EstimateScale = true;
+        params.PosteriorVarianceTerms = variances;
+        params.MaxIterations = 8;
+        params.Tolerance = 0.0;
+        params.Sigma2Floor = 1e-12;
+        std::vector<std::pair<double, double>> trace;
+        (void)CPD::Register(target, source, params, [&](const CPD::IterationTrace& t)
+                            { trace.emplace_back(t.Sigma2, glm::length(glm::dvec3(t.Transform[0]))); });
+        const auto& expected = variances ? withVariances : withoutVariances;
+        ASSERT_EQ(trace.size(), expected.size()) << variances;
+        // The collapsing run amplifies rounding (float inputs, summation order) each iteration.
+        const double relative = variances ? 1e-7 : 1e-9;
+        for (std::size_t k = 0; k < expected.size(); ++k)
+        {
+            EXPECT_NEAR(trace[k].first, expected[k].first, relative * expected[k].first) << variances << " iteration " << k;
+            EXPECT_NEAR(trace[k].second, expected[k].second, relative * expected[k].second) << variances << " iteration " << k;
+        }
+        if (variances) EXPECT_LT(trace.back().second, 0.01) << "the scale collapses with the variance terms";
+    }
+}
+
+TEST(CoherentPointDriftBayesian, SubsampledLowRankResultIsValidBeforeTheFirstIteration)
+{
+    const Fixture f = Deformed(Cloud(300, 31), 0.002, 32);
+    CPD::Params params = Bayesian();
+    params.SubsampleSource = 100;
+    params.LowRank = 20;
+    CPD::Solver solver;
+    ASSERT_EQ(solver.Initialize(f.Target, f.Source, params), CPD::Status::Success);
+    // No coefficients yet: zero deformation, identity similarity after centering both sets.
+    const auto before = solver.Current();
+    ASSERT_EQ(before.TransformedSource.size(), f.Source.size());
+    glm::dvec3 sourceMean{0.0}, targetMean{0.0};
+    for (const auto& p : f.Source) sourceMean += glm::dvec3(p) / double(f.Source.size());
+    for (const auto& p : f.Target) targetMean += glm::dvec3(p) / double(f.Target.size());
+    for (std::size_t i = 0; i < f.Source.size(); ++i)
+        ASSERT_LT(glm::length(before.TransformedSource[i] - (glm::dvec3(f.Source[i]) - sourceMean + targetMean)), 1e-5);
+    solver.Run();
+    EXPECT_TRUE(solver.Current().Succeeded());
 }
 
 TEST(CoherentPointDriftBayesian, AcceleratedPathsMatchTheReference)

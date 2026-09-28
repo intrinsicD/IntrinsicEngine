@@ -32,7 +32,9 @@ import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Error;
 import Extrinsic.ECS.Component.DirtyTags;
+import Extrinsic.ECS.Component.Hierarchy;
 import Extrinsic.ECS.Component.Transform;
+import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -44,6 +46,8 @@ import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.WorldHandle;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Vertices.Normals;
 import Geometry.Properties;
 import Geometry.Registration.CoherentPointDrift;
 
@@ -51,6 +55,7 @@ import Geometry.Registration.CoherentPointDrift;
 #include "Editor/internal/Runtime.EditorTransformHelpers.hpp"
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -151,6 +156,15 @@ namespace Extrinsic::Runtime
                 return Failure(config, EditorCommandStatus::StaleEntity, "Choose existing source and target entities.");
             if (*source == *target)
                 return Failure(config, EditorCommandStatus::InvalidProcessingParameters, "Source and target must be different entities.");
+            // Point sets are mapped with their local Transform only, so parented entities (whose
+            // world matrix includes the parents) are refused rather than registered in the wrong frame.
+            const auto parented = [&](entt::entity entity) {
+                const auto* hierarchy = raw.try_get<ECSC::Hierarchy::Component>(entity);
+                return hierarchy != nullptr && raw.valid(hierarchy->Parent);
+            };
+            if (parented(*source) || parented(*target))
+                return Failure(config, EditorCommandStatus::InvalidProcessingParameters,
+                               "Coherent Point Drift needs unparented source and target entities.");
             const auto sourceAvailable = BuildGeometryAvailability(raw, *source);
             const auto targetAvailable = BuildGeometryAvailability(raw, *target);
             config.SourcePositions = ResolveDomain(sourceAvailable, config.SourcePositions);
@@ -183,6 +197,10 @@ namespace Extrinsic::Runtime
                 return Failure(config, EditorCommandStatus::MissingTransform, "The source entity has no Transform to drive.");
             if (config.Output == CoherentPointDriftOutput::DisplacementProperty)
             {
+                // Config validation saw an unresolved domain; check the resolved one again.
+                if (IsTopologyProperty(config.SourcePositions.Domain, config.DisplacementName))
+                    return Failure(config, EditorCommandStatus::InvalidProcessingParameters,
+                                   "The displacement property cannot replace topology or deletion data.");
                 const auto* props = ResolveGeometryPropertySet(sourceAvailable, config.SourcePositions.Domain);
                 const GeometryPropertyRef output{config.SourcePositions.Domain, config.DisplacementName,
                                                  Geometry::PropertyValueKind::Vec3};
@@ -364,7 +382,8 @@ namespace Extrinsic::Runtime
             if (!std::isfinite(inverse[0][0]) || glm::determinant(glm::dmat3(run.SourceModel)) == 0.0)
             { why = "The source transform is not invertible."; return EditorCommandHistoryStatus::StaleEntity; }
 
-            struct State { bool Exists{}; std::vector<glm::vec3> Values{}; };
+            // Normals: stored vertex normals of a deformed mesh, recomputed from the new positions.
+            struct State { bool Exists{}; std::vector<glm::vec3> Values{}; std::vector<glm::vec3> Normals{}; };
             const auto existing = std::as_const(*props).Get<glm::vec3>(name);
             auto before = std::make_shared<State>(State{bool(existing), existing ? existing.Vector() : std::vector<glm::vec3>{}});
             auto after = std::make_shared<State>(State{true, existing ? existing.Vector() : std::vector<glm::vec3>(props->Size(), glm::vec3(0.0f))});
@@ -375,8 +394,33 @@ namespace Extrinsic::Runtime
                     positions ? glm::vec3(local) : glm::vec3(local - glm::dvec3(run.Source.Points[i]));
             }
             const auto available = BuildGeometryAvailability(raw, run.SourceEntity);
+            static constexpr std::string_view kNormal = Geometry::HalfedgeMesh::VertexNormals::kDefaultOutputProperty;
+            const auto storedNormals = std::as_const(*props).Get<glm::vec3>(kNormal);
+            const bool recomputeNormals = positions && domain == GeometryElementDomain::MeshVertex &&
+                                          name == ECSC::GeometrySources::PropertyNames::kPosition && storedNormals &&
+                                          storedNormals.Size() == props->Size();
+            if (recomputeNormals)
+            {
+                // The mesh is rebuilt from the stored topology (vertices keep their slots), then
+                // re-positioned; a topology it cannot rebuild keeps its stored normals.
+                auto built = GeometryProcessingDetail::MeshSupport::BuildHalfedgeMeshForVertexNormalRecompute(
+                    available.SourceView, name);
+                if (built.Succeeded() && built.Mesh.Positions().size() == after->Values.size())
+                {
+                    std::ranges::copy(after->Values, built.Mesh.Positions().begin());
+                    const auto normals = Geometry::HalfedgeMesh::VertexNormals::Recompute(built.Mesh);
+                    if (normals.Status == Geometry::HalfedgeMesh::VertexNormals::RecomputeStatus::Success &&
+                        normals.Normals.Vector().size() == props->Size())
+                    {
+                        before->Normals = storedNormals.Vector();
+                        after->Normals = normals.Normals.Vector();
+                    }
+                }
+            }
             auto revisions = std::make_shared<std::vector<GPD::PointPropertyWatch>>(
                 std::vector{GPD::ObserveGeometryProperty(available, domain, name)});
+            if (!after->Normals.empty())
+                revisions->push_back(GPD::ObserveGeometryProperty(available, domain, std::string(kNormal)));
             auto inputs = run.Source.Inputs;
             std::erase_if(inputs, [&](const auto& input) { return input.Domain == domain && input.Name == name; });
             const auto mutate = [context, entity = run.SourceEntity, inputs = std::move(inputs), revisions, domain, name,
@@ -388,9 +432,12 @@ namespace Extrinsic::Runtime
                 auto* set = GPD::MutableGeometryProperties(registry, entity, domain);
                 if (target.Exists) set->GetOrAdd<glm::vec3>(name).Vector() = target.Values;
                 else if (auto property = set->Get<glm::vec3>(name)) set->Remove(property);
-                *revisions = {GPD::ObserveGeometryProperty(BuildGeometryAvailability(registry, entity), domain, name)};
+                if (!target.Normals.empty()) set->GetOrAdd<glm::vec3>(std::string(kNormal)).Vector() = target.Normals;
+                const auto now = BuildGeometryAvailability(registry, entity);
+                for (auto& watch : *revisions) watch = GPD::ObserveGeometryProperty(now, domain, watch.Name);
                 ECS::Components::DirtyTags::MarkGpuDirty(registry, entity);
                 if (positions) ECS::Components::DirtyTags::MarkVertexPositionsDirty(registry, entity);
+                if (!target.Normals.empty()) ECS::Components::DirtyTags::MarkVertexNormalsDirty(registry, entity);
                 if (context.InvalidateWorkspaceSnapshotCache) context.InvalidateWorkspaceSnapshotCache();
                 return EditorCommandHistoryStatus::Applied;
             };

@@ -2415,8 +2415,8 @@
 - **Status**: supported — small synthetic fixtures; no scan-scale or benchmark-suite claim.
 - **Provenance**: ai-executed
 - **Crystallized via**: empirical-resolution
-- **Falsification criteria**: `Test.CoherentPointDriftBayesian.cpp` fails, or an independent implementation of Algorithm 1 with the variance terms converges to the true scale on the documented bend fixture.
-- **Proof**: [tests/unit/geometry/Test.CoherentPointDriftBayesian.cpp, methods/geometry/coherent_point_drift/paper.md, src/geometry/Geometry.Registration.CoherentPointDrift.cpp]
+- **Falsification criteria**: `Test.CoherentPointDriftBayesian.cpp` fails (its `MatchesAnIndependentImplementationOfAlgorithmOne` case replays the recorded NumPy traces), or an independent implementation of Algorithm 1 with the variance terms converges to the true scale on the documented bend fixture.
+- **Proof**: [tests/unit/geometry/Test.CoherentPointDriftBayesian.cpp, ara/evidence/diagnostics/method050_bcpd_numpy_20260928/record.json, ara/evidence/diagnostics/method050_bcpd_numpy_20260928/bcpd_reference.py, ara/evidence/diagnostics/method050_bcpd_numpy_20260928/trace-variance-terms-0.txt, ara/evidence/diagnostics/method050_bcpd_numpy_20260928/trace-variance-terms-1.txt, tests/data/cpd/bcpd_bend_source.txt, tests/data/cpd/bcpd_bend_target.txt, methods/geometry/coherent_point_drift/paper.md, src/geometry/Geometry.Registration.CoherentPointDrift.cpp]
 - **Dependencies**: []
 - **Tags**: registration, Bayesian CPD, variational Bayes, CPU reference
 - **From staging**: O254

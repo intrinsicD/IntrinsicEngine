@@ -219,10 +219,35 @@ TEST(CoherentPointDriftAccelerated, FastGaussRegistrationMatchesTheReference)
     const auto b = CPD::Register(target, source, fast, [&](const CPD::IterationTrace& t)
                                  { fastIterations += t.EStep == CPD::EStepPolicy::FastGauss ? 1u : 0u; });
     ASSERT_TRUE(a.Succeeded() && b.Succeeded());
-    EXPECT_EQ(b.Backend, "cpu_ifgt");
+    EXPECT_EQ(b.RequestedBackend, "cpu_ifgt");
+    // Iterations whose plan misses the bound fall back to dense; the result says so.
+    EXPECT_TRUE(b.Backend == "cpu_ifgt" || b.Backend == "cpu_mixed") << b.Backend;
     EXPECT_GT(fastIterations, 0u);
     EXPECT_LE(b.EStepErrorBound, 2e-9);
     EXPECT_LE(MaxPointDifference(a, b), 1e-5);
+}
+
+TEST(CoherentPointDriftAccelerated, WeightedRowsShiftByTheirLargestWeightedTerm)
+{
+    // A down-weighted nearest source must not underflow the row: log-weights [-800, 0] with the
+    // far source at squared distance 1600 (sigma^2 = 1) give equal terms e^{-800}.
+    const Soa target(std::vector<glm::vec3>{{0.0f, 0.0f, 0.0f}});
+    const Soa moved(std::vector<glm::vec3>{{0.0f, 0.0f, 0.0f}, {40.0f, 0.0f, 0.0f}});
+    const std::vector<double> logWeights{-800.0, 0.0};
+    CPD::EStep::Evaluator evaluator;
+    evaluator.SetTarget(target.View());
+    for (const CPD::EStepPolicy policy : {CPD::EStepPolicy::Dense, CPD::EStepPolicy::Truncated})
+        for (const std::size_t budget : {std::size_t{128} << 20, std::size_t{0}})
+        {
+            CPD::EStep::Sums sums;
+            ASSERT_TRUE(evaluator.Evaluate(moved.View(), 1.0, -std::numeric_limits<double>::infinity(),
+                                           {.Policy = policy, .Tolerance = 1e-6, .PartialBudgetBytes = budget}, sums,
+                                           logWeights))
+                << CPD::ToString(policy);
+            EXPECT_NEAR(sums.P1[0], 0.5, 1e-12) << CPD::ToString(policy);
+            EXPECT_NEAR(sums.P1[1], 0.5, 1e-12) << CPD::ToString(policy);
+            EXPECT_NEAR(sums.LogDenominatorSum, std::log(2.0) - 800.0, 1e-9) << CPD::ToString(policy);
+        }
 }
 
 TEST(CoherentPointDriftAccelerated, TwoPassFallbackMatchesTheBlockedSinglePass)

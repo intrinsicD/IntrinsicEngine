@@ -153,7 +153,10 @@ export namespace Geometry::CoherentPointDrift
         std::vector<glm::dvec3> TransformedSource{};
         std::vector<double> ObjectiveHistory{};
         std::vector<double> Sigma2History{};
-        std::string_view Backend{kBackendId};  // BackendId(Params::EStep)
+        // Backend that ran every iteration (BackendId of that policy); "cpu_auto" when Auto mixed
+        // policies, "cpu_mixed" when an explicit policy fell back (fast Gauss to dense).
+        std::string_view Backend{kBackendId};
+        std::string_view RequestedBackend{kBackendId}; // BackendId(Params::EStep)
         double EStepErrorBound{0.0};           // max over all iterations
         std::uint64_t KernelEvaluations{0u};   // total over all iterations
         // Low-rank nonrigid: eigenpairs used and the kernel's sampled relative error.

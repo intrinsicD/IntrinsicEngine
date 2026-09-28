@@ -44,6 +44,8 @@ layout(push_constant, scalar) uniform ScenePC {
 
 layout(location = 0) flat out uint fragEntityID;
 
+invariant gl_Position;
+
 void main() {
     const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;
     const GpuInstanceStatic inst = GpuInstanceStaticRef(scene.InstanceStaticBDA).Data[gl_InstanceIndex];

@@ -27,6 +27,7 @@
 module;
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <span>
 #include <string_view>
@@ -77,11 +78,19 @@ export namespace Geometry::CoherentPointDrift::EStep
         double LogDenominatorSum{0.0}; // sum_n log(sum_m exp(-|x_n - y_m|^2 / 2 sigma^2) + c)
         double Matched{0.0};           // sum_n Pt1_n
         EStepPolicy Used{EStepPolicy::Dense};
-        double ErrorBound{0.0};        // max relative error of a row denominator or P1 entry (0: exact)
+        // Max relative error bound of any row denominator (truncated: <= tol; the P1 entries then
+        // carry the same relative bound for kept pairs plus an absolute error <= N tol / M from
+        // dropped ones); fast Gauss adds the a-posteriori relative bound of the P1 entries (<= 2 tol
+        // total; PX is bounded only absolutely, by that bound times max |x| P1). 0: exact.
+        double ErrorBound{0.0};
         std::uint64_t KernelEvaluations{0u};
     };
 
     [[nodiscard]] std::uint32_t ResolveThreads(std::uint32_t requested) noexcept;
+    // body(begin, end) over [0, count) in fixed chunks of `grain`; each index is handled by exactly
+    // one call, so per-index results do not depend on the thread count.
+    void ParallelRange(std::size_t count, std::size_t grain, std::uint32_t threads,
+                       const std::function<void(std::size_t, std::size_t)>& body);
 
     class Evaluator
     {

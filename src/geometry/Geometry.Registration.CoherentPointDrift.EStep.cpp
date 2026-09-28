@@ -6,6 +6,7 @@ module;
 #include <bit>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <span>
@@ -141,6 +142,31 @@ namespace Geometry::CoherentPointDrift::EStep
             double sum = 0.0;
             for (std::size_t i = 0; i < count; ++i) sum += out[i];
             return sum;
+        }
+
+        // Weighted rows: values[i] <- exp(values[i] - max_j values[j]) for exponents already holding
+        // the source weights; returns the sum (index order) and the maximum in `maximum`, so the
+        // largest weighted term is exactly 1 whatever the weights.
+        __attribute__((target_clones("avx2", "default")))
+        double ExponentiateRelativeToMax(double* values, const std::size_t count, double& maximum) noexcept
+        {
+            double top = -std::numeric_limits<double>::infinity();
+            for (std::size_t i = 0; i < count; ++i) top = std::max(top, values[i]);
+            maximum = count > 0 ? top : 0.0;
+            for (std::size_t i = 0; i < count; ++i) values[i] = ExpNonPositive(values[i] - maximum);
+            double sum = 0.0;
+            for (std::size_t i = 0; i < count; ++i) sum += values[i];
+            return sum;
+        }
+
+        // Weighted dense row exponents: out[i] = (minimum - |q - s_i|^2) * inverseTwoSigma2 + logWeight[i].
+        __attribute__((target_clones("avx2", "default")))
+        void DenseRowExponents(const double* sx, const double* sy, const double* sz, const double* logWeight,
+                               const std::size_t count, const double qx, const double qy, const double qz,
+                               const double minimum, const double inverseTwoSigma2, double* out) noexcept
+        {
+            for (std::size_t i = 0; i < count; ++i)
+                out[i] = (minimum - Squared(qx, qy, qz, sx[i], sy[i], sz[i])) * inverseTwoSigma2 + logWeight[i];
         }
 
         // Adds scale * terms[i] (times x, y, z) to one block's partial P1 and PX.
@@ -438,10 +464,12 @@ namespace Geometry::CoherentPointDrift::EStep
             std::vector<std::uint32_t> Label{};
         };
 
-        void FarthestPointClusters(const PointSet& points, const std::size_t count, const std::uint32_t threads,
+        void FarthestPointClusters(const PointSet& points, const std::size_t count, const std::uint32_t requestedThreads,
                                    Clustering& out)
         {
             const std::size_t m = points.Size();
+            // Each center is one O(M) sweep; below this size spawning workers per center costs more.
+            const std::uint32_t threads = m >= 65536u ? requestedThreads : 1u;
             out.Centers.clear();
             out.Radius.clear();
             out.Label.assign(m, 0u);
@@ -594,6 +622,12 @@ namespace Geometry::CoherentPointDrift::EStep
         }
     }
 
+    void ParallelRange(const std::size_t count, const std::size_t grain, const std::uint32_t threads,
+                       const std::function<void(std::size_t, std::size_t)>& body)
+    {
+        ParallelFor(count, std::max<std::size_t>(grain, 1u), ResolveThreads(threads), body);
+    }
+
     std::uint32_t ResolveThreads(const std::uint32_t requested) noexcept
     {
         if (requested > 0u) return requested;
@@ -654,6 +688,27 @@ namespace Geometry::CoherentPointDrift::EStep
             HasScales = std::isfinite(DenominatorScale) && DenominatorScale > 0.0 && std::isfinite(P1Scale) && P1Scale > 0.0;
         }
 
+        bool Weighted{false};
+
+        // Dense row terms relative to the row's largest term. Unweighted rows use the nearest
+        // source (term exactly 1); weighted rows shift by the true maximum weighted exponent, so a
+        // heavily down-weighted nearest source cannot underflow the row. Returns the sum; `shift`
+        // receives the extra exponent (<= 0) beyond -d_min^2 / 2 sigma^2 + LogWeightShift.
+        double DenseRow(const PointSet& moved, const double qx, const double qy, const double qz, const double minDistance,
+                        const double inverseTwoSigma2, double* out, double& shift) const
+        {
+            const std::size_t m = moved.Size();
+            if (!Weighted)
+            {
+                shift = 0.0;
+                return DenseRowTerms(moved.X.data(), moved.Y.data(), moved.Z.data(), LogWeight.data(), m, qx, qy, qz,
+                                     minDistance, inverseTwoSigma2, out);
+            }
+            DenseRowExponents(moved.X.data(), moved.Y.data(), moved.Z.data(), LogWeight.data(), m, qx, qy, qz, minDistance,
+                              inverseTwoSigma2, out);
+            return ExponentiateRelativeToMax(out, m, shift);
+        }
+
         // Exact dense row j: log denominator and Pt1 (as the dense path computes them).
         void ExactRow(const PointSet& moved, const std::size_t j, const double twoSigma2, const double logC,
                       std::vector<double>& scratch, Sums& out)
@@ -662,9 +717,10 @@ namespace Geometry::CoherentPointDrift::EStep
             const std::size_t m = moved.Size();
             scratch.resize(m);
             const double minDistance = SourceTree.NearestSquared(target.X[j], target.Y[j], target.Z[j]);
-            const double sum = DenseRowTerms(moved.X.data(), moved.Y.data(), moved.Z.data(), LogWeight.data(), m, target.X[j],
-                                             target.Y[j], target.Z[j], minDistance, 1.0 / twoSigma2, scratch.data());
-            const double aMax = -minDistance / twoSigma2 + LogWeightShift;
+            double shift = 0.0;
+            const double sum = DenseRow(moved, target.X[j], target.Y[j], target.Z[j], minDistance, 1.0 / twoSigma2,
+                                        scratch.data(), shift);
+            const double aMax = -minDistance / twoSigma2 + LogWeightShift + shift;
             LogDenominator[j] = LogSumWithOutlier(aMax, sum, logC);
             out.Pt1[j] = sum * std::exp(aMax - LogDenominator[j]);
         }
@@ -730,7 +786,9 @@ namespace Geometry::CoherentPointDrift::EStep
             {
                 const double sum = std::max(Transformed[j], 0.0);
                 const double logDenominator = LogSumWithOutlier(LogWeightShift, sum, logC);
-                const double bound = WeightSum * sourcePlan.UnitError * std::exp(LogWeightShift - logDenominator);
+                // Measured against the approximate denominator: relative error <= b / (1 - b).
+                const double measured = WeightSum * sourcePlan.UnitError * std::exp(LogWeightShift - logDenominator);
+                const double bound = measured < 1.0 ? measured / (1.0 - measured) : std::numeric_limits<double>::infinity();
                 if (!(bound <= tolerance) || !std::isfinite(logDenominator))
                 {
                     exactRows.push_back(std::uint32_t(j));
@@ -767,7 +825,8 @@ namespace Geometry::CoherentPointDrift::EStep
             for (std::size_t i = 0; i < m; ++i)
             {
                 const double p1 = Transformed[i];
-                const double bound = targetPlan.UnitError * weightSum / p1;
+                const double measured = targetPlan.UnitError * weightSum / p1;
+                const double bound = measured < 1.0 ? measured / (1.0 - measured) : std::numeric_limits<double>::infinity();
                 if (!(p1 > 0.0) || !(bound <= tolerance))
                 {
                     exactSources.push_back(std::uint32_t(i));
@@ -864,7 +923,7 @@ namespace Geometry::CoherentPointDrift::EStep
                         value.clear();
                         weight.clear();
                         index.clear();
-                        double sum = 0.0;
+                        double sum = 0.0, shift = 0.0;
                         if (truncated)
                         {
                             SourceTree.ForEachWithin(x, y, z, minDistance + twoSigma2 * (tau - nearestWeight),
@@ -874,15 +933,21 @@ namespace Geometry::CoherentPointDrift::EStep
                                 weight.push_back(SlotWeight[slot]);
                                 value.push_back(d2);
                             });
-                            sum = ExponentiateShifted(value.data(), weight.data(), value.size(), minDistance, inverseTwoSigma2);
+                            if (!Weighted)
+                                sum = ExponentiateShifted(value.data(), weight.data(), value.size(), minDistance, inverseTwoSigma2);
+                            else
+                            {
+                                for (std::size_t k = 0; k < value.size(); ++k)
+                                    value[k] = (minDistance - value[k]) * inverseTwoSigma2 + weight[k];
+                                sum = ExponentiateRelativeToMax(value.data(), value.size(), shift);
+                            }
                         }
                         else
                         {
                             value.resize(m);
-                            sum = DenseRowTerms(moved.X.data(), moved.Y.data(), moved.Z.data(), LogWeight.data(), m, x, y, z,
-                                                minDistance, inverseTwoSigma2, value.data());
+                            sum = DenseRow(moved, x, y, z, minDistance, inverseTwoSigma2, value.data(), shift);
                         }
-                        const double aMax = -minDistance / twoSigma2 + LogWeightShift;
+                        const double aMax = -minDistance / twoSigma2 + LogWeightShift + shift;
                         const double logDenominator = LogSumWithOutlier(aMax, sum, logC);
                         const double inverse = std::exp(aMax - logDenominator);
                         LogDenominator[j] = logDenominator;
@@ -894,7 +959,7 @@ namespace Geometry::CoherentPointDrift::EStep
                             // mass is at most (M - kept)/M tol e^{w_nearest} in the row's shifted units;
                             // the denominator is (sum + c e^{-a_max}) in those units.
                             const double outlierShifted = std::exp(std::min(logC - aMax, 700.0));
-                            RowBound[j] = (double(m - value.size()) / double(m)) * tolerance * std::exp(nearestWeight) /
+                            RowBound[j] = (double(m - value.size()) / double(m)) * tolerance * std::exp(nearestWeight - shift) /
                                           (sum + outlierShifted);
                         }
                         if (!truncated)
@@ -953,9 +1018,9 @@ namespace Geometry::CoherentPointDrift::EStep
                 {
                     const double x = target.X[j], y = target.Y[j], z = target.Z[j];
                     const double minDistance = SourceTree.NearestSquared(x, y, z);
-                    const double sum = DenseRowTerms(moved.X.data(), moved.Y.data(), moved.Z.data(), LogWeight.data(), m, x, y,
-                                                     z, minDistance, 1.0 / twoSigma2, e.data());
-                    const double aMax = -minDistance / twoSigma2 + LogWeightShift;
+                    double shift = 0.0;
+                    const double sum = DenseRow(moved, x, y, z, minDistance, 1.0 / twoSigma2, e.data(), shift);
+                    const double aMax = -minDistance / twoSigma2 + LogWeightShift + shift;
                     LogDenominator[j] = LogSumWithOutlier(aMax, sum, logC);
                     out.Pt1[j] = sum * std::exp(aMax - LogDenominator[j]);
                     RowEvaluations[j] = m;
@@ -1004,14 +1069,20 @@ namespace Geometry::CoherentPointDrift::EStep
                     const auto [minDistance, nearestSlot] = SourceTree.Nearest(x, y, z);
                     const double nearestWeight = LogWeight[SourceTree.Original(nearestSlot)];
                     const double radius2 = minDistance + extra - twoSigma2 * nearestWeight;
+                    // The largest kept weighted exponent (0 when unweighted) keeps the row from underflowing.
+                    double shift = -std::numeric_limits<double>::infinity();
+                    SourceTree.ForEachWithin(x, y, z, radius2, [&](const std::size_t sourceSlot, const double d2)
+                    {
+                        shift = std::max(shift, (minDistance - d2) / twoSigma2 + LogWeight[SourceTree.Original(sourceSlot)]);
+                    });
                     double sum = 0.0;
                     std::uint64_t kept = 0;
                     SourceTree.ForEachWithin(x, y, z, radius2, [&](const std::size_t sourceSlot, const double d2)
                     {
-                        sum += std::exp((minDistance - d2) / twoSigma2 + LogWeight[SourceTree.Original(sourceSlot)]);
+                        sum += std::exp((minDistance - d2) / twoSigma2 + LogWeight[SourceTree.Original(sourceSlot)] - shift);
                         ++kept;
                     });
-                    const double aMax = -minDistance / twoSigma2 + LogWeightShift;
+                    const double aMax = -minDistance / twoSigma2 + LogWeightShift + shift;
                     LogDenominator[j] = LogSumWithOutlier(aMax, sum, logC);
                     out.Pt1[j] = sum * std::exp(aMax - LogDenominator[j]);
                     radius2Tree[slot] = radius2;
@@ -1019,7 +1090,7 @@ namespace Geometry::CoherentPointDrift::EStep
                     // Dropped mass <= (M - kept) exp(-radius2 / 2 sigma^2) = (M - kept)/M tol e^{a_max};
                     // the denominator is at least e^{a_max} (sum + c e^{-a_max}).
                     const double outlierShifted = std::exp(std::min(logC - aMax, 700.0));
-                    RowBound[j] = (double(m - kept) / double(m)) * tolerance * std::exp(nearestWeight) / (sum + outlierShifted);
+                    RowBound[j] = (double(m - kept) / double(m)) * tolerance * std::exp(nearestWeight - shift) / (sum + outlierShifted);
                 }
             });
             TargetTree.SetRadii(radius2Tree);
@@ -1055,6 +1126,10 @@ namespace Geometry::CoherentPointDrift::EStep
         s.TargetY.assign(target.Y.begin(), target.Y.end());
         s.TargetZ.assign(target.Z.begin(), target.Z.end());
         s.TargetTree.Build(s.Target());
+        // Fast-Gauss state belongs to the previous target.
+        s.TargetCurve = {};
+        s.TargetClusters = {};
+        s.HasScales = false;
     }
 
     bool Evaluator::Evaluate(const PointSet moved, const double sigma2, const double logOutlier, const Settings& settings,
@@ -1067,6 +1142,7 @@ namespace Geometry::CoherentPointDrift::EStep
         if (!sourceLogWeights.empty() &&
             (sourceLogWeights.size() != m || !std::ranges::all_of(sourceLogWeights, [](const double w) { return std::isfinite(w); })))
             return false;
+        s.Weighted = !sourceLogWeights.empty();
         s.LogWeightShift = sourceLogWeights.empty() ? 0.0 : *std::ranges::max_element(sourceLogWeights);
         s.LogWeight.resize(m);
         s.WeightSum = 0.0;
@@ -1203,15 +1279,18 @@ namespace Geometry::CoherentPointDrift::EStep
                 for (Eigen::Index l = 0; l < count; ++l) block(Eigen::Index(i - first), l) = kernel(i, landmarks[std::size_t(l)]);
             return block;
         };
-        // B = F^T F from fixed row blocks summed in block order (thread-count independent).
-        std::vector<Eigen::MatrixXd> partial(blocks);
-        ParallelFor(blocks, 1, workers, [&](const std::size_t begin, const std::size_t end)
+        // B = F^T F: row blocks fold into at most 64 fixed groups (block b -> group b mod G, in
+        // block order), summed in group order; thread-count independent, O(G L^2) memory.
+        const std::size_t groups = std::min<std::size_t>(blocks, 64u);
+        std::vector<Eigen::MatrixXd> partial(groups, Eigen::MatrixXd::Zero(columns, columns));
+        ParallelFor(groups, 1, workers, [&](const std::size_t begin, const std::size_t end)
         {
-            for (std::size_t b = begin; b < end; ++b)
-            {
-                const Eigen::MatrixXd fb = kernelBlock(b) * whiten;
-                partial[b].noalias() = fb.transpose() * fb;
-            }
+            for (std::size_t g = begin; g < end; ++g)
+                for (std::size_t b = g; b < blocks; b += groups)
+                {
+                    const Eigen::MatrixXd fb = kernelBlock(b) * whiten;
+                    partial[g].noalias() += fb.transpose() * fb;
+                }
         });
         Eigen::MatrixXd gram = Eigen::MatrixXd::Zero(columns, columns);
         for (const Eigen::MatrixXd& block : partial) gram += block;
@@ -1253,10 +1332,11 @@ namespace Geometry::CoherentPointDrift::EStep
             {
                 const std::size_t row = s2 * m / samples;
                 const Eigen::VectorXd weighted = basis.row(Eigen::Index(row)).transpose().cwiseProduct(eigen);
+                const Eigen::VectorXd approximate = basis * weighted; // one GEMV over the column-major basis
                 for (std::size_t i = 0; i < m; ++i)
                 {
                     const double exact = kernel(row, i);
-                    const double approx = basis.row(Eigen::Index(i)).dot(weighted);
+                    const double approx = approximate(Eigen::Index(i));
                     errorSq[s2] += (exact - approx) * (exact - approx);
                     normSq[s2] += exact * exact;
                 }

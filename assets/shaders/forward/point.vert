@@ -45,6 +45,8 @@ float ResolvePointSizePx(GpuEntityConfig cfg, uint pointElementId) {
     return clamp(pointSizePx, 0.5, 32.0);
 }
 
+invariant gl_Position;
+
 void main() {
     const uint instanceSlot = gl_InstanceIndex;
     const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;

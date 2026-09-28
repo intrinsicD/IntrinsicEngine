@@ -4593,6 +4593,7 @@ namespace
 {
 constexpr std::uint32_t kBug026MaxFrames = 24u;
 constexpr float kBug026PlaneTolerance = 0.05f;
+constexpr glm::vec3 kBug026ReferencePickPoint{0.3f, -0.3f, 0.0f};
 
 class ClickPickRoundTripApp final : public Intrinsic::Tests::RuntimeTestModule
 {
@@ -4664,8 +4665,9 @@ public:
             }
             else
             {
-                TrianglePixel = ProjectReferenceCameraPixel(
-                    glm::vec3{0.0f, 0.0f, 0.0f}, extent);
+                // Below the centroid, where the triangle is wide and its vertical mirror
+                // image (0.3, 0.3) is empty, so a Y-mirrored id image cannot hit it.
+                TrianglePixel = ProjectReferenceCameraPixel(kBug026ReferencePickPoint, extent);
             }
             Selection(engine).RequestClickPick(TrianglePixel.first, TrianglePixel.second);
             TriangleClickSubmitted = true;
@@ -4854,7 +4856,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ClickPickReadbackSelectsReferenceTriangle
 
     ASSERT_TRUE(appPtr->FailureReason.empty()) << appPtr->FailureReason;
     ASSERT_TRUE(appPtr->TriangleClickSubmitted)
-        << "The click-pick smoke never submitted its center-pixel triangle "
+        << "The click-pick smoke never submitted its reference-point triangle "
            "click.";
     ASSERT_TRUE(appPtr->TriangleHitObserved)
         << "The Vulkan pick readback did not select ReferenceTriangle before "
@@ -4885,6 +4887,9 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ClickPickReadbackSelectsReferenceTriangle
     EXPECT_LT(hit.Depth, 0.999f);
     EXPECT_NEAR(hit.WorldCursor.z, 0.0f, kBug026PlaneTolerance);
     EXPECT_NEAR(hit.LocalCursor.z, 0.0f, kBug026PlaneTolerance);
+    // The picked point is where the presented image shows it (BUG-227 orientation pin).
+    EXPECT_NEAR(hit.WorldCursor.x, kBug026ReferencePickPoint.x, kBug026PlaneTolerance);
+    EXPECT_NEAR(hit.WorldCursor.y, kBug026ReferencePickPoint.y, kBug026PlaneTolerance);
 
     const auto diagnostics = Selection(engine).GetDiagnostics();
     EXPECT_EQ(diagnostics.ClickRequestsSubmitted, 2u);

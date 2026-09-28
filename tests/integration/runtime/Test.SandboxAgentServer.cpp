@@ -202,11 +202,16 @@ TEST(SandboxAgentServer, ClientRunsSmoothingThroughTheSocketAndUndoesIt)
         check(!isError, "cpd config_apply: " + cpdConfig.dump());
         auto cpdReady = c.Tool("preview_registration", {{"method", "cpd"}});
         check(cpdReady["enabled"] == true, "preview_registration: " + cpdReady.dump());
+        const glm::vec3 beforeCpd = std::as_const(vertices).Get<glm::vec3>("v:position")[0];
         auto cpd = c.Tool("run_registration", {{"method", "cpd"}}, &isError);
         check(!isError && cpd["succeeded"] == true && cpd["iterations"].get<int>() > 0,
               "run_registration cpd: " + cpd.dump());
-        check(std::abs(vertices.Get<glm::vec3>("v:position")[0].x - 0.5f) < 1e-2f, "cpd moved the source positions");
-        c.Tool("undo");
+        check(cpd["variant"] == "rigid" && cpd["output"] == "positions", "cpd names its variant and output: " + cpd.dump());
+        check(std::abs(std::as_const(vertices).Get<glm::vec3>("v:position")[0].x - 0.5f) < 1e-2f,
+              "cpd moved the source positions");
+        auto cpdUndo = c.Tool("undo", {}, &isError);
+        check(!isError && cpdUndo["undone"].size() == 1u, "cpd undo: " + cpdUndo.dump());
+        check(std::as_const(vertices).Get<glm::vec3>("v:position")[0] == beforeCpd, "undo restored the source positions");
         auto outside = c.Tool("import_file", {{"path", "/etc/passwd"}}, &isError);
         check(isError, "paths outside the roots are refused");
         // Screenshots need an operational render device; the Null backend refuses with the reason.

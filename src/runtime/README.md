@@ -781,13 +781,16 @@ mutex-guarded snapshot (phase, trace, moving source positions) after each iterat
 property revisions and both entity transforms, then publishes one history entry: the source
 Transform for rigid results (mirrored results are refused), or the source positions or a
 named vec3 displacement property in source-local space for affine and nonrigid results.
-`ApplyEditorCoherentPointDriftCommand` chains start, a full run and publication with one
+Writing mesh-vertex positions also recomputes a stored `v:normal` (area-weighted, in the
+same history entry). Operands are mapped with their local Transform only, so parented
+entities are refused. `ApplyEditorCoherentPointDriftCommand` chains start, a full run and publication with one
 terminal callback; agents reach it through `run_registration`.
 
 The section also selects the METHOD-049 backends: `e_step` (reference, dense, truncated,
 auto, fast Gauss; the editor default is auto with `e_step_tolerance` 1e-6), `threads` and
 the nonrigid `low_rank`, which lifts the full-kernel limit of 8192 source points. Results
-and each trace row carry the backend, the E-step policy that ran and its error bound;
+carry the backend that actually ran (`cpu_auto` or `cpu_mixed` when iterations used
+different policies); each trace row carries the E-step policy that ran and its error bound;
 low-rank runs report the kernel rank and its sampled approximation error. The `bayesian`
 method (METHOD-050, BCPD) adds `gamma`, `kappa` (0 keeps equal mixing weights) and
 `subsample` (farthest-point samples registered, deformation interpolated to every point);

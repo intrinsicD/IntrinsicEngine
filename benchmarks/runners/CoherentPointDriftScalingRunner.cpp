@@ -5,18 +5,22 @@
 //   IntrinsicCoherentPointDriftScaling <out dir or .json> [sizes...]   (default sizes: 1000 10000 100000)
 //
 // Writes one result in the benchmark result schema (seal it with
-// tools/benchmark/seal_benchmark_results.py): runtime_ms is the auto run at the largest
-// size, quality_error_l2 the largest RMS error to the ground truth, quality_error_linf the
-// largest parity delta; diagnostics hold every run per size.
+// tools/benchmark/seal_benchmark_results.py): runtime_ms is the median auto run at the
+// largest size, quality_error_l2 the largest RMS error to the ground truth,
+// quality_error_linf the largest parity delta; diagnostics hold every run per size.
+// Timing: one untimed warmup (rigid and low-rank nonrigid at 1000 points), then every
+// configuration is measured kRepetitions times (fewer above the reference cap) and reported
+// as median, min and max; no observer runs inside the timed region unless tracing.
 //   CPD_SCALING_TRACE=1 prints each iteration's E-step policy, time and kernel evaluations;
 //   CPD_SCALING_ONLY=<text> runs only the runs whose name contains <text> (no parity);
 //   CPD_SCALING_ALL=1 also runs the truncated and fast Gauss policies above the reference cap;
-//   CPD_SCALING_ITERATIONS=<k> caps every run at k iterations (profiling).
+//   CPD_SCALING_ITERATIONS=<k> caps every run at k iterations (profiling);
+//   CPD_SCALING_REPETITIONS=<k> overrides the measured repetitions per configuration.
 //
 // Fixture per size S: S points sampled on a bumpy closed surface (seeded), the target is a
 // rotated, translated and noisy copy with 5% of its points replaced by uniform clutter.
 // Rigid runs compare the reference with the dense-parallel, truncated, fast Gauss and auto
-// E-steps;
+// E-steps, plus single-threaded dense and auto up to the reference cap;
 // nonrigid runs compare the full solve (while S fits) with the low-rank solve on a bent
 // copy. Quality is the RMS distance of the registered source to its ground-truth image;
 // parity is the max point difference to the reference, or to the dense-parallel run above
@@ -108,13 +112,23 @@ namespace
     {
         std::string Name;
         CPD::Result Result;
-        double Milliseconds{0.0};
+        double Milliseconds{0.0}; // median over the repetitions
+        double MinMilliseconds{0.0}, MaxMilliseconds{0.0};
+        std::size_t Repetitions{0u};
         double RmsError{0.0};
         std::optional<double> Parity{};
         std::string ParityAgainst{};
     };
 
-    Run Execute(const std::string& name, const Fixture& f, const CPD::Params& params)
+    std::size_t Repetitions(std::size_t count)
+    {
+        if (const char* value = std::getenv("CPD_SCALING_REPETITIONS"))
+            return std::max<std::size_t>(1u, std::strtoul(value, nullptr, 10));
+        return count <= kReferenceRigidCap ? 3u : 2u;
+    }
+
+    Run Execute(const std::string& name, const Fixture& f, const CPD::Params& params, std::size_t repetitions = 1u,
+                bool quiet = false)
     {
         Run run;
         run.Name = name;
@@ -125,19 +139,33 @@ namespace
             run.Result.State = CPD::Status::InvalidParameters;
             return run;
         }
-        const auto start = std::chrono::steady_clock::now();
         const bool trace = std::getenv("CPD_SCALING_TRACE") != nullptr;
-        auto last = std::chrono::steady_clock::now();
-        run.Result = CPD::Register(f.Target, f.Source, limited, [&](const CPD::IterationTrace& t)
+        std::vector<double> times;
+        for (std::size_t repetition = 0; repetition < repetitions; ++repetition)
         {
-            if (!trace) return;
-            const auto now = std::chrono::steady_clock::now();
-            std::cerr << "    " << name << " #" << t.Iteration << " " << CPD::ToString(t.EStep) << " "
-                      << std::chrono::duration<double, std::milli>(now - last).count() << " ms, sigma2 " << t.Sigma2
-                      << ", evaluations " << t.KernelEvaluations << ", bound " << t.EStepErrorBound << '\n';
-            last = now;
-        });
-        run.Milliseconds = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+            auto last = std::chrono::steady_clock::now();
+            CPD::IterationObserver observer;
+            if (trace)
+                observer = [&](const CPD::IterationTrace& t) {
+                    const auto now = std::chrono::steady_clock::now();
+                    std::cerr << "    " << name << " #" << t.Iteration << " " << CPD::ToString(t.EStep) << " "
+                              << std::chrono::duration<double, std::milli>(now - last).count() << " ms, sigma2 "
+                              << t.Sigma2 << ", evaluations " << t.KernelEvaluations << ", bound "
+                              << t.EStepErrorBound << '\n';
+                    last = now;
+                };
+            const auto start = std::chrono::steady_clock::now();
+            CPD::Result result = CPD::Register(f.Target, f.Source, limited, observer);
+            times.push_back(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
+            // Every repetition is deterministic (thread-count independent reductions); keep the first.
+            if (repetition == 0) run.Result = std::move(result);
+        }
+        std::ranges::sort(times);
+        run.Repetitions = times.size();
+        run.MinMilliseconds = times.front();
+        run.MaxMilliseconds = times.back();
+        run.Milliseconds = times.size() % 2 ? times[times.size() / 2]
+                                             : 0.5 * (times[times.size() / 2 - 1] + times[times.size() / 2]);
         if (run.Result.Succeeded())
         {
             double sum = 0.0;
@@ -148,8 +176,10 @@ namespace
             }
             run.RmsError = std::sqrt(sum / double(f.Source.size()));
         }
-        std::cerr << "  " << name << ": " << CPD::ToString(run.Result.State) << ", " << run.Result.Iterations
-                  << " iterations, " << run.Milliseconds << " ms, rms " << run.RmsError << '\n';
+        if (!quiet)
+            std::cerr << "  " << name << ": " << CPD::ToString(run.Result.State) << ", " << run.Result.Iterations
+                      << " iterations, median " << run.Milliseconds << " ms (" << run.MinMilliseconds << " - "
+                      << run.MaxMilliseconds << ", " << run.Repetitions << " runs), rms " << run.RmsError << '\n';
         return run;
     }
 
@@ -169,6 +199,8 @@ namespace
         out << "        {\"name\": \"" << run.Name << "\", \"status\": \"" << CPD::ToString(r.State)
             << "\", \"backend\": \"" << r.Backend << "\", \"iterations\": " << r.Iterations
             << ", \"termination\": \"" << CPD::ToString(r.Stop) << "\", \"runtime_ms\": " << run.Milliseconds
+            << ", \"runtime_ms_min\": " << run.MinMilliseconds << ", \"runtime_ms_max\": " << run.MaxMilliseconds
+            << ", \"repetitions\": " << run.Repetitions
             << ", \"ms_per_iteration\": " << (r.Iterations ? run.Milliseconds / double(r.Iterations) : 0.0)
             << ", \"rms_error_to_truth\": " << run.RmsError << ", \"sigma2\": " << r.Sigma2
             << ", \"kernel_evaluations\": " << r.KernelEvaluations << ", \"e_step_error_bound\": " << r.EStepErrorBound
@@ -191,6 +223,13 @@ int main(int argc, char** argv)
     if (sizes.empty()) sizes = {1'000, 10'000, 100'000};
     const std::uint32_t threads = CPD::EStep::ResolveThreads(0u);
 
+    {
+        // Untimed warmup: thread pool, allocator and page faults, both solver paths.
+        const Fixture warmRigid = RigidFixture(1'000), warmBent = BentFixture(1'000);
+        (void)Execute("warmup_rigid", warmRigid, {.OutlierWeight = 0.05, .EStep = CPD::EStepPolicy::Auto}, 1u, true);
+        (void)Execute("warmup_nonrigid", warmBent,
+                      {.Method = CPD::Variant::Nonrigid, .EStep = CPD::EStepPolicy::Auto, .LowRank = 50u}, 1u, true);
+    }
     std::ostringstream out;
     out.precision(9);
     double autoMilliseconds = 0.0, worstRms = 0.0, worstParity = 0.0;
@@ -200,9 +239,10 @@ int main(int argc, char** argv)
         const std::size_t count = sizes[s];
         std::cerr << "size " << count << '\n';
         const Fixture rigid = RigidFixture(count);
+        const std::size_t repetitions = Repetitions(count);
         const CPD::Params base{.OutlierWeight = 0.05, .MaxIterations = 100, .EStepTolerance = 1e-6};
         std::vector<Run> rigidRuns;
-        if (count <= kReferenceRigidCap) rigidRuns.push_back(Execute("rigid_reference", rigid, base));
+        if (count <= kReferenceRigidCap) rigidRuns.push_back(Execute("rigid_reference", rigid, base, repetitions));
         for (const auto policy : {CPD::EStepPolicy::Dense, CPD::EStepPolicy::Truncated, CPD::EStepPolicy::FastGauss,
                                   CPD::EStepPolicy::Auto})
         {
@@ -215,8 +255,18 @@ int main(int argc, char** argv)
                 continue;
             CPD::Params p = base;
             p.EStep = policy;
-            rigidRuns.push_back(Execute("rigid_" + std::string(CPD::ToString(policy)), rigid, p));
+            rigidRuns.push_back(Execute("rigid_" + std::string(CPD::ToString(policy)), rigid, p, repetitions));
         }
+        // Parallel speedup: the same exact and automatic E-steps on one thread.
+        if (count <= kReferenceRigidCap)
+            for (const auto policy : {CPD::EStepPolicy::Dense, CPD::EStepPolicy::Auto})
+            {
+                CPD::Params p = base;
+                p.EStep = policy;
+                p.Threads = 1u;
+                rigidRuns.push_back(
+                    Execute("rigid_" + std::string(CPD::ToString(policy)) + "_1thread", rigid, p, repetitions));
+            }
         // The first run is the oracle: the reference, or dense parallel above the reference cap.
         for (std::size_t r = 1; r < rigidRuns.size(); ++r) Compare(rigidRuns[r], rigidRuns[0]);
 
@@ -227,14 +277,14 @@ int main(int argc, char** argv)
         {
             CPD::Params full = nonrigid;
             full.EStep = CPD::EStepPolicy::Auto;
-            nonrigidRuns.push_back(Execute("nonrigid_full_auto", bent, full));
+            nonrigidRuns.push_back(Execute("nonrigid_full_auto", bent, full, repetitions));
         }
         for (const std::uint32_t rank : {50u, 150u})
         {
             CPD::Params lowRank = nonrigid;
             lowRank.EStep = CPD::EStepPolicy::Auto;
             lowRank.LowRank = rank;
-            nonrigidRuns.push_back(Execute("nonrigid_lowrank" + std::to_string(rank) + "_auto", bent, lowRank));
+            nonrigidRuns.push_back(Execute("nonrigid_lowrank" + std::to_string(rank) + "_auto", bent, lowRank, repetitions));
         }
         for (std::size_t r = 1; r < nonrigidRuns.size(); ++r) Compare(nonrigidRuns[r], nonrigidRuns[0]);
 
