@@ -1,0 +1,26 @@
+# GEOM-111 — unified point sampling smoke manifest.
+#
+# Stable benchmark contract for benchmarks/geometry/Bench_PointSamplingSmoke.cpp, emitted
+# by the IntrinsicBenchmarkSmoke runner; benchmark_id matches kPointSamplingSmokeBenchmarkId.
+#
+# Correctness is the gate: quality_error_l2 is the fraction of ranks where the hole-sieve
+# farthest-point order differs from a brute-force float64 scan (3000 points; must be 0).
+# runtime_ms times 1000 samples of 20000 points; the pair reduction is a diagnostic.
+
+benchmark_id: geometry.point_sampling.smoke
+method: geometry.point_sampling
+dataset: builtin.point_sampling_uniform_box
+params:
+  intent: smoke
+  method: farthest_point
+  timed_points: 20000
+  timed_samples: 1000
+  parity_points: 3000
+  warmup_iterations: 1
+  measured_iterations: 5
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 250
+  quality_error_l2_max: 0.0

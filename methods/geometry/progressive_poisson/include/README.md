@@ -1,3 +1,5 @@
 # Include
 
-Public method interface and data contracts for `geometry.progressive_poisson` land here with METHOD-012 (`ProgressivePoissonConfig`, `ProgressivePoissonResult`, the reference entry point).
+The public interface of the METHOD-012 CPU reference, `ProgressivePoissonReference.hpp`,
+moved to `src/geometry/ProgressivePoisson/` (GEOM-111); `Geometry.PointSampling` exposes it
+as `Method::ProgressivePoisson`.

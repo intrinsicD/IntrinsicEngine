@@ -35,11 +35,11 @@ contracts: [repo.source-documentation, geometry.element-domain-sources]
   METHOD-055 owns the Vulkan hole sieve.
 
 ## Acceptance criteria
-- [ ] `Geometry.PointSampling`: `PointSamplingMethod`, `Params` (method, seed, first index, weights, per-method settings), `Order(points, params, count)` returning original indices in progressive order plus per-sample diagnostics; invalid input fails closed.
-- [ ] Exact hole-sieve FPS: order bitwise equal to a brute-force float64 FPS with the same tie rule on 2-D/3-D fixtures (coincident points included); weighted variant equal to a brute-force weighted scan; pair-count reduction reported.
-- [ ] Progressive Poisson available through the API with results identical to METHOD-012's `ProgressivePoissonReference::Compute`.
-- [ ] CPD's farthest-point subsampling and landmark selection use the module (results unchanged: same FPS order and tie rule), removing the naive copies.
-- [ ] Module docs, README and inventory updated; smoke benchmark with a manifest.
+- [x] `Geometry.PointSampling`: `PointSamplingMethod`, `Params` (method, seed, first index, weights, per-method settings), `Order(points, params, count)` returning original indices in progressive order plus per-sample diagnostics; invalid input fails closed.
+- [x] Exact hole-sieve FPS: order bitwise equal to a brute-force float64 FPS with the same tie rule on 2-D/3-D fixtures (coincident points included); weighted variant equal to a brute-force weighted scan; pair-count reduction reported.
+- [x] Progressive Poisson available through the API with results identical to METHOD-012's `ProgressivePoissonReference::Compute`.
+- [x] CPD's farthest-point subsampling and landmark selection use the module (results unchanged: same FPS order and tie rule), removing the naive copies.
+- [x] Module docs, README and inventory updated; smoke benchmark with a manifest.
 
 ## Verification
 ```bash
@@ -47,3 +47,13 @@ cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -R 'PointSampling|CoherentPointDrift|ProgressivePoisson' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Log
+- 2026-09-28: slice 1 landed. Hole sieve order and clearances bitwise equal to brute force
+  (2-D/3-D, duplicates, leaf sizes 1/16/64, weighted); 20x fewer pairs than a flat scan for
+  1000 of 20000 points (smoke `geometry.point_sampling.smoke`: 37 ms, parity 0). The METHOD-012
+  reference moved to `src/geometry/ProgressivePoisson/` (target name kept as an INTERFACE
+  alias); results identical through `Method::ProgressivePoisson`. CPD subsampling and
+  low-rank landmarks now use the module. Remaining for retirement: nothing in this slice;
+  the task stays active as the umbrella until GEOM-112/113 and RUNTIME-289 land.
+

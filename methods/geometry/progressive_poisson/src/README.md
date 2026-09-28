@@ -1,3 +1,5 @@
 # Source
 
-CPU reference backend (`cpu_reference`) lands here with METHOD-012; the Vulkan-compute backend seam is added by METHOD-013 at the runtime layer (not in this hermetic package).
+The CPU reference backend (`cpu_reference`, METHOD-012) moved to
+`src/geometry/ProgressivePoisson/ProgressivePoissonReference.cpp` (GEOM-111). The
+Vulkan-compute backend seam stays at the runtime layer (METHOD-013).

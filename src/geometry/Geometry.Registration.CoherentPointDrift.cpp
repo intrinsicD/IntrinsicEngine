@@ -17,6 +17,8 @@ module;
 
 module Geometry.Registration.CoherentPointDrift;
 
+import Geometry.PointSampling;
+
 namespace Geometry::CoherentPointDrift
 {
     namespace
@@ -652,21 +654,14 @@ namespace Geometry::CoherentPointDrift
             s.Source.Set(i, (Eigen::Vector3d(source[i].x, source[i].y, source[i].z) - s.MeanY) / s.Scale);
             s.Moved.Set(i, s.Source.At(i));
         }
-        // Farthest-point samples from point 0 (ties: lowest index).
+        // Exact farthest-point samples from point 0 (Geometry.PointSampling; ties: lowest index),
+        // cut before the first duplicate of an earlier sample.
         const auto farthest = [](const Points& points, const std::size_t count)
         {
+            const auto order = PointSampling::Order(PointSampling::PointView{points.X, points.Y, points.Z}, {}, count);
             std::vector<std::uint32_t> chosen;
-            std::vector<double> distance(points.Size(), std::numeric_limits<double>::infinity());
-            std::size_t next = 0;
-            while (chosen.size() < count)
-            {
-                chosen.push_back(std::uint32_t(next));
-                const Eigen::Vector3d center = points.At(next);
-                for (std::size_t i = 0; i < points.Size(); ++i)
-                    distance[i] = std::min(distance[i], (points.At(i) - center).squaredNorm());
-                next = std::size_t(std::max_element(distance.begin(), distance.end()) - distance.begin());
-                if (!(distance[next] > 0.0)) break; // the rest duplicates the samples
-            }
+            for (std::size_t k = 0; k < order.Order.size() && order.Clearance[k] > 0.0; ++k)
+                chosen.push_back(order.Order[k]);
             return chosen;
         };
         if (params.Method == Variant::Bayesian && params.SubsampleTarget > 0u && params.SubsampleTarget < n)

@@ -14,9 +14,11 @@
 /// or any contiguous `glm::vec3` property buffer directly. For 2D sampling, set
 /// `Config::Dimension = 2`; the z component of each point is then ignored.
 ///
-/// The package is hermetic: it uses only the standard library and `glm` (a math
-/// primitive, not an engine layer). No core/geometry/runtime/graphics modules are
-/// imported. The GPU backend and CPU/GPU parity are out of scope here (METHOD-013).
+/// It is hermetic: it uses only the standard library and `glm` (a math primitive,
+/// not an engine layer). It is compiled into the geometry layer (GEOM-111), where
+/// `Geometry.PointSampling` offers it as `Method::ProgressivePoisson`; the method
+/// package `methods/geometry/progressive_poisson` keeps its docs and manifest. The
+/// GPU backend and CPU/GPU parity are out of scope here (METHOD-013).
 
 #include <cstdint>
 #include <span>

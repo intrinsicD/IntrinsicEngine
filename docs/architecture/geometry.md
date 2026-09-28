@@ -494,6 +494,17 @@ whether normals came from interpolated source `v:normal` data or geometric face
 fallbacks. Output clouds publish sampled positions as `v:point` and point
 normals as the point-cloud built-in `p:normal`.
 
+`Geometry.PointSampling` (GEOM-111) is the single entry point for choosing a subset
+of an existing point set. `Order(points, params, count)` returns original indices in a
+progressive order, so any prefix is the subsample of that size, for a selectable
+`Method`: `Random` (seeded, portable permutation), `FarthestPoint` (exact
+farthest-point order through a hole sieve over Morton leaf blocks: pruned updates, order
+and clearances bitwise equal to a brute-force float64 scan, optional importance weights)
+and `ProgressivePoisson` (the METHOD-012 reference, compiled into this layer from
+`src/geometry/ProgressivePoisson/`). `FarthestPointSieve` extends an order incrementally.
+Registration subsampling and Nystroem landmarks use it; GEOM-112/113 add the remaining
+sampling methods and RUNTIME-289 makes the method selectable at every consumer.
+
 `Geometry.PointCloud.QualityMetrics` is the CPU numeric-analysis companion for
 sampling papers and figure export. It accepts either `std::span<const glm::vec3>`
 or a `PointCloud::Cloud` adapter and returns owned numeric arrays with explicit

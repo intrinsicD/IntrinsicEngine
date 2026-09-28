@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 11 |
 | `core` | 41 |
 | `ecs` | 27 |
-| `geometry` | 131 |
+| `geometry` | 132 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 74 |
@@ -209,6 +209,7 @@ Root scanned: `src`
 | `Geometry.PointCloud.Utils` | `src/geometry/Geometry.PointCloud.Utils.cppm` | `geometry` |
 | `Geometry.PointCloud` | `src/geometry/Geometry.PointCloud.cppm` | `geometry` |
 | `Geometry.PointLBVH` | `src/geometry/Geometry.PointLBVH.cppm` | `geometry` |
+| `Geometry.PointSampling` | `src/geometry/Geometry.PointSampling.cppm` | `geometry` |
 | `Geometry.Primitives` | `src/geometry/Geometry.Primitives.cppm` | `geometry` |
 | `Geometry.Properties.Types` | `src/geometry/Geometry.Properties.Types.cppm` | `geometry` |
 | `Geometry.Properties` | `src/geometry/Geometry.Properties.cppm` | `geometry` |
@@ -468,4 +469,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **441**
+Total modules: **442**

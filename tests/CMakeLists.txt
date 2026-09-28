@@ -1574,6 +1574,7 @@ set(_geometry_test_files
     Test.SparseEigensolver.cpp
     Test.ModalAnalysis.cpp
     Test.QualityMetrics.cpp
+    Test.PointSampling.cpp
     Test.Sampling.cpp
     Test.SurfaceSampling.cpp
     Test.PointCloudNormals.cpp

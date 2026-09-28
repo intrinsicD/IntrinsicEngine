@@ -37,6 +37,7 @@
 #include "../geometry/Bench.CoherentPointDriftAcceleratedSmoke.hpp"
 #include "../geometry/Bench.SimplificationQualitySmoke.hpp"
 #include "../geometry/Bench.SurfaceSamplingSmoke.hpp"
+#include "../geometry/Bench.PointSamplingSmoke.hpp"
 #include "../geometry/Bench.UvAtlasSmoke.hpp"
 #include "../physics/Bench.ParticleSpringReferenceSmoke.hpp"
 #include "../physics/Bench.RigidBodyReferenceSmoke.hpp"
@@ -1096,6 +1097,30 @@ auto EmitSurfaceSamplingSmoke(const std::string &commit) -> EmittedBenchmark {
       });
 }
 
+auto EmitPointSamplingSmoke(const std::string &commit) -> EmittedBenchmark {
+  using namespace Intrinsic::Bench::Geometry;
+
+  const auto metrics = RunPointSamplingSmoke();
+
+  std::ostringstream out;
+  out.setf(std::ios::fixed);
+  out.precision(6);
+  return EmitBenchmarkResult(out, kPointSamplingSmokeBenchmarkId,
+      kPointSamplingSmokeMethod, "cpu_reference",
+      kPointSamplingSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 5,\n"
+            << "    \"sieve_pairs\": " << metrics.SievePairs << ",\n"
+            << "    \"pair_reduction\": " << metrics.PairReduction << "\n";
+      });
+}
+
 auto EmitSimplificationQualitySmoke(const std::string &commit)
     -> EmittedBenchmark {
   using namespace Intrinsic::Bench::Geometry;
@@ -1782,6 +1807,7 @@ auto main(int argc, char **argv) -> int {
   emitted.push_back(EmitBoundaryFirstFlatteningReferenceSmoke(commit));
   emitted.push_back(EmitSimplificationQualitySmoke(commit));
   emitted.push_back(EmitSurfaceSamplingSmoke(commit));
+  emitted.push_back(EmitPointSamplingSmoke(commit));
   emitted.push_back(EmitQualityMetricsSmoke(commit));
   emitted.push_back(EmitPointCloudFilteringSmoke(commit));
   emitted.push_back(EmitRigidBodyReferenceSmoke(commit));

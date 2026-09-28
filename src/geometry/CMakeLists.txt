@@ -114,6 +114,7 @@ target_sources(${target_name}
         Geometry.RobustPredicates.cppm
         Geometry.Rotation.cppm
         Geometry.RotationAveraging.cppm
+        Geometry.PointSampling.cppm
         Geometry.Sampling.cppm
         Geometry.SDF.cppm
         Geometry.SDFContact.cppm
@@ -231,6 +232,8 @@ target_sources(${target_name}
         Geometry.RobustPredicates.cpp
         Geometry.Rotation.cpp
         Geometry.RotationAveraging.cpp
+        Geometry.PointSampling.cpp
+        ProgressivePoisson/ProgressivePoissonReference.cpp
         Geometry.Sampling.cpp
         Geometry.SDF.cpp
         Geometry.Segment.cpp
@@ -254,7 +257,7 @@ target_sources(${target_name}
         Geometry.PointCloud.Fwd.cppm
 )
 
-target_include_directories(${target_name} PUBLIC .)
+target_include_directories(${target_name} PUBLIC . ProgressivePoisson)
 
 target_link_libraries(${target_name}
         PUBLIC
@@ -266,3 +269,8 @@ target_link_libraries(${target_name}
 target_link_libraries(${target_name} PRIVATE xatlas::xatlas)
 
 target_compile_definitions(${target_name} PUBLIC EIGEN_MPL2_ONLY)
+
+# METHOD-012's progressive Poisson reference lives in the geometry layer (GEOM-111) so
+# Geometry.PointSampling can select it; this name keeps its existing consumers linking.
+add_library(IntrinsicProgressivePoissonReference INTERFACE)
+target_link_libraries(IntrinsicProgressivePoissonReference INTERFACE ${target_name})

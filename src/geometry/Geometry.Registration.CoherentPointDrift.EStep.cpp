@@ -19,6 +19,8 @@ module;
 
 module Geometry.Registration.CoherentPointDrift.EStep;
 
+import Geometry.PointSampling;
+
 namespace Geometry::CoherentPointDrift
 {
     std::string_view ToString(const EStepPolicy value) noexcept
@@ -1456,20 +1458,15 @@ namespace Geometry::CoherentPointDrift::EStep
             return std::exp(inverse * Squared(points.X[a], points.Y[a], points.Z[a], points.X[b], points.Y[b], points.Z[b]));
         };
 
-        // Farthest-point landmarks, starting from point 0; ties keep the lowest index.
+        // Exact farthest-point landmarks from point 0 (Geometry.PointSampling; ties keep the
+        // lowest index), cut before the first duplicate of an earlier landmark.
         const std::size_t landmarkCount = std::min<std::size_t>(m, std::max<std::size_t>(2u * rank, rank + 32u));
-        std::vector<std::size_t> landmarks{0u};
-        landmarks.reserve(landmarkCount);
-        std::vector<double> distance(m, std::numeric_limits<double>::infinity());
-        while (landmarks.size() < landmarkCount)
+        std::vector<std::size_t> landmarks;
         {
-            const std::size_t last = landmarks.back();
-            for (std::size_t i = 0; i < m; ++i)
-                distance[i] = std::min(distance[i], Squared(points.X[i], points.Y[i], points.Z[i], points.X[last],
-                                                            points.Y[last], points.Z[last]));
-            const std::size_t next = std::size_t(std::max_element(distance.begin(), distance.end()) - distance.begin());
-            if (!(distance[next] > 0.0)) break; // remaining points duplicate the landmarks
-            landmarks.push_back(next);
+            const auto order = PointSampling::Order(PointSampling::PointView{points.X, points.Y, points.Z}, {}, landmarkCount);
+            if (!order.Succeeded()) return false;
+            for (std::size_t k = 0; k < order.Order.size() && order.Clearance[k] > 0.0; ++k)
+                landmarks.push_back(order.Order[k]);
         }
         const Eigen::Index count = Eigen::Index(landmarks.size());
 

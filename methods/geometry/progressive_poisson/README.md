@@ -15,8 +15,10 @@ level — instant level-of-detail via a single index cutoff.
 | `gpu_vulkan_compute` | recordable Vulkan dispatch + operational shared result-transport/parser seam; CPU fallback until compute parity lands | METHOD-013 / METHOD-014 |
 
 This directory holds the **paper intake** (`paper.md`), the **manifest**
-(`method.yaml`), and the METHOD-012 CPU reference implementation under
-`include/` and `src/`. The reference backend is the canonical truth for
+(`method.yaml`). The METHOD-012 CPU reference implementation lives in the
+geometry layer at `src/geometry/ProgressivePoisson/` (moved by GEOM-111 so
+`Geometry.PointSampling` can offer it to every sampling consumer; the CMake
+target `IntrinsicProgressivePoissonReference` still names it). The reference backend is the canonical truth for
 correctness tests and smoke benchmarks. METHOD-013 owns the runtime/config
 backend selection contract, CPU fallback diagnostics, the Vulkan shader/layout
 planning and recording seams, parsed GPU readback payloads, and the future
