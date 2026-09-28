@@ -36,6 +36,7 @@ target_sources(${target_name}
         Modules/PointConstruction/Runtime.PointConstructionConfig.cppm
         Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm
         Modules/Registration/Runtime.RegistrationConfig.cppm
+        Modules/PointSampling/Runtime.PointSamplingConfig.cppm
         Modules/Registration/Runtime.CoherentPointDriftConfig.cppm
         Modules/Parameterization/Runtime.ParameterizationConfig.cppm
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm
@@ -163,6 +164,7 @@ target_sources(${target_name}
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp
         Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
         Config/internal/Runtime.PointNormalsRegistrationConfigCodecs.cpp
+        Modules/PointSampling/Runtime.PointSamplingConfig.cpp
         Modules/Registration/Runtime.CoherentPointDriftConfig.cpp
         Config/internal/Runtime.PointFeaturesConfigCodecs.cpp
         Config/internal/Runtime.PointNeighborhoodConfigCodecs.cpp

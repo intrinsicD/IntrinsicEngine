@@ -10,6 +10,7 @@ module;
 export module Extrinsic.Runtime.CoherentPointDriftConfig;
 export import Extrinsic.Runtime.GeometryProperty.Types;
 export import Extrinsic.Runtime.ConfigFieldSpec;
+export import Extrinsic.Runtime.PointSamplingConfig;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 export namespace Extrinsic::Runtime
@@ -63,6 +64,12 @@ export namespace Extrinsic::Runtime
         double Gamma{1.0};
         double Kappa{0.0};
         std::uint32_t Subsample{0u};
+        // Bayesian: target samples to register against (0 = all, else at least 4) and how both
+        // subsamples are chosen ("subsample_*"); how kernel landmarks are chosen for the low-rank
+        // solve and the Nystroem E-step ("landmark_*"). RUNTIME-289.
+        std::uint32_t SubsampleTarget{0u};
+        PointSamplingConfig SubsampleSampling{};
+        PointSamplingConfig LandmarkSampling{};
     };
 
     [[nodiscard]] std::string SerializeCoherentPointDriftConfig(const CoherentPointDriftConfig& config);

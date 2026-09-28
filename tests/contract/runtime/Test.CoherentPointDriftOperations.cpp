@@ -404,3 +404,56 @@ TEST(CoherentPointDriftOperations, NystromEStepReportsItsBackendAndSampledError)
     EXPECT_LE(result.EStepSampledError, 1e-3);
     EXPECT_NEAR(s.Registry.Raw().get<T::Component>(source).Position.x, 0.1f, 1e-3f);
 }
+
+TEST(CoherentPointDriftOperations, SamplingMethodsAreSelectableForSubsamplesAndLandmarks)
+{
+    const auto registration = R::MakeCoherentPointDriftConfigSectionRegistration();
+    R::CoherentPointDriftConfig config{.Method = M::Bayesian, .Output = O::Positions, .Subsample = 300,
+                                       .SubsampleTarget = 250};
+    config.SubsampleSampling.Method = R::PointSamplingMethod::ProgressivePoisson;
+    config.SubsampleSampling.PoissonBalanced = true;
+    config.LandmarkSampling.Method = R::PointSamplingMethod::CoupledSieve;
+    config.LandmarkSampling.Eta = 0.9;
+    const auto decoded = R::DecodeCoherentPointDriftConfig(R::SerializeCoherentPointDriftConfig(config));
+    ASSERT_TRUE(decoded.has_value());
+    EXPECT_EQ(decoded->SubsampleTarget, 250u);
+    EXPECT_EQ(decoded->SubsampleSampling.Method, R::PointSamplingMethod::ProgressivePoisson);
+    EXPECT_TRUE(decoded->SubsampleSampling.PoissonBalanced);
+    EXPECT_EQ(decoded->LandmarkSampling.Method, R::PointSamplingMethod::CoupledSieve);
+    EXPECT_EQ(decoded->LandmarkSampling.Eta, 0.9);
+    EXPECT_NE(R::FindConfigFieldSpec(R::CoherentPointDriftConfigFieldSpecs(), "landmark_beta"), nullptr);
+    const auto invalid = [&](R::CoherentPointDriftConfig c) {
+        return !registration.Validate(R::SerializeCoherentPointDriftConfig(c), {}, "test").Usable();
+    };
+    R::CoherentPointDriftConfig exactCap;
+    exactCap.LandmarkSampling = {.Method = R::PointSamplingMethod::CoupledSieve, .Eta = 1.0, .CandidateCap = 4};
+    EXPECT_TRUE(invalid(exactCap));
+    R::CoherentPointDriftConfig priority;
+    priority.SubsampleSampling = {.Method = R::PointSamplingMethod::ProgressivePoisson,
+                                  .PoissonSelection = R::PointSamplingPoissonSelection::FeaturePriority};
+    EXPECT_TRUE(invalid(priority));
+    EXPECT_TRUE(invalid({.SubsampleTarget = 2}));
+    EXPECT_FALSE(registration.Validate(R"({"subsample_method": 99})", {}, "test").Usable());
+
+    // A Bayesian run registers random subsamples; a low-rank nonrigid run uses random landmarks.
+    Scene s;
+    const auto points = Cloud(800, 51);
+    std::vector<glm::vec3> moved;
+    for (const auto& p : points) moved.push_back(p + glm::vec3(0.05f, -0.02f, 0.03f));
+    const auto source = Make(s.Registry, D::PointCloudPoint, points);
+    const auto target = Make(s.Registry, D::PointCloudPoint, moved);
+    R::CoherentPointDriftConfig bayesian{.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
+                                         .Method = M::Bayesian, .OutlierWeight = 0.1, .Output = O::DisplacementProperty,
+                                         .DisplacementName = "bcpd", .Subsample = 300};
+    bayesian.SubsampleSampling.Method = R::PointSamplingMethod::Random;
+    bayesian.SubsampleSampling.Seed = 4u;
+    const auto subsampled = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), bayesian);
+    ASSERT_TRUE(subsampled.Succeeded()) << subsampled.Message;
+    R::CoherentPointDriftConfig lowRank{.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
+                                        .Method = M::Nonrigid, .OutlierWeight = 0.0, .Output = O::DisplacementProperty,
+                                        .DisplacementName = "warp", .LowRank = 30};
+    lowRank.LandmarkSampling.Method = R::PointSamplingMethod::Random;
+    const auto result = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), lowRank);
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_GT(result.KernelRank, 0u);
+}

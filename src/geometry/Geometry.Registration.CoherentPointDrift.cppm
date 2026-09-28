@@ -121,6 +121,10 @@ export namespace Geometry::CoherentPointDrift
         // like Hirose's reference implementation: with smooth kernels these terms bias the scale
         // downward and can collapse it (see paper.md).
         bool PosteriorVarianceTerms{false};
+        // How subsamples (SubsampleSource/Target) and kernel landmarks (LowRank, Nystrom E-step)
+        // are chosen (RUNTIME-289); the default is exact farthest point from point 0.
+        PointSampling::Params SubsampleSampling{};
+        PointSampling::Params LandmarkSampling{};
     };
 
     struct IterationTrace

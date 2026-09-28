@@ -207,7 +207,8 @@ namespace Geometry::CoherentPointDrift
             EStep::Sums& sums = AcceleratedSums;
             const EStep::Settings settings{.Policy = Config.EStep, .Tolerance = Config.EStepTolerance,
                                            .Threads = Config.Threads, .NystromLandmarks = Config.NystromLandmarks,
-                                           .NystromErrorLimit = Config.NystromErrorLimit};
+                                           .NystromErrorLimit = Config.NystromErrorLimit,
+                                           .NystromSampling = Config.LandmarkSampling};
             if (!Accelerated.Evaluate({Moved.X, Moved.Y, Moved.Z}, Sigma2, LogOutlierConstant(), settings, sums,
                                       SourceLogWeight))
                 return false;
@@ -654,20 +655,17 @@ namespace Geometry::CoherentPointDrift
             s.Source.Set(i, (Eigen::Vector3d(source[i].x, source[i].y, source[i].z) - s.MeanY) / s.Scale);
             s.Moved.Set(i, s.Source.At(i));
         }
-        // Exact farthest-point samples from point 0 (Geometry.PointSampling; ties: lowest index),
-        // cut before the first duplicate of an earlier sample.
-        const auto farthest = [](const Points& points, const std::size_t count)
+        // Subsamples by Params::SubsampleSampling (default: exact farthest point from point 0),
+        // cut before the first duplicate of an earlier sample; a method may return fewer.
+        const auto farthest = [&params](const Points& points, const std::size_t count)
         {
-            const auto order = PointSampling::Order(PointSampling::PointView{points.X, points.Y, points.Z}, {}, count);
-            std::vector<std::uint32_t> chosen;
-            for (std::size_t k = 0; k < order.Order.size() && order.Clearance[k] > 0.0; ++k)
-                chosen.push_back(order.Order[k]);
-            return chosen;
+            return EStep::SamplePoints({points.X, points.Y, points.Z}, count, params.SubsampleSampling);
         };
         if (params.Method == Variant::Bayesian && params.SubsampleTarget > 0u && params.SubsampleTarget < n)
         {
             const Points full = s.Target;
             const auto chosen = farthest(full, params.SubsampleTarget);
+            if (chosen.size() < 4u) return fail(Status::InvalidParameters);
             n = chosen.size();
             s.Target.Resize(n);
             s.Pt1.assign(n, 0.0);
@@ -678,6 +676,7 @@ namespace Geometry::CoherentPointDrift
             // Source becomes the samples; FullSource keeps every point for the interpolation.
             s.FullSource = s.Source;
             s.Samples = farthest(s.FullSource, registered);
+            if (s.Samples.size() < 4u) return fail(Status::InvalidParameters);
             m = s.Samples.size();
             s.Source.Resize(m); s.Moved.Resize(m); s.PX.Resize(m);
             s.P1.assign(m, 0.0); s.Scratch.assign(m, 0.0);
@@ -722,7 +721,7 @@ namespace Geometry::CoherentPointDrift
         {
             EStep::LowRankKernel kernel;
             if (!EStep::BuildLowRankGaussianKernel({s.Source.X, s.Source.Y, s.Source.Z}, params.Beta, params.LowRank,
-                                                   params.Threads, kernel))
+                                                   params.Threads, kernel, params.LandmarkSampling))
                 return fail(Status::SingularSystem);
             const Eigen::Index rank = Eigen::Index(kernel.Rank);
             s.Basis = Eigen::Map<const Eigen::MatrixXd>(kernel.Basis.data(), Eigen::Index(m), rank);

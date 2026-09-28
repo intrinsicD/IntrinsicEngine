@@ -795,7 +795,11 @@ different policies); each trace row carries the E-step policy that ran and its e
 low-rank runs report the kernel rank and its sampled approximation error. The `bayesian`
 method (METHOD-050, BCPD) adds `gamma`, `kappa` (0 keeps equal mixing weights) and
 `subsample` (farthest-point samples registered, deformation interpolated to every point);
-like nonrigid it writes positions or a displacement property.
+like nonrigid it writes positions or a displacement property. The shared
+`Extrinsic.Runtime.PointSamplingConfig` block (RUNTIME-289) makes the sampling method
+selectable: `subsample_*` chooses how the Bayesian source and target subsamples
+(`subsample`, `subsample_target`) are picked, `landmark_*` how the low-rank and Nystroem
+landmarks are picked (every `Geometry.PointSampling` method; exact farthest point by default).
 
 ### Sandbox Editor ICP Registration
 

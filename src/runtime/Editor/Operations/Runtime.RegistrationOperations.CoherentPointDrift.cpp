@@ -236,7 +236,9 @@ namespace Extrinsic::Runtime
                                       .NystromErrorLimit = config.NystromErrorLimit, .LowRank = config.LowRank,
                                       .Gamma = config.Gamma,
                                       .Kappa = config.Kappa > 0.0 ? config.Kappa : std::numeric_limits<double>::infinity(),
-                                      .SubsampleSource = config.Subsample};
+                                      .SubsampleSource = config.Subsample, .SubsampleTarget = config.SubsampleTarget,
+                                      .SubsampleSampling = ToPointSamplingParams(config.SubsampleSampling),
+                                      .LandmarkSampling = ToPointSamplingParams(config.LandmarkSampling)};
             return std::nullopt;
         }
 

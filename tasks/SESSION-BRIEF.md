@@ -14,6 +14,7 @@ picking backlog work; theme priorities and rationale live in
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
 - `METHOD-044` — Feature-aware patches and distortion-aware atlas merging (tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md)
 - `METHOD-045` — Preserve baseline regions while constructing UV charts (tasks/active/METHOD-045-baseline-preserving-atlas-cuts.md)
+- `RUNTIME-289` — Selectable point sampling wherever points are chosen (tasks/active/RUNTIME-289-selectable-point-sampling-in-consumers.md)
 - `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/active/UI-037-linear-domain-action-readiness-tooltips.md)
 - `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
 
@@ -172,7 +173,6 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `RUNTIME-212` — Progressive Poisson property-domain publication (tasks/backlog/runtime/RUNTIME-212-progressive-poisson-property-domain-publication.md)
 - blocked by `GEOM-061`: `RUNTIME-274` — Point-cloud subsampling editor workflow (tasks/backlog/runtime/RUNTIME-274-point-cloud-subsampling-workflow.md)
 - unblocked: `RUNTIME-275` — Gaussian noise editor operation (tasks/backlog/runtime/RUNTIME-275-gaussian-noise-editor-operation.md)
-- blocked by `GEOM-111`: `RUNTIME-289` — Selectable point sampling wherever points are chosen (tasks/backlog/runtime/RUNTIME-289-selectable-point-sampling-in-consumers.md)
 - blocked by `GEOM-111`: `RUNTIME-290` — Shared Vulkan execution seam for Geometry.PointSampling (tasks/backlog/runtime/RUNTIME-290-point-sampling-vulkan-execution-seam.md)
 - blocked by `RUNTIME-210`: `UI-042` — Signed Heat mesh method panel (tasks/backlog/ui/UI-042-signed-heat-mesh-panel.md)
 - blocked by `RUNTIME-211`: `UI-043` — K-Means property-domain panel (tasks/backlog/ui/UI-043-kmeans-property-domain-panel.md)

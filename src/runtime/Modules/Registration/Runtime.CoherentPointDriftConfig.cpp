@@ -8,6 +8,7 @@ module;
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 #include <nlohmann/json.hpp>
 module Extrinsic.Runtime.CoherentPointDriftConfig;
 
@@ -15,6 +16,7 @@ import Geometry.Properties.Types;
 
 #include "Config/internal/Runtime.PointConfigJson.hpp"
 #include "Config/internal/Runtime.ConfigFieldJson.hpp"
+#include "Config/internal/Runtime.PointSamplingConfigJson.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -34,7 +36,7 @@ namespace Extrinsic::Runtime
                                                               "Auto (fast Gauss or dense while wide, then truncated)",
                                                               "Fast Gauss transform (bounded error, parallel)",
                                                               "Nystroem (approximate while wide, then exact)"};
-        constexpr std::array kFields{
+        constexpr std::array kBaseFields{
             ConfigFieldSpec{.Name = "source", .Type = FT::UInt, .Description = "Stable id of the moving entity."},
             ConfigFieldSpec{.Name = "target", .Type = FT::UInt, .Description = "Stable id of the fixed entity."},
             ConfigFieldSpec{.Name = "source_positions", .Type = FT::PropertyRef, .Description = "Moving points: any vec3 position property on a point domain (Unknown picks the primary one).", .RefKinds = kVec3},
@@ -60,8 +62,24 @@ namespace Extrinsic::Runtime
             ConfigFieldSpec{.Name = "low_rank", .Type = FT::UInt, .Description = "Nonrigid and Bayesian: 0 solves with the full kernel (at most 8192 source points); k > 0 uses k kernel eigenpairs and allows large sources.", .Min = 0, .Max = 2000},
             ConfigFieldSpec{.Name = "gamma", .Type = FT::Float, .Description = "Bayesian: factor on the data-derived initial sigma^2.", .Min = 0, .Max = 100, .ExclusiveMin = true},
             ConfigFieldSpec{.Name = "kappa", .Type = FT::Float, .Description = "Bayesian: Dirichlet concentration of the mixing weights; small values adapt them to uneven density, 0 keeps them equal.", .Min = 0, .Max = 1e6},
-            ConfigFieldSpec{.Name = "subsample", .Type = FT::UInt, .Description = "Bayesian: register this many farthest-point samples and interpolate the deformation to every point (0 = all points, else at least 4).", .Min = 0, .Max = 1000000},
+            ConfigFieldSpec{.Name = "subsample", .Type = FT::UInt, .Description = "Bayesian: register this many source samples (subsample_method) and interpolate the deformation to every point (0 = all points, else at least 4).", .Min = 0, .Max = 1000000},
+            ConfigFieldSpec{.Name = "subsample_target", .Type = FT::UInt, .Description = "Bayesian: register against this many target samples (0 = all points, else at least 4); with omega = 0 unmatched samples bias the fit.", .Min = 0, .Max = 1000000},
         };
+
+        // Base fields plus the shared sampling blocks "subsample_" and "landmark_".
+        std::span<const ConfigFieldSpec> Fields()
+        {
+            static const std::vector<ConfigFieldSpec> fields = [] {
+                std::vector<ConfigFieldSpec> all(kBaseFields.begin(), kBaseFields.end());
+                for (const std::string_view prefix : {"subsample_", "landmark_"})
+                {
+                    const auto block = PointSamplingFieldSpecs(prefix);
+                    all.insert(all.end(), block.begin(), block.end());
+                }
+                return all;
+            }();
+            return fields;
+        }
 
         Json Encode(const CoherentPointDriftConfig& c)
         {
@@ -77,7 +95,15 @@ namespace Extrinsic::Runtime
                         {"e_step", unsigned(c.EStep)}, {"e_step_tolerance", c.EStepTolerance},
                         {"threads", c.Threads}, {"nystrom_landmarks", c.NystromLandmarks},
                         {"nystrom_error_limit", c.NystromErrorLimit}, {"low_rank", c.LowRank}, {"gamma", c.Gamma}, {"kappa", c.Kappa},
-                        {"subsample", c.Subsample}};
+                        {"subsample", c.Subsample}, {"subsample_target", c.SubsampleTarget}};
+        }
+
+        Json EncodeAll(const CoherentPointDriftConfig& c)
+        {
+            Json doc = Encode(c);
+            ConfigDetail::EncodePointSampling(doc, "subsample_", c.SubsampleSampling);
+            ConfigDetail::EncodePointSampling(doc, "landmark_", c.LandmarkSampling);
+            return doc;
         }
 
         CoherentPointDriftConfig Decode(const Json& doc)
@@ -109,6 +135,9 @@ namespace Extrinsic::Runtime
             c.Gamma = doc.at("gamma").get<double>();
             c.Kappa = doc.at("kappa").get<double>();
             c.Subsample = doc.at("subsample").get<std::uint32_t>();
+            c.SubsampleTarget = doc.at("subsample_target").get<std::uint32_t>();
+            ConfigDetail::DecodePointSampling(doc, "subsample_", c.SubsampleSampling);
+            ConfigDetail::DecodePointSampling(doc, "landmark_", c.LandmarkSampling);
             return c;
         }
 
@@ -122,15 +151,15 @@ namespace Extrinsic::Runtime
 
     std::string SerializeCoherentPointDriftConfig(const CoherentPointDriftConfig& config)
     {
-        return ConfigDetail::SerializeConfigJson(Encode(config));
+        return ConfigDetail::SerializeConfigJson(EncodeAll(config));
     }
 
     Core::Config::EngineConfigSectionValidationResult ValidateCoherentPointDriftConfigSection(
         std::string_view payload, std::string_view, std::string_view subject)
     {
         const auto input = ConfigDetail::ParseConfigJson(payload, false);
-        auto merged = Encode({});
-        if (auto error = ConfigDetail::ValidateDeclaredFields(input, merged, kFields,
+        auto merged = EncodeAll({});
+        if (auto error = ConfigDetail::ValidateDeclaredFields(input, merged, Fields(),
                 "Coherent Point Drift config must be an object.", "Unknown coherent point drift field: "))
             return ConfigDetail::RejectConfigSection(subject, *error);
         const auto c = Decode(merged);
@@ -144,6 +173,11 @@ namespace Extrinsic::Runtime
             return reject("Source and target must be different entities.");
         if (c.Subsample > 0u && c.Subsample < 4u)
             return reject("Subsample needs at least 4 points (or 0 for all points).");
+        if (c.SubsampleTarget > 0u && c.SubsampleTarget < 4u)
+            return reject("Target subsample needs at least 4 points (or 0 for all points).");
+        for (const auto* sampling : {&c.SubsampleSampling, &c.LandmarkSampling})
+            if (auto error = ValidatePointSamplingConfig(*sampling))
+                return reject(*error);
         return {.State = Core::Config::EngineConfigState::Valid,
                 .CanonicalPayloadJson = SerializeCoherentPointDriftConfig(c),
                 .ParsedFieldCount = static_cast<std::uint32_t>(input.is_object() ? input.size() : 0u)};
@@ -177,8 +211,8 @@ namespace Extrinsic::Runtime
                     "Coherent Point Drift",
                     "Probabilistic point-set registration (Myronenko & Song 2010): rigid, affine or nonrigid "
                     "alignment of a moving entity onto a fixed one.",
-                    kFields, Encode({}))};
+                    Fields(), EncodeAll({}))};
     }
 
-    std::span<const ConfigFieldSpec> CoherentPointDriftConfigFieldSpecs() noexcept { return kFields; }
+    std::span<const ConfigFieldSpec> CoherentPointDriftConfigFieldSpecs() noexcept { return Fields(); }
 }

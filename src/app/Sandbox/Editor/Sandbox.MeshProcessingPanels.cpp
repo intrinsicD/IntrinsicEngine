@@ -57,6 +57,7 @@ import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.ParameterizationConfig;
 
 #include "Sandbox.PanelSupport.hpp"
+#include "Sandbox.PointSamplingControls.hpp"
 
 namespace Extrinsic::Sandbox::Editor
 {
@@ -2834,6 +2835,23 @@ namespace Extrinsic::Sandbox::Editor
             changed |= DrawSpecInputDouble("Gamma##CPD", fields, "gamma", config.Gamma, defaults.Gamma);
             changed |= DrawSpecInputDouble("Kappa##CPD", fields, "kappa", config.Kappa, defaults.Kappa);
             changed |= DrawSpecInputUInt("Subsample##CPD", fields, "subsample", config.Subsample, defaults.Subsample);
+            changed |= DrawSpecInputUInt("Target subsample##CPD", fields, "subsample_target", config.SubsampleTarget,
+                                         defaults.SubsampleTarget);
+            if ((config.Subsample > 0u || config.SubsampleTarget > 0u) && ImGui::TreeNode("Subsampling##CPD"))
+            {
+                changed |= DrawPointSamplingControls("CPDSubsample", fields, "subsample_", config.SubsampleSampling,
+                                                     defaults.SubsampleSampling);
+                ImGui::TreePop();
+            }
+        }
+        const bool usesLandmarks = config.EStep == Runtime::CoherentPointDriftEStep::Nystrom ||
+                                   (config.LowRank > 0u && (config.Method == Runtime::CoherentPointDriftMethod::Nonrigid ||
+                                                            config.Method == Runtime::CoherentPointDriftMethod::Bayesian));
+        if (usesLandmarks && ImGui::TreeNode("Landmarks##CPD"))
+        {
+            changed |= DrawPointSamplingControls("CPDLandmarks", fields, "landmark_", config.LandmarkSampling,
+                                                 defaults.LandmarkSampling);
+            ImGui::TreePop();
         }
         if (ImGui::TreeNode("Performance##CPD"))
         {

@@ -667,9 +667,10 @@ namespace Geometry::CoherentPointDrift::EStep
         // Nystroem state: the fixed target's farthest-point order (cached), this call's source
         // landmarks, and the largest sigma^2 whose approximation was rejected (smaller kernels
         // are not retried, since the approximation only degrades as the kernel narrows).
-        Clustering TargetLandmarks{}, SourceLandmarks{};
+        std::vector<std::uint32_t> TargetLandmarks{}; // progressive order of the fixed target (cached)
         std::vector<double> LandmarkX{}, LandmarkY{}, LandmarkZ{}, LandmarkZero{};
         double NystromRejectedSigma2{0.0};
+        bool TargetLandmarksExhausted{false}; // the target order ended (duplicates) before the request
         std::size_t NystromLandmarks{0u}; // count that last passed (the next call starts there)
 
         void UpdateScales(const std::vector<double>& p1)
@@ -1132,22 +1133,26 @@ namespace Geometry::CoherentPointDrift::EStep
         // P1 entry is not positive, or when the sampled relative error (exact rows: 32 target
         // denominators and 32 source P1 entries) exceeds the limit; `out` is then unspecified.
         bool NystromRows(const PointSet& moved, const double sigma2, const double logC, const std::size_t landmarks,
-                         const double errorLimit, Sums& out, const std::uint32_t threads, double& sampledError,
-                         std::uint64_t& evaluations)
+                         const double errorLimit, const PointSampling::Params& sampling, Sums& out,
+                         const std::uint32_t threads, double& sampledError, std::uint64_t& evaluations)
         {
             const PointSet target = Target();
             const std::size_t n = target.Size(), m = moved.Size();
             const std::size_t half = std::max<std::size_t>(1u, landmarks / 2u);
-            if (TargetLandmarks.Centers.size() < std::min(half, n))
-                FarthestPointClusters(target, half, threads, TargetLandmarks);
-            FarthestPointClusters(moved, half, threads, SourceLandmarks);
-            LandmarkX.clear(); LandmarkY.clear(); LandmarkZ.clear();
-            for (std::size_t k = 0; k < std::min(half, TargetLandmarks.Centers.size()); ++k)
+            // Progressive orders: a longer request extends the cached target prefix.
+            if (TargetLandmarks.size() < std::min(half, n) && !TargetLandmarksExhausted)
             {
-                const std::size_t j = TargetLandmarks.Centers[k];
+                TargetLandmarks = SamplePoints(target, half, sampling);
+                TargetLandmarksExhausted = TargetLandmarks.size() < std::min(half, n);
+            }
+            const std::vector<std::uint32_t> sourceLandmarks = SamplePoints(moved, half, sampling);
+            LandmarkX.clear(); LandmarkY.clear(); LandmarkZ.clear();
+            for (std::size_t k = 0; k < std::min(half, TargetLandmarks.size()); ++k)
+            {
+                const std::size_t j = TargetLandmarks[k];
                 LandmarkX.push_back(target.X[j]); LandmarkY.push_back(target.Y[j]); LandmarkZ.push_back(target.Z[j]);
             }
-            for (const std::uint32_t i : SourceLandmarks.Centers)
+            for (const std::uint32_t i : sourceLandmarks)
             {
                 LandmarkX.push_back(moved.X[i]); LandmarkY.push_back(moved.Y[i]); LandmarkZ.push_back(moved.Z[i]);
             }
@@ -1304,6 +1309,7 @@ namespace Geometry::CoherentPointDrift::EStep
         s.TargetClusters = {};
         s.HasScales = false;
         s.TargetLandmarks = {};
+        s.TargetLandmarksExhausted = false;
         s.NystromRejectedSigma2 = 0.0;
         s.NystromLandmarks = 0u;
     }
@@ -1359,8 +1365,8 @@ namespace Geometry::CoherentPointDrift::EStep
                 spent += (2.0 * double(m) + double(n)) * l + 2.0 * l * l * l;
                 if (spent >= 0.5 * dense) break;
                 std::uint64_t evaluations = 0u;
-                nystrom = s.NystromRows(moved, sigma2, logOutlier, landmarks, settings.NystromErrorLimit, out, threads,
-                                        sampledError, evaluations);
+                nystrom = s.NystromRows(moved, sigma2, logOutlier, landmarks, settings.NystromErrorLimit,
+                                        settings.NystromSampling, out, threads, sampledError, evaluations);
                 nystromEvaluations += evaluations;
                 if (nystrom)
                 {
@@ -1445,8 +1451,23 @@ namespace Geometry::CoherentPointDrift::EStep
         return std::isfinite(out.LogDenominatorSum) && out.Matched > std::numeric_limits<double>::min() * double(n);
     }
 
+    std::vector<std::uint32_t> SamplePoints(const PointSet points, const std::size_t count,
+                                            const PointSampling::Params& params)
+    {
+        const auto order = PointSampling::Order(PointSampling::PointView{points.X, points.Y, points.Z}, params, count);
+        std::vector<std::uint32_t> out;
+        if (!order.Succeeded()) return out;
+        for (std::size_t k = 0; k < order.Order.size(); ++k)
+        {
+            if (k > 0 && !order.Clearance.empty() && !(order.Clearance[k] > 0.0)) break;
+            out.push_back(order.Order[k]);
+        }
+        return out;
+    }
+
     bool BuildLowRankGaussianKernel(const PointSet points, const double beta, const std::uint32_t rank,
-                                    const std::uint32_t threads, LowRankKernel& out)
+                                    const std::uint32_t threads, LowRankKernel& out,
+                                    const PointSampling::Params& landmarkSampling)
     {
         out = {};
         const std::size_t m = points.Size();
@@ -1462,12 +1483,8 @@ namespace Geometry::CoherentPointDrift::EStep
         // lowest index), cut before the first duplicate of an earlier landmark.
         const std::size_t landmarkCount = std::min<std::size_t>(m, std::max<std::size_t>(2u * rank, rank + 32u));
         std::vector<std::size_t> landmarks;
-        {
-            const auto order = PointSampling::Order(PointSampling::PointView{points.X, points.Y, points.Z}, {}, landmarkCount);
-            if (!order.Succeeded()) return false;
-            for (std::size_t k = 0; k < order.Order.size() && order.Clearance[k] > 0.0; ++k)
-                landmarks.push_back(order.Order[k]);
-        }
+        for (const std::uint32_t i : SamplePoints(points, landmarkCount, landmarkSampling)) landmarks.push_back(i);
+        if (landmarks.empty()) return false;
         const Eigen::Index count = Eigen::Index(landmarks.size());
 
         // G ~= C W^+ C^T = F F^T with C_il = k(p_i, z_l), W = k(z, z) and F = C U S^{-1/2} on W's

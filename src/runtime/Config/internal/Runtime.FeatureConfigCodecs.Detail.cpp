@@ -25,11 +25,13 @@ import Extrinsic.Runtime.CurvatureSegmentationConfig;
 import Extrinsic.Runtime.ParameterizationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.ProgressivePoissonConfig;
+import Extrinsic.Runtime.PointSamplingConfig;
 import Extrinsic.Runtime.GeometryProperty.Types;
 import Extrinsic.Runtime.ConfigFieldSpec;
 import Geometry.Properties.Types;
 
 #include "Config/internal/Runtime.PointConfigJson.hpp"
+#include "Config/internal/Runtime.PointSamplingConfigJson.hpp"
 #include "Config/internal/Runtime.ConfigFieldJson.hpp"
 
 namespace Extrinsic::Runtime::ConfigDetail
@@ -3266,5 +3268,62 @@ namespace Extrinsic::Runtime
                 PointCloudConsolidationConfig{}),
             ValidatePointCloudConsolidationConfigSection,
             std::move(onChanged));
+    }
+}
+
+namespace Extrinsic::Runtime::ConfigDetail
+{
+    void EncodePointSampling(nlohmann::json& o, const std::string_view prefix, const PointSamplingConfig& c)
+    {
+        const auto key = [&](const char* suffix) { return std::string(prefix) + suffix; };
+        o[key("method")] = unsigned(c.Method);
+        o[key("seed")] = c.Seed;
+        o[key("eta")] = c.Eta;
+        o[key("candidate_cap")] = c.CandidateCap;
+        o[key("beta")] = c.Beta;
+        o[key("batch_priority")] = unsigned(c.BatchPriority);
+        o[key("batch_ordering")] = unsigned(c.BatchOrdering);
+        o[key("void_density")] = c.VoidDensity;
+        o[key("poisson_selection")] = unsigned(c.PoissonSelection);
+        o[key("poisson_retries")] = c.PoissonRetries;
+        o[key("poisson_repair_levels")] = c.PoissonRepairLevels;
+        o[key("poisson_budget")] = c.PoissonBudget;
+        o[key("poisson_random_phases")] = c.PoissonRandomPhases;
+        o[key("poisson_balanced")] = c.PoissonBalanced;
+        o[key("poisson_grid_width")] = c.PoissonGridWidth;
+        o[key("poisson_max_levels")] = c.PoissonMaxLevels;
+        o[key("elimination_alpha")] = c.EliminationAlpha;
+        o[key("elimination_radius")] = c.EliminationRadius;
+        o[key("manifold_dimension")] = c.ManifoldDimension;
+    }
+
+    void DecodePointSampling(const nlohmann::json& o, const std::string_view prefix, PointSamplingConfig& c)
+    {
+        const auto read = [&](const char* suffix, auto& value) {
+            const auto it = o.find(std::string(prefix) + suffix);
+            if (it == o.end()) return;
+            using T = std::remove_cvref_t<decltype(value)>;
+            if constexpr (std::is_enum_v<T>) value = T(it->template get<unsigned>());
+            else value = it->template get<T>();
+        };
+        read("method", c.Method);
+        read("seed", c.Seed);
+        read("eta", c.Eta);
+        read("candidate_cap", c.CandidateCap);
+        read("beta", c.Beta);
+        read("batch_priority", c.BatchPriority);
+        read("batch_ordering", c.BatchOrdering);
+        read("void_density", c.VoidDensity);
+        read("poisson_selection", c.PoissonSelection);
+        read("poisson_retries", c.PoissonRetries);
+        read("poisson_repair_levels", c.PoissonRepairLevels);
+        read("poisson_budget", c.PoissonBudget);
+        read("poisson_random_phases", c.PoissonRandomPhases);
+        read("poisson_balanced", c.PoissonBalanced);
+        read("poisson_grid_width", c.PoissonGridWidth);
+        read("poisson_max_levels", c.PoissonMaxLevels);
+        read("elimination_alpha", c.EliminationAlpha);
+        read("elimination_radius", c.EliminationRadius);
+        read("manifold_dimension", c.ManifoldDimension);
     }
 }

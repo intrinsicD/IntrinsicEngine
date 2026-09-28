@@ -41,6 +41,8 @@ module;
 
 export module Geometry.Registration.CoherentPointDrift.EStep;
 
+export import Geometry.PointSampling;
+
 export namespace Geometry::CoherentPointDrift
 {
     enum class EStepPolicy : std::uint8_t
@@ -81,6 +83,8 @@ export namespace Geometry::CoherentPointDrift::EStep
         // error of the row denominators and P1 entries.
         std::uint32_t NystromLandmarks{256u};
         double NystromErrorLimit{1.0e-3};
+        // Nystrom: how the landmarks are chosen from each set (default exact farthest point).
+        PointSampling::Params NystromSampling{};
     };
 
     struct Sums
@@ -145,5 +149,11 @@ export namespace Geometry::CoherentPointDrift::EStep
     // G ~= Basis diag(Eigenvalues) Basis^T for G_ij = exp(-|p_i - p_j|^2 / (2 beta^2)).
     // Returns false for empty input, a non-positive beta or rank, or a numerically empty kernel.
     [[nodiscard]] bool BuildLowRankGaussianKernel(PointSet points, double beta, std::uint32_t rank,
-                                                  std::uint32_t threads, LowRankKernel& out);
+                                                  std::uint32_t threads, LowRankKernel& out,
+                                                  const PointSampling::Params& landmarkSampling = {});
+
+    // The first `count` points of `params`' progressive order, cut before the first duplicate
+    // of an earlier sample (zero clearance) for the farthest-point family.
+    [[nodiscard]] std::vector<std::uint32_t> SamplePoints(PointSet points, std::size_t count,
+                                                          const PointSampling::Params& params);
 }

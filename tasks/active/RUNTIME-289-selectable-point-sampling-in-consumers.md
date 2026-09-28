@@ -20,7 +20,7 @@ contracts: [method.engine-integration, geometry.element-domain-sources]
   together), and later consumers.
 
 ## Acceptance criteria
-- [ ] Shared runtime config struct + validator + panel helper; the runtime enum mirrors `PointSamplingMethod` with a static_assert.
+- [x] Shared runtime config struct + validator + panel helper; the runtime enum mirrors `PointSamplingMethod` with a static_assert.
 - [ ] The progressive Poisson options of GEOM-112 (cell policy, retries, budget, priority property and bands, phase order, ordering, order-only, profiles) are fields of the shared block.
 - [ ] CPD: `subsample_method`, target subsample, landmark method; consolidation: initial-sample method (CPU and GPU paths identical).
 - [ ] Agent fields and contract tests per consumer.
@@ -42,3 +42,12 @@ contracts: [method.engine-integration, geometry.element-domain-sources]
 ```bash
 ctest --test-dir build/ci --output-on-failure -R 'CoherentPointDrift|Consolidation|PointSampling' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
 ```
+
+## Log
+- 2026-09-28 slice 1: `Extrinsic.Runtime.PointSamplingConfig` (prefixed field specs, validator,
+  geometry mapping with static_asserts), JSON codec in the internal codec unit, panel helper
+  `Sandbox.PointSamplingControls.hpp`; CPD consumes it (`subsample_*`, `subsample_target`,
+  `landmark_*` for low rank and Nystroem). Default exact farthest point keeps every earlier
+  result. Next: consolidation initial samples (hand-written codec; CPU and GPU paths through
+  one helper), then the backend axis with RUNTIME-290.
+
