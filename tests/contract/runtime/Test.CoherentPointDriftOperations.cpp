@@ -82,7 +82,8 @@ TEST(CoherentPointDriftOperations, ConfigRoundTripsAndRejectsUnstorableOutputs)
     R::CoherentPointDriftConfig config{.SourceStableEntityId = 3, .TargetStableEntityId = 4, .Method = M::Nonrigid,
                                        .OutlierWeight = 0.2, .Beta = 1.5, .Output = O::DisplacementProperty,
                                        .DisplacementName = "warp", .EStep = R::CoherentPointDriftEStep::Truncated,
-                                       .EStepTolerance = 1e-4, .Threads = 3, .LowRank = 40};
+                                       .EStepTolerance = 1e-4, .Threads = 3, .NystromLandmarks = 128,
+                                       .NystromErrorLimit = 1e-4, .LowRank = 40};
     const auto decoded = R::DecodeCoherentPointDriftConfig(R::SerializeCoherentPointDriftConfig(config));
     ASSERT_TRUE(decoded.has_value());
     EXPECT_EQ(decoded->Method, M::Nonrigid);
@@ -92,6 +93,8 @@ TEST(CoherentPointDriftOperations, ConfigRoundTripsAndRejectsUnstorableOutputs)
     EXPECT_EQ(decoded->EStepTolerance, 1e-4);
     EXPECT_EQ(decoded->Threads, 3u);
     EXPECT_EQ(decoded->LowRank, 40u);
+    EXPECT_EQ(decoded->NystromLandmarks, 128u);
+    EXPECT_EQ(decoded->NystromErrorLimit, 1e-4);
     const auto invalid = [&](R::CoherentPointDriftConfig c) {
         return !registration.Validate(R::SerializeCoherentPointDriftConfig(c), {}, "test").Usable();
     };
@@ -103,6 +106,9 @@ TEST(CoherentPointDriftOperations, ConfigRoundTripsAndRejectsUnstorableOutputs)
     EXPECT_TRUE(invalid({.EStepTolerance = 0.0}));
     EXPECT_TRUE(invalid({.EStepTolerance = 1.0}));
     EXPECT_TRUE(invalid({.LowRank = 5000}));
+    EXPECT_TRUE(invalid({.NystromLandmarks = 1}));
+    EXPECT_TRUE(invalid({.NystromLandmarks = 5000}));
+    EXPECT_TRUE(invalid({.NystromErrorLimit = 0.0}));
     EXPECT_FALSE(registration.Validate(R"({"no_such_field":1})", {}, "test").Usable());
 }
 
@@ -378,4 +384,23 @@ TEST(CoherentPointDriftOperations, DeformedMeshesGetRecomputedNormalsAndParented
     const auto parented = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), config);
     EXPECT_EQ(parented.Status, R::EditorCommandStatus::InvalidProcessingParameters);
     EXPECT_NE(parented.Message.find("unparented"), std::string::npos) << parented.Message;
+}
+
+TEST(CoherentPointDriftOperations, NystromEStepReportsItsBackendAndSampledError)
+{
+    Scene s;
+    const auto points = Cloud(1500, 23);
+    std::vector<glm::vec3> moved;
+    const glm::mat3 turn = glm::mat3(glm::rotate(glm::mat4(1.0f), 0.25f, glm::vec3(0.0f, 0.0f, 1.0f)));
+    for (const auto& p : points) moved.push_back(turn * p + glm::vec3(0.1f, -0.05f, 0.0f));
+    const auto source = Make(s.Registry, D::PointCloudPoint, points);
+    const auto target = Make(s.Registry, D::PointCloudPoint, moved);
+    const auto result = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), {
+        .SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target), .OutlierWeight = 0.0,
+        .EStep = R::CoherentPointDriftEStep::Nystrom, .NystromLandmarks = 64});
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_EQ(result.Backend, "cpu_nystrom");
+    EXPECT_GT(result.EStepSampledError, 0.0);
+    EXPECT_LE(result.EStepSampledError, 1e-3);
+    EXPECT_NEAR(s.Registry.Raw().get<T::Component>(source).Position.x, 0.1f, 1e-3f);
 }

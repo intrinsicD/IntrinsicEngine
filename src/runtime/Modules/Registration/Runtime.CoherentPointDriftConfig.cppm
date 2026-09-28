@@ -25,9 +25,10 @@ export namespace Extrinsic::Runtime
     enum class CoherentPointDriftOutput : std::uint8_t { SourceTransform, Positions, DisplacementProperty };
     // E-step backend (METHOD-049): the single-threaded reference, exact parallel dense,
     // truncated or fast Gauss transform (both with a computed relative error bound), or
-    // automatic (fast Gauss or dense while the kernel is wide, truncated once it is narrow).
+    // automatic (fast Gauss or dense while the kernel is wide, truncated once it is narrow), or
+    // Nystroem (METHOD-053: approximate while wide, sampled error estimate, exact once narrow).
     // Values match Geometry::CoherentPointDrift::EStepPolicy.
-    enum class CoherentPointDriftEStep : std::uint8_t { Reference, Dense, Truncated, Auto, FastGauss };
+    enum class CoherentPointDriftEStep : std::uint8_t { Reference, Dense, Truncated, Auto, FastGauss, Nystrom };
 
     struct CoherentPointDriftConfig
     {
@@ -52,6 +53,9 @@ export namespace Extrinsic::Runtime
         CoherentPointDriftEStep EStep{CoherentPointDriftEStep::Auto};
         double EStepTolerance{1.0e-6};
         std::uint32_t Threads{0u};  // 0: all cores
+        // Nystrom E-step: landmarks and the largest accepted sampled relative error.
+        std::uint32_t NystromLandmarks{256u};
+        double NystromErrorLimit{1.0e-3};
         std::uint32_t LowRank{0u};  // nonrigid/Bayesian: 0 solves with the full kernel, k > 0 with k eigenpairs
         // Bayesian (METHOD-050): initial sigma^2 factor, Dirichlet concentration of the mixing
         // weights (0 keeps them equal, i.e. infinity) and farthest-point samples to register

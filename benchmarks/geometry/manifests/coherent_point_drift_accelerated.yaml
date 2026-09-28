@@ -13,8 +13,8 @@ params:
   build_preset: ci-release
   sizes: [1000, 10000, 100000]
   fixture: bumpy ellipsoid surface samples; target rotated 0.35 rad, translated, noise 0.004, 5% uniform clutter
-  rigid_runs: [reference, truncated and fast_gauss (<= 10000 points), dense, auto, single-thread dense and auto (<= 10000 points)]
-  nonrigid_runs: [full kernel with auto E-step (<= 2000 points), low rank 50 and 150 with auto E-step]
+  rigid_runs: [reference, truncated and fast_gauss (<= 10000 points), dense, auto, nystrom (METHOD-053), single-thread dense and auto (<= 10000 points)]
+  nonrigid_runs: [full kernel with auto E-step (<= 2000 points), low rank 50 and 150 with auto E-step, low rank 50 with nystrom E-step]
   nonrigid_max_iterations: 150
   e_step_tolerance: 1.0e-6
   outlier_weight: 0.05
@@ -27,5 +27,6 @@ metrics: [runtime_ms, quality_error_l2, quality_error_linf]
 thresholds:
   # quality_error_l2: RMS distance of the registered source to its ground-truth image.
   quality_error_l2_max: 0.001
-  # quality_error_linf: max point difference of any rigid policy to its oracle (bounded policies at tol 1e-6).
+  # quality_error_linf: max point difference of any rigid policy to its oracle (bounded policies at tol 1e-6,
+  # and the approximate Nystrom policy at its default error limit 1e-3).
   quality_error_linf_max: 1.0e-4

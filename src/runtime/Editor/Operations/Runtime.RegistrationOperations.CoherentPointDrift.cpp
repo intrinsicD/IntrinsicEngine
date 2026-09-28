@@ -132,7 +132,8 @@ namespace Extrinsic::Runtime
                       std::uint8_t(CoherentPointDriftEStep::Dense) == std::uint8_t(CPD::EStepPolicy::Dense) &&
                       std::uint8_t(CoherentPointDriftEStep::Truncated) == std::uint8_t(CPD::EStepPolicy::Truncated) &&
                       std::uint8_t(CoherentPointDriftEStep::Auto) == std::uint8_t(CPD::EStepPolicy::Auto) &&
-                      std::uint8_t(CoherentPointDriftEStep::FastGauss) == std::uint8_t(CPD::EStepPolicy::FastGauss));
+                      std::uint8_t(CoherentPointDriftEStep::FastGauss) == std::uint8_t(CPD::EStepPolicy::FastGauss) &&
+                      std::uint8_t(CoherentPointDriftEStep::Nystrom) == std::uint8_t(CPD::EStepPolicy::Nystrom));
 
         std::size_t MinimumPoints(CoherentPointDriftMethod method) noexcept
         {
@@ -231,7 +232,9 @@ namespace Extrinsic::Runtime
                                       .NormalizeInputs = config.NormalizeInputs, .EstimateScale = config.EstimateScale,
                                       .AllowReflection = config.AllowReflection, .Beta = config.Beta, .Lambda = config.Lambda,
                                       .EStep = CPD::EStepPolicy(config.EStep), .EStepTolerance = config.EStepTolerance,
-                                      .Threads = config.Threads, .LowRank = config.LowRank, .Gamma = config.Gamma,
+                                      .Threads = config.Threads, .NystromLandmarks = config.NystromLandmarks,
+                                      .NystromErrorLimit = config.NystromErrorLimit, .LowRank = config.LowRank,
+                                      .Gamma = config.Gamma,
                                       .Kappa = config.Kappa > 0.0 ? config.Kappa : std::numeric_limits<double>::infinity(),
                                       .SubsampleSource = config.Subsample};
             return std::nullopt;
@@ -259,6 +262,7 @@ namespace Extrinsic::Runtime
             result.Termination = std::string(CPD::ToString(current.Stop));
             result.Backend = std::string(current.Backend);
             result.EStepErrorBound = current.EStepErrorBound;
+            result.EStepSampledError = current.EStepSampledError;
             result.KernelRank = current.KernelRank;
             result.KernelApproximationError = current.KernelApproximationError;
             result.MeanDisplacement = preview.empty() ? 0.0 : displacement / double(preview.size());
@@ -297,7 +301,8 @@ namespace Extrinsic::Runtime
                                               .NegativeLogLikelihood = trace.NegativeLogLikelihood,
                                               .Objective = trace.Objective, .MatchedWeight = trace.MatchedWeight,
                                               .EStep = std::string(CPD::ToString(trace.EStep)),
-                                              .EStepErrorBound = trace.EStepErrorBound});
+                                              .EStepErrorBound = trace.EStepErrorBound,
+                                              .EStepSampledError = trace.EStepSampledError});
             };
             while (!run.Solver.Finished())
             {

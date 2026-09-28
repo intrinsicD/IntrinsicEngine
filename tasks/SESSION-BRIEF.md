@@ -13,6 +13,7 @@ picking backlog work; theme priorities and rationale live in
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
 - `METHOD-044` — Feature-aware patches and distortion-aware atlas merging (tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md)
 - `METHOD-045` — Preserve baseline regions while constructing UV charts (tasks/active/METHOD-045-baseline-preserving-atlas-cuts.md)
+- `METHOD-053` — Nystroem E-step for Coherent Point Drift (opt-in, a-posteriori error) (tasks/active/METHOD-053-coherent-point-drift-nystroem-e-step.md)
 - `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/active/UI-037-linear-domain-action-readiness-tooltips.md)
 - `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
 
@@ -155,6 +156,7 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `METHOD-032`: `METHOD-036` — Normal-orientation method comparison evidence (publication protocol) (tasks/backlog/methods/METHOD-036-orientation-comparison-evidence.md)
 - unblocked: `METHOD-048` — Full HKTex mesh authoring, compiled rendering and measured default adoption (tasks/backlog/methods/METHOD-048-hktex-mesh-textures.md)
 - unblocked: `METHOD-052` — Anderson acceleration for Coherent Point Drift EM (tasks/backlog/methods/METHOD-052-coherent-point-drift-anderson-acceleration.md)
+- unblocked: `METHOD-054` — Geodesic Bayesian Coherent Point Drift (GBCPD) (tasks/backlog/methods/METHOD-054-geodesic-bayesian-coherent-point-drift.md)
 - unblocked: `RUNTIME-210` — Signed Heat runtime and config integration (tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md)
 - unblocked: `RUNTIME-211` — K-Means property-domain integration (tasks/backlog/runtime/RUNTIME-211-kmeans-property-domain-integration.md)
 - unblocked: `RUNTIME-212` — Progressive Poisson property-domain publication (tasks/backlog/runtime/RUNTIME-212-progressive-poisson-property-domain-publication.md)

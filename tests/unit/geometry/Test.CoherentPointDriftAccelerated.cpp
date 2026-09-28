@@ -104,12 +104,14 @@ TEST(CoherentPointDriftAccelerated, ResultsAreBitwiseIdenticalAcrossThreadCounts
 {
     const auto source = Cloud(500, 21);
     const auto target = Rigid(source, 0.3, {0.1, 0.2, -0.1}, 0.003, 4);
-    for (const CPD::EStepPolicy policy : {CPD::EStepPolicy::Dense, CPD::EStepPolicy::Truncated, CPD::EStepPolicy::Auto})
+    for (const CPD::EStepPolicy policy : {CPD::EStepPolicy::Dense, CPD::EStepPolicy::Truncated, CPD::EStepPolicy::Auto,
+                                          CPD::EStepPolicy::Nystrom})
     {
         std::vector<CPD::Result> runs;
         for (const std::uint32_t threads : {1u, 3u, 8u})
             runs.push_back(CPD::Register(target, source, CPD::Params{.OutlierWeight = 0.05, .MaxIterations = 40,
-                                                                     .EStep = policy, .Threads = threads}));
+                                                                     .EStep = policy, .Threads = threads,
+                                                                     .NystromLandmarks = 16u}));
         for (const auto& run : runs)
         {
             ASSERT_TRUE(run.Succeeded());
@@ -224,6 +226,90 @@ TEST(CoherentPointDriftAccelerated, FastGaussRegistrationMatchesTheReference)
     EXPECT_TRUE(b.Backend == "cpu_ifgt" || b.Backend == "cpu_mixed") << b.Backend;
     EXPECT_GT(fastIterations, 0u);
     EXPECT_LE(b.EStepErrorBound, 2e-9);
+    EXPECT_LE(MaxPointDifference(a, b), 1e-5);
+}
+
+// METHOD-053: the Nystroem E-step's sampled error is an estimate; on wide kernels it tracks the
+// actual error of every row, and narrow kernels are rejected and redone exactly.
+TEST(CoherentPointDriftAccelerated, NystromSampledErrorTracksTheActualExpectationError)
+{
+    // Large enough that 48 landmarks cost well below the dense rows (small inputs run exactly).
+    const auto targetPoints = Cloud(1200, 81);
+    const auto movedPoints = Rigid(Cloud(1000, 82), 0.2, {0.1, 0.0, 0.05}, 0.01, 9);
+    const Soa target(targetPoints), moved(movedPoints);
+    CPD::EStep::Evaluator dense, nystrom;
+    dense.SetTarget(target.View());
+    for (const double sigma2 : {8.0, 2.0, 0.5, 0.1})
+    {
+        nystrom.SetTarget(target.View()); // no rejection memory between the kernels
+        CPD::EStep::Sums exact, approx;
+        ASSERT_TRUE(dense.Evaluate(moved.View(), sigma2, std::log(0.05), {.Policy = CPD::EStepPolicy::Dense}, exact));
+        ASSERT_TRUE(nystrom.Evaluate(moved.View(), sigma2, std::log(0.05),
+                                     {.Policy = CPD::EStepPolicy::Nystrom, .NystromLandmarks = 48u,
+                                      .NystromErrorLimit = 1.0}, approx));
+        ASSERT_EQ(approx.Used, CPD::EStepPolicy::Nystrom) << "sigma2=" << sigma2;
+        EXPECT_EQ(approx.ErrorBound, 0.0) << "no bound is claimed";
+        double pt1 = 0.0, p1 = 0.0;
+        for (std::size_t j = 0; j < exact.Pt1.size(); ++j) pt1 = std::max(pt1, std::abs(exact.Pt1[j] - approx.Pt1[j]));
+        for (std::size_t i = 0; i < exact.P1.size(); ++i)
+            p1 = std::max(p1, std::abs(exact.P1[i] - approx.P1[i]) / exact.P1[i]);
+        std::printf("sigma2 %g: sampled %.3g, max Pt1 delta %.3g, max relative P1 delta %.3g\n", sigma2,
+                    approx.SampledError, pt1, p1);
+        // Wide kernels are nearly low rank: the approximation is accurate, and the estimate from
+        // 64 sampled rows is within a small factor of the worst of all rows (measured: <= 3x).
+        if (sigma2 >= 8.0) EXPECT_LE(p1, 1e-6) << "sigma2=" << sigma2;
+        EXPECT_LE(p1, 10.0 * approx.SampledError + 1e-12) << "sigma2=" << sigma2;
+    }
+    // A narrow kernel misses the default limit and is evaluated exactly.
+    nystrom.SetTarget(target.View());
+    CPD::EStep::Sums exact, fallback;
+    ASSERT_TRUE(nystrom.Evaluate(moved.View(), 1e-4, std::log(0.05),
+                                 {.Policy = CPD::EStepPolicy::Nystrom, .NystromLandmarks = 48u}, fallback));
+    EXPECT_NE(fallback.Used, CPD::EStepPolicy::Nystrom);
+    EXPECT_EQ(fallback.SampledError, 0.0);
+    ASSERT_TRUE(dense.Evaluate(moved.View(), 1e-4, std::log(0.05), {.Policy = fallback.Used}, exact));
+    EXPECT_EQ(exact.LogDenominatorSum, fallback.LogDenominatorSum);
+    EXPECT_EQ(exact.P1, fallback.P1);
+}
+
+TEST(CoherentPointDriftAccelerated, NystromRunsExactlyWhereItWouldNotPay)
+{
+    const auto source = Cloud(300, 93);
+    const auto target = Rigid(source, 0.2, {0.1, 0.0, 0.0}, 0.003, 3);
+    std::size_t nystromIterations = 0;
+    const auto result = CPD::Register(target, source, CPD::Params{.OutlierWeight = 0.05, .EStep = CPD::EStepPolicy::Nystrom},
+                                      [&](const CPD::IterationTrace& t) { nystromIterations += t.EStep == CPD::EStepPolicy::Nystrom; });
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_EQ(nystromIterations, 0u) << "256 landmarks cost more than the dense rows of 300 x 300 points";
+    EXPECT_EQ(result.EStepSampledError, 0.0);
+    EXPECT_EQ(result.Backend, "cpu_auto") << "no iteration was approximated";
+}
+
+TEST(CoherentPointDriftAccelerated, NystromRegistrationMatchesTheReference)
+{
+    const auto source = Cloud(1500, 91);
+    const auto target = Rigid(source, 0.3, {0.2, 0.1, -0.1}, 0.003, 5);
+    const CPD::Params reference{.OutlierWeight = 0.05, .MaxIterations = 80};
+    CPD::Params approximate = reference;
+    approximate.EStep = CPD::EStepPolicy::Nystrom;
+    approximate.NystromLandmarks = 64u;
+    std::size_t nystromIterations = 0, exactIterations = 0;
+    const auto a = CPD::Register(target, source, reference);
+    const auto b = CPD::Register(target, source, approximate, [&](const CPD::IterationTrace& t)
+    {
+        (t.EStep == CPD::EStepPolicy::Nystrom ? nystromIterations : exactIterations) += 1u;
+        EXPECT_EQ(t.EStepSampledError > 0.0, t.EStep == CPD::EStepPolicy::Nystrom);
+    });
+    ASSERT_TRUE(a.Succeeded() && b.Succeeded());
+    EXPECT_EQ(b.RequestedBackend, "cpu_nystrom");
+    EXPECT_EQ(b.Backend, "cpu_nystrom");
+    // Wide early iterations are approximated, the narrow tail runs exactly.
+    EXPECT_GT(nystromIterations, 0u);
+    EXPECT_GT(exactIterations, 0u);
+    EXPECT_LE(b.EStepSampledError, approximate.NystromErrorLimit);
+    EXPECT_LE(b.KernelEvaluations, a.KernelEvaluations);
+    std::printf("nystrom %zu, exact %zu iterations; reference %u; max point delta %.3g\n", nystromIterations,
+                exactIterations, a.Iterations, MaxPointDifference(a, b));
     EXPECT_LE(MaxPointDifference(a, b), 1e-5);
 }
 
@@ -342,6 +428,14 @@ TEST(CoherentPointDriftAccelerated, InvalidAccelerationSettingsFailClosed)
                   CPD::Status::InvalidParameters);
     EXPECT_EQ(CPD::Register(source, source, CPD::Params{.EStep = CPD::EStepPolicy(9)}).State,
               CPD::Status::InvalidParameters);
+    for (const std::uint32_t landmarks : {0u, 1u, CPD::kMaxNystromLandmarks + 1u})
+        EXPECT_EQ(CPD::Register(source, source, CPD::Params{.EStep = CPD::EStepPolicy::Nystrom,
+                                                            .NystromLandmarks = landmarks}).State,
+                  CPD::Status::InvalidParameters);
+    for (const double limit : {0.0, -1.0, std::numeric_limits<double>::quiet_NaN()})
+        EXPECT_EQ(CPD::Register(source, source, CPD::Params{.EStep = CPD::EStepPolicy::Nystrom,
+                                                            .NystromErrorLimit = limit}).State,
+                  CPD::Status::InvalidParameters);
     // The tolerance is ignored by the reference path.
     EXPECT_TRUE(CPD::Register(source, source, CPD::Params{.EStepTolerance = 0.0}).Succeeded());
     CPD::EStep::LowRankKernel kernel;

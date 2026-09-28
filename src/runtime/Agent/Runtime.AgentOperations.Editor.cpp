@@ -495,6 +495,7 @@ namespace Extrinsic::Runtime
                     {"matched_weight", r.MatchedWeight}, {"mean_displacement", r.MeanDisplacement},
                     {"transform", TransformJson(r.Transform)}, {"source_points", r.SourcePointCount},
                     {"target_points", r.TargetPointCount}, {"e_step_error_bound", r.EStepErrorBound},
+                    {"e_step_sampled_error", r.EStepSampledError},
                     {"kernel_rank", r.KernelRank}, {"kernel_approximation_error", r.KernelApproximationError}};
         }
         // Both methods run their configured section (config_apply first). A queued job

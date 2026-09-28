@@ -30,6 +30,7 @@ namespace Geometry::CoherentPointDrift
         case EStepPolicy::Truncated: return "truncated";
         case EStepPolicy::Auto: return "auto";
         case EStepPolicy::FastGauss: return "fast_gauss";
+        case EStepPolicy::Nystrom: return "nystrom";
         }
         return "unknown";
     }
@@ -43,6 +44,7 @@ namespace Geometry::CoherentPointDrift
         case EStepPolicy::Truncated: return "cpu_truncated";
         case EStepPolicy::Auto: return "cpu_auto";
         case EStepPolicy::FastGauss: return "cpu_ifgt";
+        case EStepPolicy::Nystrom: return "cpu_nystrom";
         }
         return "unknown";
     }
@@ -660,6 +662,14 @@ namespace Geometry::CoherentPointDrift::EStep
         double DenominatorScale{0.0}, P1Scale{0.0};
         std::uint64_t FixedEntries{0u};
 
+        // Nystroem state: the fixed target's farthest-point order (cached), this call's source
+        // landmarks, and the largest sigma^2 whose approximation was rejected (smaller kernels
+        // are not retried, since the approximation only degrades as the kernel narrows).
+        Clustering TargetLandmarks{}, SourceLandmarks{};
+        std::vector<double> LandmarkX{}, LandmarkY{}, LandmarkZ{}, LandmarkZero{};
+        double NystromRejectedSigma2{0.0};
+        std::size_t NystromLandmarks{0u}; // count that last passed (the next call starts there)
+
         void UpdateScales(const std::vector<double>& p1)
         {
             const std::size_t n = LogDenominator.size(), m = p1.size();
@@ -1112,6 +1122,167 @@ namespace Geometry::CoherentPointDrift::EStep
                 }
             });
         }
+
+        // Nystroem E-step (METHOD-053): K_mn ~= k(y_m, Z) W^+ k(Z, x_n) with W = K(Z, Z) on
+        // landmarks Z (farthest points, half from each set), evaluated in landmark space in three
+        // passes (sources, targets, sources), each reduced over fixed chunks in chunk order so
+        // the result does not depend on the thread count. Returns false when a denominator or
+        // P1 entry is not positive, or when the sampled relative error (exact rows: 32 target
+        // denominators and 32 source P1 entries) exceeds the limit; `out` is then unspecified.
+        bool NystromRows(const PointSet& moved, const double sigma2, const double logC, const std::size_t landmarks,
+                         const double errorLimit, Sums& out, const std::uint32_t threads, double& sampledError,
+                         std::uint64_t& evaluations)
+        {
+            const PointSet target = Target();
+            const std::size_t n = target.Size(), m = moved.Size();
+            const std::size_t half = std::max<std::size_t>(1u, landmarks / 2u);
+            if (TargetLandmarks.Centers.size() < std::min(half, n))
+                FarthestPointClusters(target, half, threads, TargetLandmarks);
+            FarthestPointClusters(moved, half, threads, SourceLandmarks);
+            LandmarkX.clear(); LandmarkY.clear(); LandmarkZ.clear();
+            for (std::size_t k = 0; k < std::min(half, TargetLandmarks.Centers.size()); ++k)
+            {
+                const std::size_t j = TargetLandmarks.Centers[k];
+                LandmarkX.push_back(target.X[j]); LandmarkY.push_back(target.Y[j]); LandmarkZ.push_back(target.Z[j]);
+            }
+            for (const std::uint32_t i : SourceLandmarks.Centers)
+            {
+                LandmarkX.push_back(moved.X[i]); LandmarkY.push_back(moved.Y[i]); LandmarkZ.push_back(moved.Z[i]);
+            }
+            const std::size_t l = LandmarkX.size();
+            LandmarkZero.assign(l, 0.0);
+            const double inverseTwoSigma2 = 0.5 / sigma2;
+            const auto kernelRow = [&](const double x, const double y, const double z, double* row)
+            {
+                (void)DenseRowTerms(LandmarkX.data(), LandmarkY.data(), LandmarkZ.data(), LandmarkZero.data(), l, x, y, z,
+                                    0.0, inverseTwoSigma2, row);
+            };
+            Eigen::MatrixXd gram{Eigen::Index(l), Eigen::Index(l)};
+            for (std::size_t a = 0; a < l; ++a)
+                kernelRow(LandmarkX[a], LandmarkY[a], LandmarkZ[a], gram.col(Eigen::Index(a)).data());
+            const Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigen(gram);
+            if (eigen.info() != Eigen::Success) return false;
+            const double top = eigen.eigenvalues().maxCoeff();
+            if (!(top > 0.0)) return false;
+            // Pseudo-inverse on the numerically positive spectrum.
+            constexpr double kCutoff = 1.0e-10;
+            const Eigen::VectorXd inverse =
+                eigen.eigenvalues().unaryExpr([&](const double v) { return v > kCutoff * top ? 1.0 / v : 0.0; });
+            const Eigen::MatrixXd pseudoInverse = eigen.eigenvectors() * inverse.asDiagonal() * eigen.eigenvectors().transpose();
+
+            constexpr std::size_t kGrain = 1024;
+            // Pass 1 (sources): a = sum_m w_m k(Z, y_m).
+            const std::size_t sourceChunks = (m + kGrain - 1) / kGrain, targetChunks = (n + kGrain - 1) / kGrain;
+            std::vector<double> partial(std::max(sourceChunks, targetChunks) * 4u * l, 0.0);
+            ParallelFor(m, kGrain, threads, [&](const std::size_t begin, const std::size_t end)
+            {
+                std::vector<double> row(l);
+                double* sum = partial.data() + (begin / kGrain) * l;
+                for (std::size_t i = begin; i < end; ++i)
+                {
+                    kernelRow(moved.X[i], moved.Y[i], moved.Z[i], row.data());
+                    const double weight = std::exp(LogWeight[i]);
+                    for (std::size_t k = 0; k < l; ++k) sum[k] += weight * row[k];
+                }
+            });
+            Eigen::VectorXd a = Eigen::VectorXd::Zero(Eigen::Index(l));
+            for (std::size_t c = 0; c < sourceChunks; ++c)
+                for (std::size_t k = 0; k < l; ++k) a[Eigen::Index(k)] += partial[c * l + k];
+            const Eigen::VectorXd g = pseudoInverse * a;
+
+            // Pass 2 (targets): shifted sums S_n = k(x_n, Z) g, denominators, Pt1, and
+            // h = sum_n d_n k(Z, x_n) (1, x_n) with d_n = e^{shift} / den_n.
+            std::fill(partial.begin(), partial.end(), 0.0);
+            std::vector<double> scale(n, 0.0);
+            std::atomic<bool> valid{true};
+            ParallelFor(n, kGrain, threads, [&](const std::size_t begin, const std::size_t end)
+            {
+                std::vector<double> row(l);
+                double* sum = partial.data() + (begin / kGrain) * 4u * l;
+                for (std::size_t j = begin; j < end; ++j)
+                {
+                    kernelRow(target.X[j], target.Y[j], target.Z[j], row.data());
+                    double shifted = 0.0;
+                    for (std::size_t k = 0; k < l; ++k) shifted += row[k] * g[Eigen::Index(k)];
+                    if (!(shifted > 0.0) || !std::isfinite(shifted)) { valid = false; return; }
+                    LogDenominator[j] = LogSumWithOutlier(LogWeightShift, shifted, logC);
+                    const double d = std::exp(LogWeightShift - LogDenominator[j]);
+                    scale[j] = d;
+                    out.Pt1[j] = shifted * d;
+                    RowEvaluations[j] = l;
+                    for (std::size_t k = 0; k < l; ++k)
+                    {
+                        const double t = d * row[k];
+                        sum[k] += t;
+                        sum[l + k] += t * target.X[j];
+                        sum[2u * l + k] += t * target.Y[j];
+                        sum[3u * l + k] += t * target.Z[j];
+                    }
+                }
+            });
+            if (!valid) return false;
+            Eigen::MatrixXd h = Eigen::MatrixXd::Zero(Eigen::Index(l), 4);
+            for (std::size_t c = 0; c < targetChunks; ++c)
+                for (Eigen::Index column = 0; column < 4; ++column)
+                    for (std::size_t k = 0; k < l; ++k)
+                        h(Eigen::Index(k), column) += partial[(c * 4u + std::size_t(column)) * l + k];
+            const Eigen::MatrixXd q = pseudoInverse * h;
+
+            // Pass 3 (sources): P1 and PX.
+            ParallelFor(m, kGrain, threads, [&](const std::size_t begin, const std::size_t end)
+            {
+                std::vector<double> row(l);
+                for (std::size_t i = begin; i < end; ++i)
+                {
+                    kernelRow(moved.X[i], moved.Y[i], moved.Z[i], row.data());
+                    double v[4]{0.0, 0.0, 0.0, 0.0};
+                    for (std::size_t k = 0; k < l; ++k)
+                        for (Eigen::Index column = 0; column < 4; ++column) v[column] += row[k] * q(Eigen::Index(k), column);
+                    const double weight = std::exp(LogWeight[i]);
+                    if (!(v[0] >= 0.0) || !std::isfinite(v[1] + v[2] + v[3])) { valid = false; return; }
+                    out.P1[i] = weight * v[0]; out.PXx[i] = weight * v[1]; out.PXy[i] = weight * v[2]; out.PXz[i] = weight * v[3];
+                }
+            });
+            if (!valid) return false;
+
+            // A-posteriori check on exact rows spread over both sets.
+            const std::size_t samples = 32u;
+            const std::size_t targetSamples = std::min(samples, n), sourceSamples = std::min(samples, m);
+            std::vector<double> errors(targetSamples + sourceSamples, 0.0);
+            ParallelFor(targetSamples + sourceSamples, 1, threads, [&](const std::size_t begin, const std::size_t end)
+            {
+                std::vector<double> buffer(std::max(n, m));
+                for (std::size_t r = begin; r < end; ++r)
+                {
+                    if (r < targetSamples)
+                    {
+                        const std::size_t j = r * n / targetSamples;
+                        const double exact = DenseRowTerms(moved.X.data(), moved.Y.data(), moved.Z.data(), LogWeight.data(),
+                                                           m, target.X[j], target.Y[j], target.Z[j], 0.0, inverseTwoSigma2,
+                                                           buffer.data());
+                        const double logExact = LogSumWithOutlier(LogWeightShift, exact, logC);
+                        errors[r] = std::abs(std::expm1(LogDenominator[j] - logExact));
+                    }
+                    else
+                    {
+                        const std::size_t i = (r - targetSamples) * m / sourceSamples;
+                        SourceRowTerms(target.X.data(), target.Y.data(), target.Z.data(), LogDenominator.data(), n,
+                                       moved.X[i], moved.Y[i], moved.Z[i], inverseTwoSigma2, LogWeight[i] + LogWeightShift,
+                                       buffer.data());
+                        double exact = 0.0;
+                        for (std::size_t j = 0; j < n; ++j) exact += buffer[j];
+                        errors[r] = exact > 0.0 ? std::abs(out.P1[i] - exact) / exact
+                                                : (out.P1[i] > 0.0 ? std::numeric_limits<double>::infinity() : 0.0);
+                    }
+                }
+            });
+            sampledError = 0.0;
+            for (const double e : errors) sampledError = std::isnan(e) ? std::numeric_limits<double>::infinity()
+                                                                       : std::max(sampledError, e);
+            evaluations = std::uint64_t(l) * (2u * std::uint64_t(m) + std::uint64_t(l)) +
+                          std::uint64_t(targetSamples) * m + std::uint64_t(sourceSamples) * n;
+            return sampledError <= errorLimit;
+        }
     };
 
     Evaluator::Evaluator() : m_Impl(std::make_unique<Impl>()) {}
@@ -1130,6 +1301,9 @@ namespace Geometry::CoherentPointDrift::EStep
         s.TargetCurve = {};
         s.TargetClusters = {};
         s.HasScales = false;
+        s.TargetLandmarks = {};
+        s.NystromRejectedSigma2 = 0.0;
+        s.NystromLandmarks = 0u;
     }
 
     bool Evaluator::Evaluate(const PointSet moved, const double sigma2, const double logOutlier, const Settings& settings,
@@ -1158,6 +1332,52 @@ namespace Geometry::CoherentPointDrift::EStep
         EStepPolicy used = settings.Policy == EStepPolicy::Reference ? EStepPolicy::Dense : settings.Policy;
         IfgtPlan sourcePlan{}, targetPlan{};
         s.SourceTreeCurrent = false;
+        // Nystroem first; a rejected approximation is redone exactly with the Auto choice
+        // between truncated and dense (the fast Gauss transform loses to dense in 3-D).
+        double sampledError = 0.0;
+        std::uint64_t nystromEvaluations = 0u;
+        bool nystrom = false, allowFastGauss = true;
+        if (used == EStepPolicy::Nystrom)
+        {
+            if (!(settings.NystromLandmarks >= 2u && std::isfinite(settings.NystromErrorLimit) && settings.NystromErrorLimit > 0.0))
+                return false;
+            // Landmarks start at the count that last passed (at least the setting) and double while
+            // the approximation is rejected, as long as all attempts together stay below half the
+            // dense cost: (2M + N) L kernel terms plus the single-threaded landmark
+            // eigendecomposition (measured at about 2 L^3 kernel terms). Small inputs run exactly.
+            constexpr std::size_t kLandmarkCap = 4096u;
+            const std::size_t cap = std::min(kLandmarkCap, n + m);
+            const double dense = double(n) * double(m);
+            double spent = 0.0;
+            std::size_t count = std::max<std::size_t>(settings.NystromLandmarks, s.NystromLandmarks);
+            while (sigma2 > s.NystromRejectedSigma2)
+            {
+                const std::size_t landmarks = std::min(count, cap);
+                const double l = double(landmarks);
+                spent += (2.0 * double(m) + double(n)) * l + 2.0 * l * l * l;
+                if (spent >= 0.5 * dense) break;
+                std::uint64_t evaluations = 0u;
+                nystrom = s.NystromRows(moved, sigma2, logOutlier, landmarks, settings.NystromErrorLimit, out, threads,
+                                        sampledError, evaluations);
+                nystromEvaluations += evaluations;
+                if (nystrom)
+                {
+                    s.NystromLandmarks = landmarks;
+                    break;
+                }
+                nystromEvaluations += std::uint64_t(n) * landmarks; // the rejected target pass
+                s.Resize(n, m, out);
+                if (landmarks >= cap) break;
+                count = 2u * landmarks;
+            }
+            // Narrower kernels need more landmarks still: do not retry below this sigma^2.
+            if (!nystrom) s.NystromRejectedSigma2 = std::max(s.NystromRejectedSigma2, sigma2);
+            if (!nystrom)
+            {
+                used = EStepPolicy::Auto;
+                allowFastGauss = false;
+            }
+        }
         if (used == EStepPolicy::Auto)
         {
             // Truncation pays while it keeps few of the pairs: measure the kept share on 64 spread
@@ -1181,7 +1401,7 @@ namespace Geometry::CoherentPointDrift::EStep
                 // scatter), so truncation pays below about a quarter of the pairs.
                 if (double(kept) < 0.25 * double(samples) * double(m)) used = EStepPolicy::Truncated;
             }
-            if (used == EStepPolicy::Dense &&
+            if (used == EStepPolicy::Dense && allowFastGauss &&
                 s.PlanFastGauss(moved, sigma2, settings.Tolerance, true, threads, sourcePlan, targetPlan))
                 used = EStepPolicy::FastGauss;
         }
@@ -1190,9 +1410,10 @@ namespace Geometry::CoherentPointDrift::EStep
             used = EStepPolicy::Dense; // no plan meets the bound
         s.ExtraEvaluations = 0u;
         s.FixedEntries = 0u;
-        const std::size_t blocks = used == EStepPolicy::FastGauss
+        const std::size_t blocks = used == EStepPolicy::FastGauss || nystrom
             ? 0u : Impl::RowBlocks(n, m, settings.PartialBudgetBytes, used == EStepPolicy::Truncated);
-        if (used == EStepPolicy::FastGauss)
+        if (nystrom) {}
+        else if (used == EStepPolicy::FastGauss)
             s.FastGaussRows(moved, sigma2, logOutlier, settings.Tolerance, sourcePlan, targetPlan, out, threads);
         else if (blocks > 0u)
             s.BlockedRows(moved, twoSigma2, logOutlier, used == EStepPolicy::Truncated, settings.Tolerance, blocks, out, threads);
@@ -1214,8 +1435,9 @@ namespace Geometry::CoherentPointDrift::EStep
             out.KernelEvaluations += s.RowEvaluations[j];
         }
         // The two-pass fallback evaluates every kept pair twice.
-        if (blocks == 0u && used != EStepPolicy::FastGauss) out.KernelEvaluations *= 2u;
-        out.KernelEvaluations += s.ExtraEvaluations;
+        if (blocks == 0u && used != EStepPolicy::FastGauss && !nystrom) out.KernelEvaluations *= 2u;
+        out.KernelEvaluations += s.ExtraEvaluations + nystromEvaluations;
+        out.SampledError = nystrom ? sampledError : 0.0;
         s.SourceTreeCurrent = false;
         s.UpdateScales(out.P1);
         return std::isfinite(out.LogDenominatorSum) && out.Matched > std::numeric_limits<double>::min() * double(n);

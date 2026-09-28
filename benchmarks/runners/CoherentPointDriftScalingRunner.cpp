@@ -204,6 +204,7 @@ namespace
             << ", \"ms_per_iteration\": " << (r.Iterations ? run.Milliseconds / double(r.Iterations) : 0.0)
             << ", \"rms_error_to_truth\": " << run.RmsError << ", \"sigma2\": " << r.Sigma2
             << ", \"kernel_evaluations\": " << r.KernelEvaluations << ", \"e_step_error_bound\": " << r.EStepErrorBound
+            << ", \"e_step_sampled_error\": " << r.EStepSampledError
             << ", \"kernel_rank\": " << r.KernelRank << ", \"kernel_approximation_error\": " << r.KernelApproximationError;
         if (run.Parity) out << ", \"max_point_delta\": " << *run.Parity << ", \"parity_against\": \"" << run.ParityAgainst << "\"";
         out << '}' << (last ? "\n" : ",\n");
@@ -244,7 +245,7 @@ int main(int argc, char** argv)
         std::vector<Run> rigidRuns;
         if (count <= kReferenceRigidCap) rigidRuns.push_back(Execute("rigid_reference", rigid, base, repetitions));
         for (const auto policy : {CPD::EStepPolicy::Dense, CPD::EStepPolicy::Truncated, CPD::EStepPolicy::FastGauss,
-                                  CPD::EStepPolicy::Auto})
+                                  CPD::EStepPolicy::Auto, CPD::EStepPolicy::Nystrom})
         {
             // Measured up to the reference cap only: the fast Gauss transform's plans exceed the
             // dense cost at tol 1e-6, and an explicit truncated E-step keeps nearly every pair
@@ -285,6 +286,13 @@ int main(int argc, char** argv)
             lowRank.EStep = CPD::EStepPolicy::Auto;
             lowRank.LowRank = rank;
             nonrigidRuns.push_back(Execute("nonrigid_lowrank" + std::to_string(rank) + "_auto", bent, lowRank, repetitions));
+        }
+        {
+            // METHOD-053: the approximate E-step on the low-rank solve (parity against its auto run).
+            CPD::Params lowRank = nonrigid;
+            lowRank.EStep = CPD::EStepPolicy::Nystrom;
+            lowRank.LowRank = 50u;
+            nonrigidRuns.push_back(Execute("nonrigid_lowrank50_nystrom", bent, lowRank, repetitions));
         }
         for (std::size_t r = 1; r < nonrigidRuns.size(); ++r) Compare(nonrigidRuns[r], nonrigidRuns[0]);
 

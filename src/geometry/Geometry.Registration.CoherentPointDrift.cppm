@@ -63,6 +63,8 @@ export namespace Geometry::CoherentPointDrift
 
     inline constexpr std::uint32_t kMaxNonrigidSourcePoints = 8192; // full kernel (nonrigid and Bayesian)
     inline constexpr std::uint32_t kMaxLowRankSourcePoints = 1'000'000;
+    // Nystrom E-step landmarks: the landmark Gram matrix is eigendecomposed every iteration.
+    inline constexpr std::uint32_t kMaxNystromLandmarks = 4096;
     inline constexpr std::string_view kBackendId = "cpu_reference";
 
     // Units: with NormalizeInputs (default) both point sets are centered on their own
@@ -96,6 +98,10 @@ export namespace Geometry::CoherentPointDrift
         double EStepTolerance{1.0e-6};
         // Worker threads for the optimized E-step and kernel setup; 0 uses all cores.
         std::uint32_t Threads{0u};
+        // Nystrom E-step: landmarks (half from each set) and the largest accepted sampled
+        // relative error; iterations above it run exactly (truncated or dense).
+        std::uint32_t NystromLandmarks{256u};
+        double NystromErrorLimit{1.0e-3};
         // Nonrigid/Bayesian: 0 solves with the full Gram matrix; k > 0 uses its k leading eigenpairs.
         std::uint32_t LowRank{0u};
         // Bayesian: OutlierWeight is omega, Beta and Lambda the kernel width and deformation
@@ -127,6 +133,7 @@ export namespace Geometry::CoherentPointDrift
         glm::dmat4 Transform{1.0};             // rigid/affine map (Bayesian: its similarity) after the update; identity for nonrigid
         EStepPolicy EStep{EStepPolicy::Reference}; // policy that evaluated this iteration's E-step
         double EStepErrorBound{0.0};           // max relative row-denominator error (0: exact)
+        double EStepSampledError{0.0};         // Nystrom: sampled relative error (estimate, not a bound)
         std::uint64_t KernelEvaluations{0u};
     };
 
@@ -154,10 +161,13 @@ export namespace Geometry::CoherentPointDrift
         std::vector<double> ObjectiveHistory{};
         std::vector<double> Sigma2History{};
         // Backend that ran every iteration (BackendId of that policy); "cpu_auto" when Auto mixed
-        // policies, "cpu_mixed" when an explicit policy fell back (fast Gauss to dense).
+        // policies, "cpu_nystrom" when Nystrom approximated some iterations and ran the rest
+        // exactly ("cpu_auto" when it approximated none), "cpu_mixed" when an explicit policy fell
+        // back (fast Gauss to dense).
         std::string_view Backend{kBackendId};
         std::string_view RequestedBackend{kBackendId}; // BackendId(Params::EStep)
         double EStepErrorBound{0.0};           // max over all iterations
+        double EStepSampledError{0.0};         // Nystrom: max sampled error over accepted iterations
         std::uint64_t KernelEvaluations{0u};   // total over all iterations
         // Low-rank nonrigid: eigenpairs used and the kernel's sampled relative error.
         std::uint32_t KernelRank{0u};

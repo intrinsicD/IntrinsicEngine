@@ -16,6 +16,12 @@
 //                back to dense when no plan meets the bound. Pays off for wide kernels.
 //   - Auto:      truncated while its radius stays below the extent, otherwise the fast Gauss
 //                transform when its planned cost is well below the dense cost, else dense.
+//   - Nystrom:   approximate (METHOD-053): K ~= K(Y, Z) K(Z, Z)^+ K(Z, X) on farthest-point
+//                landmarks Z of both sets, O((2M + N) L) kernel terms. Its error has no a-priori
+//                bound; it is measured on exact sampled rows (Sums::SampledError, an estimate)
+//                and an iteration whose estimate exceeds Settings::NystromErrorLimit is redone
+//                exactly with the Auto choice between truncated and dense. Skipped (exact) where
+//                its planned cost is not below half the dense cost, i.e. for small inputs.
 // Rows are processed in fixed blocks (their count depends only on N and M) that scatter into
 // per-block partial sums reduced in block order, so each kernel term is evaluated once; above
 // Settings::PartialBudgetBytes a two-pass form (target pass for the denominators, source pass
@@ -44,6 +50,7 @@ export namespace Geometry::CoherentPointDrift
         Truncated,
         Auto,
         FastGauss, // improved fast Gauss transform with a computed error bound (wide kernels)
+        Nystrom,   // landmark low-rank kernel, sampled error estimate, exact fallback (wide kernels)
     };
 
     [[nodiscard]] std::string_view ToString(EStepPolicy value) noexcept;
@@ -70,6 +77,10 @@ export namespace Geometry::CoherentPointDrift::EStep
         // fixed block count does not fit, a two-pass evaluation (twice the kernel terms, no
         // partial sums) is used instead.
         std::size_t PartialBudgetBytes{std::size_t{128} << 20};
+        // Nystrom: landmarks (half from each set) and the largest accepted sampled relative
+        // error of the row denominators and P1 entries.
+        std::uint32_t NystromLandmarks{256u};
+        double NystromErrorLimit{1.0e-3};
     };
 
     struct Sums
@@ -83,6 +94,9 @@ export namespace Geometry::CoherentPointDrift::EStep
         // dropped ones); fast Gauss adds the a-posteriori relative bound of the P1 entries (<= 2 tol
         // total; PX is bounded only absolutely, by that bound times max |x| P1). 0: exact.
         double ErrorBound{0.0};
+        // Nystrom: largest relative error of the sampled exact rows (an estimate, not a bound;
+        // 0 when the iteration ran exactly).
+        double SampledError{0.0};
         std::uint64_t KernelEvaluations{0u};
     };
 

@@ -34,6 +34,7 @@ its dependencies, conditional gates, scope and verification.
 
 - [METHOD-048 — Full HKTex mesh textures and measured default adoption](METHOD-048-hktex-mesh-textures.md)
 - [METHOD-052 — Anderson acceleration for Coherent Point Drift EM](METHOD-052-coherent-point-drift-anderson-acceleration.md)
+- [METHOD-054 — Geodesic Bayesian Coherent Point Drift (GBCPD)](METHOD-054-geodesic-bayesian-coherent-point-drift.md)
 
 Theme I remains paused behind REVIEW-004 except explicit operator direction
 and named product dependencies. A retired prerequisite does not prove a

@@ -113,6 +113,7 @@ export namespace Extrinsic::Runtime
         double MatchedWeight{0.0};         // sum of inlier responsibilities
         std::string EStep{"reference"};    // E-step policy that ran this iteration
         double EStepErrorBound{0.0};       // its max relative responsibility error (0: exact)
+        double EStepSampledError{0.0};     // Nystrom: sampled relative error (estimate, not a bound)
     };
 
     enum class EditorCoherentPointDriftPhase : std::uint8_t
@@ -144,6 +145,7 @@ export namespace Extrinsic::Runtime
         glm::dmat4 Transform{1.0};
         double MeanDisplacement{0.0}; // mean |T(y) - y| in world units
         double EStepErrorBound{0.0};  // max over the run (0: exact)
+        double EStepSampledError{0.0}; // Nystrom: max sampled error estimate over the run
         std::uint32_t KernelRank{0u}; // low-rank nonrigid eigenpairs
         double KernelApproximationError{0.0};
         std::string Message{};

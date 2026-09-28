@@ -168,9 +168,31 @@ reported bound (denominator plus P1, about 2 tol at most) is rigorous. PX is bou
 absolutely, by that bound times max |x| P1. Measured on the scaling fixture at tol 1e-6 the plans need p = 20-24 (up to
 2300 terms per cluster and channel) and exceed the dense cost at 10^4 points; `Auto`
 therefore rarely selects it in 3-D, and the explicit policy is slower than dense there
-(`geometry.coherent_point_drift.accelerated`). E-step Nystroem is not offered because its
-error has no a-priori bound; the permutohedral lattice (GEOM-060) is the remaining
-candidate for wide kernels.
+(`geometry.coherent_point_drift.accelerated`).
+
+**Nystroem E-step (`Nystrom`, METHOD-053; approximate).** The kernel matrix K_mn =
+exp(-|x_n - y_m|^2 / 2 sigma^2) is approximated as k(y_m, Z) W^+ k(Z, x_n) on L landmarks Z
+(farthest points, half from the fixed target, cached, and half from the moving source),
+W = K(Z, Z) pseudo-inverted on its spectrum above 1e-10 of the largest eigenvalue, as
+Hirose's BCPD implementation does for wide kernels. Everything runs in landmark space: a =
+sum_m w_m k(Z, y_m), S_n = k(x_n, Z) W^+ a gives the denominators e^{shift} S_n + c and Pt1;
+h = sum_n d_n k(Z, x_n) (1, x_n) with d_n = e^{shift} / den_n gives P1_m and PX_m = w_m k(y_m,
+Z) W^+ h, i.e. (2M + N) L kernel terms plus one L x L eigendecomposition per iteration,
+reduced over fixed chunks (thread-count independent). The error has no a-priori bound. It
+is estimated a posteriori on exact rows (32 target denominators, 32 source P1 entries
+against the approximate denominators) and reported as `EStepSampledError`; on the test
+fixtures the worst row is within about 3x of the estimate. An iteration whose estimate
+exceeds `NystromErrorLimit` (default 1e-3), or with a non-positive denominator or P1
+entry, is retried with twice the landmarks while all attempts stay below half the dense
+cost (the eigendecomposition counted as 2 L^3 kernel terms), and otherwise redone exactly
+with the Auto choice between truncated and dense; narrower kernels are then not retried.
+Small inputs never pay (300 points: exact throughout). Wide kernels are nearly low rank,
+so the approximation covers the early iterations that dominate the dense cost: at 10^5
+points the landmarks grow to 1024 and rigid registration takes 128 s instead of 198 s
+(auto), the low-rank nonrigid solve 30 s instead of 170 s, with the same RMS to the
+ground truth. The middle phase (kernels too narrow for a few thousand landmarks, too wide
+for truncation) stays dense; the permutohedral lattice (GEOM-060) remains the candidate
+there.
 
 ## Bayesian Coherent Point Drift (METHOD-050)
 

@@ -2841,6 +2841,13 @@ namespace Extrinsic::Sandbox::Editor
             if (config.EStep != Runtime::CoherentPointDriftEStep::Reference && config.EStep != Runtime::CoherentPointDriftEStep::Dense)
                 changed |= DrawSpecInputDouble("Error tolerance##CPD", fields, "e_step_tolerance", config.EStepTolerance,
                                                defaults.EStepTolerance, "%.1e");
+            if (config.EStep == Runtime::CoherentPointDriftEStep::Nystrom)
+            {
+                changed |= DrawSpecInputUInt("Landmarks##CPD", fields, "nystrom_landmarks", config.NystromLandmarks,
+                                             defaults.NystromLandmarks);
+                changed |= DrawSpecInputDouble("Error limit##CPD", fields, "nystrom_error_limit", config.NystromErrorLimit,
+                                               defaults.NystromErrorLimit, "%.1e");
+            }
             if (config.EStep != Runtime::CoherentPointDriftEStep::Reference)
                 changed |= DrawSpecInputUInt("Threads##CPD", fields, "threads", config.Threads, defaults.Threads);
             ImGui::TreePop();
@@ -2952,6 +2959,8 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::Text("sigma^2: %.4g   matched: %.1f   mean move: %.4g", r.Sigma2, r.MatchedWeight, r.MeanDisplacement);
             if (!snapshot.Trace.empty())
                 ImGui::Text("E-step: %s   error bound: %.2g", snapshot.Trace.back().EStep.c_str(), r.EStepErrorBound);
+            if (r.EStepSampledError > 0.0)
+                ImGui::Text("Nystroem sampled error: %.2g (estimate)", r.EStepSampledError);
             if (r.KernelRank > 0u)
                 ImGui::Text("Kernel rank: %u   kernel error: %.2g", r.KernelRank, r.KernelApproximationError);
             if (!r.Message.empty() && snapshot.Phase == Phase::Failed) ImGui::TextWrapped("%s", r.Message.c_str());
@@ -3013,10 +3022,12 @@ namespace Extrinsic::Sandbox::Editor
                     (void)std::strftime(stamp, sizeof(stamp), "%Y%m%d-%H%M%S", &local);
                     const auto path = directory / ("cpd-trace-" + std::string(stamp) + ".csv");
                     std::ofstream csv(path);
-                    csv << "iteration,sigma2,negative_log_likelihood,objective,matched_weight,e_step,e_step_error_bound\n";
+                    csv << "iteration,sigma2,negative_log_likelihood,objective,matched_weight,e_step,e_step_error_bound,"
+                           "e_step_sampled_error\n";
                     for (const auto& t : snapshot.Trace)
                         csv << t.Iteration << ',' << t.Sigma2 << ',' << t.NegativeLogLikelihood << ',' << t.Objective << ','
-                            << t.MatchedWeight << ',' << t.EStep << ',' << t.EStepErrorBound << '\n';
+                            << t.MatchedWeight << ',' << t.EStep << ',' << t.EStepErrorBound << ',' << t.EStepSampledError
+                            << '\n';
                     state.ExportMessage = csv ? "Saved " + path.string() : "Could not write " + path.string();
                 }
                 if (!state.ExportMessage.empty()) ImGui::TextWrapped("%s", state.ExportMessage.c_str());

@@ -35,6 +35,7 @@ and failure states: [paper.md](paper.md).
 | `Truncated` | per-row relative error <= `EStepTolerance`, reported | narrow kernels (late iterations) |
 | `FastGauss` | same bound, exact fixups | measured slower than dense in 3-D; kept for completeness |
 | `Auto` (editor default) | dense or truncated per iteration from a 64-row probe | general use |
+| `Nystrom` | approximate while the kernel is wide (sampled error estimate, not a bound), then exact as `Auto` | large inputs (>= 10^4 points); results report `EStepSampledError` |
 
 `LowRank = k` replaces the nonrigid/Bayesian Gram matrix by k Nystroem eigenpairs (O(M k^2)
 per iteration, up to 1,000,000 source points) and reports its sampled kernel error.
