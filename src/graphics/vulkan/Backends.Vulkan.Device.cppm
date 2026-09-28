@@ -90,6 +90,10 @@ namespace Extrinsic::Backends::Vulkan
                                                                   uint32_t batchIndex) override;
         [[nodiscard]] bool SupportsParallelCommandContexts() const noexcept override;
         [[nodiscard]] bool SupportsShaderFloat64() const noexcept override { return m_ShaderFloat64Supported; }
+        [[nodiscard]] bool SupportsShaderInt64Atomics() const noexcept override { return m_ShaderInt64AtomicsSupported; }
+        [[nodiscard]] bool SupportsSubgroupArithmetic() const noexcept override { return m_SubgroupArithmeticSupported; }
+        [[nodiscard]] std::uint32_t SubgroupSize() const noexcept override { return m_SubgroupSize; }
+        [[nodiscard]] std::uint32_t MaxComputeSharedMemoryBytes() const noexcept override { return m_MaxComputeSharedMemoryBytes; }
         [[nodiscard]] bool BeginFrameParallelCommandContexts(
             const RHI::FrameHandle& frame,
             const RHI::ParallelCommandContextPlanDesc& plan) override;
@@ -369,5 +373,9 @@ namespace Extrinsic::Backends::Vulkan
         // swapchain/resource bring-up lands.
         bool             m_SamplerAnisotropySupported = false;
         bool             m_ShaderFloat64Supported = false;
+        bool             m_ShaderInt64AtomicsSupported = false;
+        bool             m_SubgroupArithmeticSupported = false;
+        std::uint32_t    m_SubgroupSize = 0u;
+        std::uint32_t    m_MaxComputeSharedMemoryBytes = 16384u;
     };
 }

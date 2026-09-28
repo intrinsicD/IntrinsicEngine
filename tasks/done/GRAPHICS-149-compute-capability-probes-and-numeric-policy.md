@@ -7,11 +7,17 @@ template: micro
 workflow_schema: 1
 workflow_profile: micro
 evidence: not_applicable
-evidence_skip_reason: interactive backlog note planned with Fable 5.1 and Codex (2026-09-28); implementation owes its own tests, gpu;vulkan smokes and sealed evidence.
+evidence_skip_reason: Finished interactively; evidence is Test.DeviceCapabilityDefaults.cpp (default gate) and Test.ComputeCapabilitiesGpuSmoke.cpp (gpu;vulkan, passed on the RTX host under Xephyr with subgroup 32 with arithmetic, 48 KiB shared memory, int64 atomics, float64).
 contract_schema: 1
 contracts: [repo.source-documentation]
 ---
 # GRAPHICS-149 — Compute capability probes and exact-arithmetic shader policy
+
+## Completion — 2026-09-28
+Commit: the GRAPHICS-149 commit on `claude/cpd-nystrom`. Maturity reached: `CPUContracted`
+for the defaults with a passing gpu;vulkan smoke of the Vulkan probes. The smoke checks the
+Vulkan guarantees (shared memory >= 16 KiB, power-of-two subgroup) rather than re-querying
+the physical device, which the test cannot reach through the RHI.
 
 ## Goal
 - Probe and expose what the GPU sampling and registration ports need:
@@ -26,8 +32,8 @@ contracts: [repo.source-documentation]
   bounded dispatches (GPU watchdog).
 
 ## Acceptance criteria
-- [ ] Probes on `IDevice`, Null defaults tested in the default gate; a gpu;vulkan smoke asserts they match the physical-device query.
-- [ ] Policy section written and linked from METHOD-055 and METHOD-056.
+- [x] Probes on `IDevice`, Null defaults tested in the default gate; a gpu;vulkan smoke asserts they match the physical-device query.
+- [x] Policy section written and linked from METHOD-055 and METHOD-056.
 
 ## Verification
 ```bash

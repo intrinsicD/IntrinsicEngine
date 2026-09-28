@@ -150,3 +150,40 @@ reduction results with the CPU reference, verifies readback count and
 dispatch-args publication, verifies scan overflow saturation on in-workgroup and
 multiblock fixtures, and repeats the same compaction and segmented reduction
 inputs to pin deterministic output/count behavior.
+
+## Device Capabilities And Exact-Arithmetic Policy
+
+`RHI::IDevice` reports the optional compute capabilities kernels may depend on
+(GRAPHICS-149). Defaults are the conservative answers every kernel may assume;
+the Vulkan device fills them from the physical device:
+
+| Query | Default | Vulkan source |
+| --- | --- | --- |
+| `SupportsShaderFloat64()` | false | `shaderFloat64` (enabled when present) |
+| `SupportsShaderInt64Atomics()` | false | `shaderBufferInt64Atomics` (Vulkan 1.2, enabled when present) |
+| `SupportsSubgroupArithmetic()` | false | subgroup properties: compute stage and arithmetic operations |
+| `SubgroupSize()` | 0 (unknown) | `subgroupSize` |
+| `MaxComputeSharedMemoryBytes()` | 16384 | `maxComputeSharedMemorySize` |
+
+A kernel that needs an optional capability refuses unsupported devices with a
+diagnostic and leaves the work to its CPU reference; it never assumes a subgroup
+width (subgroup paths must give the same result as a workgroup-shared fallback)
+and sizes shared memory from the query.
+
+Kernels that must match a CPU reference bit for bit (the METHOD-055 hole sieve,
+the METHOD-056 double accumulations, the METHOD-014 conflict checks) follow these
+rules:
+
+- Mark every floating-point operation of the compared arithmetic `precise`
+  (SPIR-V `NoContraction`), matching the CPU references' `fp contract(off)`;
+  keep the reference's operation order (for distances: `dx*dx`, then `+ dy*dy`,
+  then `+ dz*dz`).
+- No floating-point atomics. Reductions run in a fixed order: per-workgroup
+  partials in shared memory with a fixed tree, then a second dispatch (or the
+  CPU) reducing the partials in index order.
+- GLSL has no double-precision `exp`; kernels needing one reuse the bounded
+  `ExpNonPositive` of `property_filter.comp`.
+- Long-running work is split into bounded dispatches (no persistent kernels), so
+  a driver watchdog cannot abort it; state lives in buffers between dispatches.
+- One-ulp bound adjustments (`nextafter`) are done with 64-bit integer bit
+  operations on the double's representation.

@@ -43,6 +43,8 @@ contracts: [method.engine-integration]
   device and driver, not bitwise across vendors. An fp64-pairs diagnostic mode exists for
   parity investigations only.
 
+- Numeric policy: `docs/architecture/compute-parallel-primitives.md` §"Device Capabilities And Exact-Arithmetic Policy" (GRAPHICS-149).
+
 ## Acceptance criteria
 - [ ] Default gate: mock callback and Null host exercise the fallback; `Backend`/`RequestedBackend` truthful.
 - [ ] gpu;vulkan smoke `Test.CoherentPointDriftGpuEStepSmoke.cpp`: the tolerance above at three sigma values, weighted rows and outliers; two runs bitwise equal.

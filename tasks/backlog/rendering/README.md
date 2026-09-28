@@ -16,7 +16,6 @@ its dependencies, conditional gates, scope and verification.
 - [GRAPHICS-136 — Rename `Pipeline*` to `GraphicsState*` at the RHI boundary](GRAPHICS-136-rename-pipeline-to-graphics-state-rhi-boundary.md)
 - [GRAPHICS-137 — Shader-object realization spike (ADR-0028 killing experiment)](GRAPHICS-137-shader-object-realization-spike.md)
 - [GRAPHICS-148 — Vulkan radix sort and sorted-segment primitives](GRAPHICS-148-vulkan-radix-sort-primitive.md)
-- [GRAPHICS-149 — Compute capability probes and exact-arithmetic shader policy](GRAPHICS-149-compute-capability-probes-and-numeric-policy.md)
 - [LEGACY-043 — Retire stale multi-descriptor-set shader sources](LEGACY-043-retire-stale-multiset-shaders.md)
 
 GRAPHICS-137 requires its ADR-0028 trigger; GRAPHICS-136 also requires the

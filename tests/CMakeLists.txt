@@ -1823,6 +1823,7 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
                 integration/graphics/Test.PointConstructionGpuSmoke.cpp
                 integration/graphics/Test.PropertySmoothingGpuSmoke.cpp
                 integration/graphics/Test.SparseSolveGpuSmoke.cpp
+                integration/graphics/Test.ComputeCapabilitiesGpuSmoke.cpp
         DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
     )
     intrinsic_test_executable(IntrinsicPointLBVHGpuTests
@@ -2066,6 +2067,7 @@ set(_graphics_contract_test_files
     Test.PropertyTextureBake.cpp
     Test.RHI.CommandContextBarriers.cpp
     Test.RendererRhiBoundary.cpp
+    Test.DeviceCapabilityDefaults.cpp
     Test.TextureReadback.cpp
     Test.TextureUploadLayout.cpp
     Test.TransferQueueReadback.cpp

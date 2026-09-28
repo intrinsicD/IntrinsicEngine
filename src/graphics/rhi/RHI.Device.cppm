@@ -160,6 +160,15 @@ namespace Extrinsic::RHI
 
         // Optional shader arithmetic; kernels requiring it must refuse unsupported devices.
         [[nodiscard]] virtual bool SupportsShaderFloat64() const noexcept { return false; }
+        // Compute capabilities (GRAPHICS-149); the defaults are the conservative answers a
+        // kernel may always assume. 64-bit integer atomics on storage buffers:
+        [[nodiscard]] virtual bool SupportsShaderInt64Atomics() const noexcept { return false; }
+        // Subgroup arithmetic (reductions, scans) in compute shaders:
+        [[nodiscard]] virtual bool SupportsSubgroupArithmetic() const noexcept { return false; }
+        // Subgroup width, 0 when unknown (kernels must not assume a width):
+        [[nodiscard]] virtual std::uint32_t SubgroupSize() const noexcept { return 0u; }
+        // Workgroup shared memory; 16 KiB is the Vulkan-guaranteed minimum:
+        [[nodiscard]] virtual std::uint32_t MaxComputeSharedMemoryBytes() const noexcept { return 16384u; }
 
         // ---- Backend status ------------------------------------------
         /// Whether this backend can actually issue GPU work. Real backends

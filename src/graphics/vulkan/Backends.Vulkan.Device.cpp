@@ -112,6 +112,8 @@ namespace
         bool SampledImageArrayNonUniformIndexingSupported = false;
         bool DrawIndirectCountSupported = false;
         bool DrawIndirectFirstInstanceSupported = false;
+        // Optional compute capabilities (GRAPHICS-149), enabled when present.
+        bool ShaderBufferInt64AtomicsSupported = false;
 
         [[nodiscard]] bool AllRequiredSupported() const noexcept
         {
@@ -351,6 +353,7 @@ namespace
         probe.SampledImageArrayNonUniformIndexingSupported =
             features12.shaderSampledImageArrayNonUniformIndexing == VK_TRUE;
         probe.DrawIndirectCountSupported = features12.drawIndirectCount == VK_TRUE;
+        probe.ShaderBufferInt64AtomicsSupported = features12.shaderBufferInt64Atomics == VK_TRUE;
         return probe;
     }
 
@@ -576,6 +579,7 @@ namespace
         enabled12.runtimeDescriptorArray = VK_TRUE;
         enabled12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
         enabled12.drawIndirectCount = VK_TRUE;
+        enabled12.shaderBufferInt64Atomics = featureProbe.ShaderBufferInt64AtomicsSupported ? VK_TRUE : VK_FALSE;
 
         VkPhysicalDeviceFeatures2 enabledFeatures{};
         enabledFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -1623,6 +1627,20 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
         volkLoadDevice(m_Device);
         m_SamplerAnisotropySupported = samplerAnisotropySupported;
         m_ShaderFloat64Supported = featureProbe.ShaderFloat64Supported;
+        m_ShaderInt64AtomicsSupported = featureProbe.ShaderBufferInt64AtomicsSupported;
+        {
+            // Subgroup (Vulkan 1.1 core) and shared-memory limits for compute kernels.
+            VkPhysicalDeviceSubgroupProperties subgroup{};
+            subgroup.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
+            VkPhysicalDeviceProperties2 properties2{};
+            properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+            properties2.pNext = &subgroup;
+            vkGetPhysicalDeviceProperties2(m_PhysDevice, &properties2);
+            m_SubgroupSize = subgroup.subgroupSize;
+            m_SubgroupArithmeticSupported = (subgroup.supportedStages & VK_SHADER_STAGE_COMPUTE_BIT) != 0 &&
+                                            (subgroup.supportedOperations & VK_SUBGROUP_FEATURE_ARITHMETIC_BIT) != 0;
+            m_MaxComputeSharedMemoryBytes = properties2.properties.limits.maxComputeSharedMemorySize;
+        }
         diagnostics.DescriptorIndexingEnabled = true;
         diagnostics.TimelineSemaphoreEnabled = true;
         diagnostics.DynamicRenderingEnabled = true;
@@ -2356,6 +2374,10 @@ void VulkanDevice::Shutdown()
     m_GlobalPipelineLayout = VK_NULL_HANDLE;
     m_SamplerAnisotropySupported = false;
     m_ShaderFloat64Supported = false;
+    m_ShaderInt64AtomicsSupported = false;
+    m_SubgroupArithmeticSupported = false;
+    m_SubgroupSize = 0u;
+    m_MaxComputeSharedMemoryBytes = 16384u;
 
     if (device != VK_NULL_HANDLE && m_OneShotCmdPool != VK_NULL_HANDLE)
         vkDestroyCommandPool(device, m_OneShotCmdPool, nullptr);

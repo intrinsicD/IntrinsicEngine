@@ -29,6 +29,8 @@ contracts: [method.engine-integration]
 - One workgroup per cloud as in CUDA, so no speedup over the CPU sieve is expected for one
   cloud; the value is GPU-resident ordering and many clouds at once (`extend_many`).
 
+- Numeric policy: `docs/architecture/compute-parallel-primitives.md` §"Device Capabilities And Exact-Arithmetic Policy" (GRAPHICS-149).
+
 ## Acceptance criteria
 - [ ] Vulkan backend selectable in `PointSampling`, order equal to the CPU reference on the parity fixtures (gpu;vulkan smoke).
 - [ ] Sealed benchmark against the CPU sieve at 10^5 and 10^6 points.
