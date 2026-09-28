@@ -12,10 +12,8 @@
 // The CPU/null contract only validates the `BindPipeline +
 // PushConstants + Draw(1, 1, 0, 0)` shape; the optional `gpu;vulkan`
 // smoke (GRAPHICS-077 Slice D) is the operational verification that
-// the per-pixel color matches the submitted packet color. `gl_PointSize`
-// is held at 1.0 here — wider points are reserved for a follow-up
-// task that wires the `Radius` field through a billboard expansion
-// (see `assets/shaders/point.vert` for the retained-mode precedent).
+// the per-pixel color matches the submitted packet color. Points are
+// round sprites whose size follows the packet's world-space `Radius`.
 
 #version 460
 #extension GL_EXT_scalar_block_layout : require
@@ -34,7 +32,9 @@ layout(buffer_reference, scalar) readonly buffer VertexBuf { Vertex v[]; };
 layout(push_constant) uniform PushConsts {
     uint64_t VertexBufferBDA;
     uint     FirstVertex;
-    uint     Reserved;
+    float    Radius;         // world units
+    mat4     ViewProjection; // packet coordinates are world space
+    float    PixelsPerUnit;  // Projection[1][1] * viewport height / 2; 0 keeps 1-pixel points
 } push;
 
 layout(location = 0) out vec4 fragColor;
@@ -44,7 +44,10 @@ void main()
     VertexBuf vbuf = VertexBuf(push.VertexBufferBDA);
     Vertex vertex = vbuf.v[push.FirstVertex + gl_VertexIndex];
 
-    gl_Position = vec4(vertex.Position, 1.0);
-    gl_PointSize = 1.0;
+    gl_Position = push.ViewProjection * vec4(vertex.Position, 1.0);
+    // Diameter in pixels of a sphere of `Radius` at this depth, clamped to what point
+    // sprites reliably support.
+    const float w = max(abs(gl_Position.w), 1e-6);
+    gl_PointSize = clamp(2.0 * push.Radius * push.PixelsPerUnit / w, 1.0, 64.0);
     fragColor = unpackUnorm4x8(vertex.PackedColor);
 }

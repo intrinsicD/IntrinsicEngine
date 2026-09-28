@@ -13,6 +13,9 @@ layout(push_constant, scalar) uniform ScenePC {
     uint _pad0;
 } pc;
 
+// Bit-identical depth with the depth prepass is required by the EQUAL depth tests.
+invariant gl_Position;
+
 void main()
 {
     const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;

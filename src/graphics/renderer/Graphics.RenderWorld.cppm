@@ -76,6 +76,9 @@ namespace Extrinsic::Graphics
         std::uint32_t AtlasResolution{2048u};
     };
 
+    // Transient debug packets are world space: the TransientDebugSurfacePass applies
+    // the frame camera's view-projection (clip space only when no camera is valid).
+    // Point Radius is in world units; line Width is not consumed yet (lines are one pixel wide).
     export struct DebugLinePacket
     {
         glm::vec3 Start{0.f};

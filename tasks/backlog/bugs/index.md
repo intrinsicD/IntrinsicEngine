@@ -39,6 +39,10 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
 
+- Closed 2026-09-28: [BUG-227 — Scene image flips vertically with the number of fullscreen passes](../../done/BUG-227-scene-image-vertical-flip-parity.md).
+  Camera projections stopped double-flipping Y and fullscreen blits preserve orientation; a GPU smoke pins apex-up
+  with and without transient debug primitives.
+
 - Closed 2026-09-23: [BUG-219 — Fix the UV panel cache test's post-submit snapshot race](../../done/BUG-219-uv-panel-cache-snapshot-race.md).
   The test gates the UV job's work through the `JobCommands.Submit` seam until its post-submit snapshot. A forced
   schedule reproduced 3 vs 4 before the fix and passes after it; full CPU/ASan/UBSan and hosted pr-fast pass.

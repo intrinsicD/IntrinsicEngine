@@ -241,9 +241,20 @@ struct TransientDebugRunCapture
 	bool DeviceOperational{false};
 };
 
-[[nodiscard]] TransientDebugRunCapture DriveTransientDebugFrameAndCapture(Engine& engine)
+// World-space camera for the second readback run: packets are placed at inverse(camera) of
+// the NDC positions, so they must land on the same pixels once the camera is applied.
+[[nodiscard]] glm::mat4 TestWorldCamera()
 {
-	static const std::array<Extrinsic::Graphics::DebugTrianglePacket, 1> kTriangles{{
+	glm::mat4 camera{1.0f};
+	camera[0][0] = 0.5f;
+	camera[1][1] = 0.5f;
+	camera[3] = glm::vec4{0.3f, -0.2f, 0.0f, 1.0f};
+	return camera;
+}
+
+[[nodiscard]] TransientDebugRunCapture DriveTransientDebugFrameAndCapture(Engine& engine, bool worldCamera = false)
+{
+	std::array<Extrinsic::Graphics::DebugTrianglePacket, 1> kTriangles{{
 		Extrinsic::Graphics::DebugTrianglePacket{
 			.A = glm::vec3{PixelCenterToNdcX(48u), PixelCenterToNdcY(176u), 0.0f},
 			.B = glm::vec3{PixelCenterToNdcX(96u), PixelCenterToNdcY(176u), 0.0f},
@@ -252,7 +263,7 @@ struct TransientDebugRunCapture
 			.DepthTested = false,
 		},
 	}};
-	static const std::array<Extrinsic::Graphics::DebugLinePacket, 1> kLines{{
+	std::array<Extrinsic::Graphics::DebugLinePacket, 1> kLines{{
 		Extrinsic::Graphics::DebugLinePacket{
 			.Start = glm::vec3{PixelCenterToNdcX(120u), PixelCenterToNdcY(kLineSample.PixelY), 0.0f},
 			.End = glm::vec3{PixelCenterToNdcX(168u), PixelCenterToNdcY(kLineSample.PixelY), 0.0f},
@@ -261,7 +272,7 @@ struct TransientDebugRunCapture
 			.DepthTested = false,
 		},
 	}};
-	static const std::array<Extrinsic::Graphics::DebugPointPacket, 1> kPoints{{
+	std::array<Extrinsic::Graphics::DebugPointPacket, 1> kPoints{{
 		Extrinsic::Graphics::DebugPointPacket{
 			.Position = glm::vec3{
 				PixelCenterToNdcX(kPointSample.PixelX),
@@ -273,6 +284,18 @@ struct TransientDebugRunCapture
 			.DepthTested = false,
 		},
 	}};
+
+	if (worldCamera)
+	{
+		const glm::mat4 toWorld = glm::inverse(TestWorldCamera());
+		const auto world = [&](glm::vec3 ndc) { return glm::vec3(toWorld * glm::vec4(ndc, 1.0f)); };
+		kTriangles[0].A = world(kTriangles[0].A);
+		kTriangles[0].B = world(kTriangles[0].B);
+		kTriangles[0].C = world(kTriangles[0].C);
+		kLines[0].Start = world(kLines[0].Start);
+		kLines[0].End = world(kLines[0].End);
+		kPoints[0].Position = world(kPoints[0].Position);
+	}
 
 	auto& renderer = engine.GetRenderer();
 	auto& device = engine.GetDevice();
@@ -301,6 +324,12 @@ struct TransientDebugRunCapture
 		.Viewport = {.Width = kReadbackWidth, .Height = kReadbackHeight},
 	};
 	Extrinsic::Graphics::RenderWorld world = renderer.ExtractRenderWorld(input);
+	if (worldCamera)
+	{
+		world.Camera.Valid = true;
+		world.Camera.ViewProjection = TestWorldCamera();
+		world.Camera.Projection = glm::mat4{1.0f};
+	}
 	renderer.PrepareFrame(world);
 	renderer.ExecuteFrame(frame, world);
 	(void)renderer.EndFrame(frame);
@@ -372,7 +401,21 @@ TEST(TransientDebugSurfaceGpuSmoke, MixedLanesRecordOnOperationalVulkanCommandSt
         engine.Shutdown();
 }
 
+void ExpectMixedLaneReadback(bool worldCamera);
+
 TEST(TransientDebugSurfaceGpuSmoke, MixedLanesReadBackExpectedSampleColors)
+{
+	ExpectMixedLaneReadback(false);
+}
+
+// Packet coordinates are world space: with a valid camera they are projected, and a point's
+// world radius sizes its sprite (Radius 0.05, pixels per unit 0.5 * height = 128 -> ~13 px).
+TEST(TransientDebugSurfaceGpuSmoke, WorldSpacePacketsFollowTheCameraAndPointsKeepTheirRadius)
+{
+	ExpectMixedLaneReadback(true);
+}
+
+void ExpectMixedLaneReadback(const bool worldCamera)
 {
 	auto bootstrap = BootstrapOperationalDefaultRecipe();
 	if (bootstrap.Skipped)
@@ -409,7 +452,7 @@ TEST(TransientDebugSurfaceGpuSmoke, MixedLanesReadBackExpectedSampleColors)
 	}
 	renderer.SetTransientDebugBackbufferReadbackBuffer(readbackBuffer);
 
-	const auto run = DriveTransientDebugFrameAndCapture(engine);
+	const auto run = DriveTransientDebugFrameAndCapture(engine, worldCamera);
 
 	if (!run.DeviceOperational)
 	{
@@ -465,7 +508,10 @@ TEST(TransientDebugSurfaceGpuSmoke, MixedLanesReadBackExpectedSampleColors)
 		static_cast<std::uint64_t>(bytesPerPixel) *
 		static_cast<std::uint64_t>(kReadbackWidth);
 
-	for (const TransientDebugSamplePoint& sample : kTransientReadbackSamples)
+	std::vector<TransientDebugSamplePoint> samples(kTransientReadbackSamples.begin(), kTransientReadbackSamples.end());
+	if (worldCamera)
+		samples.push_back({"point_blue_radius", kPointSample.PixelX + 4u, kPointSample.PixelY, kPointSample.Expected});
+	for (const TransientDebugSamplePoint& sample : samples)
 	{
 		const std::uint64_t pixelOffset =
 			static_cast<std::uint64_t>(sample.PixelY) * rowStride +

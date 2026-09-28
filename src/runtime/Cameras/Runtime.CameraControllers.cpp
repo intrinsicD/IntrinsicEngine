@@ -65,9 +65,8 @@ namespace Extrinsic::Runtime
         {
             const float safeNear = std::max(0.0001f, nearPlane);
             const float safeFar = std::max(safeNear + 0.001f, farPlane);
-            glm::mat4 projection = glm::perspective(kDefaultFovYRadians, SafeAspect(viewport), safeNear, safeFar);
-            projection[1][1] *= -1.0f;
-            return projection;
+            // Y-up clip space: the RHI viewport has negative height and already maps NDC +Y to the top row.
+            return glm::perspective(kDefaultFovYRadians, SafeAspect(viewport), safeNear, safeFar);
         }
 
         [[nodiscard]] glm::mat4 MakeOrthographicProjection(const Core::Extent2D viewport,
@@ -80,9 +79,7 @@ namespace Extrinsic::Runtime
             const float safeHeight = std::max(0.0001f, height);
             const float halfHeight = safeHeight * 0.5f;
             const float halfWidth = halfHeight * SafeAspect(viewport);
-            glm::mat4 projection = glm::ortho(-halfWidth, halfWidth, -halfHeight, halfHeight, safeNear, safeFar);
-            projection[1][1] *= -1.0f;
-            return projection;
+            return glm::ortho(-halfWidth, halfWidth, -halfHeight, halfHeight, safeNear, safeFar);
         }
 
         [[nodiscard]] glm::vec3 SafeNormalized(const glm::vec3 value,

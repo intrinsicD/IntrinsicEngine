@@ -164,7 +164,6 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `RUNTIME-210`: `UI-042` — Signed Heat mesh method panel (tasks/backlog/ui/UI-042-signed-heat-mesh-panel.md)
 - blocked by `RUNTIME-211`: `UI-043` — K-Means property-domain panel (tasks/backlog/ui/UI-043-kmeans-property-domain-panel.md)
 - blocked by `RUNTIME-212`: `UI-044` — Progressive Poisson property-domain panel (tasks/backlog/ui/UI-044-progressive-poisson-property-domain-panel.md)
-- unblocked: `UI-055` — Coherent Point Drift editor panel (tasks/backlog/ui/UI-055-coherent-point-drift-editor-panel.md)
 
 ## Theme J — Framework24 product convergence
 

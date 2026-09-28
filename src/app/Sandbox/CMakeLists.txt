@@ -27,6 +27,7 @@ if(INTRINSIC_BUILD_SANDBOX OR INTRINSIC_BUILD_TESTS)
             ExtrinsicRuntime
             PRIVATE
             imgui_core_lib
+            implot::implot
     )
 endif()
 

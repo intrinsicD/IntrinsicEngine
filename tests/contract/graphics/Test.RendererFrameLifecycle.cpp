@@ -64,7 +64,7 @@ import Extrinsic.RHI.Types;
 namespace
 {
     constexpr Extrinsic::RHI::FrontFace kVulkanCameraTriangleFrontFace =
-        Extrinsic::RHI::FrontFace::Clockwise;
+        Extrinsic::RHI::FrontFace::CounterClockwise;
 
     namespace Tasks = Extrinsic::Core::Tasks;
 
@@ -806,7 +806,6 @@ TEST(RendererFrameLifecycle, PrepareFramePublishesCameraIntoGpuSceneTable)
     camera.Up = up;
     camera.View = glm::lookAt(position, position + forward, up);
     camera.Projection = glm::perspective(glm::radians(55.0f), 16.0f / 9.0f, 0.25f, 250.0f);
-    camera.Projection[1][1] *= -1.0f;
     camera.NearPlane = 0.25f;
     camera.FarPlane = 250.0f;
     camera.Valid = true;

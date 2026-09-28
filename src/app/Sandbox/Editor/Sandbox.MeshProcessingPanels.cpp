@@ -18,6 +18,12 @@ module;
 #include <vector>
 
 #include <imgui.h>
+#include <implot.h>
+#include <glm/glm.hpp>
+#include <chrono>
+#include <ctime>
+#include <filesystem>
+#include <fstream>
 
 module Extrinsic.Sandbox.Editor.MeshProcessingPanels;
 
@@ -32,6 +38,7 @@ import Extrinsic.Runtime.PointSetOperations;
 import Extrinsic.Runtime.PointConstructionOperations;
 import Extrinsic.Runtime.ScalarRidgeOperations;
 import Extrinsic.Sandbox.Editor.Shell;
+import Extrinsic.Runtime.SceneInteractionModule;
 
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorPropertyWidgets;
@@ -311,6 +318,19 @@ namespace Extrinsic::Sandbox::Editor
             std::string LastApplied{};
         };
 
+        struct CoherentPointDriftState
+        {
+            std::optional<std::vector<std::uint32_t>> LastSelectedSource{}, LastSelectedTarget{};
+            Runtime::CoherentPointDriftConfig Draft{};
+            std::string LastApplied{}, ConfigDiagnostic{};
+            Runtime::EditorCoherentPointDriftRunHandle Run{};
+            std::string RunMessage{}, ExportMessage{};
+            std::optional<Runtime::EditorCoherentPointDriftResult> LastResult{};
+            bool LivePreview{true};
+            std::uint64_t PreviewRevision{0u};
+            std::array<char, 128> DisplacementName{};
+        };
+
         using DrawWindow = void (Impl::*)(
             bool&,
             const SandboxEditorContext&);
@@ -351,6 +371,7 @@ namespace Extrinsic::Sandbox::Editor
         SubdivideState Subdivide{};
         SimplifyState Simplify{};
         RegistrationState Registration{};
+        CoherentPointDriftState CoherentPointDrift{};
         NormalsState Normals{};
         OutliersState Outliers{};
         KeypointsState Keypoints{};
@@ -409,6 +430,8 @@ namespace Extrinsic::Sandbox::Editor
         void DrawSpacingWindow(bool&, const SandboxEditorContext&);
         void DrawBilateralWindow(bool&, const SandboxEditorContext&);
         void DrawRegistrationWindow(bool&, const SandboxEditorContext&);
+        void DrawCoherentPointDriftWindow(bool&, const SandboxEditorContext&);
+        void ClearCoherentPointDriftPreview();
 
         void DrawDenoiseControls(
             const Runtime::EditorDomainWindowModel&,
@@ -537,6 +560,11 @@ namespace Extrinsic::Sandbox::Editor
                   {"pointcloud.processing.registration", "PointCloud"}}})
             RegisterRedirectWindow(id, {domain, "Processing"}, "ICP Registration",
                                    "view.registration");
+        RegisterWindow("view.coherent_point_drift", {"View"}, "Coherent Point Drift", &Impl::DrawCoherentPointDriftWindow);
+        for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
+                 {{"mesh.processing.coherent_point_drift", "Mesh"}, {"graph.processing.coherent_point_drift", "Graph"},
+                  {"pointcloud.processing.coherent_point_drift", "PointCloud"}}})
+            RegisterRedirectWindow(id, {domain, "Processing"}, "Coherent Point Drift", "view.coherent_point_drift");
     }
 
     void MeshProcessingPanels::Impl::Unregister()
@@ -2700,6 +2728,279 @@ namespace Extrinsic::Sandbox::Editor
             }
         }
         ImGui::End();
+    }
+
+    void MeshProcessingPanels::Impl::ClearCoherentPointDriftPreview()
+    {
+        if (Shell != nullptr)
+            if (auto* interaction = Shell->SceneInteraction()) interaction->ClearPreviewOverlay("coherent_point_drift");
+        CoherentPointDrift.PreviewRevision = 0u;
+    }
+
+    // RUNTIME-273 run controls: start captures the operands, steps run on the job service,
+    // the moving source is previewed as an overlay, and Apply publishes one undoable step.
+    void MeshProcessingPanels::Impl::DrawCoherentPointDriftWindow(bool& open, const SandboxEditorContext& context)
+    {
+        auto& state = CoherentPointDrift;
+        const auto& commands = context.Registration.Commands;
+        ImGui::SetNextWindowSize(ImVec2(440.0f, 720.0f), ImGuiCond_FirstUseEver);
+        if (!ImGui::Begin("Coherent Point Drift", &open))
+        {
+            ImGui::End();
+            if (!open) ClearCoherentPointDriftPreview();
+            return;
+        }
+        ImGui::TextWrapped("Probabilistic registration of a moving source onto a fixed target (Myronenko & Song 2010). "
+                           "Soft correspondences and the outlier weight make it robust to noise, clutter and partial "
+                           "overlap; affine and nonrigid variants fit deformations ICP cannot.");
+        const auto active = Runtime::GetEditorCoherentPointDriftConfig(commands).value_or(Runtime::CoherentPointDriftConfig{});
+        const auto activeText = Runtime::SerializeCoherentPointDriftConfig(active);
+        if (activeText != state.LastApplied)
+        {
+            state.Draft = active;
+            state.LastApplied = activeText;
+            state.ConfigDiagnostic.clear();
+            std::snprintf(state.DisplacementName.data(), state.DisplacementName.size(), "%s", active.DisplacementName.c_str());
+        }
+        auto& config = state.Draft;
+        const auto fields = Runtime::CoherentPointDriftConfigFieldSpecs();
+        const Runtime::CoherentPointDriftConfig defaults{};
+        const auto hint = [&](std::string_view field) { DrawConfigFieldHint(Runtime::FindConfigFieldSpec(fields, field), {}); };
+        // The target follows the selection only when two entities are selected (source, then
+        // target); a single selection must not clear a configured target.
+        {
+            const auto selection = BuildProcessingInputWorkspace(context).Selection;
+            if (selection.SelectedEntities.size() < 2u)
+            {
+                state.LastSelectedTarget.emplace();
+                for (const auto& row : selection.SelectedEntities) state.LastSelectedTarget->push_back(row.StableEntityId);
+            }
+        }
+        bool changed = DrawProcessingEntity("Source (moving)##CPD", context, config.SourceStableEntityId, state.LastSelectedSource);
+        hint("source");
+        changed |= DrawProcessingEntity("Target (fixed)##CPD", context, config.TargetStableEntityId, state.LastSelectedTarget,
+                                        std::nullopt, 1u);
+        hint("target");
+        if (ImGui::Button("Swap source and target##CPD"))
+        {
+            std::swap(config.SourceStableEntityId, config.TargetStableEntityId);
+            std::swap(config.SourcePositions, config.TargetPositions);
+            changed = true;
+        }
+        const auto propertyChoice = [&](const char* label, std::uint32_t entity, Runtime::GeometryPropertyRef& ref) {
+            const auto catalog = Runtime::GetEditorRegistrationInputCatalog(commands, entity);
+            const auto preview = std::string(Runtime::ToString(ref.Domain)) + ": " + ref.Name;
+            if (ImGui::BeginCombo(label, preview.c_str()))
+            {
+                for (const auto& row : catalog.Entries)
+                {
+                    const auto title = std::string(Runtime::ToString(row.Ref.Domain)) + ": " + row.Ref.Name + " (" +
+                                       std::to_string(row.ElementCount) + ")";
+                    if (ImGui::Selectable(title.c_str(), row.Ref == ref)) { ref = row.Ref; changed = true; }
+                }
+                ImGui::EndCombo();
+            }
+        };
+        propertyChoice("Source positions##CPD", config.SourceStableEntityId, config.SourcePositions);
+        hint("source_positions");
+        propertyChoice("Target positions##CPD", config.TargetStableEntityId, config.TargetPositions);
+        hint("target_positions");
+
+        ImGui::SeparatorText("Model");
+        if (DrawSpecEnumCombo("Method##CPD", fields, "method", config.Method, defaults.Method))
+        {
+            // Keep the output storable: a transform only holds rigid results.
+            if (config.Method != Runtime::CoherentPointDriftMethod::Rigid &&
+                config.Output == Runtime::CoherentPointDriftOutput::SourceTransform)
+                config.Output = Runtime::CoherentPointDriftOutput::DisplacementProperty;
+            changed = true;
+        }
+        changed |= DrawSpecInputDouble("Outlier weight w##CPD", fields, "outlier_weight", config.OutlierWeight, defaults.OutlierWeight);
+        if (config.Method == Runtime::CoherentPointDriftMethod::Rigid)
+        {
+            DrawSpecCheckbox("Estimate scale##CPD", fields, "estimate_scale", config.EstimateScale, defaults.EstimateScale, changed);
+            DrawSpecCheckbox("Allow reflection##CPD", fields, "allow_reflection", config.AllowReflection, defaults.AllowReflection, changed);
+        }
+        if (config.Method == Runtime::CoherentPointDriftMethod::Nonrigid)
+        {
+            changed |= DrawSpecInputDouble("Beta (kernel width)##CPD", fields, "beta", config.Beta, defaults.Beta);
+            changed |= DrawSpecInputDouble("Lambda (smoothness)##CPD", fields, "lambda", config.Lambda, defaults.Lambda);
+        }
+        if (ImGui::TreeNode("Convergence##CPD"))
+        {
+            changed |= DrawSpecInputUInt("Max iterations##CPD", fields, "max_iterations", config.MaxIterations, defaults.MaxIterations);
+            changed |= DrawSpecInputDouble("Tolerance##CPD", fields, "tolerance", config.Tolerance, defaults.Tolerance, "%.2e");
+            changed |= DrawSpecInputDouble("Initial sigma^2 (0 = auto)##CPD", fields, "initial_sigma2", config.InitialSigma2,
+                                           defaults.InitialSigma2, "%.4g");
+            changed |= DrawSpecInputDouble("Sigma^2 floor##CPD", fields, "sigma2_floor", config.Sigma2Floor, defaults.Sigma2Floor, "%.2e");
+            DrawSpecCheckbox("Normalize inputs##CPD", fields, "normalize", config.NormalizeInputs, defaults.NormalizeInputs, changed);
+            ImGui::TreePop();
+        }
+        ImGui::SeparatorText("Output");
+        changed |= DrawSpecEnumCombo("Write result to##CPD", fields, "output", config.Output, defaults.Output);
+        if (config.Output == Runtime::CoherentPointDriftOutput::DisplacementProperty)
+        {
+            if (ImGui::InputText("Displacement property##CPD", state.DisplacementName.data(), state.DisplacementName.size()))
+            {
+                config.DisplacementName = state.DisplacementName.data();
+                changed = true;
+            }
+            hint("displacement_name");
+        }
+        if (changed)
+        {
+            const auto applied = Runtime::ApplyEditorCoherentPointDriftConfig(commands, config);
+            state.ConfigDiagnostic = applied.Succeeded() ? std::string{}
+                : Runtime::PreviewEditorCoherentPointDriftCommand(commands, config).DisabledReason;
+            if (!applied.Succeeded() && state.ConfigDiagnostic.empty()) state.ConfigDiagnostic = "Settings were rejected.";
+        }
+        if (!state.ConfigDiagnostic.empty()) ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.3f, 1.0f), "%s", state.ConfigDiagnostic.c_str());
+
+        ImGui::SeparatorText("Run");
+        const auto snapshot = Runtime::SnapshotEditorCoherentPointDrift(state.Run);
+        using Phase = Runtime::EditorCoherentPointDriftPhase;
+        const bool hasRun = state.Run != nullptr;
+        const bool running = hasRun && snapshot.Phase == Phase::Running;
+        const bool steppable = hasRun && (snapshot.Phase == Phase::Ready || snapshot.Phase == Phase::Paused);
+        const bool applicable = hasRun && (snapshot.Phase == Phase::Paused || snapshot.Phase == Phase::Finished);
+        const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
+            commands, Runtime::PreviewEditorCoherentPointDriftCommand(commands, config));
+        if (!hasRun || !steppable)
+        {
+            if (DrawProcessingActionButton(hasRun ? "Restart##CPD" : "Start##CPD", readiness) && !running)
+            {
+                ClearCoherentPointDriftPreview();
+                Runtime::EditorCoherentPointDriftResult failure;
+                state.Run = Runtime::StartEditorCoherentPointDrift(commands, config, failure);
+                state.RunMessage = state.Run ? std::string{} : failure.Message;
+            }
+            if (!readiness.Enabled && !readiness.DisabledReason.empty()) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
+        }
+        if (hasRun)
+        {
+            const auto step = [&](std::uint32_t count) {
+                const auto status = Runtime::StepEditorCoherentPointDrift(commands, state.Run, count);
+                state.RunMessage = status == Runtime::EditorCommandStatus::Pending ? std::string{}
+                                                                                  : "This run takes no more steps.";
+            };
+            ImGui::BeginDisabled(!steppable);
+            if (ImGui::Button("Step##CPD")) step(1u);
+            ImGui::SameLine();
+            if (ImGui::Button("Step 10##CPD")) step(10u);
+            ImGui::SameLine();
+            if (ImGui::Button("Run to end##CPD")) step(0u);
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            ImGui::BeginDisabled(!running);
+            if (ImGui::Button("Cancel##CPD")) Runtime::CancelEditorCoherentPointDrift(state.Run);
+            ImGui::EndDisabled();
+            ImGui::BeginDisabled(!applicable);
+            if (ImGui::Button("Apply##CPD"))
+            {
+                state.LastResult = Runtime::ApplyEditorCoherentPointDrift(commands, state.Run);
+                if (state.LastResult->Succeeded()) ClearCoherentPointDriftPreview();
+            }
+            ImGui::EndDisabled();
+            if (!applicable && hasRun && snapshot.Phase != Phase::Applied)
+                DrawDisabledReasonTooltip("Apply publishes a paused or finished run.");
+            ImGui::SameLine();
+            if (ImGui::Button("Discard##CPD"))
+            {
+                if (running) Runtime::CancelEditorCoherentPointDrift(state.Run);
+                state.Run.reset();
+                ClearCoherentPointDriftPreview();
+            }
+        }
+        if (!state.RunMessage.empty()) ImGui::TextWrapped("%s", state.RunMessage.c_str());
+        // Shown next to the buttons so a rejected apply (e.g. stale inputs) is not missed below the plots.
+        if (state.LastResult)
+        {
+            const bool ok = state.LastResult->Succeeded();
+            ImGui::PushStyleColor(ImGuiCol_Text, ok ? ImGui::GetStyleColorVec4(ImGuiCol_Text) : ImVec4(1.0f, 0.55f, 0.3f, 1.0f));
+            ImGui::TextWrapped("Last apply: %s - %s", Runtime::DebugNameForEditorCommandStatus(state.LastResult->Status),
+                               state.LastResult->Message.c_str());
+            ImGui::PopStyleColor();
+        }
+        if (ImGui::Checkbox("Preview moving source in the viewport##CPD", &state.LivePreview) && !state.LivePreview)
+            ClearCoherentPointDriftPreview();
+
+        if (hasRun)
+        {
+            const auto& r = snapshot.Result;
+            ImGui::Text("Phase: %s   backend: %s", Runtime::ToString(snapshot.Phase), r.Backend.c_str());
+            ImGui::Text("Points: %zu -> %zu   iterations: %u   stop: %s", r.SourcePointCount, r.TargetPointCount, r.Iterations,
+                        r.Termination.c_str());
+            ImGui::Text("sigma^2: %.4g   matched: %.1f   mean move: %.4g", r.Sigma2, r.MatchedWeight, r.MeanDisplacement);
+            if (!r.Message.empty() && snapshot.Phase == Phase::Failed) ImGui::TextWrapped("%s", r.Message.c_str());
+
+            // Overlay the moving source (orange) whenever the run published new positions.
+            if (state.LivePreview && Shell != nullptr && snapshot.Revision != state.PreviewRevision &&
+                snapshot.Phase != Phase::Applied)
+                if (auto* interaction = Shell->SceneInteraction())
+                {
+                    std::vector<Runtime::SceneInteractionModule::PreviewPoint> points;
+                    const std::size_t count = snapshot.SourcePreview.size();
+                    const std::size_t stride = std::max<std::size_t>(1u, count / 20000u);
+                    glm::vec3 lo{std::numeric_limits<float>::max()}, hi{-std::numeric_limits<float>::max()};
+                    for (const auto& p : snapshot.Target) { lo = glm::min(lo, p); hi = glm::max(hi, p); }
+                    const float radius = std::max(1e-4f, 0.004f * glm::length(hi - lo));
+                    for (std::size_t i = 0; i < count; i += stride)
+                        points.push_back({.Position = snapshot.SourcePreview[i], .Color = {1.0f, 0.55f, 0.1f, 1.0f},
+                                          .Radius = radius, .DepthTested = true});
+                    interaction->SetPreviewOverlay("coherent_point_drift", points);
+                    state.PreviewRevision = snapshot.Revision;
+                }
+
+            if (!snapshot.Trace.empty())
+            {
+                std::vector<double> iteration, sigma2, objective, matched;
+                for (const auto& t : snapshot.Trace)
+                {
+                    iteration.push_back(double(t.Iteration));
+                    sigma2.push_back(std::max(t.Sigma2, 1e-300));
+                    objective.push_back(t.Objective);
+                    matched.push_back(t.MatchedWeight);
+                }
+                const int n = int(iteration.size());
+                if (ImPlot::BeginPlot("sigma^2##CPD", ImVec2(-1.0f, 150.0f)))
+                {
+                    ImPlot::SetupAxes("iteration", "sigma^2", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+                    ImPlot::SetupAxisScale(ImAxis_Y1, ImPlotScale_Log10);
+                    ImPlot::PlotLine("sigma^2", iteration.data(), sigma2.data(), n);
+                    ImPlot::EndPlot();
+                }
+                if (ImPlot::BeginPlot("Objective and matched weight##CPD", ImVec2(-1.0f, 150.0f)))
+                {
+                    ImPlot::SetupAxes("iteration", "objective", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+                    ImPlot::SetupAxis(ImAxis_Y2, "matched", ImPlotAxisFlags_AuxDefault | ImPlotAxisFlags_AutoFit);
+                    ImPlot::PlotLine("objective", iteration.data(), objective.data(), n);
+                    ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
+                    ImPlot::PlotLine("matched weight", iteration.data(), matched.data(), n);
+                    ImPlot::EndPlot();
+                }
+                if (ImGui::Button("Export trace (CSV)##CPD"))
+                {
+                    std::error_code error;
+                    const auto directory = std::filesystem::current_path(error) / "exports";
+                    std::filesystem::create_directories(directory, error);
+                    const std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+                    std::tm local{};
+                    localtime_r(&now, &local);
+                    char stamp[32]{};
+                    (void)std::strftime(stamp, sizeof(stamp), "%Y%m%d-%H%M%S", &local);
+                    const auto path = directory / ("cpd-trace-" + std::string(stamp) + ".csv");
+                    std::ofstream csv(path);
+                    csv << "iteration,sigma2,negative_log_likelihood,objective,matched_weight\n";
+                    for (const auto& t : snapshot.Trace)
+                        csv << t.Iteration << ',' << t.Sigma2 << ',' << t.NegativeLogLikelihood << ',' << t.Objective << ','
+                            << t.MatchedWeight << '\n';
+                    state.ExportMessage = csv ? "Saved " + path.string() : "Could not write " + path.string();
+                }
+                if (!state.ExportMessage.empty()) ImGui::TextWrapped("%s", state.ExportMessage.c_str());
+            }
+        }
+        ImGui::End();
+        if (!open) ClearCoherentPointDriftPreview();
     }
 
     MeshProcessingPanels::MeshProcessingPanels()

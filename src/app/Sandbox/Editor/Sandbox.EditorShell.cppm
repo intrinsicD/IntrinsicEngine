@@ -12,6 +12,7 @@ export module Extrinsic.Sandbox.Editor.Shell;
 
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.WorldRegistry;
 
 export namespace Extrinsic::Sandbox::Editor
@@ -73,6 +74,8 @@ export namespace Extrinsic::Sandbox::Editor
             [[nodiscard]] bool IsAttached() const noexcept;
             [[nodiscard]] const SandboxEditorFrame&
             GetLastFrame() const noexcept;
+            // Viewport overlays for tool previews; null when the module is not composed.
+            [[nodiscard]] Runtime::SceneInteractionModule* SceneInteraction() const noexcept;
 
         private:
             struct Impl;

@@ -85,9 +85,9 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, method.e
 | Compatible entity sources | Every canonical domain via RUNTIME-273. |
 | RuntimeModule | RUNTIME-273 selects the policy; no service or registry here. |
 | Config/agent | RUNTIME-273 exposes the policy and its tolerance in `sandbox.coherent_point_drift`. |
-| UI | UI-055 offers the policy with requested/actual backend feedback. |
+| UI | This task adds the policy, tolerance, low-rank k and Anderson controls to the CPD panel (UI-055, retired) with requested/actual backend feedback. |
 | Publication | Unchanged; RUNTIME-273. |
-| End-to-end tests | Parity tests here; RUNTIME-273/UI-055 cover the editor path with an accelerated policy. |
+| End-to-end tests | Parity tests here; extend the RUNTIME-273 contract and UI-055 panel tests to an accelerated policy. |
 
 ## Verification
 ```bash

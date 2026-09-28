@@ -4,7 +4,12 @@ module;
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <span>
+#include <string>
 #include <string_view>
+#include <vector>
+
+#include <glm/glm.hpp>
 
 export module Extrinsic.Runtime.SceneInteractionModule;
 
@@ -55,6 +60,26 @@ namespace Extrinsic::Runtime
             LastRefinedPrimitive() const noexcept;
         [[nodiscard]] std::uint64_t
             LastRefinedPrimitiveGeneration() const noexcept;
+
+        // Transient points and lines an editor tool draws over the scene (for example a
+        // registration preview) until it clears them. Each owner's overlay is replaced
+        // as a whole; all overlays are dropped when the bound world changes.
+        struct PreviewPoint
+        {
+            glm::vec3 Position{0.0f};
+            glm::vec4 Color{1.0f};
+            float Radius{0.01f}; // world units
+            bool DepthTested{true};
+        };
+        struct PreviewLine
+        {
+            glm::vec3 Start{0.0f}, End{0.0f};
+            glm::vec4 Color{1.0f};
+            bool DepthTested{true};
+        };
+        void SetPreviewOverlay(std::string_view owner, std::span<const PreviewPoint> points,
+                               std::span<const PreviewLine> lines = {});
+        void ClearPreviewOverlay(std::string_view owner);
 
     private:
         struct Impl;

@@ -2027,6 +2027,7 @@ namespace Extrinsic::Sandbox::Editor
             Runtime::EditorUiHost* Host{nullptr};
             Runtime::ViewCaptureModule* ViewCapture{nullptr};
             const Runtime::SelectionController* Selection{nullptr};
+            Runtime::SceneInteractionModule* Interaction{nullptr};
             // The capture the user started last (menu, F12 or window) and when it finished,
             // for the short "Saved ..." notice; agent captures stay silent.
             std::uint64_t UserCaptureTicket{0u};
@@ -2401,6 +2402,7 @@ namespace Extrinsic::Sandbox::Editor
                     RegisterAgentConnectionWindow(*agent);
                 ViewCapture = services.Find<Runtime::ViewCaptureModule>();
                 Selection = services.Find<Runtime::SelectionController>();
+                Interaction = services.Find<Runtime::SceneInteractionModule>();
                 if (ViewCapture != nullptr)
                     RegisterScreenshotWindow();
                 Attachment.Attach(worlds, services);
@@ -2433,6 +2435,7 @@ namespace Extrinsic::Sandbox::Editor
                 Host = nullptr;
                 ViewCapture = nullptr;
                 Selection = nullptr;
+                Interaction = nullptr;
                 UserCaptureTicket = 0u;
                 Attachment.Detach();
             }
@@ -2519,6 +2522,11 @@ namespace Extrinsic::Sandbox::Editor
         {
             return m_Impl->Host != nullptr &&
                    m_Impl->Host->SetWindowOpen(id, open);
+        }
+
+        Runtime::SceneInteractionModule* EditorShell::SceneInteraction() const noexcept
+        {
+            return m_Impl->Interaction;
         }
 
         bool EditorShell::IsAttached() const noexcept

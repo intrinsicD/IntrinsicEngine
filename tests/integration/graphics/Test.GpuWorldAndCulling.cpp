@@ -405,7 +405,6 @@ TEST(GraphicsCullingSystem, TeleportSnapshotTreatsCandidatesAsPhase1Visible)
     input.FarPlane = 100.0f;
     input.View = glm::lookAt(input.Position, input.Position + input.Forward, input.Up);
     input.Projection = glm::perspective(glm::radians(45.0f), 16.0f / 9.0f, input.NearPlane, input.FarPlane);
-    input.Projection[1][1] *= -1.0f;
     input.ExplicitCameraTransition = true;
     input.Valid = true;
 

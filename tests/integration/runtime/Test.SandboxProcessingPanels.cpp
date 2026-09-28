@@ -53,6 +53,8 @@ import Extrinsic.Runtime.CurvatureSegmentationConfig;
 import Extrinsic.Runtime.GeodesicsConfig;
 import Extrinsic.Runtime.MeshCurvatureConfig;
 import Extrinsic.Runtime.RegistrationConfig;
+import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.CoherentPointDriftConfig;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.SceneInteractionModule;
@@ -3245,4 +3247,73 @@ TEST(SandboxProcessingPanels, PropertySmoothingControlsClampToTheFieldTableAndSh
     h.Engine->Run();
     EXPECT_NE(activeNeighbors().find("\"neighbors\":1024"), std::string::npos)
         << "5000 neighbors were clamped to the declared maximum and applied: " << activeNeighbors();
+}
+
+// UI-055: the Coherent Point Drift panel drives a run through its own buttons: Start
+// captures, Step and Run to end iterate on the job service while the preview overlay
+// follows, and Apply publishes the transform.
+TEST(SandboxProcessingPanels, CoherentPointDriftPanelStepsRunsAndApplies)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    std::vector<glm::vec3> points;
+    for (int i = 0; i < 64; ++i)
+        points.push_back({std::sin(float(i) * 1.3f), std::cos(float(i) * 0.7f), 0.5f * std::sin(float(i) * 2.1f)});
+    const auto make = [&](glm::vec3 offset) {
+        const auto entity = scene.Create();
+        scene.Raw().emplace_or_replace<Extrinsic::ECS::Components::Transform::Component>(entity);
+        auto& vertices = scene.Raw().emplace<GS::Vertices>(entity).Properties;
+        vertices.Resize(points.size());
+        auto positions = vertices.GetOrAdd<glm::vec3>("v:position");
+        for (std::size_t i = 0; i < points.size(); ++i) positions[i] = points[i] + offset;
+        return entity;
+    };
+    const auto source = make({});
+    const auto target = make({0.25f, -0.1f, 0.05f});
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    R::SetCoherentPointDriftConfig(config, {.SourceStableEntityId = R::SelectionController::ToStableEntityId(source),
+                                            .TargetStableEntityId = R::SelectionController::ToStableEntityId(target),
+                                            .OutlierWeight = 0.0});
+    ASSERT_TRUE(h.Apply(config));
+    // The panel follows the scene selection: the source is selected, the target is picked
+    // from the panel's own combo.
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, source));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("view.coherent_point_drift", true));
+    const auto targetTitle = "Entity " + std::to_string(static_cast<std::uint32_t>(target)) + " (" +
+                             std::to_string(R::SelectionController::ToStableEntityId(target)) + ")";
+
+    auto& transform = scene.Raw().get<Extrinsic::ECS::Components::Transform::Component>(source);
+    int frames = 0;
+    const auto click = [](ImGuiWindow* window, const char* label) { ImGui::ActivateItemByID(window->GetID(label)); };
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        ++frames;
+        auto* window = ImGui::FindWindowByName("Coherent Point Drift");
+        if (!window) return;
+        ImGui::SetWindowSize(window, {520, 1400});
+        ImGui::SetWindowPos(window, {0, 0});
+        // Focusing the panel closes open combo popups, so only focus it while none is open.
+        if (ImGui::GetCurrentContext()->OpenPopupStack.empty()) ImGui::FocusWindow(window);
+        if (frames == 6) click(window, "Target (fixed)##CPD");
+        if (frames == 8)
+        {
+            auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+            EXPECT_FALSE(popups.empty());
+            if (!popups.empty() && popups.back().Window)
+                ImGui::ActivateItemByID(popups.back().Window->GetID(targetTitle.c_str()));
+        }
+        if (frames == 14) click(window, "Start##CPD");
+        if (frames == 18) click(window, "Step##CPD");
+        if (frames == 28) click(window, "Run to end##CPD");
+        if (frames == 70)
+        {
+            EXPECT_EQ(transform.Position, glm::vec3(0.0f)) << "nothing is published before Apply";
+            click(window, "Apply##CPD");
+        }
+        if (frames == 74 || frames > 200) engine.RequestExit();
+    };
+    h.Engine->Run();
+    EXPECT_NEAR(transform.Position.x, 0.25f, 2e-3f);
+    EXPECT_NEAR(transform.Position.y, -0.1f, 2e-3f);
+    // This harness composes no document history; undo/redo of the publication is covered by
+    // Test.CoherentPointDriftOperations.cpp.
 }

@@ -15,5 +15,9 @@ layout(location = 0) out vec4 outColor;
 
 void main()
 {
+    // Round sprites; a 1-pixel point has a single fragment at the sprite center.
+    const vec2 offset = gl_PointCoord - vec2(0.5);
+    if (dot(offset, offset) > 0.25)
+        discard;
     outColor = vec4(fragColor.rgb, 1.0);
 }

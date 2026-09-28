@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <string>
 #include <bit>
 #include <chrono>
 #include <cmath>
@@ -271,6 +272,14 @@ namespace Extrinsic::Runtime
     {
         struct State
         {
+            struct PreviewOverlay
+            {
+                std::string Owner{};
+                std::vector<Graphics::DebugPointPacket> Points{};
+                std::vector<Graphics::DebugLinePacket> Lines{};
+            };
+            std::vector<PreviewOverlay> PreviewOverlays{};
+
             struct InFlightPickContext
             {
                 std::uint64_t Sequence{0u};
@@ -343,6 +352,7 @@ namespace Extrinsic::Runtime
 
             void ClearWorldBoundState()
             {
+                PreviewOverlays.clear();
                 // BoundRegistry is cleared only while it is still known-live:
                 // world retirement and document replacement notify before
                 // destroying/clearing the outgoing registry.
@@ -576,6 +586,13 @@ namespace Extrinsic::Runtime
                     Selection.HoveredStableId();
                 RenderSnapshot.GizmoDrawPackets.assign(
                     packets.begin(), packets.end());
+                for (const auto& overlay : PreviewOverlays)
+                {
+                    RenderSnapshot.DebugPoints.insert(RenderSnapshot.DebugPoints.end(),
+                                                      overlay.Points.begin(), overlay.Points.end());
+                    RenderSnapshot.DebugLines.insert(RenderSnapshot.DebugLines.end(),
+                                                     overlay.Lines.begin(), overlay.Lines.end());
+                }
                 if (Extraction != nullptr)
                 {
                     Extraction->SubmitSceneInteractionSnapshot(
@@ -1060,5 +1077,29 @@ namespace Extrinsic::Runtime
         LastRefinedPrimitiveGeneration() const noexcept
     {
         return m_Impl->Shared->LastRefinedPrimitiveGeneration;
+    }
+
+    void SceneInteractionModule::SetPreviewOverlay(const std::string_view owner,
+                                                   const std::span<const PreviewPoint> points,
+                                                   const std::span<const PreviewLine> lines)
+    {
+        if (!m_Impl->Shared) return;
+        auto& overlays = m_Impl->Shared->PreviewOverlays;
+        auto it = std::ranges::find_if(overlays, [&](const auto& o) { return o.Owner == owner; });
+        if (it == overlays.end()) it = overlays.insert(overlays.end(), {.Owner = std::string(owner)});
+        it->Points.clear();
+        it->Points.reserve(points.size());
+        for (const PreviewPoint& p : points)
+            it->Points.push_back({.Position = p.Position, .Color = p.Color, .Radius = p.Radius, .DepthTested = p.DepthTested});
+        it->Lines.clear();
+        it->Lines.reserve(lines.size());
+        for (const PreviewLine& l : lines)
+            it->Lines.push_back({.Start = l.Start, .End = l.End, .Color = l.Color, .DepthTested = l.DepthTested});
+    }
+
+    void SceneInteractionModule::ClearPreviewOverlay(const std::string_view owner)
+    {
+        if (m_Impl->Shared)
+            std::erase_if(m_Impl->Shared->PreviewOverlays, [&](const auto& o) { return o.Owner == owner; });
     }
 }

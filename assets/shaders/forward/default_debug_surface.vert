@@ -37,6 +37,9 @@ layout(location = 6) out vec4 fragVertexColor;
 layout(location = 7) flat out uint fragHasVertexColor;
 layout(location = 8) flat out uint fragInstanceSlot;
 
+// Bit-identical depth with the depth prepass is required by the EQUAL depth tests.
+invariant gl_Position;
+
 void main() {
     const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;
     const GpuInstanceStatic inst = GpuInstanceStaticRef(scene.InstanceStaticBDA).Data[gl_InstanceIndex];

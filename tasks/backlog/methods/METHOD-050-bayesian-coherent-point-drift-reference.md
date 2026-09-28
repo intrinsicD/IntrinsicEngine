@@ -63,9 +63,9 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, method.e
 | Compatible entity sources | Every canonical domain via RUNTIME-273. |
 | RuntimeModule | RUNTIME-273 adds the variant token. |
 | Config/agent | `sandbox.coherent_point_drift` variant `bayesian` with its parameters. |
-| UI | UI-055 variant with upsampling controls. |
+| UI | This task adds the bayesian variant and upsampling controls to the CPD panel (UI-055, retired). |
 | Publication | Similarity transform plus displacement, published as in RUNTIME-273. |
-| End-to-end tests | Variant covered in RUNTIME-273/UI-055 tests. |
+| End-to-end tests | Extend the RUNTIME-273 contract and UI-055 panel tests to the variant. |
 
 ## Forbidden changes
 - No copied Framework24 or reference-implementation code without compatible-license provenance.

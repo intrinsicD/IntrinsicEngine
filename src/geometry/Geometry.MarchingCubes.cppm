@@ -49,6 +49,7 @@ export namespace Geometry::MarchingCubes
     {
         // Isovalue: the scalar value defining the surface.
         // Vertices with value < Isovalue are "inside"; >= Isovalue are "outside".
+        // Triangles are counter-clockwise seen from outside (toward higher values).
         float Isovalue{0.0f};
 
         // If true, compute per-vertex normals from the scalar field gradient.

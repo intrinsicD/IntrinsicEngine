@@ -4545,7 +4545,7 @@ namespace Extrinsic::Graphics
                 "shaders/forward/default_debug_surface.frag.spv");
             desc.PrimitiveTopology = RHI::Topology::TriangleList;
             desc.Rasterizer.Culling = RHI::CullMode::Back;
-            desc.Rasterizer.Winding = RHI::FrontFace::Clockwise;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
             desc.Rasterizer.Fill = RHI::FillMode::Solid;
             desc.DepthStencil.DepthTestEnable = true;
             desc.DepthStencil.DepthWriteEnable = true;
@@ -4590,7 +4590,7 @@ namespace Extrinsic::Graphics
                 "shaders/forward/default_debug_surface.frag.spv");
             desc.PrimitiveTopology = RHI::Topology::TriangleList;
             desc.Rasterizer.Culling = RHI::CullMode::Back;
-            desc.Rasterizer.Winding = RHI::FrontFace::Clockwise;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
             desc.Rasterizer.Fill = RHI::FillMode::Solid;
             desc.DepthStencil.DepthTestEnable = true;
             desc.DepthStencil.DepthWriteEnable = false;
@@ -4687,7 +4687,7 @@ namespace Extrinsic::Graphics
                 "shaders/depth_prepass.vert.spv");
             desc.PrimitiveTopology = RHI::Topology::TriangleList;
             desc.Rasterizer.Culling = RHI::CullMode::Back;
-            desc.Rasterizer.Winding = RHI::FrontFace::Clockwise;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
             desc.Rasterizer.Fill = RHI::FillMode::Solid;
             desc.DepthStencil.DepthTestEnable = true;
             desc.DepthStencil.DepthWriteEnable = true;
@@ -4732,7 +4732,7 @@ namespace Extrinsic::Graphics
                 "shaders/deferred/default_debug_gbuffer.frag.spv");
             desc.PrimitiveTopology = RHI::Topology::TriangleList;
             desc.Rasterizer.Culling = RHI::CullMode::Back;
-            desc.Rasterizer.Winding = RHI::FrontFace::Clockwise;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
             desc.Rasterizer.Fill = RHI::FillMode::Solid;
             desc.DepthStencil.DepthTestEnable = true;
             desc.DepthStencil.DepthWriteEnable = false;
@@ -4838,7 +4838,7 @@ namespace Extrinsic::Graphics
                 "shaders/selection/entity_id.frag.spv");
             desc.PrimitiveTopology = RHI::Topology::TriangleList;
             desc.Rasterizer.Culling = RHI::CullMode::Back;
-            desc.Rasterizer.Winding = RHI::FrontFace::Clockwise;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
             desc.Rasterizer.Fill = RHI::FillMode::Solid;
             desc.DepthStencil.DepthTestEnable = true;
             desc.DepthStencil.DepthWriteEnable = false;
@@ -4890,7 +4890,7 @@ namespace Extrinsic::Graphics
                 "shaders/selection/face_id.frag.spv");
             desc.PrimitiveTopology = RHI::Topology::TriangleList;
             desc.Rasterizer.Culling = RHI::CullMode::Back;
-            desc.Rasterizer.Winding = RHI::FrontFace::Clockwise;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
             desc.Rasterizer.Fill = RHI::FillMode::Solid;
             desc.DepthStencil.DepthTestEnable = true;
             desc.DepthStencil.DepthWriteEnable = false;
@@ -5782,7 +5782,7 @@ namespace Extrinsic::Graphics
             RHI::PipelineDesc depthPrepassDesc{};
             depthPrepassDesc.VertexShaderPath = Core::Filesystem::GetShaderPath(
                 "shaders/depth_prepass.vert.spv");
-            depthPrepassDesc.Rasterizer.Winding = RHI::FrontFace::Clockwise;
+            depthPrepassDesc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
             depthPrepassDesc.ColorTargetCount = 0u;
             depthPrepassDesc.DepthTargetFormat = RHI::Format::D32_FLOAT;
             depthPrepassDesc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);
@@ -9955,6 +9955,14 @@ namespace Extrinsic::Graphics
             // through the status taxonomy rather than masked as
             // `Recorded`.
             bool recordedAnyLane = false;
+            // Packets are world space; without a valid camera they stay clip space.
+            TransientDebugView transientDebugView{};
+            if (world.Camera.Valid)
+            {
+                transientDebugView.ViewProjection = world.Camera.ViewProjection;
+                transientDebugView.PixelsPerUnit =
+                    std::abs(world.Camera.Projection[1][1]) * 0.5f * static_cast<float>(world.Viewport.Height);
+            }
 
             if (hasTriangles)
             {
@@ -9966,7 +9974,8 @@ namespace Extrinsic::Graphics
                         cmd,
                         world.DebugPrimitives.Triangles,
                         uploadResult,
-                        m_LastRenderGraphStats.TransientDebugUpload);
+                        m_LastRenderGraphStats.TransientDebugUpload,
+                        transientDebugView);
                     if (uploadResult.Uploaded)
                     {
                         recordedAnyLane = true;
@@ -9988,7 +9997,8 @@ namespace Extrinsic::Graphics
                         cmd,
                         world.DebugPrimitives.Lines,
                         uploadResult,
-                        m_LastRenderGraphStats.TransientDebugUpload);
+                        m_LastRenderGraphStats.TransientDebugUpload,
+                        transientDebugView);
                     if (uploadResult.Uploaded)
                     {
                         recordedAnyLane = true;
@@ -10010,7 +10020,8 @@ namespace Extrinsic::Graphics
                         cmd,
                         world.DebugPrimitives.Points,
                         uploadResult,
-                        m_LastRenderGraphStats.TransientDebugUpload);
+                        m_LastRenderGraphStats.TransientDebugUpload,
+                        transientDebugView);
                     if (uploadResult.Uploaded)
                     {
                         recordedAnyLane = true;

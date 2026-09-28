@@ -46,6 +46,9 @@ namespace
             Core::Extent2D{1280, 720});
         EXPECT_TRUE(snapshot.Valid);
         EXPECT_TRUE(snapshot.FrustumPlanes[static_cast<std::uint32_t>(Graphics::FrustumPlaneIndex::Near)].Valid);
+        // Clip space is Y-up; the RHI's negative-height viewport performs the
+        // only Vulkan Y flip, so projections must not flip again.
+        EXPECT_GT(input.Projection[1][1], 0.0f);
     }
 
     void ExpectWorldPointCentered(const Graphics::CameraViewInput& input,
@@ -81,6 +84,12 @@ namespace
         ExpectWorldPointInsideClipSpace(input, glm::vec3{-0.5f, -0.5f, 0.0f});
         ExpectWorldPointInsideClipSpace(input, glm::vec3{ 0.5f, -0.5f, 0.0f});
         ExpectWorldPointInsideClipSpace(input, glm::vec3{ 0.0f,  0.5f, 0.0f});
+        // The apex (+Y) stays above the base in clip space whenever the camera's up is +Y.
+        if (glm::dot(input.Up, glm::vec3{0.0f, 1.0f, 0.0f}) < 0.5f)
+            return;
+        const glm::vec4 apex = input.Projection * input.View * glm::vec4{0.0f, 0.5f, 0.0f, 1.0f};
+        const glm::vec4 base = input.Projection * input.View * glm::vec4{0.0f, -0.5f, 0.0f, 1.0f};
+        EXPECT_GT(apex.y / apex.w, base.y / base.w);
     }
 }
 

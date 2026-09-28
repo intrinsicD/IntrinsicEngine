@@ -678,4 +678,18 @@ TEST(DenseGrid, MarchingCubesExtractSphereSDF)
     ASSERT_TRUE(result.has_value());
     EXPECT_GT(result->VertexCount, 0u);
     EXPECT_GT(result->TriangleCount, 0u);
+
+    // Counter-clockwise faces point outward (toward higher values) and agree
+    // with the gradient normals.
+    ASSERT_EQ(result->Normals.size(), result->Vertices.size());
+    for (const auto& t : result->Triangles)
+    {
+        const glm::vec3 a = result->Vertices[t[0]], b = result->Vertices[t[1]], c = result->Vertices[t[2]];
+        const glm::vec3 faceNormal = glm::cross(b - a, c - a);
+        if (glm::length(faceNormal) < 1e-8f)
+            continue;
+        const glm::vec3 centroid = (a + b + c) / 3.0f;
+        EXPECT_GT(glm::dot(faceNormal, centroid), 0.0f);
+        EXPECT_GT(glm::dot(faceNormal, result->Normals[t[0]] + result->Normals[t[1]] + result->Normals[t[2]]), 0.0f);
+    }
 }

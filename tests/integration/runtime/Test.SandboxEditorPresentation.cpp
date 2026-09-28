@@ -426,7 +426,7 @@ TEST(SandboxEditorPresentation, DefaultDrawStartsWithOnlyMenuBarVisible)
 
     EXPECT_TRUE(ImGuiWindowExists("##MainMenuBar"));
     const auto menu = shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), 92u);
+    ASSERT_EQ(menu.size(), 96u);
     for (const Runtime::EditorWindowMenuEntry& entry : menu)
     {
         EXPECT_FALSE(entry.Open) << entry.Id;
@@ -444,7 +444,7 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         std::string_view Id;
         std::vector<std::string> MenuPath;
     };
-    const std::array<ExpectedWindow, 82> expected{{
+    const std::array<ExpectedWindow, 86> expected{{
         {"pointcloud.appearance", {"PointCloud"}},
         {"pointcloud.properties", {"PointCloud"}},
         {"pointcloud.selection", {"PointCloud"}},
@@ -527,6 +527,10 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         {"mesh.processing.registration", {"Mesh", "Processing"}},
         {"graph.processing.registration", {"Graph", "Processing"}},
         {"pointcloud.processing.registration", {"PointCloud", "Processing"}},
+        {"view.coherent_point_drift", {"View"}},
+        {"mesh.processing.coherent_point_drift", {"Mesh", "Processing"}},
+        {"graph.processing.coherent_point_drift", {"Graph", "Processing"}},
+        {"pointcloud.processing.coherent_point_drift", {"PointCloud", "Processing"}},
     }};
 
     Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),

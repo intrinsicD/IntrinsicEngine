@@ -43,7 +43,8 @@ namespace Extrinsic::Graphics
         RHI::ICommandContext& cmd,
         const std::span<const DebugTrianglePacket> triangles,
         const TransientDebugTriangleUploadResult& uploadResult,
-        TransientDebugUploadDiagnostics& diagnostics)
+        TransientDebugUploadDiagnostics& diagnostics,
+        const TransientDebugView& view)
     {
         diagnostics.TriangleRecordsSubmitted += static_cast<std::uint64_t>(triangles.size());
 
@@ -79,6 +80,7 @@ namespace Extrinsic::Graphics
             pc.VertexBufferBDA = uploadResult.VertexBufferBDA;
             pc.FirstVertex = static_cast<std::uint32_t>(packetIndex * 3u);
             pc.Reserved = 0u;
+            pc.ViewProjection = view.ViewProjection;
             cmd.PushConstants(&pc, static_cast<std::uint32_t>(sizeof(pc)));
 
             // `Draw(3, 1, 0, 0)` per packet — the per-packet `FirstVertex`
@@ -96,7 +98,8 @@ namespace Extrinsic::Graphics
         RHI::ICommandContext& cmd,
         const std::span<const DebugLinePacket> lines,
         const TransientDebugLineUploadResult& uploadResult,
-        TransientDebugUploadDiagnostics& diagnostics)
+        TransientDebugUploadDiagnostics& diagnostics,
+        const TransientDebugView& view)
     {
         diagnostics.LineRecordsSubmitted += static_cast<std::uint64_t>(lines.size());
 
@@ -128,6 +131,7 @@ namespace Extrinsic::Graphics
             pc.VertexBufferBDA = uploadResult.VertexBufferBDA;
             pc.FirstVertex = static_cast<std::uint32_t>(packetIndex * 2u);
             pc.Reserved = 0u;
+            pc.ViewProjection = view.ViewProjection;
             cmd.PushConstants(&pc, static_cast<std::uint32_t>(sizeof(pc)));
 
             // `Draw(2, 1, 0, 0)` per packet — one line segment is two
@@ -143,7 +147,8 @@ namespace Extrinsic::Graphics
         RHI::ICommandContext& cmd,
         const std::span<const DebugPointPacket> points,
         const TransientDebugPointUploadResult& uploadResult,
-        TransientDebugUploadDiagnostics& diagnostics)
+        TransientDebugUploadDiagnostics& diagnostics,
+        const TransientDebugView& view)
     {
         diagnostics.PointRecordsSubmitted += static_cast<std::uint64_t>(points.size());
 
@@ -174,7 +179,9 @@ namespace Extrinsic::Graphics
             TransientDebugPointPushConstants pc{};
             pc.VertexBufferBDA = uploadResult.VertexBufferBDA;
             pc.FirstVertex = static_cast<std::uint32_t>(packetIndex);
-            pc.Reserved = 0u;
+            pc.Radius = packet.Radius;
+            pc.ViewProjection = view.ViewProjection;
+            pc.PixelsPerUnit = view.PixelsPerUnit;
             cmd.PushConstants(&pc, static_cast<std::uint32_t>(sizeof(pc)));
 
             // `Draw(1, 1, 0, 0)` per packet — one point is one vertex

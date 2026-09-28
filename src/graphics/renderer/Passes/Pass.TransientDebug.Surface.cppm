@@ -4,6 +4,8 @@ module;
 #include <cstdint>
 #include <span>
 
+#include <glm/mat4x4.hpp>
+
 export module Extrinsic.Graphics.Pass.TransientDebug.Surface;
 
 import Extrinsic.Graphics.RenderDiagnostics;
@@ -25,17 +27,17 @@ namespace Extrinsic::Graphics
     // depth-tested and always-on-top variants based on each packet's
     // `DepthTested` flag.
     //
-    // Push constant layout: 16 bytes packing the helper's vertex buffer
-    // BDA + a per-draw `FirstVertex` index so the BDA-fetch vertex
-    // shader can address the right packet in the shared upload buffer.
-    // All three lanes share the same 16-byte payload shape; separate
-    // types per lane keep room for per-lane evolution (e.g. line width
-    // or point radius push fields in a follow-up task).
+    // Push constant layout: the helper's vertex buffer BDA and a per-draw `FirstVertex`
+    // index (so the BDA-fetch vertex shader addresses the right packet in the shared upload
+    // buffer), then the camera's view-projection: packet coordinates are world space.
+    // Points add their world-space radius and the projection's pixels per unit at unit depth
+    // (Projection[1][1] * viewport height / 2), so the shader sizes them in pixels.
     export struct TransientDebugTrianglePushConstants
     {
         std::uint64_t VertexBufferBDA;
         std::uint32_t FirstVertex;
         std::uint32_t Reserved;
+        glm::mat4 ViewProjection;
     };
 
     export struct TransientDebugLinePushConstants
@@ -43,13 +45,25 @@ namespace Extrinsic::Graphics
         std::uint64_t VertexBufferBDA;
         std::uint32_t FirstVertex;
         std::uint32_t Reserved;
+        glm::mat4 ViewProjection;
     };
 
     export struct TransientDebugPointPushConstants
     {
         std::uint64_t VertexBufferBDA;
         std::uint32_t FirstVertex;
-        std::uint32_t Reserved;
+        float Radius;
+        glm::mat4 ViewProjection;
+        float PixelsPerUnit;
+        float Reserved[3];
+    };
+
+    // Camera for one frame's transient debug primitives. The default (identity, no point
+    // scaling) makes packet coordinates clip-space, which the pass contract tests use.
+    export struct TransientDebugView
+    {
+        glm::mat4 ViewProjection{1.0f};
+        float PixelsPerUnit{0.0f};
     };
 
     export class TransientDebugSurfacePass
@@ -105,7 +119,8 @@ namespace Extrinsic::Graphics
         void ExecuteTriangles(RHI::ICommandContext& cmd,
                               std::span<const DebugTrianglePacket> triangles,
                               const TransientDebugTriangleUploadResult& uploadResult,
-                              TransientDebugUploadDiagnostics& diagnostics);
+                              TransientDebugUploadDiagnostics& diagnostics,
+                              const TransientDebugView& view = {});
 
         // GRAPHICS-077 Slice C — line + point variants. Same shape as
         // `ExecuteTriangles`: per-packet `BindPipeline(variant) +
@@ -117,12 +132,14 @@ namespace Extrinsic::Graphics
         void ExecuteLines(RHI::ICommandContext& cmd,
                           std::span<const DebugLinePacket> lines,
                           const TransientDebugLineUploadResult& uploadResult,
-                          TransientDebugUploadDiagnostics& diagnostics);
+                          TransientDebugUploadDiagnostics& diagnostics,
+                          const TransientDebugView& view = {});
 
         void ExecutePoints(RHI::ICommandContext& cmd,
                            std::span<const DebugPointPacket> points,
                            const TransientDebugPointUploadResult& uploadResult,
-                           TransientDebugUploadDiagnostics& diagnostics);
+                           TransientDebugUploadDiagnostics& diagnostics,
+                           const TransientDebugView& view = {});
 
     private:
         RHI::PipelineHandle m_TriangleDepthTestedPipeline{};

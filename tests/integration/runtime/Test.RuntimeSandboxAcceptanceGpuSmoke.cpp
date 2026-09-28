@@ -2748,8 +2748,8 @@ constexpr std::uint32_t kBug024TotalFrames = 8u;
     const float tanHalfFovY = std::tan(glm::radians(45.0f) * 0.5f);
     const float viewDepth = 3.0f - world.z;
     const float ndcX = world.x / (tanHalfFovY * aspect * viewDepth);
-    // The reference projection flips Y for Vulkan clip space, so world +y
-    // maps to screen-up (smaller pixel y); ndcY here is already screen-space.
+    // World +y maps to screen-up (smaller pixel y); ndcY here is already
+    // screen-space (downward).
     const float ndcY = -world.y / (tanHalfFovY * viewDepth);
     const auto toPixel = [](const float ndc, const std::uint32_t size) noexcept
     {
@@ -3836,9 +3836,18 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldSurfaceAndIso
             << DescribeColormapConfig("surface", cfg, expectedColormapId) << "]";
     };
 
-    // raw t = 0.4, binned t = 0.5: must stay Viridis, not a false contour.
-    expectProbe("non-isoline", glm::vec3{0.025f, -0.25f, 0.0f},
-                expectedColormap, expectedIsoline);
+    // raw t = 0.4, binned t = 0.5: no false contour. The lit, tonemapped band
+    // is much brighter than the raw LUT colour, so require clear separation
+    // from the isoline colour rather than proximity to the raw LUT sample.
+    {
+        const auto [px, py] = ProjectReferenceCameraPixel(glm::vec3{0.025f, -0.25f, 0.0f}, extent);
+        const RgbaPixel band = ToLinearPixel(backbufferFormat, ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent, px, py));
+        EXPECT_GT(RgbDistance(band, expectedIsoline), 100)
+            << "non-isoline probe resolved to the isoline colour; sample=(" << px << "," << py
+            << ") pixel(linearized)=" << PixelText(band);
+        EXPECT_GT(RgbDistance(band, ToLinearPixel(backbufferFormat, ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent, 0u, static_cast<std::uint32_t>(extent.Height) / 2u))), 30)
+            << "non-isoline probe matches the background; pixel(linearized)=" << PixelText(band);
+    }
     // raw t = 0.5: actual evenly-spaced isoline at the interior level boundary.
     expectProbe("isoline", glm::vec3{0.125f, -0.25f, 0.0f},
                 expectedIsoline, expectedColormap);
@@ -8341,16 +8350,14 @@ struct VectorFieldSmokeFrame
     bool Skipped{false};
     std::string SkipReason{};
 
-    // The presented readback is vertically mirrored relative to
-    // `ProjectReferenceCameraPixel` (the reference triangle's base appears in
-    // the upper half); the first vector-field smoke pins this with an explicit
+    // The presented readback matches `ProjectReferenceCameraPixel` (world +Y
+    // is up); the first vector-field smoke pins this with an explicit
     // orientation probe so a convention change fails loudly instead of
     // silently moving every sample.
     [[nodiscard]] RgbaPixel At(const glm::vec3 world) const
     {
         const auto [x, y] = ProjectReferenceCameraPixel(world, Extent);
-        const auto height = static_cast<std::uint32_t>(Extent.Height);
-        return ReadPixel(Bytes, Format, BytesPerPixel, Extent, x, height - 1u - y);
+        return ReadPixel(Bytes, Format, BytesPerPixel, Extent, x, y);
     }
 };
 
@@ -8701,4 +8708,40 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, VectorFieldShaderHandlesDepthLengthModesV
     // plane to z = 7. Its visible part must still be drawn.
     const glm::vec3 nearSample = kVectorProbes[7].Anchor + glm::vec3{0.0f, 0.0f, 0.3f};
     EXPECT_TRUE(IsCyan(frame.At(nearSample))) << text(frame.At(nearSample));
+}
+
+// Clip space is Y-up and every fullscreen blit preserves orientation, so the
+// presented reference triangle keeps its apex up whether or not the frame
+// carries transient debug primitives (which add the debug-view blit).
+TEST(RuntimeSandboxAcceptanceGpuSmoke, PresentedSceneKeepsWorldUpWithAndWithoutTransientDebug)
+{
+    const auto probe = [](const VectorFieldSmokeFrame& frame, const char* variant) {
+        // Inside near the base (half-width 0.4 at y = -0.3) vs. its mirror
+        // beside the apex (half-width 0.1 at y = +0.3).
+        const auto inside = frame.At({0.3f, -0.3f, 0.0f});
+        const auto mirror = frame.At({0.3f, 0.3f, 0.0f});
+        EXPECT_GT(RgbDistance(inside, mirror), 48)
+            << variant << ": " << VectorFieldPixelText(inside) << " / " << VectorFieldPixelText(mirror);
+        EXPECT_GT(inside.R, 200) << variant << ": " << VectorFieldPixelText(inside);
+        EXPECT_GT(inside.G, 200) << variant << ": " << VectorFieldPixelText(inside);
+    };
+
+    const auto plain = RunVectorFieldSmoke(VectorFieldSmokeEdit::None, [](Engine&) {});
+    if (plain.Skipped)
+        GTEST_SKIP() << plain.SkipReason;
+    EXPECT_NE(FindPassStatus(plain.Stats, "TransientDebugSurfacePass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(plain.Stats);
+    probe(plain, "default recipe");
+
+    // One off-triangle transient point enables the transient pass and the debug-view blit.
+    const auto overlay = RunVectorFieldSmoke(VectorFieldSmokeEdit::None, [](Engine& engine) {
+        const RT::SceneInteractionModule::PreviewPoint point{.Position = {-1.2f, 0.8f, 0.0f}, .Color = {0, 0, 1, 1},
+                                                             .Radius = 0.02f};
+        Interaction(engine).SetPreviewOverlay("orientation_smoke", {&point, 1u});
+    });
+    if (overlay.Skipped)
+        GTEST_SKIP() << overlay.SkipReason;
+    EXPECT_EQ(FindPassStatus(overlay.Stats, "TransientDebugSurfacePass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(overlay.Stats);
+    probe(overlay, "transient debug");
 }

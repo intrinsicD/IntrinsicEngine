@@ -646,13 +646,16 @@ namespace Geometry::MarchingCubes
                         }
                     }
 
+                    // With this cube layout the table's triangle order faces the
+                    // inside (low values); emit reversed so counter-clockwise
+                    // faces point outside, along the gradient normals.
                     const int8_t* tri = kTriTable[cubeIndex];
                     for (int i = 0; tri[i] != -1; i += 3)
                     {
                         result.Triangles.push_back({
                             vertIdx[static_cast<std::size_t>(tri[i])],
-                            vertIdx[static_cast<std::size_t>(tri[i + 1])],
-                            vertIdx[static_cast<std::size_t>(tri[i + 2])]
+                            vertIdx[static_cast<std::size_t>(tri[i + 2])],
+                            vertIdx[static_cast<std::size_t>(tri[i + 1])]
                         });
                     }
                 }

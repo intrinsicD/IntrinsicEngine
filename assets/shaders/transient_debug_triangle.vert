@@ -31,6 +31,7 @@ layout(push_constant) uniform PushConsts {
     uint64_t VertexBufferBDA;
     uint     FirstVertex;
     uint     Reserved;
+    mat4     ViewProjection; // packet coordinates are world space
 } push;
 
 layout(location = 0) out vec4 fragColor;
@@ -40,6 +41,6 @@ void main()
     VertexBuf vbuf = VertexBuf(push.VertexBufferBDA);
     Vertex vertex = vbuf.v[push.FirstVertex + gl_VertexIndex];
 
-    gl_Position = vec4(vertex.Position, 1.0);
+    gl_Position = push.ViewProjection * vec4(vertex.Position, 1.0);
     fragColor = unpackUnorm4x8(vertex.PackedColor);
 }

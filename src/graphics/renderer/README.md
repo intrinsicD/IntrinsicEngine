@@ -556,12 +556,13 @@ Concretely:
   so surface/depth/line/point/selection vertex shaders must transform
   world-space positions with `scene.CameraViewProj` instead of declaring a
   legacy `CameraBuffer` descriptor.
-- Triangle-list retained pipelines that keep backface culling enabled must use
-  clockwise front-face winding with the promoted camera path. Runtime camera
-  projections flip Y for Vulkan clip-space parity, and leaving these pipelines
-  at counter-clockwise front-face winding can cull the centered reference
-  triangle after `scene.CameraViewProj` is applied. Line, point, fullscreen, and
-  no-cull pipelines are not affected by this rule.
+- Clip space is Y-up. `SetViewport` emits a negative-height Vulkan viewport, so
+  NDC +Y lands on framebuffer row 0 (top); runtime camera projections must not
+  flip Y again, and triangle-list pipelines with backface culling use
+  counter-clockwise front faces. Fullscreen passes (`post_fullscreen.vert`,
+  `present.vert`, `debug_view.vert`) derive `vUV.y = 0.5 * (1 - ndc.y)` so a
+  blit preserves orientation: the image's orientation must not depend on how
+  many fullscreen passes (tonemap, AA, debug view, present) a recipe runs.
 - The legacy shader pairs under `assets/shaders/` root —
   `surface.vert`, `surface.frag`, `surface_gbuffer.frag`,
   `shadow_depth.vert`, etc. — declare the pre-GpuScene push block
