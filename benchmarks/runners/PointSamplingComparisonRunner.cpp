@@ -171,9 +171,12 @@ int main(int argc, char** argv)
                 }
                 // Guarantees: every eta/beta batch member keeps its insertion priority
                 // (squared clearance) >= factor * U, U the largest clearance at the batch start.
-                if (methods[mi].Name.find("eta") != std::string::npos || methods[mi].Name.find("beta") != std::string::npos)
+                const bool etaMethod = methods[mi].Params.Method == PS::Method::CoupledSieve;
+                const bool betaMethod = methods[mi].Params.Method == PS::Method::FlatGreedy ||
+                                        methods[mi].Params.Method == PS::Method::LazyGreedy;
+                if (etaMethod || betaMethod)
                 {
-                    const double factor = methods[mi].Name.find("eta") != std::string::npos ? 0.95 * 0.95 : 1.0 / (1.1 * 1.1);
+                    const double factor = etaMethod ? params.Eta * params.Eta : 1.0 / (params.Beta * params.Beta);
                     std::vector<double> clear(cloud.Size(), std::numeric_limits<double>::infinity());
                     std::vector<char> taken(cloud.Size(), 0);
                     double batchLargest = 0.0;
@@ -188,7 +191,10 @@ int main(int argc, char** argv)
                             ++batch;
                         }
                         if (j > 0 && batchLargest > 0.0 && result.Clearance[j] < factor * batchLargest * (1.0 - 1e-9))
+                        {
+                            std::cerr << "  guarantee violated: " << methods[mi].Name << " k=" << k << " rank " << j << '\n';
                             ++violations;
+                        }
                         const std::uint32_t id = result.Order[j];
                         taken[id] = 1;
                         for (std::size_t i = 0; i < cloud.Size(); ++i) clear[i] = std::min(clear[i], Distance2(cloud, id, i));
