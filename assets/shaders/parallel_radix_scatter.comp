@@ -1,0 +1,58 @@
+#version 460
+
+// GRAPHICS-148 — stable scatter of one radix pass (see parallel_radix_common.glslinc).
+// The tile is sorted by digit in shared memory with four stable one-bit splits (a
+// workgroup scan per bit), so an element's rank among equal digits is its distance to the
+// digit's first sorted slot; DigitCountsBDA holds the scanned digit-major counts.
+
+#include "parallel_radix_common.glslinc"
+
+shared uint sharedDigit[RADIX_TILE];
+shared uint sharedSource[RADIX_TILE];
+shared uint sharedScan[RADIX_TILE];
+shared uint sharedStart[RADIX_DIGITS];
+
+void main()
+{
+    const uint local = gl_LocalInvocationID.x;
+    const uint group = gl_WorkGroupID.x;
+    const uint element = group * RADIX_TILE + local;
+    // Missing elements (the last tile's tail) take the largest digit; being last in the tile,
+    // the stable splits keep them behind every real element.
+    sharedDigit[local] = element < pc.ElementCount ? RadixDigit(element) : RADIX_DIGITS - 1u;
+    sharedSource[local] = element;
+
+    for (uint bit = 0u; bit < 4u; ++bit)
+    {
+        barrier();
+        const uint digit = sharedDigit[local];
+        const uint source = sharedSource[local];
+        const uint zero = ((digit >> bit) & 1u) == 0u ? 1u : 0u;
+        sharedScan[local] = zero;
+        barrier();
+        for (uint offset = 1u; offset < RADIX_TILE; offset <<= 1u)
+        {
+            const uint before = local >= offset ? sharedScan[local - offset] : 0u;
+            barrier();
+            sharedScan[local] += before;
+            barrier();
+        }
+        const uint zerosBefore = sharedScan[local] - zero;
+        const uint slot = zero == 1u ? zerosBefore : sharedScan[RADIX_TILE - 1u] + (local - zerosBefore);
+        barrier();
+        sharedDigit[slot] = digit;
+        sharedSource[slot] = source;
+    }
+    barrier();
+    const uint digit = sharedDigit[local];
+    if (local == 0u || sharedDigit[local - 1u] != digit) sharedStart[digit] = local;
+    barrier();
+
+    const uint source = sharedSource[local];
+    if (source >= pc.ElementCount) return;
+    const uint target = RadixWordsRef(pc.DigitCountsBDA).Values[digit * pc.GroupCount + group] + local - sharedStart[digit];
+    const uint stride = pc.KeyWords + 1u;
+    RadixWordsRef from = RadixWordsRef(pc.SourceBDA);
+    RadixWordsRef to = RadixWordsRef(pc.DestinationBDA);
+    for (uint word = 0u; word < stride; ++word) to.Values[target * stride + word] = from.Values[source * stride + word];
+}

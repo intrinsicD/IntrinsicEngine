@@ -2,7 +2,8 @@
 
 `Geometry.PointLBVH` provides exhaustive CPU query oracles and a deterministic
 Morton-sorted point tree. `Extrinsic.Graphics.PointLBVH` owns reusable Vulkan
-storage and records GPU bounds, Morton codes, bitonic sort, radix-tree
+storage and records GPU bounds, Morton codes, a stable radix sort (shared
+parallel primitive), radix-tree
 construction, and nearest/k-nearest/radius traversal with source-ID exclusion.
 
 The PCA normal estimator accepts a supplied CPU LBVH or complete neighborhood

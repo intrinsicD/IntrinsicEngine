@@ -53,7 +53,9 @@ CPU round trip.
 
 ## Shader Assets
 
-GRAPHICS-108/111/112 pin five shader assets under `assets/shaders/`:
+GRAPHICS-108/111/112 pin five shader assets under `assets/shaders/`, and
+GRAPHICS-148 adds `parallel_radix_histogram.comp` and
+`parallel_radix_scatter.comp` (shared layout in `parallel_radix_common.glslinc`):
 
 - `parallel_prefix_scan.comp` performs one 256-lane workgroup-local scan with
   subgroup arithmetic, scans the small per-subgroup totals in shared memory, and
@@ -88,6 +90,11 @@ Stream compaction scratch starts with an exclusive prefix-offset array of
 that prefix-offset array. The scatter pass reads the flags and offsets, writes
 `OutputKeys`, and publishes `OutputCount`.
 
+Radix sort scratch (GRAPHICS-148) holds, in order, a copy of the `N` records
+(`N * (KeyWords + 1) * sizeof(uint32)` bytes) for ping-pong, the digit-major
+counts (`16 * ceil(N / 256)` `uint32`), their exclusive scan
+(`PrefixOffsetsOffsetBytes`), and that scan's recursive levels.
+
 The deterministic segmented float reduction path currently requires no scratch:
 the dispatch plan records `ScratchBytes = 0`, while still returning the same
 record-result scratch fields used by scan/compaction so a later scratch-backed
@@ -104,6 +111,25 @@ Prefix scan planning emits:
 
 Stream compaction planning emits the same exclusive scan sequence over `Flags`,
 then one `StreamCompactScatter` pass.
+
+Radix sort planning (GRAPHICS-148) emits, per 4-bit digit pass, one
+`RadixHistogram` (per 256-record tile, digit-major counts), the exclusive scan
+of those counts, and one `RadixScatter`, which sorts the tile by digit with
+four stable one-bit splits in shared memory and writes each record to its
+digit's scanned offset plus its rank among equal digits in the tile. Records
+are `KeyWords` key words (1 or 2, least significant first) and one payload
+word; passes cover `KeyBits` rounded up to an even pass count, alternating
+between the caller's records (`Keys` role, at `ElementsOffsetBytes`) and the
+scratch copy, so the result ends in place. The sort is stable, uses no subgroup
+operations and only integer shared-memory atomics for the counts, and is
+checked against `SortRecordsByKeyCpu` (a `std::stable_sort`) in the opt-in
+Vulkan smoke, three runs per case. `Extrinsic.Graphics.PointLBVH` sorts its
+(Morton code, index) records with it (30 key bits, eight passes).
+
+`CreateParallelPrimitivePipelines` creates (with resolved shader paths) the
+pipelines a list of primitive kinds records with, and
+`DestroyParallelPrimitivePipelines` releases them; consumers use these instead
+of creating the pipeline set by hand.
 
 Segmented float reduction planning emits one `SegmentedFloatReduce` dispatch
 with `GroupCountX = SegmentCount`. For non-empty inputs the dispatch reads

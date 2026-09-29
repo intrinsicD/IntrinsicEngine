@@ -1,0 +1,39 @@
+// GRAPHICS-148 — shared layout of the stable LSD radix sort passes
+// (`parallel_radix_histogram.comp`, `parallel_radix_scatter.comp`).
+//
+// Elements are records of KeyWords uint32 key words (word 0 least significant) followed by
+// one uint32 payload, packed with stride KeyWords + 1. Each pass sorts by the 4-bit digit at
+// bit DigitShift; digits never straddle key words. Digit counts are digit-major
+// (digit * GroupCount + group), so their exclusive prefix scan is every tile's first output
+// slot per digit in stable order. No subgroup operations and no atomics on the output.
+
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+#define RADIX_TILE 256u
+#define RADIX_DIGITS 16u
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+layout(buffer_reference, scalar) buffer RadixWordsRef
+{
+    uint Values[];
+};
+
+layout(push_constant, scalar) uniform RadixSortPush
+{
+    uint64_t SourceBDA;
+    uint64_t DestinationBDA;
+    uint64_t DigitCountsBDA;
+    uint ElementCount;
+    uint GroupCount;
+    uint KeyWords;
+    uint DigitShift;
+} pc;
+
+uint RadixDigit(const uint element)
+{
+    const uint word = RadixWordsRef(pc.SourceBDA).Values[element * (pc.KeyWords + 1u) + (pc.DigitShift >> 5u)];
+    return (word >> (pc.DigitShift & 31u)) & (RADIX_DIGITS - 1u);
+}

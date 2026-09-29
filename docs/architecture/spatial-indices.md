@@ -109,10 +109,11 @@ the current limit before pushing. Pruning is strict, so boxes at exactly the
 limit are still visited and results, including index tie-breaks, do not depend
 on visit order.
 
-The current GPU implementation uses a bitonic sorting network and independent
-sorted-range bound unions. These prioritize deterministic, portable execution;
-they are not an optimized radix-sort or bottom-up atomic bounds implementation.
-No speed improvement is asserted. Bounds reduction starts with one workgroup;
+The current GPU implementation sorts the (Morton code, index) records with the
+stable radix sort of `Extrinsic.Graphics.ComputeParallelPrimitives`
+(GRAPHICS-148; it replaced a bitonic network with the same resulting order) and
+uses independent sorted-range bound unions, not a bottom-up atomic bounds
+implementation. No speed improvement is asserted. Bounds reduction starts with one workgroup;
 large-input build performance is not yet characterized by the smoke workload.
 
 Nearest ties choose the smallest source index. Radius queries are inclusive

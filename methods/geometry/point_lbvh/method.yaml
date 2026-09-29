@@ -61,6 +61,6 @@ known_limitations:
   - GPU k-nearest supports k=1..64 with capacity equal to k; CPU k=0 returns empty and k>N returns all eligible rows.
   - GPU radius capacity is at most 1024 hits per query; total count exposes overflow, including capacity zero.
   - Coordinates and radii are bounded by 1e18; world-space nearest under nonuniform transforms requires an explicit metric conversion.
-  - GPU sorting is bitonic and internal bounds use sorted-range unions; no radix-sort, SAH optimization, or performance improvement is claimed.
+  - GPU sorting is the shared stable radix sort (GRAPHICS-148) and internal bounds use sorted-range unions; no SAH optimization or performance improvement is claimed.
   - GPU trees do not refine points that share a 30-bit Morton code, so clustered inputs or far outliers degrade GPU traversal cost (results are unaffected); the CPU tree refines such groups.
   - Standalone GPU views require caller-controlled buffer sizes, submission ordering, and device lifetime.

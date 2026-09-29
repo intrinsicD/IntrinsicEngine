@@ -8,6 +8,7 @@ module;
 #include <string>
 module Extrinsic.Graphics.PointLBVH;
 
+import Extrinsic.Graphics.ComputeParallelPrimitives;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.Core.Filesystem.PathResolver;
@@ -33,6 +34,8 @@ namespace Extrinsic::Graphics
             std::uint64_t ExcludedIndices{};
         };
         static_assert(sizeof(BuildPush) == 64 && sizeof(QueryPush) == 72);
+        constexpr std::uint32_t kMortonBits = 30u; // lbvh_morton.comp: 10 bits per axis
+        constexpr ParallelPrimitiveKind kSort[] = {ParallelPrimitiveKind::RadixSort};
     } // namespace
     struct PointLbvhWorkspace::Impl
     {
@@ -41,16 +44,17 @@ namespace Extrinsic::Graphics
         }
         ~Impl()
         {
-            if (Storage.IsValid())
-                Device.DestroyBuffer(Storage);
+            for (auto buffer : {Storage, SortScratch})
+                if (buffer.IsValid())
+                    Device.DestroyBuffer(buffer);
+            DestroyParallelPrimitivePipelines(Device, Sort);
             for (auto p : Pipelines)
                 if (p.IsValid())
                     Device.DestroyPipeline(p);
         }
         bool PipelinesReady()
         {
-            constexpr std::array names{"lbvh_bounds", "lbvh_morton", "lbvh_sort", "lbvh_build",
-                                       "lbvh_query"};
+            constexpr std::array names{"lbvh_bounds", "lbvh_morton", "lbvh_build", "lbvh_query"};
             for (std::size_t i = 0; i < names.size(); ++i)
             {
                 if (Pipelines[i].IsValid())
@@ -62,16 +66,17 @@ namespace Extrinsic::Graphics
                     .FragmentShaderPath = {},
                     .ComputeShaderPath = path.c_str(),
                     .PushConstantSize =
-                        std::uint32_t(i == 4 ? sizeof(QueryPush) : sizeof(BuildPush)),
+                        std::uint32_t(i == 3 ? sizeof(QueryPush) : sizeof(BuildPush)),
                     .DebugName = names[i]});
                 if (!Pipelines[i].IsValid())
                     return false;
             }
-            return true;
+            return CreateParallelPrimitivePipelines(Device, Sort, kSort);
         }
         RHI::IDevice& Device;
-        RHI::BufferHandle Storage{};
-        std::array<RHI::PipelineHandle, 5> Pipelines{};
+        RHI::BufferHandle Storage{}, SortScratch{};
+        std::array<RHI::PipelineHandle, 4> Pipelines{};
+        ParallelPrimitivePipelineSet Sort{}; // radix sort of the (Morton code, index) keys
         std::uint32_t Capacity{}, Count{}, Padded{};
         std::uint64_t Allocations{}, Builds{}, Keys{}, Nodes{}, Bounds{};
         bool Built{};
@@ -98,17 +103,24 @@ namespace Extrinsic::Graphics
                                                                      RHI::BufferUsage::TransferSrc |
                                                                      RHI::BufferUsage::TransferDst,
                                                             .DebugName = "PointLBVH.Workspace"});
-        if (!buffer.IsValid())
-            return false;
-        auto bda = s.Device.GetBufferDeviceAddress(buffer);
-        if (!bda)
+        // Scratch for the largest count this capacity holds covers every smaller build.
+        const auto sortPlan = ComputeRadixSortDispatchPlan(padded, 1u, kMortonBits);
+        auto scratch = sortPlan.ScratchBytes
+            ? s.Device.CreateBuffer(BuildParallelPrimitiveScratchBufferDesc(sortPlan, "PointLBVH.SortScratch"))
+            : RHI::BufferHandle{};
+        auto bda = buffer.IsValid() ? s.Device.GetBufferDeviceAddress(buffer) : 0u;
+        if (!bda || (sortPlan.ScratchBytes && !scratch.IsValid()))
         {
-            s.Device.DestroyBuffer(buffer);
+            for (auto b : {buffer, scratch})
+                if (b.IsValid())
+                    s.Device.DestroyBuffer(b);
             return false;
         }
-        if (s.Storage.IsValid())
-            s.Device.DestroyBuffer(s.Storage);
+        for (auto b : {s.Storage, s.SortScratch})
+            if (b.IsValid())
+                s.Device.DestroyBuffer(b);
         s.Storage = buffer;
+        s.SortScratch = scratch;
         s.Capacity = padded;
         ++s.Allocations;
         s.Built = false;
@@ -158,14 +170,14 @@ namespace Extrinsic::Graphics
         };
         dispatch(0, 1);
         dispatch(1, (push.Padded + 255) / 256);
-        for (std::uint32_t k = 2; k <= push.Padded; k *= 2)
-            for (std::uint32_t j = k / 2; j; j /= 2)
-            {
-                push.K = k;
-                push.J = j;
-                dispatch(2, (push.Padded + 255) / 256);
-            }
-        dispatch(3, (std::max(points.Count, 1u) + 255) / 256);
+        // Stable by Morton code over records in index order: the (code, index) order the build
+        // expects; the invalid padding records past Count stay in place.
+        if (!RecordGpuRadixSort({.Device = &s.Device, .CommandContext = &cmd, .Pipelines = s.Sort,
+                                 .Elements = s.Storage, .ElementsOffsetBytes = s.Keys - s.Bounds,
+                                 .Scratch = s.SortScratch, .ElementCount = points.Count,
+                                 .KeyWords = 1u, .KeyBits = kMortonBits}).Succeeded())
+            return false;
+        dispatch(2, (std::max(points.Count, 1u) + 255) / 256);
         s.Count = points.Count;
         s.Padded = push.Padded;
         s.Built = true;
@@ -212,7 +224,7 @@ namespace Extrinsic::Graphics
             cmd.BufferBarrier(query.ExcludedIndices,
                               RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderWrite,
                               RHI::MemoryAccess::ShaderRead);
-        cmd.BindPipeline(s.Pipelines[4]);
+        cmd.BindPipeline(s.Pipelines[3]);
         cmd.PushConstants(&push, sizeof(push), 0);
         cmd.Dispatch((push.QueryCount + 255) / 256, 1, 1);
         for (auto buffer : {query.Neighbors, query.Headers})

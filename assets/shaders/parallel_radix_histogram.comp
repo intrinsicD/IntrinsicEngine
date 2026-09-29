@@ -1,0 +1,21 @@
+#version 460
+
+// GRAPHICS-148 — per-tile digit counts of one radix pass (see parallel_radix_common.glslinc).
+
+#include "parallel_radix_common.glslinc"
+
+shared uint sharedCounts[RADIX_DIGITS];
+
+void main()
+{
+    const uint local = gl_LocalInvocationID.x;
+    const uint group = gl_WorkGroupID.x;
+    const uint element = group * RADIX_TILE + local;
+    if (local < RADIX_DIGITS) sharedCounts[local] = 0u;
+    barrier();
+    // Integer counts: the result does not depend on the order of the atomics.
+    if (element < pc.ElementCount) atomicAdd(sharedCounts[RadixDigit(element)], 1u);
+    barrier();
+    if (local < RADIX_DIGITS)
+        RadixWordsRef(pc.DigitCountsBDA).Values[local * pc.GroupCount + group] = sharedCounts[local];
+}

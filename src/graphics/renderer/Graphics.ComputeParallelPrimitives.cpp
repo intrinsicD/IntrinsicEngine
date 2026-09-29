@@ -3,6 +3,7 @@ module;
 #include <cstdint>
 #include <algorithm>
 #include <limits>
+#include <numeric>
 #include <span>
 #include <string>
 #include <utility>
@@ -10,6 +11,7 @@ module;
 
 module Extrinsic.Graphics.ComputeParallelPrimitives;
 
+import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
@@ -111,14 +113,16 @@ namespace Extrinsic::Graphics
             });
         }
 
+        // Scans `scanCount` uint32 values through plan.ScratchLevels (built for that count).
         void AppendPrefixScanDispatches(ParallelPrimitiveDispatchPlan& plan,
+                                        const std::uint32_t scanCount,
                                         const ParallelPrimitiveBufferRole inputRole,
                                         const ParallelPrimitiveBufferRole outputRole,
                                         const std::uint64_t inputOffsetBytes,
                                         const std::uint64_t outputOffsetBytes,
                                         const std::uint64_t levelBaseOffsetBytes)
         {
-            if (plan.ElementCount == 0u)
+            if (scanCount == 0u)
             {
                 return;
             }
@@ -130,9 +134,9 @@ namespace Extrinsic::Graphics
                 .Kind = ParallelPrimitivePassKind::PrefixBlockScan,
                 .Mode = plan.Mode,
                 .LevelIndex = 0u,
-                .ElementCount = plan.ElementCount,
+                .ElementCount = scanCount,
                 .GroupSize = plan.GroupSize,
-                .GroupCountX = CeilDiv(plan.ElementCount, plan.GroupSize),
+                .GroupCountX = CeilDiv(scanCount, plan.GroupSize),
                 .GroupCountY = 1u,
                 .GroupCountZ = 1u,
                 .InputRole = inputRole,
@@ -226,9 +230,9 @@ namespace Extrinsic::Graphics
                     .Kind = ParallelPrimitivePassKind::PrefixAddBlockOffsets,
                     .Mode = PrefixScanMode::Exclusive,
                     .LevelIndex = 0u,
-                    .ElementCount = plan.ElementCount,
+                    .ElementCount = scanCount,
                     .GroupSize = plan.GroupSize,
-                    .GroupCountX = CeilDiv(plan.ElementCount, plan.GroupSize),
+                    .GroupCountX = CeilDiv(scanCount, plan.GroupSize),
                     .GroupCountY = 1u,
                     .GroupCountZ = 1u,
                     .OutputRole = outputRole,
@@ -425,6 +429,10 @@ namespace Extrinsic::Graphics
                 return pipelines.CompactByFlags;
             case ParallelPrimitivePassKind::SegmentedFloatReduce:
                 return pipelines.SegmentedFloatReduce;
+            case ParallelPrimitivePassKind::RadixHistogram:
+                return pipelines.RadixHistogram;
+            case ParallelPrimitivePassKind::RadixScatter:
+                return pipelines.RadixScatter;
             }
             return {};
         }
@@ -571,6 +579,30 @@ namespace Extrinsic::Graphics
                     cmd.PushConstants(&pc, static_cast<std::uint32_t>(sizeof(pc)), 0u);
                     break;
                 }
+                case ParallelPrimitivePassKind::RadixHistogram:
+                case ParallelPrimitivePassKind::RadixScatter:
+                {
+                    // Histogram: OutputRole receives the digit counts. Scatter: OffsetsRole holds
+                    // their scan and OutputRole receives the records.
+                    const bool scatter = dispatch.Kind == ParallelPrimitivePassKind::RadixScatter;
+                    const ParallelRadixSortPushConstants pc{
+                        .SourceBDA = AddressForRole(bindings,
+                                                    dispatch.InputRole,
+                                                    dispatch.InputOffsetBytes),
+                        .DestinationBDA = scatter
+                            ? AddressForRole(bindings, dispatch.OutputRole, dispatch.OutputOffsetBytes)
+                            : 0u,
+                        .DigitCountsBDA = scatter
+                            ? AddressForRole(bindings, dispatch.OffsetsRole, dispatch.OffsetsOffsetBytes)
+                            : AddressForRole(bindings, dispatch.OutputRole, dispatch.OutputOffsetBytes),
+                        .ElementCount = dispatch.ElementCount,
+                        .GroupCount = dispatch.GroupCountX,
+                        .KeyWords = dispatch.KeyWords,
+                        .DigitShift = dispatch.DigitShift,
+                    };
+                    cmd.PushConstants(&pc, static_cast<std::uint32_t>(sizeof(pc)), 0u);
+                    break;
+                }
                 }
 
                 cmd.Dispatch(dispatch.GroupCountX,
@@ -600,6 +632,54 @@ namespace Extrinsic::Graphics
             }
             const RHI::BufferDesc* desc = buffers->GetDesc(scratch);
             return desc == nullptr || desc->SizeBytes >= requiredBytes;
+        }
+
+        // Shared tail of every Record*: acquires (or checks) the scratch buffer, binds it,
+        // validates the plan's resources and records its dispatches.
+        [[nodiscard]] GpuParallelPrimitiveRecordResult RecordPlanWithScratch(
+            RHI::IDevice& device,
+            RHI::ICommandContext& cmd,
+            RHI::BufferManager* buffers,
+            const ParallelPrimitivePipelineSet& pipelines,
+            RHI::BufferHandle scratch,
+            ParallelPrimitiveDispatchPlan plan,
+            RoleBindings bindings,
+            GpuParallelPrimitiveRecordResult result)
+        {
+            const ParallelPrimitiveKind kind = result.Kind;
+            const std::uint32_t count = result.Diagnostics.ElementCount;
+            if (plan.ScratchBytes > 0u && !scratch.IsValid())
+            {
+                if (buffers == nullptr)
+                {
+                    return StatusResult(ParallelPrimitiveStatus::InvalidInput, kind, count);
+                }
+                auto scratchOr = buffers->Create(BuildParallelPrimitiveScratchBufferDesc(plan));
+                if (!scratchOr.has_value())
+                {
+                    return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource, kind, count);
+                }
+                result.ScratchLease = std::move(*scratchOr);
+                scratch = result.ScratchLease.GetHandle();
+            }
+
+            if (!ScratchBufferIsLargeEnough(buffers, scratch, plan.ScratchBytes))
+            {
+                return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource, kind, count);
+            }
+
+            bindings.Scratch = scratch;
+            bindings.ScratchBDA = scratch.IsValid() ? device.GetBufferDeviceAddress(scratch) : 0u;
+            if (!PlanResourcesAreRecordable(plan, bindings, pipelines))
+            {
+                return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource, kind, count);
+            }
+
+            RecordPlanDispatches(cmd, plan, bindings, pipelines);
+            result.Recorded = true;
+            result.Scratch = scratch;
+            result.Plan = std::move(plan);
+            return result;
         }
     }
 
@@ -641,6 +721,10 @@ namespace Extrinsic::Graphics
             return "StreamCompactScatter";
         case ParallelPrimitivePassKind::SegmentedFloatReduce:
             return "SegmentedFloatReduce";
+        case ParallelPrimitivePassKind::RadixHistogram:
+            return "RadixHistogram";
+        case ParallelPrimitivePassKind::RadixScatter:
+            return "RadixScatter";
         }
         return "Unknown";
     }
@@ -845,6 +929,37 @@ namespace Extrinsic::Graphics
         return result;
     }
 
+    ParallelPrimitiveCpuResult SortRecordsByKeyCpu(
+        const std::span<std::uint32_t> records,
+        const std::uint32_t keyWords) noexcept
+    {
+        ParallelPrimitiveCpuResult result{};
+        const std::size_t stride = std::size_t(keyWords) + 1u;
+        if (keyWords < 1u || keyWords > 2u || records.size() % stride != 0u ||
+            records.size() / stride > kParallelRadixMaxElements)
+        {
+            result.Status = ParallelPrimitiveStatus::InvalidInput;
+            return result;
+        }
+        const std::size_t count = records.size() / stride;
+        const auto key = [&](const std::size_t record)
+        {
+            std::uint64_t value = records[record * stride];
+            if (keyWords == 2u) value |= std::uint64_t(records[record * stride + 1u]) << 32u;
+            return value;
+        };
+        std::vector<std::uint32_t> order(count);
+        std::iota(order.begin(), order.end(), 0u);
+        std::ranges::stable_sort(order, {}, [&](const std::uint32_t record) { return key(record); });
+        const std::vector<std::uint32_t> input(records.begin(), records.end());
+        for (std::size_t i = 0; i < count; ++i)
+            std::copy_n(input.begin() + std::ptrdiff_t(order[i] * stride), stride,
+                        records.begin() + std::ptrdiff_t(i * stride));
+        result.Diagnostics.ElementCount = static_cast<std::uint32_t>(count);
+        result.Diagnostics.OutputCount = static_cast<std::uint32_t>(count);
+        return result;
+    }
+
     ParallelPrimitiveDispatchPlan ComputePrefixScanDispatchPlan(
         const std::uint32_t elementCount,
         const PrefixScanMode mode,
@@ -871,6 +986,7 @@ namespace Extrinsic::Graphics
         plan.ScratchBytes = EndOfScratchLevels(plan.ScratchLevels, 0u);
 
         AppendPrefixScanDispatches(plan,
+                                   elementCount,
                                    ParallelPrimitiveBufferRole::Input,
                                    ParallelPrimitiveBufferRole::Output,
                                    kParallelPrimitiveInvalidOffset,
@@ -918,6 +1034,7 @@ namespace Extrinsic::Graphics
                                                plan.PrefixOffsetsSizeBytes);
 
         AppendPrefixScanDispatches(plan,
+                                   elementCount,
                                    ParallelPrimitiveBufferRole::Flags,
                                    ParallelPrimitiveBufferRole::Scratch,
                                    kParallelPrimitiveInvalidOffset,
@@ -997,6 +1114,96 @@ namespace Extrinsic::Graphics
         AddShaderReadBarrier(plan, 0u, ParallelPrimitiveBufferRole::SegmentSums);
         AddShaderReadBarrier(plan, 0u, ParallelPrimitiveBufferRole::SegmentCounts);
         AddShaderReadBarrier(plan, 0u, ParallelPrimitiveBufferRole::SegmentMeans);
+        return plan;
+    }
+
+    ParallelPrimitiveDispatchPlan ComputeRadixSortDispatchPlan(
+        const std::uint32_t elementCount,
+        const std::uint32_t keyWords,
+        const std::uint32_t keyBits,
+        const std::uint32_t groupSize)
+    {
+        ParallelPrimitiveDispatchPlan plan{};
+        plan.Kind = ParallelPrimitiveKind::RadixSort;
+        plan.ElementCount = elementCount;
+        plan.KeyWords = keyWords;
+        plan.GroupSize = groupSize;
+        // The shaders sort 256-record tiles; keys are one or two words.
+        if (groupSize != kParallelPrimitiveGroupSize || keyWords < 1u || keyWords > 2u ||
+            keyBits < 1u || keyBits > 32u * keyWords || elementCount > kParallelRadixMaxElements)
+        {
+            plan.Status = ParallelPrimitiveStatus::InvalidInput;
+            return plan;
+        }
+        if (elementCount <= 1u)
+        {
+            return plan;
+        }
+
+        // Scratch: record copy | digit counts | their exclusive scan | scan levels.
+        const std::uint32_t groups = CeilDiv(elementCount, groupSize);
+        const std::uint32_t digitCounts = groups * (1u << kParallelRadixDigitBits);
+        const std::uint64_t copyBytes =
+            static_cast<std::uint64_t>(elementCount) * (keyWords + 1u) * sizeof(std::uint32_t);
+        const std::uint64_t countsOffset = copyBytes;
+        plan.PrefixOffsetsOffsetBytes = countsOffset + Uint32Bytes(digitCounts);
+        plan.PrefixOffsetsSizeBytes = Uint32Bytes(digitCounts);
+        const std::uint64_t levelsOffset = plan.PrefixOffsetsOffsetBytes + plan.PrefixOffsetsSizeBytes;
+        plan.ScratchLevels = BuildScanScratchLevels(digitCounts, groupSize, levelsOffset);
+        plan.ScratchBytes = EndOfScratchLevels(plan.ScratchLevels, levelsOffset);
+
+        // An even pass count leaves the result in the caller's records (Keys role).
+        std::uint32_t passes = CeilDiv(keyBits, kParallelRadixDigitBits);
+        passes += passes % 2u;
+        for (std::uint32_t pass = 0u; pass < passes; ++pass)
+        {
+            const bool fromKeys = pass % 2u == 0u;
+            const auto source = fromKeys ? ParallelPrimitiveBufferRole::Keys : ParallelPrimitiveBufferRole::Scratch;
+            const auto target = fromKeys ? ParallelPrimitiveBufferRole::Scratch : ParallelPrimitiveBufferRole::Keys;
+            const std::uint64_t sourceOffset = fromKeys ? kParallelPrimitiveInvalidOffset : 0u;
+            const std::uint64_t targetOffset = fromKeys ? 0u : kParallelPrimitiveInvalidOffset;
+            const ParallelPrimitiveDispatchDesc pass0{
+                .Kind = ParallelPrimitivePassKind::RadixHistogram,
+                .ElementCount = elementCount,
+                .KeyWords = keyWords,
+                .DigitShift = pass * kParallelRadixDigitBits,
+                .GroupSize = groupSize,
+                .GroupCountX = groups,
+                .InputRole = source,
+                .OutputRole = ParallelPrimitiveBufferRole::Scratch,
+                .InputOffsetBytes = sourceOffset,
+                .OutputOffsetBytes = countsOffset,
+            };
+            plan.Dispatches.push_back(pass0);
+            AddScratchBarrier(plan, static_cast<std::uint32_t>(plan.Dispatches.size() - 1u));
+            AppendPrefixScanDispatches(plan,
+                                       digitCounts,
+                                       ParallelPrimitiveBufferRole::Scratch,
+                                       ParallelPrimitiveBufferRole::Scratch,
+                                       countsOffset,
+                                       plan.PrefixOffsetsOffsetBytes,
+                                       plan.ScratchLevels.empty()
+                                           ? kParallelPrimitiveInvalidOffset
+                                           : plan.ScratchLevels.front().OffsetBytes);
+            AddScratchBarrier(plan, static_cast<std::uint32_t>(plan.Dispatches.size() - 1u));
+            ParallelPrimitiveDispatchDesc scatter = pass0;
+            scatter.Kind = ParallelPrimitivePassKind::RadixScatter;
+            scatter.OutputRole = target;
+            scatter.OutputOffsetBytes = targetOffset;
+            scatter.OffsetsRole = ParallelPrimitiveBufferRole::Scratch;
+            scatter.OffsetsOffsetBytes = plan.PrefixOffsetsOffsetBytes;
+            plan.Dispatches.push_back(scatter);
+            const auto index = static_cast<std::uint32_t>(plan.Dispatches.size() - 1u);
+            for (const auto role : {ParallelPrimitiveBufferRole::Keys, ParallelPrimitiveBufferRole::Scratch})
+            {
+                plan.Barriers.push_back(ParallelPrimitiveBarrierDesc{
+                    .AfterDispatchIndex = index,
+                    .Buffer = role,
+                    .Before = RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
+                    .After = RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
+                });
+            }
+        }
         return plan;
     }
 
@@ -1092,6 +1299,66 @@ namespace Extrinsic::Graphics
         return desc;
     }
 
+    RHI::PipelineDesc BuildParallelRadixHistogramPipelineDesc(const char* shaderPath)
+    {
+        RHI::PipelineDesc desc{};
+        desc.ComputeShaderPath = shaderPath == nullptr ? "" : shaderPath;
+        desc.PushConstantSize = static_cast<std::uint32_t>(sizeof(ParallelRadixSortPushConstants));
+        desc.DebugName = "ParallelPrimitive.RadixHistogram";
+        return desc;
+    }
+
+    RHI::PipelineDesc BuildParallelRadixScatterPipelineDesc(const char* shaderPath)
+    {
+        RHI::PipelineDesc desc{};
+        desc.ComputeShaderPath = shaderPath == nullptr ? "" : shaderPath;
+        desc.PushConstantSize = static_cast<std::uint32_t>(sizeof(ParallelRadixSortPushConstants));
+        desc.DebugName = "ParallelPrimitive.RadixScatter";
+        return desc;
+    }
+
+    bool CreateParallelPrimitivePipelines(RHI::IDevice& device,
+                                          ParallelPrimitivePipelineSet& pipelines,
+                                          const std::span<const ParallelPrimitiveKind> kinds)
+    {
+        const auto create = [&device](RHI::PipelineHandle& pipeline, RHI::PipelineDesc desc)
+        {
+            if (pipeline.IsValid()) return true;
+            desc.ComputeShaderPath = Core::Filesystem::GetShaderPath(desc.ComputeShaderPath);
+            pipeline = device.CreatePipeline(desc);
+            return pipeline.IsValid();
+        };
+        bool created = true;
+        for (const ParallelPrimitiveKind kind : kinds)
+        {
+            // Every primitive but the segmented reduction scans.
+            if (kind != ParallelPrimitiveKind::SegmentedFloatReduction)
+                created = created && create(pipelines.PrefixScan, BuildParallelPrefixScanPipelineDesc()) &&
+                          create(pipelines.AddBlockOffsets, BuildParallelScanAddOffsetsPipelineDesc());
+            if (kind == ParallelPrimitiveKind::StreamCompaction)
+                created = created && create(pipelines.CompactByFlags, BuildParallelCompactByFlagsPipelineDesc());
+            if (kind == ParallelPrimitiveKind::SegmentedFloatReduction)
+                created = created &&
+                          create(pipelines.SegmentedFloatReduce, BuildParallelSegmentedFloatReducePipelineDesc());
+            if (kind == ParallelPrimitiveKind::RadixSort)
+                created = created && create(pipelines.RadixHistogram, BuildParallelRadixHistogramPipelineDesc()) &&
+                          create(pipelines.RadixScatter, BuildParallelRadixScatterPipelineDesc());
+        }
+        return created;
+    }
+
+    void DestroyParallelPrimitivePipelines(RHI::IDevice& device,
+                                           ParallelPrimitivePipelineSet& pipelines) noexcept
+    {
+        for (RHI::PipelineHandle* pipeline : {&pipelines.PrefixScan, &pipelines.AddBlockOffsets,
+                                              &pipelines.CompactByFlags, &pipelines.SegmentedFloatReduce,
+                                              &pipelines.RadixHistogram, &pipelines.RadixScatter})
+        {
+            if (pipeline->IsValid()) device.DestroyPipeline(*pipeline);
+            *pipeline = {};
+        }
+    }
+
     GpuParallelPrimitiveRecordResult RecordGpuPrefixScan(
         const GpuPrefixScanRecordDesc& desc)
     {
@@ -1155,63 +1422,21 @@ namespace Extrinsic::Graphics
             .OutputCount = desc.ElementCount,
         };
 
-        RHI::BufferHandle scratch = desc.Scratch;
-        if (plan.ScratchBytes > 0u && !scratch.IsValid())
-        {
-            if (desc.Buffers == nullptr)
-            {
-                return StatusResult(ParallelPrimitiveStatus::InvalidInput,
-                                    ParallelPrimitiveKind::PrefixScan,
-                                    desc.ElementCount);
-            }
-
-            auto scratchOr = desc.Buffers->Create(
-                BuildParallelPrimitiveScratchBufferDesc(plan));
-            if (!scratchOr.has_value())
-            {
-                return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
-                                    ParallelPrimitiveKind::PrefixScan,
-                                    desc.ElementCount);
-            }
-
-            result.ScratchLease = std::move(*scratchOr);
-            scratch = result.ScratchLease.GetHandle();
-        }
-
-        if (!ScratchBufferIsLargeEnough(desc.Buffers, scratch, plan.ScratchBytes))
-        {
-            return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
-                                ParallelPrimitiveKind::PrefixScan,
-                                desc.ElementCount);
-        }
-
-        const RoleBindings bindings{
+        RoleBindings bindings{
             .Input = desc.Input,
             .Output = desc.Output,
-            .Scratch = scratch,
             .InputBDA = desc.Device->GetBufferDeviceAddress(desc.Input),
             .OutputBDA = desc.Device->GetBufferDeviceAddress(desc.Output),
-            .ScratchBDA = scratch.IsValid()
-                ? desc.Device->GetBufferDeviceAddress(scratch)
-                : 0u,
         };
 
-        if (!PlanResourcesAreRecordable(plan, bindings, desc.Pipelines))
-        {
-            return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
-                                ParallelPrimitiveKind::PrefixScan,
-                                desc.ElementCount);
-        }
-
-        RecordPlanDispatches(*desc.CommandContext,
-                             plan,
-                             bindings,
-                             desc.Pipelines);
-
-        result.Recorded = true;
-        result.Scratch = scratch;
-        result.Plan = std::move(plan);
-        return result;
+        return RecordPlanWithScratch(*desc.Device,
+                                     *desc.CommandContext,
+                                     desc.Buffers,
+                                     desc.Pipelines,
+                                     desc.Scratch,
+                                     std::move(plan),
+                                     bindings,
+                                     std::move(result));
     }
 
     GpuParallelPrimitiveRecordResult RecordGpuStreamCompaction(
@@ -1287,67 +1512,25 @@ namespace Extrinsic::Graphics
         result.Kind = ParallelPrimitiveKind::StreamCompaction;
         result.Diagnostics.ElementCount = desc.ElementCount;
 
-        RHI::BufferHandle scratch = desc.Scratch;
-        if (plan.ScratchBytes > 0u && !scratch.IsValid())
-        {
-            if (desc.Buffers == nullptr)
-            {
-                return StatusResult(ParallelPrimitiveStatus::InvalidInput,
-                                    ParallelPrimitiveKind::StreamCompaction,
-                                    desc.ElementCount);
-            }
-
-            auto scratchOr = desc.Buffers->Create(
-                BuildParallelPrimitiveScratchBufferDesc(plan));
-            if (!scratchOr.has_value())
-            {
-                return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
-                                    ParallelPrimitiveKind::StreamCompaction,
-                                    desc.ElementCount);
-            }
-
-            result.ScratchLease = std::move(*scratchOr);
-            scratch = result.ScratchLease.GetHandle();
-        }
-
-        if (!ScratchBufferIsLargeEnough(desc.Buffers, scratch, plan.ScratchBytes))
-        {
-            return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
-                                ParallelPrimitiveKind::StreamCompaction,
-                                desc.ElementCount);
-        }
-
-        const RoleBindings bindings{
+        RoleBindings bindings{
             .Keys = desc.Keys,
             .Flags = desc.Flags,
             .OutputKeys = desc.OutputKeys,
             .OutputCount = desc.OutputCount,
-            .Scratch = scratch,
             .KeysBDA = desc.Device->GetBufferDeviceAddress(desc.Keys),
             .FlagsBDA = desc.Device->GetBufferDeviceAddress(desc.Flags),
             .OutputKeysBDA = desc.Device->GetBufferDeviceAddress(desc.OutputKeys),
             .OutputCountBDA = desc.Device->GetBufferDeviceAddress(desc.OutputCount),
-            .ScratchBDA = scratch.IsValid()
-                ? desc.Device->GetBufferDeviceAddress(scratch)
-                : 0u,
         };
 
-        if (!PlanResourcesAreRecordable(plan, bindings, desc.Pipelines))
-        {
-            return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
-                                ParallelPrimitiveKind::StreamCompaction,
-                                desc.ElementCount);
-        }
-
-        RecordPlanDispatches(*desc.CommandContext,
-                             plan,
-                             bindings,
-                             desc.Pipelines);
-
-        result.Recorded = true;
-        result.Scratch = scratch;
-        result.Plan = std::move(plan);
-        return result;
+        return RecordPlanWithScratch(*desc.Device,
+                                     *desc.CommandContext,
+                                     desc.Buffers,
+                                     desc.Pipelines,
+                                     desc.Scratch,
+                                     std::move(plan),
+                                     bindings,
+                                     std::move(result));
     }
 
     GpuParallelPrimitiveRecordResult RecordGpuSegmentedFloatReduction(
@@ -1404,43 +1587,12 @@ namespace Extrinsic::Graphics
             .Total = desc.ElementCount,
         };
 
-        RHI::BufferHandle scratch = desc.Scratch;
-        if (plan.ScratchBytes > 0u && !scratch.IsValid())
-        {
-            if (desc.Buffers == nullptr)
-            {
-                return StatusResult(ParallelPrimitiveStatus::InvalidInput,
-                                    ParallelPrimitiveKind::SegmentedFloatReduction,
-                                    desc.ElementCount);
-            }
-
-            auto scratchOr = desc.Buffers->Create(
-                BuildParallelPrimitiveScratchBufferDesc(plan));
-            if (!scratchOr.has_value())
-            {
-                return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
-                                    ParallelPrimitiveKind::SegmentedFloatReduction,
-                                    desc.ElementCount);
-            }
-
-            result.ScratchLease = std::move(*scratchOr);
-            scratch = result.ScratchLease.GetHandle();
-        }
-
-        if (!ScratchBufferIsLargeEnough(desc.Buffers, scratch, plan.ScratchBytes))
-        {
-            return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
-                                ParallelPrimitiveKind::SegmentedFloatReduction,
-                                desc.ElementCount);
-        }
-
-        const RoleBindings bindings{
+        RoleBindings bindings{
             .Keys = desc.Keys,
             .Values = desc.Values,
             .SegmentSums = desc.SegmentSums,
             .SegmentCounts = desc.SegmentCounts,
             .SegmentMeans = desc.SegmentMeans,
-            .Scratch = scratch,
             .KeysBDA = desc.Keys.IsValid()
                 ? desc.Device->GetBufferDeviceAddress(desc.Keys)
                 : 0u,
@@ -1450,27 +1602,66 @@ namespace Extrinsic::Graphics
             .SegmentSumsBDA = desc.Device->GetBufferDeviceAddress(desc.SegmentSums),
             .SegmentCountsBDA = desc.Device->GetBufferDeviceAddress(desc.SegmentCounts),
             .SegmentMeansBDA = desc.Device->GetBufferDeviceAddress(desc.SegmentMeans),
-            .ScratchBDA = scratch.IsValid()
-                ? desc.Device->GetBufferDeviceAddress(scratch)
-                : 0u,
         };
 
-        if (!PlanResourcesAreRecordable(plan, bindings, desc.Pipelines))
+        return RecordPlanWithScratch(*desc.Device,
+                                     *desc.CommandContext,
+                                     desc.Buffers,
+                                     desc.Pipelines,
+                                     desc.Scratch,
+                                     std::move(plan),
+                                     bindings,
+                                     std::move(result));
+    }
+
+    GpuParallelPrimitiveRecordResult RecordGpuRadixSort(
+        const GpuRadixSortRecordDesc& desc)
+    {
+        constexpr auto kind = ParallelPrimitiveKind::RadixSort;
+        if (desc.Device == nullptr)
         {
-            return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource,
-                                ParallelPrimitiveKind::SegmentedFloatReduction,
-                                desc.ElementCount);
+            return StatusResult(ParallelPrimitiveStatus::InvalidInput, kind, desc.ElementCount);
         }
-
-        RecordPlanDispatches(*desc.CommandContext,
-                             plan,
-                             bindings,
-                             desc.Pipelines);
-
-        result.Recorded = true;
-        result.Scratch = scratch;
-        result.Plan = std::move(plan);
-        return result;
+        if (!desc.Device->IsOperational())
+        {
+            return DeviceUnavailableResult(kind, desc.ElementCount);
+        }
+        ParallelPrimitiveDispatchPlan plan =
+            ComputeRadixSortDispatchPlan(desc.ElementCount, desc.KeyWords, desc.KeyBits);
+        if (!plan.IsValid())
+        {
+            return StatusResult(plan.Status, kind, desc.ElementCount);
+        }
+        GpuParallelPrimitiveRecordResult result{
+            .Status = ParallelPrimitiveStatus::Success,
+            .Kind = kind,
+            .Diagnostics = ParallelPrimitiveDiagnostics{.ElementCount = desc.ElementCount,
+                                                        .OutputCount = desc.ElementCount},
+        };
+        if (plan.Dispatches.empty())
+        {
+            result.Plan = std::move(plan);
+            return result;
+        }
+        if (desc.CommandContext == nullptr)
+        {
+            return StatusResult(ParallelPrimitiveStatus::InvalidInput, kind, desc.ElementCount);
+        }
+        const std::uint64_t elements =
+            desc.Elements.IsValid() ? desc.Device->GetBufferDeviceAddress(desc.Elements) : 0u;
+        if (elements == 0u || desc.ElementsOffsetBytes % sizeof(std::uint32_t) != 0u)
+        {
+            return StatusResult(ParallelPrimitiveStatus::InvalidGpuResource, kind, desc.ElementCount);
+        }
+        const RoleBindings bindings{.Keys = desc.Elements, .KeysBDA = elements + desc.ElementsOffsetBytes};
+        return RecordPlanWithScratch(*desc.Device,
+                                     *desc.CommandContext,
+                                     desc.Buffers,
+                                     desc.Pipelines,
+                                     desc.Scratch,
+                                     std::move(plan),
+                                     bindings,
+                                     std::move(result));
     }
 
     GpuCompactionCountPublicationResult RecordCompactionCountPublication(

@@ -1086,3 +1086,165 @@ TEST(ComputeParallelPrimitives, StatusDebugNamesAreStable)
             Graphics::ParallelPrimitiveBufferRole::SegmentMeans),
         "SegmentMeans");
 }
+
+// GRAPHICS-148: stable LSD radix sort.
+namespace
+{
+    [[nodiscard]] Graphics::ParallelPrimitivePipelineSet RadixPipelineSet() noexcept
+    {
+        auto pipelines = ValidPipelineSet();
+        pipelines.RadixHistogram = ValidPipeline(15u);
+        pipelines.RadixScatter = ValidPipeline(16u);
+        return pipelines;
+    }
+}
+
+TEST(ComputeParallelPrimitives, RadixSortCpuOracleIsStableForOneAndTwoWordKeys)
+{
+    // (key, payload) records; equal keys keep their input order.
+    std::vector<std::uint32_t> one{7u, 0u, 3u, 1u, 7u, 2u, 0u, 3u, 3u, 4u};
+    ASSERT_TRUE(Graphics::SortRecordsByKeyCpu(one, 1u).Succeeded());
+    EXPECT_EQ(one, (std::vector<std::uint32_t>{0u, 3u, 3u, 1u, 3u, 4u, 7u, 0u, 7u, 2u}));
+
+    // (low, high, payload): the high word decides first.
+    std::vector<std::uint32_t> two{5u, 1u, 0u, 9u, 0u, 1u, 5u, 1u, 2u, 0u, 1u, 3u};
+    ASSERT_TRUE(Graphics::SortRecordsByKeyCpu(two, 2u).Succeeded());
+    EXPECT_EQ(two, (std::vector<std::uint32_t>{9u, 0u, 1u, 0u, 1u, 3u, 5u, 1u, 0u, 5u, 1u, 2u}));
+
+    std::vector<std::uint32_t> ragged{1u, 2u, 3u};
+    EXPECT_EQ(Graphics::SortRecordsByKeyCpu(ragged, 1u).Status, Graphics::ParallelPrimitiveStatus::InvalidInput);
+    EXPECT_EQ(Graphics::SortRecordsByKeyCpu(ragged, 3u).Status, Graphics::ParallelPrimitiveStatus::InvalidInput);
+    std::vector<std::uint32_t> empty{};
+    EXPECT_TRUE(Graphics::SortRecordsByKeyCpu(empty, 2u).Succeeded());
+}
+
+TEST(ComputeParallelPrimitives, RadixSortPlanPinsPassesScratchAndPingPong)
+{
+    // 1000 records, 4 tiles, 64 digit counts (one scan block): histogram, scan, scatter per
+    // pass; 30 key bits need 8 four-bit passes, ending back in the records.
+    const auto plan = Graphics::ComputeRadixSortDispatchPlan(1000u, 1u, 30u);
+    ASSERT_TRUE(plan.IsValid());
+    EXPECT_EQ(plan.Kind, Graphics::ParallelPrimitiveKind::RadixSort);
+    EXPECT_TRUE(plan.ScratchLevels.empty());
+    EXPECT_EQ(plan.PrefixOffsetsOffsetBytes, 1000u * 8u + 64u * 4u);
+    EXPECT_EQ(plan.ScratchBytes, 1000u * 8u + 2u * 64u * 4u);
+    ASSERT_EQ(plan.Dispatches.size(), 24u);
+    for (std::uint32_t pass = 0u; pass < 8u; ++pass)
+    {
+        const auto& histogram = plan.Dispatches[3u * pass];
+        const auto& scan = plan.Dispatches[3u * pass + 1u];
+        const auto& scatter = plan.Dispatches[3u * pass + 2u];
+        const auto records = pass % 2u == 0u ? Graphics::ParallelPrimitiveBufferRole::Keys
+                                             : Graphics::ParallelPrimitiveBufferRole::Scratch;
+        EXPECT_EQ(histogram.Kind, Graphics::ParallelPrimitivePassKind::RadixHistogram);
+        EXPECT_EQ(histogram.DigitShift, 4u * pass);
+        EXPECT_EQ(histogram.GroupCountX, 4u);
+        EXPECT_EQ(histogram.InputRole, records);
+        EXPECT_EQ(histogram.OutputOffsetBytes, 8000u);
+        EXPECT_EQ(scan.Kind, Graphics::ParallelPrimitivePassKind::PrefixBlockScan);
+        EXPECT_EQ(scan.ElementCount, 64u);
+        EXPECT_EQ(scan.OutputOffsetBytes, plan.PrefixOffsetsOffsetBytes);
+        EXPECT_EQ(scatter.Kind, Graphics::ParallelPrimitivePassKind::RadixScatter);
+        EXPECT_EQ(scatter.InputRole, records);
+        EXPECT_NE(scatter.OutputRole, records);
+        EXPECT_EQ(scatter.OffsetsOffsetBytes, plan.PrefixOffsetsOffsetBytes);
+    }
+    EXPECT_EQ(plan.Dispatches.back().OutputRole, Graphics::ParallelPrimitiveBufferRole::Keys);
+
+    // Odd digit counts round up to an even pass count; large inputs scan recursively.
+    EXPECT_EQ(Graphics::ComputeRadixSortDispatchPlan(1000u, 2u, 36u).Dispatches.size(), 30u);
+    const auto large = Graphics::ComputeRadixSortDispatchPlan(100000u, 1u, 32u);
+    ASSERT_TRUE(large.IsValid());
+    EXPECT_FALSE(large.ScratchLevels.empty());
+    EXPECT_GT(large.Dispatches.size(), 24u);
+
+    for (const std::uint32_t count : {0u, 1u})
+    {
+        const auto trivial = Graphics::ComputeRadixSortDispatchPlan(count, 1u, 32u);
+        EXPECT_TRUE(trivial.IsValid());
+        EXPECT_TRUE(trivial.Dispatches.empty());
+        EXPECT_EQ(trivial.ScratchBytes, 0u);
+    }
+    EXPECT_FALSE(Graphics::ComputeRadixSortDispatchPlan(10u, 3u, 32u).IsValid());
+    EXPECT_FALSE(Graphics::ComputeRadixSortDispatchPlan(10u, 1u, 33u).IsValid());
+    EXPECT_FALSE(Graphics::ComputeRadixSortDispatchPlan(10u, 1u, 0u).IsValid());
+    EXPECT_FALSE(Graphics::ComputeRadixSortDispatchPlan(10u, 1u, 32u, 128u).IsValid());
+    EXPECT_FALSE(Graphics::ComputeRadixSortDispatchPlan(Graphics::kParallelRadixMaxElements + 1u, 1u, 32u).IsValid());
+}
+
+TEST(ComputeParallelPrimitives, RecordsRadixSortAtAnElementOffsetWithAllocatedScratch)
+{
+    Tests::MockDevice device{};
+    RHI::BufferManager buffers{device};
+    const RHI::BufferHandle records = ValidBuffer(1u);
+
+    const auto result = Graphics::RecordGpuRadixSort(Graphics::GpuRadixSortRecordDesc{
+        .Device = &device,
+        .CommandContext = &device.CommandContext,
+        .Buffers = &buffers,
+        .Pipelines = RadixPipelineSet(),
+        .Elements = records,
+        .ElementsOffsetBytes = 32u,
+        .ElementCount = 1000u,
+        .KeyWords = 1u,
+        .KeyBits = 8u,
+    });
+
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_TRUE(result.Recorded);
+    EXPECT_TRUE(result.ScratchLease.IsValid());
+    EXPECT_EQ(device.CreateBufferCount, 1);
+    ASSERT_EQ(device.CommandContext.BoundPipelines.size(), 6u);
+    EXPECT_EQ(device.CommandContext.BoundPipelines[0], ValidPipeline(15u));
+    EXPECT_EQ(device.CommandContext.BoundPipelines[1], ValidPipeline(10u));
+    EXPECT_EQ(device.CommandContext.BoundPipelines[2], ValidPipeline(16u));
+
+    const std::uint64_t base = device.GetBufferDeviceAddress(records) + 32u;
+    const std::uint64_t scratch = device.GetBufferDeviceAddress(result.Scratch);
+    const auto histogram = ReadPushPayload<Graphics::ParallelRadixSortPushConstants>(
+        device.CommandContext.PushConstantPayloads[0]);
+    EXPECT_EQ(histogram.SourceBDA, base);
+    EXPECT_EQ(histogram.DigitCountsBDA, scratch + 8000u);
+    EXPECT_EQ(histogram.GroupCount, 4u);
+    EXPECT_EQ(histogram.ElementCount, 1000u);
+    const auto first = ReadPushPayload<Graphics::ParallelRadixSortPushConstants>(
+        device.CommandContext.PushConstantPayloads[2]);
+    EXPECT_EQ(first.SourceBDA, base);
+    EXPECT_EQ(first.DestinationBDA, scratch);
+    EXPECT_EQ(first.DigitCountsBDA, scratch + result.Plan.PrefixOffsetsOffsetBytes);
+    const auto second = ReadPushPayload<Graphics::ParallelRadixSortPushConstants>(
+        device.CommandContext.PushConstantPayloads[5]);
+    EXPECT_EQ(second.SourceBDA, scratch);
+    EXPECT_EQ(second.DestinationBDA, base);
+    EXPECT_EQ(second.DigitShift, 4u);
+
+    device.Operational = false;
+    const auto offline = Graphics::RecordGpuRadixSort(Graphics::GpuRadixSortRecordDesc{
+        .Device = &device, .Elements = records, .ElementCount = 1000u});
+    EXPECT_EQ(offline.Status, Graphics::ParallelPrimitiveStatus::DeviceUnavailable);
+    EXPECT_TRUE(offline.CpuFallbackRecommended);
+    device.Operational = true;
+    const auto missing = Graphics::RecordGpuRadixSort(Graphics::GpuRadixSortRecordDesc{
+        .Device = &device, .CommandContext = &device.CommandContext, .Buffers = &buffers,
+        .Pipelines = RadixPipelineSet(), .ElementCount = 1000u});
+    EXPECT_EQ(missing.Status, Graphics::ParallelPrimitiveStatus::InvalidGpuResource);
+}
+
+TEST(ComputeParallelPrimitives, CreatesOnlyThePipelinesTheListedPrimitivesNeed)
+{
+    Tests::MockDevice device{};
+    Graphics::ParallelPrimitivePipelineSet pipelines{};
+    constexpr Graphics::ParallelPrimitiveKind radix[] = {Graphics::ParallelPrimitiveKind::RadixSort};
+    ASSERT_TRUE(Graphics::CreateParallelPrimitivePipelines(device, pipelines, radix));
+    EXPECT_EQ(device.CreatePipelineCount, 4);
+    EXPECT_TRUE(pipelines.PrefixScan.IsValid() && pipelines.AddBlockOffsets.IsValid());
+    EXPECT_TRUE(pipelines.RadixHistogram.IsValid() && pipelines.RadixScatter.IsValid());
+    EXPECT_FALSE(pipelines.CompactByFlags.IsValid());
+    // Existing pipelines are kept; only the compaction scatter is added.
+    constexpr Graphics::ParallelPrimitiveKind compaction[] = {Graphics::ParallelPrimitiveKind::StreamCompaction};
+    ASSERT_TRUE(Graphics::CreateParallelPrimitivePipelines(device, pipelines, compaction));
+    EXPECT_EQ(device.CreatePipelineCount, 5);
+    Graphics::DestroyParallelPrimitivePipelines(device, pipelines);
+    EXPECT_EQ(device.DestroyPipelineCount, 5);
+    EXPECT_FALSE(pipelines.PrefixScan.IsValid());
+}

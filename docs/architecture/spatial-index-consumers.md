@@ -164,7 +164,7 @@ Measure cold build/upload, warm reuse, query/reduction, per-iteration rebuild,
 readback and complete method cost separately, including memory. Compare with
 the existing scan/KD-tree/octree/grid/BVH on small and large, uniform and
 clustered inputs. Keep oracle computations independent of the index under
-test. The current bitonic build and range-bound unions are a correctness
+test. The current radix-sorted build and range-bound unions are a correctness
 baseline; choose migration priority from measured consumer workloads, not
 from the name “GPU LBVH.”
 

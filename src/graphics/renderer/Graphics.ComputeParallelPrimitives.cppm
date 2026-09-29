@@ -46,6 +46,7 @@ export namespace Extrinsic::Graphics
         PrefixScan,
         StreamCompaction,
         SegmentedFloatReduction,
+        RadixSort,
     };
 
     enum class ParallelPrimitivePassKind : std::uint8_t
@@ -54,6 +55,8 @@ export namespace Extrinsic::Graphics
         PrefixAddBlockOffsets,
         StreamCompactScatter,
         SegmentedFloatReduce,
+        RadixHistogram,
+        RadixScatter,
     };
 
     enum class ParallelPrimitiveBufferRole : std::uint8_t
@@ -107,6 +110,8 @@ export namespace Extrinsic::Graphics
         std::uint32_t LevelIndex = 0u;
         std::uint32_t ElementCount = 0u;
         std::uint32_t SegmentCount = 0u;
+        std::uint32_t KeyWords = 0u;   // radix passes: 32-bit key words per record
+        std::uint32_t DigitShift = 0u; // radix passes: first bit of the 4-bit digit
         std::uint32_t GroupSize = kParallelPrimitiveGroupSize;
         std::uint32_t GroupCountX = 0u;
         std::uint32_t GroupCountY = 1u;
@@ -146,6 +151,7 @@ export namespace Extrinsic::Graphics
         PrefixScanMode Mode = PrefixScanMode::Exclusive;
         std::uint32_t ElementCount = 0u;
         std::uint32_t SegmentCount = 0u;
+        std::uint32_t KeyWords = 0u; // radix sort
         std::uint32_t GroupSize = kParallelPrimitiveGroupSize;
         std::uint64_t ScratchBytes = 0u;
         std::uint64_t PrefixOffsetsOffsetBytes = kParallelPrimitiveInvalidOffset;
@@ -227,6 +233,22 @@ export namespace Extrinsic::Graphics
     };
     static_assert(sizeof(ParallelCountToDispatchArgsPushConstants) == 32u);
 
+    // Matches `assets/shaders/parallel_radix_common.glslinc` scalar push layout.
+    struct ParallelRadixSortPushConstants
+    {
+        std::uint64_t SourceBDA = 0u;
+        std::uint64_t DestinationBDA = 0u;
+        std::uint64_t DigitCountsBDA = 0u;
+        std::uint32_t ElementCount = 0u;
+        std::uint32_t GroupCount = 0u;
+        std::uint32_t KeyWords = 0u;
+        std::uint32_t DigitShift = 0u;
+    };
+    static_assert(sizeof(ParallelRadixSortPushConstants) == 40u);
+
+    inline constexpr std::uint32_t kParallelRadixDigitBits = 4u;
+    inline constexpr std::uint32_t kParallelRadixMaxElements = 1u << 28u;
+
     struct ParallelDispatchIndirectArgs
     {
         std::uint32_t GroupCountX = 0u;
@@ -241,6 +263,8 @@ export namespace Extrinsic::Graphics
         RHI::PipelineHandle AddBlockOffsets{};
         RHI::PipelineHandle CompactByFlags{};
         RHI::PipelineHandle SegmentedFloatReduce{};
+        RHI::PipelineHandle RadixHistogram{};
+        RHI::PipelineHandle RadixScatter{};
     };
 
     struct GpuPrefixScanRecordDesc
@@ -284,6 +308,23 @@ export namespace Extrinsic::Graphics
         RHI::BufferHandle Scratch{};
         std::uint32_t ElementCount = 0u;
         std::uint32_t SegmentCount = 0u;
+    };
+
+    // Stable LSD radix sort of records (KeyWords key words, least significant first, then one
+    // payload word; stride KeyWords + 1) in place in `Elements`, by the low KeyBits key bits.
+    // Records with equal keys keep their input order.
+    struct GpuRadixSortRecordDesc
+    {
+        RHI::IDevice* Device = nullptr;
+        RHI::ICommandContext* CommandContext = nullptr;
+        RHI::BufferManager* Buffers = nullptr;
+        ParallelPrimitivePipelineSet Pipelines{};
+        RHI::BufferHandle Elements{};
+        std::uint64_t ElementsOffsetBytes = 0u;
+        RHI::BufferHandle Scratch{};
+        std::uint32_t ElementCount = 0u;
+        std::uint32_t KeyWords = 1u;
+        std::uint32_t KeyBits = 32u;
     };
 
     struct GpuParallelPrimitiveRecordResult
@@ -357,6 +398,11 @@ export namespace Extrinsic::Graphics
         std::span<std::uint32_t> segmentCounts,
         std::span<float> segmentMeans) noexcept;
 
+    // CPU oracle of RecordGpuRadixSort: stable sort of the records by all KeyWords key words.
+    [[nodiscard]] ParallelPrimitiveCpuResult SortRecordsByKeyCpu(
+        std::span<std::uint32_t> records,
+        std::uint32_t keyWords) noexcept;
+
     [[nodiscard]] ParallelPrimitiveDispatchPlan ComputePrefixScanDispatchPlan(
         std::uint32_t elementCount,
         PrefixScanMode mode,
@@ -369,6 +415,14 @@ export namespace Extrinsic::Graphics
     [[nodiscard]] ParallelPrimitiveDispatchPlan ComputeSegmentedFloatReductionDispatchPlan(
         std::uint32_t elementCount,
         std::uint32_t segmentCount,
+        std::uint32_t groupSize = kParallelPrimitiveGroupSize);
+
+    // Scratch: a record copy for ping-pong, digit counts, their scan and its levels. The pass
+    // count is ceil(KeyBits / 4) rounded up to even, so the result ends in `Elements`.
+    [[nodiscard]] ParallelPrimitiveDispatchPlan ComputeRadixSortDispatchPlan(
+        std::uint32_t elementCount,
+        std::uint32_t keyWords,
+        std::uint32_t keyBits,
         std::uint32_t groupSize = kParallelPrimitiveGroupSize);
 
     [[nodiscard]] RHI::BufferDesc BuildParallelPrimitiveScratchBufferDesc(
@@ -396,6 +450,23 @@ export namespace Extrinsic::Graphics
     [[nodiscard]] RHI::PipelineDesc BuildParallelSegmentedFloatReducePipelineDesc(
         const char* shaderPath = "shaders/parallel_segmented_float_reduce.comp.spv");
 
+    [[nodiscard]] RHI::PipelineDesc BuildParallelRadixHistogramPipelineDesc(
+        const char* shaderPath = "shaders/parallel_radix_histogram.comp.spv");
+
+    [[nodiscard]] RHI::PipelineDesc BuildParallelRadixScatterPipelineDesc(
+        const char* shaderPath = "shaders/parallel_radix_scatter.comp.spv");
+
+    // Creates the missing pipelines the listed primitives record with (shader paths resolved);
+    // false when one cannot be created. Destroy releases and clears every valid one.
+    [[nodiscard]] bool CreateParallelPrimitivePipelines(
+        RHI::IDevice& device,
+        ParallelPrimitivePipelineSet& pipelines,
+        std::span<const ParallelPrimitiveKind> kinds);
+
+    void DestroyParallelPrimitivePipelines(
+        RHI::IDevice& device,
+        ParallelPrimitivePipelineSet& pipelines) noexcept;
+
     [[nodiscard]] GpuParallelPrimitiveRecordResult RecordGpuPrefixScan(
         const GpuPrefixScanRecordDesc& desc);
 
@@ -404,6 +475,9 @@ export namespace Extrinsic::Graphics
 
     [[nodiscard]] GpuParallelPrimitiveRecordResult RecordGpuSegmentedFloatReduction(
         const GpuSegmentedFloatReductionRecordDesc& desc);
+
+    [[nodiscard]] GpuParallelPrimitiveRecordResult RecordGpuRadixSort(
+        const GpuRadixSortRecordDesc& desc);
 
     [[nodiscard]] GpuCompactionCountPublicationResult RecordCompactionCountPublication(
         const GpuCompactionCountPublicationDesc& desc);

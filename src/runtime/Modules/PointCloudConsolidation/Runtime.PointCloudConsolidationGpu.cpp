@@ -698,10 +698,6 @@ namespace Extrinsic::Runtime
                 shader("shaders/lop_iteration_finalize.comp.spv");
             const std::string reduce =
                 shader("shaders/lop_final_reduce.comp.spv");
-            const std::string prefix =
-                shader("shaders/parallel_prefix_scan.comp.spv");
-            const std::string addOffsets =
-                shader("shaders/parallel_scan_add_offsets.comp.spv");
 
             Pipelines.GridCount = Device->CreatePipeline(
                 MethodPipelineDesc(
@@ -727,13 +723,11 @@ namespace Extrinsic::Runtime
             Pipelines.FinalReduce = Device->CreatePipeline(
                 MethodPipelineDesc(
                     reduce.c_str(), "LopGpu.FinalReduce"));
-            Pipelines.Parallel.PrefixScan = Device->CreatePipeline(
-                Graphics::BuildParallelPrefixScanPipelineDesc(
-                    prefix.c_str()));
-            Pipelines.Parallel.AddBlockOffsets = Device->CreatePipeline(
-                Graphics::BuildParallelScanAddOffsetsPipelineDesc(
-                    addOffsets.c_str()));
-            if (!Pipelines.IsValid())
+            constexpr Graphics::ParallelPrimitiveKind scan[] = {
+                Graphics::ParallelPrimitiveKind::PrefixScan};
+            if (!Graphics::CreateParallelPrimitivePipelines(
+                    *Device, Pipelines.Parallel, scan) ||
+                !Pipelines.IsValid())
             {
                 DestroyPipelines();
                 return false;
@@ -762,8 +756,8 @@ namespace Extrinsic::Runtime
             destroy(Pipelines.Project);
             destroy(Pipelines.IterationFinalize);
             destroy(Pipelines.FinalReduce);
-            destroy(Pipelines.Parallel.PrefixScan);
-            destroy(Pipelines.Parallel.AddBlockOffsets);
+            Graphics::DestroyParallelPrimitivePipelines(
+                *Device, Pipelines.Parallel);
             Pipelines = {};
         }
 

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <random>
 #include <span>
 #include <string>
 #include <string_view>
@@ -1139,4 +1140,114 @@ TEST(ComputeParallelPrimitivesGpuSmoke, VulkanScanAndCompactionMatchCpuReference
     DestroyPipelineIfValid(device, compactPipeline);
     DestroyPipelineIfValid(device, addPipeline);
     DestroyPipelineIfValid(device, prefixPipeline);
+}
+
+namespace
+{
+    // GRAPHICS-148: one in-place GPU radix sort of `records`; empty on failure.
+    [[nodiscard]] std::vector<std::uint32_t> RunRadixSort(RHI::IDevice& device,
+                                                          RHI::BufferManager& buffers,
+                                                          const Graphics::ParallelPrimitivePipelineSet& pipelines,
+                                                          const std::vector<std::uint32_t>& records,
+                                                          const std::uint32_t keyWords,
+                                                          const std::uint32_t keyBits,
+                                                          const std::string_view caseName)
+    {
+        RHI::BufferHandle buffer =
+            CreateU32StorageBuffer(device, static_cast<std::uint32_t>(records.size()), "ComputePrimitiveSmoke.Radix");
+        if (!buffer.IsValid())
+        {
+            ADD_FAILURE() << caseName << ": buffer allocation failed";
+            return {};
+        }
+        if (!records.empty())
+            device.WriteBuffer(buffer, records.data(), records.size() * sizeof(std::uint32_t), 0u);
+        RHI::FrameHandle frame{};
+        RHI::ICommandContext* cmd = nullptr;
+        if (!BeginComputeFrame(device, frame, cmd, caseName))
+        {
+            DestroyBufferIfValid(device, buffer);
+            return {};
+        }
+        cmd->BufferBarrier(buffer, RHI::MemoryAccess::HostWrite, RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite);
+        const auto gpu = Graphics::RecordGpuRadixSort(Graphics::GpuRadixSortRecordDesc{
+            .Device = &device,
+            .CommandContext = cmd,
+            .Buffers = &buffers,
+            .Pipelines = pipelines,
+            .Elements = buffer,
+            .ElementCount = static_cast<std::uint32_t>(records.size() / (keyWords + 1u)),
+            .KeyWords = keyWords,
+            .KeyBits = keyBits,
+        });
+        cmd->BufferBarrier(buffer, RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite, RHI::MemoryAccess::HostRead);
+        EndComputeFrame(device, frame, cmd);
+        std::vector<std::uint32_t> sorted(records.size(), 0u);
+        if (!gpu.Succeeded())
+            ADD_FAILURE() << caseName << ": GPU radix sort failed with status "
+                          << Graphics::DebugNameForParallelPrimitiveStatus(gpu.Status);
+        else if (!records.empty())
+            device.ReadBuffer(buffer, sorted.data(), sorted.size() * sizeof(std::uint32_t), 0u);
+        DestroyBufferIfValid(device, buffer);
+        return gpu.Succeeded() ? sorted : std::vector<std::uint32_t>{};
+    }
+}
+
+TEST(ComputeParallelPrimitivesGpuSmoke, VulkanRadixSortMatchesTheStableCpuOracle)
+{
+    auto bootstrap = BootstrapEngine();
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Extrinsic::Runtime::Engine& engine = *bootstrap.EnginePtr;
+    EngineShutdownGuard shutdownGuard{engine};
+    engine.Run();
+    RHI::IDevice& device = engine.GetDevice();
+    ASSERT_TRUE(device.IsOperational());
+
+    Graphics::ParallelPrimitivePipelineSet pipelines{};
+    constexpr Graphics::ParallelPrimitiveKind radix[] = {Graphics::ParallelPrimitiveKind::RadixSort};
+    ASSERT_TRUE(Graphics::CreateParallelPrimitivePipelines(device, pipelines, radix));
+    {
+        RHI::BufferManager buffers{device};
+        std::mt19937 random(148u);
+        struct Case
+        {
+            std::string Name;
+            std::uint32_t Count, KeyWords, KeyBits;
+            std::uint32_t Distinct; // 0: full-range keys; 1: all equal; k: keys below k (many ties)
+        };
+        const Case cases[] = {
+            {"empty", 0u, 1u, 32u, 0u},           {"single", 1u, 1u, 32u, 0u},
+            {"non_power_of_two", 300u, 1u, 32u, 0u}, {"multi_workgroup_ties", 5000u, 1u, 30u, 97u},
+            {"all_equal", 4097u, 1u, 32u, 1u},    {"random_64bit", 70001u, 2u, 64u, 0u},
+            {"low_bits_64bit", 3000u, 2u, 40u, 0u},
+        };
+        for (const Case& c : cases)
+        {
+            const std::uint32_t stride = c.KeyWords + 1u;
+            const std::uint64_t mask = c.KeyBits == 64u ? ~std::uint64_t{0} : (std::uint64_t{1} << c.KeyBits) - 1u;
+            std::vector<std::uint32_t> records(std::size_t(c.Count) * stride);
+            for (std::uint32_t i = 0; i < c.Count; ++i)
+            {
+                std::uint64_t key = (std::uint64_t(random()) << 32u) | random();
+                if (c.Distinct == 1u) key = 0x9e3779b9u;
+                else if (c.Distinct > 1u) key %= c.Distinct;
+                key &= mask;
+                records[i * stride] = std::uint32_t(key);
+                if (c.KeyWords == 2u) records[i * stride + 1u] = std::uint32_t(key >> 32u);
+                records[i * stride + c.KeyWords] = i;
+            }
+            auto expected = records;
+            ASSERT_TRUE(Graphics::SortRecordsByKeyCpu(expected, c.KeyWords).Succeeded()) << c.Name;
+            // Three device runs: each equals the stable oracle, payloads of ties included.
+            for (int run = 0; run < 3; ++run)
+            {
+                const auto sorted = RunRadixSort(device, buffers, pipelines, records, c.KeyWords, c.KeyBits, c.Name);
+                ASSERT_EQ(sorted, expected) << c.Name << " run " << run;
+            }
+        }
+    }
+    Graphics::DestroyParallelPrimitivePipelines(device, pipelines);
 }
