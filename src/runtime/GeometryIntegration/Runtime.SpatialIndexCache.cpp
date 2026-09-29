@@ -9,6 +9,7 @@ module;
 #include <glm/glm.hpp>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -16,6 +17,7 @@ module Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Graphics.PointLBVH;
+import Extrinsic.Graphics.GpuPropertyResidency;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.RHI.Descriptors;
@@ -119,13 +121,16 @@ namespace Extrinsic::Runtime
             std::shared_ptr<SpatialIndexSnapshot> Snapshot{std::make_shared<SpatialIndexSnapshot>()};
             RHI::IDevice* Device{};
             RHI::BufferHandle Points{}, Mapping{};
+            // GRAPHICS-154: Points borrowed from the property's canonical residency slot (shared
+            // with every other GPU user of that revision); the lease keeps it resident.
+            std::shared_ptr<const void> ResidentPoints{};
             std::unique_ptr<Graphics::PointLbvhWorkspace> Gpu{};
             bool GpuStale{}; // UpdateWorkspace replaced the points; rebuild into the same buffers
             ~Entry()
             {
                 if (Device)
                 {
-                    if (Points.IsValid())
+                    if (Points.IsValid() && !ResidentPoints)
                         Device->DestroyBuffer(Points);
                     if (Mapping.IsValid())
                         Device->DestroyBuffer(Mapping);
@@ -134,6 +139,7 @@ namespace Extrinsic::Runtime
         };
         WorldRegistry* Worlds{};
         RHI::IDevice* Device{};
+        std::unique_ptr<Graphics::GpuPropertyResidency> Residency{};
         std::vector<std::shared_ptr<Entry>> Entries{};
         JobService* Jobs{};
         GpuQueueParticipantHandle Participant{};
@@ -339,22 +345,45 @@ namespace Extrinsic::Runtime
                         .HostVisible = true,
                         .DebugName = "SpatialIndex.Source"});
                 };
-                e->Points = allocate(e->Snapshot->Slots.size() * 12);
+                // A property-space index over every row reads the property's canonical slot:
+                // its bytes are the property's own, so every GPU user of this revision shares
+                // one upload (GRAPHICS-154). Transformed or compacted indices keep their own.
+                const bool canonical = !e->Transient && e->Space == SpatialIndexSpace::Property &&
+                                       e->Snapshot->Slots.size() == e->Size && !e->Snapshot->Slots.empty();
+                if (canonical)
+                {
+                    if (!s.Residency) s.Residency = std::make_unique<Graphics::GpuPropertyResidency>(*s.Device);
+                    const auto points = e->Snapshot->Index.Points();
+                    const auto view = s.Residency->AcquireInput(
+                        {.Scope = (std::uint64_t(e->World.Generation) << 32u) | e->World.Index, .Owner = std::uint64_t(entt::to_integral(e->Entity)),
+                         .Domain = std::uint32_t(e->Ref.Domain), .ValueKind = std::uint32_t(e->Ref.ValueKind),
+                         .Name = e->Ref.Name},
+                        e->Revision, 12u, std::uint32_t(points.size()),
+                        [&](std::span<std::byte> out) { std::memcpy(out.data(), points.data(), out.size()); });
+                    if (view)
+                    {
+                        e->Points = view->Buffer;
+                        e->ResidentPoints = view->Lease;
+                    }
+                }
+                if (!e->Points.IsValid()) e->Points = allocate(e->Snapshot->Slots.size() * 12);
                 e->Mapping = allocate(e->Snapshot->Slots.size() * 4);
                 if (!e->Points.IsValid() || !e->Mapping.IsValid())
                 {
-                    if (e->Points.IsValid())
+                    if (e->Points.IsValid() && !e->ResidentPoints)
                         s.Device->DestroyBuffer(e->Points);
                     if (e->Mapping.IsValid())
                         s.Device->DestroyBuffer(e->Mapping);
                     e->Points = {};
+                    e->ResidentPoints.reset();
                     e->Mapping = {};
                     e->Gpu.reset();
                     return false;
                 }
                 if (!e->Snapshot->Slots.empty())
                 {
-                    s.Device->WriteBuffer(e->Points, e->Snapshot->Index.Points().data(), e->Snapshot->Slots.size() * 12);
+                    if (!e->ResidentPoints)
+                        s.Device->WriteBuffer(e->Points, e->Snapshot->Index.Points().data(), e->Snapshot->Slots.size() * 12);
                     s.Device->WriteBuffer(e->Mapping, e->Snapshot->Slots.data(), e->Snapshot->Slots.size() * 4);
                 }
             }
@@ -460,6 +489,7 @@ namespace Extrinsic::Runtime
         m_Impl->ShutdownBatches();
         m_Impl->Jobs = nullptr;
         m_Impl->Entries.clear();
+        m_Impl->Residency.reset(); // after the entries release their leases
         m_Impl->Device = nullptr;
         m_Impl->Worlds = nullptr;
         (void)context.Services.Withdraw<SpatialIndexCache>(*this);
@@ -740,6 +770,17 @@ namespace Extrinsic::Runtime
         auto& s = *m_Impl;
         s.Stats.Evictions +=
             std::erase_if(s.Entries, [&](const auto& e) { return !s.Current(*e); });
+        // Canonical slots of entities that no longer exist; a live entity's slot stays for its
+        // next GPU user (a newer revision replaces it on that use).
+        if (s.Residency)
+            s.Residency->Prune([&](const Graphics::GpuPropertyKey& key) {
+                const auto* scene = s.Worlds ? s.Worlds->Get(WorldHandle{std::uint32_t(key.Scope & 0xffffffffu), std::uint32_t(key.Scope >> 32u)}) : nullptr;
+                return scene && scene->IsValid(entt::entity(std::uint32_t(key.Owner)));
+            });
+    }
+    const Graphics::GpuPropertyResidency* SpatialIndexCache::PropertyResidency() const noexcept
+    {
+        return m_Impl->Residency.get();
     }
     SpatialIndexCacheStats SpatialIndexCache::Stats() const noexcept
     {

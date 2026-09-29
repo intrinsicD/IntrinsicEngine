@@ -1,7 +1,7 @@
 // Device-owned exact (weighted) farthest-point sampling (RUNTIME-290): the GPU twin of the
 // Geometry.PointSampling brute-force order (point_sampling_farthest.comp). A run is begun
-// once and recorded in bounded chunks of rounds, one framed submission each; every readback
-// holds the order prefix sampled so far, and earlier entries never change.
+// once and recorded in bounded chunks of rounds, one submission each; only the chunk that
+// finishes needs the full readback (NextChunkFinishes, GRAPHICS-153).
 module;
 #include <cstddef>
 #include <cstdint>

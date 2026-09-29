@@ -15,7 +15,7 @@ Root scanned: `src`
 | `geometry` | 132 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 76 |
+| `graphics/renderer` | 77 |
 | `graphics/rhi` | 18 |
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
@@ -270,6 +270,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.ForwardSystem` | `src/graphics/renderer/Graphics.ForwardSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.FrameRecipe` | `src/graphics/renderer/Graphics.FrameRecipe.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.GeometryResidency` | `src/graphics/renderer/Graphics.GeometryResidency.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.GpuPropertyResidency` | `src/graphics/renderer/Graphics.GpuPropertyResidency.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.GpuScene` | `src/graphics/renderer/Graphics.GpuScene.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.GpuTransfer` | `src/graphics/renderer/Graphics.GpuTransfer.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.GpuWorld` | `src/graphics/renderer/Graphics.GpuWorld.cppm` | `graphics/renderer` |
@@ -475,4 +476,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **448**
+Total modules: **449**

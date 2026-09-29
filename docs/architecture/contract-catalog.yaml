@@ -157,6 +157,8 @@ contracts:
       - tests/contract/runtime/Test.VisualizationRecipes.cpp
       - tests/integration/graphics/Test.GpuTransferFacadeGpuSmoke.cpp
       - tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp
+      - tests/contract/graphics/Test.GpuPropertyResidency.cpp
+      - tests/integration/graphics/Test.GpuPropertyResidencySmoke.cpp
   geometry.parameterization-optimization:
     owner: geometry
     source: docs/architecture/parameterization-mapping-roadmap.md

@@ -15,17 +15,27 @@ working buffers, and perform one terminal readback. A GPU result is not
 reported as applied until runtime has revalidated the request and published the
 terminal values to the named canonical CPU output properties.
 
-This deliberately does not require a method to compute in `GpuWorld`'s packed
-render allocation. Method buffers and render buffers have different layouts,
-lifetimes, and ownership. Sharing them is a later measured optimization, not a
-correctness prerequisite. The stable boundary is:
+Methods never compute in, or read from, `GpuWorld`'s packed render allocation
+or visualization buffers: render buffers only observe (ADR 0030). A GPU method's
+inputs come from the **GPU property residency** (`Graphics.GpuPropertyResidency`):
+one canonical slot per property and CPU revision, uploaded when a GPU user first
+needs that revision and shared by every later user while the revision holds; a
+new revision uploads once into a new slot. The stable boundary is:
 
 ```text
 CPU method: const CPU input -> CPU kernel -> canonical CPU output/revision
-GPU method: CPU input -> staging/upload -> GPU-only iterations
-                                      -> terminal readback -> CPU output/revision
+GPU method: CPU revision -> canonical residency slot (once per revision, shared)
+                          -> GPU-only iterations -> terminal readback -> CPU output/revision
 Rendering:  CPU revision delta -> copied upload plan -> staging/copy -> GPU draw
 ```
+
+Current users of canonical slots: the `SpatialIndexCache` GPU index in property
+space over every row (GRAPHICS-154). Transformed or compacted indices keep a
+private upload. Method output rings, renderer observation of in-flight results,
+Accept to the CPU and routing render uploads through the residency follow ADR
+0030 (GRAPHICS-155/156, RUNTIME-292..295). Where a method still runs a CPU stage
+per iteration, the traffic that stage needs is reported by the method until its
+port lands (RUNTIME-294).
 
 ## Property revisions
 

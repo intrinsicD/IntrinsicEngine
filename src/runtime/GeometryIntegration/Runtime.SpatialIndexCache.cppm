@@ -13,6 +13,7 @@ module;
 #include <vector>
 export module Extrinsic.Runtime.SpatialIndexCache;
 export import Geometry.PointLBVH;
+export import Extrinsic.Graphics.GpuPropertyResidency;
 export import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.ModuleLifecycle;
 import Extrinsic.Runtime.WorldHandle;
@@ -159,6 +160,10 @@ export namespace Extrinsic::Runtime
             std::uint32_t excludedSlot = Geometry::PointLBVH::InvalidIndex) const;
         void Prune();
         [[nodiscard]] SpatialIndexCacheStats Stats() const noexcept;
+        // Canonical GPU copies of properties (ADR 0030): a property-space index over every row
+        // reads its positions from here, shared with every other GPU user of that revision.
+        // Null until the first GPU build.
+        [[nodiscard]] const Graphics::GpuPropertyResidency* PropertyResidency() const noexcept;
 
       private:
         [[nodiscard]] std::shared_ptr<SpatialNearestBatch> QueueGpuBatch(

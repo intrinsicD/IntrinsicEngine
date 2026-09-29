@@ -13,6 +13,7 @@ target_sources(${target_name}
         Graphics.PointKeypoints.cppm
         Graphics.CoherentPointDriftEStep.cppm
         Graphics.FarthestPointSampling.cppm
+        Graphics.GpuPropertyResidency.cppm
         Graphics.PropertyFilter.cppm
         Graphics.SparseConjugateGradient.cppm
         Graphics.FrameRecipe.cppm
@@ -63,6 +64,7 @@ target_sources(${target_name}
         Graphics.PointKeypoints.cpp
         Graphics.CoherentPointDriftEStep.cpp
         Graphics.FarthestPointSampling.cpp
+        Graphics.GpuPropertyResidency.cpp
         Graphics.PropertyFilter.cpp
         Graphics.SparseConjugateGradient.cpp
         Graphics.CurrentRendererContractAdapter.cpp
