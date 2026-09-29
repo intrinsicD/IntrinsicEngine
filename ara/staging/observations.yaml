@@ -4324,3 +4324,15 @@ observations:
     crystallized_via: artifact-commitment
     stale: false
 
+  - id: O259
+    timestamp: 2026-09-29T21:00+02:00
+    provenance: ai-executed
+    content: Passing CPD coordinates to the device as float-float pairs removes the coordinate-rounding part of the fp32 error, so a per-row first-order guard admits the same 21 of 48 iterations at 10^5 points as the unguarded run did (9.3x over the CPU twin); on this fixture no row needed the CPU, while a two-cluster fixture with a far row shows the per-row CPU path merging exactly.
+    context: One host and GPU, rigid bumpy-ellipsoid fixture with 5% uniform clutter whose far rows are negligible against the uniform term.
+    potential_type: claim
+    bound_to: [N650]
+    promoted: true
+    promoted_to: logic/claims.md:C117
+    crystallized_via: artifact-commitment
+    stale: false
+

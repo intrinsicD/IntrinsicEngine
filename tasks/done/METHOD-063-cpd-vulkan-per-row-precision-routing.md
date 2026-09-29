@@ -7,11 +7,21 @@ template: micro
 workflow_schema: 1
 workflow_profile: micro
 evidence: not_applicable
-evidence_skip_reason: interactive backlog note from the METHOD-056 review round (2026-09-29); implementation owes its own tests, gpu;vulkan smoke and a resealed scaling run.
+evidence_skip_reason: Finished interactively; the performance and parity result is ARA claim C117 with sealed, source-bound evidence in ara/evidence/diagnostics/method063_cpd_vulkan_per_row_20260929/.
 contract_schema: 1
 contracts: [method.engine-integration]
 ---
 # METHOD-063 — Per-row precision routing for the Vulkan CPD E-step
+
+## Completion — 2026-09-29
+Commit: `83e5b533f` (float-float coordinates, per-row estimates, skipped device rows merged
+from `ExactRow` + `SourceRowTerms`, counts in results, tests); the evidence commit on
+`claude/cpd-nystrom` follows. ParityProven on the recorded host (C117): 9.3x over the CPU twin
+at 10^5 points with 21 of 48 device iterations, as many as before the precision guard. On the
+scaling fixture no row needed the CPU (its clutter rows are negligible against the uniform
+term), so the gain there comes from the float-float coordinates; the per-row CPU path is
+exercised by the review's two-cluster fixture (unit test exact to 1e-12, smoke within 1e-7).
+Tile-centring was not needed.
 
 ## Goal
 - The METHOD-056 precision guard judges a whole iteration by its worst row (largest relevant
@@ -25,11 +35,11 @@ contracts: [method.engine-integration]
   fp32 conversion.
 
 ## Acceptance criteria
-- [ ] Default gate: mock evaluator parity with masked rows (the review's two-cluster + far-row
+- [x] Default gate: mock evaluator parity with masked rows (the review's two-cluster + far-row
       counterexample), statistics equal to CPU dense within 1e-12 for the CPU rows.
-- [ ] gpu;vulkan smoke adds that fixture: every admitted row within the 2e-5 estimate, overall
+- [x] gpu;vulkan smoke adds that fixture: every admitted row within the 2e-5 estimate, overall
       parity within the frozen 1e-5.
-- [ ] Resealed scaling run; C117 revised with the recovered speedup (or the measured reason not).
+- [x] Resealed scaling run; C117 revised with the recovered speedup (or the measured reason not).
 
 ## Engine integration
 

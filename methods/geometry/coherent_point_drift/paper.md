@@ -217,12 +217,12 @@ Without an evaluator, or when it fails, the iteration runs the exact CPU choice 
 `EStepFallbacks` counts it; `EStepDeviceIterations` counts the device iterations. In the editor the solver worker
 waits while a pump job records the passes through the frame loop, so one device E-step costs
 several frames of latency. Measured (C117, RTX 3050): E-step statistics within 1e-7
-relative of CPU dense on the smoke fixtures; with the precision guard, 10^5-point rigid
-registration in 114.6 s instead of 186 s for the same route with the CPU dense pass (Auto 188 s,
-Nystroem 121 s; 9 of 48 iterations on the device), registered points within 7e-12. Without the
-guard it took 18.9 s, but could admit ~1e-4 fp32 errors; the whole-target guard is strict (the
-fixture's clutter rows decide it), and per-row routing (METHOD-063) is the next step. At 10^3
-points frame latency makes it slower than the CPU
+relative of CPU dense on the smoke fixtures (including a far row evaluated on the CPU);
+10^5-point rigid registration in 19.8 s instead of 185 s for the same route with the CPU dense
+pass (Auto 188 s, Nystroem 121 s; 21 of 48 iterations on the device, no CPU rows needed there),
+registered points within 3e-11. A whole-iteration guard without float-float coordinates had kept
+most mid-sigma iterations on the CPU (115 s). At 10^3 points frame latency makes it slower than
+the CPU
 (`geometry.coherent_point_drift.vulkan_dense_e_step_scaling`).
 
 ## Bayesian Coherent Point Drift (METHOD-050)

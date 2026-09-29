@@ -13850,3 +13850,14 @@ tree:
     - ara/evidence/diagnostics/method056_cpd_vulkan_e_step_review_20260929/sealed-result.json
     status: resolved
 
+  - id: N650
+    type: experiment
+    title: Recover the Vulkan CPD E-step speedup with float-float coordinates and per-row precision routing
+    provenance: ai-executed
+    timestamp: 2026-09-29T21:00+02:00
+    result: METHOD-063 sends coordinates as float-float pairs and evaluates only rows whose fp32 estimate exceeds 2e-5 on the CPU. The resealed scaling run finds 9.3x over the CPU twin at 10^5 points with 21 device iterations (0 CPU rows on this fixture); the review's two-cluster fixture exercises the CPU rows in the unit test and the smoke. C117 revised.
+    evidence:
+    - ara/evidence/diagnostics/method063_cpd_vulkan_per_row_20260929/record.json
+    - ara/evidence/diagnostics/method063_cpd_vulkan_per_row_20260929/sealed-result.json
+    status: resolved
+

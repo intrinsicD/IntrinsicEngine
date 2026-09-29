@@ -1,0 +1,30 @@
+{
+  "task": "METHOD-063",
+  "date": "2026-09-29",
+  "source_revision": "83e5b533ff7b94f97460eb767a1c1db4ec63401c",
+  "supersedes": "ara/evidence/diagnostics/method056_cpd_vulkan_e_step_review_20260929/ (1fa23b221, whole-iteration precision guard)",
+  "environment": {
+    "cpu": "Intel Core i9-11900KF (8 cores, 16 threads), CPU E-steps use all hardware threads",
+    "gpu": "NVIDIA GeForce RTX 3050 (8 GiB), driver 590.48.01, subgroup 32, shader float64",
+    "display": "Xephyr :7 (nested X server), 64x64 window, VSync off, validation layers off",
+    "compiler": "clang++ 23.0.0",
+    "preset": "ci-vulkan-release",
+    "build_type": "Release, no -march=native"
+  },
+  "commands": [
+    "cmake --build build/ci-vulkan-release --target IntrinsicPointLBVHGpuTests",
+    "GITHUB_SHA=83e5b533ff7b94f97460eb767a1c1db4ec63401c INTRINSIC_METHOD056_SCALING_OUTPUT=<dir> DISPLAY=:7 build/ci-vulkan-release/bin/IntrinsicPointLBVHGpuTests --gtest_filter=METHOD056VulkanCpdEStep.ScalingProfile > run-progress.log",
+    "python3 tools/benchmark/seal_benchmark_results.py --root <dir> --manifests-root benchmarks --run-id method063-vulkan-e-step-scaling-per-row-20260929 --source-state clean_commit --source-revision 83e5b533ff7b94f97460eb767a1c1db4ec63401c --claim-eligible --replace",
+    "python3 tools/benchmark/validate_benchmark_results.py --root <dir> --strict"
+  ],
+  "outcomes": {
+    "rigid_100000_points": "Vulkan 19.8 s vs CPU twin 184.7 s (9.3x), Auto 187.7 s, Nystroem 121.0 s, dense 411.0 s; 21 of 48 iterations on the device (9 under the whole-iteration guard)",
+    "rigid_10000_points": "Vulkan 399 ms vs CPU twin 1324 ms (3.3x); 19 of 35 on the device",
+    "rigid_1000_points": "Vulkan 78 ms vs CPU twin 27 ms: frame latency dominates",
+    "cpu_rows": "0 on every run: the fixture's far (clutter) rows carry negligible kernel mass against the uniform term, so the gain here comes entirely from the float-float coordinates removing the coordinate-rounding term; per-row CPU evaluation is exercised by the two-cluster fixture in the unit test and the gpu;vulkan smoke (1 CPU row)",
+    "parity": "max registered-point delta to the CPU twin 2.5e-11 (10^5); RMS to the ground truth equal",
+    "gate": "passed: quality_error_l2 3.7e-4 <= 1e-3, quality_error_linf 2.5e-11 <= 1e-4"
+  },
+  "limitations": "The per-row estimate is first order, not rigorous. One host, one GPU, one rigid fixture; frame latency still loses small inputs (GRAPHICS-150).",
+  "not_measured": "Nonrigid and Bayesian device runs; memory peak; other GPUs; a scaling fixture that needs CPU rows."
+}

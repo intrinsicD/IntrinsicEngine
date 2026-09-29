@@ -14,7 +14,6 @@ picking backlog work; theme priorities and rationale live in
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
 - `METHOD-044` — Feature-aware patches and distortion-aware atlas merging (tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md)
 - `METHOD-045` — Preserve baseline regions while constructing UV charts (tasks/active/METHOD-045-baseline-preserving-atlas-cuts.md)
-- `METHOD-063` — Per-row precision routing for the Vulkan CPD E-step (tasks/active/METHOD-063-cpd-vulkan-per-row-precision-routing.md)
 - `RUNTIME-274` — Point-cloud subsampling editor workflow (tasks/active/RUNTIME-274-point-cloud-subsampling-workflow.md)
 - `RUNTIME-289` — Selectable point sampling wherever points are chosen (tasks/active/RUNTIME-289-selectable-point-sampling-in-consumers.md)
 - `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/active/UI-037-linear-domain-action-readiness-tooltips.md)

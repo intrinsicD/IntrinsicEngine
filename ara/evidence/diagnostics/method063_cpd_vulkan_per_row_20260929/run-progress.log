@@ -1,0 +1,35 @@
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = METHOD056*Scaling*
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from METHOD056VulkanCpdEStep
+[ RUN      ] METHOD056VulkanCpdEStep.ScalingProfile
+[33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+[33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+[33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+size 1000
+  rigid_vulkan: success, 25 iterations (16 on the device), median 78.4 ms (78.3 - 79.9, 3 runs), rms 0.000371
+  rigid_vulkan_cpu_twin: success, 25 iterations (0 on the device), median 27.2 ms (26.6 - 27.4, 3 runs), rms 0.000371
+  rigid_dense: success, 25 iterations (0 on the device), median 27.8 ms (27.6 - 29.0, 3 runs), rms 0.000371
+  rigid_auto: success, 25 iterations (0 on the device), median 29.2 ms (28.7 - 29.3, 3 runs), rms 0.000371
+  rigid_nystrom: success, 25 iterations (0 on the device), median 22.8 ms (22.8 - 22.9, 3 runs), rms 0.000371
+size 10000
+  rigid_vulkan: success, 35 iterations (19 on the device), median 399.3 ms (396.6 - 399.7, 3 runs), rms 0.000138
+  rigid_vulkan_cpu_twin: success, 35 iterations (0 on the device), median 1324.0 ms (1316.3 - 1325.9, 3 runs), rms 0.000138
+  rigid_dense: success, 35 iterations (0 on the device), median 2173.5 ms (2172.4 - 2185.5, 3 runs), rms 0.000138
+  rigid_auto: success, 35 iterations (0 on the device), median 1368.5 ms (1365.7 - 1377.8, 3 runs), rms 0.000138
+  rigid_nystrom: success, 35 iterations (0 on the device), median 1070.1 ms (1065.2 - 1074.7, 3 runs), rms 0.000138
+size 100000
+  rigid_vulkan: success, 48 iterations (21 on the device), median 19810.3 ms (19759.9 - 19860.7, 2 runs), rms 4.96e-05
+  rigid_vulkan_cpu_twin: success, 48 iterations (0 on the device), median 184695.6 ms (184695.6 - 184695.6, 1 runs), rms 4.96e-05
+  rigid_dense: success, 48 iterations (0 on the device), median 410967.7 ms (410967.7 - 410967.7, 1 runs), rms 4.96e-05
+  rigid_auto: success, 48 iterations (0 on the device), median 187692.5 ms (187692.5 - 187692.5, 1 runs), rms 4.96e-05
+  rigid_nystrom: success, 48 iterations (0 on the device), median 120957.6 ms (120957.6 - 120957.6, 1 runs), rms 4.96e-05
+  },
+  },
+[       OK ] METHOD056VulkanCpdEStep.ScalingProfile (964003 ms)
+[----------] 1 test from METHOD056VulkanCpdEStep (964003 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (964003 ms total)
+[  PASSED  ] 1 test.
