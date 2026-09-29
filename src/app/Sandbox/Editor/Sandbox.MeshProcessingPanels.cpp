@@ -59,6 +59,7 @@ import Extrinsic.Runtime.ParameterizationConfig;
 
 #include "Sandbox.PanelSupport.hpp"
 #include "Sandbox.PointSamplingControls.hpp"
+#include "Sandbox.RegistrationTracePlots.hpp"
 
 namespace Extrinsic::Sandbox::Editor
 {
@@ -341,6 +342,7 @@ namespace Extrinsic::Sandbox::Editor
             std::optional<Runtime::EditorCoherentPointDriftResult> LastResult{};
             bool LivePreview{true};
             bool ShowSubsamples{true};
+            bool PlotBySeconds{false};
             std::uint64_t PreviewRevision{0u};
             std::array<char, 128> DisplacementName{};
         };
@@ -3051,31 +3053,30 @@ namespace Extrinsic::Sandbox::Editor
 
             if (!snapshot.Trace.empty())
             {
-                std::vector<double> iteration, sigma2, objective, matched;
+                // UI-067: every per-iteration quantity, against iterations or elapsed seconds.
+                std::vector<double> iteration, seconds;
+                std::vector<RegistrationTraceSeries> series{{"sigma^2", {}, true}, {"objective"}, {"negative log-likelihood"},
+                                                            {"matched weight"}, {"iteration time [s]"},
+                                                            {"kernel evaluations", {}, true}};
+                bool bounded = false;
                 for (const auto& t : snapshot.Trace)
                 {
                     iteration.push_back(double(t.Iteration));
-                    sigma2.push_back(std::max(t.Sigma2, 1e-300));
-                    objective.push_back(t.Objective);
-                    matched.push_back(t.MatchedWeight);
+                    seconds.push_back(t.Seconds);
+                    series[0].Values.push_back(std::max(t.Sigma2, 1e-300));
+                    series[1].Values.push_back(t.Objective);
+                    series[2].Values.push_back(t.NegativeLogLikelihood);
+                    series[3].Values.push_back(t.MatchedWeight);
+                    series[4].Values.push_back(t.IterationSeconds);
+                    series[5].Values.push_back(std::max(double(t.KernelEvaluations), 1.0));
+                    bounded = bounded || t.EStepErrorBound > 0.0;
                 }
-                const int n = int(iteration.size());
-                if (ImPlot::BeginPlot("sigma^2##CPD", ImVec2(-1.0f, 150.0f)))
+                if (bounded)
                 {
-                    ImPlot::SetupAxes("iteration", "sigma^2", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
-                    ImPlot::SetupAxisScale(ImAxis_Y1, ImPlotScale_Log10);
-                    ImPlot::PlotLine("sigma^2", iteration.data(), sigma2.data(), n);
-                    ImPlot::EndPlot();
+                    series.push_back({"E-step error bound", {}, true});
+                    for (const auto& t : snapshot.Trace) series.back().Values.push_back(std::max(t.EStepErrorBound, 1e-300));
                 }
-                if (ImPlot::BeginPlot("Objective and matched weight##CPD", ImVec2(-1.0f, 150.0f)))
-                {
-                    ImPlot::SetupAxes("iteration", "objective", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
-                    ImPlot::SetupAxis(ImAxis_Y2, "matched", ImPlotAxisFlags_AuxDefault | ImPlotAxisFlags_AutoFit);
-                    ImPlot::PlotLine("objective", iteration.data(), objective.data(), n);
-                    ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
-                    ImPlot::PlotLine("matched weight", iteration.data(), matched.data(), n);
-                    ImPlot::EndPlot();
-                }
+                DrawRegistrationTracePlots("CPDTrace", iteration, seconds, series, state.PlotBySeconds);
                 if (ImGui::Button("Export trace (CSV)##CPD"))
                 {
                     std::error_code error;
@@ -3088,12 +3089,12 @@ namespace Extrinsic::Sandbox::Editor
                     (void)std::strftime(stamp, sizeof(stamp), "%Y%m%d-%H%M%S", &local);
                     const auto path = directory / ("cpd-trace-" + std::string(stamp) + ".csv");
                     std::ofstream csv(path);
-                    csv << "iteration,sigma2,negative_log_likelihood,objective,matched_weight,e_step,e_step_error_bound,"
-                           "e_step_sampled_error\n";
+                    csv << "iteration,seconds,iteration_seconds,sigma2,negative_log_likelihood,objective,matched_weight,e_step,"
+                           "e_step_error_bound,e_step_sampled_error,kernel_evaluations\n";
                     for (const auto& t : snapshot.Trace)
-                        csv << t.Iteration << ',' << t.Sigma2 << ',' << t.NegativeLogLikelihood << ',' << t.Objective << ','
-                            << t.MatchedWeight << ',' << t.EStep << ',' << t.EStepErrorBound << ',' << t.EStepSampledError
-                            << '\n';
+                        csv << t.Iteration << ',' << t.Seconds << ',' << t.IterationSeconds << ',' << t.Sigma2 << ','
+                            << t.NegativeLogLikelihood << ',' << t.Objective << ',' << t.MatchedWeight << ',' << t.EStep << ','
+                            << t.EStepErrorBound << ',' << t.EStepSampledError << ',' << t.KernelEvaluations << '\n';
                     state.ExportMessage = csv ? "Saved " + path.string() : "Could not write " + path.string();
                 }
                 if (!state.ExportMessage.empty()) ImGui::TextWrapped("%s", state.ExportMessage.c_str());
