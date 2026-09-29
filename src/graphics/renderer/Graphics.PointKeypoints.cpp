@@ -7,9 +7,9 @@ module;
 #include <string>
 module Extrinsic.Graphics.PointKeypoints;
 
+import Extrinsic.Graphics.ComputeParallelPrimitives;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.CommandContext;
-import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Types;
 
@@ -46,10 +46,7 @@ namespace Extrinsic::Graphics
             if (!Device.IsOperational() || !Device.SupportsShaderFloat64()) return false;
             if (!Pipeline.IsValid())
             {
-                const auto path = Core::Filesystem::GetShaderPath("shaders/point_keypoints.comp.spv");
-                Pipeline = Device.CreatePipeline({.VertexShaderPath = {}, .FragmentShaderPath = {},
-                    .ComputeShaderPath = path.c_str(), .PushConstantSize = sizeof(Push),
-                    .DebugName = "PointKeypoints"});
+                Pipeline = CreateComputePipeline(Device, "shaders/point_keypoints.comp.spv", sizeof(Push), "PointKeypoints");
                 if (!Pipeline.IsValid()) return false;
             }
             if (count <= Capacity) return true;

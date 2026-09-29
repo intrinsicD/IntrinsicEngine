@@ -40,6 +40,7 @@ import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.JobService;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
+#include "Editor/internal/Runtime.EditorFramedGpuJob.hpp"
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
@@ -301,29 +302,23 @@ namespace Extrinsic::Runtime
         {auto result=pending;result.Status=EditorCommandStatus::GeometryProcessingFailed;result.Message=std::move(message);return result;};
         if(w->Config.Backend==KeypointAnalysisBackend::VulkanCompute)
         {
-            JobDesc gpu{
-                .DebugName="Vulkan keypoint computation", .Scope=context.World, .Kind=RuntimeTaskKinds::GeometryProcess,
-                .Work=[](const JobCancellation&){return JobResultEnvelope::Make(true);},
-                .IsReadyToApply=[context,w] {
-                    if(w->Abandoned || !CurrentInput(context,*w))return true;
-                    if(!w->GpuResult)
-                    {
-                        auto workspace=std::make_shared<Graphics::PointKeypointWorkspace>(*context.Device);
-                        const auto& c=w->Config;
-                        const Graphics::PointKeypointParams params{c.SalientRadius,c.NonMaxRadius,c.Gamma21,c.Gamma32,
-                            c.MinimumNeighbors,c.GpuRadiusCapacity,c.GpuQueryBatchSize};
-                        w->GpuResult=context.SpatialIndices->QueueGpuCompute(w->GpuIndex,
-                            sizeof(Graphics::PointKeypointHeader)+w->Slots.size()*sizeof(Graphics::PointKeypointValue),
-                            [workspace,params,w](auto& commands,const SpatialGpuIndexView& view) -> RHI::BufferHandle {
-                                if(w->Abandoned)return {};
-                                return workspace->Record(commands,view.NodesBDA,view.PositionsBDA,
-                                    view.OriginalSlotsBDA,view.Count,params);
-                            });
-                    }
-                    return w->GpuResult->State==SpatialQueryState::Ready || w->GpuResult->State==SpatialQueryState::Failed;
+            JobDesc gpu=EditorFeatureDetail::MakeFramedGpuJobDesc({
+                .DebugName="Vulkan keypoint computation", .Scope=context.World,
+                .Current=[context,w]{return !w->Abandoned && CurrentInput(context,*w);},
+                .Queue=[context,w] {
+                    auto workspace=std::make_shared<Graphics::PointKeypointWorkspace>(*context.Device);
+                    const auto& c=w->Config;
+                    const Graphics::PointKeypointParams params{c.SalientRadius,c.NonMaxRadius,c.Gamma21,c.Gamma32,
+                        c.MinimumNeighbors,c.GpuRadiusCapacity,c.GpuQueryBatchSize};
+                    return w->GpuResult=context.SpatialIndices->QueueGpuCompute(w->GpuIndex,
+                        sizeof(Graphics::PointKeypointHeader)+w->Slots.size()*sizeof(Graphics::PointKeypointValue),
+                        [workspace,params,w](auto& commands,const SpatialGpuIndexView& view) -> RHI::BufferHandle {
+                            if(w->Abandoned)return {};
+                            return workspace->Record(commands,view.NodesBDA,view.PositionsBDA,
+                                view.OriginalSlotsBDA,view.Count,params);
+                        });
                 },
-                .ValidateBeforeApply=[context,w] {return !w->Abandoned && CurrentInput(context,*w)?JobApplyValidation::Current:JobApplyValidation::StaleGeneration;},
-                .PublishCompletion=[context,w,sink,delivered](KernelEventBus&,const JobResultEnvelope&) {
+                .Publish=[context,w,sink,delivered](const SpatialGpuResult*) {
                     auto& r=w->Result;r.Status=EditorCommandStatus::GeometryProcessingFailed;
                     if(!w->GpuResult || w->GpuResult->State!=SpatialQueryState::Ready)
                         r.Message=w->GpuResult?w->GpuResult->Diagnostic:"Vulkan keypoint computation did not return a result.";
@@ -355,12 +350,12 @@ namespace Extrinsic::Runtime
                     }
                     auto result=Publish(context,w);*delivered=true;if(sink)sink(result);return result.Succeeded();
                 },
-                .FinalizeUnpublishedOnMainThread=[w,sink,delivered,pending]() mutable {
+                .Abandon=[w,sink,delivered,pending]() mutable {
                     w->Abandoned=true;if(*delivered)return;*delivered=true;
                     pending.Status=EditorCommandStatus::StaleEntity;
                     pending.Message="Vulkan keypoint job cancelled or stale; previous outputs retained.";
                     if(sink)sink(std::move(pending));
-                }};
+                }});
             if(!context.JobCommands.Submit(std::move(gpu),identity).IsValid())
                 return rejected("Vulkan keypoint submission rejected.");
             return pending;

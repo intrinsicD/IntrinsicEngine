@@ -820,8 +820,19 @@ block without a prefix, an optional float `weights` property (importance weights
 priority scores), and the output — a float rank plus a bool selection property on the source
 (one undoable step) or a new point-cloud entity with the samples in world space. Points are
 sampled in the entity's world frame, so parented entities are refused. The editor's "Point
-Sampling" window and the agent tools `preview_point_sampling` / `run_point_sampling` use it;
-it runs synchronously on the CPU until RUNTIME-290 adds the Vulkan backend.
+Sampling" window and the agent tools `preview_point_sampling` / `run_point_sampling` use it.
+CPU runs are synchronous. `backend` = Vulkan (RUNTIME-290) goes through the seam
+`Extrinsic.Runtime.PointSamplingGpu`: methods with a device kernel (exact, optionally weighted,
+farthest point via `Extrinsic.Graphics.FarthestPointSampling`) run as a framed GPU job in
+bounded chunks whose order prefixes only grow; the first 64 samples are recomputed on the CPU
+before the result may report `gpu_vulkan_compute`. Every other case (another method, no job
+lane or device, no shader float64, a device failure or mismatch) runs the CPU order and
+reports `requested_backend`, `backend` and `backend_diagnostic`.
+
+Framed GPU jobs of editor operations share `EditorFeatureDetail::MakeFramedGpuJobDesc`
+(`Editor/internal/Runtime.EditorFramedGpuJob.hpp`): the worker does nothing, the main thread
+queues `SpatialIndexCache::QueueGpuCompute` chunks from `IsReadyToApply` until the operation's
+`Observe` says done, then publishes (keypoints and point sampling use it).
 
 ### Sandbox Editor ICP Registration
 

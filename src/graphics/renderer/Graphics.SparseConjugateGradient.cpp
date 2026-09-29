@@ -9,9 +9,9 @@ module;
 #include <vector>
 module Extrinsic.Graphics.SparseConjugateGradient;
 
+import Extrinsic.Graphics.ComputeParallelPrimitives;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.CommandContext;
-import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Types;
 
@@ -77,9 +77,7 @@ namespace Extrinsic::Graphics
         {
             if (!Pipeline.IsValid())
             {
-                const auto path = Core::Filesystem::GetShaderPath("shaders/sparse_cg.comp.spv");
-                Pipeline = Device.CreatePipeline({.VertexShaderPath = {}, .FragmentShaderPath = {},
-                    .ComputeShaderPath = path.c_str(), .PushConstantSize = sizeof(Push), .DebugName = "SparseConjugateGradient"});
+                Pipeline = CreateComputePipeline(Device, "shaders/sparse_cg.comp.spv", sizeof(Push), "SparseConjugateGradient");
                 if (!Pipeline.IsValid()) return false;
             }
             const std::size_t n = Rows;

@@ -8,9 +8,9 @@ module;
 #include <span>
 module Extrinsic.Graphics.CoherentPointDriftEStep;
 
+import Extrinsic.Graphics.ComputeParallelPrimitives;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.CommandContext;
-import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Types;
 
@@ -59,12 +59,7 @@ namespace Extrinsic::Graphics
         }
         RHI::PipelineHandle Pipeline(RHI::PipelineHandle& pipeline, const char* shader, const char* name)
         {
-            if (!pipeline.IsValid())
-            {
-                const auto path = Core::Filesystem::GetShaderPath(shader);
-                pipeline = Device.CreatePipeline({.VertexShaderPath = {}, .FragmentShaderPath = {},
-                    .ComputeShaderPath = path.c_str(), .PushConstantSize = sizeof(Push), .DebugName = name});
-            }
+            if (!pipeline.IsValid()) pipeline = CreateComputePipeline(Device, shader, sizeof(Push), name);
             return pipeline;
         }
     };

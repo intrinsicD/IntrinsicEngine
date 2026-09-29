@@ -126,6 +126,9 @@ checked against `SortRecordsByKeyCpu` (a `std::stable_sort`) in the opt-in
 Vulkan smoke, three runs per case. `Extrinsic.Graphics.PointLBVH` sorts its
 (Morton code, index) records with it (30 key bits, eight passes).
 
+`CreateComputePipeline` creates one compute pipeline from a shader path relative to the
+shader root; the compute workspaces of the graphics layer (property filter, sparse CG,
+keypoints, CPD E-step, point LBVH, farthest-point sampling) use it.
 `CreateParallelPrimitivePipelines` creates (with resolved shader paths) the
 pipelines a list of primitive kinds records with, and
 `DestroyParallelPrimitivePipelines` releases them; consumers use these instead

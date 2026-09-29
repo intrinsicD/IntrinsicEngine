@@ -326,7 +326,9 @@ namespace Extrinsic::Sandbox::Editor
             Runtime::PointSamplingOperationConfig Draft{};
             std::string LastApplied{}, ConfigDiagnostic{};
             std::array<char, 128> WeightsName{}, RankName{}, SelectedName{};
-            std::optional<Runtime::EditorPointSamplingResult> LastResult{};
+            // Written by the (possibly deferred) completion of the last run.
+            std::shared_ptr<std::optional<Runtime::EditorPointSamplingResult>> LastResult =
+                std::make_shared<std::optional<Runtime::EditorPointSamplingResult>>();
         };
 
         struct CoherentPointDriftState
@@ -3912,6 +3914,7 @@ namespace Extrinsic::Sandbox::Editor
         }
         ImGui::SeparatorText("Output");
         changed |= DrawSpecEnumCombo("Output##Sampling", fields, "output", config.Output, defaults.Output);
+        changed |= DrawSpecEnumCombo("Backend##Sampling", fields, "backend", config.Backend, defaults.Backend);
         if (config.Output == Runtime::PointSamplingOutput::Properties)
         {
             if (ImGui::InputText("Rank property##Sampling", state.RankName.data(), state.RankName.size()))
@@ -3938,12 +3941,18 @@ namespace Extrinsic::Sandbox::Editor
         const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
             commands, Runtime::PreviewEditorPointSamplingCommand(commands, config));
         if (DrawProcessingActionButton("Sample##Sampling", readiness))
-            state.LastResult = Runtime::ApplyEditorPointSamplingCommand(commands, config);
-        if (!readiness.Enabled && !readiness.DisabledReason.empty()) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
-        if (state.LastResult)
         {
-            const auto& r = *state.LastResult;
-            ImGui::Text("%s   %u of %u points   %.2f ms", r.Method.c_str(), r.SampleCount, r.InputCount, r.Milliseconds);
+            auto slot = state.LastResult;
+            *slot = Runtime::ApplyEditorPointSamplingCommand(commands, config,
+                [slot](Runtime::EditorPointSamplingResult result) { *slot = std::move(result); });
+        }
+        if (!readiness.Enabled && !readiness.DisabledReason.empty()) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
+        if (*state.LastResult)
+        {
+            const auto& r = **state.LastResult;
+            ImGui::Text("%s   %u of %u points   %.2f ms   backend: %s", r.Method.c_str(), r.SampleCount, r.InputCount,
+                        r.Milliseconds, r.Backend.c_str());
+            if (!r.BackendDiagnostic.empty()) ImGui::TextWrapped("%s", r.BackendDiagnostic.c_str());
             if (!r.Message.empty()) ImGui::TextWrapped("%s", r.Message.c_str());
         }
         ImGui::End();

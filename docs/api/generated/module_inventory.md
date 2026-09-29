@@ -15,12 +15,12 @@ Root scanned: `src`
 | `geometry` | 132 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 75 |
+| `graphics/renderer` | 76 |
 | `graphics/rhi` | 18 |
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 6 |
-| `runtime` | 107 |
+| `runtime` | 108 |
 
 ## Modules
 
@@ -266,6 +266,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.CurrentRendererContractAdapter` | `src/graphics/renderer/Graphics.CurrentRendererContractAdapter.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.DebugViewSystem` | `src/graphics/renderer/Graphics.DebugViewSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.DeferredSystem` | `src/graphics/renderer/Graphics.DeferredSystem.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.FarthestPointSampling` | `src/graphics/renderer/Graphics.FarthestPointSampling.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.ForwardSystem` | `src/graphics/renderer/Graphics.ForwardSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.FrameRecipe` | `src/graphics/renderer/Graphics.FrameRecipe.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.GeometryResidency` | `src/graphics/renderer/Graphics.GeometryResidency.cppm` | `graphics/renderer` |
@@ -454,6 +455,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.PointCloudConsolidationTypes` | `src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointConstructionConfig` | `src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointSamplingConfig` | `src/runtime/Modules/PointSampling/Runtime.PointSamplingConfig.cppm` | `runtime` |
+| `Extrinsic.Runtime.PointSamplingGpu` | `src/runtime/Modules/PointSampling/Runtime.PointSamplingGpu.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointSpacingConfig` | `src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressivePoissonConfig` | `src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressivePoissonGpuBackend` | `src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cppm` | `runtime` |
@@ -473,4 +475,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **446**
+Total modules: **448**

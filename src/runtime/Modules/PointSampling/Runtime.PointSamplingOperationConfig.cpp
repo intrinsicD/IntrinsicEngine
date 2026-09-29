@@ -30,12 +30,14 @@ namespace Extrinsic::Runtime
         using K = Geometry::PropertyValueKind;
         constexpr std::array<K, 1> kVec3{K::Vec3};
         constexpr std::array<std::string_view, 2> kOutputNames{"Rank and selection properties", "New point cloud"};
+        constexpr std::array<std::string_view, 2> kBackendNames{"CPU", "Vulkan (falls back to the CPU where unsupported)"};
         constexpr std::array kBaseFields{
             ConfigFieldSpec{.Name = "source", .Type = FT::UInt, .Description = "Stable id of the entity whose points are sampled."},
             ConfigFieldSpec{.Name = "positions", .Type = FT::PropertyRef, .Description = "Points: any vec3 property on a point domain (Unknown picks the primary one).", .RefKinds = kVec3},
             ConfigFieldSpec{.Name = "count", .Type = FT::UInt, .Description = "Samples to select; 0 orders every point.", .Min = 0, .Max = 100000000},
             ConfigFieldSpec{.Name = "weights", .Type = FT::String, .Description = "Optional float property on the points' domain: importance weights (farthest point, coupled sieve; positive) or priority scores (Poisson feature priority). Empty for none."},
             ConfigFieldSpec{.Name = "output", .Type = FT::Enum, .Description = "Where the samples go: rank and selection properties on the source, or a new point-cloud entity.", .EnumNames = kOutputNames},
+            ConfigFieldSpec{.Name = "backend", .Type = FT::Enum, .Description = "Where the order is computed: CPU, or Vulkan for methods with a device kernel (exact farthest point); results report the backend that ran and why the CPU did.", .EnumNames = kBackendNames},
             ConfigFieldSpec{.Name = "rank_name", .Type = FT::String, .Description = "Float property with each point's rank in the order (-1 when not ranked).", .NonEmpty = true},
             ConfigFieldSpec{.Name = "selected_name", .Type = FT::String, .Description = "Bool property marking the first `count` samples.", .NonEmpty = true},
         };
@@ -55,7 +57,7 @@ namespace Extrinsic::Runtime
         {
             Json doc{{"source", c.SourceStableEntityId}, {"positions", ConfigDetail::EncodePointPropertyRef(c.Positions)},
                      {"count", c.Count}, {"weights", c.WeightsName}, {"output", unsigned(c.Output)},
-                     {"rank_name", c.RankName}, {"selected_name", c.SelectedName}};
+                     {"backend", unsigned(c.Backend)}, {"rank_name", c.RankName}, {"selected_name", c.SelectedName}};
             ConfigDetail::EncodePointSampling(doc, "", c.Sampling);
             return doc;
         }
@@ -68,6 +70,7 @@ namespace Extrinsic::Runtime
             c.Count = doc.at("count").get<std::uint32_t>();
             c.WeightsName = doc.at("weights").get<std::string>();
             c.Output = PointSamplingOutput(doc.at("output").get<unsigned>());
+            c.Backend = PointSamplingBackend(doc.at("backend").get<unsigned>());
             c.RankName = doc.at("rank_name").get<std::string>();
             c.SelectedName = doc.at("selected_name").get<std::string>();
             ConfigDetail::DecodePointSampling(doc, "", c.Sampling);

@@ -75,6 +75,9 @@ export namespace Extrinsic::Runtime
     inline constexpr std::string_view kPointSamplingConfigSectionName = "sandbox.point_sampling";
     inline constexpr std::string_view kPointSamplingConfigSectionSchemaId = "intrinsic.runtime.sandbox.point_sampling";
     enum class PointSamplingOutput : std::uint8_t { Properties = 0, PointCloud };
+    // Where the order is computed (RUNTIME-290). Vulkan runs the methods with a device kernel
+    // (exact farthest point today) and falls back to the CPU, saying why, for the rest.
+    enum class PointSamplingBackend : std::uint8_t { Cpu = 0, Vulkan };
 
     struct PointSamplingOperationConfig
     {
@@ -87,6 +90,7 @@ export namespace Extrinsic::Runtime
         // coupled sieve; positive) or priority scores (Poisson feature priority). Empty: none.
         std::string WeightsName{};
         PointSamplingOutput Output{PointSamplingOutput::Properties};
+        PointSamplingBackend Backend{PointSamplingBackend::Cpu};
         std::string RankName{"v:sample_rank"};         // float rank in the order, -1 when unranked
         std::string SelectedName{"v:sample_selected"}; // true for the first Count samples
     };

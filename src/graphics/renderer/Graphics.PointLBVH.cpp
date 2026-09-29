@@ -11,7 +11,6 @@ module Extrinsic.Graphics.PointLBVH;
 import Extrinsic.Graphics.ComputeParallelPrimitives;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.CommandContext;
-import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Types;
 
@@ -59,15 +58,8 @@ namespace Extrinsic::Graphics
             {
                 if (Pipelines[i].IsValid())
                     continue;
-                const auto path = Core::Filesystem::GetShaderPath(std::string("shaders/") +
-                                                                  names[i] + ".comp.spv");
-                Pipelines[i] = Device.CreatePipeline(RHI::PipelineDesc{
-                    .VertexShaderPath = {},
-                    .FragmentShaderPath = {},
-                    .ComputeShaderPath = path.c_str(),
-                    .PushConstantSize =
-                        std::uint32_t(i == 3 ? sizeof(QueryPush) : sizeof(BuildPush)),
-                    .DebugName = names[i]});
+                Pipelines[i] = CreateComputePipeline(Device, (std::string("shaders/") + names[i] + ".comp.spv").c_str(),
+                    std::uint32_t(i == 3 ? sizeof(QueryPush) : sizeof(BuildPush)), names[i]);
                 if (!Pipelines[i].IsValid())
                     return false;
             }

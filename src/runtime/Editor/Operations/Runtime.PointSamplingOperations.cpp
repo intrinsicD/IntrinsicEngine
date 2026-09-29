@@ -36,6 +36,8 @@ import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.PointSamplingGpu;
+import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.Graph;
 import Geometry.HalfedgeMesh;
@@ -44,6 +46,7 @@ import Geometry.PointSampling;
 import Geometry.Properties;
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
+#include "Editor/internal/Runtime.EditorFramedGpuJob.hpp"
 #include "Editor/internal/Runtime.EditorGeneratedEntity.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 
@@ -199,19 +202,11 @@ namespace Extrinsic::Runtime
                 : mutate(*after);
         }
 
-        EditorPointSamplingResult Apply(const EditorProcessingContext& context, PointSamplingOperationConfig config)
+        // Publishes an order computed by either backend (the source was captured in `captured`).
+        EditorPointSamplingResult Publish(const EditorProcessingContext& context, const Captured& captured,
+                                          const PointSamplingOperationConfig& config, std::size_t count,
+                                          const PS::Result& order, EditorPointSamplingResult result)
         {
-            Captured captured;
-            if (auto failure = Capture(context, config, true, &captured)) return *failure;
-            EditorPointSamplingResult result;
-            result.Method = std::string(DisplayName(config.Sampling.Method));
-            result.InputCount = std::uint32_t(captured.World.size());
-            const std::size_t count = config.Count == 0u ? captured.World.size()
-                                                         : std::min<std::size_t>(config.Count, captured.World.size());
-            const auto params = ToPointSamplingParams(config.Sampling, captured.Weights, captured.Scores);
-            const auto start = std::chrono::steady_clock::now();
-            const PS::Result order = PS::Order(std::span<const glm::vec3>(captured.World), params, count);
-            result.Milliseconds = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
             if (!order.Succeeded())
             {
                 result.Status = EditorCommandStatus::InvalidProcessingParameters;
@@ -245,6 +240,98 @@ namespace Extrinsic::Runtime
                 : "The source changed before publication.";
             return result;
         }
+
+        EditorPointSamplingResult Apply(const EditorProcessingContext& context, PointSamplingOperationConfig config,
+                                        std::function<void(EditorPointSamplingResult)> onComplete)
+        {
+            const auto finish = [&onComplete](EditorPointSamplingResult result) {
+                if (onComplete) onComplete(result);
+                return result;
+            };
+            auto captured = std::make_shared<Captured>();
+            if (auto failure = Capture(context, config, true, captured.get())) return finish(*failure);
+            EditorPointSamplingResult result;
+            result.Method = std::string(DisplayName(config.Sampling.Method));
+            result.InputCount = std::uint32_t(captured->World.size());
+            const std::size_t count = config.Count == 0u ? captured->World.size()
+                                                         : std::min<std::size_t>(config.Count, captured->World.size());
+            const auto params = ToPointSamplingParams(config.Sampling, captured->Weights, captured->Scores);
+            if (config.Backend == PointSamplingBackend::Vulkan)
+            {
+                result.RequestedBackend = std::string(kPointSamplingGpuBackendId);
+                result.BackendDiagnostic = !context.JobCommands.Available() || context.SpatialIndices == nullptr
+                    ? "No job lane or spatial compute service; sampling ran on the CPU."
+                    : PointSamplingGpuUnsupportedReason(params, captured->World.size(), count, context.Device);
+            }
+            if (config.Backend == PointSamplingBackend::Cpu || !result.BackendDiagnostic.empty())
+            {
+                const auto start = std::chrono::steady_clock::now();
+                const PS::Result order = PS::Order(std::span<const glm::vec3>(captured->World), params, count);
+                result.Milliseconds = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+                return finish(Publish(context, *captured, config, count, order, std::move(result)));
+            }
+
+            // Vulkan: bounded framed chunks, the prefix checked against the CPU before publishing.
+            auto run = std::make_shared<PointSamplingGpuRun>(*context.Device, captured->World, params, count);
+            auto sink = GuardEditorProcessingResult(context, std::move(onComplete));
+            auto delivered = std::make_shared<bool>(false);
+            const auto started = std::chrono::steady_clock::now();
+            auto pending = result;
+            pending.Status = EditorCommandStatus::Pending;
+            pending.Message = "Vulkan point sampling queued.";
+            const auto current = [context, captured] {
+                return GPD::GeometryPropertiesCurrent(context, captured->Entity, captured->Input.Inputs) &&
+                       GPD::EditorProcessingContextWorldCurrent(context);
+            };
+            JobDesc job = EditorFeatureDetail::MakeFramedGpuJobDesc({
+                .DebugName = "Vulkan point sampling", .Scope = context.World, .Current = current,
+                .Queue = [context, run] { return run->QueueNext(*context.SpatialIndices); },
+                .Observe = [run](const SpatialGpuResult& chunk) { return run->Observe(chunk); },
+                .Publish = [context, captured, config, count, params, run, result, sink, delivered, started](
+                               const SpatialGpuResult* gpu) {
+                    auto final = result;
+                    std::string why;
+                    PS::Result order;
+                    if (gpu == nullptr || gpu->State != SpatialQueryState::Ready)
+                        why = gpu && !gpu->Diagnostic.empty() ? gpu->Diagnostic
+                                                              : "The Vulkan sampler did not return a result; sampling ran on the CPU.";
+                    else if (run->Current().Order.size() != count)
+                        why = "The Vulkan sampler returned an incomplete order; sampling ran on the CPU.";
+                    else if (!run->VerifyPrefix(why)) {}
+                    if (why.empty())
+                    {
+                        order = run->Current();
+                        final.Backend = std::string(kPointSamplingGpuBackendId);
+                    }
+                    else
+                    {
+                        final.BackendDiagnostic = std::move(why);
+                        order = PS::Order(std::span<const glm::vec3>(captured->World), params, count);
+                    }
+                    final.Milliseconds = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+                    final = Publish(context, *captured, config, count, order, std::move(final));
+                    *delivered = true;
+                    if (sink) sink(final);
+                    return final.Succeeded();
+                },
+                .Abandon = [sink, delivered, pending]() mutable {
+                    if (*delivered) return;
+                    *delivered = true;
+                    pending.Status = EditorCommandStatus::StaleEntity;
+                    pending.Message = "Vulkan point sampling cancelled or stale; nothing was changed.";
+                    if (sink) sink(std::move(pending));
+                }});
+            const EditorJobIdentity identity{.EntityId = config.SourceStableEntityId,
+                                             .Scope = ToEditorJobScope(config.Positions.Domain),
+                                             .OutputSemantic = GeometryPresentationSlotSemantic::ScalarField,
+                                             .OutputName = config.RankName};
+            if (!context.JobCommands.Submit(std::move(job), identity).IsValid())
+            {
+                pending.Status = EditorCommandStatus::GeometryProcessingFailed;
+                pending.Message = "The job lane rejected the Vulkan point sampling job.";
+            }
+            return pending;
+        }
     }
 
     ActionReadiness PreviewEditorPointSamplingCommand(const EditorProcessingCommands& commands,
@@ -256,16 +343,23 @@ namespace Extrinsic::Runtime
     }
 
     EditorPointSamplingResult ApplyEditorPointSamplingCommand(const EditorProcessingCommands& commands,
-                                                              const PointSamplingOperationConfig& config)
+                                                              const PointSamplingOperationConfig& config,
+                                                              std::function<void(EditorPointSamplingResult)> onComplete)
     {
-        return Apply(EditorProcessingCommandsAccess::Resolve(commands), config);
+        return Apply(EditorProcessingCommandsAccess::Resolve(commands), config, std::move(onComplete));
     }
 
-    EditorPointSamplingResult ApplyEditorConfiguredPointSampling(const EditorProcessingCommands& commands)
+    EditorPointSamplingResult ApplyEditorConfiguredPointSampling(const EditorProcessingCommands& commands,
+                                                                 std::function<void(EditorPointSamplingResult)> onComplete)
     {
         const auto config = GetEditorPointSamplingConfig(commands);
-        if (!config) return Failure(EditorCommandStatus::InvalidProcessingParameters, "The sandbox.point_sampling section is unavailable.");
-        return ApplyEditorPointSamplingCommand(commands, *config);
+        if (!config)
+        {
+            auto failure = Failure(EditorCommandStatus::InvalidProcessingParameters, "The sandbox.point_sampling section is unavailable.");
+            if (onComplete) onComplete(failure);
+            return failure;
+        }
+        return ApplyEditorPointSamplingCommand(commands, *config, std::move(onComplete));
     }
 
     RuntimeEngineConfigApplyResult ApplyEditorPointSamplingConfig(const EditorProcessingCommands& commands,

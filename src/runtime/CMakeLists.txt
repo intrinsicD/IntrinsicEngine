@@ -37,6 +37,7 @@ target_sources(${target_name}
         Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm
         Modules/Registration/Runtime.RegistrationConfig.cppm
         Modules/PointSampling/Runtime.PointSamplingConfig.cppm
+        Modules/PointSampling/Runtime.PointSamplingGpu.cppm
         Modules/Registration/Runtime.CoherentPointDriftConfig.cppm
         Modules/Registration/Runtime.CoherentPointDriftGpuEStep.cppm
         Modules/Parameterization/Runtime.ParameterizationConfig.cppm
@@ -167,6 +168,7 @@ target_sources(${target_name}
         Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
         Config/internal/Runtime.PointNormalsRegistrationConfigCodecs.cpp
         Modules/PointSampling/Runtime.PointSamplingConfig.cpp
+        Modules/PointSampling/Runtime.PointSamplingGpu.cpp
         Modules/PointSampling/Runtime.PointSamplingOperationConfig.cpp
         Modules/Registration/Runtime.CoherentPointDriftConfig.cpp
         Modules/Registration/Runtime.CoherentPointDriftGpuEStep.cpp

@@ -1317,6 +1317,17 @@ namespace Extrinsic::Graphics
         return desc;
     }
 
+    RHI::PipelineHandle CreateComputePipeline(RHI::IDevice& device,
+                                              const char* shaderPath,
+                                              const std::uint32_t pushConstantSize,
+                                              const char* debugName)
+    {
+        return device.CreatePipeline(RHI::PipelineDesc{
+            .ComputeShaderPath = Core::Filesystem::GetShaderPath(shaderPath),
+            .PushConstantSize = pushConstantSize,
+            .DebugName = debugName});
+    }
+
     bool CreateParallelPrimitivePipelines(RHI::IDevice& device,
                                           ParallelPrimitivePipelineSet& pipelines,
                                           const std::span<const ParallelPrimitiveKind> kinds)

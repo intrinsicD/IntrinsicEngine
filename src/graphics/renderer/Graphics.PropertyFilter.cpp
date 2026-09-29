@@ -10,9 +10,9 @@ module;
 #include <vector>
 module Extrinsic.Graphics.PropertyFilter;
 
+import Extrinsic.Graphics.ComputeParallelPrimitives;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.CommandContext;
-import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Types;
 
@@ -80,9 +80,7 @@ namespace Extrinsic::Graphics
             return {};
         if (!s.Pipeline.IsValid())
         {
-            const auto path = Core::Filesystem::GetShaderPath("shaders/property_filter.comp.spv");
-            s.Pipeline = s.Device.CreatePipeline({.VertexShaderPath = {}, .FragmentShaderPath = {},
-                .ComputeShaderPath = path.c_str(), .PushConstantSize = sizeof(Push), .DebugName = "PropertyFilter"});
+            s.Pipeline = CreateComputePipeline(s.Device, "shaders/property_filter.comp.spv", sizeof(Push), "PropertyFilter");
             if (!s.Pipeline.IsValid()) return {};
         }
         // Incidences per row in ascending edge order, the order the CPU reference scatters them.

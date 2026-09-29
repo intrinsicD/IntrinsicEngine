@@ -456,6 +456,14 @@ export namespace Extrinsic::Graphics
     [[nodiscard]] RHI::PipelineDesc BuildParallelRadixScatterPipelineDesc(
         const char* shaderPath = "shaders/parallel_radix_scatter.comp.spv");
 
+    // A compute pipeline from a shader path relative to the shader root (e.g.
+    // "shaders/foo.comp.spv"); invalid when the device cannot create it. Shared by the
+    // compute workspaces of this layer.
+    [[nodiscard]] RHI::PipelineHandle CreateComputePipeline(RHI::IDevice& device,
+                                                            const char* shaderPath,
+                                                            std::uint32_t pushConstantSize,
+                                                            const char* debugName);
+
     // Creates the missing pipelines the listed primitives record with (shader paths resolved);
     // false when one cannot be created. Destroy releases and clears every valid one.
     [[nodiscard]] bool CreateParallelPrimitivePipelines(

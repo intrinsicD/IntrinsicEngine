@@ -7,6 +7,8 @@
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
 #include <gtest/gtest.h>
+#include "SandboxEditorJobHarness.hpp"
+import Extrinsic.Runtime.PointSamplingGpu;
 import Extrinsic.Runtime.PointSamplingOperations;
 import Extrinsic.Runtime.RegistrationOperations;
 import Extrinsic.Runtime.WorldRegistry;
@@ -137,4 +139,44 @@ TEST(PointSamplingOperations, ConfigRoundTripsAndRejectsUnusableSettings)
     EXPECT_FALSE(R::PreviewEditorPointSamplingCommand(s.Commands(), {.SourceStableEntityId = Id(plain),
                                                                      .RankName = "v:deleted"}).Enabled);
     EXPECT_FALSE(R::PreviewEditorPointSamplingCommand(s.Commands(), {.SourceStableEntityId = Id(cloud)}).Enabled);
+}
+
+TEST(PointSamplingOperations, VulkanBackendWithoutADeviceRunsOnTheCpuAndSaysWhy)
+{
+    // RUNTIME-290: the requested backend, the one that ran and why, for every fallback path.
+    Scene s;
+    const auto cloud = MakeCloud(s, 300);
+    R::PointSamplingOperationConfig config{.SourceStableEntityId = Id(cloud), .Count = 40,
+                                           .Backend = R::PointSamplingBackend::Vulkan};
+    const auto decoded = R::DecodePointSamplingOperationConfig(R::SerializePointSamplingOperationConfig(config));
+    ASSERT_TRUE(decoded);
+    EXPECT_EQ(decoded->Backend, R::PointSamplingBackend::Vulkan);
+
+    const auto cpu = R::ApplyEditorPointSamplingCommand(s.Commands(), {.SourceStableEntityId = Id(cloud), .Count = 40});
+    ASSERT_TRUE(cpu.Succeeded()) << cpu.Message;
+    EXPECT_EQ(cpu.RequestedBackend, "cpu_reference");
+    EXPECT_TRUE(cpu.BackendDiagnostic.empty());
+    const auto rank = [&] { return std::as_const(s.Registry.Raw().get<GS::Vertices>(cloud).Properties).Get<float>("v:sample_rank").Vector(); };
+    const auto cpuRank = rank();
+
+    int delivered = 0;
+    const auto noLane = R::ApplyEditorPointSamplingCommand(s.Commands(), config, [&](R::EditorPointSamplingResult) { ++delivered; });
+    ASSERT_TRUE(noLane.Succeeded()) << noLane.Message;
+    EXPECT_EQ(delivered, 1) << "immediate results reach the sink too";
+    EXPECT_EQ(noLane.RequestedBackend, "gpu_vulkan_compute");
+    EXPECT_EQ(noLane.Backend, "cpu_reference");
+    EXPECT_NE(noLane.BackendDiagnostic.find("job lane"), std::string::npos) << noLane.BackendDiagnostic;
+    EXPECT_EQ(rank(), cpuRank) << "the fallback is the CPU order";
+
+    Extrinsic::Tests::EditorJobHarness jobs;
+    jobs.Attach(s.Context);
+    const auto noDevice = R::ApplyEditorPointSamplingCommand(s.Commands(), config);
+    EXPECT_EQ(noDevice.Backend, "cpu_reference");
+    EXPECT_NE(noDevice.BackendDiagnostic.find("spatial compute service"), std::string::npos) << noDevice.BackendDiagnostic;
+
+    namespace PS = Geometry::PointSampling;
+    EXPECT_NE(R::PointSamplingGpuUnsupportedReason({.Method = PS::Method::Random}, 300u, 40u, nullptr).find("no Vulkan kernel"),
+              std::string::npos);
+    EXPECT_NE(R::PointSamplingGpuUnsupportedReason({}, 300u, 40u, nullptr).find("No operational Vulkan device"),
+              std::string::npos);
 }

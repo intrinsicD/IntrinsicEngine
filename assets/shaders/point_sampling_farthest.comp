@@ -1,0 +1,107 @@
+#version 460
+// RUNTIME-290 — exact (weighted) farthest-point sampling rounds, the GPU twin of the
+// Geometry.PointSampling brute-force order: per round, Update lowers every unselected point's
+// squared distance to the last sample, Partial reduces each 256-point group to its best
+// (key, index), Final reduces the groups and appends the winner. Distances are fp64 in the CPU
+// operation order (`precise`), keys are w_i * clearance_i, ties take the smallest index, and
+// every reduction is a fixed tree, so the order and the clearances equal the CPU bitwise.
+#extension GL_ARB_gpu_shader_fp64 : require
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+layout(local_size_x = 256) in;
+
+layout(buffer_reference, scalar) buffer Doubles { double v[]; };
+layout(buffer_reference, scalar) buffer Uints { uint v[]; };
+struct Candidate { double Key; uint Index; uint Pad; };
+layout(buffer_reference, scalar) buffer Candidates { Candidate v[]; };
+
+const uint ModeUpdate = 0u, ModePartial = 1u, ModeFinal = 2u;
+
+layout(push_constant, scalar) uniform Push {
+    uint64_t points;     // x, y, z doubles per point
+    uint64_t weights;    // one double per point, 0: unweighted
+    uint64_t clearance;  // running squared distance per point
+    uint64_t selected;   // uint flag per point; word n holds the last sample's index
+    uint64_t partials;   // one Candidate per group
+    uint64_t results;    // clearance doubles (count), then order uints (count)
+    uint count, groups, capacity, round;
+    uint mode, reserved;
+} pc;
+
+shared double sharedKey[256];
+shared uint sharedIndex[256];
+
+bool Better(double key, uint index, double otherKey, uint otherIndex)
+{
+    return key > otherKey || (key == otherKey && index < otherIndex);
+}
+
+void Reduce(uint local)
+{
+    for (uint stride = 128u; stride > 0u; stride >>= 1u)
+    {
+        barrier();
+        if (local < stride && Better(sharedKey[local + stride], sharedIndex[local + stride], sharedKey[local], sharedIndex[local]))
+        {
+            sharedKey[local] = sharedKey[local + stride];
+            sharedIndex[local] = sharedIndex[local + stride];
+        }
+    }
+    barrier();
+}
+
+void main()
+{
+    const uint local = gl_LocalInvocationID.x;
+    const uint i = gl_GlobalInvocationID.x;
+    Uints selected = Uints(pc.selected);
+    Doubles clear = Doubles(pc.clearance);
+    if (pc.mode == ModeUpdate)
+    {
+        if (i >= pc.count || selected.v[i] != 0u) return;
+        Doubles p = Doubles(pc.points);
+        const uint last = selected.v[pc.count];
+        precise double dx = p.v[3u * i] - p.v[3u * last];
+        precise double dy = p.v[3u * i + 1u] - p.v[3u * last + 1u];
+        precise double dz = p.v[3u * i + 2u] - p.v[3u * last + 2u];
+        precise double s = dx * dx;
+        s = s + dy * dy;
+        s = s + dz * dz;
+        if (s < clear.v[i]) clear.v[i] = s;
+        return;
+    }
+    if (pc.mode == ModePartial)
+    {
+        // Selected and missing points rank below every real key (keys are >= 0).
+        double key = -1.0lf;
+        if (i < pc.count && selected.v[i] == 0u)
+        {
+            precise double weighted = pc.weights == 0ul ? clear.v[i] : Doubles(pc.weights).v[i] * clear.v[i];
+            key = weighted;
+        }
+        sharedKey[local] = key;
+        sharedIndex[local] = i;
+        Reduce(local);
+        if (local == 0u) Candidates(pc.partials).v[gl_WorkGroupID.x] = Candidate(sharedKey[0], sharedIndex[0], 0u);
+        return;
+    }
+    // ModeFinal: one workgroup folds the group winners in index order per lane, then a tree.
+    double key = -1.0lf;
+    uint index = 0xffffffffu;
+    for (uint g = local; g < pc.groups; g += 256u)
+    {
+        const Candidate c = Candidates(pc.partials).v[g];
+        if (Better(c.Key, c.Index, key, index)) { key = c.Key; index = c.Index; }
+    }
+    sharedKey[local] = key;
+    sharedIndex[local] = index;
+    Reduce(local);
+    if (local != 0u || sharedKey[0] < 0.0lf) return;
+    const uint winner = sharedIndex[0];
+    selected.v[winner] = 1u;
+    selected.v[pc.count] = winner;
+    Doubles(pc.results).v[pc.round] = sharedKey[0];
+    Uints(pc.results + uint64_t(pc.capacity) * 8ul).v[pc.round] = winner;
+}

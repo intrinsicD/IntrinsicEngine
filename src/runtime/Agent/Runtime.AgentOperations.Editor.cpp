@@ -512,12 +512,24 @@ namespace Extrinsic::Runtime
                 const auto ready = PreviewEditorPointSamplingCommand(commands, *config);
                 return Ok({{"enabled", ready.Enabled}, {"reason", ready.DisabledReason}});
             }
-            const auto r = ApplyEditorPointSamplingCommand(commands, *config);
-            const Json json{{"status", DebugNameForEditorCommandStatus(r.Status)}, {"succeeded", r.Succeeded()},
-                            {"message", r.Message}, {"method", r.Method}, {"input_points", r.InputCount},
-                            {"samples", r.SampleCount}, {"output_entity", r.OutputEntityId},
-                            {"milliseconds", r.Milliseconds}, {"distance_pairs", r.DistancePairs}};
-            return {.IsError = !r.Succeeded(), .Text = Dump(json)};
+            const auto json = [](const EditorPointSamplingResult& r) {
+                return Dump(Json{{"status", DebugNameForEditorCommandStatus(r.Status)}, {"succeeded", r.Succeeded()},
+                                 {"message", r.Message}, {"method", r.Method}, {"input_points", r.InputCount},
+                                 {"samples", r.SampleCount}, {"output_entity", r.OutputEntityId},
+                                 {"milliseconds", r.Milliseconds}, {"distance_pairs", r.DistancePairs},
+                                 {"requested_backend", r.RequestedBackend}, {"backend", r.Backend},
+                                 {"backend_diagnostic", r.BackendDiagnostic}});
+            };
+            // A Vulkan run is queued and answers once it has published or failed.
+            auto done = std::make_shared<std::optional<EditorPointSamplingResult>>();
+            const auto r = ApplyEditorPointSamplingCommand(commands, *config,
+                [done](EditorPointSamplingResult result) { *done = std::move(result); });
+            if (r.Status != EditorCommandStatus::Pending) return {.IsError = !r.Succeeded(), .Text = json(r)};
+            return {.Continuation = [done, json](const AgentOperationContext&, AgentOperationOutcome& out) {
+                if (!done->has_value()) return false;
+                out = {.IsError = !(*done)->Succeeded(), .Text = json(**done)};
+                return true;
+            }};
         }
         // Both methods run their configured section (config_apply first). A queued job
         // answers once it has published or failed.

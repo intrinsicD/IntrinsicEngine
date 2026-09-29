@@ -21,7 +21,7 @@ editor equivalent (inventory row "Grid, sampler, subsampling, octree sampling").
 ## Acceptance criteria
 - [ ] One editor operation and its own panel ("Point Sampling") offering every `Geometry.PointSampling` method (GEOM-111/112/113: random, exact and weighted farthest point, progressive Poisson profiles, the approximate FPS family, sample elimination) with their parameters, plus voxel centroid, the GEOM-061 per-voxel strategies, and octree levels once GEOM-105 lands; the progressive Poisson panel is linked and publishes through the same path.
 - [x] Output chosen explicitly: a new point-cloud entity, or a Bool selection property on the source (no silent in-place deletion); deterministic with a seed.
-- [ ] Backend combo (CPU / Vulkan through RUNTIME-290) and progressive prefix streaming from the seam's `Extend`.
+- [ ] Backend combo (CPU / Vulkan through RUNTIME-290) and progressive prefix streaming from the seam's `Extend`. (Backend combo done 2026-09-29; the seam's growing prefixes are not streamed to the panel yet.)
 - [ ] Works on point clouds, graph nodes and mesh vertices; config section with one validator; undoable publication; contract and ImGui tests.
 
 ## Engine integration
@@ -52,5 +52,6 @@ python3 tools/agents/check_task_policy.py --root . --strict
   View menu and the agent tools `preview_point_sampling` / `run_point_sampling`; contract tests
   cover every method, weights, validation, parented refusal and undo. Remaining: voxel centroid and
   the GEOM-061 per-voxel strategies and octree levels (their kernels are not implemented yet),
-  mesh/graph-domain contract rows, an ImGui panel test, and the Vulkan backend (RUNTIME-290).
+  mesh/graph-domain contract rows, an ImGui panel test, and progressive prefix streaming (the
+  Vulkan backend landed with RUNTIME-290).
 
