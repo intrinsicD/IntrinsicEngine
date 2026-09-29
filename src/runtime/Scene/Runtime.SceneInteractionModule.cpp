@@ -1103,4 +1103,12 @@ namespace Extrinsic::Runtime
         if (m_Impl->Shared)
             std::erase_if(m_Impl->Shared->PreviewOverlays, [&](const auto& o) { return o.Owner == owner; });
     }
+
+    std::size_t SceneInteractionModule::PreviewOverlayPointCount(const std::string_view owner) const
+    {
+        if (!m_Impl->Shared) return 0u;
+        const auto& overlays = m_Impl->Shared->PreviewOverlays;
+        const auto it = std::ranges::find_if(overlays, [&](const auto& o) { return o.Owner == owner; });
+        return it == overlays.end() ? 0u : it->Points.size();
+    }
 }

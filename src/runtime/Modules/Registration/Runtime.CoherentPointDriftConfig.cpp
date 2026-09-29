@@ -60,7 +60,8 @@ namespace Extrinsic::Runtime
             ConfigFieldSpec{.Name = "threads", .Type = FT::UInt, .Description = "Worker threads for the parallel E-step; 0 uses all cores.", .Min = 0, .Max = 256},
             ConfigFieldSpec{.Name = "nystrom_landmarks", .Type = FT::UInt, .Description = "Nystroem: landmark points (half from each set); more landmarks keep the approximation accurate for narrower kernels.", .Min = 2, .Max = 4096},
             ConfigFieldSpec{.Name = "nystrom_error_limit", .Type = FT::Float, .Description = "Nystroem: largest sampled relative responsibility error accepted; iterations above it run exactly. An estimate from exact sample rows, not a bound.", .Min = 0, .Max = 1, .ExclusiveMin = true},
-            ConfigFieldSpec{.Name = "low_rank", .Type = FT::UInt, .Description = "Nonrigid and Bayesian: 0 solves with the full kernel (at most 8192 source points); k > 0 uses k kernel eigenpairs and allows large sources.", .Min = 0, .Max = 2000},
+            ConfigFieldSpec{.Name = "low_rank", .Type = FT::UInt, .Description = "Nonrigid and Bayesian: 0 solves with the full kernel (at most 8192 source points; see auto_low_rank); k > 0 uses k kernel eigenpairs and allows large sources.", .Min = 0, .Max = 2000},
+            ConfigFieldSpec{.Name = "auto_low_rank", .Type = FT::Bool, .Description = "Nonrigid and Bayesian with low_rank 0: above 1024 registered source points use 100 kernel eigenpairs, since the full kernel costs O(m^3) per iteration; off keeps the exact full kernel."},
             ConfigFieldSpec{.Name = "gamma", .Type = FT::Float, .Description = "Bayesian: factor on the data-derived initial sigma^2.", .Min = 0, .Max = 100, .ExclusiveMin = true},
             ConfigFieldSpec{.Name = "kappa", .Type = FT::Float, .Description = "Bayesian: Dirichlet concentration of the mixing weights; small values adapt them to uneven density, 0 keeps them equal.", .Min = 0, .Max = 1e6},
             ConfigFieldSpec{.Name = "subsample", .Type = FT::UInt, .Description = "Bayesian: register this many source samples (subsample_method) and interpolate the deformation to every point (0 = all points, else at least 4).", .Min = 0, .Max = 1000000},
@@ -95,7 +96,7 @@ namespace Extrinsic::Runtime
                         {"output", unsigned(c.Output)}, {"displacement_name", c.DisplacementName},
                         {"e_step", unsigned(c.EStep)}, {"e_step_tolerance", c.EStepTolerance},
                         {"threads", c.Threads}, {"nystrom_landmarks", c.NystromLandmarks},
-                        {"nystrom_error_limit", c.NystromErrorLimit}, {"low_rank", c.LowRank}, {"gamma", c.Gamma}, {"kappa", c.Kappa},
+                        {"nystrom_error_limit", c.NystromErrorLimit}, {"low_rank", c.LowRank}, {"auto_low_rank", c.AutoLowRank}, {"gamma", c.Gamma}, {"kappa", c.Kappa},
                         {"subsample", c.Subsample}, {"subsample_target", c.SubsampleTarget}};
         }
 
@@ -133,6 +134,7 @@ namespace Extrinsic::Runtime
             c.NystromLandmarks = doc.at("nystrom_landmarks").get<std::uint32_t>();
             c.NystromErrorLimit = doc.at("nystrom_error_limit").get<double>();
             c.LowRank = doc.at("low_rank").get<std::uint32_t>();
+            c.AutoLowRank = doc.at("auto_low_rank").get<bool>();
             c.Gamma = doc.at("gamma").get<double>();
             c.Kappa = doc.at("kappa").get<double>();
             c.Subsample = doc.at("subsample").get<std::uint32_t>();

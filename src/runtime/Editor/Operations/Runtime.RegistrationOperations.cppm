@@ -83,6 +83,9 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] ActionReadiness PreviewEditorRegistrationCommand(
         const EditorProcessingCommands&, const EditorRegistrationCommand&);
+    // Why Vulkan LBVH correspondences would fall back to the CPU here (empty when they can run),
+    // so the panel can say so before a run starts.
+    [[nodiscard]] std::string RegistrationVulkanUnavailableReason(const EditorProcessingCommands&);
     // ICP needs a solvable correspondence problem, so this catalog keeps only
     // vec3 bindings carrying at least three live finite samples. It is
     // deliberately narrower than the shared point-input catalog.
@@ -213,6 +216,9 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] ActionReadiness PreviewEditorCoherentPointDriftCommand(
         const EditorProcessingCommands&, const CoherentPointDriftConfig&);
+    // Why the Vulkan E-step would run on the CPU here (empty when it can run on the device), so
+    // the panel can say so before a run starts.
+    [[nodiscard]] std::string CoherentPointDriftVulkanUnavailableReason(const EditorProcessingCommands&);
     // Validates the config and captures both point sets; nothing iterates yet. On failure
     // returns null and fills `failure`.
     [[nodiscard]] EditorCoherentPointDriftRunHandle StartEditorCoherentPointDrift(

@@ -91,7 +91,7 @@ TEST(CoherentPointDriftOperations, ConfigRoundTripsAndRejectsUnstorableOutputs)
                                        .OutlierWeight = 0.2, .Beta = 1.5, .Output = O::DisplacementProperty,
                                        .DisplacementName = "warp", .EStep = R::CoherentPointDriftEStep::Truncated,
                                        .EStepTolerance = 1e-4, .Threads = 3, .NystromLandmarks = 128,
-                                       .NystromErrorLimit = 1e-4, .LowRank = 40};
+                                       .NystromErrorLimit = 1e-4, .LowRank = 40, .AutoLowRank = false};
     const auto decoded = R::DecodeCoherentPointDriftConfig(R::SerializeCoherentPointDriftConfig(config));
     ASSERT_TRUE(decoded.has_value());
     EXPECT_EQ(decoded->Method, M::Nonrigid);
@@ -101,6 +101,7 @@ TEST(CoherentPointDriftOperations, ConfigRoundTripsAndRejectsUnstorableOutputs)
     EXPECT_EQ(decoded->EStepTolerance, 1e-4);
     EXPECT_EQ(decoded->Threads, 3u);
     EXPECT_EQ(decoded->LowRank, 40u);
+    EXPECT_FALSE(decoded->AutoLowRank);
     EXPECT_EQ(decoded->NystromLandmarks, 128u);
     EXPECT_EQ(decoded->NystromErrorLimit, 1e-4);
     const auto invalid = [&](R::CoherentPointDriftConfig c) {
@@ -311,12 +312,46 @@ TEST(CoherentPointDriftOperations, ReadinessExplainsWhyARunCannotStart)
         .TargetStableEntityId = Id(target)});
     EXPECT_FALSE(missing.Enabled);
     const auto large = Make(s.Registry, D::PointCloudPoint, Cloud(9000, 3));
+    // The exact full kernel is refused above 8192 points; the default automatic rank runs.
     const auto nonrigid = R::PreviewEditorCoherentPointDriftCommand(s.Commands(), {.SourceStableEntityId = Id(large),
-        .TargetStableEntityId = Id(target), .Method = M::Nonrigid, .Output = O::Positions});
+        .TargetStableEntityId = Id(target), .Method = M::Nonrigid, .Output = O::Positions, .AutoLowRank = false});
     EXPECT_FALSE(nonrigid.Enabled);
     EXPECT_NE(nonrigid.DisabledReason.find("8192"), std::string::npos) << nonrigid.DisabledReason;
+    EXPECT_TRUE(R::PreviewEditorCoherentPointDriftCommand(s.Commands(), {.SourceStableEntityId = Id(large),
+        .TargetStableEntityId = Id(target), .Method = M::Nonrigid, .Output = O::Positions}).Enabled);
     EXPECT_TRUE(R::PreviewEditorCoherentPointDriftCommand(s.Commands(), {.SourceStableEntityId = Id(target),
         .TargetStableEntityId = Id(large)}).Enabled);
+}
+
+// Above 1024 registered source points a deforming run with low_rank 0 uses the automatic rank
+// (the full kernel costs O(m^3) per iteration); auto_low_rank off keeps the exact full kernel.
+TEST(CoherentPointDriftOperations, LargeDeformingRunsUseTheAutomaticLowRankUnlessExactIsAsked)
+{
+    Scene s;
+    const auto points = Cloud(1100, 41);
+    std::vector<glm::vec3> moved;
+    for (const auto& p : points) moved.push_back(p + glm::vec3(0.05f * p.y, 0.0f, 0.02f));
+    const auto source = Make(s.Registry, D::PointCloudPoint, points);
+    const auto target = Make(s.Registry, D::PointCloudPoint, moved);
+    R::CoherentPointDriftConfig config{.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
+                                       .Method = M::Nonrigid, .MaxIterations = 2u, .Output = O::DisplacementProperty};
+    const auto automatic = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), config);
+    ASSERT_TRUE(automatic.Succeeded()) << automatic.Message;
+    EXPECT_GT(automatic.KernelRank, 0u);
+    EXPECT_LE(automatic.KernelRank, R::kCoherentPointDriftAutoLowRank);
+
+    config.AutoLowRank = false;
+    const auto exact = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), config);
+    ASSERT_TRUE(exact.Succeeded()) << exact.Message;
+    EXPECT_EQ(exact.KernelRank, 0u) << "the full kernel was asked for";
+
+    // Below the threshold the default stays exact.
+    const auto small = Make(s.Registry, D::PointCloudPoint, Cloud(200, 43));
+    config = {.SourceStableEntityId = Id(small), .TargetStableEntityId = Id(target), .Method = M::Nonrigid,
+              .MaxIterations = 2u, .Output = O::DisplacementProperty};
+    const auto smallRun = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), config);
+    ASSERT_TRUE(smallRun.Succeeded()) << smallRun.Message;
+    EXPECT_EQ(smallRun.KernelRank, 0u);
 }
 
 TEST(CoherentPointDriftOperations, QueuedRunsCompleteOnTheJobServiceAndDeliverOneResult)
@@ -425,6 +460,8 @@ TEST(CoherentPointDriftOperations, VulkanEStepWithoutADeviceRunsOnTheCpuAndSaysW
     const auto target = Make(s.Registry, D::PointCloudPoint, moved);
     const R::CoherentPointDriftConfig config{.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target),
                                              .EStep = R::CoherentPointDriftEStep::Vulkan};
+    // The panel learns the same reason before a run starts.
+    EXPECT_NE(R::CoherentPointDriftVulkanUnavailableReason(s.Commands()).find("job lane"), std::string::npos);
     const auto immediate = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), config);
     ASSERT_TRUE(immediate.Succeeded()) << immediate.Message;
     EXPECT_EQ(immediate.Backend, "cpu_auto");
@@ -434,6 +471,7 @@ TEST(CoherentPointDriftOperations, VulkanEStepWithoutADeviceRunsOnTheCpuAndSaysW
 
     Extrinsic::Tests::EditorJobHarness jobs;
     jobs.Attach(s.Context);
+    EXPECT_NE(R::CoherentPointDriftVulkanUnavailableReason(s.Commands()).find("Vulkan device"), std::string::npos);
     R::EditorCoherentPointDriftResult queued;
     auto next = config;
     next.Output = O::DisplacementProperty;

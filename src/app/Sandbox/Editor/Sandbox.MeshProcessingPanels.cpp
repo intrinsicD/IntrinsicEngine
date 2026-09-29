@@ -1812,7 +1812,6 @@ namespace Extrinsic::Sandbox::Editor
         }
         changed |= DrawProcessingEntity("Entity##Normals", context,
             config.StableEntityId, Normals.LastSelectedEntity);
-        DrawProcessingCpuBackend();
         if (DrawProcessingPointInput("Positions##Normals", [&] { return Runtime::GetEditorPointInputCatalog(context.Processing, config.StableEntityId); }, config.Positions, config.Method == Runtime::NormalEstimationMethod::MeshFaceNormals
                     ? std::optional{Runtime::GeometryElementDomain::MeshVertex} : std::nullopt))
         {
@@ -1855,7 +1854,7 @@ namespace Extrinsic::Sandbox::Editor
                 "PCA fits local planes to spatial neighbors on the selected element domain. Radius mode uses "
                 "all neighbors within the radius; otherwise k nearest neighbors are used.");
             int backend = int(config.Backend);
-            if (ImGui::Combo("Acceleration##Normals", &backend, "CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH (CPU fit)\0"))
+            if (ImGui::Combo("Backend##Normals", &backend, "CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH (CPU fit)\0"))
             {
                 config.Backend = Runtime::NormalEstimationBackend(backend);
                 changed = true;
@@ -1990,7 +1989,6 @@ namespace Extrinsic::Sandbox::Editor
         bool changed = false;
         changed |= DrawProcessingEntity("Entity##Outliers", context,
             config.StableEntityId, Outliers.LastSelectedEntity);
-        DrawProcessingCpuBackend();
         if (DrawProcessingPointInput("Positions##Outliers", [&] { return Runtime::GetEditorPointInputCatalog(context.Processing, config.StableEntityId); }, config.Positions))
         {
             config.Mask.Domain = config.Score.Domain = config.Positions.Domain;
@@ -2000,7 +1998,7 @@ namespace Extrinsic::Sandbox::Editor
             changed |= DrawProcessingScalarOutput(label, *ref);
         int method=int(config.Method), backend=int(config.Backend);
         if(ImGui::Combo("Method",&method,"Statistical\0Radius\0Local distance ratio\0")) {config.Method=Runtime::OutlierAnalysisMethod(method);changed=true;}
-        if(ImGui::Combo("Acceleration",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::OutlierAnalysisBackend(backend);changed=true;}
+        if(ImGui::Combo("Backend",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::OutlierAnalysisBackend(backend);changed=true;}
         if(config.Method==Runtime::OutlierAnalysisMethod::Statistical)
         {
             changed |= ImGui::InputScalar("Neighbors k",ImGuiDataType_U32,&config.KNeighbors);
@@ -2173,7 +2171,6 @@ namespace Extrinsic::Sandbox::Editor
         bool changed = false;
         if (DrawProcessingEntity("Entity##Descriptors", context, config.StableEntityId, Descriptors.LastSelectedEntity))
         { changed = true; Descriptors.FollowDisplayBin = false; }
-        DrawProcessingCpuBackend();
         if (DrawProcessingPointInput("Positions##Descriptors", [&] { return Runtime::GetEditorPointInputCatalog(context.Processing, config.StableEntityId); }, config.Positions))
         {
             config.Normals.Domain = config.Positions.Domain;
@@ -2197,7 +2194,7 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::TreePop();
         }
         int backend=int(config.Backend);
-        if(ImGui::Combo("Acceleration",&backend,"CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::DescriptorAnalysisBackend(backend);changed=true;}
+        if(ImGui::Combo("Backend",&backend,"CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::DescriptorAnalysisBackend(backend);changed=true;}
         changed |= ImGui::InputFloat("Feature radius (0 = automatic)",&config.FeatureRadius);
         changed |= ImGui::InputScalar("Maximum neighbors (0 = all)",ImGuiDataType_U32,&config.MaxNeighbors);
         ImGui::TextWrapped("FPFH uses three eleven-bin histograms and nonzero normals. Automatic radius is five times mean nearest-neighbor spacing. A neighbor cap keeps the lowest source IDs within the radius.");
@@ -2262,7 +2259,6 @@ namespace Extrinsic::Sandbox::Editor
         bool changed = false;
         changed |= DrawProcessingEntity("Entity##Density", context,
             config.StableEntityId, Density.LastSelectedEntity);
-        DrawProcessingCpuBackend();
         if (DrawProcessingPointInput("Positions##Density", [&] { return Runtime::GetEditorKernelDensityInputCatalog(context.PointFields.Commands, config.StableEntityId); }, config.Positions))
         {
             config.Density.Domain = config.Positions.Domain;
@@ -2270,7 +2266,7 @@ namespace Extrinsic::Sandbox::Editor
         }
         changed |= DrawProcessingScalarOutput("Density property", config.Density);
         int backend=int(config.Backend);
-        if(ImGui::Combo("Acceleration",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::KernelDensityBackend(backend);changed=true;}
+        if(ImGui::Combo("Backend",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::KernelDensityBackend(backend);changed=true;}
         changed |= ImGui::InputScalar("Neighbors k",ImGuiDataType_U32,&config.KNeighbors);
         changed |= ImGui::InputFloat("Bandwidth (0 = automatic)",&config.Bandwidth);
         ImGui::TextWrapped("Local Gaussian average over nearest candidates. Automatic bandwidth uses nearest-other spacing. Distances use the selected property coordinates.");
@@ -2319,7 +2315,6 @@ namespace Extrinsic::Sandbox::Editor
         bool changed = false;
         changed |= DrawProcessingEntity("Entity##DensityWeights", context,
             config.StableEntityId, DensityWeights.LastSelectedEntity);
-        DrawProcessingCpuBackend();
         if (DrawProcessingPointInput("Positions##DensityWeights", [&] { return Runtime::GetEditorPointInputCatalog(context.Processing, config.StableEntityId); }, config.Positions))
         {
             config.Weights.Domain = config.Positions.Domain;
@@ -2328,7 +2323,7 @@ namespace Extrinsic::Sandbox::Editor
         for (auto [label, ref] : {std::pair{"Weight property", &config.Weights}})
             changed |= DrawProcessingScalarOutput(label, *ref);
         int backend=int(config.Backend);
-        if(ImGui::Combo("Acceleration",&backend,"CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::DensityWeightBackend(backend);changed=true;}
+        if(ImGui::Combo("Backend",&backend,"CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::DensityWeightBackend(backend);changed=true;}
         changed |= ImGui::InputDouble("Support radius",&config.SupportRadius);
         int kernel=int(config.Kernel),mode=int(config.Mode);
         if(ImGui::Combo("Kernel",&kernel,"Gaussian (sigma = h/4)\0LOP theta\0Wendland C2\0"))
@@ -2389,7 +2384,6 @@ namespace Extrinsic::Sandbox::Editor
         bool changed = false;
         changed |= DrawProcessingEntity("Entity##Construction", context,
             config.StableEntityId, Construction.LastSelectedEntity);
-        DrawProcessingCpuBackend();
         if (DrawProcessingPointInput("Positions##Construction", [&] { return Runtime::GetEditorPointInputCatalog(context.Processing, config.StableEntityId); }, config.Positions))
         {
             config.Normals.Domain = config.Positions.Domain;
@@ -2401,7 +2395,7 @@ namespace Extrinsic::Sandbox::Editor
             config.Method = Runtime::PointConstructionMethod(method);
             changed = true;
         }
-        if (ImGui::Combo("Acceleration", &backend, "CPU reference\0CPU LBVH (cached)\0Vulkan LBVH\0"))
+        if (ImGui::Combo("Backend", &backend, "CPU reference\0CPU LBVH (cached)\0Vulkan LBVH\0"))
         {
             config.Backend = Runtime::PointConstructionBackend(backend);
             changed = true;
@@ -2514,7 +2508,6 @@ namespace Extrinsic::Sandbox::Editor
         bool changed = false;
         changed |= DrawProcessingEntity("Entity##Spacing", context,
             config.StableEntityId, Spacing.LastSelectedEntity);
-        DrawProcessingCpuBackend();
         if (DrawProcessingPointInput("Positions##Spacing", [&] { return Runtime::GetEditorPointSpacingInputCatalog(context.PointFields.Commands, config.StableEntityId); }, config.Positions))
         {
             config.Radii.Domain = config.Positions.Domain;
@@ -2522,7 +2515,7 @@ namespace Extrinsic::Sandbox::Editor
         }
         changed |= DrawProcessingScalarOutput("Radii property", config.Radii);
         int backend=int(config.Backend);
-        if(ImGui::Combo("Acceleration",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::PointSpacingBackend(backend);changed=true;}
+        if(ImGui::Combo("Backend",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::PointSpacingBackend(backend);changed=true;}
         changed |= ImGui::InputScalar("Neighbors k",ImGuiDataType_U32,&config.KNeighbors);
         changed |= ImGui::InputFloat("Radius scale",&config.ScaleFactor);
         ImGui::TextWrapped("Radius = scale times mean retained neighbor distance. Nearest-other spacing is reported separately. Values use the selected property coordinates; coverage is not guaranteed.");
@@ -2573,7 +2566,6 @@ namespace Extrinsic::Sandbox::Editor
         bool changed = false;
         changed |= DrawProcessingEntity("Entity##Bilateral", context,
             config.StableEntityId, Bilateral.LastSelectedEntity);
-        DrawProcessingCpuBackend();
         if (DrawProcessingPointInput("Positions##Bilateral", [&] { return Runtime::GetEditorBilateralFilterInputCatalog(context.PointSet.Commands, config.StableEntityId); }, config.Positions))
         {
             config.Output.Domain = config.Normals.Domain = config.Positions.Domain;
@@ -2586,7 +2578,7 @@ namespace Extrinsic::Sandbox::Editor
         for (auto [label, ref] : {std::pair{"Output positions", &config.Output}})
             changed |= DrawProcessingPropertyName(label, ref->Name);
         int backend=int(config.Backend);
-        if(ImGui::Combo("Acceleration",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::BilateralFilterBackend(backend);changed=true;}
+        if(ImGui::Combo("Backend",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::BilateralFilterBackend(backend);changed=true;}
         changed |= ImGui::InputScalar("Neighbors k",ImGuiDataType_U32,&config.KNeighbors);
         changed |= ImGui::InputFloat("Spatial sigma (0 = automatic)",&config.SpatialSigma);
         changed |= ImGui::InputFloat("Normal sigma",&config.NormalSigma);
@@ -2641,7 +2633,6 @@ namespace Extrinsic::Sandbox::Editor
             config.SourceStableEntityId, Registration.LastSelectedSource);
         changed |= DrawProcessingEntity("Target##ICP", context,
             config.TargetStableEntityId, Registration.LastSelectedTarget, std::nullopt, 1u);
-        DrawProcessingCpuBackend();
         if (ImGui::Button("Swap source and target"))
         {
             std::swap(config.SourceStableEntityId, config.TargetStableEntityId);
@@ -2673,8 +2664,11 @@ namespace Extrinsic::Sandbox::Editor
         if (config.Variant == Runtime::EditorICPVariant::PointToPlane)
             propertyChoice("Target normals##ICP", targetCatalog, config.TargetNormals, config.TargetPositions.Domain);
         int backend = int(config.Backend);
-        if (ImGui::Combo("Acceleration##ICP", &backend, "CPU KD-tree (reference)\0CPU LBVH (cached)\0Vulkan LBVH (CPU solve)\0"))
+        if (ImGui::Combo("Backend##ICP", &backend, "CPU KD-tree (reference)\0CPU LBVH (cached)\0Vulkan LBVH (CPU solve)\0"))
         { config.Backend = Runtime::RegistrationBackend(backend); changed = true; }
+        if (config.Backend == Runtime::RegistrationBackend::VulkanLBVH)
+            if (const auto reason = Runtime::RegistrationVulkanUnavailableReason(context.Registration.Commands); !reason.empty())
+                ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.3f, 1.0f), "%s: the run will use the CPU.", reason.c_str());
         changed |= ImGui::InputScalar("Max iterations##ICP", ImGuiDataType_U32, &config.MaxIterations);
         changed |= ImGui::InputDouble("Max distance (0 = 1e6)##ICP", &config.MaxCorrespondenceDistance);
         changed |= ImGui::InputDouble("Inlier ratio##ICP", &config.InlierRatio);
@@ -2851,16 +2845,6 @@ namespace Extrinsic::Sandbox::Editor
         const auto fields = Runtime::CoherentPointDriftConfigFieldSpecs();
         const Runtime::CoherentPointDriftConfig defaults{};
         const auto hint = [&](std::string_view field) { DrawConfigFieldHint(Runtime::FindConfigFieldSpec(fields, field), {}); };
-        // The target follows the selection only when two entities are selected (source, then
-        // target); a single selection must not clear a configured target.
-        {
-            const auto selection = BuildProcessingInputWorkspace(context).Selection;
-            if (selection.SelectedEntities.size() < 2u)
-            {
-                state.LastSelectedTarget.emplace();
-                for (const auto& row : selection.SelectedEntities) state.LastSelectedTarget->push_back(row.StableEntityId);
-            }
-        }
         bool changed = DrawProcessingEntity("Source (moving)##CPD", context, config.SourceStableEntityId, state.LastSelectedSource);
         hint("source");
         changed |= DrawProcessingEntity("Target (fixed)##CPD", context, config.TargetStableEntityId, state.LastSelectedTarget,
@@ -2900,6 +2884,11 @@ namespace Extrinsic::Sandbox::Editor
                 config.Output = Runtime::CoherentPointDriftOutput::DisplacementProperty;
             changed = true;
         }
+        // The E-step is the backend choice (CPU variants or Vulkan); its tuning stays under Performance.
+        changed |= DrawSpecEnumCombo("Backend (E-step)##CPD", fields, "e_step", config.EStep, defaults.EStep);
+        if (config.EStep == Runtime::CoherentPointDriftEStep::Vulkan)
+            if (const auto reason = Runtime::CoherentPointDriftVulkanUnavailableReason(commands); !reason.empty())
+                ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.3f, 1.0f), "%s: the E-step will run on the CPU.", reason.c_str());
         changed |= DrawSpecInputDouble("Outlier weight w##CPD", fields, "outlier_weight", config.OutlierWeight, defaults.OutlierWeight);
         if (config.Method == Runtime::CoherentPointDriftMethod::Rigid)
         {
@@ -2912,6 +2901,9 @@ namespace Extrinsic::Sandbox::Editor
             changed |= DrawSpecInputDouble("Kernel width (beta)##CPD", fields, "beta", config.Beta, defaults.Beta);
             changed |= DrawSpecInputDouble("Smoothness (lambda)##CPD", fields, "lambda", config.Lambda, defaults.Lambda);
             changed |= DrawSpecInputUInt("Kernel rank##CPD", fields, "low_rank", config.LowRank, defaults.LowRank);
+            if (config.LowRank == 0u)
+                DrawSpecCheckbox("Automatic rank for large inputs##CPD", fields, "auto_low_rank", config.AutoLowRank,
+                                 defaults.AutoLowRank, changed);
         }
         if (bayesian)
         {
@@ -2929,8 +2921,9 @@ namespace Extrinsic::Sandbox::Editor
             }
         }
         const bool usesLandmarks = config.EStep == Runtime::CoherentPointDriftEStep::Nystrom ||
-                                   (config.LowRank > 0u && (config.Method == Runtime::CoherentPointDriftMethod::Nonrigid ||
-                                                            config.Method == Runtime::CoherentPointDriftMethod::Bayesian));
+                                   ((config.LowRank > 0u || config.AutoLowRank) &&
+                                    (config.Method == Runtime::CoherentPointDriftMethod::Nonrigid ||
+                                     config.Method == Runtime::CoherentPointDriftMethod::Bayesian));
         if (usesLandmarks && ImGui::TreeNode("Landmarks##CPD"))
         {
             changed |= DrawPointSamplingControls("CPDLandmarks", fields, "landmark_", config.LandmarkSampling,
@@ -2939,7 +2932,6 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (ImGui::TreeNode("Performance##CPD"))
         {
-            changed |= DrawSpecEnumCombo("E-step##CPD", fields, "e_step", config.EStep, defaults.EStep);
             if (config.EStep != Runtime::CoherentPointDriftEStep::Reference && config.EStep != Runtime::CoherentPointDriftEStep::Dense)
                 changed |= DrawSpecInputDouble("Error tolerance##CPD", fields, "e_step_tolerance", config.EStepTolerance,
                                                defaults.EStepTolerance, "%.1e");
@@ -2989,6 +2981,8 @@ namespace Extrinsic::Sandbox::Editor
         using Phase = Runtime::EditorCoherentPointDriftPhase;
         const bool hasRun = state.Run != nullptr;
         const bool running = hasRun && snapshot.Phase == Phase::Running;
+        // Restart, Apply and Discard make this frame's snapshot stale; it must not redraw the preview.
+        bool snapshotStale = false;
         const bool steppable = hasRun && (snapshot.Phase == Phase::Ready || snapshot.Phase == Phase::Paused);
         const bool applicable = hasRun && (snapshot.Phase == Phase::Paused || snapshot.Phase == Phase::Finished);
         const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
@@ -2998,6 +2992,7 @@ namespace Extrinsic::Sandbox::Editor
             if (DrawProcessingActionButton(hasRun ? "Restart##CPD" : "Start##CPD", readiness) && !running)
             {
                 ClearCoherentPointDriftPreview();
+                snapshotStale = true;
                 Runtime::EditorCoherentPointDriftResult failure;
                 state.Run = Runtime::StartEditorCoherentPointDrift(commands, config, failure);
                 state.RunMessage = state.Run ? std::string{} : failure.Message;
@@ -3026,7 +3021,7 @@ namespace Extrinsic::Sandbox::Editor
             if (ImGui::Button("Apply##CPD"))
             {
                 state.LastResult = Runtime::ApplyEditorCoherentPointDrift(commands, state.Run);
-                if (state.LastResult->Succeeded()) ClearCoherentPointDriftPreview();
+                if (state.LastResult->Succeeded()) { ClearCoherentPointDriftPreview(); snapshotStale = true; }
             }
             ImGui::EndDisabled();
             if (!applicable && hasRun && snapshot.Phase != Phase::Applied)
@@ -3037,6 +3032,7 @@ namespace Extrinsic::Sandbox::Editor
                 if (running) Runtime::CancelEditorCoherentPointDrift(state.Run);
                 state.Run.reset();
                 ClearCoherentPointDriftPreview();
+                snapshotStale = true;
             }
         }
         if (!state.RunMessage.empty()) ImGui::TextWrapped("%s", state.RunMessage.c_str());
@@ -3084,7 +3080,7 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::TextWrapped("%s", r.Message.c_str());
 
             // Overlay the moving source (orange) whenever the run published new positions.
-            if (state.LivePreview && Shell != nullptr && snapshot.Revision != state.PreviewRevision &&
+            if (state.LivePreview && !snapshotStale && Shell != nullptr && snapshot.Revision != state.PreviewRevision &&
                 snapshot.Phase != Phase::Applied && snapshot.SourcePreview && snapshot.Target)
                 if (auto* interaction = Shell->SceneInteraction())
                 {
@@ -3134,7 +3130,7 @@ namespace Extrinsic::Sandbox::Editor
                     series[2].Values.push_back(t.NegativeLogLikelihood);
                     series[3].Values.push_back(t.MatchedWeight);
                     series[4].Values.push_back(t.IterationSeconds);
-                    series[5].Values.push_back(std::max(double(t.KernelEvaluations), 1.0));
+                    series[5].Values.push_back(double(t.KernelEvaluations));
                     bounded = bounded || t.EStepErrorBound > 0.0;
                 }
                 if (bounded)

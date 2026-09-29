@@ -135,6 +135,9 @@ namespace Extrinsic::Sandbox::Editor
             previousSelection.emplace();
             for (const auto& row : selection.SelectedEntities)
                 previousSelection->push_back(row.StableEntityId);
+            // A later slot (a registration target) follows the selection only when the selection
+            // reaches it; selecting just the source must not clear a configured target.
+            if (slot > 0u && slot >= selection.SelectedEntities.size()) return false;
             // Explicit input choices persist until the scene selection changes.
             return std::exchange(entity, selected) != selected;
         }

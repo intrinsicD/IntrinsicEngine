@@ -320,6 +320,17 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
             return glm::vec3(sum / static_cast<double>(points.size()));
         }
 
+        // Why Vulkan ICP correspondences cannot run here (empty: they can). Each iteration's
+        // queries are queued from the main thread, so they need the job lane, the spatial index
+        // service and an operational device.
+        [[nodiscard]] std::string VulkanCorrespondencesUnavailable(const EditorProcessingContext& context)
+        {
+            if (!context.JobCommands.Available()) return "No job lane";
+            if (context.SpatialIndices == nullptr) return "No spatial index service";
+            if (context.Device == nullptr || !context.Device->IsOperational()) return "No operational Vulkan device";
+            return {};
+        }
+
         [[nodiscard]] EditorRegistrationResult
         MakeRegistrationBaseResult(
             const EditorRegistrationCommand& command)
@@ -913,13 +924,16 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
                     state->Result.BackendDiagnostic = "Shared target index unavailable; using CPU KD-tree.";
                 if (command.Backend == RegistrationBackend::VulkanLBVH)
                 {
-                    if (state->IndexSnapshot && context.JobCommands.Available() && context.Device && context.Device->IsOperational() &&
-                        state->TargetBinding.Points.size() <= (1u << 20))
+                    std::string reason = VulkanCorrespondencesUnavailable(context);
+                    if (reason.empty() && !state->IndexSnapshot) reason = "No shared target index";
+                    if (reason.empty() && state->TargetBinding.Points.size() > (1u << 20))
+                        reason = "More than 2^20 target points";
+                    if (reason.empty())
                         state->Result.ActualBackend = RegistrationBackend::VulkanLBVH;
                     else
                     {
                         state->Result.FellBackToCPU = true;
-                        state->Result.BackendDiagnostic = "Vulkan correspondence execution unavailable; using " +
+                        state->Result.BackendDiagnostic = reason + "; Vulkan correspondences unavailable, using " +
                             std::string(ToString(state->Result.ActualBackend)) + ".";
                     }
                 }
@@ -1194,6 +1208,11 @@ ApplyRegistrationChecked(
         return ApplyRegistrationChecked(EditorProcessingCommandsAccess::Resolve(commands), command, false,
                                         std::move(onComplete), std::move(progress));
     }
+    std::string RegistrationVulkanUnavailableReason(const EditorProcessingCommands& commands)
+    {
+        return VulkanCorrespondencesUnavailable(EditorProcessingCommandsAccess::Resolve(commands));
+    }
+
     ActionReadiness PreviewEditorRegistrationCommand(
         const EditorProcessingCommands& commands, const EditorRegistrationCommand& command)
     {

@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
 #include <limits>
+#include <string>
 #include <vector>
 #include "SandboxEditorJobHarness.hpp"
 #include "PointDomainFixture.hpp"
@@ -122,6 +123,9 @@ TEST(RegistrationDomains, CacheUsesEntityMetricAndRebuildsAfterTargetTransformOr
     ASSERT_TRUE(result.Succeeded())<<result.Message;
     EXPECT_TRUE(result.FellBackToCPU); EXPECT_EQ(result.ActualBackend,R::RegistrationBackend::CpuLBVH);
     EXPECT_TRUE(result.TargetIndexReused); EXPECT_FALSE(result.BackendDiagnostic.empty());
+    // The panel learns the same reason before a run starts.
+    EXPECT_NE(R::RegistrationVulkanUnavailableReason(commands).find("job lane"),std::string::npos);
+    EXPECT_NE(result.BackendDiagnostic.find("job lane"),std::string::npos)<<result.BackendDiagnostic;
 }
 TEST(RegistrationConfig, RoundTripCanonicalBindingsAndRejectMalformedControls)
 {

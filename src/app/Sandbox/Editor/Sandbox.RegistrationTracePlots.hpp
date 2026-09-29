@@ -11,7 +11,7 @@ namespace Extrinsic::Sandbox::Editor
     {
         const char* Label{""};
         std::vector<double> Values{};
-        bool Log{false}; // log10 y axis; nonpositive values are left out as gaps
+        bool Log{false}; // log10 y axis when it spans a decade; nonpositive values are gaps
     };
 
     inline void DrawRegistrationTracePlots(const char* id, const std::vector<double>& iterations,
@@ -37,26 +37,29 @@ namespace Extrinsic::Sandbox::Editor
             {
                 if (!ImPlot::BeginPlot(s.Label)) continue;
                 const int count = std::min(n, int(s.Values.size()));
+                // Log series leave nonpositive values out as gaps (NaN). A log axis spanning less
+                // than a decade shows no labels, so such a series is drawn on a linear axis.
+                std::vector<double> values(s.Values.begin(), s.Values.begin() + count);
+                double low = std::numeric_limits<double>::infinity(), high = -low;
+                for (double& v : values)
+                {
+                    if (s.Log && !(v > 0.0)) v = std::numeric_limits<double>::quiet_NaN();
+                    if (std::isnan(v)) continue;
+                    low = std::min(low, v);
+                    high = std::max(high, v);
+                }
+                const bool any = low <= high;
+                const bool log = s.Log && any && high >= 10.0 * low;
                 // A (nearly) constant series, e.g. an inlier count varying by one, gets a fixed axis
                 // around its middle; autofit would repeat one label at six significant digits.
-                const auto [low, high] = std::minmax_element(s.Values.begin(), s.Values.begin() + count);
-                const double middle = count > 0 ? 0.5 * (*low + *high) : 0.0;
+                const double middle = any ? 0.5 * (low + high) : 0.0;
                 const double half = middle != 0.0 ? 1e-4 * std::abs(middle) : 1.0;
-                const bool flat = !s.Log && count > 0 && *high - *low <= 1e-4 * std::abs(middle);
+                const bool flat = !log && any && high - low <= 1e-4 * std::abs(middle);
                 ImPlot::SetupAxes(bySeconds ? "s" : "iteration", nullptr, ImPlotAxisFlags_AutoFit,
                                   flat ? ImPlotAxisFlags_None : ImPlotAxisFlags_AutoFit);
                 if (flat) ImPlot::SetupAxisLimits(ImAxis_Y1, middle - half, middle + half, ImPlotCond_Always);
-                if (!s.Log)
-                {
-                    ImPlot::PlotLine(s.Label, x.data(), s.Values.data(), count);
-                    ImPlot::EndPlot();
-                    continue;
-                }
-                ImPlot::SetupAxisScale(ImAxis_Y1, ImPlotScale_Log10);
-                std::vector<double> positive(s.Values.begin(), s.Values.begin() + count);
-                for (double& v : positive)
-                    if (!(v > 0.0)) v = std::numeric_limits<double>::quiet_NaN();
-                ImPlot::PlotLine(s.Label, x.data(), positive.data(), count); // NaN draws as a gap
+                if (log) ImPlot::SetupAxisScale(ImAxis_Y1, ImPlotScale_Log10);
+                ImPlot::PlotLine(s.Label, x.data(), values.data(), count); // NaN draws as a gap
                 ImPlot::EndPlot();
             }
             ImPlot::EndSubplots();

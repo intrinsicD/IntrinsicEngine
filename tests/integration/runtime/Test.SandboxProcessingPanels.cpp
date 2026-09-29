@@ -277,10 +277,17 @@ TEST(SandboxProcessingPanels, EveryEntityInputFollowsSelectionWithSelectionDetai
     harness.Driver->OnFrame = [&](R::Engine& engine) {
         ++frame;
         const auto& active = harness.Control().GetEngineConfigControlState().ActiveConfig;
-        if (frame == 3 || frame == 12 || frame == 18)
+        // The registration target set at frame 9 follows the selection only when two entities
+        // are selected; clearing or single selection keeps it (a destroyed one reads as stale).
+        const auto firstId = R::SelectionController::ToStableEntityId(first);
+        if (frame == 3)
             ExpectInputEntities(active, 0u);
-        if (frame == 6 || frame == 15)
-            ExpectInputEntities(active, R::SelectionController::ToStableEntityId(first));
+        if (frame == 12 || frame == 18)
+            ExpectInputEntities(active, 0u, firstId);
+        if (frame == 6)
+            ExpectInputEntities(active, firstId);
+        if (frame == 15)
+            ExpectInputEntities(active, firstId, firstId);
         if (frame == 9)
             ExpectInputEntities(active, R::SelectionController::ToStableEntityId(second));
         if (frame == 3 || frame == 12)
@@ -696,17 +703,19 @@ TEST(SandboxProcessingPanels, EntityDefaultsFollowSelectionChangesAndPreserveExp
     sync();
     EXPECT_EQ(source.Entity, 7u);
     EXPECT_EQ(target.Entity, 9u);
+    // A later slot (the registration target) follows only a selection that reaches it:
+    // selecting just the source, or nothing, keeps the chosen target.
     selection.SelectedEntities = {{.StableEntityId=3}};
     sync();
     EXPECT_EQ(source.Entity, 3u);
-    EXPECT_EQ(target.Entity, 0u);
-    target.Entity = 9;
-    sync();
     EXPECT_EQ(target.Entity, 9u);
+    target.Entity = 4;
+    sync();
+    EXPECT_EQ(target.Entity, 4u);
     selection.SelectedEntities.clear();
     sync();
     EXPECT_EQ(source.Entity, 0u);
-    EXPECT_EQ(target.Entity, 0u);
+    EXPECT_EQ(target.Entity, 4u);
     selection.SelectedEntities = {{.StableEntityId=3}, {.StableEntityId=5}};
     sync();
     EXPECT_EQ(source.Entity, 3u);
@@ -861,7 +870,7 @@ TEST(SandboxProcessingPanels, NormalInputsPreserveDomainFiltersAndPersistSelecti
     }
 }
 
-TEST(SandboxProcessingPanels, CpuAccelerationControlsPersistTheRequestedExecutionPath)
+TEST(SandboxProcessingPanels, BackendControlsPersistTheRequestedExecutionPath)
 {
     PanelHarness h;
     auto& scene = h.Scene();
@@ -883,34 +892,37 @@ TEST(SandboxProcessingPanels, CpuAccelerationControlsPersistTheRequestedExecutio
         int ChoiceIndex{2}, ExpectedBackend{2};
     };
     const std::array controls{
-        Control{"view.normal_estimation", "Normal Estimation", "Acceleration##Normals", "Vulkan LBVH (CPU fit)",
+        Control{"view.normal_estimation", "Normal Estimation", "Backend##Normals", "Vulkan LBVH (CPU fit)",
             [](const auto& c) { return int(R::GetNormalEstimationConfig(c)->Backend); }},
-        Control{"view.outlier_analysis", "Outlier Analysis", "Acceleration", "Vulkan LBVH",
+        Control{"view.outlier_analysis", "Outlier Analysis", "Backend", "Vulkan LBVH",
             [](const auto& c) { return int(R::GetOutlierAnalysisConfig(c)->Backend); }},
         Control{"view.keypoint_analysis", "ISS Keypoint Analysis", "Acceleration", "Vulkan LBVH neighborhoods",
             [](const auto& c) { return int(R::GetKeypointAnalysisConfig(c)->Backend); }},
         Control{"view.keypoint_analysis", "ISS Keypoint Analysis", "Backend", "Vulkan",
             [](const auto& c) { return int(R::GetKeypointAnalysisConfig(c)->Backend); },1,3},
-        Control{"view.descriptor_analysis", "FPFH Descriptor Analysis", "Acceleration", "Vulkan LBVH",
+        Control{"view.descriptor_analysis", "FPFH Descriptor Analysis", "Backend", "Vulkan LBVH",
             [](const auto& c) { return int(R::GetDescriptorAnalysisConfig(c)->Backend); }},
-        Control{"view.kernel_density", "Kernel Density", "Acceleration", "Vulkan LBVH",
+        Control{"view.kernel_density", "Kernel Density", "Backend", "Vulkan LBVH",
             [](const auto& c) { return int(R::GetKernelDensityConfig(c)->Backend); }},
-        Control{"view.density_weights", "Compact Density Weights", "Acceleration", "Vulkan LBVH",
+        Control{"view.density_weights", "Compact Density Weights", "Backend", "Vulkan LBVH",
             [](const auto& c) { return int(R::GetDensityWeightConfig(c)->Backend); }},
-        Control{"view.point_construction", "Construct from Points", "Acceleration", "Vulkan LBVH",
+        Control{"view.point_construction", "Construct from Points", "Backend", "Vulkan LBVH",
             [](const auto& c) { return int(R::GetPointConstructionConfig(c)->Backend); }},
-        Control{"view.point_spacing", "Point Spacing and Radii", "Acceleration", "Vulkan LBVH",
+        Control{"view.point_spacing", "Point Spacing and Radii", "Backend", "Vulkan LBVH",
             [](const auto& c) { return int(R::GetPointSpacingConfig(c)->Backend); }},
-        Control{"view.bilateral_filter", "Bilateral Point Filter", "Acceleration", "Vulkan LBVH",
+        Control{"view.bilateral_filter", "Bilateral Point Filter", "Backend", "Vulkan LBVH",
             [](const auto& c) { return int(R::GetBilateralFilterConfig(c)->Backend); }},
-        Control{"view.registration", "ICP Registration", "Acceleration##ICP", "Vulkan LBVH (CPU solve)",
+        Control{"view.registration", "ICP Registration", "Backend##ICP", "Vulkan LBVH (CPU solve)",
             [](const auto& c) { return int(R::GetRegistrationConfig(c)->Backend); }},
+        Control{"view.coherent_point_drift", "Coherent Point Drift", "Backend (E-step)##CPD",
+            "Vulkan (dense on the GPU while wide, fp32 terms)",
+            [](const auto& c) { return int(R::GetCoherentPointDriftConfig(c)->EStep); }, 6, 6},
     };
     ASSERT_TRUE(h.Shell.SetEditorWindowOpen(controls.front().Window, true));
     std::size_t action = 0;
     int step = 0, frames = 0;
     h.Driver->OnFrame = [&](R::Engine& engine) {
-        if (++frames > 180) { ADD_FAILURE() << "Acceleration controls did not finish"; engine.RequestExit(); return; }
+        if (++frames > 180) { ADD_FAILURE() << "Backend controls did not finish"; engine.RequestExit(); return; }
         const auto& control = controls[action];
         auto* window = ImGui::FindWindowByName(control.Title);
         if (!window) return;
@@ -3251,7 +3263,7 @@ TEST(SandboxProcessingPanels, PropertySmoothingControlsClampToTheFieldTableAndSh
 
 // UI-055: the Coherent Point Drift panel drives a run through its own buttons: Start
 // captures, Step and Run to end iterate on the job service while the preview overlay
-// follows, and Apply publishes the transform.
+// follows, and Apply publishes the transform. Apply and Discard drop the preview.
 TEST(SandboxProcessingPanels, CoherentPointDriftPanelStepsRunsAndApplies)
 {
     PanelHarness h;
@@ -3283,6 +3295,9 @@ TEST(SandboxProcessingPanels, CoherentPointDriftPanelStepsRunsAndApplies)
                              std::to_string(R::SelectionController::ToStableEntityId(target)) + ")";
 
     auto& transform = scene.Raw().get<Extrinsic::ECS::Components::Transform::Component>(source);
+    auto* interaction = h.Engine->Services().Find<R::SceneInteractionModule>();
+    ASSERT_NE(interaction, nullptr);
+    const auto overlay = [&] { return interaction->PreviewOverlayPointCount("coherent_point_drift"); };
     int frames = 0;
     const auto click = [](ImGuiWindow* window, const char* label) { ImGui::ActivateItemByID(window->GetID(label)); };
     h.Driver->OnFrame = [&](R::Engine& engine) {
@@ -3307,11 +3322,30 @@ TEST(SandboxProcessingPanels, CoherentPointDriftPanelStepsRunsAndApplies)
         if (frames == 70)
         {
             EXPECT_EQ(transform.Position, glm::vec3(0.0f)) << "nothing is published before Apply";
+            EXPECT_GT(overlay(), 0u) << "the moving source is previewed";
             click(window, "Apply##CPD");
         }
-        if (frames == 74 || frames > 200) engine.RequestExit();
+        // Apply and Discard drop the preview; the frame that clicks them must not redraw it.
+        if (frames == 74)
+        {
+            EXPECT_EQ(overlay(), 0u) << "the preview outlived Apply";
+            click(window, "Restart##CPD");
+        }
+        if (frames == 78) click(window, "Step##CPD");
+        if (frames == 90)
+        {
+            EXPECT_GT(overlay(), 0u);
+            click(window, "Discard##CPD");
+        }
+        if (frames == 94)
+        {
+            EXPECT_EQ(overlay(), 0u) << "the preview outlived Discard";
+            engine.RequestExit();
+        }
+        if (frames > 200) engine.RequestExit();
     };
     h.Engine->Run();
+    EXPECT_GE(frames, 94);
     EXPECT_NEAR(transform.Position.x, 0.25f, 2e-3f);
     EXPECT_NEAR(transform.Position.y, -0.1f, 2e-3f);
     // This harness composes no document history; undo/redo of the publication is covered by

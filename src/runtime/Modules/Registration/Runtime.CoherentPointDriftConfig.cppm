@@ -32,6 +32,9 @@ export namespace Extrinsic::Runtime
     // CPU choice without a framed device). Values match Geometry::CoherentPointDrift::EStepPolicy.
     enum class CoherentPointDriftEStep : std::uint8_t { Reference, Dense, Truncated, Auto, FastGauss, Nystrom, Vulkan };
 
+    inline constexpr std::uint32_t kCoherentPointDriftAutoLowRankPoints = 1024u;
+    inline constexpr std::uint32_t kCoherentPointDriftAutoLowRank = 100u;
+
     struct CoherentPointDriftConfig
     {
         std::uint32_t SourceStableEntityId{0u}; // moving
@@ -59,6 +62,9 @@ export namespace Extrinsic::Runtime
         std::uint32_t NystromLandmarks{256u};
         double NystromErrorLimit{1.0e-3};
         std::uint32_t LowRank{0u};  // nonrigid/Bayesian: 0 solves with the full kernel, k > 0 with k eigenpairs
+        // With LowRank 0: above kCoherentPointDriftAutoLowRankPoints registered source points use
+        // kCoherentPointDriftAutoLowRank eigenpairs, since the full kernel costs O(m^3) per iteration.
+        bool AutoLowRank{true};
         // Bayesian (METHOD-050): initial sigma^2 factor, Dirichlet concentration of the mixing
         // weights (0 keeps them equal, i.e. infinity) and farthest-point samples to register
         // before interpolating the deformation to all points (0 = all points).

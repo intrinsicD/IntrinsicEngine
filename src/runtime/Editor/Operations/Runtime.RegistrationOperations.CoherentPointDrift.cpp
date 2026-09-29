@@ -150,6 +150,17 @@ namespace Extrinsic::Runtime
         }
 
         // Shared by readiness (no value copy) and Start (values copied, world space).
+        // Why a Vulkan E-step cannot run here (empty: it can). The worker waits for results the
+        // main thread records, so it needs the job lane and a framed device with shader float64.
+        std::string VulkanEStepUnavailable(const EditorProcessingContext& context)
+        {
+            if (!context.JobCommands.Available()) return "No job lane";
+            if (context.SpatialIndices == nullptr || context.Device == nullptr || !context.Device->IsOperational())
+                return "No operational Vulkan device";
+            if (!context.Device->SupportsShaderFloat64()) return "The Vulkan device lacks shader float64";
+            return {};
+        }
+
         std::optional<EditorCoherentPointDriftResult> Capture(const EditorProcessingContext& context,
                                                               CoherentPointDriftConfig& config, bool copyValues,
                                                               EditorCoherentPointDriftRun* run)
@@ -190,18 +201,22 @@ namespace Extrinsic::Runtime
                 return Failure(config, EditorCommandStatus::InvalidProcessingParameters,
                                "Coherent Point Drift needs at least " + std::to_string(minimum) +
                                    " live points on each side.");
-            const std::size_t nonrigidLimit = config.LowRank > 0u ? CPD::kMaxLowRankSourcePoints : CPD::kMaxNonrigidSourcePoints;
             // Bayesian runs may register a subsample; the kernel then covers only the samples.
             const bool deforming = config.Method == CoherentPointDriftMethod::Nonrigid ||
                                    config.Method == CoherentPointDriftMethod::Bayesian;
             const std::size_t kernelPoints = config.Method == CoherentPointDriftMethod::Bayesian && config.Subsample > 0u
                 ? std::min<std::size_t>(config.Subsample, sourceCapture.LiveCount) : sourceCapture.LiveCount;
+            // The full kernel costs O(m^3) per iteration; above a thousand points it takes seconds
+            // per iteration, so unless the exact kernel is asked for a low rank is used instead.
+            if (deforming && config.LowRank == 0u && config.AutoLowRank && kernelPoints > kCoherentPointDriftAutoLowRankPoints)
+                config.LowRank = kCoherentPointDriftAutoLowRank;
+            const std::size_t nonrigidLimit = config.LowRank > 0u ? CPD::kMaxLowRankSourcePoints : CPD::kMaxNonrigidSourcePoints;
             if (deforming && (kernelPoints > nonrigidLimit || sourceCapture.LiveCount > CPD::kMaxLowRankSourcePoints))
                 return Failure(config, EditorCommandStatus::InvalidProcessingParameters,
                                config.LowRank > 0u
                                    ? "Low-rank nonrigid CPD handles at most " + std::to_string(nonrigidLimit) + " source points."
                                    : "Nonrigid and Bayesian CPD with the full kernel handle at most " + std::to_string(nonrigidLimit) +
-                                         " source points; set a low rank (for example 100) or subsample the source.");
+                                         " source points; set a low rank (for example 100), turn on the automatic rank or subsample the source.");
             const auto* sourceTransform = raw.try_get<ECSC::Transform::Component>(*source);
             if (config.Output == CoherentPointDriftOutput::SourceTransform && sourceTransform == nullptr)
                 return Failure(config, EditorCommandStatus::MissingTransform, "The source entity has no Transform to drive.");
@@ -258,14 +273,8 @@ namespace Extrinsic::Runtime
             };
             if (config.EStep == CoherentPointDriftEStep::Vulkan)
             {
-                // The worker waits for results the main thread records, so a device E-step needs
-                // the job lane and a framed device; otherwise every iteration runs on the CPU.
-                if (!context.JobCommands.Available())
-                    run->GpuUnavailable = "No job lane; the Vulkan E-step ran on the CPU.";
-                else if (context.SpatialIndices == nullptr || context.Device == nullptr || !context.Device->IsOperational())
-                    run->GpuUnavailable = "No operational Vulkan device; the E-step ran on the CPU.";
-                else if (!context.Device->SupportsShaderFloat64())
-                    run->GpuUnavailable = "The Vulkan device lacks shader float64; the E-step ran on the CPU.";
+                if (const auto reason = VulkanEStepUnavailable(context); !reason.empty())
+                    run->GpuUnavailable = reason + "; the E-step ran on the CPU.";
                 else
                 {
                     run->GpuEStep = std::make_shared<CoherentPointDriftGpuEStep>(*context.SpatialIndices, *context.Device);
@@ -696,6 +705,11 @@ namespace Extrinsic::Runtime
         case Phase::Applied: return "applied";
         }
         return "unknown";
+    }
+
+    std::string CoherentPointDriftVulkanUnavailableReason(const EditorProcessingCommands& commands)
+    {
+        return VulkanEStepUnavailable(EditorProcessingCommandsAccess::Resolve(commands));
     }
 
     ActionReadiness PreviewEditorCoherentPointDriftCommand(const EditorProcessingCommands& commands,

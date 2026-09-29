@@ -1,6 +1,7 @@
 // Owns active-world viewport interaction and publishes selection/gizmo snapshots.
 module;
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -81,6 +82,8 @@ namespace Extrinsic::Runtime
         void SetPreviewOverlay(std::string_view owner, std::span<const PreviewPoint> points,
                                std::span<const PreviewLine> lines = {});
         void ClearPreviewOverlay(std::string_view owner);
+        // Points an owner's overlay currently draws (0 when it has none).
+        [[nodiscard]] std::size_t PreviewOverlayPointCount(std::string_view owner) const;
 
     private:
         struct Impl;
