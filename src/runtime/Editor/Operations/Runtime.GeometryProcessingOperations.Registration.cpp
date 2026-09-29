@@ -1,4 +1,7 @@
 module;
+#include <mutex>
+#include <chrono>
+#include <atomic>
 #include <functional>
 #include <entt/entity/fwd.hpp>
 
@@ -59,6 +62,45 @@ import Geometry.PointLBVH;
 
 namespace Extrinsic::Runtime
 {
+    // UI-067: the live view of one ICP solve (see EditorRegistrationProgressSnapshot).
+    struct EditorRegistrationProgress
+    {
+        std::atomic<bool> CancelRequested{false};
+        mutable std::mutex Mutex{};
+        EditorRegistrationProgressSnapshot Snapshot{};
+        std::chrono::steady_clock::time_point Started{}, Last{};
+
+        void Begin(std::shared_ptr<const std::vector<glm::vec3>> source)
+        {
+            std::scoped_lock lock{Mutex};
+            Started = Last = std::chrono::steady_clock::now();
+            Snapshot.Running = true;
+            Snapshot.Trace.clear();
+            Snapshot.SourceWorld = std::move(source);
+            Snapshot.Pose = glm::mat4(1.0f);
+            ++Snapshot.Revision;
+        }
+        void Publish(const Geometry::Registration::IterationTrace& trace)
+        {
+            const auto now = std::chrono::steady_clock::now();
+            std::scoped_lock lock{Mutex};
+            Snapshot.Trace.push_back({.Iteration = std::uint32_t(trace.Iteration),
+                                      .Seconds = std::chrono::duration<double>(now - Started).count(),
+                                      .IterationSeconds = std::chrono::duration<double>(now - Last).count(),
+                                      .RMSE = trace.RMSE, .InlierCount = std::uint64_t(trace.InlierCount)});
+            Snapshot.Pose = glm::mat4(trace.Transform);
+            Last = now;
+            ++Snapshot.Revision;
+        }
+        void End()
+        {
+            std::scoped_lock lock{Mutex};
+            if (!Snapshot.Running) return;
+            Snapshot.Running = false;
+            ++Snapshot.Revision;
+        }
+    };
+
 extern "C++"
 {
 namespace GeometryProcessingDetail::MeshSupport
@@ -91,10 +133,14 @@ struct RegistrationAlignmentOutcome {
 AlignPointClouds(const std::span<const glm::vec3> sourcePoints,
                  const std::span<const glm::vec3> targetPoints,
                  const std::span<const glm::vec3> targetNormals,
-                 const Reg::RegistrationParams &params, const Reg::NearestQuery& query = {}) {
+                 const Reg::RegistrationParams &params, const Reg::NearestQuery& query = {},
+                 const Reg::IterationObserver& also = {}) {
   RegistrationAlignmentOutcome outcome;
   outcome.Traces.reserve(params.MaxIterations);
-  const Reg::IterationObserver observe = [&outcome](const Reg::IterationTrace& trace) { outcome.Traces.push_back(trace); };
+  const Reg::IterationObserver observe = [&outcome, &also](const Reg::IterationTrace& trace) {
+    outcome.Traces.push_back(trace);
+    if (also) also(trace);
+  };
   const auto result = query ? Reg::AlignICPWithQueries(sourcePoints, targetPoints, targetNormals, params, query, observe)
                             : Reg::AlignICP(sourcePoints, targetPoints, targetNormals, params, observe);
   if (result) {
@@ -345,6 +391,7 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
             glm::mat4 PrealignPose{1.f};
             Reg::RegistrationParams Params{};
             RegistrationAlignmentOutcome Outcome{};
+            EditorRegistrationProgressHandle Progress{}; // UI-067, optional
         };
 
         [[nodiscard]] std::vector<glm::vec3> TransformPointsToWorld(
@@ -532,6 +579,11 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
             state->TargetWorld = targetWorld;
             state->WorldNormals = std::move(targetWorldNormals);
             state->PrealignPose = prealignPose;
+            if (state->Progress)
+            {
+                state->Progress->Begin(std::make_shared<const std::vector<glm::vec3>>(state->SourceWorld));
+                params.Cancelled = [progress = state->Progress] { return progress->CancelRequested.load(); };
+            }
             state->Params = params;
             if (result.ActualBackend == RegistrationBackend::VulkanLBVH)
                 return JobResultEnvelope::Make<EditorJobResult>(EditorJobResult{.Diagnostic = "ICP GPU correspondences ready to queue"});
@@ -545,8 +597,19 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
                     }
                     return true;
                 };
+            const auto publish = [progress = state->Progress](const Reg::IterationTrace& trace) {
+                if (progress) progress->Publish(trace);
+            };
             const RegistrationAlignmentOutcome outcome = AlignPointClouds(
-                state->SourceWorld, state->TargetWorld, state->WorldNormals, params, query);
+                state->SourceWorld, state->TargetWorld, state->WorldNormals, params, query, publish);
+            if (state->Progress) state->Progress->End();
+            if (outcome.HasResult && outcome.Result.Cancelled)
+            {
+                result.Status = EditorCommandStatus::StaleEntity;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message = "ICP was cancelled; nothing was applied.";
+                return JobResultEnvelope::Make<EditorJobResult>(EditorJobResult{.Diagnostic = result.Message});
+            }
             if (!outcome.HasResult)
             {
                 result.Status =
@@ -571,6 +634,7 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
             if (state.Result.ActualBackend != RegistrationBackend::VulkanLBVH ||
                 state.Result.Status != EditorCommandStatus::NoChange) return true;
             auto fail = [&](std::string message) {
+                if (state.Progress) state.Progress->End();
                 state.Result.Status = EditorCommandStatus::GeometryProcessingFailed;
                 state.Result.Error = Core::ErrorCode::InvalidState;
                 state.Result.BackendDiagnostic = message;
@@ -585,6 +649,15 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
             // read, so the readiness gate closes before any of them.
             if (context.AttachmentActive && !context.AttachmentActive())
                 return fail("ICP GPU correspondences were abandoned when the world detached.");
+            if (state.Progress && state.Progress->CancelRequested.load())
+            {
+                state.Progress->End();
+                state.Result.Status = EditorCommandStatus::StaleEntity;
+                state.Result.Error = Core::ErrorCode::InvalidState;
+                state.Result.Message = "ICP was cancelled; nothing was applied.";
+                state.Batch.reset();
+                return true;
+            }
             if (!context.SpatialIndices || ValidateRegistrationCpuJobApply(context, state) != JobApplyValidation::Current)
                 return fail("ICP inputs changed while GPU correspondences were pending.");
             if (state.Batch)
@@ -601,10 +674,14 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
                 }
                 const auto status = Reg::AdvanceICP(state.SourceWorld, state.TargetWorld, state.WorldNormals,
                     state.Params, indices, state.Outcome.Result,
-                    [&](const Reg::IterationTrace& trace) { state.Outcome.Traces.push_back(trace); });
+                    [&](const Reg::IterationTrace& trace) {
+                        state.Outcome.Traces.push_back(trace);
+                        if (state.Progress) state.Progress->Publish(trace);
+                    });
                 if (status == Reg::ICPStepStatus::InvalidInput) return fail("ICP rejected GPU correspondences.");
                 if (status == Reg::ICPStepStatus::Finished)
                 {
+                    if (state.Progress) state.Progress->End();
                     state.Outcome.HasResult = true;
                     FinishRegistrationSolve(state);
                     state.Batch.reset();
@@ -712,6 +789,7 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
         void FinalizeUnpublishedRegistrationJob(
             EditorRegistrationCpuJobState& job)
         {
+            if (job.Progress) job.Progress->End();
             if (job.Delivered)
                 return;
             auto failure = BuildUnpublishedEditorJobFailure(
@@ -795,10 +873,12 @@ TrajectoryPose(const RegistrationAlignmentOutcome &outcome,
             PointInputCapture normals,
             const ECSC::Transform::Component& sourceTransform,
             const ECSC::Transform::Component* targetTransform,
-            std::function<void(EditorRegistrationResult)> onComplete)
+            std::function<void(EditorRegistrationResult)> onComplete,
+            EditorRegistrationProgressHandle progress)
         {
             auto state =
                 std::make_shared<EditorRegistrationCpuJobState>();
+            state->Progress = std::move(progress);
             state->SourceStableEntityId = command.SourceStableEntityId;
             state->TargetStableEntityId = command.TargetStableEntityId;
             state->Command = command;
@@ -921,7 +1001,8 @@ DebugNameForEditorICPVariant(
 ApplyRegistrationChecked(
         const EditorProcessingContext& context,
         const EditorRegistrationCommand& input, bool preview,
-        std::function<void(EditorRegistrationResult)> onComplete = {})
+        std::function<void(EditorRegistrationResult)> onComplete = {},
+        EditorRegistrationProgressHandle progress = {})
     {
         EditorRegistrationCommand command = input;
         EditorRegistrationResult result =
@@ -1103,15 +1184,15 @@ ApplyRegistrationChecked(
             return result;
         }
         return SubmitRegistrationCpuJob(context, command, std::move(source), std::move(target), std::move(normals),
-            *transform, targetTransform, std::move(onComplete));
+            *transform, targetTransform, std::move(onComplete), std::move(progress));
     }
 
     EditorRegistrationResult ApplyEditorRegistrationCommand(
         const EditorProcessingCommands& commands, const EditorRegistrationCommand& command,
-        std::function<void(EditorRegistrationResult)> onComplete)
+        std::function<void(EditorRegistrationResult)> onComplete, EditorRegistrationProgressHandle progress)
     {
         return ApplyRegistrationChecked(EditorProcessingCommandsAccess::Resolve(commands), command, false,
-                                        std::move(onComplete));
+                                        std::move(onComplete), std::move(progress));
     }
     ActionReadiness PreviewEditorRegistrationCommand(
         const EditorProcessingCommands& commands, const EditorRegistrationCommand& command)
@@ -1121,7 +1202,8 @@ ApplyRegistrationChecked(
         return {result.Succeeded(), result.Succeeded() ? std::string{} : result.Message};
     }
     EditorRegistrationResult ApplyEditorConfiguredRegistrationCommand(
-        const EditorProcessingCommands& commands, std::function<void(EditorRegistrationResult)> onComplete)
+        const EditorProcessingCommands& commands, std::function<void(EditorRegistrationResult)> onComplete,
+        EditorRegistrationProgressHandle progress)
     {
         const auto config = GetEditorRegistrationConfig(commands);
         if (!config)
@@ -1132,7 +1214,24 @@ ApplyRegistrationChecked(
             result.Message = "ICP registration requires an available engine config.";
             return result;
         }
-        return ApplyEditorRegistrationCommand(commands, *config, std::move(onComplete));
+        return ApplyEditorRegistrationCommand(commands, *config, std::move(onComplete), std::move(progress));
+    }
+
+    EditorRegistrationProgressHandle MakeEditorRegistrationProgress()
+    {
+        return std::make_shared<EditorRegistrationProgress>();
+    }
+
+    EditorRegistrationProgressSnapshot SnapshotEditorRegistrationProgress(const EditorRegistrationProgressHandle& progress)
+    {
+        if (!progress) return {};
+        std::scoped_lock lock{progress->Mutex};
+        return progress->Snapshot;
+    }
+
+    void CancelEditorRegistration(const EditorRegistrationProgressHandle& progress)
+    {
+        if (progress) progress->CancelRequested = true;
     }
     GeometryPropertyCatalogSnapshot GetEditorRegistrationInputCatalog(
         const EditorProcessingCommands& commands, std::uint32_t stableId)

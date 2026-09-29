@@ -319,6 +319,10 @@ namespace Extrinsic::Sandbox::Editor
             std::string ConfigDiagnostic{};
             Runtime::RegistrationConfig Draft{};
             std::string LastApplied{};
+            // UI-067: the live view of the last run, its preview and plots.
+            Runtime::EditorRegistrationProgressHandle Progress{};
+            bool LivePreview{true}, PlotBySeconds{false}, PreviewShown{false};
+            std::uint64_t PreviewRevision{0u};
         };
 
         struct PointSamplingState
@@ -450,6 +454,7 @@ namespace Extrinsic::Sandbox::Editor
         void DrawCoherentPointDriftWindow(bool&, const SandboxEditorContext&);
         void DrawPointSamplingWindow(bool&, const SandboxEditorContext&);
         void ClearCoherentPointDriftPreview();
+        void DrawRegistrationProgress(const Runtime::EditorRegistrationProgressSnapshot& live);
 
         void DrawDenoiseControls(
             const Runtime::EditorDomainWindowModel&,
@@ -2690,13 +2695,21 @@ namespace Extrinsic::Sandbox::Editor
         const auto readiness = Runtime::ResolveEditorProcessingActionReadiness(
             context.Registration.Commands, preview);
         if (!readiness.Enabled) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
-        const bool runFinal = DrawProcessingActionButton("Run ICP##ICP", readiness);
+        const auto live = Runtime::SnapshotEditorRegistrationProgress(Registration.Progress);
+        const bool runFinal = DrawProcessingActionButton("Run ICP##ICP", readiness) && !live.Running;
         if (runFinal) config.TrajectoryStep = config.MaxIterations;
-        if (runFinal || (applyTrajectory && readiness.Enabled))
+        if (runFinal || (applyTrajectory && readiness.Enabled && !live.Running))
+        {
+            Registration.Progress = Runtime::MakeEditorRegistrationProgress();
             ApplyProcessingExecution(Registration, config,
                 [&](const auto& value) { return Runtime::ApplyEditorRegistrationConfig(context.Registration.Commands, value); },
-                [&] { return Runtime::ApplyEditorConfiguredRegistrationCommand(context.Registration.Commands, context.Registration.ResultSinks.Registration); },
+                [&] {
+                    return Runtime::ApplyEditorConfiguredRegistrationCommand(context.Registration.Commands,
+                        context.Registration.ResultSinks.Registration, Registration.Progress);
+                },
                 context.Registration.ResultSinks.Registration, "Registration config was rejected.");
+        }
+        DrawRegistrationProgress(live);
 
         if (!Registration.LastResult.has_value())
         {
@@ -2747,6 +2760,57 @@ namespace Extrinsic::Sandbox::Editor
             }
         }
         ImGui::End();
+    }
+
+    // UI-067: the running ICP job's iteration, cancel, moving-source preview and plots.
+    void MeshProcessingPanels::Impl::DrawRegistrationProgress(const Runtime::EditorRegistrationProgressSnapshot& live)
+    {
+        auto& state = Registration;
+        if (!state.Progress) return;
+        if (live.Running)
+        {
+            const auto* last = live.Trace.empty() ? nullptr : &live.Trace.back();
+            ImGui::TextColored(ImVec4(0.55f, 0.8f, 1.0f, 1.0f), "Running: iteration %zu   RMSE %.6g   inliers %llu   %.1f s",
+                               live.Trace.size(), last ? last->RMSE : 0.0,
+                               static_cast<unsigned long long>(last ? last->InlierCount : 0u), last ? last->Seconds : 0.0);
+            if (ImGui::Button("Cancel##ICP")) Runtime::CancelEditorRegistration(state.Progress);
+        }
+        ImGui::Checkbox("Preview moving source##ICP", &state.LivePreview);
+        auto* interaction = Shell != nullptr ? Shell->SceneInteraction() : nullptr;
+        const bool show = state.LivePreview && live.Running && live.SourceWorld && !live.SourceWorld->empty();
+        if (interaction != nullptr && show && live.Revision != state.PreviewRevision)
+        {
+            const auto& source = *live.SourceWorld;
+            const std::size_t stride = std::max<std::size_t>(1u, source.size() / 20000u);
+            glm::vec3 lo{std::numeric_limits<float>::max()}, hi{-std::numeric_limits<float>::max()};
+            for (std::size_t i = 0; i < source.size(); i += stride) { lo = glm::min(lo, source[i]); hi = glm::max(hi, source[i]); }
+            const float radius = std::max(1e-4f, 0.004f * glm::length(hi - lo));
+            std::vector<Runtime::SceneInteractionModule::PreviewPoint> points;
+            for (std::size_t i = 0; i < source.size(); i += stride)
+                points.push_back({.Position = glm::vec3(live.Pose * glm::vec4(source[i], 1.0f)),
+                                  .Color = {1.0f, 0.55f, 0.1f, 1.0f}, .Radius = radius, .DepthTested = true, .Sphere = true});
+            interaction->SetPreviewOverlay("icp", points);
+            state.PreviewRevision = live.Revision;
+            state.PreviewShown = true;
+        }
+        else if (interaction != nullptr && !show && state.PreviewShown)
+        {
+            interaction->ClearPreviewOverlay("icp");
+            state.PreviewShown = false;
+            state.PreviewRevision = 0u;
+        }
+        if (live.Trace.empty()) return;
+        std::vector<double> iteration, seconds;
+        std::vector<RegistrationTraceSeries> series{{"RMSE", {}, true}, {"inliers"}, {"iteration time [s]"}};
+        for (const auto& t : live.Trace)
+        {
+            iteration.push_back(double(t.Iteration));
+            seconds.push_back(t.Seconds);
+            series[0].Values.push_back(std::max(t.RMSE, 1e-300));
+            series[1].Values.push_back(double(t.InlierCount));
+            series[2].Values.push_back(t.IterationSeconds);
+        }
+        DrawRegistrationTracePlots("ICPTrace", iteration, seconds, series, state.PlotBySeconds);
     }
 
     void MeshProcessingPanels::Impl::ClearCoherentPointDriftPreview()

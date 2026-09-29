@@ -376,3 +376,36 @@ TEST(RegistrationDomains, QueuedEqualValueMaskRemappingStillDiscardsResults)
     EXPECT_EQ(jobs.Snapshot().Entries[0].State, R::JobState::StaleDiscarded);
     EXPECT_FALSE(history.CanUndo());
 }
+TEST(RegistrationDomains, ProgressPublishesEveryIterationAndCancelAppliesNothing)
+{
+    // UI-067: a caller-owned progress handle sees one trace row per iteration, the pose and the
+    // pre-aligned source; a cancelled run publishes no transform.
+    R::WorldRegistry worlds; auto world=worlds.CreateWorld("icp"); auto& scene=*worlds.Get(world);
+    auto source=Make(scene,D::PointCloudPoint,{}), target=Make(scene,D::PointCloudPoint,{7,-2,3});
+    R::EditorCommandHistory history;
+    R::EditorProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history};
+    const auto commands=R::BindEditorProcessingCommands(context);
+    const R::EditorRegistrationCommand command{
+        .SourceStableEntityId=R::SelectionController::ToStableEntityId(source),
+        .TargetStableEntityId=R::SelectionController::ToStableEntityId(target),
+        .InlierRatio=1.,.TrajectoryStep=50,.SourcePositions=Ref(D::PointCloudPoint),.TargetPositions=Ref(D::PointCloudPoint)};
+
+    const auto progress=R::MakeEditorRegistrationProgress();
+    const auto result=R::ApplyEditorRegistrationCommand(commands,command,{},progress);
+    ASSERT_TRUE(result.Succeeded())<<result.Message;
+    const auto live=R::SnapshotEditorRegistrationProgress(progress);
+    EXPECT_FALSE(live.Running);
+    ASSERT_TRUE(live.SourceWorld);
+    EXPECT_EQ(live.Trace.size(),result.IterationsPerformed);
+    for(std::size_t k=1;k<live.Trace.size();++k) EXPECT_GE(live.Trace[k].Seconds,live.Trace[k-1].Seconds);
+    EXPECT_GT(live.Revision,0u);
+
+    auto& transform=scene.Raw().get<T::Component>(source);
+    transform.Position=glm::vec3(0);
+    const auto cancelled=R::MakeEditorRegistrationProgress();
+    R::CancelEditorRegistration(cancelled);
+    const auto stopped=R::ApplyEditorRegistrationCommand(commands,command,{},cancelled);
+    EXPECT_EQ(stopped.Status,R::EditorCommandStatus::StaleEntity)<<stopped.Message;
+    EXPECT_EQ(transform.Position,glm::vec3(0))<<"a cancelled run publishes nothing";
+    EXPECT_TRUE(R::SnapshotEditorRegistrationProgress(cancelled).Trace.empty());
+}

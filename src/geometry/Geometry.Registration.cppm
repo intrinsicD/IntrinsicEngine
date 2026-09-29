@@ -50,6 +50,10 @@ export namespace Geometry::Registration
         // trimming. Disengaged by default to preserve the legacy ICP path.
         std::optional<Geometry::Robust::RobustKernel> RobustKernelKind{};
 
+        // UI-067: polled before every iteration of AlignICP / AlignICPWithQueries; true ends the
+        // run with RegistrationResult::Cancelled. Must be thread-safe.
+        std::function<bool()> Cancelled{};
+
         // Robust residual scale in world-space units. Used only when
         // RobustKernelKind is engaged; must be finite and > 0.
         double RobustScale{1.0};
@@ -82,6 +86,10 @@ export namespace Geometry::Registration
 
         // Number of inlier correspondences in the final iteration.
         std::size_t FinalInlierCount{0};
+
+        // UI-067: RegistrationParams::Cancelled stopped the run between iterations; the
+        // transform is the last completed iteration's.
+        bool Cancelled{false};
     };
 
     // -------------------------------------------------------------------------

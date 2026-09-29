@@ -475,6 +475,11 @@ namespace Geometry::Registration
         std::vector<std::uint32_t> indices(source.size());
         for (;;)
         {
+            if (params.Cancelled && params.Cancelled())
+            {
+                result.Cancelled = true;
+                return result;
+            }
             const auto queries = MakeICPQueries(source, result.Transform);
             std::fill(indices.begin(), indices.end(), std::numeric_limits<std::uint32_t>::max());
             if (!query(queries, indices))

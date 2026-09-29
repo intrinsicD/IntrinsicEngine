@@ -88,17 +88,46 @@ export namespace Extrinsic::Runtime
     // deliberately narrower than the shared point-input catalog.
     [[nodiscard]] GeometryPropertyCatalogSnapshot GetEditorRegistrationInputCatalog(
         const EditorProcessingCommands&, std::uint32_t stableId);
+    // UI-067: live view of a running ICP job. The caller creates it, passes it to the command,
+    // reads snapshots while the job runs and may cancel it; the worker publishes one trace row
+    // (and the current pose) per iteration.
+    struct EditorRegistrationTraceRow
+    {
+        std::uint32_t Iteration{0u};
+        double Seconds{0.0};          // since the solve began
+        double IterationSeconds{0.0};
+        double RMSE{0.0};             // inlier RMSE of the correspondences this iteration used
+        std::uint64_t InlierCount{0u};
+    };
+    struct EditorRegistrationProgressSnapshot
+    {
+        bool Running{false};
+        std::vector<EditorRegistrationTraceRow> Trace{};
+        // The (pre-aligned) source in world space and the current ICP pose applied to it.
+        std::shared_ptr<const std::vector<glm::vec3>> SourceWorld{};
+        glm::mat4 Pose{1.0f};
+        std::uint64_t Revision{0u};
+    };
+    struct EditorRegistrationProgress;
+    using EditorRegistrationProgressHandle = std::shared_ptr<EditorRegistrationProgress>;
+    [[nodiscard]] EditorRegistrationProgressHandle MakeEditorRegistrationProgress();
+    [[nodiscard]] EditorRegistrationProgressSnapshot SnapshotEditorRegistrationProgress(const EditorRegistrationProgressHandle&);
+    // Stops the job before its next iteration; it then publishes nothing.
+    void CancelEditorRegistration(const EditorRegistrationProgressHandle&);
+
     // Immediate outcomes return directly. Only a newly queued job delivers a
     // terminal callback, while attached. Duplicate Pending requests add no callback.
     [[nodiscard]] EditorRegistrationResult ApplyEditorRegistrationCommand(
         const EditorProcessingCommands&, const EditorRegistrationCommand&,
-        std::function<void(EditorRegistrationResult)> onComplete = {});
+        std::function<void(EditorRegistrationResult)> onComplete = {},
+        EditorRegistrationProgressHandle progress = {});
     [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorRegistrationConfig(
         const EditorProcessingCommands&, const RegistrationConfig&, std::string sourceId = {});
     [[nodiscard]] std::optional<RegistrationConfig> GetEditorRegistrationConfig(
         const EditorProcessingCommands&);
     [[nodiscard]] EditorRegistrationResult ApplyEditorConfiguredRegistrationCommand(
-        const EditorProcessingCommands&, std::function<void(EditorRegistrationResult)> onComplete = {});
+        const EditorProcessingCommands&, std::function<void(EditorRegistrationResult)> onComplete = {},
+        EditorRegistrationProgressHandle progress = {});
 
     // --- Coherent Point Drift (RUNTIME-273) -------------------------------------------
     // A run captures both point sets in world space, iterates on a worker (all at once or
