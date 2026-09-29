@@ -3,7 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-09-29
 - **Owners:** graphics / runtime
-- **Related tasks:** GRAPHICS-153, GRAPHICS-154, GRAPHICS-155, RUNTIME-292, GRAPHICS-156, RUNTIME-293, RUNTIME-294
+- **Related tasks:** GRAPHICS-153, GRAPHICS-154, GRAPHICS-155, RUNTIME-292, GRAPHICS-156, RUNTIME-293, RUNTIME-294, METHOD-064, METHOD-065
 
 ## Context
 
@@ -51,7 +51,8 @@ reviews):
   Immediate compute (GRAPHICS-150) is submitted on the graphics queue, so both are ordered before
   every later frame. Host-visible completion (`CollectCompleted`) is a once-per-frame poll: work is
   delivered once it has finished, not necessarily in the frame that submitted it.
-- **Hybrid methods.** Several methods run a CPU stage every iteration:
+- **CPU stages in today's implementations.** Several methods run a CPU stage every iteration (an
+  implementation state, not an algorithmic necessity; see decision 8):
   - ICP solve and CPD M-step;
   - WLOP/CLOP/EAR projection;
   - the reductions of normals, outliers, FPFH, density, weights, spacing, bilateral and
@@ -126,8 +127,13 @@ reviews):
    - The block is restored from the **current** CPU state: a forced extraction re-upload, not the
      transaction's old shadow.
    - Busy or stale acquisition defers or aborts; it is not a silent CPU fallback.
-8. **Hybrids are declared.** Per-iteration traffic that a CPU stage needs stays and is reported
-   in diagnostics. Removing it means porting that stage, one task per method.
+8. **CPU stages are declared, then ported.**
+   - Where today's implementation runs a CPU stage per iteration, the traffic that stage needs
+     stays and is reported in diagnostics.
+   - Almost every such stage can be ported. Only MST normal orientation is inherently sequential,
+     and even it has parallel alternatives. The ports are sized per method in RUNTIME-294, with
+     vertex normals and outliers first.
+   - Nonrigid CPD/BCPD becomes GPU-friendly with a basis-filtered M-step (METHOD-065).
 9. **Backend seam.**
    - A GPU method's graphics workspace records from `GpuPropertyView` inputs into `WriteLease`
      outputs, never from CPU spans. Its runtime job uses Resolve, Acquire and Commit.
