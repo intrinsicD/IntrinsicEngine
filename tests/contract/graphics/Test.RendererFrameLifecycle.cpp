@@ -2854,8 +2854,12 @@ TEST(RendererFrameLifecycle, ForwardPointSphereImpostorsWriteCorrectedDepth)
     EXPECT_NE(pointVertex.find("clamp(pointSizePx, 0.5, 32.0)"),
               std::string::npos);
     EXPECT_NE(pointVertex.find("vDiscUV"), std::string::npos);
-    EXPECT_NE(pointFragment.find("surfaceViewPos"), std::string::npos);
+    // The ray cast lives in the impostor include shared with the transient debug spheres (UI-067).
+    const std::string impostor = ReadShaderSource("common/point_sphere_impostor.glsl");
+    EXPECT_NE(pointFragment.find("ShadeSphereImpostor("), std::string::npos);
+    EXPECT_NE(impostor.find("surfaceViewPos"), std::string::npos);
     EXPECT_NE(pointFragment.find("gl_FragDepth = depth"), std::string::npos);
+    EXPECT_NE(ReadShaderSource("transient_debug_sphere.frag").find("ShadeSphereImpostor("), std::string::npos);
     EXPECT_NE(cullShader.find("geo.PointVertexCount * 6u"), std::string::npos);
     EXPECT_NE(cullShader.find("geo.PointFirstVertex * 6u"), std::string::npos);
     EXPECT_NE(cullShader.find("buckets.LineQuads"), std::string::npos);

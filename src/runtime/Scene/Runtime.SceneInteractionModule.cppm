@@ -70,6 +70,7 @@ namespace Extrinsic::Runtime
             glm::vec4 Color{1.0f};
             float Radius{0.01f}; // world units
             bool DepthTested{true};
+            bool Sphere{false};  // shaded sphere (the point renderer's sphere look) instead of a flat dot
         };
         struct PreviewLine
         {

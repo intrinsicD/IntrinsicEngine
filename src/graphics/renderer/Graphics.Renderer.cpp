@@ -1743,6 +1743,8 @@ namespace Extrinsic::Graphics
             m_TransientDebugLinePipelineLeaseAlwaysOnTop.reset();
             m_TransientDebugPointPipelineLeaseDepthTested.reset();
             m_TransientDebugPointPipelineLeaseAlwaysOnTop.reset();
+            m_TransientDebugSpherePipelineLeaseDepthTested.reset();
+            m_TransientDebugSpherePipelineLeaseAlwaysOnTop.reset();
             // GRAPHICS-078 Slices B + C — drop the canonical default-
             // recipe visualization-overlay pipeline leases (vector-
             // field + isoline lanes, depth-tested + always-on-top each)
@@ -1839,6 +1841,8 @@ namespace Extrinsic::Graphics
             m_TransientDebugSurfacePass.SetLineAlwaysOnTopPipeline(RHI::PipelineHandle{});
             m_TransientDebugSurfacePass.SetPointDepthTestedPipeline(RHI::PipelineHandle{});
             m_TransientDebugSurfacePass.SetPointAlwaysOnTopPipeline(RHI::PipelineHandle{});
+            m_TransientDebugSurfacePass.SetSphereDepthTestedPipeline(RHI::PipelineHandle{});
+            m_TransientDebugSurfacePass.SetSphereAlwaysOnTopPipeline(RHI::PipelineHandle{});
             // GRAPHICS-078 Slices B + C — zero the visualization-overlay
             // pass's cached vector-field + isoline pipeline handles
             // alongside the transient-debug handles above so a later
@@ -5600,6 +5604,23 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
+        // UI-067: transient debug spheres, six billboard vertices per point; the depth-tested
+        // variant writes the ray-cast depth so overlapping spheres occlude each other.
+        [[nodiscard]] static RHI::PipelineDesc BuildTransientDebugSpherePipelineDesc(
+            const bool depthTested) noexcept
+        {
+            RHI::PipelineDesc desc = BuildOverlayPipelineDesc(depthTested);
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath("shaders/transient_debug_sphere.vert.spv");
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath("shaders/transient_debug_sphere.frag.spv");
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
+            desc.DepthStencil.DepthWriteEnable = depthTested;
+            desc.PushConstantSize = static_cast<std::uint32_t>(sizeof(TransientDebugSpherePushConstants));
+            desc.DebugName = depthTested
+                ? "Renderer.TransientDebug.Sphere.DepthTested"
+                : "Renderer.TransientDebug.Sphere.AlwaysOnTop";
+            return desc;
+        }
+
         [[nodiscard]] static RHI::PipelineDesc BuildVisualizationVectorFieldPipelineDesc(
             const bool depthTested) noexcept
         {
@@ -6584,6 +6605,8 @@ namespace Extrinsic::Graphics
             m_TransientDebugLinePipelineLeaseAlwaysOnTop.reset();
             m_TransientDebugPointPipelineLeaseDepthTested.reset();
             m_TransientDebugPointPipelineLeaseAlwaysOnTop.reset();
+            m_TransientDebugSpherePipelineLeaseDepthTested.reset();
+            m_TransientDebugSpherePipelineLeaseAlwaysOnTop.reset();
             // GRAPHICS-078 Slices B + C — visualization-overlay pipelines.
             // Created after the GRAPHICS-077 point-lane pipelines so call
             // indices stay stable: vector-field DepthTested at call #31
@@ -6600,6 +6623,8 @@ namespace Extrinsic::Graphics
             m_TransientDebugSurfacePass.SetLineAlwaysOnTopPipeline(RHI::PipelineHandle{});
             m_TransientDebugSurfacePass.SetPointDepthTestedPipeline(RHI::PipelineHandle{});
             m_TransientDebugSurfacePass.SetPointAlwaysOnTopPipeline(RHI::PipelineHandle{});
+            m_TransientDebugSurfacePass.SetSphereDepthTestedPipeline(RHI::PipelineHandle{});
+            m_TransientDebugSurfacePass.SetSphereAlwaysOnTopPipeline(RHI::PipelineHandle{});
             m_VisualizationOverlayPass.SetVectorFieldDepthTestedPipeline(RHI::PipelineHandle{});
             m_VisualizationOverlayPass.SetVectorFieldAlwaysOnTopPipeline(RHI::PipelineHandle{});
             m_VisualizationOverlayPass.SetIsolineDepthTestedPipeline(RHI::PipelineHandle{});
@@ -6941,6 +6966,27 @@ namespace Extrinsic::Graphics
                     "[Graphics] SelectionEntityId outline-only pipeline unavailable; "
                     "outline-only selection ID recording will be skipped: error={}",
                     static_cast<int>(selectionEntityIdOutlinePipeline.error()));
+            }
+
+            // UI-067: transient debug spheres, appended last so historical
+            // `FailPipelineCreateCall` indices remain stable. Optional: without them the pass
+            // draws sphere packets as flat sprites.
+            for (const bool depthTested : {true, false})
+            {
+                auto& lease = depthTested ? m_TransientDebugSpherePipelineLeaseDepthTested
+                                          : m_TransientDebugSpherePipelineLeaseAlwaysOnTop;
+                lease.reset();
+                auto created = m_Subsystems.PipelineManager->Create(BuildTransientDebugSpherePipelineDesc(depthTested));
+                if (!created.has_value())
+                {
+                    Core::Log::Warn("[Graphics] TransientDebug.Sphere pipeline unavailable; sphere points draw flat: error={}",
+                                    static_cast<int>(created.error()));
+                    continue;
+                }
+                lease.emplace(std::move(*created));
+                const auto handle = m_Subsystems.PipelineManager->GetDeviceHandle(lease->GetHandle());
+                if (depthTested) m_TransientDebugSurfacePass.SetSphereDepthTestedPipeline(handle);
+                else m_TransientDebugSurfacePass.SetSphereAlwaysOnTopPipeline(handle);
             }
 
             return m_CullingOutputAvailable && m_DepthPrepassPipelineLease.has_value() &&
@@ -9960,6 +10006,9 @@ namespace Extrinsic::Graphics
             if (world.Camera.Valid)
             {
                 transientDebugView.ViewProjection = world.Camera.ViewProjection;
+                transientDebugView.View = world.Camera.View;
+                transientDebugView.Projection = world.Camera.Projection;
+                transientDebugView.HasCamera = true;
                 transientDebugView.PixelsPerUnit =
                     std::abs(world.Camera.Projection[1][1]) * 0.5f * static_cast<float>(world.Viewport.Height);
             }
@@ -10411,6 +10460,8 @@ namespace Extrinsic::Graphics
         std::optional<RHI::PipelineManager::PipelineLease> m_TransientDebugLinePipelineLeaseAlwaysOnTop;
         std::optional<RHI::PipelineManager::PipelineLease> m_TransientDebugPointPipelineLeaseDepthTested;
         std::optional<RHI::PipelineManager::PipelineLease> m_TransientDebugPointPipelineLeaseAlwaysOnTop;
+        std::optional<RHI::PipelineManager::PipelineLease> m_TransientDebugSpherePipelineLeaseDepthTested;
+        std::optional<RHI::PipelineManager::PipelineLease> m_TransientDebugSpherePipelineLeaseAlwaysOnTop;
         // GRAPHICS-078 Slice B — visualization-overlay vector-field
         // pipelines. Two variants per kind (depth-tested + always-
         // on-top); same reset/republish pattern as the transient-

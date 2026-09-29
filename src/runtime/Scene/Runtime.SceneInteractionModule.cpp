@@ -1090,7 +1090,8 @@ namespace Extrinsic::Runtime
         it->Points.clear();
         it->Points.reserve(points.size());
         for (const PreviewPoint& p : points)
-            it->Points.push_back({.Position = p.Position, .Color = p.Color, .Radius = p.Radius, .DepthTested = p.DepthTested});
+            it->Points.push_back({.Position = p.Position, .Color = p.Color, .Radius = p.Radius,
+                                  .DepthTested = p.DepthTested, .Sphere = p.Sphere});
         it->Lines.clear();
         it->Lines.reserve(lines.size());
         for (const PreviewLine& l : lines)

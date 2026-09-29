@@ -20,6 +20,7 @@
 // Slice C extends to line + point lanes; Slice D adds the opt-in
 // `gpu;vulkan` pixel-readback smoke.
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -29,9 +30,11 @@
 #include <vector>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include <gtest/gtest.h>
 
+import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.Pass.TransientDebug.Surface;
 import Extrinsic.Graphics.Renderer;
@@ -1326,4 +1329,49 @@ TEST(TransientDebugSurfacePassContract, MixedLanePartialPipelineSkipRecordsRemai
     EXPECT_EQ(stats.TransientDebugUpload.MissingPipelineSkipCount, 1u);
 
     renderer->Shutdown();
+}
+
+TEST(TransientDebugSurfacePassContract, BatchesPointRunsAndDrawsSphereRunsAsBillboards)
+{
+    // UI-067: points sharing depth mode, radius and shape are one draw; sphere packets with a
+    // camera draw six billboard vertices per point, without a camera they stay flat sprites.
+    std::array<Graphics::DebugPointPacket, 3> points{};
+    for (std::size_t k = 0; k < points.size(); ++k)
+        points[k] = {.Position = glm::vec3{0.1f * float(k), 0.0f, 0.0f}, .Color = glm::vec4{1.0f},
+                     .Radius = 0.05f, .DepthTested = true, .Sphere = true};
+    const auto run = [&](bool withCamera) {
+        MockDevice device;
+        device.BackbufferHandle = RHI::TextureHandle{715u, 1u};
+        std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+        renderer->Initialize(device);
+        RHI::FrameHandle frame{};
+        EXPECT_TRUE(renderer->BeginFrame(frame));
+        renderer->SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
+            .DebugPoints = std::span<const Graphics::DebugPointPacket>{points.data(), points.size()},
+        });
+        Graphics::CameraViewInput camera{};
+        camera.Position = glm::vec3{0.0f, 0.0f, 3.0f};
+        camera.Forward = glm::vec3{0.0f, 0.0f, -1.0f};
+        camera.Up = glm::vec3{0.0f, 1.0f, 0.0f};
+        camera.View = glm::lookAt(camera.Position, glm::vec3{0.0f}, camera.Up);
+        camera.Projection = glm::perspective(glm::radians(50.0f), 1.0f, 0.1f, 100.0f);
+        camera.NearPlane = 0.1f;
+        camera.FarPlane = 100.0f;
+        camera.Valid = withCamera;
+        const Graphics::RenderFrameInput input{.Viewport = {.Width = 128, .Height = 128}, .Camera = camera};
+        Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+        renderer->PrepareFrame(world);
+        renderer->ExecuteFrame(frame, world);
+        const auto& stats = renderer->GetLastRenderGraphStats();
+        EXPECT_EQ(stats.TransientDebugUpload.PointRecordsRecorded, 3u);
+        std::vector<std::uint32_t> vertexCounts;
+        for (const auto& draw : device.CommandContext.DrawRecords) vertexCounts.push_back(draw.VertexCount);
+        renderer->Shutdown();
+        return vertexCounts;
+    };
+    const auto sphere = run(true);
+    EXPECT_NE(std::ranges::find(sphere, 18u), sphere.end()) << "one draw of 3 x 6 billboard vertices";
+    EXPECT_EQ(std::ranges::count(sphere, 1u), 0) << "no per-point draws";
+    const auto flat = run(false);
+    EXPECT_NE(std::ranges::find(flat, 3u), flat.end()) << "without a camera: one flat draw of 3 points";
 }

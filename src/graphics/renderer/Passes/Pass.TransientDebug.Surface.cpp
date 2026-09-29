@@ -39,6 +39,16 @@ namespace Extrinsic::Graphics
         m_PointAlwaysOnTopPipeline = pipeline;
     }
 
+    void TransientDebugSurfacePass::SetSphereDepthTestedPipeline(const RHI::PipelineHandle pipeline) noexcept
+    {
+        m_SphereDepthTestedPipeline = pipeline;
+    }
+
+    void TransientDebugSurfacePass::SetSphereAlwaysOnTopPipeline(const RHI::PipelineHandle pipeline) noexcept
+    {
+        m_SphereAlwaysOnTopPipeline = pipeline;
+    }
+
     void TransientDebugSurfacePass::ExecuteTriangles(
         RHI::ICommandContext& cmd,
         const std::span<const DebugTrianglePacket> triangles,
@@ -161,34 +171,55 @@ namespace Extrinsic::Graphics
             return;
         }
 
-        int lastDepthTested = -1;
+        // Runs of consecutive packets sharing depth mode, radius and shape are one draw each
+        // (UI-067): flat sprites Draw(n) point vertices, spheres Draw(6 n) billboard vertices.
+        const bool spheresAvailable =
+            view.HasCamera && m_SphereDepthTestedPipeline.IsValid() && m_SphereAlwaysOnTopPipeline.IsValid();
+        const auto sphere = [&](const DebugPointPacket& packet) { return packet.Sphere && spheresAvailable; };
+        RHI::PipelineHandle bound{};
         std::uint32_t recordedPackets = 0u;
-        for (std::size_t packetIndex = 0; packetIndex < points.size(); ++packetIndex)
+        for (std::size_t first = 0; first < points.size();)
         {
-            const DebugPointPacket& packet = points[packetIndex];
-            const int packetDepthTested = packet.DepthTested ? 1 : 0;
-            if (packetDepthTested != lastDepthTested)
+            const DebugPointPacket& packet = points[first];
+            std::size_t end = first + 1u;
+            while (end < points.size() && points[end].DepthTested == packet.DepthTested &&
+                   points[end].Radius == packet.Radius && sphere(points[end]) == sphere(packet))
+                ++end;
+            const auto count = static_cast<std::uint32_t>(end - first);
+            const RHI::PipelineHandle pipeline = sphere(packet)
+                ? (packet.DepthTested ? m_SphereDepthTestedPipeline : m_SphereAlwaysOnTopPipeline)
+                : (packet.DepthTested ? m_PointDepthTestedPipeline : m_PointAlwaysOnTopPipeline);
+            if (pipeline != bound)
             {
-                const RHI::PipelineHandle pipeline = packet.DepthTested
-                    ? m_PointDepthTestedPipeline
-                    : m_PointAlwaysOnTopPipeline;
                 cmd.BindPipeline(pipeline);
-                lastDepthTested = packetDepthTested;
+                bound = pipeline;
             }
-
-            TransientDebugPointPushConstants pc{};
-            pc.VertexBufferBDA = uploadResult.VertexBufferBDA;
-            pc.FirstVertex = static_cast<std::uint32_t>(packetIndex);
-            pc.Radius = packet.Radius;
-            pc.ViewProjection = view.ViewProjection;
-            pc.PixelsPerUnit = view.PixelsPerUnit;
-            cmd.PushConstants(&pc, static_cast<std::uint32_t>(sizeof(pc)));
-
-            // `Draw(1, 1, 0, 0)` per packet — one point is one vertex
-            // fetched via BDA at `FirstVertex + gl_VertexIndex` (with
-            // `gl_VertexIndex = 0` on this single-vertex draw).
-            cmd.Draw(1u, 1u, 0u, 0u);
-            ++recordedPackets;
+            if (sphere(packet))
+            {
+                TransientDebugSpherePushConstants pc{};
+                pc.VertexBufferBDA = uploadResult.VertexBufferBDA;
+                pc.FirstVertex = static_cast<std::uint32_t>(first);
+                pc.Radius = packet.Radius;
+                for (int c = 0; c < 4; ++c)
+                    for (int r = 0; r < 3; ++r) pc.View[c * 3 + r] = view.View[c][r];
+                pc.Projection = view.Projection;
+                cmd.PushConstants(&pc, static_cast<std::uint32_t>(sizeof(pc)));
+                cmd.Draw(6u * count, 1u, 0u, 0u);
+            }
+            else
+            {
+                TransientDebugPointPushConstants pc{};
+                pc.VertexBufferBDA = uploadResult.VertexBufferBDA;
+                pc.FirstVertex = static_cast<std::uint32_t>(first);
+                pc.Radius = packet.Radius;
+                pc.ViewProjection = view.ViewProjection;
+                pc.PixelsPerUnit = view.PixelsPerUnit;
+                cmd.PushConstants(&pc, static_cast<std::uint32_t>(sizeof(pc)));
+                // `FirstVertex + gl_VertexIndex` addresses each point of the run.
+                cmd.Draw(count, 1u, 0u, 0u);
+            }
+            recordedPackets += count;
+            first = end;
         }
 
         diagnostics.PointRecordsRecorded += recordedPackets;

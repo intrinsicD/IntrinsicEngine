@@ -58,12 +58,30 @@ namespace Extrinsic::Graphics
         float Reserved[3];
     };
 
+    // UI-067: sphere points. One draw per run of packets sharing depth mode and radius, six
+    // billboard vertices per point; View is world -> view as a 4x3 (scalar layout) so the block
+    // fits the guaranteed 128 bytes.
+    export struct TransientDebugSpherePushConstants
+    {
+        std::uint64_t VertexBufferBDA;
+        std::uint32_t FirstVertex;
+        float Radius;
+        float View[12]; // glm::mat4x3, column-major
+        glm::mat4 Projection;
+    };
+    static_assert(sizeof(TransientDebugSpherePushConstants) == 128);
+
     // Camera for one frame's transient debug primitives. The default (identity, no point
     // scaling) makes packet coordinates clip-space, which the pass contract tests use.
     export struct TransientDebugView
     {
         glm::mat4 ViewProjection{1.0f};
         float PixelsPerUnit{0.0f};
+        // Sphere points need the view and projection separately; without a camera they are
+        // drawn as flat sprites.
+        glm::mat4 View{1.0f};
+        glm::mat4 Projection{1.0f};
+        bool HasCamera{false};
     };
 
     export class TransientDebugSurfacePass
@@ -80,6 +98,9 @@ namespace Extrinsic::Graphics
         void SetLineAlwaysOnTopPipeline(RHI::PipelineHandle pipeline) noexcept;
         void SetPointDepthTestedPipeline(RHI::PipelineHandle pipeline) noexcept;
         void SetPointAlwaysOnTopPipeline(RHI::PipelineHandle pipeline) noexcept;
+        // Optional (UI-067): without them sphere packets fall back to flat sprites.
+        void SetSphereDepthTestedPipeline(RHI::PipelineHandle pipeline) noexcept;
+        void SetSphereAlwaysOnTopPipeline(RHI::PipelineHandle pipeline) noexcept;
 
         [[nodiscard]] RHI::PipelineHandle GetTriangleDepthTestedPipeline() const noexcept
         {
@@ -148,5 +169,7 @@ namespace Extrinsic::Graphics
         RHI::PipelineHandle m_LineAlwaysOnTopPipeline{};
         RHI::PipelineHandle m_PointDepthTestedPipeline{};
         RHI::PipelineHandle m_PointAlwaysOnTopPipeline{};
+        RHI::PipelineHandle m_SphereDepthTestedPipeline{};
+        RHI::PipelineHandle m_SphereAlwaysOnTopPipeline{};
     };
 }

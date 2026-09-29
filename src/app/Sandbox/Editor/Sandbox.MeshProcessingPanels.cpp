@@ -3023,7 +3023,7 @@ namespace Extrinsic::Sandbox::Editor
                     const float radius = std::max(1e-4f, 0.004f * glm::length(hi - lo));
                     for (std::size_t i = 0; i < count; i += stride)
                         points.push_back({.Position = preview[i], .Color = {1.0f, 0.55f, 0.1f, 1.0f},
-                                          .Radius = radius, .DepthTested = true});
+                                          .Radius = radius, .DepthTested = true, .Sphere = true});
                     interaction->SetPreviewOverlay("coherent_point_drift", points);
                     state.PreviewRevision = snapshot.Revision;
                 }

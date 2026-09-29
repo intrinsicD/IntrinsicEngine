@@ -94,6 +94,8 @@ namespace Extrinsic::Graphics
         glm::vec4 Color{1.f};
         float Radius{0.01f};
         bool DepthTested{true};
+        // UI-067: shaded sphere of world `Radius` (needs a camera; flat round sprite otherwise).
+        bool Sphere{false};
     };
 
     // Transient debug triangles are drawn two-sided (no culling), so their winding does not matter.
