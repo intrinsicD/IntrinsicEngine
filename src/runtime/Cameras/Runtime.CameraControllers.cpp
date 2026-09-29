@@ -285,7 +285,10 @@ namespace Extrinsic::Runtime
             const glm::vec3 right = Detail::RightFromOrientation(m_Orientation);
             const glm::vec3 up = Detail::UpFromOrientation(m_Orientation);
             const glm::quat yawRotation = glm::angleAxis(glm::radians(-xDelta), up);
-            const glm::quat pitchRotation = glm::angleAxis(glm::radians(yDelta), right);
+            // Grab convention: dragging up turns the object's front upward, so the camera moves below
+            // the target (screen Y grows downward). BUG-040 chose the opposite sign while the scene
+            // image was still vertically mirrored (fixed by BUG-227).
+            const glm::quat pitchRotation = glm::angleAxis(glm::radians(-yDelta), right);
             m_Orientation = Detail::SafeNormalized(yawRotation * pitchRotation * m_Orientation,
                                                    m_Orientation);
             m_Yaw = Detail::YawFromForward(Detail::ForwardFromOrientation(m_Orientation));

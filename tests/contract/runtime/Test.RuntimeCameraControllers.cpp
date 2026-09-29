@@ -137,7 +137,7 @@ TEST(RuntimeCameraControllers, OrbitAlsoRotatesWithMiddleMouseDrag)
     ExpectValidCameraView(controller.GetView(Core::Extent2D{1280, 720}));
 }
 
-TEST(RuntimeCameraControllers, OrbitMouseUpDragMovesCameraAboveTarget)
+TEST(RuntimeCameraControllers, OrbitMouseUpDragTurnsTheObjectUpward)
 {
     Runtime::OrbitCameraController upward{MakeSeed()};
     Platform::Input::Context upInput{};
@@ -149,10 +149,12 @@ TEST(RuntimeCameraControllers, OrbitMouseUpDragMovesCameraAboveTarget)
     upward.Update(upInput, 1.0 / 60.0);
 
     const Graphics::CameraViewInput upView = upward.GetView(Core::Extent2D{1280, 720});
-    EXPECT_GT(upView.Position.y, 0.01f)
-        << "Dragging up should move the orbit camera above the target.";
-    EXPECT_LT(upView.Forward.y, -0.01f)
-        << "A camera above the target should look downward toward it.";
+    // Grab convention (with the Y-up image of BUG-227): the object's front follows the mouse up,
+    // so the camera goes below the target and looks upward at it.
+    EXPECT_LT(upView.Position.y, -0.01f)
+        << "Dragging up should move the orbit camera below the target.";
+    EXPECT_GT(upView.Forward.y, 0.01f)
+        << "A camera below the target should look upward toward it.";
     ExpectWorldPointCentered(upView, glm::vec3{0.0f, 0.0f, 0.0f});
 
     Runtime::OrbitCameraController downward{MakeSeed()};
@@ -165,10 +167,10 @@ TEST(RuntimeCameraControllers, OrbitMouseUpDragMovesCameraAboveTarget)
     downward.Update(downInput, 1.0 / 60.0);
 
     const Graphics::CameraViewInput downView = downward.GetView(Core::Extent2D{1280, 720});
-    EXPECT_LT(downView.Position.y, -0.01f)
-        << "Dragging down should move the orbit camera below the target.";
-    EXPECT_GT(downView.Forward.y, 0.01f)
-        << "A camera below the target should look upward toward it.";
+    EXPECT_GT(downView.Position.y, 0.01f)
+        << "Dragging down should move the orbit camera above the target.";
+    EXPECT_LT(downView.Forward.y, -0.01f)
+        << "A camera above the target should look downward toward it.";
     ExpectWorldPointCentered(downView, glm::vec3{0.0f, 0.0f, 0.0f});
 }
 
