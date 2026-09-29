@@ -13,6 +13,19 @@ contracts: [repo.source-documentation]
 ---
 # UI-067 — Observable, responsive registration (ICP, CPD, BCPD)
 
+## Completion — 2026-09-29
+Commit: on `claude/cpd-nystrom`, `e087e7746` (orbit pitch), `a3a5fac25` (CPD cancellation and
+stages), `0b137f51d` (sphere impostor point runs), `03371204a` (BCPD subsamples), `3acfeabb8`
+(shared trace plots), `873f6f846` (ICP progress and cancel), `59bd6b399` (log/flat plot axes).
+Live check (release sandbox, Xephyr, two 385456-point M16 clouds): BCPD with 2000/2000
+subsamples; Step ran one iteration in under a second and paused with Apply enabled; Step 10
+showed "Iteration N: stage for X s" while running; Cancel during Run to end ended the run within
+0.4 s ("cancelled; nothing was applied"); source/target subsamples and the moving preview drew as
+shaded spheres; all trace plots updated live. ICP (20/50 iterations, 0.15 s each) showed the
+running iteration, RMSE and inliers; Cancel after 1 s stopped at iteration 10 without applying.
+The check found unreadable axes for zero log values and a near-constant inlier count, fixed in
+`59bd6b399`. Operational.
+
 ## Goal
 - Operator report (2026-09-29): after pressing Step the CPD panel stayed "Running" with only
   Restart/Cancel/Discard; registration progress is not observable; subsamples should render with
@@ -33,10 +46,10 @@ contracts: [repo.source-documentation]
 6. Live sandbox check of the CPD and ICP panels.
 
 ## Acceptance criteria
-- [ ] A Step on a large nonrigid/BCPD run shows its stage and elapsed time; Cancel ends it within one kernel row block or E-step chunk; Apply is available after a completed Step.
-- [ ] CPD and ICP panels plot every per-iteration quantity over iterations or seconds; the solver publishes at most one snapshot per iteration.
-- [ ] Preview and BCPD subsamples render as shaded spheres in a single draw.
-- [ ] Contract tests for cancellation, stage reporting and the transient point draw shape.
+- [x] A Step on a large nonrigid/BCPD run shows its stage and elapsed time; Cancel ends it within one kernel row block or E-step chunk; Apply is available after a completed Step.
+- [x] CPD and ICP panels plot every per-iteration quantity over iterations or seconds; the solver publishes at most one snapshot per iteration.
+- [x] Preview and BCPD subsamples render as shaded spheres in a single draw.
+- [x] Contract tests for cancellation, stage reporting and the transient point draw shape.
 
 ## Verification
 ```bash
