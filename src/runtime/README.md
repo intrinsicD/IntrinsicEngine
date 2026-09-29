@@ -796,8 +796,9 @@ low-rank runs report the kernel rank and its sampled approximation error. The `v
 E-step (METHOD-056) runs the dense two-pass form on the device while the kernel is wide:
 `Extrinsic.Runtime.CoherentPointDriftGpuEStep` is a per-run broker whose `Evaluate` (the
 solver's external evaluator) blocks the step worker while a companion pump job, polled on
-the main thread through `IsReadyToApply`, records it with `SpatialIndexCache::QueueGpuCompute`
-(`Extrinsic.Graphics.CoherentPointDriftEStep`) and hands the readback back. Without the job
+the main thread through `IsReadyToApply`, submits it with `SpatialIndexCache::QueueGpuCompute`
+as an immediate (off-frame, GRAPHICS-150) request (`Extrinsic.Graphics.CoherentPointDriftEStep`)
+and hands the readback back, usually within the frame. Without the job
 lane, an operational device with shader float64, or after a device failure or timeout, the
 iterations run the exact CPU choice; results count them in `e_step_fallbacks` and say why in
 `gpu_diagnostic`, and count device iterations in `e_step_device_iterations` (kernels too narrow

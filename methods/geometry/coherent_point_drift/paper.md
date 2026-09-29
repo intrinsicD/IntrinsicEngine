@@ -215,14 +215,15 @@ CPU dense pass (a review found that a row far from every source under a narrow k
 error bound (not rigorous: term errors partly cancel), and results count the CPU rows.
 Without an evaluator, or when it fails, the iteration runs the exact CPU choice and
 `EStepFallbacks` counts it; `EStepDeviceIterations` counts the device iterations. In the editor the solver worker
-waits while a pump job records the passes through the frame loop, so one device E-step costs
-several frames of latency. Measured (C117, RTX 3050): E-step statistics within 1e-7
+waits while a pump job submits the passes off-frame (GRAPHICS-150), so one device E-step costs
+about one engine frame of latency. Measured (C117, RTX 3050): E-step statistics within 1e-7
 relative of CPU dense on the smoke fixtures (including a far row evaluated on the CPU);
 10^5-point rigid registration in 19.8 s instead of 185 s for the same route with the CPU dense
 pass (Auto 188 s, Nystroem 121 s; 21 of 48 iterations on the device, no CPU rows needed there),
 registered points within 3e-11. A whole-iteration guard without float-float coordinates had kept
-most mid-sigma iterations on the CPU (115 s). At 10^3 points frame latency makes it slower than
-the CPU
+most mid-sigma iterations on the CPU (115 s). Off-frame submits (3.4 ms instead of 8.9 ms per
+round trip) give 3.8x at 10^4 points (349 ms vs 1315 ms); at 10^3 points the frame pacing still
+loses to the CPU (34 ms vs 28 ms, 78 ms framed)
 (`geometry.coherent_point_drift.vulkan_dense_e_step_scaling`).
 
 ## Bayesian Coherent Point Drift (METHOD-050)

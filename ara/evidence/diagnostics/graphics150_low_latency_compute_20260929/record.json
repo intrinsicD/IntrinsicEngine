@@ -1,0 +1,29 @@
+{
+  "task": "GRAPHICS-150",
+  "date": "2026-09-29",
+  "source_revision": "36bcf55db1201c0cf3700b40db15457d390bf44e",
+  "supersedes_timing_of": "ara/evidence/diagnostics/method063_cpd_vulkan_per_row_20260929/ (framed QueueGpuCompute, 83e5b533f)",
+  "environment": {
+    "cpu": "Intel Core i9-11900KF (8 cores, 16 threads), CPU E-steps use all hardware threads",
+    "gpu": "NVIDIA GeForce RTX 3050 (8 GiB), driver 590.48.01, subgroup 32, shader float64",
+    "display": "Xephyr :7 (nested X server), 64x64 window, VSync off, validation layers off",
+    "compiler": "clang++ 23.0.0",
+    "preset": "ci-vulkan-release",
+    "build_type": "Release, no -march=native"
+  },
+  "commands": [
+    "cmake --build build/ci-vulkan-release --target IntrinsicPointLBVHGpuTests",
+    "GITHUB_SHA=36bcf55db1201c0cf3700b40db15457d390bf44e INTRINSIC_METHOD056_SCALING_OUTPUT=<dir> DISPLAY=:7 build/ci-vulkan-release/bin/IntrinsicPointLBVHGpuTests --gtest_filter='METHOD056VulkanCpdEStep.ScalingProfile:GRAPHICS150*' > run-progress.log",
+    "python3 tools/benchmark/seal_benchmark_results.py --root <dir> --manifests-root benchmarks --run-id graphics150-vulkan-e-step-scaling-immediate-20260929 --source-state clean_commit --source-revision 36bcf55db1201c0cf3700b40db15457d390bf44e --claim-eligible --replace",
+    "python3 tools/benchmark/validate_benchmark_results.py --root <dir> --strict"
+  ],
+  "outcomes": {
+    "round_trip": "GRAPHICS150LowLatencyCompute (CPD E-step workspace, 4096 x 3000): framed 3.0 frames / 8.92 ms, immediate 0.0 frames / 3.36 ms per round trip, identical readback bytes",
+    "rigid_1000_points": "Vulkan 34.2 ms (was 78.4 ms framed) vs CPU twin 28.0 ms: still 1.22x slower; 16 of 25 iterations on the device, 1.4 ms per iteration",
+    "rigid_10000_points": "Vulkan 349 ms (was 399 ms) vs CPU twin 1315 ms (3.8x); 19 of 35 on the device",
+    "rigid_100000_points": "Vulkan 20.1 s (was 19.8 s) vs CPU twin 186.5 s (9.3x): compute-bound, latency irrelevant",
+    "parity": "max registered-point delta to the CPU twin 2.5e-11 (10^5), 1.6e-12 (10^3); RMS to the ground truth equal"
+  },
+  "limitations": "The broker's pump still runs once per engine frame, so each device iteration waits for the next frame's job drain; at 10^3 points (1 ms CPU E-step) that pacing keeps the device path 22% behind the CPU. With VSync on (sandbox) a frame is 16 ms, so small inputs lose more there. One host, one GPU, one rigid fixture.",
+  "not_measured": "VSync-on pacing; nonrigid and Bayesian device runs; ICP (QueueGpuNearest batches stay framed)."
+}

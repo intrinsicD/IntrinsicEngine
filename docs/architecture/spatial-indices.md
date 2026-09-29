@@ -46,6 +46,17 @@ context and shader-readable index view. A failed recording/readback returns a
 diagnostic, and runtime consumers still validate source revisions before
 publishing properties. Keypoint computation uses this path.
 
+By default the recorder runs inside the next frame's command buffer and is read
+back after the frames in flight (4-6 frames per round trip). Iterative consumers
+pass `SpatialGpuLatency::Immediate` (GRAPHICS-150): the cache hands the same
+recorder to `IDevice::SubmitComputeReadback`, which records it into a command
+buffer of its own on the graphics queue, copies the result into a readback slot
+and submits at once, so the transfer queue's `CollectCompleted` delivers it in
+the same frame's maintenance. An index-backed request goes immediate only once
+its index is built; a device without the path (or a refused submit) leaves the
+work to the frame. The CPD E-step broker, point-sampling chunks and the sparse
+CG solver use it.
+
 A consumer owning a changing hierarchy uses `Graphics::PointLbvhWorkspace`
 directly. Its borrowed buffer addresses remain valid only while the workspace
 and device remain alive.

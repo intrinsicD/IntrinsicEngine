@@ -4336,3 +4336,14 @@ observations:
     crystallized_via: artifact-commitment
     stale: false
 
+  - id: O260
+    timestamp: 2026-09-29T23:00+02:00
+    provenance: ai-executed
+    content: Submitting the Vulkan CPD E-step on its own command buffer outside the frame and reading it back at the next CollectCompleted (GRAPHICS-150) cuts a round trip from 3 frames / 8.9 ms to the same frame / 3.4 ms with identical bytes; the device route then takes 349 ms instead of 399 ms at 10^4 points (3.8x over the CPU twin) and 34 ms instead of 78 ms at 10^3, still 1.2x behind the CPU because the pump runs once per engine frame.
+    context: One host and GPU, Release, VSync off, 64x64 window under Xephyr; rigid bumpy-ellipsoid fixture.
+    potential_type: claim
+    bound_to: [N651]
+    promoted: true
+    promoted_to: logic/claims.md:C117
+    crystallized_via: artifact-commitment
+    stale: false

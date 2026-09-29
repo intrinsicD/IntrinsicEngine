@@ -13861,3 +13861,13 @@ tree:
     - ara/evidence/diagnostics/method063_cpd_vulkan_per_row_20260929/sealed-result.json
     status: resolved
 
+  - id: N651
+    type: experiment
+    title: Off-frame compute submit and readback for iterative GPU jobs
+    provenance: ai-executed
+    timestamp: 2026-09-29T23:00+02:00
+    result: GRAPHICS-150 adds IDevice::SubmitComputeReadback and SpatialGpuLatency::Immediate; the CPD E-step broker, point sampling and sparse CG opt in. Round trip 3.4 ms (framed 8.9 ms), 10^4-point CPD 3.8x over the CPU twin, 10^3 points still 1.2x slower (engine-frame pump pacing). C117 revised.
+    evidence:
+    - ara/evidence/diagnostics/graphics150_low_latency_compute_20260929/record.json
+    - ara/evidence/diagnostics/graphics150_low_latency_compute_20260929/sealed-result.json
+    status: resolved

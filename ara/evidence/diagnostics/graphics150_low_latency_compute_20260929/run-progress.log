@@ -1,0 +1,89 @@
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = METHOD056VulkanCpdEStep.ScalingProfile:GRAPHICS150*
+[==========] Running 2 tests from 2 test suites.
+[----------] Global test environment set-up.
+[----------] 1 test from METHOD056VulkanCpdEStep
+[ RUN      ] METHOD056VulkanCpdEStep.ScalingProfile
+[32m[INFO] Initialized Scheduler with 15 worker threads.[0m
+[33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+[33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+[33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+size 1000
+  rigid_vulkan: success, 25 iterations (16 on the device), median 34.2 ms (33.9 - 34.3, 3 runs), rms 0.000371
+  rigid_vulkan_cpu_twin: success, 25 iterations (0 on the device), median 28.0 ms (27.0 - 28.6, 3 runs), rms 0.000371
+  rigid_dense: success, 25 iterations (0 on the device), median 27.9 ms (27.8 - 28.2, 3 runs), rms 0.000371
+  rigid_auto: success, 25 iterations (0 on the device), median 29.2 ms (28.6 - 29.7, 3 runs), rms 0.000371
+  rigid_nystrom: success, 25 iterations (0 on the device), median 23.3 ms (23.0 - 23.4, 3 runs), rms 0.000371
+size 10000
+  rigid_vulkan: success, 35 iterations (19 on the device), median 349.0 ms (345.5 - 360.2, 3 runs), rms 0.000138
+  rigid_vulkan_cpu_twin: success, 35 iterations (0 on the device), median 1315.4 ms (1312.9 - 1324.6, 3 runs), rms 0.000138
+  rigid_dense: success, 35 iterations (0 on the device), median 2177.3 ms (2160.1 - 2181.3, 3 runs), rms 0.000138
+  rigid_auto: success, 35 iterations (0 on the device), median 1370.1 ms (1366.2 - 1387.5, 3 runs), rms 0.000138
+  rigid_nystrom: success, 35 iterations (0 on the device), median 1067.9 ms (1059.8 - 1083.6, 3 runs), rms 0.000138
+size 100000
+  rigid_vulkan: success, 48 iterations (21 on the device), median 20131.3 ms (20121.1 - 20141.5, 2 runs), rms 4.96e-05
+  rigid_vulkan_cpu_twin: success, 48 iterations (0 on the device), median 186481.1 ms (186481.1 - 186481.1, 1 runs), rms 4.96e-05
+  rigid_dense: success, 48 iterations (0 on the device), median 411565.3 ms (411565.3 - 411565.3, 1 runs), rms 4.96e-05
+  rigid_auto: success, 48 iterations (0 on the device), median 186976.7 ms (186976.7 - 186976.7, 1 runs), rms 4.96e-05
+  rigid_nystrom: success, 48 iterations (0 on the device), median 120905.3 ms (120905.3 - 120905.3, 1 runs), rms 4.96e-05
+{
+  "benchmark_id": "geometry.coherent_point_drift.vulkan_dense_e_step_scaling",
+  "method": "geometry.coherent_point_drift",
+  "backend": "gpu_vulkan_compute",
+  "dataset": "builtin.cpd_bumpy_ellipsoid_scaling.v1",
+  "commit": "36bcf55db1201c0cf3700b40db15457d390bf44e",
+  "metrics": {
+    "runtime_ms": 20131.2765,
+    "quality_error_l2": 0.00037056028,
+    "quality_error_linf": 2.47211116e-11
+  },
+  "diagnostics": {
+    "runner": "IntrinsicPointLBVHGpuTests --gtest_filter=METHOD056VulkanCpdEStep.ScalingProfile",
+    "mode": "performance_scaling_profile",
+    "reported_backend": "gpu_vulkan_fp32_dense",
+    "device_subgroup_size": 32,
+    "validation_layers": false,
+    "vsync": false,
+    "e_step_tolerance": 1e-06,
+    "sizes": [
+      {"points": 1000, "rigid": [
+        {"name": "rigid_vulkan", "status": "success", "backend": "gpu_vulkan_fp32_dense", "iterations": 25, "device_iterations": 16, "e_step_fallbacks": 0, "device_cpu_rows": 0, "runtime_ms": 34.176643, "runtime_ms_min": 33.928546, "runtime_ms_max": 34.315339, "repetitions": 3, "ms_per_iteration": 1.36706572, "worker_wait_ms_first_run": 22.679586, "rms_error_to_truth": 0.00037056028, "kernel_evaluations": 32503192, "e_step_sampled_error": 0, "max_point_delta": 1.64047012e-12, "parity_against": "rigid_vulkan_cpu_twin"},
+        {"name": "rigid_vulkan_cpu_twin", "status": "success", "backend": "cpu_auto", "iterations": 25, "device_iterations": 0, "e_step_fallbacks": 16, "device_cpu_rows": 0, "runtime_ms": 28.004077, "runtime_ms_min": 26.982219, "runtime_ms_max": 28.597442, "repetitions": 3, "ms_per_iteration": 1.12016308, "worker_wait_ms_first_run": 0, "rms_error_to_truth": 0.00037056028, "kernel_evaluations": 16503192, "e_step_sampled_error": 0},
+        {"name": "rigid_dense", "status": "success", "backend": "cpu_dense_parallel", "iterations": 25, "device_iterations": 0, "e_step_fallbacks": 0, "device_cpu_rows": 0, "runtime_ms": 27.930715, "runtime_ms_min": 27.801828, "runtime_ms_max": 28.18441, "repetitions": 3, "ms_per_iteration": 1.1172286, "worker_wait_ms_first_run": 0, "rms_error_to_truth": 0.00037056028, "kernel_evaluations": 26000000, "e_step_sampled_error": 0, "max_point_delta": 6.26615021e-13, "parity_against": "rigid_vulkan_cpu_twin"},
+        {"name": "rigid_auto", "status": "success", "backend": "cpu_auto", "iterations": 25, "device_iterations": 0, "e_step_fallbacks": 0, "device_cpu_rows": 0, "runtime_ms": 29.225082, "runtime_ms_min": 28.619086, "runtime_ms_max": 29.667186, "repetitions": 3, "ms_per_iteration": 1.16900328, "worker_wait_ms_first_run": 0, "rms_error_to_truth": 0.00037056028, "kernel_evaluations": 16503192, "e_step_sampled_error": 0, "max_point_delta": 0, "parity_against": "rigid_vulkan_cpu_twin"},
+        {"name": "rigid_nystrom", "status": "success", "backend": "cpu_auto", "iterations": 25, "device_iterations": 0, "e_step_fallbacks": 0, "device_cpu_rows": 0, "runtime_ms": 23.329275, "runtime_ms_min": 22.960202, "runtime_ms_max": 23.422729, "repetitions": 3, "ms_per_iteration": 0.933171, "worker_wait_ms_first_run": 0, "rms_error_to_truth": 0.00037056028, "kernel_evaluations": 16503192, "e_step_sampled_error": 0, "max_point_delta": 0, "parity_against": "rigid_vulkan_cpu_twin"}
+      ]},
+      {"points": 10000, "rigid": [
+        {"name": "rigid_vulkan", "status": "success", "backend": "gpu_vulkan_fp32_dense", "iterations": 35, "device_iterations": 19, "e_step_fallbacks": 0, "device_cpu_rows": 0, "runtime_ms": 349.035461, "runtime_ms_min": 345.512292, "runtime_ms_max": 360.169561, "repetitions": 3, "ms_per_iteration": 9.97244174, "worker_wait_ms_first_run": 142.895165, "rms_error_to_truth": 0.000138222094, "kernel_evaluations": 3861327699, "e_step_sampled_error": 0, "max_point_delta": 1.49955886e-12, "parity_against": "rigid_vulkan_cpu_twin"},
+        {"name": "rigid_vulkan_cpu_twin", "status": "success", "backend": "cpu_auto", "iterations": 35, "device_iterations": 0, "e_step_fallbacks": 19, "device_cpu_rows": 0, "runtime_ms": 1315.39322, "runtime_ms_min": 1312.86533, "runtime_ms_max": 1324.58334, "repetitions": 3, "ms_per_iteration": 37.5826635, "worker_wait_ms_first_run": 0, "rms_error_to_truth": 0.000138222094, "kernel_evaluations": 1961327651, "e_step_sampled_error": 0},
+        {"name": "rigid_dense", "status": "success", "backend": "cpu_dense_parallel", "iterations": 35, "device_iterations": 0, "e_step_fallbacks": 0, "device_cpu_rows": 0, "runtime_ms": 2177.26965, "runtime_ms_min": 2160.14084, "runtime_ms_max": 2181.252, "repetitions": 3, "ms_per_iteration": 62.2077042, "worker_wait_ms_first_run": 0, "rms_error_to_truth": 0.000138222094, "kernel_evaluations": 3600000000, "e_step_sampled_error": 0, "max_point_delta": 4.06029446e-14, "parity_against": "rigid_vulkan_cpu_twin"},
+        {"name": "rigid_auto", "status": "success", "backend": "cpu_auto", "iterations": 35, "device_iterations": 0, "e_step_fallbacks": 0, "device_cpu_rows": 0, "runtime_ms": 1370.07205, "runtime_ms_min": 1366.18221, "runtime_ms_max": 1387.51579, "repetitions": 3, "ms_per_iteration": 39.1449157, "worker_wait_ms_first_run": 0, "rms_error_to_truth": 0.000138222094, "kernel_evaluations": 1961327651, "e_step_sampled_error": 0, "max_point_delta": 0, "parity_against": "rigid_vulkan_cpu_twin"},
+        {"name": "rigid_nystrom", "status": "success", "backend": "cpu_nystrom", "iterations": 35, "device_iterations": 0, "e_step_fallbacks": 0, "device_cpu_rows": 0, "runtime_ms": 1067.89678, "runtime_ms_min": 1059.82122, "runtime_ms_max": 1083.55298, "repetitions": 3, "ms_per_iteration": 30.5113366, "worker_wait_ms_first_run": 0, "rms_error_to_truth": 0.000138222044, "kernel_evaluations": 1420037997, "e_step_sampled_error": 0.000740573318, "max_point_delta": 6.57879082e-10, "parity_against": "rigid_vulkan_cpu_twin"}
+      ]},
+      {"points": 100000, "rigid": [
+        {"name": "rigid_vulkan", "status": "success", "backend": "gpu_vulkan_fp32_dense", "iterations": 48, "device_iterations": 21, "e_step_fallbacks": 0, "device_cpu_rows": 0, "runtime_ms": 20131.2765, "runtime_ms_min": 20121.0911, "runtime_ms_max": 20141.4619, "repetitions": 2, "ms_per_iteration": 419.401594, "worker_wait_ms_first_run": 9104.0238, "rms_error_to_truth": 4.96497643e-05, "kernel_evaluations": 426734216456, "e_step_sampled_error": 0, "max_point_delta": 2.47211116e-11, "parity_against": "rigid_vulkan_cpu_twin"},
+        {"name": "rigid_vulkan_cpu_twin", "status": "success", "backend": "cpu_auto", "iterations": 48, "device_iterations": 0, "e_step_fallbacks": 21, "device_cpu_rows": 0, "runtime_ms": 186481.111, "runtime_ms_min": 186481.111, "runtime_ms_max": 186481.111, "repetitions": 1, "ms_per_iteration": 3885.02314, "worker_wait_ms_first_run": 0, "rms_error_to_truth": 4.96497562e-05, "kernel_evaluations": 426734211542, "e_step_sampled_error": 0},
+        {"name": "rigid_dense", "status": "success", "backend": "cpu_dense_parallel", "iterations": 48, "device_iterations": 0, "e_step_fallbacks": 0, "device_cpu_rows": 0, "runtime_ms": 411565.346, "runtime_ms_min": 411565.346, "runtime_ms_max": 411565.346, "repetitions": 1, "ms_per_iteration": 8574.27803, "worker_wait_ms_first_run": 0, "rms_error_to_truth": 4.96497562e-05, "kernel_evaluations": 980000000000, "e_step_sampled_error": 0, "max_point_delta": 8.13507351e-14, "parity_against": "rigid_vulkan_cpu_twin"},
+        {"name": "rigid_auto", "status": "success", "backend": "cpu_auto", "iterations": 48, "device_iterations": 0, "e_step_fallbacks": 0, "device_cpu_rows": 0, "runtime_ms": 186976.666, "runtime_ms_min": 186976.666, "runtime_ms_max": 186976.666, "repetitions": 1, "ms_per_iteration": 3895.34721, "worker_wait_ms_first_run": 0, "rms_error_to_truth": 4.96497562e-05, "kernel_evaluations": 426734211542, "e_step_sampled_error": 0, "max_point_delta": 0, "parity_against": "rigid_vulkan_cpu_twin"},
+        {"name": "rigid_nystrom", "status": "success", "backend": "cpu_nystrom", "iterations": 48, "device_iterations": 0, "e_step_fallbacks": 0, "device_cpu_rows": 0, "runtime_ms": 120905.264, "runtime_ms_min": 120905.264, "runtime_ms_max": 120905.264, "repetitions": 1, "ms_per_iteration": 2518.85966, "worker_wait_ms_first_run": 0, "rms_error_to_truth": 4.96452818e-05, "kernel_evaluations": 268099881197, "e_step_sampled_error": 0.000966634574, "max_point_delta": 1.20847375e-08, "parity_against": "rigid_vulkan_cpu_twin"}
+      ]}
+    ]
+  },
+  "status": "passed"
+}
+[       OK ] METHOD056VulkanCpdEStep.ScalingProfile (965945 ms)
+[----------] 1 test from METHOD056VulkanCpdEStep (965945 ms total)
+
+[----------] 1 test from GRAPHICS150LowLatencyCompute
+[ RUN      ] GRAPHICS150LowLatencyCompute.ImmediateSubmitsReturnTheFramedBytesInFewerFrames
+[32m[INFO] Initialized Scheduler with 15 worker threads.[0m
+[33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+[33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+[33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+GRAPHICS-150: framed 3.0 frames / 8.92 ms, immediate 0.0 frames / 3.36 ms per round trip
+[       OK ] GRAPHICS150LowLatencyCompute.ImmediateSubmitsReturnTheFramedBytesInFewerFrames (335 ms)
+[----------] 1 test from GRAPHICS150LowLatencyCompute (335 ms total)
+
+[----------] Global test environment tear-down
+[==========] 2 tests from 2 test suites ran. (966281 ms total)
+[  PASSED  ] 2 tests.
