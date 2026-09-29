@@ -48,6 +48,7 @@ import Geometry.Properties;
 #include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
 #include "Editor/internal/Runtime.EditorFramedGpuJob.hpp"
 #include "Editor/internal/Runtime.EditorGeneratedEntity.hpp"
+#include "Editor/internal/Runtime.EditorTransformHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 
 namespace Extrinsic::Runtime
@@ -79,6 +80,8 @@ namespace Extrinsic::Runtime
             std::vector<glm::vec3> World{};
             std::vector<double> Weights{};
             std::vector<float> Scores{};
+            // World frame the samples were taken in (checked before a deferred publication).
+            std::optional<ECSC::Transform::Component> Transform{};
         };
 
         EditorPointSamplingResult Failure(EditorCommandStatus status, std::string message)
@@ -129,6 +132,10 @@ namespace Extrinsic::Runtime
             if (out == nullptr) return std::nullopt;
             out->Entity = *entity;
             out->Input = std::move(input);
+            // A deferred run publishes only while the weights it read are unchanged, too.
+            if (weights) out->Input.Inputs.push_back(GPD::ObserveGeometryProperty(available, config.Positions.Domain,
+                                                                                  config.WeightsName));
+            if (const auto* transform = raw.try_get<ECSC::Transform::Component>(*entity)) out->Transform = *transform;
             const glm::dmat4 model = ModelMatrix(raw.try_get<ECSC::Transform::Component>(*entity));
             for (const auto& p : out->Input.Points)
                 out->World.push_back(glm::vec3(model * glm::dvec4(glm::dvec3(p), 1.0)));
@@ -279,9 +286,19 @@ namespace Extrinsic::Runtime
             auto pending = result;
             pending.Status = EditorCommandStatus::Pending;
             pending.Message = "Vulkan point sampling queued.";
+            // Everything the samples depend on: positions, deletions, weights and the world frame.
             const auto current = [context, captured] {
-                return GPD::GeometryPropertiesCurrent(context, captured->Entity, captured->Input.Inputs) &&
-                       GPD::EditorProcessingContextWorldCurrent(context);
+                if (!GPD::EditorProcessingContextWorldCurrent(context) ||
+                    !GPD::GeometryPropertiesCurrent(context, captured->Entity, captured->Input.Inputs))
+                    return false;
+                auto& raw = context.Scene->Raw();
+                if (const auto* hierarchy = raw.try_get<ECSC::Hierarchy::Component>(captured->Entity);
+                    hierarchy != nullptr && raw.valid(hierarchy->Parent))
+                    return false;
+                const auto* transform = raw.try_get<ECSC::Transform::Component>(captured->Entity);
+                return transform == nullptr ? !captured->Transform
+                                            : captured->Transform &&
+                                                  EditorFeatureDetail::SameTransformComponent(*transform, *captured->Transform);
             };
             JobDesc job = EditorFeatureDetail::MakeFramedGpuJobDesc({
                 .DebugName = "Vulkan point sampling", .Scope = context.World, .Current = current,

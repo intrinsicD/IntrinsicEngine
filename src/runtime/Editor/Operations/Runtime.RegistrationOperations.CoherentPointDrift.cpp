@@ -291,6 +291,7 @@ namespace Extrinsic::Runtime
             result.EStepErrorBound = current.EStepErrorBound;
             result.EStepSampledError = current.EStepSampledError;
             result.EStepFallbacks = current.EStepFallbacks;
+            result.EStepDeviceIterations = current.EStepDeviceIterations;
             result.GpuDiagnostic = run.GpuEStep ? run.GpuEStep->Diagnostic() : run.GpuUnavailable;
             result.KernelRank = current.KernelRank;
             result.KernelApproximationError = current.KernelApproximationError;
@@ -617,7 +618,8 @@ namespace Extrinsic::Runtime
                     },
                     .ValidateBeforeApply = [] { return JobApplyValidation::Current; },
                     .PublishCompletion = [broker](KernelEventBus&, const JobResultEnvelope&) {
-                        broker->ReleaseDeviceResources();
+                        // A Step() queued meanwhile has its own pump and keeps the workspace.
+                        if (!broker->WorkerActive()) broker->ReleaseDeviceResources();
                         return true;
                     },
                     .FinalizeUnpublishedOnMainThread = [broker] {

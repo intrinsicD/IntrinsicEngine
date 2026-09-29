@@ -27,6 +27,12 @@ records with the radix sort; the bitonic `lbvh_sort.comp` and its log^2 dispatch
 deleted (same order: stable by code over index-ordered records). Candidate left open:
 LOP grid bucketing (GRAPHICS-151).
 
+Review round (2026-09-29, Fable 5.1 and Codex 6 Astra): key bits at or above `KeyBits` now
+read as zero (the padding pass and partial digits sorted by higher bits before; the oracle takes
+`keyBits` and the smoke sorts unmasked 36- and 5-bit keys), inputs are capped at 65535 tiles
+(the guaranteed workgroup count), and the docs state that the digit-count scan needs subgroup
+arithmetic, which the LBVH now depends on.
+
 ## Goal
 - A reusable, stable LSD radix sort in `Graphics.ComputeParallelPrimitives` (uint32 keys +
   uint32 payload; uint64 keys as two 32-bit passes; 4-bit digits):

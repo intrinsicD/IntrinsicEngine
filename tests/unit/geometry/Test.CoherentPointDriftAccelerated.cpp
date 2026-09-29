@@ -447,6 +447,35 @@ TEST(CoherentPointDriftAccelerated, VulkanPolicyRunsWideKernelsOnTheExternalEval
     EXPECT_EQ(calls, 2u) << "narrow kernels stay on the CPU";
 }
 
+TEST(CoherentPointDriftAccelerated, VulkanPolicyKeepsKernelsTooNarrowForFp32OnTheCpu)
+{
+    // Review counterexample: a target far from two close sources with a narrow kernel keeps the
+    // dense route (both sources matter), but fp32 exponents of magnitude ~5000 would carry
+    // ~1e-4 relative error. The estimate routes it to the exact CPU pass; wide kernels report
+    // their estimate as the error bound instead of 0.
+    const Soa target(std::vector<glm::vec3>{{1.0f, 0.0f, 0.0f}});
+    const Soa moved(std::vector<glm::vec3>{{-3e-5f, 0.0f, 0.0f}, {3e-5f, 0.0f, 0.0f}});
+    CPD::EStep::Evaluator evaluator;
+    evaluator.SetTarget(target.View());
+    std::size_t calls = 0;
+    const CPD::EStep::Settings vulkan{.Policy = CPD::EStepPolicy::Vulkan, .Tolerance = 1e-6,
+        .External = [&calls](const CPD::EStep::ExternalRequest& r) { return ReferenceExternal(r, calls); }};
+    CPD::EStep::Sums narrow;
+    ASSERT_TRUE(evaluator.Evaluate(moved.View(), 1e-4, -std::numeric_limits<double>::infinity(), vulkan, narrow));
+    EXPECT_EQ(narrow.Used, CPD::EStepPolicy::Dense);
+    EXPECT_FALSE(narrow.ExternalFallback) << "a deliberate routing, not a device failure";
+    EXPECT_EQ(narrow.ErrorBound, 0.0);
+    EXPECT_EQ(calls, 0u);
+
+    const Soa wideTarget(Cloud(200, 71)), wideMoved(Cloud(190, 72));
+    evaluator.SetTarget(wideTarget.View());
+    CPD::EStep::Sums wide;
+    ASSERT_TRUE(evaluator.Evaluate(wideMoved.View(), 1.0, std::log(0.02), vulkan, wide));
+    EXPECT_EQ(wide.Used, CPD::EStepPolicy::Vulkan);
+    EXPECT_GT(wide.ErrorBound, 0.0) << "fp32 terms are not exact";
+    EXPECT_LE(wide.ErrorBound, CPD::EStep::kExternalErrorLimit);
+}
+
 TEST(CoherentPointDriftAccelerated, VulkanPolicyFallsBackToTheCpuAndSaysSo)
 {
     const Soa target(Cloud(200, 63)), moved(Cloud(190, 64));

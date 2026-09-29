@@ -112,6 +112,7 @@ export namespace Extrinsic::Graphics
         std::uint32_t SegmentCount = 0u;
         std::uint32_t KeyWords = 0u;   // radix passes: 32-bit key words per record
         std::uint32_t DigitShift = 0u; // radix passes: first bit of the 4-bit digit
+        std::uint32_t KeyBits = 0u;    // radix passes: key bits sorted by (higher bits ignored)
         std::uint32_t GroupSize = kParallelPrimitiveGroupSize;
         std::uint32_t GroupCountX = 0u;
         std::uint32_t GroupCountY = 1u;
@@ -243,11 +244,14 @@ export namespace Extrinsic::Graphics
         std::uint32_t GroupCount = 0u;
         std::uint32_t KeyWords = 0u;
         std::uint32_t DigitShift = 0u;
+        std::uint32_t KeyBits = 0u; // bits above are ignored (a digit past them is 0)
+        std::uint32_t Reserved0 = 0u;
     };
-    static_assert(sizeof(ParallelRadixSortPushConstants) == 40u);
+    static_assert(sizeof(ParallelRadixSortPushConstants) == 48u);
 
     inline constexpr std::uint32_t kParallelRadixDigitBits = 4u;
-    inline constexpr std::uint32_t kParallelRadixMaxElements = 1u << 28u;
+    // One 256-record tile per workgroup, within the guaranteed 65535 groups per dispatch.
+    inline constexpr std::uint32_t kParallelRadixMaxElements = 65535u * 256u;
 
     struct ParallelDispatchIndirectArgs
     {
@@ -398,10 +402,12 @@ export namespace Extrinsic::Graphics
         std::span<std::uint32_t> segmentCounts,
         std::span<float> segmentMeans) noexcept;
 
-    // CPU oracle of RecordGpuRadixSort: stable sort of the records by all KeyWords key words.
+    // CPU oracle of RecordGpuRadixSort: stable sort of the records by the low keyBits bits of
+    // their KeyWords key words (0: every key bit).
     [[nodiscard]] ParallelPrimitiveCpuResult SortRecordsByKeyCpu(
         std::span<std::uint32_t> records,
-        std::uint32_t keyWords) noexcept;
+        std::uint32_t keyWords,
+        std::uint32_t keyBits = 0u) noexcept;
 
     [[nodiscard]] ParallelPrimitiveDispatchPlan ComputePrefixScanDispatchPlan(
         std::uint32_t elementCount,

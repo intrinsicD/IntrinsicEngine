@@ -29,7 +29,8 @@ export namespace Extrinsic::Graphics
         ~FarthestPointSamplingWorkspace();
         // Kernel pairs (points x rounds) one submission may evaluate.
         static constexpr std::uint64_t MaxPairsPerSubmission = std::uint64_t{1} << 26;
-        static constexpr std::uint32_t MaxPoints = 1u << 24;
+        // One workgroup of 256 points per group, within the guaranteed 65535 groups per dispatch.
+        static constexpr std::uint32_t MaxPoints = 65535u * 256u;
         // Readback: Count clearance doubles (+inf for the first), then Count order uints.
         [[nodiscard]] static std::size_t ReadbackBytes(std::uint32_t count) noexcept;
         // Copies the input; false for an invalid shape (the device is checked when recording).

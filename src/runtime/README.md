@@ -800,7 +800,8 @@ the main thread through `IsReadyToApply`, records it with `SpatialIndexCache::Qu
 (`Extrinsic.Graphics.CoherentPointDriftEStep`) and hands the readback back. Without the job
 lane, an operational device with shader float64, or after a device failure or timeout, the
 iterations run the exact CPU choice; results count them in `e_step_fallbacks` and say why in
-`gpu_diagnostic`. The `bayesian`
+`gpu_diagnostic`, and count device iterations in `e_step_device_iterations` (kernels too narrow
+for fp32 terms stay on the CPU by design and are not fallbacks). The `bayesian`
 method (METHOD-050, BCPD) adds `gamma`, `kappa` (0 keeps equal mixing weights) and
 `subsample` (farthest-point samples registered, deformation interpolated to every point);
 like nonrigid it writes positions or a displacement property. The shared

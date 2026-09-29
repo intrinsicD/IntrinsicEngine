@@ -31,6 +31,15 @@ Reuse decisions: the framed GPU job is now one helper, `EditorFeatureDetail::Mak
 their pipelines through `Graphics::CreateComputePipeline` (property filter, sparse CG, keypoints,
 CPD E-step, LBVH, farthest point).
 
+Review round (2026-09-29, Fable 5.1 and Codex 6 Astra): deferred publication now also requires
+unchanged weights, transform and parent; non-finite or non-positive weights are refused before
+any device frame; the prefix check uses `PointSampling::FarthestPointBruteForce` within 2^24
+pairs instead of building the sieve on the main thread; `MaxPoints` is capped at 65535 groups.
+Open review notes: the CPU fallback after a device failure still orders on the main thread,
+the host-visible buffer idiom repeats between the CPD and farthest-point workspaces, and
+`-ffp-contract=fast` (GCC with native arch) would make the CPU sieve fuse and the prefix check
+fail closed.
+
 ## Goal
 - One runtime module `src/runtime/Modules/PointSampling/Runtime.PointSamplingGpu.{cppm,cpp}`
   owning upload (float positions, optional weights), persistent per-run buffers, the

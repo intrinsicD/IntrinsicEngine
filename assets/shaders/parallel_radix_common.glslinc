@@ -5,7 +5,8 @@
 // one uint32 payload, packed with stride KeyWords + 1. Each pass sorts by the 4-bit digit at
 // bit DigitShift; digits never straddle key words. Digit counts are digit-major
 // (digit * GroupCount + group), so their exclusive prefix scan is every tile's first output
-// slot per digit in stable order. No subgroup operations and no atomics on the output.
+// slot per digit in stable order. These passes use no subgroup operations and no atomics on
+// the output; the scan between them (parallel_prefix_scan.comp) uses subgroup arithmetic.
 
 #extension GL_EXT_scalar_block_layout : require
 #extension GL_EXT_buffer_reference2 : require
@@ -30,10 +31,16 @@ layout(push_constant, scalar) uniform RadixSortPush
     uint GroupCount;
     uint KeyWords;
     uint DigitShift;
+    uint KeyBits;
+    uint Reserved0;
 } pc;
 
+// Bits at or above KeyBits read as 0, so padding passes and partial digits keep the order
+// of records whose requested key bits are equal.
 uint RadixDigit(const uint element)
 {
+    if (pc.DigitShift >= pc.KeyBits) return 0u;
     const uint word = RadixWordsRef(pc.SourceBDA).Values[element * (pc.KeyWords + 1u) + (pc.DigitShift >> 5u)];
-    return (word >> (pc.DigitShift & 31u)) & (RADIX_DIGITS - 1u);
+    const uint width = min(pc.KeyBits - pc.DigitShift, 4u);
+    return (word >> (pc.DigitShift & 31u)) & ((1u << width) - 1u);
 }

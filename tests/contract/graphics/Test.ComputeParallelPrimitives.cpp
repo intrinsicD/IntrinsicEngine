@@ -1116,6 +1116,11 @@ TEST(ComputeParallelPrimitives, RadixSortCpuOracleIsStableForOneAndTwoWordKeys)
     EXPECT_EQ(Graphics::SortRecordsByKeyCpu(ragged, 3u).Status, Graphics::ParallelPrimitiveStatus::InvalidInput);
     std::vector<std::uint32_t> empty{};
     EXPECT_TRUE(Graphics::SortRecordsByKeyCpu(empty, 2u).Succeeded());
+
+    // Only the low keyBits count: 0x10 and 0x01 have low nibbles 0 and 1, so no reordering.
+    std::vector<std::uint32_t> masked{0x11u, 0u, 0x10u, 1u, 0x01u, 2u};
+    ASSERT_TRUE(Graphics::SortRecordsByKeyCpu(masked, 1u, 4u).Succeeded());
+    EXPECT_EQ(masked, (std::vector<std::uint32_t>{0x10u, 1u, 0x11u, 0u, 0x01u, 2u}));
 }
 
 TEST(ComputeParallelPrimitives, RadixSortPlanPinsPassesScratchAndPingPong)

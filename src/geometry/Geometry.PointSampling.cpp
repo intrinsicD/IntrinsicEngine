@@ -553,4 +553,41 @@ namespace Geometry::PointSampling
         }
         return Order(PointView{x, y, z}, params, count);
     }
+
+    Result FarthestPointBruteForce(const PointView points, const std::uint32_t firstIndex,
+                                   const std::span<const double> weights, const std::size_t count)
+    {
+        Result result;
+        const std::size_t n = points.Size();
+        result.State = Detail::ValidatePoints(points);
+        if (!result.Succeeded()) return result;
+        if (firstIndex >= n || (!weights.empty() && weights.size() != n))
+        {
+            result.State = Status::InvalidParameters;
+            return result;
+        }
+        std::vector<double> clear(n, std::numeric_limits<double>::infinity());
+        std::vector<bool> selected(n, false);
+        std::size_t next = firstIndex;
+        double nextKey = std::numeric_limits<double>::infinity();
+        while (result.Order.size() < std::min(count, n))
+        {
+            result.Order.push_back(std::uint32_t(next));
+            result.Clearance.push_back(nextKey);
+            selected[next] = true;
+            nextKey = -1.0;
+            std::size_t winner = next;
+            for (std::size_t i = 0; i < n; ++i)
+            {
+                if (selected[i]) continue;
+                clear[i] = std::min(clear[i], Detail::SquaredDistance(points.X[i], points.Y[i], points.Z[i],
+                                                                      points.X[next], points.Y[next], points.Z[next]));
+                const double key = weights.empty() ? clear[i] : weights[i] * clear[i];
+                if (key > nextKey) { nextKey = key; winner = i; }
+            }
+            result.DistancePairs += n - result.Order.size();
+            next = winner;
+        }
+        return result;
+    }
 }

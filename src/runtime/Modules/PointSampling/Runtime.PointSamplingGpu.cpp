@@ -1,5 +1,6 @@
 module;
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -32,13 +33,15 @@ namespace Extrinsic::Runtime
         if (points == 0u || points > Graphics::FarthestPointSamplingWorkspace::MaxPoints || count == 0u ||
             params.FirstIndex >= points || (!params.Weights.empty() && params.Weights.size() != points))
             return "The request is outside the Vulkan sampler's limits; sampling ran on the CPU.";
+        // The CPU reference rejects these too; refuse before spending device frames.
+        for (const double w : params.Weights)
+            if (!(w > 0.0) || !std::isfinite(w)) return "Importance weights must be finite and positive.";
         return {};
     }
 
     struct PointSamplingGpuRun::Impl
     {
         std::shared_ptr<Graphics::FarthestPointSamplingWorkspace> Workspace;
-        std::vector<glm::vec3> Points{};
         std::vector<double> X{}, Y{}, Z{}, Weights{};
         PS::Params Params{};
         std::size_t Count{0u};
@@ -52,7 +55,6 @@ namespace Extrinsic::Runtime
     {
         auto& s = *m_Impl;
         s.Workspace = std::make_shared<Graphics::FarthestPointSamplingWorkspace>(device);
-        s.Points.assign(points.begin(), points.end());
         // The CPU reference converts the same floats to doubles, so both see identical inputs.
         for (const auto& p : points)
         {
@@ -104,8 +106,10 @@ namespace Extrinsic::Runtime
     bool PointSamplingGpuRun::VerifyPrefix(std::string& diagnostic) const
     {
         const auto& s = *m_Impl;
-        const std::size_t checked = std::min(s.Prefix.Order.size(), kPointSamplingVerifiedPrefix);
-        const PS::Result reference = PS::Order(std::span<const glm::vec3>(s.Points), s.Params, checked);
+        const std::size_t checked = std::min({s.Prefix.Order.size(), kPointSamplingVerifiedPrefix,
+                                              std::max<std::size_t>(1u, kPointSamplingVerifiedPairs / s.X.size())});
+        const PS::Result reference =
+            PS::FarthestPointBruteForce({s.X, s.Y, s.Z}, s.Params.FirstIndex, s.Weights, checked);
         for (std::size_t k = 0; k < checked; ++k)
         {
             if (k >= reference.Order.size() || reference.Order[k] != s.Prefix.Order[k] ||

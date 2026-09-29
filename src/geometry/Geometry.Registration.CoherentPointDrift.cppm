@@ -177,6 +177,9 @@ export namespace Geometry::CoherentPointDrift
         std::uint64_t KernelEvaluations{0u};   // total over all iterations
         // Vulkan: iterations meant for the device that ran on the CPU (no evaluator or it failed).
         std::uint32_t EStepFallbacks{0u};
+        // Vulkan: iterations the device evaluated (the rest ran truncated, too narrow for fp32
+        // terms, or fell back).
+        std::uint32_t EStepDeviceIterations{0u};
         // Low-rank nonrigid: eigenpairs used and the kernel's sampled relative error.
         std::uint32_t KernelRank{0u};
         double KernelApproximationError{0.0};

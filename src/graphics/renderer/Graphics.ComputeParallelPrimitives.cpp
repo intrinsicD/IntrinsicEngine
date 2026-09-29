@@ -599,6 +599,7 @@ namespace Extrinsic::Graphics
                         .GroupCount = dispatch.GroupCountX,
                         .KeyWords = dispatch.KeyWords,
                         .DigitShift = dispatch.DigitShift,
+                        .KeyBits = dispatch.KeyBits,
                     };
                     cmd.PushConstants(&pc, static_cast<std::uint32_t>(sizeof(pc)), 0u);
                     break;
@@ -931,11 +932,12 @@ namespace Extrinsic::Graphics
 
     ParallelPrimitiveCpuResult SortRecordsByKeyCpu(
         const std::span<std::uint32_t> records,
-        const std::uint32_t keyWords) noexcept
+        const std::uint32_t keyWords,
+        const std::uint32_t keyBits) noexcept
     {
         ParallelPrimitiveCpuResult result{};
         const std::size_t stride = std::size_t(keyWords) + 1u;
-        if (keyWords < 1u || keyWords > 2u || records.size() % stride != 0u ||
+        if (keyWords < 1u || keyWords > 2u || keyBits > 32u * keyWords || records.size() % stride != 0u ||
             records.size() / stride > kParallelRadixMaxElements)
         {
             result.Status = ParallelPrimitiveStatus::InvalidInput;
@@ -946,7 +948,7 @@ namespace Extrinsic::Graphics
         {
             std::uint64_t value = records[record * stride];
             if (keyWords == 2u) value |= std::uint64_t(records[record * stride + 1u]) << 32u;
-            return value;
+            return keyBits == 0u || keyBits >= 64u ? value : value & ((std::uint64_t{1} << keyBits) - 1u);
         };
         std::vector<std::uint32_t> order(count);
         std::iota(order.begin(), order.end(), 0u);
@@ -1167,6 +1169,7 @@ namespace Extrinsic::Graphics
                 .ElementCount = elementCount,
                 .KeyWords = keyWords,
                 .DigitShift = pass * kParallelRadixDigitBits,
+                .KeyBits = keyBits,
                 .GroupSize = groupSize,
                 .GroupCountX = groups,
                 .InputRole = source,

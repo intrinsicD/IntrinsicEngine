@@ -11,6 +11,14 @@
 #include <entt/entity/registry.hpp>
 #include <gtest/gtest.h>
 #include "SandboxEditorJobHarness.hpp"
+#include "MockRHI.hpp"
+#include <atomic>
+#include <chrono>
+#include <limits>
+#include <thread>
+import Extrinsic.Runtime.CoherentPointDriftGpuEStep;
+import Extrinsic.Runtime.SpatialIndexCache;
+import Geometry.Registration.CoherentPointDrift;
 import Extrinsic.Runtime.RegistrationOperations;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Runtime.WorldHandle;
@@ -489,4 +497,38 @@ TEST(CoherentPointDriftOperations, SamplingMethodsAreSelectableForSubsamplesAndL
     const auto result = R::ApplyEditorCoherentPointDriftCommand(s.Commands(), lowRank);
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     EXPECT_GT(result.KernelRank, 0u);
+}
+
+TEST(CoherentPointDriftOperations, VulkanEStepBrokerFailsClosedAndTimesOut)
+{
+    // METHOD-056 review: the worker/main-thread handoff without a framed device. A refused
+    // computation closes the broker (later iterations do not wait), and a request nobody pumps
+    // times out and closes it too; both make Evaluate return false (the CPU runs the iteration).
+    Extrinsic::Tests::MockDevice device{};
+    R::SpatialIndexCache cache;
+    const std::vector<double> x{0.0, 1.0}, zero(2, 0.0), weights(2, 0.0);
+    std::vector<double> logDen(2), pt1(2), p1(2), px(2), py(2), pz(2);
+    const Geometry::CoherentPointDrift::EStep::ExternalRequest request{
+        .Target = {x, zero, zero}, .Moved = {x, zero, zero}, .TargetGeneration = 1u, .Sigma2 = 1.0,
+        .LogOutlier = -std::numeric_limits<double>::infinity(), .LogWeights = weights,
+        .LogDenominator = logDen, .Pt1 = pt1, .P1 = p1, .PXx = px, .PXy = py, .PXz = pz};
+    {
+        R::CoherentPointDriftGpuEStep broker(cache, device);
+        std::atomic<bool> done{false};
+        bool evaluated = true;
+        std::thread worker([&] { evaluated = broker.Evaluate(request); done = true; });
+        while (!done) { broker.Pump(); std::this_thread::yield(); }
+        worker.join();
+        EXPECT_FALSE(evaluated);
+        EXPECT_TRUE(broker.Closed());
+        EXPECT_FALSE(broker.Diagnostic().empty());
+        EXPECT_EQ(broker.Stats().Failed, 1u);
+        EXPECT_FALSE(broker.Evaluate(request)) << "a closed broker answers at once";
+    }
+    {
+        R::CoherentPointDriftGpuEStep broker(cache, device, std::chrono::milliseconds{20});
+        EXPECT_FALSE(broker.Evaluate(request)) << "nobody pumps: the wait times out";
+        EXPECT_TRUE(broker.Closed());
+        EXPECT_NE(broker.Diagnostic().find("in time"), std::string::npos) << broker.Diagnostic();
+    }
 }

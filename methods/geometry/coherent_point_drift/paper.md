@@ -204,8 +204,14 @@ into fp32 high and low parts. Distances and exponentials are fp32 (Cody-Waite re
 degree-7 polynomial), tile sums fp32 Kahan, running sums fp64; nothing is atomic and every
 sum runs in index order, so a run is deterministic on one device and driver. Weighted
 (Bayesian) rows and the outlier term travel in the frame shifted by the largest log-weight.
-Truncated iterations stay on the CPU; without an evaluator, or when it fails, the iteration
-runs that exact CPU choice and `EStepFallbacks` counts it. In the editor the solver worker
+Truncated iterations stay on the CPU, and so do iterations whose first-order fp32 error
+estimate exceeds `kExternalErrorLimit` (2e-5): about 4 ulp of the largest relevant exponent
+magnitude plus the coordinate-rounding term 4 sqrt(3) ulp X |x - y| / sigma^2, over rows whose
+kernel mass is not negligible against the uniform term (a review found that a target far from
+two close sources under a narrow kernel keeps the dense route but loses ~1e-4 in fp32). The
+estimate is reported as the iteration's error bound (not rigorous: term errors partly cancel).
+Without an evaluator, or when it fails, the iteration runs the exact CPU choice and
+`EStepFallbacks` counts it; `EStepDeviceIterations` counts the device iterations. In the editor the solver worker
 waits while a pump job records the passes through the frame loop, so one device E-step costs
 several frames of latency. Measured (C117, RTX 3050): E-step statistics within 1e-7
 relative of CPU dense; 10^5-point rigid registration in 18.9 s instead of 186 s for the same

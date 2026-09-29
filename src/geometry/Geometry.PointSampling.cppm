@@ -187,6 +187,11 @@ export namespace Geometry::PointSampling
     // The first min(count, N) samples of the method's order.
     [[nodiscard]] Result Order(PointView points, const Params& params, std::size_t count);
     [[nodiscard]] Result Order(std::span<const glm::vec3> points, const Params& params, std::size_t count);
+    // Brute-force (weighted) farthest-point order of the first `count` samples, O(N count), with
+    // the sieve's arithmetic and tie rule, so it equals Order(FarthestPoint) bitwise: the cheap
+    // parity check of device ports for short prefixes (no Morton sort or tree).
+    [[nodiscard]] Result FarthestPointBruteForce(PointView points, std::uint32_t firstIndex,
+                                                 std::span<const double> weights, std::size_t count);
 
     // Incremental exact farthest-point order (the hole sieve behind Method::FarthestPoint);
     // Extend continues where the previous call stopped, so prefixes are computed once.

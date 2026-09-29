@@ -19,6 +19,13 @@ Commit: `6a4f9b4d0` (seam, shaders, workspace, broker, config/panel/agent, tests
 `claude/cpd-nystrom` follows. ParityProven on the recorded host (C117); frame latency is
 GRAPHICS-150.
 
+Review round (2026-09-29, Fable 5.1 and Codex 6 Astra, medium effort) fixed: an fp32 precision
+guard (first-order error estimate, iterations above 2e-5 stay on the CPU, the estimate is the
+reported error bound instead of 0), the dispatch chunk capped at 65535 workgroups, device
+iteration counts in results, and the pump job no longer releasing the workspace under a newer
+step; a CPU contract test covers the broker's failure and timeout paths. The scaling run was
+repeated and resealed after the guard (see C117).
+
 ## Goal
 - Evaluate the CPD E-step statistics (P1, Pt1, PX, LogDenominatorSum, Matched) on the GPU so
   a 10^5-point iteration takes a fraction of a second instead of 8.8 s (CPU dense, C113),

@@ -1217,12 +1217,14 @@ TEST(ComputeParallelPrimitivesGpuSmoke, VulkanRadixSortMatchesTheStableCpuOracle
             std::string Name;
             std::uint32_t Count, KeyWords, KeyBits;
             std::uint32_t Distinct; // 0: full-range keys; 1: all equal; k: keys below k (many ties)
+            bool Unmasked = false;  // keep bits above KeyBits: the sort must ignore them
         };
         const Case cases[] = {
             {"empty", 0u, 1u, 32u, 0u},           {"single", 1u, 1u, 32u, 0u},
             {"non_power_of_two", 300u, 1u, 32u, 0u}, {"multi_workgroup_ties", 5000u, 1u, 30u, 97u},
             {"all_equal", 4097u, 1u, 32u, 1u},    {"random_64bit", 70001u, 2u, 64u, 0u},
             {"low_bits_64bit", 3000u, 2u, 40u, 0u},
+            {"unmasked_36_of_64_bits", 5000u, 2u, 36u, 0u, true}, {"unmasked_5_of_32_bits", 3000u, 1u, 5u, 0u, true},
         };
         for (const Case& c : cases)
         {
@@ -1234,13 +1236,13 @@ TEST(ComputeParallelPrimitivesGpuSmoke, VulkanRadixSortMatchesTheStableCpuOracle
                 std::uint64_t key = (std::uint64_t(random()) << 32u) | random();
                 if (c.Distinct == 1u) key = 0x9e3779b9u;
                 else if (c.Distinct > 1u) key %= c.Distinct;
-                key &= mask;
+                if (!c.Unmasked) key &= mask;
                 records[i * stride] = std::uint32_t(key);
                 if (c.KeyWords == 2u) records[i * stride + 1u] = std::uint32_t(key >> 32u);
                 records[i * stride + c.KeyWords] = i;
             }
             auto expected = records;
-            ASSERT_TRUE(Graphics::SortRecordsByKeyCpu(expected, c.KeyWords).Succeeded()) << c.Name;
+            ASSERT_TRUE(Graphics::SortRecordsByKeyCpu(expected, c.KeyWords, c.KeyBits).Succeeded()) << c.Name;
             // Three device runs: each equals the stable oracle, payloads of ties included.
             for (int run = 0; run < 3; ++run)
             {

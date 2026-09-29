@@ -113,7 +113,9 @@ namespace Extrinsic::Graphics
         const auto pass = [&](RHI::PipelineHandle pipeline, std::size_t threads, std::size_t other)
         {
             commands.BindPipeline(pipeline);
-            const std::uint64_t groups = std::max<std::uint64_t>(1u, MaxPairsPerDispatch / (std::uint64_t(other) * kTile));
+            // Also within the guaranteed Vulkan limit of 65535 workgroups per dispatch dimension.
+            const std::uint64_t groups = std::clamp<std::uint64_t>(MaxPairsPerDispatch / (std::uint64_t(other) * kTile),
+                                                                   1u, 65535u);
             const std::size_t chunk = std::size_t(groups) * kTile;
             for (std::size_t first = 0; first < threads; first += chunk)
             {

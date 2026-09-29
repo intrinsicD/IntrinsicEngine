@@ -25,8 +25,11 @@ export namespace Extrinsic::Runtime
 {
     inline constexpr std::string_view kPointSamplingGpuBackendId = "gpu_vulkan_compute";
     inline constexpr std::string_view kPointSamplingCpuBackendId = "cpu_reference";
-    // Samples of every device order recomputed on the CPU before the device result is accepted.
+    // Samples of every device order recomputed on the CPU (brute force, on the main thread)
+    // before the device result is accepted: up to 64, fewer on large inputs so the check stays
+    // within kPointSamplingVerifiedPairs point pairs.
     inline constexpr std::size_t kPointSamplingVerifiedPrefix = 64u;
+    inline constexpr std::size_t kPointSamplingVerifiedPairs = std::size_t{1} << 24;
 
     // Empty when the request can run on `device`; otherwise why it runs on the CPU.
     [[nodiscard]] std::string PointSamplingGpuUnsupportedReason(const Geometry::PointSampling::Params& params,
@@ -49,8 +52,8 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] bool Observe(const SpatialGpuResult& chunk);
         // The order sampled so far (a prefix of the final order).
         [[nodiscard]] const Geometry::PointSampling::Result& Current() const noexcept;
-        // Recomputes the first kPointSamplingVerifiedPrefix samples on the CPU; false, with a
-        // diagnostic, when any order entry or clearance differs.
+        // Recomputes the leading samples on the CPU (see kPointSamplingVerifiedPrefix); false,
+        // with a diagnostic, when any order entry or clearance differs.
         [[nodiscard]] bool VerifyPrefix(std::string& diagnostic) const;
 
     private:

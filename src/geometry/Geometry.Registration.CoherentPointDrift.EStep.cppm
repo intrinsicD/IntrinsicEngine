@@ -24,8 +24,10 @@
 //                its planned cost is not below half the dense cost, i.e. for small inputs.
 //   - Vulkan:    the dense two-pass form on a device through Settings::External (METHOD-056;
 //                fp32 kernel terms, fp64 sums, so not exact). Iterations where Auto would truncate
-//                stay on the CPU truncated path; without an evaluator, or when it fails, the
-//                iteration runs with the exact Auto choice between truncated and dense.
+//                stay on the CPU truncated path, and so do those whose first-order fp32 error
+//                estimate exceeds kExternalErrorLimit (the estimate is the reported bound);
+//                without an evaluator, or when it fails, the iteration runs with the exact Auto
+//                choice between truncated and dense.
 // Rows are processed in fixed blocks (their count depends only on N and M) that scatter into
 // per-block partial sums reduced in block order, so each kernel term is evaluated once; above
 // Settings::PartialBudgetBytes a two-pass form (target pass for the denominators, source pass
@@ -92,6 +94,10 @@ export namespace Geometry::CoherentPointDrift::EStep
         std::span<double> LogDenominator{}, Pt1{}, P1{}, PXx{}, PXy{}, PXz{};
     };
     using ExternalEvaluator = std::function<bool(const ExternalRequest&)>;
+    // Vulkan: iterations whose first-order fp32 error estimate (reported as Sums::ErrorBound)
+    // exceeds this run the exact CPU dense pass instead (kernels narrow against the distances
+    // or coordinate magnitudes, e.g. far outlier rows).
+    inline constexpr double kExternalErrorLimit = 2.0e-5;
 
     struct Settings
     {

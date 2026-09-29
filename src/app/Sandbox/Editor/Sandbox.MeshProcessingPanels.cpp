@@ -2994,6 +2994,8 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::Text("E-step: %s   error bound: %.2g", snapshot.Trace.back().EStep.c_str(), r.EStepErrorBound);
             if (r.EStepSampledError > 0.0)
                 ImGui::Text("Nystroem sampled error: %.2g (estimate)", r.EStepSampledError);
+            if (r.EStepDeviceIterations > 0u)
+                ImGui::Text("GPU E-step iterations: %u of %u", r.EStepDeviceIterations, r.Iterations);
             if (r.EStepFallbacks > 0u)
                 ImGui::TextWrapped("GPU E-step fell back to the CPU %u time(s)%s%s", r.EStepFallbacks,
                                    r.GpuDiagnostic.empty() ? "" : ": ", r.GpuDiagnostic.c_str());

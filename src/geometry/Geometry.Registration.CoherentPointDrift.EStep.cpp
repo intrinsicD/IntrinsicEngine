@@ -677,10 +677,52 @@ namespace Geometry::CoherentPointDrift::EStep
 
         std::uint64_t TargetGeneration{0u}; // process-unique per SetTarget, for external evaluators
 
+        // First-order estimate of the relative error an external evaluator with fp32 kernel terms
+        // adds to a row denominator (review of METHOD-056): per relevant term, the exponent
+        // a = w - |x - y|^2 / 2 sigma^2 carries about 4 ulp of |a| from its own rounding plus
+        // 4 sqrt(3) ulp of X |x - y| / sigma^2 from rounding the coordinates (X: the largest
+        // coordinate magnitude). Relevant terms lie within kRelevantExponent of their row's
+        // largest one; rows whose whole kernel mass is below e^-25 of the uniform term are
+        // ignored (their responsibilities are that small). Not a rigorous bound: errors of many
+        // terms partly cancel, so measured errors are far lower (C117).
+        double ExternalErrorEstimate(const PointSet& moved, const double sigma2, const double logC,
+                                     const std::uint32_t threads)
+        {
+            constexpr double kRelevantExponent = 20.0, kUlp = 0x1p-24;
+            const std::size_t n = TargetX.size(), m = moved.Size();
+            if (!SourceTreeCurrent)
+            {
+                SourceTree.Build(moved);
+                SourceTreeCurrent = true;
+            }
+            const double inverse = 1.0 / (2.0 * sigma2);
+            const double logMass = std::log(double(m)), logUniform = logC - LogWeightShift;
+            std::vector<double> chunkLargest((n + kRowGrain - 1) / kRowGrain, 0.0);
+            ParallelFor(n, kRowGrain, threads, [&](const std::size_t begin, const std::size_t end)
+            {
+                double largest = 0.0;
+                for (std::size_t j = begin; j < end; ++j)
+                {
+                    const double exponent = SourceTree.NearestSquared(TargetX[j], TargetY[j], TargetZ[j]) * inverse;
+                    if (logMass - exponent < logUniform - 25.0) continue; // shifted weights are <= 0
+                    largest = std::max(largest, exponent);
+                }
+                chunkLargest[begin / kRowGrain] = largest;
+            });
+            double weightSpread = 0.0, coordinate = 0.0;
+            for (const double w : LogWeight) weightSpread = std::max(weightSpread, -w);
+            for (const PointSet& set : {Target(), moved})
+                for (const auto axis : {set.X, set.Y, set.Z})
+                    for (const double v : axis) coordinate = std::max(coordinate, std::abs(v));
+            const double a = *std::ranges::max_element(chunkLargest) + weightSpread + kRelevantExponent;
+            return 4.0 * kUlp * (a + std::sqrt(3.0) * coordinate * std::sqrt(a * inverse));
+        }
+
         // External (Vulkan) rows; false when the evaluator is absent, fails or returns non-finite
-        // or negative statistics (the caller then runs the CPU choice).
+        // or negative statistics (the caller then runs the CPU choice). `estimate` is reported as
+        // every row's error bound.
         bool ExternalRows(const Settings& settings, const PointSet& moved, const double sigma2, const double logC,
-                          Sums& out)
+                          const double estimate, Sums& out)
         {
             const std::size_t n = TargetX.size(), m = moved.Size();
             if (!settings.External) return false;
@@ -693,7 +735,7 @@ namespace Geometry::CoherentPointDrift::EStep
             {
                 if (!std::isfinite(LogDenominator[j]) || !(out.Pt1[j] >= 0.0) || !std::isfinite(out.Pt1[j])) return false;
                 LogDenominator[j] += LogWeightShift;
-                RowBound[j] = 0.0;
+                RowBound[j] = estimate;
                 RowEvaluations[j] = m;
             }
             for (std::size_t i = 0; i < m; ++i)
@@ -1456,9 +1498,12 @@ namespace Geometry::CoherentPointDrift::EStep
                  !s.PlanFastGauss(moved, sigma2, settings.Tolerance, false, threads, sourcePlan, targetPlan))
             used = EStepPolicy::Dense; // no plan meets the bound
         bool externalFallback = false;
-        if (wantExternal && used == EStepPolicy::Dense)
+        // Kernels too narrow for fp32 terms (see ExternalErrorEstimate) stay on the exact CPU pass.
+        const double externalEstimate = wantExternal && used == EStepPolicy::Dense
+            ? s.ExternalErrorEstimate(moved, sigma2, logOutlier, threads) : 0.0;
+        if (wantExternal && used == EStepPolicy::Dense && externalEstimate <= kExternalErrorLimit)
         {
-            external = s.ExternalRows(settings, moved, sigma2, logOutlier, out);
+            external = s.ExternalRows(settings, moved, sigma2, logOutlier, externalEstimate, out);
             if (external) used = EStepPolicy::Vulkan;
             else
             {

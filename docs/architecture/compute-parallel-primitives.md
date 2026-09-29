@@ -120,11 +120,17 @@ digit's scanned offset plus its rank among equal digits in the tile. Records
 are `KeyWords` key words (1 or 2, least significant first) and one payload
 word; passes cover `KeyBits` rounded up to an even pass count, alternating
 between the caller's records (`Keys` role, at `ElementsOffsetBytes`) and the
-scratch copy, so the result ends in place. The sort is stable, uses no subgroup
-operations and only integer shared-memory atomics for the counts, and is
-checked against `SortRecordsByKeyCpu` (a `std::stable_sort`) in the opt-in
-Vulkan smoke, three runs per case. `Extrinsic.Graphics.PointLBVH` sorts its
-(Morton code, index) records with it (30 key bits, eight passes).
+scratch copy, so the result ends in place. Key bits at or above `KeyBits` read
+as zero, so a partial last digit and the padding pass keep equal requested keys
+in order. The sort is stable; its own passes use no subgroup operations and
+only integer shared-memory atomics for the counts, while the digit-count scan
+is `parallel_prefix_scan.comp`, which needs subgroup arithmetic (so does every
+consumer, now including `Extrinsic.Graphics.PointLBVH`). Inputs are limited to
+65535 tiles of 256 records, the guaranteed Vulkan workgroup count per dispatch.
+It is checked against `SortRecordsByKeyCpu` (a `std::stable_sort` by the low
+`KeyBits`) in the opt-in Vulkan smoke, three runs per case, including keys with
+bits above `KeyBits`. `Extrinsic.Graphics.PointLBVH` sorts its (Morton code,
+index) records with it (30 key bits, eight passes).
 
 `CreateComputePipeline` creates one compute pipeline from a shader path relative to the
 shader root; the compute workspaces of the graphics layer (property filter, sparse CG,
