@@ -42,15 +42,14 @@ contracts: [geometry.element-domain-sources, repo.source-documentation]
 1. Loops recycle: WLOP keeps its moving-point index across iterations (points updated in place,
    rebuild into reserved storage) and its query batches; paged queries reuse the batch for a
    short last page and address self-queries through the index's positions.
-2. One device-lifetime compute pipeline set per kernel kind, shared by all workspace instances.
+2. One device-lifetime compute pipeline set per kernel kind, shared by all workspace instances
+   (pipelines are created per job or index, no longer inside loops since slice 1).
 3. Capacity-grown scratch: CPD `Ensure`, SparseCG `Begin`, PropertyFilter `Record` reuse
    their buffers; no allocation inside a loop.
 4. Readback trimming: CG reads the current report per chunk and the solutions once; FPS reads
    only the new tail; ICP uploads a matrix and transforms on the GPU.
-5. GPU property view resolver: `v:position` of a resident, current, row-aligned geometry
-   resolves to the renderer's buffer (+offset, stride, count, revision); otherwise one cached
-   upload keyed by entity/property/revision. Consumers: SpatialIndexCache GPU build,
-   k-means, LOP, FPS, texture bake. Lifetime of pool blocks across immediate submits checked.
+5. Moved to ADR 0030 (GPU property residency): GRAPHICS-154 (lifetimes + resident position
+   resolver), GRAPHICS-155, RUNTIME-292, GRAPHICS-156, RUNTIME-293, RUNTIME-294.
 6. Measure: per-method upload/readback bytes and wall time before/after on the Vlasic meshes
    and the CPD scaling fixture; sealed evidence.
 
