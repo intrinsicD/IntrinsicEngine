@@ -105,6 +105,17 @@ reviews):
    - When the ring is exhausted, previews are dropped or coalesced; the ring never overwrites and
      never blocks.
    - Device loss evicts everything, and running methods abort.
+   - **Canonical slots are a cache** (operator, 2026-09-29). They can always be rebuilt from the
+     CPU, so they are evicted:
+     - after an idle time T without use (config, default 60 s);
+     - least recently used first, weighted by size, when a byte budget is exceeded (config;
+       later tied to the reported VRAM budget, `VK_EXT_memory_budget`).
+     - "Use" is a method input or a frame in which the renderer observes the slot.
+     - Never evicted: slots with a ring (running or awaiting Accept), with pending completions,
+       or observed in the current frame.
+     - Freeing waits for completions. An evicted slot costs one upload on its next use.
+     - The clock is injected for deterministic tests. Counters: hits, misses, evictions and
+       resident bytes.
 5. **Observation (what the renderer shows).**
    - The renderer observes the properties the appearance settings select: positions, the
      colormap scalar, colors.

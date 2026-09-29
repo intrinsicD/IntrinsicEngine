@@ -22,7 +22,7 @@ contracts: [geometry.property-coherence, geometry.element-domain-sources]
   - ring depth as a per-key policy;
   - slot reuse only after completion;
   - dropping or coalescing previews when the ring is exhausted;
-  - eviction;
+  - eviction as an LRU cache with idle time and byte budget (ADR 0030 decision 4);
   - IO counters (upload/readback bytes and counts, reuse hits, swaps, ring waits, dropped
     previews).
 - It uses device-local `BufferManager` leases and keeps the property's own type. A float
@@ -38,6 +38,13 @@ contracts: [geometry.property-coherence, geometry.element-domain-sources]
   - a slot is not rewritten before its completions;
   - an exhausted ring drops a preview instead of blocking.
 - [ ] Discard frees only after pending readbacks complete.
+- [ ] Canonical slots form an LRU cache with an idle timeout and a byte budget (config section,
+      injected clock):
+  - an idle slot is evicted after T;
+  - over budget, the least recently used slots go first (size-weighted);
+  - rings, pending slots and currently observed slots are never evicted;
+  - an evicted slot re-uploads once on its next use;
+  - hit, miss, eviction and resident-byte counters are reported.
 
 ## Verification
 ```bash
