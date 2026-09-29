@@ -32,10 +32,19 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     struct GpuRowPages
     {
         std::shared_ptr<SpatialNearestBatch> Batch{};
+        // GRAPHICS-153: the completed batch, reused by the next pass so a loop allocates once.
+        std::shared_ptr<SpatialNearestBatch> Spare{};
         std::size_t NextQuery{}, QueryBatches{};
         bool Finished{};
         std::chrono::steady_clock::time_point Started{};
         double Milliseconds{};
+        // Another pass over new queries; keeps the spare batch and the cumulative batch count.
+        void Restart()
+        {
+            if (Batch && !Spare) Spare = std::move(Batch);
+            Batch.reset();
+            NextQuery = 0; Finished = false; Started = {}; Milliseconds = 0.0;
+        }
     };
     enum class RowsState { Pending, Ready, Failed };
 
@@ -59,14 +68,15 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             pages.NextQuery += batch.Counts.size();
             if (pages.NextQuery == total)
             {
-                pages.Batch.reset(); pages.Finished = true;
+                pages.Spare = std::move(pages.Batch); pages.Finished = true;
                 pages.Milliseconds = std::chrono::duration<double, std::milli>(
                     std::chrono::steady_clock::now() - pages.Started).count();
                 return RowsState::Ready;
             }
         }
         const auto count = std::min<std::size_t>(batchSize, total - pages.NextQuery);
-        if (pages.Batch && pages.Batch->Counts.size() != count) pages.Batch.reset();
+        // A completed batch serves any page that fits it (the cache regrows it otherwise).
+        if (!pages.Batch) pages.Batch = std::move(pages.Spare);
         pages.Batch = queue(pages.NextQuery, count, std::move(pages.Batch));
         ++pages.QueryBatches;
         if (pages.Batch->State == SpatialQueryState::Failed) return fail(pages.Batch->Diagnostic);

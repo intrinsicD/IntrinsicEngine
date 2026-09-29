@@ -45,6 +45,9 @@ export namespace Extrinsic::Runtime
     struct SpatialIndexCacheStats
     {
         std::uint64_t Builds{}, Hits{}, Evictions{}, GpuBuilds{};
+        // GRAPHICS-153: device buffer sets created for query batches (a reused batch that fits
+        // allocates nothing), and private workspaces updated in place instead of rebuilt.
+        std::uint64_t GpuBatchAllocations{}, WorkspaceUpdates{};
     };
     enum class SpatialIndexSpace : std::uint8_t { Property, EntityTransform };
     struct SpatialIndexSnapshot
@@ -106,6 +109,11 @@ export namespace Extrinsic::Runtime
         // Keep the snapshot lease alive while querying; dropping its last caller
         // lease expires the handle. Pending GPU work retains resources until safe.
         [[nodiscard]] SpatialIndexWorkspace CreateWorkspace(std::span<const glm::vec3> positions);
+        // Replaces a private workspace's points (same count) for an iterative caller: the CPU
+        // index is rebuilt into a new snapshot, the device index into its existing buffers on
+        // its next GPU use (no new buffers or pipelines). False, leaving the workspace as it
+        // was, for another handle or count, invalid points, or GPU work still using it.
+        [[nodiscard]] bool UpdateWorkspace(SpatialIndexWorkspace& workspace, std::span<const glm::vec3> positions);
         // Immutable CPU lease survives eviction; indices here are compact, Slots maps to original rows.
         [[nodiscard]] std::shared_ptr<const SpatialIndexSnapshot> Snapshot(SpatialIndexHandle handle) const;
         // Device-owner thread only. Reuse a completed batch to retain its buffer allocation.

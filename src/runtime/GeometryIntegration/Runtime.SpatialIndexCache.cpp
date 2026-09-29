@@ -120,6 +120,7 @@ namespace Extrinsic::Runtime
             RHI::IDevice* Device{};
             RHI::BufferHandle Points{}, Mapping{};
             std::unique_ptr<Graphics::PointLbvhWorkspace> Gpu{};
+            bool GpuStale{}; // UpdateWorkspace replaced the points; rebuild into the same buffers
             ~Entry()
             {
                 if (Device)
@@ -146,6 +147,9 @@ namespace Extrinsic::Runtime
             float Radius{-1.f};
             RHI::IDevice* Device{};
             RHI::BufferHandle Input{}, Output{}, Header{}, Exclusions{};
+            // Allocated rows: queries, and neighbor entries (queries x capacity). A reused batch
+            // may serve any request that fits (GRAPHICS-153), e.g. a shorter last page.
+            std::size_t QueryRows{}, NeighborRows{};
             std::uint64_t SubmittedFrame{};
             unsigned Downloads{};
             bool DownloadQueued{};
@@ -354,8 +358,14 @@ namespace Extrinsic::Runtime
                     s.Device->WriteBuffer(e->Mapping, e->Snapshot->Slots.data(), e->Snapshot->Slots.size() * 4);
                 }
             }
-            if (!e->Gpu->View().NodesBDA)
+            else if (e->GpuStale)
             {
+                // Same count and identity slots: only the points change.
+                s.Device->WriteBuffer(e->Points, e->Snapshot->Index.Points().data(), e->Snapshot->Slots.size() * 12);
+            }
+            if (!e->Gpu->View().NodesBDA || e->GpuStale)
+            {
+                e->GpuStale = false;
                 if (!e->Gpu->RecordBuild(commands,
                                          {.Buffer = e->Points, .Count = std::uint32_t(e->Snapshot->Slots.size())},
                                          e->Mapping))
@@ -516,6 +526,31 @@ namespace Extrinsic::Runtime
         ++m_Impl->Stats.Builds;
         return result;
     }
+    bool SpatialIndexCache::UpdateWorkspace(SpatialIndexWorkspace& workspace, std::span<const glm::vec3> positions)
+    {
+        auto& s = *m_Impl;
+        const auto found = std::ranges::find_if(s.Entries, [&](const auto& e) { return e->Id == workspace.Handle.Value; });
+        if (found == s.Entries.end() || !(*found)->Transient || (*found)->Snapshot != workspace.Snapshot ||
+            (*found)->Snapshot->Slots.size() != positions.size())
+            return false;
+        auto& e = *found;
+        // The device buffers are host visible and rewritten on the next record: nothing that
+        // reads them may still be queued or in flight.
+        const auto busy = [](SpatialQueryState state) {
+            return state == SpatialQueryState::Queued || state == SpatialQueryState::Submitted;
+        };
+        if (std::ranges::any_of(s.Batches, [&](const auto& b) { return b->Target == e && busy(b->State->State); }) ||
+            std::ranges::any_of(s.Computations, [&](const auto& c) { return c->Target == e && busy(c->Result->State); }))
+            return false;
+        auto snapshot = std::make_shared<SpatialIndexSnapshot>();
+        if (!snapshot->Index.Build(positions)) return false;
+        snapshot->Slots = e->Snapshot->Slots; // identity
+        e->Snapshot = snapshot;
+        workspace.Snapshot = std::move(snapshot);
+        e->GpuStale = e->Gpu != nullptr;
+        ++s.Stats.WorkspaceUpdates;
+        return true;
+    }
     std::shared_ptr<const SpatialIndexSnapshot> SpatialIndexCache::Snapshot(SpatialIndexHandle handle) const
     {
         const auto* entry = m_Impl->Find(handle);
@@ -573,15 +608,25 @@ namespace Extrinsic::Runtime
         if (reuse)
         {
             auto found = std::ranges::find_if(s.Batches, [&](const auto& b) { return b->State == reuse; });
-            if (found == s.Batches.end() || reuse->State != SpatialQueryState::Ready ||
-                ((*found)->Queries.size() != queries.size() || (*found)->Capacity != k))
-                return fail("Only a completed batch with the same query count and k can be reused.");
+            if (found == s.Batches.end() || reuse->State != SpatialQueryState::Ready)
+                return fail("Only a completed batch can be reused.");
             batch = *found;
+            // Too small for this request: release its buffers and allocate below.
+            if (batch->QueryRows < queries.size() || batch->NeighborRows < queries.size() * k)
+            {
+                for (auto buffer : {batch->Input, batch->Output, batch->Header, batch->Exclusions})
+                    if (buffer.IsValid()) s.Device->DestroyBuffer(buffer);
+                batch->Input = batch->Output = batch->Header = batch->Exclusions = {};
+            }
         }
-        else
+        if (!batch)
         {
             batch = std::make_shared<Impl::Batch>();
             batch->Device = s.Device;
+            s.Batches.push_back(batch);
+        }
+        if (!batch->Input.IsValid())
+        {
             auto allocate = [&](std::size_t bytes, bool host) {
                 return s.Device->CreateBuffer({.SizeBytes = bytes,
                     .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
@@ -592,8 +637,13 @@ namespace Extrinsic::Runtime
             batch->Header = allocate(queries.size()*8, false);
             batch->Exclusions = allocate(queries.size()*4, true);
             if (!batch->Input.IsValid() || !batch->Output.IsValid() || !batch->Header.IsValid() || !batch->Exclusions.IsValid())
+            {
+                batch->State->State = SpatialQueryState::Failed; // lets Drain drop it
                 return fail("GPU spatial batch allocation failed.");
-            s.Batches.push_back(batch);
+            }
+            batch->QueryRows = queries.size();
+            batch->NeighborRows = queries.size() * k;
+            ++s.Stats.GpuBatchAllocations;
         }
         batch->Target = *std::ranges::find_if(s.Entries, [&](const auto& e) { return e->Id == handle.Value; });
         batch->Queries.assign(queries.begin(), queries.end());

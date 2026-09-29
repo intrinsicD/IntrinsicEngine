@@ -1604,7 +1604,7 @@ namespace
                         EXPECT_EQ(result.ActualBackend,"vulkan_lbvh");
                         EXPECT_GT(result.GpuQueryBatches,0);
                         if(Phase==1)EXPECT_TRUE(result.IndexReused);
-                        EXPECT_EQ(result.CompletedIterations,3);EXPECT_EQ(result.WorkspaceBuilds,2);
+                        EXPECT_EQ(result.CompletedIterations,3);EXPECT_EQ(result.WorkspaceBuilds,1) << "GRAPHICS-153: later passes update one private index";
                         const auto& ref=ReferenceResults[unsigned(result.Output.Domain)-1];
                         EXPECT_EQ(result.PointsFiltered,ref.PointsFiltered);
                         EXPECT_EQ(result.DegenerateNormals,ref.DegenerateNormals);

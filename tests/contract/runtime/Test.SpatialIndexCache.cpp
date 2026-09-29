@@ -199,6 +199,30 @@ TEST(SpatialIndexCache, FramedRadiusWithoutDeviceFailsExplicitly)
     }
 }
 
+// GRAPHICS-153: an iterative caller updates its private workspace in place; old snapshot leases
+// stay valid, and a wrong count, a foreign handle or invalid points leave the workspace alone.
+TEST(SpatialIndexCache, PrivateWorkspaceUpdatesInPlaceAndKeepsOldLeases)
+{
+    R::SpatialIndexCache cache;
+    std::vector<glm::vec3> points{{0,0,0},{2,0,0},{4,0,0}};
+    auto moving=cache.CreateWorkspace(points);ASSERT_TRUE(moving.Ready());
+    const auto handle=moving.Handle;const auto before=moving.Snapshot;
+    EXPECT_EQ(cache.Nearest(handle,{3.9f,0,0})->Index,2u);
+    std::vector<glm::vec3> moved{{10,0,0},{12,0,0},{3.8f,0,0}};
+    ASSERT_TRUE(cache.UpdateWorkspace(moving,moved));
+    EXPECT_EQ(moving.Handle.Value,handle.Value) << "same workspace, no new build";
+    EXPECT_NE(moving.Snapshot,before);
+    EXPECT_EQ(before->Index.Points()[0],glm::vec3(0,0,0)) << "an old lease keeps its points";
+    EXPECT_EQ(cache.Nearest(handle,{0,0,0})->Index,2u);
+    EXPECT_EQ(cache.Stats().Builds,1u);EXPECT_EQ(cache.Stats().WorkspaceUpdates,1u);
+    EXPECT_FALSE(cache.UpdateWorkspace(moving,std::vector<glm::vec3>{{0,0,0}})) << "count changed";
+    moved[1].x=1e30f;EXPECT_FALSE(cache.UpdateWorkspace(moving,moved)) << "invalid points";
+    EXPECT_EQ(cache.Nearest(handle,{0,0,0})->Index,2u) << "a refused update leaves the workspace";
+    R::SpatialIndexWorkspace foreign{.Handle={9999},.Snapshot=moving.Snapshot};
+    EXPECT_FALSE(cache.UpdateWorkspace(foreign,points));
+    EXPECT_EQ(cache.Stats().WorkspaceUpdates,1u);
+}
+
 TEST(SpatialIndexCache, PrivateWorkspaceLeaseOwnsImmutableIndependentPositions)
 {
     R::SpatialIndexCache cache;

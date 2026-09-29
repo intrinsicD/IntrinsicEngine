@@ -10,6 +10,7 @@ picking backlog work; theme priorities and rationale live in
 
 - `GEOM-111` — Unified progressive point sampling (`Geometry.PointSampling`) (tasks/active/GEOM-111-unified-progressive-point-sampling.md)
 - `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/active/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
+- `GRAPHICS-153` — GPU methods reuse resident buffers; CPU<->GPU IO only at start and end (tasks/active/GRAPHICS-153-gpu-buffer-reuse-and-minimal-io.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
 - `METHOD-044` — Feature-aware patches and distortion-aware atlas merging (tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md)

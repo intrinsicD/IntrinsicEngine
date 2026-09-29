@@ -58,6 +58,8 @@ namespace Extrinsic::Runtime
             std::optional<EditorBilateralFilterResult> MainFailure{};
             std::shared_ptr<const SpatialIndexSnapshot> Index{};
             SpatialIndexHandle GpuIndex{};
+            // Private index over the moving points from the second pass on, updated in place.
+            SpatialIndexWorkspace Moving{};
             GeometryProcessingDetail::GpuRowPages Pages{};
             bool Abandoned{};
             EditorBilateralFilterResult Result{};
@@ -203,10 +205,13 @@ namespace Extrinsic::Runtime
             if (w.Pages.Finished) return true;
             if (!w.GpuIndex.Value)
             {
-                auto workspace=context.SpatialIndices->CreateWorkspace(w.Points);
-                if(!workspace.Ready())return fail(workspace.Diagnostic);
-                w.GpuIndex=workspace.Handle;w.Index=std::move(workspace.Snapshot);
-                ++w.Result.WorkspaceBuilds;
+                if(!w.Moving.Ready() || !context.SpatialIndices->UpdateWorkspace(w.Moving,w.Points))
+                {
+                    w.Moving=context.SpatialIndices->CreateWorkspace(w.Points);
+                    if(!w.Moving.Ready())return fail(w.Moving.Diagnostic);
+                    ++w.Result.WorkspaceBuilds;
+                }
+                w.GpuIndex=w.Moving.Handle;w.Index=w.Moving.Snapshot;
             }
             const auto width=std::min<std::size_t>(w.Points.size()-1,w.Config.KNeighbors)+1;
             std::string diagnostic;
@@ -396,7 +401,7 @@ namespace Extrinsic::Runtime
                         if(w->Result.Status!=EditorCommandStatus::Applied){w->MainFailure=w->Result;return false;}
                         // Restart pagination for the moved points; the batch count stays cumulative.
                         w->GpuIndex={};w->Index.reset();w->NeighborIds.clear();
-                        w->Pages={.QueryBatches=w->Pages.QueryBatches};return true;};
+                        w->Pages.Restart();return true;};
                     step.FinalizeUnpublishedOnMainThread=[w]{w->Abandoned=true;};
                 }
                 submitted=submit(std::move(step));

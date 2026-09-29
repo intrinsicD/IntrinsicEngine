@@ -384,8 +384,7 @@ namespace Extrinsic::Runtime
                                                       w.Result.QueryCount - w.NextQuery));
             if (!std::all_of(w.Queries.begin(), w.Queries.end(), GpuPoint))
                 return fail("Vulkan grid queries require normal-or-zero components within 1e18.");
-            if (w.Batch && w.Batch->Counts.size() != w.Queries.size())
-                w.Batch.reset();
+            // A completed batch serves every page that fits it (GRAPHICS-153).
             w.GpuStarted = Clock::now();
             w.Batch = context.SpatialIndices->QueueGpuKNearest(w.GpuIndex, w.Queries, w.Width, {},
                                                                std::move(w.Batch));

@@ -905,7 +905,7 @@ namespace
                     {
                         ASSERT_TRUE(r.Succeeded())<<r.Message;EXPECT_EQ(r.ActualBackend,Runtime::PointCloudConsolidationBackend::VulkanLBVH);
                         EXPECT_FALSE(r.FellBackToCpu);EXPECT_EQ(r.ImplementationId,"vulkan_lbvh_cpu_projection");
-                        EXPECT_EQ(r.Iterations,3u);EXPECT_EQ(r.SpatialWorkspaceBuilds,3u);EXPECT_GT(r.GpuQueryBatches,0u);
+                        EXPECT_EQ(r.Iterations,3u);EXPECT_EQ(r.SpatialWorkspaceBuilds,1u) << "GRAPHICS-153: the moving index is updated in place";EXPECT_GT(r.GpuQueryBatches,0u);
                         if(Phase==1)EXPECT_TRUE(r.ReusedSpatialIndex);
                         const auto d=unsigned(r.Properties.InputPositions.Domain);
                         const auto actual=Props(d).Get<glm::vec3>("projected").Vector();
@@ -929,7 +929,11 @@ namespace
                     const auto error=MeasurePositionError(Props(8).Get<glm::vec3>(name).Vector(),SpecialReference.Positions);
                     MaxError=std::max(MaxError,error.Linf);EXPECT_LE(error.Linf,1e-6);
                     EXPECT_EQ(Results.front().Iterations,SpecialReference.Diagnostics.Iterations);
-                    EXPECT_EQ(Results.front().SpatialWorkspaceBuilds,SpecialReference.Diagnostics.Iterations);
+                    // GRAPHICS-153: the moving index is updated in place; only inserted points
+                    // (a new count) force a new build.
+                    EXPECT_GE(Results.front().SpatialWorkspaceBuilds,1u);
+                    EXPECT_LE(Results.front().SpatialWorkspaceBuilds,SpecialReference.Diagnostics.Iterations);
+                    if(SpecialReference.Diagnostics.InsertedPointCount==0)EXPECT_EQ(Results.front().SpatialWorkspaceBuilds,1u);
                     EXPECT_EQ(Results.front().InsertedPointCount,SpecialReference.Diagnostics.InsertedPointCount);
                     if(UsesNormals())
                     {

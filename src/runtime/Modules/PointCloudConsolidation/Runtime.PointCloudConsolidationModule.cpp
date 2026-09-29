@@ -2294,14 +2294,18 @@ namespace Extrinsic::Runtime
         {
             std::vector<std::uint32_t> Offsets{0}, Indices{};
             std::shared_ptr<SpatialNearestBatch> Batch{};
+            // GRAPHICS-153: the last completed batch, reused by the next iteration's first page.
+            std::shared_ptr<SpatialNearestBatch> Spare{};
             std::size_t Next{};
             Geometry::PointNeighborhoods View() const { return {Offsets, Indices}; }
+            void Restart() { Offsets.assign(1, 0u); Indices.clear(); Next = 0; }
         };
         struct ProjectionGpuWork
         {
             PointCloudConsolidationSnapshot Snapshot{};
             std::unique_ptr<Consolidation::NeighborhoodProjection> Projection{};
             SpatialIndexWorkspace Moving{};
+            bool MovingStale{}; // the moving points changed since Moving was built or updated
             ProjectionGpuRows Source{}, Projected{};
             std::optional<PointCloudConsolidationResult> Failure{};
             bool Abandoned{}, Delivered{};
@@ -2347,10 +2351,11 @@ namespace Extrinsic::Runtime
                     rows.Offsets.push_back(static_cast<std::uint32_t>(rows.Indices.size()));
                 }
                 rows.Next+=expected;
-                if(rows.Next==points.size()){rows.Batch.reset();return ProjectionRowState::Ready;}
+                if(rows.Next==points.size()){rows.Spare=std::move(rows.Batch);return ProjectionRowState::Ready;}
             }
             const auto count=std::min<std::size_t>(batchSize,points.size()-rows.Next);
-            if(rows.Batch && rows.Batch->Counts.size()!=count)rows.Batch.reset();
+            // A completed batch serves any page that fits it (shorter last pages included).
+            if(!rows.Batch)rows.Batch=std::move(rows.Spare);
             std::vector<std::uint32_t> exclusions;
             if(selfExcluded)for(std::size_t i=0;i<count;++i)exclusions.push_back(static_cast<std::uint32_t>(rows.Next+i));
             const auto capacity=std::max(1u,std::min(w.Snapshot.Request.Config.GpuRadiusCapacity,sourceCount-(selfExcluded?1u:0u)));
@@ -2387,6 +2392,10 @@ namespace Extrinsic::Runtime
                 if(state==ProjectionRowState::Pending)return false;
             }
             if(!w.Projection->NeedsRepulsion())return true;
+            // The moving points change every iteration: update the index in place (its buffers,
+            // device workspace and pipelines stay) and build a new one only when that is refused.
+            if(w.Moving.Ready() && w.MovingStale && !cache.UpdateWorkspace(w.Moving,points))w.Moving={};
+            w.MovingStale=false;
             if(!w.Moving.Ready())
             {
                 w.Moving=cache.CreateWorkspace(points);
@@ -2486,7 +2495,7 @@ namespace Extrinsic::Runtime
                 else step.PublishCompletion=[w,check](KernelEventBus& bus,const JobResultEnvelope& result)
                 {
                     if(!check(bus,result))return false;
-                    w->Source={};w->Projected={};w->Moving={};return true;
+                    w->Source.Restart();w->Projected.Restart();w->MovingStale=true;return true;
                 };
                 accepted=submit(std::move(step));
             }
