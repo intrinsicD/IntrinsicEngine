@@ -31,6 +31,18 @@ contracts: [method.engine-integration]
       parity within the frozen 1e-5.
 - [ ] Resealed scaling run; C117 revised with the recovered speedup (or the measured reason not).
 
+## Engine integration
+
+| Field | Disposition |
+| --- | --- |
+| Least-structured input | Two point spans (unchanged). |
+| Compatible entity sources | Every canonical point domain via RUNTIME-273 (unchanged). |
+| RuntimeModule | Existing `Runtime.CoherentPointDriftGpuEStep` broker (unchanged interface). |
+| Config/agent | Unchanged `e_step` value `vulkan`; results keep `e_step_device_iterations`. |
+| UI | Unchanged CPD panel Performance node. |
+| Publication | Unchanged. |
+| End-to-end tests | The existing gpu;vulkan editor-command smoke plus the new masked-row fixture. |
+
 ## Verification
 ```bash
 ctest --test-dir build/ci --output-on-failure -R 'CoherentPointDrift' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
