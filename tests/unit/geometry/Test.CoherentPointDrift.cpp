@@ -4,6 +4,7 @@
 //   affine: max matrix entry error <= 0.02, translation <= 0.02
 //   nonrigid: mean landmark error <= 0.02 (displacement amplitude 0.1)
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -279,4 +280,48 @@ TEST(CoherentPointDrift, InvalidInputsFailClosed)
     const auto affine = CPD::Register(cloud, planar, CPD::Params{.Method = CPD::Variant::Affine});
     EXPECT_EQ(affine.State, CPD::Status::SingularSystem);
     EXPECT_TRUE(affine.TransformedSource.empty()) << "failures publish no geometry";
+}
+
+TEST(CoherentPointDrift, CancellationStopsKernelBuildsAndStepsAndStagesAreReported)
+{
+    // UI-067: the predicate is polled inside the Gram-matrix build and every E-step chunk.
+    const auto source = Cloud(600, 61);
+    std::vector<glm::vec3> target;
+    for (const auto& p : source) target.push_back(p + glm::vec3(0.1f, 0.0f, 0.05f));
+    std::atomic<int> polls{0}, cancelAfter{-1}; // -1: never
+    std::atomic<bool> cancel{false};
+    std::vector<CPD::Stage> stages;
+    CPD::Params params{.Method = CPD::Variant::Nonrigid, .EStep = CPD::EStepPolicy::Dense};
+    params.Cancelled = [&] {
+        const int poll = ++polls;
+        return cancel.load() || (cancelAfter.load() >= 0 && poll > cancelAfter.load());
+    };
+    params.StageObserver = [&](CPD::Stage stage) { stages.push_back(stage); };
+
+    // Cancelled while the full 600 x 600 Gram matrix is built (polled every 64 rows): Initialize
+    // stops with Cancelled after the kernel stage began.
+    cancelAfter = 3;
+    CPD::Solver early;
+    EXPECT_EQ(early.Initialize(target, source, params), CPD::Status::Cancelled);
+    EXPECT_EQ(stages, (std::vector<CPD::Stage>{CPD::Stage::Preparing, CPD::Stage::BuildingKernel}));
+    EXPECT_LT(polls.load(), 12) << "stopped inside the build, not after it";
+    CPD::Solver immediate;
+    cancelAfter = -1;
+    cancel = true;
+    EXPECT_EQ(immediate.Initialize(target, source, params), CPD::Status::Cancelled);
+
+    // Initialized, one full iteration, then cancelled before the next E-step finishes.
+    cancel = false;
+    polls = 0;
+    stages.clear();
+    CPD::Solver solver;
+    ASSERT_EQ(solver.Initialize(target, source, params), CPD::Status::Success);
+    ASSERT_TRUE(solver.Step());
+    EXPECT_EQ(stages, (std::vector<CPD::Stage>{CPD::Stage::Preparing, CPD::Stage::BuildingKernel,
+                                               CPD::Stage::ExpectationStep, CPD::Stage::MaximizationStep}));
+    EXPECT_GT(polls.load(), 0);
+    cancel = true;
+    EXPECT_FALSE(solver.Step());
+    EXPECT_TRUE(solver.Finished());
+    EXPECT_EQ(solver.Current().State, CPD::Status::Cancelled) << "a cancelled run reports no partial result";
 }

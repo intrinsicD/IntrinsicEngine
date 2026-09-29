@@ -61,24 +61,30 @@ namespace Geometry::CoherentPointDrift::EStep
         constexpr std::uint32_t kNone = std::numeric_limits<std::uint32_t>::max();
         constexpr std::size_t kRowGrain = 64;
 
+        // The calling thread's cancellation predicate (CancellationScope).
+        thread_local const std::function<bool()>* tCancelled = nullptr;
+
         // Runs body(begin, end) over [0, count) in fixed-size chunks. Each index is handled
-        // by exactly one call, so per-index outputs do not depend on the thread count.
+        // by exactly one call, so per-index outputs do not depend on the thread count. Under a
+        // CancellationScope the remaining chunks are skipped once the predicate returns true.
         template <class Body>
         void ParallelFor(const std::size_t count, const std::size_t grain, const std::uint32_t threads, Body&& body)
         {
             const std::size_t chunks = (count + grain - 1) / grain;
             const std::size_t workers = std::min<std::size_t>(threads, chunks);
-            if (workers <= 1)
-            {
-                if (count > 0) body(std::size_t{0}, count);
-                return;
-            }
+            const std::function<bool()>* cancelled = tCancelled;
+            const auto stop = [cancelled] { return cancelled != nullptr && *cancelled && (*cancelled)(); };
             std::atomic<std::size_t> next{0};
             const auto work = [&]
             {
-                for (std::size_t chunk = next.fetch_add(1); chunk < chunks; chunk = next.fetch_add(1))
+                for (std::size_t chunk = next.fetch_add(1); chunk < chunks && !stop(); chunk = next.fetch_add(1))
                     body(chunk * grain, std::min(count, (chunk + 1) * grain));
             };
+            if (workers <= 1)
+            {
+                work();
+                return;
+            }
             std::vector<std::jthread> pool;
             pool.reserve(workers - 1);
             for (std::size_t t = 1; t < workers; ++t) pool.emplace_back(work);
@@ -633,6 +639,13 @@ namespace Geometry::CoherentPointDrift::EStep
     {
         ParallelFor(count, std::max<std::size_t>(grain, 1u), ResolveThreads(threads), body);
     }
+
+    CancellationScope::CancellationScope(const std::function<bool()>* cancelled) noexcept : m_Previous(tCancelled)
+    {
+        tCancelled = cancelled;
+    }
+
+    CancellationScope::~CancellationScope() { tCancelled = m_Previous; }
 
     std::uint32_t ResolveThreads(const std::uint32_t requested) noexcept
     {

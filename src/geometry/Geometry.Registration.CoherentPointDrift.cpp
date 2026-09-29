@@ -83,6 +83,19 @@ namespace Geometry::CoherentPointDrift
         return "unknown";
     }
 
+    std::string_view ToString(const Stage value) noexcept
+    {
+        switch (value)
+        {
+        case Stage::Preparing: return "preparing";
+        case Stage::Subsampling: return "subsampling";
+        case Stage::BuildingKernel: return "building_kernel";
+        case Stage::ExpectationStep: return "expectation_step";
+        case Stage::MaximizationStep: return "maximization_step";
+        }
+        return "unknown";
+    }
+
     std::string_view ToString(const Status value) noexcept
     {
         switch (value)
@@ -94,6 +107,7 @@ namespace Geometry::CoherentPointDrift
         case Status::TooLarge: return "too_large";
         case Status::SingularSystem: return "singular_system";
         case Status::NumericalFailure: return "numerical_failure";
+        case Status::Cancelled: return "cancelled";
         }
         return "unknown";
     }
@@ -607,6 +621,11 @@ namespace Geometry::CoherentPointDrift
         s.Config = params;
         s.Ended = true;
         const auto fail = [&](Status status) { s.Failure = status; return status; };
+        // Kernel builds and subsampling below poll the cancellation predicate chunk by chunk.
+        const EStep::CancellationScope scope(&s.Config.Cancelled);
+        const auto cancelled = [&s] { return s.Config.Cancelled && s.Config.Cancelled(); };
+        const auto stage = [&s](const Stage value) { if (s.Config.StageObserver) s.Config.StageObserver(value); };
+        stage(Stage::Preparing);
         if (target.empty() || source.empty()) return fail(Status::EmptyInput);
         if (!std::ranges::all_of(target, Finite) || !std::ranges::all_of(source, Finite))
             return fail(Status::NonFiniteInput);
@@ -666,6 +685,8 @@ namespace Geometry::CoherentPointDrift
         {
             return EStep::SamplePoints({points.X, points.Y, points.Z}, count, params.SubsampleSampling);
         };
+        if ((params.Method == Variant::Bayesian && params.SubsampleTarget > 0u && params.SubsampleTarget < n) || subsampled)
+            stage(Stage::Subsampling);
         if (params.Method == Variant::Bayesian && params.SubsampleTarget > 0u && params.SubsampleTarget < n)
         {
             const Points full = s.Target;
@@ -722,12 +743,15 @@ namespace Geometry::CoherentPointDrift
             for (std::size_t j = 0; j < n; ++j) { lo = lo.cwiseMin(s.Target.At(j)); hi = hi.cwiseMax(s.Target.At(j)); }
             s.Volume = std::max((hi - lo).cwiseMax(1e-6).prod(), 1e-12);
         }
+        if (cancelled()) return fail(Status::Cancelled);
+        if (deforming) stage(Stage::BuildingKernel);
         if (deforming && params.LowRank > 0u)
         {
             EStep::LowRankKernel kernel;
             if (!EStep::BuildLowRankGaussianKernel({s.Source.X, s.Source.Y, s.Source.Z}, params.Beta, params.LowRank,
                                                    params.Threads, kernel, params.LandmarkSampling))
-                return fail(Status::SingularSystem);
+                return fail(cancelled() ? Status::Cancelled : Status::SingularSystem);
+            if (cancelled()) return fail(Status::Cancelled); // skipped chunks leave the kernel incomplete
             const Eigen::Index rank = Eigen::Index(kernel.Rank);
             s.Basis = Eigen::Map<const Eigen::MatrixXd>(kernel.Basis.data(), Eigen::Index(m), rank);
             s.Eigenvalues = Eigen::Map<const Eigen::VectorXd>(kernel.Eigenvalues.data(), rank);
@@ -749,6 +773,7 @@ namespace Geometry::CoherentPointDrift
             const double inverse = -1.0 / (2.0 * params.Beta * params.Beta);
             for (Eigen::Index a = 0; a < count; ++a)
             {
+                if (a % 64 == 0 && cancelled()) return fail(Status::Cancelled);
                 s.Kernel(a, a) = 1.0;
                 for (Eigen::Index b = a + 1; b < count; ++b)
                 {
@@ -768,10 +793,26 @@ namespace Geometry::CoherentPointDrift
     {
         State& s = *m_State;
         if (s.Ended) return false;
+        const EStep::CancellationScope scope(&s.Config.Cancelled);
+        const auto cancelled = [&s] { return s.Config.Cancelled && s.Config.Cancelled(); };
+        const auto stage = [&s](const Stage value) { if (s.Config.StageObserver) s.Config.StageObserver(value); };
+        if (cancelled())
+        {
+            s.Fail(Status::Cancelled);
+            return false;
+        }
         double nll = 0.0, matched = 0.0;
+        stage(Stage::ExpectationStep);
         if (s.Config.Method == Variant::Bayesian) s.UpdateBayesianWeights();
         ++s.Revision;
-        if (!s.ExpectationStep(nll, matched))
+        const bool expected = s.ExpectationStep(nll, matched);
+        // A cancelled E-step skipped chunks: its statistics are incomplete, whatever it returned.
+        if (cancelled())
+        {
+            s.Fail(Status::Cancelled);
+            return false;
+        }
+        if (!expected)
         {
             s.Fail(Status::NumericalFailure);
             return false;
@@ -791,6 +832,7 @@ namespace Geometry::CoherentPointDrift
         }
 
         Status status = Status::Success;
+        stage(Stage::MaximizationStep);
         switch (s.Config.Method)
         {
         case Variant::Rigid: status = s.RigidStep(matched); break;
@@ -798,6 +840,8 @@ namespace Geometry::CoherentPointDrift
         case Variant::Nonrigid: status = s.NonrigidStep(matched); break;
         case Variant::Bayesian: status = s.BayesianStep(matched); break;
         }
+        // M-steps using the parallel helpers may have skipped chunks as well.
+        if (cancelled()) status = Status::Cancelled;
         if (status != Status::Success)
         {
             s.Fail(status);

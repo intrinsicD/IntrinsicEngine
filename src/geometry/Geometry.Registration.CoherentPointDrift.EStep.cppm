@@ -145,6 +145,21 @@ export namespace Geometry::CoherentPointDrift::EStep
     };
 
     [[nodiscard]] std::uint32_t ResolveThreads(std::uint32_t requested) noexcept;
+
+    // While alive on a thread, the parallel loops started from it (E-step rows, kernel builds)
+    // poll `cancelled` before each chunk and skip the remaining chunks once it returns true, so
+    // a long evaluation stops within one chunk. The results are then incomplete: callers must
+    // check the predicate afterwards and discard them. Nested scopes restore the outer one.
+    class CancellationScope
+    {
+    public:
+        explicit CancellationScope(const std::function<bool()>* cancelled) noexcept;
+        ~CancellationScope();
+        CancellationScope(const CancellationScope&) = delete;
+        CancellationScope& operator=(const CancellationScope&) = delete;
+    private:
+        const std::function<bool()>* m_Previous;
+    };
     // body(begin, end) over [0, count) in fixed chunks of `grain`; each index is handled by exactly
     // one call, so per-index results do not depend on the thread count.
     void ParallelRange(std::size_t count, std::size_t grain, std::uint32_t threads,

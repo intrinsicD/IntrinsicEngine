@@ -50,8 +50,20 @@ export namespace Geometry::CoherentPointDrift
         InvalidParameters,
         TooLarge,        // nonrigid source beyond kMaxNonrigidSourcePoints (kMaxLowRankSourcePoints with LowRank)
         SingularSystem,  // affine source covariance or nonrigid system not invertible
-        NumericalFailure // all mass on the outlier component, or a non-finite update
+        NumericalFailure, // all mass on the outlier component, or a non-finite update
+        Cancelled         // Params::Cancelled returned true
     };
+
+    // Long phases of a run, reported to Params::StageObserver as each starts.
+    enum class Stage : std::uint8_t
+    {
+        Preparing = 0,    // validation, normalization, initial sigma^2
+        Subsampling,      // Bayesian source/target subsamples
+        BuildingKernel,   // nonrigid/Bayesian Gram matrix or its low-rank eigenpairs
+        ExpectationStep,
+        MaximizationStep,
+    };
+    [[nodiscard]] std::string_view ToString(Stage value) noexcept;
 
     enum class Termination : std::uint8_t
     {
@@ -127,6 +139,11 @@ export namespace Geometry::CoherentPointDrift
         PointSampling::Params LandmarkSampling{};
         // Vulkan E-step: the device evaluator (METHOD-056); empty runs every iteration on the CPU.
         EStep::ExternalEvaluator EStepExternal{};
+        // UI-067: polled (from several threads) during the kernel builds, every E-step chunk and
+        // between phases; true ends the run with Status::Cancelled. Must be thread-safe.
+        std::function<bool()> Cancelled{};
+        // Called on the solving thread as each Stage starts (progress display).
+        std::function<void(Stage)> StageObserver{};
     };
 
     struct IterationTrace

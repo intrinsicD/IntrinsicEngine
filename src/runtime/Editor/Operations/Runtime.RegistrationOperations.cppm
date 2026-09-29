@@ -1,6 +1,7 @@
 // Point-set registration of named point bindings through shared processing commands:
 // iterative closest point (ICP) and Coherent Point Drift (CPD, RUNTIME-273).
 module;
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -114,6 +115,9 @@ export namespace Extrinsic::Runtime
         std::string EStep{"reference"};    // E-step policy that ran this iteration
         double EStepErrorBound{0.0};       // its max relative responsibility error (0: exact)
         double EStepSampledError{0.0};     // Nystrom: sampled relative error (estimate, not a bound)
+        std::uint64_t KernelEvaluations{0u};
+        double Seconds{0.0};               // UI-067: since the run's first step began
+        double IterationSeconds{0.0};      // this iteration's wall time
     };
 
     enum class EditorCoherentPointDriftPhase : std::uint8_t
@@ -163,9 +167,14 @@ export namespace Extrinsic::Runtime
         EditorCoherentPointDriftPhase Phase{EditorCoherentPointDriftPhase::Ready};
         EditorCoherentPointDriftResult Result{};
         std::vector<EditorCoherentPointDriftTrace> Trace{};
-        std::vector<glm::vec3> SourcePreview{}; // current T(y), world space, capture order
-        std::vector<glm::vec3> Target{};        // fixed points, world space
-        std::uint64_t Revision{0u};             // increments with every update
+        // Shared and immutable, so a per-frame snapshot copies no points.
+        std::shared_ptr<const std::vector<glm::vec3>> SourcePreview{}; // current T(y), world space, capture order
+        std::shared_ptr<const std::vector<glm::vec3>> Target{};        // fixed points, world space
+        std::uint64_t Revision{0u};             // increments with every update (not with Stage)
+        // UI-067: the phase a Running step is in ("preparing", "building_kernel",
+        // "expectation_step", ...) and when it began, for a live progress line.
+        std::string Stage{};
+        std::chrono::steady_clock::time_point StageStarted{};
     };
 
     struct EditorCoherentPointDriftRun;

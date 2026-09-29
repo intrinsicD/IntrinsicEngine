@@ -2987,6 +2987,11 @@ namespace Extrinsic::Sandbox::Editor
         {
             const auto& r = snapshot.Result;
             ImGui::Text("Phase: %s   backend: %s", Runtime::ToString(snapshot.Phase), r.Backend.c_str());
+            // UI-067: what a running step is doing right now, and for how long.
+            if (snapshot.Phase == Phase::Running && !snapshot.Stage.empty())
+                ImGui::TextColored(ImVec4(0.55f, 0.8f, 1.0f, 1.0f), "Iteration %zu: %s for %.1f s", snapshot.Trace.size() + 1u,
+                                   snapshot.Stage.c_str(),
+                                   std::chrono::duration<double>(std::chrono::steady_clock::now() - snapshot.StageStarted).count());
             ImGui::Text("Points: %zu -> %zu   iterations: %u   stop: %s", r.SourcePointCount, r.TargetPointCount, r.Iterations,
                         r.Termination.c_str());
             ImGui::Text("sigma^2: %.4g   matched: %.1f   mean move: %.4g", r.Sigma2, r.MatchedWeight, r.MeanDisplacement);
@@ -3001,21 +3006,23 @@ namespace Extrinsic::Sandbox::Editor
                                    r.GpuDiagnostic.empty() ? "" : ": ", r.GpuDiagnostic.c_str());
             if (r.KernelRank > 0u)
                 ImGui::Text("Kernel rank: %u   kernel error: %.2g", r.KernelRank, r.KernelApproximationError);
-            if (!r.Message.empty() && snapshot.Phase == Phase::Failed) ImGui::TextWrapped("%s", r.Message.c_str());
+            if (!r.Message.empty() && (snapshot.Phase == Phase::Failed || snapshot.Phase == Phase::Cancelled))
+                ImGui::TextWrapped("%s", r.Message.c_str());
 
             // Overlay the moving source (orange) whenever the run published new positions.
             if (state.LivePreview && Shell != nullptr && snapshot.Revision != state.PreviewRevision &&
-                snapshot.Phase != Phase::Applied)
+                snapshot.Phase != Phase::Applied && snapshot.SourcePreview && snapshot.Target)
                 if (auto* interaction = Shell->SceneInteraction())
                 {
                     std::vector<Runtime::SceneInteractionModule::PreviewPoint> points;
-                    const std::size_t count = snapshot.SourcePreview.size();
+                    const auto& preview = *snapshot.SourcePreview;
+                    const std::size_t count = preview.size();
                     const std::size_t stride = std::max<std::size_t>(1u, count / 20000u);
                     glm::vec3 lo{std::numeric_limits<float>::max()}, hi{-std::numeric_limits<float>::max()};
-                    for (const auto& p : snapshot.Target) { lo = glm::min(lo, p); hi = glm::max(hi, p); }
+                    for (const auto& p : *snapshot.Target) { lo = glm::min(lo, p); hi = glm::max(hi, p); }
                     const float radius = std::max(1e-4f, 0.004f * glm::length(hi - lo));
                     for (std::size_t i = 0; i < count; i += stride)
-                        points.push_back({.Position = snapshot.SourcePreview[i], .Color = {1.0f, 0.55f, 0.1f, 1.0f},
+                        points.push_back({.Position = preview[i], .Color = {1.0f, 0.55f, 0.1f, 1.0f},
                                           .Radius = radius, .DepthTested = true});
                     interaction->SetPreviewOverlay("coherent_point_drift", points);
                     state.PreviewRevision = snapshot.Revision;

@@ -241,7 +241,7 @@ TEST(CoherentPointDriftOperations, StepModeTracesEachIterationAndAppliesTheCurre
         .TargetStableEntityId = Id(target)}, failure);
     ASSERT_TRUE(run) << failure.Message;
     EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(run).Phase, R::EditorCoherentPointDriftPhase::Ready);
-    EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(run).Target.size(), 100u);
+    EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(run).Target->size(), 100u);
     EXPECT_EQ(R::ApplyEditorCoherentPointDrift(s.Commands(), run).Status, R::EditorCommandStatus::InvalidProcessingParameters)
         << "nothing to apply before a step";
 
@@ -251,7 +251,7 @@ TEST(CoherentPointDriftOperations, StepModeTracesEachIterationAndAppliesTheCurre
     EXPECT_EQ(snapshot.Trace.size(), 2u);
     EXPECT_EQ(snapshot.Result.Iterations, 2u);
     EXPECT_LT(snapshot.Trace[1].Sigma2, snapshot.Trace[0].Sigma2);
-    EXPECT_NE(snapshot.SourcePreview[0], points[0]) << "the preview moves before anything is published";
+    EXPECT_NE((*snapshot.SourcePreview)[0], points[0]) << "the preview moves before anything is published";
     EXPECT_EQ(s.Registry.Raw().get<T::Component>(source).Position, glm::vec3(0.0f));
 
     EXPECT_EQ(R::StepEditorCoherentPointDrift(s.Commands(), run, 0), R::EditorCommandStatus::Pending);
@@ -531,4 +531,44 @@ TEST(CoherentPointDriftOperations, VulkanEStepBrokerFailsClosedAndTimesOut)
         EXPECT_TRUE(broker.Closed());
         EXPECT_NE(broker.Diagnostic().find("in time"), std::string::npos) << broker.Diagnostic();
     }
+}
+
+TEST(CoherentPointDriftOperations, CancelAnswersAtOnceAndTraceRowsCarryElapsedTime)
+{
+    // UI-067: Cancel while a step job is queued turns the phase to Cancelled immediately; the
+    // job, when it runs, publishes nothing that overrides it. Trace rows carry elapsed times.
+    Scene s;
+    const auto points = Cloud(200, 13);
+    std::vector<glm::vec3> moved;
+    for (const auto& p : points) moved.push_back(p + glm::vec3(0.2f, 0.0f, 0.1f));
+    const auto source = Make(s.Registry, D::PointCloudPoint, points);
+    const auto target = Make(s.Registry, D::PointCloudPoint, moved);
+    const R::CoherentPointDriftConfig config{.SourceStableEntityId = Id(source), .TargetStableEntityId = Id(target)};
+
+    R::EditorCoherentPointDriftResult failure;
+    const auto timed = R::StartEditorCoherentPointDrift(s.Commands(), config, failure);
+    ASSERT_TRUE(timed) << failure.Message;
+    ASSERT_EQ(R::StepEditorCoherentPointDrift(s.Commands(), timed, 3), R::EditorCommandStatus::Pending);
+    const auto trace = R::SnapshotEditorCoherentPointDrift(timed).Trace;
+    ASSERT_EQ(trace.size(), 3u);
+    for (std::size_t k = 0; k < trace.size(); ++k)
+    {
+        EXPECT_GE(trace[k].IterationSeconds, 0.0);
+        if (k > 0) EXPECT_GE(trace[k].Seconds, trace[k - 1].Seconds);
+    }
+    EXPECT_TRUE(R::SnapshotEditorCoherentPointDrift(timed).Stage.empty()) << "no stage once paused";
+
+    Extrinsic::Tests::EditorJobHarness jobs;
+    jobs.Attach(s.Context);
+    const auto run = R::StartEditorCoherentPointDrift(s.Commands(), config, failure);
+    ASSERT_TRUE(run) << failure.Message;
+    ASSERT_EQ(R::StepEditorCoherentPointDrift(s.Commands(), run, 1), R::EditorCommandStatus::Pending);
+    EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(run).Phase, R::EditorCoherentPointDriftPhase::Running);
+    R::CancelEditorCoherentPointDrift(run);
+    EXPECT_EQ(R::SnapshotEditorCoherentPointDrift(run).Phase, R::EditorCoherentPointDriftPhase::Cancelled)
+        << "the panel sees the cancel before the job ends";
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    const auto after = R::SnapshotEditorCoherentPointDrift(run);
+    EXPECT_EQ(after.Phase, R::EditorCoherentPointDriftPhase::Cancelled);
+    EXPECT_FALSE(R::ApplyEditorCoherentPointDrift(s.Commands(), run).Succeeded());
 }

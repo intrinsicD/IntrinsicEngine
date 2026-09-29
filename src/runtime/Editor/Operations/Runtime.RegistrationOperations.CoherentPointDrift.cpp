@@ -5,6 +5,7 @@
 // Nothing is written to the scene until Apply, which revalidates the captured inputs and
 // both entity transforms and publishes one undoable history entry.
 module;
+#include <chrono>
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -83,6 +84,7 @@ namespace Extrinsic::Runtime
         // Worker-owned; only one step job runs at a time (Busy).
         CPD::Solver Solver{};
         bool Initialized{false};
+        std::chrono::steady_clock::time_point Started{}, LastIteration{}; // worker-owned
         std::atomic<bool> Busy{false};
         std::atomic<bool> CancelRequested{false};
 
@@ -246,6 +248,14 @@ namespace Extrinsic::Runtime
                                       .SubsampleSource = config.Subsample, .SubsampleTarget = config.SubsampleTarget,
                                       .SubsampleSampling = ToPointSamplingParams(config.SubsampleSampling),
                                       .LandmarkSampling = ToPointSamplingParams(config.LandmarkSampling)};
+            // UI-067: cancellation polled inside kernel builds and E-step chunks, and the phase in
+            // flight for the panel (the run owns its solver, so the raw pointer outlives both).
+            run->Params.Cancelled = [flag = &run->CancelRequested] { return flag->load(std::memory_order_relaxed); };
+            run->Params.StageObserver = [raw = run](const CPD::Stage stage) {
+                std::scoped_lock lock{raw->Mutex};
+                raw->Snapshot.Stage = std::string(CPD::ToString(stage));
+                raw->Snapshot.StageStarted = std::chrono::steady_clock::now();
+            };
             if (config.EStep == CoherentPointDriftEStep::Vulkan)
             {
                 // The worker waits for results the main thread records, so a device E-step needs
@@ -303,38 +313,61 @@ namespace Extrinsic::Runtime
                 result.Message = "Coherent Point Drift failed: " + std::string(CPD::ToString(current.State)) + ".";
             }
             else
-                snapshot.SourcePreview = std::move(preview);
+                snapshot.SourcePreview = std::make_shared<const std::vector<glm::vec3>>(std::move(preview));
             if (phase) snapshot.Phase = *phase;
+            // A cancel wins over whatever the step in flight reached.
+            if (run.CancelRequested.load() || current.State == CPD::Status::Cancelled)
+            {
+                snapshot.Phase = Phase::Cancelled;
+                result.Status = EditorCommandStatus::StaleEntity;
+                result.Message = "Coherent Point Drift was cancelled; nothing was applied.";
+            }
+            snapshot.Stage.clear();
             ++snapshot.Revision;
         }
 
-        // Runs up to `iterations` EM iterations (0: until the solver ends).
+        // Runs up to `iterations` EM iterations (0: until the solver ends); one snapshot per
+        // iteration (UI-067: the trace carries elapsed times, the stage shows the phase in flight).
         void RunSteps(EditorCoherentPointDriftRun& run, std::uint32_t iterations, const JobCancellation& cancellation)
         {
+            const auto now = [] { return std::chrono::steady_clock::now(); };
             if (!run.Initialized)
             {
                 run.Initialized = true;
+                run.Started = run.LastIteration = now();
                 const auto status = run.Solver.Initialize(run.TargetWorld, run.SourceWorld, run.Params);
                 if (status != CPD::Status::Success)
                 {
                     std::scoped_lock lock{run.Mutex};
-                    run.Snapshot.Phase = Phase::Failed;
-                    run.Snapshot.Result.Status = EditorCommandStatus::GeometryProcessingFailed;
-                    run.Snapshot.Result.Message = "Coherent Point Drift rejected the input: " + std::string(CPD::ToString(status)) + ".";
+                    const bool cancelled = status == CPD::Status::Cancelled || run.CancelRequested.load();
+                    run.Snapshot.Phase = cancelled ? Phase::Cancelled : Phase::Failed;
+                    run.Snapshot.Stage.clear();
+                    run.Snapshot.Result.Status = cancelled ? EditorCommandStatus::StaleEntity
+                                                           : EditorCommandStatus::GeometryProcessingFailed;
+                    run.Snapshot.Result.Message = cancelled
+                        ? "Coherent Point Drift was cancelled; nothing was applied."
+                        : "Coherent Point Drift rejected the input: " + std::string(CPD::ToString(status)) + ".";
                     ++run.Snapshot.Revision;
                     return;
                 }
             }
             std::uint32_t done = 0;
-            const CPD::IterationObserver observer = [&run](const CPD::IterationTrace& trace) {
+            const CPD::IterationObserver observer = [&run, &now](const CPD::IterationTrace& trace) {
+                const auto at = now();
+                const double iterationSeconds = std::chrono::duration<double>(at - run.LastIteration).count();
+                run.LastIteration = at;
                 std::scoped_lock lock{run.Mutex};
                 run.Snapshot.Trace.push_back({.Iteration = trace.Iteration, .Sigma2 = trace.Sigma2,
                                               .NegativeLogLikelihood = trace.NegativeLogLikelihood,
                                               .Objective = trace.Objective, .MatchedWeight = trace.MatchedWeight,
                                               .EStep = std::string(CPD::ToString(trace.EStep)),
                                               .EStepErrorBound = trace.EStepErrorBound,
-                                              .EStepSampledError = trace.EStepSampledError});
+                                              .EStepSampledError = trace.EStepSampledError,
+                                              .KernelEvaluations = trace.KernelEvaluations,
+                                              .Seconds = std::chrono::duration<double>(at - run.Started).count(),
+                                              .IterationSeconds = iterationSeconds});
             };
+            run.LastIteration = now(); // a paused run's idle time is not iteration time
             while (!run.Solver.Finished())
             {
                 if (cancellation.IsCancelled() || run.CancelRequested.load())
@@ -345,14 +378,10 @@ namespace Extrinsic::Runtime
                 run.Solver.Step(observer);
                 ++done;
                 const bool ended = run.Solver.Finished();
+                const bool batchDone = iterations != 0u && done >= iterations;
                 PublishProgress(run, ended ? std::optional{run.Solver.Current().Succeeded() ? Phase::Finished : Phase::Failed}
-                                           : std::nullopt);
-                if (ended) return;
-                if (iterations != 0u && done >= iterations)
-                {
-                    PublishProgress(run, Phase::Paused);
-                    return;
-                }
+                                   : batchDone ? std::optional{Phase::Paused} : std::nullopt);
+                if (ended || batchDone) return;
             }
             // Finished before this call (e.g. a converged solver asked for more steps).
             PublishProgress(run, run.Solver.Current().Succeeded() ? Phase::Finished : Phase::Failed);
@@ -509,7 +538,7 @@ namespace Extrinsic::Runtime
                               "A mirrored result cannot be stored in the source transform; write positions instead.");
             const EditorCommandHistoryStatus status = run.Config.Output == CoherentPointDriftOutput::SourceTransform
                 ? PublishTransform(context, run, snapshot.Result.Transform)
-                : PublishProperty(context, run, snapshot.SourcePreview, why);
+                : PublishProperty(context, run, *snapshot.SourcePreview, why);
             result.Status = ToEditorCommandStatus(status);
             if (!result.Succeeded())
                 return reject(result.Status, why.empty() ? "Coherent Point Drift publication was rejected by history checks." : why);
@@ -689,8 +718,8 @@ namespace Extrinsic::Runtime
                            .Backend = std::string(CPD::BackendId(run->Params.EStep)),
                            .SourcePointCount = run->SourceWorld.size(), .TargetPointCount = run->TargetWorld.size(),
                            .Message = "Coherent Point Drift is ready."};
-        snapshot.SourcePreview = run->SourceWorld;
-        snapshot.Target = run->TargetWorld;
+        snapshot.SourcePreview = std::make_shared<const std::vector<glm::vec3>>(run->SourceWorld);
+        snapshot.Target = std::make_shared<const std::vector<glm::vec3>>(run->TargetWorld);
         snapshot.Revision = 1u;
         return run;
     }
@@ -705,15 +734,18 @@ namespace Extrinsic::Runtime
     void CancelEditorCoherentPointDrift(const EditorCoherentPointDriftRunHandle& run)
     {
         if (!run) return;
+        // Answers at once: the solver polls the flag inside kernel builds and every E-step chunk,
+        // and a step still in flight publishes nothing more than this cancelled phase.
         run->CancelRequested = true;
-        if (!run->Busy.load())
+        std::scoped_lock lock{run->Mutex};
+        if (run->Snapshot.Phase == Phase::Ready || run->Snapshot.Phase == Phase::Paused ||
+            run->Snapshot.Phase == Phase::Running)
         {
-            std::scoped_lock lock{run->Mutex};
-            if (run->Snapshot.Phase == Phase::Ready || run->Snapshot.Phase == Phase::Paused)
-            {
-                run->Snapshot.Phase = Phase::Cancelled;
-                ++run->Snapshot.Revision;
-            }
+            run->Snapshot.Phase = Phase::Cancelled;
+            run->Snapshot.Stage.clear();
+            run->Snapshot.Result.Status = EditorCommandStatus::StaleEntity;
+            run->Snapshot.Result.Message = "Coherent Point Drift was cancelled; nothing was applied.";
+            ++run->Snapshot.Revision;
         }
     }
 
