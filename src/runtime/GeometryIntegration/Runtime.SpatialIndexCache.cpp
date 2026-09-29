@@ -167,6 +167,40 @@ namespace Extrinsic::Runtime
             bool DownloadQueued{};
         };
         std::vector<std::shared_ptr<Computation>> Computations{};
+        // Delivers a computation's readback bytes (framed download or immediate submit).
+        static RHI::ReadbackSink ComputationSink(const std::shared_ptr<Computation>& work)
+        {
+            return RHI::ReadbackSink::Invoke([work](std::span<const std::byte> data) {
+                if (data.size() != work->Result->Data.size())
+                {
+                    work->Result->Diagnostic = "GPU computation returned an incomplete result.";
+                    work->Result->State = SpatialQueryState::Failed;
+                    return;
+                }
+                std::memcpy(work->Result->Data.data(), data.data(), data.size());
+                work->Result->State = SpatialQueryState::Ready;
+            });
+        }
+        // GRAPHICS-150: submits the computation on its own command buffer at once. Only an index
+        // that is already built qualifies (a build recorded here would be lost if the submit
+        // were refused); false leaves the work for the frame.
+        bool SubmitImmediate(const std::shared_ptr<Computation>& work)
+        {
+            if (work->Target && !(work->Target->Gpu && work->Target->Gpu->View().NodesBDA)) return false;
+            const auto record = [this, work](RHI::ICommandContext& commands) {
+                if (!work->Target) return work->Record(commands, {});
+                const auto& e = *work->Target;
+                return work->Record(commands, {e.Gpu->View().NodesBDA, Device->GetBufferDeviceAddress(e.Points),
+                                               Device->GetBufferDeviceAddress(e.Mapping),
+                                               std::uint32_t(e.Snapshot->Slots.size())});
+            };
+            if (!Device->SubmitComputeReadback(record, work->Result->Data.size(), ComputationSink(work)).IsValid())
+                return false;
+            work->DownloadQueued = true;
+            work->SubmittedFrame = Device->GetGlobalFrameNumber();
+            work->Result->State = SpatialQueryState::Submitted;
+            return true;
+        }
         void ShutdownBatches()
         {
             // Called after the participant's device-idle fence. Deliver pending sinks
@@ -193,17 +227,7 @@ namespace Extrinsic::Runtime
                     Device->GetGlobalFrameNumber() < work->SubmittedFrame + Device->GetFramesInFlight()) continue;
                 work->DownloadQueued = true;
                 const auto ticket = Device->GetTransferQueue().DownloadBuffer(
-                    work->Output, work->Result->Data.size(), 0,
-                    RHI::ReadbackSink::Invoke([work](std::span<const std::byte> data) {
-                        if (data.size() != work->Result->Data.size())
-                        {
-                            work->Result->Diagnostic = "GPU computation returned an incomplete result.";
-                            work->Result->State = SpatialQueryState::Failed;
-                            return;
-                        }
-                        std::memcpy(work->Result->Data.data(), data.data(), data.size());
-                        work->Result->State = SpatialQueryState::Ready;
-                    }));
+                    work->Output, work->Result->Data.size(), 0, ComputationSink(work));
                 if (!ticket.IsValid())
                 {
                     work->Result->State = SpatialQueryState::Failed;
@@ -589,7 +613,8 @@ namespace Extrinsic::Runtime
     }
     std::shared_ptr<SpatialGpuResult> SpatialIndexCache::QueueGpuCompute(
         SpatialIndexHandle handle, std::size_t readbackBytes,
-        std::function<RHI::BufferHandle(RHI::ICommandContext&, const SpatialGpuIndexView&)> record)
+        std::function<RHI::BufferHandle(RHI::ICommandContext&, const SpatialGpuIndexView&)> record,
+        const SpatialGpuLatency latency)
     {
         auto work = std::make_shared<Impl::Computation>();
         auto& s = *m_Impl;
@@ -605,12 +630,14 @@ namespace Extrinsic::Runtime
         work->Target = *std::ranges::find_if(s.Entries, [&](const auto& e) { return e->Id == handle.Value; });
         work->Record = std::move(record);
         work->Result->Data.resize(readbackBytes);
+        if (latency == SpatialGpuLatency::Immediate) (void)s.SubmitImmediate(work);
         s.Computations.push_back(work);
         return work->Result;
     }
     std::shared_ptr<SpatialGpuResult> SpatialIndexCache::QueueGpuCompute(
         std::size_t readbackBytes,
-        std::function<RHI::BufferHandle(RHI::ICommandContext&, const SpatialGpuIndexView&)> record)
+        std::function<RHI::BufferHandle(RHI::ICommandContext&, const SpatialGpuIndexView&)> record,
+        const SpatialGpuLatency latency)
     {
         auto work = std::make_shared<Impl::Computation>();
         if (!GpuQueriesAvailable() || !record || readbackBytes == 0 || readbackBytes > (1u << 28))
@@ -621,6 +648,7 @@ namespace Extrinsic::Runtime
         }
         work->Record = std::move(record);
         work->Result->Data.resize(readbackBytes);
+        if (latency == SpatialGpuLatency::Immediate) (void)m_Impl->SubmitImmediate(work);
         m_Impl->Computations.push_back(work);
         return work->Result;
     }

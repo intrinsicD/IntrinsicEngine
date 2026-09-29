@@ -1398,6 +1398,31 @@ RHI::ITransferQueue& VulkanDevice::GetTransferQueue()
     return m_FallbackTransferQueue;
 }
 
+RHI::ReadbackToken VulkanDevice::SubmitComputeReadback(
+    std::function<RHI::BufferHandle(RHI::ICommandContext&)> record, const std::uint64_t readbackBytes,
+    RHI::ReadbackSink sink)
+{
+    if (!record || readbackBytes == 0u || !HasLiveOperationalPrerequisites() || !m_TransferQueue ||
+        !m_TransferQueue->IsValid() || !m_BindlessHeap || !m_BindlessHeap->IsValid())
+        return {};
+    // GRAPHICS-150: a transfer-pool command buffer on the graphics queue, so the work is ordered
+    // after every submitted frame and its readback arrives with the next CollectCompleted.
+    VkCommandBuffer cmd = m_TransferQueue->Allocate();
+    if (cmd == VK_NULL_HANDLE)
+        return {};
+    const VulkanFrameGraphBarrierQueueFamilies families = ResolveFrameGraphBarrierQueueFamilies(
+        m_GraphicsFamily, m_AsyncComputeQueue != VK_NULL_HANDLE ? m_AsyncComputeFamily : VK_QUEUE_FAMILY_IGNORED,
+        m_TransferVkQueue != VK_NULL_HANDLE ? m_TransferFamily : VK_QUEUE_FAMILY_IGNORED, m_PresentFamily,
+        GetQueueCapabilityProfile());
+    VulkanCommandContext context;
+    context.Bind(m_Device, cmd, m_GlobalPipelineLayout, m_BindlessHeap->GetSet(), &m_Buffers, &m_Images, &m_Samplers,
+                 &m_Pipelines, m_DefaultSamplerHandle, m_GraphicsFamily, families.Graphics, families.AsyncCompute,
+                 families.Present, families.Transfer);
+    context.Begin();
+    const RHI::BufferHandle output = context.IsRecordingForProfiler() ? record(context) : RHI::BufferHandle{};
+    return m_TransferQueue->SubmitRecordedDownload(cmd, output, readbackBytes, std::move(sink));
+}
+
 RHI::IBindlessHeap& VulkanDevice::GetBindlessHeap()
 {
     if (HasOperationalSafetyPrerequisites() && m_BindlessHeap && m_BindlessHeap->IsValid())

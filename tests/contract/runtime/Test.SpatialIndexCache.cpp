@@ -7,6 +7,8 @@
 #include <gtest/gtest.h>
 #include <vector>
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
@@ -182,6 +184,11 @@ TEST(SpatialIndexCache, FramedRadiusWithoutDeviceFailsExplicitly)
     ASSERT_TRUE(computation);
     EXPECT_EQ(computation->State,R::SpatialQueryState::Failed);
     EXPECT_FALSE(computation->Diagnostic.empty());
+    // GRAPHICS-150: an immediate request fails closed the same way without a device.
+    const auto immediate=cache.QueueGpuCompute(32,[](auto&,const auto&){return Extrinsic::RHI::BufferHandle{};},
+                                               R::SpatialGpuLatency::Immediate);
+    ASSERT_TRUE(immediate);
+    EXPECT_EQ(immediate->State,R::SpatialQueryState::Failed);
     const std::vector<glm::vec3> queries{{0,0,0}};
     for (float radius : {-1.f, 0.f, 1.f})
     {

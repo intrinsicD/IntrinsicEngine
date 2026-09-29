@@ -78,6 +78,11 @@ export namespace Extrinsic::Runtime
         std::uint64_t NodesBDA{}, PositionsBDA{}, OriginalSlotsBDA{};
         std::uint32_t Count{};
     };
+    // GRAPHICS-150: Framed work is recorded into the next frame and read back after the frames
+    // in flight (4-6 frames per round trip); Immediate work is submitted at once on its own
+    // command buffer and is Ready as soon as the GPU finished (the same frame's maintenance),
+    // falling back to Framed where the device cannot.
+    enum class SpatialGpuLatency : std::uint8_t { Framed, Immediate };
     struct SpatialGpuResult
     {
         SpatialQueryState State{SpatialQueryState::Queued};
@@ -126,12 +131,14 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] std::shared_ptr<SpatialGpuResult> QueueGpuCompute(
             SpatialIndexHandle handle, std::size_t readbackBytes,
             std::function<RHI::BufferHandle(RHI::ICommandContext&,
-                                           const SpatialGpuIndexView&)> record);
-        // Same framed recording and readback without an index; the view is empty.
+                                           const SpatialGpuIndexView&)> record,
+            SpatialGpuLatency latency = SpatialGpuLatency::Framed);
+        // Same recording and readback without an index; the view is empty.
         [[nodiscard]] std::shared_ptr<SpatialGpuResult> QueueGpuCompute(
             std::size_t readbackBytes,
             std::function<RHI::BufferHandle(RHI::ICommandContext&,
-                                           const SpatialGpuIndexView&)> record);
+                                           const SpatialGpuIndexView&)> record,
+            SpatialGpuLatency latency = SpatialGpuLatency::Framed);
         // Stale world/entity/property/deletion revisions return nullopt; reacquire to rebuild.
         [[nodiscard]] std::optional<Geometry::PointLBVH::Neighbor> Nearest(
             SpatialIndexHandle handle, glm::vec3 query,

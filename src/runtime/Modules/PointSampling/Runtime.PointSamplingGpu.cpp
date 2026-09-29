@@ -79,7 +79,7 @@ namespace Extrinsic::Runtime
         return cache.QueueGpuCompute(Graphics::FarthestPointSamplingWorkspace::ReadbackBytes(std::uint32_t(s.Count)),
             [workspace = s.Workspace](RHI::ICommandContext& commands, const SpatialGpuIndexView&) {
                 return workspace->RecordNext(commands);
-            });
+            }, SpatialGpuLatency::Immediate);
     }
 
     bool PointSamplingGpuRun::Observe(const SpatialGpuResult& chunk)

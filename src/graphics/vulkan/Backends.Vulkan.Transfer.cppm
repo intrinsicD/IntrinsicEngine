@@ -5,6 +5,7 @@ module;
 #include <cstddef>
 #include <deque>
 #include <memory>
+#include <optional>
 #include <mutex>
 #include <span>
 #include <string_view>
@@ -126,7 +127,27 @@ namespace Extrinsic::Backends::Vulkan
         friend class VulkanDevice;
 
     private:
+        // A primary command buffer from the transfer pool, not begun (the pool is externally
+        // synchronized, so allocation holds m_Mutex).
+        [[nodiscard]] VkCommandBuffer Allocate();
         [[nodiscard]] VkCommandBuffer Begin();
+        struct DownloadSource
+        {
+            VkBuffer Buffer = VK_NULL_HANDLE;
+            uint64_t Offset = 0, Size = 0;
+            size_t SlotIndex = 0;
+        };
+        // Validates a buffer readback and reserves its staging slot; nullopt (logged and counted
+        // as dropped) on refusal.
+        [[nodiscard]] std::optional<DownloadSource> PrepareDownload(RHI::BufferHandle src, uint64_t size,
+                                                                    uint64_t offset, const RHI::ReadbackSink& sink);
+        // Records the source barrier (after every earlier write on this queue) and the copy
+        // into the staging slot, then submits; frees `cmd` and the slot on failure.
+        [[nodiscard]] RHI::ReadbackToken RecordAndSubmitDownload(VkCommandBuffer cmd, const DownloadSource& source,
+                                                                 RHI::ReadbackSink sink);
+        // GRAPHICS-150: `cmd` (begun, from Allocate) already holds the producer's commands.
+        [[nodiscard]] RHI::ReadbackToken SubmitRecordedDownload(VkCommandBuffer cmd, RHI::BufferHandle src,
+                                                                uint64_t size, RHI::ReadbackSink sink);
         [[nodiscard]] bool FinishCommandBuffer(VkCommandBuffer cmd, std::string_view operation);
         // Caller holds m_Mutex through ticket submission and lane-specific retirement.
         [[nodiscard]] uint64_t SubmitTimelineLocked(VkCommandBuffer cmd, std::string_view operation);

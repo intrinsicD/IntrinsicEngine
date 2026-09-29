@@ -1,6 +1,6 @@
 // Vulkan execution seam of Geometry.PointSampling (RUNTIME-290). Geometry stays CPU-only; this
-// module decides whether a request can run on the device, drives it in bounded framed chunks
-// through SpatialIndexCache::QueueGpuCompute (main thread), keeps the growing order prefix
+// module decides whether a request can run on the device, drives it in bounded chunks
+// through SpatialIndexCache::QueueGpuCompute (main thread, immediate submits), keeps the growing order prefix
 // (published entries never change) and checks it against the CPU reference before the
 // result may report `gpu_vulkan_compute`. Methods with a device kernel: exact (weighted)
 // farthest point (Graphics.FarthestPointSampling); METHOD-014/055/060-062 plug in here.

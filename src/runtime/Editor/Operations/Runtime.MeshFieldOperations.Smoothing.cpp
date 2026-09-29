@@ -592,7 +592,7 @@ namespace Extrinsic::Runtime
                     if (!current()) return true;
                     if (w->Implicit)
                     {
-                        // One bounded chunk per framed submission; observe each readback first.
+                        // One bounded chunk per immediate submission (GRAPHICS-150); observe each readback first.
                         const auto queue = [&] {
                             w->Gpu = context.SpatialIndices->QueueGpuCompute(
                                 Graphics::SparseConjugateGradientWorkspace::ReadbackBytes(std::uint32_t(w->Plan.Count),
@@ -600,7 +600,7 @@ namespace Extrinsic::Runtime
                                 [solver = w->Solver, w](RHI::ICommandContext& commands, const SpatialGpuIndexView&) -> RHI::BufferHandle {
                                     if (w->Abandoned) return {};
                                     return solver->RecordNext(commands);
-                                });
+                                }, SpatialGpuLatency::Immediate);
                         };
                         if (!w->Solver)
                         {

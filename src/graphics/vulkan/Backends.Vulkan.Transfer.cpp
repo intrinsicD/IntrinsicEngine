@@ -6,6 +6,7 @@ module;
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <mutex>
 #include <span>
 #include <string_view>
@@ -132,7 +133,7 @@ uint64_t VulkanTransferQueue::QueryCompletedValue() const
     return val;
 }
 
-VkCommandBuffer VulkanTransferQueue::Begin()
+VkCommandBuffer VulkanTransferQueue::Allocate()
 {
     if (!IsValid())
     {
@@ -146,20 +147,33 @@ VkCommandBuffer VulkanTransferQueue::Begin()
     allocCI.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocCI.commandBufferCount = 1;
     VkCommandBuffer cmd = VK_NULL_HANDLE;
-    VkResult result = vkAllocateCommandBuffers(m_Device, &allocCI, &cmd);
+    VkResult result;
+    {
+        // Retirement frees into the same pool under m_Mutex; pool access must be serialized.
+        std::scoped_lock lock{m_Mutex};
+        result = vkAllocateCommandBuffers(m_Device, &allocCI, &cmd);
+    }
     if (result != VK_SUCCESS || cmd == VK_NULL_HANDLE)
     {
         Core::Log::Error("[VulkanTransferQueue] vkAllocateCommandBuffers failed; upload skipped");
         return VK_NULL_HANDLE;
     }
+    return cmd;
+}
+
+VkCommandBuffer VulkanTransferQueue::Begin()
+{
+    VkCommandBuffer cmd = Allocate();
+    if (cmd == VK_NULL_HANDLE)
+        return VK_NULL_HANDLE;
 
     VkCommandBufferBeginInfo beginCI{};
     beginCI.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginCI.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    result = vkBeginCommandBuffer(cmd, &beginCI);
-    if (result != VK_SUCCESS)
+    if (vkBeginCommandBuffer(cmd, &beginCI) != VK_SUCCESS)
     {
         Core::Log::Error("[VulkanTransferQueue] vkBeginCommandBuffer failed; upload skipped");
+        std::scoped_lock lock{m_Mutex};
         vkFreeCommandBuffers(m_Device, m_CmdPool, 1, &cmd);
         return VK_NULL_HANDLE;
     }
@@ -174,13 +188,17 @@ bool VulkanTransferQueue::FinishCommandBuffer(
         Core::Log::Warn("[VulkanTransferQueue] Cannot submit {} command buffer; service or command buffer is invalid",
                        operation == "upload" ? std::string_view{"transfer"} : operation);
         if (cmd != VK_NULL_HANDLE && m_Device != VK_NULL_HANDLE && m_CmdPool != VK_NULL_HANDLE)
+        {
+            std::scoped_lock lock{m_Mutex};
             vkFreeCommandBuffers(m_Device, m_CmdPool, 1u, &cmd);
+        }
         return false;
     }
 
     if (vkEndCommandBuffer(cmd) != VK_SUCCESS)
     {
         Core::Log::Error("[VulkanTransferQueue] vkEndCommandBuffer failed; {} skipped", operation);
+        std::scoped_lock lock{m_Mutex};
         vkFreeCommandBuffers(m_Device, m_CmdPool, 1u, &cmd);
         return false;
     }
@@ -773,44 +791,26 @@ RHI::TransferToken VulkanTransferQueue::UploadTextureFullChain(RHI::TextureHandl
     return token;
 }
 
-RHI::ReadbackToken VulkanTransferQueue::DownloadBuffer(RHI::BufferHandle src,
-                                                       uint64_t size,
-                                                       uint64_t offset,
-                                                       RHI::ReadbackSink sink)
+std::optional<VulkanTransferQueue::DownloadSource> VulkanTransferQueue::PrepareDownload(
+    RHI::BufferHandle src, uint64_t size, uint64_t offset, const RHI::ReadbackSink& sink)
 {
-    [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"VulkanTransferQueue::DownloadBuffer", Extrinsic::Core::Telemetry::HashString("VulkanTransferQueue::DownloadBuffer")};
+    const auto refuse = [&](std::string_view reason) -> std::optional<DownloadSource> {
+        Core::Log::Warn("[VulkanTransferQueue] DownloadBuffer rejected; {}", reason);
+        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
+        return std::nullopt;
+    };
     if (!IsValid())
-    {
-        Core::Log::Warn("[VulkanTransferQueue] DownloadBuffer rejected; transfer service is invalid");
-        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
-        return {};
-    }
+        return refuse("transfer service is invalid");
     if (!m_Buffers)
-    {
-        Core::Log::Warn("[VulkanTransferQueue] DownloadBuffer rejected; buffer pool is unavailable");
-        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
-        return {};
-    }
+        return refuse("buffer pool is unavailable");
     if (!sink.IsValidForSize(size))
-    {
-        Core::Log::Warn("[VulkanTransferQueue] DownloadBuffer rejected; readback sink is invalid for the requested size");
-        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
-        return {};
-    }
+        return refuse("readback sink is invalid for the requested size");
 
     VulkanBuffer* buf = m_Buffers->GetIfValid(src);
     if (!buf || buf->Buffer == VK_NULL_HANDLE)
-    {
-        Core::Log::Warn("[VulkanTransferQueue] DownloadBuffer rejected; source buffer handle is invalid");
-        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
-        return {};
-    }
+        return refuse("source buffer handle is invalid");
     if ((buf->Usage & VK_BUFFER_USAGE_TRANSFER_SRC_BIT) == 0)
-    {
-        Core::Log::Warn("[VulkanTransferQueue] DownloadBuffer rejected; source buffer lacks transfer-src usage");
-        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
-        return {};
-    }
+        return refuse("source buffer lacks transfer-src usage");
 
     const RHI::BufferDesc sourceDesc{
         .SizeBytes = buf->SizeBytes,
@@ -824,43 +824,29 @@ RHI::ReadbackToken VulkanTransferQueue::DownloadBuffer(RHI::BufferHandle src,
                                                     .SizeBytes = size,
                                                 });
     if (!range.has_value())
-    {
-        Core::Log::Warn("[VulkanTransferQueue] DownloadBuffer rejected; readback range is invalid");
-        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
-        return {};
-    }
+        return refuse("readback range is invalid");
     if (range->SizeBytes > static_cast<uint64_t>(std::numeric_limits<size_t>::max()))
-    {
-        Core::Log::Warn("[VulkanTransferQueue] DownloadBuffer rejected; requested readback is too large for this host");
-        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
-        return {};
-    }
+        return refuse("requested readback is too large for this host");
 
     const size_t slotIndex = AcquireReadbackSlot(range->SizeBytes);
     if (slotIndex == std::numeric_limits<size_t>::max())
-    {
-        Core::Log::Warn("[VulkanTransferQueue] DownloadBuffer rejected; readback staging allocation failed");
-        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
-        return {};
-    }
+        return refuse("readback staging allocation failed");
+    return DownloadSource{.Buffer = buf->Buffer, .Offset = range->OffsetBytes, .Size = range->SizeBytes,
+                          .SlotIndex = slotIndex};
+}
 
-    VkCommandBuffer cmd = Begin();
-    if (cmd == VK_NULL_HANDLE)
-    {
-        ReleaseReadbackSlot(slotIndex, 0u);
-        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
-        return {};
-    }
-
+RHI::ReadbackToken VulkanTransferQueue::RecordAndSubmitDownload(VkCommandBuffer cmd, const DownloadSource& source,
+                                                                RHI::ReadbackSink sink)
+{
     VkBufferMemoryBarrier2 beforeCopy{};
     beforeCopy.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
     beforeCopy.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
     beforeCopy.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
     beforeCopy.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
     beforeCopy.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
-    beforeCopy.buffer = buf->Buffer;
-    beforeCopy.offset = range->OffsetBytes;
-    beforeCopy.size = range->SizeBytes;
+    beforeCopy.buffer = source.Buffer;
+    beforeCopy.offset = source.Offset;
+    beforeCopy.size = source.Size;
 
     VkDependencyInfo dependency{};
     dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
@@ -869,37 +855,66 @@ RHI::ReadbackToken VulkanTransferQueue::DownloadBuffer(RHI::BufferHandle src,
     vkCmdPipelineBarrier2(cmd, &dependency);
 
     VkBufferCopy copy{};
-    copy.srcOffset = range->OffsetBytes;
+    copy.srcOffset = source.Offset;
     copy.dstOffset = 0u;
-    copy.size = range->SizeBytes;
+    copy.size = source.Size;
     {
         std::scoped_lock lock{m_Mutex};
-        if (slotIndex >= m_ReadbackSlots.size() || m_ReadbackSlots[slotIndex].Buffer == VK_NULL_HANDLE)
+        if (source.SlotIndex >= m_ReadbackSlots.size() || m_ReadbackSlots[source.SlotIndex].Buffer == VK_NULL_HANDLE)
         {
             Core::Log::Warn("[VulkanTransferQueue] DownloadBuffer rejected; readback staging slot became invalid");
-            if (slotIndex < m_ReadbackSlots.size())
-                m_ReadbackSlots[slotIndex].InUse = false;
+            if (source.SlotIndex < m_ReadbackSlots.size())
+                m_ReadbackSlots[source.SlotIndex].InUse = false;
             vkFreeCommandBuffers(m_Device, m_CmdPool, 1u, &cmd);
             m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
             return {};
         }
-        vkCmdCopyBuffer(cmd, buf->Buffer, m_ReadbackSlots[slotIndex].Buffer, 1u, &copy);
+        vkCmdCopyBuffer(cmd, source.Buffer, m_ReadbackSlots[source.SlotIndex].Buffer, 1u, &copy);
     }
 
-    const RHI::ReadbackToken token = SubmitReadback(cmd,
-                                                    slotIndex,
-                                                    range->SizeBytes,
-                                                    std::move(sink));
+    const RHI::ReadbackToken token = SubmitReadback(cmd, source.SlotIndex, source.Size, std::move(sink));
     if (!token.IsValid())
     {
-        ReleaseReadbackSlot(slotIndex, 0u);
+        ReleaseReadbackSlot(source.SlotIndex, 0u);
         m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
         return {};
     }
 
     m_DownloadsQueued.fetch_add(1u, std::memory_order_relaxed);
-    m_ReadbackBytesStaged.fetch_add(range->SizeBytes, std::memory_order_relaxed);
+    m_ReadbackBytesStaged.fetch_add(source.Size, std::memory_order_relaxed);
     return token;
+}
+
+RHI::ReadbackToken VulkanTransferQueue::DownloadBuffer(RHI::BufferHandle src,
+                                                       uint64_t size,
+                                                       uint64_t offset,
+                                                       RHI::ReadbackSink sink)
+{
+    [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"VulkanTransferQueue::DownloadBuffer", Extrinsic::Core::Telemetry::HashString("VulkanTransferQueue::DownloadBuffer")};
+    const auto source = PrepareDownload(src, size, offset, sink);
+    if (!source)
+        return {};
+    VkCommandBuffer cmd = Begin();
+    if (cmd == VK_NULL_HANDLE)
+    {
+        ReleaseReadbackSlot(source->SlotIndex, 0u);
+        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
+        return {};
+    }
+    return RecordAndSubmitDownload(cmd, *source, std::move(sink));
+}
+
+RHI::ReadbackToken VulkanTransferQueue::SubmitRecordedDownload(VkCommandBuffer cmd, RHI::BufferHandle src,
+                                                               uint64_t size, RHI::ReadbackSink sink)
+{
+    const auto source = src.IsValid() ? PrepareDownload(src, size, 0u, sink) : std::nullopt;
+    if (!source)
+    {
+        std::scoped_lock lock{m_Mutex};
+        vkFreeCommandBuffers(m_Device, m_CmdPool, 1u, &cmd);
+        return {};
+    }
+    return RecordAndSubmitDownload(cmd, *source, std::move(sink));
 }
 
 RHI::ReadbackToken VulkanTransferQueue::DownloadTexture(RHI::TextureHandle src,

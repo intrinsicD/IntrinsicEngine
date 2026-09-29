@@ -3,6 +3,7 @@ module;
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <functional>
 #include <cstddef>
 #include <memory>
 #include <mutex>
@@ -138,6 +139,9 @@ namespace Extrinsic::Backends::Vulkan
         void DestroyPipeline(RHI::PipelineHandle handle) override;
 
         [[nodiscard]] RHI::ITransferQueue& GetTransferQueue() override;
+        [[nodiscard]] RHI::ReadbackToken SubmitComputeReadback(
+            std::function<RHI::BufferHandle(RHI::ICommandContext&)> record, std::uint64_t readbackBytes,
+            RHI::ReadbackSink sink) override;
         [[nodiscard]] RHI::IBindlessHeap& GetBindlessHeap() override;
         [[nodiscard]] RHI::IProfiler*      GetProfiler()      override { return m_Profiler.get(); }
         [[nodiscard]] uint32_t GetFramesInFlight()    const override { return kMaxFramesInFlight; }

@@ -2,8 +2,8 @@
 // JobService worker, but GPU work is recorded on the device-owner thread: the worker's Evaluate
 // (the solver's EStep::ExternalEvaluator) converts the request to fp32, queues it and waits; Pump,
 // called on the main thread every drain while a step job runs, records it through
-// SpatialIndexCache::QueueGpuCompute (Graphics::CoherentPointDriftEStepWorkspace) and hands the
-// readback back. A result arrives two to three frames after the request.
+// SpatialIndexCache::QueueGpuCompute (Graphics::CoherentPointDriftEStepWorkspace) as an immediate
+// submit (GRAPHICS-150) and hands the readback back, usually in the frame that submitted it.
 //
 // Evaluate returns false, and the solver runs that iteration on the CPU, when the broker is
 // closed, the computation is refused or fails (which closes the broker, so later iterations do

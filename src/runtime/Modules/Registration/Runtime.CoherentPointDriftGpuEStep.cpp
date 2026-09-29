@@ -165,7 +165,7 @@ namespace Extrinsic::Runtime
                         .TargetGeneration = request->TargetGeneration, .Source = request->Source,
                         .SkipRows = request->SkipRows,
                         .Sigma2 = request->Sigma2, .LogOutlier = request->LogOutlier});
-                });
+                }, SpatialGpuLatency::Immediate);
             s.State = Slot::InFlight;
         }
         if (s.State == Slot::InFlight && s.Gpu)

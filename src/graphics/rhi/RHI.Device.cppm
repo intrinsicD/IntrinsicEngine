@@ -2,6 +2,7 @@
 module;
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <span>
 
@@ -276,6 +277,21 @@ namespace Extrinsic::RHI
         // GpuAssetCache and other streaming consumers inject ITransferQueue&
         // directly — they never need the full IDevice interface.
         [[nodiscard]] virtual ITransferQueue& GetTransferQueue() = 0;
+
+        // GRAPHICS-150: low-latency compute outside the frame. Records `record` into a command
+        // buffer of its own, copies `readbackBytes` of the buffer it returns (created with
+        // TransferSrc) and submits at once; the transfer queue's CollectCompleted delivers the
+        // bytes to `sink` as soon as the GPU finished, with no frames-in-flight wait. The work
+        // is ordered after every frame already submitted. Device-owner thread only; buffers the
+        // recorder uses must stay alive, and unwritten, until the sink ran. An invalid token
+        // (the default: unsupported, or the recorder returned no buffer) means nothing was
+        // submitted; the caller then records into the frame instead.
+        [[nodiscard]] virtual ReadbackToken SubmitComputeReadback(
+            std::function<BufferHandle(ICommandContext&)> /*record*/, std::uint64_t /*readbackBytes*/,
+            ReadbackSink /*sink*/)
+        {
+            return {};
+        }
 
         // ---- Bindless heap -------------------------------------------
         // Returns the global bindless heap for this device.
