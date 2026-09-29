@@ -31,6 +31,19 @@ contracts: [method.engine-integration, geometry.element-domain-sources]
   | Heat kernel G_t (METHOD-064) | lambda/2 tr(z^T Lambda^-1 z) in the basis | low-rank Woodbury with Phi_k, e^{-t Lambda_k} (tiny modes dropped) | unit-mean-diagonal scaling; mesh-independent |
   | Rational (M + tau L_w)^-n, n in {1, 2}, **default n = 2** | lambda/2 tr(V^T L_w (M^-1 L_w)^{n-1} V) | basis-free: (D + a L_w) V = D R for n = 1; (D + a L_w M^-1 L_w) V = D R for n = 2, by sparse CG | n = 1 (H^1) is mesh-dependent on surfaces |
 
+- **Optional normal consistency for the Gaussian kernel** (operator, 2026-09-29). It keeps the
+  Gram matrix PD: products of PD kernels are PD (Schur); a clipped max(0, n_i . n_j)^p is not
+  PD and is used only for Laplacian weights (METHOD-064).
+  - Oriented source normals: k_ij = exp(-||y_i - y_j||^2 / 2 beta^2) * exp(kappa (n_i . n_j - 1)).
+    This is exactly the Gaussian kernel on augmented coordinates [y, n / sqrt(kappa)] (since
+    ||n_i - n_j||^2 = 2 - 2 n_i . n_j), so full, low-rank, Nystroem and the error estimates
+    work unchanged in 6-D.
+  - Unoriented normals (PCA without MST): exp(kappa ((n_i . n_j)^2 - 1)), which is PD and
+    sign-invariant; the low-rank builder then needs the kernel directly rather than the 6-D
+    embedding.
+  - Normals of the fixed source are computed once; kappa = 0 is bitwise today's kernel.
+  - Also offered for the heat kernel? No: the heat kernel already follows the surface. Normal
+    weights enter its point-cloud Laplacian instead (METHOD-064).
 - **Why n = 2 is the default.** On a 2-manifold the Green's function of (D + a L_w) is
   log-singular. One confident correspondence makes a spike that sharpens under refinement.
   Fable's measurement of the centre/neighbour ratio as h halves:
@@ -85,6 +98,12 @@ contracts: [method.engine-integration, geometry.element-domain-sources]
       decrease monotonically on the fixtures.
 - [ ] Analytic filter check with p_i = c m_i (or unit mass), stating c; the heat-kernel Woodbury
       path agrees with a dense solve.
+- [ ] Normal-consistent Gaussian:
+  - the Gram matrix is PD on a fixture with opposed normals (smallest eigenvalue > 0);
+  - kappa = 0 is bitwise the current kernel;
+  - the oriented form equals the 6-D Gaussian embedding;
+  - on two touching parts with opposed normals (a folded strip, the Vlasic hand at the hip) the
+    cross-part coupling drops.
 - [ ] Mesh-independence test: the spike ratio stays bounded under refinement for n = 2 and the
       heat kernel; n = 1 is documented as growing.
 - [ ] A zero-weight component (forced P1 underflow) still solves (epsilon shift or pinning) and
@@ -108,7 +127,7 @@ contracts: [method.engine-integration, geometry.element-domain-sources]
 | Least-structured input | Unchanged two point sets; the geodesic and LBO options need source topology or a kNN graph. |
 | Compatible entity sources | Mesh vertices, graph nodes, point clouds (LBO/geodesic built per domain). |
 | RuntimeModule | Existing CPD operations; the eigenbasis comes from the Laplacian eigenbasis module, the CG from the existing sparse CG workspace. |
-| Config/agent | New `regularizer` enum (gaussian, heat_kernel, rational) plus `diffusion_time`, `basis_size`, `rational_order` (1 or 2, default 2); for BCPD with variance terms, `diagonal` (basis, selected_inversion); the default keeps today's results. |
+| Config/agent | New `regularizer` enum (gaussian, heat_kernel, rational) plus `diffusion_time`, `basis_size`, `rational_order` (1 or 2, default 2), `normal_consistency` (kappa, 0 = off) with `normals` (a vec3 property ref) and `normals_oriented`; for BCPD with variance terms, `diagonal` (basis, selected_inversion); the default keeps today's results. |
 | UI | CPD panel Model section: regularizer combo, only its parameters shown. |
 | Publication | Unchanged (displacement/positions). |
 | End-to-end tests | Editor-command test per regularizer; gpu;vulkan smoke once the device M-step lands. |
