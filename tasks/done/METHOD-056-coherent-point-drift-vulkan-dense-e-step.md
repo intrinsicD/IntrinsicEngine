@@ -24,7 +24,9 @@ guard (first-order error estimate, iterations above 2e-5 stay on the CPU, the es
 reported error bound instead of 0), the dispatch chunk capped at 65535 workgroups, device
 iteration counts in results, and the pump job no longer releasing the workspace under a newer
 step; a CPU contract test covers the broker's failure and timeout paths. The scaling run was
-repeated and resealed after the guard (see C117).
+repeated and resealed after the guard (`ara/evidence/diagnostics/method056_cpd_vulkan_e_step_review_20260929/`):
+1.6x over the CPU twin at 10^5 points instead of 9.8x, since the whole-target guard keeps most
+mid-sigma iterations on the CPU; C117 was revised and per-row routing is METHOD-063.
 
 ## Goal
 - Evaluate the CPD E-step statistics (P1, Pt1, PX, LogDenominatorSum, Matched) on the GPU so

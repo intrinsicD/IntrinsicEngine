@@ -4312,3 +4312,15 @@ observations:
     crystallized_via: artifact-commitment
     stale: false
 
+  - id: O258
+    timestamp: 2026-09-29T18:00+02:00
+    provenance: ai-executed
+    content: An independent review showed that fp32 kernel terms lose ~1e-4 relative accuracy when the kernel is narrow against a row's distances or the coordinate magnitudes, cases the dense route still sends to the device. A whole-target first-order guard (2e-5) fixes the accuracy but keeps most mid-sigma iterations on the CPU, cutting the 10^5-point speedup over the CPU twin from 9.8x to 1.6x; routing per row should recover most of it.
+    context: One host and GPU, rigid bumpy-ellipsoid fixture with 5% uniform clutter, whose far rows dominate the whole-target guard.
+    potential_type: claim
+    bound_to: [N649]
+    promoted: true
+    promoted_to: logic/claims.md:C117
+    crystallized_via: artifact-commitment
+    stale: false
+

@@ -1,0 +1,30 @@
+{
+  "task": "METHOD-056 (review round)",
+  "date": "2026-09-29",
+  "source_revision": "1fa23b221fb3a70b8074bf55ef1723fe60472f11",
+  "supersedes": "ara/evidence/diagnostics/method056_cpd_vulkan_e_step_20260929/ (de87fd33f, before the fp32 precision guard)",
+  "environment": {
+    "cpu": "Intel Core i9-11900KF (8 cores, 16 threads), CPU E-steps use all hardware threads",
+    "gpu": "NVIDIA GeForce RTX 3050 (8 GiB), driver 590.48.01, subgroup 32, shader float64",
+    "display": "Xephyr :7 (nested X server), 64x64 window, VSync off, validation layers off",
+    "compiler": "clang++ 23.0.0",
+    "preset": "ci-vulkan-release",
+    "build_type": "Release, no -march=native"
+  },
+  "commands": [
+    "cmake --build build/ci-vulkan-release --target IntrinsicPointLBVHGpuTests",
+    "GITHUB_SHA=1fa23b221fb3a70b8074bf55ef1723fe60472f11 INTRINSIC_METHOD056_SCALING_OUTPUT=<dir> DISPLAY=:7 build/ci-vulkan-release/bin/IntrinsicPointLBVHGpuTests --gtest_filter=METHOD056VulkanCpdEStep.ScalingProfile > run-progress.log",
+    "python3 tools/benchmark/seal_benchmark_results.py --root <dir> --manifests-root benchmarks --run-id method056-vulkan-e-step-scaling-review-20260929 --source-state clean_commit --source-revision 1fa23b221fb3a70b8074bf55ef1723fe60472f11 --claim-eligible --replace",
+    "python3 tools/benchmark/validate_benchmark_results.py --root <dir> --strict"
+  ],
+  "why_rerun": "The independent review (Fable 5.1, Codex 6 Astra) showed fp32 kernel terms can lose ~1e-4 relative accuracy on inputs the seam routed to the device (narrow kernels with far rows or large coordinates). The fix routes iterations whose first-order fp32 error estimate exceeds 2e-5 to the exact CPU dense pass; that changes which iterations run on the device, so the scaling profile was repeated.",
+  "outcomes": {
+    "rigid_100000_points": "Vulkan 114.6 s vs CPU twin 186.1 s (1.62x), Auto 187.6 s, Nystroem 121.2 s, dense 411.7 s; 9 of 48 iterations on the device (21 before the guard)",
+    "rigid_10000_points": "Vulkan 829 ms vs CPU twin 1312 ms (1.58x), Nystroem 1061 ms; 10 of 35 on the device",
+    "rigid_1000_points": "Vulkan 57 ms vs CPU twin 28 ms: frame latency dominates",
+    "parity": "max registered-point delta to the CPU twin 6.6e-12 (10^5); RMS to the ground truth equal",
+    "gate": "passed: quality_error_l2 3.7e-4 <= 1e-3, quality_error_linf 6.6e-12 <= 1e-4"
+  },
+  "limitations": "The guard takes the worst row over the whole target (the fixture's 5% uniform clutter rows make it strict), so most mid-sigma iterations run the CPU dense pass; per-row routing is METHOD-063. One host, one GPU, one rigid fixture.",
+  "not_measured": "Nonrigid and Bayesian device runs; memory peak; other GPUs."
+}

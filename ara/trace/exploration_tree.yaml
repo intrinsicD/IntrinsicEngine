@@ -13839,3 +13839,14 @@ tree:
     - ara/evidence/diagnostics/method056_cpd_vulkan_e_step_20260929/sealed-result.json
     status: resolved
 
+  - id: N649
+    type: experiment
+    title: Guard the Vulkan CPD E-step against fp32 precision loss found in review
+    provenance: ai-executed
+    timestamp: 2026-09-29T18:00+02:00
+    result: Fable 5.1 and Codex 6 Astra reviewed the GPU slices; their fp32 counterexamples held. A first-order error estimate now keeps iterations above 2e-5 on the exact CPU pass and is reported as the error bound. The resealed scaling run finds 1.6x over the CPU twin at 10^5 points (9 of 48 iterations on the device, down from 21); C117 was revised and per-row routing planned as METHOD-063.
+    evidence:
+    - ara/evidence/diagnostics/method056_cpd_vulkan_e_step_review_20260929/record.json
+    - ara/evidence/diagnostics/method056_cpd_vulkan_e_step_review_20260929/sealed-result.json
+    status: resolved
+

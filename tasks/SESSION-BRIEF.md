@@ -168,6 +168,7 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `METHOD-055`: `METHOD-060` — Vulkan coupled eta-sieve (tasks/backlog/methods/METHOD-060-vulkan-coupled-eta-sieve.md)
 - unblocked: `METHOD-061` — Vulkan flat beta-greedy / implicit MIS sampling (tasks/backlog/methods/METHOD-061-vulkan-flat-beta-greedy.md)
 - unblocked: `METHOD-062` — Vulkan lazy greedy sampling over the point LBVH (tasks/backlog/methods/METHOD-062-vulkan-lazy-greedy-lbvh.md)
+- unblocked: `METHOD-063` — Per-row precision routing for the Vulkan CPD E-step (tasks/backlog/methods/METHOD-063-cpd-vulkan-per-row-precision-routing.md)
 - unblocked: `RUNTIME-210` — Signed Heat runtime and config integration (tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md)
 - unblocked: `RUNTIME-211` — K-Means property-domain integration (tasks/backlog/runtime/RUNTIME-211-kmeans-property-domain-integration.md)
 - unblocked: `RUNTIME-212` — Progressive Poisson property-domain publication (tasks/backlog/runtime/RUNTIME-212-progressive-poisson-property-domain-publication.md)
