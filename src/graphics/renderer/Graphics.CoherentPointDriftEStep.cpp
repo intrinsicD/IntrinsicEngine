@@ -21,27 +21,27 @@ namespace Extrinsic::Graphics
         constexpr std::uint32_t kTile = 128u; // CPD_TILE of cpd_estep_common.glslinc
         struct Push
         {
-            std::uint64_t Target{}, Source{}, Results{};
+            std::uint64_t Target{}, Source{}, Results{}, SkipRows{};
             double LogOutlier{};
             float InverseTwoSigma2{};
             std::uint32_t TargetCount{}, SourceCount{};
             std::uint32_t First{}, Count{};
-            std::uint32_t HasOutlier{};
+            std::uint32_t HasOutlier{}, Reserved{};
         };
-        static_assert(sizeof(Push) == 56 && offsetof(Push, InverseTwoSigma2) == 32 && offsetof(Push, HasOutlier) == 52);
+        static_assert(sizeof(Push) == 72 && offsetof(Push, InverseTwoSigma2) == 40 && offsetof(Push, HasOutlier) == 60);
     }
 
     struct CoherentPointDriftEStepWorkspace::Impl
     {
         RHI::IDevice& Device;
         RHI::PipelineHandle TargetPass{}, SourcePass{};
-        RHI::BufferHandle Target{}, Source{}, Results{};
-        std::size_t TargetBytes{0u}, SourceBytes{0u}, ResultBytes{0u};
+        RHI::BufferHandle Target{}, Source{}, Results{}, Skip{};
+        std::size_t TargetBytes{0u}, SourceBytes{0u}, ResultBytes{0u}, SkipBytes{0u};
         std::uint64_t TargetGeneration{0u};
         explicit Impl(RHI::IDevice& device) : Device(device) {}
         ~Impl()
         {
-            for (auto buffer : {Target, Source, Results})
+            for (auto buffer : {Target, Source, Results, Skip})
                 if (buffer.IsValid()) Device.DestroyBuffer(buffer);
             for (auto pipeline : {TargetPass, SourcePass})
                 if (pipeline.IsValid()) Device.DestroyPipeline(pipeline);
@@ -77,8 +77,9 @@ namespace Extrinsic::Graphics
                                                                const CoherentPointDriftEStepGpuInput& input)
     {
         auto& s = *m_Impl;
-        const std::size_t n = input.Target.size() / 4u, m = input.Source.size() / 4u;
-        if (n == 0u || m == 0u || n > MaxPoints || m > MaxPoints || input.Target.size() % 4u || input.Source.size() % 4u ||
+        const std::size_t n = input.Target.size() / 8u, m = input.Source.size() / 8u;
+        if (n == 0u || m == 0u || n > MaxPoints || m > MaxPoints || input.Target.size() % 8u || input.Source.size() % 8u ||
+            (!input.SkipRows.empty() && input.SkipRows.size() != n) ||
             !(input.Sigma2 > 0.0) || !std::isfinite(input.Sigma2) || std::isnan(input.LogOutlier) ||
             input.LogOutlier == std::numeric_limits<double>::infinity() ||
             !s.Device.IsOperational() || !s.Device.SupportsShaderFloat64())
@@ -98,16 +99,23 @@ namespace Extrinsic::Graphics
             !s.Ensure(s.Results, s.ResultBytes, ReadbackBytes(n, m), "CoherentPointDrift.EStep.Results"))
             return {};
         s.Device.WriteBuffer(s.Source, input.Source.data(), input.Source.size_bytes());
+        if (!input.SkipRows.empty())
+        {
+            if (!s.Ensure(s.Skip, s.SkipBytes, input.SkipRows.size_bytes(), "CoherentPointDrift.EStep.SkipRows")) return {};
+            s.Device.WriteBuffer(s.Skip, input.SkipRows.data(), input.SkipRows.size_bytes());
+        }
 
         const auto address = [&](RHI::BufferHandle b) { return s.Device.GetBufferDeviceAddress(b); };
         const bool outlier = input.LogOutlier > -std::numeric_limits<double>::infinity();
         Push push{.Target = address(s.Target), .Source = address(s.Source), .Results = address(s.Results),
+                  .SkipRows = input.SkipRows.empty() ? 0u : address(s.Skip),
                   .LogOutlier = outlier ? input.LogOutlier : 0.0,
                   .InverseTwoSigma2 = float(1.0 / (2.0 * input.Sigma2)),
                   .TargetCount = std::uint32_t(n), .SourceCount = std::uint32_t(m), .HasOutlier = outlier ? 1u : 0u};
-        for (auto buffer : {s.Target, s.Source, s.Results})
-            commands.BufferBarrier(buffer, RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderRead,
-                                   RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite);
+        for (auto buffer : {s.Target, s.Source, s.Results, s.Skip})
+            if (buffer.IsValid())
+                commands.BufferBarrier(buffer, RHI::MemoryAccess::TransferWrite | RHI::MemoryAccess::ShaderRead,
+                                       RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite);
         // Each thread loops over the whole other set, so a dispatch of `count` threads evaluates
         // count * other pairs; chunks are whole workgroups.
         const auto pass = [&](RHI::PipelineHandle pipeline, std::size_t threads, std::size_t other)

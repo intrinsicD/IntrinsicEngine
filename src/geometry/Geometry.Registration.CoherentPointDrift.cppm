@@ -180,6 +180,7 @@ export namespace Geometry::CoherentPointDrift
         // Vulkan: iterations the device evaluated (the rest ran truncated, too narrow for fp32
         // terms, or fell back).
         std::uint32_t EStepDeviceIterations{0u};
+        std::uint64_t EStepDeviceCpuRows{0u}; // rows of device iterations evaluated on the CPU (fp32 too coarse)
         // Low-rank nonrigid: eigenpairs used and the kernel's sampled relative error.
         std::uint32_t KernelRank{0u};
         double KernelApproximationError{0.0};

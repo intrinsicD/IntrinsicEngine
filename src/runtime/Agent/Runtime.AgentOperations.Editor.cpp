@@ -497,7 +497,8 @@ namespace Extrinsic::Runtime
                     {"transform", TransformJson(r.Transform)}, {"source_points", r.SourcePointCount},
                     {"target_points", r.TargetPointCount}, {"e_step_error_bound", r.EStepErrorBound},
                     {"e_step_sampled_error", r.EStepSampledError},
-                    {"e_step_fallbacks", r.EStepFallbacks}, {"e_step_device_iterations", r.EStepDeviceIterations}, {"gpu_diagnostic", r.GpuDiagnostic},
+                    {"e_step_fallbacks", r.EStepFallbacks}, {"e_step_device_iterations", r.EStepDeviceIterations},
+                    {"e_step_device_cpu_rows", r.EStepDeviceCpuRows}, {"gpu_diagnostic", r.GpuDiagnostic},
                     {"kernel_rank", r.KernelRank}, {"kernel_approximation_error", r.KernelApproximationError}};
         }
         // RUNTIME-274: the standalone sampling operation on the sandbox.point_sampling section.

@@ -387,8 +387,10 @@ namespace
             const double dx = r.Target.X[j] - r.Moved.X[i], dy = r.Target.Y[j] - r.Moved.Y[i], dz = r.Target.Z[j] - r.Moved.Z[i];
             return r.LogWeights[i] - (dx * dx + dy * dy + dz * dz) / (2.0 * r.Sigma2);
         };
+        const auto skipped = [&](std::size_t j) { return !r.SkipRows.empty() && r.SkipRows[j] != 0u; };
         for (std::size_t j = 0; j < n; ++j)
         {
+            if (skipped(j)) { r.LogDenominator[j] = 1e30; r.Pt1[j] = 0.0; continue; } // the CPU evaluates it
             double top = -std::numeric_limits<double>::infinity(), sum = 0.0;
             for (std::size_t i = 0; i < m; ++i) top = std::max(top, a(j, i));
             for (std::size_t i = 0; i < m; ++i) sum += std::exp(a(j, i) - top);
@@ -400,6 +402,7 @@ namespace
             double p1 = 0.0, px = 0.0, py = 0.0, pz = 0.0;
             for (std::size_t j = 0; j < n; ++j)
             {
+                if (skipped(j)) continue;
                 const double p = std::exp(a(j, i) - r.LogDenominator[j]);
                 p1 += p; px += p * r.Target.X[j]; py += p * r.Target.Y[j]; pz += p * r.Target.Z[j];
             }
@@ -474,6 +477,47 @@ TEST(CoherentPointDriftAccelerated, VulkanPolicyKeepsKernelsTooNarrowForFp32OnTh
     EXPECT_EQ(wide.Used, CPD::EStepPolicy::Vulkan);
     EXPECT_GT(wide.ErrorBound, 0.0) << "fp32 terms are not exact";
     EXPECT_LE(wide.ErrorBound, CPD::EStep::kExternalErrorLimit);
+}
+
+TEST(CoherentPointDriftAccelerated, VulkanPolicyEvaluatesRowsTooNarrowForFp32OnTheCpu)
+{
+    // METHOD-063: the review's two tight clusters plus one target row ~7 sigma from every
+    // source, narrow kernel, no uniform term. Auto keeps the dense route (each row keeps half the
+    // sources); the far row's fp32 estimate exceeds the limit, so the CPU evaluates that row
+    // exactly and merges it, and the device (here the exact contract) the rest.
+    std::mt19937 random(73u);
+    std::normal_distribution<float> spread(0.0f, 0.03f);
+    std::vector<glm::vec3> targetPoints, sourcePoints;
+    for (int k = 0; k < 120; ++k)
+    {
+        const float side = k % 2 ? 1.0f : -1.0f;
+        targetPoints.push_back({side + spread(random), spread(random), spread(random)});
+        sourcePoints.push_back({side + spread(random), spread(random), spread(random)});
+    }
+    targetPoints.push_back({-1.0f, 0.4f, 0.0f});
+    const Soa target(targetPoints), moved(sourcePoints);
+    CPD::EStep::Evaluator evaluator;
+    evaluator.SetTarget(target.View());
+    std::size_t calls = 0;
+    const double noOutliers = -std::numeric_limits<double>::infinity();
+    CPD::EStep::Sums device, dense;
+    ASSERT_TRUE(evaluator.Evaluate(moved.View(), 1e-3, noOutliers,
+        {.Policy = CPD::EStepPolicy::Vulkan, .Tolerance = 1e-6,
+         .External = [&calls](const CPD::EStep::ExternalRequest& r) { return ReferenceExternal(r, calls); }},
+        device));
+    ASSERT_TRUE(evaluator.Evaluate(moved.View(), 1e-3, noOutliers, {.Policy = CPD::EStepPolicy::Dense}, dense));
+    EXPECT_EQ(device.Used, CPD::EStepPolicy::Vulkan);
+    EXPECT_EQ(calls, 1u);
+    EXPECT_EQ(device.ExternalCpuRows, 1u);
+    EXPECT_GT(device.ErrorBound, 0.0);
+    EXPECT_LE(device.ErrorBound, CPD::EStep::kExternalErrorLimit);
+    EXPECT_NEAR(device.LogDenominatorSum, dense.LogDenominatorSum, 1e-9 * std::abs(dense.LogDenominatorSum));
+    for (std::size_t j = 0; j < dense.Pt1.size(); ++j) ASSERT_NEAR(device.Pt1[j], dense.Pt1[j], 1e-12);
+    for (std::size_t i = 0; i < dense.P1.size(); ++i)
+    {
+        ASSERT_NEAR(device.P1[i], dense.P1[i], 1e-12 * (1.0 + dense.P1[i]));
+        ASSERT_NEAR(device.PXy[i], dense.PXy[i], 1e-12 * (1.0 + std::abs(dense.PXy[i])));
+    }
 }
 
 TEST(CoherentPointDriftAccelerated, VulkanPolicyFallsBackToTheCpuAndSaysSo)

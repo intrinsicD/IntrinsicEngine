@@ -1,6 +1,8 @@
 // Shared state of the Coherent Point Drift device E-step (METHOD-056). Both passes evaluate the
 // kernel exponent a_nm = w_m - |x_n - y_m|^2 / (2 sigma^2) with the same fp32 operations, so the
 // target pass's row denominators and the source pass's responsibilities see identical terms.
+// Coordinates arrive as float-float pairs (hi + lo) and differences are formed as
+// (x_hi - y_hi) + (x_lo - y_lo), so rounding the coordinates costs no accuracy (METHOD-063).
 // Kernel terms are fp32 (Cody-Waite exp), tile sums fp32 Kahan, running sums fp64; nothing is
 // atomic and every sum runs in index order, so a run is deterministic on one device and driver.
 #extension GL_ARB_gpu_shader_fp64 : require
@@ -12,28 +14,32 @@
 
 layout(local_size_x = CPD_TILE) in;
 
-layout(buffer_reference, scalar) readonly buffer CpdPoints { vec4 v[]; };  // x, y, z, (source: log-weight)
+// hi: x, y, z, (source: log-weight); lo: the float residuals of x, y, z.
+struct CpdPoint { vec4 hi; vec4 lo; };
+layout(buffer_reference, scalar) readonly buffer CpdPoints { CpdPoint v[]; };
 layout(buffer_reference, scalar) buffer CpdDoubles { double v[]; };
+layout(buffer_reference, scalar) readonly buffer CpdUints { uint v[]; };
 
 // results: [LogDenominator n][Pt1 n][P1 m][PXx m][PXy m][PXz m]
 layout(push_constant, scalar) uniform Push {
     uint64_t target, source, results;
+    uint64_t skipRows;       // uint per target row, nonzero: evaluated on the CPU; 0: none
     double logOutlier;       // shifted by the largest source log-weight
     float inverseTwoSigma2;
     uint targetCount, sourceCount;
     uint first, count;       // the rows (target pass) or sources (source pass) of this dispatch
-    uint hasOutlier;
+    uint hasOutlier, reserved;
 } pc;
 
-float CpdExponent(vec3 x, vec4 y)
+float CpdExponent(vec3 xHi, vec3 xLo, vec4 yHi, vec3 yLo)
 {
-    precise float dx = x.x - y.x;
-    precise float dy = x.y - y.y;
-    precise float dz = x.z - y.z;
+    precise float dx = (xHi.x - yHi.x) + (xLo.x - yLo.x);
+    precise float dy = (xHi.y - yHi.y) + (xLo.y - yLo.y);
+    precise float dz = (xHi.z - yHi.z) + (xLo.z - yLo.z);
     precise float d2 = dx * dx;
     d2 = d2 + dy * dy;
     d2 = d2 + dz * dz;
-    precise float a = y.w - d2 * pc.inverseTwoSigma2;
+    precise float a = yHi.w - d2 * pc.inverseTwoSigma2;
     return a;
 }
 

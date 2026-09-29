@@ -292,6 +292,7 @@ namespace Extrinsic::Runtime
             result.EStepSampledError = current.EStepSampledError;
             result.EStepFallbacks = current.EStepFallbacks;
             result.EStepDeviceIterations = current.EStepDeviceIterations;
+            result.EStepDeviceCpuRows = current.EStepDeviceCpuRows;
             result.GpuDiagnostic = run.GpuEStep ? run.GpuEStep->Diagnostic() : run.GpuUnavailable;
             result.KernelRank = current.KernelRank;
             result.KernelApproximationError = current.KernelApproximationError;

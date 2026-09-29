@@ -4,7 +4,8 @@
 // target pass's fp64 denominators split into fp32 high and low parts.
 #include "cpd_estep_common.glslinc"
 
-shared vec4 sTargets[CPD_TILE]; // x, y, z, high part of LogDenominator
+shared vec4 sTargets[CPD_TILE]; // x, y, z (hi), high part of LogDenominator
+shared vec3 sTargetLo[CPD_TILE];
 shared float sLow[CPD_TILE];
 
 void main()
@@ -12,7 +13,7 @@ void main()
     const uint local = gl_LocalInvocationID.x;
     const bool inRange = gl_GlobalInvocationID.x < pc.count;
     const uint i = pc.first + gl_GlobalInvocationID.x;
-    const vec4 y = inRange ? CpdPoints(pc.source).v[i] : vec4(0.0);
+    const CpdPoint source = inRange ? CpdPoints(pc.source).v[i] : CpdPoint(vec4(0.0), vec4(0.0));
     CpdDoubles results = CpdDoubles(pc.results);
 
     double p1 = 0.0lf, px = 0.0lf, py = 0.0lf, pz = 0.0lf;
@@ -24,7 +25,9 @@ void main()
             const double logDenominator = results.v[k];
             const float high = float(logDenominator);
             precise double low = logDenominator - double(high);
-            sTargets[local] = vec4(CpdPoints(pc.target).v[k].xyz, high);
+            const CpdPoint target = CpdPoints(pc.target).v[k];
+            sTargets[local] = vec4(target.hi.xyz, high);
+            sTargetLo[local] = target.lo.xyz;
             sLow[local] = float(low);
         }
         barrier();
@@ -33,7 +36,7 @@ void main()
         for (uint j = 0u; j < end; ++j)
         {
             const vec4 x = sTargets[j];
-            precise float t = (CpdExponent(x.xyz, y) - x.w) - sLow[j];
+            precise float t = (CpdExponent(x.xyz, sTargetLo[j], source.hi, source.lo.xyz) - x.w) - sLow[j];
             const float p = CpdExpF(t);
             CpdKahan(s1, c1, p);
             precise float qx = p * x.x;

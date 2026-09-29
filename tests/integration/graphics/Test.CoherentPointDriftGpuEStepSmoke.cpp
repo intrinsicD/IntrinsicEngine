@@ -105,13 +105,15 @@ namespace
         }
     };
 
-    Errors Compare(const CPD::EStep::Sums& gpu, const std::vector<double>& gpuLogDen, const CPD::EStep::Sums& cpu,
-                   const std::vector<double>& cpuLogDen, double maxAbsX)
+    // gpuLogDen: the device's rows as returned (rows it skipped for the CPU are not compared).
+    Errors Compare(const CPD::EStep::Sums& gpu, const std::vector<double>& gpuLogDen, const std::vector<std::uint32_t>& skipped,
+                   const CPD::EStep::Sums& cpu, const std::vector<double>& cpuLogDen, double maxAbsX)
     {
         Errors e;
         for (std::size_t j = 0; j < cpuLogDen.size(); ++j)
         {
-            e.LogDenominator = std::max(e.LogDenominator, std::abs(gpuLogDen[j] - cpuLogDen[j]));
+            if (skipped.empty() || skipped[j] == 0u)
+                e.LogDenominator = std::max(e.LogDenominator, std::abs(gpuLogDen[j] - cpuLogDen[j]));
             e.Pt1 = std::max(e.Pt1, std::abs(gpu.Pt1[j] - cpu.Pt1[j]) / std::max(cpu.Pt1[j], 1e-300));
         }
         const double top = *std::ranges::max_element(cpu.P1);
@@ -169,11 +171,13 @@ namespace
             device.SetTarget(target.View());
             cpu.SetTarget(target.View());
             std::vector<double> deviceLogDen, cpuLogDen;
+            std::vector<std::uint32_t> deviceSkipped;
             // Wraps the broker to keep the per-row denominators (Sums only carries their sum).
             const CPD::EStep::Settings vulkan{.Policy = CPD::EStepPolicy::Vulkan, .Tolerance = 1e-6,
                 .External = [&](const CPD::EStep::ExternalRequest& r) {
                     const bool ok = Broker->Evaluate(r);
                     deviceLogDen.assign(r.LogDenominator.begin(), r.LogDenominator.end());
+                    deviceSkipped.assign(r.SkipRows.begin(), r.SkipRows.end());
                     return ok;
                 }};
             for (const double sigma2 : {0.2, 0.6, 2.0})
@@ -206,12 +210,43 @@ namespace
                         // The evaluator hands the device the frame shifted by the largest log-weight.
                         if (weighted)
                             for (double& v : cpuLogDen) v -= *std::ranges::max_element(logWeights);
-                        const auto e = Compare(gpu, gpuLogDen, reference, cpuLogDen, maxAbsX);
+                        const auto e = Compare(gpu, gpuLogDen, deviceSkipped, reference, cpuLogDen, maxAbsX);
                         MaxErrors.Merge(e);
                         LogDenSumError = std::max(LogDenSumError, std::abs(gpu.LogDenominatorSum - reference.LogDenominatorSum) /
                                                                       std::abs(reference.LogDenominatorSum));
                         ++ParityCases;
                     }
+
+            // METHOD-063: two tight clusters plus one target row far from every source, narrow
+            // kernel, no uniform term: the far row goes to the CPU, the rest to the device.
+            std::mt19937 random(73u);
+            std::normal_distribution<float> spread(0.0f, 0.03f);
+            std::vector<glm::vec3> clusterTargets, clusterSources;
+            for (int k = 0; k < 1200; ++k)
+            {
+                const float side = k % 2 ? 1.0f : -1.0f;
+                clusterTargets.push_back({side + spread(random), spread(random), spread(random)});
+                clusterSources.push_back({side + spread(random), spread(random), spread(random)});
+            }
+            clusterTargets.push_back({-1.0f, 0.4f, 0.0f});
+            const Soa ct(clusterTargets), cs(clusterSources);
+            CPD::EStep::Evaluator clusterDevice, clusterCpu;
+            clusterDevice.SetTarget(ct.View());
+            clusterCpu.SetTarget(ct.View());
+            const double none = -std::numeric_limits<double>::infinity();
+            CPD::EStep::Sums gpu, reference;
+            if (!clusterDevice.Evaluate(cs.View(), 1e-3, none, vulkan, gpu) || gpu.Used != CPD::EStepPolicy::Vulkan ||
+                gpu.ExternalCpuRows == 0u || !clusterCpu.Evaluate(cs.View(), 1e-3, none, {.Policy = CPD::EStepPolicy::Dense}, reference))
+            {
+                Failure = "cluster case did not mix device and CPU rows (" + std::string(CPD::ToString(gpu.Used)) + ", " +
+                          std::to_string(gpu.ExternalCpuRows) + " CPU rows): " + Broker->Diagnostic();
+                return;
+            }
+            ClusterCpuRows = gpu.ExternalCpuRows;
+            double clusterX = 1.2;
+            MaxErrors.Merge(Compare(gpu, deviceLogDen, deviceSkipped, reference,
+                                    RowLogDenominators(ct, cs, 1e-3, none, {}), clusterX));
+            ++ParityCases;
         }
 
         // Exact per-row log-denominators (the CPU Sums expose only their sum).
@@ -317,7 +352,7 @@ namespace
         std::chrono::steady_clock::time_point Started{}, PhaseStarted{};
         Errors MaxErrors{};
         double LogDenSumError{0.0}, ParityMs{0.0}, EditorMs{0.0};
-        std::size_t ParityCases{0u}, RepeatChecks{0u}, Frames{0u};
+        std::size_t ParityCases{0u}, RepeatChecks{0u}, Frames{0u}, ClusterCpuRows{0u};
         int Phase{0};
         bool Bitwise{true}, Done{false}, TimedOut{false};
         std::string Failure{};
@@ -446,6 +481,7 @@ namespace
                         << "\", \"backend\": \"" << res.Backend << "\", \"iterations\": " << res.Iterations
                         << ", \"device_iterations\": " << run.DeviceIterations
                         << ", \"e_step_fallbacks\": " << res.EStepFallbacks
+                        << ", \"device_cpu_rows\": " << res.EStepDeviceCpuRows
                         << ", \"runtime_ms\": " << run.Median << ", \"runtime_ms_min\": " << run.Min
                         << ", \"runtime_ms_max\": " << run.Max << ", \"repetitions\": " << run.Repetitions
                         << ", \"ms_per_iteration\": " << (res.Iterations ? run.Median / double(res.Iterations) : 0.0)
@@ -526,7 +562,8 @@ TEST(METHOD056VulkanCpdEStep, DenseStatisticsAndRegistrationMatchTheCpu)
     ASSERT_TRUE(run->Failure.empty()) << run->Failure;
     ASSERT_TRUE(run->Done);
 
-    EXPECT_EQ(run->ParityCases, 12u);
+    EXPECT_EQ(run->ParityCases, 13u);
+    EXPECT_EQ(run->ClusterCpuRows, 1u) << "only the far row needs the CPU";
     EXPECT_EQ(run->RepeatChecks, 2u);
     EXPECT_TRUE(run->Bitwise) << "two device runs must be bitwise equal";
     EXPECT_LE(run->MaxErrors.LogDenominator, 1e-5);

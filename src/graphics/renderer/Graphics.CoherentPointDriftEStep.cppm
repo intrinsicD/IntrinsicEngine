@@ -17,9 +17,12 @@ export namespace Extrinsic::Graphics
 {
     struct CoherentPointDriftEStepGpuInput
     {
-        std::span<const float> Target;       // n x 4: x, y, z, unused
+        // Float-float coordinates: per point hi (x, y, z, w) then lo (x, y, z, unused), where
+        // lo = float(x - hi); the target's w is unused, the source's w is its log-weight (<= 0).
+        std::span<const float> Target;       // n x 8
         std::uint64_t TargetGeneration{0u};  // the target is uploaded again when this changes
-        std::span<const float> Source;       // m x 4: x, y, z, log-weight (<= 0)
+        std::span<const float> Source;       // m x 8
+        std::span<const std::uint32_t> SkipRows; // n flags (nonzero: row evaluated on the CPU) or empty
         double Sigma2{1.0};
         double LogOutlier{0.0};              // -inf: no uniform component
     };

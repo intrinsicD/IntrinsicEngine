@@ -204,12 +204,15 @@ into fp32 high and low parts. Distances and exponentials are fp32 (Cody-Waite re
 degree-7 polynomial), tile sums fp32 Kahan, running sums fp64; nothing is atomic and every
 sum runs in index order, so a run is deterministic on one device and driver. Weighted
 (Bayesian) rows and the outlier term travel in the frame shifted by the largest log-weight.
-Truncated iterations stay on the CPU, and so do iterations whose first-order fp32 error
-estimate exceeds `kExternalErrorLimit` (2e-5): about 4 ulp of the largest relevant exponent
-magnitude plus the coordinate-rounding term 4 sqrt(3) ulp X |x - y| / sigma^2, over rows whose
-kernel mass is not negligible against the uniform term (a review found that a target far from
-two close sources under a narrow kernel keeps the dense route but loses ~1e-4 in fp32). The
-estimate is reported as the iteration's error bound (not rigorous: term errors partly cancel).
+Truncated iterations stay on the CPU. Coordinates travel as float-float pairs (differences
+(x_hi - y_hi) + (x_lo - y_lo)), so rounding them costs nothing; the remaining fp32 error of a row
+is estimated as about 5 ulp of its largest relevant exponent magnitude (nearest-source exponent
++ weight spread + 20). Rows whose estimate exceeds `kExternalErrorLimit` (2e-5) are skipped by
+the device and evaluated exactly on the CPU (denominator, Pt1 and their P1/PX terms, merged per
+source in row order; METHOD-063), and when they are the majority the whole iteration runs the
+CPU dense pass (a review found that a row far from every source under a narrow kernel loses
+~1e-4 in fp32 without this). The largest admitted estimate is reported as the iteration's
+error bound (not rigorous: term errors partly cancel), and results count the CPU rows.
 Without an evaluator, or when it fails, the iteration runs the exact CPU choice and
 `EStepFallbacks` counts it; `EStepDeviceIterations` counts the device iterations. In the editor the solver worker
 waits while a pump job records the passes through the frame loop, so one device E-step costs

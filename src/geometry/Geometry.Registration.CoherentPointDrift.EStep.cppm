@@ -24,9 +24,10 @@
 //                its planned cost is not below half the dense cost, i.e. for small inputs.
 //   - Vulkan:    the dense two-pass form on a device through Settings::External (METHOD-056;
 //                fp32 kernel terms, fp64 sums, so not exact). Iterations where Auto would truncate
-//                stay on the CPU truncated path, and so do those whose first-order fp32 error
-//                estimate exceeds kExternalErrorLimit (the estimate is the reported bound);
-//                without an evaluator, or when it fails, the iteration runs with the exact Auto
+//                stay on the CPU truncated path; rows whose first-order fp32 error estimate
+//                exceeds kExternalErrorLimit are evaluated exactly on the CPU and merged (all of
+//                them when they are the majority; the estimate is the reported bound); without
+//                an evaluator, or when it fails, the iteration runs with the exact Auto
 //                choice between truncated and dense.
 // Rows are processed in fixed blocks (their count depends only on N and M) that scatter into
 // per-block partial sums reduced in block order, so each kernel term is evaluated once; above
@@ -91,12 +92,15 @@ export namespace Geometry::CoherentPointDrift::EStep
         double Sigma2{0.0};
         double LogOutlier{0.0}; // -inf: no uniform component
         std::span<const double> LogWeights{};
+        // Nonzero: the row is evaluated on the CPU; the evaluator leaves it out of P1/PX and may
+        // write any finite LogDenominator and Pt1 for it (they are overwritten). Empty: none.
+        std::span<const std::uint32_t> SkipRows{};
         std::span<double> LogDenominator{}, Pt1{}, P1{}, PXx{}, PXy{}, PXz{};
     };
     using ExternalEvaluator = std::function<bool(const ExternalRequest&)>;
-    // Vulkan: iterations whose first-order fp32 error estimate (reported as Sums::ErrorBound)
-    // exceeds this run the exact CPU dense pass instead (kernels narrow against the distances
-    // or coordinate magnitudes, e.g. far outlier rows).
+    // Vulkan: rows whose first-order fp32 error estimate (reported as their error bound) exceeds
+    // this are evaluated exactly on the CPU (e.g. rows far from every source under a narrow
+    // kernel); when they are the majority, the whole iteration runs the CPU dense pass.
     inline constexpr double kExternalErrorLimit = 2.0e-5;
 
     struct Settings
@@ -136,6 +140,8 @@ export namespace Geometry::CoherentPointDrift::EStep
         std::uint64_t KernelEvaluations{0u};
         // Vulkan: the external evaluator was wanted (Auto would not truncate) but was absent or failed.
         bool ExternalFallback{false};
+        // Vulkan: rows of a device iteration evaluated exactly on the CPU (too narrow for fp32).
+        std::uint32_t ExternalCpuRows{0u};
     };
 
     [[nodiscard]] std::uint32_t ResolveThreads(std::uint32_t requested) noexcept;

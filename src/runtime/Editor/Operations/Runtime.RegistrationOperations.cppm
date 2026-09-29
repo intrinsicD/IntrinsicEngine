@@ -149,6 +149,7 @@ export namespace Extrinsic::Runtime
         // Vulkan: iterations meant for the device that ran on the CPU, and why the last one did.
         std::uint32_t EStepFallbacks{0u};
         std::uint32_t EStepDeviceIterations{0u};
+        std::uint64_t EStepDeviceCpuRows{0u}; // rows of device iterations evaluated on the CPU
         std::string GpuDiagnostic{};
         std::uint32_t KernelRank{0u}; // low-rank nonrigid eigenpairs
         double KernelApproximationError{0.0};

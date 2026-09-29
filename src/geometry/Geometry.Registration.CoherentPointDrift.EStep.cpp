@@ -677,16 +677,16 @@ namespace Geometry::CoherentPointDrift::EStep
 
         std::uint64_t TargetGeneration{0u}; // process-unique per SetTarget, for external evaluators
 
-        // First-order estimate of the relative error an external evaluator with fp32 kernel terms
-        // adds to a row denominator (review of METHOD-056): per relevant term, the exponent
-        // a = w - |x - y|^2 / 2 sigma^2 carries about 4 ulp of |a| from its own rounding plus
-        // 4 sqrt(3) ulp of X |x - y| / sigma^2 from rounding the coordinates (X: the largest
-        // coordinate magnitude). Relevant terms lie within kRelevantExponent of their row's
-        // largest one; rows whose whole kernel mass is below e^-25 of the uniform term are
-        // ignored (their responsibilities are that small). Not a rigorous bound: errors of many
-        // terms partly cancel, so measured errors are far lower (C117).
-        double ExternalErrorEstimate(const PointSet& moved, const double sigma2, const double logC,
-                                     const std::uint32_t threads)
+        // Per-row first-order estimate of the relative error an external evaluator with fp32 kernel
+        // terms adds to a row denominator (METHOD-056 review, METHOD-063). Coordinates travel as
+        // float-float pairs and differences are formed as (x_hi - y_hi) + (x_lo - y_lo), so the
+        // coordinate rounding term vanishes; what remains is about 5 ulp of the exponent
+        // magnitude a = |w| + |x - y|^2 / 2 sigma^2 of the row's relevant terms, which lie within
+        // kRelevantExponent of its largest one (bounded by the nearest source). Rows whose whole
+        // kernel mass is below e^-25 of the uniform term get 0 (their responsibilities are that
+        // small). Not a rigorous bound: errors of many terms partly cancel (C117).
+        void ExternalRowEstimates(const PointSet& moved, const double sigma2, const double logC,
+                                  const std::uint32_t threads, std::vector<double>& estimate)
         {
             constexpr double kRelevantExponent = 20.0, kUlp = 0x1p-24;
             const std::size_t n = TargetX.size(), m = moved.Size();
@@ -695,53 +695,92 @@ namespace Geometry::CoherentPointDrift::EStep
                 SourceTree.Build(moved);
                 SourceTreeCurrent = true;
             }
+            double weightSpread = 0.0;
+            for (const double w : LogWeight) weightSpread = std::max(weightSpread, -w);
             const double inverse = 1.0 / (2.0 * sigma2);
             const double logMass = std::log(double(m)), logUniform = logC - LogWeightShift;
-            std::vector<double> chunkLargest((n + kRowGrain - 1) / kRowGrain, 0.0);
+            estimate.assign(n, 0.0);
             ParallelFor(n, kRowGrain, threads, [&](const std::size_t begin, const std::size_t end)
             {
-                double largest = 0.0;
                 for (std::size_t j = begin; j < end; ++j)
                 {
                     const double exponent = SourceTree.NearestSquared(TargetX[j], TargetY[j], TargetZ[j]) * inverse;
                     if (logMass - exponent < logUniform - 25.0) continue; // shifted weights are <= 0
-                    largest = std::max(largest, exponent);
+                    estimate[j] = 5.0 * kUlp * (exponent + weightSpread + kRelevantExponent);
                 }
-                chunkLargest[begin / kRowGrain] = largest;
             });
-            double weightSpread = 0.0, coordinate = 0.0;
-            for (const double w : LogWeight) weightSpread = std::max(weightSpread, -w);
-            for (const PointSet& set : {Target(), moved})
-                for (const auto axis : {set.X, set.Y, set.Z})
-                    for (const double v : axis) coordinate = std::max(coordinate, std::abs(v));
-            const double a = *std::ranges::max_element(chunkLargest) + weightSpread + kRelevantExponent;
-            return 4.0 * kUlp * (a + std::sqrt(3.0) * coordinate * std::sqrt(a * inverse));
         }
 
         // External (Vulkan) rows; false when the evaluator is absent, fails or returns non-finite
-        // or negative statistics (the caller then runs the CPU choice). `estimate` is reported as
-        // every row's error bound.
+        // or negative statistics (the caller then runs the CPU choice). Rows flagged in `cpuRows`
+        // are skipped by the device and evaluated here exactly (denominator, Pt1 and their
+        // P1/PX terms, added per source in row order); the others report their estimate as bound.
         bool ExternalRows(const Settings& settings, const PointSet& moved, const double sigma2, const double logC,
-                          const double estimate, Sums& out)
+                          const std::vector<double>& estimate, const std::vector<std::uint32_t>& cpuRows,
+                          const std::uint32_t threads, Sums& out)
         {
             const std::size_t n = TargetX.size(), m = moved.Size();
             if (!settings.External) return false;
+            const bool anyCpuRow = std::ranges::any_of(cpuRows, [](const std::uint32_t flag) { return flag != 0u; });
             const ExternalRequest request{.Target = Target(), .Moved = moved, .TargetGeneration = TargetGeneration,
                 .Sigma2 = sigma2, .LogOutlier = logC - LogWeightShift, .LogWeights = LogWeight,
+                .SkipRows = anyCpuRow ? std::span<const std::uint32_t>(cpuRows) : std::span<const std::uint32_t>{},
                 .LogDenominator = LogDenominator, .Pt1 = out.Pt1, .P1 = out.P1,
                 .PXx = out.PXx, .PXy = out.PXy, .PXz = out.PXz};
             if (!settings.External(request)) return false;
             for (std::size_t j = 0; j < n; ++j)
             {
+                if (anyCpuRow && cpuRows[j] != 0u) continue;
                 if (!std::isfinite(LogDenominator[j]) || !(out.Pt1[j] >= 0.0) || !std::isfinite(out.Pt1[j])) return false;
                 LogDenominator[j] += LogWeightShift;
-                RowBound[j] = estimate;
+                RowBound[j] = estimate[j];
                 RowEvaluations[j] = m;
             }
             for (std::size_t i = 0; i < m; ++i)
                 if (!(out.P1[i] >= 0.0) || !std::isfinite(out.P1[i]) || !std::isfinite(out.PXx[i]) ||
                     !std::isfinite(out.PXy[i]) || !std::isfinite(out.PXz[i]))
                     return false;
+            if (!anyCpuRow) return true;
+
+            // The skipped rows exactly, as the dense path computes them.
+            std::vector<std::uint32_t> rows;
+            for (std::uint32_t j = 0; j < n; ++j)
+                if (cpuRows[j] != 0u) rows.push_back(j);
+            const double twoSigma2 = 2.0 * sigma2;
+            ParallelFor(rows.size(), 1u, threads, [&](const std::size_t begin, const std::size_t end)
+            {
+                std::vector<double> scratch;
+                for (std::size_t k = begin; k < end; ++k)
+                {
+                    ExactRow(moved, rows[k], twoSigma2, logC, scratch, out);
+                    RowBound[rows[k]] = 0.0;
+                    RowEvaluations[rows[k]] = m; // doubled with the two-pass count below
+                }
+            });
+            std::vector<double> x(rows.size()), y(rows.size()), z(rows.size()), logDen(rows.size());
+            for (std::size_t k = 0; k < rows.size(); ++k)
+            {
+                x[k] = TargetX[rows[k]]; y[k] = TargetY[rows[k]]; z[k] = TargetZ[rows[k]];
+                logDen[k] = LogDenominator[rows[k]];
+            }
+            const double inverseTwoSigma2 = 1.0 / twoSigma2;
+            ParallelFor(m, kRowGrain, threads, [&](const std::size_t begin, const std::size_t end)
+            {
+                std::vector<double> p(rows.size());
+                for (std::size_t i = begin; i < end; ++i)
+                {
+                    SourceRowTerms(x.data(), y.data(), z.data(), logDen.data(), rows.size(), moved.X[i], moved.Y[i],
+                                   moved.Z[i], inverseTwoSigma2, LogWeight[i] + LogWeightShift, p.data());
+                    for (std::size_t k = 0; k < rows.size(); ++k)
+                    {
+                        out.P1[i] += p[k];
+                        out.PXx[i] += p[k] * x[k];
+                        out.PXy[i] += p[k] * y[k];
+                        out.PXz[i] += p[k] * z[k];
+                    }
+                }
+            });
+            out.ExternalCpuRows = std::uint32_t(rows.size());
             return true;
         }
 
@@ -1499,11 +1538,25 @@ namespace Geometry::CoherentPointDrift::EStep
             used = EStepPolicy::Dense; // no plan meets the bound
         bool externalFallback = false;
         // Kernels too narrow for fp32 terms (see ExternalErrorEstimate) stay on the exact CPU pass.
-        const double externalEstimate = wantExternal && used == EStepPolicy::Dense
-            ? s.ExternalErrorEstimate(moved, sigma2, logOutlier, threads) : 0.0;
-        if (wantExternal && used == EStepPolicy::Dense && externalEstimate <= kExternalErrorLimit)
+        // Rows too narrow for fp32 terms (see ExternalRowEstimates) run exactly on the CPU; when
+        // they are the majority the whole iteration does.
+        std::vector<double> rowEstimate;
+        std::vector<std::uint32_t> cpuRows;
+        std::size_t cpuRowCount = 0u;
+        if (wantExternal && used == EStepPolicy::Dense)
         {
-            external = s.ExternalRows(settings, moved, sigma2, logOutlier, externalEstimate, out);
+            s.ExternalRowEstimates(moved, sigma2, logOutlier, threads, rowEstimate);
+            cpuRows.resize(n);
+            for (std::size_t j = 0; j < n; ++j)
+            {
+                cpuRows[j] = rowEstimate[j] > kExternalErrorLimit ? 1u : 0u;
+                cpuRowCount += cpuRows[j];
+            }
+        }
+        out.ExternalCpuRows = 0u;
+        if (wantExternal && used == EStepPolicy::Dense && 2u * cpuRowCount <= n)
+        {
+            external = s.ExternalRows(settings, moved, sigma2, logOutlier, rowEstimate, cpuRows, threads, out);
             if (external) used = EStepPolicy::Vulkan;
             else
             {

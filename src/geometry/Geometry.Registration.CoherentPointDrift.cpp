@@ -162,6 +162,7 @@ namespace Geometry::CoherentPointDrift
         EStepPolicy LastPolicy{EStepPolicy::Reference};
         std::uint32_t UsedPolicies{0u}; // bit per EStepPolicy that ran an iteration
         std::uint32_t EStepFallbacks{0u}, EStepDeviceIterations{0u};
+        std::uint64_t EStepDeviceCpuRows{0u};
         // Current() caches the (expensive) subsampled interpolation per solver state.
         std::uint64_t Revision{0u};
         mutable std::uint64_t CachedRevision{~std::uint64_t{0}};
@@ -222,6 +223,7 @@ namespace Geometry::CoherentPointDrift
             LastErrorBound = sums.ErrorBound;
             LastSampledError = sums.SampledError;
             if (sums.ExternalFallback) ++EStepFallbacks;
+            EStepDeviceCpuRows += sums.ExternalCpuRows;
             MaxSampledError = std::max(MaxSampledError, LastSampledError);
             LastKernelEvaluations = sums.KernelEvaluations;
             MaxErrorBound = std::max(MaxErrorBound, LastErrorBound);
@@ -871,6 +873,7 @@ namespace Geometry::CoherentPointDrift
         result.KernelEvaluations = s.TotalKernelEvaluations;
         result.EStepFallbacks = s.EStepFallbacks;
         result.EStepDeviceIterations = s.EStepDeviceIterations;
+        result.EStepDeviceCpuRows = s.EStepDeviceCpuRows;
         result.KernelRank = std::uint32_t(s.Eigenvalues.size());
         result.KernelApproximationError = s.KernelError;
         if (s.Config.Method != Variant::Nonrigid)

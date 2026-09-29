@@ -31,6 +31,7 @@ namespace Extrinsic::Runtime
             std::shared_ptr<const std::vector<float>> Target{};
             std::uint64_t TargetGeneration{0u};
             std::vector<float> Source{};
+            std::vector<std::uint32_t> SkipRows{};
             double Sigma2{1.0}, LogOutlier{0.0};
         };
 
@@ -80,17 +81,18 @@ namespace Extrinsic::Runtime
             std::scoped_lock lock{s.Mutex};
             if (s.IsClosed) return false;
         }
-        // Normalized coordinates convert to fp32 here, off the main thread; the target once per run.
+        // Normalized coordinates convert to float-float pairs here, off the main thread; the
+        // target once per run.
+        const auto split = [](float* to, const double x, const double y, const double z, const double w) {
+            const float hx = float(x), hy = float(y), hz = float(z);
+            to[0] = hx; to[1] = hy; to[2] = hz; to[3] = float(w);
+            to[4] = float(x - double(hx)); to[5] = float(y - double(hy)); to[6] = float(z - double(hz)); to[7] = 0.0f;
+        };
         if (!s.Target || s.TargetGeneration != request.TargetGeneration)
         {
-            auto target = std::make_shared<std::vector<float>>(4u * n);
+            auto target = std::make_shared<std::vector<float>>(8u * n);
             for (std::size_t j = 0; j < n; ++j)
-            {
-                (*target)[4u * j] = float(request.Target.X[j]);
-                (*target)[4u * j + 1u] = float(request.Target.Y[j]);
-                (*target)[4u * j + 2u] = float(request.Target.Z[j]);
-                (*target)[4u * j + 3u] = 0.0f;
-            }
+                split(target->data() + 8u * j, request.Target.X[j], request.Target.Y[j], request.Target.Z[j], 0.0);
             s.Target = std::move(target);
             s.TargetGeneration = request.TargetGeneration;
         }
@@ -99,14 +101,11 @@ namespace Extrinsic::Runtime
         pending->TargetGeneration = s.TargetGeneration;
         pending->Sigma2 = request.Sigma2;
         pending->LogOutlier = request.LogOutlier;
-        pending->Source.resize(4u * m);
+        pending->SkipRows.assign(request.SkipRows.begin(), request.SkipRows.end());
+        pending->Source.resize(8u * m);
         for (std::size_t i = 0; i < m; ++i)
-        {
-            pending->Source[4u * i] = float(request.Moved.X[i]);
-            pending->Source[4u * i + 1u] = float(request.Moved.Y[i]);
-            pending->Source[4u * i + 2u] = float(request.Moved.Z[i]);
-            pending->Source[4u * i + 3u] = float(request.LogWeights[i]);
-        }
+            split(pending->Source.data() + 8u * i, request.Moved.X[i], request.Moved.Y[i], request.Moved.Z[i],
+                  request.LogWeights[i]);
 
         const auto start = std::chrono::steady_clock::now();
         std::vector<std::byte> data;
@@ -159,11 +158,12 @@ namespace Extrinsic::Runtime
             }
             if (!s.Workspace) s.Workspace = std::make_shared<Graphics::CoherentPointDriftEStepWorkspace>(s.Device);
             const auto request = s.Pending;
-            const std::size_t n = request->Target->size() / 4u, m = request->Source.size() / 4u;
+            const std::size_t n = request->Target->size() / 8u, m = request->Source.size() / 8u;
             s.Gpu = s.Cache.QueueGpuCompute(Graphics::CoherentPointDriftEStepWorkspace::ReadbackBytes(n, m),
                 [workspace = s.Workspace, request](RHI::ICommandContext& commands, const SpatialGpuIndexView&) {
                     return workspace->Record(commands, {.Target = *request->Target,
                         .TargetGeneration = request->TargetGeneration, .Source = request->Source,
+                        .SkipRows = request->SkipRows,
                         .Sigma2 = request->Sigma2, .LogOutlier = request->LogOutlier});
                 });
             s.State = Slot::InFlight;

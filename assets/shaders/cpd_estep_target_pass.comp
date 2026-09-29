@@ -5,7 +5,8 @@
 //   LogDenominator_n = log(exp(a_max) sum + exp(logOutlier)),  Pt1_n = sum exp(a_max - LogDenominator_n).
 #include "cpd_estep_common.glslinc"
 
-shared vec4 sSources[CPD_TILE];
+shared vec4 sSourceHi[CPD_TILE];
+shared vec3 sSourceLo[CPD_TILE];
 
 // exp for fp64 (GLSL has none): Cody-Waite reduction and a degree-13 Taylor polynomial, as
 // property_filter.comp's ExpNonPositive, here for |x| <= 745.
@@ -63,16 +64,22 @@ void main()
     const uint local = gl_LocalInvocationID.x;
     const bool inRange = gl_GlobalInvocationID.x < pc.count;
     const uint row = pc.first + gl_GlobalInvocationID.x;
-    const vec3 x = inRange ? CpdPoints(pc.target).v[row].xyz : vec3(0.0);
+    const CpdPoint point = inRange ? CpdPoints(pc.target).v[row] : CpdPoint(vec4(0.0), vec4(0.0));
+    const vec3 xHi = point.hi.xyz, xLo = point.lo.xyz;
 
     float rowMax = -3.402823466e38;
     for (uint base = 0u; base < pc.sourceCount; base += CPD_TILE)
     {
         const uint k = base + local;
-        sSources[local] = k < pc.sourceCount ? CpdPoints(pc.source).v[k] : vec4(0.0);
+        if (k < pc.sourceCount)
+        {
+            const CpdPoint source = CpdPoints(pc.source).v[k];
+            sSourceHi[local] = source.hi;
+            sSourceLo[local] = source.lo.xyz;
+        }
         barrier();
         const uint end = min(CPD_TILE, pc.sourceCount - base);
-        for (uint j = 0u; j < end; ++j) rowMax = max(rowMax, CpdExponent(x, sSources[j]));
+        for (uint j = 0u; j < end; ++j) rowMax = max(rowMax, CpdExponent(xHi, xLo, sSourceHi[j], sSourceLo[j]));
         barrier();
     }
 
@@ -80,19 +87,32 @@ void main()
     for (uint base = 0u; base < pc.sourceCount; base += CPD_TILE)
     {
         const uint k = base + local;
-        sSources[local] = k < pc.sourceCount ? CpdPoints(pc.source).v[k] : vec4(0.0);
+        if (k < pc.sourceCount)
+        {
+            const CpdPoint source = CpdPoints(pc.source).v[k];
+            sSourceHi[local] = source.hi;
+            sSourceLo[local] = source.lo.xyz;
+        }
         barrier();
         const uint end = min(CPD_TILE, pc.sourceCount - base);
         float s = 0.0, c = 0.0;
         for (uint j = 0u; j < end; ++j)
         {
-            precise float t = CpdExponent(x, sSources[j]) - rowMax;
+            precise float t = CpdExponent(xHi, xLo, sSourceHi[j], sSourceLo[j]) - rowMax;
             CpdKahan(s, c, CpdExpF(t));
         }
         sum += CpdKahanValue(s, c);
         barrier();
     }
     if (!inRange) return;
+    CpdDoubles results = CpdDoubles(pc.results);
+    if (pc.skipRows != 0ul && CpdUints(pc.skipRows).v[row] != 0u)
+    {
+        // A finite placeholder far above every exponent: the source pass adds exp(-1e30) = 0.
+        results.v[row] = 1.0e30lf;
+        results.v[pc.targetCount + row] = 0.0lf;
+        return;
+    }
 
     const double aMax = double(rowMax);
     double logDenominator;
@@ -103,7 +123,6 @@ void main()
         // log1p(sum e^{-logOutlier}) is below 1e-290 there.
         logDenominator = logOutlier > 700.0lf ? pc.logOutlier : aMax + LogD(sum + ExpD(logOutlier));
     }
-    CpdDoubles results = CpdDoubles(pc.results);
     results.v[row] = logDenominator;
     results.v[pc.targetCount + row] = sum * ExpD(aMax - logDenominator);
 }
