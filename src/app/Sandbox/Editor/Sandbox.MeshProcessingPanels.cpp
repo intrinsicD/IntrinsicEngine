@@ -9,7 +9,9 @@ module;
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <cmath>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -2806,7 +2808,7 @@ namespace Extrinsic::Sandbox::Editor
         {
             iteration.push_back(double(t.Iteration));
             seconds.push_back(t.Seconds);
-            series[0].Values.push_back(std::max(t.RMSE, 1e-300));
+            series[0].Values.push_back(t.RMSE);
             series[1].Values.push_back(double(t.InlierCount));
             series[2].Values.push_back(t.IterationSeconds);
         }
@@ -3127,7 +3129,7 @@ namespace Extrinsic::Sandbox::Editor
                 {
                     iteration.push_back(double(t.Iteration));
                     seconds.push_back(t.Seconds);
-                    series[0].Values.push_back(std::max(t.Sigma2, 1e-300));
+                    series[0].Values.push_back(t.Sigma2);
                     series[1].Values.push_back(t.Objective);
                     series[2].Values.push_back(t.NegativeLogLikelihood);
                     series[3].Values.push_back(t.MatchedWeight);
@@ -3138,7 +3140,7 @@ namespace Extrinsic::Sandbox::Editor
                 if (bounded)
                 {
                     series.push_back({"E-step error bound", {}, true});
-                    for (const auto& t : snapshot.Trace) series.back().Values.push_back(std::max(t.EStepErrorBound, 1e-300));
+                    for (const auto& t : snapshot.Trace) series.back().Values.push_back(t.EStepErrorBound);
                 }
                 DrawRegistrationTracePlots("CPDTrace", iteration, seconds, series, state.PlotBySeconds);
                 if (ImGui::Button("Export trace (CSV)##CPD"))
