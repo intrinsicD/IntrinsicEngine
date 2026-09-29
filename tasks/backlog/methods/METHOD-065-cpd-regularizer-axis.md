@@ -14,34 +14,92 @@ contracts: [method.engine-integration, geometry.element-domain-sources]
 # METHOD-065 — Selectable deformation regularizer for nonrigid CPD and BCPD
 
 ## Goal
-- The nonrigid CPD M-step is Tikhonov smoothing of the residual field R = P1^-1 P X - Y:
-  (G + lambda sigma^2 P1^-1) W = R, V = G W. The low-rank mode already filters R in the
-  eigenbasis of G. BCPD has the same structure (prior N(0, lambda^-1 G)).
-- Make the regularizer an axis; the default stays as it is:
-  1. **Gaussian kernel** (current, extrinsic; full or low rank).
-  2. **Geodesic Gaussian kernel** (METHOD-064), full or low rank. Paper intake: Hirose,
-     "Geodesic-based Bayesian coherent point drift" (verify the citation and its formulation
-     before use).
-  3. **LBO spectral filter.** Solve (D + lambda sigma^2 L) V = D R: an implicit Laplacian
-     smoothing step with the matching weights as mass.
-     - Either in a truncated LBO eigenbasis Phi (k x k system), reusing the Laplacian
-       eigenbasis module;
-     - or by CG on the sparse operator, reusing the GPU sparse CG.
-     - Mesh cotangent Laplacian; point clouds use the heat-kernel (Belkin-Niyogi) Laplacian.
-- GPU: with a basis the M-step is two dense m x k products and a k x k solve. Together with the
-  device E-step, nonrigid CPD/BCPD then runs on the GPU and reads back only a convergence value
-  per iteration (RUNTIME-294 row, medium effort).
+- **Starting point (verified by Fable 5.1 and Codex 6 Astra, 2026-09-29, to 1e-15).**
+  - The code solves (D G + lambda sigma^2 I) W = P X - D Y with D = diag(P1),
+    `Geometry.Registration.CoherentPointDrift.cpp:563-576`.
+  - This minimizes sum_i p_i ||v_i - r_i||^2 + lambda sigma^2 v^T G^-1 v, i.e. Tikhonov
+    smoothing of the residual field R = D^-1 P X - Y.
+  - With weights p_i = c: the spectral filter g_i / (g_i + lambda sigma^2 / c), where
+    c ~ N_p / M.
+  - The low-rank Woodbury path is basis-agnostic: it needs Lambda^-1 but not orthonormal
+    columns, verified with a non-orthonormal Q to 2e-13.
+- **Axis** (the default stays Gaussian, unchanged on the unchanged backend):
+
+  | Regularizer | Prior on V | M-step | Notes |
+  |---|---|---|---|
+  | Gaussian kernel (today) | lambda/2 tr(W^T G W) | full or low rank, as today | unit-diagonal kernel |
+  | Heat kernel G_t (METHOD-064) | lambda/2 tr(z^T Lambda^-1 z) in the basis | low-rank Woodbury with Phi_k, e^{-t Lambda_k} (tiny modes dropped) | unit-mean-diagonal scaling; mesh-independent |
+  | Rational (M + tau L_w)^-n, n in {1, 2}, **default n = 2** | lambda/2 tr(V^T L_w (M^-1 L_w)^{n-1} V) | basis-free: (D + a L_w) V = D R for n = 1; (D + a L_w M^-1 L_w) V = D R for n = 2, by sparse CG | n = 1 (H^1) is mesh-dependent on surfaces |
+
+- **Why n = 2 is the default.** On a 2-manifold the Green's function of (D + a L_w) is
+  log-singular. One confident correspondence makes a spike that sharpens under refinement.
+  Fable's measurement of the centre/neighbour ratio as h halves:
+  - n = 1: 4.9 -> 8.9 -> 11.0 -> 12.9 -> 14.9;
+  - biharmonic (n = 2): 1.19 at every h;
+  - heat kernel: about 2.0.
+
+  Sobolev order > d/2 (Duchon, verify) makes the result mesh-independent. n = 1 stays available
+  and is documented as mesh-dependent.
+- **Objective and EM.**
+  - `Coherence()` (`CoherentPointDrift.cpp:586-595`) must use the matching prior (lambda/2 of
+    the table's form); convergence otherwise tests a wrong objective.
+  - With a fixed L_w this is MAP/generalized EM: NLL + prior decreases monotonically.
+  - The sigma^2 update is unchanged (the prior carries no sigma^2).
+  - Rebuilding L_w from deformed positions would change the objective, so it is not done.
+- **SPD and zero weights.**
+  - SPD holds iff ker D intersected with ker L_w = {0}.
+  - P1 underflows to exactly 0 under the truncated, Nystroem and device E-step policies, so a
+    whole component can lose all weight. An epsilon M shift or component pinning is part of the
+    design, not a fallback.
+  - Conditioning ~ (max p + a mu_max) / min p.
+- **BCPD.**
+  - The default (`PosteriorVarianceTerms` off, `CoherentPointDrift.cppm:131`) needs only
+    Sigma b, which CG provides.
+  - With variance terms on, the sigma^2 trace may use Hutchinson (weighted trace error
+    1e-3..4e-3 with 16 probes). The per-point variances in the E-step need an exact diagonal:
+    the truncated basis (exact for the restricted model) or selected inversion on the sparse
+    Cholesky `Geometry::Sparse::SparseLLT` (Takahashi; Bekas-Kokiopoulou-Saad probing; verify).
+    Hutchinson's per-entry error (median 21%, max 100% at 16 probes) is not acceptable there.
+  - The heat prior's precision is used only in the basis.
+- **Subsamples.** Build the basis/L_w on the full mesh and restrict rows to the BCPD subsample.
+  The full-source interpolation (`CoherentPointDrift.cpp:940-966`) is Gaussian-specific
+  (Nystroem extension) and needs a basis-restriction path for non-Gaussian regularizers.
+- **Point clouds.** The METHOD-064 Laplacian fixes apply: Belkin-Niyogi scaling, density
+  normalization, and normal-consistency weights against shortcut edges.
+- **GPU cost (corrected).**
+  - Basis variant: forming Phi^T D Phi is O(m k^2) per EM iteration, plus O(k^3). With k = 500
+    and m = 1e5 that is 2.5e10 flop per iteration, so it suits moderate k.
+  - CG variant: iterations scale with sqrt(a mu_max / min p). Warm starts saved 0..10% in
+    Fable's run; the gain comes from a shrinking a = lambda sigma^2.
+  - At `ChunkDispatches` = 2048, about 227 CG iterations per chunk, early EM iterations take
+    several chunks.
+  - The objective and sigma^2 need V on the host unless their reductions move to the device
+    (RUNTIME-294).
+- Literature to verify: Myronenko-Song; Hirose (BCPD, geodesic BCPD); Belkin-Niyogi;
+  Coifman-Lafon; Sharp-Crane 2020; Feragen et al. 2015; Duchon; Lindgren-Rue-Lindstroem
+  (SPDE/Matern sparse precisions, a possible principled form of the n = 2 prior); Takahashi
+  selected inversion.
 
 ## Acceptance criteria
-- [ ] CPU reference per regularizer. Analytic checks:
-  - equal weights reduce to the diagonal spectral filter;
-  - the Gaussian option is bitwise unchanged from today.
-- [ ] Benchmark on the Vlasic articulated meshes and the existing CPD fixtures: accuracy against
-      the ground-truth correspondence (same topology), run time, and iterations per regularizer;
-      sealed evidence.
-- [ ] Documented limits: the LBO null space (translation free, rotations penalized; rigid
-      pre-alignment advised for plain CPD), point-cloud graph shortcuts, the basis on BCPD
-      subsamples.
+- [ ] CPU reference per regularizer; `Coherence()` matches the prior; the NLL plus the prior
+      decrease monotonically on the fixtures.
+- [ ] Analytic filter check with p_i = c m_i (or unit mass), stating c; the heat-kernel Woodbury
+      path agrees with a dense solve.
+- [ ] Mesh-independence test: the spike ratio stays bounded under refinement for n = 2 and the
+      heat kernel; n = 1 is documented as growing.
+- [ ] A zero-weight component (forced P1 underflow) still solves (epsilon shift or pinning) and
+      is reported.
+- [ ] BCPD: default mode through CG; with variance terms on, an exact diagonal (basis or
+      selected inversion); Hutchinson only for the trace, with its error measured.
+- [ ] Subsample: basis on the full mesh restricted to the samples; the full-source
+      interpolation matches a full-resolution run within a stated tolerance.
+- [ ] GPU: CG iterations per EM iteration against a = lambda sigma^2, and chunks per EM
+      iteration, reported (cold vs warm start measured, not assumed); parity with the CPU
+      reference within the CG tolerance.
+- [ ] Benchmark on the Vlasic meshes (first verify that the release keeps vertex correspondence
+      across frames) and the existing CPD fixtures: accuracy, time and iterations per
+      regularizer; sealed evidence. The Gaussian option is bitwise unchanged on the unchanged
+      backend.
 
 ## Engine integration
 
@@ -49,8 +107,8 @@ contracts: [method.engine-integration, geometry.element-domain-sources]
 | --- | --- |
 | Least-structured input | Unchanged two point sets; the geodesic and LBO options need source topology or a kNN graph. |
 | Compatible entity sources | Mesh vertices, graph nodes, point clouds (LBO/geodesic built per domain). |
-| RuntimeModule | Existing CPD operations; the eigenbasis comes from the Laplacian eigenbasis module. |
-| Config/agent | New `regularizer` enum (gaussian, geodesic_gaussian, lbo_spectral) plus `basis_size`; the default keeps today's results. |
+| RuntimeModule | Existing CPD operations; the eigenbasis comes from the Laplacian eigenbasis module, the CG from the existing sparse CG workspace. |
+| Config/agent | New `regularizer` enum (gaussian, heat_kernel, rational) plus `diffusion_time`, `basis_size`, `rational_order` (1 or 2, default 2); for BCPD with variance terms, `diagonal` (basis, selected_inversion); the default keeps today's results. |
 | UI | CPD panel Model section: regularizer combo, only its parameters shown. |
 | Publication | Unchanged (displacement/positions). |
 | End-to-end tests | Editor-command test per regularizer; gpu;vulkan smoke once the device M-step lands. |
