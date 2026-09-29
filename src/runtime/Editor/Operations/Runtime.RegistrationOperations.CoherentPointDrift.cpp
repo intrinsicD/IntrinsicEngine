@@ -315,6 +315,11 @@ namespace Extrinsic::Runtime
             else
                 snapshot.SourcePreview = std::make_shared<const std::vector<glm::vec3>>(std::move(preview));
             if (phase) snapshot.Phase = *phase;
+            // The subsamples are fixed once the solver has chosen them.
+            if (!snapshot.SourceSamples && !current.SourceSamples.empty())
+                snapshot.SourceSamples = std::make_shared<const std::vector<std::uint32_t>>(current.SourceSamples);
+            if (!snapshot.TargetSamples && !current.TargetSamples.empty())
+                snapshot.TargetSamples = std::make_shared<const std::vector<std::uint32_t>>(current.TargetSamples);
             // A cancel wins over whatever the step in flight reached.
             if (run.CancelRequested.load() || current.State == CPD::Status::Cancelled)
             {

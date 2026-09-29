@@ -170,6 +170,8 @@ export namespace Extrinsic::Runtime
         // Shared and immutable, so a per-frame snapshot copies no points.
         std::shared_ptr<const std::vector<glm::vec3>> SourcePreview{}; // current T(y), world space, capture order
         std::shared_ptr<const std::vector<glm::vec3>> Target{};        // fixed points, world space
+        // BCPD subsamples (UI-067): indices into SourcePreview and Target (null: none).
+        std::shared_ptr<const std::vector<std::uint32_t>> SourceSamples{}, TargetSamples{};
         std::uint64_t Revision{0u};             // increments with every update (not with Stage)
         // UI-067: the phase a Running step is in ("preparing", "building_kernel",
         // "expectation_step", ...) and when it began, for a live progress line.

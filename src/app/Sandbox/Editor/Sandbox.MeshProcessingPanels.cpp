@@ -340,6 +340,7 @@ namespace Extrinsic::Sandbox::Editor
             std::string RunMessage{}, ExportMessage{};
             std::optional<Runtime::EditorCoherentPointDriftResult> LastResult{};
             bool LivePreview{true};
+            bool ShowSubsamples{true};
             std::uint64_t PreviewRevision{0u};
             std::array<char, 128> DisplacementName{};
         };
@@ -2982,6 +2983,11 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (ImGui::Checkbox("Preview in viewport##CPD", &state.LivePreview) && !state.LivePreview)
             ClearCoherentPointDriftPreview();
+        if (state.LivePreview && hasRun && (snapshot.SourceSamples || snapshot.TargetSamples))
+        {
+            ImGui::SameLine();
+            if (ImGui::Checkbox("Show subsamples##CPD", &state.ShowSubsamples)) state.PreviewRevision = 0u; // redraw
+        }
 
         if (hasRun)
         {
@@ -3024,6 +3030,21 @@ namespace Extrinsic::Sandbox::Editor
                     for (std::size_t i = 0; i < count; i += stride)
                         points.push_back({.Position = preview[i], .Color = {1.0f, 0.55f, 0.1f, 1.0f},
                                           .Radius = radius, .DepthTested = true, .Sphere = true});
+                    // BCPD subsamples as larger spheres: the registered source samples follow the
+                    // moving source (green), the target samples stay put (cyan).
+                    if (state.ShowSubsamples)
+                    {
+                        if (snapshot.SourceSamples)
+                            for (const std::uint32_t i : *snapshot.SourceSamples)
+                                if (i < count)
+                                    points.push_back({.Position = preview[i], .Color = {0.2f, 0.9f, 0.3f, 1.0f},
+                                                      .Radius = 2.0f * radius, .DepthTested = true, .Sphere = true});
+                        if (snapshot.TargetSamples)
+                            for (const std::uint32_t j : *snapshot.TargetSamples)
+                                if (j < snapshot.Target->size())
+                                    points.push_back({.Position = (*snapshot.Target)[j], .Color = {0.2f, 0.75f, 1.0f, 1.0f},
+                                                      .Radius = 2.0f * radius, .DepthTested = true, .Sphere = true});
+                    }
                     interaction->SetPreviewOverlay("coherent_point_drift", points);
                     state.PreviewRevision = snapshot.Revision;
                 }

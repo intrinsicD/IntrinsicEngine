@@ -201,6 +201,10 @@ export namespace Geometry::CoherentPointDrift
         // Low-rank nonrigid: eigenpairs used and the kernel's sampled relative error.
         std::uint32_t KernelRank{0u};
         double KernelApproximationError{0.0};
+        // Bayesian subsampling (UI-067): the registered source samples and the target samples,
+        // as indices into the inputs of Initialize (empty: every point).
+        std::vector<std::uint32_t> SourceSamples{};
+        std::vector<std::uint32_t> TargetSamples{};
 
         [[nodiscard]] bool Succeeded() const noexcept { return State == Status::Success; }
     };

@@ -572,3 +572,28 @@ TEST(CoherentPointDriftOperations, CancelAnswersAtOnceAndTraceRowsCarryElapsedTi
     EXPECT_EQ(after.Phase, R::EditorCoherentPointDriftPhase::Cancelled);
     EXPECT_FALSE(R::ApplyEditorCoherentPointDrift(s.Commands(), run).Succeeded());
 }
+
+TEST(CoherentPointDriftOperations, BayesianSubsamplesReachTheSnapshotForThePreview)
+{
+    // UI-067: the chosen source and target samples are published once, as indices into the
+    // preview and target, so the panel can draw them.
+    Scene s;
+    const auto points = Cloud(300, 17);
+    std::vector<glm::vec3> moved;
+    for (const auto& p : points) moved.push_back(p + glm::vec3(0.05f, 0.0f, 0.0f));
+    const auto source = Make(s.Registry, D::PointCloudPoint, points);
+    const auto target = Make(s.Registry, D::PointCloudPoint, moved);
+    R::EditorCoherentPointDriftResult failure;
+    const auto run = R::StartEditorCoherentPointDrift(s.Commands(), {.SourceStableEntityId = Id(source),
+        .TargetStableEntityId = Id(target), .Method = M::Bayesian, .Output = O::DisplacementProperty,
+        .Subsample = 60, .SubsampleTarget = 80}, failure);
+    ASSERT_TRUE(run) << failure.Message;
+    EXPECT_FALSE(R::SnapshotEditorCoherentPointDrift(run).SourceSamples) << "nothing chosen before a step";
+    ASSERT_EQ(R::StepEditorCoherentPointDrift(s.Commands(), run, 1), R::EditorCommandStatus::Pending);
+    const auto snapshot = R::SnapshotEditorCoherentPointDrift(run);
+    ASSERT_TRUE(snapshot.SourceSamples && snapshot.TargetSamples);
+    EXPECT_EQ(snapshot.SourceSamples->size(), 60u);
+    EXPECT_EQ(snapshot.TargetSamples->size(), 80u);
+    for (const std::uint32_t i : *snapshot.SourceSamples) ASSERT_LT(i, snapshot.SourcePreview->size());
+    for (const std::uint32_t j : *snapshot.TargetSamples) ASSERT_LT(j, snapshot.Target->size());
+}

@@ -164,6 +164,7 @@ namespace Geometry::CoherentPointDrift
         // Subsampled Bayesian runs register Source = the samples; FullSource keeps every point.
         Points FullSource{};
         std::vector<std::uint32_t> Samples{};
+        std::vector<std::uint32_t> TargetSamples{}; // target subsample indices (empty: all)
         // Kernel-form coefficients of the displacement: v = G KernelWeights (full kernel, M x 3) or
         // v = Basis KernelWeights (low rank, k x 3); interpolation evaluates the same expansions at
         // new points (low rank through the Nystroem extension).
@@ -696,6 +697,7 @@ namespace Geometry::CoherentPointDrift
             s.Target.Resize(n);
             s.Pt1.assign(n, 0.0);
             for (std::size_t k = 0; k < n; ++k) s.Target.Set(k, full.At(chosen[k]));
+            s.TargetSamples = chosen;
         }
         if (subsampled)
         {
@@ -918,6 +920,8 @@ namespace Geometry::CoherentPointDrift
         result.EStepFallbacks = s.EStepFallbacks;
         result.EStepDeviceIterations = s.EStepDeviceIterations;
         result.EStepDeviceCpuRows = s.EStepDeviceCpuRows;
+        result.SourceSamples = s.Samples;
+        result.TargetSamples = s.TargetSamples;
         result.KernelRank = std::uint32_t(s.Eigenvalues.size());
         result.KernelApproximationError = s.KernelError;
         if (s.Config.Method != Variant::Nonrigid)
