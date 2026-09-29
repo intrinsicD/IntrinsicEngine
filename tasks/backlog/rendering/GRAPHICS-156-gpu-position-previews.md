@@ -11,30 +11,33 @@ evidence_skip_reason: planned from the operator's GPU residency decision and two
 contract_schema: 1
 contracts: [geometry.property-coherence, geometry.element-domain-sources]
 ---
-# GRAPHICS-156 — Position previews through GpuWorld
+# GRAPHICS-156 — Renderer observes positions from the residency
 
 ## Goal
-- ADR 0030 decision 5.
-- A published position front is copied into its `GpuWorld` block at the head of the culling pass
-  (where `SubmitPendingUploadBarriers` runs), reusing `GpuTransferInCommandUploadDesc`, with
-  compute-write->transfer-read and transfer-write->shader-read barriers.
+- ADR 0030 decision 5 for positions.
+- The renderer observes the appearance-selected position property. While a method's ring
+  exists (running, or finished but not accepted), its front is GPU-copied into the `GpuWorld`
+  block at the head of the culling pass:
+  - where `SubmitPendingUploadBarriers` runs, via `GpuTransferInCommandUploadDesc`;
+  - with compute-write->transfer-read and transfer-write->shader-read barriers.
 - Seam-split meshes get a gather through a device copy of `MeshSourceVertexForGpuVertex`, keyed
   by its remap revision.
-- During a preview:
-  - the block is pinned and marked as holding a preview (the GRAPHICS-154 resolver refuses it as
-    canonical input);
+- While uncommitted positions are shown:
   - bounds are widened conservatively or culling is bypassed;
   - primitive pick refinement is disabled for the entity;
-  - dependent normals keep their CPU state.
-- Abort restores the block from the current CPU state through a forced extraction re-upload.
+  - dependent normals keep their CPU state;
+  - the block's CPU shadow is marked stale, so compaction or replay never overwrites it.
+- Discard or cancel restores the block from the current CPU state through a forced extraction
+  update.
 
 ## Acceptance criteria
-- [ ] gpu;vulkan smoke: preview pixels move before commit and return on abort; a moved preview
-      is not culled.
+- [ ] gpu;vulkan smoke:
+  - observed pixels move before Accept and return on Discard;
+  - a moved preview is not culled.
 - [ ] Contract tests:
-  - the resolver refuses a preview block;
-  - pick refinement is off during a preview;
-  - abort after a concurrent CPU edit shows the edit, not the old shadow.
+  - pick refinement is off while uncommitted positions are shown;
+  - a Discard after a concurrent CPU edit shows the edit;
+  - compaction does not replay a stale shadow.
 
 ## Verification
 ```bash

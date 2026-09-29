@@ -11,28 +11,36 @@ evidence_skip_reason: planned from the operator's GPU residency decision and two
 contract_schema: 1
 contracts: [geometry.property-coherence, geometry.element-domain-sources]
 ---
-# RUNTIME-292 — First end-to-end GPU property transaction: scalar smoothing
+# RUNTIME-292 — First end-to-end GPU property transaction: scalar smoothing with Accept
 
 ## Goal
-- ADR 0030 decisions 6-7 on one scalar consumer before any position preview.
-- Vulkan property smoothing (PropertyFilter, then implicit CG) does this:
-  - reads its input through the residency;
-  - writes a typed output ring;
-  - shows each published chunk as a colormap preview through the visualization recipe
-    `BufferBDA` (no readback);
-  - at the end reads the front back once and publishes through the existing undoable
-    publication, then binds the revision (the next run uploads nothing).
-- Cancel and stale publish nothing and remove the preview.
-- Undo changes the CPU revision, and the next GPU run uploads once.
+- ADR 0030 decisions 5-7 on one scalar consumer before any position observation.
+- Vulkan property smoothing (PropertyFilter, then implicit CG):
+  - reads its input from the canonical slot;
+  - writes a typed ring.
+- The renderer observes it when the appearance shows that scalar. The ring front is bound
+  directly through the visualization recipe `BufferBDA` (float presentation view for doubles),
+  with no readback.
+- When the method finishes or is stopped, the panel shows Accept / Discard:
+  - Accept: one readback, the existing undoable publication, then the front becomes the
+    canonical slot for the new revision (the next run uploads nothing).
+  - Discard: nothing is published, and observation returns to the canonical slot.
+- Stale while pending: Accept is disabled with the reason. Undo changes the CPU revision, and
+  the next GPU use uploads once.
+- Batch and agent commands keep automatic publication.
 
 ## Acceptance criteria
-- [ ] Contract tests: commit binds the revision; cancel, stale and undo behave as ADR 0030 says;
-      "Applied" is reported only after the CPU publication.
+- [ ] Contract tests:
+  - Accept binds the revision;
+  - Discard, cancel, stale-while-pending and undo behave as ADR 0030 says;
+  - "Applied" is reported only after the CPU publication.
 - [ ] gpu;vulkan smoke:
-  - the preview colormap changes before commit;
-  - after commit the CPU values equal the readback and the CPU reference within the existing
+  - the observed colormap changes before Accept;
+  - after Accept the CPU values equal the readback and the CPU reference within the existing
     tolerance;
   - a second run on the same revision uploads zero input bytes.
+- [ ] Panel test: Accept / Discard appear after finishing or stopping; Accept is disabled on a
+      stale input.
 
 ## Verification
 ```bash

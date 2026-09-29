@@ -33,7 +33,7 @@ This index tracks long-lived architecture decisions for IntrinsicEngine.
 27. [0027 — Right-sized runtime composition mechanism](0027-right-sized-runtime-composition.md)
 28. [0028 — Declarative graphics state at the RHI boundary](0028-declarative-graphics-state-rhi-boundary.md)
 29. [0029 — Agent control lane over a local socket](0029-agent-control-lane.md)
-30. [0030 — GPU property residency with preview swaps and end-of-method CPU commit](0030-gpu-property-residency.md)
+30. [0030 — GPU property residency, observing renderer, and Accept to the CPU](0030-gpu-property-residency.md)
 
 ## Conventions
 

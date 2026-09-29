@@ -11,10 +11,10 @@ evidence_skip_reason: planned from the operator's GPU residency decision and two
 contract_schema: 1
 contracts: [geometry.property-coherence, geometry.element-domain-sources]
 ---
-# RUNTIME-293 — Commit GPU-authored positions without a re-upload
+# RUNTIME-293 — Accept GPU-authored positions without a re-upload
 
 ## Goal
-- ADR 0030 decision 6 for positions.
+- ADR 0030 decision 6 for positions: Accept writes the ring front back to the CPU property.
 - A positions publication analogue of `PublishPointScalarField`: before/after, revision watches,
   undoable.
 - For 1:1 domains (point clouds, graphs):
@@ -25,7 +25,7 @@ contracts: [geometry.property-coherence, geometry.element-domain-sources]
 - Meshes commit through the ordinary revision-delta upload.
 
 ## Acceptance criteria
-- [ ] After commit, extraction issues no position upload for a point cloud (IO counter); the
+- [ ] After Accept, extraction issues no position upload for a point cloud (IO counter); the
       render and CPU positions are equal.
 - [ ] Undo/redo restores positions and uploads once each.
 
