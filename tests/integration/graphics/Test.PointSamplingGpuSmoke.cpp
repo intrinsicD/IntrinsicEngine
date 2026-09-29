@@ -1,6 +1,6 @@
 // RUNTIME-290: the Vulkan point-sampling seam. Direct: an exact weighted farthest-point run in
-// several framed chunks, whose every observed prefix is a prefix of the final order, which
-// equals the CPU reference bitwise (order and clearances, duplicates included). Editor: the
+// several chunks, of which only the last reads the order back (GRAPHICS-153; earlier observed
+// prefixes are empty), which equals the CPU reference bitwise (order and clearances, duplicates included). Editor: the
 // Vulkan backend of the point-sampling command against its CPU backend, three runs equal.
 #include "RuntimeTestModule.hpp"
 #include <algorithm>
@@ -196,10 +196,10 @@ TEST(RUNTIME290VulkanPointSampling, FarthestPointMatchesTheCpuAcrossChunksAndThr
     ASSERT_EQ(run->Phase, 6);
 
     // Direct: several chunks, each observed prefix a prefix of the final order, equal to the CPU.
-    ASSERT_GE(run->Prefixes.size(), 2u) << "the run must take more than one framed chunk";
+    ASSERT_GE(run->Prefixes.size(), 2u) << "the run must take more than one chunk";
     const auto& final = run->Prefixes.back();
-    for (const auto& prefix : run->Prefixes)
-        ASSERT_TRUE(std::equal(prefix.begin(), prefix.end(), final.begin())) << "published entries changed";
+    for (std::size_t c = 0; c + 1 < run->Prefixes.size(); ++c)
+        EXPECT_TRUE(run->Prefixes[c].empty()) << "an intermediate chunk read samples back";
     const PS::Result reference = PS::Order(std::span<const glm::vec3>(run->Direct),
                                            PS::Params{.FirstIndex = 5u, .Weights = run->Weights}, 3000u);
     ASSERT_TRUE(reference.Succeeded());

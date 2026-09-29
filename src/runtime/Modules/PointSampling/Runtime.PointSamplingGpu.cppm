@@ -1,7 +1,7 @@
 // Vulkan execution seam of Geometry.PointSampling (RUNTIME-290). Geometry stays CPU-only; this
 // module decides whether a request can run on the device, drives it in bounded chunks
-// through SpatialIndexCache::QueueGpuCompute (main thread, immediate submits), keeps the growing order prefix
-// (published entries never change) and checks it against the CPU reference before the
+// through SpatialIndexCache::QueueGpuCompute (main thread, immediate submits), reads the order
+// back once, with the last chunk, and checks it against the CPU reference before the
 // result may report `gpu_vulkan_compute`. Methods with a device kernel: exact (weighted)
 // farthest point (Graphics.FarthestPointSampling); METHOD-014/055/060-062 plug in here.
 module;
@@ -48,7 +48,8 @@ export namespace Extrinsic::Runtime
 
         // Main thread: queues the next bounded chunk (null when the request was refused).
         [[nodiscard]] std::shared_ptr<SpatialGpuResult> QueueNext(SpatialIndexCache& cache);
-        // Main thread, on a ready chunk: extends the prefix; true once every sample is in.
+        // Main thread, on a ready chunk: true once every sample is in (only the last chunk carries
+        // the order, GRAPHICS-153).
         [[nodiscard]] bool Observe(const SpatialGpuResult& chunk);
         // The order sampled so far (a prefix of the final order).
         [[nodiscard]] const Geometry::PointSampling::Result& Current() const noexcept;

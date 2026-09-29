@@ -453,6 +453,7 @@ namespace Extrinsic::Runtime
             S::PropertyImplicitSystem System{};
             std::vector<double> ChannelMajor{}, SeedRhs{};
             std::shared_ptr<Graphics::SparseConjugateGradientWorkspace> Solver{};
+            bool FinalQueued{}; // the solutions' single readback is under way
             std::shared_ptr<SpatialGpuResult> Gpu{};
             EditorPropertySmoothingResult Result{};
             bool Abandoned{};
@@ -592,14 +593,25 @@ namespace Extrinsic::Runtime
                     if (!current()) return true;
                     if (w->Implicit)
                     {
-                        // One bounded chunk per immediate submission (GRAPHICS-150); observe each readback first.
+                        // One bounded chunk per immediate submission (GRAPHICS-150); each chunk reads
+                        // back only the reports it is observed by, the solutions come once at the end
+                        // (GRAPHICS-153).
+                        const std::uint32_t solves = w->Publication.Config.Filter.Iterations * std::uint32_t(w->Plan.Channels);
                         const auto queue = [&] {
                             w->Gpu = context.SpatialIndices->QueueGpuCompute(
-                                Graphics::SparseConjugateGradientWorkspace::ReadbackBytes(std::uint32_t(w->Plan.Count),
-                                    w->Publication.Config.Filter.Iterations * std::uint32_t(w->Plan.Channels)),
+                                Graphics::SparseConjugateGradientWorkspace::ReportReadbackBytes(solves),
                                 [solver = w->Solver, w](RHI::ICommandContext& commands, const SpatialGpuIndexView&) -> RHI::BufferHandle {
                                     if (w->Abandoned) return {};
                                     return solver->RecordNext(commands);
+                                }, SpatialGpuLatency::Immediate);
+                        };
+                        const auto queueFinal = [&] {
+                            w->FinalQueued = true;
+                            w->Gpu = context.SpatialIndices->QueueGpuCompute(
+                                Graphics::SparseConjugateGradientWorkspace::ReadbackBytes(std::uint32_t(w->Plan.Count), solves),
+                                [solver = w->Solver, w](RHI::ICommandContext& commands, const SpatialGpuIndexView&) -> RHI::BufferHandle {
+                                    if (w->Abandoned) return {};
+                                    return solver->RecordFinal(commands);
                                 }, SpatialGpuLatency::Immediate);
                         };
                         if (!w->Solver)
@@ -618,12 +630,14 @@ namespace Extrinsic::Runtime
                         }
                         if (!w->Gpu || w->Gpu->State == SpatialQueryState::Failed) return true;
                         if (w->Gpu->State != SpatialQueryState::Ready) return false;
+                        if (w->FinalQueued) return true;
                         if (!w->Solver->Finished())
                         {
                             w->Solver->Observe(w->Gpu->Data);
                             if (!w->Solver->Finished()) { queue(); return false; }
                         }
-                        return true;
+                        queueFinal();
+                        return false;
                     }
                     if (!w->Gpu)
                     {

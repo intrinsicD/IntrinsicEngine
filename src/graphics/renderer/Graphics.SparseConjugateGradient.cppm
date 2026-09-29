@@ -56,15 +56,23 @@ export namespace Extrinsic::Graphics
         // Dispatches recorded per chunk at most; one CG iteration costs nine.
         static constexpr std::uint32_t ChunkDispatches = 2048;
         [[nodiscard]] static std::uint64_t ReadbackBytes(std::uint32_t rows, std::uint32_t solves);
+        // The reports alone (the head of the result buffer): what a chunk's readback needs for
+        // Observe (GRAPHICS-153); the solutions are read once, after RecordFinal.
+        [[nodiscard]] static std::uint64_t ReportReadbackBytes(std::uint32_t solves);
         // Validates and copies the problem; false on malformed CSR, shapes, parameters, or a device
         // without operational state or shader double support.
         [[nodiscard]] bool Begin(const SparseCgProblem& problem);
         // Records the next bounded chunk (uploading the operator on the first call) and returns the
         // buffer holding every report and solution, ready for transfer reads; invalid on failure.
+        // Read back ReportReadbackBytes per chunk.
         // Record one chunk per framed submission and Observe its readback before the next.
         [[nodiscard]] RHI::BufferHandle RecordNext(RHI::ICommandContext& commands);
-        // Consumes a chunk's readback: a finished solve skips its remaining iterations.
+        // Consumes a chunk's readback (at least the reports): a finished solve skips its remaining
+        // iterations.
         void Observe(std::span<const std::byte> readback);
+        // Once Finished: the result buffer (reports and solutions) ready for transfer reads, for
+        // the single final readback of ReadbackBytes; invalid before.
+        [[nodiscard]] RHI::BufferHandle RecordFinal(RHI::ICommandContext& commands);
         [[nodiscard]] bool Finished() const noexcept;
         [[nodiscard]] std::uint32_t Chunks() const noexcept;
     private:

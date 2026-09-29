@@ -38,6 +38,12 @@ namespace Extrinsic::Graphics
         // Points, weights, clearance, selected (+ last sample), group winners, results.
         std::array<RHI::BufferHandle, 6> Buffers{};
         std::vector<double> Points{}, Weights{};
+        // Rounds one chunk records for `remaining` samples: the pairs stay under the budget.
+        [[nodiscard]] std::uint32_t Rounds(std::uint32_t remaining) const noexcept
+        {
+            return remaining == 0u ? 0u
+                : std::uint32_t(std::clamp<std::uint64_t>(MaxPairsPerSubmission / N, 1u, remaining));
+        }
         std::uint32_t N{0u}, Count{0u}, First{0u}, Produced{0u};
         bool Uploaded{false};
         explicit Impl(RHI::IDevice& device) : Device(device) {}
@@ -148,9 +154,7 @@ namespace Extrinsic::Graphics
         };
         // Each round is three bounded dispatches over the points; a chunk keeps its pairs under
         // the submission budget, so no single submission runs long enough for a watchdog.
-        const std::uint32_t remaining = s.Count - s.Produced;
-        const std::uint32_t rounds =
-            remaining == 0u ? 0u : std::uint32_t(std::clamp<std::uint64_t>(MaxPairsPerSubmission / s.N, 1u, remaining));
+        const std::uint32_t rounds = s.Rounds(s.Count - s.Produced);
         for (std::uint32_t r = 0; r < rounds; ++r)
         {
             push.Round = s.Produced + r;
@@ -165,6 +169,14 @@ namespace Extrinsic::Graphics
     }
 
     std::uint32_t FarthestPointSamplingWorkspace::Produced() const noexcept { return m_Impl->Produced; }
+
+    bool FarthestPointSamplingWorkspace::NextChunkFinishes() const noexcept
+    {
+        const auto& s = *m_Impl;
+        if (s.N == 0u) return true;
+        const std::uint32_t produced = s.Uploaded ? s.Produced : 1u; // the first sample comes with the upload
+        return produced + s.Rounds(s.Count - produced) >= s.Count;
+    }
 
     bool FarthestPointSamplingWorkspace::Finished() const noexcept
     {

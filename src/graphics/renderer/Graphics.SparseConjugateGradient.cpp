@@ -112,6 +112,20 @@ namespace Extrinsic::Graphics
         return std::uint64_t(solves) * (sizeof(SparseCgReport) + std::uint64_t(rows) * sizeof(double));
     }
 
+    std::uint64_t SparseConjugateGradientWorkspace::ReportReadbackBytes(std::uint32_t solves)
+    {
+        return std::uint64_t(solves) * sizeof(SparseCgReport);
+    }
+
+    RHI::BufferHandle SparseConjugateGradientWorkspace::RecordFinal(RHI::ICommandContext& commands)
+    {
+        auto& s = *m_Impl;
+        if (s.Failed || !s.Uploaded || !Finished()) return {};
+        commands.BufferBarrier(s.Result, RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
+                               RHI::MemoryAccess::TransferRead);
+        return s.Result;
+    }
+
     bool SparseConjugateGradientWorkspace::Begin(const SparseCgProblem& p)
     {
         auto& s = *m_Impl;

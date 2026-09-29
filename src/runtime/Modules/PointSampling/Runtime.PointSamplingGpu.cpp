@@ -76,7 +76,11 @@ namespace Extrinsic::Runtime
     {
         auto& s = *m_Impl;
         if (!s.Began) return nullptr;
-        return cache.QueueGpuCompute(Graphics::FarthestPointSamplingWorkspace::ReadbackBytes(std::uint32_t(s.Count)),
+        // Only the chunk that finishes reads the order back; earlier chunks read one double
+        // (GRAPHICS-153: CPU<->GPU traffic at the start and the end only).
+        const std::size_t bytes = s.Workspace->NextChunkFinishes()
+            ? Graphics::FarthestPointSamplingWorkspace::ReadbackBytes(std::uint32_t(s.Count)) : sizeof(double);
+        return cache.QueueGpuCompute(bytes,
             [workspace = s.Workspace](RHI::ICommandContext& commands, const SpatialGpuIndexView&) {
                 return workspace->RecordNext(commands);
             }, SpatialGpuLatency::Immediate);
@@ -86,9 +90,10 @@ namespace Extrinsic::Runtime
     {
         auto& s = *m_Impl;
         const std::size_t produced = s.Workspace->Produced();
-        if (chunk.Data.size() != Graphics::FarthestPointSamplingWorkspace::ReadbackBytes(std::uint32_t(s.Count)) ||
-            produced > s.Count)
-            return true;
+        if (produced > s.Count) return true;
+        // An intermediate chunk carries no samples; the order arrives with the last one.
+        if (chunk.Data.size() != Graphics::FarthestPointSamplingWorkspace::ReadbackBytes(std::uint32_t(s.Count)))
+            return chunk.Data.size() != sizeof(double) || s.Workspace->Finished();
         // Entries already published never change; only the new tail is appended.
         std::vector<double> clearance(produced);
         std::vector<std::uint32_t> order(produced);

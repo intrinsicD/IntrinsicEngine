@@ -41,6 +41,9 @@ export namespace Extrinsic::Graphics
         // until that readback has completed.
         [[nodiscard]] RHI::BufferHandle RecordNext(RHI::ICommandContext& commands);
         [[nodiscard]] std::uint32_t Produced() const noexcept; // samples in the last recorded result
+        // Whether the next RecordNext produces the last samples (GRAPHICS-153): only that chunk
+        // needs the full readback; an earlier chunk reads back one double.
+        [[nodiscard]] bool NextChunkFinishes() const noexcept;
         [[nodiscard]] bool Finished() const noexcept;
     private:
         struct Impl;
