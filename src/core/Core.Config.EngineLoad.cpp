@@ -468,6 +468,8 @@ namespace Extrinsic::Core::Config
                  "enable_gpu_profiling",
                  "frames_in_flight",
                  "default_recipe_config_path",
+                 "gpu_property_idle_evict_seconds",
+                 "gpu_property_budget_megabytes",
                  "synchronous_extraction"});
 
             RenderConfig& config = result.Preview.Config.Render;
@@ -543,6 +545,20 @@ namespace Extrinsic::Core::Config
                 synchronous.has_value())
             {
                 config.SynchronousExtraction = *synchronous;
+                ++result.Preview.ParsedFieldCount;
+            }
+            if (const std::optional<std::int64_t> seconds = ReadInteger(
+                    result, *object, "gpu_property_idle_evict_seconds", "render", 0, 86400);
+                seconds.has_value())
+            {
+                config.GpuPropertyIdleEvictSeconds = static_cast<std::uint32_t>(*seconds);
+                ++result.Preview.ParsedFieldCount;
+            }
+            if (const std::optional<std::int64_t> megabytes = ReadInteger(
+                    result, *object, "gpu_property_budget_megabytes", "render", 0, 1048576);
+                megabytes.has_value())
+            {
+                config.GpuPropertyBudgetMegabytes = static_cast<std::uint32_t>(*megabytes);
                 ++result.Preview.ParsedFieldCount;
             }
         }
@@ -1382,6 +1398,8 @@ namespace Extrinsic::Core::Config
             {"default_recipe_config_path",
              config.Render.DefaultRecipeConfigPath},
             {"synchronous_extraction", config.Render.SynchronousExtraction},
+            {"gpu_property_idle_evict_seconds", config.Render.GpuPropertyIdleEvictSeconds},
+            {"gpu_property_budget_megabytes", config.Render.GpuPropertyBudgetMegabytes},
         });
         root["simulation"] = json::object({
             {"worker_thread_count", config.Simulation.WorkerThreadCount},

@@ -391,6 +391,7 @@ into graphics public contracts.
 - `Extrinsic.Graphics.RenderWorld`
 - `Extrinsic.Graphics.ComputeParallelPrimitives`
 - `Extrinsic.Graphics.GpuTransfer`
+- `Extrinsic.Graphics.GpuPropertyResidency`
 - `Extrinsic.Graphics.RuntimeRenderSnapshotBatch` (declared by `Extrinsic.Graphics.Renderer`)
 - `Extrinsic.Graphics.GpuWorld`
 - `Extrinsic.Graphics.Material`
@@ -1832,6 +1833,19 @@ Concretely:
   deterministically instead of sampling an in-flight upload. The synchronous
   `IDevice::WriteTexture()` helper remains only as the guarded backend
   fail-closed baseline, not a renderer/runtime upload path.
+- `Graphics.GpuPropertyResidency` holds the GPU copies of CPU properties that
+  GPU methods read and write (ADR 0030). It is one concrete class with plain
+  records, keyed ECS-blind: per key a device-local canonical slot in the
+  property's own typed layout (one transfer-queue upload per CPU revision,
+  shared while the revision holds; a refused upload caches nothing and is
+  counted) and, while a method
+  runs, an output ring (`AcquireBack` / `Publish` / `Front` / `Discard` /
+  `BindRevision`, depth 1..3 per key) that drops previews instead of blocking.
+  Slots are reused or freed only after their recorded completions (`NoteUse`
+  frame, `AddCompletion` transfer/readback tokens) and leases; canonical slots
+  are an LRU cache with an idle timeout and a byte budget (`Tick`, injected
+  clock, counters in `Stats()`). Render buffers are never a source; see
+  [property coherence](../../../docs/architecture/property-coherence.md).
 - `Graphics.GpuTransfer` is the recommended facade for algorithm/user
   buffer-transfer helpers introduced by
   [ADR-0023](../../../docs/adr/0023-cpu-gpu-transfer-foundation.md). It composes

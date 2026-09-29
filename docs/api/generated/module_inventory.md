@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 6 |
-| `runtime` | 108 |
+| `runtime` | 109 |
 
 ## Modules
 
@@ -414,6 +414,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.GeometryPlanBuilders` | `src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeometryPresentation` | `src/runtime/GeometryIntegration/Runtime.GeometryPresentation.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeometryProperty.Types` | `src/runtime/GeometryIntegration/Runtime.GeometryProperty.Types.cppm` | `runtime` |
+| `Extrinsic.Runtime.GpuPropertyBinding` | `src/runtime/GeometryIntegration/Runtime.GpuPropertyBinding.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshPrimitiveView` | `src/runtime/GeometryIntegration/Runtime.MeshPrimitiveView.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshSurfaceTopology` | `src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cppm` | `runtime` |
 | `Extrinsic.Runtime.PrimitiveSelectionRefinement` | `src/runtime/GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cppm` | `runtime` |
@@ -476,4 +477,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **449**
+Total modules: **450**

@@ -86,6 +86,7 @@ target_sources(${target_name}
         Kernel/Runtime.WorldRegistry.cppm
         GeometryIntegration/Runtime.GeometryProperty.Types.cppm
         GeometryIntegration/Runtime.GeometryAvailability.cppm
+        GeometryIntegration/Runtime.GpuPropertyBinding.cppm
         GeometryIntegration/Runtime.SpatialIndexCache.cppm
         Modules/PhysicsIntegration/Runtime.PhysicsModule.cppm
         Scene/Runtime.SceneDocumentModule.cppm
@@ -254,6 +255,7 @@ target_sources(${target_name}
         Kernel/Runtime.WorldRegistry.cpp
         GeometryIntegration/Runtime.GeometryProperty.Types.cpp
         GeometryIntegration/Runtime.GeometryAvailability.cpp
+        GeometryIntegration/Runtime.GpuPropertyBinding.cpp
         GeometryIntegration/Runtime.SpatialIndexCache.cpp
         Modules/PhysicsIntegration/Runtime.PhysicsModule.cpp
         Scene/Runtime.SceneDocumentModule.cpp

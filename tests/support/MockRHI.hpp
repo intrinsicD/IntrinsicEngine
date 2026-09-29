@@ -51,6 +51,7 @@ namespace Extrinsic::Tests
         };
 
         bool AlwaysComplete = true;
+        bool ReadbacksComplete = true; // valid readback tokens (issued elsewhere) report complete
         bool AcceptBufferUploads = false;
         bool FailTextureUploads = false;
         std::vector<RHI::TransferToken> Issued{};
@@ -83,6 +84,11 @@ namespace Extrinsic::Tests
         {
             (void)token;
             return AlwaysComplete;
+        }
+
+        [[nodiscard]] bool IsComplete(RHI::ReadbackToken token) const override
+        {
+            return !token.IsValid() || ReadbacksComplete;
         }
 
         void CollectCompleted() override {}

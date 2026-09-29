@@ -31,5 +31,10 @@ namespace Extrinsic::Core::Config
         // declaration. Lives on the core render config (never in graphics) so the
         // composition root can size the pool without a graphics dependency.
         bool SynchronousExtraction{true};
+        // ADR 0030: canonical GPU property slots are a cache. A slot unused for this many
+        // seconds is evicted (0 disables); above the budget the least recently used slots
+        // go first, size-weighted (0 = no budget). Read at boot by the residency owner.
+        std::uint32_t GpuPropertyIdleEvictSeconds{60u};
+        std::uint32_t GpuPropertyBudgetMegabytes{256u};
     };
 }

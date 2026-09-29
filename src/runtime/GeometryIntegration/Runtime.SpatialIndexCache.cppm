@@ -102,6 +102,8 @@ export namespace Extrinsic::Runtime
         ~SpatialIndexCache() override;
         [[nodiscard]] std::string_view Name() const noexcept override;
         [[nodiscard]] Core::Result OnRegister(EngineSetup& setup) override;
+        // Reads the residency cache limits (render.gpu_property_*) when EngineConfigControl is composed.
+        [[nodiscard]] Core::Result OnResolve(EngineSetup& setup) override;
         void OnShutdown(RuntimeModuleShutdownContext& context) override;
         [[nodiscard]] SpatialIndexAcquisition Acquire(WorldHandle world, entt::entity entity,
                                                       const GeometryPropertyRef& positions,
@@ -160,9 +162,11 @@ export namespace Extrinsic::Runtime
             std::uint32_t excludedSlot = Geometry::PointLBVH::InvalidIndex) const;
         void Prune();
         [[nodiscard]] SpatialIndexCacheStats Stats() const noexcept;
-        // Canonical GPU copies of properties (ADR 0030): a property-space index over every row
-        // reads its positions from here, shared with every other GPU user of that revision.
-        // Null until the first GPU build.
+        // Canonical GPU copies of properties and method output rings (ADR 0030): a
+        // property-space index over every row reads its positions from here, shared with every
+        // other GPU user of that revision; GPU methods bind through Runtime.GpuPropertyBinding.
+        // Created on first use; null without a device (const: null until the first use).
+        [[nodiscard]] Graphics::GpuPropertyResidency* PropertyResidency() noexcept;
         [[nodiscard]] const Graphics::GpuPropertyResidency* PropertyResidency() const noexcept;
 
       private:

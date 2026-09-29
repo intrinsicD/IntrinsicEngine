@@ -1304,6 +1304,7 @@ if(TARGET ExtrinsicRuntime)
         Test.CurvatureSegmentationOperations.cpp
         Test.PrimitiveSelection.cpp
         Test.SpatialIndexCache.cpp
+        Test.GpuPropertyBinding.cpp
         Test.RegistrationDomains.cpp
         Test.CoherentPointDriftOperations.cpp
         Test.PointSamplingOperations.cpp

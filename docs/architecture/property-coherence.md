@@ -17,10 +17,46 @@ terminal values to the named canonical CPU output properties.
 
 Methods never compute in, or read from, `GpuWorld`'s packed render allocation
 or visualization buffers: render buffers only observe (ADR 0030). A GPU method's
-inputs come from the **GPU property residency** (`Graphics.GpuPropertyResidency`):
-one canonical slot per property and CPU revision, uploaded when a GPU user first
-needs that revision and shared by every later user while the revision holds; a
-new revision uploads once into a new slot. The stable boundary is:
+inputs come from the **GPU property residency** (`Graphics.GpuPropertyResidency`,
+ECS-blind; runtime binds entities through `Runtime.GpuPropertyBinding`):
+
+- **Canonical slot.** One device-local buffer per key, CPU revision and typed
+  layout (`GpuPropertyLayout`: scalar type, channels, stride, count, row map).
+  It is uploaded through the transfer queue when a GPU user first needs that
+  revision and shared by every later user while the revision holds; a new
+  revision or another layout uploads once into a new buffer. The property keeps
+  its own type: a double property is resident as double, and a layout mismatch
+  is a miss, never a reinterpretation; a tightly packed stride and stride 0
+  are one identity. A refused transfer-queue upload caches nothing (counted;
+  the caller defers, never a synchronous write of unknown outcome). A slot's
+  frame use is complete one frame past the frames-in-flight distance, because
+  frame N's fence is waited by `BeginFrame(N + FramesInFlight)` after the
+  counter already reads that value. Consumers record their own
+  `TransferWrite -> ShaderRead` barrier before the first read (the LBVH build
+  already does).
+- **Output ring.** While a method writes a property, its key has a ring of
+  1..3 slots (a per-key depth policy): `AcquireBack` hands out a write slot,
+  `Publish` makes it the front, `Front` is what the renderer observes, and
+  after Accept `BindRevision` makes the front the canonical slot of the new CPU
+  revision, so the next run uploads nothing. `Discard` releases the ring. An
+  exhausted ring (every slot front, leased or pending) drops the preview; it
+  never blocks and never overwrites.
+- **Completion.** Every slot records its last frame of use (`NoteUse`) and its
+  transfer/readback tokens (`AddCompletion`); it is rewritten or freed only when
+  the frames in flight have passed, every token is complete and no lease is
+  held. `DestroyBuffer` is frame-deferred, so freeing was already safe; the
+  records exist for in-place ring rewrites and eviction.
+- **Cache.** Canonical slots are an LRU cache (`Tick`): a slot unused for
+  `render.gpu_property_idle_evict_seconds` is evicted, and above
+  `render.gpu_property_budget_megabytes` the least recently used slots go
+  first, size-weighted. Use is a method input or a frame in which the renderer
+  observes the slot (`MarkObserved`). Slots with a ring, pending completions, a
+  lease or observed this frame are never evicted; an evicted slot costs one
+  upload on its next use. The clock is injected for tests. IO counters report
+  uploads, readbacks, hits, misses, evictions, resident bytes, publishes, ring
+  waits and dropped previews.
+
+The stable boundary is:
 
 ```text
 CPU method: const CPU input -> CPU kernel -> canonical CPU output/revision
@@ -29,13 +65,16 @@ GPU method: CPU revision -> canonical residency slot (once per revision, shared)
 Rendering:  CPU revision delta -> copied upload plan -> staging/copy -> GPU draw
 ```
 
-Current users of canonical slots: the `SpatialIndexCache` GPU index in property
-space over every row (GRAPHICS-154). Transformed or compacted indices keep a
-private upload. Method output rings, renderer observation of in-flight results,
-Accept to the CPU and routing render uploads through the residency follow ADR
-0030 (GRAPHICS-155/156, RUNTIME-292..295). Where a method still runs a CPU stage
-per iteration, the traffic that stage needs is reported by the method until its
-port lands (RUNTIME-294).
+`SpatialIndexCache` owns the residency (created on first GPU use, configured
+from the render config, ticked from its maintenance hook). Current users of
+canonical slots: its GPU index in property space over every row (GRAPHICS-154);
+an index keeps its slot leased while it is current, so that slot is not evicted
+under it. Transformed or compacted indices keep a private upload. Renderer
+observation of in-flight results, Accept to the CPU and routing render uploads
+through the residency follow ADR 0030 (RUNTIME-292, GRAPHICS-156,
+RUNTIME-293..295). Where a method still runs a CPU stage per iteration, the
+traffic that stage needs is reported by the method until its port lands
+(RUNTIME-294).
 
 ## Property revisions
 

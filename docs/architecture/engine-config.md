@@ -48,7 +48,9 @@ in agreement.
     "enable_gpu_profiling": false,
     "frames_in_flight": 2,
     "default_recipe_config_path": "config/render-recipe.json",
-    "synchronous_extraction": true
+    "synchronous_extraction": true,
+    "gpu_property_idle_evict_seconds": 60,
+    "gpu_property_budget_megabytes": 256
   },
   "simulation": {
     "worker_thread_count": 0
@@ -200,6 +202,8 @@ in agreement.
 | `render` | `frames_in_flight` | Integer in `[1, 8]` |
 | `render` | `default_recipe_config_path` | String path; empty disables startup/live recipe loading |
 | `render` | `synchronous_extraction` | Boolean |
+| `render` | `gpu_property_idle_evict_seconds` | Integer in `[0, 86400]`; canonical GPU property slots unused this long are evicted (ADR 0030); `0` disables |
+| `render` | `gpu_property_budget_megabytes` | Integer in `[0, 1048576]`; above this resident size the least recently used canonical slots are evicted, size-weighted; `0` means no budget |
 | `simulation` | `worker_thread_count` | Integer in `[0, 1024]`; `0` keeps scheduler auto-detect |
 | `reference_scene` | `enabled` | Boolean |
 | `reference_scene` | `selector` | `Triangle` |
@@ -335,6 +339,7 @@ The schema is primarily a boot config. Runtime reads it before constructing
 
 - graphics backend selection and promoted-Vulkan opt-in;
 - frames-in-flight and synchronous extraction mode;
+- GPU property residency idle timeout and byte budget;
 - validation and VSync toggles;
 - scheduler worker-thread count;
 - window title, size, resizable flag, and platform backend override;

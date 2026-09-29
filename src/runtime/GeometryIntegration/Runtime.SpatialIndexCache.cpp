@@ -18,6 +18,8 @@ import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Graphics.PointLBVH;
 import Extrinsic.Graphics.GpuPropertyResidency;
+import Extrinsic.Runtime.GpuPropertyBinding;
+import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.RHI.Descriptors;
@@ -140,6 +142,7 @@ namespace Extrinsic::Runtime
         WorldRegistry* Worlds{};
         RHI::IDevice* Device{};
         std::unique_ptr<Graphics::GpuPropertyResidency> Residency{};
+        Graphics::GpuPropertyResidencyConfig ResidencyConfig{};
         std::vector<std::shared_ptr<Entry>> Entries{};
         JobService* Jobs{};
         GpuQueueParticipantHandle Participant{};
@@ -305,6 +308,11 @@ namespace Extrinsic::Runtime
         }
         std::uint64_t Next{1};
         SpatialIndexCacheStats Stats{};
+        Graphics::GpuPropertyResidency* EnsureResidency()
+        {
+            if (!Residency && Device) Residency = std::make_unique<Graphics::GpuPropertyResidency>(*Device, ResidencyConfig);
+            return Residency.get();
+        }
         bool Current(const Entry& e) const
         {
             if (e.Transient) return e.Snapshot.use_count() > 1;
@@ -352,13 +360,10 @@ namespace Extrinsic::Runtime
                                        e->Snapshot->Slots.size() == e->Size && !e->Snapshot->Slots.empty();
                 if (canonical)
                 {
-                    if (!s.Residency) s.Residency = std::make_unique<Graphics::GpuPropertyResidency>(*s.Device);
                     const auto points = e->Snapshot->Index.Points();
-                    const auto view = s.Residency->AcquireInput(
-                        {.Scope = (std::uint64_t(e->World.Generation) << 32u) | e->World.Index, .Owner = std::uint64_t(entt::to_integral(e->Entity)),
-                         .Domain = std::uint32_t(e->Ref.Domain), .ValueKind = std::uint32_t(e->Ref.ValueKind),
-                         .Name = e->Ref.Name},
-                        e->Revision, 12u, std::uint32_t(points.size()),
+                    const auto view = s.EnsureResidency()->AcquireInput(
+                        MakeGpuPropertyKey(e->World, e->Entity, e->Ref), e->Revision,
+                        *MakeGpuPropertyLayout(Geometry::PropertyValueKind::Vec3, std::uint32_t(points.size())),
                         [&](std::span<std::byte> out) { std::memcpy(out.data(), points.data(), out.size()); });
                     if (view)
                     {
@@ -392,6 +397,8 @@ namespace Extrinsic::Runtime
                 // Same count and identity slots: only the points change.
                 s.Device->WriteBuffer(e->Points, e->Snapshot->Index.Points().data(), e->Snapshot->Slots.size() * 12);
             }
+            // The build and every query read the canonical slot in this frame.
+            if (e->ResidentPoints && s.Residency) s.Residency->NoteUse(e->Points, s.Device->GetGlobalFrameNumber());
             if (!e->Gpu->View().NodesBDA || e->GpuStale)
             {
                 e->GpuStale = false;
@@ -481,6 +488,16 @@ namespace Extrinsic::Runtime
             });
         return setup.RegisterFrameHook(FramePhase::Maintenance,
                                        [this](RuntimeFrameHookContext&) { Prune(); });
+    }
+    Core::Result SpatialIndexCache::OnResolve(EngineSetup& setup)
+    {
+        if (const auto* control = setup.Services().Find<EngineConfigControl>())
+        {
+            const auto& render = control->GetEngineConfigControlState().ActiveConfig.Render;
+            m_Impl->ResidencyConfig.IdleEvictSeconds = double(render.GpuPropertyIdleEvictSeconds);
+            m_Impl->ResidencyConfig.BudgetBytes = std::uint64_t(render.GpuPropertyBudgetMegabytes) << 20u;
+        }
+        return Core::Ok();
     }
     void SpatialIndexCache::OnShutdown(RuntimeModuleShutdownContext& context)
     {
@@ -770,13 +787,20 @@ namespace Extrinsic::Runtime
         auto& s = *m_Impl;
         s.Stats.Evictions +=
             std::erase_if(s.Entries, [&](const auto& e) { return !s.Current(*e); });
-        // Canonical slots of entities that no longer exist; a live entity's slot stays for its
-        // next GPU user (a newer revision replaces it on that use).
+        // Slots of entities that no longer exist go; a live entity's canonical slot stays for
+        // its next GPU user until the residency's idle timeout or byte budget evicts it.
         if (s.Residency)
+        {
             s.Residency->Prune([&](const Graphics::GpuPropertyKey& key) {
                 const auto* scene = s.Worlds ? s.Worlds->Get(WorldHandle{std::uint32_t(key.Scope & 0xffffffffu), std::uint32_t(key.Scope >> 32u)}) : nullptr;
                 return scene && scene->IsValid(entt::entity(std::uint32_t(key.Owner)));
             });
+            s.Residency->Tick();
+        }
+    }
+    Graphics::GpuPropertyResidency* SpatialIndexCache::PropertyResidency() noexcept
+    {
+        return m_Impl->EnsureResidency();
     }
     const Graphics::GpuPropertyResidency* SpatialIndexCache::PropertyResidency() const noexcept
     {

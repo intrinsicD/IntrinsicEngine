@@ -124,6 +124,14 @@ namespace Extrinsic::Runtime
                                           candidate.Render.SynchronousExtraction,
                                       "render.synchronous_extraction");
             RecordBootOnlyDifference(fields,
+                                      current.Render.GpuPropertyIdleEvictSeconds !=
+                                          candidate.Render.GpuPropertyIdleEvictSeconds,
+                                      "render.gpu_property_idle_evict_seconds");
+            RecordBootOnlyDifference(fields,
+                                      current.Render.GpuPropertyBudgetMegabytes !=
+                                          candidate.Render.GpuPropertyBudgetMegabytes,
+                                      "render.gpu_property_budget_megabytes");
+            RecordBootOnlyDifference(fields,
                                       current.Simulation.WorkerThreadCount !=
                                           candidate.Simulation.WorkerThreadCount,
                                       "simulation.worker_thread_count");

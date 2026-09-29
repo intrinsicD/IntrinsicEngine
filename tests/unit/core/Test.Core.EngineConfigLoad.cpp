@@ -224,6 +224,8 @@ TEST(CoreEngineConfigLoad, CoreAndRegisteredSectionRoundTrip)
     config.Render.FramesInFlight = 3u;
     config.Render.DefaultRecipeConfigPath = "config/test-recipe.json";
     config.Render.SynchronousExtraction = false;
+    config.Render.GpuPropertyIdleEvictSeconds = 120u;
+    config.Render.GpuPropertyBudgetMegabytes = 64u;
     config.Simulation.WorkerThreadCount = 4u;
     config.ReferenceScene.Enabled = true;
     config.ReferenceScene.Selector = ReferenceSceneSelector::Triangle;
@@ -251,10 +253,12 @@ TEST(CoreEngineConfigLoad, CoreAndRegisteredSectionRoundTrip)
     ASSERT_EQ(preview.State, EngineConfigState::Valid);
     EXPECT_FALSE(HasErrors(preview));
     EXPECT_TRUE(preview.Preview.SideEffectFree);
-    EXPECT_EQ(preview.Preview.ParsedFieldCount, 20u);
+    EXPECT_EQ(preview.Preview.ParsedFieldCount, 22u);
     EXPECT_EQ(preview.Preview.Config.Window.Title, "Generic Section Test");
     EXPECT_EQ(preview.Preview.Config.Window.Width, 1280);
     EXPECT_EQ(preview.Preview.Config.Render.FramesInFlight, 3u);
+    EXPECT_EQ(preview.Preview.Config.Render.GpuPropertyIdleEvictSeconds, 120u);
+    EXPECT_EQ(preview.Preview.Config.Render.GpuPropertyBudgetMegabytes, 64u);
     EXPECT_TRUE(preview.Preview.Config.Render.EnableGpuProfiling);
     EXPECT_EQ(
         preview.Preview.Config.Render.DefaultRecipeConfigPath,
