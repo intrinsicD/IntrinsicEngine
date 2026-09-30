@@ -15,7 +15,7 @@ Root scanned: `src`
 | `geometry` | 132 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 80 |
+| `graphics/renderer` | 81 |
 | `graphics/rhi` | 18 |
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
@@ -284,6 +284,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.OutlierAnalysis` | `src/graphics/renderer/Graphics.OutlierAnalysis.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.PointKeypoints` | `src/graphics/renderer/Graphics.PointKeypoints.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.PointLBVH` | `src/graphics/renderer/Graphics.PointLBVH.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.PointNormals` | `src/graphics/renderer/Graphics.PointNormals.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.PointScalarAnalysis` | `src/graphics/renderer/Graphics.PointScalarAnalysis.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.PostProcessSystem` | `src/graphics/renderer/Graphics.PostProcessSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.PropertyFilter` | `src/graphics/renderer/Graphics.PropertyFilter.cppm` | `graphics/renderer` |
@@ -481,4 +482,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **454**
+Total modules: **455**

@@ -63,6 +63,7 @@ schema defaults):
   "method": "point_set_pca",
   "backend": "vulkan_lbvh",
   "gpu_query_batch_size": 4096,
+  "orientation": 0,
   "positions": {"domain": "MeshFace", "name": "f:centroid", "kind": "vec3"},
   "output": {"domain": "MeshFace", "name": "f:pca_normal", "kind": "vec3"},
   "k_neighbors": 15,
@@ -81,10 +82,9 @@ preserved. Invalid edits never replace the active config.
 `EditorProcessingCommands` handle and copies results through
 `PrepareEditorNormalFrame`. Its implementation runs copied CPU jobs through JobService
 when composed, with a synchronous path for CPU direct/headless callers. Vulkan
-requests require the framed cache and JobService: a neighborhood job advances
-GPU batches/readback on the device thread, then releases a dependent CPU
-PCA/orientation job. Both jobs identify the same named output. Workers do not
-wait on GPU fences and fitting does not run in the UI frame. Worker code does
+requests require the framed cache, a float64-capable device and JobService. The
+resident PCA kernel computes neighborhoods, covariance and normals on the device;
+a terminal job waits for Accept/Discard. Workers do not wait on GPU fences. Worker code does
 not access live property containers. Publication checks entity identity and the
 revisions/cardinality of the consumed position, deletion, topology and output
 properties. Cancellation and stale completion retain the previous output.
@@ -161,7 +161,7 @@ backend value is the CPU reference for these methods, and the other methods refu
   as the CPU reference. `ActualBackend = vulkan_mesh_face_normals`; the same smoke compares
   the accepted face rows with the CPU reference (measured delta 0) and checks that a second
   run uploads nothing.
-- PCA normals follow in RUNTIME-299.
+- PCA uses the same transaction, with its own LBVH compute workspace (below).
 
 ## Spatial ownership and numerical limits
 
@@ -172,29 +172,85 @@ supplies the existing PCA kernel. Positions are interpreted in the property's
 coordinate space, without applying the entity transform. Unchanged positions
 and deletion masks permit reuse across requests; changed inputs rebuild.
 
-All three query backends preserve the existing k+1-then-remove-self neighborhood rule and
-complete radius support. Equal-distance boundary ties can select different
-neighbors in the existing KD-tree and LBVH implementations; no universal
-bitwise equivalence is asserted. The result reports requested/actual backend,
-index reuse, valid/fallback counts and publication status. A missing cache or
-unsupported LBVH input is rejected rather than silently changing the requested
-backend. CPU LBVH accepts at most 2^24 samples and finite coordinates/radius
-within 1e18. The explicit `vulkan_lbvh` option uses the same cache with framed kNN/radius
-queries, followed by supplied-neighborhood CPU PCA and orientation. It requires
-an operational Vulkan device, at most 2^20 live samples and coordinates/radius
-within 1e18. kNN accepts at most 64 candidates including the reference kernel's
-extra candidate (normally k/minimum <=63). Radius rows report the total hit
-count; more than 1024 candidates fails without publishing partial normals.
-Use a CPU backend or a smaller radius for such dense support. Query chunks bound
-transient GPU buffers; complete neighborhoods are retained for CPU fitting and
-MST orientation. The result exposes GPU batch count, elapsed neighborhood time
-(including frame waits/readback), and CPU compute time. CPU compute time also
-includes neighborhood search on CPU backends; it is not a device timestamp.
-PCA and orientation remain CPU work. The default stays `cpu_kdtree`.
+The CPU KD-tree and LBVH PCA queries use double squared-distance keys, inclusive
+radius membership, source-index ties and the k+1-then-remove-self rule. The
+`BVH` query owner exposes the double-key option; other consumers retain their
+existing default. PCA accumulates the query point first, then neighbors in
+(distance, index) order. Deleted rows never enter the index or covariance.
+CPU LBVH accepts at most 2^24 samples and coordinates/radius within 1e18.
+
+### Resident PCA (`vulkan_lbvh`)
+
+`Graphics.PointNormals` reads the canonical position slot and cached LBVH through
+`lbvhQueryDouble`, then accumulates the covariance in double in that same order.
+It writes a float3 ring through `EditorNormalTransaction`. There are no neighborhood
+downloads or CPU covariance fits. It requires an operational float64 device, at
+most 2^20 live samples, coordinates/radius within 1e18, at most 64 kNN candidates
+(including self), and complete radius support of at most 1024 candidates. Overflow
+fails the whole result before publication. Radius queries return capacity+1 immediately
+on overflow; scalar/outlier queries still count every dense neighbor. Complete rows
+are heapsorted by source index, then by distance/index for PCA, preserving the
+reference order. Pages clamp `gpu_query_batch_size` to 64..4096 rows for both modes (a configured
+value of 1 still exercises the smallest dispatch chunk). Each page is a separate framed
+compute submission; the next is queued only after completion/readback of the previous
+page. Scratch is reused and diagnostics accumulate across pages; output is published
+only once, after every page succeeds. Cancellation, staleness or overflow discards the
+ring.
+
+Radius queries stop at the first candidate past the 1024 capacity, so a dense overflow
+(the case that timed out the device when every row of a 1026-point cluster inserted all
+candidates in one submission) costs O(capacity) per row. The remaining worst case is
+the same as for kNN: a query whose sphere intersects many tree boxes without enclosing
+their points can visit up to 2N-1 nodes. That bound is shared with every LBVH consumer
+and is not specific to radius search.
+
+Subnormal coordinates, radius/fallback components
+and double-subnormal tolerances are refused explicitly. The shader emulates
+binary32 rounding in double where needed and stores subnormal output components
+through integer bits, avoiding device float flush-to-zero behavior.
+
+The primary symmetric eigensolver remains closed form. `Geometry.PCA` and
+`pca_eigen_double.glsl` use matching double range-reduced atan and cosine series;
+repeated or ambiguous roots use the same bounded largest-pivot Jacobi fallback.
+This replaces the reference's platform libm/Eigen fallback so both implementations
+have a deterministic basis and expression order. Near repeated roots, eigenvector
+bases can differ from historical output. After float conversion and normalization,
+valid PCA normals take the sign that makes the largest-magnitude component positive, breaking
+exact magnitude ties by the lowest axis (x, then y, then z), identically on CPU
+and GPU. This establishes a signed normal convention, not a global outward
+orientation; the general PCA eigenframe keeps its existing handedness contract. Minimum-neighbor, collinear-ratio, degenerate-length and normalized fallback
+rules remain those of the reference. CPU eigensolver tests check eigenpair
+residuals and repeated roots; existing callers share the same canonical solver.
+
+Only **unoriented** PCA is admitted on the device. MST remains available on CPU
+backends and is explicitly refused for `vulkan_lbvh`; viewpoint orientation is
+not currently a configuration mode. Default MST + `vulkan_lbvh` previously ran
+through CPU fitting/orientation; it now fails explicitly instead of hiding that
+CPU stage.
+`GpuInputUploadBytes`, `GpuInputCacheHits` and `CpuStageReadbackBytes` report input
+residency traffic and diagnostic/Accept downloads. The result message carries
+these counters for command/agent consumers. A second resident run has no input
+uploads; no per-iteration upload is needed. Legacy neighborhood/CPU fit timing
+fields are zero for resident runs, not performance measurements.
+
+| `method.engine-integration` field | Resident PCA disposition |
+| --- | --- |
+| Input | Canonical float3 positions on all eight point-compatible domains; deletion masks retain source rows |
+| Config/agent/UI | `vulkan_lbvh`; shared preflight; Normal Estimation panel Accept/Discard; batch/agent auto-Accept |
+| Publication | GPU preview: no; commit via `EditorNormalTransaction` → `GpuFrontReadback` → undoable normal publication → publication-bound `BindRevision` |
+| Orientation | Unoriented on device; MST refused with a CPU-backend reason; no viewpoint mode |
+| Evidence | `NormalTransaction.Pca*` contracts; `RUNTIME299PointNormalsResidency.PcaParityAcceptZeroUploadAndDiscard` smoke |
+
+The smoke records maximum absolute delta for each component and the maximum
+signed-normal angle for kNN and radius, including noisy, deleted, collinear and
+coincident rows. Its proposed bound is eight float epsilons per component and
+2e-6 radians: a small allowance for final binary32 normalization and device double
+sqrt/division rounding. Exact or ulp-level parity is intended, but **measured GPU
+deltas remain pending**; this implementation session does not execute GPU tests.
 
 PCA is sensitive to neighborhood scale, noise, sampling density and sharp
 features. Collinear, sparse or degenerate neighborhoods use the existing
-fallback-normal policy. Unoriented PCA leaves eigenvector signs unconstrained;
+fallback-normal policy. Unoriented PCA uses the largest-magnitude-positive sign rule;
 MST orientation propagates signs over the neighborhood graph and does not
 establish a globally outward orientation for arbitrary/disconnected geometry.
 
@@ -208,8 +264,8 @@ Framework24's [point-cloud PCA system](https://github.com/intrinsicD/framework24
 and [mesh vertex-normal system](https://github.com/intrinsicD/framework24/blob/81c54ad4294280fc034d39e46eafc1a29d598b81/lib_bcg_viewer/src/bcg_system_mesh_vertices_normals.cpp)
 supply the behavioral baseline for kNN/radius and face-weighting choices.
 PCA eigenvalue/features/saliency publication remains separate.
-Adaptive, robust and learned estimators are excluded variants; this wiring does
-not change the oracle, its orientation construction or its numerical policy.
+Adaptive, robust and learned estimators are excluded variants; MST orientation construction is unchanged; the portable eigensolver and double
+neighbor ranking above define the current numerical reference.
 
 [Normal workflow contracts](../../tests/contract/runtime/Test.NormalEstimation.cpp)
 cover all canonical domains, same-domain publication/history, cached CPU LBVH,
@@ -231,7 +287,7 @@ records cold/warm method cost and separate CPU reference timing; this small
 fixture does not establish a performance advantage.
 
 The [2026-09-09 verification record](../../ara/evidence/tables/normal_vulkan_verification_2026-09-09.md)
-binds the current CPU and actual Vulkan normal-neighborhood fixtures to source
+binds the historical CPU and Vulkan neighborhood/CPU-fit fixtures to source
 hashes and C80. The local Clang 23 `ci` gate passed 4,376 tests with one expected
 unsanitized LSan-control skip; the Sandbox built. Two corrected `ci-vulkan`
 ASan+UBSan cases executed on RTX 3050 (driver 590.48.01), including the eight-domain

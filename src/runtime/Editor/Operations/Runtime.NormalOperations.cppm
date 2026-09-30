@@ -30,10 +30,9 @@ export namespace Extrinsic::Runtime
         bool IndexReused{};
         std::size_t GpuQueryBatches{};
         double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
-        // Residency IO of the Vulkan mesh backend (ADR 0030): bytes the run uploaded for its
-        // positions (0 when the revision was resident), the topology bundle's bytes and whether
-        // that bundle was already resident for the topology revision.
-        std::uint64_t GpuInputUploadBytes{}, GpuTopologyBytes{};
+        // Input traffic, resident hits and diagnostic/Accept downloads. Topology bytes apply
+        // to mesh methods; PCA uses the cached LBVH and never downloads neighborhoods.
+        std::uint64_t GpuInputUploadBytes{}, GpuTopologyBytes{}, GpuInputCacheHits{}, CpuStageReadbackBytes{};
         bool GpuTopologyReused{};
         [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied || Status==EditorCommandStatus::NoChange; }
     };
@@ -66,7 +65,7 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::optional<NormalEstimationConfig> GetEditorNormalEstimationConfig(const EditorProcessingCommands&);
     [[nodiscard]] EditorNormalEstimationResult ApplyEditorConfiguredNormalEstimation(const EditorProcessingCommands&, std::function<void(EditorNormalEstimationResult)> onComplete = {});
 
-    // The Vulkan mesh-vertex-normal run as a GPU property transaction (RUNTIME-296, ADR 0030
+    // Mesh and point-set PCA normals share a GPU property transaction (ADR 0030
     // decisions 6-7): the kernels read the canonical positions slot and a topology bundle the
     // residency keeps per topology revision, and write the output's float3 ring. The ring is
     // not observed by the renderer (vec3 rings are not colormap scalars or positions), so the
@@ -87,7 +86,7 @@ export namespace Extrinsic::Runtime
     struct EditorNormalTransaction;
     using EditorNormalTransactionHandle = std::shared_ptr<EditorNormalTransaction>;
     // Validates and captures like the command, then queues the device run. Null with `failure`
-    // filled when the request is rejected (a non-mesh method, a CPU backend, a missing device or
+    // filled when the request is rejected (an unsupported method/mode, CPU backend, missing device or
     // residency, or a result for the same output still waiting for Accept or Discard).
     [[nodiscard]] EditorNormalTransactionHandle StartEditorNormalEstimationTransaction(
         const EditorProcessingCommands&, const NormalEstimationConfig&, EditorNormalEstimationResult& failure);

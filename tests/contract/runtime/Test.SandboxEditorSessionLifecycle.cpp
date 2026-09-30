@@ -2356,6 +2356,7 @@ TEST_F(EditorPointReadiness, NormalTopologyMetadataRefreshesWithoutPointRescans)
 TEST_F(EditorPointReadiness, NormalBackendReasonFollowsPendingPointValidation)
 {
     Normals.Backend = Runtime::NormalEstimationBackend::VulkanLBVH;
+    Normals.Orientation = Geometry::PointCloud::Normals::OrientationMode::None;
     EXPECT_EQ(PreviewNormals().DisabledReason, "Checking live point samples. Wait for input validation.");
     Drain();
     const auto unavailable = PreviewNormals();

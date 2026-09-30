@@ -124,6 +124,7 @@ namespace Extrinsic::Runtime
                            std::uint64_t,
                            Core::StrongHandleHash<WorldHandleTag>>
             WorldGenerations{};
+        bool Draining{};
         JobServiceStats Stats{};
         JobServiceTestHooks TestHooks{};
     };
@@ -165,6 +166,65 @@ namespace Extrinsic::Runtime
     }
 
     JobService::~JobService() = default;
+
+    void JobService::CancelAndDrain()
+    {
+        // Engine calls this on the main thread while borrowed services/device live.
+        // Reject reentrant submissions from workers and unpublished finalizers.
+        {
+            std::lock_guard lock(m_State->Mutex);
+            m_State->Draining = true;
+            for (const auto& [token, job] : m_State->Jobs)
+            {
+                if (!IsTerminal(job->State.load(std::memory_order_acquire)) &&
+                    !job->CancelRequested->exchange(true, std::memory_order_acq_rel))
+                    ++m_State->Stats.CancelledJobs;
+            }
+        }
+        Core::Tasks::Scheduler::WaitForAll();
+        decltype(m_State->Jobs) jobs;
+        {
+            std::lock_guard lock(m_State->Mutex);
+            jobs = m_State->Jobs; // Finalizers may reap; retain every record until callbacks are cleared.
+            for (const auto& [token, job] : jobs)
+            {
+                if (job->State.load(std::memory_order_acquire) == JobState::Published)
+                    continue;
+                job->State.store(JobState::Cancelled, std::memory_order_release);
+                QueueUnpublishedFinalizerLocked(*m_State, job);
+            }
+        }
+        (void)RunUnpublishedFinalizers();
+
+        // Drop result payloads and all callbacks outside the lock: destructors
+        // can themselves use the service. The scheduler no longer runs Work.
+        decltype(m_State->CompletionQueue) completions;
+        {
+            std::lock_guard lock(m_State->Mutex);
+            m_State->Jobs.clear();
+            completions.swap(m_State->CompletionQueue);
+            m_State->PendingDependencies.clear();
+            m_State->Stats.AwaitingDependencyJobs = 0;
+        }
+        completions.clear();
+        for (auto& [token, job] : jobs)
+        {
+            job->Work = {};
+            job->PublishCompletion = {};
+            job->IsReadyToApply = {};
+            job->ValidateBeforeApply = {};
+            job->FinalizeUnpublishedOnMainThread = {};
+        }
+        jobs.clear();
+        // Submissions stay rejected until ResumeSubmissions(): module and device teardown
+        // after the drain must not queue work that would outlive them.
+    }
+
+    void JobService::ResumeSubmissions()
+    {
+        std::lock_guard lock(m_State->Mutex);
+        m_State->Draining = false;
+    }
 
     bool JobCancellation::IsCancelled() const noexcept
     {
@@ -264,6 +324,11 @@ namespace Extrinsic::Runtime
         auto job = std::make_shared<JobService::JobRecord>();
         {
             std::lock_guard lock(m_State->Mutex);
+            if (m_State->Draining)
+            {
+                ++m_State->Stats.RejectedJobs;
+                return {};
+            }
             job->Token = JobToken{m_State->NextTokenIndex++, 1u};
             job->Scope = desc.Scope.IsValid() ? desc.Scope : DefaultWorldHandle;
             job->Target = desc.Target;
@@ -313,8 +378,11 @@ namespace Extrinsic::Runtime
         const std::shared_ptr<JobService::JobRecord>& job)
     {
         job->State.store(JobState::Queued, std::memory_order_release);
-        Core::Tasks::Scheduler::Dispatch([state, job]() mutable
+        Core::Tasks::Scheduler::Dispatch([state, queuedJob = std::shared_ptr<JobRecord>(job)]() mutable
         {
+            // Drop this record before the scheduler marks the task finished;
+            // its callable storage may survive WaitForAll briefly on a worker.
+            const auto job = std::move(queuedJob);
             const auto finishUnpublished =
                 [&state, &job](const JobState terminalState,
                                const bool countDropped)

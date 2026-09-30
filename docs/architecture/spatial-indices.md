@@ -202,11 +202,13 @@ CPU normal kernels can call `Geometry::PointCloud::Normals::Estimate(points,
 index, params)`. The supplied index must match the points exactly. The adapter
 preserves PCA and orientation behavior, including the existing k+1-then-filter
 neighborhood policy. It does not change default method selection. The [normal-estimation workflow](normal-estimation.md) integrates canonical
-config/UI/publication with cached CPU LBVH acquisition and Vulkan query chunks.
+config/UI/publication with cached CPU LBVH acquisition and resident Vulkan PCA kernels.
 The `Estimate(points, Neighborhoods{offsets, indices}, params)` overload accepts
 complete candidate rows, validates their CSR layout/indices, and reuses the
-existing CPU PCA/orientation implementation. Runtime maps GPU source IDs back
-to compact input rows before fitting. Radius overflow fails without publishing.
+CPU PCA/orientation implementation for supplied rows. The resident Vulkan normal
+path gathers through `lbvhQueryDouble` and fits in double on the device without
+downloading neighborhoods; MST is refused for that path. Radius overflow fails
+without publishing.
 [Outlier analysis](outlier-analysis.md) uses shared kNN/exclusion and framed radius
 counts through RUNTIME-209/UI-041; CPU classification publishes named mask/score
 properties. Radius counts remain complete beyond retained-hit capacity. See the

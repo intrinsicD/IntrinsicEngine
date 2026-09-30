@@ -1193,15 +1193,15 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
         WithoutWhitespace(clusteringModule).find(
             "returnKMeansSnapshot{.Command=command,.World=world"),
         std::string::npos);
-    // Every remaining geometry factory and the normal jobs (the CPU job, the PCA neighborhood
-    // job, the RUNTIME-296 residency run and its Accept) carry their owning world scope.
+    // Every remaining geometry factory and normal job (CPU, shared resident mesh/PCA
+    // compute and Accept) carries its owning world scope.
     EXPECT_EQ(CountOccurrences(geometryMeshOperations, "return DerivedJobDesc{"), 0u);
     EXPECT_EQ(CountOccurrences(geometryMeshOperations, "return JobDesc{"), 4u);
     EXPECT_EQ(CountOccurrences(geometryMeshOperations, ".Scope = context.World"), 4u);
     EXPECT_EQ(CountOccurrences(normalOperations, "JobDesc desc{"), 1u);
-    EXPECT_EQ(CountOccurrences(normalOperations, "JobDesc gpu{"), 2u);
+    EXPECT_EQ(CountOccurrences(normalOperations, "JobDesc gpu{"), 1u);
     EXPECT_EQ(CountOccurrences(normalOperations, "JobDesc accept{"), 1u);
-    EXPECT_EQ(CountOccurrences(normalOperations, ".Scope = context.World"), 3u);
+    EXPECT_EQ(CountOccurrences(normalOperations, ".Scope = context.World"), 2u);
     EXPECT_EQ(CountOccurrences(normalOperations, ".Scope = ctx.World"), 1u);
     EXPECT_EQ(CountOccurrences(
                   workspaceSession,

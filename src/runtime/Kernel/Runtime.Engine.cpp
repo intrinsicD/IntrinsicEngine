@@ -488,6 +488,7 @@ namespace Extrinsic::Runtime
     void Engine::Initialize()
     {
         m_Impl->m_ShutdownBegun = false;
+        m_Impl->m_JobService.ResumeSubmissions();
         // ── 1. CPU fiber scheduler ────────────────────────────────────────
         // Must be first — all three graphs dispatch through it.
         Core::Tasks::Scheduler::Initialize(m_Impl->m_Config.Simulation.WorkerThreadCount);
@@ -656,6 +657,9 @@ namespace Extrinsic::Runtime
         if (!m_Impl->m_ShutdownBegun)
             return;
 
+        // Job finalizers borrow module services; workspace destructors borrow the
+        // device. Settle both before either owner is torn down.
+        m_Impl->m_JobService.CancelAndDrain();
         ShutdownRuntimeModules();
         m_Impl->m_Scene = nullptr;
         m_Impl->m_WorldRegistry.Clear();

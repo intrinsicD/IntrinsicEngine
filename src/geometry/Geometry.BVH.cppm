@@ -1,3 +1,4 @@
+// AABB hierarchy and indexed spatial queries shared by geometry consumers, including point KD-trees.
 module;
 
 #include <concepts>
@@ -106,13 +107,14 @@ export namespace Geometry
         };
 
         // Up to k elements ordered by (squared box distance, element index); nearer child first.
+        // Double keys preserve near-boundary ordering/membership; metadata retains its float ABI.
         [[nodiscard]] std::optional<BVHKNNResult> QueryKNN(const glm::vec3& query, std::uint32_t k,
-            std::vector<ElementIndex>& outElementIndices) const;
+            std::vector<ElementIndex>& outElementIndices, bool doubleDistances = false) const;
         // Elements whose box lies within the inclusive radius, in ascending element index.
         [[nodiscard]] std::optional<BVHRadiusResult> QueryRadius(const glm::vec3& query, float radius,
-            std::vector<ElementIndex>& outElementIndices) const;
+            std::vector<ElementIndex>& outElementIndices, bool doubleDistances = false) const;
         [[nodiscard]] std::optional<BVHRadiusResult> QueryRadius(const glm::vec3& query, float radius,
-            std::vector<ElementIndex>& outElementIndices, RadiusQueryScratch& scratch) const;
+            std::vector<ElementIndex>& outElementIndices, RadiusQueryScratch& scratch, bool doubleDistances = false) const;
 
         [[nodiscard]] const std::vector<AABB>& ElementAabbs() const noexcept { return m_ElementAabbs; }
         [[nodiscard]] const std::vector<ElementIndex>& ElementIndices() const noexcept { return m_ElementIndices; }

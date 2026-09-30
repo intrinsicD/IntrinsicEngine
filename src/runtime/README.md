@@ -417,8 +417,9 @@ weighted mesh-vertex and mesh-face normal operations. Callers bind the existing
 `EditorProcessingCommands`; the editor reads copied results and guarded callbacks
 from `PrepareEditorNormalFrame`. The shared window provides entity, input,
 output, backend and explicit Show controls through `sandbox.normal_estimation`.
-Numerical kernels remain in geometry, and shared runtime helpers own property
-observation, catalogs, config application and mesh reconstruction.
+Geometry owns the CPU numerical references; graphics owns resident mesh/PCA normal
+kernels. Shared runtime helpers own property observation, catalogs, config
+application, mesh reconstruction and the undoable Accept/Discard transaction.
 
 See [normal estimation](../../docs/architecture/normal-estimation.md) for input,
 publication, history and backend contracts.

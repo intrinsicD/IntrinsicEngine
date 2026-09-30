@@ -35,7 +35,7 @@ void main()
         nearest.v[i]=0.;
         uint row=slots.v[i];vec3 p=lbvhPoint(pc.positions,12,row);
         uint count=lbvhQueryDouble(pc.positions,pc.nodes,pc.count,p,pc.method==2?row:LBVH_INVALID,
-            pc.method==2?double(pc.queryRadius):-1.0lf,pc.method==2?0:pc.width,pc.width,neighbors,i*pc.width);
+            pc.method==2?double(pc.queryRadius):-1.0lf,pc.method==2?0:pc.width,pc.width,neighbors,i*pc.width,false);
         if(pc.method==2)atomicMax(stats.maximumNeighbors,count);
         if(count>pc.width){atomicOr(stats.invalid,1);return;}
         if(pc.method==2)

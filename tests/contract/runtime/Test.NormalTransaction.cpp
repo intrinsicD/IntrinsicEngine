@@ -25,6 +25,7 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.GpuPropertyBinding;
 import Extrinsic.Graphics.GpuPropertyResidency;
 import Geometry.Properties;
+import Extrinsic.Core.Config.Engine;
 namespace R = Extrinsic::Runtime;
 namespace G = Extrinsic::Graphics;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
@@ -417,4 +418,93 @@ TEST(NormalTransaction, FaceNormalsBundleCarriesRingsOnlyAndFollowsDeletions)
     EXPECT_TRUE(deletedFace->Uploaded);
     EXPECT_EQ(deletedFace->LiveRows, 1u);
     EXPECT_EQ(deletedFace->Bytes, (3u + 3u + 5u + 1u) * sizeof(std::uint32_t));
+}
+
+TEST(NormalTransaction, PcaAcceptBindsRevisionAndUndoPreservesDeletedRows)
+{
+    Harness h;
+    h.Config.Method = R::NormalEstimationMethod::PointSetPCA;
+    h.Config.Backend = R::NormalEstimationBackend::VulkanLBVH;
+    h.Config.Orientation = Geometry::PointCloud::Normals::OrientationMode::None;
+    h.Vertices().GetOrAdd<glm::vec3>("v:normal").Vector().assign(h.Rows(), glm::vec3(7));
+    h.Vertices().GetOrAdd<bool>("v:deleted")[3] = true;
+    auto rows = std::vector<glm::vec3>(h.Rows(), glm::vec3(0, 0, 1));
+    rows[3] = glm::vec3(7);
+    const auto run = R::MakeEditorNormalTransactionForTest(h.Commands(), h.Config, rows, &h.Residency);
+    ASSERT_TRUE(run);
+    ASSERT_EQ(R::AcceptEditorNormalEstimation(h.Commands(), run).Status, R::EditorCommandStatus::Pending);
+    ASSERT_TRUE(h.Jobs.DrainUntilTerminal());
+    const auto snapshot = R::SnapshotEditorNormalEstimation(h.Commands(), run);
+    EXPECT_EQ(snapshot.Phase, R::EditorGpuTransactionPhase::Applied);
+    EXPECT_EQ(snapshot.Result.ActualBackend, "vulkan_lbvh");
+    EXPECT_EQ(std::as_const(h.Vertices()).Get<glm::vec3>("v:normal").Vector(), rows);
+    ASSERT_TRUE(h.Residency.Front(h.Key()));
+    EXPECT_EQ(h.Residency.Front(h.Key())->Revision, h.OutputRevision());
+    EXPECT_FALSE(h.Residency.HasRing(h.Key()));
+    EXPECT_TRUE(h.History.Undo().Succeeded());
+    EXPECT_EQ(h.Vertices().Get<glm::vec3>("v:normal")[0], glm::vec3(7));
+    EXPECT_EQ(h.Vertices().Get<glm::vec3>("v:normal")[3], glm::vec3(7));
+}
+
+TEST(NormalTransaction, PcaDiscardAndStaleRingNeverPublish)
+{
+    Harness h;
+    h.Config.Method = R::NormalEstimationMethod::PointSetPCA;
+    h.Config.Backend = R::NormalEstimationBackend::VulkanLBVH;
+    h.Config.Orientation = Geometry::PointCloud::Normals::OrientationMode::None;
+    auto run = h.Ready(glm::vec3(0, 0, 1));
+    ASSERT_TRUE(run);
+    R::DiscardEditorNormalEstimation(h.Commands(), run);
+    EXPECT_FALSE(h.Vertices().Exists("v:normal"));
+    EXPECT_FALSE(h.Residency.HasRing(h.Key()));
+    run = h.Ready(glm::vec3(0, 0, 1));
+    ASSERT_TRUE(run);
+    const auto generation = h.Residency.RingGeneration(h.Key());
+    ASSERT_TRUE(h.Residency.Discard(h.Key(), generation));
+    const auto replacement = h.Ready(glm::vec3(1, 0, 0));
+    ASSERT_TRUE(replacement);
+    EXPECT_FALSE(R::SnapshotEditorNormalEstimation(h.Commands(), run).CanAccept);
+    EXPECT_EQ(R::AcceptEditorNormalEstimation(h.Commands(), run).Status, R::EditorCommandStatus::StaleEntity);
+    R::DiscardEditorNormalEstimation(h.Commands(), run);
+    EXPECT_TRUE(h.Residency.HasRing(h.Key()));
+    h.Vertices().Get<glm::vec3>("v:position")[0].z += 1;
+    EXPECT_FALSE(R::SnapshotEditorNormalEstimation(h.Commands(), replacement).CanAccept);
+    R::DiscardEditorNormalEstimation(h.Commands(), replacement);
+    EXPECT_FALSE(h.Vertices().Exists("v:normal"));
+    EXPECT_EQ(h.History.UndoCount(), 0u);
+}
+
+TEST(NormalTransaction, PcaAdmissionAndConfigPreserveTheBackendContract)
+{
+    Harness h;
+    h.Config.Method = R::NormalEstimationMethod::PointSetPCA;
+    h.Config.Backend = R::NormalEstimationBackend::VulkanLBVH;
+    h.Config.Orientation = Geometry::PointCloud::Normals::OrientationMode::None;
+    const auto valid = R::ValidateNormalEstimationConfigSection(R::SerializeNormalEstimationConfig(h.Config), {}, "test");
+    EXPECT_TRUE(valid.Usable());
+    EXPECT_NE(R::SerializeNormalEstimationConfig(h.Config).find("vulkan_lbvh"), std::string::npos);
+    Extrinsic::Core::Config::EngineConfig engine;
+    R::SetNormalEstimationConfig(engine, h.Config);
+    const auto restored = R::GetNormalEstimationConfig(engine);
+    ASSERT_TRUE(restored);
+    EXPECT_EQ(restored->Backend, h.Config.Backend);
+    EXPECT_EQ(restored->Orientation, h.Config.Orientation);
+    EXPECT_EQ(R::SerializeNormalEstimationConfig(*restored), R::SerializeNormalEstimationConfig(h.Config));
+    auto mst = h.Config;
+    mst.Orientation = Geometry::PointCloud::Normals::OrientationMode::MinimumSpanningTree;
+    EXPECT_NE(R::PreviewEditorNormalEstimationCommand(h.Commands(), mst).DisabledReason.find("MST"), std::string::npos);
+    auto output = h.Config;
+    output.Positions.Name = "samples";
+    output.Output.Name = "v:position";
+    h.Vertices().GetOrAdd<glm::vec3>("samples").Vector() = h.Vertices().Get<glm::vec3>("v:position").Vector();
+    EXPECT_NE(R::PreviewEditorNormalEstimationCommand(h.Commands(), output).DisabledReason.find("position"), std::string::npos);
+    auto readiness = R::PreviewEditorNormalEstimationCommand(h.Commands(), h.Config);
+    EXPECT_FALSE(readiness.Enabled);
+    EXPECT_NE(readiness.DisabledReason.find("framed"), std::string::npos);
+    h.Vertices().Get<glm::vec3>("v:position")[0].x = 1e-40f;
+    readiness = R::PreviewEditorNormalEstimationCommand(h.Commands(), h.Config);
+    EXPECT_FALSE(readiness.Enabled);
+    EXPECT_NE(readiness.DisabledReason.find("subnormal"), std::string::npos);
+    h.Config.Backend = R::NormalEstimationBackend::CpuKDTree;
+    EXPECT_TRUE(R::PreviewEditorNormalEstimationCommand(h.Commands(), h.Config).Enabled);
 }

@@ -2,6 +2,7 @@
 // threads than one dispatch may cover is issued in chunks with a base index, every dispatch
 // staying within the guaranteed 65535 workgroups; a bundle or a layout beyond the 32-bit
 // index limits is refused before anything is allocated.
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -9,6 +10,8 @@
 #include <gtest/gtest.h>
 #include "MockRHI.hpp"
 import Extrinsic.Graphics.VertexNormals;
+import Extrinsic.Graphics.PointNormals;
+import Extrinsic.Graphics.GpuPropertyResidency;
 import Extrinsic.RHI.Handles;
 namespace G = Extrinsic::Graphics;
 
@@ -106,4 +109,58 @@ TEST(VertexNormalsWorkspace, BundlesAndLayoutsBeyondTheIndexLimitsAreRefusedBefo
     const G::VertexNormalsResidentIo io{.Positions = view, .Topology = view, .Output = view, .OutputBytes = 48u, .Layout = layout};
     EXPECT_FALSE(workspace.Record(commands, {}, io).IsValid());
     EXPECT_TRUE(commands.DispatchRecords.empty());
+}
+
+TEST(PointNormalsWorkspace, RadiusPagesBoundWorkAndKeepOutputAndStatsAcrossSubmissions)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.ShaderFloat64 = true;
+    Extrinsic::Tests::MockCommandContext commands;
+    G::PointNormalsWorkspace workspace(device);
+    const auto buffer = device.CreateBuffer({.SizeBytes = 1026u * 12u, .Usage = Extrinsic::RHI::BufferUsage::Storage});
+    const G::GpuPropertyView view{.Buffer = buffer, .Address = device.GetBufferDeviceAddress(buffer), .Bytes = 1026u * 12u};
+    const G::PointNormalsResidentIo io{.Positions = view, .Output = view, .Nodes = 16, .LiveSlots = 32, .LiveCount = 1026};
+    const G::PointNormalsGpuParams params{.BatchSize = 1, .RadiusSearch = true, .Radius = 1};
+    const auto stats = workspace.Record(commands, params, io);
+    ASSERT_TRUE(stats.IsValid());
+    ASSERT_EQ(commands.DispatchRecords.size(), 1u);
+    EXPECT_EQ(commands.DispatchRecords.back().X, 1u);
+    EXPECT_EQ(commands.FillBufferCalls, 2); // output and aggregate stats, first page only
+    const auto checkPage = [&](std::uint32_t first, std::uint32_t rows) {
+        std::uint32_t words[2]{};
+        EXPECT_EQ(commands.PushConstantPayloads.back().size(), 104u);
+        std::memcpy(words, commands.PushConstantPayloads.back().data() + 96, sizeof(words));
+        EXPECT_EQ(words[0], first);
+        EXPECT_EQ(words[1], rows);
+    };
+    checkPage(0, 64);
+    for (std::uint32_t first = 64; first < io.LiveCount; first += 64)
+    {
+        ASSERT_EQ(workspace.Record(commands, params, io, first), stats);
+        checkPage(first, std::min(64u, io.LiveCount - first));
+    }
+    EXPECT_EQ(commands.DispatchRecords.size(), 17u);
+    EXPECT_EQ(commands.FillBufferCalls, 2);
+    EXPECT_EQ(device.CreatePipelineCount, 1);
+    EXPECT_EQ(G::PointNormalsWorkspace::RowsPerSubmission(false, 1), 64u);
+    EXPECT_EQ(G::PointNormalsWorkspace::RowsPerSubmission(false, 16384), 4096u);
+    // Radius rows exit early on overflow, so radius pages follow the same batch clamp.
+    EXPECT_EQ(G::PointNormalsWorkspace::RowsPerSubmission(true, 1), 64u);
+    EXPECT_EQ(G::PointNormalsWorkspace::RowsPerSubmission(true, 16384), 4096u);
+}
+
+TEST(PointNormalsWorkspace, InputBeyondTheLbvhLimitIsRefusedBeforeRecording)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.ShaderFloat64 = true;
+    Extrinsic::Tests::MockCommandContext commands;
+    G::PointNormalsWorkspace workspace(device);
+    for (auto count : {(1u << 20) + 1u, 1u << 21})
+    {
+        const G::PointNormalsResidentIo io{.Positions = {.Address = 8}, .Output = {.Address = 16},
+                                          .Nodes = 32, .LiveSlots = 64, .LiveCount = count};
+        EXPECT_FALSE(workspace.Record(commands, {.RadiusSearch = true}, io).IsValid());
+    }
+    EXPECT_TRUE(commands.DispatchRecords.empty());
+    EXPECT_EQ(device.CreatePipelineCount, 0);
 }

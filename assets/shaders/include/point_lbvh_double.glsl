@@ -16,8 +16,49 @@ void lbvhStorePositiveFloat(uint64_t address,uint row,double value)
         : floatBitsToUint(float(value));
     LbvhIndices(address).v[row]=bits;
 }
+// Deterministic in-place heapsort: complete radius rows use source order, while
+// PCA needs distance/source order. Neither sort changes membership or count.
+bool lbvhRadiusLess(uint a,uint b,uint64_t positions,vec3 q,bool distanceOrder)
+{
+    if(distanceOrder)
+    {
+        double ad=lbvhDistanceDouble(q,lbvhPoint(positions,12,a));
+        double bd=lbvhDistanceDouble(q,lbvhPoint(positions,12,b));
+        if(ad!=bd)return ad<bd;
+    }
+    return a<b;
+}
+void lbvhSortRadiusDouble(LbvhNeighbors neighbors,uint base,uint count,
+                          uint64_t positions,vec3 q,bool distanceOrder)
+{
+    if(count<2)return;
+    // Build a max heap, then move the maximum to the shrinking suffix.
+    uint start=count/2,end=count;
+    while(end>1)
+    {
+        uint root,value;
+        if(start>0){root=--start;value=neighbors.v[base+root].index;}
+        else
+        {
+            value=neighbors.v[base+--end].index;
+            neighbors.v[base+end].index=neighbors.v[base].index;
+            root=0;
+        }
+        while(root*2+1<end)
+        {
+            uint child=root*2+1;
+            if(child+1<end && lbvhRadiusLess(neighbors.v[base+child].index,
+                neighbors.v[base+child+1].index,positions,q,distanceOrder))++child;
+            uint candidate=neighbors.v[base+child].index;
+            if(!lbvhRadiusLess(value,candidate,positions,q,distanceOrder))break;
+            neighbors.v[base+root].index=candidate;
+            root=child;
+        }
+        neighbors.v[base+root].index=value;
+    }
+}
 uint lbvhQueryDouble(uint64_t positions,uint64_t nodes,uint pointCount,vec3 q,uint excluded,
-                     double radius,uint kNearestCount,uint capacity,LbvhNeighbors neighbors,uint base)
+                     double radius,uint kNearestCount,uint capacity,LbvhNeighbors neighbors,uint base,bool stopAtOverflow)
 {
     for(uint j=0;j<capacity;++j)neighbors.v[base+j]=LbvhNeighbor(LBVH_INVALID,0.);
     uint count=0,size=pointCount==0?0:1;uint stack[64];stack[0]=0;
@@ -55,9 +96,19 @@ uint lbvhQueryDouble(uint64_t positions,uint64_t nodes,uint pointCount,vec3 q,ui
         else
         {
             ++count;
+            if(stopAtOverflow)
+            {
+                if(count>capacity)return capacity+1;
+                neighbors.v[base+count-1].index=value;
+                continue;
+            }
             for(uint k=0;k<capacity;++k)
                 if(value<neighbors.v[base+k].index){uint old=neighbors.v[base+k].index;neighbors.v[base+k].index=value;value=old;}
         }
     }
+    // Preserve source-index order for complete radius rows. Overflow-only users
+    // append cheaply during traversal and never sort a row they will reject.
+    if(stopAtOverflow && kNearestCount==0)
+        lbvhSortRadiusDouble(neighbors,base,count,positions,q,false);
     return count;
 }

@@ -1875,6 +1875,11 @@ namespace Extrinsic::Sandbox::Editor
             {
                 auto candidate = config;
                 candidate.Method = method;
+                if ((method != Runtime::NormalEstimationMethod::PointSetPCA && candidate.Backend == Runtime::NormalEstimationBackend::VulkanLBVH) ||
+                    (method == Runtime::NormalEstimationMethod::PointSetPCA && candidate.Backend == Runtime::NormalEstimationBackend::Vulkan))
+                    candidate.Backend = method == Runtime::NormalEstimationMethod::PointSetPCA
+                        ? Runtime::NormalEstimationBackend::VulkanLBVH
+                        : Runtime::NormalEstimationBackend::Vulkan;
                 candidate.Output.Domain = method == Runtime::NormalEstimationMethod::MeshFaceNormals
                     ? Runtime::GeometryElementDomain::MeshFace : candidate.Positions.Domain;
                 if (candidate.Output.Name == "v:normal" || candidate.Output.Name == "f:normal")
@@ -1905,14 +1910,14 @@ namespace Extrinsic::Sandbox::Editor
                 "PCA fits local planes to spatial neighbors on the selected element domain. Radius mode uses "
                 "all neighbors within the radius; otherwise k nearest neighbors are used.");
             int backend = int(config.Backend);
-            if (ImGui::Combo("Backend##Normals", &backend, "CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH (CPU fit)\0"))
+            if (ImGui::Combo("Backend##Normals", &backend, "CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH (resident PCA)\0"))
             {
                 config.Backend = Runtime::NormalEstimationBackend(backend);
                 changed = true;
             }
             if (config.Backend == Runtime::NormalEstimationBackend::VulkanLBVH)
             {
-                ImGui::TextWrapped("GPU neighborhood queries; PCA and orientation run on CPU. "
+                ImGui::TextWrapped("GPU neighbors, covariance and normals; unoriented only. No viewport preview. "
                                    "Dense radius neighborhoods exceeding 1024 candidates are rejected.");
                 changed |= ImGui::InputScalar("GPU query batch size##Normals", ImGuiDataType_U32,
                                               &config.GpuQueryBatchSize);
@@ -1997,7 +2002,7 @@ namespace Extrinsic::Sandbox::Editor
         if (!readiness.Enabled) ImGui::TextWrapped("%s", readiness.DisabledReason.c_str());
         if (DrawProcessingActionButton("Estimate normals", readiness))
         {
-            if (config.Backend == Runtime::NormalEstimationBackend::Vulkan)
+            if ((config.Backend == Runtime::NormalEstimationBackend::Vulkan || config.Backend == Runtime::NormalEstimationBackend::VulkanLBVH))
             {
                 // Interactive Vulkan runs compute on the device and publish on Accept.
                 Normals.ConfigDiagnostic = Runtime::ApplyEditorNormalEstimationConfig(context.Normals.Commands, config).Succeeded()
@@ -3400,6 +3405,10 @@ namespace Extrinsic::Sandbox::Editor
         if (!transaction.AcceptDisabledReason.empty()) ImGui::TextWrapped("%s", transaction.AcceptDisabledReason.c_str());
         else if (transaction.Phase == Phase::ReadyToAccept)
             ImGui::TextWrapped("The device result is resident (no viewport preview); Accept publishes it (undoable), Discard keeps the CPU normals.");
+        ImGui::TextWrapped("Input uploads: %llu bytes; cache hits: %llu; CPU readback: %llu bytes",
+            static_cast<unsigned long long>(transaction.Result.GpuInputUploadBytes),
+            static_cast<unsigned long long>(transaction.Result.GpuInputCacheHits),
+            static_cast<unsigned long long>(transaction.Result.CpuStageReadbackBytes));
         if (transaction.Result.GpuTopologyBytes || transaction.Result.GpuInputUploadBytes)
             ImGui::TextDisabled("Residency IO: positions upload %llu bytes; topology bundle %llu bytes (%s)",
                                 static_cast<unsigned long long>(transaction.Result.GpuInputUploadBytes),

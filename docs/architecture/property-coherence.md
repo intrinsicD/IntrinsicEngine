@@ -484,3 +484,18 @@ cleanup cannot discard the replacement. A nonempty Accept callback replaces the
 Start callback after admission succeeds, with one terminal delivery. Scalar
 panels omit the Start callback and fold the terminal snapshot through the same
 runtime result adapters before publishing their retained result once.
+
+### Resident point-set PCA normals
+
+`Graphics.PointNormals` reads the canonical position slot and cached LBVH, gathers
+complete ordered neighborhoods, accumulates double covariance and solves the same
+portable double eigensystem as `Geometry.PCA`. Only unoriented execution is admitted;
+MST requires a CPU backend. No neighborhood arrays cross to the CPU. The vec3 ring
+is not observed by the viewport. `EditorNormalTransaction` owns leases, stale and
+ring-generation validation, Discard, and Accept through `GpuFrontReadback`, undoable
+normal publication and publication-bound `BindRevision`. Existing deleted output
+rows copy the resident base; absent deleted rows start at zero. Results and command
+messages report upload bytes, input hits and diagnostic/Accept readback bytes.
+The panel uses this same lifecycle; batch/agent commands accept automatically.
+See [normal estimation](normal-estimation.md#resident-pca-vulkan_lbvh) for admission,
+numerical limits and pending GPU parity evidence.

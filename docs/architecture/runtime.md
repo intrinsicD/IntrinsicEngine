@@ -1064,7 +1064,15 @@ runs the Engine-private renderer-hook removal followed by the sole
 `JobService::ShutdownGpuQueueParticipants(...)` participant-shutdown/device-
 idle boundary. Application shutdown follows while the persistent
 `AssetWorkflowModule` and `RuntimeInputActionRegistry` still exist; Sandbox
-unregisters its optional `F` action. Ordinary
+unregisters its optional `F` action. Before module teardown, Engine's `Shutdown`
+calls `JobService::CancelAndDrain`: it cancels every job, joins CPU Work through
+the shared scheduler, runs unpublished main-thread finalizers exactly once and
+releases all retained callback/result captures. Reentrant submissions during
+this barrier are rejected. Thus job-owned GPU workspaces die while the device
+and borrowed module services still exist; cancel flags alone are insufficient.
+The barrier follows application teardown because application-owned work gates
+may be released there; `BeginShutdown` remains the announcement/device-idle
+boundary. The job service can be reused after the barrier. Ordinary
 reverse name-sorted module teardown then shuts down AsyncWork before
 AssetWorkflow and destroys providers, followed by world, frame graph,
 render-extraction plus renderer, device, window, and scheduler. The Dear ImGui

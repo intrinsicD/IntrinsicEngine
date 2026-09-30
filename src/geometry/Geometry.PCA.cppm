@@ -1,3 +1,4 @@
+// Deterministic double symmetric eigendecomposition and finite-sample PCA for geometry consumers.
 module;
 
 #include <span>

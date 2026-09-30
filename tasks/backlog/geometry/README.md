@@ -6,6 +6,8 @@ its dependencies, conditional gates, scope and verification.
 
 ## Tasks
 
+- [GEOM-114 — Scale-relative PCA isotropic cutoff](GEOM-114-scale-relative-pca-isotropic-cutoff.md)
+
 - [GEOM-013 — Feature-preserving dual contouring](GEOM-013-feature-preserving-dual-contouring.md)
 - [GEOM-059 — Kernel matrices, Nyström approximation, and Gaussian-process interpolation seam](GEOM-059-kernel-matrices-nystroem-gaussian-process.md)
 - [GEOM-060 — Permutohedral lattice fast high-dimensional filtering seam](GEOM-060-permutohedral-lattice-highdim-filtering.md)

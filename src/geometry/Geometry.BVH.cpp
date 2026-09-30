@@ -1,4 +1,5 @@
 module;
+#pragma STDC FP_CONTRACT OFF
 
 #include <algorithm>
 #include <array>
@@ -33,9 +34,11 @@ namespace Geometry
             return (box.Min[axis] + box.Max[axis]) * 0.5f;
         }
 
-        [[nodiscard]] float NodeDistanceSquared(const glm::vec3& p, const BVH::Node& node)
+        [[nodiscard]] double QueryDistanceSquared(const glm::vec3& p, const AABB& box, bool doubleDistances)
         {
-            return static_cast<float>(SquaredDistance(node.Aabb, p));
+            if (!doubleDistances) return static_cast<float>(SquaredDistance(box, p));
+            const glm::dvec3 delta = glm::dvec3(p) - glm::dvec3(glm::clamp(p, box.Min, box.Max));
+            return (delta.x * delta.x + delta.y * delta.y) + delta.z * delta.z;
         }
 
         [[nodiscard]] AABB ComputeBounds(const std::vector<AABB>& elementAabbs,
@@ -211,7 +214,7 @@ namespace Geometry
     }
 
     std::optional<BVHKNNResult> BVH::QueryKNN(const glm::vec3& query, const std::uint32_t k,
-        std::vector<ElementIndex>& outElementIndices) const
+        std::vector<ElementIndex>& outElementIndices, const bool doubleDistances) const
     {
         outElementIndices.clear();
         if (m_Nodes.empty() || k == 0)
@@ -219,7 +222,7 @@ namespace Geometry
             return std::nullopt;
         }
 
-        using Candidate = std::pair<float, ElementIndex>; // dist2, element index
+        using Candidate = std::pair<double, ElementIndex>; // dist2, element index
         auto maxHeapCmp = [](const Candidate& a, const Candidate& b)
         {
             if (a.first != b.first) return a.first < b.first;
@@ -240,7 +243,7 @@ namespace Geometry
             ++visitedNodes;
 
             const Node& node = m_Nodes[nodeIndex];
-            const float nodeLowerBound = NodeDistanceSquared(query, node);
+            const double nodeLowerBound = QueryDistanceSquared(query, node.Aabb, doubleDistances);
             if (best.size() == k && nodeLowerBound > best.top().first)
             {
                 continue;
@@ -252,7 +255,7 @@ namespace Geometry
                 for (std::size_t i = node.FirstElement; i < end; ++i)
                 {
                     const ElementIndex elementIndex = m_ElementIndices[i];
-                    const float dist2 = static_cast<float>(SquaredDistance(m_ElementAabbs[elementIndex], query));
+                    const double dist2 = QueryDistanceSquared(query, m_ElementAabbs[elementIndex], doubleDistances);
                     ++distanceEvaluations;
 
                     if (best.size() < k)
@@ -270,8 +273,8 @@ namespace Geometry
 
             const Node& left = m_Nodes[node.Left];
             const Node& right = m_Nodes[node.Right];
-            const float leftBound = NodeDistanceSquared(query, left);
-            const float rightBound = NodeDistanceSquared(query, right);
+            const double leftBound = QueryDistanceSquared(query, left.Aabb, doubleDistances);
+            const double rightBound = QueryDistanceSquared(query, right.Aabb, doubleDistances);
 
             if (leftBound <= rightBound)
             {
@@ -310,19 +313,19 @@ namespace Geometry
             .ReturnedCount = outElementIndices.size(),
             .VisitedNodes = visitedNodes,
             .DistanceEvaluations = distanceEvaluations,
-            .MaxDistanceSquared = ordered.empty() ? 0.0f : ordered.back().first,
+            .MaxDistanceSquared = ordered.empty() ? 0.0f : static_cast<float>(ordered.back().first),
         };
     }
 
     std::optional<BVHRadiusResult> BVH::QueryRadius(const glm::vec3& query, const float radius,
-        std::vector<ElementIndex>& outElementIndices) const
+        std::vector<ElementIndex>& outElementIndices, const bool doubleDistances) const
     {
         RadiusQueryScratch scratch{};
-        return QueryRadius(query, radius, outElementIndices, scratch);
+        return QueryRadius(query, radius, outElementIndices, scratch, doubleDistances);
     }
 
     std::optional<BVHRadiusResult> BVH::QueryRadius(const glm::vec3& query, const float radius,
-        std::vector<ElementIndex>& outElementIndices, RadiusQueryScratch& scratch) const
+        std::vector<ElementIndex>& outElementIndices, RadiusQueryScratch& scratch, const bool doubleDistances) const
     {
         outElementIndices.clear();
         if (m_Nodes.empty() || !std::isfinite(radius) || radius < 0.0f)
@@ -330,7 +333,7 @@ namespace Geometry
             return std::nullopt;
         }
 
-        const float radius2 = radius * radius;
+        const double radius2 = doubleDistances ? double(radius) * double(radius) : double(radius * radius);
 
         scratch.NodeStack.clear();
         scratch.NodeStack.push_back(0u);
@@ -345,7 +348,7 @@ namespace Geometry
             ++visitedNodes;
 
             const Node& node = m_Nodes[nodeIndex];
-            if (NodeDistanceSquared(query, node) > radius2)
+            if (QueryDistanceSquared(query, node.Aabb, doubleDistances) > radius2)
             {
                 continue;
             }
@@ -356,7 +359,7 @@ namespace Geometry
                 for (std::size_t i = node.FirstElement; i < end; ++i)
                 {
                     const ElementIndex elementIndex = m_ElementIndices[i];
-                    const float dist2 = static_cast<float>(SquaredDistance(m_ElementAabbs[elementIndex], query));
+                    const double dist2 = QueryDistanceSquared(query, m_ElementAabbs[elementIndex], doubleDistances);
                     ++distanceEvaluations;
                     if (dist2 <= radius2)
                     {

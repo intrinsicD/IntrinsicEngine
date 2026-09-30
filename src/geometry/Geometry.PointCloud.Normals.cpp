@@ -1,4 +1,5 @@
 module;
+#pragma STDC FP_CONTRACT OFF
 
 #include <algorithm>
 #include <cmath>
@@ -157,10 +158,10 @@ namespace Geometry::PointCloud::Normals
                       neighbors.end(),
                       [&](const std::size_t lhs, const std::size_t rhs)
                       {
-                          const glm::vec3 lhsDelta = points[lhs] - points[queryIndex];
-                          const glm::vec3 rhsDelta = points[rhs] - points[queryIndex];
-                          const float lhsDist = glm::dot(lhsDelta, lhsDelta);
-                          const float rhsDist = glm::dot(rhsDelta, rhsDelta);
+                          const glm::dvec3 lhsDelta = glm::dvec3(points[lhs]) - glm::dvec3(points[queryIndex]);
+                          const glm::dvec3 rhsDelta = glm::dvec3(points[rhs]) - glm::dvec3(points[queryIndex]);
+                          const double lhsDist = glm::dot(lhsDelta, lhsDelta);
+                          const double rhsDist = glm::dot(rhsDelta, rhsDelta);
                           if (lhsDist != rhsDist)
                           {
                               return lhsDist < rhsDist;
@@ -268,7 +269,7 @@ namespace Geometry::PointCloud::Normals
                 }
 
                 std::vector<KDTree::ElementIndex> indices;
-                const auto queryResult = tree.QueryRadius(query, params.Radius, indices);
+                const auto queryResult = tree.QueryRadius(query, params.Radius, indices, true);
                 if (!queryResult.has_value())
                 {
                     ++result.Diagnostics.SpatialQueryFailureCount;
@@ -290,7 +291,7 @@ namespace Geometry::PointCloud::Normals
 
             const std::size_t target = EffectiveNeighborTarget(params) + 1u;
             std::vector<KDTree::ElementIndex> indices;
-            const auto queryResult = tree.QueryKNN(query, static_cast<std::uint32_t>(target), indices);
+            const auto queryResult = tree.QueryKNN(query, static_cast<std::uint32_t>(target), indices, true);
             if (!queryResult.has_value())
             {
                 ++result.Diagnostics.SpatialQueryFailureCount;
@@ -513,7 +514,7 @@ namespace Geometry::PointCloud::Normals
                         {
                             // Full membership is required for radius PCA; never truncate support.
                             const auto hits = context.LbvhIndex->Radius(points[index], params.Radius,
-                                                                       std::uint32_t(points.size()));
+                                                                       std::uint32_t(points.size()), PointLBVH::InvalidIndex, true);
                             for (const auto& hit : hits.Neighbors) neighbors.push_back(hit.Index);
                         }
                     }
@@ -521,7 +522,7 @@ namespace Geometry::PointCloud::Normals
                     {
                         // Retain the reference's k+1 then identity-filter policy even on ties.
                         const auto count = std::min(EffectiveNeighborTarget(params), points.size()) + 1;
-                        for (const auto& hit : context.LbvhIndex->KNearest(points[index], std::uint32_t(count)))
+                        for (const auto& hit : context.LbvhIndex->KNearest(points[index], std::uint32_t(count), PointLBVH::InvalidIndex, true))
                             neighbors.push_back(hit.Index);
                     }
                     if (!queryOk) ++result.Diagnostics.SpatialQueryFailureCount;
@@ -597,6 +598,11 @@ namespace Geometry::PointCloud::Normals
                     continue;
                 }
 
+                // Same sign convention as point_normals.comp, before optional MST orientation.
+                int axis = 0;
+                if (std::abs(normal.y) > std::abs(normal[axis])) axis = 1;
+                if (std::abs(normal.z) > std::abs(normal[axis])) axis = 2;
+                if (normal[axis] < 0.0f) normal = -normal;
                 result.Normals[index] = normal;
                 validNormals[index] = true;
                 ++result.Diagnostics.ValidNormalPointCount;

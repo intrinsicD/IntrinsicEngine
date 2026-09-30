@@ -345,6 +345,14 @@ namespace Extrinsic::Runtime
         explicit JobService(JobServiceTestHooks testHooks = {});
         ~JobService();
 
+        // Main-thread shutdown barrier: cancel, join CPU Work, finalize unpublished
+        // jobs exactly once, then release all job callbacks/results. Call while
+        // borrowed runtime services and the device still live. Submissions during
+        // the drain and afterwards are rejected until ResumeSubmissions().
+        void CancelAndDrain();
+        // Accepts submissions again after CancelAndDrain (Engine::Initialize).
+        void ResumeSubmissions();
+
         JobService(const JobService&) = delete;
         JobService& operator=(const JobService&) = delete;
 

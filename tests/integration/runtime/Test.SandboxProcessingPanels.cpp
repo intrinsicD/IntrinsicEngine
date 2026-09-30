@@ -894,7 +894,7 @@ TEST(SandboxProcessingPanels, BackendControlsPersistTheRequestedExecutionPath)
         int ChoiceIndex{2}, ExpectedBackend{2};
     };
     const std::array controls{
-        Control{"view.normal_estimation", "Normal Estimation", "Backend##Normals", "Vulkan LBVH (CPU fit)",
+        Control{"view.normal_estimation", "Normal Estimation", "Backend##Normals", "Vulkan LBVH (resident PCA)",
             [](const auto& c) { return int(R::GetNormalEstimationConfig(c)->Backend); }},
         Control{"view.outlier_analysis", "Outlier Analysis", "Backend", "Vulkan LBVH",
             [](const auto& c) { return int(R::GetOutlierAnalysisConfig(c)->Backend); }},

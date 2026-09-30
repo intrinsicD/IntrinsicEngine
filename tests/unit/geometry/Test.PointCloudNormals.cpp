@@ -271,3 +271,25 @@ TEST(PointCloudNormals, WrongOutputPropertyTypeFailsClosed)
     EXPECT_FALSE(result.Normals.IsValid());
     EXPECT_TRUE(cloud.PointProperties().Get<float>("v:normal").IsValid());
 }
+
+TEST(PointCloudNormals, UnorientedNormalsUseLargestPositiveComponentWithAxisTies)
+{
+    PointNormals::Params params;
+    params.Orientation = PointNormals::OrientationMode::None;
+    params.KNeighbors = 15;
+    // Tilted planes exercise each dominant axis, including opposing equal components.
+    for (const auto expected : {glm::vec3(3, -2, -1), glm::vec3(-1, 3, -2),
+                               glm::vec3(-2, -1, 3), glm::vec3(1, -1, 0)})
+    {
+        const auto normal = glm::normalize(expected);
+        const auto u = glm::normalize(glm::cross(normal, glm::vec3(0, 0, 1)));
+        const auto v = glm::cross(normal, u);
+        auto points = MakeFlatGrid(5, 0.2f);
+        for (auto& point : points) point = point.x * u + point.y * v;
+        const auto result = PointNormals::Estimate(points, params);
+        ASSERT_TRUE(result.has_value());
+        EXPECT_EQ(result->Diagnostics.ValidNormalPointCount, points.size());
+        for (const auto actual : result->Normals)
+            EXPECT_GT(glm::dot(actual, normal), 0.9999f);
+    }
+}

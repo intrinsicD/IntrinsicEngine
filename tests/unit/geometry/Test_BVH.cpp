@@ -145,3 +145,18 @@ TEST(BVH, KnnAndRadiusUseElementBoxDistances)
     ASSERT_TRUE(bvh.QueryRadius(query, 2.5f, out).has_value());
     EXPECT_EQ(out, (std::vector<std::uint32_t>{2, 3, 4}));
 }
+
+TEST(BVH, DoubleDistanceQueriesDistinguishFloatRoundedBoundaryTies)
+{
+    Geometry::KDTree tree;
+    const std::vector<glm::vec3> points{{1, 0.0001f, 0}, {1, 0, 0}, {-1, 0, 0}};
+    ASSERT_TRUE(tree.BuildFromPoints(points));
+    std::vector<Geometry::KDTree::ElementIndex> rows;
+    ASSERT_TRUE(tree.QueryKNN(glm::vec3(0), 2, rows, true));
+    EXPECT_EQ(rows, (std::vector<Geometry::KDTree::ElementIndex>{1,2}));
+    ASSERT_TRUE(tree.QueryRadius(glm::vec3(0), 1.f, rows, true));
+    EXPECT_EQ(rows, (std::vector<Geometry::KDTree::ElementIndex>{1,2}));
+    // Existing callers explicitly retain the default float-key contract.
+    ASSERT_TRUE(tree.QueryKNN(glm::vec3(0), 2, rows));
+    EXPECT_EQ(rows, (std::vector<Geometry::KDTree::ElementIndex>{0,1}));
+}

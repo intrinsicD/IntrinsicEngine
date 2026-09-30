@@ -27,7 +27,7 @@ void main()
     {
         uint row=slots.v[i];vec3 p=lbvhPoint(pc.positions,12,row);
         uint count=lbvhQueryDouble(pc.positions,pc.nodes,pc.count,p,pc.method==1?row:LBVH_INVALID,
-            pc.method==1?double(pc.radius):-1.0lf,pc.method==1?0:pc.width,pc.width,neighbors,i*pc.width);
+            pc.method==1?double(pc.radius):-1.0lf,pc.method==1?0:pc.width,pc.width,neighbors,i*pc.width,false);
         if(pc.method==1){means.v[row*2+1]=double(count);score.v[row]=float(count);return;}
         precise double sum=0.;uint used=0;
         for(uint j=0;j<count;++j)

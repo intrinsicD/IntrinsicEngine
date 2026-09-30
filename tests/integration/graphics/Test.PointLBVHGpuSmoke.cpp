@@ -575,12 +575,14 @@ namespace
             c.Output={.Domain=Domain(d),.Name="estimated",.ValueKind=Geometry::PropertyValueKind::Vec3};
             c.KNeighbors=15;c.UseRadiusSearch=Phase==2;c.Radius=1.1f;
             c.Backend=Runtime::NormalEstimationBackend::VulkanLBVH;
+            c.Orientation=Geometry::PointCloud::Normals::OrientationMode::None;
             c.GpuQueryBatchSize=64; // Exercise a final partial chunk and buffer lifetime.
             return c;
         }
         void Resolve() override
         {
             Started=std::chrono::steady_clock::now();
+            Context.Device=&Kernel().GetDevice();
             Context.Scene=Kernel().Worlds().Get(Kernel().ActiveWorld());Context.World=Kernel().ActiveWorld();
             Context.SpatialIndices=Kernel().Services().Find<Runtime::SpatialIndexCache>();
             std::mt19937 random(241);std::uniform_real_distribution<float> dist(-1,1);
@@ -692,7 +694,12 @@ namespace
                 }
                 CpuMs.push_back(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-cpuStart).count());
             }
-            Context.JobCommands.Submit=[this](Runtime::JobDesc desc,Runtime::EditorJobIdentity){FitToken=Kernel().Jobs().Submit(std::move(desc));return FitToken;};
+            Context.JobCommands.Submit=[this](Runtime::JobDesc desc,Runtime::EditorJobIdentity){
+                // Drive the device readiness poll, but hold terminal application through the
+                // cancellation frame so faster resident execution cannot race this assertion.
+                if(Phase==4 && desc.IsReadyToApply){auto ready=std::move(desc.IsReadyToApply);
+                    desc.IsReadyToApply=[this,ready=std::move(ready)]() mutable {const bool complete=ready();return complete && CancelFrames>=4;};}
+                FitToken=Kernel().Jobs().Submit(std::move(desc));return FitToken;};
             Context.CommandHistory=&History;ExpectedResults=Phase<3?8:1;Submitted=true;PhaseStarted=std::chrono::steady_clock::now();
             if(Phase<3)
             {
@@ -710,7 +717,7 @@ namespace
             else
             {
                 auto c=Config(8);
-                if(Phase==4)c.GpuQueryBatchSize=1; // Cancel after GPU submission, before all 65 rows complete.
+                if(Phase==4)c.GpuQueryBatchSize=1; // Exercise a small dispatch batch before cancellation.
                 if(Phase==5)
                 {
                     auto& p=Props(8);p.Resize(1026);

@@ -19,6 +19,7 @@ target_sources(${target_name}
         Graphics.PointScalarAnalysis.cppm
         Graphics.OutlierAnalysis.cppm
         Graphics.VertexNormals.cppm
+        Graphics.PointNormals.cppm
         Graphics.FrameRecipe.cppm
         Graphics.RenderDiagnostics.cppm
         Graphics.RenderRecipeConfig.cppm
@@ -73,6 +74,7 @@ target_sources(${target_name}
         Graphics.PointScalarAnalysis.cpp
         Graphics.OutlierAnalysis.cpp
         Graphics.VertexNormals.cpp
+        Graphics.PointNormals.cpp
         Graphics.CurrentRendererContractAdapter.cpp
         Graphics.RenderRecipeConfig.cpp
         Graphics.RenderCommandRouter.cpp

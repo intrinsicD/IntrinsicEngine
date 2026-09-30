@@ -6,6 +6,7 @@
 #include <condition_variable>
 #include <cstdint>
 #include <mutex>
+#include <memory>
 #include <string>
 #include <thread>
 #include <vector>
@@ -16,6 +17,7 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Tasks;
 import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Types;
@@ -1554,4 +1556,96 @@ TEST(RuntimeJobService, SuccessfulDependencyChainsRemainReapable)
     EXPECT_EQ(published,(std::vector<int>{1,2,3}));
     EXPECT_EQ(jobs.Stats().ReapedJobs,3u);
     EXPECT_TRUE(jobs.SnapshotAll().empty());
+}
+
+TEST(RuntimeJobService, ShutdownJoinsWorkFinalizesAndReleasesEveryCallback)
+{
+    SchedulerScope scheduler(1);
+    Runtime::JobService jobs;
+    std::atomic<bool> started{false}, finished{false};
+    unsigned finalized = 0;
+    const auto mainThread = std::this_thread::get_id();
+    auto resource = std::make_shared<int>(42);
+    std::weak_ptr<int> lifetime = resource;
+    auto published = Runtime::MakeCpuJobDesc<JobProbeResult>("retained published", Runtime::DefaultWorldHandle,
+        [resource](const auto&) { return JobProbeResult{}; },
+        [resource](const auto&) { return JobSuppressedCompleted{}; });
+    published.FinalizeUnpublishedOnMainThread = [resource] { ADD_FAILURE(); };
+    ASSERT_TRUE(jobs.Submit(std::move(published)).IsValid());
+    Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+    Runtime::KernelEventBus events;
+    EXPECT_EQ(jobs.DrainCompletions(events), 1u);
+    Runtime::JobDesc running;
+    running.Work = [resource, &started, &finished](const Runtime::JobCancellation& cancel) {
+        started.store(true);
+        while (!cancel.IsCancelled()) std::this_thread::yield();
+        finished.store(true);
+        return Runtime::JobResultEnvelope::Make(JobProbeResult{});
+    };
+    running.PublishCompletion = [resource](auto&, const auto&) { ADD_FAILURE(); return true; };
+    running.IsReadyToApply = [resource] { return false; };
+    running.ValidateBeforeApply = [resource] { return Runtime::JobApplyValidation::Current; };
+    running.FinalizeUnpublishedOnMainThread = [resource, &finalized, &jobs, mainThread] {
+        EXPECT_EQ(std::this_thread::get_id(), mainThread);
+        ++finalized;
+        auto rejected = Runtime::MakeCpuJobDesc<JobProbeResult>("shutdown reentry", Runtime::DefaultWorldHandle,
+            [](const auto&) { return JobProbeResult{}; }, [](const auto&) { return JobSuppressedCompleted{}; });
+        EXPECT_FALSE(jobs.Submit(std::move(rejected)).IsValid());
+    };
+    const auto token = jobs.Submit(std::move(running));
+    ASSERT_TRUE(token.IsValid());
+    ASSERT_TRUE(WaitUntil([&] { return started.load(); }));
+    auto dependent = Runtime::MakeCpuJobDesc<JobProbeResult>("pending dependency", Runtime::DefaultWorldHandle,
+        [resource](const auto&) { ADD_FAILURE(); return JobProbeResult{}; },
+        [resource](const auto&) { ADD_FAILURE(); return JobSuppressedCompleted{}; });
+    dependent.DependsOn.push_back({token, "must never dispatch during shutdown"});
+    dependent.FinalizeUnpublishedOnMainThread = [resource, &finalized] { ++finalized; };
+    ASSERT_TRUE(jobs.Submit(std::move(dependent)).IsValid());
+    resource.reset();
+    jobs.CancelAndDrain();
+    EXPECT_TRUE(finished.load());
+    EXPECT_EQ(finalized, 2u);
+    EXPECT_TRUE(lifetime.expired());
+    EXPECT_TRUE(jobs.SnapshotAll().empty());
+    jobs.CancelAndDrain();
+    EXPECT_EQ(finalized, 2u);
+    auto late = Runtime::MakeCpuJobDesc<JobProbeResult>("after drain", Runtime::DefaultWorldHandle,
+        [](const auto&) { return JobProbeResult{}; }, [](const auto&) { return JobSuppressedCompleted{}; });
+    EXPECT_FALSE(jobs.Submit(std::move(late)).IsValid()) << "module teardown after the drain cannot queue work";
+    jobs.ResumeSubmissions();
+    auto resumed = Runtime::MakeCpuJobDesc<JobProbeResult>("reinitialized", Runtime::DefaultWorldHandle,
+        [](const auto&) { return JobProbeResult{}; }, [](const auto&) { return JobSuppressedCompleted{}; });
+    EXPECT_TRUE(jobs.Submit(std::move(resumed)).IsValid());
+    jobs.CancelAndDrain();
+}
+
+TEST(RuntimeJobService, EngineShutdownReleasesPendingGpuCaptureBeforeDevice)
+{
+    Runtime::Engine engine(NullWindowHeadlessConfig());
+    engine.Initialize();
+    auto& device = engine.GetDevice();
+    bool released = false;
+    auto resource = std::shared_ptr<int>(new int(0), [&](int* value) {
+        // This virtual call is valid only while the engine still owns its device.
+        device.WaitIdle();
+        released = true;
+        delete value;
+    });
+    auto desc = Runtime::MakeCpuJobDesc<JobProbeResult>("pending GPU readback", Runtime::DefaultWorldHandle,
+        [resource](const auto&) { return JobProbeResult{}; },
+        [resource](const auto&) { ADD_FAILURE(); return JobSuppressedCompleted{}; });
+    unsigned finalizers = 0;
+    desc.IsReadyToApply = [resource] { return false; };
+    desc.FinalizeUnpublishedOnMainThread = [resource, &finalizers] { ++finalizers; };
+    const auto token = engine.Jobs().Submit(std::move(desc));
+    ASSERT_TRUE(token.IsValid());
+    Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+    Runtime::KernelEventBus events;
+    (void)engine.Jobs().DrainCompletions(events);
+    ASSERT_EQ(engine.Jobs().GetState(token), Runtime::JobState::AwaitingApply);
+    resource.reset();
+    engine.Shutdown();
+    EXPECT_TRUE(released);
+    EXPECT_EQ(finalizers, 1u);
+    EXPECT_TRUE(engine.Jobs().SnapshotAll().empty());
 }

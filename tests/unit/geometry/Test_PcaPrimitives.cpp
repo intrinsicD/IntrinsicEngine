@@ -192,3 +192,28 @@ TEST(PcaPrimitives, SmallSeparatedSpectrumKeepsItsEigenvectors)
         EXPECT_LE(glm::length(matrix*result.Eigenvectors[i]-result.Eigenvalues[i]*result.Eigenvectors[i]),1e-20);
     }
 }
+
+TEST(PcaPrimitives, PortableDoubleEigenSolverPreservesEigenpairsAndRepeatedRoots)
+{
+    // Analytically constructed SPD matrices exercise both the closed form and its
+    // repeated-root fallback independently of PCA's covariance implementation.
+    for (const glm::dvec3 spectrum : {glm::dvec3(7, 2, .03), glm::dvec3(3, 3, .1),
+                                      glm::dvec3(3, 3-1e-8, .1), glm::dvec3(4, 0, 0)})
+        for (int sample = 0; sample < 40; ++sample)
+        {
+            const auto u = glm::normalize(glm::dvec3(1+sample*.03, -.7, .2));
+            const auto v = glm::normalize(glm::cross(u, glm::dvec3(.1, 1, -.4)));
+            const auto w = glm::cross(u,v);
+            const glm::dmat3 basis(u,v,w);
+            const glm::dmat3 matrix = basis * glm::dmat3(spectrum.x,0,0, 0,spectrum.y,0, 0,0,spectrum.z) * glm::transpose(basis);
+            const auto result = Geometry::PCA::SymmetricEigen3(matrix[0][0],matrix[0][1],matrix[0][2],
+                                                               matrix[1][1],matrix[1][2],matrix[2][2]);
+            for (int i = 0; i < 3; ++i)
+            {
+                EXPECT_NEAR(result.Eigenvalues[i], spectrum[i], 1e-11);
+                EXPECT_LE(glm::length(matrix*result.Eigenvectors[i]-result.Eigenvalues[i]*result.Eigenvectors[i]), 1e-11);
+                EXPECT_NEAR(glm::length(result.Eigenvectors[i]), 1, 1e-12);
+            }
+            EXPECT_NEAR(glm::dot(glm::cross(result.Eigenvectors[0],result.Eigenvectors[1]),result.Eigenvectors[2]),1,1e-12);
+        }
+}
