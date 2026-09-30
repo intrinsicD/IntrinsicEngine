@@ -116,9 +116,17 @@ Read-only reviewers inspect a fixed diff; source edits invalidate affected revie
 results. Reconcile integrations and verify the combined source before reporting it complete.
 Interactive isolation does not require task claims or a work graph.
 
-Run focused targets first; broaden only when the focused gate passes and the change warrants it.
+Testing must be fast: run only the affected tests. For slices, small tasks, and refactors:
+1. List the new/changed test files plus existing tests that directly exercise the changed code (`grep -rl <Module|Symbol> tests/`).
+2. Map each to its executable: `grep <file> build/ci/test-inventories/RegisteredTestSources.tsv`.
+3. Build only those targets and run only their suites (CTest names are `<Suite>.<Case>`):
+```
+cmake --build --preset ci --target <IntrinsicXxxTests>
+ctest --test-dir build/ci --output-on-failure --timeout 60 -R '^(SuiteA|SuiteB)\.'
+```
+Do not broaden to the full suite on your own. It runs only when the operator asks, or when a focused selection cannot be bounded (CMake/test-registry/toolchain changes, a widely imported module interface, a cross-cutting refactor) — state that reason first. A green focused run is sufficient before commit/push; PR/merge CI owns the full gates.
 
-Touched-scope helper for local iteration:
+Optional touched-scope helper (if its plan falls back to the broad route, do not `--run` it; select tests manually as above):
 ```
 python3 tools/ci/touched_scope.py --root . --local --base-ref origin/main --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --print
 python3 tools/ci/touched_scope.py --root . --local --base-ref origin/main --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --run
@@ -127,7 +135,7 @@ python3 tools/ci/touched_scope.py --root . --local --base-ref origin/main --pres
 `--local` includes committed changes through `HEAD`, staged/unstaged edits, and
 non-ignored untracked files. CI omits it and supplies exact base/head revisions.
 
-Default CPU gate (when code/tests touched):
+Full CPU gate (operator-triggered or justified as above):
 ```
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
@@ -142,7 +150,7 @@ python3 tools/agents/generate_session_brief.py --check   # when tasks/ changed
 python3 tools/agents/sync_skills.py --check              # when docs/agent/* changed
 ```
 
-Layering-touching changes (in addition to the default gate):
+Layering-touching changes (in addition to the focused tests):
 ```
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict

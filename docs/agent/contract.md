@@ -324,7 +324,11 @@ Method manifests live at `methods/**/method.yaml` and are validated by
 
 For each change:
 
-- Run the strongest relevant subset of repository verification commands.
+- Run only the tests affected by the change: new/changed tests plus existing tests that directly exercise the changed
+  code. Build only their owning executable(s) (look up `build/ci/test-inventories/RegisteredTestSources.tsv`) and
+  select their suites with `ctest -R '^(Suite)\.'`. Slices, small tasks, and local refactors never run the full suite.
+  The full suite runs only when the operator asks, or when a focused selection cannot be bounded (CMake/test-registry/
+  toolchain changes, a widely imported module interface, a cross-cutting refactor); state the reason before running.
 - Add/update tests for behavior changes.
 - Preserve or improve pass rate unless a temporary shim is documented.
 - Label tests using the documented CTest allow-list in `tests/README.md` and `tests/CMakeLists.txt` (categories:
@@ -351,7 +355,7 @@ For each change:
       CTest command just run.
     - For noisy commands, capture full output with `tee`, display a bounded tail, and use `set -o pipefail` so filtering
       does not hide failures.
-- The default CPU-supported correctness gate is:
+- The full CPU-supported correctness gate (operator-triggered, justified as above, or run by PR/merge CI) is:
 
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60

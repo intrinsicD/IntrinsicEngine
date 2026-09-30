@@ -155,14 +155,30 @@ work also reads the [consumer inventory](docs/architecture/spatial-index-consume
 
 ## 7. Testing protocol
 
-Run the strongest relevant verification, focused targets first. Add/update tests
-for behavior changes; do not weaken gates to reach green. Before code, build, or
-test changes, read [verification requirements](docs/agent/contract.md#testing-and-verification-protocol)
-for labels, touched-scope feedback, full CPU, sanitizer, and Vulkan gates.
+Testing must be fast. Add/update tests for behavior changes; do not weaken gates
+to reach green. Before code, build, or test changes, read
+[verification requirements](docs/agent/contract.md#testing-and-verification-protocol)
+for labels, focused selection, full CPU, sanitizer, and Vulkan gates.
 Task-specific stricter checks still apply. C++ tests use `Test.<Name>.cpp`;
 do not rename legacy test files outside an explicit mechanical task.
 
-Default code/test gate:
+Default code/test gate is **focused**: build only the test executable(s) that own
+the new, changed, or directly affected tests and run only those suites. Map a
+test source to its executable via `build/ci/test-inventories/RegisteredTestSources.tsv`;
+CTest names are `<Suite>.<Case>`.
+
+```bash
+cmake --build --preset ci --target <IntrinsicXxxTests>
+ctest --test-dir build/ci --output-on-failure --timeout 60 -R '^(SuiteA|SuiteB)\.'
+```
+
+Do not run the full suite (`IntrinsicTests` + unfiltered CTest) for slices,
+small tasks, or local refactors. It runs only when the operator asks, or when a
+focused selection cannot be bounded (CMake/test-registry/toolchain changes, a
+widely imported module interface, a cross-cutting refactor); state that reason
+before running it. PR/merge CI owns the full CPU, sanitizer, and Vulkan gates.
+
+Full suite (operator-triggered or justified as above):
 
 ```bash
 cmake --preset ci
@@ -231,8 +247,8 @@ quarantine a gate without diagnosis. A pre-existing/environmental failing check
 requires a `BUG-` task with evidence in the same session and a PR reference.
 For a failure or CI/workflow change, read the [CI requirements](docs/agent/contract.md#ci-expectations)
 and [failure procedure](docs/agent/prompt/prompt.md#when-ci-fails).
-Code verification configures `ci`, builds a meaningful target, and runs CTest;
-`help` is not verification. Docs-only work follows §7's structural route.
+Code verification builds the affected test target(s) in `ci` and runs their
+CTest suites (§7); `help` is not verification. Docs-only work follows §7's structural route.
 
 ## 11. Task execution workflow
 
