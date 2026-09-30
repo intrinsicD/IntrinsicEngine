@@ -24,10 +24,15 @@ nearest-other spacing and standard deviation uses population variance.
 
 This is a local Gaussian score with spacing-based bandwidth. It does not sum
 all n Gaussian contributions, estimate a covariance bandwidth matrix or claim a
-normalized probability distribution over the ambient domain. It preserves the
-existing float arithmetic; invalid/nonfinite input, malformed supplied candidate
-rows, or unrepresentable float kernel values reject the operation before output
-publication. Underflowed individual distant contributions can be zero.
+normalized probability distribution over the ambient domain. Coordinates are
+promoted before subtraction; distances, squared distances, bandwidth estimation,
+Gaussian values, normalization and ordered reductions use double with no FMA
+contraction. Float properties round only at publication. Invalid inputs or
+unrepresentable outputs refuse publication. Exponents below -708 yield a zero kernel on CPU and Vulkan. Normalized
+products and per-point means below `DBL_MIN` likewise flush to zero before the
+operation; these neighbors still count in the averaging denominator. Widely
+separated points therefore produce finite densities without refusing the run. Float-subnormal
+kernels such as exp(-90) remain supported and may normalize to normal outputs.
 
 Literature reviewed: [Silverman (1986), §§2.4–2.5](https://ned.ipac.caltech.edu/level5/March02/Silverman/Silver_contents.html)
 provides the kernel/nearest-neighbor background. The engine's spacing floors and
@@ -40,17 +45,20 @@ bandwidth/FFT approaches; this integration does not adopt those estimators.
 
 - `cpu_octree` remains the default CPU reference.
 - `cpu_lbvh` borrows an immutable canonical-domain `SpatialIndexCache` snapshot.
-- `vulkan_lbvh` uses framed kNN queries and readback from that cache, followed by
-  CPU bandwidth selection and Gaussian evaluation. It requires the operational
-  GPU query path and JobService; unsupported requests fail explicitly.
+- `vulkan_lbvh` records `Graphics.PointScalarAnalysis` over the canonical resident
+  position slot and cached LBVH. kNN rows, nearest spacing, automatic bandwidth,
+  Gaussian evaluation and fixed-order double reductions stay on the device.
+  The host supplies double `pow(n,-0.2)` and `(2*pi)^1.5` constants; the device
+  retains double scratch bandwidth and nearest distances between passes.
 
-The same candidate rows supply nearest-other spacing and Gaussian support, so
-no separate bandwidth query or radius cutoff is needed. Vulkan accepts k=0..63
-(k<2 is floored to two), at most 2^20 live samples and query chunks of 1..16384.
-CPU LBVH accepts at most 2^24 live samples. Both LBVH paths require coordinates
-within 1e18. Supplied-candidate LBVH storage costs O(n min(n,max(k,2)+1)); the CPU reference
-streams rows with O(n+k) query scratch. GPU transient buffers
-are additionally bounded by chunk size. CPU octree has no Vulkan k limit.
+The same candidate rows supply nearest-other spacing and Gaussian support.
+Vulkan accepts k=0..63 (k<2 is floored to two), at most 2^20 live samples,
+2^24 property rows and 2^24 neighbor entries. CPU LBVH accepts 2^24 samples.
+Both LBVH paths require coordinates within 1e18. Vulkan refuses subnormal
+coordinates/float parameters and non-float output storage. It requires shader
+float64 (the shared workspace capability contract), a framed cache and jobs.
+The persisted query batch size remains config-compatible but does not paginate
+this single resident compute submission. CPU octree has no Vulkan k limit.
 
 Distances use the bound property's coordinates. Entity transforms do not alter
 this metric; bind world-space samples when that is the intended measurement.
@@ -108,3 +116,50 @@ records this slice.
 The [2026-09-09 verification record](../../ara/evidence/tables/density_vulkan_verification_2026-09-09.md)
 binds the bounded CPU/Vulkan result to C82. It reports zero observed GPU density
 delta at 1e-5 tolerance, with CPU bandwidth and evaluation retained.
+
+## Resident scalar transaction
+
+| method.engine-integration | Publication |
+| --- | --- |
+| Kernel density | GPU preview: yes; commit via `GpuFrontReadback` → `PublishPointScalarField` → `BindRevision(key, revision, publication)`. |
+
+The panel offers Accept/Discard and stale refusal reasons; detach discards.
+Batch/agent Apply accepts automatically. The scalar front is observed by the
+colormap before Accept, with CPU rows unchanged. Deleted output rows are copied
+from the resident base, or zero for a new output. Results and agent messages
+report input upload bytes, residency hits and Accept readback bytes. There is no
+CPU neighborhood reduction. A second unchanged-input run reuses resident input.
+
+`PointScalarTransaction` contract tests cover publication, revision binding,
+undo, discard, stale inputs/outputs and config round trips. The opt-in
+`RUNTIME298PointScalarResidency.ParityResidentSecondRunAndDiscard` compares the
+resident result to the CPU reference, records each measured maximum absolute
+delta, and checks zero-upload reuse and deleted-row preservation. Its fixture
+uses a 2e-5 absolute tolerance plus relative checks for final float publication; existing
+multi-domain tests retain their 1e-5 bounds. GPU execution of this port is pending;
+previous neighborhood-only parity records do not establish parity for this kernel.
+
+### Numerical query and exponential contract
+
+The CPU octree/LBVH queries opt into double box distances and double candidate
+keys, ordered by `(squared distance, source index)`. Resident shaders use
+`point_lbvh_double.glsl` over the existing nodes, including identical candidate
+caps and self removal. The default standalone float query ABI is unchanged.
+No float-distance pruning or limited slack-candidate reranking is used here.
+
+`exp_double.glsl` evaluates a degree-13 Taylor polynomial after split-ln(2)
+range reduction. On [-708,0], its truncation error is below 5e-18 relative;
+allowing rounded, uncontracted binary64 operations gives a conservative 8e-15
+relative error budget. A host translation of the exact shader expression,
+compiled with contraction off, measured 2.219e-16 maximum relative difference
+from `std::exp` over 4,003,064 uniformly spaced and reduction-boundary samples.
+This is a host arithmetic check; real-device parity is exercised by
+`RUNTIME298PointScalarResidency.ParityResidentSecondRunAndDiscard`, including
+h=1e-12 with points 1.34e-11 apart and relative error checks that reject zero.
+
+Supplied-neighbor APIs validate monotonic squared distances in double, promoting
+coordinates before subtraction and breaking exact ties by source ID. Candidate
+rows sorted using float-rounded distance keys can therefore be rejected even
+when their membership is correct. This applies to KDE, radii/statistics and
+local-distance-ratio `*FromNeighbors` entry points; bilateral filtering retains
+its float-distance contract.

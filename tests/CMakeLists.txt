@@ -1307,6 +1307,7 @@ if(TARGET ExtrinsicRuntime)
         Test.SpatialIndexCache.cpp
         Test.GpuPropertyBinding.cpp
         Test.PropertySmoothingTransaction.cpp
+        Test.PointScalarTransaction.cpp
         Test.OutlierTransaction.cpp
         Test.NormalTransaction.cpp
         Test.GpuPositionsAccept.cpp
@@ -1837,6 +1838,7 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
                 integration/graphics/Test.PropertySmoothingTransactionGpuSmoke.cpp
                 integration/graphics/Test.GpuPositionPreviewSmoke.cpp
                 integration/graphics/Test.GpuPositionsAcceptSmoke.cpp
+                integration/graphics/Test.PointScalarTransactionGpuSmoke.cpp
                 integration/graphics/Test.OutlierTransactionGpuSmoke.cpp
                 integration/graphics/Test.VertexNormalsTransactionGpuSmoke.cpp
         DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore

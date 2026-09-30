@@ -42,7 +42,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         indices.reserve(indices.size() + points.size() * width);
         for (const auto point : points)
         {
-            const auto row = source.Index.KNearest(point, width);
+            const auto row = source.Index.KNearest(point, width, Geometry::PointLBVH::InvalidIndex, true);
             if (row.size() != width)
             {
                 diagnostic = "Incomplete CPU kNN neighborhood.";

@@ -316,7 +316,9 @@ TEST(OutlierAnalysis, RadiusBoundaryAndStatisticalMinimumMatchAcrossCpuBackends)
     auto config=Config(entity,D::PointCloudPoint);config.Method=R::OutlierAnalysisMethod::Radius;config.Radius=.5f;
     R::SpatialIndexCache cache(worlds);R::EditorProcessingContext context{.Scene=&scene,.World=world,.SpatialIndices=&cache};
     ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Succeeded());
-    const auto scores=std::as_const(props).Get<float>("scores").Vector();EXPECT_EQ(scores[0],2);
+    // Stored .3f/.4f give d^2=0.25000001192092913, 1.1921e-8 above .5^2.
+    // Float arithmetic rounded this neighbor onto the boundary; double excludes it.
+    const auto scores=std::as_const(props).Get<float>("scores").Vector();EXPECT_EQ(scores[0],1);
     config.Backend=R::OutlierAnalysisBackend::CpuLBVH;
     ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Succeeded());
     EXPECT_EQ(std::as_const(props).Get<float>("scores").Vector(),scores);

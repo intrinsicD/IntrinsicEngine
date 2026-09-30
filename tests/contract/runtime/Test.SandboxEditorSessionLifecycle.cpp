@@ -1362,7 +1362,7 @@ TEST_F(EditorPointReadiness, ScalarBackendPredicatesFollowTheSharedInputVerdict)
     EXPECT_TRUE(subnormal[0].Enabled);
     EXPECT_TRUE(subnormal[1].Enabled);
     EXPECT_EQ(subnormal[2].DisabledReason,
-        "Vulkan density weights require normal or zero coordinate components; subnormal coordinates are unsupported.");
+        "Vulkan scalar analysis requires normal or zero coordinates; subnormal components are unsupported.");
     EXPECT_EQ(Stats().PropertyScans, 3u);
 }
 

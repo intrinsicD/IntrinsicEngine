@@ -41,7 +41,7 @@ namespace
         std::optional<R::EditorOutlierAnalysisResult> Accepted{};
         entt::entity Entity{};
         int Step{},Method{};
-        bool Done{};
+        bool Done{},Boundary{};
         std::vector<float> SavedScores{};
         std::vector<std::uint32_t> SavedMask{};
         std::chrono::steady_clock::time_point Started{};
@@ -79,11 +79,24 @@ namespace
             if(std::chrono::steady_clock::now()-Started>std::chrono::seconds(120)){Fail("Outlier smoke timed out");return;}
             if(!Kernel().GetDevice().IsOperational()||!Context.SpatialIndices)return;
             if(Step==0){
+                if(Boundary){
+                    auto p=Rows().Get<glm::vec3>("v:position");
+                    p[0]={0,0,0};p[1]={1e-20f,0,0};p[2]={3e-20f,0,0};
+                    auto deleted=Rows().Get<bool>("v:deleted");for(unsigned j=3;j<67;++j)deleted[j]=true;
+                    Config.KNeighbors=1;Config.Radius=1.5e-20f;Config.MinimumNeighbors=1;
+                }
                 Config.Method=R::OutlierAnalysisMethod(Method);
                 auto cpu=Config;cpu.Backend=R::OutlierAnalysisBackend::CpuOctree;cpu.Score.Name="cpu_score";cpu.Mask.Name="cpu_mask";
                 auto context=Context;context.JobCommands={};
                 const auto result=R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),cpu);
                 if(!result.Succeeded()){Fail(result.Message);return;}
+                // A rejected initial submission returns one terminal result without calling its sink.
+                const auto submit=Context.JobCommands.Submit;
+                Context.JobCommands.Submit=[](R::JobDesc,R::EditorJobIdentity){return R::JobToken{};};
+                unsigned callbacks=0;
+                const auto rejected=R::ApplyEditorOutlierAnalysisCommand(Commands(),Config,[&](auto){++callbacks;});
+                EXPECT_EQ(rejected.Status,R::EditorCommandStatus::GeometryProcessingFailed);EXPECT_EQ(callbacks,0u);
+                Context.JobCommands.Submit=submit;
                 Start();Step=1;return;
             }
             const auto snapshot=R::SnapshotEditorOutlierAnalysis(Commands(),Run);
@@ -107,9 +120,11 @@ namespace
                     delta=std::max(delta,std::abs(double(SavedScores[i])-scores[i]));
                     EXPECT_EQ(SavedMask[i],mask[i])<<"method "<<Method<<" row "<<i;
                 }
-                // Ordered float distance sums and division may differ by a few ulps on the
-                // device. Counts/masks and untouched deleted-row bytes must match exactly.
-                ::testing::Test::RecordProperty("outlier_method_"+std::to_string(Method)+"_max_abs_delta",std::to_string(delta));
+                // Double sums and classification precede float publication. Relative checks
+                // detect a flushed tiny statistical distance, with exact counts and masks.
+                if(Boundary)for(unsigned j=0;j<3;++j)
+                    EXPECT_NEAR(SavedScores[j],scores[j],std::abs(double(scores[j]))*2e-6);
+                ::testing::Test::RecordProperty(std::string(Boundary?"boundary_outlier_method_":"outlier_method_")+std::to_string(Method)+"_max_abs_delta",std::to_string(delta));
                 EXPECT_LE(delta,2e-5);EXPECT_EQ(SavedScores[66],scores[66]);
                 Start();Step=3;return;
             }
@@ -119,7 +134,7 @@ namespace
                 R::DiscardEditorOutlierAnalysis(Commands(),Run);
                 EXPECT_EQ(std::as_const(Rows()).Get<float>(Config.Score.Name).Vector(),SavedScores);
                 EXPECT_EQ(std::as_const(Rows()).Get<std::uint32_t>(Config.Mask.Name).Vector(),SavedMask);
-                Run.reset();if(++Method==3){Done=true;Kernel().RequestExit();}else Step=0;
+                Run.reset();if(++Method==3){if(Boundary){Done=true;Kernel().RequestExit();}else{Boundary=true;Method=0;Step=0;}}else Step=0;
             }
         }
         void Shutdown() override {R::DiscardEditorOutlierAnalysis({},Run);Run.reset();Context={};}

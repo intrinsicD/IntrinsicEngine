@@ -18,6 +18,7 @@ module Geometry.PointCloud.Kernels;
 import Geometry.AABB;
 import Geometry.KDTree;
 
+#pragma clang fp contract(off)
 namespace Geometry::PointCloud::Kernels
 {
     namespace
@@ -258,7 +259,9 @@ namespace Geometry::PointCloud::Kernels
         // Using min_normal also keeps the query square out of the FTZ range.
         constexpr double epsilon=std::numeric_limits<float>::epsilon();
         constexpr double minimum=std::numeric_limits<float>::min();
-        const double expanded=std::sqrt(h*h*(1+8*epsilon)+8*minimum);
+        // Below 1e-100, h^2 is irrelevant at the float-minimum floor. Avoid
+        // forming an underflowing double square for normal tiny support radii.
+        const double expanded=std::sqrt((h<1e-100?0.0:h*h*(1+8*epsilon))+8*minimum);
         if(expanded>=maximum)return std::numeric_limits<float>::max();
         float radius=static_cast<float>(expanded);
         if(static_cast<double>(radius)<expanded)

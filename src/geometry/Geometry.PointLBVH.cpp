@@ -11,6 +11,7 @@ module;
 #include <vector>
 module Geometry.PointLBVH;
 
+#pragma clang fp contract(off)
 namespace Geometry::PointLBVH
 {
     namespace
@@ -97,23 +98,29 @@ namespace Geometry::PointLBVH
             return a.SquaredDistance < b.SquaredDistance ||
                    (a.SquaredDistance == b.SquaredDistance && a.Index < b.Index);
         }
-        float BoxDistance(const Node& node, glm::vec3 query)
+        double PreciseDistance(glm::vec3 a, glm::vec3 b)
         {
-            return Distance(query, glm::clamp(query, node.Min, node.Max));
+            const glm::dvec3 d=glm::dvec3(a)-glm::dvec3(b);
+            return (d.x*d.x+d.y*d.y)+d.z*d.z;
+        }
+        double BoxDistance(const Node& node, glm::vec3 query)
+        {
+            return PreciseDistance(query, glm::clamp(query, node.Min, node.Max));
         }
         // Visits every leaf whose box is within `limit`, nearer child first so shrinking
         // kNN/nearest limits prune early. Pruning is strict, so boxes at exactly the limit
         // are still visited and index tie-breaks do not depend on visit order.
         template <typename Visit>
-        void Traverse(std::span<const Node> nodes, glm::vec3 query, float& limit, Visit visit)
+        void Traverse(std::span<const Node> nodes, glm::vec3 query, auto& limit, Visit visit, bool doubleDistances = false)
         {
             if (nodes.empty() || !ValidPoint(query))
                 return;
             // Tree depth is at most the key length: nine 30-bit Morton digits and a 32-bit id,
             // 302 bits. Each expansion replaces one entry by at most two, so 304 entries suffice.
-            struct Entry { std::uint32_t Node; float Distance; };
+            const auto boxDistance=[&](const Node& node){return doubleDistances ? BoxDistance(node,query) : double(Distance(query,glm::clamp(query,node.Min,node.Max)));};
+            struct Entry { std::uint32_t Node; double Distance; };
             std::array<Entry, 304> stack{};
-            stack[0] = {0u, BoxDistance(nodes[0], query)};
+            stack[0] = {0u, boxDistance(nodes[0])};
             std::uint32_t size = 1;
             while (size)
             {
@@ -126,8 +133,8 @@ namespace Geometry::PointLBVH
                     visit(node.Object);
                     continue;
                 }
-                Entry near{node.Left, BoxDistance(nodes[node.Left], query)};
-                Entry far{node.Right, BoxDistance(nodes[node.Right], query)};
+                Entry near{node.Left, boxDistance(nodes[node.Left])};
+                Entry far{node.Right, boxDistance(nodes[node.Right])};
                 if (far.Distance < near.Distance) std::swap(near, far);
                 if (far.Distance <= limit) stack[size++] = far;
                 if (near.Distance <= limit) stack[size++] = near;
@@ -301,48 +308,53 @@ namespace Geometry::PointLBVH
         return best;
     }
     RadiusResult Index::Radius(glm::vec3 query, float radius, std::uint32_t capacity,
-                              std::uint32_t excludedIndex) const
+                              std::uint32_t excludedIndex, bool doubleDistances) const
     {
         RadiusResult result;
         if (!std::isfinite(radius) || radius < 0 || radius > CoordinateLimit)
             return result;
-        float limit = radius * radius;
+        double limit = doubleDistances ? double(radius) * double(radius) : double(radius*radius);
         Traverse(m_Nodes, query, limit, [&](std::uint32_t i) {
             if (i == excludedIndex) return;
-            const float d = Distance(m_Points[i], query);
+            const double d = doubleDistances ? PreciseDistance(m_Points[i], query) : double(Distance(m_Points[i],query));
             if (d > limit)
                 return;
             ++result.TotalCount;
             auto at = std::ranges::lower_bound(result.Neighbors, i, {}, &Neighbor::Index);
             if (at != result.Neighbors.end() || result.Neighbors.size() < capacity)
-                result.Neighbors.insert(at, {i, d});
+                result.Neighbors.insert(at, {i, float(d)});
             if (result.Neighbors.size() > capacity)
                 result.Neighbors.pop_back();
-        });
+        }, doubleDistances);
         return result;
     }
     std::vector<Neighbor> Index::KNearest(glm::vec3 query, std::uint32_t k,
-                                          std::uint32_t excludedIndex) const
+                                          std::uint32_t excludedIndex, bool doubleDistances) const
     {
         std::vector<Neighbor> result;
         k = std::min(k, static_cast<std::uint32_t>(m_Points.size()));
         if (k == 0 || !ValidPoint(query)) return result;
         result.reserve(k);
-        float limit = std::numeric_limits<float>::infinity();
+        const auto better = [&](const Neighbor& a,const Neighbor& b) {
+            if(!doubleDistances)return Better(a,b);
+            const double da=PreciseDistance(m_Points[a.Index],query),db=PreciseDistance(m_Points[b.Index],query);
+            return da<db || (da==db && a.Index<b.Index);
+        };
+        double limit = std::numeric_limits<double>::infinity();
         Traverse(m_Nodes, query, limit, [&](std::uint32_t i) {
             if (i == excludedIndex) return;
             const Neighbor candidate{i, Distance(m_Points[i], query)};
             if (result.size() == k)
             {
-                if (!Better(candidate, result.front())) return;
-                std::pop_heap(result.begin(), result.end(), Better);
+                if (!better(candidate, result.front())) return;
+                std::pop_heap(result.begin(), result.end(), better);
                 result.pop_back();
             }
             result.push_back(candidate);
-            std::push_heap(result.begin(), result.end(), Better);
-            if (result.size() == k) limit = result.front().SquaredDistance;
-        });
-        std::ranges::sort(result, Better);
+            std::push_heap(result.begin(), result.end(), better);
+            if (result.size() == k) limit = doubleDistances ? PreciseDistance(m_Points[result.front().Index],query) : double(result.front().SquaredDistance);
+        }, doubleDistances);
+        std::ranges::sort(result, better);
         return result;
     }
 } // namespace Geometry::PointLBVH

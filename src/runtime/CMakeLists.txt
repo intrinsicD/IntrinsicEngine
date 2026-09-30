@@ -47,6 +47,7 @@ target_sources(${target_name}
         Editor/Runtime.EditorCommandHistory.cppm
         Editor/Runtime.EditorCommon.cppm
         Editor/Runtime.EditorProcessing.cppm
+        Editor/Operations/Runtime.PointScalarTransaction.cppm
         Editor/Operations/Runtime.PointFieldOperations.cppm
         Editor/Operations/Runtime.PointAnalysisOperations.cppm
         Editor/Operations/Runtime.PointSetOperations.cppm
@@ -151,6 +152,7 @@ target_sources(${target_name}
         Modules/Curvature/Runtime.MeshCurvatureConfig.cpp
         Modules/Geodesics/Runtime.GeodesicsConfig.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp
+        Editor/Operations/Runtime.PointScalarTransaction.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Density.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.GpuPositions.cpp

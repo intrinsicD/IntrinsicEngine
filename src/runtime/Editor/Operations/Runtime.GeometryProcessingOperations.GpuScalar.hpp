@@ -1,0 +1,15 @@
+// Private adapter into the compiled resident scalar lifecycle; captures retain method publication semantics.
+#pragma once
+extern "C++" {
+namespace Extrinsic::Runtime::GeometryProcessingDetail
+{
+    [[nodiscard]] bool AdmitPointScalarGpu(const EditorProcessingContext&,const PointScalarCapture&,
+        const Graphics::PointScalarGpuParams&,std::string&);
+    [[nodiscard]] EditorPointScalarTransactionHandle StartPointScalarGpu(
+        const EditorProcessingContext&,std::shared_ptr<PointScalarCapture>,entt::entity,std::uint32_t stableId,
+        GeometryPropertyRef positions,const Graphics::PointScalarGpuParams&,std::string label,
+        EditorPointScalarTransactionSnapshot&,std::function<void(EditorPointScalarTransactionSnapshot)>,bool automatic,
+        Graphics::GpuPropertyResidency* testResidency=nullptr,
+        const EditorPointScalarTransactionSnapshot& testResult = {});
+}
+}

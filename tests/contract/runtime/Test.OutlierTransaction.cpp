@@ -128,7 +128,7 @@ TEST(OutlierTransaction, UnsupportedStorageAndSubnormalInputsRefuseAdmission)
     EXPECT_NE(failure.Message.find("subnormal positions"),std::string::npos);
 }
 
-TEST(OutlierTransaction, RadiusSquaredUnderflowIsRefusedButNormalBoundaryPassesThatGate)
+TEST(OutlierTransaction, FloatSubnormalRadiusSquaredPassesNumericalAdmission)
 {
     Harness h; R::SpatialIndexCache cache;
     h.Context.SpatialIndices=&cache; h.Device.ShaderFloat64=true;
@@ -141,10 +141,9 @@ TEST(OutlierTransaction, RadiusSquaredUnderflowIsRefusedButNormalBoundaryPassesT
         const auto preview=R::PreviewEditorOutlierAnalysisCommand(h.Commands(),h.Config);
         R::EditorOutlierAnalysisResult failure;
         EXPECT_FALSE(R::StartEditorOutlierAnalysisTransaction(h.Commands(),h.Config,failure));
-        const bool tooSmall=double(radius)*double(radius)<std::numeric_limits<float>::min();
-        EXPECT_EQ(preview.DisabledReason.find("radius squared")!=std::string::npos,tooSmall);
-        EXPECT_EQ(failure.Message.find("radius squared")!=std::string::npos,tooSmall);
-        if(!tooSmall)EXPECT_NE(failure.Message.find("spatial cache and job service"),std::string::npos);
+        // Double radius squares are normal: 1e-40 is ~268 orders above DBL_MIN.
+        EXPECT_EQ(preview.DisabledReason.find("radius squared"),std::string::npos);
+        EXPECT_NE(failure.Message.find("spatial cache and job service"),std::string::npos);
     }
 }
 
@@ -175,4 +174,42 @@ TEST(OutlierTransaction, NeighborhoodWidthMatchesEachMethodAndClampsSmallInputs)
     EXPECT_EQ(G::OutlierNeighborWidth(2,1,100),3u);
     EXPECT_EQ(G::OutlierNeighborWidth(2,63,2),2u);
     EXPECT_EQ(G::OutlierNeighborWidth(0,~0u,5),5u);
+}
+
+TEST(OutlierTransaction, InitialSubmissionRejectsWithoutCallback)
+{
+    Harness h; auto& Context=h.Context; auto& Device=h.Device; auto& Jobs=h.Jobs;
+    R::SpatialIndexCache cache;Context.SpatialIndices=&cache;Device.ShaderFloat64=true;
+    R::CommandBus commands;R::KernelEventBus events;R::WorldRegistry worlds;R::ServiceRegistry services;
+    Context.World=worlds.CreateWorld("initial-rejection");Context.Scene=worlds.Get(Context.World);
+    const auto entity=Intrinsic::Tests::MakePointDomainSource(*Context.Scene,R::GeometryElementDomain::PointCloudPoint);
+    (void)Intrinsic::Tests::PointDomainProperties(*Context.Scene,entity,R::GeometryElementDomain::PointCloudPoint).GetOrAdd<glm::vec3>("v:position",glm::vec3{0});
+    h.Config.StableEntityId=R::SelectionController::ToStableEntityId(entity);
+    services.BeginRegistration();
+    ASSERT_TRUE(services.Provide<Extrinsic::RHI::IDevice>(Device,"test").has_value());
+    R::EngineSetup setup{commands,events,Jobs.Jobs(),worlds,services,[](R::FramePhase,R::RuntimeFrameHook){}};
+    ASSERT_TRUE(cache.OnRegister(setup).has_value());
+    unsigned callbacks=0,submissions=0;
+    Context.JobCommands.Submit=[&](R::JobDesc,R::EditorJobIdentity){++submissions;return R::JobToken{};};
+    const auto result=R::ApplyEditorOutlierAnalysisCommand(h.Commands(),h.Config,[&](auto){++callbacks;});
+    EXPECT_EQ(result.Status,R::EditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_EQ(submissions,1u);EXPECT_EQ(callbacks,0u); // One terminal outcome, returned directly.
+    R::RuntimeModuleShutdownContext shutdown{commands,events,Jobs.Jobs(),worlds,services};cache.OnShutdown(shutdown);
+}
+
+TEST(OutlierTransaction, ReplacedRingRefusesAcceptAndDiscardPreservesReplacement)
+{
+    for(unsigned slot=0;slot<3;++slot){
+        Harness h;auto run=h.Ready();ASSERT_TRUE(run);
+        const auto ref=slot==0?h.Config.Score:slot==1?h.Config.Mask:R::GpuPropertyPresentationRef(h.Config.Mask);
+        const auto key=h.Key(ref);
+        ASSERT_TRUE(h.Residency.Discard(key,h.Residency.RingGeneration(key)));
+        auto replacement=R::AcquireGpuPropertyOutput(h.Residency,h.Context.World,h.Entity,ref,
+            std::uint32_t(h.Rows().Size()),3);
+        ASSERT_TRUE(replacement);const auto generation=h.Residency.RingGeneration(key);
+        EXPECT_FALSE(R::SnapshotEditorOutlierAnalysis(h.Commands(),run).CanAccept);
+        EXPECT_EQ(R::AcceptEditorOutlierAnalysis(h.Commands(),run).Status,R::EditorCommandStatus::StaleEntity);
+        R::DiscardEditorOutlierAnalysis(h.Commands(),run);
+        EXPECT_EQ(h.Residency.RingGeneration(key),generation);
+    }
 }

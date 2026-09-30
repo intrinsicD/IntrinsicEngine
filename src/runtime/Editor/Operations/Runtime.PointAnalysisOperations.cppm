@@ -13,6 +13,7 @@ module;
 #include <string>
 export module Extrinsic.Runtime.PointAnalysisOperations;
 export import Extrinsic.Runtime.EditorProcessing;
+export import Extrinsic.Runtime.PointScalarTransaction;
 export import Extrinsic.Runtime.EditorCommon;
 export import Extrinsic.Runtime.OutlierAnalysisConfig;
 export import Extrinsic.Runtime.KeypointAnalysisConfig;
@@ -87,6 +88,7 @@ export namespace Extrinsic::Runtime
         Geometry::PointCloud::Kernels::DensityWeightDiagnostics Diagnostics{};
         float QueryRadius{}, MinWeight{}, MaxWeight{};
         std::size_t MaximumNeighbors{};
+        std::uint64_t GpuInputUploadBytes{}, GpuInputCacheHits{}, CpuStageReadbackBytes{};
         bool IndexReused{};
         std::size_t GpuQueryBatches{};
         double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
@@ -152,6 +154,13 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::optional<KeypointAnalysisConfig> GetEditorKeypointAnalysisConfig(const EditorProcessingCommands&);
     [[nodiscard]] EditorKeypointAnalysisResult ApplyEditorConfiguredKeypointAnalysis(const EditorProcessingCommands&, std::function<void(EditorKeypointAnalysisResult)> onComplete = {});
 
+    // Fold complete transaction diagnostics into the method result retained by the caller.
+    void UpdateEditorPointScalarResult(EditorDensityWeightResult&, const EditorPointScalarTransactionSnapshot&);
+    [[nodiscard]] EditorPointScalarTransactionHandle StartEditorDensityWeightTransaction(
+        const EditorProcessingCommands&,const DensityWeightConfig&,EditorDensityWeightResult&,
+        std::function<void(EditorDensityWeightResult)> onComplete={});
+    [[nodiscard]] EditorPointScalarTransactionHandle MakeEditorDensityWeightTransactionForTest(
+        const EditorProcessingCommands&,const DensityWeightConfig&,std::vector<float>,Graphics::GpuPropertyResidency&, const EditorPointScalarTransactionSnapshot& diagnostics = {});
     [[nodiscard]] ActionReadiness PreviewEditorDensityWeightCommand(const EditorProcessingCommands&, const DensityWeightConfig&);
     [[nodiscard]] EditorDensityWeightResult ApplyEditorDensityWeightCommand(const EditorProcessingCommands&, const DensityWeightConfig&, std::function<void(EditorDensityWeightResult)> onComplete = {});
     [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorDensityWeightConfig(const EditorProcessingCommands&, const DensityWeightConfig&, std::string sourceId = {});

@@ -20,8 +20,9 @@ Statistical analysis scores each live sample by its mean Euclidean distance to
 k other samples. It requires `0 < k < live_count`. The threshold is the global
 mean of those scores plus `stddev_multiplier` times their **population** standard
 deviation. A finite score at the threshold is retained; larger scores are
-marked. Per-sample distance accumulation uses float and global moments use
-double. Coincident peers remain neighbors; only the source row is excluded.
+marked. Distances, per-sample means, ratios, global moments and classification use
+double, with contraction disabled. Coordinates are promoted before subtraction;
+only published scores/statistics round to float. Coincident peers remain neighbors; only the source row is excluded.
 
 Radius analysis scores each sample by the count of other live samples in the
 inclusive radius. A count below `minimum_neighbors` is marked. A zero minimum
@@ -50,16 +51,20 @@ select the reference's candidate set before self removal, including coincident
 peers and ties ordered by source row. The device workspace admits at most 2^20
 source slots and 2^24 candidate entries. CPU LBVH is limited to 2^24 samples.
 LBVH coordinates/radius must remain within 1e18. Vulkan requires shader float64,
-a float score and uint32 mask; unsupported storage, subnormal coordinates,
-radius analysis with radius squared below `FLT_MIN`, or excessive workspace sizes
+a float score and uint32 mask; unsupported storage, subnormal coordinates or float parameters,
+or excessive workspace sizes
 are refused explicitly. Radius uses one candidate entry per live point; the other
 methods use their clamped candidate count. No CPU fallback occurs.
-Float32 denormal preservation is not required: pairwise squared distances below
-`FLT_MIN` (separations below approximately 1.1e-19) may differ from the CPU on devices
-that flush denormals, even when the coordinates themselves are normal.
-Radius is the only configured threshold squared in float32. Local distance ratio
-compares its dimensionless score threshold directly; statistical classification
-computes and compares its derived distance threshold in float64.
+Radius squares and squared distances may be below `FLT_MIN`: the CPU and GPU
+compute them in double. Statistical and ratio masks are classified before float
+publication. The CPU octree and LBVH opt into double pruning and candidate keys;
+the resident shader uses `lbvhQueryDouble`. kNN sorts by double squared distance
+then source index, with identical pre-self-removal candidate limits. Radius
+membership compares double squares inclusively. The octree radius path uses an
+outward-rounded AABB broad phase followed by that same exact test. Float storage
+bounds nonzero coordinate differences and their squares far above `DBL_MIN`;
+nonzero subnormal input components remain refused on Vulkan because LBVH building
+still uses float arithmetic.
 The serialized batch-size control remains available to older query consumers;
 resident outlier scoring uses one device submission with chunked dispatches.
 
@@ -80,7 +85,7 @@ mask without any extra GPU readback.
 | Runtime/config/agent | Existing `PointAnalysisOperations` and `sandbox.outlier_analysis`; requested/actual backend retained. |
 | Publication | GPU preview: yes for score; commit via the outlier transaction's existing atomic undoable two-field publisher, followed by `BindRevision`; removal via the existing CPU removal command. |
 | IO | `GpuInputUploadBytes`, `GpuInputCacheHits`, `CpuStageReadbackBytes`; diagnostic messages also expose these to command/agent callers. Acceptance reads score/mask; no neighborhood download or CPU classification stage. |
-| Parity evidence | `RUNTIME297OutlierResidency.ParityResidentSecondRunAndDiscard` compares all three estimators, masks exactly and scores with absolute tolerance 2e-5 (ordered float distances and device sqrt/division rounding); emits `outlier_method_<n>_max_abs_delta`. Actual measured deltas require running this test on a Vulkan host; compilation alone supplies none. |
+| Parity evidence | `RUNTIME297OutlierResidency.ParityResidentSecondRunAndDiscard` compares all three estimators, masks exactly and scores with absolute tolerance 2e-5 (final float rounding); tiny-distance fixtures additionally check relative error; emits `outlier_method_<n>_max_abs_delta`. Actual measured deltas require running this test on a Vulkan host; compilation alone supplies none. |
 
 No speedup or automatic backend selection is claimed.
 
@@ -166,3 +171,10 @@ python3 tools/benchmark/validate_benchmark_results.py --root /tmp/outlier-benchm
 Use a distinct run ID for each invocation. This smoke follows the existing GPU
 cohort's leak setting; [BUG-180](../../tasks/backlog/bugs/BUG-180-framed-icp-leak-enabled-process-retention.md)
 tracks separate leak-enabled investigation. Passing this smoke is no leak-freedom claim.
+
+Supplied-neighbor APIs validate monotonic squared distances in double, promoting
+coordinates before subtraction and breaking exact ties by source ID. Candidate
+rows sorted using float-rounded distance keys can therefore be rejected even
+when their membership is correct. This applies to KDE, radii/statistics and
+local-distance-ratio `*FromNeighbors` entry points; bilateral filtering retains
+its float-distance contract.

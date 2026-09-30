@@ -7,6 +7,8 @@
 #include <gtest/gtest.h>
 import Geometry.PointCloud;
 import Geometry.PointCloud.Utils;
+import Geometry.Octree;
+import Geometry.PointLBVH;
 namespace PC = Geometry::PointCloud;
 namespace
 {
@@ -90,5 +92,32 @@ TEST(PointSpacing, MalformedAndUnrepresentableInputsFail)
     EXPECT_FALSE(PC::EstimateRadii(p,{.ScaleFactor=std::numeric_limits<float>::max()}));
     p[0].x=std::numeric_limits<float>::quiet_NaN();
     EXPECT_FALSE(PC::EstimateRadii(p));EXPECT_FALSE(PC::ComputeStatistics(p));
-    p[0].x=1e30f;EXPECT_FALSE(PC::EstimateRadii(p));
+    // Squaring 1e30 overflowed float; the double reference now returns finite 1e30-scale radii.
+    p[0].x=1e30f;const auto large=PC::EstimateRadii(p);ASSERT_TRUE(large);
+    EXPECT_FLOAT_EQ(large->Radii[0],1e30f);
+}
+
+TEST(PointSpacing, FloatSubnormalSquaredDistanceSurvivesScaling)
+{
+    const std::vector<glm::vec3> p{{0,0,0},{1e-20f,0,0}};
+    const auto r=PC::EstimateRadii(p,{.KNeighbors=1,.ScaleFactor=1e20f});
+    ASSERT_TRUE(r);
+    EXPECT_FLOAT_EQ(r->Radii[0],float(double(p[1].x)*double(1e20f)));
+    EXPECT_NEAR(r->Radii[0],1,1e-7);
+    EXPECT_FLOAT_EQ(r->Statistics.AverageSpacing,p[1].x);
+}
+TEST(PointSpacing, DoubleRankingDistinguishesFloatSquaredDistanceTies)
+{
+    // Both squared distances round to 1 in float, but index 2 is truly closer.
+    const std::vector<glm::vec3> p{{0,0,0},{1,1e-4f,0},{1,0,0}};
+    Geometry::PointLBVH::Index lbvh;ASSERT_TRUE(lbvh.Build(p));
+    const auto neighbors=lbvh.KNearest(p[0],2,Geometry::PointLBVH::InvalidIndex,true);
+    ASSERT_EQ(neighbors.size(),2u);EXPECT_EQ(neighbors[1].Index,2u);
+    Geometry::Octree tree;ASSERT_TRUE(tree.BuildFromPoints(p,{},32,10));
+    std::vector<std::size_t> ids;tree.QueryKNN(p[0],2,ids,true);
+    EXPECT_EQ(ids,(std::vector<std::size_t>{0,2}));
+    EXPECT_FALSE(PC::EstimateRadiiFromNeighbors(p,{std::vector<std::uint32_t>{0,1,2,1,2,0,2,1,0}},
+        {.KNeighbors=2}));
+    const auto r=PC::EstimateRadii(p,{.KNeighbors=1});ASSERT_TRUE(r);
+    EXPECT_FLOAT_EQ(r->Radii[0],1);
 }

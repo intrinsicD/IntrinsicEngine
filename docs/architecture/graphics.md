@@ -47,6 +47,10 @@ Graphics is organized into explicit sublayers:
   VertexNormals additionally defines the packed topology bundle
   (`PackVertexNormalsTopology` / `UnpackVertexNormalsTopologyLayout`) the runtime keeps
   resident per topology revision (RUNTIME-296).
+  `PointScalarAnalysis` records density, spacing and compact-weight kernels from
+  `GpuPropertyView` inputs into resident float rings over the shared LBVH query.
+  Runtime owns their [scalar transaction and publication](property-coherence.md#resident-density-spacing-and-density-weights);
+  graphics retains no ECS or editor state.
   ComputeParallelPrimitives and GpuTransfer borrow `IDevice`, retaining the
   CommandContext import for its `MemoryAccess` value type. Visualization property
   residency and overlay uploads, ImGuiOverlaySystem and ImGuiUploadHelper borrow

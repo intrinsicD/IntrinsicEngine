@@ -2,8 +2,9 @@
 #extension GL_GOOGLE_include_directive : require
 #extension GL_ARB_gpu_shader_fp64 : require
 #include "include/point_lbvh.glsl"
+#include "include/point_lbvh_double.glsl"
 layout(local_size_x=64) in;
-layout(buffer_reference,scalar) buffer OutlierStats { uint rejected; uint invalid; float mean; float stddev; float threshold; };
+layout(buffer_reference,scalar) buffer OutlierStats { uint rejected; uint invalid; double mean; double stddev; double threshold; };
 layout(push_constant,scalar) uniform Push
 {
     uint64_t positions; uint64_t nodes; uint64_t slots; uint64_t neighbors;
@@ -17,57 +18,59 @@ void main()
     uint local=gl_GlobalInvocationID.x;if(local>=pc.threads)return;
     uint i=pc.first+local;
     LbvhIndices slots=LbvhIndices(pc.slots);
-    LbvhFloats means=LbvhFloats(pc.means),score=LbvhFloats(pc.score);
+    LbvhDoubles means=LbvhDoubles(pc.means);
+    LbvhFloats score=LbvhFloats(pc.score);
     LbvhNeighbors neighbors=LbvhNeighbors(pc.neighbors);
     OutlierStats stats=OutlierStats(pc.stats);
     if(pc.mode==3){LbvhFloats(pc.presentation).v[i]=float(LbvhIndices(pc.mask).v[i]);return;}
     if(pc.mode==0)
     {
         uint row=slots.v[i];vec3 p=lbvhPoint(pc.positions,12,row);
-        uint count=lbvhQuery(pc.nodes,pc.count,p,pc.method==1?row:LBVH_INVALID,
-            pc.method==1?pc.radius:-1.,pc.method==1?0:pc.width,pc.width,neighbors,i*pc.width);
-        if(pc.method==1){score.v[row]=float(count);return;}
-        precise float sum=0.;uint used=0;
+        uint count=lbvhQueryDouble(pc.positions,pc.nodes,pc.count,p,pc.method==1?row:LBVH_INVALID,
+            pc.method==1?double(pc.radius):-1.0lf,pc.method==1?0:pc.width,pc.width,neighbors,i*pc.width);
+        if(pc.method==1){means.v[row*2+1]=double(count);score.v[row]=float(count);return;}
+        precise double sum=0.;uint used=0;
         for(uint j=0;j<count;++j)
         {
             uint id=neighbors.v[i*pc.width+j].index;if(id==row)continue;
-            sum+=sqrt(lbvhDistance(p,lbvhPoint(pc.positions,12,id)));++used;
+            sum+=sqrt(lbvhDistanceDouble(p,lbvhPoint(pc.positions,12,id)));++used;
         }
-        means.v[row]=used>0?sum/float(used):0.;
-        if(pc.method==0)score.v[row]=means.v[row];
+        means.v[row*2]=used>0?sum/double(used):0.;
+        if(pc.method==0){means.v[row*2+1]=means.v[row*2];lbvhStorePositiveFloat(pc.score,row,means.v[row*2]);}
         return;
     }
     if(pc.mode==1)
     {
-        uint row=slots.v[i];precise float sum=0.;uint used=0;
+        uint row=slots.v[i];precise double sum=0.;uint used=0;
         for(uint j=0;j<pc.width;++j)
         {
             uint id=neighbors.v[i*pc.width+j].index;if(id==row)continue;
-            sum+=means.v[id];++used;
+            sum+=means.v[id*2];++used;
         }
         if(isnan(sum)||isinf(sum)){score.v[row]=uintBitsToFloat(0x7fc00000u);return;}
-        float neighborMean=used>0?sum/float(used):1.;
-        score.v[row]=neighborMean>1e-12?means.v[row]/neighborMean:0.;return;
+        precise double neighborMean=used>0?sum/double(used):1.;
+        means.v[row*2+1]=neighborMean>1e-12lf?means.v[row*2]/neighborMean:0.0lf;
+        lbvhStorePositiveFloat(pc.score,row,means.v[row*2+1]);return;
     }
     // One invocation, source-row order, matching ClassifyStatisticalOutliers.
     precise double sum=0.,sumSq=0.;
     for(uint j=0;j<pc.count;++j)
     {
-        double value=double(score.v[slots.v[j]]);sum+=value;sumSq+=value*value;
+        double value=means.v[slots.v[j]*2+1];sum+=value;sumSq+=value*value;
     }
     precise double mean=sum/double(pc.count);
     precise double variance=max(0.,sumSq/double(pc.count)-mean*mean);
     double stddev=sqrt(variance);
     precise double threshold=mean+double(pc.multiplier)*stddev;
-    stats.mean=pc.method==0?float(mean):0.;stats.stddev=pc.method==0?float(stddev):0.;
-    stats.threshold=pc.method==0?float(threshold):0.;stats.rejected=0;stats.invalid=0;
-    precise float scoreSum=0.;
+    stats.mean=pc.method==0?mean:0.0lf;stats.stddev=pc.method==0?stddev:0.0lf;
+    stats.threshold=pc.method==0?threshold:0.0lf;stats.rejected=0;stats.invalid=0;
+    precise double scoreSum=0.;
     for(uint j=0;j<pc.count;++j)
     {
-        uint row=slots.v[j];float value=score.v[row];
+        uint row=slots.v[j];double value=means.v[row*2+1];
         scoreSum+=value;
-        if(isnan(value)||isinf(value)){stats.invalid=1;continue;}
-        uint rejected=uint(pc.method==0?double(value)>threshold:pc.method==1?value<float(pc.minimum):value>pc.scoreThreshold);
+        if(isnan(value)||isinf(value)||value>3.4028234663852886e38lf){stats.invalid=1;continue;}
+        uint rejected=uint(pc.method==0?means.v[row*2]>threshold:pc.method==1?value<double(pc.minimum):means.v[row*2+1]>double(pc.scoreThreshold));
         LbvhIndices(pc.mask).v[row]=rejected;LbvhFloats(pc.presentation).v[row]=float(rejected);
         stats.rejected+=rejected;
     }

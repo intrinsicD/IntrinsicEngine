@@ -1,0 +1,117 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+#extension GL_ARB_gpu_shader_fp64 : require
+#include "include/point_lbvh.glsl"
+#include "include/point_lbvh_double.glsl"
+#include "include/exp_double.glsl"
+layout(local_size_x=64) in;
+layout(buffer_reference,scalar) buffer ScalarStats {
+    uint invalid; uint maximumNeighbors; uint contributions; uint reserved;
+    double bandwidth; double mean; double minimum; double maximum;
+    double averageSpacing; double minSpacing; double maxSpacing; double diagonal;
+    double cx; double cy; double cz; double padding;
+};
+layout(push_constant,scalar) uniform Push {
+    uint64_t positions; uint64_t nodes; uint64_t slots; uint64_t neighbors;
+    uint64_t nearest; uint64_t outputValues; uint64_t stats;
+    double supportRadius;
+    uint count; uint width; uint method; uint kernel; uint inverse; uint mode;
+    float bandwidth; float scale; float queryRadius;
+    uint first; uint threads;
+    uint padding;
+    double countBandwidthFactor; double gaussianNormConstant;
+} pc;
+void main()
+{
+    uint local=gl_GlobalInvocationID.x;if(local>=pc.threads)return;
+    uint i=pc.first+local;
+    LbvhIndices slots=LbvhIndices(pc.slots);
+    LbvhFloats outputValues=LbvhFloats(pc.outputValues);
+    LbvhDoubles nearest=LbvhDoubles(pc.nearest),values=LbvhDoubles(pc.nearest+uint64_t(pc.count)*8);
+    LbvhNeighbors neighbors=LbvhNeighbors(pc.neighbors);
+    ScalarStats stats=ScalarStats(pc.stats);
+    if(pc.mode==0)
+    {
+        nearest.v[i]=0.;
+        uint row=slots.v[i];vec3 p=lbvhPoint(pc.positions,12,row);
+        uint count=lbvhQueryDouble(pc.positions,pc.nodes,pc.count,p,pc.method==2?row:LBVH_INVALID,
+            pc.method==2?double(pc.queryRadius):-1.0lf,pc.method==2?0:pc.width,pc.width,neighbors,i*pc.width);
+        if(pc.method==2)atomicMax(stats.maximumNeighbors,count);
+        if(count>pc.width){atomicOr(stats.invalid,1);return;}
+        if(pc.method==2)
+        {
+            precise double density=1.0lf;uint contributions=0;
+            for(uint j=0;j<count;++j)
+            {
+                uint id=neighbors.v[i*pc.width+j].index;
+                precise dvec3 d=dvec3(p)-dvec3(lbvhPoint(pc.positions,12,id));
+                precise double squared=(d.x*d.x+d.y*d.y)+d.z*d.z;
+                double distance=sqrt(squared);double value=0.0lf;
+                if(squared==0.0lf)value=1.0lf;
+                else if(distance<pc.supportRadius)
+                {
+                    precise double normalized=distance/pc.supportRadius;
+                    precise double normalizedSquared=normalized*normalized;
+                    if(pc.kernel<2)value=ExpNonPositive((pc.kernel==0?-8.0lf:-16.0lf)*normalizedSquared);
+                    else {precise double t=1.0lf-normalized;precise double t2=t*t;value=t2*t2*(1.0lf+4.0lf*normalized);}
+                }
+                if(value>0.0lf){density+=value;++contributions;}
+            }
+            values.v[i]=pc.inverse!=0?1.0lf/density:density;
+            lbvhStorePositiveFloat(pc.outputValues,row,values.v[i]);
+            nearest.v[i]=double(contributions);
+            atomicMax(stats.maximumNeighbors,count);
+            return;
+        }
+        precise double sum=0.;double closest=1.7976931348623157e308lf;uint used=0;
+        for(uint j=0;j<count;++j){uint id=neighbors.v[i*pc.width+j].index;if(id==row)continue;
+            double distance=sqrt(lbvhDistanceDouble(p,lbvhPoint(pc.positions,12,id)));
+            sum+=distance;closest=min(closest,distance);++used;}
+        nearest.v[i]=closest;
+        if(used==0||isinf(sum)||isnan(sum)||isinf(closest))atomicOr(stats.invalid,1);
+        if(pc.method==1){values.v[i]=(sum/double(used))*double(pc.scale);lbvhStorePositiveFloat(pc.outputValues,row,values.v[i]);}
+        return;
+    }
+    if(pc.mode==1)
+    {
+        if(pc.method==2){for(uint j=0;j<pc.count;++j)stats.contributions+=uint(nearest.v[j]);return;}
+        precise double mean=0.;double lo=nearest.v[0],hi=lo;
+        precise dvec3 center=dvec3(0);vec3 low=lbvhPoint(pc.positions,12,slots.v[0]),high=low;
+        for(uint j=0;j<pc.count;++j){double d=nearest.v[j];mean+=d;lo=min(lo,d);hi=max(hi,d);
+            vec3 p=lbvhPoint(pc.positions,12,slots.v[j]);center+=dvec3(p);low=min(low,p);high=max(high,p);}
+        mean=mean/double(pc.count);
+        center=center/double(pc.count);
+        stats.averageSpacing=mean;stats.minSpacing=lo;stats.maxSpacing=hi;
+        stats.cx=center.x;stats.cy=center.y;stats.cz=center.z;stats.diagonal=sqrt(lbvhDistanceDouble(low,high));
+        precise double bandwidth=pc.bandwidth;
+        if(pc.method==0&&bandwidth<=0.){
+            precise double variance=0.;for(uint j=0;j<pc.count;++j){precise double d=nearest.v[j]-mean;variance+=d*d;}
+            variance=variance/double(pc.count);double sigma=max(sqrt(variance),mean);
+            bandwidth=max(1.06lf*sigma*pc.countBandwidthFactor,1e-8lf);}
+        stats.bandwidth=bandwidth;
+        if(isnan(mean)||isinf(mean)||any(isnan(center))||any(isinf(center))||isinf(stats.diagonal))stats.invalid=1;
+        return;
+    }
+    if(pc.mode==2)
+    {
+        uint row=slots.v[i];vec3 p=lbvhPoint(pc.positions,12,row);
+        double h=stats.bandwidth;precise double invH2=-0.5lf/(h*h);
+        precise double denominator=pc.gaussianNormConstant*h*h*h;
+        precise double norm=1.0lf/denominator;
+        if(isinf(invH2)||isinf(norm)||isnan(norm)||norm<=0.){atomicOr(stats.invalid,1);return;}
+        precise double sum=0.;uint used=0;
+        for(uint j=0;j<pc.width;++j){uint id=neighbors.v[i*pc.width+j].index;if(id==row)continue;
+            double d=sqrt(lbvhDistanceDouble(p,lbvhPoint(pc.positions,12,id)));
+            precise double exponent=d*d*invH2;
+            double kernel=exponent < -708.0lf ? 0.0lf : ExpNonPositive(exponent);
+            if(kernel>0.0lf && norm>=2.2250738585072014e-308lf/kernel)sum+=norm*kernel;
+            ++used;}
+        values.v[i]=used>0 && sum>=2.2250738585072014e-308lf*double(used)?sum/double(used):0.0lf;lbvhStorePositiveFloat(pc.outputValues,row,values.v[i]);return;
+    }
+    // Source-row ordered double reductions; float rounding only at publication.
+    precise double sum=0.;double lo=values.v[0],hi=lo;
+    for(uint j=0;j<pc.count;++j){double v=values.v[j];
+        if(isnan(v)||isinf(v)||isinf(outputValues.v[slots.v[j]]))stats.invalid=1;sum+=v;lo=min(lo,v);hi=max(hi,v);}
+    if(isnan(sum)||isinf(sum))stats.invalid=1;
+    stats.mean=sum>=2.2250738585072014e-308lf*double(pc.count)?sum/double(pc.count):0.0lf;stats.minimum=lo;stats.maximum=hi;
+}

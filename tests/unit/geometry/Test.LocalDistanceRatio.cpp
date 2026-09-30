@@ -70,10 +70,12 @@ TEST(LocalDistanceRatio, MalformedAndNonfiniteInputsRejectWithoutPublication)
     }
     EXPECT_FALSE(PC::EstimateOutlierProbability(points,{.ScoreThreshold=-1}));
     EXPECT_FALSE(PC::EstimateOutlierProbability(points,{.ScoreThreshold=std::numeric_limits<float>::quiet_NaN()}));
-    points[0].x=1e30f;EXPECT_FALSE(PC::EstimateOutlierProbability(points));
+    // Float squared-distance overflow formerly refused these finite ratios.
+    points[0].x=1e30f;auto large=PC::EstimateOutlierProbability(points);ASSERT_TRUE(large);
+    EXPECT_EQ(large->Scores,(std::vector<float>{2,2.f/3,2.f/3}));
     PC::Cloud cloud;for(auto point:points)(void)cloud.AddPoint(point);
     auto property=cloud.GetOrAddVertexProperty<float>("p:outlier_score",17);
-    EXPECT_FALSE(PC::EstimateOutlierProbability(cloud));EXPECT_EQ(property.Vector(),std::vector<float>(3,17));
+    ASSERT_TRUE(PC::EstimateOutlierProbability(cloud));EXPECT_EQ(property.Vector(),large->Scores);
     points[0].x=std::numeric_limits<float>::quiet_NaN();EXPECT_FALSE(PC::EstimateOutlierProbability(points));
     points.resize(1);EXPECT_FALSE(PC::EstimateOutlierProbability(points));
 }

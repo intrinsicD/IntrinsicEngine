@@ -13,6 +13,7 @@ module;
 #include <vector>
 #include <span>
 #include <utility>
+#include <type_traits>
 
 #include <glm/glm.hpp>
 
@@ -23,6 +24,8 @@ import Geometry.Octree;
 import Geometry.Sampling;
 import Geometry.Sphere;
 
+#pragma clang fp contract(off)
+
 namespace Geometry::PointCloud
 {
     namespace
@@ -30,6 +33,12 @@ namespace Geometry::PointCloud
         [[nodiscard]] bool IsFinite(const glm::vec3& value)
         {
             return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
+        }
+
+        double DistanceSquared(glm::vec3 a, glm::vec3 b)
+        {
+            const glm::dvec3 d = glm::dvec3(a) - glm::dvec3(b);
+            return (d.x*d.x + d.y*d.y) + d.z*d.z;
         }
 
         // Builds an owned cloud from the given (already ascending) original
@@ -115,15 +124,16 @@ namespace Geometry::PointCloud
             if (points.empty()) return std::nullopt;
             CloudStatistics stats;
             stats.PointCount = points.size();
-            glm::vec3 low = points[0], high = low, sum{0};
+            glm::vec3 low = points[0], high = low;
+            glm::dvec3 sum{0};
             for (const auto p : points)
             {
                 if (!IsFinite(p)) return std::nullopt;
-                low = glm::min(low, p); high = glm::max(high, p); sum += p;
+                low = glm::min(low, p); high = glm::max(high, p); sum += glm::dvec3(p);
             }
             stats.BoundingBox = AABB{low, high};
-            stats.BoundingBoxDiagonal = glm::length(high-low);
-            stats.Centroid = sum / float(points.size());
+            stats.BoundingBoxDiagonal = std::sqrt(DistanceSquared(high,low));
+            stats.Centroid = sum / double(points.size());
             if (!IsFinite(stats.Centroid) || !std::isfinite(stats.BoundingBoxDiagonal)) return std::nullopt;
             return stats;
         }
@@ -132,30 +142,31 @@ namespace Geometry::PointCloud
             return params.SpacingSampleCount ? std::min(count, params.SpacingSampleCount) : count;
         }
         // Monotonic distance/ID ordering also rejects duplicate IDs without a set per row.
-        template<class Id>
+        template<class Id, class Scalar>
         bool NeighborDistances(std::span<const glm::vec3> points, std::size_t source,
-            std::span<const Id> row, float& sum, float& nearest, std::size_t& count, bool requireOther = true)
+            std::span<const Id> row, Scalar& sum, Scalar& nearest, std::size_t& count, bool requireOther = true)
         {
-            float previous = -1;
+            Scalar previous = -1;
             std::size_t previousId = 0;
-            sum = 0; nearest = std::numeric_limits<float>::max(); count = 0;
+            sum = 0; nearest = std::numeric_limits<Scalar>::max(); count = 0;
             for (const auto id : row)
             {
                 if (id >= points.size()) return false;
-                const auto delta = points[id]-points[source];
-                const float squared = glm::dot(delta, delta);
+                const Scalar squared = [&] {
+                    if constexpr(std::is_same_v<Scalar,double>) return DistanceSquared(points[id],points[source]);
+                    else {const auto d=points[id]-points[source];return glm::dot(d,d);}
+                }();
                 if (!std::isfinite(squared) || squared < previous ||
                     (squared == previous && id <= previousId)) return false;
                 previous = squared; previousId = id;
                 if (id == source) continue;
-                const float distance = std::sqrt(squared);
+                const Scalar distance = std::sqrt(squared);
                 sum += distance; nearest = std::min(nearest, distance); ++count;
             }
             return (count || !requireOther) && std::isfinite(sum);
         }
         void AddSpacing(CloudStatistics& stats, float distance, std::size_t sample)
         {
-            stats.AverageSpacing += distance;
             stats.MinSpacing = sample ? std::min(stats.MinSpacing, distance) : distance;
             stats.MaxSpacing = std::max(stats.MaxSpacing, distance);
         }
@@ -167,14 +178,15 @@ namespace Geometry::PointCloud
             if (!stats || points.size() < 2) return stats;
             const auto samples = SpacingSamples(points.size(), params);
             const auto stride = points.size()/samples;
+            double spacingSum=0;
             for (std::size_t i=0; i<samples; ++i)
             {
-                float sum, nearest; std::size_t count;
+                double sum, nearest; std::size_t count;
                 const auto row = query(i, i*stride);
                 if (row.size()!=2 || !NeighborDistances(points, i*stride, row, sum, nearest, count)) return std::nullopt;
-                AddSpacing(*stats, nearest, i);
+                AddSpacing(*stats, nearest, i); spacingSum+=nearest;
             }
-            stats->AverageSpacing /= float(samples);
+            stats->AverageSpacing = spacingSum/double(samples);
             if (!std::isfinite(stats->AverageSpacing)) return std::nullopt;
             return stats;
         }
@@ -193,7 +205,7 @@ namespace Geometry::PointCloud
             return std::nullopt;
         std::vector<std::size_t> ids;
         return StatisticsWithQueries(positions, params, [&](std::size_t, std::size_t source) {
-            ids.clear(); tree.QueryKNN(positions[source], 2, ids); return std::span<const std::size_t>(ids);
+            ids.clear(); tree.QueryKNN(positions[source], 2, ids, true); return std::span<const std::size_t>(ids);
         });
     }
     std::optional<CloudStatistics> ComputeStatisticsFromNeighbors(std::span<const glm::vec3> positions,
@@ -372,21 +384,21 @@ namespace Geometry::PointCloud
             RadiusEstimationResult result;
             result.Radii.reserve(points.size());
             const auto width = RadiusWidth(points.size(), params.KNeighbors);
-            float radiusSum = 0;
+            double radiusSum = 0, spacingSum = 0;
             for (std::size_t i=0; i<points.size(); ++i)
             {
-                float sum, nearest; std::size_t count;
+                double sum, nearest; std::size_t count;
                 const auto row = query(i);
                 if (row.size()!=width || !NeighborDistances(points, i, row, sum, nearest, count)) return std::nullopt;
-                const float radius = (sum/float(count))*params.ScaleFactor;
-                if (!std::isfinite(radius)) return std::nullopt;
+                const double radius = (sum/double(count))*double(params.ScaleFactor);
+                if (!std::isfinite(float(radius))) return std::nullopt;
                 result.Radii.push_back(radius); radiusSum += radius;
-                result.MinRadius = i ? std::min(result.MinRadius, radius) : radius;
-                result.MaxRadius = std::max(result.MaxRadius, radius);
-                AddSpacing(*stats, nearest, i);
+                result.MinRadius = i ? std::min(result.MinRadius, float(radius)) : radius;
+                result.MaxRadius = std::max(result.MaxRadius, float(radius));
+                AddSpacing(*stats, nearest, i); spacingSum += nearest;
             }
-            result.AverageRadius = radiusSum/float(points.size());
-            stats->AverageSpacing /= float(points.size());
+            result.AverageRadius = radiusSum/double(points.size());
+            stats->AverageSpacing = spacingSum/double(points.size());
             result.Statistics = *stats;
             if (!std::isfinite(result.AverageRadius) || !std::isfinite(stats->AverageSpacing)) return std::nullopt;
             return result;
@@ -406,7 +418,7 @@ namespace Geometry::PointCloud
         if (!tree.BuildFromPoints(positions, policy, params.OctreeMaxPerNode, params.OctreeMaxDepth)) return std::nullopt;
         std::vector<std::size_t> ids;
         return RadiiWithQueries(positions, params, [&](std::size_t source) {
-            ids.clear(); tree.QueryKNN(positions[source], RadiusWidth(positions.size(), params.KNeighbors), ids);
+            ids.clear(); tree.QueryKNN(positions[source], RadiusWidth(positions.size(), params.KNeighbors), ids, true);
             return std::span<const std::size_t>(ids);
         });
     }
@@ -636,32 +648,33 @@ namespace Geometry::PointCloud
             if (points.size() < 2 || !std::isfinite(params.ScoreThreshold) || params.ScoreThreshold < 0 ||
                 !std::ranges::all_of(points, IsFinite)) return std::nullopt;
             const auto width = OutlierCandidateWidth(points.size(), params.KNeighbors);
-            std::vector<float> means(points.size());
+            std::vector<double> means(points.size());
             for (std::size_t i = 0; i < points.size(); ++i)
             {
-                float sum, nearest; std::size_t count;
+                double sum, nearest; std::size_t count;
                 const auto row = query(i);
                 if (row.size() != width || !NeighborDistances(points, i, row, sum, nearest, count)) return std::nullopt;
-                means[i] = sum / float(count);
+                means[i] = sum / double(count);
             }
             OutlierEstimationResult result;
             result.Scores.reserve(points.size());
-            float scoreSum = 0;
+            double scoreSum = 0;
             for (std::size_t i = 0; i < points.size(); ++i)
             {
-                float sum = 0; std::size_t count = 0;
+                double sum = 0; std::size_t count = 0;
                 for (const auto id : query(i))
                     if (id != i) { sum += means[id]; ++count; }
                 if (!std::isfinite(sum)) return std::nullopt;
-                const float neighborMean = count ? sum / float(count) : 1.f;
-                const float score = neighborMean > 1e-12f ? means[i] / neighborMean : 0.f;
+                const double neighborMean = count ? sum / double(count) : 1.f;
+                const double score = neighborMean > 1e-12 ? means[i] / neighborMean : 0.f;
                 if (!std::isfinite(score)) return std::nullopt;
                 result.Scores.push_back(score);
                 scoreSum += score;
-                result.MaxScore = std::max(result.MaxScore, score);
-                result.OutlierCount += score > params.ScoreThreshold;
+                result.MaxScore = std::max(result.MaxScore, float(score));
+                result.Mask.push_back(score > params.ScoreThreshold);
+                result.OutlierCount += result.Mask.back();
             }
-            result.MeanScore = scoreSum / float(points.size());
+            result.MeanScore = scoreSum / double(points.size());
             if (!std::isfinite(result.MeanScore)) return std::nullopt;
             return result;
         }
@@ -675,7 +688,7 @@ namespace Geometry::PointCloud
         if (!tree.BuildFromPoints(positions, policy, 32, 10)) return std::nullopt;
         std::vector<std::vector<std::size_t>> rows(positions.size());
         const auto width = OutlierCandidateWidth(positions.size(), params.KNeighbors);
-        for (std::size_t i = 0; i < positions.size(); ++i) tree.QueryKNN(positions[i], width, rows[i]);
+        for (std::size_t i = 0; i < positions.size(); ++i) tree.QueryKNN(positions[i], width, rows[i], true);
         return DistanceRatioWithQueries(positions, params, [&](std::size_t i) { return std::span<const std::size_t>(rows[i]); });
     }
     std::optional<OutlierEstimationResult> EstimateOutlierProbabilityFromNeighbors(
@@ -741,7 +754,7 @@ namespace Geometry::PointCloud
         // get a sentinel NaN so they always fall on the reject side and never
         // pollute the global mean/std-dev estimate.
         const std::size_t kQuery = k + 1; // +1 for self.
-        std::vector<float> meanDist(n, 0.0f);
+        std::vector<double> meanDist(n, 0.0f);
         std::vector<std::size_t> knn;
 
 
@@ -755,34 +768,34 @@ namespace Geometry::PointCloud
             }
 
             knn.clear();
-            index.Tree.QueryKNN(positions[i], kQuery, knn);
+            index.Tree.QueryKNN(positions[i], kQuery, knn, true);
 
-            float distSum = 0.0f;
+            double distSum = 0.0f;
             std::size_t count = 0;
             for (std::size_t compact : knn)
             {
                 const std::size_t ni = index.Source[compact];
                 if (ni == i)
                     continue;
-                distSum += glm::length(positions[ni] - positions[i]);
+                distSum += std::sqrt(DistanceSquared(positions[ni], positions[i]));
                 ++count;
             }
 
-            const float m = (count > 0) ? distSum / static_cast<float>(count) : 0.0f;
+            const double m = (count > 0) ? distSum / static_cast<double>(count) : 0.0f;
             meanDist[i] = m;
         }
 
         return ClassifyStatisticalOutliers(meanDist, params.StdDevMultiplier);
     }
 
-    OutlierAnalysisResult ClassifyStatisticalOutliers(std::span<const float> distances, float multiplier)
+    OutlierAnalysisResult ClassifyStatisticalOutliers(std::span<const double> distances, float multiplier)
     {
         OutlierAnalysisResult result;
         if (distances.empty()) { result.Status = OutlierRemovalStatus::EmptyInput; return result; }
         result.Scores.assign(distances.begin(), distances.end());
         double sum=0, sumSq=0;
         std::size_t count=0;
-        for (const float distance : distances)
+        for (const double distance : distances)
         {
             if (std::isnan(distance)) { ++result.NonFiniteCount; continue; }
             sum += distance;
@@ -794,7 +807,7 @@ namespace Geometry::PointCloud
         const double stddev = std::sqrt(variance);
         const double threshold = mean + double(multiplier)*stddev;
         result.MeanDistance=float(mean);result.StdDevDistance=float(stddev);result.DistanceThreshold=float(threshold);
-        for (float distance : distances)
+        for (double distance : distances)
         {
             const bool rejected = !std::isfinite(distance) || !(double(distance)<=threshold);
             result.Mask.push_back(rejected);result.RejectedCount += rejected;
@@ -832,12 +845,18 @@ namespace Geometry::PointCloud
                 result.Mask.push_back(1);result.Scores.push_back(std::numeric_limits<float>::quiet_NaN());
                 ++result.NonFiniteCount;++result.RejectedCount;continue;
             }
-            hits.clear();index.Tree.QuerySphere(Sphere{positions[i],params.SearchRadius},hits);
+            const glm::dvec3 center(positions[i]);
+            glm::vec3 lo(center-double(params.SearchRadius)), hi(center+double(params.SearchRadius));
+            for(int axis=0;axis<3;++axis) {
+                lo[axis]=std::nextafter(lo[axis],-std::numeric_limits<float>::infinity());
+                hi[axis]=std::nextafter(hi[axis],std::numeric_limits<float>::infinity());
+            }
+            hits.clear();index.Tree.QueryAABB(AABB{lo,hi},hits);
             std::size_t count=0;
             for (auto compact : hits)
             {
                 const std::size_t neighbor=index.Source[compact];
-                if (neighbor!=i && glm::length(positions[neighbor]-positions[i])<=params.SearchRadius) ++count;
+                if (neighbor!=i && DistanceSquared(positions[neighbor],positions[i])<=double(params.SearchRadius)*double(params.SearchRadius)) ++count;
             }
             result.Scores.push_back(float(count));result.Mask.push_back(count<params.MinNeighbors);
             result.RejectedCount += count<params.MinNeighbors;
@@ -885,81 +904,88 @@ namespace Geometry::PointCloud
             return std::nullopt;
         for (auto p : positions)
             if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z)) return std::nullopt;
-        std::vector<float> nnDists(n);
+        std::vector<double> nnDists(n);
         std::vector<std::size_t> seen(n, n);
         for (std::size_t i = 0; i < n; ++i)
         {
-            float nearest = std::numeric_limits<float>::infinity();
+            double nearest = std::numeric_limits<double>::infinity();
             for (auto id : candidates.subspan(i * width, width))
             {
                 if (id >= n || seen[id] == i) return std::nullopt;
                 seen[id] = i;
-                if (id != i) nearest = std::min(nearest, glm::length(positions[id] - positions[i]));
+                if (id != i) nearest = std::min(nearest, std::sqrt(DistanceSquared(positions[id], positions[i])));
             }
             if (!std::isfinite(nearest)) return std::nullopt;
             nnDists[i] = nearest;
         }
         // Preserve the spacing heuristic: a univariate rule applied to NN distances,
         // with mean-spacing and absolute floors. This is not a multivariate bandwidth fit.
-        float bandwidth = params.Bandwidth;
+        double bandwidth = params.Bandwidth;
         if (bandwidth <= 0.0f)
         {
             // Use standard deviation of NN distances, floored by mean NN distance
             // to avoid degenerate bandwidth on uniform point clouds.
-            float mean = 0.0f;
-            for (float d : nnDists) mean += d;
-            mean /= static_cast<float>(n);
+            double mean = 0.0f;
+            for (double d : nnDists) mean += d;
+            mean /= static_cast<double>(n);
 
-            float variance = 0.0f;
-            for (float d : nnDists)
+            double variance = 0.0f;
+            for (double d : nnDists)
             {
-                float diff = d - mean;
+                double diff = d - mean;
                 variance += diff * diff;
             }
-            variance /= static_cast<float>(n);
-            float sigma = std::sqrt(variance);
+            variance /= static_cast<double>(n);
+            double sigma = std::sqrt(variance);
 
             // For uniform point clouds, σ ≈ 0 but mean spacing is meaningful.
             // Use max(σ, mean) so the bandwidth scales with point density.
             sigma = std::max(sigma, mean);
 
-            bandwidth = 1.06f * sigma * std::pow(static_cast<float>(n), -0.2f);
-            bandwidth = std::max(bandwidth, 1e-8f);
+            bandwidth = 1.06 * sigma * std::pow(static_cast<double>(n), -0.2);
+            bandwidth = std::max(bandwidth, 1e-8);
         }
 
-        const float invH2 = -0.5f / (bandwidth * bandwidth);
+        const double invH2 = -0.5f / (bandwidth * bandwidth);
         // 3D isotropic Gaussian normalization: 1 / ((2π)^(3/2) * h³)
-        const float pi = static_cast<float>(std::numbers::pi);
-        const float normFactor = 1.0f / (std::pow(2.0f * pi, 1.5f) * bandwidth * bandwidth * bandwidth);
+        const double pi = static_cast<double>(std::numbers::pi);
+        const double normFactor = 1.0f / (std::pow(2.0f * pi, 1.5f) * bandwidth * bandwidth * bandwidth);
 
-        if (!std::isfinite(bandwidth) || !std::isfinite(invH2) || !std::isfinite(normFactor) || normFactor <= 0)
+        if (!std::isfinite(float(bandwidth)) || !std::isfinite(invH2) || !std::isfinite(normFactor) || normFactor <= 0)
             return std::nullopt;
 
         // Phase 2: Compute density at each point via KNN Gaussian KDE.
         KDEResult result{};
         result.Densities.resize(n, 0.0f);
         result.UsedBandwidth = bandwidth;
-        float densitySum = 0.0f;
-        float minDensity = std::numeric_limits<float>::max();
-        float maxDensity = 0.0f;
+        double densitySum = 0.0f;
+        double minDensity = std::numeric_limits<double>::max();
+        double maxDensity = 0.0f;
 
         for (std::size_t i = 0; i < n; ++i)
         {
 
-            float kde = 0.0f;
+            double kde = 0.0f;
             uint32_t neighborCount = 0;
             for (auto ni : candidates.subspan(i * width, width))
             {
                 if (ni == i) continue;
-                float dist = glm::length(positions[ni] - positions[i]);
-                kde += normFactor * std::exp(dist * dist * invH2);
+                double dist = std::sqrt(DistanceSquared(positions[ni], positions[i]));
+                const double exponent = dist * dist * invH2;
+                // Match the device: flush double-subnormal tails before evaluating exp.
+                const double kernel = exponent < -708.0 ? 0.0 : std::exp(exponent);
+                if (kernel > 0.0 && normFactor >= std::numeric_limits<double>::min() / kernel)
+                    kde += normFactor * kernel;
                 ++neighborCount;
             }
 
             if (neighborCount > 0)
-                kde /= static_cast<float>(neighborCount);
+            {
+                kde = kde < std::numeric_limits<double>::min() * double(neighborCount)
+                    ? 0.0 : kde / static_cast<double>(neighborCount);
+            }
 
-            if (!std::isfinite(kde)) return std::nullopt;
+            if (!std::isfinite(float(kde))) return std::nullopt;
             result.Densities[i] = kde;
             densitySum += kde;
             minDensity = std::min(minDensity, kde);
@@ -967,7 +993,8 @@ namespace Geometry::PointCloud
         }
 
         if (!std::isfinite(densitySum)) return std::nullopt;
-        result.MeanDensity = (n > 0) ? densitySum / static_cast<float>(n) : 0.0f;
+        result.MeanDensity = n > 0 && densitySum >= std::numeric_limits<double>::min() * double(n)
+            ? densitySum / static_cast<double>(n) : 0.0;
         result.MinDensity = minDensity;
         result.MaxDensity = maxDensity;
 
@@ -999,19 +1026,19 @@ namespace Geometry::PointCloud
         const std::size_t kQuery = std::min(n, k + 1); // +1 for self
 
         // Phase 1: Compute nearest-neighbor distances for bandwidth estimation.
-        std::vector<float> nnDists(n, 0.0f);
+        std::vector<double> nnDists(n, 0.0f);
         std::vector<std::size_t> knnIndices;
 
         for (std::size_t i = 0; i < n; ++i)
         {
             knnIndices.clear();
-            octree.QueryKNN(positions[i], 2, knnIndices);
+            octree.QueryKNN(positions[i], 2, knnIndices, true);
 
-            float nearestDist = 0.0f;
+            double nearestDist = 0.0f;
             for (std::size_t ni : knnIndices)
             {
                 if (ni == i) continue;
-                nearestDist = glm::length(positions[ni] - positions[i]);
+                nearestDist = std::sqrt(DistanceSquared(positions[ni], positions[i]));
                 break;
             }
             if (!std::isfinite(nearestDist)) return std::nullopt;
@@ -1019,68 +1046,75 @@ namespace Geometry::PointCloud
         }
 
         // Preserve the inherited univariate NN-spacing heuristic and its floors.
-        float bandwidth = params.Bandwidth;
+        double bandwidth = params.Bandwidth;
         if (bandwidth <= 0.0f)
         {
             // Silverman's rule: h = 1.06 * σ * n^(-1/5)
             // Use standard deviation of NN distances, floored by mean NN distance
             // to avoid degenerate bandwidth on uniform point clouds.
-            float mean = 0.0f;
-            for (float d : nnDists) mean += d;
-            mean /= static_cast<float>(n);
+            double mean = 0.0f;
+            for (double d : nnDists) mean += d;
+            mean /= static_cast<double>(n);
 
-            float variance = 0.0f;
-            for (float d : nnDists)
+            double variance = 0.0f;
+            for (double d : nnDists)
             {
-                float diff = d - mean;
+                double diff = d - mean;
                 variance += diff * diff;
             }
-            variance /= static_cast<float>(n);
-            float sigma = std::sqrt(variance);
+            variance /= static_cast<double>(n);
+            double sigma = std::sqrt(variance);
 
             // For uniform point clouds, σ ≈ 0 but mean spacing is meaningful.
             // Use max(σ, mean) so the bandwidth scales with point density.
             sigma = std::max(sigma, mean);
 
-            bandwidth = 1.06f * sigma * std::pow(static_cast<float>(n), -0.2f);
-            bandwidth = std::max(bandwidth, 1e-8f);
+            bandwidth = 1.06 * sigma * std::pow(static_cast<double>(n), -0.2);
+            bandwidth = std::max(bandwidth, 1e-8);
         }
 
-        const float invH2 = -0.5f / (bandwidth * bandwidth);
+        const double invH2 = -0.5f / (bandwidth * bandwidth);
         // 3D isotropic Gaussian normalization: 1 / ((2π)^(3/2) * h³)
-        const float pi = static_cast<float>(std::numbers::pi);
-        const float normFactor = 1.0f / (std::pow(2.0f * pi, 1.5f) * bandwidth * bandwidth * bandwidth);
+        const double pi = static_cast<double>(std::numbers::pi);
+        const double normFactor = 1.0f / (std::pow(2.0f * pi, 1.5f) * bandwidth * bandwidth * bandwidth);
 
-        if (!std::isfinite(bandwidth) || !std::isfinite(invH2) || !std::isfinite(normFactor) || normFactor <= 0)
+        if (!std::isfinite(float(bandwidth)) || !std::isfinite(invH2) || !std::isfinite(normFactor) || normFactor <= 0)
             return std::nullopt;
 
         // Phase 2: Compute density at each point via KNN Gaussian KDE.
         KDEResult result{};
         result.Densities.resize(n, 0.0f);
         result.UsedBandwidth = bandwidth;
-        float densitySum = 0.0f;
-        float minDensity = std::numeric_limits<float>::max();
-        float maxDensity = 0.0f;
+        double densitySum = 0.0f;
+        double minDensity = std::numeric_limits<double>::max();
+        double maxDensity = 0.0f;
 
         for (std::size_t i = 0; i < n; ++i)
         {
             knnIndices.clear();
-            octree.QueryKNN(positions[i], kQuery, knnIndices);
+            octree.QueryKNN(positions[i], kQuery, knnIndices, true);
 
-            float kde = 0.0f;
+            double kde = 0.0f;
             uint32_t neighborCount = 0;
             for (std::size_t ni : knnIndices)
             {
                 if (ni == i) continue;
-                float dist = glm::length(positions[ni] - positions[i]);
-                kde += normFactor * std::exp(dist * dist * invH2);
+                double dist = std::sqrt(DistanceSquared(positions[ni], positions[i]));
+                const double exponent = dist * dist * invH2;
+                // Match the device: flush double-subnormal tails before evaluating exp.
+                const double kernel = exponent < -708.0 ? 0.0 : std::exp(exponent);
+                if (kernel > 0.0 && normFactor >= std::numeric_limits<double>::min() / kernel)
+                    kde += normFactor * kernel;
                 ++neighborCount;
             }
 
             if (neighborCount > 0)
-                kde /= static_cast<float>(neighborCount);
+            {
+                kde = kde < std::numeric_limits<double>::min() * double(neighborCount)
+                    ? 0.0 : kde / static_cast<double>(neighborCount);
+            }
 
-            if (!std::isfinite(kde)) return std::nullopt;
+            if (!std::isfinite(float(kde))) return std::nullopt;
             result.Densities[i] = kde;
             densitySum += kde;
             minDensity = std::min(minDensity, kde);
@@ -1088,7 +1122,8 @@ namespace Geometry::PointCloud
         }
 
         if (!std::isfinite(densitySum)) return std::nullopt;
-        result.MeanDensity = (n > 0) ? densitySum / static_cast<float>(n) : 0.0f;
+        result.MeanDensity = n > 0 && densitySum >= std::numeric_limits<double>::min() * double(n)
+            ? densitySum / static_cast<double>(n) : 0.0;
         result.MinDensity = minDensity;
         result.MaxDensity = maxDensity;
 

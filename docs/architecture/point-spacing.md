@@ -40,10 +40,11 @@ expects two candidate IDs per sampled row; singleton statistics require none.
 Bounds and centroid always cover the full input.
 
 Nonfinite inputs, negative/nonfinite scale, malformed candidate rows or
-unrepresentable float distances, sums or results fail with `nullopt`. These
-failures now propagate through the Cloud wrappers as well; ordinary finite
-inputs preserve the original float formula. Tiny distances or radii may round
-to zero through float underflow. The supplied-row caller guarantees
+unrepresentable float results fail with `nullopt`. Distances, squared distances,
+means, scale products, centroid and statistics accumulate in double with
+contraction disabled; coordinates are converted before subtraction. A separation
+of 1e-20 with scale 1e20 therefore produces a radius near one even on float-FTZ
+devices. The supplied-row caller guarantees
 nearest membership; the kernel checks cardinality, bounds, uniqueness and
 order. Very large k is clamped without overflowing k+1. CPU octree streams a
 single neighborhood, retaining O(n+k) query storage.
@@ -56,15 +57,16 @@ same preflight for execution, config and UI discovery.
 
 - `cpu_octree`: default independent CPU reference.
 - `cpu_lbvh`: shared immutable `SpatialIndexCache` snapshot.
-- `vulkan_lbvh`: shared framed GPU kNN/readback, followed by CPU spacing/radius
-  reduction. Requires GPU availability and jobs; no silent fallback.
+- `vulkan_lbvh`: resident LBVH kNN, radius values and fixed-order double statistics
+  in `Graphics.PointScalarAnalysis`; no neighborhood download or CPU reduction.
 
-GPU requests permit k=0..63 (zero is floored to one), at most 2^20 live samples
-and 1..16384 queries per batch. CPU LBVH supports at most 2^24 samples. Both
-LBVH paths require coordinates within 1e18. Supplied-candidate storage is
-O(n min(n,max(k,1)+1)); GPU transient buffers are additionally batch-bounded.
-A large CPU k can therefore consume substantial memory. Index ownership remains
-with the existing cache; this adds no ECS index component or runtime service.
+GPU requests permit k=0..63 (zero is floored to one), at most 2^20 live samples,
+2^24 property rows and 2^24 neighbor entries. Both LBVH paths require coordinates
+within 1e18; CPU LBVH supports 2^24 samples. Vulkan requires float64 support,
+framed cache/jobs, float output storage and normal-or-zero float inputs/parameters.
+Other scalar storage is explicitly refused; use CPU for its checked conversions.
+The persisted query batch size does not paginate the resident submission.
+Index ownership remains with the existing cache.
 
 ## Config and diagnostics
 
@@ -113,3 +115,37 @@ remaining spatial integrations.
 The [2026-09-10 verification record](../../ara/evidence/tables/spacing_vulkan_verification_2026-09-10.md)
 binds the bounded CPU/Vulkan result to C83. The recorded maximum radius/spacing
 error is zero at a 1e-5 tolerance, with CPU distance reduction retained.
+
+## Resident scalar transaction
+
+| method.engine-integration | Publication |
+| --- | --- |
+| Point spacing | GPU preview: yes; commit via `GpuFrontReadback` → `PublishPointScalarField` → `BindRevision(key, revision, publication)`. |
+
+`Runtime.PointScalarTransaction` shares the density/weight lifecycle: colormap
+observation, explicit Accept/Discard, stale watches, detach discard, undoable
+publication and automatic batch/agent Accept. Deleted output rows retain their
+resident base values. Result/agent output includes upload bytes, residency hits
+and Accept readback bytes; no CPU neighborhood stage remains.
+
+`PointScalarTransaction` mock tests and
+`RUNTIME298PointScalarResidency.ParityResidentSecondRunAndDiscard` cover the port.
+The smoke records measured maximum absolute delta, with 2e-5 allowed for device
+final float publication on its O(1) fixture; existing multi-domain
+spacing/statistics comparisons retain 1e-5. It checks deleted rows, zero input
+upload on a second run and Discard retaining CPU rows. GPU execution is pending;
+the historical CPU-reduction verification does not validate this device kernel.
+
+CPU octree and CPU LBVH scalar queries use double keys and box bounds; GPU scalar
+queries use the same double squared-distance expression and index tie-break.
+Candidate caps apply before self removal. Distances are bounded away from double
+underflow by float coordinate storage; Vulkan continues refusing subnormal input
+coordinates because building the shared LBVH uses float arithmetic. Boundary
+smokes additionally use relative checks for tiny published statistics.
+
+Supplied-neighbor APIs validate monotonic squared distances in double, promoting
+coordinates before subtraction and breaking exact ties by source ID. Candidate
+rows sorted using float-rounded distance keys can therefore be rejected even
+when their membership is correct. This applies to KDE, radii/statistics and
+local-distance-ratio `*FromNeighbors` entry points; bilateral filtering retains
+its float-distance contract.

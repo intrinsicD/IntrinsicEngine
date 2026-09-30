@@ -21,6 +21,7 @@ import Geometry.Overlap;
 import Geometry.Support;
 import Geometry.Validation;
 
+#pragma clang fp contract(off)
 namespace Geometry
 {
     namespace
@@ -251,7 +252,7 @@ namespace Geometry
         }
     }
 
-    void Octree::QueryKNN(const glm::vec3& queryPoint, std::size_t k, std::vector<size_t>& out) const
+    void Octree::QueryKNN(const glm::vec3& queryPoint, std::size_t k, std::vector<size_t>& out, bool doubleDistances) const
         {
             out.clear();
             if (m_Nodes.empty() || k == 0)
@@ -259,27 +260,32 @@ namespace Geometry
                 return;
             }
 
-            using QueueElement = std::pair<float, std::size_t>;
+            const auto distance = [&](const AABB& box) {
+                if (!doubleDistances) return double(float(SquaredDistance(box,queryPoint)));
+                const glm::dvec3 d = glm::dvec3(queryPoint)-glm::dvec3(glm::clamp(queryPoint,box.Min,box.Max));
+                return (d.x*d.x+d.y*d.y)+d.z*d.z;
+            };
+            using QueueElement = std::pair<double, std::size_t>;
             Extrinsic::Core::BoundedHeap<QueueElement> heap(k);
 
-            using Trav = std::pair<float, NodeIndex>; // (node lower-bound d2, node index)
+            using Trav = std::pair<double, NodeIndex>; // (node lower-bound d2, node index)
             std::priority_queue<Trav, std::vector<Trav>, std::greater<>> pq;
 
             constexpr NodeIndex rootIndex(0);
             auto d2Node = [&](NodeIndex nodeIndex)
             {
-                return static_cast<float>(SquaredDistance(m_Nodes[nodeIndex].Aabb, queryPoint));
+                return static_cast<double>(distance(m_Nodes[nodeIndex].Aabb));
             };
             auto d2Elem = [&](size_t ei)
             {
-                return static_cast<float>(SquaredDistance(ElementAabbs[ei], queryPoint));
+                return static_cast<double>(distance(ElementAabbs[ei]));
             };
 
             pq.emplace(d2Node(rootIndex), rootIndex);
-            float tau = std::numeric_limits<float>::infinity();
+            double tau = std::numeric_limits<double>::infinity();
             auto UpdateTau = [&]()
             {
-                tau = (heap.Size() == k) ? heap.top().first : std::numeric_limits<float>::infinity();
+                tau = (heap.Size() == k) ? heap.top().first : std::numeric_limits<double>::infinity();
             };
 
             while (!pq.empty())
@@ -332,7 +338,7 @@ namespace Geometry
                                 const NodeIndex childIndex = node.BaseChildIndex + childOffset;
 
                                 if (childIndex == kInvalidIndex) continue;
-                                const float cd2 = d2Node(childIndex);
+                                const double cd2 = d2Node(childIndex);
                                 if (cd2 <= tau) pq.emplace(cd2, childIndex);
 
                                 // Move to the next existing child in the contiguous block

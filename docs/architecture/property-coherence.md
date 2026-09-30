@@ -287,9 +287,13 @@ transaction). Two things are new:
 
 ### Outlier score and mask transactions
 
-Vulkan admission refuses radius analysis when radius squared is below `FLT_MIN`.
-Float32 denormal preservation is not required, so pairwise squared distances below
-`FLT_MIN` may differ on devices that flush denormals; see [outlier analysis](outlier-analysis.md).
+Outliers and resident scalar methods use double distance decisions and ordered
+double reductions, with float rounding at property publication. Subnormal float output bit patterns are encoded by rounded integer stores,
+so publication also avoids float FTZ. Float-subnormal
+intermediates no longer require float32 denormal preservation; see
+[outlier analysis](outlier-analysis.md) and [kernel density](kernel-density.md).
+Nonzero subnormal position inputs remain refused because shared LBVH building
+uses float arithmetic. Double-underflow kernel ranges fail closed.
 
 Vulkan outlier analysis reads canonical positions through `SpatialIndexCache`;
 indices with deleted rows gather their compact positions on the device. The
@@ -448,3 +452,35 @@ The contract is exercised by geometry property revision tests, mesh/graph/
 point-cloud no-dirty-tag extraction tests, visualization dirty-stamp tests,
 `GpuWorld` transfer-staging tests, and the validation-enabled Vulkan LOP
 publication-to-render-residency regression listed in the contract catalog.
+
+### Resident density, spacing and density weights
+
+`Graphics.PointScalarAnalysis` reads the canonical position slot through the
+cached LBVH and writes a float scalar ring. Density/spacing use ordered double
+reductions; compact density weights use source-index-ordered double sums and
+shared double exponential evaluation. No neighborhood arrays cross to CPU.
+The three adapters share `Runtime.PointScalarTransaction` for leases, stale
+watches, generation-safe Discard and `GpuFrontReadback` Accept into
+`PublishPointScalarField`, followed by publication-bound `BindRevision`.
+Existing deleted rows copy the resident output base; new deleted rows are zero.
+The float ring is directly observable by the colormap. Other scalar storage is
+refused at Vulkan admission because this kernel's store/readback contract is float.
+Panels expose Accept/Discard and discard on detach; batch/agent Apply accepts
+automatically. Result/agent IO counters distinguish input uploads/cache hits
+from the terminal scalar readback. Legacy neighborhood/CPU timing fields are zero
+for resident runs; these counters are not a performance measurement. GPU parity
+execution for this port is pending.
+
+Initial compute-submit rejection is an immediate result and does not invoke the
+completion sink. Once queued, terminal completion (including an Accept-submit
+rejection) is delivered exactly once and releases the ring without CPU/history
+publication. The scalar failure smoke restores ordinary samples after its radius
+overflow fixture, rejects `Accept point scalar`, checks ring release, then runs
+successfully again.
+
+Scalar and outlier transactions validate captured ring generations before Accept
+and job publication. A replacement ring invalidates the older transaction; its
+cleanup cannot discard the replacement. A nonempty Accept callback replaces the
+Start callback after admission succeeds, with one terminal delivery. Scalar
+panels omit the Start callback and fold the terminal snapshot through the same
+runtime result adapters before publishing their retained result once.

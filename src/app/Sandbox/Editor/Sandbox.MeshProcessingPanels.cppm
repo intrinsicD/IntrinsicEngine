@@ -32,6 +32,7 @@ export namespace Extrinsic::Sandbox::Editor
         // The same seam for the Normal Estimation window's Vulkan run (Accept / Discard).
         void InjectNormalTransactionForTest(Runtime::EditorNormalTransactionHandle transaction);
         void InjectOutlierTransactionForTest(Runtime::EditorOutlierTransactionHandle transaction);
+        void InjectPointScalarTransactionForTest(unsigned method, Runtime::EditorPointScalarTransactionHandle transaction);
 
     private:
         struct Impl;

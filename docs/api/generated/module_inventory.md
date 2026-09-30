@@ -15,12 +15,12 @@ Root scanned: `src`
 | `geometry` | 132 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 79 |
+| `graphics/renderer` | 80 |
 | `graphics/rhi` | 18 |
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 6 |
-| `runtime` | 109 |
+| `runtime` | 110 |
 
 ## Modules
 
@@ -284,6 +284,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.OutlierAnalysis` | `src/graphics/renderer/Graphics.OutlierAnalysis.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.PointKeypoints` | `src/graphics/renderer/Graphics.PointKeypoints.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.PointLBVH` | `src/graphics/renderer/Graphics.PointLBVH.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.PointScalarAnalysis` | `src/graphics/renderer/Graphics.PointScalarAnalysis.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.PostProcessSystem` | `src/graphics/renderer/Graphics.PostProcessSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.PropertyFilter` | `src/graphics/renderer/Graphics.PropertyFilter.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.PropertyTextureBake` | `src/graphics/renderer/Graphics.PropertyTextureBake.cppm` | `graphics/renderer` |
@@ -395,6 +396,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.PointConstructionOperations` | `src/runtime/Editor/Operations/Runtime.PointConstructionOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointFieldOperations` | `src/runtime/Editor/Operations/Runtime.PointFieldOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointSamplingOperations` | `src/runtime/Editor/Operations/Runtime.PointSamplingOperations.cppm` | `runtime` |
+| `Extrinsic.Runtime.PointScalarTransaction` | `src/runtime/Editor/Operations/Runtime.PointScalarTransaction.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointSetOperations` | `src/runtime/Editor/Operations/Runtime.PointSetOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.RegistrationOperations` | `src/runtime/Editor/Operations/Runtime.RegistrationOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderRecipeEditingOperations` | `src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.cppm` | `runtime` |
@@ -479,4 +481,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **452**
+Total modules: **454**

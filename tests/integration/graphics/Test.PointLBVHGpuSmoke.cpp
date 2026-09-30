@@ -30,6 +30,8 @@ import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.GpuPropertyBinding;
+import Extrinsic.Graphics.GpuPropertyResidency;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.ECS.Scene.Registry;
@@ -1043,6 +1045,7 @@ namespace
 {
     class DensityApp final : public Intrinsic::Tests::RuntimeTestModule
     {
+        static constexpr std::size_t kIsolatedRow=75;unsigned IsolatedChecks{};
     public:
         Geometry::PropertySet& Props(unsigned d)
         {
@@ -1064,12 +1067,12 @@ namespace
         {
             Started=std::chrono::steady_clock::now();
             Context.Scene=Kernel().Worlds().Get(Kernel().ActiveWorld());Context.World=Kernel().ActiveWorld();
-            Context.SpatialIndices=Kernel().Services().Find<Runtime::SpatialIndexCache>();
+            Context.SpatialIndices=Kernel().Services().Find<Runtime::SpatialIndexCache>();Context.Device=&Kernel().GetDevice();
             std::mt19937 random(241);std::uniform_real_distribution<float> dist(-1,1);
             std::vector<glm::vec3> points;
             for(unsigned i=0;i<82;++i){const float x=dist(random),y=dist(random);points.push_back({.1f*x,.1f*y,0});}
             points[0]={0,0,0};points[1]={.3f,.4f,0};points[2]=points[0];
-            points[3]={std::nextafter(.5f,1.f),0,0};points[65]={10,0,0};
+            points[3]={std::nextafter(.5f,1.f),0,0};points[65]={10,0,0};points[kIsolatedRow]={40,0,0};
             for(unsigned d=1;d<=8;++d)
             {
                 auto entity=Context.Scene->Create();Entities.push_back(entity);
@@ -1153,7 +1156,9 @@ namespace
                         batches+=result.GpuQueryBatches;
                         EXPECT_TRUE(result.Succeeded())<<result.Message;
                         EXPECT_EQ(result.ActualBackend,"vulkan_lbvh");
-                        EXPECT_GE(result.GpuQueryBatches,2);
+                        EXPECT_EQ(result.GpuQueryBatches,1); // One resident kernel submission replaces paged neighborhood downloads.
+                        EXPECT_EQ(result.CpuComputeMilliseconds,0);
+                        EXPECT_EQ(result.CpuStageReadbackBytes,result.SlotCount*sizeof(float));
                         if(Phase>0)EXPECT_TRUE(result.IndexReused);
                     }
                     NeighborhoodMs.push_back(neighborhoodMs);FitMs.push_back(fitMs);BatchCounts.push_back(batches);
@@ -1167,8 +1172,14 @@ namespace
                             const double error=std::abs(values[i]-Reference[d-1][i]);
                             MaxError=std::isfinite(error)?std::max(MaxError,error):std::numeric_limits<double>::infinity();
                         }
+                        // The isolated live sample has Gaussian tails below -708 at h=.2.
+                        // Both references must succeed and retain an exact zero density
+                        // (rows 60-69 are deleted, so it sits outside that run).
+                        if(Phase==2 && kIsolatedRow<values.size())
+                        {EXPECT_EQ(values[kIsolatedRow],0.f)<<"domain "<<d;EXPECT_EQ(Reference[d-1][kIsolatedRow],0.f)<<"domain "<<d;++IsolatedChecks;}
                         EXPECT_EQ(std::as_const(Props(d)).Get<float>("keep")[0],42.f);
                     }
+                    if(Phase==2)EXPECT_GT(IsolatedChecks,0u)<<"the isolated sample was checked in no domain";
                     EXPECT_LE(MaxError,1e-5);
                     EXPECT_EQ(History.UndoCount(),8);
                     for(unsigned i=0;i<8;++i)EXPECT_EQ(History.Undo().Status,Runtime::EditorCommandHistoryStatus::Undone);
@@ -1191,7 +1202,11 @@ namespace
                 }
                 CpuMs.push_back(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-cpuStart).count());
             }
-            Context.JobCommands.Submit=[this](Runtime::JobDesc desc,Runtime::EditorJobIdentity){FitToken=Kernel().Jobs().Submit(std::move(desc));return FitToken;};
+            Context.JobCommands.Submit=[this](Runtime::JobDesc desc,Runtime::EditorJobIdentity){
+                if(Phase==4 && desc.DebugName=="Device point scalar"){
+                    auto ready=std::move(desc.IsReadyToApply);
+                    desc.IsReadyToApply=[ready=std::move(ready)]() mutable {(void)ready();return false;};}
+                FitToken=Kernel().Jobs().Submit(std::move(desc));return FitToken;};
             Context.CommandHistory=&History;ExpectedResults=Phase<3?8:1;Submitted=true;PhaseStarted=std::chrono::steady_clock::now();
             if(Phase<3)
             {
@@ -1290,7 +1305,7 @@ namespace
         {
             Started=std::chrono::steady_clock::now();
             Context.Scene=Kernel().Worlds().Get(Kernel().ActiveWorld());Context.World=Kernel().ActiveWorld();
-            Context.SpatialIndices=Kernel().Services().Find<Runtime::SpatialIndexCache>();
+            Context.SpatialIndices=Kernel().Services().Find<Runtime::SpatialIndexCache>();Context.Device=&Kernel().GetDevice();
             std::mt19937 random(241);std::uniform_real_distribution<float> dist(-1,1);
             std::vector<glm::vec3> points;
             for(unsigned i=0;i<82;++i){const float x=dist(random),y=dist(random);points.push_back({.1f*x,.1f*y,0});}
@@ -1379,7 +1394,9 @@ namespace
                         batches+=result.GpuQueryBatches;
                         EXPECT_TRUE(result.Succeeded())<<result.Message;
                         EXPECT_EQ(result.ActualBackend,"vulkan_lbvh");
-                        EXPECT_GE(result.GpuQueryBatches,2);
+                        EXPECT_EQ(result.GpuQueryBatches,1); // One resident kernel submission replaces paged neighborhood downloads.
+                        EXPECT_EQ(result.CpuComputeMilliseconds,0);
+                        EXPECT_EQ(result.CpuStageReadbackBytes,result.SlotCount*sizeof(float));
                         if(Phase>0)EXPECT_TRUE(result.IndexReused);
                         const auto& ref=ReferenceResults[unsigned(result.Radii.Domain)-1];
                         for(auto [actual,expected] : {std::pair{result.MeanRadius,ref.MeanRadius},
@@ -1433,7 +1450,11 @@ namespace
                 }
                 CpuMs.push_back(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-cpuStart).count());
             }
-            Context.JobCommands.Submit=[this](Runtime::JobDesc desc,Runtime::EditorJobIdentity){FitToken=Kernel().Jobs().Submit(std::move(desc));return FitToken;};
+            Context.JobCommands.Submit=[this](Runtime::JobDesc desc,Runtime::EditorJobIdentity){
+                if(Phase==4 && desc.DebugName=="Device point scalar"){
+                    auto ready=std::move(desc.IsReadyToApply);
+                    desc.IsReadyToApply=[ready=std::move(ready)]() mutable {(void)ready();return false;};}
+                FitToken=Kernel().Jobs().Submit(std::move(desc));return FitToken;};
             Context.CommandHistory=&History;ExpectedResults=Phase<3?8:1;Submitted=true;PhaseStarted=std::chrono::steady_clock::now();
             if(Phase<3)
             {
@@ -2355,7 +2376,7 @@ namespace
         {
             Started=std::chrono::steady_clock::now();
             Context.Scene=Kernel().Worlds().Get(Kernel().ActiveWorld());Context.World=Kernel().ActiveWorld();
-            Context.SpatialIndices=Kernel().Services().Find<Runtime::SpatialIndexCache>();
+            Context.SpatialIndices=Kernel().Services().Find<Runtime::SpatialIndexCache>();Context.Device=&Kernel().GetDevice();
             std::mt19937 random(251);std::uniform_real_distribution<float> dist(-1,1);
             std::vector<glm::vec3> points;
             for(unsigned i=0;i<66;++i){const float x=dist(random),y=dist(random);points.push_back({x,y,.1f*dist(random)});}
@@ -2392,7 +2413,7 @@ namespace
                 p.Get<glm::vec3>("samples")[4]={std::numeric_limits<float>::quiet_NaN(),0,0};
             }
 
-            Completion=[this](auto result){Results.push_back(std::move(result));};
+            Completion=[this](auto result){++Callbacks;Results.push_back(std::move(result));};
         }
         void Frame(double,double) override
         {
@@ -2407,9 +2428,14 @@ namespace
                 {EXPECT_TRUE(Kernel().Jobs().Cancel(SupportToken));Cancelled=true;}
                 if(Phase==11)(void)Kernel().Jobs().ReapCompleted();
                 if(Results.size()<(all?8:1))return;
-                if(Phase==13)
+                if(Phase>=13 && Phase<=15)
                     for(auto token:SubmissionTokens)
                         if(Kernel().Jobs().GetState(token)!=Runtime::JobState::Invalid && !Kernel().Jobs().IsComplete(token))return;
+                if(Phase==15){
+                    ASSERT_EQ(Results.size(),1u);EXPECT_TRUE(Results[0].Succeeded())<<Results[0].Message;
+                    EXPECT_EQ(History.UndoCount(),1);EXPECT_EQ(Callbacks,1u);
+                    Done=true;Kernel().RequestExit();return;
+                }
                 if(all || edge)
                 {
                     PhaseMs.push_back(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-PhaseStarted).count());
@@ -2458,9 +2484,19 @@ namespace
                     }
                     if(Phase==13)
                     {
-                        EXPECT_EQ(SubmissionCount,2);EXPECT_EQ(SubmissionTokens.size(),1);
+                        EXPECT_EQ(SubmissionCount,1)<<Results.back().Message;EXPECT_TRUE(SubmissionTokens.empty());
+                        EXPECT_NE(Results.back().Message.find("submission rejected"),std::string::npos)<<Results.back().Message;
+                        EXPECT_EQ(Results.size(),1u);EXPECT_EQ(Callbacks,0u);
+                    }
+                    if(Phase==14){
+                        EXPECT_EQ(Results.size(),1u);EXPECT_EQ(Callbacks,1u);
                         EXPECT_NE(Results.back().Message.find("submission rejected"),std::string::npos);
-                        Done=true;Kernel().RequestExit();return;
+                        EXPECT_TRUE(AcceptRejected);
+                        EXPECT_EQ(std::as_const(Props(8)).Get<float>("weights").Vector(),BeforeWeights);
+                    }
+                    if(Phase==13 || Phase==14){
+                        const auto key=Runtime::MakeGpuPropertyKey(Context.World,Entities[7],Config(8).Weights);
+                        EXPECT_FALSE(Context.SpatialIndices->PropertyResidency()->HasRing(key));
                     }
                 }
                 Results.clear();Submitted=false;++Phase;
@@ -2500,11 +2536,12 @@ namespace
                 }
                 CpuMs.push_back(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-cpuStart).count());
             }
-            SubmissionCount=0;SupportReadyForCancel=false;SubmissionTokens.clear();
+            SubmissionCount=0;Callbacks=0;SupportReadyForCancel=false;SubmissionTokens.clear();
             Context.JobCommands.Submit=[this](Runtime::JobDesc desc,Runtime::EditorJobIdentity)
             {
-                ++SubmissionCount;if(Phase==13 && SubmissionCount==2)return Runtime::JobToken{};
-                const bool support=desc.DebugName=="Density radius support (Vulkan)";
+                ++SubmissionCount;if(Phase==13 && SubmissionCount==1)return Runtime::JobToken{}; // the resident path submits the compute job first
+                if(Phase==14 && desc.DebugName=="Accept point scalar"){AcceptRejected=true;return Runtime::JobToken{};}
+                const bool support=desc.DebugName=="Device point scalar";
                 if(Phase==11 && support)
                 {
                     auto ready=std::move(desc.IsReadyToApply);
@@ -2525,7 +2562,11 @@ namespace
                     p.Resize(1030);p.Get<glm::vec3>("samples").Vector().assign(1030,glm::vec3(0));
                     p.GetOrAdd<bool>("v:deleted").Vector().assign(1030,false);
                 }
-                p.Get<float>("weights").Vector().assign(p.Size(),77);
+                if(Phase==13){
+                    p.Resize(3);p.Get<glm::vec3>("samples").Vector()={{0,0,0},{0.1f,0,0},{0.2f,0,0}};
+                    p.GetOrAdd<bool>("v:deleted").Vector().assign(3,false);
+                }
+                p.Get<float>("weights").Vector().assign(p.Size(),77);BeforeWeights=std::as_const(p).Get<float>("weights").Vector();
                 const auto r=Runtime::ApplyEditorDensityWeightCommand(Runtime::BindEditorProcessingCommands(Context), Config(8), Completion);if(r.Status!=Runtime::EditorCommandStatus::Pending)Results.push_back(r);
                 if(Phase==10)p.Get<glm::vec3>("samples")[0]+=.1f;
             }
@@ -2537,7 +2578,8 @@ namespace
         std::vector<Runtime::EditorDensityWeightResult> Results,ReferenceResults;std::vector<double> PhaseMs,CpuMs;
         std::chrono::steady_clock::time_point Started{},PhaseStarted{};
         Runtime::JobToken SupportToken{};std::vector<Runtime::JobToken> SubmissionTokens;
-        unsigned Phase{},ColdFrames{},SubmissionCount{};
+        unsigned Phase{},ColdFrames{},SubmissionCount{},Callbacks{};
+        bool AcceptRejected{};std::vector<float> BeforeWeights;
         bool Submitted{},Done{},TimedOut{},Cancelled{},SupportReadyForCancel{};double MaxError{};
     };
 }

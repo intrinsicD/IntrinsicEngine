@@ -53,11 +53,12 @@ export namespace Geometry::PointLBVH
         [[nodiscard]] bool Build(std::span<const glm::vec3> points);
         [[nodiscard]] Neighbor Nearest(glm::vec3 query,
                                         std::uint32_t excludedIndex = InvalidIndex) const;
+        // Double keys affect pruning/ranking; returned distance metadata retains the float ABI.
         [[nodiscard]] RadiusResult Radius(glm::vec3 query, float radius,
                                           std::uint32_t capacity,
-                                          std::uint32_t excludedIndex = InvalidIndex) const;
+                                          std::uint32_t excludedIndex = InvalidIndex, bool doubleDistances = false) const;
         [[nodiscard]] std::vector<Neighbor> KNearest(
-            glm::vec3 query, std::uint32_t k, std::uint32_t excludedIndex = InvalidIndex) const;
+            glm::vec3 query, std::uint32_t k, std::uint32_t excludedIndex = InvalidIndex, bool doubleDistances = false) const;
         [[nodiscard]] std::span<const Node> Nodes() const noexcept
         {
             return m_Nodes;

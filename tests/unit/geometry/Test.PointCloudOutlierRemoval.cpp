@@ -290,7 +290,7 @@ TEST(PointCloudOutlierAnalysis, SpanScoresAndMaskMatchIndependentDistanceOracle)
 
 TEST(PointCloudOutlierAnalysis, SuppliedSummariesRetainPopulationVarianceAndDegeneratePolicy)
 {
-    const auto result=PC::ClassifyStatisticalOutliers(std::vector<float>{0,0,0,4},1);
+    const auto result=PC::ClassifyStatisticalOutliers(std::vector<double>{0,0,0,4},1);
     EXPECT_FLOAT_EQ(result.MeanDistance,1);
     EXPECT_NEAR(result.StdDevDistance,std::sqrt(3.f),1e-6);
     EXPECT_EQ(result.Mask,(std::vector<std::uint32_t>{0,0,0,1}));
@@ -301,4 +301,15 @@ TEST(PointCloudOutlierAnalysis, SuppliedSummariesRetainPopulationVarianceAndDege
     const auto zeroMinimum=PC::AnalyzeRadiusOutliers(tied,{.SearchRadius=1,.MinNeighbors=0});
     EXPECT_EQ(zeroMinimum.RejectedCount,0);
     EXPECT_TRUE(std::ranges::all_of(zeroMinimum.Scores,[](float value){return value==19;}));
+}
+
+TEST(PointCloudOutlierAnalysis, DoubleDistanceAndRadiusPreserveFloatSubnormalSquares)
+{
+    const std::vector<glm::vec3> p{{0,0,0},{1e-20f,0,0},{3e-20f,0,0}};
+    const auto statistical=PC::AnalyzeStatisticalOutliers(p,{.KNeighbors=1,.StdDevMultiplier=1});
+    EXPECT_FLOAT_EQ(statistical.Scores[0],1e-20f);
+    EXPECT_EQ(statistical.Mask,(std::vector<std::uint32_t>{0,0,1}));
+    const auto radius=PC::AnalyzeRadiusOutliers(p,{.SearchRadius=1.5e-20f,.MinNeighbors=1});
+    EXPECT_EQ(radius.Scores,(std::vector<float>{1,1,0}));
+    EXPECT_EQ(radius.Mask,(std::vector<std::uint32_t>{0,0,1}));
 }

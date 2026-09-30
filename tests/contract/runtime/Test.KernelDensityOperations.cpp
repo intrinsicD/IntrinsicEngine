@@ -186,7 +186,7 @@ TEST(KernelDensityConfig, RoundTripAndSharedPreviewApplyRun)
 
 TEST(KernelDensityOperations, EveryDomainPublishesNamedDensityAndPreservesDeletedRowsWithHistory)
 {
-    for(unsigned d=1;d<=8;++d) for(float bandwidth : {0.f,.2f}) for(unsigned k : {1u, 2u, 63u})
+    for(unsigned d=1;d<=8;++d) for(float bandwidth : {0.f,.2f,2.f}) for(unsigned k : {1u, 2u, 63u})
     {
         SCOPED_TRACE(d);
         SCOPED_TRACE(bandwidth);
@@ -215,7 +215,8 @@ TEST(KernelDensityOperations, EveryDomainPublishesNamedDensityAndPreservesDelete
         EXPECT_TRUE(std::ranges::any_of(catalog.Entries,[&](auto& e){return e.Ref==config.Positions;}));
         ASSERT_TRUE(R::PreviewEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), config).Enabled);
         const auto reference=R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), config);
-        ASSERT_TRUE(reference.Succeeded())<<reference.Message;EXPECT_EQ(reference.ActualBackend,"cpu_octree");
+        ASSERT_TRUE(reference.Succeeded())<<reference.Message;
+        EXPECT_EQ(reference.ActualBackend,"cpu_octree");
         const auto values=std::as_const(props).Get<float>("density").Vector();
         EXPECT_EQ(values[2],77);if(half)EXPECT_EQ(values[3],77);
         EXPECT_EQ(props.Size(),size);EXPECT_EQ(std::as_const(props).Get<glm::vec3>("samples").Revision(),positionRevision);
@@ -266,6 +267,8 @@ TEST(KernelDensityOperations, InvalidUnsupportedAndNumericalFailuresRetainOutput
     EXPECT_TRUE(R::PreviewEditorKernelDensityCommand(R::BindEditorProcessingCommands(context),unrelatedName).Enabled);
     config.Backend=R::KernelDensityBackend::VulkanLBVH;
     EXPECT_FALSE(R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), config).Succeeded());
+    // A coincident peer keeps a nonzero kernel: h^-3 genuinely overflows the float output.
+    props.Get<glm::vec3>("samples")[1]=std::as_const(props).Get<glm::vec3>("samples")[0];
     config.Backend=R::KernelDensityBackend::CpuOctree;config.Bandwidth=1e-30f;
     EXPECT_FALSE(R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), config).Succeeded());
     EXPECT_EQ(std::as_const(props).Get<float>("density")[0],77);

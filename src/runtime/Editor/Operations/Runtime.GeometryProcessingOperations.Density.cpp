@@ -15,6 +15,7 @@ module;
 #include <entt/entity/registry.hpp>
 module Extrinsic.Runtime.PointFieldOperations;
 import Extrinsic.Core.Error;
+import Extrinsic.Graphics.PointScalarAnalysis;
 import Geometry.PointCloud.Utils;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.JobService;
@@ -33,6 +34,7 @@ import Extrinsic.Core.Config.EngineLoad;
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuScalar.hpp"
 
 // Kernel density and point spacing each publish one kNN-derived scalar per live
 // sample. They share capture, index admission, job lifecycle and publication;
@@ -64,6 +66,8 @@ namespace Extrinsic::Runtime
             static constexpr std::string_view Noun{"Density"}, Lower{"density"}, Method{"Kernel density"},
                 History{"Estimate kernel density"}, Evaluation{"CPU bandwidth/Gaussian evaluation"},
                 Failure{"Kernel density failed: invalid neighborhoods or unrepresentable float kernel values/bandwidth."};
+            static Graphics::PointScalarGpuParams Params(const Config& c) { return {.Method=0,.K=c.KNeighbors,.Bandwidth=c.Bandwidth}; }
+            static void Stats(Result& r,const Graphics::PointScalarGpuStats& s) { r.UsedBandwidth=s.Bandwidth;r.MeanDensity=s.Mean;r.MinDensity=s.Minimum;r.MaxDensity=s.Maximum; }
             static constexpr std::size_t MinimumK = 2; // Query min(n,max(k,2)+1) including self.
             static auto& Output(auto& c) { return c.Density; }
             static Result Initial(const Config& c) { return {.RequestedBackend = c.Backend, .Density = c.Density}; }
@@ -92,6 +96,9 @@ namespace Extrinsic::Runtime
             static constexpr std::string_view Noun{"Radii"}, Lower{"radii"}, Method{"Point spacing"},
                 History{"Estimate point spacing and radii"}, Evaluation{"CPU spacing/radius evaluation"},
                 Failure{"Point spacing failed: invalid neighborhoods or unrepresentable float distances/radii."};
+            static Graphics::PointScalarGpuParams Params(const Config& c) { return {.Method=1,.K=c.KNeighbors,.Scale=c.ScaleFactor}; }
+            static void Stats(Result& r,const Graphics::PointScalarGpuStats& s) { r.MeanRadius=s.Mean;r.MinRadius=s.Minimum;r.MaxRadius=s.Maximum;
+                r.AverageSpacing=s.AverageSpacing;r.MinSpacing=s.MinSpacing;r.MaxSpacing=s.MaxSpacing;r.BoundingBoxDiagonal=s.Diagonal;r.Centroid={s.CentroidX,s.CentroidY,s.CentroidZ}; }
             static constexpr std::size_t MinimumK = 1; // Query min(n,max(k,1)+1) including self.
             static auto& Output(auto& c) { return c.Radii; }
             static Result Initial(const Config& c) { return {.RequestedBackend = c.Backend, .Radii = c.Radii}; }
@@ -160,13 +167,7 @@ namespace Extrinsic::Runtime
                     return fail("LBVH requires the spatial cache, at most 2^24 samples and coordinates within 1e18.");
                 if (c.Backend == Backend::VulkanLBVH)
                 {
-                    if (!context.JobCommands.Available() || !context.SpatialIndices->GpuQueriesAvailable())
-                        return fail(Join({"Vulkan ", M::Lower,
-                            " neighborhoods require the framed spatial cache and job service."}));
-                    if (w->Result.LiveCount > (1u << 20) ||
-                        c.KNeighbors > 63)
-                        return fail(Join({"Vulkan ", M::Lower,
-                            " queries support at most 2^20 live samples and k<=63 (64 candidates including self)."}));
+                    if(!AdmitPointScalarGpu(context,*w,M::Params(c),diagnostic))return {};
                 }
             }
             return w;
@@ -196,23 +197,6 @@ namespace Extrinsic::Runtime
             r.Message = Join({M::Noun, " computed using ", r.ActualBackend, " neighborhoods and ", M::Evaluation, "."});
         }
         template <class M>
-        bool AdvanceGpu(const EditorProcessingContext& context, PointFieldWork<M>& w)
-        {
-            if (w.Abandoned || !PointScalarFieldCurrent(context, w.Entity, w))
-            {
-                w.Result.Status = EditorCommandStatus::StaleEntity;
-                w.Result.Message = Join({M::Noun, " inputs changed or the job was cancelled."});
-                w.Neighbors.Batch.reset();
-                return true;
-            }
-            const auto state = AdvancePointKnnRows(*context.SpatialIndices, w.GpuIndex,
-                w.Points, w.Slots, NeighborWidth(w), w.Config.GpuQueryBatchSize, w.Neighbors, w.Result.Message);
-            w.Result.GpuQueryBatches = w.Neighbors.QueryBatches;
-            w.Result.GpuNeighborhoodMilliseconds = w.Neighbors.Milliseconds;
-            if (state == RowsState::Failed) w.Result.Status = EditorCommandStatus::GeometryProcessingFailed;
-            return state != RowsState::Pending;
-        }
-        template <class M>
         typename M::Result Publish(const EditorProcessingContext& context, const std::shared_ptr<PointFieldWork<M>>& w)
         {
             auto& r = w->Result;
@@ -231,6 +215,22 @@ namespace Extrinsic::Runtime
                 ? "Output values are not exactly representable in the selected scalar storage."
                 : Join({M::Noun, " publication rejected by history checks."});
             return r;
+        }
+        template<class M>
+        void FoldGpu(typename M::Result& r,const EditorPointScalarTransactionSnapshot& s)
+        {
+            r.Status=s.Status;r.Message=s.Message;r.LiveCount=s.LiveCount;r.ActualBackend=s.GpuQueryBatches?"vulkan_lbvh":"";
+            r.GpuInputUploadBytes=s.GpuInputUploadBytes;r.GpuInputCacheHits=s.GpuInputCacheHits;r.CpuStageReadbackBytes=s.CpuStageReadbackBytes;
+            r.GpuQueryBatches=s.GpuQueryBatches;r.IndexReused=s.IndexReused;M::Stats(r,s.Statistics);if(s.Phase==EditorGpuTransactionPhase::Applied)r.WrittenCount=r.LiveCount;
+        }
+        template<class M>
+        EditorPointScalarTransactionHandle StartGpu(const EditorProcessingContext& ctx,const std::shared_ptr<PointFieldWork<M>>& w,
+            typename M::Result& result,std::function<void(typename M::Result)> sink,bool automatic,Graphics::GpuPropertyResidency* test=nullptr, const EditorPointScalarTransactionSnapshot& diagnostics = {})
+        {
+            EditorPointScalarTransactionSnapshot state;
+            auto run=StartPointScalarGpu(ctx,w,w->Entity,w->Config.StableEntityId,w->Config.Positions,M::Params(w->Config),std::string(M::History),state,
+                [w,sink=std::move(sink)](EditorPointScalarTransactionSnapshot s){FoldGpu<M>(w->Result,s);if(sink)sink(w->Result);},automatic,test,diagnostics);
+            FoldGpu<M>(w->Result,state);result=w->Result;return run;
         }
         template <class M>
         ActionReadiness Preview(const EditorProcessingCommands& commands, const typename M::Config& config)
@@ -256,6 +256,7 @@ namespace Extrinsic::Runtime
             };
             if (!w)
                 return report(EditorCommandStatus::InvalidProcessingParameters, std::move(diagnostic));
+            if(w->Config.Backend==Backend::VulkanLBVH){typename M::Result result; (void)StartGpu<M>(context,w,result,std::move(onComplete),true);return result;}
             if (w->Config.Backend != Backend::CpuOctree)
             {
                 const auto indexState = AcquirePointIndex(
@@ -323,22 +324,6 @@ namespace Extrinsic::Runtime
                             sink(std::move(pending));
                         }
                     }};
-            if (w->Config.Backend == Backend::VulkanLBVH)
-            {
-                JobDesc gpu{
-                    .DebugName = Join({M::Noun, " neighborhoods (Vulkan)"}), .Scope = context.World,
-                    .Kind = RuntimeTaskKinds::GeometryProcess,
-                    .Work = [](const JobCancellation&) { return JobResultEnvelope::Make(true); },
-                    .IsReadyToApply = [context, w] { return AdvanceGpu(context, *w); },
-                    .PublishCompletion = [w](KernelEventBus&, const JobResultEnvelope&) { return w->Neighbors.Finished; },
-                    .FinalizeUnpublishedOnMainThread = [w] { w->Abandoned = true; }};
-                const auto prerequisite = context.JobCommands.Submit(std::move(gpu), identity);
-                if (!prerequisite.IsValid())
-                    return report(EditorCommandStatus::GeometryProcessingFailed,
-                                  Join({"GPU ", M::Lower, " job submission was rejected."}));
-                desc.DependsOn.push_back({prerequisite,
-                    Join({"Complete Vulkan ", M::Lower, " neighborhoods before ", M::Evaluation})});
-            }
             const auto token = context.JobCommands.Submit(std::move(desc), identity);
             if (!token.IsValid())
             {
@@ -357,6 +342,24 @@ namespace Extrinsic::Runtime
                         .Message = Join({M::Noun, " estimation config is unavailable."})};
             return Apply<M>(commands, *config, std::move(onComplete));
         }
+    }
+    void UpdateEditorPointScalarResult(EditorKernelDensityResult& result, const EditorPointScalarTransactionSnapshot& snapshot)
+    { FoldGpu<KernelDensityMethod>(result,snapshot); }
+    EditorPointScalarTransactionHandle StartEditorKernelDensityTransaction(const EditorProcessingCommands& commands,const KernelDensityConfig& config,
+        EditorKernelDensityResult& result,std::function<void(EditorKernelDensityResult)> sink)
+    {
+        const auto& ctx=EditorProcessingCommandsAccess::Resolve(commands);std::string why;
+        auto w=Capture<KernelDensityMethod>(ctx,config,why);
+        if(!w||config.Backend!=KernelDensityBackend::VulkanLBVH){result=KernelDensityMethod::Initial(config);result.Status=EditorCommandStatus::InvalidProcessingParameters;result.Message=w?"GPU transaction requires vulkan_lbvh.":why;return {};}
+        return StartGpu<KernelDensityMethod>(ctx,w,result,std::move(sink),false);
+    }
+    EditorPointScalarTransactionHandle MakeEditorKernelDensityTransactionForTest(const EditorProcessingCommands& commands,const KernelDensityConfig& config,
+        std::vector<float> values,Graphics::GpuPropertyResidency& residency, const EditorPointScalarTransactionSnapshot& diagnostics)
+    {
+        const auto& ctx=EditorProcessingCommandsAccess::Resolve(commands);auto cpu=config;cpu.Backend=KernelDensityBackend::CpuOctree;std::string why;
+        auto w=Capture<KernelDensityMethod>(ctx,cpu,why);if(!w||values.size()!=w->SlotCount)return {};
+        w->Config.Backend=config.Backend;w->Result.RequestedBackend=config.Backend;w->AfterValues=std::move(values);EditorKernelDensityResult result;
+        return StartGpu<KernelDensityMethod>(ctx,w,result,{},false,&residency,diagnostics);
     }
     ActionReadiness PreviewEditorKernelDensityCommand(
         const EditorProcessingCommands& commands, const KernelDensityConfig& config)
@@ -378,6 +381,24 @@ namespace Extrinsic::Runtime
     {
         return ApplyConfigured<KernelDensityMethod>(
             commands, GetEditorKernelDensityConfig(commands), std::move(onComplete));
+    }
+    void UpdateEditorPointScalarResult(EditorPointSpacingResult& result, const EditorPointScalarTransactionSnapshot& snapshot)
+    { FoldGpu<PointSpacingMethod>(result,snapshot); }
+    EditorPointScalarTransactionHandle StartEditorPointSpacingTransaction(const EditorProcessingCommands& commands,const PointSpacingConfig& config,
+        EditorPointSpacingResult& result,std::function<void(EditorPointSpacingResult)> sink)
+    {
+        const auto& ctx=EditorProcessingCommandsAccess::Resolve(commands);std::string why;
+        auto w=Capture<PointSpacingMethod>(ctx,config,why);
+        if(!w||config.Backend!=PointSpacingBackend::VulkanLBVH){result=PointSpacingMethod::Initial(config);result.Status=EditorCommandStatus::InvalidProcessingParameters;result.Message=w?"GPU transaction requires vulkan_lbvh.":why;return {};}
+        return StartGpu<PointSpacingMethod>(ctx,w,result,std::move(sink),false);
+    }
+    EditorPointScalarTransactionHandle MakeEditorPointSpacingTransactionForTest(const EditorProcessingCommands& commands,const PointSpacingConfig& config,
+        std::vector<float> values,Graphics::GpuPropertyResidency& residency, const EditorPointScalarTransactionSnapshot& diagnostics)
+    {
+        const auto& ctx=EditorProcessingCommandsAccess::Resolve(commands);auto cpu=config;cpu.Backend=PointSpacingBackend::CpuOctree;std::string why;
+        auto w=Capture<PointSpacingMethod>(ctx,cpu,why);if(!w||values.size()!=w->SlotCount)return {};
+        w->Config.Backend=config.Backend;w->Result.RequestedBackend=config.Backend;w->AfterValues=std::move(values);EditorPointSpacingResult result;
+        return StartGpu<PointSpacingMethod>(ctx,w,result,{},false,&residency,diagnostics);
     }
     ActionReadiness PreviewEditorPointSpacingCommand(
         const EditorProcessingCommands& commands, const PointSpacingConfig& config)

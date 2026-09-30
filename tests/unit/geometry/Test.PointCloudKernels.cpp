@@ -478,3 +478,16 @@ TEST(PointCloudKernels, ConservativeRadiusRetainsExtremeReferenceSupport)
     const auto expanded=Kernels::ComputeDensityWeights(separated,std::numeric_limits<float>::max());
     ASSERT_TRUE(expanded.Succeeded());EXPECT_EQ(expanded.Weights,(std::vector<float>{2,2}));
 }
+
+TEST(PointCloudKernels, DoubleWeightsPreserveFloatSubnormalSquaredDistance)
+{
+    const std::vector<glm::vec3> points{{0,0,0},{1e-20f,0,0}};
+    const double h=2e-20;
+    const auto result=Kernels::ComputeDensityWeights(points,h,Kernels::KernelType::Gaussian,Kernels::DensityWeightMode::Direct);
+    ASSERT_TRUE(result.Succeeded());
+    const double t=double(points[1].x)/h;
+    EXPECT_FLOAT_EQ(result.Weights[0],float(1+std::exp(-8*t*t)));
+    EXPECT_EQ(result.Weights[0],result.Weights[1]);
+    const auto tiny=Kernels::ComputeDensityWeights(points,1e-200,Kernels::KernelType::Gaussian,Kernels::DensityWeightMode::Direct);
+    ASSERT_TRUE(tiny.Succeeded());EXPECT_EQ(tiny.Weights,(std::vector<float>{1,1}));
+}

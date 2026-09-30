@@ -24,7 +24,7 @@ export namespace Extrinsic::Graphics
     struct OutlierGpuStats
     {
         std::uint32_t Rejected{}, Invalid{};
-        float Mean{}, StdDev{}, Threshold{};
+        double Mean{}, StdDev{}, Threshold{};
     };
     class OutlierWorkspace
     {

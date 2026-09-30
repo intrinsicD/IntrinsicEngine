@@ -3672,3 +3672,84 @@ TEST(SandboxProcessingPanels, GpuTransactionsDisplayTerminalFailuresAndStaleResu
         R::DiscardEditorPropertySmoothing({},smoothingRun);
     }
 }
+
+TEST(SandboxProcessingPanels, ScalarTransactionTerminalResultsPersistAndDetachDiscards)
+{
+    using Phase=R::EditorGpuTransactionPhase;
+    for(unsigned method=0;method<3;++method) for(bool applied:{false,true})
+    {
+        SCOPED_TRACE(method);
+        SCOPED_TRACE(applied);PanelHarness h;
+        Extrinsic::Tests::MockDevice device;Extrinsic::Graphics::GpuPropertyResidency residency{device};
+        device.TransferQueue.AcceptBufferUploads=true;
+        auto& scene=h.Scene();const auto entity=scene.Create();
+        scene.Raw().emplace<Extrinsic::ECS::Components::Transform::Component>(entity);
+        Geometry::HalfedgeMesh::Mesh mesh;
+        const auto a=mesh.AddVertex({0,0,0}),b=mesh.AddVertex({1,0,0}),c=mesh.AddVertex({0,1,0});
+        (void)mesh.AddTriangle(a,b,c);GS::PopulateFromMesh(scene.Raw(),entity,mesh);
+        auto& rows=scene.Raw().get<GS::Vertices>(entity).Properties;
+        R::KernelDensityConfig density;R::PointSpacingConfig spacing;R::DensityWeightConfig weights;
+        density.StableEntityId=spacing.StableEntityId=weights.StableEntityId=R::SelectionController::ToStableEntityId(entity);
+        density.Positions.Domain=spacing.Positions.Domain=weights.Positions.Domain=R::GeometryElementDomain::MeshVertex;
+        density.Density.Domain=spacing.Radii.Domain=weights.Weights.Domain=R::GeometryElementDomain::MeshVertex;
+        density.Backend=R::KernelDensityBackend::VulkanLBVH;spacing.Backend=R::PointSpacingBackend::VulkanLBVH;weights.Backend=R::DensityWeightBackend::VulkanLBVH;
+        auto config=h.Control().GetEngineConfigControlState().ActiveConfig;
+        R::SetKernelDensityConfig(config,density);R::SetPointSpacingConfig(config,spacing);R::SetDensityWeightConfig(config,weights);
+        ASSERT_TRUE(h.Apply(config));ASSERT_TRUE(h.Selection().SetSelectedEntity(scene,entity));
+        const char* ids[]={"view.kernel_density","view.point_spacing","view.density_weights"};
+        const char* titles[]={"Kernel Density","Point Spacing and Radii","Compact Density Weights"};
+        ASSERT_TRUE(h.Shell.SetEditorWindowOpen(ids[method],true));
+        R::EditorProcessingContext context;context.Scene=&scene;
+        context.JobCommands.Submit=[&](R::JobDesc job,const auto&)->R::JobToken {
+            return applied?h.Engine->Jobs().Submit(std::move(job)):R::JobToken{};
+        };
+        // Seed device diagnostics through the existing mock-front seam; no device execution is claimed.
+        R::EditorPointScalarTransactionSnapshot diagnostics;
+        diagnostics.GpuInputUploadBytes=36;diagnostics.CpuStageReadbackBytes=12;
+        diagnostics.GpuInputCacheHits=1;diagnostics.GpuQueryBatches=1;
+        diagnostics.Statistics.Mean=3;diagnostics.Statistics.Minimum=2;diagnostics.Statistics.Maximum=4;
+        diagnostics.Statistics.Bandwidth=1;diagnostics.Statistics.AverageSpacing=2;
+        bool kept=false;
+        const auto observer=h.Shell.AddFrameObserver([&](const Editor::SandboxEditorContext& frame){
+            const auto check=[&](const auto& result){
+                if(!result || result->Status!=R::EditorCommandStatus::Applied)return false;
+                EXPECT_EQ(result->WrittenCount,rows.Size());EXPECT_EQ(result->ActualBackend,"vulkan_lbvh");
+                EXPECT_EQ(result->GpuInputUploadBytes,36u);EXPECT_EQ(result->CpuStageReadbackBytes,12u);
+                EXPECT_EQ(result->GpuInputCacheHits,1u);EXPECT_EQ(result->GpuQueryBatches,1u);
+                return true;};
+            if(method==0 && check(frame.PointFields.Results.LastKernelDensityResult)){
+                kept=true;EXPECT_EQ(frame.PointFields.Results.LastKernelDensityResult->MeanDensity,3);}
+            if(method==1 && check(frame.PointFields.Results.LastPointSpacingResult)){
+                kept=true;EXPECT_EQ(frame.PointFields.Results.LastPointSpacingResult->MeanRadius,3);}
+            if(method==2 && check(frame.PointAnalysis.Results.LastDensityWeightResult)){
+                kept=true;EXPECT_EQ(frame.PointAnalysis.Results.LastDensityWeightResult->MaxWeight,4);}
+        });
+        const auto commands=R::BindEditorProcessingCommands(context);
+        const auto make=[&]{
+            std::vector<float> values(rows.Size(),3);
+            if(method==0)return R::MakeEditorKernelDensityTransactionForTest(commands,density,values,residency,diagnostics);
+            if(method==1)return R::MakeEditorPointSpacingTransactionForTest(commands,spacing,values,residency,diagnostics);
+            return R::MakeEditorDensityWeightTransactionForTest(commands,weights,values,residency,diagnostics);};
+        auto run=make();ASSERT_TRUE(run);h.Panels.InjectPointScalarTransactionForTest(method,run);
+        int frames=0,terminalFrame=0;bool checked=false;
+        h.Driver->OnFrame=[&](R::Engine& engine){
+            if(++frames>40){ADD_FAILURE()<<"scalar terminal result was not displayed";engine.RequestExit();return;}
+            auto* window=ImGui::FindWindowByName(titles[method]);if(!window)return;
+            ImGui::SetWindowSize(window,{800,1800});ImGui::SetWindowPos(window,{0,0});
+            if(frames==5)ImGui::ActivateItemByID(window->GetID("Accept"));
+            const auto state=R::SnapshotEditorPointScalar(commands,run);
+            if(state.Phase!=Phase::Applied && state.Phase!=Phase::Failed)return;
+            if(!terminalFrame){terminalFrame=frames;return;}
+            if(frames==terminalFrame+3){ImGui::GetCurrentContext()->LogBuffer.clear();ImGui::LogToBuffer();ImGui::GetCurrentContext()->LogWindow=nullptr;}
+            if(frames==terminalFrame+5){
+                EXPECT_EQ(state.Phase,applied?Phase::Applied:Phase::Failed);
+                const std::string text{ImGui::GetCurrentContext()->LogBuffer.c_str()};ImGui::LogFinish();
+                EXPECT_FALSE(state.Message.empty());EXPECT_NE(text.find(state.Message),std::string::npos)<<text;
+                checked=true;engine.RequestExit();}
+        };
+        h.Engine->Run();EXPECT_TRUE(checked);EXPECT_EQ(kept,applied);h.Shell.RemoveFrameObserver(observer);
+        auto pending=make();ASSERT_TRUE(pending);h.Panels.InjectPointScalarTransactionForTest(method,pending);
+        h.Panels.Unregister();EXPECT_EQ(R::SnapshotEditorPointScalar(commands,pending).Phase,Phase::Discarded);
+        EXPECT_EQ(rows.Exists(method==0?density.Density.Name:method==1?spacing.Radii.Name:weights.Weights.Name),applied);
+    }
+}

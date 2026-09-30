@@ -20,6 +20,7 @@ import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Core.Error;
+import Extrinsic.Graphics.PointScalarAnalysis;
 import Geometry.PointCloud.Utils;
 import Geometry.PointCloud.Kernels;
 import Extrinsic.Core.Config.Engine;
@@ -32,6 +33,7 @@ import Extrinsic.Runtime.JobService;
 #include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuScalar.hpp"
 namespace Extrinsic::Runtime
 {
     namespace
@@ -46,13 +48,14 @@ namespace Extrinsic::Runtime
             std::shared_ptr<const SpatialIndexSnapshot> Index{};
             SpatialIndexHandle GpuIndex{};
             bool Abandoned{};
-            std::optional<EditorDensityWeightResult> MainFailure{};
             EditorDensityWeightResult Result{};
         };
         bool Current(const EditorProcessingContext& context,const DensityWeightWork& w)
         {
             return Detail::PointScalarFieldCurrent(context, w.Entity, w);
         }
+        Graphics::PointScalarGpuParams Params(const DensityWeightConfig& c,float radius)
+        { return {.Method=2,.Capacity=c.GpuRadiusCapacity,.Kernel=std::uint32_t(c.Kernel),.Inverse=std::uint32_t(c.Mode),.QueryRadius=radius,.SupportRadius=c.SupportRadius}; }
         enum class Purpose { Execute, Readiness };
         std::shared_ptr<DensityWeightWork> Capture(const EditorProcessingContext& context,
             DensityWeightConfig c,std::string& diagnostic,Purpose purpose=Purpose::Execute)
@@ -79,11 +82,7 @@ namespace Extrinsic::Runtime
                     return fail("LBVH requires the spatial cache, at most 2^24 points, and coordinates/expanded radius within 1e18.");
                 if(c.Backend==DensityWeightBackend::VulkanLBVH)
                 {
-                    // The current shader clamp needs ordered AABB endpoints even
-                    // when the device flushes subnormal values independently.
-                    if(w->HasSubnormalCoordinates)return fail("Vulkan density weights require normal or zero coordinate components; subnormal coordinates are unsupported.");
-                    if(!context.JobCommands.Available() || !context.SpatialIndices->GpuQueriesAvailable() || w->Result.LiveCount>(1u<<20))
-                        return fail("Vulkan density weights require framed GPU queries/jobs and at most 2^20 live samples.");
+                    if(!Detail::AdmitPointScalarGpu(context,*w,Params(c,*radius),diagnostic))return {};
                 }
             }
             return w;
@@ -103,7 +102,7 @@ namespace Extrinsic::Runtime
                     for(std::uint32_t i=0;i<w.Points.size();++i)
                     {
                         const auto support=w.Index->Index.Radius(w.Points[i],r.QueryRadius,
-                            std::uint32_t(std::max<std::size_t>(1,w.Points.size()-1)),i);
+                            std::uint32_t(std::max<std::size_t>(1,w.Points.size()-1)),i,true);
                         if(support.Neighbors.size()!=support.TotalCount){r.Message="Incomplete CPU radius candidates.";return;}
                         row.clear();for(const auto& n:support.Neighbors)row.push_back(n.Index);
                         if(!Detail::AppendPointRadiusRow(w.Rows,row,r.Message))return;
@@ -120,20 +119,7 @@ namespace Extrinsic::Runtime
             r.CpuComputeMilliseconds=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
             r.Message="Density weights computed with "+r.ActualBackend+" radius candidates and CPU double-precision kernel reduction.";
         }
-        bool AdvanceGpu(const EditorProcessingContext& context,DensityWeightWork& w)
-        {
-            if(w.Abandoned || !Current(context,w))
-            {w.Result.Status=EditorCommandStatus::StaleEntity;w.Result.Message="Density input changed or the job was cancelled.";w.MainFailure=w.Result;w.Rows.Batch.reset();return true;}
-            std::string diagnostic;
-            const auto state=Detail::AdvancePointRadiusRows(*context.SpatialIndices,w.GpuIndex,w.Points,w.Slots,
-                w.Result.QueryRadius,w.Config.GpuQueryBatchSize,w.Config.GpuRadiusCapacity,0,w.Rows,diagnostic);
-            w.Result.MaximumNeighbors=w.Rows.MaximumNeighbors;w.Result.GpuQueryBatches=w.Rows.QueryBatches;
-            w.Result.GpuNeighborhoodMilliseconds=w.Rows.Milliseconds;
-            if(w.Rows.Queried)w.Result.ActualBackend="vulkan_lbvh";
-            if(state==Detail::RowsState::Failed)
-            {w.Result.Status=EditorCommandStatus::GeometryProcessingFailed;w.Result.Message=std::move(diagnostic);w.MainFailure=w.Result;}
-            return state!=Detail::RowsState::Pending;
-        }
+
         EditorDensityWeightResult Publish(const EditorProcessingContext& context,const std::shared_ptr<DensityWeightWork>& w)
         {
             auto& r=w->Result;
@@ -151,6 +137,40 @@ namespace Extrinsic::Runtime
                     : "Density publication rejected by history checks.";
             return r;
         }
+        void FoldGpu(EditorDensityWeightResult& r,const EditorPointScalarTransactionSnapshot& s)
+        {
+            r.Status=s.Status;r.Message=s.Message;r.LiveCount=s.LiveCount;r.ActualBackend=s.GpuQueryBatches?"vulkan_lbvh":"";
+            r.GpuInputUploadBytes=s.GpuInputUploadBytes;r.GpuInputCacheHits=s.GpuInputCacheHits;r.CpuStageReadbackBytes=s.CpuStageReadbackBytes;
+            r.GpuQueryBatches=s.GpuQueryBatches;r.IndexReused=s.IndexReused;r.MinWeight=s.Statistics.Minimum;r.MaxWeight=s.Statistics.Maximum;r.MaximumNeighbors=s.Statistics.MaximumNeighbors;
+            r.Diagnostics.QueryCount=r.LiveCount;r.Diagnostics.NeighborContributionCount=s.Statistics.Contributions;
+            r.Diagnostics.UsedSuppliedNeighborhoods=true;
+            if(s.Phase==EditorGpuTransactionPhase::Applied)r.WrittenCount=r.LiveCount;
+        }
+        EditorPointScalarTransactionHandle StartGpu(const EditorProcessingContext& ctx,const std::shared_ptr<DensityWeightWork>& w,
+            EditorDensityWeightResult& result,std::function<void(EditorDensityWeightResult)> sink,bool automatic,Graphics::GpuPropertyResidency* test=nullptr, const EditorPointScalarTransactionSnapshot& diagnostics = {})
+        {
+            EditorPointScalarTransactionSnapshot state;
+            auto run=Detail::StartPointScalarGpu(ctx,w,w->Entity,w->Config.StableEntityId,w->Config.Positions,Params(w->Config,w->Result.QueryRadius),"Estimate density weights",state,
+                [w,sink=std::move(sink)](EditorPointScalarTransactionSnapshot s){FoldGpu(w->Result,s);if(sink)sink(w->Result);},automatic,test,diagnostics);
+            FoldGpu(w->Result,state);result=w->Result;return run;
+        }
+    }
+    void UpdateEditorPointScalarResult(EditorDensityWeightResult& result, const EditorPointScalarTransactionSnapshot& snapshot)
+    { FoldGpu(result,snapshot); }
+    EditorPointScalarTransactionHandle StartEditorDensityWeightTransaction(const EditorProcessingCommands& commands,const DensityWeightConfig& config,
+        EditorDensityWeightResult& result,std::function<void(EditorDensityWeightResult)> sink)
+    {
+        result.RequestedBackend=config.Backend;result.Weights=config.Weights;
+        const auto& ctx=EditorProcessingCommandsAccess::Resolve(commands);std::string why;auto w=Capture(ctx,config,why);
+        if(!w||config.Backend!=DensityWeightBackend::VulkanLBVH){result.Status=EditorCommandStatus::InvalidProcessingParameters;result.Message=w?"GPU transaction requires vulkan_lbvh.":why;return {};}
+        return StartGpu(ctx,w,result,std::move(sink),false);
+    }
+    EditorPointScalarTransactionHandle MakeEditorDensityWeightTransactionForTest(const EditorProcessingCommands& commands,const DensityWeightConfig& config,
+        std::vector<float> values,Graphics::GpuPropertyResidency& residency, const EditorPointScalarTransactionSnapshot& diagnostics)
+    {
+        const auto& ctx=EditorProcessingCommandsAccess::Resolve(commands);auto cpu=config;cpu.Backend=DensityWeightBackend::CpuKDTree;std::string why;
+        auto w=Capture(ctx,cpu,why);if(!w||values.size()!=w->SlotCount)return {};w->Config.Backend=config.Backend;w->Result.RequestedBackend=config.Backend;w->AfterValues=std::move(values);
+        EditorDensityWeightResult result;return StartGpu(ctx,w,result,{},false,&residency,diagnostics);
     }
     ActionReadiness PreviewEditorDensityWeightCommand(const EditorProcessingCommands& commands,const DensityWeightConfig& config)
     {
@@ -166,6 +186,7 @@ namespace Extrinsic::Runtime
         const auto report=[&](EditorCommandStatus status,std::string message)
         {auto r=w?w->Result:EditorDensityWeightResult{.RequestedBackend=config.Backend,.Weights=config.Weights};r.Status=status;r.Message=std::move(message);return r;};
         if(!w)return report(EditorCommandStatus::InvalidProcessingParameters,diagnostic);
+        if(w->Config.Backend==DensityWeightBackend::VulkanLBVH){EditorDensityWeightResult result;(void)StartGpu(context,w,result,std::move(onComplete),true);return result;}
         if(w->Config.Backend!=DensityWeightBackend::CpuKDTree)
         {
             const auto indexState = GeometryProcessingDetail::AcquirePointIndex(
@@ -194,21 +215,9 @@ namespace Extrinsic::Runtime
             .FinalizeUnpublishedOnMainThread=[w,sink,delivered,pending]() mutable
             {
                 w->Abandoned=true;if(*delivered)return;*delivered=true;auto r=pending;
-                if(w->MainFailure)r=*w->MainFailure;
-                else {r.Status=EditorCommandStatus::StaleEntity;r.Message="Density job cancelled or stale; previous output retained.";}
+                r.Status=EditorCommandStatus::StaleEntity;r.Message="Density job cancelled or stale; previous output retained.";
                 if(sink)sink(std::move(r));
             }};
-        if(w->Config.Backend==DensityWeightBackend::VulkanLBVH)
-        {
-            JobDesc gpu{.DebugName="Density radius support (Vulkan)",.Scope=context.World,.Kind=RuntimeTaskKinds::GeometryProcess,
-                .Work=[](const JobCancellation&){return JobResultEnvelope::Make(true);},
-                .IsReadyToApply=[context,w]{return AdvanceGpu(context,*w);},
-                .PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope&){return w->Rows.Finished;},
-                .FinalizeUnpublishedOnMainThread=[w]{w->Abandoned=true;}};
-            const auto support=context.JobCommands.Submit(std::move(gpu),identity);
-            if(!support.IsValid())return rejected("Density GPU submission rejected.");
-            desc.DependsOn.push_back({support,"Complete radius candidates before density reduction"});
-        }
         const auto token=context.JobCommands.Submit(std::move(desc),identity);
         if(!token.IsValid()){w->Abandoned=true;return rejected("Density reduction submission rejected.");}
         return pending;

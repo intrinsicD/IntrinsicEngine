@@ -184,6 +184,30 @@ namespace Extrinsic::Sandbox::Editor
                 ApplyProcessingExecution(state, state.Draft, apply, execute, sink, executionRejected);
         }
 
+        template<class State,class Sink>
+        bool DrawPointScalarTransaction(const Runtime::EditorProcessingCommands& commands,
+            Runtime::EditorPointScalarTransactionHandle& run,State& state,const Sink& sink)
+        {
+            if(!run)return false;
+            const auto snapshot=Runtime::SnapshotEditorPointScalar(commands,run);
+            const auto phase=snapshot.Phase;
+            const bool active=phase==Runtime::EditorGpuTransactionPhase::Running||phase==Runtime::EditorGpuTransactionPhase::Accepting||phase==Runtime::EditorGpuTransactionPhase::ReadyToAccept;
+            if(!active){
+                if(state.LastResult){auto result=*state.LastResult;Runtime::UpdateEditorPointScalarResult(result,snapshot);
+                    PublishCommandResult(state.LastResult,std::move(result),sink);}
+                run.reset();return false;}
+            ImGui::TextWrapped("%s",snapshot.Message.c_str());
+            ImGui::Text("Input upload: %llu bytes; residency hits: %llu; CPU readback: %llu bytes",
+                static_cast<unsigned long long>(snapshot.GpuInputUploadBytes),static_cast<unsigned long long>(snapshot.GpuInputCacheHits),static_cast<unsigned long long>(snapshot.CpuStageReadbackBytes));
+            if(phase==Runtime::EditorGpuTransactionPhase::ReadyToAccept){
+                ImGui::BeginDisabled(!snapshot.CanAccept);
+                if(ImGui::Button("Accept"))(void)Runtime::AcceptEditorPointScalar(commands,run);
+                ImGui::EndDisabled();
+                if(!snapshot.AcceptRefusalReason.empty())ImGui::TextWrapped("%s",snapshot.AcceptRefusalReason.c_str());}
+            if(ImGui::Button("Discard"))Runtime::DiscardEditorPointScalar(commands,run);
+            return true;
+        }
+
         void ShowCurvatureSegmentationVisualization(
             const SandboxEditorContext& context,
             const std::uint32_t stableEntityId,
@@ -406,6 +430,7 @@ namespace Extrinsic::Sandbox::Editor
             std::make_shared<std::optional<Runtime::EditorNormalEstimationResult>>()};
         OutliersState Outliers{};
         Runtime::EditorOutlierTransactionHandle OutlierTransaction{};
+        Runtime::EditorPointScalarTransactionHandle DensityTransaction{}, SpacingTransaction{}, WeightTransaction{};
         KeypointsState Keypoints{};
         DescriptorsState Descriptors{};
         DensityState Density{};
@@ -645,6 +670,7 @@ namespace Extrinsic::Sandbox::Editor
         Normals = {};
         if (OutlierTransaction) Runtime::DiscardEditorOutlierAnalysis({}, OutlierTransaction);
         OutlierTransaction.reset();
+        for(auto* run:{&DensityTransaction,&SpacingTransaction,&WeightTransaction}){Runtime::DiscardEditorPointScalar({},*run);run->reset();}
         Outliers = {};
         Keypoints = {};
         Descriptors = {};
@@ -2396,13 +2422,19 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::TextWrapped("Local Gaussian average over nearest candidates. Automatic bandwidth uses nearest-other spacing. Distances use the selected property coordinates.");
         if(config.Backend==Runtime::KernelDensityBackend::VulkanLBVH)
             changed |= ImGui::InputScalar("GPU query batch size",ImGuiDataType_U32,&config.GpuQueryBatchSize);
+        const bool scalarActive=DrawPointScalarTransaction(context.PointFields.Commands,DensityTransaction,Density,context.PointFields.ResultSinks.KernelDensity);
+        ImGui::BeginDisabled(scalarActive);
         DrawProcessingExecution(context.PointFields.Commands, Density, changed,
             [&](const auto& c) { return Runtime::PreviewEditorKernelDensityCommand(context.PointFields.Commands, c); },
             [&](const auto& c) { return Runtime::ApplyEditorKernelDensityConfig(context.PointFields.Commands, c); },
-            [&] { return Runtime::ApplyEditorConfiguredKernelDensity(context.PointFields.Commands, context.PointFields.ResultSinks.KernelDensity); },
+            [&] {
+                if(config.Backend==Runtime::KernelDensityBackend::VulkanLBVH){Runtime::EditorKernelDensityResult result;
+                    DensityTransaction=Runtime::StartEditorKernelDensityTransaction(context.PointFields.Commands,config,result);return result;}
+                return Runtime::ApplyEditorConfiguredKernelDensity(context.PointFields.Commands,context.PointFields.ResultSinks.KernelDensity); },
             context.PointFields.ResultSinks.KernelDensity, "Estimate density",
             "Controls were rejected by density config validation.", "Density config was rejected.");
-        ImGui::TextWrapped("Vulkan computes neighbors; bandwidth and Gaussian evaluation run on CPU. The named density property supports Undo.");
+        ImGui::EndDisabled();
+        ImGui::TextWrapped("Vulkan previews density on the device. Accept publishes the scalar with Undo; Discard retains CPU rows.");
         if (ImGui::Button("Show density"))
             Density.VisualizationDiagnostic = Runtime::DebugNameForEditorCommandStatus(
                 ShowProcessingProperty(context, config.StableEntityId, config.Density));
@@ -2461,13 +2493,19 @@ namespace Extrinsic::Sandbox::Editor
             changed |= ImGui::InputScalar("GPU radius capacity",ImGuiDataType_U32,&config.GpuRadiusCapacity);
             ImGui::TextWrapped("Vulkan collects complete conservative radius candidates. Overflow leaves the previous output unchanged. Subnormal coordinate components are unsupported.");
         }
+        const bool scalarActive=DrawPointScalarTransaction(context.PointAnalysis.Commands,WeightTransaction,DensityWeights,context.PointAnalysis.ResultSinks.DensityWeight);
+        ImGui::BeginDisabled(scalarActive);
         DrawProcessingExecution(context.PointAnalysis.Commands, DensityWeights, changed,
             [&](const auto& request) { return Runtime::PreviewEditorDensityWeightCommand(context.PointAnalysis.Commands, request); },
             [&](const auto& request) { return Runtime::ApplyEditorDensityWeightConfig(context.PointAnalysis.Commands, request); },
-            [&] { return Runtime::ApplyEditorConfiguredDensityWeight(context.PointAnalysis.Commands, context.PointAnalysis.ResultSinks.DensityWeight); },
+            [&] {
+                if(config.Backend==Runtime::DensityWeightBackend::VulkanLBVH){Runtime::EditorDensityWeightResult result;
+                    WeightTransaction=Runtime::StartEditorDensityWeightTransaction(context.PointAnalysis.Commands,config,result);return result;}
+                return Runtime::ApplyEditorConfiguredDensityWeight(context.PointAnalysis.Commands,context.PointAnalysis.ResultSinks.DensityWeight); },
             context.PointAnalysis.ResultSinks.DensityWeight, "Compute compact weights",
             "Controls were rejected by density config validation.", "Density config was rejected.");
-        ImGui::TextWrapped("Vulkan computes radius candidates; strict support and kernel reduction run on CPU. The named weight property supports Undo.");
+        ImGui::EndDisabled();
+        ImGui::TextWrapped("Vulkan previews compact weights using double kernel sums. Accept publishes with Undo; Discard retains CPU rows.");
         auto density=config.Weights;
         if(ImGui::Button("Show weights"))
             DensityWeights.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(ShowProcessingProperty(context, config.StableEntityId, density));
@@ -2645,13 +2683,19 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::TextWrapped("Radius = scale times mean retained neighbor distance. Nearest-other spacing is reported separately. Values use the selected property coordinates; coverage is not guaranteed.");
         if(config.Backend==Runtime::PointSpacingBackend::VulkanLBVH)
             changed |= ImGui::InputScalar("GPU query batch size",ImGuiDataType_U32,&config.GpuQueryBatchSize);
+        const bool scalarActive=DrawPointScalarTransaction(context.PointFields.Commands,SpacingTransaction,Spacing,context.PointFields.ResultSinks.PointSpacing);
+        ImGui::BeginDisabled(scalarActive);
         DrawProcessingExecution(context.PointFields.Commands, Spacing, changed,
             [&](const auto& c) { return Runtime::PreviewEditorPointSpacingCommand(context.PointFields.Commands, c); },
             [&](const auto& c) { return Runtime::ApplyEditorPointSpacingConfig(context.PointFields.Commands, c); },
-            [&] { return Runtime::ApplyEditorConfiguredPointSpacing(context.PointFields.Commands, context.PointFields.ResultSinks.PointSpacing); },
+            [&] {
+                if(config.Backend==Runtime::PointSpacingBackend::VulkanLBVH){Runtime::EditorPointSpacingResult result;
+                    SpacingTransaction=Runtime::StartEditorPointSpacingTransaction(context.PointFields.Commands,config,result);return result;}
+                return Runtime::ApplyEditorConfiguredPointSpacing(context.PointFields.Commands,context.PointFields.ResultSinks.PointSpacing); },
             context.PointFields.ResultSinks.PointSpacing, "Estimate radii",
             "Controls were rejected by radii config validation.", "Spacing config was rejected.");
-        ImGui::TextWrapped("Vulkan computes neighbors; spacing and radii are evaluated on CPU. Undo restores the named radius property. Show radii maps values to colors; point rendering currently expects pixel sizes.");
+        ImGui::EndDisabled();
+        ImGui::TextWrapped("Vulkan previews spacing and radii on the device. Accept publishes with Undo; Discard retains CPU rows. Show radii maps values to colors; point rendering currently expects pixel sizes.");
         if (ImGui::Button("Show radii"))
             Spacing.VisualizationDiagnostic = Runtime::DebugNameForEditorCommandStatus(
                 ShowProcessingProperty(context, config.StableEntityId, config.Radii));
@@ -3308,6 +3352,13 @@ namespace Extrinsic::Sandbox::Editor
     void MeshProcessingPanels::InjectPropertySmoothingTransactionForTest(Runtime::EditorPropertySmoothingTransactionHandle transaction)
     {
         m_Impl->SmoothingTransaction = std::move(transaction);
+    }
+
+    void MeshProcessingPanels::InjectPointScalarTransactionForTest(unsigned method,Runtime::EditorPointScalarTransactionHandle transaction)
+    {
+        if(method==0){m_Impl->DensityTransaction=std::move(transaction);m_Impl->Density.LastResult.emplace();}
+        else if(method==1){m_Impl->SpacingTransaction=std::move(transaction);m_Impl->Spacing.LastResult.emplace();}
+        else if(method==2){m_Impl->WeightTransaction=std::move(transaction);m_Impl->DensityWeights.LastResult.emplace();}
     }
 
     void MeshProcessingPanels::InjectOutlierTransactionForTest(Runtime::EditorOutlierTransactionHandle transaction)

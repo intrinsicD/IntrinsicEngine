@@ -16,6 +16,7 @@ target_sources(${target_name}
         Graphics.GpuPropertyResidency.cppm
         Graphics.PropertyFilter.cppm
         Graphics.SparseConjugateGradient.cppm
+        Graphics.PointScalarAnalysis.cppm
         Graphics.OutlierAnalysis.cppm
         Graphics.VertexNormals.cppm
         Graphics.FrameRecipe.cppm
@@ -69,6 +70,7 @@ target_sources(${target_name}
         Graphics.GpuPropertyResidency.cpp
         Graphics.PropertyFilter.cpp
         Graphics.SparseConjugateGradient.cpp
+        Graphics.PointScalarAnalysis.cpp
         Graphics.OutlierAnalysis.cpp
         Graphics.VertexNormals.cpp
         Graphics.CurrentRendererContractAdapter.cpp

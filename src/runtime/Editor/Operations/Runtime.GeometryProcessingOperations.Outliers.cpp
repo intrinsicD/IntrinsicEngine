@@ -49,6 +49,7 @@ import Extrinsic.RHI.CommandContext;
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.GpuFront.hpp"
 
+#pragma clang fp contract(off)
 namespace Extrinsic::Runtime
 {
     namespace
@@ -152,11 +153,10 @@ namespace Extrinsic::Runtime
                                                                       std::uint32_t(w->LiveCount));
                     if (w->SlotCount > (1u << 20) || std::uint64_t(w->LiveCount) * width > (1u << 24))
                         return fail("Vulkan outlier storage exceeds the bounded device workspace.");
-                    // Compute in double so the admission check itself cannot flush the square.
-                    // Radius is the only configured quantity squared by these estimators.
-                    if (c.Method == OutlierAnalysisMethod::Radius &&
-                        double(c.Radius) * double(c.Radius) < double(std::numeric_limits<float>::min()))
-                        return fail("Vulkan radius outliers require radius squared >= FLT_MIN; float32 denorm preservation is not guaranteed.");
+                    if (c.Method==OutlierAnalysisMethod::Radius && std::fpclassify(c.Radius)==FP_SUBNORMAL)
+                        return fail("Vulkan radius outliers refuse subnormal radius parameters.");
+                    if (std::fpclassify(c.ScoreThreshold)==FP_SUBNORMAL || std::fpclassify(c.StdDevMultiplier)==FP_SUBNORMAL)
+                        return fail("Vulkan outliers refuse subnormal float threshold parameters.");
                     if (w->HasSubnormalCoordinates)
                         return fail("Vulkan outliers do not admit subnormal positions.");
                     if (!context.JobCommands.Available() || !context.SpatialIndices->GpuQueriesAvailable())
@@ -206,8 +206,7 @@ namespace Extrinsic::Runtime
                 }
                 if (!ratio) { r.Message="Local distance ratio failed: invalid neighborhoods or unrepresentable float scores."; return; }
                 analysis.Scores = std::move(ratio->Scores);
-                analysis.Mask.reserve(analysis.Scores.size());
-                for (const float score : analysis.Scores) analysis.Mask.push_back(score > c.ScoreThreshold);
+                analysis.Mask = std::move(ratio->Mask);
                 analysis.RejectedCount = ratio->OutlierCount;
             }
             else if (c.Backend == OutlierAnalysisBackend::CpuOctree)
@@ -220,20 +219,26 @@ namespace Extrinsic::Runtime
             {
                 if (w.Index && c.Backend == OutlierAnalysisBackend::CpuLBVH)
                     for (std::uint32_t i=0; i<w.Points.size(); ++i)
-                        w.Counts.push_back(w.Index->Index.Radius(w.Points[i], c.Radius, 1, i).TotalCount);
+                        w.Counts.push_back(w.Index->Index.Radius(w.Points[i], c.Radius, 1, i, true).TotalCount);
                 analysis = PC::ClassifyRadiusOutliers(w.Counts, c.MinimumNeighbors);
             }
             else
             {
-                std::vector<float> means(w.Points.size());
+                std::vector<double> means(w.Points.size());
                 const auto k = std::min<std::size_t>(c.KNeighbors, w.Points.size()-1);
                 for (std::uint32_t i=0; i<w.Points.size(); ++i)
                 {
-                    float sum=0;
-                    const auto neighbors = w.Index->Index.KNearest(w.Points[i], std::uint32_t(k), i);
-                    if (neighbors.size()!=k) { r.Message="Incomplete CPU kNN neighborhood."; return; }
-                    for (const auto& n : neighbors) sum += glm::length(w.Points[i]-w.Points[n.Index]);
-                    means[i]=sum/float(k);
+                    double sum=0;
+                    const auto neighbors = w.Index->Index.KNearest(w.Points[i], std::uint32_t(k+1), Geometry::PointLBVH::InvalidIndex, true);
+                    if (neighbors.size()!=k+1) { r.Message="Incomplete CPU kNN neighborhood."; return; }
+                    std::size_t used=0;
+                    for (const auto& n : neighbors) {
+                        if(n.Index==i)continue;
+                        ++used;
+                        const glm::dvec3 d=glm::dvec3(w.Points[i])-glm::dvec3(w.Points[n.Index]);
+                        sum += std::sqrt((d.x*d.x+d.y*d.y)+d.z*d.z);
+                    }
+                    means[i]=used?sum/double(used):0;
                 }
                 analysis=PC::ClassifyStatisticalOutliers(means,c.StdDevMultiplier);
             }
@@ -383,6 +388,8 @@ namespace Extrinsic::Runtime
         using Run=EditorOutlierTransactionHandle;
         bool Current(const Run& w)
         {
+            for(std::size_t i=0;i<w->Keys.size();++i)
+                if(w->Generations[i] && w->Residency->RingGeneration(w->Keys[i])!=w->Generations[i])return false;
             return !w->Abandoned && GP::EditorProcessingContextWorldCurrent(w->Context) && CurrentInput(w->Context,*w->Work);
         }
         void Release(const Run& w)
@@ -546,7 +553,7 @@ namespace Extrinsic::Runtime
                     if(w->AutoAccept){const auto accepted=Accept(w,{});if(accepted.Status!=EditorCommandStatus::Pending)Finish(w,EditorGpuTransactionPhase::Failed,accepted.Status,accepted.Message);}
                     return !w->Delivered;},
                 .FinalizeUnpublishedOnMainThread=[w]{if(!w->Delivered)Finish(w,EditorGpuTransactionPhase::Discarded,EditorCommandStatus::StaleEntity,"Outlier run cancelled or stale.");}};
-            if(!ctx.JobCommands.Submit(std::move(job),w->Identity).IsValid()){Fail(w,"Outlier compute submission refused.");result=work->Result;return {};}
+            if(!ctx.JobCommands.Submit(std::move(job),w->Identity).IsValid()){w->Sink={};Fail(w,"Outlier compute submission refused.");result=work->Result;return {};}
             result=work->Result;return w;
         }
     }

@@ -20,6 +20,7 @@ namespace Extrinsic::Graphics
             std::uint32_t Mode{}, First{}, Threads{};
         };
         static_assert(sizeof(Push)==112);
+        static_assert(sizeof(OutlierGpuStats)==32);
     }
     struct OutlierWorkspace::Impl
     {
@@ -53,7 +54,7 @@ namespace Extrinsic::Graphics
         s.Pipeline=CreateComputePipeline(s.Device,"shaders/outlier_analysis.comp.spv",sizeof(Push),"OutlierAnalysis");
         const auto allocate=[&](std::uint64_t bytes){return s.Device.CreateBuffer({.SizeBytes=bytes,
             .Usage=RHI::BufferUsage::Storage|RHI::BufferUsage::TransferSrc,.DebugName="OutlierAnalysis.Scratch"});};
-        s.Neighbors=allocate(std::uint64_t(count)*width*8);s.Means=allocate(io.Score.Bytes);s.Stats=allocate(sizeof(OutlierGpuStats));
+        s.Neighbors=allocate(std::uint64_t(count)*width*8);s.Means=allocate(io.Score.Bytes*4);s.Stats=allocate(sizeof(OutlierGpuStats));
         if(!s.Pipeline.IsValid()||!s.Neighbors.IsValid()||!s.Means.IsValid()||!s.Stats.IsValid())return {};
         const auto shader=RHI::MemoryAccess::ShaderRead|RHI::MemoryAccess::ShaderWrite;
         cmd.BufferBarrier(io.Positions.Buffer,RHI::MemoryAccess::TransferWrite|shader,RHI::MemoryAccess::ShaderRead);
@@ -80,8 +81,8 @@ namespace Extrinsic::Graphics
         dispatch(3,io.Mask.Layout.Count);
         cmd.BufferBarrier(io.Presentation.Buffer,RHI::MemoryAccess::ShaderWrite,RHI::MemoryAccess::ShaderWrite);
         dispatch(0,count);
-        for(auto b:{s.Neighbors,s.Means,io.Score.Buffer})cmd.BufferBarrier(b,RHI::MemoryAccess::ShaderWrite,RHI::MemoryAccess::ShaderRead);
-        if(p.Method==2){dispatch(1,count);cmd.BufferBarrier(io.Score.Buffer,RHI::MemoryAccess::ShaderWrite,RHI::MemoryAccess::ShaderRead);}
+        for(auto b:{s.Neighbors,s.Means,io.Score.Buffer})cmd.BufferBarrier(b,RHI::MemoryAccess::ShaderWrite,shader);
+        if(p.Method==2){dispatch(1,count);for(auto b:{s.Means,io.Score.Buffer})cmd.BufferBarrier(b,RHI::MemoryAccess::ShaderWrite,RHI::MemoryAccess::ShaderRead);}
         dispatch(2,1);
         for(auto b:{io.Score.Buffer,io.Mask.Buffer,io.Presentation.Buffer,s.Stats})
             cmd.BufferBarrier(b,shader,RHI::MemoryAccess::ShaderRead|RHI::MemoryAccess::TransferRead);

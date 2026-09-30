@@ -94,7 +94,8 @@ export namespace Geometry::PointCloud
         std::span<const glm::vec3> positions, const StatisticsParams& params = {});
     // Two nearest candidates per sampled row (none for a singleton). Sample i
     // addresses i*floor(n/sampleCount), preserving StatisticsParams sampling.
-    // Sorted by squared distance then ID; caller guarantees nearest membership.
+    // Sorted by double squared distance then ID; caller guarantees nearest membership.
+    // Promote coordinates before subtraction; float-distance ordering can be rejected.
     [[nodiscard]] std::optional<CloudStatistics> ComputeStatisticsFromNeighbors(
         std::span<const glm::vec3> positions, std::span<const std::uint32_t> candidates,
         const StatisticsParams& params = {});
@@ -179,7 +180,9 @@ export namespace Geometry::PointCloud
     [[nodiscard]] std::optional<RadiusEstimationResult> EstimateRadii(
         std::span<const glm::vec3> positions, const RadiusEstimationParams& params = {});
     // Row-major min(n,max(k,1)+1) candidates per input, sorted by squared distance
-    // then source ID, including self if selected. Caller guarantees nearest membership.
+    // then source ID, including self if selected. Distances use double coordinates
+    // promoted before subtraction; float-distance ordering can be rejected.
+    // Caller guarantees nearest membership.
     [[nodiscard]] std::optional<RadiusEstimationResult> EstimateRadiiFromNeighbors(
         std::span<const glm::vec3> positions, std::span<const std::uint32_t> candidates,
         const RadiusEstimationParams& params = {});
@@ -282,6 +285,7 @@ export namespace Geometry::PointCloud
 
     struct OutlierEstimationResult
     {
+        std::vector<std::uint32_t> Mask; // Classified before rounding scores to float.
         std::vector<float> Scores;         // Per-point outlier score (≥ 0).
         std::size_t        OutlierCount{0}; // Points with score > threshold.
         float              MeanScore{0.0f};
@@ -299,7 +303,9 @@ export namespace Geometry::PointCloud
         std::span<const glm::vec3> positions, const OutlierEstimationParams& params = {});
 
     // Packed rows contain min(n,max(k,2)+1) IDs, sorted by squared distance/ID.
-    // Query without self exclusion, then discard the source ID in the reduction.
+    // Double ordering promotes coordinates before subtraction; float-distance ties
+    // can violate the required order. Query without self exclusion, then discard
+    // the source ID in the reduction.
     [[nodiscard]] std::optional<OutlierEstimationResult> EstimateOutlierProbabilityFromNeighbors(
         std::span<const glm::vec3> positions, std::span<const std::uint32_t> candidates,
         const OutlierEstimationParams& params = {});
@@ -405,7 +411,7 @@ export namespace Geometry::PointCloud
     // NaN distance denotes an invalid input row; classification keeps the existing
     // population-variance rule and strict greater-than rejection threshold.
     [[nodiscard]] OutlierAnalysisResult ClassifyStatisticalOutliers(
-        std::span<const float> meanDistances, float stdDevMultiplier);
+        std::span<const double> meanDistances, float stdDevMultiplier);
     [[nodiscard]] OutlierAnalysisResult ClassifyRadiusOutliers(
         std::span<const std::uint32_t> counts, std::uint32_t minimumNeighbors);
 
@@ -440,6 +446,8 @@ export namespace Geometry::PointCloud
     // Row-major min(n,max(k,2)+1) nearest candidate IDs per sample, including
     // self if selected, sorted by distance then source ID. The caller guarantees
     // nearest membership; bounds, uniqueness and cardinality are validated here.
+    // Order by double squared distance with coordinates promoted before subtraction;
+    // ordering float-rounded distances can fail validation.
     [[nodiscard]] std::optional<KDEResult> EstimateKernelDensityFromNeighbors(
         std::span<const glm::vec3> positions, std::span<const std::uint32_t> candidates,
         const KDEParams& params = {});
