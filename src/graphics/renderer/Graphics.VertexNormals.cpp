@@ -18,7 +18,7 @@ namespace Extrinsic::Graphics
 {
     namespace
     {
-        enum Mode : std::uint32_t { Faces, Vertices };
+        enum Mode : std::uint32_t { Faces, Vertices, FaceNormals };
         struct Push
         {
             std::uint64_t Positions{}, FaceOffsets{}, Corners{}, VertexOffsets{}, Incidence{}, LiveRows{}, Areas{}, Result{}, Stats{};
@@ -33,41 +33,51 @@ namespace Extrinsic::Graphics
 
     VertexNormalsTopologyLayout PackVertexNormalsTopology(
         const std::span<const std::uint32_t> faceOffsets, const std::span<const std::uint32_t> corners,
-        const std::uint32_t vertices, const std::span<const std::uint32_t> liveRows, std::vector<std::uint32_t>& out)
+        const std::uint32_t vertices, const std::span<const std::uint32_t> liveRows, std::vector<std::uint32_t>& out,
+        const VertexNormalsBundleKind kind)
     {
         VertexNormalsTopologyLayout layout{};
+        layout.Kind = kind;
         out.clear();
+        const bool faceRows = kind == VertexNormalsBundleKind::FaceNormals;
         // Limits first, before anything sized by the inputs is allocated.
         if (faceOffsets.empty() || faceOffsets.size() - 1u > VertexNormalsMaxFaces || vertices == 0u ||
-            vertices > VertexNormalsMaxVertices || corners.size() > VertexNormalsMaxCorners || liveRows.size() > vertices)
+            vertices > VertexNormalsMaxVertices || corners.size() > VertexNormalsMaxCorners)
             return {};
+        const auto faces = std::uint32_t(faceOffsets.size() - 1u);
+        const std::uint32_t rowBound = faceRows ? faces : vertices;
+        if (liveRows.size() > rowBound) return {};
         if (faceOffsets.front() != 0u || faceOffsets.back() != corners.size() ||
             !std::is_sorted(faceOffsets.begin(), faceOffsets.end()))
             return {};
         for (const auto corner : corners)
-            if (corner >= vertices) return {};
+            if (corner >= vertices && !(faceRows && corner == VertexNormalsDeletedCorner)) return {};
         for (const auto row : liveRows)
-            if (row >= vertices) return {};
-        const auto faces = std::uint32_t(faceOffsets.size() - 1u);
+            if (row >= rowBound) return {};
         // Incidences per vertex, then their (face, corner) pairs in ascending face order: the
-        // reference visits faces in index order and each face's corners in ring order.
+        // reference visits faces in index order and each face's corners in ring order. The
+        // face-normals kernel walks rings only, so its bundle carries none.
         std::vector<std::uint32_t> vertexOffsets(std::size_t(vertices) + 1u, 0u);
-        for (const auto corner : corners) ++vertexOffsets[std::size_t(corner) + 1u];
-        for (std::size_t v = 0; v < vertices; ++v) vertexOffsets[v + 1u] += vertexOffsets[v];
-        std::vector<std::uint32_t> incidence(std::size_t(corners.size()) * 2u);
-        std::vector<std::uint32_t> cursor(vertexOffsets.begin(), vertexOffsets.end() - 1);
-        for (std::uint32_t f = 0; f < faces; ++f)
-            for (std::uint32_t c = faceOffsets[f]; c < faceOffsets[f + 1u]; ++c)
-            {
-                const auto slot = cursor[corners[c]]++;
-                incidence[std::size_t(slot) * 2u] = f;
-                incidence[std::size_t(slot) * 2u + 1u] = c - faceOffsets[f];
-            }
+        std::vector<std::uint32_t> incidence;
+        if (!faceRows)
+        {
+            for (const auto corner : corners) ++vertexOffsets[std::size_t(corner) + 1u];
+            for (std::size_t v = 0; v < vertices; ++v) vertexOffsets[v + 1u] += vertexOffsets[v];
+            incidence.resize(std::size_t(corners.size()) * 2u);
+            std::vector<std::uint32_t> cursor(vertexOffsets.begin(), vertexOffsets.end() - 1);
+            for (std::uint32_t f = 0; f < faces; ++f)
+                for (std::uint32_t c = faceOffsets[f]; c < faceOffsets[f + 1u]; ++c)
+                {
+                    const auto slot = cursor[corners[c]]++;
+                    incidence[std::size_t(slot) * 2u] = f;
+                    incidence[std::size_t(slot) * 2u + 1u] = c - faceOffsets[f];
+                }
+        }
         layout.Faces = faces;
         layout.Vertices = vertices;
         layout.LiveRows = std::uint32_t(liveRows.size());
         layout.Corners = std::uint32_t(corners.size());
-        layout.Incidences = std::uint32_t(corners.size());
+        layout.Incidences = std::uint32_t(incidence.size() / 2u);
         const auto append = [&](const std::span<const std::uint32_t> words) {
             const auto at = std::uint32_t(out.size());
             out.insert(out.end(), words.begin(), words.end());
@@ -83,17 +93,24 @@ namespace Extrinsic::Graphics
     }
 
     VertexNormalsTopologyLayout UnpackVertexNormalsTopologyLayout(
-        const std::uint32_t faces, const std::uint32_t vertices, const std::uint32_t liveRows, const std::uint32_t words)
+        const std::uint32_t faces, const std::uint32_t vertices, const std::uint32_t liveRows, const std::uint32_t words,
+        const VertexNormalsBundleKind kind)
     {
+        const bool faceRows = kind == VertexNormalsBundleKind::FaceNormals;
         const std::uint64_t fixed = std::uint64_t(faces) + 1u + std::uint64_t(vertices) + 1u + liveRows;
-        if (vertices == 0u || faces > VertexNormalsMaxFaces || vertices > VertexNormalsMaxVertices || liveRows > vertices ||
-            words < fixed || (words - fixed) % 3u != 0u || (words - fixed) / 3u > VertexNormalsMaxCorners)
+        // Corners take one word each, plus two incidence words for VertexNormals.
+        const std::uint64_t perCorner = faceRows ? 1u : 3u;
+        if (vertices == 0u || faces > VertexNormalsMaxFaces || vertices > VertexNormalsMaxVertices ||
+            liveRows > (faceRows ? faces : vertices) || words < fixed || (words - fixed) % perCorner != 0u ||
+            (words - fixed) / perCorner > VertexNormalsMaxCorners)
             return {};
         VertexNormalsTopologyLayout layout{};
+        layout.Kind = kind;
         layout.Faces = faces;
         layout.Vertices = vertices;
         layout.LiveRows = liveRows;
-        layout.Corners = layout.Incidences = std::uint32_t((words - fixed) / 3u);
+        layout.Corners = std::uint32_t((words - fixed) / perCorner);
+        layout.Incidences = faceRows ? 0u : layout.Corners;
         layout.FaceOffsetsAt = 0u;
         layout.CornersAt = faces + 1u;
         layout.VertexOffsetsAt = layout.CornersAt + layout.Corners;
@@ -147,12 +164,14 @@ namespace Extrinsic::Graphics
     {
         auto& s = *m_Impl;
         const auto& layout = io.Layout;
+        const bool faceRows = layout.Kind == VertexNormalsBundleKind::FaceNormals;
+        const std::uint32_t outputRows = faceRows ? layout.Faces : layout.Vertices;
         if (!io.Positions.Valid() || !io.Topology.Valid() || !io.Output.Valid() || layout.Words == 0u ||
             layout.Vertices == 0u || layout.Vertices > VertexNormalsMaxVertices || layout.Faces > VertexNormalsMaxFaces ||
-            layout.Corners > VertexNormalsMaxCorners || layout.LiveRows > layout.Vertices ||
-            io.OutputBytes < std::uint64_t(layout.Vertices) * 3u * sizeof(float) ||
+            layout.Corners > VertexNormalsMaxCorners || layout.LiveRows > outputRows ||
+            io.OutputBytes < std::uint64_t(outputRows) * 3u * sizeof(float) ||
             !(params.Epsilon > 0.0) || !s.Device.IsOperational() || !s.Device.SupportsShaderFloat64() ||
-            !s.EnsurePipeline() || !s.EnsureBuffers(std::uint64_t(std::max(layout.Faces, 1u)) * kAreaBytesPerFace))
+            !s.EnsurePipeline() || !s.EnsureBuffers(faceRows ? kAreaBytesPerFace : std::uint64_t(std::max(layout.Faces, 1u)) * kAreaBytesPerFace))
             return {};
         const auto word = [&](const std::uint32_t at) { return io.Topology.Address + std::uint64_t(at) * 4u; };
         // Inputs uploaded by the transfer queue (positions, bundle) become shader-readable;
@@ -191,9 +210,14 @@ namespace Extrinsic::Graphics
                 commands.Dispatch((push.Count + 63u) / 64u, 1, 1);
             }
         };
-        dispatch(Mode::Faces, layout.Faces);
-        commands.BufferBarrier(s.Areas, RHI::MemoryAccess::ShaderWrite, RHI::MemoryAccess::ShaderRead);
-        dispatch(Mode::Vertices, layout.LiveRows);
+        if (faceRows)
+            dispatch(Mode::FaceNormals, layout.LiveRows); // one pass: a Newell normal per processed face
+        else
+        {
+            dispatch(Mode::Faces, layout.Faces);
+            commands.BufferBarrier(s.Areas, RHI::MemoryAccess::ShaderWrite, RHI::MemoryAccess::ShaderRead);
+            dispatch(Mode::Vertices, layout.LiveRows);
+        }
         // Ready for the Accept readback (and any observer) and the stats copy.
         commands.BufferBarrier(io.Output.Buffer, RHI::MemoryAccess::ShaderWrite, RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::TransferRead);
         commands.BufferBarrier(s.Stats, kShaderAccess, RHI::MemoryAccess::TransferRead);

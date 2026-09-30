@@ -129,10 +129,31 @@ namespace
 
         static constexpr std::size_t kDeletedVertex = 40, kDeletedFace = 7;
         Geometry::PropertySet& Vertices() { return Context.Scene->Raw().get<GS::Vertices>(Entity).Properties; }
+        Geometry::PropertySet& Faces() { return Context.Scene->Raw().get<GS::Faces>(Entity).Properties; }
         std::vector<glm::vec3> Normals(const char* name = "v:normal")
         {
             const auto p = std::as_const(Vertices()).Get<glm::vec3>(name);
             return p ? p.Vector() : std::vector<glm::vec3>{};
+        }
+        std::vector<glm::vec3> FaceNormals(const char* name = "f:normal")
+        {
+            const auto p = std::as_const(Faces()).Get<glm::vec3>(name);
+            return p ? p.Vector() : std::vector<glm::vec3>{};
+        }
+        // mesh_face_normals (slice 2): Newell normals over the face rows.
+        Runtime::NormalEstimationConfig FaceConfig(const char* output = "f:normal") const
+        {
+            auto config = Config;
+            config.Method = Runtime::NormalEstimationMethod::MeshFaceNormals;
+            config.Output = {Domain::MeshFace, output, K::Vec3};
+            return config;
+        }
+        bool StartFaces(const char* what)
+        {
+            Runtime::EditorNormalEstimationResult failure;
+            Run = Runtime::StartEditorNormalEstimationTransaction(Commands(), FaceConfig(), failure);
+            if (!Run) Fail(std::string{what} + " start rejected: " + failure.Message);
+            return Run != nullptr;
         }
         Extrinsic::Graphics::GpuPropertyResidency* Residency() { return Context.SpatialIndices->PropertyResidency(); }
         Extrinsic::Graphics::GpuPropertyKey Key() { return Runtime::MakeGpuPropertyKey(Context.World, Entity, Config.Output); }
@@ -175,7 +196,8 @@ namespace
         }
         // Max component delta between the accepted normals and the reference over every row
         // (deleted rows included: both keep 0 / their published bytes).
-        void ExpectParity(const std::vector<glm::vec3>& gpu, const std::vector<glm::vec3>& cpu, const char* what)
+        void ExpectParity(const std::vector<glm::vec3>& gpu, const std::vector<glm::vec3>& cpu, const char* what,
+                          const std::size_t deletedRow = kDeletedVertex)
         {
             ASSERT_EQ(gpu.size(), cpu.size()) << what;
             double delta = 0;
@@ -192,7 +214,7 @@ namespace
             ::testing::Test::RecordProperty(std::string{what} + "_max_abs_delta", std::to_string(delta));
             EXPECT_LE(delta, kParityTolerance) << what << ": row " << worst << " GPU (" << gpu[worst].x << ", " << gpu[worst].y << ", "
                                                << gpu[worst].z << ") vs CPU (" << cpu[worst].x << ", " << cpu[worst].y << ", " << cpu[worst].z << ")";
-            EXPECT_EQ(gpu[kDeletedVertex], cpu[kDeletedVertex]) << what << ": a deleted row keeps its published bytes";
+            EXPECT_EQ(gpu[deletedRow], cpu[deletedRow]) << what << ": a deleted row keeps its published bytes";
         }
         void ExpectCounts(const Runtime::EditorNormalEstimationResult& gpu, const Runtime::EditorNormalEstimationResult& cpu, const char* what)
         {
@@ -327,6 +349,53 @@ namespace
                 // the output's revision, so only the newest entry on an output is undoable).
                 ASSERT_TRUE(History.Undo().Succeeded());
                 EXPECT_EQ(Normals(), Run2) << "undo restores the previous publication";
+                // Slice 2: face normals. The CPU reference, then a device run whose positions
+                // are resident; only the face bundle uploads.
+                auto reference = FaceConfig("cpu_face");
+                reference.Backend = Runtime::NormalEstimationBackend::CpuKDTree;
+                CpuFace = Runtime::ApplyEditorNormalEstimationCommand(Runtime::BindEditorProcessingCommands(CpuContext), reference);
+                if (!CpuFace.Succeeded()) return Fail("CPU face reference failed: " + CpuFace.Message);
+                EXPECT_GT(CpuFace.ValidCount, 0u);
+                EXPECT_GT(CpuFace.FallbackCount, 0u) << "the faces around the deleted vertex take the fallback";
+                StatsBefore = Residency()->Stats();
+                if (!StartFaces("face run 1")) return;
+                ++Step;
+                return;
+            }
+            case 8:
+            {
+                if (!Ready("face run 1")) return;
+                const auto snapshot = Snapshot();
+                EXPECT_EQ(snapshot.Result.GpuInputUploadBytes, 0u) << "the positions are resident";
+                EXPECT_FALSE(snapshot.Result.GpuTopologyReused);
+                EXPECT_EQ(Residency()->Stats().Uploads, StatsBefore.Uploads + 1u) << "only the face bundle uploads";
+                EXPECT_FALSE(std::as_const(Faces()).Exists("f:normal"));
+                Accept();
+                ++Step;
+                return;
+            }
+            case 9:
+            {
+                if (!Accepted) return;
+                ASSERT_EQ(Accepted->Status, Runtime::EditorCommandStatus::Applied) << Accepted->Message;
+                EXPECT_EQ(Accepted->ActualBackend, "vulkan_mesh_face_normals");
+                FaceRun = FaceNormals();
+                ExpectParity(FaceRun, FaceNormals("cpu_face"), "face_run1", kDeletedFace);
+                ExpectCounts(*Accepted, CpuFace, "face run 1");
+                StatsBefore = Residency()->Stats();
+                if (!StartFaces("face run 2")) return;
+                ++Step;
+                return;
+            }
+            case 10: // Resident positions, bundle and accepted output: zero bytes; Discard keeps the rows.
+            {
+                if (!Ready("face run 2")) return;
+                const auto snapshot = Snapshot();
+                EXPECT_EQ(Residency()->Stats().UploadBytes, StatsBefore.UploadBytes) << "face run 2 uploads nothing";
+                EXPECT_TRUE(snapshot.Result.GpuTopologyReused);
+                Runtime::DiscardEditorNormalEstimation(Commands(), Run);
+                EXPECT_EQ(Snapshot().Phase, Phase::Discarded);
+                EXPECT_EQ(FaceNormals(), FaceRun);
                 Done = true;
                 Kernel().RequestExit();
                 return;
@@ -349,8 +418,8 @@ namespace
         Runtime::NormalEstimationConfig Config{};
         Runtime::EditorNormalTransactionHandle Run{};
         std::optional<Runtime::EditorNormalEstimationResult> Accepted{};
-        Runtime::EditorNormalEstimationResult CpuArea{}, CpuMax{}, CpuUniform{};
-        std::vector<glm::vec3> Run1{}, Run2{}, Run3{};
+        Runtime::EditorNormalEstimationResult CpuArea{}, CpuMax{}, CpuUniform{}, CpuFace{};
+        std::vector<glm::vec3> Run1{}, Run2{}, Run3{}, FaceRun{};
         Extrinsic::Graphics::GpuPropertyResidencyStats StatsBefore{};
         std::chrono::steady_clock::time_point Started{};
         std::size_t OperationalFrames{};

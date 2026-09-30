@@ -1857,8 +1857,9 @@ namespace Extrinsic::Sandbox::Editor
                 if (ImGui::Selectable(Runtime::ToString(method), config.Method == method))
                 {
                     config = candidate;
-                    // The residency backend belongs to the mesh method alone.
+                    // The residency backend belongs to the mesh methods alone.
                     if (method != Runtime::NormalEstimationMethod::MeshFaceWeighted &&
+                        method != Runtime::NormalEstimationMethod::MeshFaceNormals &&
                         config.Backend == Runtime::NormalEstimationBackend::Vulkan)
                         config.Backend = Runtime::NormalEstimationBackend::CpuKDTree;
                     changed = true;
@@ -1926,6 +1927,15 @@ namespace Extrinsic::Sandbox::Editor
         {
             ImGui::TextWrapped("Compute one object-space normal per polygon from its full face ring. "
                                "Face winding determines the direction.");
+            int backend = config.Backend == Runtime::NormalEstimationBackend::Vulkan ? 1 : 0;
+            if (ImGui::Combo("Backend##FaceNormals", &backend, "CPU reference\0Vulkan (GPU property residency, double precision)\0"))
+            {
+                config.Backend = backend == 1 ? Runtime::NormalEstimationBackend::Vulkan : Runtime::NormalEstimationBackend::CpuKDTree;
+                changed = true;
+            }
+            if (config.Backend == Runtime::NormalEstimationBackend::Vulkan)
+                ImGui::TextWrapped("The kernel reads the resident positions and a per-topology ring bundle; the result "
+                                   "waits for Accept (undoable) or Discard. No viewport preview.");
         }
         else
         {

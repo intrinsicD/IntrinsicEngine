@@ -350,3 +350,71 @@ TEST(NormalTransaction, VulkanBackendIsAdmittedOnlyForMeshVertexNormalsOnACapabl
     const auto validation = R::ValidateNormalEstimationConfigSection(R::SerializeNormalEstimationConfig(h.Config), {}, "test");
     EXPECT_TRUE(validation.Usable());
 }
+
+// RUNTIME-296 slice 2: `mesh_face_normals` runs the same transaction over face rows.
+TEST(NormalTransaction, FaceNormalsAcceptOverFaceRowsAndBindTheFront)
+{
+    Harness h;
+    h.Config.Method = R::NormalEstimationMethod::MeshFaceNormals;
+    h.Config.Output = {D::MeshFace, "f:normal", K::Vec3};
+    const glm::vec3 value{0.f, 0.f, 1.f};
+    const auto faces = h.Faces().Size();
+    ASSERT_EQ(faces, 2u);
+    const auto run = R::MakeEditorNormalTransactionForTest(h.Commands(), h.Config, std::vector<glm::vec3>(faces, value), &h.Residency);
+    ASSERT_TRUE(run);
+    const auto key = R::MakeGpuPropertyKey(h.Context.World, h.Entity, h.Config.Output);
+    EXPECT_TRUE(h.Residency.HasRing(key));
+    std::optional<R::EditorNormalEstimationResult> delivered;
+    ASSERT_EQ(R::AcceptEditorNormalEstimation(h.Commands(), run, [&](R::EditorNormalEstimationResult r) { delivered = r; }).Status,
+              R::EditorCommandStatus::Pending);
+    ASSERT_TRUE(h.Jobs.DrainUntilTerminal());
+    ASSERT_TRUE(delivered);
+    EXPECT_EQ(delivered->Status, R::EditorCommandStatus::Applied) << delivered->Message;
+    EXPECT_EQ(delivered->ActualBackend, "vulkan_mesh_face_normals");
+    EXPECT_EQ(delivered->WrittenCount, faces);
+    const auto normals = std::as_const(h.Faces()).Get<glm::vec3>("f:normal");
+    ASSERT_TRUE(normals);
+    for (std::size_t f = 0; f < faces; ++f) EXPECT_EQ(normals[f], value) << "face " << f;
+    EXPECT_FALSE(h.Residency.HasRing(key));
+    const auto front = h.Residency.Front(key);
+    ASSERT_TRUE(front);
+    EXPECT_EQ(front->Revision, normals.Revision());
+    EXPECT_EQ(front->Layout.Count, faces);
+    ASSERT_TRUE(h.History.Undo().Succeeded());
+    EXPECT_FALSE(h.Faces().Exists("f:normal"));
+}
+
+TEST(NormalTransaction, FaceNormalsBundleCarriesRingsOnlyAndFollowsDeletions)
+{
+    Harness h;
+    h.Config.Method = R::NormalEstimationMethod::MeshFaceNormals;
+    h.Config.Output = {D::MeshFace, "f:normal", K::Vec3};
+    std::string why;
+    const auto first = h.Topology(why);
+    ASSERT_TRUE(first) << why;
+    EXPECT_TRUE(first->Uploaded);
+    EXPECT_EQ(first->Faces, 2u);
+    EXPECT_EQ(first->LiveRows, 2u) << "the rows are the processed faces";
+    // faces + 1, six corners, vertices + 1, no incidences, two face rows: 16 words.
+    EXPECT_EQ(first->Bytes, 16u * sizeof(std::uint32_t));
+    const auto again = h.Topology(why);
+    ASSERT_TRUE(again) << why;
+    EXPECT_FALSE(again->Uploaded);
+
+    // A deleted vertex keeps both rings; its corners become the fallback sentinel (a new
+    // revision of the same size).
+    h.Vertices().GetOrAdd<bool>("v:deleted", false)[3] = true;
+    const auto deletedVertex = h.Topology(why);
+    ASSERT_TRUE(deletedVertex) << why;
+    EXPECT_TRUE(deletedVertex->Uploaded);
+    EXPECT_EQ(deletedVertex->LiveRows, 2u);
+    EXPECT_EQ(deletedVertex->Bytes, 16u * sizeof(std::uint32_t));
+
+    // A deleted face drops its ring and its row.
+    h.Faces().GetOrAdd<bool>("f:deleted", false)[0] = true;
+    const auto deletedFace = h.Topology(why);
+    ASSERT_TRUE(deletedFace) << why;
+    EXPECT_TRUE(deletedFace->Uploaded);
+    EXPECT_EQ(deletedFace->LiveRows, 1u);
+    EXPECT_EQ(deletedFace->Bytes, (3u + 3u + 5u + 1u) * sizeof(std::uint32_t));
+}

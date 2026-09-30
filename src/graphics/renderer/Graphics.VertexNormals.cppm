@@ -23,7 +23,7 @@ export namespace Extrinsic::Graphics
 
     struct VertexNormalsGpuParams
     {
-        VertexNormalGpuWeighting Weighting{VertexNormalGpuWeighting::AreaWeighted};
+        VertexNormalGpuWeighting Weighting{VertexNormalGpuWeighting::AreaWeighted}; // VertexNormals only
         double Epsilon{1.0e-12};                 // DegenerateNormalLengthEpsilon (> 0)
         std::array<float, 3> Fallback{0.f, 1.f, 0.f}; // the normalized fallback the reference writes
     };
@@ -38,12 +38,21 @@ export namespace Extrinsic::Graphics
     inline constexpr std::uint32_t VertexNormalsMaxCorners = 1u << 26;
     inline constexpr std::uint32_t VertexNormalsMaxDispatchThreads = 65535u * 64u;
 
+    // The two methods that share the kernels and the bundle format. VertexNormals
+    // (`mesh_face_weighted`) gathers per vertex; FaceNormals (`mesh_face_normals`) writes one
+    // Newell normal per processed face row (RUNTIME-296 slice 2).
+    enum class VertexNormalsBundleKind : std::uint32_t { VertexNormals, FaceNormals };
+    // A corner of a face-normals ring whose vertex is deleted: the face gets the fallback.
+    inline constexpr std::uint32_t VertexNormalsDeletedCorner = 0xffffffffu;
+
     // Where each section of a packed topology bundle sits (uint32 word offsets) and its
     // counts. The bundle is one uint32 array: face offsets (Faces + 1), corner vertices,
     // vertex offsets (Vertices + 1), incidences ((face, corner) pairs, ascending face order
-    // per vertex) and the live rows the vertex pass writes.
+    // per vertex; empty for FaceNormals) and the live rows the last pass writes (vertex rows,
+    // or the processed face rows for FaceNormals).
     struct VertexNormalsTopologyLayout
     {
+        VertexNormalsBundleKind Kind{VertexNormalsBundleKind::VertexNormals};
         std::uint32_t Faces{}, Vertices{}, LiveRows{}, Corners{}, Incidences{};
         std::uint32_t FaceOffsetsAt{}, CornersAt{}, VertexOffsetsAt{}, IncidenceAt{}, LiveRowsAt{};
         std::uint32_t Words{};
@@ -57,14 +66,18 @@ export namespace Extrinsic::Graphics
     // before any allocation). The section order is fixed, so a
     // bundle already resident on the device is described again by
     // `UnpackVertexNormalsTopologyLayout` from its counts alone.
+    // For FaceNormals the corners may be `VertexNormalsDeletedCorner`, no incidences are
+    // built and the live rows are face indices.
     [[nodiscard]] VertexNormalsTopologyLayout PackVertexNormalsTopology(
         std::span<const std::uint32_t> faceOffsets, std::span<const std::uint32_t> corners,
-        std::uint32_t vertices, std::span<const std::uint32_t> liveRows, std::vector<std::uint32_t>& out);
+        std::uint32_t vertices, std::span<const std::uint32_t> liveRows, std::vector<std::uint32_t>& out,
+        VertexNormalsBundleKind kind = VertexNormalsBundleKind::VertexNormals);
     // The layout of a packed bundle of `words` words over `faces`, `vertices` and `liveRows`
     // (the corner count follows from the word count); empty when the counts do not fit or
     // exceed the limits.
     [[nodiscard]] VertexNormalsTopologyLayout UnpackVertexNormalsTopologyLayout(
-        std::uint32_t faces, std::uint32_t vertices, std::uint32_t liveRows, std::uint32_t words);
+        std::uint32_t faces, std::uint32_t vertices, std::uint32_t liveRows, std::uint32_t words,
+        VertexNormalsBundleKind kind = VertexNormalsBundleKind::VertexNormals);
 
     // A resident buffer endpoint (device address of tightly packed rows).
     struct VertexNormalsResidentView
@@ -74,9 +87,10 @@ export namespace Extrinsic::Graphics
         [[nodiscard]] bool Valid() const noexcept { return Buffer.IsValid() && Address != 0u; }
     };
     // The run's resident endpoints: canonical float3 positions over every vertex, the packed
-    // topology bundle, the float3 output ring slot (first filled from `Base`, the output's
-    // canonical slot when the property exists, or zeroed over `OutputBytes`, so rows outside
-    // the live rows keep their published bytes).
+    // topology bundle, the float3 output ring slot over the output rows (vertices, or faces
+    // for FaceNormals; first filled from `Base`, the output's canonical slot when the property
+    // exists, or zeroed over `OutputBytes`, so rows outside the live rows keep their published
+    // bytes).
     struct VertexNormalsResidentIo
     {
         VertexNormalsResidentView Positions{}, Topology{}, Output{}, Base{};

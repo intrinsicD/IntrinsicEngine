@@ -98,6 +98,47 @@ namespace Extrinsic::Runtime
             const auto p = props->Get<bool>(name);
             return p && p.Size() == count;
         }
+        // The source faces `BuildHalfedgeMeshForVertexNormalRecompute` reconstructs, in order:
+        // every face that is not deleted and whose ring touches no deleted edge. False with a
+        // diagnostic on a ring the builder would reject.
+        bool ProcessedSourceFaces(const GS::ConstSourceView& view, std::vector<std::uint32_t>& faces, std::string& diagnostic)
+        {
+            faces.clear();
+            const auto& faceProps = view.FaceSource->Properties;
+            const auto& halfProps = view.HalfedgeSource->Properties;
+            const auto faceHalfedges = faceProps.Get<std::uint32_t>(GS::PropertyNames::kFaceHalfedge);
+            const auto halfedgeFaces = halfProps.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeFace);
+            const auto nextHalfedges = halfProps.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeNext);
+            const auto toVertices = halfProps.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeToVertex);
+            const auto deletedFaces = faceProps.Get<bool>("f:deleted");
+            const auto deletedEdges = view.EdgeSource ? view.EdgeSource->Properties.Get<bool>("e:deleted")
+                                                      : decltype(faceProps.Get<bool>("f:deleted")){};
+            const auto vertexCount = std::uint32_t(view.VertexSource->Properties.Size());
+            std::vector<std::uint32_t> ring;
+            for (std::size_t face = 0; face < faceHalfedges.Size(); ++face)
+            {
+                if (deletedFaces && face < deletedFaces.Size() && deletedFaces[face]) continue;
+                const auto status = Detail::MeshSupport::BuildMeshFaceRing(faceHalfedges.Vector(), halfedgeFaces.Vector(),
+                    nextHalfedges.Vector(), toVertices.Vector(), face, vertexCount, ring);
+                if (status != Detail::MeshSupport::MeshFaceRingStatus::Triangulate)
+                {
+                    diagnostic = "selected mesh topology is not valid for normal recompute";
+                    return false;
+                }
+                bool touchesDeletedEdge = false;
+                if (deletedEdges)
+                {
+                    auto h = faceHalfedges[face];
+                    for (std::size_t corner = 0; corner < ring.size(); ++corner)
+                    {
+                        if (h / 2 < deletedEdges.Size() && deletedEdges[h / 2]) touchesDeletedEdge = true;
+                        h = nextHalfedges[h];
+                    }
+                }
+                if (!touchesDeletedEdge) faces.push_back(std::uint32_t(face));
+            }
+            return true;
+        }
         enum class CapturePurpose
         {
             Execute,
@@ -151,10 +192,10 @@ namespace Extrinsic::Runtime
             if (c.Backend == NormalEstimationBackend::Vulkan)
             {
                 using Weighting = Geometry::HalfedgeMesh::VertexNormals::AveragingMode;
-                if (c.Method != NormalEstimationMethod::MeshFaceWeighted)
-                    return fail("Backend vulkan runs mesh_face_weighted normals on the GPU property residency; "
-                                "point-set PCA uses vulkan_lbvh and the other methods run on the CPU.");
-                if (c.Weighting == Weighting::AngleWeighted || c.Weighting == Weighting::AreaAngleWeighted)
+                if (c.Method != NormalEstimationMethod::MeshFaceWeighted && !faceNormals)
+                    return fail("Backend vulkan runs mesh_face_weighted and mesh_face_normals on the GPU property residency; "
+                                "point-set PCA uses vulkan_lbvh and graph normals run on the CPU.");
+                if (!faceNormals && (c.Weighting == Weighting::AngleWeighted || c.Weighting == Weighting::AreaAngleWeighted))
                     return fail("Vulkan vertex normals support uniform, area and max weighting; the angle weightings run on the CPU.");
                 if (c.Output.Name == "v:position")
                     return fail("Vulkan vertex normals cannot write v:position (its ring would be shown as positions).");
@@ -261,6 +302,13 @@ namespace Extrinsic::Runtime
                 if (c.Backend == NormalEstimationBackend::Vulkan &&
                     (faces->Size() > Graphics::VertexNormalsMaxFaces || halves->Size() > Graphics::VertexNormalsMaxCorners))
                     return fail("Vulkan vertex normals support at most 2^24 faces and 2^26 corners; use the CPU backend.");
+                if (purpose == CapturePurpose::ExecuteResident && faceNormals)
+                {
+                    // The rows the face-normals kernel writes: the faces the snapshot would hold
+                    // (not deleted, no deleted edge on the ring), without reconstructing it.
+                    if (!ProcessedSourceFaces(a.SourceView, work->Slots, diagnostic)) return {};
+                    work->Result.LiveCount = work->Slots.size();
+                }
                 if (purpose != CapturePurpose::Execute)
                     return work;
                 // Snapshot reconstruction is submission work, never a per-frame UI readiness operation.
@@ -310,6 +358,14 @@ namespace Extrinsic::Runtime
             return work;
         }
 
+        // The fallback mesh_face_normals writes: the configured normal normalized in double, or
+        // +Z when it is not longer than the epsilon (shared by the CPU and Vulkan backends).
+        glm::vec3 FaceNormalFallback(const NormalEstimationConfig& c)
+        {
+            const glm::dvec3 fallback(c.FallbackNormal);
+            const double fallbackLength = glm::length(fallback);
+            return fallbackLength > c.DegenerateNormalLengthEpsilon ? glm::vec3(fallback / fallbackLength) : glm::vec3{0, 0, 1};
+        }
         bool CurrentNormalInput(const EditorProcessingContext &context, const NormalWork &work,
                                 bool output)
         {
@@ -372,10 +428,7 @@ namespace Extrinsic::Runtime
             else if (c.Method == NormalEstimationMethod::MeshFaceNormals)
             {
                 r.ActualBackend = "cpu_mesh_face_normals";
-                const glm::dvec3 fallback(c.FallbackNormal);
-                const double fallbackLength = glm::length(fallback);
-                const glm::vec3 fallbackNormal = fallbackLength > c.DegenerateNormalLengthEpsilon
-                    ? glm::vec3(fallback / fallbackLength) : glm::vec3{0, 0, 1};
+                const glm::vec3 fallbackNormal = FaceNormalFallback(c);
                 for (std::uint32_t face = 0; face < w.Slots.size(); ++face)
                 {
                     const auto handle = Geometry::FaceHandle{face};
@@ -572,7 +625,8 @@ namespace Extrinsic::Runtime
         Graphics::GpuPropertyResidency* Residency{};
         Graphics::GpuPropertyKey Key{};   // the output ring
         std::uint64_t Ring{};             // the ring generation this run acquired: the only one it discards
-        std::uint32_t Count{};            // vertex rows
+        std::uint32_t Count{};            // output rows (vertices, or faces for mesh_face_normals)
+        std::uint32_t VertexCount{};      // rows of the positions input
         // Input: the canonical positions slot; Base: the output's canonical slot when the
         // property exists; Topology: the resident bundle; Back: the ring write slot.
         std::optional<Graphics::GpuPropertyView> Input{}, Base{}, Topology{}, Back{};
@@ -595,14 +649,21 @@ namespace Extrinsic::Runtime
         namespace GP = GeometryProcessingDetail;
         constexpr std::uint32_t kRingDepth = 2u;    // terminal-only output (ADR 0030 decision 4)
         constexpr std::uint32_t kMaxDeferrals = 600u; // frames the residency may refuse before the run fails
-        constexpr std::string_view kBackend = "vulkan_mesh_face_weighted";
+        constexpr std::string_view kBackend = "vulkan_mesh_face_weighted", kFaceBackend = "vulkan_mesh_face_normals";
+        bool FaceNormals(const NormalWork& w) { return w.Config.Method == NormalEstimationMethod::MeshFaceNormals; }
+        Graphics::VertexNormalsBundleKind KindOf(const NormalWork& w)
+        {
+            return FaceNormals(w) ? Graphics::VertexNormalsBundleKind::FaceNormals : Graphics::VertexNormalsBundleKind::VertexNormals;
+        }
+        std::string_view BackendOf(const NormalWork& w) { return FaceNormals(w) ? kFaceBackend : kBackend; }
 
         // The topology bundle's residency key: derived (no CPU property of that name), one per
-        // entity, so `Prune` drops it with the entity.
-        Graphics::GpuPropertyKey TopologyKeyFor(const EditorProcessingContext& ctx, const entt::entity entity)
+        // entity and bundle kind, so `Prune` drops it with the entity.
+        Graphics::GpuPropertyKey TopologyKeyFor(const EditorProcessingContext& ctx, const NormalWork& w)
         {
-            return MakeGpuPropertyKey(ctx.World, entity,
-                {.Domain = D::MeshFace, .Name = "#vertex_normal_topology", .ValueKind = Geometry::PropertyValueKind::UInt32});
+            return MakeGpuPropertyKey(ctx.World, w.Entity,
+                {.Domain = D::MeshFace, .Name = FaceNormals(w) ? "#face_normal_topology" : "#vertex_normal_topology",
+                 .ValueKind = Geometry::PropertyValueKind::UInt32});
         }
         // The bundle's revision: FNV-1a over the captured topology and deletion watches (every
         // watch but the positions), so a topology or deletion edit is a new revision.
@@ -643,21 +704,46 @@ namespace Extrinsic::Runtime
                 return false;
             }
             built.Mesh.VertexProperties().GetOrAdd<bool>("v:deleted").Vector() = w.Deleted;
-            const auto table = MN::GatherFaceCornerTable(built.Mesh);
             std::vector<std::uint32_t> faceOffsets(w.FaceCount + 1u, 0u), corners;
-            corners.reserve(table.Corners.size());
-            std::size_t meshFace = 0;
-            for (std::size_t face = 0; face < w.FaceCount; ++face)
+            if (FaceNormals(w))
             {
-                if (meshFace < built.SourceFaceForMeshFace.size() && built.SourceFaceForMeshFace[meshFace] == face)
+                // mesh_face_normals walks every snapshot face's ring as MeshUtils::FaceAreaVector
+                // does (deleted corners become the fallback sentinel); the rows are the snapshot
+                // faces themselves.
+                if (built.SourceFaceForMeshFace != w.Slots)
                 {
-                    corners.insert(corners.end(), table.Corners.begin() + table.FaceOffsets[meshFace],
-                                   table.Corners.begin() + table.FaceOffsets[meshFace + 1u]);
-                    ++meshFace;
+                    why = "The processed face rows do not match the mesh snapshot.";
+                    return false;
                 }
-                faceOffsets[face + 1u] = std::uint32_t(corners.size());
+                for (std::size_t meshFace = 0, face = 0; face < w.FaceCount; ++face)
+                {
+                    if (meshFace < built.SourceFaceForMeshFace.size() && built.SourceFaceForMeshFace[meshFace] == face)
+                    {
+                        for (const auto vertex : built.Mesh.VerticesAroundFace(Geometry::FaceHandle{std::uint32_t(meshFace)}))
+                            corners.push_back(built.Mesh.IsDeleted(vertex) ? Graphics::VertexNormalsDeletedCorner
+                                                                           : std::uint32_t(vertex.Index));
+                        ++meshFace;
+                    }
+                    faceOffsets[face + 1u] = std::uint32_t(corners.size());
+                }
             }
-            layout = Graphics::PackVertexNormalsTopology(faceOffsets, corners, std::uint32_t(w.Deleted.size()), w.Slots, bundle);
+            else
+            {
+                const auto table = MN::GatherFaceCornerTable(built.Mesh);
+                corners.reserve(table.Corners.size());
+                std::size_t meshFace = 0;
+                for (std::size_t face = 0; face < w.FaceCount; ++face)
+                {
+                    if (meshFace < built.SourceFaceForMeshFace.size() && built.SourceFaceForMeshFace[meshFace] == face)
+                    {
+                        corners.insert(corners.end(), table.Corners.begin() + table.FaceOffsets[meshFace],
+                                       table.Corners.begin() + table.FaceOffsets[meshFace + 1u]);
+                        ++meshFace;
+                    }
+                    faceOffsets[face + 1u] = std::uint32_t(corners.size());
+                }
+            }
+            layout = Graphics::PackVertexNormalsTopology(faceOffsets, corners, std::uint32_t(w.Deleted.size()), w.Slots, bundle, KindOf(w));
             if (layout.Words == 0u)
             {
                 why = "The mesh topology could not be packed for the device.";
@@ -673,7 +759,7 @@ namespace Extrinsic::Runtime
                                       std::vector<std::uint32_t>& bundle, Graphics::VertexNormalsTopologyLayout& layout,
                                       std::optional<Graphics::GpuPropertyView>& view, bool& uploaded, std::string& why)
         {
-            const auto key = TopologyKeyFor(ctx, w.Entity);
+            const auto key = TopologyKeyFor(ctx, w);
             const auto signature = SignatureOf(w);
             const auto vertices = std::uint32_t(w.Deleted.size()), liveRows = std::uint32_t(w.Slots.size());
             const auto faces = std::uint32_t(w.FaceCount);
@@ -682,7 +768,7 @@ namespace Extrinsic::Runtime
                 if (const auto resident = r.HasRing(key) ? std::nullopt : r.Front(key);
                     resident && resident->Revision == signature && resident->Layout.Scalar == Graphics::GpuScalarType::UInt32 &&
                     resident->Layout.Channels == 1u && resident->Layout.Stride == 0u)
-                    layout = Graphics::UnpackVertexNormalsTopologyLayout(faces, vertices, liveRows, resident->Layout.Count);
+                    layout = Graphics::UnpackVertexNormalsTopologyLayout(faces, vertices, liveRows, resident->Layout.Count, KindOf(w));
                 if (layout.Words == 0u && !BuildBundle(ctx, w, bundle, layout, why)) return TopologyState::Failed;
             }
             const Graphics::GpuPropertyLayout slot{.Scalar = Graphics::GpuScalarType::UInt32, .Channels = 1u, .Count = layout.Words};
@@ -761,9 +847,15 @@ namespace Extrinsic::Runtime
                              : c.Weighting == Weighting::MaxWeighted ? Graphics::VertexNormalGpuWeighting::MaxWeighted
                              : Graphics::VertexNormalGpuWeighting::AreaWeighted;
             params.Epsilon = c.DegenerateNormalLengthEpsilon;
-            bool repaired = false;
-            const auto fallback = MN::ResolveFallbackNormal(
-                {.FallbackNormal = c.FallbackNormal, .DegenerateNormalLengthEpsilon = c.DegenerateNormalLengthEpsilon}, repaired);
+            glm::vec3 fallback{};
+            if (c.Method == NormalEstimationMethod::MeshFaceNormals)
+                fallback = FaceNormalFallback(c); // the face-normals reference normalizes in double, +Z when degenerate
+            else
+            {
+                bool repaired = false;
+                fallback = MN::ResolveFallbackNormal(
+                    {.FallbackNormal = c.FallbackNormal, .DegenerateNormalLengthEpsilon = c.DegenerateNormalLengthEpsilon}, repaired);
+            }
             params.Fallback = {fallback.x, fallback.y, fallback.z};
             return params;
         }
@@ -780,7 +872,7 @@ namespace Extrinsic::Runtime
             {
                 const auto before = r.Stats().UploadBytes;
                 w->Input = ResolveGpuPropertyInput(r, *ctx.Scene, ctx.World, work.Entity, c.Positions);
-                if (!w->Input || w->Input->Layout.Count != w->Count) { w->Input.reset(); return TopologyState::Deferred; }
+                if (!w->Input || w->Input->Layout.Count != w->VertexCount) { w->Input.reset(); return TopologyState::Deferred; }
                 io.GpuInputUploadBytes += r.Stats().UploadBytes - before;
             }
             // An existing output keeps its bytes outside the live rows: the store copies its
@@ -926,7 +1018,7 @@ namespace Extrinsic::Runtime
             }
             work.After = std::move(after);
             auto& r = work.Result;
-            r.ActualBackend = std::string{kBackend};
+            r.ActualBackend = std::string{BackendOf(work)};
             r.WrittenCount = work.Slots.size();
             r.ChangedCount = 0;
             for (const auto i : work.Slots)
@@ -1030,7 +1122,8 @@ namespace Extrinsic::Runtime
             w->Work = work;
             w->Identity = identity;
             w->Residency = residency;
-            w->Count = std::uint32_t(work->Deleted.size());
+            w->Count = std::uint32_t(work->Result.SlotCount);
+            w->VertexCount = std::uint32_t(work->Deleted.size());
             w->Key = MakeGpuPropertyKey(context.World, work->Entity, c.Output);
             if (residency->HasRing(w->Key))
                 return fail(EditorCommandStatus::InvalidProcessingParameters, "A GPU result for this output awaits Accept or Discard.");
@@ -1160,7 +1253,9 @@ namespace Extrinsic::Runtime
         config.Backend = NormalEstimationBackend::CpuKDTree;
         std::string diagnostic;
         auto work = CaptureNormalWork(context, config, diagnostic, CapturePurpose::ExecuteResident);
-        if (!work || work->Config.Method != NormalEstimationMethod::MeshFaceWeighted || front.size() != work->Deleted.size())
+        if (!work || (work->Config.Method != NormalEstimationMethod::MeshFaceWeighted &&
+                      work->Config.Method != NormalEstimationMethod::MeshFaceNormals) ||
+            front.size() != work->Result.SlotCount)
             return {};
         work->Config.Backend = c.Backend;
         work->Result.RequestedBackend = c.Backend;
@@ -1169,7 +1264,8 @@ namespace Extrinsic::Runtime
         w->Work = work;
         w->Identity = {.EntityId = c.StableEntityId, .Scope = ToEditorJobScope(work->Config.Output.Domain),
                        .OutputSemantic = GeometryPresentationSlotSemantic::Normal, .OutputName = work->Config.Output.Name};
-        w->Count = std::uint32_t(work->Deleted.size());
+        w->Count = std::uint32_t(work->Result.SlotCount);
+        w->VertexCount = std::uint32_t(work->Deleted.size());
         w->Key = MakeGpuPropertyKey(context.World, work->Entity, work->Config.Output);
         w->Residency = residency;
         if (residency)
@@ -1184,7 +1280,7 @@ namespace Extrinsic::Runtime
         auto& r = work->Result;
         r.Status = EditorCommandStatus::Pending;
         r.Message = "The GPU normals wait for Accept or Discard.";
-        r.ActualBackend = std::string{NT::kBackend};
+        r.ActualBackend = std::string{NT::BackendOf(*work)};
         w->Phase = EditorGpuTransactionPhase::ReadyToAccept;
         return w;
     }
@@ -1199,9 +1295,10 @@ namespace Extrinsic::Runtime
         config.Backend = NormalEstimationBackend::CpuKDTree;
         auto work = CaptureNormalWork(context, config, diagnostic, CapturePurpose::ExecuteResident);
         if (!work) return std::nullopt;
-        if (work->Config.Method != NormalEstimationMethod::MeshFaceWeighted)
+        if (work->Config.Method != NormalEstimationMethod::MeshFaceWeighted &&
+            work->Config.Method != NormalEstimationMethod::MeshFaceNormals)
         {
-            diagnostic = "The topology bundle serves mesh_face_weighted normals.";
+            diagnostic = "The topology bundle serves mesh_face_weighted and mesh_face_normals.";
             return std::nullopt;
         }
         std::vector<std::uint32_t> bundle;

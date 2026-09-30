@@ -21,7 +21,7 @@ appearance and displays the output as a constant color per original face.
 | `mesh_face_weighted` | Named vertex positions, polygon face rings and halfedge topology | Incident polygon normals with uniform, area, angle, area-angle or Max weighting |
 | `graph_neighborhood` | Named vertex/node positions and canonical edge endpoints | Existing adjacency-based local normal kernel; mesh adjacency is accepted without creating a graph entity |
 
-`mesh_face_weighted` also runs on the GPU property residency (backend `vulkan`, see
+`mesh_face_weighted` and `mesh_face_normals` also run on the GPU property residency (backend `vulkan`, see
 [Vulkan vertex normals](#vulkan-vertex-normals-on-the-gpu-property-residency)).
 
 Point-set PCA accepts mesh vertex, edge, halfedge and face properties; graph
@@ -105,10 +105,10 @@ session attachment epoch.
 
 ## Vulkan vertex normals on the GPU property residency
 
-`mesh_face_weighted` with backend `vulkan` (RUNTIME-296, ADR 0030 decisions 8-9) runs the
-whole method on the device as a GPU property transaction
+`mesh_face_weighted` and `mesh_face_normals` with backend `vulkan` (RUNTIME-296, ADR 0030
+decisions 8-9) run the whole method on the device as a GPU property transaction
 ([property coherence](property-coherence.md#vertex-normals-runtime-296)); every other
-backend value is the CPU reference for this method, and the other methods refuse `vulkan`
+backend value is the CPU reference for these methods, and the other methods refuse `vulkan`
 (PCA keeps `vulkan_lbvh`).
 
 - **Inputs.** The positions come from their canonical residency slot
@@ -152,8 +152,16 @@ backend value is the CPU reference for this method, and the other methods refuse
   ([`Test.NormalTransaction.cpp`](../../tests/contract/runtime/Test.NormalTransaction.cpp))
   cover Accept / Discard / stale / cancel, the deleted-row bytes and the bundle's residency
   per topology revision on a mock device; the panel test drives Accept / Discard.
-- **Not yet on the device:** `mesh_face_normals` (Newell area vectors on the face domain)
-  stays CPU (RUNTIME-296, second slice); PCA normals follow in RUNTIME-299.
+- **Face normals.** `mesh_face_normals` shares the kernels, the bundle format and the
+  transaction: its bundle (`#face_normal_topology`) carries the face rings of the processed
+  faces (not deleted, no deleted edge on the ring) with deleted-vertex corners marked, and no
+  incidences. One pass forms Newell's area vector per face in double precision in ring order
+  (`MeshUtils::FaceAreaVector`) and writes the normalized vector or the fallback (a deleted
+  or non-finite corner, fewer than three corners, a length not above the epsilon), exactly
+  as the CPU reference. `ActualBackend = vulkan_mesh_face_normals`; the same smoke compares
+  the accepted face rows with the CPU reference (measured delta 0) and checks that a second
+  run uploads nothing.
+- PCA normals follow in RUNTIME-299.
 
 ## Spatial ownership and numerical limits
 

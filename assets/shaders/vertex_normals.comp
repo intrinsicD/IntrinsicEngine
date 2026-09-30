@@ -24,9 +24,16 @@ layout(buffer_reference, scalar) readonly buffer Uints { uint v[]; };
 layout(buffer_reference, scalar) buffer Doubles { double v[]; };
 layout(buffer_reference, scalar) buffer Stats { uint v[]; };
 
-const uint ModeFaces = 0, ModeVertices = 1;
+const uint ModeFaces = 0, ModeVertices = 1, ModeFaceNormals = 2;
+const uint DeletedCorner = 0xffffffffu;
 const uint WeightUniformFace = 0, WeightAreaWeighted = 1, WeightMaxWeighted = 2;
 
+// ModeFaceNormals (`mesh_face_normals`, RUNTIME-296 slice 2): one thread per processed face
+// row forms Newell's area vector over the ring (MeshUtils::FaceAreaVector: sum of
+// cross(v_i, v_{i+1}) closed over the loop, halved) and writes the normalized vector, or the
+// fallback when a corner is deleted (the DeletedCorner sentinel), a corner is non-finite, the
+// ring has under three corners or the length is not above epsilon, into the face ring.
+//
 // `first` + `count` name the chunk of faces or live rows this dispatch covers (a dispatch
 // stays within the guaranteed 65535 workgroups); the caller issues one dispatch per chunk.
 layout(push_constant, scalar) uniform Push {
@@ -171,11 +178,59 @@ void VertexPass(uint row)
     }
 }
 
+void FaceNormalPass(uint row)
+{
+    const uint face = Uints(pc.liveRows).v[row];
+    Uints offsets = Uints(pc.faceOffsets);
+    Uints corners = Uints(pc.corners);
+    const uint first = offsets.v[face], last = offsets.v[face + 1u];
+    const uint n = last - first;
+    precise dvec3 accum = dvec3(0.0lf);
+    dvec3 head = dvec3(0.0lf), previous = dvec3(0.0lf);
+    bool ok = true;
+    for (uint i = 0u; ok && i < n; ++i)
+    {
+        const uint corner = corners.v[first + i];
+        if (corner == DeletedCorner) { ok = false; break; } // the reference writes the fallback
+        const vec3 pf = PositionF(corner);
+        if (!FiniteF(pf)) { ok = false; break; }           // FaceAreaVector fails closed
+        const dvec3 p = dvec3(pf);
+        if (i == 0u) head = p;
+        else accum += Cross(previous, p);
+        previous = p;
+    }
+    dvec3 area = dvec3(0.0lf);
+    if (ok && n >= 3u)
+    {
+        accum += Cross(previous, head);
+        area = accum * 0.5lf;
+    }
+    const double length = sqrt(DotLengthSq(area));
+    OutFloats result = OutFloats(pc.result);
+    if (Finite(length) && length > pc.epsilon)
+    {
+        const dvec3 normal = area / length;
+        result.v[3u * face] = float(normal.x);
+        result.v[3u * face + 1u] = float(normal.y);
+        result.v[3u * face + 2u] = float(normal.z);
+        atomicAdd(Stats(pc.stats).v[1], 1u);
+    }
+    else
+    {
+        result.v[3u * face] = pc.fallbackX;
+        result.v[3u * face + 1u] = pc.fallbackY;
+        result.v[3u * face + 2u] = pc.fallbackZ;
+        atomicAdd(Stats(pc.stats).v[2], 1u);
+    }
+    atomicAdd(Stats(pc.stats).v[0], 1u);
+}
+
 void main()
 {
     const uint local = gl_GlobalInvocationID.x;
     if (local >= pc.count) return;
     const uint id = pc.first + local;
     if (pc.mode == ModeFaces) FacePass(id);
+    else if (pc.mode == ModeFaceNormals) FaceNormalPass(id);
     else VertexPass(id);
 }

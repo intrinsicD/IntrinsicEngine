@@ -264,13 +264,14 @@ state; a method that owns them republishes them itself.
 ### Vertex normals (RUNTIME-296)
 
 The first method row of RUNTIME-294 ported to the residency (ADR 0030 decisions 8-9). The
-Vulkan `mesh_face_weighted` run reads the canonical `v:position` slot and writes the
-output's float3 ring through the same transaction shape as the scalar run
+Vulkan `mesh_face_weighted` and `mesh_face_normals` runs read the canonical `v:position` slot
+and write the output's float3 ring (vertex or face rows) through the same transaction shape as the scalar run
 (`EditorNormalTransaction`, phases `EditorGpuTransactionPhase` shared by every GPU
 transaction). Two things are new:
 
 - **Derived resident data.** The face rings and vertex->face incidences the kernels gather
-  over are a `uint32` bundle under a derived key (`#vertex_normal_topology`, domain
+  over are a `uint32` bundle under a derived key (`#vertex_normal_topology`, or
+  `#face_normal_topology` with rings only for face normals; domain
   MeshFace, ValueKind UInt32) whose revision is a hash of the topology and deletion watches
   (every captured input but the positions). It is a canonical slot like any other: uploaded
   once per topology revision, an LRU cache entry, pruned with its entity, and counted by the
